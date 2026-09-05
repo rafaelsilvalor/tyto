@@ -1,0 +1,13 @@
+# Prettier is configured with endOfLine: lf, and the Husky hooks run under sh on Linux
+# CI, so working copies stay LF on every platform.
+* text=auto eol=lf
+
+*.png binary
+*.jpg binary
+*.webp binary
+*.ttf binary
+*.otf binary
+*.woff binary
+*.woff2 binary
+
+pnpm-lock.yaml linguist-generated=true -diff

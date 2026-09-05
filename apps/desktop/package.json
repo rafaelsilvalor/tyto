@@ -1,0 +1,13 @@
+{
+  "name": "@tyto/desktop",
+  "private": true,
+  "type": "module",
+  "description": "Electron desktop application.",
+  "license": "UNLICENSED",
+  "scripts": {
+    "dev": "node -e \"console.log('@tyto/desktop: electron-vite scaffold lands with E9.1')\"",
+    "typecheck": "tsc --noEmit",
+    "lint": "eslint . --max-warnings 0",
+    "test": "vitest run --passWithNoTests"
+  }
+}
