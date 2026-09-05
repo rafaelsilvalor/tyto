@@ -1,0 +1,8 @@
+dist/
+node_modules/
+.turbo/
+coverage/
+pnpm-lock.yaml
+**/__fixtures__/**/*.html
+**/__fixtures__/**/*.svg
+docs/patterns-explained.pt-BR.html

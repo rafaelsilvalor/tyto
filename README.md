@@ -1,6 +1,6 @@
 # Tyto
 
-*English · [Português abaixo](#português)*
+_English · [Português abaixo](#português)_
 
 Local-first, multi-format advertising art generator. Part of the Breu suite.
 

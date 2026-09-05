@@ -10,14 +10,14 @@ brief.brief ──parse──▶ AST ──compile──▶ Scene ──export-h
 
 Every arrow is a pure function `(input) → Result<output, Diagnostic[]>`. Stages do not know each other; `pipeline` composes them.
 
-| Stage | Package | Input → Output |
-|---|---|---|
-| parse | `brief-lang` | text → `BriefAst` (frontmatter + directives + rich text) |
-| resolve | `core` | `BriefAst` + `TemplateRegistry` → `ResolvedBrief` (typed slots, adjustments validated against the manifest) |
-| compile | `core` | `ResolvedBrief` × template → `Scene` (one `Artwork` per slide, one `Frame` per format) |
-| export | `export-html`, `export-svg` | `Scene` → string per `Frame` |
-| raster | `raster` (port) | HTML → image bytes |
-| deliver | `io` (port) | artifacts → fs / … |
+| Stage   | Package                     | Input → Output                                                                                              |
+| ------- | --------------------------- | ----------------------------------------------------------------------------------------------------------- |
+| parse   | `brief-lang`                | text → `BriefAst` (frontmatter + directives + rich text)                                                    |
+| resolve | `core`                      | `BriefAst` + `TemplateRegistry` → `ResolvedBrief` (typed slots, adjustments validated against the manifest) |
+| compile | `core`                      | `ResolvedBrief` × template → `Scene` (one `Artwork` per slide, one `Frame` per format)                      |
+| export  | `export-html`, `export-svg` | `Scene` → string per `Frame`                                                                                |
+| raster  | `raster` (port)             | HTML → image bytes                                                                                          |
+| deliver | `io` (port)                 | artifacts → fs / …                                                                                          |
 
 ## Packages
 
@@ -67,6 +67,7 @@ renderer (Chromium, no Node)   preload (typed bridge)   main (Node)
 Raster on desktop uses an offscreen `BrowserWindow` in main (`webContents.capturePage`); the CLI uses Playwright. Both implement `Rasterizer`.
 
 ## Design directives
+
 1. The IR is the single source of truth for the artwork. If it is not in the IR, it does not exist.
 2. Templates produce IR, never HTML. Both the TS path and the HTML-like path converge on `Scene`.
 3. Anything that can be validated without executing code (manifest, plugin.json) is validated before execution.

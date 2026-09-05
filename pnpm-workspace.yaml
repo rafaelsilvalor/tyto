@@ -1,0 +1,8 @@
+packages:
+  - 'packages/*'
+  - 'apps/*'
+  - 'tools/*'
+
+# esbuild (via tsup) ships a platform binary that its install script unpacks.
+allowBuilds:
+  esbuild: true

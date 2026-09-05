@@ -1,7 +1,8 @@
 name: visual
 on:
   pull_request:
-    paths: ['packages/export-*/**', 'packages/raster/**', 'packages/templates/**', 'packages/core/**']
+    paths:
+      ['packages/export-*/**', 'packages/raster/**', 'packages/templates/**', 'packages/core/**']
 jobs:
   visual:
     runs-on: ubuntu-latest

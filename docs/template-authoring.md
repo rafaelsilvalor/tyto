@@ -14,26 +14,33 @@ promo-curso/
 ```
 
 ## manifest.yaml
+
 ```yaml
 name: promo-curso
 version: 1.0.0
 description: Course promotion with teacher photo
-formats: [feed, story, banner-wide]       # ids defined in the project's formats.yaml
+formats: [feed, story, banner-wide] # ids defined in the project's formats.yaml
 slots:
-  titulo:    { type: rich-text, required: true, max: 60 }
+  titulo: { type: rich-text, required: true, max: 60 }
   subtitulo: { type: rich-text }
-  imagem:    { type: image }
-  cor:       { type: enum, values: [azul-escuro, laranja, verde], default: azul-escuro }
-  slide:     { type: rich-text, repeat: true, min: 1, max: 10 }
+  imagem: { type: image }
+  cor: { type: enum, values: [azul-escuro, laranja, verde], default: azul-escuro }
+  slide: { type: rich-text, repeat: true, min: 1, max: 10 }
 adjustments:
-  destaque:  { type: flag, applies: [slide] }
-  cor:       { type: enum, values: [azul-escuro, laranja, verde], applies: [slide] }
+  destaque: { type: flag, applies: [slide] }
+  cor: { type: enum, values: [azul-escuro, laranja, verde], applies: [slide] }
 ```
+
 Slot names are chosen by the template author and may be in Portuguese — they are the vocabulary the brief writer sees. Keys of the manifest itself are English.
 
 ## template.html — Tyto markup
+
 Looks like HTML+CSS, but every tag is an IR node and the CSS is a controlled subset. No JS.
 
+<!-- The block below is the Tyto template language, not CSS: Prettier would
+     reflow it as a stylesheet and rewrite its quotes. -->
+
+<!-- prettier-ignore -->
 ```html
 <frame format="feed" bg="none">
   <image src="{imagem}" fit="cover" class="bg" />
@@ -66,13 +73,16 @@ Looks like HTML+CSS, but every tag is an IR node and the CSS is a controlled sub
 **Slot rules**: `slot="x"` on `text` injects the rich text; on `image` injects the asset. Adjustments become classes: `{destaque}` ⇒ `.destaque` targetable from CSS; `{cor: laranja}` ⇒ `--slot-cor: laranja`.
 
 ## template.ts — code path
+
 ```ts
 import { defineTemplate, frame, group, text, image } from '@tyto/core/template';
 export default defineTemplate(manifest, ({ slots, format, adjustments }) => frame({...}));
 ```
+
 Same nodes, same output. Use it when you need computation (text auto-fit, dynamic grids).
 
 ## Agent workflow
+
 1. Read `manifest.yaml` and this document.
 2. Write `template.html`.
 3. Run `tyto template check templates/<name>` — returns diagnostics with line numbers.
