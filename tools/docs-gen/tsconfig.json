@@ -1,0 +1,9 @@
+{
+  "extends": "../../tsconfig.node.json",
+  "compilerOptions": {
+    // generate.ts runs straight through Node's type stripping, which requires the real
+    // file extension on relative imports.
+    "allowImportingTsExtensions": true
+  },
+  "include": ["src/**/*.ts", "*.config.ts"]
+}
