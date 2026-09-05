@@ -34,6 +34,13 @@ const NODE_PACKAGES = [
 
 const DOM_PACKAGES = ['packages/editor'];
 
+/**
+ * Not yet enforced: ADR 0010 also says no package may import another package's adapter —
+ * composition belongs to apps/*. That rule cannot be written against empty packages,
+ * because nothing yet distinguishes a port from the adapter that implements it. It lands
+ * with E7.1, when PluginHost makes the adapter graph real.
+ */
+
 const sourcesIn = (packages) => packages.map((directory) => `${directory}/**/*.ts`);
 
 /** Bare specifiers (`fs`) and prefixed ones (`node:fs`) both have to be caught. */
