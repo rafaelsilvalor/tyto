@@ -23,6 +23,7 @@ imagem: ./prof-ana.png
 ```
 
 ## Rules
+
 - **Frontmatter**: metadata and scalar slots. `template` is required (or `--template` on the CLI). `formats` defaults come from the manifest.
 - **Slot directive** `::name value` — inline value to end of line, or an indented block on the following lines. The name must exist in the template manifest (`E_UNKNOWN_SLOT`).
 - **Repeatable directive** (`::slide`) — each occurrence becomes an `Artwork`. The manifest declares which slot is `repeat`.
@@ -34,9 +35,11 @@ imagem: ./prof-ana.png
 - **Plugin directives**: plugins register namespaced directives, `::ai/caption`. Without the plugin ⇒ `E_UNKNOWN_DIRECTIVE`.
 
 ## Diagnostics
+
 `E_UNKNOWN_SLOT`, `E_UNKNOWN_DIRECTIVE`, `E_MISSING_REQUIRED_SLOT`, `E_BAD_ADJUSTMENT`, `E_ASSET_NOT_FOUND`, `W_TEXT_OVERFLOW` (from compile), `W_UNUSED_SLOT`. All carry a `range` for the editor. Messages are English; the editor may localize them later via the code.
 
 ## AST
+
 ```ts
 BriefAst  { frontmatter: Record<string, unknown>; directives: Directive[]; range }
 Directive { name; namespace?; adjustments: Adjustment[]; body: RichText; range }

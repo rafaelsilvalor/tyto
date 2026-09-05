@@ -1,0 +1,17 @@
+{
+  "name": "@tyto/cli",
+  "private": true,
+  "type": "module",
+  "description": "Command-line interface (commander).",
+  "license": "UNLICENSED",
+  "scripts": {
+    "build": "tsup",
+    "start": "node dist/index.js",
+    "typecheck": "tsc --noEmit",
+    "lint": "eslint . --max-warnings 0",
+    "test": "vitest run --passWithNoTests"
+  },
+  "bin": {
+    "tyto": "./dist/index.js"
+  }
+}

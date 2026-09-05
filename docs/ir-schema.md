@@ -28,17 +28,18 @@ AssetRef  { id; source: 'file'|'url'|'inline'; path?; hash }
 
 ## Exporter mapping
 
-| IR | HTML/CSS | SVG |
-|---|---|---|
-| Frame without background | `omitBackground` in raster | no background `<rect>` |
-| Group.opacity/blend | `opacity`, `mix-blend-mode` | `<g opacity>` + `style="mix-blend-mode"` |
-| mask | `mask-image` (mask node rendered as SVG data URI) | `<mask>` |
-| clip | `overflow: hidden` | `<clipPath>` |
-| Shadow/Blur | `filter: drop-shadow()/blur()` | `<filter>` |
-| Text | `div` + spans; bundled `@font-face` | `<text>`+`<tspan>`; font embedded in `<style>` or converted to paths (option) |
-| Vector.svg | inline `<svg>` | inline (namespaces normalized) |
+| IR                       | HTML/CSS                                          | SVG                                                                           |
+| ------------------------ | ------------------------------------------------- | ----------------------------------------------------------------------------- |
+| Frame without background | `omitBackground` in raster                        | no background `<rect>`                                                        |
+| Group.opacity/blend      | `opacity`, `mix-blend-mode`                       | `<g opacity>` + `style="mix-blend-mode"`                                      |
+| mask                     | `mask-image` (mask node rendered as SVG data URI) | `<mask>`                                                                      |
+| clip                     | `overflow: hidden`                                | `<clipPath>`                                                                  |
+| Shadow/Blur              | `filter: drop-shadow()/blur()`                    | `<filter>`                                                                    |
+| Text                     | `div` + spans; bundled `@font-face`               | `<text>`+`<tspan>`; font embedded in `<style>` or converted to paths (option) |
+| Vector.svg               | inline `<svg>`                                    | inline (namespaces normalized)                                                |
 
 ## Invariants (tested in `core`)
+
 - `id` unique per Document.
 - `mask.nodeId` points to an existing node that is not a descendant of the masked node.
 - Referenced fonts exist in `Document.fonts`; assets in `Document.assets`.
