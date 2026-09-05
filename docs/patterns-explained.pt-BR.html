@@ -1,0 +1,338 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Tyto — os padrões de arquitetura, explicados sem código</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,600&family=Source+Sans+3:ital,wght@0,400;0,600;1,400&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --paper:#EEF1F4; --ink:#1B2230; --ink-2:#4A5568; --line:#C9D1DA;
+    --teal:#14636B; --teal-soft:#D6E7E8; --mustard:#E0A526; --rose:#B4463F;
+    --measure:66ch;
+  }
+  @media (prefers-color-scheme: dark){
+    :root{ --paper:#161B22; --ink:#E8ECF1; --ink-2:#A7B0BC; --line:#2E3742; --teal:#4FB3BD; --teal-soft:#1E3538; }
+  }
+  *{box-sizing:border-box}
+  html{scroll-behavior:smooth}
+  @media (prefers-reduced-motion:reduce){ html{scroll-behavior:auto} }
+  body{margin:0;background:var(--paper);color:var(--ink);font-family:"Source Sans 3",system-ui,sans-serif;font-size:1.125rem;line-height:1.55}
+  a{color:var(--teal)}
+  a:focus-visible,button:focus-visible{outline:3px solid var(--mustard);outline-offset:3px}
+  .wrap{max-width:var(--measure);margin:0 auto;padding:0 1.25rem}
+  header{padding:5rem 0 3rem;border-bottom:1px solid var(--line)}
+  h1,h2,h3{font-family:"Fraunces",Georgia,serif;font-weight:600;line-height:1.1;margin:0}
+  h1{font-size:clamp(2.4rem,6vw,4rem);letter-spacing:-.01em;font-variation-settings:"opsz" 144}
+  header p.lede{font-size:1.3rem;color:var(--ink-2);max-width:52ch;margin:1.4rem 0 0}
+  nav.toc{padding:2rem 0;border-bottom:1px solid var(--line)}
+  nav.toc ol{margin:0;padding-left:1.4rem;columns:2;column-gap:2.5rem}
+  nav.toc li{break-inside:avoid;margin:.25rem 0}
+  nav.toc a{text-decoration:none;color:var(--ink)}
+  nav.toc a:hover{text-decoration:underline}
+  @media (max-width:560px){ nav.toc ol{columns:1} }
+  section.pattern{padding:3.5rem 0 3rem;border-bottom:1px solid var(--line)}
+  section.pattern h2{font-size:clamp(1.8rem,4vw,2.5rem)}
+  .also{color:var(--ink-2);font-style:italic;margin:.3rem 0 1.6rem}
+  .analogy{font-family:"Fraunces",Georgia,serif;font-size:1.45rem;line-height:1.35;font-weight:400;border-left:4px solid var(--teal);padding:.2rem 0 .2rem 1.1rem;margin:0 0 1.6rem;font-variation-settings:"opsz" 30}
+  h3{font-size:1.05rem;margin:1.8rem 0 .4rem;color:var(--teal)}
+  p{margin:.6rem 0}
+  figure{margin:1.6rem 0 0;padding:1.25rem;background:var(--teal-soft);border-radius:6px}
+  figure svg{display:block;width:100%;height:auto;max-width:560px;margin:0 auto}
+  figcaption{font-size:.95rem;color:var(--ink-2);margin-top:.8rem;text-align:center}
+  .without{margin-top:1.4rem;padding:.9rem 1.1rem;border:1px dashed var(--rose);border-radius:6px;color:var(--ink)}
+  .without strong{color:var(--rose)}
+  .map{padding:3.5rem 0}
+  table{width:100%;border-collapse:collapse;font-size:1rem}
+  th,td{text-align:left;padding:.55rem .6rem;border-bottom:1px solid var(--line);vertical-align:top}
+  th{font-weight:600}
+  footer{padding:2rem 0 4rem;color:var(--ink-2);font-size:.95rem}
+  /* svg tokens */
+  .b{fill:none;stroke:var(--ink);stroke-width:1.5}
+  .bt{fill:none;stroke:var(--teal);stroke-width:2}
+  .f{fill:var(--paper)}
+  .ft{fill:var(--teal)}
+  .fm{fill:var(--mustard)}
+  .fr{fill:var(--rose)}
+  .t{font-family:"Source Sans 3",sans-serif;font-size:13px;fill:var(--ink)}
+  .tw{font-family:"Source Sans 3",sans-serif;font-size:13px;fill:#fff;font-weight:600}
+  .ts{font-family:"Source Sans 3",sans-serif;font-size:11px;fill:var(--ink-2)}
+  .x{stroke:var(--rose);stroke-width:2}
+</style>
+</head>
+<body>
+
+<header>
+  <div class="wrap">
+    <h1>Como o Tyto é construído por dentro — e por que assim</h1>
+    <p class="lede">Um guia para quem não programa. Cada seção pega um dos padrões de arquitetura do projeto, conta o que ele resolve usando o dia a dia de uma agência, e mostra o que daria errado sem ele.</p>
+  </div>
+</header>
+
+<nav class="toc" aria-label="Sumário">
+  <div class="wrap">
+    <ol>
+      <li><a href="#pipeline">Linha de montagem (pipeline)</a></li>
+      <li><a href="#ir">A matriz da arte (Scene IR)</a></li>
+      <li><a href="#hexagonal">Tomadas padronizadas (hexagonal)</a></li>
+      <li><a href="#visitor">Um tradutor por idioma (visitor)</a></li>
+      <li><a href="#strategy">Trocar o fornecedor (strategy)</a></li>
+      <li><a href="#registry">O catálogo (registry)</a></li>
+      <li><a href="#command">Cada ação num papelzinho (command)</a></li>
+      <li><a href="#result">Erros que são informação (result)</a></li>
+      <li><a href="#bus">O interfone (event bus)</a></li>
+      <li><a href="#plugin">Tomadas para terceiros (plugin host)</a></li>
+      <li><a href="#fronteira">O que nunca sai do estúdio (fronteira puro / Node / DOM)</a></li>
+      <li><a href="#mapa">Mapa: qual padrão vive onde</a></li>
+    </ol>
+  </div>
+</nav>
+
+<main class="wrap">
+
+<!-- 1 PIPELINE -->
+<section class="pattern" id="pipeline">
+  <h2>Linha de montagem</h2>
+  <p class="also">Nome técnico: pipeline de compilador</p>
+  <p class="analogy">Uma gráfica não tem uma pessoa que "faz o cartaz". Tem quem recebe o pedido, quem prepara a arte, quem imprime, quem corta. Cada posto recebe algo pronto do anterior e entrega algo pronto ao próximo.</p>
+  <h3>No Tyto</h3>
+  <p>O brief passa por postos fixos: <em>ler o texto</em> → <em>conferir contra o template</em> → <em>montar a cena</em> → <em>traduzir para HTML ou SVG</em> → <em>gerar a imagem</em>. Cada posto só conhece o que entra e o que sai dele. O posto que lê o brief não sabe que existe PNG; o posto que gera PNG não sabe que existe brief.</p>
+  <h3>Por que assim</h3>
+  <p>Porque cada posto pode ser testado sozinho, trocado sozinho e consertado sozinho. Se um dia a sintaxe do brief mudar, só o primeiro posto muda. Se aparecer um formato de saída novo, só o quarto posto ganha um tradutor.</p>
+  <figure>
+    <svg viewBox="0 0 560 120" role="img" aria-label="Cinco postos em sequência ligados por setas">
+      <g class="t">
+        <rect class="f b" x="6" y="40" width="90" height="40" rx="4"/><text x="51" y="65" text-anchor="middle">ler brief</text>
+        <rect class="f b" x="118" y="40" width="90" height="40" rx="4"/><text x="163" y="65" text-anchor="middle">conferir</text>
+        <rect class="f b" x="230" y="40" width="90" height="40" rx="4"/><text x="275" y="65" text-anchor="middle">montar cena</text>
+        <rect class="f b" x="342" y="40" width="90" height="40" rx="4"/><text x="387" y="65" text-anchor="middle">traduzir</text>
+        <rect class="f b" x="454" y="40" width="100" height="40" rx="4"/><text x="504" y="65" text-anchor="middle">gerar imagem</text>
+        <path class="bt" d="M96 60h22M208 60h22M320 60h22M432 60h22" marker-end="url(#a)"/>
+      </g>
+      <defs><marker id="a" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0 0L10 5 0 10z" class="ft"/></marker></defs>
+    </svg>
+    <figcaption>Cada caixa é um posto. Só a seta liga um ao outro.</figcaption>
+  </figure>
+  <div class="without"><strong>Sem isso:</strong> um único programa gigante que faz tudo. Qualquer mudança em qualquer ponto arrisca quebrar tudo, e ninguém consegue testar uma parte sem rodar o todo.</div>
+</section>
+
+<!-- 2 IR -->
+<section class="pattern" id="ir">
+  <h2>A matriz da arte</h2>
+  <p class="also">Nome técnico: representação intermediária (Scene IR)</p>
+  <p class="analogy">Um estúdio sério não guarda só o JPG final. Guarda o arquivo aberto, com as camadas, os textos editáveis, as máscaras. Do arquivo aberto sai qualquer coisa: JPG para o Instagram, PDF para a gráfica, SVG para o site. Do JPG não sai mais nada.</p>
+  <h3>No Tyto</h3>
+  <p>O brief não vira HTML diretamente. Vira uma <em>descrição da arte</em>: tela de 1080×1080, camada "fundo" com gradiente, camada "título" com tal fonte, tal posição, 90% de opacidade, um grupo com máscara. Essa descrição é a matriz. O HTML (para virar PNG) e o SVG (vetor) são dois produtos feitos a partir dela, nunca um a partir do outro.</p>
+  <h3>Por que assim</h3>
+  <p>Porque você pediu PNG <em>e</em> SVG. Se cada um fosse gerado por caminho próprio, o texto quebraria em lugar diferente, a sombra sairia diferente, e dois times de bugs apareceriam. Com uma matriz, existe uma única verdade. E tudo que é "editor" — mostrar camadas, desfazer, comparar duas versões — vira operação sobre a matriz, que é um objeto organizado, não sobre uma string de HTML.</p>
+  <figure>
+    <svg viewBox="0 0 560 170" role="img" aria-label="Brief vira cena; da cena saem HTML, SVG e futuros formatos">
+      <g class="t">
+        <rect class="f b" x="10" y="65" width="100" height="40" rx="4"/><text x="60" y="90" text-anchor="middle">brief</text>
+        <rect class="ft" x="190" y="55" width="140" height="60" rx="6"/><text class="tw" x="260" y="80" text-anchor="middle">cena</text><text class="tw" x="260" y="98" text-anchor="middle" style="font-weight:400">(a matriz)</text>
+        <rect class="f b" x="440" y="10" width="110" height="34" rx="4"/><text x="495" y="32" text-anchor="middle">HTML → PNG</text>
+        <rect class="f b" x="440" y="68" width="110" height="34" rx="4"/><text x="495" y="90" text-anchor="middle">SVG</text>
+        <rect class="f b" x="440" y="126" width="110" height="34" rx="4" stroke-dasharray="4 3"/><text class="ts" x="495" y="148" text-anchor="middle">PDF, vídeo (futuro)</text>
+        <path class="bt" d="M110 85h78" marker-end="url(#a)"/>
+        <path class="bt" d="M330 85c60 0 50-58 108-58M330 85h108M330 85c60 0 50 58 108 58" marker-end="url(#a)"/>
+      </g>
+    </svg>
+    <figcaption>Um brief, uma cena, quantas saídas forem necessárias.</figcaption>
+  </figure>
+  <div class="without"><strong>Sem isso:</strong> o brief vira HTML e pronto. Para ter SVG, alguém escreve um segundo gerador que inevitavelmente diverge do primeiro. Preview por camada e "desfazer" ficam quase impossíveis.</div>
+</section>
+
+<!-- 3 HEXAGONAL -->
+<section class="pattern" id="hexagonal">
+  <h2>Tomadas padronizadas</h2>
+  <p class="also">Nome técnico: arquitetura hexagonal, ou <em>ports & adapters</em></p>
+  <p class="analogy">Sua mesa de trabalho tem tomadas. Você não solda o monitor na parede; encaixa. Amanhã troca de monitor, de impressora, de fone, e a mesa não muda. O que vale é o formato da tomada, não a marca do aparelho.</p>
+  <h3>No Tyto</h3>
+  <p>O núcleo do programa declara as tomadas de que precisa: "alguém que transforme HTML em imagem", "alguém que me entregue um brief", "alguém que guarde o resultado". Chamamos essas tomadas de <em>portas</em>. Quem encaixa nelas são os <em>adaptadores</em>: o Chromium encaixa na porta de imagem; a pasta local encaixa na porta de entrega; um dia, um serviço na nuvem encaixa na mesma porta.</p>
+  <h3>Por que assim</h3>
+  <p>Você pediu local hoje e nuvem depois. Com tomadas, a nuvem não é uma reescrita: é trocar dois adaptadores. O núcleo — a parte cara, difícil e que carrega as regras da arte — não sabe se está num laptop ou num servidor.</p>
+  <figure>
+    <svg viewBox="0 0 560 190" role="img" aria-label="Núcleo com portas e adaptadores encaixados">
+      <g class="t">
+        <polygon class="ft" points="280,30 360,75 360,135 280,180 200,135 200,75"/>
+        <text class="tw" x="280" y="100" text-anchor="middle">núcleo</text><text class="tw" x="280" y="118" text-anchor="middle" style="font-weight:400">regras da arte</text>
+        <rect class="fm" x="192" y="70" width="16" height="16"/><rect class="fm" x="352" y="70" width="16" height="16"/><rect class="fm" x="192" y="124" width="16" height="16"/><rect class="fm" x="352" y="124" width="16" height="16"/>
+        <rect class="f b" x="20" y="58" width="130" height="40" rx="4"/><text x="85" y="82" text-anchor="middle">pasta local</text>
+        <rect class="f b" x="20" y="112" width="130" height="40" rx="4" stroke-dasharray="4 3"/><text class="ts" x="85" y="136" text-anchor="middle">fila na nuvem (depois)</text>
+        <rect class="f b" x="410" y="58" width="130" height="40" rx="4"/><text x="475" y="82" text-anchor="middle">Chromium</text>
+        <rect class="f b" x="410" y="112" width="130" height="40" rx="4" stroke-dasharray="4 3"/><text class="ts" x="475" y="136" text-anchor="middle">outro motor (depois)</text>
+        <path class="bt" d="M150 78h42M150 132h42M410 78h-42M410 132h-42"/>
+      </g>
+    </svg>
+    <figcaption>Os quadrados amarelos são as portas. Os retângulos são o que se encaixa nelas.</figcaption>
+  </figure>
+  <div class="without"><strong>Sem isso:</strong> o código que decide layout está misturado com o código que fala com o Chromium e com a pasta do disco. Ir para a nuvem vira reescrever o projeto.</div>
+</section>
+
+<!-- 4 VISITOR -->
+<section class="pattern" id="visitor">
+  <h2>Um tradutor por idioma</h2>
+  <p class="also">Nome técnico: visitor</p>
+  <p class="analogy">Você tem um documento em português e precisa dele em inglês, espanhol e francês. Não reescreve o documento três vezes: contrata um tradutor por idioma. Cada um lê o mesmo original, página por página, e escreve na língua dele. Um tradutor de italiano amanhã não obriga ninguém a mexer no original.</p>
+  <h3>No Tyto</h3>
+  <p>A cena (a matriz) é o original. O exportador de HTML é um tradutor que percorre a cena camada por camada e escreve HTML. O exportador de SVG é outro tradutor, percorrendo a mesma cena, escrevendo SVG. Ambos visitam cada nó — daí o nome. PDF ou vídeo, no futuro, são só mais um tradutor.</p>
+  <h3>Por que assim</h3>
+  <p>Porque a cena fica intocada quando um formato novo aparece. E porque cada tradutor é um arquivo isolado, fácil de testar: dá uma cena, olha o texto que saiu.</p>
+  <div class="without"><strong>Sem isso:</strong> cada tipo de camada (texto, imagem, grupo) teria dentro de si o código de "como me viro em HTML" e "como me viro em SVG". Adicionar PDF significaria mexer em todas as camadas.</div>
+</section>
+
+<!-- 5 STRATEGY -->
+<section class="pattern" id="strategy">
+  <h2>Trocar o fornecedor sem trocar o pedido</h2>
+  <p class="also">Nome técnico: strategy</p>
+  <p class="analogy">Você manda a arte para a gráfica A. Ela fecha; você manda para a gráfica B. O pedido é o mesmo — "imprime isso em tal papel" — e ninguém na agência precisou mudar como trabalha.</p>
+  <h3>No Tyto</h3>
+  <p>"Transformar HTML em PNG" é um pedido com um jeito só de ser feito hoje: o Chromium. Mas o pedido é declarado separado de quem o cumpre. No app desktop, o Chromium embutido cumpre; na linha de comando, o Playwright cumpre; num servidor, outro ainda. É o mesmo princípio das tomadas, aplicado a uma escolha específica que pode variar até em tempo de execução.</p>
+  <h3>Por que assim</h3>
+  <p>Você não sabia qual motor de imagem escolher — e não precisa saber agora. A decisão fica local e reversível.</p>
+</section>
+
+<!-- 6 REGISTRY -->
+<section class="pattern" id="registry">
+  <h2>O catálogo</h2>
+  <p class="also">Nome técnico: registry</p>
+  <p class="analogy">Uma biblioteca não abre todos os livros para saber o que tem. Tem um catálogo: título, autor, onde está. Você consulta o catálogo, depois vai buscar só o livro que quer.</p>
+  <h3>No Tyto</h3>
+  <p>Cada template tem uma ficha (<em>manifest</em>): nome, quais campos aceita, quais formatos suporta, quais ajustes permite. O Tyto lê só as fichas ao abrir — sem executar nada — e monta o catálogo. Com o catálogo, o editor sabe sugerir campos, avisar "esse template não tem subtítulo" e listar formatos, antes de renderizar qualquer coisa. Plugins têm o mesmo mecanismo: uma ficha lida antes de o plugin rodar.</p>
+  <h3>Por que assim</h3>
+  <p>Segurança e velocidade. Ler uma ficha é instantâneo e inofensivo; executar um template ou plugin desconhecido não é. E o designer (ou o agente de IA) que cria um template só precisa escrever uma ficha correta para ele aparecer no catálogo.</p>
+  <div class="without"><strong>Sem isso:</strong> para saber o que um template aceita, seria preciso executá-lo. Autocomplete no editor não existiria, e um template quebrado poderia derrubar o app só por estar na pasta.</div>
+</section>
+
+<!-- 7 COMMAND -->
+<section class="pattern" id="command">
+  <h2>Cada ação num papelzinho</h2>
+  <p class="also">Nome técnico: command</p>
+  <p class="analogy">Imagine que cada coisa que você faz no editor é escrita num papelzinho: "troquei a palavra X por Y na linha 3". Com a pilha de papeizinhos, desfazer é ler o de cima e fazer o contrário. Refazer é ler de novo. Mandar para um colega é entregar a pilha.</p>
+  <h3>No Tyto</h3>
+  <p>Toda ação do editor — digitar, colar, mudar de template, aplicar um ajuste — é um <em>comando</em> com duas metades: fazer e desfazer. Os atalhos de teclado (modo normal ou modo Vim) não fazem nada diretamente; eles disparam comandos. Um plugin que quer adicionar um atalho só registra um comando novo.</p>
+  <h3>Por que assim</h3>
+  <p>Desfazer/refazer confiável de graça. Modo Vim e modo normal compartilham a mesma lista de comandos, só mudam as teclas. E, se um dia houver colaboração em tempo real, a pilha de comandos é o que viaja entre as máquinas.</p>
+  <div class="without"><strong>Sem isso:</strong> cada atalho de teclado mexe no texto por conta própria. Desfazer vira uma gambiarra de guardar cópias inteiras, e cada modo de edição precisa reimplementar tudo.</div>
+</section>
+
+<!-- 8 RESULT -->
+<section class="pattern" id="result">
+  <h2>Erros que são informação, não pânico</h2>
+  <p class="also">Nome técnico: Result e Diagnostic, em vez de exceções</p>
+  <p class="analogy">Um revisor de texto não rasga o documento ao achar um erro. Ele marca: "página 3, linha 12, esse termo não existe no glossário". O documento continua ali, com uma lista de marcações que alguém pode corrigir uma a uma.</p>
+  <h3>No Tyto</h3>
+  <p>Cada posto da linha de montagem devolve duas coisas: o resultado (quando dá) e uma lista de <em>diagnósticos</em> — cada um com gravidade, código, mensagem e a posição exata no brief. O editor usa a posição para sublinhar em vermelho. A linha de comando imprime a lista. O <code>result.json</code> que o Jacurutu lê carrega a mesma lista.</p>
+  <h3>Por que assim</h3>
+  <p>Erro é a situação mais comum de um editor — a pessoa está no meio de digitar. Se o programa "explodisse" a cada campo incompleto, não daria para trabalhar. Tratando erro como dado, o mesmo diagnóstico serve para a pessoa, para o log e para o agente de IA que vai corrigir o template.</p>
+  <figure>
+    <svg viewBox="0 0 560 120" role="img" aria-label="Brief com marcação de erro apontando linha e coluna">
+      <g class="t">
+        <rect class="f b" x="10" y="10" width="330" height="100" rx="4"/>
+        <text x="24" y="36">::titulo Direito Constitucional</text>
+        <text x="24" y="60">::subtitolo Aulas ao vivo</text>
+        <path class="x" d="M24 66 q10 6 20 0 t20 0 t20 0 t20 0"/>
+        <text x="24" y="90">::slide O que cai na prova</text>
+        <rect class="fr" x="370" y="34" width="180" height="52" rx="4"/>
+        <text class="tw" x="380" y="54">E_UNKNOWN_SLOT · linha 2</text>
+        <text class="tw" x="380" y="74" style="font-weight:400">"subtitolo" não existe. Quis dizer "subtitulo"?</text>
+        <path class="bt" d="M370 60h-20" marker-end="url(#a)"/>
+      </g>
+    </svg>
+    <figcaption>O erro sabe onde está e o que sugerir — porque é um dado, não uma explosão.</figcaption>
+  </figure>
+</section>
+
+<!-- 9 EVENT BUS -->
+<section class="pattern" id="bus">
+  <h2>O interfone</h2>
+  <p class="also">Nome técnico: event bus tipado via preload (Electron)</p>
+  <p class="analogy">No estúdio, a sala de criação e a sala de máquinas ficam separadas por uma porta trancada — por segurança. Elas se falam por um interfone com botões fixos: "renderizar", "salvar", "listar templates". Não existe botão "faça qualquer coisa".</p>
+  <h3>No Tyto</h3>
+  <p>O app desktop tem dois lados: a <em>tela</em> (o editor, o preview) e a <em>máquina</em> (quem lê arquivos, roda o Chromium, guarda senhas). A tela nunca toca o disco nem a rede. Ela aperta botões do interfone, e cada botão tem formato definido — o que manda e o que recebe de volta é conferido pelo tipo.</p>
+  <h3>Por que assim</h3>
+  <p>Segurança em primeiro lugar: se algo malicioso entrar pela tela (um plugin de painel, um SVG estranho), não tem acesso ao disco. E clareza: a lista de botões do interfone é a lista completa do que a interface pode pedir.</p>
+  <div class="without"><strong>Sem isso:</strong> a tela teria acesso total ao computador. Qualquer conteúdo que ela exibe — inclusive um SVG vindo de fora — poderia ler seus arquivos.</div>
+</section>
+
+<!-- 10 PLUGIN HOST -->
+<section class="pattern" id="plugin">
+  <h2>Tomadas para terceiros, com disjuntor</h2>
+  <p class="also">Nome técnico: plugin host com manifest, permissões e isolamento</p>
+  <p class="analogy">Um coworking aluga mesas. Cada inquilino recebe uma tomada e um crachá que diz onde pode entrar. Quem precisa do arquivo trancado pede acesso na entrada. Se um inquilino faz besteira, o disjuntor da mesa dele cai — o prédio continua funcionando.</p>
+  <h3>No Tyto</h3>
+  <p>Tudo que estende o Tyto — um pacote de templates, um exportador novo, um comando de editor, um painel — é um plugin com uma ficha que declara <em>o que ele adiciona</em> e <em>o que ele pede</em> (rede? arquivos? credenciais?). O Tyto mostra o pedido na instalação. O plugin roda numa sala separada e fala com o Tyto pelo interfone. E, detalhe importante: os recursos que já vêm de fábrica usam exatamente a mesma tomada. Isso garante que a tomada funciona antes de abrir para gente de fora.</p>
+  <h3>Por que assim</h3>
+  <p>Você pediu extensibilidade "como o Vim". O Vim deixa qualquer plugin fazer qualquer coisa — aceitável para um editor de texto, inaceitável quando o app guarda credenciais do Jira e do Drive. O modelo aqui é o do VS Code: aberto, mas com crachá e disjuntor.</p>
+  <figure>
+    <svg viewBox="0 0 560 150" role="img" aria-label="Tyto no centro, plugins em salas isoladas ligados por interfone com permissões">
+      <g class="t">
+        <rect class="ft" x="210" y="45" width="140" height="60" rx="6"/><text class="tw" x="280" y="80" text-anchor="middle">Tyto</text>
+        <rect class="f b" x="20" y="15" width="130" height="36" rx="4"/><text x="85" y="38" text-anchor="middle">templates (de fábrica)</text>
+        <rect class="f b" x="20" y="57" width="130" height="36" rx="4"/><text x="85" y="80" text-anchor="middle">exportador SVG</text>
+        <rect class="f b" x="20" y="99" width="130" height="36" rx="4" stroke-dasharray="4 3"/><text class="ts" x="85" y="122" text-anchor="middle">plugin de terceiro</text>
+        <rect class="f b" x="410" y="36" width="130" height="36" rx="4"/><text x="475" y="59" text-anchor="middle">comando do editor</text>
+        <rect class="f b" x="410" y="78" width="130" height="36" rx="4" stroke-dasharray="4 3"/><text class="ts" x="475" y="101" text-anchor="middle">painel de terceiro</text>
+        <path class="bt" d="M150 33h60M150 75h60M150 117h60M410 54h-60M410 96h-60"/>
+        <rect class="fm" x="180" y="111" width="12" height="12"/><rect class="fm" x="368" y="90" width="12" height="12"/>
+        <text class="ts" x="196" y="145">■ crachá: permissões declaradas e aprovadas</text>
+      </g>
+    </svg>
+    <figcaption>Fábrica e terceiros entram pela mesma tomada. Só terceiros passam pelo crachá.</figcaption>
+  </figure>
+</section>
+
+<!-- 11 FRONTEIRA -->
+<section class="pattern" id="fronteira">
+  <h2>O que nunca sai do estúdio</h2>
+  <p class="also">Nome técnico: fronteira puro / Node / DOM, garantida por lint</p>
+  <p class="analogy">O que faz a agência ser a agência é o método, os padrões, o gosto — não o prédio. Se amanhã mudar de endereço, o método vai junto. Para isso, o método não pode estar colado na parede.</p>
+  <h3>No Tyto</h3>
+  <p>Os pacotes centrais — leitor de brief, matriz da cena, tradutores, templates — são "puros": não usam nada que só exista num computador com Windows/Mac (ler disco, abrir janela) nem nada que só exista num navegador. São só lógica. Isso não é uma promessa; é uma regra verificada automaticamente. Se alguém tentar importar "ler arquivo" dentro do núcleo, a verificação falha antes do código entrar.</p>
+  <h3>Por que assim</h3>
+  <p>É isso que torna a nuvem possível de verdade. O mesmo código roda no laptop do designer, na linha de comando e num servidor. Só as bordas mudam.</p>
+  <figure>
+    <svg viewBox="0 0 560 130" role="img" aria-label="Três anéis: núcleo puro dentro, Node e DOM nas bordas">
+      <g class="t">
+        <rect class="f b" x="10" y="10" width="540" height="110" rx="8"/>
+        <text x="24" y="32">borda: computador (Node) — disco, Chromium, rede</text>
+        <rect class="f b" x="24" y="44" width="512" height="66" rx="6" stroke-dasharray="4 3"/>
+        <text x="38" y="64">borda: navegador (DOM) — editor, preview</text>
+        <rect class="ft" x="180" y="72" width="200" height="30" rx="4"/><text class="tw" x="280" y="92" text-anchor="middle">núcleo puro — só lógica</text>
+      </g>
+    </svg>
+    <figcaption>O núcleo não sabe onde está. As bordas sabem.</figcaption>
+  </figure>
+</section>
+
+<!-- MAPA -->
+<section class="map" id="mapa">
+  <h2>Mapa: qual padrão vive onde</h2>
+  <p>Para quando alguém perguntar "e isso fica em que parte do projeto?".</p>
+  <table>
+    <thead><tr><th>Padrão</th><th>Onde no Tyto</th><th>Pergunta que ele responde</th></tr></thead>
+    <tbody>
+      <tr><td>Linha de montagem</td><td>pacote <em>pipeline</em>, compondo <em>brief-lang</em>, <em>core</em>, <em>export-*</em>, <em>raster</em></td><td>Como um brief vira imagem sem ninguém saber de tudo?</td></tr>
+      <tr><td>Matriz da arte</td><td><em>core</em> (schema da cena)</td><td>Como PNG e SVG saem iguais?</td></tr>
+      <tr><td>Tomadas padronizadas</td><td>portas em <em>core</em>, <em>io</em>, <em>plugin-api</em>; adaptadores em <em>raster</em>, <em>io</em></td><td>Como ir para a nuvem sem reescrever?</td></tr>
+      <tr><td>Um tradutor por idioma</td><td><em>export-html</em>, <em>export-svg</em></td><td>Como adicionar um formato sem tocar na cena?</td></tr>
+      <tr><td>Trocar o fornecedor</td><td><em>raster</em> (Chromium hoje)</td><td>E se o motor de imagem mudar?</td></tr>
+      <tr><td>Catálogo</td><td><em>core</em> (TemplateRegistry), <em>plugin-api</em> (PluginRegistry)</td><td>Como o editor sabe o que um template aceita?</td></tr>
+      <tr><td>Cada ação num papelzinho</td><td><em>editor</em></td><td>Como desfazer funciona nos dois modos de teclado?</td></tr>
+      <tr><td>Erros como informação</td><td>todos os pacotes, definido em <em>core</em></td><td>Como o erro aparece sublinhado no lugar certo?</td></tr>
+      <tr><td>Interfone</td><td><em>apps/desktop</em> (preload)</td><td>Por que a tela não consegue ler o disco?</td></tr>
+      <tr><td>Tomadas para terceiros</td><td><em>plugin-api</em>, carregador em <em>apps/*</em></td><td>Como abrir para plugins sem virar risco?</td></tr>
+      <tr><td>O que nunca sai do estúdio</td><td>regra de lint no monorepo</td><td>O que garante que o núcleo roda em qualquer lugar?</td></tr>
+    </tbody>
+  </table>
+</section>
+
+</main>
+
+<footer>
+  <div class="wrap">Tyto · suíte Breu · decisões completas em <code>docs/adr/</code>. As analogias simplificam de propósito; quando houver dúvida técnica, o ADR vence.</div>
+</footer>
+
+</body>
+</html>

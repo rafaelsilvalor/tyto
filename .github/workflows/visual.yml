@@ -1,0 +1,19 @@
+name: visual
+on:
+  pull_request:
+    paths: ['packages/export-*/**', 'packages/raster/**', 'packages/templates/**', 'packages/core/**']
+jobs:
+  visual:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with: { lfs: true }
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: 22, cache: pnpm }
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm exec playwright install --with-deps chromium
+      - run: pnpm test:visual
+      - uses: actions/upload-artifact@v4
+        if: failure()
+        with: { name: visual-diffs, path: '**/__diff__/**' }
