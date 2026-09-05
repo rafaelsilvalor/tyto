@@ -37,3 +37,5 @@ Um **brief** escrito em linguagem de marcação própria escolhe um **template**
 Interfaces: app desktop (Electron; editor com highlight e modo vim) e CLI. Fila remota e entrega (Jira, Drive…) são papel do Jacurutu, outro produto da suíte; a fronteira é um contrato de arquivos (ADR 0011). Tudo que é fonte, destino, exportador, rasterizador, pacote de templates ou comando de editor é um **plugin** — os built-in usam a mesma API.
 
 Comece por `CLAUDE.md`, depois `docs/architecture.md` e `docs/backlog.md`. A documentação técnica está em inglês; a explicação dos padrões para não-programadores está em `docs/patterns-explained.pt-BR.html`.
+
+<!-- smoke PR: validates required check names; safe to close unmerged -->
