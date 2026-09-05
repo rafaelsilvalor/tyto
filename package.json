@@ -20,6 +20,7 @@
     "test": "turbo run test",
     "test:visual": "turbo run test:visual",
     "build": "turbo run build",
+    "docs:gen": "turbo run build --filter=@tyto/core && pnpm --filter @tyto/docs-gen run generate",
     "lint": "turbo run lint",
     "typecheck": "turbo run typecheck",
     "format": "prettier --write .",

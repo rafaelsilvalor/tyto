@@ -29,7 +29,7 @@ const NODE_PACKAGES = [
   'packages/io',
   'apps/cli',
   'apps/desktop',
-  'tools/repo-checks',
+  'tools',
 ];
 
 const DOM_PACKAGES = ['packages/editor'];
