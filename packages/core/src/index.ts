@@ -155,3 +155,12 @@ export {
   walk,
   walkFrame,
 } from './scene/visitor.js';
+
+export {
+  type Bounds,
+  type FrameBounds,
+  boundsVisitor,
+  frameBounds,
+  sceneBounds,
+  unionBounds,
+} from './scene/bounds.js';

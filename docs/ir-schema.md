@@ -86,6 +86,25 @@ single frame, for an exporter that already picked one.
 `invariants.ts` is a caller: each rule wants the same flat list of nodes, and "is this
 node inside that one" is the ancestor chain read from the other side.
 
+### Bounds
+
+`bounds.ts` is the other caller and the first shipped visitor. `frameBounds(scene, artwork,
+frame)` and `sceneBounds(scene)` give the axis-aligned box the visible nodes occupy, in
+frame coordinates — a `viewBox`, a crop-to-content export, the question E4.5 asks about a
+text. `boundsVisitor` and `unionBounds` are exported too, for a caller that wants bounds
+per node id or wants hidden nodes counted after all.
+
+- **These are layout bounds, not ink bounds.** A stroke aligned `outside` paints half a
+  stroke width past the box and a shadow paints wherever its offset and blur put it;
+  neither is counted. Both are computable from the node, so the visitor that needs them
+  wraps this one instead of every caller paying for them.
+- **`Bounds.exact` is false when some node did not fully declare its own box** — a text
+  with an absent `box.w` or `box.h`, or one whose `overflow` is `grow`. The real box is
+  then at least that large and never smaller, and the flag travels up through
+  `unionBounds`. It is the honest form of the hole that stays open until E4.5 measures
+  laid-out text; a caller that must not clip pads or waits.
+- **A hidden node bounds to `undefined`**, and so does a frame that draws nothing.
+
 ## Exporter mapping
 
 | IR                       | HTML/CSS                                          | SVG                                                                           |
