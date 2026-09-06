@@ -1,6 +1,7 @@
 import type { SceneNode } from './nodes.js';
 import type { Paint } from './primitives.js';
 import type { Artwork, Frame, Scene } from './scene.js';
+import { type SceneVisitor, type VisitContext, walk } from './visitor.js';
 import { type Diagnostic, diagnostic } from '../diagnostics/diagnostic.js';
 
 /**
@@ -11,38 +12,32 @@ import { type Diagnostic, diagnostic } from '../diagnostics/diagnostic.js';
  * `artworks.0.frames.1.children.4` is what Zod can offer and is useless to whoever wrote
  * the template — the id is the thing they can search for.
  *
- * The traversal here is local and private. `SceneVisitor` and `walk()` arrive in E2.2 and
- * this file becomes one of their callers; building the visitor now would be doing that
- * card's work with none of its tests.
+ * The traversal is `walk()`. Each rule wants the same flat list of nodes, and the one
+ * relationship any of them needs — is this node inside that one — is the ancestor chain
+ * the walk already carries.
  */
 
 interface NodeRecord {
   readonly node: SceneNode;
-  /** Ids below this node, excluding its own — what the mask rule needs. */
-  readonly descendantIds: ReadonlySet<string>;
+  /** Ids above this node, excluding its own — the mask rule read from the other side. */
+  readonly ancestorIds: ReadonlySet<string>;
 }
 
-function collect(node: SceneNode, into: NodeRecord[]): Set<string> {
-  const below = new Set<string>();
-  if (node.kind === 'group') {
-    for (const child of node.children) {
-      for (const id of collect(child, into)) below.add(id);
-    }
-  }
-  // Pushed before the node adds itself, so `descendantIds` never contains the node.
-  into.push({ node, descendantIds: new Set(below) });
-  below.add(node.id);
-  return below;
+function recordOf(node: SceneNode, context: VisitContext): NodeRecord {
+  return { node, ancestorIds: new Set(context.ancestors.map((ancestor) => ancestor.id)) };
 }
 
-function recordsOf(scene: Scene): NodeRecord[] {
-  const records: NodeRecord[] = [];
-  for (const artwork of scene.artworks) {
-    for (const frame of artwork.frames) {
-      for (const child of frame.children) collect(child, records);
-    }
-  }
-  return records;
+/** Flattens the scene: a group is itself followed by everything beneath it. */
+const recordCollector: SceneVisitor<readonly NodeRecord[]> = {
+  group: (node, context, children) => [recordOf(node, context), ...children.flat()],
+  rect: (node, context) => [recordOf(node, context)],
+  text: (node, context) => [recordOf(node, context)],
+  image: (node, context) => [recordOf(node, context)],
+  vector: (node, context) => [recordOf(node, context)],
+};
+
+function recordsOf(scene: Scene): readonly NodeRecord[] {
+  return walk(scene, recordCollector).flatMap((visit) => visit.children.flat());
 }
 
 /** Every asset a paint pulls in; only `image` paints reference one. */
@@ -79,17 +74,20 @@ function duplicateIds(scene: Scene, records: readonly NodeRecord[]): Diagnostic[
 }
 
 function maskProblems(records: readonly NodeRecord[]): Diagnostic[] {
-  const nodeIds = new Set(records.map((record) => record.node.id));
+  const byId = new Map(records.map((record) => [record.node.id, record]));
 
-  return records.flatMap(({ node, descendantIds }) => {
+  return records.flatMap(({ node }) => {
     const { mask } = node;
     if (!mask) return [];
-    if (!nodeIds.has(mask.nodeId)) {
+    const target = byId.get(mask.nodeId);
+    if (!target) {
       return [diagnostic('E_SCENE_MASK_NOT_FOUND', { id: node.id, maskId: mask.nodeId })];
     }
-    if (descendantIds.has(mask.nodeId)) {
-      // A node masked by its own child would have to be rendered to produce the mask that
-      // decides how it is rendered.
+    // "The mask is a descendant of the masked node" and "the masked node is one of the
+    // mask's ancestors" are the same sentence; the walk hands down the second one.
+    // A node masked by its own child would have to be rendered to produce the mask that
+    // decides how it is rendered.
+    if (target.ancestorIds.has(node.id)) {
       return [diagnostic('E_SCENE_MASK_DESCENDANT', { id: node.id, maskId: mask.nodeId })];
     }
     return [];

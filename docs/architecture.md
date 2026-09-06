@@ -48,7 +48,7 @@ Path to the cloud: same pure code; `raster` swaps to Playwright in a container, 
 
 - **Hexagonal (ports & adapters)** — ports in `core`/`plugin-api`/`io`; adapters in `raster`, `io`, `sources`. Composition only in `apps/*`.
 - **Compiler pipeline** — pure stages, tested in isolation with fixtures.
-- **Visitor** — `SceneVisitor<T>` in `core`; each exporter implements one. New output format = new visitor.
+- **Visitor** — `SceneVisitor<T>` and `walk()` in `core`; each exporter implements one and none of them writes the recursion again. The walk hands every node its accumulated transform, effective opacity, ancestor chain and frame. New output format = new visitor.
 - **Registry** — `TemplateRegistry` and `PluginRegistry`: folder discovery, manifest read without executing code.
 - **Command** — editor: every edit is a `Command { execute, undo }`; keymaps map to commands; plugins register commands.
 - **Result/Diagnostic** — errors are data with `severity`, `code`, `message`, `range`; they travel to the UI and to `result.json`.

@@ -43,6 +43,68 @@ The prose above is the contract; these are the decisions taken while writing the
 - **`Vector.geometry` is a tagged union** rather than the spec's `svg | path` shorthand, so an exporter cannot mistake one for the other.
 - **Gradients need at least two stops.** One stop is a solid paint written the long way.
 
+## Walking a scene
+
+`SceneVisitor<T>` and `walk(scene, visitor)` in `packages/core/src/scene/visitor.ts` are the
+only traversal of the IR. Every exporter implements the visitor; none of them writes the
+recursion, the transform composition or the opacity product again, because two exporters
+that disagree on any of those render the same scene two ways.
+
+```ts
+interface SceneVisitor<T> {
+  group(node: GroupNode, context: VisitContext, children: readonly T[]): T;
+  rect(node: RectNode, context: VisitContext): T;
+  text(node: TextNode, context: VisitContext): T;
+  image(node: ImageNode, context: VisitContext): T;
+  vector(node: VectorNode, context: VisitContext): T;
+}
+
+VisitContext { scene; artwork; frame; format; ancestors: GroupNode[]; transform: Matrix; opacity; visible }
+```
+
+A visitor never recurses. `walk()` descends and hands `group()` what its children already
+returned, which makes a visitor a fold over the tree rather than a callback that has to
+remember where it is. `walk()` returns one `FrameVisit` per frame; `walkFrame()` does a
+single frame, for an exporter that already picked one.
+
+- **`context.transform` includes the node's own transform.** It maps the node's own
+  coordinates onto the frame, which is what an exporter emits; a visitor that wants the
+  parent's matrix reads it from `ancestors`. `Transform` is composed as a `Matrix`
+  (`[a c e; b d f]`, SVG order) because two nested rotations around different anchors are
+  not a third rotation around a third anchor.
+- **`context.opacity` is the product from the frame down to and including the node**, and
+  is independent of `visible` — an exporter that needs them combined combines them.
+- **A hidden node is visited.** `context.visible` is false when the node or any ancestor
+  is invisible, and the walk continues into it anyway: the badge mask in
+  `valid-promo.json` is `visible: false` and exists only to be rendered into a `<mask>`.
+  Skipping belongs to the visitor that knows why it is walking.
+- **`Transform.anchor` is resolved against the node's own declared box.** A group has no
+  box and a text may leave a dimension to its content, so both anchor at their origin.
+  Resolving them properly means measuring laid-out text, which the IR does not record and
+  E4.5 is where it arrives.
+
+`invariants.ts` is a caller: each rule wants the same flat list of nodes, and "is this
+node inside that one" is the ancestor chain read from the other side.
+
+### Bounds
+
+`bounds.ts` is the other caller and the first shipped visitor. `frameBounds(scene, artwork,
+frame)` and `sceneBounds(scene)` give the axis-aligned box the visible nodes occupy, in
+frame coordinates — a `viewBox`, a crop-to-content export, the question E4.5 asks about a
+text. `boundsVisitor` and `unionBounds` are exported too, for a caller that wants bounds
+per node id or wants hidden nodes counted after all.
+
+- **These are layout bounds, not ink bounds.** A stroke aligned `outside` paints half a
+  stroke width past the box and a shadow paints wherever its offset and blur put it;
+  neither is counted. Both are computable from the node, so the visitor that needs them
+  wraps this one instead of every caller paying for them.
+- **`Bounds.exact` is false when some node did not fully declare its own box** — a text
+  with an absent `box.w` or `box.h`, or one whose `overflow` is `grow`. The real box is
+  then at least that large and never smaller, and the flag travels up through
+  `unionBounds`. It is the honest form of the hole that stays open until E4.5 measures
+  laid-out text; a caller that must not clip pads or waits.
+- **A hidden node bounds to `undefined`**, and so does a frame that draws nothing.
+
 ## Exporter mapping
 
 | IR                       | HTML/CSS                                          | SVG                                                                           |
