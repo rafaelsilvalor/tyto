@@ -1,0 +1,23 @@
+{
+  "version": 1,
+  "artworks": [
+    {
+      "id": "slide-1",
+      "frames": [
+        {
+          "format": "feed",
+          "size": { "w": 100, "h": 100 },
+          "children": [
+            {
+              "kind": "rect",
+              "id": "masked",
+              "size": { "w": 10, "h": 10 },
+              "radius": [0, 0, 0, 0],
+              "mask": { "nodeId": "ghost", "mode": "alpha" }
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

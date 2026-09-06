@@ -1,0 +1,24 @@
+{
+  "version": 1,
+  "artworks": [
+    {
+      "id": "slide-1",
+      "frames": [
+        {
+          "format": "feed",
+          "size": { "w": 100, "h": "tall" },
+          "children": [
+            {
+              "kind": "rect",
+              "id": "typo",
+              "size": { "w": 10, "h": 10 },
+              "radius": [0, 0, 0, 0],
+              "fill": { "kind": "solid", "color": { "r": 0, "g": 0, "b": 0 } },
+              "opacty": 0.5
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

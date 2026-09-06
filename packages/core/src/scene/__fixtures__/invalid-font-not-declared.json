@@ -1,0 +1,36 @@
+{
+  "version": 1,
+  "fonts": [{ "family": "Inter", "source": "bundled" }],
+  "artworks": [
+    {
+      "id": "slide-1",
+      "frames": [
+        {
+          "format": "feed",
+          "size": { "w": 100, "h": 100 },
+          "children": [
+            {
+              "kind": "text",
+              "id": "headline",
+              "box": {},
+              "align": "left",
+              "valign": "top",
+              "lineHeight": 1.2,
+              "overflow": "clip",
+              "runs": [
+                {
+                  "text": "hello",
+                  "font": { "family": "Neverbundled", "source": "bundled" },
+                  "size": 24,
+                  "weight": 400,
+                  "style": "normal",
+                  "color": { "kind": "solid", "color": { "r": 0, "g": 0, "b": 0 } }
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}
