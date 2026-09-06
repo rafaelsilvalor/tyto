@@ -10,6 +10,8 @@ Spec: `docs/conventions.md`, `docs/git-workflow.md`, ADR 0010, 0012.
 - **E1.2** `@tyto/core` — `Result`, `Diagnostic`, code catalog, range helpers. AC: tests; generated code doc. (S)
 - **E1.3** GitHub: `ci`, `visual`, `commitlint`, `release` workflows; branch protection; Dependabot; Git LFS for snapshots; PR template. AC: a PR with broken lint is blocked; Changesets opens the version PR. (M)
 - **E1.4** `desktop.yml` workflow (OS matrix + electron-builder + GitHub Release). Enters once E9.1 exists. (S)
+- **E1.5** Changeset reminder in the pre-commit hook: warns, never blocks, when a commit touches a publishable package while the branch has no changeset. AC: warns on `packages/*` without one; silent with one, and silent for private packages. (S)
+- **E1.6** Turborepo remote cache. Deferred on measurement — a cold `ci` run is 19s today. Enters after E5.3, when Playwright and electron-builder make it hurt. (S)
 
 ## E2 — Scene IR
 
