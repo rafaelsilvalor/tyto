@@ -29,7 +29,10 @@ interface Workflow {
   name?: string;
   jobs?: Record<
     string,
-    { steps?: { uses?: string; run?: string; env?: Record<string, string> }[] }
+    {
+      env?: Record<string, string | number>;
+      steps?: { uses?: string; run?: string; env?: Record<string, string> }[];
+    }
   >;
 }
 
@@ -76,6 +79,14 @@ describe('workflows', () => {
         expect(action, `${file} uses an unpinned action`).toMatch(/@/);
       }
     }
+  });
+
+  it('keep the Husky hooks out of the job that commits on its own', () => {
+    // `prepare: husky` installs the hooks on every install, CI included, and the commit
+    // Changesets makes has no Jira key — commitlint rejected it and took the release job
+    // down before it could open the version PR. The rule is for human commits.
+    const jobs = readYaml<Workflow>(`${WORKFLOWS_DIR}/release.yml`).jobs ?? {};
+    expect(jobs.release?.env?.HUSKY).toBe(0);
   });
 
   it('never interpolate the PR title into a shell script', () => {

@@ -5,6 +5,11 @@ permissions: { contents: write, pull-requests: write }
 jobs:
   release:
     runs-on: ubuntu-latest
+    # `prepare: husky` runs on every install, so a CI checkout gets the commit-msg hook
+    # as well. The commit Changesets makes here carries no Jira key, which commitlint
+    # requires of a human commit, and the hook killed the job before it could open the
+    # version PR. The rule stays as it is; the hook simply does not belong in CI.
+    env: { HUSKY: 0 }
     steps:
       - uses: actions/checkout@v4
       - uses: pnpm/action-setup@v4
