@@ -67,6 +67,48 @@ export const diagnosticCodes = {
       "Plugin '{plugin}' called '{capability}' without that permission being granted at install time.",
     spec: 'docs/plugin-api.md',
   },
+  E_SCENE_SHAPE: {
+    severity: 'error',
+    summary: 'A scene does not match the IR schema.',
+    template: "Scene is invalid at '{path}': {problem}.",
+    spec: 'docs/ir-schema.md',
+  },
+  E_SCENE_DUPLICATE_ID: {
+    severity: 'error',
+    summary: 'The same id is used more than once in one scene.',
+    template: "Id '{id}' is used {count} times; ids must be unique within a scene.",
+    spec: 'docs/ir-schema.md',
+  },
+  E_SCENE_MASK_NOT_FOUND: {
+    severity: 'error',
+    summary: 'A mask references a node the scene does not contain.',
+    template: "Node '{id}' is masked by '{maskId}', which no node in the scene defines.",
+    spec: 'docs/ir-schema.md',
+  },
+  E_SCENE_MASK_DESCENDANT: {
+    severity: 'error',
+    summary: 'A mask references a descendant of the node it masks.',
+    template: "Node '{id}' is masked by '{maskId}', which is one of its own descendants.",
+    spec: 'docs/ir-schema.md',
+  },
+  E_SCENE_FONT_NOT_DECLARED: {
+    severity: 'error',
+    summary: 'Text uses a font family the scene does not declare.',
+    template: "Node '{id}' uses font family '{family}', which the scene does not declare.",
+    spec: 'docs/ir-schema.md',
+  },
+  E_SCENE_ASSET_NOT_DECLARED: {
+    severity: 'error',
+    summary: 'A node or paint uses an asset the scene does not declare.',
+    template: "Node '{id}' uses asset '{assetId}', which the scene does not declare.",
+    spec: 'docs/ir-schema.md',
+  },
+  E_SCENE_EMPTY_TEXT: {
+    severity: 'error',
+    summary: 'A text node carries no runs, so there is nothing to render.',
+    template: "Text node '{id}' has no runs; there is nothing to render.",
+    spec: 'docs/ir-schema.md',
+  },
   W_TEXT_OVERFLOW: {
     severity: 'warning',
     summary: 'Compiled text does not fit its frame in one of the requested formats.',
