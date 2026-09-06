@@ -1,1 +1,5 @@
 pnpm exec lint-staged
+
+# A reminder, not a gate: `|| true` so that even a crash inside it cannot be the reason a
+# commit fails. See tools/repo-checks/src/changeset-reminder.mjs.
+node tools/repo-checks/src/changeset-reminder.mjs || true

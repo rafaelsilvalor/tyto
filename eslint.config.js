@@ -151,7 +151,9 @@ export default tseslint.config(
 
   {
     name: 'repo/config-files',
-    files: ['*.js', 'tools/**/*.ts', '**/*.config.ts'],
+    // `tools/**/*.mjs` is here for the git hooks, which have to run with no build step
+    // and therefore stay JavaScript.
+    files: ['*.js', 'tools/**/*.ts', 'tools/**/*.mjs', '**/*.config.ts'],
     languageOptions: { globals: globals.node },
     rules: { 'no-console': 'off' },
   },
