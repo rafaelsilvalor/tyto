@@ -1,0 +1,24 @@
+{
+  "version": 1,
+  "assets": [{ "id": "declared", "source": "file", "path": "a.png", "hash": "sha256-aa" }],
+  "artworks": [
+    {
+      "id": "slide-1",
+      "frames": [
+        {
+          "format": "feed",
+          "size": { "w": 100, "h": 100 },
+          "children": [
+            {
+              "kind": "image",
+              "id": "photo",
+              "asset": { "id": "absent", "source": "file", "path": "b.png", "hash": "sha256-bb" },
+              "size": { "w": 10, "h": 10 },
+              "fit": "cover"
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

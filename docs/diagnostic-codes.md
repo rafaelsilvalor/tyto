@@ -16,6 +16,13 @@ successful result (ADR 0013).
 | `E_ASSET_NOT_FOUND` | error | An asset path in the brief does not resolve to a file. |
 | `E_UNSUPPORTED_CSS` | error | A template uses a CSS property outside the accepted set. |
 | `E_PERMISSION` | error | A plugin called a capability it was not granted at install time. |
+| `E_SCENE_SHAPE` | error | A scene does not match the IR schema. |
+| `E_SCENE_DUPLICATE_ID` | error | The same id is used more than once in one scene. |
+| `E_SCENE_MASK_NOT_FOUND` | error | A mask references a node the scene does not contain. |
+| `E_SCENE_MASK_DESCENDANT` | error | A mask references a descendant of the node it masks. |
+| `E_SCENE_FONT_NOT_DECLARED` | error | Text uses a font family the scene does not declare. |
+| `E_SCENE_ASSET_NOT_DECLARED` | error | A node or paint uses an asset the scene does not declare. |
+| `E_SCENE_EMPTY_TEXT` | error | A text node carries no runs, so there is nothing to render. |
 | `W_TEXT_OVERFLOW` | warning | Compiled text does not fit its frame in one of the requested formats. |
 | `W_UNUSED_SLOT` | warning | The brief sets a slot the chosen template never renders. |
 
@@ -104,6 +111,90 @@ Plugin '{plugin}' called '{capability}' without that permission being granted at
 ```
 
 Parameters: `plugin`, `capability`
+
+### `E_SCENE_SHAPE`
+
+**Severity:** error · **Spec:** `docs/ir-schema.md`
+
+A scene does not match the IR schema.
+
+```
+Scene is invalid at '{path}': {problem}.
+```
+
+Parameters: `path`, `problem`
+
+### `E_SCENE_DUPLICATE_ID`
+
+**Severity:** error · **Spec:** `docs/ir-schema.md`
+
+The same id is used more than once in one scene.
+
+```
+Id '{id}' is used {count} times; ids must be unique within a scene.
+```
+
+Parameters: `id`, `count`
+
+### `E_SCENE_MASK_NOT_FOUND`
+
+**Severity:** error · **Spec:** `docs/ir-schema.md`
+
+A mask references a node the scene does not contain.
+
+```
+Node '{id}' is masked by '{maskId}', which no node in the scene defines.
+```
+
+Parameters: `id`, `maskId`
+
+### `E_SCENE_MASK_DESCENDANT`
+
+**Severity:** error · **Spec:** `docs/ir-schema.md`
+
+A mask references a descendant of the node it masks.
+
+```
+Node '{id}' is masked by '{maskId}', which is one of its own descendants.
+```
+
+Parameters: `id`, `maskId`
+
+### `E_SCENE_FONT_NOT_DECLARED`
+
+**Severity:** error · **Spec:** `docs/ir-schema.md`
+
+Text uses a font family the scene does not declare.
+
+```
+Node '{id}' uses font family '{family}', which the scene does not declare.
+```
+
+Parameters: `id`, `family`
+
+### `E_SCENE_ASSET_NOT_DECLARED`
+
+**Severity:** error · **Spec:** `docs/ir-schema.md`
+
+A node or paint uses an asset the scene does not declare.
+
+```
+Node '{id}' uses asset '{assetId}', which the scene does not declare.
+```
+
+Parameters: `id`, `assetId`
+
+### `E_SCENE_EMPTY_TEXT`
+
+**Severity:** error · **Spec:** `docs/ir-schema.md`
+
+A text node carries no runs, so there is nothing to render.
+
+```
+Text node '{id}' has no runs; there is nothing to render.
+```
+
+Parameters: `id`
 
 ## Warnings
 
