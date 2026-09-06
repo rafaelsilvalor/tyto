@@ -96,6 +96,11 @@ export default tseslint.config(
       '**/coverage/**',
       '**/test-results/**',
       '**/playwright-report/**',
+      // tsup writes a bundled copy of its config into the package while it builds and
+      // deletes it on the way out. Turbo runs lint and build in parallel, so ESLint can
+      // list the file and then fail to open it — a race that only shows up in CI, where
+      // build is part of the same run.
+      '**/tsup.config.bundled_*.mjs',
     ],
   },
 

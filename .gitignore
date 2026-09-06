@@ -19,6 +19,10 @@ build/
 out/
 *.tsbuildinfo
 
+# tsup bundles its config into the package while building; an interrupted build leaves
+# the file behind.
+tsup.config.bundled_*.mjs
+
 # Electron
 release/
 app/dist/
