@@ -1,0 +1,26 @@
+{
+  "version": 1,
+  "artworks": [
+    {
+      "id": "slide-1",
+      "frames": [
+        {
+          "format": "feed",
+          "size": { "w": 100, "h": 100 },
+          "children": [
+            {
+              "kind": "text",
+              "id": "silent",
+              "box": {},
+              "align": "left",
+              "valign": "top",
+              "lineHeight": 1.2,
+              "overflow": "clip",
+              "runs": []
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

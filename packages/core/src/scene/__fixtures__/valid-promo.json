@@ -1,0 +1,117 @@
+{
+  "version": 1,
+  "fonts": [{ "family": "Inter", "source": "bundled" }],
+  "assets": [{ "id": "hero", "source": "file", "path": "hero.jpg", "hash": "sha256-1f0a" }],
+  "artworks": [
+    {
+      "id": "slide-1",
+      "label": "Opening",
+      "frames": [
+        {
+          "format": "feed",
+          "size": { "w": 1080, "h": 1080 },
+          "background": { "kind": "solid", "color": { "r": 12, "g": 14, "b": 20 } },
+          "children": [
+            {
+              "kind": "image",
+              "id": "hero-image",
+              "asset": {
+                "id": "hero",
+                "source": "file",
+                "path": "hero.jpg",
+                "hash": "sha256-1f0a"
+              },
+              "size": { "w": 1080, "h": 620 },
+              "fit": "cover"
+            },
+            {
+              "kind": "group",
+              "id": "copy",
+              "transform": { "y": 660 },
+              "children": [
+                {
+                  "kind": "text",
+                  "id": "headline",
+                  "box": { "w": 920 },
+                  "align": "left",
+                  "valign": "top",
+                  "lineHeight": 1.1,
+                  "overflow": "shrink",
+                  "runs": [
+                    {
+                      "text": "Turma nova",
+                      "font": { "family": "Inter", "source": "bundled" },
+                      "size": 96,
+                      "weight": 700,
+                      "style": "normal",
+                      "color": { "kind": "solid", "color": { "r": 255, "g": 255, "b": 255 } }
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "kind": "rect",
+              "id": "badge",
+              "size": { "w": 240, "h": 240 },
+              "radius": [24, 24, 24, 24],
+              "mask": { "nodeId": "badge-mask", "mode": "alpha" },
+              "fill": {
+                "kind": "linear-gradient",
+                "angle": 45,
+                "stops": [
+                  { "offset": 0, "color": { "r": 255, "g": 89, "b": 0 } },
+                  { "offset": 1, "color": { "r": 255, "g": 189, "b": 0 } }
+                ]
+              },
+              "stroke": {
+                "paint": { "kind": "solid", "color": { "r": 0, "g": 0, "b": 0 } },
+                "width": 2
+              },
+              "effects": [
+                {
+                  "kind": "shadow",
+                  "x": 0,
+                  "y": 8,
+                  "blur": 24,
+                  "spread": 0,
+                  "color": { "r": 0, "g": 0, "b": 0, "a": 0.35 }
+                }
+              ]
+            },
+            {
+              "kind": "vector",
+              "id": "badge-mask",
+              "visible": false,
+              "geometry": { "kind": "path", "d": "M0 0 H240 V240 H0 Z" },
+              "size": { "w": 240, "h": 240 },
+              "fill": { "kind": "solid", "color": { "r": 255, "g": 255, "b": 255 } }
+            }
+          ]
+        },
+        {
+          "format": "story",
+          "size": { "w": 1080, "h": 1920 },
+          "children": [
+            {
+              "kind": "rect",
+              "id": "story-bg",
+              "size": { "w": 1080, "h": 1920 },
+              "radius": [0, 0, 0, 0],
+              "fill": {
+                "kind": "image",
+                "asset": {
+                  "id": "hero",
+                  "source": "file",
+                  "path": "hero.jpg",
+                  "hash": "sha256-1f0a"
+                },
+                "fit": "cover"
+              }
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

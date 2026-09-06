@@ -1,8 +1,8 @@
 /**
  * @tyto/core — the vocabulary every other package speaks.
  *
- * Today: `Result`, `Diagnostic`, the diagnostic catalog and source ranges. The Scene IR,
- * the visitor, the ports and the template SDK follow in epics E2 and E4. Pure: no Node,
+ * Today: `Result`, `Diagnostic`, the diagnostic catalog, source ranges and the Scene IR.
+ * The visitor, the ports and the template SDK follow in E2.2, E2.3 and E4. Pure: no Node,
  * no DOM (ADR 0010).
  */
 
@@ -69,3 +69,72 @@ export {
   sourceRange,
   unionRanges,
 } from './source/range.js';
+
+export {
+  type GroupNode,
+  type ImageNode,
+  type RectNode,
+  type SceneNode,
+  type TextAlign,
+  type TextNode,
+  type TextOverflow,
+  type TextRun,
+  type TextVerticalAlign,
+  type VectorGeometry,
+  type VectorNode,
+  groupNodeSchema,
+  imageNodeSchema,
+  rectNodeSchema,
+  sceneNodeSchema,
+  textAlignSchema,
+  textNodeSchema,
+  textOverflowSchema,
+  textRunSchema,
+  textVerticalAlignSchema,
+  vectorGeometrySchema,
+  vectorNodeSchema,
+} from './scene/nodes.js';
+
+export {
+  type AssetRef,
+  type BlendMode,
+  type Color,
+  type Effect,
+  type Fit,
+  type FontRef,
+  type GradientStop,
+  type MaskRef,
+  type Paint,
+  type Size,
+  type Stroke,
+  type Transform,
+  type UnitPoint,
+  assetRefSchema,
+  blendModeSchema,
+  blendModes,
+  colorSchema,
+  effectSchema,
+  fitSchema,
+  fontRefSchema,
+  gradientStopSchema,
+  identityTransform,
+  maskRefSchema,
+  paintSchema,
+  sizeSchema,
+  strokeSchema,
+  transformSchema,
+  unitPointSchema,
+} from './scene/primitives.js';
+
+export {
+  type Artwork,
+  type Frame,
+  type Scene,
+  artworkSchema,
+  frameSchema,
+  isScene,
+  parseScene,
+  sceneSchema,
+} from './scene/scene.js';
+
+export { sceneInvariants } from './scene/invariants.js';
