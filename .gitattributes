@@ -10,4 +10,11 @@
 *.woff binary
 *.woff2 binary
 
+# Reference renders for the visual tests live in Git LFS (docs/git-workflow.md). The
+# pattern is anchored on __fixtures__ so only the snapshot corpus goes to LFS: a full
+# `*.png` rule would drag every icon and doc image along, and those are small, rarely
+# rewritten, and useful in a plain `git clone` without the LFS client installed.
+# Checkouts that need the real bytes (ci.yml, visual.yml) pass `lfs: true`.
+**/__fixtures__/**/*.png filter=lfs diff=lfs merge=lfs -text
+
 pnpm-lock.yaml linguist-generated=true -diff

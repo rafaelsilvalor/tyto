@@ -1,0 +1,63 @@
+# Per-package PR labels (docs/git-workflow.md). Consumed by .github/workflows/labeler.yml.
+#
+# The label tells a reviewer which runtime boundary a PR crosses before they open the
+# diff, so the globs mirror the workspace layout one-to-one. A package without a rule
+# here would silently produce unlabelled PRs, which is why github-config.test.ts fails
+# when a new workspace directory has no entry.
+
+'pkg:core':
+  - changed-files:
+      - any-glob-to-any-file: 'packages/core/**'
+'pkg:brief-lang':
+  - changed-files:
+      - any-glob-to-any-file: 'packages/brief-lang/**'
+'pkg:template-lang':
+  - changed-files:
+      - any-glob-to-any-file: 'packages/template-lang/**'
+'pkg:export-html':
+  - changed-files:
+      - any-glob-to-any-file: 'packages/export-html/**'
+'pkg:export-svg':
+  - changed-files:
+      - any-glob-to-any-file: 'packages/export-svg/**'
+'pkg:templates':
+  - changed-files:
+      - any-glob-to-any-file: 'packages/templates/**'
+'pkg:plugin-api':
+  - changed-files:
+      - any-glob-to-any-file: 'packages/plugin-api/**'
+'pkg:raster':
+  - changed-files:
+      - any-glob-to-any-file: 'packages/raster/**'
+'pkg:pipeline':
+  - changed-files:
+      - any-glob-to-any-file: 'packages/pipeline/**'
+'pkg:io':
+  - changed-files:
+      - any-glob-to-any-file: 'packages/io/**'
+'pkg:editor':
+  - changed-files:
+      - any-glob-to-any-file: 'packages/editor/**'
+
+'app:cli':
+  - changed-files:
+      - any-glob-to-any-file: 'apps/cli/**'
+'app:desktop':
+  - changed-files:
+      - any-glob-to-any-file: 'apps/desktop/**'
+
+docs:
+  - changed-files:
+      - any-glob-to-any-file: ['docs/**', '**/*.md']
+
+repo:
+  - changed-files:
+      - any-glob-to-any-file:
+          - '.github/**'
+          - '.changeset/**'
+          - '.husky/**'
+          - 'tools/**'
+          - '*.json'
+          - '*.js'
+          - '*.yaml'
+          - '.gitattributes'
