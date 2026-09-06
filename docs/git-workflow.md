@@ -47,6 +47,10 @@ Required approvals are **0** while the project has one maintainer. Requiring one
 
 The release workflow opens the "Version Packages" PR with `GITHUB_TOKEN`, which needs _Settings → Actions → General → Allow GitHub Actions to create and approve pull requests_ enabled. Without it Changesets fails with "GitHub Actions is not permitted to create or approve pull requests".
 
+That job also runs with `HUSKY=0`. `prepare: husky` installs the hooks on every install, CI included, and the commit Changesets makes carries no Jira key — the commit-msg hook rejected it and killed the run. The rule is about commits a person writes; a job that commits on its own opts out of the hooks, not out of the rule.
+
+The version PR is titled `chore(release): TYTO-0 version packages`. `lint` is a required check and reads the PR title, so a title without a key would open a PR that could never be merged; `TYTO-0` is the key this repository uses for work no card asked for.
+
 Weekly grouped Dependabot for npm and actions. Per-package labels (`pkg:core`, `app:cli`, `docs`, `repo`) via `.github/labeler.yml`; the labels themselves have to exist in the repository. CODEOWNERS: maintainer on everything; per package once more people join.
 
 ## Visual snapshots in Git

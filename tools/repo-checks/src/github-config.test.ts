@@ -29,7 +29,10 @@ interface Workflow {
   name?: string;
   jobs?: Record<
     string,
-    { steps?: { uses?: string; run?: string; env?: Record<string, string> }[] }
+    {
+      env?: Record<string, string | number>;
+      steps?: { uses?: string; run?: string; env?: Record<string, string> }[];
+    }
   >;
 }
 
@@ -75,6 +78,25 @@ describe('workflows', () => {
       for (const action of uses) {
         expect(action, `${file} uses an unpinned action`).toMatch(/@/);
       }
+    }
+  });
+
+  it('keep the Husky hooks out of the job that commits on its own', () => {
+    // `prepare: husky` installs the hooks on every install, CI included, and the commit
+    // Changesets makes has no Jira key — commitlint rejected it and took the release job
+    // down before it could open the version PR. The rule is for human commits.
+    const jobs = readYaml<Workflow>(`${WORKFLOWS_DIR}/release.yml`).jobs ?? {};
+    expect(jobs.release?.env?.HUSKY).toBe(0);
+  });
+
+  it('give the version PR a title its own commitlint rule accepts', () => {
+    // `lint` is a required check on main and reads the PR title, so a version PR
+    // without a Jira key would open and then be unmergeable for good.
+    const release = readRepoFile(`${WORKFLOWS_DIR}/release.yml`);
+    for (const field of ['commit', 'title']) {
+      const value = new RegExp(`${field}: '([^']+)'`).exec(release)?.[1];
+      expect(value, `release.yml has no ${field}`).toBeDefined();
+      expect(value).toMatch(/^\w+(\([\w-]+\))?: TYTO-\d+ [a-z0-9]/);
     }
   });
 
