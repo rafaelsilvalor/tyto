@@ -35,11 +35,20 @@ Template in `.github/pull_request_template.md`: card, what changed, how to test,
 | `commitlint.yml` | PR                                       | validates PR title and commits                                                 |
 | `release.yml`    | push to main                             | Changesets → version PR → tags                                                 |
 | `desktop.yml`    | tag `desktop-v*`                         | OS matrix, electron-builder, GitHub Release                                    |
+| `labeler.yml`    | PR (`pull_request_target`)               | applies `pkg:*`/`app:*`/`docs`/`repo` labels from `.github/labeler.yml`        |
 
 ## Protections and labels
 
-Branch protection on `main`: require PR, required checks `ci`, `commitlint` (and `visual` when it ran), dismiss stale reviews, linear history. Weekly grouped Dependabot for npm and actions. Per-package labels (`pkg:core`…) via `labeler.yml`. CODEOWNERS: maintainer on everything; per package once more people join.
+Branch protection on `main`: require PR, dismiss stale reviews, linear history, no force pushes, no deletions, and the rule applies to administrators too.
+
+Required status checks are stored as job names, not workflow names: `check` (from `ci.yml`) and `lint` (from `commitlint.yml`). `visual.yml` is deliberately not required — it is path-filtered, and a check that never reports on most PRs would leave them permanently pending. Renaming either job changes the required context, so `tools/repo-checks/src/github-config.test.ts` fails when the names drift.
+
+Required approvals are **0** while the project has one maintainer. Requiring one, with administrators included in the rule, would leave nobody able to merge: GitHub does not let an author approve their own PR. It goes to 1 the day a second maintainer joins.
+
+The release workflow opens the "Version Packages" PR with `GITHUB_TOKEN`, which needs _Settings → Actions → General → Allow GitHub Actions to create and approve pull requests_ enabled. Without it Changesets fails with "GitHub Actions is not permitted to create or approve pull requests".
+
+Weekly grouped Dependabot for npm and actions. Per-package labels (`pkg:core`, `app:cli`, `docs`, `repo`) via `.github/labeler.yml`; the labels themselves have to exist in the repository. CODEOWNERS: maintainer on everything; per package once more people join.
 
 ## Visual snapshots in Git
 
-Reference PNGs live in Git LFS (`*.png` under `__fixtures__`). Updating a snapshot requires an explicit commit `test(export-html): TYTO-… update snapshots` with justification in the PR.
+Reference PNGs live in Git LFS, matched by `**/__fixtures__/**/*.png` in `.gitattributes` — only the snapshot corpus, so icons and doc images stay readable in a clone without the LFS client. Any workflow that compares pixels must check out with `lfs: true`, or it diffs against a pointer file. Updating a snapshot requires an explicit commit `test(export-html): TYTO-… update snapshots` with justification in the PR.

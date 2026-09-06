@@ -1,5 +1,7 @@
 name: commitlint
 on: pull_request
+permissions: { contents: read }
+concurrency: { group: 'commitlint-${{ github.ref }}', cancel-in-progress: true }
 jobs:
   lint:
     runs-on: ubuntu-latest
@@ -10,5 +12,16 @@ jobs:
       - uses: actions/setup-node@v4
         with: { node-version: 22, cache: pnpm }
       - run: pnpm install --frozen-lockfile
-      - run: pnpm exec commitlint --from ${{ github.event.pull_request.base.sha }} --to ${{ github.event.pull_request.head.sha }}
-      - run: echo "${{ github.event.pull_request.title }}" | pnpm exec commitlint
+      - name: Lint the commits on the branch
+        run: >-
+          pnpm exec commitlint
+          --from ${{ github.event.pull_request.base.sha }}
+          --to ${{ github.event.pull_request.head.sha }}
+      # main takes squash merges, so the PR title becomes the commit message on main and
+      # has to pass the same rules. The title goes through the environment rather than
+      # `${{ }}` inside the script: interpolation happens before the shell runs, so a
+      # title containing a quote or `$(…)` would be executed instead of linted.
+      - name: Lint the PR title, which squash merge turns into the commit message
+        env:
+          PR_TITLE: ${{ github.event.pull_request.title }}
+        run: printf '%s\n' "$PR_TITLE" | pnpm exec commitlint

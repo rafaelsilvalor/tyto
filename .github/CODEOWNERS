@@ -1,1 +1,4 @@
-* @rafael
+# GitHub silently ignores an owner it cannot resolve, so the handle has to be the real
+# account, not a nickname. One owner for everything until the project has more people;
+# per-package lines land when it does (docs/git-workflow.md).
+* @rafaelsilvalor
