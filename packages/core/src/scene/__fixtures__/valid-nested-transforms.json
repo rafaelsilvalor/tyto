@@ -1,0 +1,54 @@
+{
+  "version": 1,
+  "artworks": [
+    {
+      "id": "nested",
+      "frames": [
+        {
+          "format": "feed",
+          "size": { "w": 400, "h": 400 },
+          "children": [
+            {
+              "kind": "group",
+              "id": "outer",
+              "transform": { "x": 100, "y": 50 },
+              "opacity": 0.5,
+              "children": [
+                {
+                  "kind": "rect",
+                  "id": "inner",
+                  "transform": { "x": 10, "y": 20 },
+                  "opacity": 0.5,
+                  "size": { "w": 60, "h": 40 },
+                  "radius": [0, 0, 0, 0],
+                  "fill": { "kind": "solid", "color": { "r": 255, "g": 0, "b": 0 } }
+                },
+                {
+                  "kind": "rect",
+                  "id": "spun",
+                  "transform": {
+                    "x": 200,
+                    "y": 100,
+                    "rotation": 90,
+                    "anchor": { "x": 0.5, "y": 0.5 }
+                  },
+                  "size": { "w": 100, "h": 20 },
+                  "radius": [0, 0, 0, 0],
+                  "fill": { "kind": "solid", "color": { "r": 0, "g": 0, "b": 255 } }
+                },
+                {
+                  "kind": "rect",
+                  "id": "hidden-one",
+                  "visible": false,
+                  "transform": { "x": 0, "y": 300 },
+                  "size": { "w": 10, "h": 10 },
+                  "radius": [0, 0, 0, 0]
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

@@ -1,9 +1,9 @@
 /**
  * @tyto/core — the vocabulary every other package speaks.
  *
- * Today: `Result`, `Diagnostic`, the diagnostic catalog, source ranges and the Scene IR.
- * The visitor, the ports and the template SDK follow in E2.2, E2.3 and E4. Pure: no Node,
- * no DOM (ADR 0010).
+ * Today: `Result`, `Diagnostic`, the diagnostic catalog, source ranges, the Scene IR and
+ * the visitor that walks it. The ports and the template SDK follow in E2.3 and E4. Pure:
+ * no Node, no DOM (ADR 0010).
  */
 
 export {
@@ -138,3 +138,20 @@ export {
 } from './scene/scene.js';
 
 export { sceneInvariants } from './scene/invariants.js';
+
+export {
+  type Matrix,
+  type Point,
+  applyMatrix,
+  identityMatrix,
+  multiplyMatrix,
+  transformMatrix,
+} from './scene/matrix.js';
+
+export {
+  type FrameVisit,
+  type SceneVisitor,
+  type VisitContext,
+  walk,
+  walkFrame,
+} from './scene/visitor.js';
