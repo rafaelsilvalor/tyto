@@ -89,6 +89,17 @@ describe('workflows', () => {
     expect(jobs.release?.env?.HUSKY).toBe(0);
   });
 
+  it('give the version PR a title its own commitlint rule accepts', () => {
+    // `lint` is a required check on main and reads the PR title, so a version PR
+    // without a Jira key would open and then be unmergeable for good.
+    const release = readRepoFile(`${WORKFLOWS_DIR}/release.yml`);
+    for (const field of ['commit', 'title']) {
+      const value = new RegExp(`${field}: '([^']+)'`).exec(release)?.[1];
+      expect(value, `release.yml has no ${field}`).toBeDefined();
+      expect(value).toMatch(/^\w+(\([\w-]+\))?: TYTO-\d+ [a-z0-9]/);
+    }
+  });
+
   it('never interpolate the PR title into a shell script', () => {
     // `${{ … }}` is substituted before the shell parses the line, so a title containing
     // `$(…)` would run as code with the workflow token in scope. The title has to arrive

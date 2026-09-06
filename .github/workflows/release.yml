@@ -21,6 +21,10 @@ jobs:
         with:
           version: pnpm changeset version
           publish: pnpm changeset tag
-          commit: 'chore(release): version packages'
-          title: 'chore(release): version packages'
+          # The title is linted like any other, because squash merge turns it into the
+          # commit on main and `lint` is a required check — without a key the version PR
+          # would open and then never be mergeable. TYTO-0 is the key this repository
+          # already uses for work no card asked for.
+          commit: 'chore(release): TYTO-0 version packages'
+          title: 'chore(release): TYTO-0 version packages'
         env: { GITHUB_TOKEN: '${{ secrets.GITHUB_TOKEN }}' }
