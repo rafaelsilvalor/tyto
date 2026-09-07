@@ -9,18 +9,24 @@
  * Pure: no Node, no DOM (ADR 0010).
  */
 
+/**
+ * The AST types live in `@tyto/core` — `resolve` consumes them and `core` may not import
+ * this package back (`packages/core/src/brief/ast.ts`). They are re-exported here so a
+ * caller that only talks to the parser has one import.
+ */
 export type {
-  Adjustment,
+  BriefAdjustment,
   Bold,
   Break,
   BriefAst,
   Directive,
+  Frontmatter,
   Inline,
   Italic,
   Mark,
   RichText,
   Text,
-} from './ast.js';
+} from '@tyto/core';
 
 export { parser } from './brief.parser.js';
 

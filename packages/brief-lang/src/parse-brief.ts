@@ -1,8 +1,14 @@
 import type { SyntaxNode, Tree } from '@lezer/common';
 import {
+  type BriefAdjustment,
+  type BriefAst,
   type Diagnostic,
   type Diagnostics,
+  type Directive,
+  type Frontmatter,
+  type Inline,
   type Result,
+  type RichText,
   type SourceRange,
   diagnostic,
   err,
@@ -11,7 +17,6 @@ import {
   sourceRange,
 } from '@tyto/core';
 
-import type { Adjustment, BriefAst, Directive, Inline, RichText } from './ast.js';
 import { parser } from './brief.parser.js';
 import { parseFrontmatter } from './frontmatter.js';
 
@@ -221,7 +226,7 @@ function bodyOf(node: SyntaxNode, text: string): RichText {
   return body;
 }
 
-function adjustmentsOf(node: SyntaxNode, text: string): readonly Adjustment[] {
+function adjustmentsOf(node: SyntaxNode, text: string): readonly BriefAdjustment[] {
   const list = node.getChild('Adjustments');
   if (list === null) return [];
 
@@ -272,13 +277,13 @@ export function parseBrief(text: string): Result<BriefAst, Diagnostics> {
   const top = tree.topNode;
   const diagnostics: Diagnostic[] = syntaxDiagnostics(tree, text);
 
-  let frontmatter: Readonly<Record<string, unknown>> = {};
+  let frontmatter: Frontmatter = { data: {}, ranges: {} };
   const directives: Directive[] = [];
 
   for (const child of children(top)) {
     if (child.name === 'Frontmatter') {
       const parsed = parseFrontmatter(text, child.from, child.to);
-      frontmatter = parsed.data;
+      frontmatter = { data: parsed.data, ranges: parsed.ranges, range: rangeOf(child) };
       diagnostics.push(...parsed.diagnostics);
     } else if (child.name === 'Directive') {
       directives.push(directiveOf(child, text));

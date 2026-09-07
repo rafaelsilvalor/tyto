@@ -1,3 +1,4 @@
+import type { BriefAst, Directive, Inline } from '@tyto/core';
 import { type SourceRange, isOk, sliceRange } from '@tyto/core';
 import { describe, expect, it } from 'vitest';
 
@@ -26,7 +27,6 @@ import nestedEmphasis from './__fixtures__/nested-emphasis.brief?raw';
 import noTrailingNewline from './__fixtures__/no-trailing-newline.brief?raw';
 import pluginDirective from './__fixtures__/plugin-directive.brief?raw';
 import repeatable from './__fixtures__/repeatable.brief?raw';
-import type { BriefAst, Directive, Inline } from './ast.js';
 import { parseBrief } from './parse-brief.js';
 
 /**
@@ -332,7 +332,7 @@ describe('what a directive says', () => {
 
 describe('the frontmatter', () => {
   it('parses the YAML the grammar deliberately left alone', () => {
-    expect(astOf('frontmatter.brief', frontmatter).frontmatter).toEqual({
+    expect(astOf('frontmatter.brief', frontmatter).frontmatter.data).toEqual({
       template: 'promo-curso',
       formats: ['feed', 'story'],
       cor: 'azul-escuro',
@@ -340,12 +340,12 @@ describe('the frontmatter', () => {
   });
 
   it('is an empty object on a brief that has none', () => {
-    expect(astOf('minimal.brief', minimal).frontmatter).toEqual({});
+    expect(astOf('minimal.brief', minimal).frontmatter.data).toEqual({});
   });
 
   it('is an empty object between two fences with nothing in them', () => {
     const result = parseBrief('---\n---\n::titulo Um\n');
-    expect(isOk(result) && result.value.frontmatter).toEqual({});
+    expect(isOk(result) && result.value.frontmatter.data).toEqual({});
   });
 
   it('reports invalid YAML at the offset inside the block', () => {
@@ -368,7 +368,7 @@ describe('the frontmatter', () => {
 
   it('does not validate the keys, which is resolve’s job', () => {
     // No `template`, and `formats` is a number. Both are E3.3 diagnostics, not syntax.
-    expect(astOf('loose', '---\nformats: 7\n---\n').frontmatter).toEqual({ formats: 7 });
+    expect(astOf('loose', '---\nformats: 7\n---\n').frontmatter.data).toEqual({ formats: 7 });
   });
 });
 
@@ -437,7 +437,11 @@ describe('the edges', () => {
   it('reads an empty file as a brief with nothing in it', () => {
     expect(parseBrief('')).toEqual({
       ok: true,
-      value: { frontmatter: {}, directives: [], range: { start: 0, end: 0 } },
+      value: {
+        frontmatter: { data: {}, ranges: {} },
+        directives: [],
+        range: { start: 0, end: 0 },
+      },
       warnings: [],
     });
   });
@@ -463,5 +467,26 @@ describe('the edges', () => {
       { kind: 'break', range: { start: 18, end: 19 } },
       { kind: 'text', value: 'e outra', range: { start: 21, end: 28 } },
     ]);
+  });
+});
+
+describe('the frontmatter carries where each key was written', () => {
+  it('gives every top-level key its own range', () => {
+    // `resolve` (E3.3) reports an unknown slot against the key that named it; without
+    // these the only honest range would be the whole block.
+    const ast = astOf('frontmatter.brief', frontmatter);
+    expect(ast.frontmatter.ranges.template).toBeDefined();
+    const range = ast.frontmatter.ranges.template;
+    expect(range && sliceRange(frontmatter, range)).toBe('template');
+    expect(Object.keys(ast.frontmatter.ranges)).toEqual(['template', 'formats', 'cor']);
+  });
+
+  it('carries the whole block too, for a diagnostic that belongs to no one key', () => {
+    const ast = astOf('frontmatter-only.brief', frontmatterOnly);
+    expect(ast.frontmatter.range).toEqual({ start: 0, end: 30 });
+  });
+
+  it('leaves the block range absent on a brief that has no frontmatter', () => {
+    expect(astOf('minimal.brief', minimal).frontmatter).not.toHaveProperty('range');
   });
 });

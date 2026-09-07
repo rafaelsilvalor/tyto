@@ -1,4 +1,4 @@
-import { type Diagnostic, diagnostic, sourceRange } from '@tyto/core';
+import { type Diagnostic, type SourceRange, diagnostic, sourceRange } from '@tyto/core';
 import { parseDocument } from 'yaml';
 
 /**
@@ -19,10 +19,35 @@ import { parseDocument } from 'yaml';
 
 export interface FrontmatterResult {
   readonly data: Readonly<Record<string, unknown>>;
+  /**
+   * The span of each top-level key. `resolve` reports "this slot is not declared" against
+   * a frontmatter key, and a diagnostic that pointed at the whole block instead would make
+   * the author read four lines to find the one word that is wrong.
+   */
+  readonly ranges: Readonly<Record<string, SourceRange>>;
   readonly diagnostics: readonly Diagnostic[];
 }
 
-const EMPTY: FrontmatterResult = { data: {}, diagnostics: [] };
+const EMPTY: FrontmatterResult = { data: {}, ranges: {}, diagnostics: [] };
+
+/**
+ * The key spans of a YAML mapping, offset back onto the brief.
+ *
+ * `yaml` reports a node's range as `[start, valueEnd, nodeEnd]` relative to the text it
+ * was handed, which here is the block between the fences.
+ */
+function keyRanges(contents: unknown, offset: number): Record<string, SourceRange> {
+  const items = (contents as { items?: unknown } | null)?.items;
+  if (!Array.isArray(items)) return {};
+
+  const ranges: Record<string, SourceRange> = {};
+  for (const item of items) {
+    const key = (item as { key?: { value?: unknown; range?: [number, number, number] } }).key;
+    if (typeof key?.value !== 'string' || !key.range) continue;
+    ranges[key.value] = sourceRange(offset + key.range[0], offset + key.range[1]);
+  }
+  return ranges;
+}
 
 /**
  * The span between the fences, given the whole block the tokenizer matched.
@@ -64,6 +89,7 @@ export function parseFrontmatter(
   if (document.errors.length > 0) {
     return {
       data: {},
+      ranges: {},
       diagnostics: document.errors.map((error) =>
         diagnostic(
           'E_SYNTAX',
@@ -81,6 +107,7 @@ export function parseFrontmatter(
   if (typeof value !== 'object' || Array.isArray(value)) {
     return {
       data: {},
+      ranges: {},
       diagnostics: [
         diagnostic(
           'E_SYNTAX',
@@ -91,5 +118,9 @@ export function parseFrontmatter(
     };
   }
 
-  return { data: value as Record<string, unknown>, diagnostics: [] };
+  return {
+    data: value as Record<string, unknown>,
+    ranges: keyRanges(document.contents, start),
+    diagnostics: [],
+  };
 }
