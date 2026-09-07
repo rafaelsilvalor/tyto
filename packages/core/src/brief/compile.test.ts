@@ -3,6 +3,7 @@ import { describe, expect, it } from 'vitest';
 import type { BriefAst, Directive, Frontmatter, RichText } from './ast.js';
 import { compile } from './compile.js';
 import { type ResolvedBrief, resolve } from './resolve.js';
+import { formatCatalogue } from '../config/formats.js';
 import type { AssetResolver } from '../ports/asset-resolver.js';
 import type { AssetRef } from '../scene/primitives.js';
 import type { Frame, Scene } from '../scene/scene.js';
@@ -60,10 +61,12 @@ const registry: TemplateRegistry = {
 };
 
 const inter = font('Inter');
-const SIZES: Readonly<Record<string, { w: number; h: number }>> = {
+
+/** The project's `formats.yaml`, which is where a size lives now (TYTO-56). */
+const FORMATS = formatCatalogue({
   feed: { w: 1080, h: 1080 },
   story: { w: 1080, h: 1920 },
-};
+});
 
 /** The palette the manifest's `cor` enum names; only the template knows what a name is. */
 const PALETTE: Readonly<Record<string, string>> = { azul: '#0c2340', laranja: '#ff5900' };
@@ -76,7 +79,6 @@ const PALETTE: Readonly<Record<string, string>> = { azul: '#0c2340', laranja: '#
  * an adjustment, an image asset, and rich text that carries bold and a mark.
  */
 const promoCurso: Template = defineTemplate(MANIFEST, (context) => {
-  const size = SIZES[context.format] ?? SIZES.feed;
   const cor = context.slots.cor?.value;
   const background = solid(PALETTE[cor?.kind === 'enum' ? cor.value : 'azul'] ?? '#000000');
   const foto = context.slots.imagem?.value;
@@ -85,12 +87,12 @@ const promoCurso: Template = defineTemplate(MANIFEST, (context) => {
 
   return frame({
     format: context.format,
-    size: size ?? { w: 1080, h: 1080 },
+    size: context.size,
     background,
     idPrefix: context.idPrefix,
     children: [
       ...(foto?.kind === 'image'
-        ? [image({ asset: foto.asset, size: { w: size?.w ?? 1080, h: 620 } })]
+        ? [image({ asset: foto.asset, size: { w: context.size.w, h: 620 } })]
         : []),
       group({
         id: `${context.idPrefix}.copy`,
@@ -168,7 +170,7 @@ async function resolved(ast: BriefAst = BRIEF): Promise<ResolvedBrief> {
 }
 
 async function compiled(template: Template = promoCurso): Promise<Scene> {
-  const result = compile(await resolved(), template);
+  const result = compile(await resolved(), template, { formats: FORMATS });
   if (!result.ok) throw new Error(result.error.map((item) => item.message).join('; '));
   return result.value;
 }
@@ -268,7 +270,7 @@ describe('ids stay unique across a whole scene', () => {
       }),
     );
 
-    const result = compile(await resolved(), forgetful);
+    const result = compile(await resolved(), forgetful, { formats: FORMATS });
     expect(result.ok).toBe(false);
     if (!result.ok) expect(result.error[0]?.code).toBe('E_SCENE_DUPLICATE_ID');
   });
@@ -295,7 +297,7 @@ describe('what compile collects', () => {
       }),
     );
 
-    const result = compile(await resolved(), ignoresPhoto);
+    const result = compile(await resolved(), ignoresPhoto, { formats: FORMATS });
     expect(result.ok).toBe(true);
     if (result.ok) expect(result.value.assets).toEqual([]);
   });
@@ -311,7 +313,7 @@ describe('what compile collects', () => {
       }),
     );
 
-    const result = compile(await resolved(), painted);
+    const result = compile(await resolved(), painted, { formats: FORMATS });
     expect(result.ok).toBe(true);
     if (result.ok) expect(result.value.assets).toEqual([PHOTO]);
   });
@@ -323,7 +325,7 @@ describe('a template that throws (ADR 0014)', () => {
       throw new Error('cannot read properties of undefined');
     });
 
-    const result = compile(await resolved(), broken);
+    const result = compile(await resolved(), broken, { formats: FORMATS });
     expect(result.ok).toBe(false);
     if (!result.ok) {
       expect(result.error[0]?.code).toBe('E_TEMPLATE_CRASH');
@@ -339,7 +341,7 @@ describe('a template that throws (ADR 0014)', () => {
       throw new TemplateError('color', "'#gggggg' is not a hex colour");
     });
 
-    const result = compile(await resolved(), badColour);
+    const result = compile(await resolved(), badColour, { formats: FORMATS });
     expect(result.ok).toBe(false);
     if (!result.ok) expect(result.error[0]?.code).toBe('E_TEMPLATE_VALUE');
   });
@@ -353,7 +355,7 @@ describe('a template that throws (ADR 0014)', () => {
       }),
     );
 
-    const result = compile(await resolved(), confused);
+    const result = compile(await resolved(), confused, { formats: FORMATS });
     expect(result.ok).toBe(false);
     if (!result.ok) {
       expect(result.error[0]?.code).toBe('E_TEMPLATE_CRASH');
@@ -391,17 +393,46 @@ slots:
       defineTemplate(single, (context) =>
         frame({
           format: context.format,
-          size: { w: 100, h: 100 },
+          size: context.size,
           idPrefix: context.idPrefix,
           children: [text({ runs: [run('x', { font: inter, size: 12, color: '#fff' })] })],
         }),
       ),
+      { formats: FORMATS },
     );
 
     expect(scene.ok).toBe(true);
     if (scene.ok) {
       expect(scene.value.artworks).toHaveLength(1);
       expect(scene.value.artworks[0]?.id).toBe('artwork-1');
+    }
+  });
+});
+
+describe('the frame size comes from the project, not from the template', () => {
+  it('hands each format its own size', async () => {
+    const scene = await compiled();
+    const sizes = framesOf(scene)
+      .slice(0, 2)
+      .map((item) => item.size);
+
+    expect(sizes).toEqual([
+      { w: 1080, h: 1080 },
+      { w: 1080, h: 1920 },
+    ]);
+  });
+
+  it('refuses a format the project does not define, before building anything', async () => {
+    // Reported once, not once per slide: finding out per artwork would say the same thing
+    // three times about one missing line in formats.yaml.
+    const result = compile(await resolved(), promoCurso, {
+      formats: formatCatalogue({ feed: { w: 1080, h: 1080 } }),
+    });
+
+    expect(result.ok).toBe(false);
+    if (!result.ok) {
+      expect(result.error.map((item) => item.code)).toEqual(['E_FORMAT_NOT_DEFINED']);
+      expect(result.error[0]?.message).toContain("format 'story'");
     }
   });
 });

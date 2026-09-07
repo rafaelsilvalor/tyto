@@ -13,6 +13,31 @@ promo-curso/
   preview.png
 ```
 
+## formats.yaml
+
+The sizes a project renders at, one file for the whole project:
+
+```yaml
+feed: { w: 1080, h: 1080 }
+story: { w: 1080, h: 1920, label: Story }
+banner-wide: { w: 1600, h: 400 }
+```
+
+An id is what a manifest's `formats` list names, what reaches a shell as `--format <id>`,
+and what becomes `Frame.format`; `label` is only what a picker shows a human. Blanks,
+whitespace and separators in an id are refused for the same reason a template name refuses
+them, and nothing about style is.
+
+**This is the only place a number like 1080×1920 is written.** A template states its
+layout, not its canvas: `compile` reads the size from here and hands it to the template as
+`context.size`, so two templates cannot disagree about what `story` is. It is also what
+makes `%` ("of parent") and `vw/vh` ("of frame") mean anything.
+
+`parseFormats(source, path)` and `loadFormats(fileSystem, path)` in
+`packages/core/src/config/formats.ts` read it — one file, never anything executed. A
+template rendering a format the project does not define is `E_FORMAT_NOT_DEFINED`, raised
+once before any frame is built rather than once per slide.
+
 ## manifest.yaml
 
 ```yaml
@@ -165,8 +190,8 @@ built, and anything else becomes `E_TEMPLATE_CRASH`. Returning a frame for a for
 not asked for is caught too — that is a template that mixed up its own branches, and the
 scene would otherwise render the story layout under the feed's name.
 
-**Frame size comes from the template**, as the example below writes it. `formats.yaml` is
-what the HTML path will read (E4.3); the TS path has the number in hand and states it.
+**Frame size comes from `context.size`**, which `compile` reads from `formats.yaml`. A
+template that hardcodes one is writing down a number the project already knows.
 
 ### The SDK
 
@@ -192,8 +217,8 @@ the identity.
 
 ```ts
 frame({
-  format: 'feed',
-  size: { w: 1080, h: 1080 },
+  format: context.format,
+  size: context.size,
   background: solid('#0c0e14'),
   children: [
     image({ asset: imagem, size: { w: 1080, h: 620 } }),

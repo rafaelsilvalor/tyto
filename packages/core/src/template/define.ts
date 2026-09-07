@@ -1,5 +1,6 @@
 import type { TemplateManifest } from './manifest.js';
 import type { ResolvedSlot } from '../brief/resolve.js';
+import type { Size } from '../scene/primitives.js';
 import type { Frame } from '../scene/scene.js';
 
 /**
@@ -17,6 +18,15 @@ import type { Frame } from '../scene/scene.js';
 export interface TemplateContext {
   /** The format this call is for — one of the manifest's. */
   readonly format: string;
+
+  /**
+   * What that format measures, from the project's `formats.yaml`.
+   *
+   * A template states its layout, not its canvas: two templates that each wrote their own
+   * 1080×1920 would eventually disagree about what `story` is, and `%` and `vw/vh` are
+   * relative to this number. Pass it to `frame({ size })`.
+   */
+  readonly size: Size;
 
   /**
    * Unique per (artwork, format). **Pass it to `frame({ idPrefix })`.**

@@ -1,9 +1,8 @@
-import { parseDocument } from 'yaml';
 import { z } from 'zod';
 
-import { type Diagnostic, diagnostic } from '../diagnostics/diagnostic.js';
+import { parseYamlConfig } from '../config/yaml-source.js';
+import { diagnostic } from '../diagnostics/diagnostic.js';
 import { type Diagnostics, type Result, err, ok } from '../result/result.js';
-import { type SourceRange, sourceRange } from '../source/range.js';
 
 /**
  * `manifest.yaml` — what a template declares about itself (`docs/template-authoring.md`).
@@ -188,91 +187,20 @@ export const templateManifestSchema = z
   });
 export type TemplateManifest = z.infer<typeof templateManifestSchema>;
 
-/** `slots.titulo.max` — the same path Zod reports, joined the way a YAML reader scans. */
-function issuePath(path: readonly PropertyKey[]): string {
-  return path.length === 0 ? '(root)' : path.map(String).join('.');
-}
-
-/**
- * The span of the value a Zod path points at.
- *
- * A path may name a key the document does not have — that is what a missing required field
- * is — so it climbs towards the root until something resolves. Blaming the enclosing
- * mapping is the closest true answer to "where should I add this", and it beats blaming
- * the first character of the file.
- */
-function rangeAt(
-  document: ReturnType<typeof parseDocument>,
-  path: readonly PropertyKey[],
-): SourceRange | undefined {
-  for (let depth = path.length; depth >= 0; depth -= 1) {
-    const node: unknown =
-      depth === 0 ? document.contents : document.getIn(path.slice(0, depth), true);
-    const range = (node as { range?: [number, number, number] } | null | undefined)?.range;
-    if (range) return sourceRange(range[0], range[1]);
-  }
-  return undefined;
-}
-
 /**
  * Parses a `manifest.yaml` and reports every problem in it, each at the key that caused it.
  *
  * `path` is the manifest's own location, and travels into the messages so that a registry
- * reporting six broken templates says which file each line is about.
+ * reporting six broken templates says which file each line is about. The YAML-to-range
+ * machinery is shared with `formats.yaml` (`../config/yaml-source.ts`), because doing it
+ * twice would be two chances to do it differently.
  */
 export function parseManifest(source: string, path: string): Result<TemplateManifest, Diagnostics> {
-  const document = parseDocument(source);
+  const parsed = parseYamlConfig(source, templateManifestSchema, {
+    syntax: (problem, range) => diagnostic('E_MANIFEST_SYNTAX', { path, problem }, { range }),
+    shape: (key, problem, range) =>
+      diagnostic('E_MANIFEST_SHAPE', { path: key, problem }, range === undefined ? {} : { range }),
+  });
 
-  if (document.errors.length > 0) {
-    return err(
-      document.errors.map((error) =>
-        diagnostic(
-          'E_MANIFEST_SYNTAX',
-          { path, problem: error.message.split('\n')[0] ?? error.message },
-          { range: sourceRange(error.pos[0], Math.min(error.pos[1], source.length)) },
-        ),
-      ),
-    );
-  }
-
-  const parsed = templateManifestSchema.safeParse(document.toJS());
-  if (!parsed.success) {
-    return err(parsed.error.issues.flatMap((issue) => shapeDiagnostics(document, issue)));
-  }
-
-  return ok(parsed.data);
-}
-
-/**
- * A `strictObject` reports every unknown key of one object in a single issue whose path
- * stops at the object. Split it, so each stray key gets its own squiggle on itself rather
- * than one shared complaint on the mapping above them.
- */
-function shapeDiagnostics(
-  document: ReturnType<typeof parseDocument>,
-  issue: z.core.$ZodIssue,
-): Diagnostic[] {
-  if (issue.code === 'unrecognized_keys') {
-    return issue.keys.map((key) => {
-      const path = [...issue.path, key];
-      return diagnostic(
-        'E_MANIFEST_SHAPE',
-        { path: issuePath(path), problem: 'unknown key' },
-        withRange(rangeAt(document, path)),
-      );
-    });
-  }
-
-  return [
-    diagnostic(
-      'E_MANIFEST_SHAPE',
-      { path: issuePath(issue.path), problem: issue.message },
-      withRange(rangeAt(document, issue.path)),
-    ),
-  ];
-}
-
-/** exactOptionalPropertyTypes tells an absent key from an undefined one. */
-function withRange(range: SourceRange | undefined): { range?: SourceRange } {
-  return range === undefined ? {} : { range };
+  return 'value' in parsed ? ok(parsed.value) : err([...parsed.diagnostics]);
 }
