@@ -81,6 +81,71 @@ export default defineTemplate(manifest, ({ slots, format, adjustments }) => fram
 
 Same nodes, same output. Use it when you need computation (text auto-fit, dynamic grids).
 
+`defineTemplate` is not built yet — it takes a manifest, and the manifest schema arrives
+with E4.1. The builders it wraps are shipped and usable today.
+
+### The SDK
+
+```ts
+import { frame, group, rect, text, image, vector } from '@tyto/core/template';
+import {
+  color,
+  solid,
+  linearGradient,
+  radialGradient,
+  imagePaint,
+  stop,
+  font,
+  run,
+} from '@tyto/core/template';
+```
+
+`frame({ format, size, background?, children?, idPrefix? })` returns IR. The six node
+builders return **drafts** — every field filled except the id — and `frame()` turns them
+into nodes. Write only what differs from the default: transform, opacity, blend mode,
+visibility, clip and effects are supplied, and `transform: { y: 660 }` keeps the rest of
+the identity.
+
+```ts
+frame({
+  format: 'feed',
+  size: { w: 1080, h: 1080 },
+  background: solid('#0c0e14'),
+  children: [
+    image({ asset: imagem, size: { w: 1080, h: 620 } }),
+    group({
+      id: 'copy',
+      transform: { y: 660 },
+      children: [
+        text({
+          box: { w: 920 },
+          lineHeight: 1.1,
+          overflow: 'shrink',
+          runs: [run('Turma nova', { font: font('Inter'), size: 96, weight: 700, color: '#fff' })],
+        }),
+      ],
+    }),
+  ],
+});
+```
+
+- **Ids are optional and derived from position.** The example produces `feed.0`, `copy`
+  and `copy.0`: the path segment is the node's own id when it has one, so reordering a
+  sibling above a named group does not rewrite its children. A generated id is stable
+  across runs — it is derived, not counted — which is what determinism requires.
+- **Ids must be unique across the whole scene, and a frame only sees its own subtree.**
+  Two artworks with a `feed` frame each would both generate `feed.0`. Pass `idPrefix` (the
+  compile stage passes the artwork id) or `parseScene` reports `E_SCENE_DUPLICATE_ID`.
+- **Colour is written as CSS and stored as channels.** `color()` reads `#rgb`, `#rgba`,
+  `#rrggbb` and `#rrggbbaa`; `solid`, `stop` and `run` take a hex string directly. There
+  are no named colours in the SDK — `white` is the stylesheet's word, not a value's.
+- **Misuse is a type error where a type can hold it.** A `text` without runs and a
+  gradient with fewer than two stops do not compile. What a type cannot check is a hex
+  string's contents: `color('#gggggg')` throws a `TemplateError` carrying a ready
+  `E_TEMPLATE_VALUE` diagnostic, because a bad colour literal is a bug in code and not
+  something a brief author can cause.
+- **Builders do not validate.** Zod is the validator and `parseScene` is where it runs.
+
 ## Agent workflow
 
 1. Read `manifest.yaml` and this document.
