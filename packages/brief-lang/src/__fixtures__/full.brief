@@ -1,0 +1,16 @@
+---
+template: promo-curso
+formats: [feed, story]
+imagem: ./prof-ana.png
+---
+// abertura
+::titulo Direito **Constitucional**
+::subtitulo Aulas ao vivo toda semana
+
+::slide
+  O que cai na prova
+::slide {destaque}
+  Como estudar
+::slide {destaque, cor: laranja}
+  Garanta sua {cor:branco}vaga{/}
+::ai/caption Legenda
