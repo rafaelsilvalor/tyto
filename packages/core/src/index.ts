@@ -63,6 +63,17 @@ export type {
   Text,
 } from './brief/ast.js';
 
+export { compile } from './brief/compile.js';
+
+export {
+  type Template,
+  type TemplateBuild,
+  type TemplateContext,
+  defineTemplate,
+} from './template/define.js';
+
+export { type RunStyle, type RunsOptions, runsOf } from './template/runs.js';
+
 export {
   type ResolveOptions,
   type ResolvedAdjustment,
