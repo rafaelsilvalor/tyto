@@ -41,10 +41,15 @@ generate:parser` builds it, and the generated parser is build output rather than
 committed. These are the questions the prose above left open, answered where the grammar
 had to answer them.
 
-- **Emphasis nests strictly downwards.** A mark may hold bold, bold may hold italic, italic
-  holds only text. `*a*b*c*` is ambiguous in Markdown proper — is the second star closing
-  the first or opening a nested one? — and Markdown resolves it with delimiter runs, which
-  an LR parser cannot do. Two levels is what the language promised anyway.
+- **Emphasis nests, but never inside its own kind.** Bold may hold italic and italic may
+  hold bold, so `**a *b* c**` and `*a **b** c*` both parse; neither may hold itself.
+  `*a*b*c*` is ambiguous in Markdown proper — is the second star closing the first or
+  opening a nested one? — and Markdown resolves it with delimiter runs, which an LR parser
+  cannot do (ADR 0015).
+- **Two closers cannot touch.** `**bold *italic***` does not parse: longest match reads the
+  trailing `***` as `**` then `*`, leaving both runs open. Write `**bold *italic* **` or
+  reorder so text separates the closers. The error lands at the end of the line, repeated
+  once per open run — the editor collapses it before showing a squiggle.
 - **The first `{…}` after a directive name is an adjustment list.** A mark opens the same
   way, so `::titulo {cor:azul}oi{/}` reads `{cor:azul}` as an adjustment. Put text before
   the mark, or put it in an indented body, where a mark may lead the line.
@@ -77,5 +82,5 @@ had to answer them.
 ```ts
 BriefAst  { frontmatter: Record<string, unknown>; directives: Directive[]; range }
 Directive { name; namespace?; adjustments: Adjustment[]; body: RichText; range }
-RichText  = Inline[]; Inline = Text | Bold | Italic | Break | Mark{key, value, children}
+RichText  = Inline[]; Inline = Text | Bold{children} | Italic{children} | Break | Mark{key, value, children}
 ```

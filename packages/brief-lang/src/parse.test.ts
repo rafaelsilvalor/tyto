@@ -4,6 +4,7 @@ import adjustmentsFlag from './__fixtures__/adjustments-flag.brief?raw';
 import adjustmentsMany from './__fixtures__/adjustments-many.brief?raw';
 import adjustmentsPair from './__fixtures__/adjustments-pair.brief?raw';
 import blankLines from './__fixtures__/blank-lines.brief?raw';
+import brokenAdjacentEmphasis from './__fixtures__/broken-adjacent-emphasis.brief?raw';
 import brokenFrontmatter from './__fixtures__/broken-frontmatter.brief?raw';
 import brokenNamelessDirective from './__fixtures__/broken-nameless-directive.brief?raw';
 import brokenOrphanIndent from './__fixtures__/broken-orphan-indent.brief?raw';
@@ -20,6 +21,7 @@ import inlineBoldItalic from './__fixtures__/inline-bold-italic.brief?raw';
 import lineBreak from './__fixtures__/line-break.brief?raw';
 import mark from './__fixtures__/mark.brief?raw';
 import minimal from './__fixtures__/minimal.brief?raw';
+import nestedEmphasis from './__fixtures__/nested-emphasis.brief?raw';
 import noTrailingNewline from './__fixtures__/no-trailing-newline.brief?raw';
 import pluginDirective from './__fixtures__/plugin-directive.brief?raw';
 import repeatable from './__fixtures__/repeatable.brief?raw';
@@ -45,6 +47,7 @@ const valid = {
   'adjustments-many.brief': adjustmentsMany,
   'repeatable.brief': repeatable,
   'inline-bold-italic.brief': inlineBoldItalic,
+  'nested-emphasis.brief': nestedEmphasis,
   'mark.brief': mark,
   'line-break.brief': lineBreak,
   'escaped-directive.brief': escapedDirective,
@@ -57,6 +60,7 @@ const valid = {
 
 const broken = {
   'broken-unclosed-bold.brief': brokenUnclosedBold,
+  'broken-adjacent-emphasis.brief': brokenAdjacentEmphasis,
   'broken-unclosed-mark.brief': brokenUnclosedMark,
   'broken-unclosed-adjustment.brief': brokenUnclosedAdjustment,
   'broken-frontmatter.brief': brokenFrontmatter,
@@ -138,6 +142,19 @@ describe('where the error lands', () => {
     expect(errorRanges(brokenUnclosedBold)).toEqual([{ from: 33, to: 33, text: '' }]);
   });
 
+  it('piles the adjacent-emphasis error at the end of the line', () => {
+    // `**Constitucional *aplicado***`: longest match reads the trailing `***` as `**`
+    // then `*`, so both runs are left open and recovery inserts both closers at EOF.
+    // Four identical empty nodes is the noise that costs — E8.1 has to collapse them by
+    // offset before drawing squiggles, or the author sees four warnings for one mistake.
+    expect(errorRanges(brokenAdjacentEmphasis)).toEqual([
+      { from: 46, to: 46, text: '' },
+      { from: 46, to: 46, text: '' },
+      { from: 46, to: 46, text: '' },
+      { from: 46, to: 46, text: '' },
+    ]);
+  });
+
   it('marks the end of a mark that never closed', () => {
     expect(errorRanges(brokenUnclosedMark)).toEqual([{ from: 38, to: 38, text: '' }]);
   });
@@ -198,6 +215,20 @@ describe('the shapes the language promises', () => {
   it('reads bold and italic without letting either swallow the other', () => {
     expect(nodesNamed(inlineBoldItalic, 'Bold')).toEqual(['**Constitucional**']);
     expect(nodesNamed(inlineBoldItalic, 'Italic')).toEqual(['*Administrativo*']);
+  });
+
+  it('nests emphasis in both directions, but never inside its own kind', () => {
+    // ADR 0015: bold holds italic and italic holds bold, so an author does not have to
+    // remember which order the grammar happens to accept. Neither holds itself, because
+    // that is the ambiguity an LR parser cannot resolve.
+    expect(nodesNamed(nestedEmphasis, 'Bold')).toEqual([
+      '**Turma nova de *Direito Constitucional* agora**',
+      '**turmas presenciais**',
+    ]);
+    expect(nodesNamed(nestedEmphasis, 'Italic')).toEqual([
+      '*Direito Constitucional*',
+      '*Vagas para **turmas presenciais** neste mês*',
+    ]);
   });
 
   it('reads a mark with its key, its value and the text it wraps', () => {
