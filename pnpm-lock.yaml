@@ -176,6 +176,12 @@ importers:
       '@lezer/lr':
         specifier: ^1.4.10
         version: 1.4.10
+      '@tyto/core':
+        specifier: workspace:*
+        version: link:../core
+      yaml:
+        specifier: ^2.9.0
+        version: 2.9.0
     devDependencies:
       '@lezer/generator':
         specifier: ^1.8.0
