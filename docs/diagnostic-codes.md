@@ -27,7 +27,7 @@ successful result (ADR 0013).
 | `E_SCENE_MASK_DESCENDANT` | error | A mask references a descendant of the node it masks. |
 | `E_SCENE_FONT_NOT_DECLARED` | error | Text uses a font family the scene does not declare. |
 | `E_SCENE_ASSET_NOT_DECLARED` | error | A node or paint uses an asset the scene does not declare. |
-| `E_SCENE_EMPTY_TEXT` | error | A text node carries no runs, so there is nothing to render. |
+| `E_SCENE_EMPTY_TEXT` | error | A text node has nothing to draw — no runs at all, or only line breaks. |
 | `E_TEMPLATE_VALUE` | error | A template SDK builder was given a value it cannot turn into IR. |
 | `E_TEMPLATE_CRASH` | error | A template threw while building its scene, which is a bug in the template. |
 | `E_MANIFEST_SYNTAX` | error | A template manifest is not valid YAML. |
@@ -259,10 +259,10 @@ Parameters: `id`, `assetId`
 
 **Severity:** error · **Spec:** `docs/ir-schema.md`
 
-A text node carries no runs, so there is nothing to render.
+A text node has nothing to draw — no runs at all, or only line breaks.
 
 ```
-Text node '{id}' has no runs; there is nothing to render.
+Text node '{id}' has nothing to draw; it needs at least one run of text.
 ```
 
 Parameters: `id`

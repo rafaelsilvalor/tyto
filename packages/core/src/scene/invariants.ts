@@ -55,7 +55,8 @@ function nodeAssetIds(node: SceneNode): string[] {
     case 'vector':
       return [...paintAssetIds(node.fill), ...paintAssetIds(node.stroke?.paint)];
     case 'text':
-      return node.runs.flatMap((run) => paintAssetIds(run.color));
+      // A break has no colour to pull an asset in through (ADR 0016).
+      return node.runs.flatMap((run) => (run.kind === 'break' ? [] : paintAssetIds(run.color)));
     case 'group':
       return [];
   }
@@ -100,7 +101,10 @@ function undeclaredFonts(scene: Scene, records: readonly NodeRecord[]): Diagnost
   return records.flatMap(({ node }) => {
     if (node.kind !== 'text') return [];
     const missing = new Set(
-      node.runs.map((run) => run.font.family).filter((family) => !declared.has(family)),
+      node.runs
+        .filter((run) => run.kind === 'text')
+        .map((run) => run.font.family)
+        .filter((family) => !declared.has(family)),
     );
     return [...missing].map((family) =>
       diagnostic('E_SCENE_FONT_NOT_DECLARED', { id: node.id, family }),
@@ -136,9 +140,16 @@ function undeclaredAssets(scene: Scene, records: readonly NodeRecord[]): Diagnos
   return [...fromNodes, ...fromBackgrounds];
 }
 
+/**
+ * A text node has to draw something.
+ *
+ * Since ADR 0016 a run may be a line break, and a node whose runs are all breaks renders
+ * exactly as much as one with no runs at all — nothing. The rule that caught the second
+ * now catches both, which is why it asks for a span rather than for a length.
+ */
 function emptyText(records: readonly NodeRecord[]): Diagnostic[] {
   return records
-    .filter(({ node }) => node.kind === 'text' && node.runs.length === 0)
+    .filter(({ node }) => node.kind === 'text' && !node.runs.some((run) => run.kind === 'text'))
     .map(({ node }) => diagnostic('E_SCENE_EMPTY_TEXT', { id: node.id }));
 }
 
