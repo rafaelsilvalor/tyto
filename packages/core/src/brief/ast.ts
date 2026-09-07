@@ -1,4 +1,4 @@
-import type { SourceRange } from '@tyto/core';
+import type { SourceRange } from '../source/range.js';
 
 /**
  * The typed shape a brief compiles to (`docs/brief-language.md`, AST section).
@@ -11,7 +11,15 @@ import type { SourceRange } from '@tyto/core';
  *
  * Every node carries a `range`, half-open UTF-16 offsets into the brief that produced it,
  * so a diagnostic raised three stages later still points at the character the author
- * wrote. Pure: no Node, no DOM (ADR 0010).
+ * wrote.
+ *
+ * It lives in `core` rather than in `brief-lang` for the same reason `Scene` does: the
+ * package that produces a vocabulary type is not the package that owns it. `brief-lang`
+ * builds a `BriefAst` and re-exports these types for a caller that only talks to the
+ * parser; `resolve` consumes one, and `docs/architecture.md` puts `resolve` in `core`.
+ * With `brief-lang` depending on `core`, `core` importing back would be a cycle.
+ *
+ * Pure: no Node, no DOM (ADR 0010).
  */
 
 /** Plain text. `value` is decoded — `\::` in the source arrives here as `::`. */
@@ -75,13 +83,27 @@ export interface Directive {
 }
 
 /**
- * `frontmatter` is whatever the YAML block parsed to, unvalidated: this stage knows the
- * language, not the templates, and `template` or `formats` being absent or the wrong type
- * is `resolve`'s diagnostic to raise (E3.3). An absent block gives an empty object rather
- * than `undefined`, so no caller has to branch on it.
+ * The YAML block, parsed but not judged.
+ *
+ * `data` is whatever the YAML said: the parse stage knows the language, not the templates,
+ * so `template` being absent or `formats` being a number is `resolve`'s diagnostic to
+ * raise. An absent block gives an empty `data` rather than `undefined`, so no caller has
+ * to branch on it.
+ *
+ * `ranges` is what makes those diagnostics pointable. A key's value is a plain `unknown`
+ * by the time it reaches `resolve`, and "this slot is not declared" has to underline the
+ * key that said so, not the whole block.
  */
+export interface Frontmatter {
+  readonly data: Readonly<Record<string, unknown>>;
+  /** The span of each top-level key, by key. */
+  readonly ranges: Readonly<Record<string, SourceRange>>;
+  /** The whole block, fences included; absent on a brief that has no frontmatter. */
+  readonly range?: SourceRange;
+}
+
 export interface BriefAst {
-  readonly frontmatter: Readonly<Record<string, unknown>>;
+  readonly frontmatter: Frontmatter;
   readonly directives: readonly Directive[];
   readonly range: SourceRange;
 }
