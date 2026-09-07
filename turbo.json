@@ -3,18 +3,18 @@
   "ui": "stream",
   "tasks": {
     "build": {
-      "dependsOn": ["^build"],
+      "dependsOn": ["^build", "generate:parser"],
       "outputs": ["dist/**"]
     },
     "typecheck": {
-      "dependsOn": ["^build"],
+      "dependsOn": ["^build", "generate:parser"],
       "outputs": []
     },
     "lint": {
       "outputs": []
     },
     "test": {
-      "dependsOn": ["^build"],
+      "dependsOn": ["^build", "generate:parser"],
       "outputs": []
     },
     "test:visual": {
@@ -24,6 +24,9 @@
     "dev": {
       "cache": false,
       "persistent": true
+    },
+    "generate:parser": {
+      "outputs": ["src/*.parser.js", "src/*.parser.terms.js"]
     }
   }
 }

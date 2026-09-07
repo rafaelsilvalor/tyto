@@ -1,9 +1,14 @@
 /**
  * @tyto/brief-lang — Lezer grammar and parser for the brief language.
  *
- * Produces a typed `BriefAst` and doubles as the editor's syntax definition, so the
- * compiler and the editor can never disagree about what a brief means.
+ * One grammar, two consumers: `parseBrief` (E3.2) turns the tree into a typed `BriefAst`,
+ * and the editor (E8.1) hangs highlighting off the same nodes. That is the point of
+ * shipping the grammar rather than a hand-written parser — the compiler and the editor
+ * cannot disagree about what a brief means, because they read the same tree.
  *
- * Filled in by epic E3.
+ * Pure: no Node, no DOM (ADR 0010).
  */
-export {};
+
+export { parser } from './brief.parser.js';
+
+export { briefHighlighting } from './highlight.js';

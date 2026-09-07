@@ -1,0 +1,6 @@
+::slide
+  Primeiro
+::slide {destaque}
+  Segundo
+::slide
+  Terceiro
