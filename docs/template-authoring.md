@@ -117,8 +117,56 @@ export default defineTemplate(manifest, ({ slots, format, adjustments }) => fram
 
 Same nodes, same output. Use it when you need computation (text auto-fit, dynamic grids).
 
-`defineTemplate` is not built yet. The manifest schema it takes is shipped, and so are the
-builders it wraps; wiring the two is E4.2.
+`defineTemplate(manifest, build)` pairs a manifest with the function `compile` calls **once
+per (artwork, format)**. It does nothing else — no registration, no lifecycle, no state. A
+template that needs to know where it is in a scene reads its context rather than
+remembering.
+
+```ts
+build: (context: TemplateContext) => Frame;
+```
+
+| `context`     | What it is                                                                                                                               |
+| ------------- | ---------------------------------------------------------------------------------------------------------------------------------------- |
+| `format`      | the format this call is for, one of the manifest's                                                                                       |
+| `idPrefix`    | **pass it to `frame({ idPrefix })`** — see below                                                                                         |
+| `artwork`     | `{ id, index, count }`, so a slide can number itself `2/3`                                                                               |
+| `slots`       | every slot the brief gave a value, with the repeatable one already resolved to _this_ artwork's occurrence — `slots.slide` is this slide |
+| `adjustments` | this artwork's, flattened: `true` for a flag, the value for an enum                                                                      |
+
+**Pass `idPrefix` or the scene will not validate.** Node ids are derived from position, so
+two artworks with a `feed` frame each would both generate `feed.0`, and so would the two
+formats of one artwork. The prefix carries both — `slide-1.feed` — and a template that
+ignores it produces duplicate ids that `parseScene` reports as `E_SCENE_DUPLICATE_ID`.
+
+### `runsOf` — rich text into runs
+
+The brief says what is emphasised; the template says what emphasis looks like.
+
+```ts
+runsOf(text, { font, size, color }, { bold: 700, mark: (key, value) => ({ color: '#ff5900' }) });
+```
+
+Bold becomes a weight, italic becomes a style, and a `Break` becomes a `LineBreak` run
+rather than a `
+` in a string (ADR 0016). Marks are the part no default can cover:
+`{cor:laranja}` names a colour in the template's own vocabulary, so the template supplies
+the mapping, and a mark nothing maps passes its children through unchanged.
+
+### What `compile` does with the result
+
+It calls the function once per (artwork, format), collects the fonts and assets **the scene
+reached for** — an asset `resolve` found and the template chose not to draw is in neither
+list — and hands the whole thing to `parseScene`. A template is code, and code that
+produces IR is exactly the code whose output is validated rather than trusted.
+
+Nothing a template throws escapes (ADR 0014): a `TemplateError` carries the diagnostic it
+built, and anything else becomes `E_TEMPLATE_CRASH`. Returning a frame for a format it was
+not asked for is caught too — that is a template that mixed up its own branches, and the
+scene would otherwise render the story layout under the feed's name.
+
+**Frame size comes from the template**, as the example below writes it. `formats.yaml` is
+what the HTML path will read (E4.3); the TS path has the number in hand and states it.
 
 ### The SDK
 
