@@ -106,7 +106,11 @@ rename. These are the choices that gap forced, and where each one shows.
   produces. The author wrote three lines and means three lines, the language has no other
   way to say so, and concatenating them would glue two words together. No break is emitted
   before the first line of a block, where the boundary separates the body from the
-  directive name rather than one line of text from the next.
+  directive name rather than one line of text from the next. One `Break` serves both,
+  rather than a soft and a hard kind, because nothing downstream would tell them apart:
+  the overflow strategies are `clip`, `shrink` and `grow`, all of which change size, and
+  none of which reflows by collapsing a break. **Where a `Break` lands in the Scene IR is
+  open** — `TextRun` has no representation for one at all, which is TYTO-55.
 - **A directive's range stops before the line break that ends it.** The break is
   punctuation; an editor squiggle that ran onto the next line would be pointing at it.
 - **One diagnostic per position.** Two touching closers leave four error nodes at the same
