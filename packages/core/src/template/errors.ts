@@ -11,7 +11,9 @@ import { type Diagnostic, diagnostic } from '../diagnostics/diagnostic.js';
  * builder's return type.
  *
  * It carries the `Diagnostic` already built, so the stage that runs the template (E4.2)
- * catches and collects it without having to invent a message of its own.
+ * catches and collects it without having to invent a message of its own. That stage
+ * catches every exception a template throws, not only this one: anything else is a bug in
+ * third-party code and becomes `E_TEMPLATE_CRASH` (ADR 0014).
  */
 export class TemplateError extends Error {
   readonly diagnostic: Diagnostic;

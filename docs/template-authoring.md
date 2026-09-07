@@ -143,7 +143,10 @@ frame({
   gradient with fewer than two stops do not compile. What a type cannot check is a hex
   string's contents: `color('#gggggg')` throws a `TemplateError` carrying a ready
   `E_TEMPLATE_VALUE` diagnostic, because a bad colour literal is a bug in code and not
-  something a brief author can cause.
+  something a brief author can cause. `color()` is the only builder that throws, and the
+  exception stops at `compile`, which catches everything a template throws and turns it
+  into diagnostics — a `TemplateError` into the one it carries, anything else into
+  `E_TEMPLATE_CRASH`. A broken template produces diagnostics, never a crash (ADR 0014).
 - **Builders do not validate.** Zod is the validator and `parseScene` is where it runs.
 
 ## Agent workflow
