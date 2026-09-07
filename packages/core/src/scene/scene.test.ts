@@ -6,7 +6,9 @@ import emptyText from './__fixtures__/invalid-empty-text.json';
 import fontNotDeclared from './__fixtures__/invalid-font-not-declared.json';
 import maskDescendant from './__fixtures__/invalid-mask-descendant.json';
 import maskNotFound from './__fixtures__/invalid-mask-not-found.json';
+import onlyBreaks from './__fixtures__/invalid-only-breaks.json';
 import invalidShape from './__fixtures__/invalid-shape.json';
+import validLineBreaks from './__fixtures__/valid-line-breaks.json';
 import validPromo from './__fixtures__/valid-promo.json';
 import { identityTransform } from './primitives.js';
 import { isScene, parseScene, sceneSchema } from './scene.js';
@@ -138,6 +140,15 @@ describe('invariants', () => {
     expect(errors[0]?.message).toContain("'silent'");
   });
 
+  it('rejects a text node whose runs are all line breaks', () => {
+    // Breaks draw exactly as much as no runs at all, so the rule that caught the second
+    // catches the first: it asks for a span, not for a length (ADR 0016).
+    const errors = errorsOf(onlyBreaks);
+
+    expect(codes(errors)).toEqual(['E_SCENE_EMPTY_TEXT']);
+    expect(errors[0]?.message).toContain("'so-quebras'");
+  });
+
   it('reports every problem in one pass rather than the first one repeatedly', () => {
     const scene = {
       version: 1,
@@ -261,5 +272,98 @@ describe('invariants', () => {
     };
 
     expect(codes(errorsOf(scene))).toEqual(['E_SCENE_DUPLICATE_ID']);
+  });
+});
+
+describe('line breaks in a run list (ADR 0016)', () => {
+  it('accepts one leading, one trailing and two in a row', () => {
+    // An empty line is a thing an author asks for, and the brief language produces all
+    // three shapes. The IR records what was asked for; whether it fits is E4.5's question.
+    const parsed = parseScene(validLineBreaks);
+
+    expect(parsed.ok).toBe(true);
+    if (parsed.ok) {
+      const node = parsed.value.artworks[0]?.frames[0]?.children[0];
+      expect(node?.kind).toBe('text');
+      expect(node?.kind === 'text' && node.runs.map((run) => run.kind)).toEqual([
+        'break',
+        'text',
+        'break',
+        'break',
+        'text',
+        'break',
+      ]);
+    }
+  });
+
+  it('gives a break no fields to carry, because it has no glyph', () => {
+    const withExtras = {
+      version: 1,
+      fonts: [{ family: 'Inter', source: 'bundled' }],
+      artworks: [
+        {
+          id: 'a',
+          frames: [
+            {
+              format: 'feed',
+              size: { w: 10, h: 10 },
+              children: [
+                {
+                  kind: 'text',
+                  id: 't',
+                  box: {},
+                  align: 'left',
+                  valign: 'top',
+                  lineHeight: 1.2,
+                  overflow: 'clip',
+                  runs: [{ kind: 'break', size: 12 }],
+                },
+              ],
+            },
+          ],
+        },
+      ],
+    };
+
+    const parsed = parseScene(withExtras);
+    expect(parsed.ok).toBe(false);
+    if (!parsed.ok) expect(parsed.error[0]?.code).toBe('E_SCENE_SHAPE');
+  });
+
+  it('tells a reader which member of the union was wrong, not both', () => {
+    // The point of tagging: Zod reports against the `break` branch alone, rather than
+    // complaining that a break is missing `font`, `size`, `weight`, `style` and `color`.
+    const parsed = parseScene({
+      version: 1,
+      artworks: [
+        {
+          id: 'a',
+          frames: [
+            {
+              format: 'feed',
+              size: { w: 10, h: 10 },
+              children: [
+                {
+                  kind: 'text',
+                  id: 't',
+                  box: {},
+                  align: 'left',
+                  valign: 'top',
+                  lineHeight: 1.2,
+                  overflow: 'clip',
+                  runs: [{ kind: 'quebra' }],
+                },
+              ],
+            },
+          ],
+        },
+      ],
+    });
+
+    expect(parsed.ok).toBe(false);
+    if (!parsed.ok) {
+      expect(parsed.error).toHaveLength(1);
+      expect(parsed.error[0]?.message).toContain('runs.0');
+    }
   });
 });

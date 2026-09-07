@@ -42,6 +42,7 @@ export {
   imagePaint,
   linearGradient,
   radialGradient,
+  lineBreak,
   run,
   solid,
   stop,
