@@ -144,6 +144,7 @@ describe('what `exact` admits to', () => {
                   overflow: 'grow',
                   runs: [
                     {
+                      kind: 'text',
                       text: 'x',
                       font: { family: 'Inter', source: 'bundled' },
                       size: 12,

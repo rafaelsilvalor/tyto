@@ -8,7 +8,7 @@ import type {
   Paint,
   UnitPoint,
 } from '../scene/primitives.js';
-import type { TextRun } from '../scene/nodes.js';
+import type { LineBreak, TextSpan } from '../scene/nodes.js';
 
 /**
  * The leaf values a template writes, in the form a template author wants to write them.
@@ -114,8 +114,9 @@ function paintOf(value: string | ColorChannels | Paint): Paint {
  * One run of text in one style. Weight defaults to 400 and style to normal, because a
  * template that says neither means body text.
  */
-export function run(text: string, options: RunOptions): TextRun {
+export function run(text: string, options: RunOptions): TextSpan {
   return {
+    kind: 'text',
     text,
     font: options.font,
     size: options.size,
@@ -124,4 +125,15 @@ export function run(text: string, options: RunOptions): TextRun {
     color: paintOf(options.color),
     ...(options.decoration !== undefined ? { decoration: options.decoration } : {}),
   };
+}
+
+/**
+ * A line ends here (ADR 0016).
+ *
+ * It takes no options because it has no glyph — the runs around it decide what the line it
+ * ends looks like. A template writes `[run('Turma'), lineBreak(), run('nova')]` for text
+ * the author broke in two.
+ */
+export function lineBreak(): LineBreak {
+  return { kind: 'break' };
 }

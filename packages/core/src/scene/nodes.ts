@@ -53,7 +53,8 @@ export type TextVerticalAlign = z.infer<typeof textVerticalAlignSchema>;
 export const textOverflowSchema = z.enum(['clip', 'shrink', 'grow']);
 export type TextOverflow = z.infer<typeof textOverflowSchema>;
 
-export const textRunSchema = z.strictObject({
+export const textSpanSchema = z.strictObject({
+  kind: z.literal('text'),
   text: z.string(),
   font: fontRefSchema,
   size: z.number().finite().positive(),
@@ -68,6 +69,29 @@ export const textRunSchema = z.strictObject({
   color: paintSchema,
   decoration: z.enum(['underline', 'line-through']).optional(),
 });
+export type TextSpan = z.infer<typeof textSpanSchema>;
+
+/**
+ * A line ends here.
+ *
+ * It carries no styling because it has no glyph: the runs around it decide what the line
+ * looks like. Leading, trailing and consecutive breaks are all legal — they are how an
+ * author asks for an empty line, and the brief language produces all three (ADR 0016).
+ */
+export const lineBreakSchema = z.strictObject({ kind: z.literal('break') });
+export type LineBreak = z.infer<typeof lineBreakSchema>;
+
+/**
+ * A run is a span of styled text or a break between two lines.
+ *
+ * A break is a node in the list rather than a `
+` inside a span's text, so that no
+ * exporter ever scans a string to find one — the same rule that keeps colour structured
+ * (`docs/ir-schema.md`, ADR 0016). SVG has no automatic line breaking and has to split
+ * into positioned `<tspan>` elements either way; reading the split off the list is that
+ * work done once, in the IR, instead of once per exporter.
+ */
+export const textRunSchema = z.discriminatedUnion('kind', [textSpanSchema, lineBreakSchema]);
 export type TextRun = z.infer<typeof textRunSchema>;
 
 /**

@@ -135,8 +135,8 @@ export const diagnosticCodes = {
   },
   E_SCENE_EMPTY_TEXT: {
     severity: 'error',
-    summary: 'A text node carries no runs, so there is nothing to render.',
-    template: "Text node '{id}' has no runs; there is nothing to render.",
+    summary: 'A text node has nothing to draw — no runs at all, or only line breaks.',
+    template: "Text node '{id}' has nothing to draw; it needs at least one run of text.",
     spec: 'docs/ir-schema.md',
   },
   E_TEMPLATE_VALUE: {
