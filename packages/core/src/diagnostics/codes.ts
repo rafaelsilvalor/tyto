@@ -127,6 +127,30 @@ export const diagnosticCodes = {
     template: "Template '{template}' failed while building the scene: {problem}.",
     spec: 'docs/template-authoring.md',
   },
+  E_MANIFEST_SYNTAX: {
+    severity: 'error',
+    summary: 'A template manifest is not valid YAML.',
+    template: "Manifest '{path}' is not valid YAML: {problem}.",
+    spec: 'docs/template-authoring.md',
+  },
+  E_MANIFEST_SHAPE: {
+    severity: 'error',
+    summary: 'A template manifest parses as YAML but does not match the manifest schema.',
+    template: "Manifest is invalid at '{path}': {problem}.",
+    spec: 'docs/template-authoring.md',
+  },
+  E_TEMPLATE_DUPLICATE: {
+    severity: 'error',
+    summary: 'Two template folders declare the same manifest name.',
+    template: "Template name '{name}' is declared by both '{first}' and '{second}'.",
+    spec: 'docs/template-authoring.md',
+  },
+  E_TEMPLATE_READ: {
+    severity: 'error',
+    summary: 'A template folder or manifest could not be read from the filesystem.',
+    template: "Could not read '{path}': {problem}.",
+    spec: 'docs/template-authoring.md',
+  },
   W_TEXT_OVERFLOW: {
     severity: 'warning',
     summary: 'Compiled text does not fit its frame in one of the requested formats.',

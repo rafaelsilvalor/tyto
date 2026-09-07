@@ -26,6 +26,10 @@ successful result (ADR 0013).
 | `E_SCENE_EMPTY_TEXT` | error | A text node carries no runs, so there is nothing to render. |
 | `E_TEMPLATE_VALUE` | error | A template SDK builder was given a value it cannot turn into IR. |
 | `E_TEMPLATE_CRASH` | error | A template threw while building its scene, which is a bug in the template. |
+| `E_MANIFEST_SYNTAX` | error | A template manifest is not valid YAML. |
+| `E_MANIFEST_SHAPE` | error | A template manifest parses as YAML but does not match the manifest schema. |
+| `E_TEMPLATE_DUPLICATE` | error | Two template folders declare the same manifest name. |
+| `E_TEMPLATE_READ` | error | A template folder or manifest could not be read from the filesystem. |
 | `W_TEXT_OVERFLOW` | warning | Compiled text does not fit its frame in one of the requested formats. |
 | `W_UNUSED_SLOT` | warning | The brief sets a slot the chosen template never renders. |
 
@@ -234,6 +238,54 @@ Template '{template}' failed while building the scene: {problem}.
 ```
 
 Parameters: `template`, `problem`
+
+### `E_MANIFEST_SYNTAX`
+
+**Severity:** error · **Spec:** `docs/template-authoring.md`
+
+A template manifest is not valid YAML.
+
+```
+Manifest '{path}' is not valid YAML: {problem}.
+```
+
+Parameters: `path`, `problem`
+
+### `E_MANIFEST_SHAPE`
+
+**Severity:** error · **Spec:** `docs/template-authoring.md`
+
+A template manifest parses as YAML but does not match the manifest schema.
+
+```
+Manifest is invalid at '{path}': {problem}.
+```
+
+Parameters: `path`, `problem`
+
+### `E_TEMPLATE_DUPLICATE`
+
+**Severity:** error · **Spec:** `docs/template-authoring.md`
+
+Two template folders declare the same manifest name.
+
+```
+Template name '{name}' is declared by both '{first}' and '{second}'.
+```
+
+Parameters: `name`, `first`, `second`
+
+### `E_TEMPLATE_READ`
+
+**Severity:** error · **Spec:** `docs/template-authoring.md`
+
+A template folder or manifest could not be read from the filesystem.
+
+```
+Could not read '{path}': {problem}.
+```
+
+Parameters: `path`, `problem`
 
 ## Warnings
 
