@@ -1,6 +1,6 @@
 {
   "name": "@tyto/brief-lang",
-  "version": "0.4.0",
+  "version": "0.4.1",
   "type": "module",
   "description": "Lezer grammar and parser for the brief language; also powers editor highlighting.",
   "license": "UNLICENSED",
