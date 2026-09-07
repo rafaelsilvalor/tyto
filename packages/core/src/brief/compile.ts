@@ -1,4 +1,5 @@
 import type { ResolvedBrief, ResolvedSlot } from './resolve.js';
+import { type FormatCatalogue, undefinedFormats } from '../config/formats.js';
 import { type Diagnostic, diagnostic } from '../diagnostics/diagnostic.js';
 import { type Diagnostics, type Result, err } from '../result/result.js';
 import type { SceneNode } from '../scene/nodes.js';
@@ -114,7 +115,24 @@ function planArtworks(resolved: ResolvedBrief, template: Template): readonly Pla
   }));
 }
 
-export function compile(resolved: ResolvedBrief, template: Template): Result<Scene, Diagnostics> {
+export interface CompileOptions {
+  /**
+   * The project's `formats.yaml`. Required, because a `Frame` has a size and this is where
+   * that number lives — a template states its layout, not its canvas.
+   */
+  readonly formats: FormatCatalogue;
+}
+
+export function compile(
+  resolved: ResolvedBrief,
+  template: Template,
+  options: CompileOptions,
+): Result<Scene, Diagnostics> {
+  // Before anything is built: a format with no size cannot produce a frame, and finding
+  // that out per artwork would report the same thing once per slide.
+  const missing = undefinedFormats(options.formats, resolved.formats, template.manifest.name);
+  if (missing.length > 0) return err(missing);
+
   const plans = planArtworks(resolved, template);
   const problems: Diagnostic[] = [];
   const artworks: Artwork[] = [];
@@ -127,6 +145,8 @@ export function compile(resolved: ResolvedBrief, template: Template): Result<Sce
     for (const format of resolved.formats) {
       const context: TemplateContext = {
         format,
+        // Defined: `undefinedFormats` above refused every format the catalogue lacks.
+        size: options.formats.sizeOf(format) ?? { w: 0, h: 0 },
         idPrefix: idPrefixOf(plan.id, format),
         artwork: { id: plan.id, index: plan.index, count: plans.length },
         slots: plan.slots,
