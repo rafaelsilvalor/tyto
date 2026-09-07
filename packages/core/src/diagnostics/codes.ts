@@ -109,6 +109,12 @@ export const diagnosticCodes = {
     template: "Text node '{id}' has no runs; there is nothing to render.",
     spec: 'docs/ir-schema.md',
   },
+  E_TEMPLATE_VALUE: {
+    severity: 'error',
+    summary: 'A template SDK builder was given a value it cannot turn into IR.',
+    template: "Template value for '{field}' is invalid: {problem}.",
+    spec: 'docs/template-authoring.md',
+  },
   W_TEXT_OVERFLOW: {
     severity: 'warning',
     summary: 'Compiled text does not fit its frame in one of the requested formats.',
