@@ -22,6 +22,12 @@ export interface DiagnosticCodeDefinition {
 }
 
 export const diagnosticCodes = {
+  E_SYNTAX: {
+    severity: 'error',
+    summary: 'The brief does not match the grammar, or its frontmatter is not valid YAML.',
+    template: 'Syntax error: {problem}.',
+    spec: 'docs/brief-language.md',
+  },
   E_UNKNOWN_SLOT: {
     severity: 'error',
     summary: 'A directive names a slot the template manifest does not declare.',

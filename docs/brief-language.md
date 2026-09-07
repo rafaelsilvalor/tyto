@@ -75,12 +75,49 @@ had to answer them.
 
 ## Diagnostics
 
-`E_UNKNOWN_SLOT`, `E_UNKNOWN_DIRECTIVE`, `E_MISSING_REQUIRED_SLOT`, `E_BAD_ADJUSTMENT`, `E_ASSET_NOT_FOUND`, `W_TEXT_OVERFLOW` (from compile), `W_UNUSED_SLOT`. All carry a `range` for the editor. Messages are English; the editor may localize them later via the code.
+`E_SYNTAX` (from parse), `E_UNKNOWN_SLOT`, `E_UNKNOWN_DIRECTIVE`, `E_MISSING_REQUIRED_SLOT`, `E_BAD_ADJUSTMENT`, `E_ASSET_NOT_FOUND`, `W_TEXT_OVERFLOW` (from compile), `W_UNUSED_SLOT`. All carry a `range` for the editor. Messages are English; the editor may localize them later via the code.
 
 ## AST
 
 ```ts
-BriefAst  { frontmatter: Record<string, unknown>; directives: Directive[]; range }
-Directive { name; namespace?; adjustments: Adjustment[]; body: RichText; range }
-RichText  = Inline[]; Inline = Text | Bold{children} | Italic{children} | Break | Mark{key, value, children}
+BriefAst   { frontmatter: Record<string, unknown>; directives: Directive[]; range }
+Directive  { name; namespace?; adjustments: Adjustment[]; body: RichText; range }
+Adjustment { name; value?; range }
+RichText   = Inline[]; Inline = Text{value} | Bold{children} | Italic{children} | Break | Mark{key, value, children}
 ```
+
+`parseBrief` in `packages/brief-lang/src/parse-brief.ts` builds it, returning
+`Result<BriefAst, Diagnostic[]>`: a brief that does not parse comes back as `Err`, never
+as a half-built AST.
+
+## What the AST settles
+
+The tree is a syntax tree and the AST is a meaning tree, so the conversion is not a
+rename. These are the choices that gap forced, and where each one shows.
+
+- **The shapes the tokenizer needed are gone.** `Namespace` loses its slash, the space
+  between a directive name and its inline body is dropped, and the `Space` nodes that
+  exist only because a `Text` token may not begin with one are merged back into the text
+  around them. Ranges stay exact through all three.
+- **A `Text` node carries what the source meant, not what it says.** `\::` arrives as
+  `::`, so its `value` is two characters where its `range` covers three. That is the only
+  place the two lengths differ, and it is what an escape is for.
+- **The line between two block lines is a `Break`** — the same node a trailing `\`
+  produces. The author wrote three lines and means three lines, the language has no other
+  way to say so, and concatenating them would glue two words together. No break is emitted
+  before the first line of a block, where the boundary separates the body from the
+  directive name rather than one line of text from the next.
+- **A directive's range stops before the line break that ends it.** The break is
+  punctuation; an editor squiggle that ran onto the next line would be pointing at it.
+- **One diagnostic per position.** Two touching closers leave four error nodes at the same
+  offset, one per open run recovery had to close — one mistake, so the first at each
+  position wins and the other three are dropped.
+- **An empty error node is read from the construct around it.** Lezer recovers by
+  inserting the missing token, which records where but not what; the enclosing node is the
+  what, so an empty error inside `Bold` reports a missing closing `**`.
+- **Comments and blank lines are dropped.** They are how a brief is written, not what it
+  says, and nothing downstream renders them.
+- **The frontmatter is parsed but not judged.** `parseBrief` reports YAML that does not
+  parse and a block that is not a mapping; a missing `template` or a `formats` of the
+  wrong type is `resolve`'s diagnostic to raise, because this stage knows the language and
+  not the templates.
