@@ -39,6 +39,7 @@ Spec: `docs/template-authoring.md`, ADR 0005.
 - **E4.3** `@tyto/template-lang`: parser for the HTML-like markup (tags, attributes, restricted CSS, `@format`, `@if`, `@each`, `extends`) → template function. AC: promo-curso in HTML yields a Scene identical to the TS version. (L)
 - **E4.4** Two built-in templates (promo-curso, carrossel-lista) with example `.brief` files. AC: render in feed and story without overflow. (M)
 - **E4.5** Text auto-fit (`overflow: shrink`) with font measurement in `core` (fontkit/opentype.js). AC: W_TEXT_OVERFLOW accurate to ±1px vs raster. (M)
+- **E4.6** `formats.yaml`: the project's format catalogue (id to size), read by `compile` and handed to a template as `context.size`. Blocks E4.3. AC: invalid file reported with the YAML path and a range; a template rendering an undefined format is a diagnostic. (S)
 
 ## E5 — Exporters and raster
 

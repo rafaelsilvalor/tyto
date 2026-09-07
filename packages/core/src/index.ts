@@ -63,7 +63,19 @@ export type {
   Text,
 } from './brief/ast.js';
 
-export { compile } from './brief/compile.js';
+export { type CompileOptions, compile } from './brief/compile.js';
+
+export {
+  type FormatCatalogue,
+  type FormatDefinition,
+  type Formats,
+  formatCatalogue,
+  formatSchema,
+  formatsSchema,
+  loadFormats,
+  parseFormats,
+  undefinedFormats,
+} from './config/formats.js';
 
 export {
   type Template,

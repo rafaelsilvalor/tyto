@@ -151,6 +151,25 @@ export const diagnosticCodes = {
     template: "Template '{template}' failed while building the scene: {problem}.",
     spec: 'docs/template-authoring.md',
   },
+  E_FORMATS_SYNTAX: {
+    severity: 'error',
+    summary: "The project's formats.yaml is not valid YAML.",
+    template: "Formats file '{path}' is not valid YAML: {problem}.",
+    spec: 'docs/template-authoring.md',
+  },
+  E_FORMATS_SHAPE: {
+    severity: 'error',
+    summary: 'A formats file parses as YAML but does not match the formats schema.',
+    template: "Formats are invalid at '{path}': {problem}.",
+    spec: 'docs/template-authoring.md',
+  },
+  E_FORMAT_NOT_DEFINED: {
+    severity: 'error',
+    summary: 'A template renders a format the project does not define a size for.',
+    template:
+      "Template '{template}' renders format '{format}', which the project does not define. Defined: {defined}.",
+    spec: 'docs/template-authoring.md',
+  },
   E_MANIFEST_SYNTAX: {
     severity: 'error',
     summary: 'A template manifest is not valid YAML.',
