@@ -33,6 +33,42 @@ adjustments:
 
 Slot names are chosen by the template author and may be in Portuguese — they are the vocabulary the brief writer sees. Keys of the manifest itself are English.
 
+`templateManifestSchema` in `packages/core/src/template/manifest.ts` is the schema, and
+`parseManifest(source, path)` is the only way in. It reports every problem in one pass,
+each carrying the YAML path of the offending key and the range of the value under it.
+These are the rules it enforces beyond the shape:
+
+- **`min` and `max` count occurrences on a repeatable slot and characters on every other
+  one** — `titulo` above is capped at 60 characters, `slide` at 10 slides. Two meanings for
+  two keys is a footgun, and it is the one the example above already writes; renaming them
+  is a change to this document, not to the schema alone.
+- **At most one slot may repeat.** Each occurrence becomes an `Artwork`, so a second
+  repeatable slot would leave the number of artworks undefined.
+- **A slot or adjustment name has to be a name a brief can write** — the grammar's
+  identifier, `[a-zA-Z_][a-zA-Z0-9_-]*`. A slot spelled any other way could never be set by
+  any brief.
+- **An `enum` lists its `values`, and nothing else may.** A `default` has to be one of them.
+- **Every `applies` entry names a declared slot**, and unknown keys anywhere are an error —
+  a misspelled key must reach its author rather than be silently ignored.
+- **`name` may not be blank or contain a space or a slash.** It reaches a shell as
+  `--template <name>` and may be joined into a path. Nothing about style is enforced.
+
+## Discovery: `TemplateRegistry`
+
+`loadTemplateRegistry(fileSystem, root)` walks `root` and reads one `manifest.yaml` per
+subfolder, through a `FileSystem` port — `core` is pure and may not import `node:fs`
+(ADR 0010). It exposes `list()`, `get(name)`, `formatsOf(name)` and `directoryOf(name)`.
+
+**It never imports or executes `template.ts` or `template.html`.** Listing templates in a
+picker and validating a brief both happen long before anyone asks for output, and neither
+moment should be able to run a third party's code. Running a template is `compile`'s job.
+
+A folder with no manifest is not a template and is skipped in silence; a folder _with_ a
+manifest that does not parse is a `failure` on the registry, and the templates around it
+still work. Two folders declaring the same `name` is a failure on the second one, so which
+template a name means does not depend on the order the filesystem listed them in. The load
+itself fails only when `root` cannot be read at all.
+
 ## template.html — Tyto markup
 
 Looks like HTML+CSS, but every tag is an IR node and the CSS is a controlled subset. No JS.
@@ -81,8 +117,8 @@ export default defineTemplate(manifest, ({ slots, format, adjustments }) => fram
 
 Same nodes, same output. Use it when you need computation (text auto-fit, dynamic grids).
 
-`defineTemplate` is not built yet — it takes a manifest, and the manifest schema arrives
-with E4.1. The builders it wraps are shipped and usable today.
+`defineTemplate` is not built yet. The manifest schema it takes is shipped, and so are the
+builders it wraps; wiring the two is E4.2.
 
 ### The SDK
 
