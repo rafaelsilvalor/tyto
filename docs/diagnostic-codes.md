@@ -9,6 +9,7 @@ successful result (ADR 0013).
 
 | Code | Severity | Summary |
 | --- | --- | --- |
+| `E_SYNTAX` | error | The brief does not match the grammar, or its frontmatter is not valid YAML. |
 | `E_UNKNOWN_SLOT` | error | A directive names a slot the template manifest does not declare. |
 | `E_UNKNOWN_DIRECTIVE` | error | A directive matches no template slot and no installed plugin. |
 | `E_MISSING_REQUIRED_SLOT` | error | The manifest marks a slot as required and the brief leaves it unset. |
@@ -29,6 +30,18 @@ successful result (ADR 0013).
 | `W_UNUSED_SLOT` | warning | The brief sets a slot the chosen template never renders. |
 
 ## Errors
+
+### `E_SYNTAX`
+
+**Severity:** error · **Spec:** `docs/brief-language.md`
+
+The brief does not match the grammar, or its frontmatter is not valid YAML.
+
+```
+Syntax error: {problem}.
+```
+
+Parameters: `problem`
 
 ### `E_UNKNOWN_SLOT`
 

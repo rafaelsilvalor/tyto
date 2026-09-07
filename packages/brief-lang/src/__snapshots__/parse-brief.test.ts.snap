@@ -1,0 +1,1213 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`the corpus, one level up from the tree > matches the recorded AST of every fixture > adjustments-flag.brief 1`] = `
+{
+  "ok": true,
+  "value": {
+    "directives": [
+      {
+        "adjustments": [
+          {
+            "name": "destaque",
+            "range": {
+              "end": 17,
+              "start": 9,
+            },
+          },
+        ],
+        "body": [
+          {
+            "kind": "text",
+            "range": {
+              "end": 33,
+              "start": 21,
+            },
+            "value": "Como estudar",
+          },
+        ],
+        "name": "slide",
+        "range": {
+          "end": 33,
+          "start": 0,
+        },
+      },
+    ],
+    "frontmatter": {},
+    "range": {
+      "end": 34,
+      "start": 0,
+    },
+  },
+  "warnings": [],
+}
+`;
+
+exports[`the corpus, one level up from the tree > matches the recorded AST of every fixture > adjustments-many.brief 1`] = `
+{
+  "ok": true,
+  "value": {
+    "directives": [
+      {
+        "adjustments": [
+          {
+            "name": "destaque",
+            "range": {
+              "end": 17,
+              "start": 9,
+            },
+          },
+          {
+            "name": "cor",
+            "range": {
+              "end": 31,
+              "start": 19,
+            },
+            "value": "laranja",
+          },
+        ],
+        "body": [
+          {
+            "kind": "text",
+            "range": {
+              "end": 53,
+              "start": 35,
+            },
+            "value": "O que cai na prova",
+          },
+        ],
+        "name": "slide",
+        "range": {
+          "end": 53,
+          "start": 0,
+        },
+      },
+    ],
+    "frontmatter": {},
+    "range": {
+      "end": 54,
+      "start": 0,
+    },
+  },
+  "warnings": [],
+}
+`;
+
+exports[`the corpus, one level up from the tree > matches the recorded AST of every fixture > adjustments-pair.brief 1`] = `
+{
+  "ok": true,
+  "value": {
+    "directives": [
+      {
+        "adjustments": [
+          {
+            "name": "cor",
+            "range": {
+              "end": 21,
+              "start": 9,
+            },
+            "value": "laranja",
+          },
+        ],
+        "body": [
+          {
+            "kind": "text",
+            "range": {
+              "end": 41,
+              "start": 25,
+            },
+            "value": "Garanta sua vaga",
+          },
+        ],
+        "name": "slide",
+        "range": {
+          "end": 41,
+          "start": 0,
+        },
+      },
+    ],
+    "frontmatter": {},
+    "range": {
+      "end": 42,
+      "start": 0,
+    },
+  },
+  "warnings": [],
+}
+`;
+
+exports[`the corpus, one level up from the tree > matches the recorded AST of every fixture > blank-lines.brief 1`] = `
+{
+  "ok": true,
+  "value": {
+    "directives": [
+      {
+        "adjustments": [],
+        "body": [
+          {
+            "kind": "text",
+            "range": {
+              "end": 11,
+              "start": 9,
+            },
+            "value": "Um",
+          },
+        ],
+        "name": "titulo",
+        "range": {
+          "end": 11,
+          "start": 0,
+        },
+      },
+      {
+        "adjustments": [],
+        "body": [
+          {
+            "kind": "text",
+            "range": {
+              "end": 29,
+              "start": 25,
+            },
+            "value": "Dois",
+          },
+        ],
+        "name": "subtitulo",
+        "range": {
+          "end": 29,
+          "start": 13,
+        },
+      },
+      {
+        "adjustments": [],
+        "body": [
+          {
+            "kind": "text",
+            "range": {
+              "end": 45,
+              "start": 41,
+            },
+            "value": "Tres",
+          },
+        ],
+        "name": "rodape",
+        "range": {
+          "end": 45,
+          "start": 32,
+        },
+      },
+    ],
+    "frontmatter": {},
+    "range": {
+      "end": 46,
+      "start": 0,
+    },
+  },
+  "warnings": [],
+}
+`;
+
+exports[`the corpus, one level up from the tree > matches the recorded AST of every fixture > broken-adjacent-emphasis.brief 1`] = `
+{
+  "error": [
+    {
+      "code": "E_SYNTAX",
+      "message": "Syntax error: an italic run is missing its closing *.",
+      "range": {
+        "end": 46,
+        "start": 46,
+      },
+      "severity": "error",
+    },
+  ],
+  "ok": false,
+}
+`;
+
+exports[`the corpus, one level up from the tree > matches the recorded AST of every fixture > broken-frontmatter.brief 1`] = `
+{
+  "error": [
+    {
+      "code": "E_SYNTAX",
+      "message": "Syntax error: unexpected '---'.",
+      "range": {
+        "end": 3,
+        "start": 0,
+      },
+      "severity": "error",
+    },
+    {
+      "code": "E_SYNTAX",
+      "message": "Syntax error: unexpected 'template:'.",
+      "range": {
+        "end": 14,
+        "start": 4,
+      },
+      "severity": "error",
+    },
+    {
+      "code": "E_SYNTAX",
+      "message": "Syntax error: unexpected 'promo-curso'.",
+      "range": {
+        "end": 25,
+        "start": 14,
+      },
+      "severity": "error",
+    },
+  ],
+  "ok": false,
+}
+`;
+
+exports[`the corpus, one level up from the tree > matches the recorded AST of every fixture > broken-nameless-directive.brief 1`] = `
+{
+  "error": [
+    {
+      "code": "E_SYNTAX",
+      "message": "Syntax error: this directive is incomplete.",
+      "range": {
+        "end": 3,
+        "start": 2,
+      },
+      "severity": "error",
+    },
+  ],
+  "ok": false,
+}
+`;
+
+exports[`the corpus, one level up from the tree > matches the recorded AST of every fixture > broken-orphan-indent.brief 1`] = `
+{
+  "error": [
+    {
+      "code": "E_SYNTAX",
+      "message": "Syntax error: an indented line must follow a directive.",
+      "range": {
+        "end": 2,
+        "start": 0,
+      },
+      "severity": "error",
+    },
+    {
+      "code": "E_SYNTAX",
+      "message": "Syntax error: this directive is incomplete.",
+      "range": {
+        "end": 2,
+        "start": 2,
+      },
+      "severity": "error",
+    },
+  ],
+  "ok": false,
+}
+`;
+
+exports[`the corpus, one level up from the tree > matches the recorded AST of every fixture > broken-unclosed-adjustment.brief 1`] = `
+{
+  "error": [
+    {
+      "code": "E_SYNTAX",
+      "message": "Syntax error: an adjustment list is missing its closing }.",
+      "range": {
+        "end": 17,
+        "start": 17,
+      },
+      "severity": "error",
+    },
+  ],
+  "ok": false,
+}
+`;
+
+exports[`the corpus, one level up from the tree > matches the recorded AST of every fixture > broken-unclosed-bold.brief 1`] = `
+{
+  "error": [
+    {
+      "code": "E_SYNTAX",
+      "message": "Syntax error: a bold run is missing its closing **.",
+      "range": {
+        "end": 33,
+        "start": 33,
+      },
+      "severity": "error",
+    },
+  ],
+  "ok": false,
+}
+`;
+
+exports[`the corpus, one level up from the tree > matches the recorded AST of every fixture > broken-unclosed-mark.brief 1`] = `
+{
+  "error": [
+    {
+      "code": "E_SYNTAX",
+      "message": "Syntax error: a mark is missing its closing {/}.",
+      "range": {
+        "end": 38,
+        "start": 38,
+      },
+      "severity": "error",
+    },
+  ],
+  "ok": false,
+}
+`;
+
+exports[`the corpus, one level up from the tree > matches the recorded AST of every fixture > comments.brief 1`] = `
+{
+  "ok": true,
+  "value": {
+    "directives": [
+      {
+        "adjustments": [],
+        "body": [
+          {
+            "kind": "text",
+            "range": {
+              "end": 52,
+              "start": 39,
+            },
+            "value": "Aulas ao vivo",
+          },
+        ],
+        "name": "titulo",
+        "range": {
+          "end": 52,
+          "start": 30,
+        },
+      },
+    ],
+    "frontmatter": {},
+    "range": {
+      "end": 67,
+      "start": 0,
+    },
+  },
+  "warnings": [],
+}
+`;
+
+exports[`the corpus, one level up from the tree > matches the recorded AST of every fixture > escaped-directive.brief 1`] = `
+{
+  "ok": true,
+  "value": {
+    "directives": [
+      {
+        "adjustments": [],
+        "body": [
+          {
+            "kind": "text",
+            "range": {
+              "end": 45,
+              "start": 15,
+            },
+            "value": ":: isto e texto, nao diretiva",
+          },
+        ],
+        "name": "observacao",
+        "range": {
+          "end": 45,
+          "start": 0,
+        },
+      },
+    ],
+    "frontmatter": {},
+    "range": {
+      "end": 46,
+      "start": 0,
+    },
+  },
+  "warnings": [],
+}
+`;
+
+exports[`the corpus, one level up from the tree > matches the recorded AST of every fixture > frontmatter.brief 1`] = `
+{
+  "ok": true,
+  "value": {
+    "directives": [
+      {
+        "adjustments": [],
+        "body": [
+          {
+            "kind": "text",
+            "range": {
+              "end": 89,
+              "start": 79,
+            },
+            "value": "Turma nova",
+          },
+        ],
+        "name": "titulo",
+        "range": {
+          "end": 89,
+          "start": 70,
+        },
+      },
+    ],
+    "frontmatter": {
+      "cor": "azul-escuro",
+      "formats": [
+        "feed",
+        "story",
+      ],
+      "template": "promo-curso",
+    },
+    "range": {
+      "end": 90,
+      "start": 0,
+    },
+  },
+  "warnings": [],
+}
+`;
+
+exports[`the corpus, one level up from the tree > matches the recorded AST of every fixture > frontmatter-only.brief 1`] = `
+{
+  "ok": true,
+  "value": {
+    "directives": [],
+    "frontmatter": {
+      "template": "promo-curso",
+    },
+    "range": {
+      "end": 30,
+      "start": 0,
+    },
+  },
+  "warnings": [],
+}
+`;
+
+exports[`the corpus, one level up from the tree > matches the recorded AST of every fixture > full.brief 1`] = `
+{
+  "ok": true,
+  "value": {
+    "directives": [
+      {
+        "adjustments": [],
+        "body": [
+          {
+            "kind": "text",
+            "range": {
+              "end": 105,
+              "start": 97,
+            },
+            "value": "Direito ",
+          },
+          {
+            "children": [
+              {
+                "kind": "text",
+                "range": {
+                  "end": 121,
+                  "start": 107,
+                },
+                "value": "Constitucional",
+              },
+            ],
+            "kind": "bold",
+            "range": {
+              "end": 123,
+              "start": 105,
+            },
+          },
+        ],
+        "name": "titulo",
+        "range": {
+          "end": 123,
+          "start": 88,
+        },
+      },
+      {
+        "adjustments": [],
+        "body": [
+          {
+            "kind": "text",
+            "range": {
+              "end": 161,
+              "start": 136,
+            },
+            "value": "Aulas ao vivo toda semana",
+          },
+        ],
+        "name": "subtitulo",
+        "range": {
+          "end": 161,
+          "start": 124,
+        },
+      },
+      {
+        "adjustments": [],
+        "body": [
+          {
+            "kind": "text",
+            "range": {
+              "end": 191,
+              "start": 173,
+            },
+            "value": "O que cai na prova",
+          },
+        ],
+        "name": "slide",
+        "range": {
+          "end": 191,
+          "start": 163,
+        },
+      },
+      {
+        "adjustments": [
+          {
+            "name": "destaque",
+            "range": {
+              "end": 209,
+              "start": 201,
+            },
+          },
+        ],
+        "body": [
+          {
+            "kind": "text",
+            "range": {
+              "end": 225,
+              "start": 213,
+            },
+            "value": "Como estudar",
+          },
+        ],
+        "name": "slide",
+        "range": {
+          "end": 225,
+          "start": 192,
+        },
+      },
+      {
+        "adjustments": [
+          {
+            "name": "destaque",
+            "range": {
+              "end": 243,
+              "start": 235,
+            },
+          },
+          {
+            "name": "cor",
+            "range": {
+              "end": 257,
+              "start": 245,
+            },
+            "value": "laranja",
+          },
+        ],
+        "body": [
+          {
+            "kind": "text",
+            "range": {
+              "end": 273,
+              "start": 261,
+            },
+            "value": "Garanta sua ",
+          },
+          {
+            "children": [
+              {
+                "kind": "text",
+                "range": {
+                  "end": 289,
+                  "start": 285,
+                },
+                "value": "vaga",
+              },
+            ],
+            "key": "cor",
+            "kind": "mark",
+            "range": {
+              "end": 292,
+              "start": 273,
+            },
+            "value": "branco",
+          },
+        ],
+        "name": "slide",
+        "range": {
+          "end": 292,
+          "start": 226,
+        },
+      },
+      {
+        "adjustments": [],
+        "body": [
+          {
+            "kind": "text",
+            "range": {
+              "end": 313,
+              "start": 306,
+            },
+            "value": "Legenda",
+          },
+        ],
+        "name": "caption",
+        "namespace": "ai",
+        "range": {
+          "end": 313,
+          "start": 293,
+        },
+      },
+    ],
+    "frontmatter": {
+      "formats": [
+        "feed",
+        "story",
+      ],
+      "imagem": "./prof-ana.png",
+      "template": "promo-curso",
+    },
+    "range": {
+      "end": 314,
+      "start": 0,
+    },
+  },
+  "warnings": [],
+}
+`;
+
+exports[`the corpus, one level up from the tree > matches the recorded AST of every fixture > indented-block.brief 1`] = `
+{
+  "ok": true,
+  "value": {
+    "directives": [
+      {
+        "adjustments": [],
+        "body": [
+          {
+            "kind": "text",
+            "range": {
+              "end": 33,
+              "start": 10,
+            },
+            "value": "Primeira linha do bloco",
+          },
+          {
+            "kind": "break",
+            "range": {
+              "end": 34,
+              "start": 33,
+            },
+          },
+          {
+            "kind": "text",
+            "range": {
+              "end": 58,
+              "start": 36,
+            },
+            "value": "Segunda linha do bloco",
+          },
+          {
+            "kind": "break",
+            "range": {
+              "end": 59,
+              "start": 58,
+            },
+          },
+          {
+            "kind": "text",
+            "range": {
+              "end": 69,
+              "start": 61,
+            },
+            "value": "Terceira",
+          },
+        ],
+        "name": "slide",
+        "range": {
+          "end": 69,
+          "start": 0,
+        },
+      },
+    ],
+    "frontmatter": {},
+    "range": {
+      "end": 70,
+      "start": 0,
+    },
+  },
+  "warnings": [],
+}
+`;
+
+exports[`the corpus, one level up from the tree > matches the recorded AST of every fixture > inline-bold-italic.brief 1`] = `
+{
+  "ok": true,
+  "value": {
+    "directives": [
+      {
+        "adjustments": [],
+        "body": [
+          {
+            "kind": "text",
+            "range": {
+              "end": 17,
+              "start": 9,
+            },
+            "value": "Direito ",
+          },
+          {
+            "children": [
+              {
+                "kind": "text",
+                "range": {
+                  "end": 33,
+                  "start": 19,
+                },
+                "value": "Constitucional",
+              },
+            ],
+            "kind": "bold",
+            "range": {
+              "end": 35,
+              "start": 17,
+            },
+          },
+          {
+            "kind": "text",
+            "range": {
+              "end": 38,
+              "start": 35,
+            },
+            "value": " e ",
+          },
+          {
+            "children": [
+              {
+                "kind": "text",
+                "range": {
+                  "end": 53,
+                  "start": 39,
+                },
+                "value": "Administrativo",
+              },
+            ],
+            "kind": "italic",
+            "range": {
+              "end": 54,
+              "start": 38,
+            },
+          },
+        ],
+        "name": "titulo",
+        "range": {
+          "end": 54,
+          "start": 0,
+        },
+      },
+    ],
+    "frontmatter": {},
+    "range": {
+      "end": 55,
+      "start": 0,
+    },
+  },
+  "warnings": [],
+}
+`;
+
+exports[`the corpus, one level up from the tree > matches the recorded AST of every fixture > line-break.brief 1`] = `
+{
+  "ok": true,
+  "value": {
+    "directives": [
+      {
+        "adjustments": [],
+        "body": [
+          {
+            "kind": "text",
+            "range": {
+              "end": 26,
+              "start": 12,
+            },
+            "value": "Primeira linha",
+          },
+          {
+            "kind": "break",
+            "range": {
+              "end": 27,
+              "start": 26,
+            },
+          },
+        ],
+        "name": "subtitulo",
+        "range": {
+          "end": 27,
+          "start": 0,
+        },
+      },
+    ],
+    "frontmatter": {},
+    "range": {
+      "end": 28,
+      "start": 0,
+    },
+  },
+  "warnings": [],
+}
+`;
+
+exports[`the corpus, one level up from the tree > matches the recorded AST of every fixture > mark.brief 1`] = `
+{
+  "ok": true,
+  "value": {
+    "directives": [
+      {
+        "adjustments": [],
+        "body": [
+          {
+            "kind": "text",
+            "range": {
+              "end": 15,
+              "start": 9,
+            },
+            "value": "Turma ",
+          },
+          {
+            "children": [
+              {
+                "kind": "text",
+                "range": {
+                  "end": 32,
+                  "start": 28,
+                },
+                "value": "nova",
+              },
+            ],
+            "key": "cor",
+            "kind": "mark",
+            "range": {
+              "end": 35,
+              "start": 15,
+            },
+            "value": "laranja",
+          },
+          {
+            "kind": "text",
+            "range": {
+              "end": 41,
+              "start": 35,
+            },
+            "value": " agora",
+          },
+        ],
+        "name": "titulo",
+        "range": {
+          "end": 41,
+          "start": 0,
+        },
+      },
+    ],
+    "frontmatter": {},
+    "range": {
+      "end": 42,
+      "start": 0,
+    },
+  },
+  "warnings": [],
+}
+`;
+
+exports[`the corpus, one level up from the tree > matches the recorded AST of every fixture > minimal.brief 1`] = `
+{
+  "ok": true,
+  "value": {
+    "directives": [
+      {
+        "adjustments": [],
+        "body": [
+          {
+            "kind": "text",
+            "range": {
+              "end": 31,
+              "start": 9,
+            },
+            "value": "Direito Constitucional",
+          },
+        ],
+        "name": "titulo",
+        "range": {
+          "end": 31,
+          "start": 0,
+        },
+      },
+    ],
+    "frontmatter": {},
+    "range": {
+      "end": 32,
+      "start": 0,
+    },
+  },
+  "warnings": [],
+}
+`;
+
+exports[`the corpus, one level up from the tree > matches the recorded AST of every fixture > nested-emphasis.brief 1`] = `
+{
+  "ok": true,
+  "value": {
+    "directives": [
+      {
+        "adjustments": [],
+        "body": [
+          {
+            "children": [
+              {
+                "kind": "text",
+                "range": {
+                  "end": 25,
+                  "start": 11,
+                },
+                "value": "Turma nova de ",
+              },
+              {
+                "children": [
+                  {
+                    "kind": "text",
+                    "range": {
+                      "end": 48,
+                      "start": 26,
+                    },
+                    "value": "Direito Constitucional",
+                  },
+                ],
+                "kind": "italic",
+                "range": {
+                  "end": 49,
+                  "start": 25,
+                },
+              },
+              {
+                "kind": "text",
+                "range": {
+                  "end": 55,
+                  "start": 49,
+                },
+                "value": " agora",
+              },
+            ],
+            "kind": "bold",
+            "range": {
+              "end": 57,
+              "start": 9,
+            },
+          },
+        ],
+        "name": "titulo",
+        "range": {
+          "end": 57,
+          "start": 0,
+        },
+      },
+      {
+        "adjustments": [],
+        "body": [
+          {
+            "children": [
+              {
+                "kind": "text",
+                "range": {
+                  "end": 82,
+                  "start": 71,
+                },
+                "value": "Vagas para ",
+              },
+              {
+                "children": [
+                  {
+                    "kind": "text",
+                    "range": {
+                      "end": 102,
+                      "start": 84,
+                    },
+                    "value": "turmas presenciais",
+                  },
+                ],
+                "kind": "bold",
+                "range": {
+                  "end": 104,
+                  "start": 82,
+                },
+              },
+              {
+                "kind": "text",
+                "range": {
+                  "end": 114,
+                  "start": 104,
+                },
+                "value": " neste mês",
+              },
+            ],
+            "kind": "italic",
+            "range": {
+              "end": 115,
+              "start": 70,
+            },
+          },
+        ],
+        "name": "subtitulo",
+        "range": {
+          "end": 115,
+          "start": 58,
+        },
+      },
+    ],
+    "frontmatter": {},
+    "range": {
+      "end": 116,
+      "start": 0,
+    },
+  },
+  "warnings": [],
+}
+`;
+
+exports[`the corpus, one level up from the tree > matches the recorded AST of every fixture > no-trailing-newline.brief 1`] = `
+{
+  "ok": true,
+  "value": {
+    "directives": [
+      {
+        "adjustments": [],
+        "body": [
+          {
+            "kind": "text",
+            "range": {
+              "end": 26,
+              "start": 9,
+            },
+            "value": "Sem quebra no fim",
+          },
+        ],
+        "name": "titulo",
+        "range": {
+          "end": 26,
+          "start": 0,
+        },
+      },
+    ],
+    "frontmatter": {},
+    "range": {
+      "end": 26,
+      "start": 0,
+    },
+  },
+  "warnings": [],
+}
+`;
+
+exports[`the corpus, one level up from the tree > matches the recorded AST of every fixture > plugin-directive.brief 1`] = `
+{
+  "ok": true,
+  "value": {
+    "directives": [
+      {
+        "adjustments": [],
+        "body": [
+          {
+            "kind": "text",
+            "range": {
+              "end": 27,
+              "start": 13,
+            },
+            "value": "Legenda gerada",
+          },
+        ],
+        "name": "caption",
+        "namespace": "ai",
+        "range": {
+          "end": 27,
+          "start": 0,
+        },
+      },
+    ],
+    "frontmatter": {},
+    "range": {
+      "end": 28,
+      "start": 0,
+    },
+  },
+  "warnings": [],
+}
+`;
+
+exports[`the corpus, one level up from the tree > matches the recorded AST of every fixture > repeatable.brief 1`] = `
+{
+  "ok": true,
+  "value": {
+    "directives": [
+      {
+        "adjustments": [],
+        "body": [
+          {
+            "kind": "text",
+            "range": {
+              "end": 18,
+              "start": 10,
+            },
+            "value": "Primeiro",
+          },
+        ],
+        "name": "slide",
+        "range": {
+          "end": 18,
+          "start": 0,
+        },
+      },
+      {
+        "adjustments": [
+          {
+            "name": "destaque",
+            "range": {
+              "end": 36,
+              "start": 28,
+            },
+          },
+        ],
+        "body": [
+          {
+            "kind": "text",
+            "range": {
+              "end": 47,
+              "start": 40,
+            },
+            "value": "Segundo",
+          },
+        ],
+        "name": "slide",
+        "range": {
+          "end": 47,
+          "start": 19,
+        },
+      },
+      {
+        "adjustments": [],
+        "body": [
+          {
+            "kind": "text",
+            "range": {
+              "end": 66,
+              "start": 58,
+            },
+            "value": "Terceiro",
+          },
+        ],
+        "name": "slide",
+        "range": {
+          "end": 66,
+          "start": 48,
+        },
+      },
+    ],
+    "frontmatter": {},
+    "range": {
+      "end": 67,
+      "start": 0,
+    },
+  },
+  "warnings": [],
+}
+`;

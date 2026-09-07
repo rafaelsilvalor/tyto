@@ -20,6 +20,7 @@ Spec: `docs/ir-schema.md`, ADR 0003.
 - **E2.1** Full Zod schema + inferred types + invariants (unique ids, valid mask, referenced fonts/assets). AC: valid and invalid fixtures covering every invariant. (M)
 - **E2.2** `SceneVisitor<T>` and `walk()` with context (accumulated transform, effective opacity). AC: counting visitor tested. (S)
 - **E2.3** Template-SDK builders `frame/group/text/image/rect/vector`. AC: build valid IR; typed error on misuse. (S)
+- **E2.4** How a line break reaches the Scene: `TextRun` cannot represent one, and both the hard `\` and a block line boundary need somewhere to land. ADR + schema. Blocks E4.2. AC: ADR recorded; schema and `docs/ir-schema.md` agree; `parseScene` rejects the forms the ADR rules out. (M)
 
 ## E3 — Brief language
 
