@@ -53,12 +53,14 @@ BlockText { bodyInline+ }
 
 bodyInline { headInline | Mark }
 
-// Emphasis nests strictly downwards: a mark may hold bold, bold may hold italic, italic
-// holds only text. Letting any of them hold its own kind is what makes `*a*b*c*`
-// ambiguous — is the second star closing the first or opening a nested one? Markdown
-// answers that with delimiter runs, which is not something an LR parser can do, and is
-// why @lezer/markdown is hand-written. `docs/brief-language.md` promises `**bold**`,
-// `*italic*`, a break and a mark; it never promises them inside each other.
+// Emphasis nests, but never inside its own kind: bold may hold italic, italic may hold
+// bold, and neither may hold itself. Its own kind is what makes `*a*b*c*` ambiguous — is
+// the second star closing the first or opening a nested one? Markdown answers that with
+// delimiter runs, which an LR parser cannot do, and is why @lezer/markdown is hand-written.
+//
+// The same limit shows at the seam of two closers: `**bold *italic***` does not parse,
+// because longest match reads the trailing `***` as `**` then `*` and no lookahead could
+// prefer the other split. Write `**bold *italic* **` or reorder the runs (ADR 0015).
 headInline { Text | Space | Bold | Italic | Break | EscapedDirective }
 
 Bold { boldMark boldInline+ boldMark }
@@ -67,7 +69,7 @@ boldInline { Text | Space | Italic | Break | EscapedDirective }
 
 Italic { italicMark italicInline+ italicMark }
 
-italicInline { Text | Space | Break | EscapedDirective }
+italicInline { Text | Space | Bold | Break | EscapedDirective }
 
 Mark { braceOpen MarkName valueSep MarkValue braceClose headInline+ markClose }
 
