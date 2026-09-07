@@ -10,6 +10,10 @@ successful result (ADR 0013).
 | Code | Severity | Summary |
 | --- | --- | --- |
 | `E_SYNTAX` | error | The brief does not match the grammar, or its frontmatter is not valid YAML. |
+| `E_NO_TEMPLATE` | error | A brief names no template and none was supplied on the command line. |
+| `E_UNKNOWN_TEMPLATE` | error | A brief names a template the registry does not have. |
+| `E_UNKNOWN_FORMAT` | error | A requested format is not one the chosen template renders. |
+| `E_BAD_SLOT_VALUE` | error | A slot is set to something the manifest does not allow for it. |
 | `E_UNKNOWN_SLOT` | error | A directive names a slot the template manifest does not declare. |
 | `E_UNKNOWN_DIRECTIVE` | error | A directive matches no template slot and no installed plugin. |
 | `E_MISSING_REQUIRED_SLOT` | error | The manifest marks a slot as required and the brief leaves it unset. |
@@ -46,6 +50,54 @@ Syntax error: {problem}.
 ```
 
 Parameters: `problem`
+
+### `E_NO_TEMPLATE`
+
+**Severity:** error · **Spec:** `docs/brief-language.md`
+
+A brief names no template and none was supplied on the command line.
+
+```
+The brief sets no 'template' in its frontmatter, and none was given.
+```
+
+Parameters: none
+
+### `E_UNKNOWN_TEMPLATE`
+
+**Severity:** error · **Spec:** `docs/brief-language.md`
+
+A brief names a template the registry does not have.
+
+```
+No template named '{template}'. Available: {available}.
+```
+
+Parameters: `template`, `available`
+
+### `E_UNKNOWN_FORMAT`
+
+**Severity:** error · **Spec:** `docs/brief-language.md`
+
+A requested format is not one the chosen template renders.
+
+```
+Format '{format}' is not rendered by template '{template}'. It renders: {declared}.
+```
+
+Parameters: `format`, `template`, `declared`
+
+### `E_BAD_SLOT_VALUE`
+
+**Severity:** error · **Spec:** `docs/brief-language.md`
+
+A slot is set to something the manifest does not allow for it.
+
+```
+Slot '{slot}' is invalid: {problem}.
+```
+
+Parameters: `slot`, `problem`
 
 ### `E_UNKNOWN_SLOT`
 

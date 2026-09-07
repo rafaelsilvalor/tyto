@@ -32,7 +32,10 @@ exports[`the corpus, one level up from the tree > matches the recorded AST of ev
         },
       },
     ],
-    "frontmatter": {},
+    "frontmatter": {
+      "data": {},
+      "ranges": {},
+    },
     "range": {
       "end": 34,
       "start": 0,
@@ -82,7 +85,10 @@ exports[`the corpus, one level up from the tree > matches the recorded AST of ev
         },
       },
     ],
-    "frontmatter": {},
+    "frontmatter": {
+      "data": {},
+      "ranges": {},
+    },
     "range": {
       "end": 54,
       "start": 0,
@@ -125,7 +131,10 @@ exports[`the corpus, one level up from the tree > matches the recorded AST of ev
         },
       },
     ],
-    "frontmatter": {},
+    "frontmatter": {
+      "data": {},
+      "ranges": {},
+    },
     "range": {
       "end": 42,
       "start": 0,
@@ -195,7 +204,10 @@ exports[`the corpus, one level up from the tree > matches the recorded AST of ev
         },
       },
     ],
-    "frontmatter": {},
+    "frontmatter": {
+      "data": {},
+      "ranges": {},
+    },
     "range": {
       "end": 46,
       "start": 0,
@@ -375,7 +387,10 @@ exports[`the corpus, one level up from the tree > matches the recorded AST of ev
         },
       },
     ],
-    "frontmatter": {},
+    "frontmatter": {
+      "data": {},
+      "ranges": {},
+    },
     "range": {
       "end": 67,
       "start": 0,
@@ -409,7 +424,10 @@ exports[`the corpus, one level up from the tree > matches the recorded AST of ev
         },
       },
     ],
-    "frontmatter": {},
+    "frontmatter": {
+      "data": {},
+      "ranges": {},
+    },
     "range": {
       "end": 46,
       "start": 0,
@@ -444,12 +462,32 @@ exports[`the corpus, one level up from the tree > matches the recorded AST of ev
       },
     ],
     "frontmatter": {
-      "cor": "azul-escuro",
-      "formats": [
-        "feed",
-        "story",
-      ],
-      "template": "promo-curso",
+      "data": {
+        "cor": "azul-escuro",
+        "formats": [
+          "feed",
+          "story",
+        ],
+        "template": "promo-curso",
+      },
+      "range": {
+        "end": 70,
+        "start": 0,
+      },
+      "ranges": {
+        "cor": {
+          "end": 52,
+          "start": 49,
+        },
+        "formats": {
+          "end": 33,
+          "start": 26,
+        },
+        "template": {
+          "end": 12,
+          "start": 4,
+        },
+      },
     },
     "range": {
       "end": 90,
@@ -466,7 +504,19 @@ exports[`the corpus, one level up from the tree > matches the recorded AST of ev
   "value": {
     "directives": [],
     "frontmatter": {
-      "template": "promo-curso",
+      "data": {
+        "template": "promo-curso",
+      },
+      "range": {
+        "end": 30,
+        "start": 0,
+      },
+      "ranges": {
+        "template": {
+          "end": 12,
+          "start": 4,
+        },
+      },
     },
     "range": {
       "end": 30,
@@ -653,12 +703,32 @@ exports[`the corpus, one level up from the tree > matches the recorded AST of ev
       },
     ],
     "frontmatter": {
-      "formats": [
-        "feed",
-        "story",
-      ],
-      "imagem": "./prof-ana.png",
-      "template": "promo-curso",
+      "data": {
+        "formats": [
+          "feed",
+          "story",
+        ],
+        "imagem": "./prof-ana.png",
+        "template": "promo-curso",
+      },
+      "range": {
+        "end": 76,
+        "start": 0,
+      },
+      "ranges": {
+        "formats": {
+          "end": 33,
+          "start": 26,
+        },
+        "imagem": {
+          "end": 55,
+          "start": 49,
+        },
+        "template": {
+          "end": 12,
+          "start": 4,
+        },
+      },
     },
     "range": {
       "end": 314,
@@ -723,7 +793,10 @@ exports[`the corpus, one level up from the tree > matches the recorded AST of ev
         },
       },
     ],
-    "frontmatter": {},
+    "frontmatter": {
+      "data": {},
+      "ranges": {},
+    },
     "range": {
       "end": 70,
       "start": 0,
@@ -799,7 +872,10 @@ exports[`the corpus, one level up from the tree > matches the recorded AST of ev
         },
       },
     ],
-    "frontmatter": {},
+    "frontmatter": {
+      "data": {},
+      "ranges": {},
+    },
     "range": {
       "end": 55,
       "start": 0,
@@ -840,7 +916,10 @@ exports[`the corpus, one level up from the tree > matches the recorded AST of ev
         },
       },
     ],
-    "frontmatter": {},
+    "frontmatter": {
+      "data": {},
+      "ranges": {},
+    },
     "range": {
       "end": 28,
       "start": 0,
@@ -901,7 +980,10 @@ exports[`the corpus, one level up from the tree > matches the recorded AST of ev
         },
       },
     ],
-    "frontmatter": {},
+    "frontmatter": {
+      "data": {},
+      "ranges": {},
+    },
     "range": {
       "end": 42,
       "start": 0,
@@ -935,7 +1017,10 @@ exports[`the corpus, one level up from the tree > matches the recorded AST of ev
         },
       },
     ],
-    "frontmatter": {},
+    "frontmatter": {
+      "data": {},
+      "ranges": {},
+    },
     "range": {
       "end": 32,
       "start": 0,
@@ -1055,7 +1140,10 @@ exports[`the corpus, one level up from the tree > matches the recorded AST of ev
         },
       },
     ],
-    "frontmatter": {},
+    "frontmatter": {
+      "data": {},
+      "ranges": {},
+    },
     "range": {
       "end": 116,
       "start": 0,
@@ -1089,7 +1177,10 @@ exports[`the corpus, one level up from the tree > matches the recorded AST of ev
         },
       },
     ],
-    "frontmatter": {},
+    "frontmatter": {
+      "data": {},
+      "ranges": {},
+    },
     "range": {
       "end": 26,
       "start": 0,
@@ -1124,7 +1215,10 @@ exports[`the corpus, one level up from the tree > matches the recorded AST of ev
         },
       },
     ],
-    "frontmatter": {},
+    "frontmatter": {
+      "data": {},
+      "ranges": {},
+    },
     "range": {
       "end": 28,
       "start": 0,
@@ -1202,7 +1296,10 @@ exports[`the corpus, one level up from the tree > matches the recorded AST of ev
         },
       },
     ],
-    "frontmatter": {},
+    "frontmatter": {
+      "data": {},
+      "ranges": {},
+    },
     "range": {
       "end": 67,
       "start": 0,

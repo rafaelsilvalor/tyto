@@ -28,6 +28,30 @@ export const diagnosticCodes = {
     template: 'Syntax error: {problem}.',
     spec: 'docs/brief-language.md',
   },
+  E_NO_TEMPLATE: {
+    severity: 'error',
+    summary: 'A brief names no template and none was supplied on the command line.',
+    template: "The brief sets no 'template' in its frontmatter, and none was given.",
+    spec: 'docs/brief-language.md',
+  },
+  E_UNKNOWN_TEMPLATE: {
+    severity: 'error',
+    summary: 'A brief names a template the registry does not have.',
+    template: "No template named '{template}'. Available: {available}.",
+    spec: 'docs/brief-language.md',
+  },
+  E_UNKNOWN_FORMAT: {
+    severity: 'error',
+    summary: 'A requested format is not one the chosen template renders.',
+    template: "Format '{format}' is not rendered by template '{template}'. It renders: {declared}.",
+    spec: 'docs/brief-language.md',
+  },
+  E_BAD_SLOT_VALUE: {
+    severity: 'error',
+    summary: 'A slot is set to something the manifest does not allow for it.',
+    template: "Slot '{slot}' is invalid: {problem}.",
+    spec: 'docs/brief-language.md',
+  },
   E_UNKNOWN_SLOT: {
     severity: 'error',
     summary: 'A directive names a slot the template manifest does not declare.',

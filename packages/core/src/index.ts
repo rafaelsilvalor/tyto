@@ -49,6 +49,32 @@ export {
   withWarnings,
 } from './result/result.js';
 
+export type {
+  Adjustment as BriefAdjustment,
+  Bold,
+  Break,
+  BriefAst,
+  Directive,
+  Frontmatter,
+  Inline,
+  Italic,
+  Mark,
+  RichText,
+  Text,
+} from './brief/ast.js';
+
+export {
+  type ResolveOptions,
+  type ResolvedAdjustment,
+  type ResolvedArtwork,
+  type ResolvedBrief,
+  type ResolvedSlot,
+  type SlotValue,
+  resolve,
+} from './brief/resolve.js';
+
+export type { AssetResolver } from './ports/asset-resolver.js';
+
 export type { DirectoryEntry, FileSystem } from './ports/file-system.js';
 
 export {

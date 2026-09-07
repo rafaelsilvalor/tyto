@@ -75,7 +75,7 @@ had to answer them.
 
 ## Diagnostics
 
-`E_SYNTAX` (from parse), `E_UNKNOWN_SLOT`, `E_UNKNOWN_DIRECTIVE`, `E_MISSING_REQUIRED_SLOT`, `E_BAD_ADJUSTMENT`, `E_ASSET_NOT_FOUND`, `W_TEXT_OVERFLOW` (from compile), `W_UNUSED_SLOT`. All carry a `range` for the editor. Messages are English; the editor may localize them later via the code.
+`E_SYNTAX` (from parse); `E_NO_TEMPLATE`, `E_UNKNOWN_TEMPLATE`, `E_UNKNOWN_FORMAT`, `E_UNKNOWN_SLOT`, `E_UNKNOWN_DIRECTIVE`, `E_MISSING_REQUIRED_SLOT`, `E_BAD_SLOT_VALUE`, `E_BAD_ADJUSTMENT`, `E_ASSET_NOT_FOUND`, `W_UNUSED_SLOT` (from resolve); `W_TEXT_OVERFLOW` (from compile). All carry a `range` for the editor. Messages are English; the editor may localize them later via the code.
 
 ## AST
 
@@ -89,6 +89,16 @@ RichText   = Inline[]; Inline = Text{value} | Bold{children} | Italic{children} 
 `parseBrief` in `packages/brief-lang/src/parse-brief.ts` builds it, returning
 `Result<BriefAst, Diagnostic[]>`: a brief that does not parse comes back as `Err`, never
 as a half-built AST.
+
+**The types live in `@tyto/core`** (`packages/core/src/brief/ast.ts`), for the same reason
+`Scene` does — the package that produces a vocabulary type is not the package that owns it.
+`resolve` consumes a `BriefAst` and `docs/architecture.md` puts `resolve` in `core`, which
+with `brief-lang` depending on `core` leaves nowhere else for them to be. `brief-lang`
+re-exports them, so a caller that only talks to the parser has one import.
+
+`frontmatter` is a `Frontmatter`, not a bare record: `data` is what the YAML said, `ranges`
+is the span of each top-level key, and `range` is the whole block. The ranges are what let
+`resolve` underline the key that named an unknown slot instead of the block around it.
 
 ## What the AST settles
 
@@ -125,3 +135,28 @@ rename. These are the choices that gap forced, and where each one shows.
   parse and a block that is not a mapping; a missing `template` or a `formats` of the
   wrong type is `resolve`'s diagnostic to raise, because this stage knows the language and
   not the templates.
+
+## What resolve settles
+
+`resolve(ast, { registry, assets, template?, renderedSlots? })` in
+`packages/core/src/brief/resolve.ts` is where a brief meets the template it was written
+for. It answers what neither neighbour can: the parser knows the language and nothing about
+templates, the compiler knows a template and nothing about the brief that fed it.
+
+- **Two questions stop everything else.** A brief that names no template, or one the
+  registry does not have, comes back with that diagnostic alone: without a manifest there
+  is nothing to check a slot against. Every other problem is reported in one pass.
+- **The frontmatter and a `::directive` are the same thing by the time the manifest is
+  asked.** They differ in where the value came from and in nothing else, so a scalar in the
+  frontmatter reaches a rich-text slot as one run of text spanning its key. The repeatable
+  slot is the exception: it is written with a directive, because each occurrence is an
+  artwork and a mapping key appears once.
+- **`W_UNUSED_SLOT` needs the template body, so it is opt-in.** A manifest says which slots
+  _may_ be set; only the template says which are _drawn_, and reading a template is
+  `compile`'s job. A caller that has already parsed one passes `renderedSlots` and gets the
+  warning; a caller that has not gets silence rather than a guess.
+- **A defaulted slot has no range**, because the brief never wrote it. Every other resolved
+  slot carries the span of the directive or the frontmatter key that set it.
+- **`E_UNKNOWN_SLOT` suggests.** A declared name within an edit distance of a third of the
+  written word is a typo and becomes a hint; anything further is a different slot, and
+  suggesting it would be worse than suggesting nothing.
