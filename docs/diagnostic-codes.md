@@ -24,6 +24,7 @@ successful result (ADR 0013).
 | `E_SCENE_ASSET_NOT_DECLARED` | error | A node or paint uses an asset the scene does not declare. |
 | `E_SCENE_EMPTY_TEXT` | error | A text node carries no runs, so there is nothing to render. |
 | `E_TEMPLATE_VALUE` | error | A template SDK builder was given a value it cannot turn into IR. |
+| `E_TEMPLATE_CRASH` | error | A template threw while building its scene, which is a bug in the template. |
 | `W_TEXT_OVERFLOW` | warning | Compiled text does not fit its frame in one of the requested formats. |
 | `W_UNUSED_SLOT` | warning | The brief sets a slot the chosen template never renders. |
 
@@ -208,6 +209,18 @@ Template value for '{field}' is invalid: {problem}.
 ```
 
 Parameters: `field`, `problem`
+
+### `E_TEMPLATE_CRASH`
+
+**Severity:** error · **Spec:** `docs/template-authoring.md`
+
+A template threw while building its scene, which is a bug in the template.
+
+```
+Template '{template}' failed while building the scene: {problem}.
+```
+
+Parameters: `template`, `problem`
 
 ## Warnings
 

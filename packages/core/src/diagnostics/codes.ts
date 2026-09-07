@@ -115,6 +115,12 @@ export const diagnosticCodes = {
     template: "Template value for '{field}' is invalid: {problem}.",
     spec: 'docs/template-authoring.md',
   },
+  E_TEMPLATE_CRASH: {
+    severity: 'error',
+    summary: 'A template threw while building its scene, which is a bug in the template.',
+    template: "Template '{template}' failed while building the scene: {problem}.",
+    spec: 'docs/template-authoring.md',
+  },
   W_TEXT_OVERFLOW: {
     severity: 'warning',
     summary: 'Compiled text does not fit its frame in one of the requested formats.',
