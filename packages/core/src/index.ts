@@ -2,8 +2,9 @@
  * @tyto/core — the vocabulary every other package speaks.
  *
  * Today: `Result`, `Diagnostic`, the diagnostic catalog, source ranges, the Scene IR and
- * the visitor that walks it. The ports and the template SDK follow in E2.3 and E4. Pure:
- * no Node, no DOM (ADR 0010).
+ * the visitor that walks it, the `FileSystem` port, and the template manifest with the
+ * registry that discovers one per folder. `resolve` and `compile` follow in E3.3 and E4.2.
+ * Pure: no Node, no DOM (ADR 0010).
  */
 
 export {
@@ -47,6 +48,28 @@ export {
   unwrapOrElse,
   withWarnings,
 } from './result/result.js';
+
+export type { DirectoryEntry, FileSystem } from './ports/file-system.js';
+
+export {
+  type Adjustment,
+  type AdjustmentType,
+  type Slot,
+  type SlotType,
+  type TemplateManifest,
+  adjustmentSchema,
+  adjustmentTypeSchema,
+  parseManifest,
+  slotSchema,
+  slotTypeSchema,
+  templateManifestSchema,
+} from './template/manifest.js';
+
+export {
+  type TemplateFailure,
+  type TemplateRegistry,
+  loadTemplateRegistry,
+} from './template/registry.js';
 
 export {
   type LineColumn,

@@ -5,8 +5,9 @@
  * node builders and the values that feed them, not the pipeline's `Result`, the
  * diagnostic catalog or the visitor. Pure: no Node, no DOM (ADR 0010).
  *
- * `defineTemplate` is not here yet. It takes a manifest, and the manifest schema arrives
- * with E4.1; wiring the two is E4.2.
+ * `defineTemplate` is not here yet. The manifest it takes ships from `@tyto/core` — a
+ * template author declares one, a template registry reads one, and neither wants the node
+ * builders — so wiring the two is all that is left, in E4.2.
  */
 
 export {
