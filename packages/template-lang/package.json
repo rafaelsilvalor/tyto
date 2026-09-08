@@ -2,7 +2,7 @@
   "name": "@tyto/template-lang",
   "version": "0.0.0",
   "type": "module",
-  "description": "Grammar and parser for the HTML-like template markup.",
+  "description": "Lezer grammar and parser for the HTML-like template markup; compiles it to a template function.",
   "license": "UNLICENSED",
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
@@ -17,9 +17,19 @@
   ],
   "sideEffects": false,
   "scripts": {
+    "generate:parser": "lezer-generator src/template.grammar -o src/template.parser.js",
     "build": "tsup",
     "typecheck": "tsc --noEmit",
     "lint": "eslint . --max-warnings 0",
     "test": "vitest run --passWithNoTests"
+  },
+  "dependencies": {
+    "@lezer/common": "^1.5.2",
+    "@lezer/highlight": "^1.2.3",
+    "@lezer/lr": "^1.4.10",
+    "@tyto/core": "workspace:*"
+  },
+  "devDependencies": {
+    "@lezer/generator": "^1.8.0"
   }
 }

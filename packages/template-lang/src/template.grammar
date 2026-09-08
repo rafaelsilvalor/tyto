@@ -1,0 +1,142 @@
+// The Tyto template markup (docs/template-authoring.md, ADR 0005).
+//
+// It looks like HTML with a stylesheet, and it is neither: every tag is an IR node and
+// every property is a field of one. The grammar is deliberately small — there is no text
+// content, no attribute without quotes, no JavaScript — because everything it cannot
+// express is something an exporter would then have to guess at.
+//
+// Two languages share one tokenizer. Markup and CSS never overlap: `<` only starts a tag
+// and `{` only opens a block, and Lezer only offers the tokenizer what the current state
+// accepts. What does overlap is the shape of a name — a tag, an attribute, a property and
+// a selector are all identifiers — and that is what the separate token names are for: the
+// tree says which one it was, so highlighting (E8.4) does not have to re-derive it.
+
+@top Template { item* }
+
+item { Element | StyleSheet }
+
+// Elements hold elements and nothing else. Text belongs to a slot, so a template that
+// wants words asks for them with `slot="titulo"` rather than typing them here.
+Element {
+  tagStart TagName Attribute* (selfClose | tagEnd Element* CloseTag)
+}
+
+CloseTag { closeStart TagName tagEnd }
+
+Attribute { AttributeName (equals AttributeValue)? }
+
+// One stylesheet per template, and the only place a number lands on a node.
+StyleSheet { styleStart Rule* styleEnd }
+
+Rule { StyleRule | AtRule }
+
+StyleRule { SelectorList Block }
+
+SelectorList { Selector (Comma Selector)* }
+
+// Parts of one selector are written together — `.title.destaque` — and the language has
+// no descendant combinator, so the space between two parts means nothing. Whitespace is
+// skipped everywhere in this grammar and this is the one place that could have wanted it
+// back; `docs/template-authoring.md` says so rather than the tokenizer.
+Selector { selectorPart+ }
+
+selectorPart { ClassSelector | IdSelector | RootSelector | TagSelector }
+
+ClassSelector { dot SelectorName }
+IdSelector { hash SelectorName }
+RootSelector { rootKeyword }
+TagSelector { SelectorName }
+
+Block { braceOpen declarationList? braceClose }
+
+// The semicolon is a separator, optional only after the last declaration. It has to be
+// written out that way rather than hung off each declaration: with `Declaration semi?`
+// the tokenizer reaches the end of a value not knowing whether the next name continues
+// the value or starts the next property, and `Ident` and `PropertyName` are the same
+// shape.
+declarationList { Declaration (semi Declaration)* semi? }
+
+Declaration { PropertyName colon Value }
+
+Value { valueItem+ }
+
+// `Slash` and `Comma` are nodes rather than skipped punctuation because they carry
+// meaning inside a value: the slash in `700 72px/1.05 "Inter"` separates size from line
+// height, and the comma separates a gradient's stops from its angle.
+valueItem { Dimension | HexColor | StringValue | Ident | FunctionCall | Slash | Comma }
+
+FunctionCall { FunctionName valueItem* parenClose }
+
+// `@format`, `@if` and `@each`. Which keywords are real, and what each one accepts in its
+// prelude, is decided while reading the tree — an LR parser that hard-coded them would
+// answer a misspelled `@fromat` with "unexpected token" instead of a suggestion.
+AtRule { AtKeyword preludeItem* NestedBlock }
+
+preludeItem { Ident | FunctionCall }
+
+NestedBlock { braceOpen StyleRule* braceClose }
+
+@tokens {
+  identifier { ("-" "-")? $[a-zA-Z_] $[a-zA-Z0-9_-]* }
+
+  TagName { identifier }
+  AttributeName { identifier }
+  SelectorName { identifier }
+  PropertyName { identifier }
+  Ident { identifier }
+
+  // The paren is inside the token, the same trick `brief.grammar` uses for `Namespace`:
+  // `var` and `var(` are the same shape until the paren, and a Lezer token has no
+  // lookahead, so making the call the longer match is what settles it.
+  FunctionName { identifier "(" }
+
+  AttributeValue { "\"" !["\n]* "\"" }
+  StringValue { "\"" !["\n]* "\"" }
+
+  // Unit and number in one token; which units are legal is `docs/template-authoring.md`'s
+  // list, and reporting a bad one belongs to the reader that knows the property.
+  Dimension { "-"? $[0-9]+ ("." $[0-9]+)? ("%" | $[a-zA-Z]+)? }
+
+  HexColor { "#" $[0-9a-fA-F]+ }
+
+  AtKeyword { "@" $[a-zA-Z-]+ }
+
+  tagStart { "<" }
+  closeStart { "</" }
+  selfClose { "/>" }
+  tagEnd { ">" }
+  equals { "=" }
+
+  styleStart { "<style>" }
+  styleEnd { "</style>" }
+
+  braceOpen { "{" }
+  braceClose { "}" }
+  parenClose { ")" }
+  colon { ":" }
+  rootKeyword { ":root" }
+  semi { ";" }
+  Comma { "," }
+  dot { "." }
+  hash { "#" }
+  Slash { "/" }
+
+  Comment { "<!--" (![-] | "-" ![-] | "--" ![>])* "-->" }
+  BlockComment { "/*" (![*] | "*" ![/])* "*/" }
+
+  space { $[ \t\r\n]+ }
+
+  // The only pair the parse state cannot separate: a prelude and a value both accept a
+  // bare name and a call, so `var` and `var(` are live at the same point.
+  //
+  // Nothing else is listed, and that is the load-bearing part. A `@precedence` puts its
+  // tokens in one group and makes the tokenizer choose between them without consulting
+  // the parse state — list `TagName` beside `AttributeName` and every attribute in the
+  // file is read as a tag name. Every other overlap here is a prefix of a longer token
+  // (`<` of `<style>`, `/` of `/>`, `:` of `:root`), which longest match already settles.
+  @precedence { FunctionName, Ident }
+}
+
+@skip { space | Comment | BlockComment }
+
+@detectDelim

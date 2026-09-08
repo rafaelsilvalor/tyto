@@ -20,6 +20,9 @@ successful result (ADR 0013).
 | `E_BAD_ADJUSTMENT` | error | An adjustment is not declared for the slot it is applied to. |
 | `E_ASSET_NOT_FOUND` | error | An asset path in the brief does not resolve to a file. |
 | `E_UNSUPPORTED_CSS` | error | A template uses a CSS property outside the accepted set. |
+| `E_UNSUPPORTED_TAG` | error | A template uses a tag the template language does not define. |
+| `E_UNSUPPORTED_ATTRIBUTE` | error | A template uses an attribute the tag it sits on does not accept. |
+| `E_TEMPLATE_MARKUP` | error | A template.html parses but does not describe a scene the compiler can build. |
 | `E_PERMISSION` | error | A plugin called a capability it was not granted at install time. |
 | `E_SCENE_SHAPE` | error | A scene does not match the IR schema. |
 | `E_SCENE_DUPLICATE_ID` | error | The same id is used more than once in one scene. |
@@ -173,6 +176,42 @@ CSS property '{property}' is not supported by the template language. Try '{sugge
 ```
 
 Parameters: `property`, `suggestion`
+
+### `E_UNSUPPORTED_TAG`
+
+**Severity:** error · **Spec:** `docs/template-authoring.md`
+
+A template uses a tag the template language does not define.
+
+```
+Tag '<{tag}>' is not part of the template language. Try '{suggestion}'.
+```
+
+Parameters: `tag`, `suggestion`
+
+### `E_UNSUPPORTED_ATTRIBUTE`
+
+**Severity:** error · **Spec:** `docs/template-authoring.md`
+
+A template uses an attribute the tag it sits on does not accept.
+
+```
+Attribute '{attribute}' is not accepted on '<{tag}>'. Try '{suggestion}'.
+```
+
+Parameters: `attribute`, `tag`, `suggestion`
+
+### `E_TEMPLATE_MARKUP`
+
+**Severity:** error · **Spec:** `docs/template-authoring.md`
+
+A template.html parses but does not describe a scene the compiler can build.
+
+```
+Template markup is invalid: {problem}.
+```
+
+Parameters: `problem`
 
 ### `E_PERMISSION`
 

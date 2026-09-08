@@ -90,6 +90,24 @@ export const diagnosticCodes = {
       "CSS property '{property}' is not supported by the template language. Try '{suggestion}'.",
     spec: 'docs/template-authoring.md',
   },
+  E_UNSUPPORTED_TAG: {
+    severity: 'error',
+    summary: 'A template uses a tag the template language does not define.',
+    template: "Tag '<{tag}>' is not part of the template language. Try '{suggestion}'.",
+    spec: 'docs/template-authoring.md',
+  },
+  E_UNSUPPORTED_ATTRIBUTE: {
+    severity: 'error',
+    summary: 'A template uses an attribute the tag it sits on does not accept.',
+    template: "Attribute '{attribute}' is not accepted on '<{tag}>'. Try '{suggestion}'.",
+    spec: 'docs/template-authoring.md',
+  },
+  E_TEMPLATE_MARKUP: {
+    severity: 'error',
+    summary: 'A template.html parses but does not describe a scene the compiler can build.',
+    template: 'Template markup is invalid: {problem}.',
+    spec: 'docs/template-authoring.md',
+  },
   E_PERMISSION: {
     severity: 'error',
     summary: 'A plugin called a capability it was not granted at install time.',
