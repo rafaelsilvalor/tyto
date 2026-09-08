@@ -1,0 +1,10 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1080" height="1920" viewBox="0 0 1080 1920">
+  <defs>
+    <pattern id="paint0" width="1" height="1" patternContentUnits="objectBoundingBox">
+      <image href="data:image/jpeg;base64,sha256-1f0a" width="1" height="1" preserveAspectRatio="xMidYMid slice"/>
+    </pattern>
+  </defs>
+  <g id="story-bg">
+    <path d="M0 0 H1080 V1920 H0 V0 Z" fill="url(#paint0)"/>
+  </g>
+</svg>

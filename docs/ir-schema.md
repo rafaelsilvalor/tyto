@@ -136,6 +136,15 @@ carries `nodeMatrix(node)` and the browser composes the rest; per-node styling g
 document's stylesheet under an escaped `#id`, because a mask is a whole SVG document
 inside a `url()` and an attribute would have to carry it through HTML escaping.
 
+`packages/export-svg` is the second, and nests the same way — a node is a `<g>` with its
+own matrix. Where the two differ is what each format can state exactly. SVG draws a
+stroke's `align` and a shadow's `spread` precisely and HTML approximates both; HTML lays
+text out and SVG cannot, so **an SVG does not wrap**: its lines are exactly the brief's
+`LineBreak` runs until E4.5 measures text, and a baseline sits at an approximated ascent.
+ADR 0019 has the reasoning and the rest of the list — `--text-as-paths` takes glyph
+outlines from a port, a focal point is snapped to `preserveAspectRatio`'s nine alignments,
+and a mask may only name a node drawn in the same frame.
+
 ## Invariants (tested in `core`)
 
 Checked in `scene/invariants.ts`, after the shape holds. Each one names the id at fault, because a Zod path like `artworks.0.frames.1.children.4` is not something a template author can search for.

@@ -1,0 +1,79 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="400" height="400" viewBox="0 0 400 400">
+  <defs>
+    <linearGradient id="paint0" gradientUnits="userSpaceOnUse" x1="0" y1="40" x2="120" y2="40">
+      <stop offset="0" stop-color="#ffffff"/>
+      <stop offset="1" stop-color="#ffffff" stop-opacity="0"/>
+    </linearGradient>
+    <clipPath id="stroke1">
+      <path d="M16 0 H116 A4 4 0 0 1 120 4 V64 A16 16 0 0 1 104 80 H4 A4 4 0 0 1 0 76 V16 A16 16 0 0 1 16 0 Z"/>
+    </clipPath>
+    <mask id="stroke2" maskUnits="userSpaceOnUse">
+      <rect x="-4" y="-4" width="68" height="68" fill="#ffffff"/>
+      <path d="M0 0 H60 V60 H0 V0 Z" fill="#000000"/>
+    </mask>
+    <filter id="filter10" x="-50%" y="-50%" width="200%" height="200%">
+      <feColorMatrix in="SourceGraphic" type="matrix" values="0 0 0 0 0  0 0 0 0 0  0 0 0 0 0  0 0 0 1 0" result="fx4"/>
+      <feMorphology in="fx4" operator="dilate" radius="3" result="fx5"/>
+      <feOffset in="fx5" dx="0" dy="4" result="fx6"/>
+      <feGaussianBlur in="fx6" stdDeviation="6" result="fx7"/>
+      <feFlood flood-color="#000000" flood-opacity="0.5" result="fx8"/>
+      <feComposite in="fx8" in2="fx7" operator="in" result="fx9"/>
+      <feMerge result="fx3">
+        <feMergeNode in="fx9"/>
+        <feMergeNode in="SourceGraphic"/>
+      </feMerge>
+    </filter>
+    <linearGradient id="paint12" gradientUnits="userSpaceOnUse" x1="80" y1="0" x2="80" y2="120">
+      <stop offset="0" stop-color="#ffffff"/>
+      <stop offset="1" stop-color="#ffffff" stop-opacity="0"/>
+    </linearGradient>
+    <filter id="filter14" x="-50%" y="-50%" width="200%" height="200%">
+      <feGaussianBlur in="SourceGraphic" stdDeviation="0.5" result="fx13"/>
+    </filter>
+    <linearGradient id="paint15" gradientUnits="userSpaceOnUse" x1="83" y1="111" x2="277" y2="-83">
+      <stop offset="0" stop-color="#ff5900"/>
+      <stop offset="1" stop-color="#ffbd00"/>
+    </linearGradient>
+    <mask id="mask11" maskUnits="userSpaceOnUse" style="mask-type:alpha">
+      <g>
+        <path d="M0 0 H160 V120 H0 V0 Z" fill="url(#paint12)"/>
+      </g>
+    </mask>
+    <radialGradient id="paint16" cx="0.5" cy="0.2" r="0.9">
+      <stop offset="0" stop-color="#282c3c"/>
+      <stop offset="1" stop-color="#08090e"/>
+    </radialGradient>
+    <style>@font-face{font-family:"Fraunces";font-weight:400;font-style:normal;src:url("data:font/woff2;base64,Fraunces-400-normal")}@font-face{font-family:"Inter";font-weight:400;font-style:normal;src:url("data:font/woff2;base64,Inter-400-normal")}@font-face{font-family:"Inter";font-weight:700;font-style:italic;src:url("data:font/woff2;base64,Inter-700-italic")}
+    </style>
+  </defs>
+  <rect width="400" height="400" fill="url(#paint16)"/>
+  <g id="clipped" transform="matrix(1 0 0 1 20 20)" opacity="0.8" style="mix-blend-mode:screen">
+    <g id="gradient-stroke">
+      <path d="M16 0 H116 A4 4 0 0 1 120 4 V64 A16 16 0 0 1 104 80 H4 A4 4 0 0 1 0 76 V16 A16 16 0 0 1 16 0 Z" fill="#ff5900" fill-opacity="0.9"/>
+      <path d="M16 0 H116 A4 4 0 0 1 120 4 V64 A16 16 0 0 1 104 80 H4 A4 4 0 0 1 0 76 V16 A16 16 0 0 1 16 0 Z" fill="none" stroke="url(#paint0)" stroke-width="8" clip-path="url(#stroke1)"/>
+    </g>
+    <g id="spun" transform="matrix(0.7071 0.7071 -0.7071 0.7071 230 -2.4264)" filter="url(#filter10)">
+      <path d="M0 0 H60 V60 H0 V0 Z" fill="#00c8b4"/>
+      <path d="M0 0 H60 V60 H0 V0 Z" fill="none" stroke="#ffffff" stroke-width="4" mask="url(#stroke2)"/>
+    </g>
+  </g>
+  <g id="portrait" transform="matrix(1 0 0 1 20 130)" mask="url(#mask11)">
+    <image href="data:image/jpeg;base64,sha256-77aa" width="160" height="120" preserveAspectRatio="xMidYMid slice"/>
+  </g>
+  <g id="fade" transform="matrix(1 0 0 1 20 130)" display="none">
+    <path d="M0 0 H160 V120 H0 V0 Z" fill="url(#paint12)"/>
+  </g>
+  <g id="chevron" transform="matrix(1 0 0 1 220 140)" filter="url(#filter14)">
+    <path d="M8 8 L40 24 L8 40 Z" fill-rule="evenodd" fill="#ffffff" fill-opacity="0.85"/>
+  </g>
+  <g id="inline-mark" transform="matrix(1 0 0 1 300 140)">
+    <svg width="48" height="48" overflow="visible" fill="#ffbd00">
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">
+        <circle cx="12" cy="12" r="10"/>
+      </svg>
+    </svg>
+  </g>
+  <g id="copy" transform="matrix(1 0 0 1 20 270)">
+    <text text-anchor="middle" letter-spacing="-0.5" xml:space="preserve"><tspan x="180" y="53.05"><tspan font-family="Inter" font-size="28" font-weight="400" fill="#ffffff">Turma </tspan><tspan font-family="Inter" font-size="28" font-weight="700" font-style="italic" fill="url(#paint15)" text-decoration="underline">nova</tspan></tspan><tspan x="180" y="76.5"><tspan font-family="Fraunces" font-size="18" font-weight="400" fill="#bec3d2">&lt;matrículas &amp; vagas&gt;</tspan></tspan></text>
+  </g>
+</svg>
