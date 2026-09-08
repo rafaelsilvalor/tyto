@@ -204,7 +204,11 @@ importers:
         specifier: workspace:*
         version: link:../core
 
-  packages/export-svg: {}
+  packages/export-svg:
+    dependencies:
+      '@tyto/core':
+        specifier: workspace:*
+        version: link:../core
 
   packages/io: {}
 
