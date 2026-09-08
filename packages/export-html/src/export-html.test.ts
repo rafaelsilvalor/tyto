@@ -287,3 +287,63 @@ describe('the mask is a document of its own', () => {
     expect(feed).toContain('mask-image:');
   });
 });
+
+describe('the SVG renderer inside this exporter', () => {
+  /**
+   * A rect whose stroke is not a colour drops to inline SVG to keep the paint, and a mask
+   * is inline SVG by definition. Both can carry an image, and both used to write the
+   * pattern in bounding-box units — where the image's viewport is the unit *square*, so
+   * `preserveAspectRatio` fits the picture to a square that is then stretched to the box.
+   * Chrome rendered the same defect in `export-svg` as 972151 of 2073600 differing pixels.
+   */
+  it('gives an image paint the node’s real box, so cover does not distort it', () => {
+    const scene = sceneOf({
+      version: 1,
+      assets: [{ id: 'p', source: 'file', path: 'p.png', hash: 'h1' }],
+      artworks: [
+        {
+          id: 'a',
+          frames: [
+            {
+              format: 'feed',
+              size: { w: 400, h: 200 },
+              children: [
+                {
+                  kind: 'rect',
+                  id: 'wide',
+                  size: { w: 400, h: 200 },
+                  radius: [0, 0, 0, 0],
+                  fill: {
+                    kind: 'image',
+                    asset: { id: 'p', source: 'file', path: 'p.png', hash: 'h1' },
+                    fit: 'cover',
+                  },
+                  stroke: {
+                    paint: {
+                      kind: 'linear-gradient',
+                      angle: 90,
+                      stops: [
+                        { offset: 0, color: { r: 255, g: 255, b: 255 } },
+                        { offset: 1, color: { r: 0, g: 0, b: 0 } },
+                      ],
+                    },
+                    width: 4,
+                    align: 'center',
+                  },
+                },
+              ],
+            },
+          ],
+        },
+      ],
+    });
+
+    const html = htmlOf(scene)[0] ?? '';
+
+    // The inline SVG is body markup, not an attribute, so its quotes are literal here;
+    // only a mask travels through HTML escaping.
+    expect(html).toContain('patternUnits="userSpaceOnUse"');
+    expect(html).not.toContain('objectBoundingBox');
+    expect(html).toContain('<pattern id="p0" width="400" height="200"');
+  });
+});
