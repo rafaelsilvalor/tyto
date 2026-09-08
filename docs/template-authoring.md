@@ -195,6 +195,9 @@ files. `{slot}` interpolates: `src="{imagem}"` alone on an `image` is that slot'
 
 ### Slots, adjustments and marks
 
+The reasoning behind the three rules below — why a mark reads a class, why an enum does not,
+and why an enum needs `@if` to reach a value — is ADR 0017.
+
 - `slot="x"` on `text` draws the rich text; on `image` it draws the asset. **A slot the brief
   left unset leaves its node out of the scene** rather than drawing an empty one, which is
   what makes `@if slot(x) is empty` worth writing.
@@ -219,7 +222,7 @@ files. `{slot}` interpolates: `src="{imagem}"` alone on an `image` is that slot'
   slot. **`@if slot(<name>) is <value>`** — the block applies while the enum `<name>` holds
   `<value>`. The second reading is the only way an enum reaches a value: `--slot-cor` holds
   the word `laranja`, and no amount of `var()` turns a word into `#ff5900`.
-- **`@each <slot>`** — a **scope, not a loop**. `compile` already calls the template once per
+- **`@each <slot>`** — a **scope, not a loop** (ADR 0017). `compile` already calls the template once per
   (artwork, format) with the repeatable slot resolved to _this_ artwork's occurrence, so
   there is nothing left to iterate. The block applies while rendering an artwork that slot
   produced: every artwork of a brief that filled it, and none of the single artwork a
