@@ -19,6 +19,8 @@ export {
   placeholderNames,
 } from './diagnostics/codes.js';
 
+export { didYouMean, editDistance } from './diagnostics/suggest.js';
+
 export {
   type Diagnostic,
   type DiagnosticOptions,
