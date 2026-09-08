@@ -212,6 +212,32 @@ export const diagnosticCodes = {
     template: "Could not read '{path}': {problem}.",
     spec: 'docs/template-authoring.md',
   },
+  E_EXPORT_ASSET_UNRESOLVED: {
+    severity: 'error',
+    summary: 'An exporter was given no bytes for an asset the scene draws.',
+    template:
+      "Asset '{asset}' on '{node}' was not resolved to embeddable bytes, and an export makes no network requests.",
+    spec: 'docs/ir-schema.md',
+  },
+  E_EXPORT_FONT_UNRESOLVED: {
+    severity: 'error',
+    summary: 'An exporter was given no bytes for a font the scene draws text in.',
+    template:
+      "Font '{font}' was not resolved to embeddable bytes; text would render in whatever the viewer has, and the output must be deterministic.",
+    spec: 'docs/ir-schema.md',
+  },
+  E_EXPORT_UNSUPPORTED: {
+    severity: 'error',
+    summary: 'A scene uses something the chosen exporter cannot express at all.',
+    template: "'{node}' uses {feature}, which {exporter} cannot express: {detail}.",
+    spec: 'docs/ir-schema.md',
+  },
+  W_EXPORT_APPROXIMATED: {
+    severity: 'warning',
+    summary: 'An exporter rendered something close to, but not exactly, what the IR asked for.',
+    template: "'{node}': {feature} is approximated by {exporter} — {detail}.",
+    spec: 'docs/ir-schema.md',
+  },
   W_TEXT_OVERFLOW: {
     severity: 'warning',
     summary: 'Compiled text does not fit its frame in one of the requested formats.',

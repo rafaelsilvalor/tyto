@@ -1,0 +1,24 @@
+<!doctype html>
+<html>
+  <head>
+    <meta charset="utf-8">
+    <title>slide-1:feed</title>
+    <style>
+      * { margin: 0; padding: 0; border: 0; box-sizing: border-box; }
+      html, body { background: transparent; }
+      .tyto-frame { position: relative; overflow: hidden; }
+      .tyto-node { position: absolute; left: 0; top: 0; transform-origin: 0 0; }
+      .tyto-node > svg { display: block; width: 100%; height: 100%; }
+      @font-face { font-family: "Inter"; font-weight: 700; font-style: normal; src: url("data:font/woff2;base64,Inter-700-normal"); }
+      .tyto-frame { width: 1080px; height: 1080px; background-color: #0c0e14; }
+      #hero-image { width: 1080px; height: 620px; object-fit: cover; object-position: 50% 50%; }
+      #headline { width: 920px; display: flex; flex-direction: column; justify-content: flex-start; text-align: left; line-height: 1.1; white-space: pre-wrap; overflow: hidden; }
+      #copy { transform: matrix(1, 0, 0, 1, 0, 660); }
+      #badge { filter: drop-shadow(0px 8px 24px rgba(0, 0, 0, 0.35)); mask-image: url("data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 240 240%22 width=%22240px%22 height=%22240px%22><path d=%22M0 0 H240 V240 H0 Z%22 fill=%22%23ffffff%22/></svg>"); mask-size: 240px 240px; mask-position: 0px 0px; mask-repeat: no-repeat; mask-mode: alpha; width: 240px; height: 240px; background-image: linear-gradient(45deg, #ff5900 0%, #ffbd00 100%); border-radius: 24px 24px 24px 24px; outline: 2px solid #000000; outline-offset: -1px; }
+      #badge-mask { display: none; width: 240px; height: 240px; }
+    </style>
+  </head>
+  <body>
+    <div class="tyto-frame"><img id="hero-image" class="tyto-node" src="data:image/jpeg;base64,sha256-1f0a" alt=""><div id="copy" class="tyto-node"><div id="headline" class="tyto-node"><div><span style="font-family: &quot;Inter&quot;; font-size: 96px; font-weight: 700; color: #ffffff">Turma nova</span></div></div></div><div id="badge" class="tyto-node"></div><svg id="badge-mask" class="tyto-node" viewBox="0 0 240 240"><path d="M0 0 H240 V240 H0 Z" fill="#ffffff"/></svg></div>
+  </body>
+</html>

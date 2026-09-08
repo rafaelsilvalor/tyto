@@ -73,8 +73,12 @@ type Inherited = Omit<VisitContext, 'format'>;
  * A group has no box of its own and a text may leave a dimension to its content, so both
  * fall back to zero — their anchor is their origin. Resolving them properly means
  * measuring laid-out text, which the IR does not record and E4.5 is where it arrives.
+ *
+ * Exported because an exporter that nests its output — HTML does, each element carrying
+ * only its own transform — needs the same rule, and two exporters that disagree about
+ * where a rotation pivots render the same scene two ways.
  */
-function anchorBox(node: SceneNode): Size {
+export function anchorBox(node: SceneNode): Size {
   switch (node.kind) {
     case 'rect':
     case 'image':
@@ -87,6 +91,18 @@ function anchorBox(node: SceneNode): Size {
   }
 }
 
+/**
+ * A node's own transform as a matrix, anchored against its own box.
+ *
+ * `VisitContext.transform` is this composed with everything above it, which is what an
+ * exporter that positions every node against the frame wants. An exporter that nests
+ * instead wants this one, because the ancestors' matrices are already carried by the
+ * elements it nested inside.
+ */
+export function nodeMatrix(node: SceneNode): Matrix {
+  return transformMatrix(node.transform, anchorBox(node));
+}
+
 function contextFor(node: SceneNode, inherited: Inherited): VisitContext {
   return {
     scene: inherited.scene,
@@ -94,10 +110,7 @@ function contextFor(node: SceneNode, inherited: Inherited): VisitContext {
     frame: inherited.frame,
     format: inherited.frame.format,
     ancestors: inherited.ancestors,
-    transform: multiplyMatrix(
-      inherited.transform,
-      transformMatrix(node.transform, anchorBox(node)),
-    ),
+    transform: multiplyMatrix(inherited.transform, nodeMatrix(node)),
     opacity: inherited.opacity * node.opacity,
     visible: inherited.visible && node.visible,
   };
