@@ -198,7 +198,11 @@ importers:
 
   packages/editor: {}
 
-  packages/export-html: {}
+  packages/export-html:
+    dependencies:
+      '@tyto/core':
+        specifier: workspace:*
+        version: link:../core
 
   packages/export-svg: {}
 

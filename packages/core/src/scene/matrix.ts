@@ -44,6 +44,31 @@ export function multiplyMatrix(outer: Matrix, inner: Matrix): Matrix {
   };
 }
 
+/**
+ * The matrix that undoes this one, or `undefined` when it flattens the plane.
+ *
+ * An exporter needs it to express one node's coordinates in another's: a CSS mask is
+ * painted in the masked element's own space, and the node that supplies the mask knows
+ * only its own place in the frame. `inverse(masked) x mask` is the bridge, and there is
+ * no other way to write it — the two matrices are arbitrary.
+ *
+ * A scale of zero on either axis has no inverse, which is a node scaled to nothing; the
+ * caller decides whether that is an error or something to skip.
+ */
+export function invertMatrix(matrix: Matrix): Matrix | undefined {
+  const determinant = matrix.a * matrix.d - matrix.b * matrix.c;
+  if (determinant === 0 || !Number.isFinite(determinant)) return undefined;
+
+  return {
+    a: matrix.d / determinant,
+    b: -matrix.b / determinant,
+    c: -matrix.c / determinant,
+    d: matrix.a / determinant,
+    e: (matrix.c * matrix.f - matrix.d * matrix.e) / determinant,
+    f: (matrix.b * matrix.e - matrix.a * matrix.f) / determinant,
+  };
+}
+
 export function applyMatrix(matrix: Matrix, point: Point): Point {
   return {
     x: matrix.a * point.x + matrix.c * point.y + matrix.e,

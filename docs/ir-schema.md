@@ -124,6 +124,18 @@ per node id or wants hidden nodes counted after all.
 | TextRun `break`          | `<br>`                                            | ends the `<tspan>`; the next one starts at `x` with `dy` of one line          |
 | Vector.svg               | inline `<svg>`                                    | inline (namespaces normalized)                                                |
 
+Where the table is silent and a visitor cannot be, ADR 0018 decides: `clip` on a group is
+ignored (a group has no box to clip to), a radial gradient's `radius` is a fraction of the
+node's box on both axes, a shadow's `spread` is drawn where the format has one and
+reported where it does not, and bytes for fonts and assets arrive through a resolver the
+caller supplies — an exporter is pure and opens no files, so a path it could not resolve
+is `E_EXPORT_ASSET_UNRESOLVED` rather than a link the output would follow.
+
+`packages/export-html` is the first of the two. It nests its output, so each element
+carries `nodeMatrix(node)` and the browser composes the rest; per-node styling goes in the
+document's stylesheet under an escaped `#id`, because a mask is a whole SVG document
+inside a `url()` and an attribute would have to carry it through HTML escaping.
+
 ## Invariants (tested in `core`)
 
 Checked in `scene/invariants.ts`, after the shape holds. Each one names the id at fault, because a Zod path like `artworks.0.frames.1.children.4` is not something a template author can search for.

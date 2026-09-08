@@ -222,6 +222,7 @@ export {
   type Point,
   applyMatrix,
   identityMatrix,
+  invertMatrix,
   multiplyMatrix,
   transformMatrix,
 } from './scene/matrix.js';
@@ -230,6 +231,8 @@ export {
   type FrameVisit,
   type SceneVisitor,
   type VisitContext,
+  anchorBox,
+  nodeMatrix,
   walk,
   walkFrame,
 } from './scene/visitor.js';

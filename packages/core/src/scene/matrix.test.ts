@@ -1,6 +1,12 @@
 import { describe, expect, it } from 'vitest';
 
-import { applyMatrix, identityMatrix, multiplyMatrix, transformMatrix } from './matrix.js';
+import {
+  applyMatrix,
+  identityMatrix,
+  invertMatrix,
+  multiplyMatrix,
+  transformMatrix,
+} from './matrix.js';
 import { identityTransform } from './primitives.js';
 import type { Matrix, Point } from './matrix.js';
 
@@ -84,5 +90,43 @@ describe('transformMatrix', () => {
     // The node's own x axis points down after the rotation, so scaleX stretches downwards.
     expectPoint(applyMatrix(matrix, { x: 10, y: 0 }), { x: 0, y: 30 });
     expectPoint(applyMatrix(matrix, { x: 0, y: 10 }), { x: -10, y: 0 });
+  });
+});
+
+describe('invertMatrix', () => {
+  const box = { w: 100, h: 20 };
+  const placed = transformMatrix(
+    { ...identityTransform, x: 40, y: -12, rotation: 30, scaleX: 2, scaleY: 0.5 },
+    box,
+  );
+
+  it('undoes a transform, whichever side it is applied from', () => {
+    const inverse = invertMatrix(placed);
+    expect(inverse).toBeDefined();
+    if (inverse === undefined) return;
+
+    expectMatrix(multiplyMatrix(placed, inverse), identityMatrix);
+    expectMatrix(multiplyMatrix(inverse, placed), identityMatrix);
+  });
+
+  it('takes a point back where it came from', () => {
+    const inverse = invertMatrix(placed);
+    if (inverse === undefined) throw new Error('no inverse');
+
+    expectPoint(applyMatrix(inverse, applyMatrix(placed, { x: 7, y: 3 })), { x: 7, y: 3 });
+  });
+
+  it('expresses one node in another’s coordinates, which is what a CSS mask needs', () => {
+    const masked = transformMatrix({ ...identityTransform, x: 20, y: 130 }, box);
+    const mask = transformMatrix({ ...identityTransform, x: 20, y: 130 }, box);
+    const inverse = invertMatrix(masked);
+    if (inverse === undefined) throw new Error('no inverse');
+
+    // Two nodes at the same place: inside one, the other sits at the origin.
+    expectMatrix(multiplyMatrix(inverse, mask), identityMatrix);
+  });
+
+  it('has no answer for a node scaled to nothing', () => {
+    expect(invertMatrix(transformMatrix({ ...identityTransform, scaleX: 0 }, box))).toBeUndefined();
   });
 });

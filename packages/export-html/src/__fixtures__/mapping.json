@@ -1,0 +1,193 @@
+{
+  "version": 1,
+  "fonts": [
+    { "family": "Inter", "source": "bundled" },
+    { "family": "Fraunces", "source": "file", "path": "fonts/Fraunces.woff2" }
+  ],
+  "assets": [{ "id": "photo", "source": "file", "path": "photo.jpg", "hash": "sha256-77aa" }],
+  "artworks": [
+    {
+      "id": "mapping",
+      "label": "One node per row of the exporter mapping table",
+      "frames": [
+        {
+          "format": "feed",
+          "size": { "w": 400, "h": 400 },
+          "background": {
+            "kind": "radial-gradient",
+            "center": { "x": 0.5, "y": 0.2 },
+            "radius": 0.9,
+            "stops": [
+              { "offset": 0, "color": { "r": 40, "g": 44, "b": 60 } },
+              { "offset": 1, "color": { "r": 8, "g": 9, "b": 14 } }
+            ]
+          },
+          "children": [
+            {
+              "kind": "group",
+              "id": "clipped",
+              "clip": true,
+              "blend": "screen",
+              "opacity": 0.8,
+              "transform": { "x": 20, "y": 20 },
+              "children": [
+                {
+                  "kind": "rect",
+                  "id": "gradient-stroke",
+                  "size": { "w": 120, "h": 80 },
+                  "radius": [16, 4, 16, 4],
+                  "fill": { "kind": "solid", "color": { "r": 255, "g": 89, "b": 0, "a": 0.9 } },
+                  "stroke": {
+                    "paint": {
+                      "kind": "linear-gradient",
+                      "angle": 90,
+                      "stops": [
+                        { "offset": 0, "color": { "r": 255, "g": 255, "b": 255 } },
+                        { "offset": 1, "color": { "r": 255, "g": 255, "b": 255, "a": 0 } }
+                      ]
+                    },
+                    "width": 4,
+                    "align": "inside"
+                  }
+                },
+                {
+                  "kind": "rect",
+                  "id": "spun",
+                  "transform": {
+                    "x": 200,
+                    "y": 10,
+                    "rotation": 45,
+                    "anchor": { "x": 0.5, "y": 0.5 }
+                  },
+                  "size": { "w": 60, "h": 60 },
+                  "radius": [0, 0, 0, 0],
+                  "fill": { "kind": "solid", "color": { "r": 0, "g": 200, "b": 180 } },
+                  "stroke": {
+                    "paint": { "kind": "solid", "color": { "r": 255, "g": 255, "b": 255 } },
+                    "width": 2,
+                    "align": "outside"
+                  },
+                  "effects": [
+                    {
+                      "kind": "shadow",
+                      "x": 0,
+                      "y": 4,
+                      "blur": 12,
+                      "spread": 3,
+                      "color": { "r": 0, "g": 0, "b": 0, "a": 0.5 }
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "kind": "image",
+              "id": "portrait",
+              "asset": {
+                "id": "photo",
+                "source": "file",
+                "path": "photo.jpg",
+                "hash": "sha256-77aa"
+              },
+              "size": { "w": 160, "h": 120 },
+              "fit": "cover",
+              "position": { "x": 0.5, "y": 0.25 },
+              "transform": { "x": 20, "y": 130 },
+              "mask": { "nodeId": "fade", "mode": "alpha" }
+            },
+            {
+              "kind": "rect",
+              "id": "fade",
+              "visible": false,
+              "transform": { "x": 20, "y": 130 },
+              "size": { "w": 160, "h": 120 },
+              "radius": [0, 0, 0, 0],
+              "fill": {
+                "kind": "linear-gradient",
+                "angle": 180,
+                "stops": [
+                  { "offset": 0, "color": { "r": 255, "g": 255, "b": 255 } },
+                  { "offset": 1, "color": { "r": 255, "g": 255, "b": 255, "a": 0 } }
+                ]
+              }
+            },
+            {
+              "kind": "vector",
+              "id": "chevron",
+              "transform": { "x": 220, "y": 140 },
+              "size": { "w": 48, "h": 48 },
+              "geometry": { "kind": "path", "d": "M8 8 L40 24 L8 40 Z", "fillRule": "evenodd" },
+              "fill": { "kind": "solid", "color": { "r": 255, "g": 255, "b": 255, "a": 0.85 } },
+              "effects": [{ "kind": "blur", "radius": 1 }]
+            },
+            {
+              "kind": "vector",
+              "id": "inline-mark",
+              "transform": { "x": 300, "y": 140 },
+              "size": { "w": 48, "h": 48 },
+              "geometry": {
+                "kind": "svg",
+                "markup": "<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 24 24\"><circle cx=\"12\" cy=\"12\" r=\"10\"/></svg>"
+              },
+              "fill": { "kind": "solid", "color": { "r": 255, "g": 189, "b": 0 } }
+            },
+            {
+              "kind": "text",
+              "id": "copy",
+              "transform": { "x": 20, "y": 270 },
+              "box": { "w": 360, "h": 110 },
+              "align": "center",
+              "valign": "middle",
+              "lineHeight": 1.15,
+              "letterSpacing": -0.5,
+              "overflow": "clip",
+              "effects": [{ "kind": "background-blur", "radius": 6 }],
+              "runs": [
+                {
+                  "kind": "text",
+                  "text": "Turma ",
+                  "font": { "family": "Inter", "source": "bundled" },
+                  "size": 28,
+                  "weight": 400,
+                  "style": "normal",
+                  "color": { "kind": "solid", "color": { "r": 255, "g": 255, "b": 255 } }
+                },
+                {
+                  "kind": "text",
+                  "text": "nova",
+                  "font": { "family": "Inter", "source": "bundled" },
+                  "size": 28,
+                  "weight": 700,
+                  "style": "italic",
+                  "decoration": "underline",
+                  "color": {
+                    "kind": "linear-gradient",
+                    "angle": 45,
+                    "stops": [
+                      { "offset": 0, "color": { "r": 255, "g": 89, "b": 0 } },
+                      { "offset": 1, "color": { "r": 255, "g": 189, "b": 0 } }
+                    ]
+                  }
+                },
+                { "kind": "break" },
+                {
+                  "kind": "text",
+                  "text": "<matrículas & vagas>",
+                  "font": {
+                    "family": "Fraunces",
+                    "source": "file",
+                    "path": "fonts/Fraunces.woff2"
+                  },
+                  "size": 18,
+                  "weight": 400,
+                  "style": "normal",
+                  "color": { "kind": "solid", "color": { "r": 190, "g": 195, "b": 210 } }
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}
