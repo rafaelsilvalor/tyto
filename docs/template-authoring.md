@@ -97,6 +97,9 @@ itself fails only when `root` cannot be read at all.
 ## template.html — Tyto markup
 
 Looks like HTML+CSS, but every tag is an IR node and the CSS is a controlled subset. No JS.
+`compileTemplate(source, { manifest, assets })` in `packages/template-lang` is the only way
+in; it returns the same `Template` a `template.ts` exports, so `compile` cannot tell the two
+paths apart.
 
 <!-- The block below is the Tyto template language, not CSS: Prettier would
      reflow it as a stylesheet and rewrite its quotes. -->
@@ -105,33 +108,140 @@ Looks like HTML+CSS, but every tag is an IR node and the CSS is a controlled sub
 ```html
 <frame format="feed" bg="none">
   <image src="{imagem}" fit="cover" class="bg" />
+  <rect id="grad" class="grad" />
   <group class="content" opacity="0.95" blend="normal" mask="#grad">
-    <rect id="grad" class="grad" />
     <text slot="titulo" class="title" />
     <text slot="subtitulo" class="sub" />
   </group>
   <vector src="assets/logo.svg" class="logo" />
 </frame>
 
-<frame format="story" extends="feed">
-  <!-- inherits the feed tree; only @format CSS changes -->
-</frame>
+<frame format="story" extends="feed" />
 
 <style>
   :root { --color: var(--slot-cor); }
   .bg    { x: 0; y: 0; w: 100%; h: 100%; }
+  .grad  { x: 0; y: 0; w: 100%; h: 100%;
+           fill: linear-gradient(180deg, #00000000 0, #000000cc 1); }
   .title { x: 64; y: 720; w: 952; font: 700 72px/1.05 "Inter"; color: white; }
   .sub   { x: 64; y: 880; w: 952; font: 400 36px/1.2 "Inter"; color: white; }
-  .logo  { x: 64; y: 64; w: 200; }
+  .logo  { x: 64; y: 64; w: 200; h: 60; }
   @format story { .title { y: 1400; font-size: 96px; } .sub { y: 1600; } }
   @if slot(imagem) is empty { .title { y: 400; } }
-  @each slide { .title { content: slot(slide); } }
+  @each slide { .sub { overflow: shrink; } }
 </style>
 ```
 
-**Tags**: `frame`, `group`, `rect`, `text`, `image`, `vector`. **Attributes**: `id`, `class`, `slot`, `src`, `fit`, `opacity`, `blend`, `mask`, `clip`, `extends` (frame). **Accepted CSS properties**: `x y w h rotation anchor`, `font font-size font-weight line-height letter-spacing color text-align vertical-align overflow`, `fill stroke radius`, `opacity mix-blend-mode`, `shadow blur`, `visible`. Units: `px`, `%` (of parent), `vw/vh` (of frame). Any other property ⇒ `E_UNSUPPORTED_CSS` with a suggestion.
+**Tags**: `frame`, `group`, `rect`, `text`, `image`, `vector`. Only `group` holds other
+tags, and only `frame` sits at the top level. **There is no text content** — a template
+draws slots, and words between two tags are `E_SYNTAX`.
 
-**Slot rules**: `slot="x"` on `text` injects the rich text; on `image` injects the asset. Adjustments become classes: `{destaque}` ⇒ `.destaque` targetable from CSS; `{cor: laranja}` ⇒ `--slot-cor: laranja`.
+**Attributes.** Every drawable tag takes `id`, `class`, `name`, `opacity`, `blend`, `mask`,
+`clip`; `text` and `image` also take `slot`; `image` also takes `src` and `fit`; `vector`
+takes `src`. A `frame` is not a node and takes its own set: `format`, `extends`, `bg`, `id`,
+`class`. Anything else is `E_UNSUPPORTED_ATTRIBUTE` with a suggestion. Where an attribute and
+a CSS property say the same thing (`opacity`), **the stylesheet wins** — the attribute is the
+shorthand and a rule is the override.
+
+**Accepted CSS properties**: `x y w h rotation anchor`, `font font-size font-weight
+line-height letter-spacing color text-align vertical-align overflow`, `fill stroke radius`,
+`opacity mix-blend-mode`, `shadow blur`, `visible`. Any other property is
+`E_UNSUPPORTED_CSS` with a suggestion. The shapes the compound ones take:
+
+| Property         | Written as                                                                                                                     |
+| ---------------- | ------------------------------------------------------------------------------------------------------------------------------ |
+| `font`           | `700 72px/1.05 "Inter"` — weight and `/line-height` optional                                                                   |
+| `fill` / `color` | `#ff5900`, a CSS basic colour name, `linear-gradient(180deg, #000 0, #fff 1)`, `radial-gradient(0.5 0.5, 0.7, #000 0, #fff 1)` |
+| `stroke`         | `2px #ffffff` with an optional `inside` / `center` / `outside`                                                                 |
+| `shadow`         | `0 4 12 #00000088`, or `0 4 12 2 #00000088` with a spread                                                                      |
+| `radius`         | `8`, or `8 8 0 0` for `[tl, tr, br, bl]`                                                                                       |
+| `anchor`         | `center`, `0.5`, or `0.5 1`                                                                                                    |
+| `visible`        | `true` / `false`                                                                                                               |
+
+**Units**: `px`, `%`, `vw`, `vh`, and a bare number means `px`. `vw` and `vh` are always of
+the frame. `%` is of the nearest ancestor that declared a size, and of the frame otherwise —
+a group has no size in the IR, so a `w` on a group is used as its children's percentage base
+and stored nowhere.
+
+**Colour names** are the CSS basic set (`white`, `black`, `red`, …, `transparent`) and
+nothing more. A template's own palette belongs in `:root` as a variable, where the name means
+what this template says it means.
+
+**Selectors**: `.class`, `#id`, a tag name, and `:root`. Parts of one selector are written
+together — `.title.destaque` — and there is no descendant combinator, so the space between two
+parts means nothing. **There is no specificity**: declarations apply in the order they are
+written and the last one to set a property wins, at-rule blocks included. That is why
+`@format story` goes after the base rules in the example above; move it above them and it
+stops overriding anything.
+
+**Variables**: `:root { --brand: #ff5900; }`, read back as `var(--brand)`, with an optional
+fallback (`var(--brand, #000)`). Custom properties are read **only** from `:root`, which may
+sit inside an at-rule block; anywhere else is an error. Every enum in play is seeded as
+`--slot-<name>` before the stylesheet runs, so `var(--slot-cor)` holds the word `laranja`.
+
+**`extends`** on a frame inherits the tree of the frame it names, and its `bg` unless this
+frame writes its own. A frame either extends another or has children of its own, not both.
+
+**`mask="#grad"`** names an `id` in the same frame. Ids are unique across a whole scene, so an
+explicit `id` is namespaced with `context.idPrefix` on the way into the IR: `grad` in the
+markup is `slide-1.feed.grad` in the scene. It also means a mask may not name one of the
+masked node's own descendants (`E_SCENE_MASK_DESCENDANT`), which is why the `<rect id="grad">`
+above is a sibling of the group it masks rather than a child of it.
+
+**`src`** on `image` and `vector` is a path relative to the template folder, resolved by
+whoever loaded the template and handed in `assets`; `template-lang` is pure and reads no
+files. `{slot}` interpolates: `src="{imagem}"` alone on an `image` is that slot's asset, and
+`src="assets/{cor}.png"` splices an enum's word into a path.
+
+### Slots, adjustments and marks
+
+- `slot="x"` on `text` draws the rich text; on `image` it draws the asset. **A slot the brief
+  left unset leaves its node out of the scene** rather than drawing an empty one, which is
+  what makes `@if slot(x) is empty` worth writing.
+- A **flag** adjustment becomes a class: `{destaque}` gives `.destaque`. It is _ambient_ — it
+  is on every element of that artwork — so a rule that wants one writes it beside the
+  element's own class: `.slide.destaque { … }`. A bare `.destaque { … }` applies to every
+  node.
+- An **enum** adjustment or slot becomes a variable: `{cor: laranja}` gives
+  `--slot-cor: laranja`, with an adjustment on this artwork winning over a slot of the same
+  name. To turn that word into a value, branch on it:
+  `@if slot(cor) is laranja { :root { --bg: #ff5900; } }`.
+- A **mark** in the brief's rich text takes the run properties of the class that spells it
+  out: `{cor:laranja}Turma nova{/}` reads `.cor-laranja`, and `color`, `font`, `font-size`
+  and `font-weight` from that rule land on those runs. A mark nothing spells out passes its
+  text through unchanged.
+
+### The at-rules
+
+- **`@format <id>`** — the block applies while rendering that format. The id has to be one
+  the manifest renders.
+- **`@if slot(<name>) is empty`** — the block applies while the brief set no value for that
+  slot. **`@if slot(<name>) is <value>`** — the block applies while the enum `<name>` holds
+  `<value>`. The second reading is the only way an enum reaches a value: `--slot-cor` holds
+  the word `laranja`, and no amount of `var()` turns a word into `#ff5900`.
+- **`@each <slot>`** — a **scope, not a loop**. `compile` already calls the template once per
+  (artwork, format) with the repeatable slot resolved to _this_ artwork's occurrence, so
+  there is nothing left to iterate. The block applies while rendering an artwork that slot
+  produced: every artwork of a brief that filled it, and none of the single artwork a
+  manifest with no repeatable slot produces. `<slot>` must name the manifest's repeatable
+  slot.
+
+At-rule blocks hold style rules, not other at-rules.
+
+### What the markup cannot do
+
+Compose text the brief did not write. A slide that numbers itself `2/3` is arithmetic on
+`context.artwork`, and the markup draws slots — that template is a `template.ts`. The same
+goes for a grid whose column count depends on how many items there are, and for anything else
+the next section calls computation.
+
+### `renderedSlots`
+
+`compileTemplate` returns the set of slots the markup draws, alongside the manifest and the
+build function. Hand it to `resolve` as `renderedSlots` and a brief that fills a slot the
+template ignores gets `W_UNUSED_SLOT`. The code path cannot report this — a plain function
+call does not say which slots it touched — which is why the warning stays silent unless a
+caller supplies the set.
 
 ## template.ts — code path
 

@@ -1,0 +1,27 @@
+<!-- A copy of the example printed in docs/template-authoring.md. It is here so that the
+     doc's own template is proven to parse: an example nobody runs is an example that rots. -->
+
+<frame format="feed" bg="none">
+  <image src="{imagem}" fit="cover" class="bg" />
+  <rect id="grad" class="grad" />
+  <group class="content" opacity="0.95" blend="normal" mask="#grad">
+    <text slot="titulo" class="title" />
+    <text slot="subtitulo" class="sub" />
+  </group>
+  <vector src="assets/logo.svg" class="logo" />
+</frame>
+
+<frame format="story" extends="feed" />
+
+<style>
+  :root { --color: var(--slot-cor); }
+  .bg    { x: 0; y: 0; w: 100%; h: 100%; }
+  .grad  { x: 0; y: 0; w: 100%; h: 100%;
+           fill: linear-gradient(180deg, #00000000 0, #000000cc 1); }
+  .title { x: 64; y: 720; w: 952; font: 700 72px/1.05 "Inter"; color: white; }
+  .sub   { x: 64; y: 880; w: 952; font: 400 36px/1.2 "Inter"; color: white; }
+  .logo  { x: 64; y: 64; w: 200; h: 60; }
+  @format story { .title { y: 1400; font-size: 96px; } .sub { y: 1600; } }
+  @if slot(imagem) is empty { .title { y: 400; } }
+  @each slide { .sub { overflow: shrink; } }
+</style>

@@ -1,0 +1,31 @@
+<!-- promo-curso, the same layout `compile.test.ts` writes with the SDK (E4.2).
+     The pair is the acceptance criterion of TYTO-24: both paths converge on Scene. -->
+
+<frame format="feed" bg="var(--bg)">
+  <image slot="imagem" class="photo" />
+  <group id="copy" class="copy">
+    <text slot="titulo" class="title" />
+    <text slot="slide" class="slide" />
+  </group>
+</frame>
+
+<frame format="story" extends="feed" />
+
+<style>
+  /* The template's own vocabulary. `cor` is a word in the brief; only the template
+     knows it is #ff5900, and this is where it says so. */
+  :root { --bg: #0c2340 }
+  @if slot(cor) is laranja { :root { --bg: #ff5900 } }
+
+  /* The same two words as marks: {cor:laranja} around a phrase reads .cor-laranja. */
+  .cor-azul { color: #0c2340 }
+  .cor-laranja { color: #ff5900 }
+
+  .photo { w: 100%; h: 620 }
+  .copy { y: 660 }
+  .title { w: 920; font: 400 96px/1.05 "Inter"; color: white }
+  .slide { w: 920; font: 400 48px/1.2 "Inter"; color: white }
+
+  /* An adjustment is ambient, so it is written beside the element's own class. */
+  .slide.destaque { font: 400 64px/1.2 "Inter" }
+</style>
