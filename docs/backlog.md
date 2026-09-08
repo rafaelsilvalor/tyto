@@ -40,6 +40,49 @@ Spec: `docs/template-authoring.md`, ADR 0005.
 - **E4.4** Two built-in templates (promo-curso, carrossel-lista) with example `.brief` files. AC: render in feed and story without overflow. (M)
 - **E4.5** Text auto-fit (`overflow: shrink`) with font measurement in `core` (fontkit/opentype.js). AC: W_TEXT_OVERFLOW accurate to ±1px vs raster. (M)
 - **E4.6** `formats.yaml`: the project's format catalogue (id to size), read by `compile` and handed to a template as `context.size`. Blocks E4.3. AC: invalid file reported with the YAML path and a range; a template rendering an undefined format is a diagnostic. (S)
+- **E4.7** Three loose ends from E3.3 and E4.1. Opened straight on the board as TYTO-57 and
+  never written here; this line exists so the gap in the numbering is not read as a typo. (S)
+- **E4.8** Reusable components in the template markup: `<define name="…">` at the top level
+  and `<use component="…">` wherever a node may appear, expanded before the tree reaches
+  `build.ts`. A `<use>`'s own classes propagate to every node in the expansion, the way a
+  flag adjustment already does (`.chip.second`), which is what gives an instance an
+  override without a descendant combinator or a second cascade — both of which the
+  language closed on purpose (`docs/template-authoring.md`, ADR 0017). `<define>` may not
+  write `id`, so masks stay out of a component and the existing "id used twice in one
+  frame" check keeps meaning what it means. Needs an ADR in the same PR. AC: three `<use>`
+  of one `<define>` produce the scene the hand-written triplicate produces; a circular
+  `<use>`, an unknown component and an `id` inside a `<define>` are each refused with a
+  suggestion. (M)
+- **E4.9** Component parameters: `<define name="card" params="texto">` with the body
+  writing `slot="texto"`, bound by `<use component="card" texto="slide">`. Substitution
+  happens before `checkSlot`, so the existing slot type-checking and `renderedSlots` are
+  unchanged. Without it a component only repeats shapes; with it, content. (M)
+
+**What E4.8 is not, and what it costs.** Measured against the parser as it shipped in
+TYTO-24, not estimated:
+
+- **The grammar needs no change.** `TagName`, `AttributeName` and `AtKeyword` are generic
+  identifiers, so `<define>`, `<use>` and `@component` already parse; what refuses them is
+  `isTag` in `vocabulary.ts` and the top-level check in `collectFrames`.
+- **The IR contract does not change.** Expansion happens above the `switch (element.tag)`
+  in `build.ts`, so the IR receives a `group` indistinguishable from a hand-written one.
+- **Instances do not collide by id.** `assignIds` derives an id from position, so two
+  copies of a subtree get `…0.0` and `…1.0` on their own. Only an explicit `id` collides,
+  and that case is already refused with a range.
+- **Components do not give data-driven repetition.** A repeatable slot produces one artwork
+  per occurrence, so a `<use>` is always written by hand. This is a DRY feature for a
+  template author, not a loop; a grid whose column count depends on the data is still a
+  `template.ts`.
+
+**Gate: E4.4 first.** There are no real templates yet, so how much duplication the markup
+actually produces is unmeasured. `promo-curso` and `carrossel-lista` are the evidence, and
+designing the syntax before they exist is the mistake ADR 0017 avoided by shipping only
+what the parser could not be written without.
+
+A shared component library across templates — a `component-pack` extension point, with the
+CSS scoping it would force — is deliberately absent. That is where a component's style can
+collide with its host's, and it has no consumer: `packages/templates` ships no template
+yet.
 
 ## E5 — Exporters and raster
 
