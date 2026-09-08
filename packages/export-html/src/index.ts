@@ -1,8 +1,14 @@
 /**
- * @tyto/export-html — `Scene` to HTML and CSS.
+ * @tyto/export-html — `Scene` to a self-contained HTML document per frame.
  *
- * A `SceneVisitor` implementation. Receives only the IR, never an AST or a brief.
+ * A `SceneVisitor` (`docs/architecture.md`) that receives only the IR, never an AST or a
+ * brief. The documents it produces make no network requests: fonts and images arrive as
+ * bytes through `HtmlResources` and are embedded, because the rasterizer downstream opens
+ * them offline and the same brief must produce the same pixels every time.
  *
- * Filled in by epic E5.
+ * Pure: no Node, no DOM (ADR 0010). It builds strings.
  */
-export {};
+
+export { exportFrameHtml, exportHtml } from './export-html.js';
+
+export type { HtmlExportOptions, HtmlFontFace, HtmlFrame, HtmlResources } from './html.js';
