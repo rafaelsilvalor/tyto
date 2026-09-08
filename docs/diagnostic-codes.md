@@ -40,6 +40,10 @@ successful result (ADR 0013).
 | `E_MANIFEST_SHAPE` | error | A template manifest parses as YAML but does not match the manifest schema. |
 | `E_TEMPLATE_DUPLICATE` | error | Two template folders declare the same manifest name. |
 | `E_TEMPLATE_READ` | error | A template folder or manifest could not be read from the filesystem. |
+| `E_EXPORT_ASSET_UNRESOLVED` | error | An exporter was given no bytes for an asset the scene draws. |
+| `E_EXPORT_FONT_UNRESOLVED` | error | An exporter was given no bytes for a font the scene draws text in. |
+| `E_EXPORT_UNSUPPORTED` | error | A scene uses something the chosen exporter cannot express at all. |
+| `W_EXPORT_APPROXIMATED` | warning | An exporter rendered something close to, but not exactly, what the IR asked for. |
 | `W_TEXT_OVERFLOW` | warning | Compiled text does not fit its frame in one of the requested formats. |
 | `W_UNUSED_SLOT` | warning | The brief sets a slot the chosen template never renders. |
 
@@ -417,7 +421,55 @@ Could not read '{path}': {problem}.
 
 Parameters: `path`, `problem`
 
+### `E_EXPORT_ASSET_UNRESOLVED`
+
+**Severity:** error · **Spec:** `docs/ir-schema.md`
+
+An exporter was given no bytes for an asset the scene draws.
+
+```
+Asset '{asset}' on '{node}' was not resolved to embeddable bytes, and an export makes no network requests.
+```
+
+Parameters: `asset`, `node`
+
+### `E_EXPORT_FONT_UNRESOLVED`
+
+**Severity:** error · **Spec:** `docs/ir-schema.md`
+
+An exporter was given no bytes for a font the scene draws text in.
+
+```
+Font '{font}' was not resolved to embeddable bytes; text would render in whatever the viewer has, and the output must be deterministic.
+```
+
+Parameters: `font`
+
+### `E_EXPORT_UNSUPPORTED`
+
+**Severity:** error · **Spec:** `docs/ir-schema.md`
+
+A scene uses something the chosen exporter cannot express at all.
+
+```
+'{node}' uses {feature}, which {exporter} cannot express: {detail}.
+```
+
+Parameters: `node`, `feature`, `exporter`, `detail`
+
 ## Warnings
+
+### `W_EXPORT_APPROXIMATED`
+
+**Severity:** warning · **Spec:** `docs/ir-schema.md`
+
+An exporter rendered something close to, but not exactly, what the IR asked for.
+
+```
+'{node}': {feature} is approximated by {exporter} — {detail}.
+```
+
+Parameters: `node`, `feature`, `exporter`, `detail`
 
 ### `W_TEXT_OVERFLOW`
 

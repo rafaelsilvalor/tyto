@@ -1,0 +1,29 @@
+<!doctype html>
+<html>
+  <head>
+    <meta charset="utf-8">
+    <title>mapping:feed</title>
+    <style>
+      * { margin: 0; padding: 0; border: 0; box-sizing: border-box; }
+      html, body { background: transparent; }
+      .tyto-frame { position: relative; overflow: hidden; }
+      .tyto-node { position: absolute; left: 0; top: 0; transform-origin: 0 0; }
+      .tyto-node > svg { display: block; width: 100%; height: 100%; }
+      @font-face { font-family: "Fraunces"; font-weight: 400; font-style: normal; src: url("data:font/woff2;base64,Fraunces-400-normal"); }
+      @font-face { font-family: "Inter"; font-weight: 400; font-style: normal; src: url("data:font/woff2;base64,Inter-400-normal"); }
+      @font-face { font-family: "Inter"; font-weight: 700; font-style: italic; src: url("data:font/woff2;base64,Inter-700-italic"); }
+      .tyto-frame { width: 400px; height: 400px; background-image: radial-gradient(ellipse 90% 90% at 50% 20%, #282c3c 0%, #08090e 100%); }
+      #gradient-stroke { width: 120px; height: 80px; }
+      #spun { transform: matrix(0.7071, 0.7071, -0.7071, 0.7071, 230, -2.4264); filter: drop-shadow(0px 4px 12px rgba(0, 0, 0, 0.5)); width: 60px; height: 60px; background-color: #00c8b4; outline: 2px solid #ffffff; outline-offset: 0px; }
+      #clipped { transform: matrix(1, 0, 0, 1, 20, 20); opacity: 0.8; mix-blend-mode: screen; }
+      #portrait { transform: matrix(1, 0, 0, 1, 20, 130); mask-image: url("data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 160 120%22 width=%22160px%22 height=%22120px%22><defs><linearGradient id=%22p0%22 gradientUnits=%22userSpaceOnUse%22 x1=%2280%22 y1=%220%22 x2=%2280%22 y2=%22120%22><stop offset=%220%22 stop-color=%22%23ffffff%22 stop-opacity=%221%22/><stop offset=%221%22 stop-color=%22%23ffffff%22 stop-opacity=%220%22/></linearGradient></defs><path d=%22M0 0 H160 V120 H0 V0 Z%22 fill=%22url(%23p0)%22/></svg>"); mask-size: 160px 120px; mask-position: 0px 0px; mask-repeat: no-repeat; mask-mode: alpha; width: 160px; height: 120px; object-fit: cover; object-position: 50% 25%; }
+      #fade { transform: matrix(1, 0, 0, 1, 20, 130); display: none; width: 160px; height: 120px; background-image: linear-gradient(180deg, #ffffff 0%, rgba(255, 255, 255, 0) 100%); }
+      #chevron { transform: matrix(1, 0, 0, 1, 220, 140); filter: blur(1px); width: 48px; height: 48px; }
+      #inline-mark { transform: matrix(1, 0, 0, 1, 300, 140); width: 48px; height: 48px; fill: #ffbd00; }
+      #copy { transform: matrix(1, 0, 0, 1, 20, 270); backdrop-filter: blur(6px); width: 360px; height: 110px; display: flex; flex-direction: column; justify-content: center; text-align: center; line-height: 1.15; letter-spacing: -0.5px; white-space: pre-wrap; overflow: hidden; }
+    </style>
+  </head>
+  <body>
+    <div class="tyto-frame"><div id="clipped" class="tyto-node"><div id="gradient-stroke" class="tyto-node"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 120 80" width="120px" height="80px"><defs><linearGradient id="p0" gradientUnits="userSpaceOnUse" x1="0" y1="40" x2="120" y2="40"><stop offset="0" stop-color="#ffffff" stop-opacity="1"/><stop offset="1" stop-color="#ffffff" stop-opacity="0"/></linearGradient></defs><path d="M16 0 H116 A4 4 0 0 1 120 4 V64 A16 16 0 0 1 104 80 H4 A4 4 0 0 1 0 76 V16 A16 16 0 0 1 16 0 Z" fill="#ff5900" fill-opacity="0.9" stroke="url(#p0)" stroke-width="4"/></svg></div><div id="spun" class="tyto-node"></div></div><img id="portrait" class="tyto-node" src="data:image/jpeg;base64,sha256-77aa" alt=""><div id="fade" class="tyto-node"></div><svg id="chevron" class="tyto-node" viewBox="0 0 48 48"><path d="M8 8 L40 24 L8 40 Z" fill-rule="evenodd" fill="#ffffff" fill-opacity="0.85"/></svg><div id="inline-mark" class="tyto-node"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/></svg></div><div id="copy" class="tyto-node"><div><span style="font-family: &quot;Inter&quot;; font-size: 28px; font-weight: 400; color: #ffffff">Turma </span><span style="font-family: &quot;Inter&quot;; font-size: 28px; font-weight: 700; font-style: italic; background-image: linear-gradient(45deg, #ff5900 0%, #ffbd00 100%); background-clip: text; color: transparent; text-decoration-line: underline">nova</span><br><span style="font-family: &quot;Fraunces&quot;; font-size: 18px; font-weight: 400; color: #bec3d2">&lt;matrículas &amp; vagas&gt;</span></div></div></div>
+  </body>
+</html>
