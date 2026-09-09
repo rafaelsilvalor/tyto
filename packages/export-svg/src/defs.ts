@@ -196,19 +196,23 @@ export function paintValue(
   if (href === undefined) return undefined;
 
   const id = nextId(sink, 'paint');
+  // User space, not `objectBoundingBox`. In bounding-box units the image's viewport is the
+  // unit *square*, so `preserveAspectRatio` fits the picture to a square and the square is
+  // then stretched to the node's box — which turns a circle into an ellipse on anything
+  // that is not square. Giving the pattern the real box is what makes `cover` mean cover.
   sink.defs.push(
     element(
       'pattern',
       [
         attribute('id', id),
-        attribute('width', '1'),
-        attribute('height', '1'),
-        attribute('patternContentUnits', 'objectBoundingBox'),
+        attribute('width', svgNumber(size.w)),
+        attribute('height', svgNumber(size.h)),
+        attribute('patternUnits', 'userSpaceOnUse'),
       ],
       element('image', [
         attribute('href', escapeXml(href)),
-        attribute('width', '1'),
-        attribute('height', '1'),
+        attribute('width', svgNumber(size.w)),
+        attribute('height', svgNumber(size.h)),
         attribute('preserveAspectRatio', aspectRatio(paint.fit)),
       ]),
     ),

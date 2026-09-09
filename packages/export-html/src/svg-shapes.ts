@@ -134,8 +134,13 @@ function paintValue(
   }
   const ratio =
     paint.fit === 'fill' ? 'none' : paint.fit === 'cover' ? 'xMidYMid slice' : 'xMidYMid meet';
+  // User space with the node's real box, not `objectBoundingBox`. In bounding-box units the
+  // image's viewport is the unit *square*, so `preserveAspectRatio` fits the picture to a
+  // square that is then stretched to the box, and a circle comes out an ellipse on anything
+  // that is not square.
+  const box = `width="${cssNumber(size.w)}" height="${cssNumber(size.h)}"`;
   defs.entries.push(
-    `<pattern id="${id}" width="1" height="1" patternContentUnits="objectBoundingBox"><image href="${escapeHtml(href)}" width="1" height="1" preserveAspectRatio="${ratio}"/></pattern>`,
+    `<pattern id="${id}" ${box} patternUnits="userSpaceOnUse"><image href="${escapeHtml(href)}" ${box} preserveAspectRatio="${ratio}"/></pattern>`,
   );
   return { value: `url(#${id})` };
 }
