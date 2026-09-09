@@ -93,6 +93,22 @@ describe('a scene becomes one SVG document per frame', () => {
     await expect(feed).toMatchFileSnapshot('./__snapshots__/mapping.feed.svg');
   });
 
+  it('gives an image paint the node’s real box, so cover does not distort it', () => {
+    // `story-bg` is 1080x1920 filled with a `cover` image. In `objectBoundingBox` units the
+    // pattern's viewport is the unit *square*, so preserveAspectRatio fits the picture to a
+    // square that is then stretched to the box — a circle comes out an ellipse. Chrome
+    // rendered exactly that: 972151 of 2073600 pixels differed from the HTML export, and
+    // 0 do now.
+    const [, story = ''] = svgOf(sceneOf(promoFixture));
+
+    expect(story).toContain('patternUnits="userSpaceOnUse"');
+    expect(story).not.toContain('objectBoundingBox');
+    expect(story).toMatch(/<pattern id="paint\d+" width="1080" height="1920"/u);
+    expect(story).toMatch(
+      /<image [^>]*width="1080" height="1920" preserveAspectRatio="xMidYMid slice"/u,
+    );
+  });
+
   it('produces well-formed XML, which is what a design tool refuses on', () => {
     const documents = [...svgOf(sceneOf(promoFixture)), ...svgOf(sceneOf(mappingFixture))];
 
