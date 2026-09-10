@@ -1,0 +1,15 @@
+---
+template: promo-curso
+formats: [feed, story]
+imagem: ./ana.png
+cor: laranja
+---
+// Three slides in two formats: six frames, and twelve files once png and svg are
+// both asked for. That count is the card's acceptance criterion.
+::titulo Direito **Constitucional**
+::slide
+  O que cai na prova
+::slide {destaque}
+  Como estudar
+::slide
+  Garanta sua {cor:azul}vaga{/}
