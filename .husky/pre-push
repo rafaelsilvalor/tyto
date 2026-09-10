@@ -1,0 +1,19 @@
+# Git LFS uploads through a pre-push hook that `git lfs install` writes into
+# `.git/hooks`. This repository sets `core.hooksPath` to `.husky/_`, so that hook is never
+# read and a plain `git push` sends the pointer files without their objects. CI then checks
+# out with `lfs: true`, asks for objects the server does not have, and fails in
+# `actions/checkout` with "Object does not exist on the server: [404]" — before it has run
+# a single test, which is a confusing way to learn that a snapshot never left the machine.
+#
+# So the hook is declared here instead, where the hooks path can see it.
+# `docs/git-workflow.md` (Visual snapshots in Git) is the reference for what lives in LFS.
+
+if ! command -v git-lfs >/dev/null 2>&1; then
+  # Loud, and still a gate: a push that silently drops the objects is what this hook
+  # exists to prevent, so refusing is the safer answer than pushing pointers alone.
+  echo 'git-lfs is not installed, and this repository keeps reference PNGs in LFS.' >&2
+  echo 'Install it from https://git-lfs.com and run `git lfs install`, then push again.' >&2
+  exit 1
+fi
+
+git lfs pre-push "$@"
