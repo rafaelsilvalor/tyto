@@ -24,22 +24,29 @@ import shapesFixture from './__fixtures__/shapes.json';
  * exporters' own tests snapshot strings, and a string snapshot tells you the markup moved
  * without telling you whether the artwork did.
  *
- * ## Why the references are keyed on the platform
+ * ## One reference per fixture, and why that was not obvious
  *
- * Chromium rasterizes the same document differently on different operating systems: the
- * glyph rasterizer is FreeType on Linux and Skia over DirectWrite on Windows, and
- * gradient dithering and filter kernels follow the same split. `DETERMINISM_ARGS` closes
- * the gaps that are settings; the ones that are different code stay open. So a reference
- * PNG is only comparable against the platform that produced it, which is the same
- * conclusion Playwright's own screenshot assertions reached — hence
- * `reference/<name>.<platform>.png`.
+ * The first version of this suite keyed every reference on `process.platform`, the way
+ * Playwright's own screenshot assertions do, on the reasoning that Chromium rasterizes
+ * differently per operating system — FreeType on Linux, Skia over DirectWrite on Windows.
+ * Then the two were measured against each other, and for this corpus the reasoning does
+ * not bite: the Windows render and the Linux render of both fixtures are **identical at
+ * `threshold: 0` — 0 differing pixels of 160 000 and of 14 400**. Gradients, a rotated
+ * rect, a drop shadow, a blur, an alpha mask and a `cover` crop all land on the same
+ * bytes, which is Skia's software rasterizer being deterministic across platforms once
+ * `DETERMINISM_ARGS` has taken the host's opinions out of it.
  *
- * A platform with no reference yet **fails**, writes the render it would have compared
- * into `__diff__/`, and names the file to commit. `visual.yml` uploads that folder on
- * failure, so seeding a new platform is: run the job, download the artifact, commit it
- * under `reference/`. Skipping instead would report green for a platform nothing is
- * checked on, and a suite that passes because it did not look is worse than one that is
- * red.
+ * So there is one reference per fixture and no seeding round trip. The platform split is
+ * real for **glyphs**, and that is the half of it this corpus does not contain — the card
+ * that bundles a test font (E5.6) is the one that will have to measure text across
+ * platforms and, if it diverges, reintroduce the key. Until something is measured to
+ * differ, a per-platform file would be three copies of the same bytes in Git LFS and a
+ * red `visual` job on every machine nobody has seeded yet.
+ *
+ * A missing reference **fails**, writes the render it would have compared into `__diff__/`
+ * and names the file to commit; `visual.yml` uploads that folder on failure. Skipping
+ * would report green for a corpus nothing is checked against, and a suite that passes
+ * because it did not look is worse than one that is red.
  *
  * ## Why there is no text in the corpus
  *
@@ -56,7 +63,7 @@ const HERE = dirname(fileURLToPath(import.meta.url));
 const REFERENCE_DIR = join(HERE, '__fixtures__', 'reference');
 const DIFF_DIR = join(HERE, '__diff__');
 
-/** Playwright's own platform keys, so a reader recognises the suffix. */
+/** Named in the failure message, because a divergence would most likely be one. */
 const PLATFORM = process.platform;
 
 /**
@@ -222,7 +229,7 @@ function write(directory: string, file: string, bytes: Uint8Array): string {
  * the suite cannot answer the question it was asked, and saying so is the answer.
  */
 function mismatchFraction(name: string, rendered: Uint8Array): number {
-  const file = `${name}.${PLATFORM}.png`;
+  const file = `${name}.png`;
 
   if (UPDATING) {
     write(REFERENCE_DIR, file, rendered);
@@ -235,8 +242,8 @@ function mismatchFraction(name: string, rendered: Uint8Array): number {
   } catch {
     const candidate = write(DIFF_DIR, file, rendered);
     throw new Error(
-      `No reference for '${name}' on ${PLATFORM}. The render is at ${candidate}; commit it as ` +
-        `src/__fixtures__/reference/${file} (Git LFS), or record it locally with ` +
+      `No reference for '${name}'. The render, made on ${PLATFORM}, is at ${candidate}; commit ` +
+        `it as src/__fixtures__/reference/${file} (Git LFS), or record it locally with ` +
         'UPDATE_VISUAL_REFERENCE=1 pnpm --filter @tyto/raster test:visual.',
     );
   }
@@ -266,7 +273,7 @@ function mismatchFraction(name: string, rendered: Uint8Array): number {
   const fraction = differing / (reference.width * reference.height);
   if (fraction > TOLERANCE) {
     write(DIFF_DIR, file, rendered);
-    write(DIFF_DIR, `${name}.${PLATFORM}.diff.png`, PNG.sync.write(diff));
+    write(DIFF_DIR, `${name}.diff.png`, PNG.sync.write(diff));
   }
 
   return fraction;
