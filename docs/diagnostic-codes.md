@@ -44,6 +44,8 @@ successful result (ADR 0013).
 | `E_EXPORT_FONT_UNRESOLVED` | error | An exporter was given no bytes for a font the scene draws text in. |
 | `E_EXPORT_UNSUPPORTED` | error | A scene uses something the chosen exporter cannot express at all. |
 | `W_EXPORT_APPROXIMATED` | warning | An exporter rendered something close to, but not exactly, what the IR asked for. |
+| `E_RENDER_FAILED` | error | A frame could not be turned into bytes by the exporter or the rasterizer. |
+| `E_OUTPUT_WRITE` | error | An artifact was rendered but could not be written to the output. |
 | `W_TEXT_OVERFLOW` | warning | Compiled text does not fit its frame in one of the requested formats. |
 | `W_UNUSED_SLOT` | warning | The brief sets a slot the chosen template never renders. |
 
@@ -456,6 +458,30 @@ A scene uses something the chosen exporter cannot express at all.
 ```
 
 Parameters: `node`, `feature`, `exporter`, `detail`
+
+### `E_RENDER_FAILED`
+
+**Severity:** error · **Spec:** `docs/architecture.md`
+
+A frame could not be turned into bytes by the exporter or the rasterizer.
+
+```
+Frame '{frame}' could not be rendered as {kind}: {problem}.
+```
+
+Parameters: `frame`, `kind`, `problem`
+
+### `E_OUTPUT_WRITE`
+
+**Severity:** error · **Spec:** `docs/architecture.md`
+
+An artifact was rendered but could not be written to the output.
+
+```
+Could not write '{artifact}': {problem}.
+```
+
+Parameters: `artifact`, `problem`
 
 ## Warnings
 

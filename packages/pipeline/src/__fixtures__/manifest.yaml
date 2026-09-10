@@ -1,0 +1,12 @@
+name: promo-curso
+version: 1.0.0
+description: The manifest promo-curso's markup is compiled against.
+formats: [feed, story]
+slots:
+  titulo: { type: rich-text, required: true }
+  imagem: { type: image }
+  cor: { type: enum, values: [azul, laranja], default: azul }
+  slide: { type: rich-text, repeat: true, min: 1, max: 10 }
+adjustments:
+  destaque: { type: flag, applies: [slide] }
+  tom: { type: enum, values: [claro, escuro], applies: [slide] }
