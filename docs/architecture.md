@@ -46,7 +46,7 @@ Path to the cloud: same pure code; `raster` swaps to Playwright in a container, 
 
 ## Patterns and where they live
 
-- **Hexagonal (ports & adapters)** — ports in `core`/`plugin-api`/`io`; adapters in `raster`, `io`, `sources`. Composition only in `apps/*`.
+- **Hexagonal (ports & adapters)** — a port is declared by the package that _consumes_ it, not in one central place: `FileSystem` and `AssetResolver` in `core` because the pure stages ask them questions, `Rasterizer` in `raster`, `BriefSource`/`OutputSink` in `io`, and `TemplateSource`/`ArtifactSink` in `pipeline`. Adapters live beside their runtime (`raster`, `io`, `sources`); composition only in `apps/*`.
 - **Compiler pipeline** — pure stages, tested in isolation with fixtures.
 - **Visitor** — `SceneVisitor<T>` and `walk()` in `core`; each exporter implements one and none of them writes the recursion again. The walk hands every node its accumulated transform, effective opacity, ancestor chain and frame. New output format = new visitor.
 - **Registry** — `TemplateRegistry` and `PluginRegistry`: folder discovery, manifest read without executing code.
@@ -54,6 +54,7 @@ Path to the cloud: same pure code; `raster` swaps to Playwright in a container, 
 - **Result/Diagnostic** — errors are data with `severity`, `code`, `message`, `range`; they travel to the UI and to `result.json`.
 - **Typed event bus** — `desktop`: main↔renderer channel through preload with contracts in `apps/desktop/shared`.
 - **Strategy** — `Rasterizer` (chromium today; other backends later) and `OutputSink`.
+- **Job** — `pipeline` composes the stages and owns the four decisions no single stage can make alone: the order they run in, what the files are called, how many frames raster at once, and what happens when one frame of twelve is broken. It walks the frames itself rather than calling `exportHtml`/`exportSvg`, because those fail a whole scene and an author should see every broken frame in one run.
 
 ## Desktop processes
 

@@ -212,7 +212,30 @@ importers:
 
   packages/io: {}
 
-  packages/pipeline: {}
+  packages/pipeline:
+    dependencies:
+      '@tyto/brief-lang':
+        specifier: workspace:*
+        version: link:../brief-lang
+      '@tyto/core':
+        specifier: workspace:*
+        version: link:../core
+      '@tyto/export-html':
+        specifier: workspace:*
+        version: link:../export-html
+      '@tyto/export-svg':
+        specifier: workspace:*
+        version: link:../export-svg
+      '@tyto/raster':
+        specifier: workspace:*
+        version: link:../raster
+      '@tyto/template-lang':
+        specifier: workspace:*
+        version: link:../template-lang
+    devDependencies:
+      vitest:
+        specifier: ^3.2.4
+        version: 3.2.7(@types/node@22.20.1)(jiti@2.6.1)(supports-color@7.2.0)(yaml@2.9.0)
 
   packages/plugin-api: {}
 
@@ -238,7 +261,7 @@ importers:
         version: 7.0.0
       vitest:
         specifier: ^3.2.4
-        version: 3.2.7
+        version: 3.2.7(@types/node@22.20.1)(jiti@2.6.1)(supports-color@7.2.0)(yaml@2.9.0)
 
   packages/template-lang:
     dependencies:

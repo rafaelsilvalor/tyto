@@ -238,6 +238,18 @@ export const diagnosticCodes = {
     template: "'{node}': {feature} is approximated by {exporter} — {detail}.",
     spec: 'docs/ir-schema.md',
   },
+  E_RENDER_FAILED: {
+    severity: 'error',
+    summary: 'A frame could not be turned into bytes by the exporter or the rasterizer.',
+    template: "Frame '{frame}' could not be rendered as {kind}: {problem}.",
+    spec: 'docs/architecture.md',
+  },
+  E_OUTPUT_WRITE: {
+    severity: 'error',
+    summary: 'An artifact was rendered but could not be written to the output.',
+    template: "Could not write '{artifact}': {problem}.",
+    spec: 'docs/architecture.md',
+  },
   W_TEXT_OVERFLOW: {
     severity: 'warning',
     summary: 'Compiled text does not fit its frame in one of the requested formats.',
