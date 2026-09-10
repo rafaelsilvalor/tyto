@@ -10,7 +10,7 @@ pnpm workspaces + Turborepo · TS 5 `strict`, `noUncheckedIndexedAccess`, `exact
 
 ## Root scripts
 
-`pnpm dev` (desktop) · `pnpm cli -- …` · `pnpm check` = typecheck + lint + test · `pnpm test:visual` (raster snapshots) · `pnpm build` · `pnpm changeset` · `pnpm format` / `format:check`.
+`pnpm dev` (desktop) · `pnpm cli -- …` · `pnpm check` = typecheck + lint + test · `pnpm test:visual` (raster snapshots; needs `pnpm exec playwright install chromium`) · `pnpm build` · `pnpm changeset` · `pnpm format` / `format:check`.
 
 ## Packages
 
@@ -35,6 +35,8 @@ See `docs/git-workflow.md`.
 ## Errors
 
 `Result<T, Diagnostic[]>` from `@tyto/core`. `Diagnostic { severity, code, message, range?, hint? }`. Codes `E_*`/`W_*` catalogued in `core/src/diagnostics/codes.ts`.
+
+A port is the exception, and only for what it cannot predict: `FileSystem`, `AssetResolver` and `Rasterizer` reject rather than returning a `Result` when the runtime refuses them — an unreadable path or a browser that will not launch is the operating system's answer, not a diagnostic any brief could have caused. The caller that owns a user-facing edge catches and writes the diagnostic there. What a port _can_ predict from its arguments alone is a programmer error and throws `TypeError`, which is why `resolveRasterOptions` refuses `quality` on a PNG instead of inventing a code for it.
 
 ## Docs
 

@@ -56,3 +56,11 @@ Weekly grouped Dependabot for npm and actions. Per-package labels (`pkg:core`, `
 ## Visual snapshots in Git
 
 Reference PNGs live in Git LFS, matched by `**/__fixtures__/**/*.png` in `.gitattributes` — only the snapshot corpus, so icons and doc images stay readable in a clone without the LFS client. Any workflow that compares pixels must check out with `lfs: true`, or it diffs against a pointer file. Updating a snapshot requires an explicit commit `test(export-html): TYTO-… update snapshots` with justification in the PR.
+
+They live under `packages/raster/src/__fixtures__/reference/` as `<artwork>.<format>.png`, one file per fixture and not one per platform. That is measured, not assumed: the Windows and Linux renders of the current corpus are identical at `threshold: 0`, 0 differing pixels on both fixtures, because `DETERMINISM_ARGS` in the Playwright adapter takes the host's opinions out of Skia's software rasterizer. The platform split is real for **glyphs** — FreeType on Linux, Skia over DirectWrite on Windows — and the corpus has no text in it yet; the card that bundles a test font is the one that has to measure text across platforms and reintroduce a per-platform key if it diverges. Until then a per-platform file would be three copies of the same bytes in LFS.
+
+`pnpm test:visual` with no reference on disk **fails**, writes the render it would have compared into `__diff__/`, and names the file to commit; `visual.yml` uploads that folder on failure, so a first reference can be taken from a CI artifact. Recording locally is `UPDATE_VISUAL_REFERENCE=1 pnpm --filter @tyto/raster test:visual`, and needs `pnpm exec playwright install chromium` first.
+
+A Playwright bump is a re-record, not a tolerance question: the diff tolerates a whole-image drift of ±1 per channel and nothing wider, which is deliberate — the measurements behind both numbers are in the header of `raster.visual.test.ts`. Re-record in its own commit, saying which browser version it moved to.
+
+**`core.hooksPath` is `.husky/_`, so the pre-push hook `git lfs install` writes into `.git/hooks` is never read.** `.husky/pre-push` declares it where the hooks path can see it. Without that hook a plain `git push` sends the pointer files alone and `actions/checkout` fails with `Object does not exist on the server: [404]` before running a test.

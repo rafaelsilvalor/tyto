@@ -1,0 +1,37 @@
+{
+  "version": 1,
+  "artworks": [
+    {
+      "id": "alpha",
+      "label": "A frame with no background, so the corners have to come back transparent",
+      "frames": [
+        {
+          "format": "square",
+          "size": { "w": 120, "h": 120 },
+          "children": [
+            {
+              "kind": "rect",
+              "id": "opaque",
+              "name": "fully opaque, axis aligned, square corners — no antialiased edge anywhere",
+              "transform": { "x": 20, "y": 20 },
+              "size": { "w": 40, "h": 40 },
+              "radius": [0, 0, 0, 0],
+              "fill": { "kind": "solid", "color": { "r": 255, "g": 89, "b": 0, "a": 1 } }
+            },
+            {
+              "kind": "rect",
+              "id": "half",
+              "name": "half transparent, to prove the alpha channel carries more than 0 and 255",
+              "transform": { "x": 60, "y": 60 },
+              "size": { "w": 40, "h": 40 },
+              "radius": [0, 0, 0, 0],
+              "fill": { "kind": "solid", "color": { "r": 0, "g": 200, "b": 180, "a": 0.5 } }
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "fonts": [],
+  "assets": []
+}

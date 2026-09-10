@@ -54,3 +54,7 @@ Thumbs.db
 # Logs
 logs/
 *.log
+
+# Visual test output: the render and the pixel diff for a reference that did not match.
+# `visual.yml` uploads it as an artifact; it is never committed.
+__diff__/

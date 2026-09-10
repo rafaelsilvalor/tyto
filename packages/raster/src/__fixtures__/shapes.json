@@ -1,0 +1,161 @@
+{
+  "version": 1,
+  "artworks": [
+    {
+      "id": "shapes",
+      "label": "Everything Chromium has to draw that is not a glyph",
+      "frames": [
+        {
+          "format": "feed",
+          "size": { "w": 400, "h": 400 },
+          "background": {
+            "kind": "linear-gradient",
+            "angle": 160,
+            "stops": [
+              { "offset": 0, "color": { "r": 12, "g": 18, "b": 38 } },
+              { "offset": 1, "color": { "r": 60, "g": 20, "b": 80 } }
+            ]
+          },
+          "children": [
+            {
+              "kind": "rect",
+              "id": "card",
+              "name": "solid fill, rounded corners, stroke",
+              "transform": { "x": 24, "y": 24 },
+              "size": { "w": 160, "h": 100 },
+              "radius": [16, 16, 16, 16],
+              "fill": { "kind": "solid", "color": { "r": 255, "g": 89, "b": 0, "a": 0.9 } },
+              "stroke": {
+                "paint": { "kind": "solid", "color": { "r": 255, "g": 255, "b": 255 } },
+                "width": 4,
+                "align": "center"
+              }
+            },
+            {
+              "kind": "rect",
+              "id": "spun",
+              "name": "rotation about the centre, plus a drop shadow",
+              "transform": { "x": 230, "y": 30, "rotation": 45, "anchor": { "x": 0.5, "y": 0.5 } },
+              "size": { "w": 80, "h": 80 },
+              "radius": [8, 8, 8, 8],
+              "fill": { "kind": "solid", "color": { "r": 0, "g": 200, "b": 180 } },
+              "effects": [
+                {
+                  "kind": "shadow",
+                  "x": 0,
+                  "y": 6,
+                  "blur": 16,
+                  "spread": 0,
+                  "color": { "r": 0, "g": 0, "b": 0, "a": 0.6 }
+                }
+              ]
+            },
+            {
+              "kind": "group",
+              "id": "blend",
+              "name": "group opacity and blend mode, inherited through the DOM",
+              "transform": { "x": 24, "y": 150 },
+              "opacity": 0.85,
+              "blend": "screen",
+              "children": [
+                {
+                  "kind": "rect",
+                  "id": "blend-warm",
+                  "size": { "w": 80, "h": 80 },
+                  "radius": [40, 40, 40, 40],
+                  "fill": { "kind": "solid", "color": { "r": 255, "g": 189, "b": 0 } }
+                },
+                {
+                  "kind": "rect",
+                  "id": "blend-cool",
+                  "transform": { "x": 50, "y": 0 },
+                  "size": { "w": 80, "h": 80 },
+                  "radius": [40, 40, 40, 40],
+                  "fill": { "kind": "solid", "color": { "r": 0, "g": 140, "b": 255 } }
+                }
+              ]
+            },
+            {
+              "kind": "rect",
+              "id": "glow",
+              "name": "radial gradient with a transparent outer stop",
+              "transform": { "x": 200, "y": 140 },
+              "size": { "w": 170, "h": 100 },
+              "radius": [0, 0, 0, 0],
+              "fill": {
+                "kind": "radial-gradient",
+                "center": { "x": 0.5, "y": 0.5 },
+                "radius": 0.8,
+                "stops": [
+                  { "offset": 0, "color": { "r": 255, "g": 255, "b": 255, "a": 0.9 } },
+                  { "offset": 1, "color": { "r": 255, "g": 255, "b": 255, "a": 0 } }
+                ]
+              }
+            },
+            {
+              "kind": "rect",
+              "id": "soft",
+              "name": "blur effect",
+              "transform": { "x": 24, "y": 250 },
+              "size": { "w": 100, "h": 60 },
+              "radius": [12, 12, 12, 12],
+              "fill": { "kind": "solid", "color": { "r": 120, "g": 255, "b": 200 } },
+              "effects": [{ "kind": "blur", "radius": 6 }]
+            },
+            {
+              "kind": "vector",
+              "id": "chevron",
+              "name": "path geometry with an explicit fill rule",
+              "transform": { "x": 150, "y": 250 },
+              "geometry": { "kind": "path", "d": "M8 8 L40 24 L8 40 Z", "fillRule": "evenodd" },
+              "size": { "w": 48, "h": 48 },
+              "fill": { "kind": "solid", "color": { "r": 255, "g": 255, "b": 255 } }
+            },
+            {
+              "kind": "vector",
+              "id": "mark",
+              "name": "inline svg markup, fill supplied by the node",
+              "transform": { "x": 215, "y": 250 },
+              "geometry": {
+                "kind": "svg",
+                "markup": "<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 24 24\"><circle cx=\"12\" cy=\"12\" r=\"10\"/></svg>"
+              },
+              "size": { "w": 48, "h": 48 },
+              "fill": { "kind": "solid", "color": { "r": 255, "g": 189, "b": 0 } }
+            },
+            {
+              "kind": "rect",
+              "id": "photo-mask",
+              "name": "drawn only as the mask for photo, so it is invisible itself",
+              "visible": false,
+              "transform": { "x": 24, "y": 325 },
+              "size": { "w": 350, "h": 55 },
+              "radius": [0, 0, 0, 0],
+              "fill": {
+                "kind": "linear-gradient",
+                "angle": 90,
+                "stops": [
+                  { "offset": 0, "color": { "r": 255, "g": 255, "b": 255, "a": 1 } },
+                  { "offset": 1, "color": { "r": 255, "g": 255, "b": 255, "a": 0 } }
+                ]
+              }
+            },
+            {
+              "kind": "image",
+              "id": "photo",
+              "name": "image paint cropped by cover, faded by an alpha mask",
+              "transform": { "x": 24, "y": 325 },
+              "asset": { "id": "checker", "source": "inline", "hash": "sha256-checker" },
+              "size": { "w": 350, "h": 55 },
+              "fit": "cover",
+              "position": { "x": 0.5, "y": 0.5 },
+              "mask": { "nodeId": "photo-mask", "mode": "alpha" }
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "fonts": [],
+  "assets": [{ "id": "checker", "source": "inline", "hash": "sha256-checker" }]
+}
