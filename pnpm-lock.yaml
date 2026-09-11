@@ -337,6 +337,12 @@ importers:
       '@tyto/export-html':
         specifier: workspace:*
         version: link:../export-html
+      '@tyto/export-svg':
+        specifier: workspace:*
+        version: link:../export-svg
+      '@tyto/test-fonts':
+        specifier: workspace:*
+        version: link:../../tools/test-fonts
       pixelmatch:
         specifier: ^7.2.0
         version: 7.2.0
@@ -414,6 +420,12 @@ importers:
       yaml:
         specifier: ^2.9.0
         version: 2.9.0
+
+  tools/test-fonts:
+    devDependencies:
+      vitest:
+        specifier: ^3.2.4
+        version: 3.2.7(@types/node@22.20.1)(jiti@2.6.1)(supports-color@7.2.0)(yaml@2.9.0)
 
 packages:
 

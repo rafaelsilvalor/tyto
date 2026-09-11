@@ -15,3 +15,7 @@ docs/patterns-explained.pt-BR.html
 docs/diagnostic-codes.md
 docs/render-contract.md
 docs/render-result.schema.json
+
+# Upstream licence text, redistributed verbatim (fonts/README.md). Reflowing a licence is
+# not a formatting decision this repository gets to make.
+fonts/*/LICENSE.md

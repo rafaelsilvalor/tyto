@@ -2,7 +2,14 @@ name: visual
 on:
   pull_request:
     paths:
-      ['packages/export-*/**', 'packages/raster/**', 'packages/templates/**', 'packages/core/**']
+      - 'packages/export-*/**'
+      - 'packages/raster/**'
+      - 'packages/templates/**'
+      - 'packages/core/**'
+      # A reference render embeds the bundled font's bytes, so changing the font, or the
+      # code that reads it, changes the pixels as surely as changing an exporter does.
+      - 'fonts/**'
+      - 'tools/test-fonts/**'
 jobs:
   visual:
     runs-on: ubuntu-latest
