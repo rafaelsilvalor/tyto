@@ -1,0 +1,8 @@
+name: cartaz
+version: 2.1.0
+description: A template with no text in it, so the folder contract can be tested without a font.
+formats: [feed]
+slots:
+  cor: { type: enum, values: [azul, laranja], default: azul }
+  imagem: { type: image }
+  slide: { type: rich-text, repeat: true, min: 1, max: 10 }
