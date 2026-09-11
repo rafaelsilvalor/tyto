@@ -7,12 +7,15 @@ import type {
   TemplateRegistry,
 } from '@tyto/core';
 import { formatCatalogue, isError, loadTemplateRegistry } from '@tyto/core';
+import { type HtmlResources, htmlExporterPlugin } from '@tyto/export-html';
+import { type SvgResources, svgExporterPlugin } from '@tyto/export-svg';
+import { type ExporterRegistry, createPluginHost } from '@tyto/plugin-api';
 import type { RasterOptions, Rasterizer } from '@tyto/raster';
 import { describe, expect, it } from 'vitest';
 
 import type { Artifact, ArtifactSink } from './artifact.js';
 import type { JobEvent } from './events.js';
-import { type JobPorts, type JobResources, type OutputRequest, runJob } from './job.js';
+import { type JobPorts, type OutputRequest, runJob } from './job.js';
 import { markupTemplateSource } from './template-source.js';
 
 import briefSource from './__fixtures__/promo-curso.brief?raw';
@@ -90,19 +93,36 @@ const formats = formatCatalogue({
  * (`E_EXPORT_FONT_UNRESOLVED`), and the repo bundles no font yet, so without these every
  * frame of this fixture would fail for a reason that has nothing to do with the job.
  */
-const resources: JobResources = {
-  html: {
-    asset: (ref) => `data:image/png;base64,${ref.hash}`,
-    font: (face) => `data:font/woff2;base64,${face.font.family}-${String(face.weight)}`,
-  },
-  svg: {
-    asset: (ref) => `data:image/png;base64,${ref.hash}`,
-    // `SvgFontFace` carries `family` where `HtmlFontFace` carries `font: FontRef`. The two
-    // exporters describe a face differently, which is why the job passes the resolvers
-    // through untouched instead of offering one shape and adapting.
-    font: (face) => `data:font/woff2;base64,${face.family}-${String(face.weight)}`,
-  },
+const htmlResources: HtmlResources = {
+  asset: (ref) => `data:image/png;base64,${ref.hash}`,
+  font: (face) => `data:font/woff2;base64,${face.font.family}-${String(face.weight)}`,
 };
+
+const svgResources: SvgResources = {
+  asset: (ref) => `data:image/png;base64,${ref.hash}`,
+  // `SvgFontFace` carries `family` where `HtmlFontFace` carries `font: FontRef`. The two
+  // exporters describe a face differently, which is why each binds its own resources when
+  // it is registered instead of the job offering one shape and adapting (TYTO-62).
+  font: (face) => `data:font/woff2;base64,${face.family}-${String(face.weight)}`,
+};
+
+/**
+ * The two built-ins, activated through the real host.
+ *
+ * Through the host and not by calling `exportFrameHtml` directly, because that is the whole
+ * point of TYTO-34: the job asks a registry which exporter produces a kind, and a test that
+ * skipped the registry would be testing a path nothing ships.
+ */
+function exportersOf(): ExporterRegistry {
+  const host = createPluginHost();
+  for (const plugin of [
+    htmlExporterPlugin({ resources: htmlResources }),
+    svgExporterPlugin({ resources: svgResources }),
+  ]) {
+    plugin.activate(host.hostFor(plugin.id));
+  }
+  return host.registry.exporters;
+}
 
 async function registryOf(): Promise<TemplateRegistry> {
   const loaded = await loadTemplateRegistry(fileSystem, 'templates');
@@ -182,7 +202,7 @@ async function portsOf(extra: Partial<JobPorts> = {}): Promise<JobPorts> {
     templates: markupTemplateSource(fileSystem, registry),
     assets,
     formats,
-    resources,
+    exporters: exportersOf(),
     rasterizer: fakeRasterizer(),
     ...extra,
   };

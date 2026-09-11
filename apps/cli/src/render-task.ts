@@ -1,14 +1,16 @@
 import { type AssetRef, type Diagnostics, hasErrors } from '@tyto/core';
 import {
+  type ExportResources,
   type RenderResult,
   fileAssetResolver,
   fileResources,
   fsTaskOutput,
   renderResult,
 } from '@tyto/io';
-import { type JobResources, type OutputRequest, runJob } from '@tyto/pipeline';
+import { type OutputRequest, runJob } from '@tyto/pipeline';
 import type { Rasterizer } from '@tyto/raster';
 
+import { activateBuiltIns } from './plugins/index.js';
 import { type RenderContext, templateWiring } from './render-context.js';
 import { registerOrigin } from './report.js';
 
@@ -54,7 +56,7 @@ export interface RenderTaskReport {
 }
 
 /** The two asset sources a render has, asked in the order that makes a template overridable. */
-function combine(brief: JobResources, template: JobResources): JobResources {
+function combine(brief: ExportResources, template: ExportResources): ExportResources {
   const asset = (ref: AssetRef): string | undefined =>
     brief.html?.asset?.(ref) ?? template.html?.asset?.(ref);
   return { html: { asset }, svg: { asset } };
@@ -70,6 +72,16 @@ export async function renderTask(
   const wiring = templateWiring(context);
   const output = await fsTaskOutput(task.outDirectory, { label: task.id });
 
+  // Per task, because an exporter binds the bytes of the folder it is rendering: two tasks
+  // in a `tyto watch` have different `assets/`, and an exporter bound to the wrong one
+  // would embed the wrong logo (ADR 0007 — every built-in through the same door).
+  const host = activateBuiltIns({
+    resources: combine(await fileResources({ base: task.assetBase }), wiring.resources),
+    ...(options.rasterizer === undefined ? {} : { rasterizer: options.rasterizer }),
+  });
+
+  const registered = host.registry.rasterizers<Rasterizer>()[0]?.value;
+
   const job = await runJob(
     {
       brief: task.brief,
@@ -82,9 +94,11 @@ export async function renderTask(
       registry: context.registry,
       templates: wiring.source,
       assets: fileAssetResolver({ base: task.assetBase }),
-      resources: combine(await fileResources({ base: task.assetBase }), wiring.resources),
+      exporters: host.registry.exporters,
       formats: context.formats,
-      ...(options.rasterizer === undefined ? {} : { rasterizer: options.rasterizer }),
+      // Read back out of the registry rather than passed through: what renders is what was
+      // registered, which is the claim the extension point makes.
+      ...(registered === undefined ? {} : { rasterizer: registered }),
       ...(options.concurrency === undefined ? {} : { concurrency: options.concurrency }),
       sink: output,
     },

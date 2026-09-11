@@ -19,11 +19,16 @@ import {
   resolve,
 } from '@tyto/core';
 import { parseBrief } from '@tyto/brief-lang';
-import { type HtmlResources, exportFrameHtml } from '@tyto/export-html';
-import { type SvgResources, exportFrameSvg } from '@tyto/export-svg';
-import type { RasterFormat, Rasterizer } from '@tyto/raster';
+import type { Exporter, ExporterRegistry } from '@tyto/plugin-api';
+import type { Rasterizer } from '@tyto/raster';
 
-import { type Artifact, type ArtifactSink, artifactMimeType, artifactName } from './artifact.js';
+import {
+  type Artifact,
+  type ArtifactKind,
+  type ArtifactSink,
+  artifactMimeType,
+  artifactName,
+} from './artifact.js';
 import { type FrameTarget, type JobListener, notify } from './events.js';
 import { limiter } from './limit.js';
 import { type TemplateSource, renderedSlotsOf } from './template-source.js';
@@ -56,31 +61,24 @@ import { type TemplateSource, renderedSlotsOf } from './template-source.js';
  * reason the job does not open files itself.
  */
 
-/** One requested encoding of every frame. */
-export type OutputRequest =
-  | { readonly kind: 'svg'; readonly textAsPaths?: boolean }
-  | {
-      readonly kind: RasterFormat;
-      /** 1–100, and only for `jpeg` and `webp`; the port refuses it on `png`. */
-      readonly quality?: number;
-      /** Device pixels per CSS pixel. `2` is the retina export. */
-      readonly scale?: number;
-    };
-
 /**
- * Bytes for the fonts and images a scene draws, as the exporters want them: synchronous
- * lookups returning a data URI.
+ * One requested encoding of every frame.
  *
- * The job passes them through and never loads anything. Which faces a scene needs is
- * known only by walking its text runs, and whoever bundled the fonts already knows where
- * they are — so eagerly loading them belongs to the composition root (E6.3), not to the
- * stage in the middle. A scene that draws text without these gets
- * `E_EXPORT_FONT_UNRESOLVED` per frame, which is the exporters' answer and not one this
- * job should second-guess.
+ * One shape rather than a union per kind. It was a union — `svg` with `textAsPaths`, the
+ * raster formats with `quality` and `scale` — and that made the *type* say which options
+ * belong to which exporter, which is exactly the knowledge an extension point takes away
+ * from the job (ADR 0007). An exporter reads the options it understands and ignores the
+ * rest; the rasterizer port still refuses `quality` on a PNG at the one place that can
+ * actually check it.
  */
-export interface JobResources {
-  readonly html?: HtmlResources;
-  readonly svg?: SvgResources;
+export interface OutputRequest {
+  readonly kind: ArtifactKind;
+  /** 1–100, and only for `jpeg` and `webp`; the raster port refuses it on `png`. */
+  readonly quality?: number;
+  /** Device pixels per CSS pixel. `2` is the retina export. */
+  readonly scale?: number;
+  /** `svg` only: draw text as outlines. An exporter that does not know it ignores it. */
+  readonly textAsPaths?: boolean;
 }
 
 export interface JobRequest {
@@ -112,9 +110,18 @@ export interface JobPorts {
   readonly templates: TemplateSource;
   readonly assets: AssetResolver;
   readonly formats: FormatCatalogue;
-  /** Required as soon as one output is not `svg`. */
+  /**
+   * Which exporter produces which output kind (ADR 0007).
+   *
+   * A port, like every other capability here. The job used to import `exportFrameHtml` and
+   * `exportFrameSvg` and branch on `kind === 'svg'`, which made two of the nine extension
+   * points built in rather than contributed — and left a third-party exporter with nothing
+   * to plug into. The bytes each exporter needs for a font or an image are bound when it is
+   * registered, so this stage no longer carries resources it never reads.
+   */
+  readonly exporters: ExporterRegistry;
+  /** Required as soon as one requested kind comes from a `rasterized` exporter. */
   readonly rasterizer?: Rasterizer;
-  readonly resources?: JobResources;
   /** Absent means the artifacts come back in memory and nothing is written. */
   readonly sink?: ArtifactSink;
   /** Frames rastered at once. Defaults to 2 — see `limit.ts` for why not more. */
@@ -189,15 +196,33 @@ export async function runJob(
     );
   }
 
-  const rastering = request.outputs.some((output) => output.kind !== 'svg');
+  // Resolved before anything runs, so a missing exporter is one sentence at the top rather
+  // than the same failure repeated once per frame.
+  const exporterFor = new Map<string, Exporter>();
+  for (const output of request.outputs) {
+    const exporter = ports.exporters.forKind(output.kind);
+    if (exporter === undefined) {
+      throw new TypeError(
+        `No registered exporter produces '${output.kind}'. Registered: ` +
+          `${ports.exporters
+            .list()
+            .map((item) => `${item.id} (${item.kinds.join(', ')})`)
+            .join('; ')} — see docs/plugin-api.md.`,
+      );
+    }
+    exporterFor.set(output.kind, exporter);
+  }
+
+  const rastering = [...exporterFor.values()].some((exporter) => exporter.rasterized);
   if (rastering && ports.rasterizer === undefined) {
-    const kinds = request.outputs
-      .filter((output) => output.kind !== 'svg')
-      .map((output) => output.kind)
+    const kinds = [...exporterFor]
+      .filter(([, exporter]) => exporter.rasterized)
+      .map(([kind]) => kind)
       .join(', ');
     throw new TypeError(
-      `Outputs ${kinds} need a rasterizer, and none was supplied. Pass ports.rasterizer, ` +
-        "or ask only for 'svg'.",
+      `Outputs ${kinds} come from an exporter whose document has to be rastered, and no ` +
+        'rasterizer was supplied. Pass ports.rasterizer, or ask only for kinds a ' +
+        'non-rasterized exporter produces.',
     );
   }
 
@@ -315,21 +340,27 @@ export async function runJob(
   let failed = 0;
   let cancelled = false;
 
+  /** Defined for every requested kind: the loop above refused the job otherwise. */
+  function exporterOf(task: Task): Exporter {
+    const exporter = exporterFor.get(task.output.kind);
+    if (exporter === undefined) {
+      throw new TypeError(`No exporter for '${task.output.kind}', which was checked earlier.`);
+    }
+    return exporter;
+  }
+
   function bytesOf(task: Task): Result<string, Diagnostics> {
-    return task.output.kind === 'svg'
-      ? exportFrameSvg(scene, task.artwork, task.frame, {
-          ...(ports.resources?.svg === undefined ? {} : { resources: ports.resources.svg }),
-          ...(task.output.textAsPaths === undefined
-            ? {}
-            : { textAsPaths: task.output.textAsPaths }),
-        })
-      : exportFrameHtml(scene, task.artwork, task.frame, {
-          ...(ports.resources?.html === undefined ? {} : { resources: ports.resources.html }),
-        });
+    // An exporter that does not understand `textAsPaths` ignores it, which is why this is
+    // the same call for every kind. The resources were bound when it was registered.
+    return exporterOf(task).exportFrame(scene, task.artwork, task.frame, {
+      ...(task.output.textAsPaths === undefined ? {} : { textAsPaths: task.output.textAsPaths }),
+    });
   }
 
   async function encode(task: Task, document: string): Promise<Result<Uint8Array, Diagnostics>> {
-    if (task.output.kind === 'svg') return ok(new TextEncoder().encode(document));
+    // The exporter says whether its document is already the artifact. The job used to ask
+    // `kind === 'svg'`, which is the same question with the answer hardcoded.
+    if (!exporterOf(task).rasterized) return ok(new TextEncoder().encode(document));
 
     // The `Rasterizer` port takes positive integers and refuses to guess at a rounding
     // (`resolveRasterOptions`), so the job — the caller — decides here. A frame that
@@ -349,10 +380,14 @@ export async function runJob(
 
     try {
       // Defined: the guard at the top of `runJob` refused a raster output without one.
+      const format = task.output.kind === 'svg' ? undefined : task.output.kind;
       const bytes = await ports.rasterizer?.raster(document, {
         width,
         height,
-        format: task.output.kind,
+        // Absent only for `svg`, which never reaches here: an exporter that produces it
+        // is not `rasterized`. Narrowed rather than cast, so the impossible case stays
+        // impossible to the compiler too.
+        ...(format === undefined ? {} : { format }),
         ...(task.output.quality === undefined ? {} : { quality: task.output.quality }),
         ...(task.output.scale === undefined ? {} : { scale: task.output.scale }),
       });
