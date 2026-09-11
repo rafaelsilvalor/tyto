@@ -224,14 +224,17 @@ describe('promo-curso in markup and promo-curso in TypeScript', () => {
     expect(sizes).toEqual([48, 64, 48]);
   });
 
-  it('reports every slot the markup draws, which is what W_UNUSED_SLOT needs', async () => {
+  it('reports every slot the template reads, which is what W_UNUSED_SLOT needs', async () => {
     const template = compileTemplate(promoCursoMarkup, { manifest: MANIFEST });
     expect(template.ok).toBe(true);
     if (!template.ok) return;
 
-    expect([...template.value.renderedSlots].sort()).toEqual(['imagem', 'slide', 'titulo']);
+    // `cor` is in the list without being drawn anywhere: the stylesheet branches on it —
+    // `@if slot(cor) is laranja { :root { --bg: #ff5900 } }` — and that branch is what
+    // decides the background. Until TYTO-63 it was missing, and this brief was told to
+    // delete the line that colours the artwork.
+    expect([...template.value.renderedSlots].sort()).toEqual(['cor', 'imagem', 'slide', 'titulo']);
 
-    // `cor` is set by the brief and drawn by nothing, which only the markup path can know.
     const resolved = await resolve(BRIEF, {
       registry,
       assets,
@@ -239,8 +242,140 @@ describe('promo-curso in markup and promo-curso in TypeScript', () => {
     });
     expect(resolved.ok).toBe(true);
     if (!resolved.ok) return;
+    expect(resolved.warnings.map((item) => item.code)).toEqual([]);
+  });
+});
+
+/* ----------------------------------------------------- which slots count as read -- */
+
+const READS = manifestOf(`name: leitura
+version: 1.0.0
+formats: [feed, story]
+slots:
+  titulo: { type: rich-text }
+  imagem: { type: image }
+  cor: { type: enum, values: [azul, laranja], default: azul }
+  fundo: { type: enum, values: [claro, escuro], default: claro }
+  slide: { type: rich-text, repeat: true, min: 1, max: 10 }
+`);
+
+/** A template that draws nothing but one text, so a case adds exactly one reference. */
+function readsIn(body: string, markup = ''): readonly string[] {
+  const source =
+    `<frame format="feed"><text slot="titulo" class="t" />${markup}</frame>` +
+    `<frame format="story" extends="feed" />` +
+    `<style>.t { w: 100; font: 400 32px "Inter"; color: white } .i { w: 100; h: 100 } ${body}</style>`;
+  const compiled = compileTemplate(source, { manifest: READS });
+  if (!compiled.ok) throw new Error(compiled.error.map((item) => item.message).join('; '));
+  return [...compiled.value.renderedSlots].sort();
+}
+
+const readsRegistry: TemplateRegistry = {
+  list: () => [READS],
+  get: (name) => (name === READS.name ? READS : undefined),
+  formatsOf: (name) => (name === READS.name ? READS.formats : undefined),
+  directoryOf: () => 'templates/leitura',
+  failures: [],
+};
+
+describe('the sources a slot reference can come from', () => {
+  it('the slot attribute on a drawable', () => {
+    expect(readsIn('', '<image slot="imagem" class="i" />')).toEqual(['imagem', 'titulo']);
+  });
+
+  it('a slot spliced into a src', () => {
+    // `docs/template-authoring.md`: `src="assets/{cor}.png"` splices an enum's word into a
+    // path, so the file that gets drawn depends on what the brief set.
+    expect(readsIn('', '<image src="assets/{cor}.png" class="i" />')).toEqual(['cor', 'titulo']);
+  });
+
+  it('a stylesheet condition on an enum — the case TYTO-63 was written for', () => {
+    expect(readsIn('@if slot(cor) is laranja { :root { --bg: #ff5900 } }')).toEqual([
+      'cor',
+      'titulo',
+    ]);
+  });
+
+  it('a stylesheet condition on emptiness', () => {
+    // Never drawn, and still decides the layout: an author who sets `imagem` moved the
+    // title, which is exactly what "this brief used the slot" means.
+    expect(readsIn('@if slot(imagem) is empty { .t { w: 400 } }')).toEqual(['imagem', 'titulo']);
+  });
+
+  it('an @each scope, which names the repeatable slot', () => {
+    expect(readsIn('@each slide { .t { w: 400 } }')).toEqual(['slide', 'titulo']);
+  });
+
+  it('the seeded variable a slot becomes', () => {
+    // `--slot-cor` holds the word the brief wrote. A template whose enum lists CSS colour
+    // names can use it directly, and then the brief picked the colour.
+    expect(readsIn(':root { --bg: var(--slot-cor) }')).toEqual(['cor', 'titulo']);
+  });
+
+  it('that variable however deeply a call nests it', () => {
+    expect(readsIn(':root { --bg: linear-gradient(180deg, var(--slot-cor) 0, #000 1) }')).toEqual([
+      'cor',
+      'titulo',
+    ]);
+  });
+
+  it('and a fallback inside another var()', () => {
+    expect(readsIn(':root { --bg: var(--nope, var(--slot-fundo)) }')).toEqual(['fundo', 'titulo']);
+  });
+
+  it('collects each source once, and every source at once', () => {
+    const reads = readsIn(
+      '@if slot(cor) is laranja { :root { --bg: #ff5900 } } ' +
+        '@if slot(imagem) is empty { .t { w: 400 } } ' +
+        '@each slide { .t { h: 40 } } ' +
+        ':root { --fg: var(--slot-fundo) }',
+      '<image slot="imagem" class="i" />',
+    );
+
+    expect(reads).toEqual(['cor', 'fundo', 'imagem', 'slide', 'titulo']);
+  });
+});
+
+describe('what the warning still has to catch', () => {
+  it('a slot the template mentions nowhere is still unused', async () => {
+    // The half a fix like this can quietly trade away. `fundo` is declared, set by the
+    // brief below, and appears in no attribute, no src and no condition — so it must still
+    // warn, or the false positive was traded for silence.
+    const compiled = compileTemplate(
+      '<frame format="feed"><text slot="titulo" class="t" /></frame>' +
+        '<frame format="story" extends="feed" />' +
+        '<style>.t { w: 100; font: 400 32px "Inter"; color: white }' +
+        ' @if slot(cor) is laranja { .t { w: 200 } }</style>',
+      { manifest: READS },
+    );
+    if (!compiled.ok) throw new Error(compiled.error.map((item) => item.message).join('; '));
+    expect([...compiled.value.renderedSlots].sort()).toEqual(['cor', 'titulo']);
+
+    const resolved = await resolve(
+      {
+        frontmatter: frontmatter({ template: 'leitura', cor: 'laranja', fundo: 'escuro' }),
+        directives: [directive('titulo', textOf('Oi')), directive('slide', textOf('Um'))],
+        range: sourceRange(0, 300),
+      },
+      { registry: readsRegistry, assets, renderedSlots: compiled.value.renderedSlots },
+    );
+
+    if (!resolved.ok) throw new Error(resolved.error.map((item) => item.message).join('; '));
     expect(resolved.warnings.map((item) => item.code)).toEqual(['W_UNUSED_SLOT']);
-    expect(resolved.warnings[0]?.message).toContain("Slot 'cor'");
+    expect(resolved.warnings[0]?.message).toContain("Slot 'fundo'");
+  });
+
+  it('an empty conditional block reads nothing, because it changes nothing', () => {
+    // Deliberate. The set is read from what reaches the cascade, and a block with no
+    // declarations reaches none of it — so the slot in its prelude really is used by
+    // nothing, and saying otherwise would silence a warning that is correct.
+    expect(readsIn('@if slot(cor) is laranja { }')).toEqual(['titulo']);
+  });
+
+  it('a custom property that merely starts with --slot- is not a slot reference', () => {
+    expect(readsIn(':root { --slot-machine: #fff; --bg: var(--slot-machine) }')).toEqual([
+      'titulo',
+    ]);
   });
 });
 
