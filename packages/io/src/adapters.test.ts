@@ -9,7 +9,8 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { isInside } from './contain.js';
 import { fileResources } from './file-resources.js';
 import { fsInbox } from './fs-inbox.js';
-import { fsOutbox } from './fs-outbox.js';
+import { fileTemplateAssets } from './file-template-assets.js';
+import { fsOutbox, fsTaskOutput } from './fs-outbox.js';
 import { nodeFileSystem } from './node-file-system.js';
 import { pollSource } from './poll.js';
 import type { BriefSource, BriefTask } from './ports.js';
@@ -24,6 +25,12 @@ beforeEach(async () => {
 afterEach(async () => {
   await rm(workspace, { recursive: true, force: true });
 });
+
+/** A real 1x1 PNG, so a hash is a hash of something and a data URI decodes. */
+const PNG_1X1 = Buffer.from(
+  'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==',
+  'base64',
+);
 
 function artifactOf(name: string, bytes = 'hello'): Artifact {
   return {
@@ -119,6 +126,89 @@ describe('fsOutbox', () => {
 
     const names = await readdir(join(workspace, 'outbox', 'issue-1', 'out'));
     expect([...names].sort()).toEqual(['result.json', 'slide-1-feed.png']);
+  });
+});
+
+describe('fsTaskOutput', () => {
+  it('writes into exactly the folder it was given, with no out/ of its own', async () => {
+    // What `tyto render --out <dir>` needs: `docs/integrations.md` writes the contract as
+    // `--out <task>/out`, so the folder named on the command line *is* the out folder.
+    const output = await fsTaskOutput(join(workspace, 'anywhere'));
+    await output.write(artifactOf('slide-1-feed.png'));
+
+    expect(await readdir(join(workspace, 'anywhere'))).toEqual(['slide-1-feed.png']);
+  });
+
+  it('creates the folder, so a caller does not have to mkdir before rendering', async () => {
+    await fsTaskOutput(join(workspace, 'deep', 'nested', 'out'));
+
+    expect(await readdir(join(workspace, 'deep', 'nested'))).toEqual(['out']);
+  });
+
+  it('validates result.json the same way the outbox does', async () => {
+    const output = await fsTaskOutput(join(workspace, 'anywhere'));
+
+    await expect(output.finish({ status: 'ok' } as never)).rejects.toThrow(
+      /does not match its schema/,
+    );
+  });
+});
+
+describe('fileTemplateAssets', () => {
+  /** A template folder in the shape `docs/template-authoring.md` documents. */
+  async function installTemplate(): Promise<string> {
+    const directory = join(workspace, 'templates', 'cartaz');
+    await mkdir(join(directory, 'assets'), { recursive: true });
+    await writeFile(join(directory, 'template.html'), '<frame format="feed" />');
+    await writeFile(
+      join(directory, 'assets', 'mark.svg'),
+      '<svg xmlns="http://www.w3.org/2000/svg"><path d="M0 0h1v1H0z"/></svg>',
+    );
+    await writeFile(join(directory, 'assets', 'logo.png'), PNG_1X1);
+    await writeFile(join(directory, 'assets', 'source.psd'), 'not for embedding');
+    return directory;
+  }
+
+  it('hands back the markup of a <vector src>, keyed the way a template writes it', async () => {
+    const { assets } = await fileTemplateAssets({ base: await installTemplate() });
+
+    expect(assets.svg?.('assets/mark.svg')).toContain('M0 0h1v1H0z');
+    // A template is text and always uses forward slashes; the filesystem it ran on is the
+    // one with an opinion about separators.
+    expect(assets.svg?.('./assets/mark.svg')).toContain('M0 0h1v1H0z');
+  });
+
+  it('mints an AssetRef for an <image src>, hashed on the bytes', async () => {
+    const { assets } = await fileTemplateAssets({ base: await installTemplate() });
+    const ref = assets.image?.('assets/logo.png');
+
+    // The path as the template wrote it, so a diagnostic says what the file says rather
+    // than an absolute path from this machine.
+    expect(ref?.id).toBe('assets/logo.png');
+    expect(ref?.hash).toMatch(/^sha256-[0-9a-f]{64}$/u);
+  });
+
+  it('gives the exporters bytes for the ref it minted', async () => {
+    const { assets, resources } = await fileTemplateAssets({ base: await installTemplate() });
+    const ref = assets.image?.('assets/logo.png');
+    if (ref === undefined) throw new Error('no ref was minted for assets/logo.png');
+
+    expect(resources.html?.asset?.(ref)).toMatch(/^data:image\/png;base64,/u);
+  });
+
+  it('ignores a file no document could embed', async () => {
+    const { assets } = await fileTemplateAssets({ base: await installTemplate() });
+
+    // A `.psd` beside the logo is a working file, not an oversight to report.
+    expect(assets.image?.('assets/source.psd')).toBeUndefined();
+  });
+
+  it('answers nothing for a folder that is not there, rather than throwing', async () => {
+    const { assets } = await fileTemplateAssets({ base: join(workspace, 'no-such-template') });
+
+    // A template with no `src` needs no folder. The unresolved path is `template-lang`'s
+    // diagnostic to write, not this adapter's exception to throw.
+    expect(assets.svg?.('assets/mark.svg')).toBeUndefined();
   });
 });
 
