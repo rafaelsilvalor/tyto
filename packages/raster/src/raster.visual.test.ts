@@ -2,9 +2,11 @@ import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-import type { Scene } from '@tyto/core';
+import type { Diagnostics, Scene } from '@tyto/core';
 import { parseScene } from '@tyto/core';
 import { exportHtml } from '@tyto/export-html';
+import { exportSvg } from '@tyto/export-svg';
+import { htmlTestFont, svgTestFont } from '@tyto/test-fonts';
 import pixelmatch from 'pixelmatch';
 import { PNG } from 'pngjs';
 import { afterAll, describe, expect, it } from 'vitest';
@@ -14,6 +16,7 @@ import type { RasterFormat } from './rasterizer.js';
 
 import alphaFixture from './__fixtures__/alpha.json';
 import shapesFixture from './__fixtures__/shapes.json';
+import textFixture from './__fixtures__/text.json';
 
 /**
  * The pixels. This is the suite the card's acceptance criteria are about, and the reason
@@ -48,15 +51,25 @@ import shapesFixture from './__fixtures__/shapes.json';
  * would report green for a corpus nothing is checked against, and a suite that passes
  * because it did not look is worse than one that is red.
  *
- * ## Why there is no text in the corpus
+ * ## The text fixture, and the platform question it was supposed to settle
  *
- * `docs/conventions.md` wants test fonts bundled in the repo and none is bundled yet, and
- * `export-html` refuses to embed a font it was given no bytes for
- * (`E_EXPORT_FONT_UNRESOLVED`) — so no existing fixture can be rasterized at all. Picking
- * a font is a licensing and provenance decision, and text is also exactly where
- * cross-platform raster comparison is least stable. Both belong to the card that bundles
- * the font (E4.5 needs one to measure with anyway); this corpus covers everything else
- * Chromium draws.
+ * `text.feed` is the third fixture and the only one with glyphs in it. It exists because
+ * the repository now bundles a font (`fonts/`, read by `@tyto/test-fonts`); before that
+ * `export-html` refused to embed a face it had no bytes for and **no fixture carrying text
+ * could be rasterized at all**.
+ *
+ * Text is the half of the corpus TYTO-29 left out on the reasoning that glyph
+ * rasterization is where platforms diverge — FreeType on Linux, Skia over DirectWrite on
+ * Windows. That reasoning is still the live hypothesis, and this file cannot settle it
+ * alone: **the number below was measured on win32 only**. What was measured here is the
+ * other half of the question, stability on one platform, and it is clean —
+ * **12 of 12 re-renders of `text.feed` came back byte-identical**, so the pixel check
+ * stays rather than being dropped.
+ *
+ * If the Linux render turns out to differ, the answer is a per-platform key for this
+ * fixture (`docs/git-workflow.md` reserved one), not a wider tolerance. The numbers below
+ * are the reason: at a tolerance loose enough to absorb a different glyph rasterizer, the
+ * suite stops seeing the things it is here for.
  */
 
 const HERE = dirname(fileURLToPath(import.meta.url));
@@ -92,6 +105,56 @@ const CHANNEL = process.env['TYTO_RASTER_CHANNEL'];
  * 0.049%. The suite catches a change to something the size of a headline card (a 1px
  * shift of the 160×100 rect is 0.144%) and does not catch a nudge to an icon. That is the
  * trade the number is, and it is written down rather than discovered later.
+ *
+ * ## What it costs on glyphs
+ *
+ * Same method on `text.feed`, 400×400, on win32, at `PIXEL_THRESHOLD` below. Percentages
+ * are of 160 000 pixels; the tolerance line is 0.100%.
+ *
+ * ```
+ * threshold                                    0     0.005      0.01      0.02      0.05       0.1
+ * identical re-render                     0.000%    0.000%    0.000%    0.000%    0.000%    0.000%
+ * headline green channel +1               2.551%    0.000%    0.000%    0.000%    0.000%    0.000%
+ * headline green channel +2               2.553%    2.550%    0.000%    0.000%    0.000%    0.000%
+ * headline green channel +4               2.559%    2.551%    2.550%    0.000%    0.000%    0.000%
+ * headline green channel +8               2.566%    2.552%    2.550%    2.550%    0.000%    0.000%
+ * body text +1 on every channel           0.774%    0.000%    0.000%    0.000%    0.000%    0.000%
+ * headline shifted 1px                    0.419%    0.381%    0.378%    0.372%    0.364%    0.351%
+ * body shifted 1px                        1.471%    1.445%    1.421%    1.367%    1.252%    1.066%
+ * kicker shifted 1px                      0.253%    0.248%    0.243%    0.232%    0.206%    0.166%
+ * body size 15 → 15.25                    1.944%    1.904%    1.884%    1.843%    1.709%    1.527%
+ * body line-height 1.45 → 1.5             0.000%    0.000%    0.000%    0.000%    0.000%    0.000%
+ * body line-height 1.45 → 1.6             1.479%    1.437%    1.408%    1.351%    1.204%    1.023%
+ * kicker letterSpacing 2.5 → 2.6          0.151%    0.146%    0.143%    0.134%    0.108%    0.074%
+ * one digit changed in the body           0.024%    0.024%    0.023%    0.020%    0.017%    0.011%
+ * headline weight 700 → 400               3.885%    3.841%    3.834%    3.820%    3.775%    3.746%
+ * whole-image drift ±1                   94.183%    0.000%    0.000%    0.000%    0.000%    0.000%
+ * whole-image drift ±2                   94.183%   94.183%    0.000%    0.000%    0.000%    0.000%
+ * whole-image drift ±3                   94.183%   94.183%   91.508%    0.000%    0.000%    0.000%
+ * ```
+ *
+ * **Glyphs turn out to be the easy case, not the fragile one.** Text covers a small
+ * fraction of the frame and every letter is an edge, so anything that moves type moves
+ * hundreds of antialiased pixels at once: a 1px nudge of the 15px body paragraph is
+ * 1.421%, fourteen times the tolerance, where the same nudge to a solid 48×48 icon in
+ * `shapes.feed` is 0.049% and invisible to the suite. The rows that read as identical
+ * behave the same way the shapes corpus does — a one-step colour change and a ±2
+ * whole-image drift are both forgiven, deliberately, by `PIXEL_THRESHOLD`.
+ *
+ * Two rows are blind spots worth naming rather than leaving to be discovered:
+ *
+ * **One digit of body copy — 0.023%, a quarter of the tolerance, missed.** Changing "dia
+ * 30" to "dia 38" touches 37 pixels of 160 000. A visual suite does not check copy, and
+ * nothing here should be read as saying it does; a wrong word is a job for a snapshot of
+ * the exporter's string, which is what `export-html`'s own tests are.
+ *
+ * **A line-height of 1.45 and one of 1.5 are the same image, at `threshold: 0`.** That is
+ * not the tolerance being generous — it is Chromium quantizing the used line-height to
+ * whole pixels: 15px × 1.45 = 21.75 and 15px × 1.5 = 22.5 both land on 22. The next value
+ * that lands anywhere else, 1.6, moves 1.408%. So the suite's floor for leading is the
+ * rasterizer's, not this file's, and a tolerance change would not move it. It is listed
+ * because a reader who sees 0.000% and concludes the check is weak would draw the wrong
+ * conclusion about which instrument produced it.
  */
 const TOLERANCE = 0.001;
 
@@ -185,7 +248,7 @@ interface Document {
 function documentsOf(fixture: unknown): readonly Document[] {
   const scene = sceneOf(fixture);
   const exported = exportHtml(scene, {
-    resources: { asset: () => CHECKERBOARD },
+    resources: { asset: () => CHECKERBOARD, font: htmlTestFont },
   });
 
   if (!exported.ok) {
@@ -202,6 +265,7 @@ function documentsOf(fixture: unknown): readonly Document[] {
 
 const SHAPES = documentsOf(shapesFixture);
 const ALPHA = documentsOf(alphaFixture);
+const TEXT = documentsOf(textFixture);
 
 async function render(
   document: Document,
@@ -292,7 +356,7 @@ function pixelAt(bytes: Uint8Array, x: number, y: number): readonly number[] {
 }
 
 describe('reference renders', () => {
-  it.each([...SHAPES, ...ALPHA].map((document) => [document.name, document] as const))(
+  it.each([...SHAPES, ...ALPHA, ...TEXT].map((document) => [document.name, document] as const))(
     '%s matches its committed reference',
     async (name, document) => {
       const fraction = mismatchFraction(name, await render(document));
@@ -304,6 +368,107 @@ describe('reference renders', () => {
       );
     },
   );
+});
+
+/**
+ * The codes an export reported, whether it failed or came back with warnings.
+ *
+ * `E_EXPORT_FONT_UNRESOLVED` is an error, so it lands in `error`; reading both branches
+ * means the assertion says "nothing reported it" rather than "the call happened to
+ * succeed", and the two are not the same sentence once a warning is added.
+ */
+function codesOf(result: { ok: boolean; warnings?: Diagnostics; error?: Diagnostics }): string[] {
+  return [...(result.ok ? (result.warnings ?? []) : (result.error ?? []))].map(
+    (problem) => problem.code,
+  );
+}
+
+/** The text fixture with every run flipped to a face the repository does not bundle. */
+function inItalic(): Scene {
+  const scene = sceneOf(textFixture) as unknown as {
+    artworks: { frames: { children: { runs?: { kind: string; style?: string }[] }[] }[] }[];
+  };
+  const clone = structuredClone(scene);
+  for (const artwork of clone.artworks) {
+    for (const frame of artwork.frames) {
+      for (const child of frame.children) {
+        for (const run of child.runs ?? []) {
+          if (run.kind === 'text') run.style = 'italic';
+        }
+      }
+    }
+  }
+  return sceneOf(clone);
+}
+
+describe('glyph rendering on this platform', () => {
+  const document = TEXT[0];
+  if (document === undefined) throw new Error('The text fixture rendered no frames.');
+
+  it('is repeatable to the byte, which is what the reference rests on', async () => {
+    // The measurement in TOLERANCE's header ran this twelve times; three is what a suite
+    // can afford every run. It is here because "the text reference is unstable" is the
+    // one finding that would make this card drop the pixel check for text instead of
+    // committing a file, and a claim that only a one-off script ever checked is a claim
+    // that quietly stops being true.
+    const first = await render(document);
+    const second = await render(document);
+    const third = await render(document);
+
+    expect(Buffer.from(second).equals(Buffer.from(first))).toBe(true);
+    expect(Buffer.from(third).equals(Buffer.from(first))).toBe(true);
+  });
+});
+
+describe('the bundled font', () => {
+  const scene = sceneOf(textFixture);
+
+  it('resolves through export-html, and the document carries the real bytes', () => {
+    const exported = exportHtml(scene, { resources: { font: htmlTestFont } });
+
+    expect(codesOf(exported)).not.toContain('E_EXPORT_FONT_UNRESOLVED');
+    if (!exported.ok) throw new Error('export-html failed on the text fixture.');
+
+    const [frame] = exported.value;
+    if (frame === undefined) throw new Error('The text fixture exported no frames.');
+
+    // Both weights, both embedded. A `@font-face` per weight is what the fixture is for:
+    // a resolver keyed on family alone would emit one rule and Chromium would synthesise
+    // the bold, which looks like a bold and is not the bundled one.
+    expect(frame.html).toContain('font-weight: 400');
+    expect(frame.html).toContain('font-weight: 700');
+    expect([...frame.html.matchAll(/src: url\("data:font\/woff2;base64,/g)]).toHaveLength(2);
+  });
+
+  it('resolves through export-svg too', () => {
+    const exported = exportSvg(scene, { resources: { font: svgTestFont } });
+
+    expect(codesOf(exported)).not.toContain('E_EXPORT_FONT_UNRESOLVED');
+    if (!exported.ok) throw new Error('export-svg failed on the text fixture.');
+
+    const [frame] = exported.value;
+    if (frame === undefined) throw new Error('The text fixture exported no frames.');
+    expect([...frame.svg.matchAll(/src:url\("data:font\/woff2;base64,/g)]).toHaveLength(2);
+  });
+
+  it('is still the only thing standing between a fixture and that diagnostic', () => {
+    // Without the resolver the fixture is exactly where the corpus was before this card,
+    // and the failure has to stay legible: this is the assertion that stops a future
+    // resolver from quietly substituting a face it does have.
+    expect(codesOf(exportHtml(scene))).toContain('E_EXPORT_FONT_UNRESOLVED');
+    expect(codesOf(exportSvg(scene))).toContain('E_EXPORT_FONT_UNRESOLVED');
+  });
+
+  it('reports a face it does not bundle rather than substituting one', () => {
+    const italic = inItalic();
+
+    expect(codesOf(exportHtml(italic, { resources: { font: htmlTestFont } }))).toContain(
+      'E_EXPORT_FONT_UNRESOLVED',
+    );
+    expect(codesOf(exportSvg(italic, { resources: { font: svgTestFont } }))).toContain(
+      'E_EXPORT_FONT_UNRESOLVED',
+    );
+  });
 });
 
 describe('a frame with no background', () => {

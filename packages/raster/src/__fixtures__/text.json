@@ -1,0 +1,103 @@
+{
+  "version": 1,
+  "artworks": [
+    {
+      "id": "text",
+      "label": "Glyphs, which is the half of the corpus no other fixture contains",
+      "frames": [
+        {
+          "format": "feed",
+          "size": { "w": 400, "h": 400 },
+          "background": {
+            "kind": "solid",
+            "color": { "r": 12, "g": 18, "b": 38 }
+          },
+          "children": [
+            {
+              "kind": "text",
+              "id": "headline",
+              "name": "bold, large, light on dark — the easiest case for antialiasing",
+              "transform": { "x": 32, "y": 40 },
+              "box": { "w": 336 },
+              "align": "left",
+              "valign": "top",
+              "lineHeight": 1.1,
+              "letterSpacing": 0,
+              "overflow": "clip",
+              "runs": [
+                {
+                  "kind": "text",
+                  "text": "Turma nova",
+                  "font": { "family": "Source Sans 3", "source": "bundled" },
+                  "size": 56,
+                  "weight": 700,
+                  "style": "normal",
+                  "color": { "kind": "solid", "color": { "r": 255, "g": 255, "b": 255 } }
+                },
+                { "kind": "break" },
+                {
+                  "kind": "text",
+                  "text": "de setembro",
+                  "font": { "family": "Source Sans 3", "source": "bundled" },
+                  "size": 56,
+                  "weight": 700,
+                  "style": "normal",
+                  "color": { "kind": "solid", "color": { "r": 255, "g": 137, "b": 0 } }
+                }
+              ]
+            },
+            {
+              "kind": "text",
+              "id": "body",
+              "name": "regular, small, low contrast — where glyph antialiasing is least stable",
+              "transform": { "x": 32, "y": 200 },
+              "box": { "w": 336 },
+              "align": "left",
+              "valign": "top",
+              "lineHeight": 1.45,
+              "letterSpacing": 0,
+              "overflow": "clip",
+              "runs": [
+                {
+                  "kind": "text",
+                  "text": "Inscrições abertas até o dia 30. Aulas ao vivo, material incluso e certificado ao final do curso.",
+                  "font": { "family": "Source Sans 3", "source": "bundled" },
+                  "size": 15,
+                  "weight": 400,
+                  "style": "normal",
+                  "color": { "kind": "solid", "color": { "r": 176, "g": 184, "b": 204 } }
+                }
+              ]
+            },
+            {
+              "kind": "text",
+              "id": "kicker",
+              "name": "tracked-out small caps-ish label, so letterSpacing reaches a render",
+              "transform": { "x": 32, "y": 320 },
+              "box": { "w": 336 },
+              "align": "left",
+              "valign": "top",
+              "lineHeight": 1.2,
+              "letterSpacing": 2.5,
+              "overflow": "clip",
+              "runs": [
+                {
+                  "kind": "text",
+                  "text": "MATRICULE-SE",
+                  "font": { "family": "Source Sans 3", "source": "bundled" },
+                  "size": 13,
+                  "weight": 700,
+                  "style": "normal",
+                  "color": { "kind": "solid", "color": { "r": 255, "g": 137, "b": 0 } },
+                  "decoration": "underline"
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "fonts": [{ "family": "Source Sans 3", "source": "bundled" }],
+  "assets": []
+}
