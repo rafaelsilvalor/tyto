@@ -24,16 +24,37 @@ docs/
   adr/                   architecture decision records
 ```
 
-Language policy: code, comments, docs, commits and Jira cards are in English (cards also carry a Portuguese translation). The maintainer reads English and writes to AI agents in Portuguese.
+Language policy: code, comments, docs, commits and Jira cards are in English. A card also carries a Portuguese half, which is **not** a translation — the maintainer reads English fine, so translating the body twice buys nothing. It says what the card adds for somebody who does not write code: one concrete thing a person can do afterwards that they could not do before, and one sentence on what still does not work. The maintainer reads English and writes to AI agents in Portuguese.
+
+The `## Português` section below follows the same rule, for the same reason.
 
 ---
 
 ## Português
 
-Gerador multiformato de arte publicitária, local-first, parte da suíte Breu.
+O Tyto monta arte publicitária a partir de um arquivo de texto, na sua própria máquina.
+Faz parte da suíte Breu.
 
-Um **brief** escrito em linguagem de marcação própria escolhe um **template**, preenche seus slots e é compilado para uma **árvore de cena (IR)**. Da cena saem exportadores independentes: HTML (rasterizado em Chromium para PNG/JPG/WebP) e SVG vetorial. Uma peça pode gerar várias artes (carrossel) em vários formatos (feed, story, banner).
+**O que você escreve.** Um arquivo — o _briefing_ — com o texto da peça, as imagens e as
+opções que ela aceita. Não é editor de imagem: você não arrasta caixa, não escolhe posição,
+não mexe em tamanho. Quem sabe onde cada coisa fica é o _template_, que alguém de design
+escreve uma vez e todo mundo reusa.
 
-Interfaces: app desktop (Electron; editor com highlight e modo vim) e CLI. Fila remota e entrega (Jira, Drive…) são papel do Jacurutu, outro produto da suíte; a fronteira é um contrato de arquivos (ADR 0011). Tudo que é fonte, destino, exportador, rasterizador, pacote de templates ou comando de editor é um **plugin** — os built-in usam a mesma API.
+**O que sai.** As artes prontas, em todos os tamanhos que a campanha pede — feed, story,
+banner — do mesmo briefing e de uma vez só. Um carrossel de cinco slides vira cinco artes em
+cada tamanho. Saem em PNG, JPEG e WebP, e também em SVG.
 
-Comece por `CLAUDE.md`, depois `docs/architecture.md` e `docs/backlog.md`. A documentação técnica está em inglês; a explicação dos padrões para não-programadores está em `docs/patterns-explained.pt-BR.html`.
+**Por que isso resolve algo.** Mudou o preço, mudou a data, mudou uma palavra: você edita uma
+linha e gera tudo de novo em segundos, sem refazer doze arquivos à mão. E o mesmo briefing
+sempre produz as mesmas imagens — não "parecidas", idênticas. É isso que permite mandar
+gerar sem ter que conferir peça por peça.
+
+**O que ainda não funciona.** Não existe janela: hoje só roda por linha de comando, e o
+aplicativo de desktop ainda está por fazer. **Texto ainda não é desenhado** — o projeto
+ainda não embarcou nenhuma fonte, então uma peça com palavras não renderiza. O SVG que sai
+ainda não abre direito em Illustrator ou Figma. E não há integração com Jira ou Drive: isso é
+papel do Jacurutu, o outro produto da suíte.
+
+Para quem for mexer no código: comece por `CLAUDE.md`, depois `docs/architecture.md` e
+`docs/backlog.md`. A documentação técnica está em inglês; a explicação dos padrões de projeto
+para não-programadores está em `docs/patterns-explained.pt-BR.html`.
