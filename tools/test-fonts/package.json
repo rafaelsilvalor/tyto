@@ -1,0 +1,26 @@
+{
+  "name": "@tyto/test-fonts",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Reads the fonts bundled in fonts/ and hands them to the exporters as data URIs.",
+  "license": "UNLICENSED",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
+  },
+  "sideEffects": false,
+  "scripts": {
+    "build": "tsup",
+    "typecheck": "tsc --noEmit",
+    "lint": "eslint . --max-warnings 0",
+    "test": "vitest run"
+  },
+  "devDependencies": {
+    "vitest": "^3.2.4"
+  }
+}

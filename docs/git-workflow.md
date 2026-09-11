@@ -16,7 +16,7 @@ Template in `.github/pull_request_template.md`: card, what changed, how to test,
 
 - One card per PR. If the card grew, split the card, not the PR.
 - Claude Code opens the PR as a draft and moves the card to Review; the human reviews, marks ready, merges.
-- CI runs on every PR; `test:visual` only when `packages/export-*`, `raster`, `templates` or `core` change.
+- CI runs on every PR; `test:visual` only when `packages/export-*`, `raster`, `templates`, `core`, `fonts/` or `tools/test-fonts` change.
 - Optional PR bot (Claude Code Action) reviews against `CLAUDE.md`.
 
 ## Versioning and releases
@@ -57,7 +57,13 @@ Weekly grouped Dependabot for npm and actions. Per-package labels (`pkg:core`, `
 
 Reference PNGs live in Git LFS, matched by `**/__fixtures__/**/*.png` in `.gitattributes` — only the snapshot corpus, so icons and doc images stay readable in a clone without the LFS client. Any workflow that compares pixels must check out with `lfs: true`, or it diffs against a pointer file. Updating a snapshot requires an explicit commit `test(export-html): TYTO-… update snapshots` with justification in the PR.
 
-They live under `packages/raster/src/__fixtures__/reference/` as `<artwork>.<format>.png`, one file per fixture and not one per platform. That is measured, not assumed: the Windows and Linux renders of the current corpus are identical at `threshold: 0`, 0 differing pixels on both fixtures, because `DETERMINISM_ARGS` in the Playwright adapter takes the host's opinions out of Skia's software rasterizer. The platform split is real for **glyphs** — FreeType on Linux, Skia over DirectWrite on Windows — and the corpus has no text in it yet; the card that bundles a test font is the one that has to measure text across platforms and reintroduce a per-platform key if it diverges. Until then a per-platform file would be three copies of the same bytes in LFS.
+They live under `packages/raster/src/__fixtures__/reference/`. The shape fixtures are `<artwork>.<format>.png`, one file each and not one per platform. That is measured, not assumed: the Windows and Linux renders of `shapes.feed` and `alpha.square` are identical at `threshold: 0`, 0 differing pixels, because `DETERMINISM_ARGS` in the Playwright adapter takes the host's opinions out of Skia's software rasterizer.
+
+**Glyphs are the exception, and it is measured too.** `text.feed`, the fixture TYTO-61 added, is `<artwork>.<format>.<platform>.png` — the split this document reserved for text, now spent. Its Windows reference against the Linux render of the same commit differs on **1 664 pixels of 160 000, 1.040% at the suite's threshold, ten times the tolerance**, with a largest single-channel difference of 112 of 255. Nothing moved: the diff is glyph edges, FreeType and Skia-over-DirectWrite filling an antialiased boundary differently. It only falls under the tolerance at `threshold: 0.2`, which would leave the suite unable to see a wrong colour, so the answer is a file per platform rather than a looser number — the perturbation table in `raster.visual.test.ts` is the working.
+
+`win32` and `linux` are committed; **`darwin` is not.** The first Mac to run the suite gets a failure naming the file to record, which is the same path any missing reference takes. Only the platform itself can record its own file, and the other platforms' files are not substitutes for it.
+
+A font is now part of what a reference depends on: `fonts/` holds the bundled faces and `tools/test-fonts` reads them (`docs/conventions.md`). Changing either re-records the corpus, which is why both are in `visual.yml`'s path filter — a PR that swaps a font version and runs no pixel check would land a corpus nothing compared.
 
 `pnpm test:visual` with no reference on disk **fails**, writes the render it would have compared into `__diff__/`, and names the file to commit; `visual.yml` uploads that folder on failure, so a first reference can be taken from a CI artifact. Recording locally is `UPDATE_VISUAL_REFERENCE=1 pnpm --filter @tyto/raster test:visual`, and needs `pnpm exec playwright install chromium` first.
 

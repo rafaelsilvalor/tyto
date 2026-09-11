@@ -30,7 +30,13 @@ See `docs/git-workflow.md`.
 - Exporters: `.brief` fixture → committed `.html`/`.svg` snapshot.
 - Raster: reference PNG + tolerant diff (`pixelmatch`), runs in CI with Playwright.
 - Desktop: Playwright for critical flows (open brief, see preview, export).
-- Test fonts bundled in the repo (determinism).
+- Test fonts bundled in the repo (determinism). They live in **`fonts/<family>/`** at the
+  root, never in a package's `__fixtures__`: `export-html`, `export-svg`, `raster` and —
+  once E4.5 lands — `core` all want the same bytes and none of them owns them. `.woff2`
+  for the exporters to embed and `.ttf`/`.otf` for fontkit to measure, both from the same
+  upstream release, with the licence and the version beside them. `fonts/README.md` has
+  the rule for adding another family; `tools/test-fonts` is the only code that knows the
+  path, and hands the bytes to either exporter's `resources.font` as a `data:` URI.
 
 ## Errors
 
