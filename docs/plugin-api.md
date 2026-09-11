@@ -99,5 +99,6 @@ Phase 1 every plugin is a built-in this repository wired itself and that is a wi
 when a loader arrives it catches the throw and reports the plugin that lost.
 
 Not yet: the output kinds a caller may ask for are still the four built-in ones, so a
-third-party exporter can register but nothing can request its kind. Widening that vocabulary
-is its own card.
+third-party exporter can register and nothing can request its kind. Widening that vocabulary
+belongs with the loader (E11.1) rather than before it — until a plugin can be installed at
+all, opening the list would only let a caller ask for a kind nothing can provide.
