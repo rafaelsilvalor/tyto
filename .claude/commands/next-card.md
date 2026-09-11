@@ -1,8 +1,14 @@
 If $ARGUMENTS is given, use that card instead of searching.
 
-Find the highest-priority TYTO card in status "To Do" in Jira, skipping any card
-whose labels include `blocked-by-*` unless the referenced dependency is already
-Done. If several qualify, take the lowest key number.
+Find the highest-priority TYTO card in status **"Ready"** in Jira, skipping any
+card whose labels include `blocked-by-*` unless the referenced dependency is
+already Done. If several qualify, take the lowest key number.
+
+"Ready" is the first column of the board — where Rafael drags a card when he
+wants it worked. **"To Do" is the backlog.** Never pick from it on your own: if
+"Ready" is empty, say so and name the two or three cards from "To Do" you would
+suggest, then wait. Before this status existed the two were one, and nothing
+readable through the API told them apart.
 
 Then:
 
