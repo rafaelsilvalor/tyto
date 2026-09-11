@@ -1,10 +1,10 @@
-import { createHash } from 'node:crypto';
 import { readFile } from 'node:fs/promises';
 import { isAbsolute, resolve } from 'node:path';
 
 import type { AssetResolver, AssetRef } from '@tyto/core';
 
 import { isInside } from './contain.js';
+import { hashOf } from './hash.js';
 
 /**
  * `core`'s `AssetResolver` port, on a real disk.
@@ -36,11 +36,6 @@ export interface FileAssetResolverOptions {
    * can turn it off.
    */
   readonly confine?: boolean;
-}
-
-/** `sha256-<hex>`, the form `AssetRef.hash` carries elsewhere in the codebase. */
-function hashOf(bytes: Buffer): string {
-  return `sha256-${createHash('sha256').update(bytes).digest('hex')}`;
 }
 
 export function fileAssetResolver(options: FileAssetResolverOptions): AssetResolver {

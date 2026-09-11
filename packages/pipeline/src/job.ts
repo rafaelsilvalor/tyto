@@ -93,6 +93,15 @@ export interface JobRequest {
    * before `resolve` runs in order to load the template at all.
    */
   readonly template?: string;
+  /**
+   * `--formats`, used only when the brief's frontmatter lists none.
+   *
+   * Passed straight to `resolve`, which owns the precedence and the `E_UNKNOWN_FORMAT` it
+   * writes for a format the template does not render. The job does not filter frames
+   * itself: a frame the caller did not ask for should never be built, and building one to
+   * drop it afterwards would run the template for nothing.
+   */
+  readonly formats?: readonly string[];
   /** At least one. An empty list is a caller that has not decided what it wants. */
   readonly outputs: readonly OutputRequest[];
   readonly signal?: AbortSignal;
@@ -254,6 +263,7 @@ export async function runJob(
     registry: ports.registry,
     assets: ports.assets,
     ...(request.template === undefined ? {} : { template: request.template }),
+    ...(request.formats === undefined ? {} : { formats: request.formats }),
     ...(renderedSlots === undefined ? {} : { renderedSlots }),
   });
   if (!resolved.ok) return err([...problems, ...resolved.error]);

@@ -40,6 +40,7 @@ successful result (ADR 0013).
 | `E_MANIFEST_SHAPE` | error | A template manifest parses as YAML but does not match the manifest schema. |
 | `E_TEMPLATE_DUPLICATE` | error | Two template folders declare the same manifest name. |
 | `E_TEMPLATE_READ` | error | A template folder or manifest could not be read from the filesystem. |
+| `E_INPUT_READ` | error | A file or folder a command was pointed at could not be read. |
 | `E_EXPORT_ASSET_UNRESOLVED` | error | An exporter was given no bytes for an asset the scene draws. |
 | `E_EXPORT_FONT_UNRESOLVED` | error | An exporter was given no bytes for a font the scene draws text in. |
 | `E_EXPORT_UNSUPPORTED` | error | A scene uses something the chosen exporter cannot express at all. |
@@ -416,6 +417,18 @@ Parameters: `name`, `first`, `second`
 **Severity:** error · **Spec:** `docs/template-authoring.md`
 
 A template folder or manifest could not be read from the filesystem.
+
+```
+Could not read '{path}': {problem}.
+```
+
+Parameters: `path`, `problem`
+
+### `E_INPUT_READ`
+
+**Severity:** error · **Spec:** `docs/integrations.md`
+
+A file or folder a command was pointed at could not be read.
 
 ```
 Could not read '{path}': {problem}.

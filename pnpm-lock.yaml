@@ -161,7 +161,33 @@ importers:
         specifier: ^3.2.4
         version: 3.2.7(@types/node@22.20.1)(jiti@2.6.1)(supports-color@7.2.0)(yaml@2.9.0)
 
-  apps/cli: {}
+  apps/cli:
+    dependencies:
+      '@tyto/core':
+        specifier: workspace:*
+        version: link:../../packages/core
+      '@tyto/io':
+        specifier: workspace:*
+        version: link:../../packages/io
+      '@tyto/pipeline':
+        specifier: workspace:*
+        version: link:../../packages/pipeline
+      '@tyto/raster':
+        specifier: workspace:*
+        version: link:../../packages/raster
+      '@tyto/template-lang':
+        specifier: workspace:*
+        version: link:../../packages/template-lang
+      commander:
+        specifier: ^15.0.0
+        version: 15.0.0
+      playwright:
+        specifier: ^1.63.0
+        version: 1.63.0
+    devDependencies:
+      vitest:
+        specifier: ^3.2.4
+        version: 3.2.7(@types/node@22.20.1)(jiti@2.6.1)(supports-color@7.2.0)(yaml@2.9.0)
 
   apps/desktop: {}
 
@@ -218,6 +244,9 @@ importers:
       '@tyto/pipeline':
         specifier: workspace:*
         version: link:../pipeline
+      '@tyto/template-lang':
+        specifier: workspace:*
+        version: link:../template-lang
       zod:
         specifier: ^4.5.4
         version: 4.5.4
@@ -234,9 +263,6 @@ importers:
       '@tyto/raster':
         specifier: workspace:*
         version: link:../raster
-      '@tyto/template-lang':
-        specifier: workspace:*
-        version: link:../template-lang
       vitest:
         specifier: ^3.2.4
         version: 3.2.7(@types/node@22.20.1)(jiti@2.6.1)(supports-color@7.2.0)(yaml@2.9.0)
@@ -1345,6 +1371,10 @@ packages:
   commander@14.0.3:
     resolution: {integrity: sha512-H+y0Jo/T1RZ9qPP4Eh1pkcQcLRglraJaSLoyOtHxu6AapkjWVCy2Sit1QQ4x3Dng8qDlSsZEet7g5Pq06MvTgw==}
     engines: {node: '>=20'}
+
+  commander@15.0.0:
+    resolution: {integrity: sha512-z67u4ZhzCL/Tydu1lJARtEZYWbWaN7oYLHbsuzocr6y4N6WZAagG3RQ4FW61V1/0+jImpj293XfrcYnd1qxtPg==}
+    engines: {node: '>=22.12.0'}
 
   commander@4.1.1:
     resolution: {integrity: sha512-NOKm8xhkzAjzFx8B2v5OAHT+u5pRQc2UCa2Vq9jYL/31o2wi9mxBA7LIFs3sV5VSC49z6pEhfbMULvShKj26WA==}
@@ -3335,6 +3365,8 @@ snapshots:
   colorette@2.0.20: {}
 
   commander@14.0.3: {}
+
+  commander@15.0.0: {}
 
   commander@4.1.1: {}
 

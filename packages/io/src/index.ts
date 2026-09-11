@@ -16,9 +16,22 @@ export { type FileAssetResolverOptions, fileAssetResolver } from './file-assets.
 
 export { type FileResourcesOptions, fileResources } from './file-resources.js';
 
+export {
+  type FileTemplateAssets,
+  type FileTemplateAssetsOptions,
+  fileTemplateAssets,
+} from './file-template-assets.js';
+
 export { ASSETS_DIR, BRIEF_FILE, type FsInboxOptions, fsInbox } from './fs-inbox.js';
 
-export { OUT_DIR, RESULT_FILE, type FsOutboxOptions, fsOutbox } from './fs-outbox.js';
+export {
+  OUT_DIR,
+  RESULT_FILE,
+  type FsOutboxOptions,
+  type FsTaskOutputOptions,
+  fsOutbox,
+  fsTaskOutput,
+} from './fs-outbox.js';
 
 export { type NodeFileSystemOptions, nodeFileSystem } from './node-file-system.js';
 

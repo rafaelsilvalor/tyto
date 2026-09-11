@@ -164,6 +164,29 @@ describe('what a brief resolves to', () => {
     expect((await accepted(valid({ data: { formats: ['story'] } }))).formats).toEqual(['story']);
   });
 
+  it("takes the caller's formats when the frontmatter lists none", async () => {
+    // `--formats` on the CLI. A brief that says nothing about formats is a brief the
+    // command line may answer for.
+    expect((await accepted(valid(), { formats: ['story'] })).formats).toEqual(['story']);
+  });
+
+  it('lets the frontmatter win over the caller, exactly as it does for the template', async () => {
+    // One rule for a reader: what the brief says about itself beats what this run says
+    // about the brief. `--template` has worked this way since E3.3.
+    const resolved = await accepted(valid({ data: { formats: ['feed'] } }), { formats: ['story'] });
+    expect(resolved.formats).toEqual(['feed']);
+  });
+
+  it('checks the caller’s formats against the manifest, with no range to point at', async () => {
+    const [problem] = (await problems(valid(), { formats: ['banner'] })).filter(
+      (item) => item.code === 'E_UNKNOWN_FORMAT',
+    );
+    expect(problem?.message).toContain("Format 'banner' is not rendered by template 'promo-curso'");
+    // No range: a flag is not a position in the file, and underlining a line the author
+    // did not write is worse than underlining nothing.
+    expect(problem).not.toHaveProperty('range');
+  });
+
   it('fills a slot the brief left unset from the manifest default', async () => {
     const resolved = await accepted(valid());
     expect(resolved.slots.cor?.value).toEqual({ kind: 'enum', value: 'azul' });

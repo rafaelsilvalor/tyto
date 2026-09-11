@@ -212,6 +212,12 @@ export const diagnosticCodes = {
     template: "Could not read '{path}': {problem}.",
     spec: 'docs/template-authoring.md',
   },
+  E_INPUT_READ: {
+    severity: 'error',
+    summary: 'A file or folder a command was pointed at could not be read.',
+    template: "Could not read '{path}': {problem}.",
+    spec: 'docs/integrations.md',
+  },
   E_EXPORT_ASSET_UNRESOLVED: {
     severity: 'error',
     summary: 'An exporter was given no bytes for an asset the scene draws.',

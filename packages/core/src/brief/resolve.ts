@@ -64,6 +64,16 @@ export interface ResolveOptions {
   /** `--template` on the CLI, for a brief whose frontmatter names none. */
   readonly template?: string;
   /**
+   * `--formats` on the CLI, for a brief whose frontmatter lists none.
+   *
+   * A fallback and not an override, which is `template`'s rule above and therefore the
+   * one rule a reader has to learn: what the brief says about itself wins over what the
+   * command line says about this run. Each entry is checked against the manifest the same
+   * way the frontmatter's are, so a format the template does not render is
+   * `E_UNKNOWN_FORMAT` whichever of the two named it.
+   */
+  readonly formats?: readonly string[];
+  /**
    * The slots the chosen template actually renders, when the caller knows them.
    *
    * A manifest says which slots may be set; only the template body says which are drawn,
@@ -403,16 +413,24 @@ class Resolver {
   }
 }
 
-/** The frontmatter's `formats`, checked against the manifest; its own when it says nothing. */
+/**
+ * The formats to render: the frontmatter's, else the caller's, else the manifest's own.
+ *
+ * The range goes on the diagnostic only when the frontmatter asked, because a `--formats`
+ * flag has nowhere in the file for an editor to underline.
+ */
 function formatsOf(
   ast: BriefAst,
   manifest: TemplateManifest,
+  override: readonly string[] | undefined,
   report: (problem: Diagnostic) => void,
 ): readonly string[] {
-  const requested = ast.frontmatter.data.formats;
+  const written = ast.frontmatter.data.formats;
+  const requested =
+    written ?? (override !== undefined && override.length > 0 ? override : undefined);
   if (requested === undefined) return manifest.formats;
 
-  const range = ast.frontmatter.ranges.formats;
+  const range = written === undefined ? undefined : ast.frontmatter.ranges.formats;
   const listed = Array.isArray(requested) ? requested : [requested];
   const kept: string[] = [];
 
@@ -467,7 +485,7 @@ export async function resolve(
   }
 
   const resolver = new Resolver(manifest, options);
-  const formats = formatsOf(ast, manifest, (problem) => {
+  const formats = formatsOf(ast, manifest, options.formats, (problem) => {
     resolver.report(problem);
   });
 

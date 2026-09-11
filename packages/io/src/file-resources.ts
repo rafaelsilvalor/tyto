@@ -5,6 +5,8 @@ import { extname, join, resolve } from 'node:path';
 import type { AssetRef } from '@tyto/core';
 import type { JobResources } from '@tyto/pipeline';
 
+import { EMBEDDABLE_MIME, dataUri } from './mime.js';
+
 /**
  * Bytes for the images a scene draws, as the exporters want them: a data URI, synchronously.
  *
@@ -25,17 +27,6 @@ import type { JobResources } from '@tyto/pipeline';
  * `@tyto/pipeline`'s API and belongs to its own card. Recorded here rather than worked
  * around silently.
  */
-
-/** What a browser needs in the `data:` URI to decode the bytes. */
-const MIME_BY_EXTENSION: Readonly<Record<string, string>> = {
-  '.png': 'image/png',
-  '.jpg': 'image/jpeg',
-  '.jpeg': 'image/jpeg',
-  '.webp': 'image/webp',
-  '.gif': 'image/gif',
-  '.avif': 'image/avif',
-  '.svg': 'image/svg+xml',
-};
 
 export interface FileResourcesOptions {
   /** The folder to read — a task's `assets/`, normally `BriefTask.assetBase`. */
@@ -80,7 +71,7 @@ async function collect(
       continue;
     }
 
-    const mime = MIME_BY_EXTENSION[extname(entry.name).toLowerCase()];
+    const mime = EMBEDDABLE_MIME[extname(entry.name).toLowerCase()];
     // Only what a document can embed. A `.psd` beside the logo is not an oversight to
     // report; it is a working file that has no business in an export.
     if (mime === undefined) continue;
@@ -91,7 +82,7 @@ async function collect(
     const bytes = await readFile(path).catch(() => undefined);
     if (bytes === undefined) continue;
 
-    into.set(resolve(path), `data:${mime};base64,${bytes.toString('base64')}`);
+    into.set(resolve(path), dataUri(mime, bytes));
   }
 }
 
