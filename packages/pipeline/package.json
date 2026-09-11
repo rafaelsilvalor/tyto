@@ -25,12 +25,13 @@
   "dependencies": {
     "@tyto/brief-lang": "workspace:*",
     "@tyto/core": "workspace:*",
-    "@tyto/export-html": "workspace:*",
-    "@tyto/export-svg": "workspace:*",
+    "@tyto/plugin-api": "workspace:*",
     "@tyto/raster": "workspace:*",
     "@tyto/template-lang": "workspace:*"
   },
   "devDependencies": {
+    "@tyto/export-html": "workspace:*",
+    "@tyto/export-svg": "workspace:*",
     "vitest": "^3.2.4"
   }
 }

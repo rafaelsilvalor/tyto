@@ -23,6 +23,7 @@
     "test": "vitest run --passWithNoTests"
   },
   "dependencies": {
-    "@tyto/core": "workspace:*"
+    "@tyto/core": "workspace:*",
+    "@tyto/plugin-api": "workspace:*"
   }
 }

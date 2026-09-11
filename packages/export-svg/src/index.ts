@@ -14,6 +14,8 @@
 
 export { exportFrameSvg, exportSvg } from './export-svg.js';
 
+export { type SvgExporterPluginOptions, svgExporterPlugin } from './plugin.js';
+
 export type { Outline, OutlineRequest, SvgFontFace, SvgResources } from './defs.js';
 
 export type { SvgExportOptions, SvgFrame } from './svg.js';

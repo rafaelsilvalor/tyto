@@ -24,14 +24,15 @@
   },
   "dependencies": {
     "@tyto/core": "workspace:*",
+    "@tyto/export-html": "workspace:*",
+    "@tyto/export-svg": "workspace:*",
     "@tyto/pipeline": "workspace:*",
     "@tyto/template-lang": "workspace:*",
     "zod": "^4.5.4"
   },
   "devDependencies": {
     "@tyto/brief-lang": "workspace:*",
-    "@tyto/export-html": "workspace:*",
-    "@tyto/export-svg": "workspace:*",
+    "@tyto/plugin-api": "workspace:*",
     "@tyto/raster": "workspace:*",
     "vitest": "^3.2.4"
   }
