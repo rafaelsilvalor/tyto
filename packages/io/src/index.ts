@@ -10,6 +10,15 @@
  * `FileSystem` and `AssetResolver`. Node here, so the pure side stays pure (ADR 0010).
  */
 
+export {
+  EXIT_CODES,
+  EXIT_DIAGNOSTICS,
+  EXIT_INTERNAL,
+  EXIT_OK,
+  type ContractPath,
+  type ExitCode,
+} from './contract.js';
+
 export { isInside } from './contain.js';
 
 export type { ExportResources } from './export-resources.js';

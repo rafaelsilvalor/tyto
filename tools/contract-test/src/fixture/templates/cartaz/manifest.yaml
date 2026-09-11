@@ -1,0 +1,8 @@
+name: cartaz
+version: 2.1.0
+description: A template with no text in it, so the CLI can be tested without a bundled font.
+formats: [feed, story]
+slots:
+  cor: { type: enum, values: [azul, laranja], default: azul }
+  imagem: { type: image }
+  slide: { type: rich-text, repeat: true, min: 1, max: 10 }

@@ -11,7 +11,9 @@
     "test": "vitest run --passWithNoTests"
   },
   "dependencies": {
-    "@tyto/core": "workspace:*"
+    "@tyto/core": "workspace:*",
+    "@tyto/io": "workspace:*",
+    "zod": "^4.5.4"
   },
   "devDependencies": {
     "vitest": "^3.2.4"
