@@ -23,16 +23,46 @@ my-plugin/
 
 ## Extension points
 
-| `contributes`     | Registers                                                  | Built-in                                              |
-| ----------------- | ---------------------------------------------------------- | ----------------------------------------------------- |
-| `source` / `sink` | `BriefSource` — `pull()`, `ack()`; `OutputSink` — `push()` | fs-inbox, fs-outbox (remote ones deferred — ADR 0011) |
-| `exporter`        | `SceneVisitor<string>` + mime + extension                  | html, svg                                             |
-| `rasterizer`      | `Rasterizer` — `raster(html, opts): Promise<Uint8Array>`   | chromium                                              |
-| `template-pack`   | folder of templates                                        | built-in templates                                    |
-| `directive`       | `::ns/name` in the brief → transforms AST/ResolvedBrief    | —                                                     |
-| `editor.command`  | `{ id, run(ctx), undo? }`                                  | core-commands                                         |
-| `editor.keymap`   | binding → command id (normal and vim)                      | default-keymap, vim                                   |
-| `panel`           | UI component in the desktop renderer (sandboxed iframe)    | queue, jobs, diagnostics                              |
+| `contributes`     | Registers                                                              | Built-in                                              |
+| ----------------- | ---------------------------------------------------------------------- | ----------------------------------------------------- |
+| `source` / `sink` | `BriefSource` — `pull()`, `ack()`; `OutputSink` — `push()`             | fs-inbox, fs-outbox (remote ones deferred — ADR 0011) |
+| `exporter`        | one **frame** to a document + mime + extension + the kinds it produces | html, svg                                             |
+| `rasterizer`      | `Rasterizer` — `raster(html, opts): Promise<Uint8Array>`               | chromium                                              |
+| `template-pack`   | folder of templates                                                    | built-in templates                                    |
+| `directive`       | `::ns/name` in the brief → transforms AST/ResolvedBrief                | —                                                     |
+| `editor.command`  | `{ id, run(ctx), undo? }`                                              | core-commands                                         |
+| `editor.keymap`   | binding → command id (normal and vim)                                  | default-keymap, vim                                   |
+| `panel`           | UI component in the desktop renderer (sandboxed iframe)                | queue, jobs, diagnostics                              |
+
+### `exporter`, in full
+
+```ts
+interface Exporter {
+  id: string;
+  mime: string;
+  extension: string;
+  kinds: readonly string[]; // 'svg'; or 'png','jpeg','webp' for html
+  rasterized: boolean; // the document still has to go through a Rasterizer
+  exportFrame(scene, artwork, frame, options?): Result<string, Diagnostics>;
+}
+```
+
+**Per frame, not per scene, and not a `SceneVisitor`.** This row used to say
+`SceneVisitor<string>`, which is not a thing a job can call: a visitor is per node, and a
+whole-scene export fails as a whole — twelve frames would produce one verdict where an
+author needs twelve. `runJob` walks the frames itself for exactly that reason, so the
+extension point is the function it actually calls (TYTO-34).
+
+**`rasterized` is the one thing the document does not say about itself.** An SVG _is_ the
+artifact; an HTML document is not a file anybody asked for, and becomes `png`, `jpeg` or
+`webp` through the `rasterizer` point. Without that flag a job would be back to asking
+`kind === 'svg'`, which is the branch the extension point exists to remove.
+
+**Resources are bound at registration, not passed per frame.** What an exporter needs for a
+font or an image has a shape only that exporter knows — `HtmlResources.font` takes an
+`HtmlFontFace` where `SvgResources.font` takes an `SvgFontFace` — so `htmlExporterPlugin`
+and `svgExporterPlugin` close over theirs. Reconciling the two shapes is a separate question
+(TYTO-62) and the extension point stays out of it.
 
 ## PluginHost (what the plugin receives)
 
@@ -59,3 +89,15 @@ interface PluginHost {
 ## Phase 1 vs later
 
 Phase 1 implements `PluginHost` and routes **every built-in through it**, with no external loader. External loading, permissions and isolation come in the plugins epic. The API is validated by real use before it opens.
+
+What Phase 1 shipped (TYTO-34): the nine contribution types, `createPluginHost`, and the two
+exporters, the Chromium rasterizer and the template pack activated through it by `apps/cli`.
+Three points are typed generically — `source`, `sink` and `rasterizer` — because their ports
+are declared in Node packages (`@tyto/io`, `@tyto/raster`) and this one is pure (ADR 0010);
+the host stores the value and only ever reads its id. A duplicate id **throws**, because in
+Phase 1 every plugin is a built-in this repository wired itself and that is a wiring bug;
+when a loader arrives it catches the throw and reports the plugin that lost.
+
+Not yet: the output kinds a caller may ask for are still the four built-in ones, so a
+third-party exporter can register but nothing can request its kind. Widening that vocabulary
+is its own card.

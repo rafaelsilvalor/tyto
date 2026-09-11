@@ -17,8 +17,11 @@
   },
   "dependencies": {
     "@tyto/core": "workspace:*",
+    "@tyto/export-html": "workspace:*",
+    "@tyto/export-svg": "workspace:*",
     "@tyto/io": "workspace:*",
     "@tyto/pipeline": "workspace:*",
+    "@tyto/plugin-api": "workspace:*",
     "@tyto/raster": "workspace:*",
     "@tyto/template-lang": "workspace:*",
     "commander": "^15.0.0",

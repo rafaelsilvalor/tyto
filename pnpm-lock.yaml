@@ -166,12 +166,21 @@ importers:
       '@tyto/core':
         specifier: workspace:*
         version: link:../../packages/core
+      '@tyto/export-html':
+        specifier: workspace:*
+        version: link:../../packages/export-html
+      '@tyto/export-svg':
+        specifier: workspace:*
+        version: link:../../packages/export-svg
       '@tyto/io':
         specifier: workspace:*
         version: link:../../packages/io
       '@tyto/pipeline':
         specifier: workspace:*
         version: link:../../packages/pipeline
+      '@tyto/plugin-api':
+        specifier: workspace:*
+        version: link:../../packages/plugin-api
       '@tyto/raster':
         specifier: workspace:*
         version: link:../../packages/raster
@@ -229,18 +238,30 @@ importers:
       '@tyto/core':
         specifier: workspace:*
         version: link:../core
+      '@tyto/plugin-api':
+        specifier: workspace:*
+        version: link:../plugin-api
 
   packages/export-svg:
     dependencies:
       '@tyto/core':
         specifier: workspace:*
         version: link:../core
+      '@tyto/plugin-api':
+        specifier: workspace:*
+        version: link:../plugin-api
 
   packages/io:
     dependencies:
       '@tyto/core':
         specifier: workspace:*
         version: link:../core
+      '@tyto/export-html':
+        specifier: workspace:*
+        version: link:../export-html
+      '@tyto/export-svg':
+        specifier: workspace:*
+        version: link:../export-svg
       '@tyto/pipeline':
         specifier: workspace:*
         version: link:../pipeline
@@ -254,12 +275,9 @@ importers:
       '@tyto/brief-lang':
         specifier: workspace:*
         version: link:../brief-lang
-      '@tyto/export-html':
+      '@tyto/plugin-api':
         specifier: workspace:*
-        version: link:../export-html
-      '@tyto/export-svg':
-        specifier: workspace:*
-        version: link:../export-svg
+        version: link:../plugin-api
       '@tyto/raster':
         specifier: workspace:*
         version: link:../raster
@@ -275,12 +293,9 @@ importers:
       '@tyto/core':
         specifier: workspace:*
         version: link:../core
-      '@tyto/export-html':
+      '@tyto/plugin-api':
         specifier: workspace:*
-        version: link:../export-html
-      '@tyto/export-svg':
-        specifier: workspace:*
-        version: link:../export-svg
+        version: link:../plugin-api
       '@tyto/raster':
         specifier: workspace:*
         version: link:../raster
@@ -288,11 +303,28 @@ importers:
         specifier: workspace:*
         version: link:../template-lang
     devDependencies:
+      '@tyto/export-html':
+        specifier: workspace:*
+        version: link:../export-html
+      '@tyto/export-svg':
+        specifier: workspace:*
+        version: link:../export-svg
       vitest:
         specifier: ^3.2.4
         version: 3.2.7(@types/node@22.20.1)(jiti@2.6.1)(supports-color@7.2.0)(yaml@2.9.0)
 
-  packages/plugin-api: {}
+  packages/plugin-api:
+    dependencies:
+      '@tyto/core':
+        specifier: workspace:*
+        version: link:../core
+      zod:
+        specifier: ^4.5.4
+        version: 4.5.4
+    devDependencies:
+      vitest:
+        specifier: ^3.2.4
+        version: 3.2.7(@types/node@22.20.1)(jiti@2.6.1)(supports-color@7.2.0)(yaml@2.9.0)
 
   packages/raster:
     devDependencies:

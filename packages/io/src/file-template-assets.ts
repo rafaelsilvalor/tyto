@@ -3,7 +3,7 @@ import { readFile, readdir, stat } from 'node:fs/promises';
 import { extname, join, relative, resolve } from 'node:path';
 
 import type { AssetRef } from '@tyto/core';
-import type { JobResources } from '@tyto/pipeline';
+import type { ExportResources } from './export-resources.js';
 import type { TemplateAssets } from '@tyto/template-lang';
 
 import { hashOf } from './hash.js';
@@ -53,7 +53,7 @@ export interface FileTemplateAssets {
    * is the composition root's call — which of the two wins for a path they both answer is
    * not something either adapter can decide alone.
    */
-  readonly resources: JobResources;
+  readonly resources: ExportResources;
 }
 
 const DEFAULT_MAX_BYTES = 32 * 1024 * 1024;

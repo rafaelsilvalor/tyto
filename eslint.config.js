@@ -35,11 +35,23 @@ const NODE_PACKAGES = [
 const DOM_PACKAGES = ['packages/editor'];
 
 /**
- * Not yet enforced: ADR 0010 also says no package may import another package's adapter —
- * composition belongs to apps/*. That rule cannot be written against empty packages,
- * because nothing yet distinguishes a port from the adapter that implements it. It lands
- * with E7.1, when PluginHost makes the adapter graph real.
+ * ADR 0010 also says no package may import another package's adapter — composition belongs
+ * to apps/*. E7.1 made the first half of that enforceable: the two exporters reach a job
+ * through the `exporter` extension point now, so `pipeline` naming either of them is a
+ * regression a rule can catch.
+ *
+ * It is deliberately one rule about one pair rather than a blanket ban on the four package
+ * names. A *port's* types are exactly what a package is supposed to import — `io` names
+ * `HtmlResources` to describe the bytes it reads off a disk, and `pipeline` names
+ * `type Rasterizer` because that is the port it takes injected. A `grep` for package names
+ * would flag all of those; what is actually forbidden is depending on the implementation,
+ * and for the exporters the implementation is the only thing those modules export.
  */
+const NO_EXPORTERS_IN_PIPELINE =
+  'A job reaches an exporter through the `exporter` extension point (ADR 0007): ' +
+  'ports.exporters.forKind(kind). Importing @tyto/export-html or @tyto/export-svg here ' +
+  'makes two of the nine extension points built in rather than contributed, and leaves a ' +
+  'third-party exporter with nothing to plug into.';
 
 const sourcesIn = (packages) => packages.map((directory) => `${directory}/**/*.ts`);
 
@@ -150,6 +162,28 @@ export default tseslint.config(
     rules: {
       ...restrictedImports(NO_NODE_IN_DOM),
       ...restrictedGlobals([NODE_GLOBALS, NO_NODE_IN_DOM]),
+    },
+  },
+
+  {
+    name: 'boundary/pipeline-has-no-exporters',
+    // Tests are exempt: `job.test.ts` activates the real built-ins through the real host,
+    // which is the only way to assert that a job renders through whatever was registered.
+    files: ['packages/pipeline/src/**/*.ts'],
+    ignores: ['packages/pipeline/src/**/*.test.ts'],
+    rules: {
+      '@typescript-eslint/no-restricted-imports': [
+        'error',
+        {
+          patterns: [
+            {
+              group: ['@tyto/export-html', '@tyto/export-svg'],
+              message: NO_EXPORTERS_IN_PIPELINE,
+              allowTypeImports: false,
+            },
+          ],
+        },
+      ],
     },
   },
 

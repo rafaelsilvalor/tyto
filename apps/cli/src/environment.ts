@@ -1,6 +1,6 @@
 import { createRequire } from 'node:module';
 
-import { type Rasterizer, createPlaywrightRasterizer } from '@tyto/raster';
+import { type CloseableRasterizer, defaultRasterizer } from './plugins/rasterizer.js';
 
 /**
  * Everything the commands reach for that is not a pure function of their arguments.
@@ -50,9 +50,10 @@ export interface CliEnvironment {
  *
  * `close` is optional because the port does not have one — a fake in a test holds nothing
  * to release — and a `tyto render` that left Chromium running would be a command that
- * never returns to the shell.
+ * never returns to the shell. Declared beside the registration module that builds one, so
+ * `@tyto/raster`'s adapter is named in exactly one file (ADR 0007, ADR 0010).
  */
-export type CliRasterizer = Rasterizer & { close?: () => Promise<void> };
+export type CliRasterizer = CloseableRasterizer;
 
 /** `tyto`'s own version, for `result.json`'s `tyto.version` and `--version`. */
 export function cliVersion(): string {
@@ -77,6 +78,6 @@ export function defaultEnvironment(): CliEnvironment {
     },
     version: cliVersion(),
     cwd: process.cwd(),
-    rasterizer: () => createPlaywrightRasterizer(),
+    rasterizer: defaultRasterizer,
   };
 }

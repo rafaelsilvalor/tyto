@@ -11,13 +11,8 @@ import {
   loadTemplateRegistry,
   ok,
 } from '@tyto/core';
-import { fileTemplateAssets, nodeFileSystem } from '@tyto/io';
-import {
-  TEMPLATE_FILE,
-  type JobResources,
-  type TemplateSource,
-  markupTemplateSource,
-} from '@tyto/pipeline';
+import { type ExportResources, fileTemplateAssets, nodeFileSystem } from '@tyto/io';
+import { TEMPLATE_FILE, type TemplateSource, markupTemplateSource } from '@tyto/pipeline';
 
 import { registerOrigin } from './report.js';
 
@@ -99,7 +94,7 @@ export interface TemplateWiring {
    * TYTO-62 exists to fix properly. Here it is exploitable rather than merely painful,
    * because only one template is ever loaded per job.
    */
-  readonly resources: JobResources;
+  readonly resources: ExportResources;
 }
 
 /**
@@ -110,7 +105,7 @@ export interface TemplateWiring {
  * which is a composition root's call and not a stage's.
  */
 export function templateWiring(context: RenderContext): TemplateWiring {
-  const loaded: JobResources[] = [];
+  const loaded: ExportResources[] = [];
 
   const asset = (ref: AssetRef): string | undefined => {
     for (const resources of loaded) {

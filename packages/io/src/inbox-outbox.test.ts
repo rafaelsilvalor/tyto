@@ -3,11 +3,15 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
 import { loadTemplateRegistry, formatCatalogue } from '@tyto/core';
+import { htmlExporterPlugin } from '@tyto/export-html';
+import { svgExporterPlugin } from '@tyto/export-svg';
+import { type ExporterRegistry, createPluginHost } from '@tyto/plugin-api';
 import type { Rasterizer } from '@tyto/raster';
 import { markupTemplateSource, runJob } from '@tyto/pipeline';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
 import { fileAssetResolver } from './file-assets.js';
+import type { ExportResources } from './export-resources.js';
 import { fileResources } from './file-resources.js';
 import { fsInbox } from './fs-inbox.js';
 import { fsOutbox } from './fs-outbox.js';
@@ -68,6 +72,24 @@ async function installTemplate(): Promise<void> {
   await writeFile(join(directory, 'template.html'), templateMarkup);
 }
 
+/**
+ * The built-in exporters, activated through the real host (TYTO-34).
+ *
+ * The bytes this folder produced are bound into each exporter here, which is the
+ * composition this package's own header says a test has to do in order to have anything to
+ * assert. `apps/cli` does the same thing for real.
+ */
+function exportersOf(resources: ExportResources): ExporterRegistry {
+  const host = createPluginHost();
+  for (const plugin of [
+    htmlExporterPlugin({ ...(resources.html === undefined ? {} : { resources: resources.html }) }),
+    svgExporterPlugin({ ...(resources.svg === undefined ? {} : { resources: resources.svg }) }),
+  ]) {
+    plugin.activate(host.hostFor(plugin.id));
+  }
+  return host.registry.exporters;
+}
+
 function fakeRasterizer(failWhen?: (width: number) => boolean): Rasterizer {
   return {
     raster: (_html, options) => {
@@ -88,6 +110,7 @@ async function render(
   const registry = loaded.value;
 
   const output = await fsOutbox({ root: join(workspace, 'outbox') }).open(task.id);
+  const resources = await fileResources({ base: task.assetBase });
 
   const result = await runJob(
     { brief: task.brief, outputs: [{ kind: 'png' }, { kind: 'svg' }] },
@@ -95,7 +118,7 @@ async function render(
       registry,
       templates: markupTemplateSource(fileSystem, registry),
       assets: fileAssetResolver({ base: task.assetBase }),
-      resources: await fileResources({ base: task.assetBase }),
+      exporters: exportersOf(resources),
       formats: formatCatalogue({ feed: { w: 1080, h: 1080 } }),
       rasterizer: options.rasterizer ?? fakeRasterizer(),
       sink: output,

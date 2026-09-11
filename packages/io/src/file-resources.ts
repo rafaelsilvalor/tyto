@@ -3,7 +3,7 @@ import { readFile, readdir, stat } from 'node:fs/promises';
 import { extname, join, resolve } from 'node:path';
 
 import type { AssetRef } from '@tyto/core';
-import type { JobResources } from '@tyto/pipeline';
+import type { ExportResources } from './export-resources.js';
 
 import { EMBEDDABLE_MIME, dataUri } from './mime.js';
 
@@ -92,7 +92,7 @@ async function collect(
  * Keyed on the absolute path, which is what `fileAssetResolver` puts in `AssetRef.path` —
  * so the lookup is an identity, not a second guess at how a relative reference resolves.
  */
-export async function fileResources(options: FileResourcesOptions): Promise<JobResources> {
+export async function fileResources(options: FileResourcesOptions): Promise<ExportResources> {
   const base = resolve(options.base);
   const byPath = new Map<string, string>();
   await collect(base, options.recursive ?? true, options.maxBytes ?? DEFAULT_MAX_BYTES, byPath);
