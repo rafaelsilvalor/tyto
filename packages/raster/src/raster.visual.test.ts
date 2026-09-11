@@ -27,49 +27,55 @@ import textFixture from './__fixtures__/text.json';
  * exporters' own tests snapshot strings, and a string snapshot tells you the markup moved
  * without telling you whether the artwork did.
  *
- * ## One reference per fixture, and why that was not obvious
+ * ## One reference per fixture, except for glyphs — and both halves are measured
  *
  * The first version of this suite keyed every reference on `process.platform`, the way
  * Playwright's own screenshot assertions do, on the reasoning that Chromium rasterizes
  * differently per operating system — FreeType on Linux, Skia over DirectWrite on Windows.
- * Then the two were measured against each other, and for this corpus the reasoning does
- * not bite: the Windows render and the Linux render of both fixtures are **identical at
- * `threshold: 0` — 0 differing pixels of 160 000 and of 14 400**. Gradients, a rotated
- * rect, a drop shadow, a blur, an alpha mask and a `cover` crop all land on the same
- * bytes, which is Skia's software rasterizer being deterministic across platforms once
- * `DETERMINISM_ARGS` has taken the host's opinions out of it.
+ * Then the two were measured against each other, and for the **shape** fixtures the
+ * reasoning does not bite: the Windows render and the Linux render of `shapes.feed` and
+ * `alpha.square` are **identical at `threshold: 0` — 0 differing pixels of 160 000 and of
+ * 14 400**. Gradients, a rotated rect, a drop shadow, a blur, an alpha mask and a `cover`
+ * crop all land on the same bytes, which is Skia's software rasterizer being deterministic
+ * across platforms once `DETERMINISM_ARGS` has taken the host's opinions out of it. Those
+ * two keep one file each; three copies of the same bytes in Git LFS is not a split.
  *
- * So there is one reference per fixture and no seeding round trip. The platform split is
- * real for **glyphs**, and that is the half of it this corpus does not contain — the card
- * that bundles a test font (E5.6) is the one that will have to measure text across
- * platforms and, if it diverges, reintroduce the key. Until something is measured to
- * differ, a per-platform file would be three copies of the same bytes in Git LFS and a
- * red `visual` job on every machine nobody has seeded yet.
+ * `text.feed` is where the reasoning does bite, and it was the case the key was reserved
+ * for. Its Windows reference against the Linux render of the same commit:
+ *
+ * ```
+ * threshold                 0     0.005      0.01      0.02      0.05       0.1       0.2
+ * win32 vs linux       1.207%    1.109%    1.040%    0.899%    0.533%    0.159%    0.003%
+ * ```
+ *
+ * **1 664 pixels of 160 000 differ at the threshold this suite runs at — 1.040%, ten times
+ * the tolerance — and the largest single-channel difference is 112 of 255.** The diff is
+ * glyph edges and nothing else: no letter moved, the two rasterizers just fill the
+ * antialiased boundary differently. It only falls under the tolerance at `threshold: 0.2`,
+ * where a channel could be 112 steps wrong before the suite counted it, which is not a
+ * tolerance, it is a blindfold. So `text.feed` is keyed on the platform and the shape
+ * fixtures are not, `referenceFile` is the whole of that rule, and the perturbation table
+ * under `TOLERANCE` is why the answer was not a bigger number.
+ *
+ * The other half of the question is stability on one platform, and there it is clean:
+ * **12 of 12 re-renders of `text.feed` came back byte-identical on win32**, and the Linux
+ * job's own repeatability test passes too. The fixture is deterministic where it is
+ * recorded; it just is not portable. That is why this card kept the pixel check for text
+ * rather than dropping it.
  *
  * A missing reference **fails**, writes the render it would have compared into `__diff__/`
  * and names the file to commit; `visual.yml` uploads that folder on failure. Skipping
  * would report green for a corpus nothing is checked against, and a suite that passes
- * because it did not look is worse than one that is red.
+ * because it did not look is worse than one that is red. For `text.feed` that now happens
+ * once per platform: `win32` and `linux` are committed, **`darwin` is not**, and the first
+ * Mac to run the suite will be told exactly which file to record and commit.
  *
- * ## The text fixture, and the platform question it was supposed to settle
+ * ## What has glyphs in it
  *
- * `text.feed` is the third fixture and the only one with glyphs in it. It exists because
- * the repository now bundles a font (`fonts/`, read by `@tyto/test-fonts`); before that
- * `export-html` refused to embed a face it had no bytes for and **no fixture carrying text
- * could be rasterized at all**.
- *
- * Text is the half of the corpus TYTO-29 left out on the reasoning that glyph
- * rasterization is where platforms diverge — FreeType on Linux, Skia over DirectWrite on
- * Windows. That reasoning is still the live hypothesis, and this file cannot settle it
- * alone: **the number below was measured on win32 only**. What was measured here is the
- * other half of the question, stability on one platform, and it is clean —
- * **12 of 12 re-renders of `text.feed` came back byte-identical**, so the pixel check
- * stays rather than being dropped.
- *
- * If the Linux render turns out to differ, the answer is a per-platform key for this
- * fixture (`docs/git-workflow.md` reserved one), not a wider tolerance. The numbers below
- * are the reason: at a tolerance loose enough to absorb a different glyph rasterizer, the
- * suite stops seeing the things it is here for.
+ * `text.feed` is the only fixture with text, and it exists because the repository now
+ * bundles a font (`fonts/`, read by `@tyto/test-fonts`). Before that `export-html` refused
+ * to embed a face it had no bytes for and **no fixture carrying text could be rasterized at
+ * all**.
  */
 
 const HERE = dirname(fileURLToPath(import.meta.url));
@@ -108,8 +114,8 @@ const CHANNEL = process.env['TYTO_RASTER_CHANNEL'];
  *
  * ## What it costs on glyphs
  *
- * Same method on `text.feed`, 400×400, on win32, at `PIXEL_THRESHOLD` below. Percentages
- * are of 160 000 pixels; the tolerance line is 0.100%.
+ * Same method on `text.feed`, 400×400, on win32 — the platform whose reference this is.
+ * Percentages are of 160 000 pixels; the tolerance line is 0.100%.
  *
  * ```
  * threshold                                    0     0.005      0.01      0.02      0.05       0.1
@@ -242,10 +248,12 @@ interface Document {
   readonly html: string;
   readonly width: number;
   readonly height: number;
+  /** Whether this fixture's reference is keyed on `process.platform`. Only glyphs are. */
+  readonly perPlatform: boolean;
 }
 
 /** Every frame of a fixture as a document ready to rasterize, named `<artwork>.<format>`. */
-function documentsOf(fixture: unknown): readonly Document[] {
+function documentsOf(fixture: unknown, perPlatform = false): readonly Document[] {
   const scene = sceneOf(fixture);
   const exported = exportHtml(scene, {
     resources: { asset: () => CHECKERBOARD, font: htmlTestFont },
@@ -260,12 +268,24 @@ function documentsOf(fixture: unknown): readonly Document[] {
     html: frame.html,
     width: frame.frame.size.w,
     height: frame.frame.size.h,
+    perPlatform,
   }));
 }
 
 const SHAPES = documentsOf(shapesFixture);
 const ALPHA = documentsOf(alphaFixture);
-const TEXT = documentsOf(textFixture);
+const TEXT = documentsOf(textFixture, true);
+
+/**
+ * `<artwork>.<format>.png`, or `<artwork>.<format>.<platform>.png` for a fixture with
+ * glyphs in it.
+ *
+ * The split is measured, not assumed, in both directions — see the header. A file per
+ * platform for the shape fixtures would be three copies of the same bytes.
+ */
+function referenceFile(document: Document): string {
+  return document.perPlatform ? `${document.name}.${PLATFORM}.png` : `${document.name}.png`;
+}
 
 async function render(
   document: Document,
@@ -292,8 +312,9 @@ function write(directory: string, file: string, bytes: Uint8Array): string {
  * A missing reference throws with the command that records one. It is the one case where
  * the suite cannot answer the question it was asked, and saying so is the answer.
  */
-function mismatchFraction(name: string, rendered: Uint8Array): number {
-  const file = `${name}.png`;
+function mismatchFraction(document: Document, rendered: Uint8Array): number {
+  const name = document.name;
+  const file = referenceFile(document);
 
   if (UPDATING) {
     write(REFERENCE_DIR, file, rendered);
@@ -306,9 +327,14 @@ function mismatchFraction(name: string, rendered: Uint8Array): number {
   } catch {
     const candidate = write(DIFF_DIR, file, rendered);
     throw new Error(
-      `No reference for '${name}'. The render, made on ${PLATFORM}, is at ${candidate}; commit ` +
+      `No reference for '${name}' on ${PLATFORM}. The render is at ${candidate}; commit ` +
         `it as src/__fixtures__/reference/${file} (Git LFS), or record it locally with ` +
-        'UPDATE_VISUAL_REFERENCE=1 pnpm --filter @tyto/raster test:visual.',
+        'UPDATE_VISUAL_REFERENCE=1 pnpm --filter @tyto/raster test:visual.' +
+        (document.perPlatform
+          ? ` This fixture has glyphs in it, so its reference is keyed on the platform and ` +
+            `only ${PLATFORM} can record ${file} — the other platforms' files are not ` +
+            'substitutes and are not missing.'
+          : ''),
     );
   }
 
@@ -337,7 +363,7 @@ function mismatchFraction(name: string, rendered: Uint8Array): number {
   const fraction = differing / (reference.width * reference.height);
   if (fraction > TOLERANCE) {
     write(DIFF_DIR, file, rendered);
-    write(DIFF_DIR, `${name}.diff.png`, PNG.sync.write(diff));
+    write(DIFF_DIR, file.replace(/\.png$/, '.diff.png'), PNG.sync.write(diff));
   }
 
   return fraction;
@@ -356,18 +382,19 @@ function pixelAt(bytes: Uint8Array, x: number, y: number): readonly number[] {
 }
 
 describe('reference renders', () => {
-  it.each([...SHAPES, ...ALPHA, ...TEXT].map((document) => [document.name, document] as const))(
-    '%s matches its committed reference',
-    async (name, document) => {
-      const fraction = mismatchFraction(name, await render(document));
+  // Titled by the reference file rather than the fixture: for a per-platform fixture those
+  // are different names, and the failing test should say which file it compared against.
+  it.each(
+    [...SHAPES, ...ALPHA, ...TEXT].map((document) => [referenceFile(document), document] as const),
+  )('%s matches its committed reference', async (_file, document) => {
+    const fraction = mismatchFraction(document, await render(document));
 
-      // The number is in the message on purpose: "0.04% of pixels differ" is a report,
-      // "expected true" is not.
-      expect(fraction, `${(fraction * 100).toFixed(4)}% of pixels differ`).toBeLessThanOrEqual(
-        TOLERANCE,
-      );
-    },
-  );
+    // The number is in the message on purpose: "0.04% of pixels differ" is a report,
+    // "expected true" is not.
+    expect(fraction, `${(fraction * 100).toFixed(4)}% of pixels differ`).toBeLessThanOrEqual(
+      TOLERANCE,
+    );
+  });
 });
 
 /**
