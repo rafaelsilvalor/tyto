@@ -240,11 +240,29 @@ the next section calls computation.
 
 ### `renderedSlots`
 
-`compileTemplate` returns the set of slots the markup draws, alongside the manifest and the
-build function. Hand it to `resolve` as `renderedSlots` and a brief that fills a slot the
+`compileTemplate` returns the set of slots the template **reads**, alongside the manifest and
+the build function. Hand it to `resolve` as `renderedSlots` and a brief that fills a slot the
 template ignores gets `W_UNUSED_SLOT`. The code path cannot report this — a plain function
 call does not say which slots it touched — which is why the warning stays silent unless a
 caller supplies the set.
+
+Reads, not draws. A slot counts when it reaches the output by any of four routes:
+
+| Route                                      | Example                                                                |
+| ------------------------------------------ | ---------------------------------------------------------------------- |
+| a `slot` attribute                         | `<text slot="titulo" />`                                               |
+| a slot spliced into a `src`                | `src="{imagem}"`, `src="assets/{cor}.png"`                             |
+| an at-rule condition                       | `@if slot(cor) is laranja`, `@if slot(imagem) is empty`, `@each slide` |
+| the seeded variable, however deeply nested | `var(--slot-cor)`                                                      |
+
+The middle two are never drawn and still decide what comes out, which is the whole point:
+a template whose background is `@if slot(cor) is laranja { :root { --bg: #ff5900 } }` is
+using `cor`, and telling its author the slot is unused tells them to delete the line that
+makes the template work.
+
+One case deliberately counts as no reference: a conditional block with nothing inside it.
+`@if slot(cor) is laranja { }` changes no output, so the slot in its prelude really is used
+by nothing.
 
 ## template.ts — code path
 

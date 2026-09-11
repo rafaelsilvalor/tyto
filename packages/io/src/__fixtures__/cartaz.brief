@@ -2,6 +2,7 @@
 template: cartaz
 formats: [feed]
 cor: laranja
+subtitulo: Nada desenha isto
 imagem: ./logo.png
 ---
 // Two slides, one format: two artworks, and four files once png and svg are both asked

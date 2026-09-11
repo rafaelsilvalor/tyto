@@ -4,5 +4,9 @@ description: A template with no text in it, so the folder contract can be tested
 formats: [feed]
 slots:
   cor: { type: enum, values: [azul, laranja], default: azul }
+  # Declared, set by the brief, and mentioned by no part of template.html — the slot that
+  # makes W_UNUSED_SLOT fire here. `cor` used to play this part by accident (TYTO-63): the
+  # stylesheet branches on it, so it was never unused, it was only never collected.
+  subtitulo: { type: rich-text }
   imagem: { type: image }
   slide: { type: rich-text, repeat: true, min: 1, max: 10 }

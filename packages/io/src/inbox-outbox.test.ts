@@ -195,10 +195,17 @@ describe('a task folder dropped into the inbox', () => {
     const parsed = parseRenderResult(await resultOf('issue-42'));
     if (!parsed.ok) throw new Error(parsed.error.join('; '));
 
-    // The template declares `slide` and never draws it, so `resolve` says so. ADR 0013:
+    // `subtitulo` is set by the brief and mentioned by no part of the template. ADR 0013:
     // a warning rides the ok branch.
     expect(parsed.value.status).toBe('ok');
-    expect(parsed.value.diagnostics.some((item) => item.code === 'W_UNUSED_SLOT')).toBe(true);
+    const unused = parsed.value.diagnostics.filter((item) => item.code === 'W_UNUSED_SLOT');
+    expect(unused.map((item) => item.message)).toEqual([
+      "Slot 'subtitulo' is set in the brief but template 'cartaz' does not use it.",
+    ]);
+
+    // And `cor` is not among them: the stylesheet branches on it to pick the background,
+    // so a brief that sets it changed the artwork (TYTO-63).
+    expect(unused.some((item) => item.message.includes("'cor'"))).toBe(false);
   });
 
   it('resolves the asset against the task folder and hashes its bytes', async () => {

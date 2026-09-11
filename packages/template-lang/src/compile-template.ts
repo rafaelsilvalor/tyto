@@ -14,7 +14,7 @@ import type { TemplateElement } from './ast.js';
 import { type Program, type TemplateAssets, buildFrame, checkStatically } from './build.js';
 import { attributeOf, collectFrames, interpolatedSlots } from './frames.js';
 import { parseTemplate } from './parse-template.js';
-import { compileStylesheet } from './style.js';
+import { compileStylesheet, referencedSlots } from './style.js';
 
 /**
  * `template.html` × manifest → the same thing a `template.ts` exports.
@@ -26,9 +26,9 @@ import { compileStylesheet } from './style.js';
  * stays exactly as it was (ADR 0005).
  *
  * One thing does leave that a `template.ts` cannot produce: `renderedSlots`. `resolve`
- * emits `W_UNUSED_SLOT` only when a caller tells it which slots the template draws, and a
- * plain function call cannot report that. Markup can — every `slot="x"` in the file is the
- * set — which closes the acceptance criterion E3.3 had to leave open.
+ * emits `W_UNUSED_SLOT` only when a caller tells it which slots the template reads, and a
+ * plain function call cannot report that. Markup can, because every way it reaches a slot
+ * is written down — which closes the acceptance criterion E3.3 had to leave open.
  */
 
 export interface CompileTemplateOptions {
@@ -39,15 +39,22 @@ export interface CompileTemplateOptions {
 
 export interface HtmlTemplate extends Template {
   /**
-   * Every slot the markup draws, in source order and deduplicated.
+   * Every slot the template reads, deduplicated.
    *
    * Hand it to `resolve` as `renderedSlots` and a brief that fills a slot this template
    * ignores gets `W_UNUSED_SLOT`; leave it out and the warning stays silent rather than
    * being guessed at.
+   *
+   * **Reads, not draws.** A slot a stylesheet only branches on — `@if slot(cor) is
+   * laranja` deciding the background — is never drawn and still decides what comes out, so
+   * a brief that sets it changed the artwork. Counting only the drawn ones told the author
+   * to delete the line that makes the template work, which is how this name earned a
+   * correction (TYTO-63).
    */
   readonly renderedSlots: readonly string[];
 }
 
+/** The slots the markup draws: `slot="x"`, and `{x}` spliced into a `src`. */
 function slotsDrawnBy(elements: readonly TemplateElement[], found: Set<string>): void {
   for (const element of elements) {
     const named = attributeOf(element, 'slot');
@@ -102,12 +109,15 @@ export function compileTemplate(
 
   if (problems.length > 0) return err(sortDiagnostics(problems));
 
-  const drawn = new Set<string>();
-  for (const definition of frames.values()) slotsDrawnBy(definition.children, drawn);
+  // The two halves of the file, because a slot reaches the output through either. The
+  // markup draws it; the stylesheet branches on it or splices its word into a value.
+  const read = new Set<string>();
+  for (const definition of frames.values()) slotsDrawnBy(definition.children, read);
+  for (const name of referencedSlots(entries, Object.keys(manifest.slots))) read.add(name);
 
   const template: HtmlTemplate = {
     ...defineTemplate(manifest, (context) => buildFrame(program, context)),
-    renderedSlots: [...drawn],
+    renderedSlots: [...read],
   };
 
   return fromDiagnostics(template, []);

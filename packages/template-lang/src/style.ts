@@ -422,6 +422,63 @@ export function classStyle(
   return computeStyle(entries, conditions, { tag: '', id: undefined, classes: [className] });
 }
 
+/** `--slot-cor` is the seeded variable for the slot `cor`; nothing else wears the prefix. */
+const SLOT_VARIABLE = '--slot-';
+
+/** Every `var(--slot-x)` in a value, however deeply a call nests it. */
+function slotVariablesIn(tokens: readonly ValueToken[], into: Set<string>): void {
+  for (const token of tokens) {
+    if (token.kind !== 'call') continue;
+    if (token.name === 'var') {
+      const [name] = token.args;
+      if (name?.kind === 'ident' && name.text.startsWith(SLOT_VARIABLE)) {
+        into.add(name.text.slice(SLOT_VARIABLE.length));
+      }
+    }
+    // Walked either way: a `var()` can sit inside a gradient, and a `var()`'s own fallback
+    // can be another `var()`.
+    slotVariablesIn(token.args, into);
+  }
+}
+
+/**
+ * Every slot the stylesheet reads.
+ *
+ * The counterpart of `slotsDrawnBy` in `compile-template.ts`, which sees only the markup.
+ * A stylesheet reaches a slot in two ways, and both change what comes out: a guard
+ * (`@if slot(cor) is laranja`, `@if slot(imagem) is empty`, `@each slide`) decides whether
+ * a block applies, and `var(--slot-cor)` splices the word itself into a value. Neither
+ * draws the slot, and both mean a brief that sets it changed the artwork — which is the
+ * only question `W_UNUSED_SLOT` is asking.
+ *
+ * Read from the compiled `entries` rather than from the at-rules, so the answer is about
+ * what reaches the cascade. `@if slot(cor) is laranja { }` with nothing inside contributes
+ * no entry and no slot, and it should not: an empty block changes no output, so the slot
+ * in its prelude really is used by nothing.
+ */
+export function referencedSlots(
+  entries: readonly RuleEntry[],
+  slots: readonly string[],
+): Set<string> {
+  const found = new Set<string>();
+
+  for (const entry of entries) {
+    const { guard } = entry;
+    // `format` names a format and `always` names nothing. The other three carry a slot the
+    // guard builders have already checked against the manifest.
+    if (guard.kind === 'empty' || guard.kind === 'value' || guard.kind === 'each') {
+      found.add(guard.slot);
+    }
+    for (const declaration of entry.rule.declarations) {
+      slotVariablesIn(declaration.value, found);
+    }
+  }
+
+  // A `--slot-` prefix a template invented for itself is a custom property like any other,
+  // not a reference to a slot that does not exist.
+  return new Set([...found].filter((name) => slots.includes(name)));
+}
+
 /** Every id a rule targets, so a template can be told about `#grad` matching nothing. */
 export function referencedIds(entries: readonly RuleEntry[]): Set<string> {
   const ids = new Set<string>();
