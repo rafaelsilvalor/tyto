@@ -1,15 +1,10 @@
 /**
- * The three outcomes ADR 0011 fixes, and nothing else.
+ * The three outcomes ADR 0011 fixes, re-exported from where the contract lives.
  *
- * `docs/integrations.md`: *exit 0 = ok, 1 = error diagnostics, 2 = internal failure*. The
- * distinction is the whole point of having two non-zero codes — Jacurutu retries an
- * internal failure and does not retry a brief that will not compile, and a CLI that
- * exited 1 for both would make it retry forever or never.
+ * They moved to `@tyto/io` when `docs/render-contract.md` was published (TYTO-46): the
+ * generator that writes that document cannot import an app, and two copies of "1 means
+ * error diagnostics" is two places for it to stop being true. This module stays so that
+ * every command still reads them from one import, and so the move is one file rather than
+ * a rename across nine.
  */
-export const EXIT_OK = 0;
-/** The run produced error diagnostics: a brief, a template or a frame the author owns. */
-export const EXIT_DIAGNOSTICS = 1;
-/** Something threw that nobody turned into a diagnostic. Not the author's fault. */
-export const EXIT_INTERNAL = 2;
-
-export type ExitCode = typeof EXIT_OK | typeof EXIT_DIAGNOSTICS | typeof EXIT_INTERNAL;
+export { EXIT_CODES, EXIT_DIAGNOSTICS, EXIT_INTERNAL, EXIT_OK, type ExitCode } from '@tyto/io';

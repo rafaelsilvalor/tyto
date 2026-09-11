@@ -1,0 +1,3 @@
+# The project's sizes, the one place a number like 1080×1080 is written.
+feed: { w: 1080, h: 1080 }
+story: { w: 1080, h: 1920, label: Story }

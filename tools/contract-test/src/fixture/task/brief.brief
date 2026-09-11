@@ -1,0 +1,12 @@
+---
+template: cartaz
+formats: [feed]
+cor: laranja
+imagem: ./logo.png
+---
+// Two slides, one format: two artworks, and four files once png and svg are both asked
+// for. The asset path resolves against the task's `assets/` folder (ADR 0011).
+::slide
+  Primeiro
+::slide
+  Segundo

@@ -1,0 +1,40 @@
+<!-- Text-free on purpose: drawing a glyph would need a font the repo does not bundle yet
+     (TYTO-61) and would make every assertion here about a missing font instead of about
+     the command line. The `<vector src>` is the one thing this fixture has that the io
+     package's copy does not — it is what proves the CLI resolves a template's own files. -->
+
+<frame format="feed" bg="var(--bg)">
+  <image slot="imagem" class="photo" />
+  <vector src="assets/mark.svg" class="mark" />
+  <rect class="band" />
+</frame>
+
+<frame format="story" extends="feed" />
+
+<style>
+  :root {
+    --bg: #0c2340;
+  }
+  @if slot(cor) is laranja {
+    :root {
+      --bg: #ff5900;
+    }
+  }
+
+  .photo {
+    w: 100%;
+    h: 300;
+  }
+  .mark {
+    x: 40;
+    y: 40;
+    w: 120;
+    h: 120;
+  }
+  .band {
+    y: 320;
+    w: 100%;
+    h: 80;
+    fill: #ffffff;
+  }
+</style>
