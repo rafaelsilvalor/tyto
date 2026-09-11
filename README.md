@@ -18,6 +18,7 @@ docs/
   template-authoring.md  how to write templates (human or AI agent)
   plugin-api.md          extension points and host API
   integrations.md        Jacurutu boundary, local inbox/outbox, deferred remote sources
+  render-contract.md     what a program outside Tyto can rely on (generated)
   conventions.md         stack, tooling, tests
   git-workflow.md        branches, PRs, releases, GitHub workflows
   backlog.md             ordered epics and stories → Jira cards
