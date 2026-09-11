@@ -584,6 +584,27 @@ describe('the stages before the render', () => {
     expect(result.error.some((item) => item.code === 'E_TEMPLATE_READ')).toBe(true);
   });
 
+  it('passes request.formats to resolve, for a brief whose frontmatter lists none', async () => {
+    // `--formats` on the CLI. The job does not filter frames afterwards: a frame nobody
+    // asked for should never be built, and building one to drop it would run the template
+    // for nothing.
+    const result = await runJob(
+      {
+        brief: briefSource.replace('formats: [feed, story]\n', ''),
+        formats: ['story'],
+        outputs: [{ kind: 'svg' }],
+      },
+      await portsOf(),
+    );
+
+    if (!result.ok) throw new Error(result.error.map((item) => item.message).join('; '));
+    expect(result.value.artifacts.map((artifact) => artifact.name)).toEqual([
+      'slide-1-story.svg',
+      'slide-2-story.svg',
+      'slide-3-story.svg',
+    ]);
+  });
+
   it('carries the warnings from every stage onto the success branch', async () => {
     // `subtitulo` is not a slot this manifest declares, so `resolve` reports it — as an
     // error, since an unknown slot is a typo. The point of the case is that the job does

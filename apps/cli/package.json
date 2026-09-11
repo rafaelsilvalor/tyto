@@ -1,5 +1,6 @@
 {
   "name": "@tyto/cli",
+  "version": "0.1.0",
   "private": true,
   "type": "module",
   "description": "Command-line interface (commander).",
@@ -13,5 +14,17 @@
   },
   "bin": {
     "tyto": "./dist/index.js"
+  },
+  "dependencies": {
+    "@tyto/core": "workspace:*",
+    "@tyto/io": "workspace:*",
+    "@tyto/pipeline": "workspace:*",
+    "@tyto/raster": "workspace:*",
+    "@tyto/template-lang": "workspace:*",
+    "commander": "^15.0.0",
+    "playwright": "^1.63.0"
+  },
+  "devDependencies": {
+    "vitest": "^3.2.4"
   }
 }

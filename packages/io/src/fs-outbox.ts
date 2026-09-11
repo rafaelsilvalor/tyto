@@ -51,39 +51,64 @@ async function writeAtomic(path: string, bytes: Uint8Array | string): Promise<vo
   }
 }
 
+export interface FsTaskOutputOptions {
+  /** See {@link FsOutboxOptions.validate}. On by default. */
+  readonly validate?: boolean;
+  /** Named in the schema-mismatch message, so a reader knows which task produced it. */
+  readonly label?: string;
+}
+
+/**
+ * One folder as a `TaskOutput`: artifacts beside a `result.json`, nothing around them.
+ *
+ * Split out of `fsOutbox` because `tyto render --out <dir>` writes into exactly the folder
+ * it was given (`docs/integrations.md`: `--out <task>/out`), while the outbox derives
+ * `<root>/<id>/out` from a task id. Same files, same atomic write, two ways of arriving at
+ * the directory — and the atomic write is the part neither of them may have its own copy
+ * of.
+ */
+export async function fsTaskOutput(
+  directory: string,
+  options: FsTaskOutputOptions = {},
+): Promise<TaskOutput> {
+  const full = resolve(directory);
+  const validate = options.validate ?? true;
+  const label = options.label ?? full;
+  await mkdir(full, { recursive: true });
+
+  return {
+    async write(artifact: Artifact): Promise<void> {
+      await writeAtomic(join(full, artifact.name), artifact.bytes);
+    },
+
+    async finish(result: RenderResult): Promise<void> {
+      if (validate) {
+        const parsed = renderResultSchema.safeParse(result);
+        if (!parsed.success) {
+          throw new Error(
+            `result.json for '${label}' does not match its schema: ${parsed.error.issues
+              .map((issue) => `${issue.path.map(String).join('.') || '(root)'} ${issue.message}`)
+              .join('; ')}`,
+          );
+        }
+      }
+
+      // Last, and atomically. `result.json` appearing is how a reader knows the task is
+      // finished, so it must not appear before the artifacts it lists.
+      await writeAtomic(join(full, RESULT_FILE), `${JSON.stringify(result, null, 2)}\n`);
+    },
+  };
+}
+
 export function fsOutbox(options: FsOutboxOptions): OutputSink {
   const root = resolve(options.root);
-  const validate = options.validate ?? true;
 
   return {
     async open(id: string): Promise<TaskOutput> {
-      const directory = join(root, id, OUT_DIR);
-      await mkdir(directory, { recursive: true });
-
-      return {
-        async write(artifact: Artifact): Promise<void> {
-          await writeAtomic(join(directory, artifact.name), artifact.bytes);
-        },
-
-        async finish(result: RenderResult): Promise<void> {
-          if (validate) {
-            const parsed = renderResultSchema.safeParse(result);
-            if (!parsed.success) {
-              throw new Error(
-                `result.json for '${id}' does not match its schema: ${parsed.error.issues
-                  .map(
-                    (issue) => `${issue.path.map(String).join('.') || '(root)'} ${issue.message}`,
-                  )
-                  .join('; ')}`,
-              );
-            }
-          }
-
-          // Last, and atomically. `result.json` appearing is how a reader knows the task
-          // is finished, so it must not appear before the artifacts it lists.
-          await writeAtomic(join(directory, RESULT_FILE), `${JSON.stringify(result, null, 2)}\n`);
-        },
-      };
+      return fsTaskOutput(join(root, id, OUT_DIR), {
+        ...(options.validate === undefined ? {} : { validate: options.validate }),
+        label: id,
+      });
     },
   };
 }
