@@ -21,5 +21,18 @@
     "typecheck": "tsc --noEmit",
     "lint": "eslint . --max-warnings 0",
     "test": "vitest run --passWithNoTests"
+  },
+  "dependencies": {
+    "@tyto/core": "workspace:*",
+    "@tyto/pipeline": "workspace:*",
+    "zod": "^4.5.4"
+  },
+  "devDependencies": {
+    "@tyto/brief-lang": "workspace:*",
+    "@tyto/export-html": "workspace:*",
+    "@tyto/export-svg": "workspace:*",
+    "@tyto/raster": "workspace:*",
+    "@tyto/template-lang": "workspace:*",
+    "vitest": "^3.2.4"
   }
 }

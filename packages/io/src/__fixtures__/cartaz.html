@@ -1,0 +1,33 @@
+<!-- A deliberately text-free template. This package's subject is folders and files, and
+     drawing a glyph would drag in a font the repo does not bundle yet (TYTO-61) without
+     making a single assertion about `out/` any sharper. The repeatable `slide` slot is
+     declared and never drawn, which is what turns two directives into two artworks — and
+     produces a W_UNUSED_SLOT warning, so the test can check that a warning reaches
+     `result.json` on the ok branch. -->
+
+<frame format="feed" bg="var(--bg)">
+  <image slot="imagem" class="photo" />
+  <rect class="band" />
+</frame>
+
+<style>
+  :root {
+    --bg: #0c2340;
+  }
+  @if slot(cor) is laranja {
+    :root {
+      --bg: #ff5900;
+    }
+  }
+
+  .photo {
+    w: 100%;
+    h: 300;
+  }
+  .band {
+    y: 320;
+    w: 100%;
+    h: 80;
+    fill: #ffffff;
+  }
+</style>

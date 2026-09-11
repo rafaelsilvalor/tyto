@@ -1,0 +1,13 @@
+---
+template: cartaz
+formats: [feed]
+cor: laranja
+imagem: ./logo.png
+---
+// Two slides, one format: two artworks, and four files once png and svg are both asked
+// for. The asset path is relative to the task's `assets/` folder, which is where
+// Jacurutu drops an issue's attachments (ADR 0011).
+::slide
+  Primeiro
+::slide
+  Segundo
