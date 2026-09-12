@@ -80,6 +80,18 @@ export interface Directive {
   readonly adjustments: readonly Adjustment[];
   readonly body: RichText;
   readonly range: SourceRange;
+  /**
+   * Just the name, namespace and its slash included: `ai/caption` in `::ai/caption`.
+   *
+   * A misspelled slot name is a problem with the name, and `range` covers the body too —
+   * underlining five lines of indented block because the first word of the first line is
+   * wrong tells an author where the directive is, not where the mistake is. `resolve`
+   * reports `E_UNKNOWN_SLOT` and `E_UNKNOWN_DIRECTIVE` against this instead.
+   *
+   * The `::` is left out: it is the only way to write a directive, so it is never the part
+   * that is wrong.
+   */
+  readonly nameRange: SourceRange;
 }
 
 /**

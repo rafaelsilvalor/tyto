@@ -143,7 +143,7 @@ function textOf(value: string): RichText {
 }
 
 function directive(name: string, body: RichText, extra: Partial<Directive> = {}): Directive {
-  return { name, adjustments: [], body, range: AT, ...extra };
+  return { name, adjustments: [], body, range: AT, nameRange: AT, ...extra };
 }
 
 const BRIEF: BriefAst = {

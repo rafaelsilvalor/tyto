@@ -251,9 +251,18 @@ function withoutTrailingBreak(text: string, from: number, to: number): SourceRan
   return sourceRange(from, Math.max(from, end));
 }
 
+/** `::` — the two characters a directive opens with, which `nameRange` starts after. */
+const DIRECTIVE_MARK = 2;
+
 function directiveOf(node: SyntaxNode, text: string): Directive {
   const name = node.getChild('Name');
   const namespace = node.getChild('Namespace');
+
+  // `Namespace` carries its own slash, so starting there spans `ai/caption` whole. With no
+  // name node there is no name to point at, and an empty span where one would have started
+  // is the honest answer — a directive that far gone is an `E_SYNTAX` anyway.
+  const nameStart = (namespace ?? name)?.from ?? node.from + DIRECTIVE_MARK;
+  const nameEnd = name?.to ?? nameStart;
 
   return {
     name: name === null ? '' : sliceOf(text, name),
@@ -263,6 +272,7 @@ function directiveOf(node: SyntaxNode, text: string): Directive {
     adjustments: adjustmentsOf(node, text),
     body: bodyOf(node, text),
     range: withoutTrailingBreak(text, node.from, node.to),
+    nameRange: sourceRange(nameStart, nameEnd),
   };
 }
 

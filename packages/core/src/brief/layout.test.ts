@@ -121,7 +121,8 @@ function richText(value: string, at: { start: number; end: number }): RichText {
 }
 
 function directive(name: string, body: RichText, range: { start: number; end: number }): Directive {
-  return { name, adjustments: [], body, range: sourceRange(range.start, range.end) };
+  const at = sourceRange(range.start, range.end);
+  return { name, adjustments: [], body, range: at, nameRange: at };
 }
 
 const BRIEF: BriefAst = {
