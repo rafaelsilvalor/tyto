@@ -169,6 +169,15 @@ export const diagnosticCodes = {
     template: "Template '{template}' failed while building the scene: {problem}.",
     spec: 'docs/template-authoring.md',
   },
+  // Read, then parse, then validate: the three ways a formats file fails, in the order it
+  // fails them. The read used to report E_TEMPLATE_READ, which named the wrong kind of file
+  // and told a diagnostics panel that a broken project was a broken template (TYTO-73).
+  E_FORMATS_READ: {
+    severity: 'error',
+    summary: "The project's formats.yaml could not be read from the filesystem.",
+    template: "Could not read formats file '{path}': {problem}.",
+    spec: 'docs/template-authoring.md',
+  },
   E_FORMATS_SYNTAX: {
     severity: 'error',
     summary: "The project's formats.yaml is not valid YAML.",
@@ -206,10 +215,13 @@ export const diagnosticCodes = {
     template: "Template name '{name}' is declared by both '{first}' and '{second}'.",
     spec: 'docs/template-authoring.md',
   },
+  // Says template, and now only means template: a folder, a manifest.yaml or a
+  // template.html. What the path points at is in the message, so a reader does not have to
+  // recognise a filename to know which of the three it was.
   E_TEMPLATE_READ: {
     severity: 'error',
-    summary: 'A template folder or manifest could not be read from the filesystem.',
-    template: "Could not read '{path}': {problem}.",
+    summary: 'A template folder, manifest or markup file could not be read from the filesystem.',
+    template: "Could not read template '{path}': {problem}.",
     spec: 'docs/template-authoring.md',
   },
   E_INPUT_READ: {
