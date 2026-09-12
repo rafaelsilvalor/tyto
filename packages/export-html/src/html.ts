@@ -379,6 +379,50 @@ function runDeclarations(run: TextSpan, nodeId: string, emit: Emit): string[] {
   ];
 }
 
+/**
+ * The run whose face the node's line boxes are built from: the largest, ties to the first.
+ *
+ * A block's line box is at least as tall as its **strut** — an invisible zero-width box
+ * carrying the block's own font and `line-height` — and a `<div>` that declares neither
+ * gets the document's defaults, which is Times New Roman at 16px. That is how a node
+ * asking for `lineHeight: 1.45` over a single 15px run laid out at 23.75px per line
+ * instead of 21.75: a strut nobody wrote, made of a font nobody bundled.
+ *
+ * The largest run rather than the first, because the strut has to be the tallest thing in
+ * the line or it decides nothing: CSS gives a line box the height of its tallest inline
+ * box, so a strut under the biggest run would leave the leading to that run and a node
+ * with two sizes would space its lines by whichever one happened to be there. Sized to the
+ * largest, every line of the node advances by `lineHeight × that size` — one leading per
+ * node, which is the one the IR declares (`docs/ir-schema.md`).
+ */
+function referenceRun(node: TextNode): TextSpan | undefined {
+  let largest: TextSpan | undefined;
+  for (const run of node.runs) {
+    if (run.kind !== 'text') continue;
+    if (largest === undefined || run.size > largest.size) largest = run;
+  }
+  return largest;
+}
+
+/**
+ * `font-family`, `font-size` and `font-weight` for the node itself, so the strut is a face
+ * the document actually embeds rather than the browser's default.
+ *
+ * Every span writes all three of its own, so putting them here changes no run — it only
+ * gives the block the metrics its line boxes are measured against.
+ */
+function strutDeclarations(node: TextNode): string[] {
+  const run = referenceRun(node);
+  // A node whose runs are all breaks draws nothing, and there is no face to name.
+  if (run === undefined) return [];
+
+  return [
+    `font-family: "${run.font.family}"`,
+    `font-size: ${cssLength(run.size)}`,
+    `font-weight: ${cssNumber(run.weight)}`,
+  ];
+}
+
 const VERTICAL_ALIGN: Readonly<Record<TextNode['valign'], string>> = {
   top: 'flex-start',
   middle: 'center',
@@ -405,6 +449,9 @@ function textDeclarations(node: TextNode, emit: Emit, context: VisitContext): st
     'flex-direction: column',
     `justify-content: ${VERTICAL_ALIGN[node.valign]}`,
     `text-align: ${node.align}`,
+    // Before `line-height`, because the number below is a multiple of the size above and a
+    // reader should meet them in that order.
+    ...strutDeclarations(node),
     `line-height: ${cssNumber(node.lineHeight)}`,
     ...(node.letterSpacing === 0 ? [] : [`letter-spacing: ${cssLength(node.letterSpacing)}`]),
     // Runs carry their own spaces and the IR says where the lines end, so neither

@@ -42,6 +42,15 @@ The prose above is the contract; these are the decisions taken while writing the
 - **Fields that almost always take the same value carry a default** — `transform`, `opacity`, `blend`, `visible`, `clip`, `effects`, `letterSpacing`, `Color.a`, `Stroke.align`, `Image.position`, `fillRule`. Input may omit them; a parsed `Scene` always has them, so no exporter writes `?? 'normal'`.
 - **`Vector.geometry` is a tagged union** rather than the spec's `svg | path` shorthand, so an exporter cannot mistake one for the other.
 - **Gradients need at least two stops.** One stop is a solid paint written the long way.
+- **`Text.lineHeight` multiplies the size of the node's _largest_ run.** The field is one
+  number for a node whose runs may each declare a size, and the prose above never said
+  which. A node with a single run — which is nearly every node — is unaffected: the leading
+  is `lineHeight × that size`. A mixed-size node gets one leading for all of its lines,
+  taken from the biggest type in it, because a strut shorter than the tallest run decides
+  nothing (CSS gives a line box the height of its tallest inline box) and the node would
+  end up spaced by whichever run happened to be there. TYTO-65 made this explicit in
+  `export-html`, where the node previously declared no font at all and inherited the
+  browser's default — Times New Roman at 16px — as its strut.
 - **A line break is a run, not a `
 ` inside one** (ADR 0016). `TextRun` is a tagged union,
   so an exporter dispatches on `kind` instead of scanning a string for breaks — the same
@@ -144,6 +153,16 @@ text out and SVG cannot, so **an SVG does not wrap**: its lines are exactly the 
 ADR 0019 has the reasoning and the rest of the list — `--text-as-paths` takes glyph
 outlines from a port, a focal point is snapped to `preserveAspectRatio`'s nine alignments,
 and a mask may only name a node drawn in the same frame.
+
+One more bounded disagreement, of the same family: **on a text node whose runs differ in
+size, the two exporters space its lines differently.** `export-html` gives the node one
+leading for every line, from its largest run, because that is what a block's strut is and
+CSS has no way to vary it per line without splitting the node into separate elements.
+`export-svg` positions every baseline itself, so it advances each line by that line's own
+size (`packages/export-svg/src/text.ts`). Single-size nodes — nearly all of them — are
+identical in both. This is not left as a defect to find later: it is the same limit ADR
+0019 records for wrapping, and it closes the same way. Once E4.5 measures text and the
+lines arrive already decided in the IR, neither exporter is choosing a leading any more.
 
 ## Invariants (tested in `core`)
 
