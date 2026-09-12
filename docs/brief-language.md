@@ -81,7 +81,7 @@ had to answer them.
 
 ```ts
 BriefAst   { frontmatter: Record<string, unknown>; directives: Directive[]; range }
-Directive  { name; namespace?; adjustments: Adjustment[]; body: RichText; range }
+Directive  { name; namespace?; adjustments: Adjustment[]; body: RichText; range; nameRange }
 Adjustment { name; value?; range }
 RichText   = Inline[]; Inline = Text{value} | Bold{children} | Italic{children} | Break | Mark{key, value, children}
 ```
@@ -123,6 +123,12 @@ rename. These are the choices that gap forced, and where each one shows.
   `TextRun` (ADR 0016); `compile` writes that mapping.
 - **A directive's range stops before the line break that ends it.** The break is
   punctuation; an editor squiggle that ran onto the next line would be pointing at it.
+- **A directive is ranged twice: the whole of it, and its name.** `range` covers `::` to
+  the end of the body, which is the span a problem with the _value_ belongs to. A problem
+  with the _name_ — an unknown slot, a directive no plugin claims — belongs to `nameRange`,
+  five characters rather than five lines. It takes in the namespace and its slash, so
+  `::ai/caption` underlines `ai/caption`, and leaves out the `::`: that is the only way to
+  write a directive, so it is never the part that is wrong.
 - **One diagnostic per position.** Two touching closers leave four error nodes at the same
   offset, one per open run recovery had to close — one mistake, so the first at each
   position wins and the other three are dropped.
@@ -162,6 +168,10 @@ templates, the compiler knows a template and nothing about the brief that fed it
   the diagnostic.
 - **A defaulted slot has no range**, because the brief never wrote it. Every other resolved
   slot carries the span of the directive or the frontmatter key that set it.
+- **A name diagnostic lands on the name.** `E_UNKNOWN_SLOT` and `E_UNKNOWN_DIRECTIVE` are
+  reported against the directive's `nameRange`; every other diagnostic keeps the span of
+  the whole directive, because every other one is about the value. A frontmatter key is its
+  own name, so that half was already right.
 - **`E_UNKNOWN_SLOT` suggests.** A declared name within an edit distance of a third of the
   written word is a typo and becomes a hint; anything further is a different slot, and
   suggesting it would be worse than suggesting nothing.

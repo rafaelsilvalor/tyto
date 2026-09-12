@@ -78,7 +78,7 @@ function directive(
   extra: Partial<Directive> = {},
   at = ANY,
 ): Directive {
-  return { name, adjustments: [], body: text(body), range: at, ...extra };
+  return { name, adjustments: [], body: text(body), range: at, nameRange: at, ...extra };
 }
 
 function frontmatter(
@@ -222,22 +222,48 @@ slots:
 
 describe('one test per diagnostic code', () => {
   it('E_UNKNOWN_SLOT — a directive names a slot the manifest does not declare', async () => {
-    const at = sourceRange(10, 22);
-    const ast = valid({ directives: [directive('slide', 'Um'), directive('rodape', 'x', {}, at)] });
+    // `::rodape` over a three-line body: the whole directive is 10..64, the name is 12..18.
+    // A wrong name is a problem with the name, so the narrow span is the one reported —
+    // an editor underlining all four lines says where the directive is, not what is wrong.
+    const at = sourceRange(10, 64);
+    const nameRange = sourceRange(12, 18);
+    const ast = valid({
+      directives: [directive('slide', 'Um'), directive('rodape', 'x', { nameRange }, at)],
+    });
     const [problem] = (await problems(ast)).filter((item) => item.code === 'E_UNKNOWN_SLOT');
     expect(problem?.message).toContain("Unknown slot 'rodape'");
     expect(problem?.message).toContain('titulo, subtitulo, imagem, cor, slide');
-    expect(problem?.range).toEqual(at);
+    expect(problem?.range).toEqual(nameRange);
   });
 
   it('E_UNKNOWN_DIRECTIVE — a namespaced directive with no plugin behind it', async () => {
     const at = sourceRange(30, 50);
+    const nameRange = sourceRange(32, 42);
     const ast = valid({
-      directives: [directive('slide', 'Um'), directive('caption', 'x', { namespace: 'ai' }, at)],
+      directives: [
+        directive('slide', 'Um'),
+        directive('caption', 'x', { namespace: 'ai', nameRange }, at),
+      ],
     });
     const [problem] = (await problems(ast)).filter((item) => item.code === 'E_UNKNOWN_DIRECTIVE');
     expect(problem?.message).toContain("'::ai/caption'");
-    expect(problem?.range).toEqual(at);
+    expect(problem?.range).toEqual(nameRange);
+  });
+
+  it('leaves every other diagnostic on the span of the whole directive', async () => {
+    // The name is right and the value is wrong on all three, so the body is what an author
+    // has to look at. Only the two diagnostics above moved.
+    const at = sourceRange(10, 64);
+    const nameRange = sourceRange(12, 18);
+    const ast = valid({
+      directives: [
+        directive('slide', 'Um', { nameRange }, at),
+        directive('titulo', 'Direito Constitucional e Administrativo', { nameRange }, at),
+      ],
+    });
+    const reported = (await problems(ast)).filter((item) => item.code === 'E_BAD_SLOT_VALUE');
+    expect(reported).not.toHaveLength(0);
+    for (const problem of reported) expect(problem.range).toEqual(at);
   });
 
   it('E_MISSING_REQUIRED_SLOT — a required slot nobody set', async () => {

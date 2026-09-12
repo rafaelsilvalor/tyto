@@ -26,6 +26,10 @@ exports[`the corpus, one level up from the tree > matches the recorded AST of ev
           },
         ],
         "name": "slide",
+        "nameRange": {
+          "end": 7,
+          "start": 2,
+        },
         "range": {
           "end": 33,
           "start": 0,
@@ -79,6 +83,10 @@ exports[`the corpus, one level up from the tree > matches the recorded AST of ev
           },
         ],
         "name": "slide",
+        "nameRange": {
+          "end": 7,
+          "start": 2,
+        },
         "range": {
           "end": 53,
           "start": 0,
@@ -125,6 +133,10 @@ exports[`the corpus, one level up from the tree > matches the recorded AST of ev
           },
         ],
         "name": "slide",
+        "nameRange": {
+          "end": 7,
+          "start": 2,
+        },
         "range": {
           "end": 41,
           "start": 0,
@@ -162,6 +174,10 @@ exports[`the corpus, one level up from the tree > matches the recorded AST of ev
           },
         ],
         "name": "titulo",
+        "nameRange": {
+          "end": 8,
+          "start": 2,
+        },
         "range": {
           "end": 11,
           "start": 0,
@@ -180,6 +196,10 @@ exports[`the corpus, one level up from the tree > matches the recorded AST of ev
           },
         ],
         "name": "subtitulo",
+        "nameRange": {
+          "end": 24,
+          "start": 15,
+        },
         "range": {
           "end": 29,
           "start": 13,
@@ -198,6 +218,10 @@ exports[`the corpus, one level up from the tree > matches the recorded AST of ev
           },
         ],
         "name": "rodape",
+        "nameRange": {
+          "end": 40,
+          "start": 34,
+        },
         "range": {
           "end": 45,
           "start": 32,
@@ -381,6 +405,10 @@ exports[`the corpus, one level up from the tree > matches the recorded AST of ev
           },
         ],
         "name": "titulo",
+        "nameRange": {
+          "end": 38,
+          "start": 32,
+        },
         "range": {
           "end": 52,
           "start": 30,
@@ -418,6 +446,10 @@ exports[`the corpus, one level up from the tree > matches the recorded AST of ev
           },
         ],
         "name": "observacao",
+        "nameRange": {
+          "end": 12,
+          "start": 2,
+        },
         "range": {
           "end": 45,
           "start": 0,
@@ -455,6 +487,10 @@ exports[`the corpus, one level up from the tree > matches the recorded AST of ev
           },
         ],
         "name": "titulo",
+        "nameRange": {
+          "end": 78,
+          "start": 72,
+        },
         "range": {
           "end": 89,
           "start": 70,
@@ -562,6 +598,10 @@ exports[`the corpus, one level up from the tree > matches the recorded AST of ev
           },
         ],
         "name": "titulo",
+        "nameRange": {
+          "end": 96,
+          "start": 90,
+        },
         "range": {
           "end": 123,
           "start": 88,
@@ -580,6 +620,10 @@ exports[`the corpus, one level up from the tree > matches the recorded AST of ev
           },
         ],
         "name": "subtitulo",
+        "nameRange": {
+          "end": 135,
+          "start": 126,
+        },
         "range": {
           "end": 161,
           "start": 124,
@@ -598,6 +642,10 @@ exports[`the corpus, one level up from the tree > matches the recorded AST of ev
           },
         ],
         "name": "slide",
+        "nameRange": {
+          "end": 170,
+          "start": 165,
+        },
         "range": {
           "end": 191,
           "start": 163,
@@ -624,6 +672,10 @@ exports[`the corpus, one level up from the tree > matches the recorded AST of ev
           },
         ],
         "name": "slide",
+        "nameRange": {
+          "end": 199,
+          "start": 194,
+        },
         "range": {
           "end": 225,
           "start": 192,
@@ -677,6 +729,10 @@ exports[`the corpus, one level up from the tree > matches the recorded AST of ev
           },
         ],
         "name": "slide",
+        "nameRange": {
+          "end": 233,
+          "start": 228,
+        },
         "range": {
           "end": 292,
           "start": 226,
@@ -695,6 +751,10 @@ exports[`the corpus, one level up from the tree > matches the recorded AST of ev
           },
         ],
         "name": "caption",
+        "nameRange": {
+          "end": 305,
+          "start": 295,
+        },
         "namespace": "ai",
         "range": {
           "end": 313,
@@ -787,6 +847,10 @@ exports[`the corpus, one level up from the tree > matches the recorded AST of ev
           },
         ],
         "name": "slide",
+        "nameRange": {
+          "end": 7,
+          "start": 2,
+        },
         "range": {
           "end": 69,
           "start": 0,
@@ -866,6 +930,10 @@ exports[`the corpus, one level up from the tree > matches the recorded AST of ev
           },
         ],
         "name": "titulo",
+        "nameRange": {
+          "end": 8,
+          "start": 2,
+        },
         "range": {
           "end": 54,
           "start": 0,
@@ -910,6 +978,10 @@ exports[`the corpus, one level up from the tree > matches the recorded AST of ev
           },
         ],
         "name": "subtitulo",
+        "nameRange": {
+          "end": 11,
+          "start": 2,
+        },
         "range": {
           "end": 27,
           "start": 0,
@@ -974,6 +1046,10 @@ exports[`the corpus, one level up from the tree > matches the recorded AST of ev
           },
         ],
         "name": "titulo",
+        "nameRange": {
+          "end": 8,
+          "start": 2,
+        },
         "range": {
           "end": 41,
           "start": 0,
@@ -1011,6 +1087,10 @@ exports[`the corpus, one level up from the tree > matches the recorded AST of ev
           },
         ],
         "name": "titulo",
+        "nameRange": {
+          "end": 8,
+          "start": 2,
+        },
         "range": {
           "end": 31,
           "start": 0,
@@ -1082,6 +1162,10 @@ exports[`the corpus, one level up from the tree > matches the recorded AST of ev
           },
         ],
         "name": "titulo",
+        "nameRange": {
+          "end": 8,
+          "start": 2,
+        },
         "range": {
           "end": 57,
           "start": 0,
@@ -1134,6 +1218,10 @@ exports[`the corpus, one level up from the tree > matches the recorded AST of ev
           },
         ],
         "name": "subtitulo",
+        "nameRange": {
+          "end": 69,
+          "start": 60,
+        },
         "range": {
           "end": 115,
           "start": 58,
@@ -1171,6 +1259,10 @@ exports[`the corpus, one level up from the tree > matches the recorded AST of ev
           },
         ],
         "name": "titulo",
+        "nameRange": {
+          "end": 8,
+          "start": 2,
+        },
         "range": {
           "end": 26,
           "start": 0,
@@ -1208,6 +1300,10 @@ exports[`the corpus, one level up from the tree > matches the recorded AST of ev
           },
         ],
         "name": "caption",
+        "nameRange": {
+          "end": 12,
+          "start": 2,
+        },
         "namespace": "ai",
         "range": {
           "end": 27,
@@ -1246,6 +1342,10 @@ exports[`the corpus, one level up from the tree > matches the recorded AST of ev
           },
         ],
         "name": "slide",
+        "nameRange": {
+          "end": 7,
+          "start": 2,
+        },
         "range": {
           "end": 18,
           "start": 0,
@@ -1272,6 +1372,10 @@ exports[`the corpus, one level up from the tree > matches the recorded AST of ev
           },
         ],
         "name": "slide",
+        "nameRange": {
+          "end": 26,
+          "start": 21,
+        },
         "range": {
           "end": 47,
           "start": 19,
@@ -1290,6 +1394,10 @@ exports[`the corpus, one level up from the tree > matches the recorded AST of ev
           },
         ],
         "name": "slide",
+        "nameRange": {
+          "end": 55,
+          "start": 50,
+        },
         "range": {
           "end": 66,
           "start": 48,
