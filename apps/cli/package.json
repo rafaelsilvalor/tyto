@@ -28,6 +28,6 @@
     "playwright": "^1.63.0"
   },
   "devDependencies": {
-    "vitest": "^3.2.4"
+    "vitest": "^5.0.0"
   }
 }
