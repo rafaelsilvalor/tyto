@@ -66,6 +66,19 @@ had to answer them.
   general one is a change to the spec, not to the grammar alone.
 - **A file whose last line has no break still parses.** The tokenizer supplies a zero-length
   one at end of input rather than leaving an error node on a perfectly good brief.
+- **A line ends on `\n`, on `\r\n` or on a lone `\r`.** A brief is a file a person edits, and
+  the three endings are all a real editor writes; a Windows file used to fail at the
+  frontmatter fence and then report every directive after it as incomplete.
+  `.gitattributes` does not solve that, because the parser is handed text by a CLI reading
+  a disk and by an editor holding a buffer, and neither goes through Git.
+- **The endings are read by the grammar, not normalised away first.** Normalising would move
+  every offset by one unit per line, and a `range` indexes the text the caller handed in —
+  an editor highlighting a range computed against a shorter string would underline the
+  wrong characters. So the three endings are line endings in the tokens themselves, offsets
+  stay the caller's, and `createLineIndex` in `core` already counts all three as one line
+  end. The one exception is inside the frontmatter, where `yaml` does not recognise a lone
+  `\r`: those are rewritten before it parses, which swaps one code unit for one and
+  therefore moves nothing.
 - **`Namespace` includes its slash** (`ai/`), and the space between a directive name and
   its inline body sits inside `InlineBody`. Both are shapes the tokenizer forced, and
   `parseBrief` trims them; the ranges stay exact either way.

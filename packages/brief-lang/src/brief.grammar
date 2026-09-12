@@ -120,13 +120,28 @@ BlankLine { newline }
   Break { "\\" }
 
   // Everything that is not markup. It may not begin with a space: at the start of a line
-  // that space belongs to `blockIndent`, and the two would be indistinguishable.
-  Text { ![ \t*{}\\\n] ![*{}\\\n]* }
+  // that space belongs to `blockIndent`, and the two would be indistinguishable. `\r` is
+  // excluded for the same reason `\n` is: it ends a line (see `lineBreak`), so letting it
+  // into text would leave half a CRLF inside a Text node.
+  Text { ![ \t*{}\\\n\r] ![*{}\\\n\r]* }
 
-  Comment { "//" ![\n]* }
+  Comment { "//" ![\n\r]* }
 
-  newline { "\n" }
-  blockIndent { "\n" $[ \t]+ }
+  // Every line ending a person's editor writes. A brief is a file somebody edits, the
+  // maintainer works on Windows, and ADR 0011 has Jacurutu writing `brief.brief` on
+  // whatever machine it runs on — so `\r\n` and a lone `\r` end a line here rather than
+  // failing the file (TYTO-64).
+  //
+  // Handled in the grammar rather than by normalising the text first. Normalisation moves
+  // every offset by one unit per line, and `Diagnostic.range` indexes the text the caller
+  // handed in: an editor highlighting a range computed against normalised text would
+  // underline the wrong characters in a CRLF buffer. `createLineIndex` in `core` already
+  // counts `\r\n` and a lone `\r` as one line end, so line and column come out right as
+  // soon as the offsets are the original ones.
+  lineBreak { "\n" | "\r" "\n"? }
+
+  newline { lineBreak }
+  blockIndent { lineBreak $[ \t]+ }
   space { $[ \t]+ }
 
   @precedence { adjustmentsStart, space }

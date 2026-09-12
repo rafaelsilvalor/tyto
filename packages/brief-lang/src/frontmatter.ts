@@ -50,6 +50,31 @@ function keyRanges(contents: unknown, offset: number): Record<string, SourceRang
 }
 
 /**
+ * Just past the first line ending at or after `from`, or `-1` where there is none.
+ *
+ * Searching for `'\n'` was enough until briefs had to survive every editor: a file written
+ * with lone `\r` contains no `\n` at all, so the search failed and the body started at
+ * offset 0 — the fence itself parsed as YAML and the frontmatter came back empty
+ * (TYTO-64). `\r\n` is one ending, not two.
+ */
+function afterLineBreak(text: string, from: number): number {
+  for (let offset = from; offset < text.length; offset += 1) {
+    if (text[offset] === '\n') return offset + 1;
+    if (text[offset] === '\r') return text[offset + 1] === '\n' ? offset + 2 : offset + 1;
+  }
+  return -1;
+}
+
+/** Where the line ending just before `before` starts; `0` when that is the first line. */
+function lineStartBefore(text: string, before: number): number {
+  for (let offset = before - 1; offset >= 0; offset -= 1) {
+    const char = text[offset];
+    if (char === '\n' || char === '\r') return offset + 1;
+  }
+  return 0;
+}
+
+/**
  * The span between the fences, given the whole block the tokenizer matched.
  *
  * The opening fence always ends in a line break — the tokenizer refuses the block
@@ -57,10 +82,34 @@ function keyRanges(contents: unknown, offset: number): Record<string, SourceRang
  * break of its own on a file that ends there.
  */
 function bodySpan(text: string, blockStart: number, blockEnd: number): [number, number] {
-  const start = text.indexOf('\n', blockStart) + 1;
-  const beforeTrailingBreak = text[blockEnd - 1] === '\n' ? blockEnd - 1 : blockEnd;
-  const closingFenceStart = text.lastIndexOf('\n', beforeTrailingBreak - 1) + 1;
-  return [start, Math.max(start, closingFenceStart)];
+  const start = afterLineBreak(text, blockStart);
+  if (start < 0 || start > blockEnd) return [blockEnd, blockEnd];
+
+  // The block's own trailing break, so the search below finds the break before the closing
+  // fence rather than the one after it.
+  let beforeTrailingBreak = blockEnd;
+  if (text[beforeTrailingBreak - 1] === '\n') beforeTrailingBreak -= 1;
+  if (text[beforeTrailingBreak - 1] === '\r') beforeTrailingBreak -= 1;
+
+  return [start, Math.max(start, lineStartBefore(text, beforeTrailingBreak))];
+}
+
+/**
+ * The block's text as `yaml` can read it, without moving a single offset.
+ *
+ * `yaml` ends a line on `\n` and on `\r\n`, and **not** on a lone `\r`: a classic-Mac file
+ * arrives as one long line and comes back "Nested mappings are not allowed in compact
+ * mappings". So the lone ones are rewritten — and because `\r` and `\n` are one code unit
+ * each, this is a substitution and not a normalisation. The text keeps its length, every
+ * key range `yaml` reports still indexes the brief the caller handed in, and the trap the
+ * card warned about — an editor underlining the wrong characters because the offsets were
+ * computed against a shorter string — never opens.
+ *
+ * `\r\n` is deliberately left alone for exactly that reason: collapsing it would shorten
+ * the text by one unit per line, and `yaml` does not need the help.
+ */
+function forYaml(body: string): string {
+  return body.replace(/\r(?!\n)/gu, '\n');
 }
 
 /** `yaml` reports a message with a code frame under it; the gutter wants the first line. */
@@ -81,7 +130,7 @@ export function parseFrontmatter(
   blockEnd: number,
 ): FrontmatterResult {
   const [start, end] = bodySpan(text, blockStart, blockEnd);
-  const body = text.slice(start, end);
+  const body = forYaml(text.slice(start, end));
   if (body.trim() === '') return EMPTY;
 
   const document = parseDocument(body);
