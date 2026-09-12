@@ -1,4 +1,4 @@
-import { readdirSync, readFileSync } from 'node:fs';
+import { existsSync, readdirSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -271,6 +271,52 @@ describe('dependabot', () => {
 
   const DEPENDABOT_CONFIG = '.github/dependabot.yml';
 
+  /**
+   * One ecosystem's `ignore` rules, flattened to one entry per version spec, with the
+   * major each spec names. `undefined` for a spec that names no major is deliberate: the
+   * callers assert on it rather than skipping it quietly.
+   */
+  const ignoredMajorsOf = (ecosystem: string) => {
+    const update = (readYaml<DependabotConfig>(DEPENDABOT_CONFIG).updates ?? []).find(
+      (entry) => entry['package-ecosystem'] === ecosystem,
+    );
+    expect(update, `dependabot.yml no longer configures the ${ecosystem} ecosystem`).toBeDefined();
+
+    return (update!.ignore ?? []).flatMap((rule) =>
+      (rule.versions ?? []).map((spec) => ({
+        name: rule['dependency-name'],
+        spec,
+        major: /^(\d+)\./.exec(spec)?.[1],
+      })),
+    );
+  };
+
+  /** Every major a workspace manifest declares for a package, by package name. */
+  const declaredMajors = () => {
+    const manifests = [
+      'package.json',
+      ...['packages', 'apps', 'tools'].flatMap((dir) =>
+        directoriesIn(dir).map((name) => `${dir}/${name}/package.json`),
+      ),
+    ].filter((path) => existsSync(join(repoRoot, path)));
+
+    const majors = new Map<string, Set<string>>();
+    for (const manifest of manifests) {
+      const json = JSON.parse(readRepoFile(manifest)) as Record<
+        string,
+        Record<string, string> | undefined
+      >;
+      for (const field of ['dependencies', 'devDependencies', 'peerDependencies']) {
+        for (const [name, range] of Object.entries(json[field] ?? {})) {
+          const major = /(\d+)\./.exec(range)?.[1];
+          if (major === undefined) continue;
+          majors.set(name, (majors.get(name) ?? new Set<string>()).add(major));
+        }
+      }
+    }
+    return majors;
+  };
+
   it('still groups the npm ecosystem into dev and prod', () => {
     // One pull request a week is the point: `main` requires branches to be up to date, so
     // five separate bumps are five update-and-rerun cycles (TYTO-76). The updater spent
@@ -322,17 +368,8 @@ describe('dependabot', () => {
     // version instead, silently, because Dependabot does not report what it skipped.
     //
     // So the refusal is tied to the thing it refuses: the moment a workflow uses the major
-    // being ignored, this fails and the entry has to go. Only the actions ecosystem is
-    // checked, because only there does the repository state the version in a file that can
-    // be read back — an npm ignore would have to be matched against the manifest instead.
-    const actions = (readYaml<DependabotConfig>(DEPENDABOT_CONFIG).updates ?? []).find(
-      (entry) => entry['package-ecosystem'] === 'github-actions',
-    );
-    expect(
-      actions,
-      'dependabot.yml no longer configures the github-actions ecosystem',
-    ).toBeDefined();
-
+    // being ignored, this fails and the entry has to go. The npm half is the test below —
+    // the same rule, read against the manifests instead of against `uses:`.
     const usedMajors = new Map(
       workflowFiles
         .flatMap((file) => Object.values(readYaml<Workflow>(`${WORKFLOWS_DIR}/${file}`).jobs ?? {}))
@@ -342,20 +379,42 @@ describe('dependabot', () => {
         .map((uses) => [uses.split('@')[0]!, uses.split('@')[1]!]),
     );
 
-    for (const rule of actions!.ignore ?? []) {
-      const name = rule['dependency-name'];
+    for (const { name, spec, major } of ignoredMajorsOf('github-actions')) {
+      expect(
+        major,
+        `${DEPENDABOT_CONFIG} ignores '${name}' at '${spec}', which names no major`,
+      ).toBeDefined();
+
       const inUse = name === undefined ? undefined : usedMajors.get(name);
-      for (const spec of rule.versions ?? []) {
-        const ignoredMajor = /^(\d+)\./.exec(spec)?.[1];
-        expect(
-          ignoredMajor,
-          `${DEPENDABOT_CONFIG} ignores '${name}' at '${spec}', which names no major`,
-        ).toBeDefined();
-        expect(
-          inUse,
-          `${DEPENDABOT_CONFIG} ignores ${name}@${spec}, but the workflows already use ${inUse}; the entry now hides the next version instead of the one it was written for`,
-        ).not.toBe(`v${ignoredMajor}`);
-      }
+      expect(
+        inUse,
+        `${DEPENDABOT_CONFIG} ignores ${name}@${spec}, but the workflows already use ${inUse}; the entry now hides the next version instead of the one it was written for`,
+      ).not.toBe(`v${major}`);
+    }
+  });
+
+  it('ignores no npm major the workspace has since moved to', () => {
+    // `typescript` 7.x is ignored because typescript-eslint refuses TS 7 by name and the
+    // declaration build calls a TS 6 API it removed — two required checks down on one
+    // package, which in a grouped update takes ten unrelated bumps with it (TYTO-84).
+    //
+    // It goes stale the same way the actions entry does, and worse: an npm ignore that
+    // outlives its reason hides security updates, not just features. So it is read against
+    // every manifest in the workspace, and the day one of them declares the ignored major
+    // — which is what adopting TS 7 would mean — this fails and the entry has to go.
+    const majors = declaredMajors();
+
+    for (const { name, spec, major } of ignoredMajorsOf('npm')) {
+      expect(
+        major,
+        `${DEPENDABOT_CONFIG} ignores '${name}' at '${spec}', which names no major`,
+      ).toBeDefined();
+
+      const declared = name === undefined ? [] : [...(majors.get(name) ?? [])];
+      expect(
+        declared,
+        `${DEPENDABOT_CONFIG} ignores ${name}@${spec}, but a workspace manifest already declares ${name} ${major}.x; the entry now hides the next version instead of the one it was written for`,
+      ).not.toContain(major);
     }
   });
 });
