@@ -27,21 +27,31 @@ updates:
     schedule: { interval: weekly }
     groups: { dev: { dependency-type: development }, prod: { dependency-type: production } }
     ignore:
-      # `typescript-eslint` refuses TS 7 by name — "typescript-eslint does not support
+      # Two majors, and they are held back for two different reasons — measured one after
+      # the other, because ignoring 7 is what made 6 visible (TYTO-84).
+      #
+      # TS 7: `typescript-eslint` refuses it by name — "typescript-eslint does not support
       # TS 7.0", https://github.com/typescript-eslint/typescript-eslint/issues/10940 — and
       # the declaration build calls a TS 6 API that TS 7 removed, dying at `@tyto/core`
       # with `Cannot read properties of undefined (reading 'useCaseSensitiveFileNames')`.
-      # Two required checks, both on this one package.
       #
-      # Without this entry it is not one bump that waits. `dev` is a single grouped pull
-      # request, so the ten unrelated bumps beside it in #96 — and every dev bump after —
-      # queue behind a TypeScript major (TYTO-84). Adopting TS 7 is a stack change and
-      # wants an ADR; this entry is the holding position, not the decision.
+      # TS 6: `typescript-eslint` is fine with it, so that half is not the problem. `tsup`
+      # is. It sets `baseUrl` for every declaration build whether the project asked for one
+      # or not — `baseUrl: compilerOptions.baseUrl || "."`, tsup 8.5.1 dist/rollup.js:6837
+      # — and TS 6 raises that deprecation as an error, so every `dts` build fails with
+      # `TS5101`. There is no newer tsup to move to: 8.5.1 is the latest published, and
+      # carries the same line. Nothing in this repository's own tsconfig sets `baseUrl`.
       #
-      # Narrow on purpose: the 7.x line only, so 8.x is still offered. Remove it when
-      # typescript-eslint supports TS >= 7.1 and the ADR says to move.
+      # Without these entries it is not one bump that waits. `dev` is a single grouped pull
+      # request, so the ten unrelated bumps beside it in #96 and #100 — and every dev bump
+      # after — queue behind a TypeScript major. Adopting either major is a stack change
+      # and wants an ADR; this is the holding position, not the decision.
+      #
+      # Narrow on purpose: these two lines only, so 8.x is still offered. TS 7 goes when
+      # typescript-eslint supports >= 7.1; TS 6 goes when tsup stops forcing `baseUrl`, or
+      # when the declaration build stops going through tsup.
       - dependency-name: typescript
-        versions: ['7.x']
+        versions: ['6.x', '7.x']
   # One group, not two: an action has no development/production split, and five separate
   # pull requests editing the same five workflows is five update-and-rerun cycles for what
   # is one decision — `main` requires branches to be up to date (TYTO-76).
