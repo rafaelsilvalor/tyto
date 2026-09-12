@@ -216,7 +216,16 @@ function bodyOf(node: SyntaxNode, text: string): RichText {
       appendInlines(body, parts, text);
     } else if (child.name === 'BodyLine') {
       if (body.length > 0) {
-        body.push({ kind: 'break', range: sourceRange(child.from, child.from + 1) });
+        // A `BodyLine` opens with `blockIndent`, which is the line ending plus the indent,
+        // so the break starts where the line does. Its length is not always one: `\r\n` is
+        // two units, and a hardcoded `+ 1` left the `Break` node covering half of it —
+        // which reads as a stray carriage return and puts the next node a column out
+        // (TYTO-64).
+        const isCrLf = text[child.from] === '\r' && text[child.from + 1] === '\n';
+        body.push({
+          kind: 'break',
+          range: sourceRange(child.from, child.from + (isCrLf ? 2 : 1)),
+        });
       }
       const blockText = child.getChild('BlockText');
       if (blockText !== null) appendInlines(body, children(blockText), text);
