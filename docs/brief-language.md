@@ -24,7 +24,7 @@ imagem: ./prof-ana.png
 
 ## Rules
 
-- **Frontmatter**: metadata and scalar slots. `template` is required (or `--template` on the CLI). `formats` defaults come from the manifest.
+- **Frontmatter**: metadata and scalar slots. `template` is required (or `--template` on the CLI). `formats` defaults come from the manifest. A scalar on a rich-text slot is one run of plain text, and inline markup in it is `W_MARKUP_IN_FRONTMATTER` — see below.
 - **Slot directive** `::name value` — inline value to end of line, or an indented block on the following lines. The name must exist in the template manifest (`E_UNKNOWN_SLOT`).
 - **Repeatable directive** (`::slide`) — each occurrence becomes an `Artwork`. The manifest declares which slot is `repeat`.
 - **Adjustments** `{a, b: value}` — only those declared in `manifest.adjustments`. They apply to the slot; on a repeatable slot, to that slide.
@@ -172,6 +172,19 @@ templates, the compiler knows a template and nothing about the brief that fed it
   reported against the directive's `nameRange`; every other diagnostic keeps the span of
   the whole directive, because every other one is about the value. A frontmatter key is its
   own name, so that half was already right.
+- **A frontmatter scalar on a rich-text slot stays plain text, and says so.** A `titulo`
+  set in the frontmatter to `Direito **Constitucional**` renders the asterisks; the same
+  words after `::titulo` come out bold. The scalar is accepted — a one-line title in the frontmatter is why the
+  frontmatter carries scalar slots at all — but inline markup inside one is
+  `W_MARKUP_IN_FRONTMATTER`, naming the markup and the directive to write instead. It is a
+  warning and not an error because the brief still means something, and it is not parsed
+  because `core` may not import `brief-lang`; parsing it would mean moving the inline layer,
+  which is a bigger decision than this one (TYTO-59).
+- **The markup detector is deliberately crude, and errs quiet.** It is a second reader of
+  the inline syntax rather than the parser itself, so it asks for two asterisks before it
+  calls something italic, for a `{/}` before it calls something a mark, and for the
+  backslash to be last. `Promo 2 * 3 vagas` is not a warning. A detector that cried wolf
+  would teach an author to ignore the warning, which costs more than the case it missed.
 - **`E_UNKNOWN_SLOT` suggests.** A declared name within an edit distance of a third of the
   written word is a typo and becomes a hint; anything further is a different slot, and
   suggesting it would be worse than suggesting nothing.
