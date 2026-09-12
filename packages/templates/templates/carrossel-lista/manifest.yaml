@@ -1,0 +1,15 @@
+name: carrossel-lista
+version: 1.0.0
+description: A list carousel — the list's title on every slide, one item to a slide.
+formats: [feed, story]
+slots:
+  titulo: { type: rich-text, required: true, max: 60 }
+  item: { type: rich-text, repeat: true, min: 1, max: 10 }
+  # Declared as a slot *and* as an adjustment, which is the pattern
+  # docs/template-authoring.md shows for `cor`: the slot is what `@if slot(tom)` branches on
+  # and what the brief sets once in its frontmatter, the adjustment is the per-slide
+  # override, and an adjustment on an artwork wins over the slot of the same name.
+  tom: { type: enum, values: [claro, escuro], default: escuro }
+adjustments:
+  destaque: { type: flag, applies: [item] }
+  tom: { type: enum, values: [claro, escuro], applies: [item] }

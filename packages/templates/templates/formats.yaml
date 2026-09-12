@@ -1,0 +1,5 @@
+# The sizes the example briefs assume, so the built-in pack can be rendered straight out of
+# the repository: `tyto render --templates packages/templates/templates --formats-file …`.
+# A project overrides this with its own; a template states its layout, not its canvas.
+feed: { w: 1080, h: 1080 }
+story: { w: 1080, h: 1920, label: Story }

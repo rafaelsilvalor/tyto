@@ -4,14 +4,16 @@ import type { Plugin } from '@tyto/plugin-api';
 /**
  * The `template-pack` extension point's built-in.
  *
- * **It registers nothing today.** `@tyto/templates` is an empty stub — epic E4 has not
- * shipped `promo-curso` or `carrossel-lista` yet (TYTO-25) — so there is no built-in pack
- * to contribute. The module exists anyway, because the alternative is discovering at E4
- * that nobody ever checked whether a pack can be registered at all.
+ * **It registers nothing today.** TYTO-25 shipped the folders — `promo-curso` and
+ * `carrossel-lista` are real templates under `packages/templates/templates/` — and
+ * deliberately stopped short of registering them. What is missing is a decision, not code:
+ * how a published package's directory is located at runtime, and what happens when a
+ * built-in pack and a `--templates <dir>` both offer the same name. That spans this app,
+ * `pipeline` and `templates`, so it wants an ADR.
  *
- * What a project actually renders with today comes from `--templates <dir>` through
- * `loadTemplateRegistry`, which is a folder on a disk and not a pack. Merging the two is
- * E4.4's problem, not this card's.
+ * What a project renders with today still comes from `--templates <dir>` through
+ * `loadTemplateRegistry`, which is a folder on a disk and not a pack — and the built-in
+ * folders work that way too, which is how the contract test drives them.
  */
 
 export interface TemplatePackOptions {

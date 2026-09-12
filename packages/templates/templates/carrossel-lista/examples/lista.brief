@@ -1,0 +1,21 @@
+---
+template: carrossel-lista
+formats: [feed, story]
+---
+// Four slides, so `compile` produces four artworks of two frames each. The adjustments on
+// the third one are what a brief writer reaches for when a slide has to stand out.
+
+::titulo
+  Como estudar para a prova
+
+::item
+  Leia a lei seca **antes** da doutrina
+
+::item
+  Resolva questões da própria banca
+
+::item {destaque, tom: escuro}
+  Revise o que errou, não o que acertou
+
+::item
+  Simulados cronometrados na reta final

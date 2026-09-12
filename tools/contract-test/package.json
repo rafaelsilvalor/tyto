@@ -10,10 +10,14 @@
     "test": "vitest run"
   },
   "dependencies": {
+    "@tyto/brief-lang": "workspace:*",
     "@tyto/cli": "workspace:*",
-    "@tyto/io": "workspace:*"
+    "@tyto/core": "workspace:*",
+    "@tyto/io": "workspace:*",
+    "@tyto/pipeline": "workspace:*"
   },
   "devDependencies": {
+    "@tyto/test-fonts": "workspace:*",
     "ajv": "^8.17.1",
     "vitest": "^3.2.4"
   }
