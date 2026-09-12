@@ -1,5 +1,13 @@
 # @tyto/export-svg
 
+## 0.2.2
+
+### Patch Changes
+
+- Updated dependencies [15dfa8b]
+  - @tyto/core@0.14.1
+  - @tyto/plugin-api@0.2.2
+
 ## 0.2.1
 
 ### Patch Changes
