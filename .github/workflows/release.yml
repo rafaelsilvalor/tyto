@@ -17,18 +17,33 @@ jobs:
         with: { node-version: 22, cache: pnpm }
       - run: pnpm install --frozen-lockfile
       - run: pnpm build
-      # Pinned to v1 because this repository is on Changesets CLI v2, and v2 of the action
-      # refuses to run against it: "use Changesets action v1 instead, which is compatible
-      # with CLI v2." Moving to the action's v2 means moving the CLI to v3 first and
-      # renaming all four inputs below, which is TYTO-78's other half — not a bump.
-      - uses: changesets/action@v1
+      # The action's major and the CLI's major move together: v1 runs against Changesets
+      # CLI v2, v2 against CLI v3, and each refuses the other outright. `@changesets/cli`
+      # is v3 here, so this is v2 — the v1 pin TYTO-78 put in was for the CLI of the day
+      # and stopped matching the moment the CLI moved (TYTO-80).
+      #
+      # All four inputs are renamed under v2, and getting that wrong is silent: an action
+      # ignores an input it does not know rather than failing on it, so `commit:` and
+      # `title:` would sit here meaning nothing and the version PR would open under the
+      # action's own default title, "Version Packages" — a green run and a pull request
+      # with no Jira key, unmergeable for good. `github-config.test.ts` pins the accepted
+      # input names per major so the file cannot drift back into that.
+      #
+      # There is deliberately no `env: GITHUB_TOKEN` any more. v2 stopped reading that
+      # variable — a custom token has to arrive through the `github-token` input — and the
+      # input already defaults to `${{ github.token }}`, which is the token this step was
+      # being handed. The line was removed because it had stopped doing anything, not
+      # because the step stopped needing a token.
+      - uses: changesets/action@v2
         with:
-          version: pnpm changeset version
-          publish: pnpm changeset tag
+          version-script: pnpm changeset version
+          # `git-tag`, not `tag`: CLI v3 renamed the command. `tag` still runs and still
+          # tags, printing "The 'tag' command is deprecated. Please use 'git-tag'
+          # instead." — which is a countdown, not a pass.
+          publish-script: pnpm changeset git-tag
           # The title is linted like any other, because squash merge turns it into the
           # commit on main and `lint` is a required check — without a key the version PR
           # would open and then never be mergeable. TYTO-0 is the key this repository
           # already uses for work no card asked for.
-          commit: 'chore(release): TYTO-0 version packages'
-          title: 'chore(release): TYTO-0 version packages'
-        env: { GITHUB_TOKEN: '${{ secrets.GITHUB_TOKEN }}' }
+          commit-message: 'chore(release): TYTO-0 version packages'
+          pr-title: 'chore(release): TYTO-0 version packages'

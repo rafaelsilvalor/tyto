@@ -68,6 +68,73 @@ const REQUIRED_CHECKS = [
   { context: 'lint', workflow: 'commitlint.yml' },
 ];
 
+interface ChangesetsActionMajor {
+  /** Every input name that major declares, read off its own `action.yml`. */
+  reads: readonly string[];
+  /** The input carrying the commit message, which commitlint reads after a squash merge. */
+  commitMessage: string;
+  /** The input carrying the pull request title, which the required `lint` check reads. */
+  prTitle: string;
+}
+
+/**
+ * What each major of `changesets/action` calls its inputs. The action's major and the
+ * Changesets CLI's move together — v1 runs against CLI v2, v2 against CLI v3, and each
+ * refuses the other by name — so a CLI upgrade arrives here as a rename of every input
+ * this repository passes.
+ *
+ * The whole list is pinned, not just the four in use, because an action ignores an input
+ * it does not know rather than failing on it. The v1 → v2 bump left `commit:` and
+ * `title:` in `release.yml` meaning nothing, and the version PR opened under the action's
+ * own default title, "Version Packages" — a green run and a pull request with no Jira
+ * key, unmergeable for good (TYTO-78).
+ *
+ * `commitMessage` and `prTitle` name the two that carry the linted strings, so the
+ * assertion below reads the input the pinned major actually reads. The check they replace
+ * searched the file text for `title: '…'`, which under v2 still matches — `pr-title:`
+ * ends in `title:` — and would have gone on passing while reporting on an input v1 never
+ * had.
+ */
+const CHANGESETS_ACTION_BY_MAJOR: Record<string, ChangesetsActionMajor> = {
+  v1: {
+    reads: [
+      'version',
+      'publish',
+      'commit',
+      'title',
+      'branch',
+      'cwd',
+      'setupGitUser',
+      'createGithubReleases',
+    ],
+    commitMessage: 'commit',
+    prTitle: 'title',
+  },
+  v2: {
+    reads: [
+      'github-token',
+      'publish-script',
+      'version-script',
+      'commit-message',
+      'pr-title',
+      'pr-draft',
+      'pr-base-branch',
+      'create-github-releases',
+      'push-git-tags',
+      'push-with-git-cli',
+      'cwd',
+    ],
+    commitMessage: 'commit-message',
+    prTitle: 'pr-title',
+  },
+};
+
+/** Input names a major does not read. Empty is the passing case. */
+const unreadInputs = (major: string, inputs: Record<string, unknown>) =>
+  Object.keys(inputs).filter(
+    (name) => CHANGESETS_ACTION_BY_MAJOR[major]?.reads.includes(name) !== true,
+  );
+
 describe('workflows', () => {
   it('parse as YAML and declare at least one job', () => {
     for (const file of workflowFiles) {
@@ -104,41 +171,8 @@ describe('workflows', () => {
     expect(jobs.release?.env?.HUSKY).toBe(0);
   });
 
-  it('give the version PR a title its own commitlint rule accepts', () => {
-    // `lint` is a required check on main and reads the PR title, so a version PR
-    // without a Jira key would open and then be unmergeable for good.
-    const release = readRepoFile(`${WORKFLOWS_DIR}/release.yml`);
-    for (const field of ['commit', 'title']) {
-      const value = new RegExp(`${field}: '([^']+)'`).exec(release)?.[1];
-      expect(value, `release.yml has no ${field}`).toBeDefined();
-      expect(value).toMatch(/^\w+(\([\w-]+\))?: TYTO-\d+ [a-z0-9]/);
-    }
-  });
-
-  it('pass changesets/action only input names the pinned major actually reads', () => {
-    // An action ignores an input it does not know rather than failing on it. v2 of this
-    // action renamed all four, so the bump left `commit:` and `title:` sitting in the file
-    // meaning nothing, and fell back to its own defaults — a version PR titled "Version
-    // Packages", with no Jira key and therefore unmergeable for good (TYTO-78). The test
-    // above kept passing the whole time, because it reads those strings out of the file
-    // and the file still had them. So the input *names* are pinned to the major.
-    //
-    // There is no entry for v2 on purpose: this repository is on Changesets CLI v2, which
-    // the action's v2 refuses to run against. Moving to it is a CLI migration, and adding
-    // a list here is the deliberate step that migration has to take.
-    const INPUTS_BY_MAJOR: Record<string, readonly string[]> = {
-      v1: [
-        'version',
-        'publish',
-        'commit',
-        'title',
-        'branch',
-        'cwd',
-        'setupGitUser',
-        'createGithubReleases',
-      ],
-    };
-
+  /** The single `changesets/action` step in `release.yml`, with the major it pins. */
+  const changesetsActionStep = () => {
     const steps = Object.values(readYaml<Workflow>(`${WORKFLOWS_DIR}/release.yml`).jobs ?? {})
       .flatMap((job) => job.steps ?? [])
       .filter((step) => step.uses?.startsWith('changesets/action@') === true);
@@ -146,16 +180,58 @@ describe('workflows', () => {
     expect(steps, 'release.yml no longer uses changesets/action').toHaveLength(1);
 
     const major = steps[0]!.uses!.split('@')[1]!;
-    const allowed = INPUTS_BY_MAJOR[major];
+    const names = CHANGESETS_ACTION_BY_MAJOR[major];
     expect(
-      allowed,
+      names,
       `no input list is pinned for changesets/action@${major}; it renamed every input between majors, and an unknown one is ignored rather than refused`,
     ).toBeDefined();
 
-    for (const name of Object.keys(steps[0]!.with ?? {})) {
-      expect(allowed, `changesets/action@${major} does not read the input '${name}'`).toContain(
-        name,
-      );
+    return { major, inputs: steps[0]!.with ?? {}, names: names! };
+  };
+
+  it('pass changesets/action only input names the pinned major actually reads', () => {
+    const { major, inputs } = changesetsActionStep();
+    expect(
+      unreadInputs(major, inputs),
+      `release.yml passes changesets/action@${major} inputs that major does not read; an action ignores an unknown input rather than refusing it, so these are silently doing nothing`,
+    ).toEqual([]);
+  });
+
+  it('catch a wrong input name rather than only reporting on the file of the day', () => {
+    // The assertion above is only as good as whatever `release.yml` happens to say, so on
+    // a correct file it reads green without having caught anything. This runs the same
+    // predicate against the exact mistake TYTO-78 made — v1's four names left under v2 —
+    // and against v2's own names, so the guard is measured in both directions.
+    expect(
+      unreadInputs('v2', { version: 'x', publish: 'x', commit: 'x', title: 'x' }),
+    ).toStrictEqual(['version', 'publish', 'commit', 'title']);
+    expect(
+      unreadInputs('v2', {
+        'version-script': 'x',
+        'publish-script': 'x',
+        'commit-message': 'x',
+        'pr-title': 'x',
+      }),
+    ).toStrictEqual([]);
+  });
+
+  it('give the version PR a title its own commitlint rule accepts', () => {
+    // `lint` is a required check on main and reads the PR title, so a version PR
+    // without a Jira key would open and then be unmergeable for good.
+    //
+    // Read through the pinned major's input names rather than by searching the file for
+    // `title: '…'`, the way this check used to: that search still matches under v2,
+    // because `pr-title:` ends in `title:`, so it would report on an input v1 never had
+    // and miss a `commit-message:` that had gone missing entirely.
+    const { major, inputs, names } = changesetsActionStep();
+
+    for (const field of [names.commitMessage, names.prTitle]) {
+      const value = inputs[field];
+      expect(
+        value,
+        `release.yml passes changesets/action@${major} no '${field}', so the version PR would take the action's own default`,
+      ).toBeTypeOf('string');
+      expect(value as string).toMatch(/^\w+(\([\w-]+\))?: TYTO-\d+ [a-z0-9]/);
     }
   });
 
@@ -368,14 +444,21 @@ describe('dependabot', () => {
 
   it('ignores no action major the workflows have since moved to', () => {
     // An `ignore` entry is a refusal with an expiry date nobody writes down. `changesets/
-    // action` 2.x is ignored because the action's v2 will not run against Changesets CLI
-    // v2, which is a migration and not a bump (TYTO-80, TYTO-83) — and the day that
-    // migration lands, the entry stops protecting anything and starts hiding the next
-    // version instead, silently, because Dependabot does not report what it skipped.
+    // action` 2 was ignored because the action's v2 will not run against Changesets CLI
+    // v2, which is a migration and not a bump (TYTO-78, TYTO-83); TYTO-80 did the
+    // migration, `release.yml` moved to `changesets/action@v2`, and this is the check that
+    // made the entry's removal part of that PR instead of something to remember later —
+    // past its reason it would have stopped refusing the version it was written for and
+    // started hiding the next one, silently, because Dependabot never reports what it
+    // skipped.
     //
     // So the refusal is tied to the thing it refuses: the moment a workflow uses the major
     // being ignored, this fails and the entry has to go. The npm half is the test below —
     // the same rule, read against the manifests instead of against `uses:`.
+    //
+    // As of TYTO-80 the actions ecosystem ignores nothing, so this iterates over an empty
+    // list and asserts nothing today. That is the intended resting state, not a hole: it
+    // is here for the next entry somebody adds.
     //
     // What this does not check, and cannot: whether Dependabot honours the entry. It reads
     // the two files and compares them, and the first version of this entry passed here
