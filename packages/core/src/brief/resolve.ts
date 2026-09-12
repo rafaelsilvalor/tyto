@@ -371,8 +371,16 @@ class Resolver {
       if (slot.repeat) {
         const count = this.artworks.length;
         if (slot.min !== undefined && count < slot.min) {
+          // Too few occurrences has no occurrence to point at — zero of them is the
+          // usual case — so it borrows the same fallback `E_MISSING_REQUIRED_SLOT`
+          // uses. A span covering the frontmatter beats a diagnostic an editor cannot
+          // place anywhere at all.
           this.report(
-            badValue(name, `appears ${count} times and the manifest needs ${slot.min}`, undefined),
+            badValue(
+              name,
+              `appears ${count} times and the manifest needs ${slot.min}`,
+              fallbackRange,
+            ),
           );
         }
         if (slot.max !== undefined && count > slot.max) {

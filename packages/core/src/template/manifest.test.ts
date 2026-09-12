@@ -152,6 +152,27 @@ describe('the rules a shape alone cannot state', () => {
     expect(pathsOf(rejected(source))).toEqual(['slots.titulo.min']);
   });
 
+  it.each(['image', 'enum, values: [a]'])(
+    'refuses a max on a non-repeatable %s slot, which has no characters to count',
+    (type) => {
+      const source = MINIMAL.replace('{ type: rich-text }', `{ type: ${type}, max: 60 }`);
+      expect(pathsOf(rejected(source))).toEqual(['slots.titulo.max']);
+    },
+  );
+
+  it('blames both bounds when a non-repeatable image slot carries both', () => {
+    const source = MINIMAL.replace('{ type: rich-text }', '{ type: image, min: 1, max: 60 }');
+    expect(pathsOf(rejected(source))).toEqual(['slots.titulo.min', 'slots.titulo.max']);
+  });
+
+  it('allows the same bounds once the slot repeats, where they count occurrences', () => {
+    const source = MINIMAL.replace(
+      '{ type: rich-text }',
+      '{ type: image, repeat: true, min: 1, max: 10 }',
+    );
+    expect(accepted(source).slots.titulo).toMatchObject({ repeat: true, min: 1, max: 10 });
+  });
+
   it('refuses an adjustment that applies to a slot nobody declared', () => {
     const source = `${MINIMAL}adjustments:\n  destaque: { type: flag, applies: [slide] }\n`;
     expect(pathsOf(rejected(source))).toEqual(['adjustments.destaque.applies.0']);
