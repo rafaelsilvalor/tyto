@@ -60,8 +60,22 @@ updates:
       # and every other action bump — a security one included — queues behind a migration
       # inside a pull request that cannot merge (TYTO-83).
       #
-      # Narrow on purpose: only the 2.x line. A later major is still offered, and a broad
-      # `version-update:semver-major` would silence this dependency for good. Remove the
-      # whole entry with TYTO-80.
+      # Narrow on purpose: only the major being refused. A later major is still offered,
+      # and a broad `version-update:semver-major` would silence this dependency for good.
+      # Remove the whole entry with TYTO-80.
+      #
+      # `'2'` and not `'2.x'`, and the difference is not cosmetic. A GitHub Actions version
+      # is the *ref* the workflow pins — `2`, the way `actions/checkout` is `7` — not a
+      # semver release, so a semver range matches nothing. The first attempt spelled it
+      # `'2.x'`, the updater accepted the condition and printed it, and opened the pull
+      # request anyway (TYTO-83):
+      #
+      #   Checking if changesets/action 1 needs updating
+      #   Ignored versions:
+      #     2.x - from .github/dependabot.yml
+      #   Available release version/ref is 2
+      #
+      # The npm entry below the fold keeps `7.x`, which is right there: npm versions are
+      # real semver and the range is what matches them.
       - dependency-name: changesets/action
-        versions: ['2.x']
+        versions: ['2']
