@@ -41,24 +41,25 @@ import textFixture from './__fixtures__/text.json';
  * two keep one file each; three copies of the same bytes in Git LFS is not a split.
  *
  * `text.feed` is where the reasoning does bite, and it was the case the key was reserved
- * for. Its Windows reference against the Linux render of the same commit, measured on the
- * corpus as TYTO-61 recorded it:
+ * for. Its Windows reference against the Linux render of the same commit:
  *
  * ```
  * threshold                 0     0.005      0.01      0.02      0.05       0.1       0.2
- * win32 vs linux       1.207%    1.109%    1.040%    0.899%    0.533%    0.159%    0.003%
+ * win32 vs linux       1.207%    1.109%    1.040%    0.899%    0.532%    0.159%    0.003%
  * ```
  *
- * **1 664 pixels of 160 000 differed at the threshold this suite runs at — 1.040%, ten
- * times the tolerance — and the largest single-channel difference was 112 of 255.** The
- * two references have both been re-recorded since, for the leading fix in TYTO-65; the
- * shape of the divergence is what this paragraph is for, and it did not change. The diff is
+ * **1 664 pixels of 160 000 differ at the threshold this suite runs at — 1.040%, ten times
+ * the tolerance — and the largest single-channel difference is 112 of 255.** The diff is
  * glyph edges and nothing else: no letter moved, the two rasterizers just fill the
  * antialiased boundary differently. It only falls under the tolerance at `threshold: 0.2`,
  * where a channel could be 112 steps wrong before the suite counted it, which is not a
  * tolerance, it is a blindfold. So `text.feed` is keyed on the platform and the shape
  * fixtures are not, `referenceFile` is the whole of that rule, and the perturbation table
  * under `TOLERANCE` is why the answer was not a bigger number.
+ *
+ * Both references were re-recorded in TYTO-65, for the leading fix, and this table was
+ * re-measured against the new pair: it moved by one thousandth of a percent, in one
+ * column. The fix changed where the glyphs sit, not how the two platforms draw them.
  *
  * The other half of the question is stability on one platform, and there it is clean:
  * **12 of 12 re-renders of `text.feed` came back byte-identical on win32**, and the Linux
