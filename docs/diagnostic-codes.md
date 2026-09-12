@@ -49,6 +49,7 @@ successful result (ADR 0013).
 | `E_OUTPUT_WRITE` | error | An artifact was rendered but could not be written to the output. |
 | `W_TEXT_OVERFLOW` | warning | Compiled text does not fit its frame in one of the requested formats. |
 | `W_UNUSED_SLOT` | warning | The brief sets a slot the chosen template never renders. |
+| `W_MARKUP_IN_FRONTMATTER` | warning | A frontmatter scalar on a rich-text slot contains what looks like inline markup. |
 
 ## Errors
 
@@ -533,3 +534,15 @@ Slot '{slot}' is set in the brief but template '{template}' does not use it.
 ```
 
 Parameters: `slot`, `template`
+
+### `W_MARKUP_IN_FRONTMATTER`
+
+**Severity:** warning · **Spec:** `docs/brief-language.md`
+
+A frontmatter scalar on a rich-text slot contains what looks like inline markup.
+
+```
+Slot '{slot}' is set in the frontmatter, where '{markup}' is literal text. Write it as a ::{slot} directive for it to be markup.
+```
+
+Parameters: `slot`, `markup`
