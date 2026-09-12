@@ -1,5 +1,11 @@
 # @tyto/io
 
+## 1.0.1
+
+### Patch Changes
+
+- @tyto/pipeline@0.5.1
+
 ## 1.0.0
 
 ### Major Changes
