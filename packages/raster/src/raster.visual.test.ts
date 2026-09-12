@@ -45,7 +45,7 @@ import textFixture from './__fixtures__/text.json';
  *
  * ```
  * threshold                 0     0.005      0.01      0.02      0.05       0.1       0.2
- * win32 vs linux       1.207%    1.109%    1.040%    0.899%    0.533%    0.159%    0.003%
+ * win32 vs linux       1.207%    1.109%    1.040%    0.899%    0.532%    0.159%    0.003%
  * ```
  *
  * **1 664 pixels of 160 000 differ at the threshold this suite runs at — 1.040%, ten times
@@ -56,6 +56,10 @@ import textFixture from './__fixtures__/text.json';
  * tolerance, it is a blindfold. So `text.feed` is keyed on the platform and the shape
  * fixtures are not, `referenceFile` is the whole of that rule, and the perturbation table
  * under `TOLERANCE` is why the answer was not a bigger number.
+ *
+ * Both references were re-recorded in TYTO-65, for the leading fix, and this table was
+ * re-measured against the new pair: it moved by one thousandth of a percent, in one
+ * column. The fix changed where the glyphs sit, not how the two platforms draw them.
  *
  * The other half of the question is stability on one platform, and there it is clean:
  * **12 of 12 re-renders of `text.feed` came back byte-identical on win32**, and the Linux
@@ -128,9 +132,10 @@ const CHANNEL = process.env['TYTO_RASTER_CHANNEL'];
  * headline shifted 1px                    0.419%    0.381%    0.378%    0.372%    0.364%    0.351%
  * body shifted 1px                        1.471%    1.445%    1.421%    1.367%    1.252%    1.066%
  * kicker shifted 1px                      0.253%    0.248%    0.243%    0.232%    0.206%    0.166%
- * body size 15 → 15.25                    1.944%    1.904%    1.884%    1.843%    1.709%    1.527%
- * body line-height 1.45 → 1.5             0.000%    0.000%    0.000%    0.000%    0.000%    0.000%
- * body line-height 1.45 → 1.6             1.479%    1.437%    1.408%    1.351%    1.204%    1.023%
+ * body size 15 → 15.25                    1.998%    1.965%    1.948%    1.915%    1.784%    1.601%
+ * body line-height 1.45 → 1.46            0.000%    0.000%    0.000%    0.000%    0.000%    0.000%
+ * body line-height 1.45 → 1.5             1.409%    1.371%    1.343%    1.291%    1.148%    0.988%
+ * body line-height 1.45 → 1.6             1.789%    1.747%    1.724%    1.682%    1.547%    1.340%
  * kicker letterSpacing 2.5 → 2.6          0.151%    0.146%    0.143%    0.134%    0.108%    0.074%
  * one digit changed in the body           0.024%    0.024%    0.023%    0.020%    0.017%    0.011%
  * headline weight 700 → 400               3.885%    3.841%    3.834%    3.820%    3.775%    3.746%
@@ -154,13 +159,26 @@ const CHANNEL = process.env['TYTO_RASTER_CHANNEL'];
  * nothing here should be read as saying it does; a wrong word is a job for a snapshot of
  * the exporter's string, which is what `export-html`'s own tests are.
  *
- * **A line-height of 1.45 and one of 1.5 are the same image, at `threshold: 0`.** That is
- * not the tolerance being generous — it is Chromium quantizing the used line-height to
- * whole pixels: 15px × 1.45 = 21.75 and 15px × 1.5 = 22.5 both land on 22. The next value
- * that lands anywhere else, 1.6, moves 1.408%. So the suite's floor for leading is the
- * rasterizer's, not this file's, and a tolerance change would not move it. It is listed
- * because a reader who sees 0.000% and concludes the check is weak would draw the wrong
- * conclusion about which instrument produced it.
+ * **A line-height of 1.45 and one of 1.46 are the same image, at `threshold: 0`.** 1.46 ×
+ * 15px is 21.9 against 21.75, so a second line moves 0.15px, and Chromium snaps a glyph
+ * box's top to a whole pixel. The floor for leading is therefore the rasterizer's and not
+ * this file's: a tolerance change would not move it. 1.5, the next step up, moves 1.343%.
+ *
+ * ## A correction, because this table told a lie for one commit
+ *
+ * The row above used to read `1.45 → 1.5   0.000%` across the board, and this file
+ * explained it as Chromium quantizing the used line-height to whole pixels. **That was
+ * wrong, and it was covering a defect rather than describing the browser.** `export-html`
+ * was writing `line-height` on the node and `font-size` on the run's span, so the block's
+ * strut came from the document default — Times New Roman at 16px — and dominated the
+ * leading the IR had asked for. Both 1.45 and 1.5 were being ignored, which is why both
+ * looked the same. TYTO-65 fixed the exporter, and the row now moves 1.343%.
+ *
+ * It is recorded rather than quietly edited because of what it cost: a measured 0.000%
+ * with a plausible explanation attached read as a property of the rasterizer for a whole
+ * commit, and the thing it was actually measuring was a bug two packages away. The lesson
+ * is in `text-metrics.visual.test.ts` — the CSS string said `line-height: 1.45` the entire
+ * time, and only the laid-out geometry disagreed.
  */
 const TOLERANCE = 0.001;
 
