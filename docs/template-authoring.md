@@ -67,6 +67,10 @@ These are the rules it enforces beyond the shape:
   one** — `titulo` above is capped at 60 characters, `slide` at 10 slides. Two meanings for
   two keys is a footgun, and it is the one the example above already writes; renaming them
   is a change to this document, not to the schema alone.
+- **Neither is accepted where it would count nothing.** Characters only exist on
+  `rich-text`, so `{ type: image, max: 60 }` and `{ type: enum, min: 2 }` are errors at
+  `slots.<name>.max` and `slots.<name>.min` rather than caps that silently never fire. Add
+  `repeat: true` and the same pair counts occurrences, which is meaningful for every type.
 - **At most one slot may repeat.** Each occurrence becomes an `Artwork`, so a second
   repeatable slot would leave the number of artworks undefined.
 - **A slot or adjustment name has to be a name a brief can write** — the grammar's

@@ -24,7 +24,9 @@ import { type Diagnostics, type Result, err, ok } from '../result/result.js';
  * the manifest key in the message, than as a parse error in every brief that tries.
  *
  * The pattern is duplicated rather than imported: `brief-lang` depends on `core`, so the
- * arrow only points one way. If the grammar's identifier changes, this changes with it.
+ * arrow only points one way. If the grammar's identifier changes, this changes with it —
+ * and `tools/repo-checks/src/grammar-identifier.test.ts` fails the build when only one of
+ * the two moves, from outside both packages, where the coupling is visible.
  */
 const IDENTIFIER = /^[a-zA-Z_][a-zA-Z0-9_-]*$/u;
 
@@ -82,6 +84,22 @@ export const slotSchema = z
         path: ['values'],
         message: `values are only meaningful on an enum slot, not on '${slot.type}'`,
       });
+    }
+
+    // On a non-repeatable slot the pair counts characters, and only `rich-text` has any:
+    // an `image` is a path the author never sees rendered and an `enum` is one of a listed
+    // set, so `{ type: image, max: 60 }` reads like a rule and enforces nothing. Refused
+    // here rather than ignored at `resolve`, where a cap that silently does nothing is the
+    // worse of the two.
+    if (!slot.repeat && slot.type !== 'rich-text') {
+      for (const bound of ['min', 'max'] as const) {
+        if (slot[bound] === undefined) continue;
+        context.addIssue({
+          code: 'custom',
+          path: [bound],
+          message: `${bound} counts characters on a non-repeatable slot, and a '${slot.type}' slot has none; it is only meaningful on 'rich-text' or with repeat: true`,
+        });
+      }
     }
 
     if (slot.min !== undefined && slot.max !== undefined && slot.min > slot.max) {
