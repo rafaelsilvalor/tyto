@@ -386,6 +386,27 @@ describe('the values a manifest constrains', () => {
     );
   });
 
+  it('blames the frontmatter for too few, there being no occurrence to point at', async () => {
+    // Zero of them is the usual way to be short of `min`, and nothing in the file marks
+    // the slide that was not written. The span `E_MISSING_REQUIRED_SLOT` falls back to is
+    // the same honest answer, and beats a diagnostic an editor cannot place at all.
+    const ast = brief(frontmatter({ template: 'promo-curso' }), [directive('titulo', 'Direito')]);
+    const [problem] = (await problems(ast)).filter((item) =>
+      item.message.includes('the manifest needs'),
+    );
+    expect(problem?.range).toEqual(ast.frontmatter.range);
+  });
+
+  it('blames it the same way when some occurrences are there but not enough', async () => {
+    const manifest = MANIFEST.replace('repeat: true, min: 1', 'repeat: true, min: 2');
+    const ast = valid();
+    const [problem] = (await problems(ast, { registry: registryOf(manifestOf(manifest)) })).filter(
+      (item) => item.message.includes('the manifest needs'),
+    );
+    expect(problem?.message).toContain('appears 1 times and the manifest needs 2');
+    expect(problem?.range).toEqual(ast.frontmatter.range);
+  });
+
   it('refuses too many, and blames the first one over the limit', async () => {
     const fourth = sourceRange(90, 100);
     const ast = valid({
