@@ -1,22 +1,27 @@
 version: 2
 updates:
-  # The npm half of this file has never completed a run, and the cause is not in this file
-  # — it is the `packageManager` pin. Dependabot honours `pnpm@12.3.4` from package.json
-  # and installs it into the updater container, but pnpm 12 publishes a launcher rather
-  # than the program: first run fetches `@pnpm/exe.<platform>`, and that fetch never
-  # reaches the container's proxy, which is the only route out of it. So `pnpm -v` exits 1,
-  # every `pnpm update --lockfile-only` after it exits 1, and all eleven dependencies fail
-  # at `update_files` reporting `unknown_error` with no detail (TYTO-79). Measured in the
-  # private job log of 2026-09-12: 0 of the proxy's 120 requests were for `@pnpm/exe`, and
-  # the proxy recorded no error of its own.
+  # The npm updater runs on whatever `packageManager` in package.json names, inside a
+  # container whose only route to the network is a proxy. That pin is part of this
+  # configuration, and it reads `packageManager pnpm@11.27.0` deliberately. pnpm 12
+  # publishes a launcher rather than the program, and on the Corepack path — the one
+  # Dependabot takes, because Corepack installs no optional dependencies — the launcher
+  # downloads `@pnpm/exe.<target>` through a bare `fetch` that installs no dispatcher. It
+  # therefore cannot honour HTTP(S)_PROXY, never leaves the container, and every `pnpm`
+  # call after it exits 1 (TYTO-79, TYTO-82).
   #
-  # Ruled out: the `dev`/`prod` grouping, the lockfile and the workspace layout. Resolution
-  # succeeds for every dependency — the log shows it finding each latest version — and the
-  # run dies before any of the three is read. Not ruled out, and not ours: whether pnpm's
-  # launcher could be made to honour the proxy. The lever this repository holds is the pin,
-  # and moving it is a toolchain decision, not a fix for a robot.
+  # Measured rather than assumed. pnpm 11.27.0 ships no launcher at all: no
+  # `native-binary.mjs`, no `install.js`, no `@pnpm/exe.*` optional dependencies, and 21 MB
+  # of JavaScript in `dist/` that Node runs directly. Moving the pin cost 101 lines of
+  # `pnpm-lock.yaml` — pnpm 12 and its eight platform binaries leaving the file, and a
+  # `settings:` header arriving — while 0 of the project's own 472 packages changed
+  # resolution.
   #
-  # The grouping stays either way: one pull request a week is the point (TYTO-76).
+  # Ruled out: staying on pnpm 12 and waiting for it to be fixed upstream. The downloader
+  # in 12.4.1 is byte-identical to the one in 12.3.4, and nothing under `get-pnpm/`
+  # mentions a proxy agent. Ruled out earlier, by TYTO-79: the grouping below, the
+  # lockfile and the workspace layout, none of which the failing run ever reached.
+  #
+  # The grouping stays: one pull request a week is the point (TYTO-76).
   - package-ecosystem: npm
     directory: /
     schedule: { interval: weekly }
