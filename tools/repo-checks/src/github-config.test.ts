@@ -27,6 +27,8 @@ const directoriesIn = (relativePath: string) =>
 
 interface Workflow {
   name?: string;
+  on?: string | string[] | Record<string, unknown>;
+  concurrency?: { group?: string; 'cancel-in-progress'?: boolean };
   jobs?: Record<
     string,
     {
@@ -37,6 +39,14 @@ interface Workflow {
 }
 
 const WORKFLOWS_DIR = '.github/workflows';
+
+/** The events a workflow runs on, however its `on:` is written. */
+function triggersOf(workflow: Workflow): string[] {
+  const on = workflow.on;
+  if (typeof on === 'string') return [on];
+  if (Array.isArray(on)) return on;
+  return on === undefined ? [] : Object.keys(on);
+}
 
 const workflowFiles = readdirSync(join(repoRoot, WORKFLOWS_DIR)).filter((file) =>
   file.endsWith('.yml'),
@@ -97,6 +107,28 @@ describe('workflows', () => {
       const value = new RegExp(`${field}: '([^']+)'`).exec(release)?.[1];
       expect(value, `release.yml has no ${field}`).toBeDefined();
       expect(value).toMatch(/^\w+(\([\w-]+\))?: TYTO-\d+ [a-z0-9]/);
+    }
+  });
+
+  it('key a pull_request_target concurrency group on the pull request, not on github.ref', () => {
+    // `github.ref` means opposite things on the two triggers. On `pull_request` it is
+    // `refs/pull/<n>/merge` and is already unique per PR, which is why the sibling
+    // workflows are right to use it. On `pull_request_target` it is the *base* branch, so
+    // every open PR against main lands in one group and each new one cancels the last —
+    // 4 of 5 labeler runs were cancelled the day Dependabot opened five at once (TYTO-77).
+    for (const file of workflowFiles) {
+      const workflow = readYaml<Workflow>(`${WORKFLOWS_DIR}/${file}`);
+      if (!triggersOf(workflow).includes('pull_request_target')) continue;
+
+      const group = workflow.concurrency?.group;
+      expect(group, `${file} runs on pull_request_target with no concurrency group`).toBeDefined();
+      expect(
+        group,
+        `${file} keys its concurrency group on github.ref, which is the base branch`,
+      ).not.toMatch(/github\.ref\b/);
+      expect(group, `${file} does not key its concurrency group on the pull request`).toMatch(
+        /github\.event\.pull_request\.number/,
+      );
     }
   });
 
