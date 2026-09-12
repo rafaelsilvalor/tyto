@@ -1,5 +1,12 @@
 # @tyto/brief-lang
 
+## 0.5.2
+
+### Patch Changes
+
+- Updated dependencies [f0d3d25]
+  - @tyto/core@0.17.0
+
 ## 0.5.1
 
 ### Patch Changes
