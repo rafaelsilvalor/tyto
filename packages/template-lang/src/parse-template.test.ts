@@ -20,6 +20,48 @@ function parsedOrThrow(source: string) {
   return result.value;
 }
 
+describe('a template written with any line ending', () => {
+  /**
+   * TYTO-64 asked whether `template.html` has the brief language's problem. It does not,
+   * and this records the measurement rather than assuming the conclusion.
+   *
+   * The reason is structural. `brief.grammar` is line-oriented — a directive ends at its
+   * break, an indented block is recognised by the break in front of it — so it names the
+   * newline in half a dozen tokens and had to learn the other two endings in every one of
+   * them. This grammar is not line-oriented: its `space` token takes the carriage return
+   * alongside the tab and the newline, and `@skip` drops all three everywhere. A carriage
+   * return has never been anything here but whitespace.
+   */
+  const CRLF = (text: string) => text.replaceAll('\n', '\r\n');
+  const CR = (text: string) => text.replaceAll('\n', '\r');
+
+  it.each([
+    ['CRLF', CRLF],
+    ['CR', CR],
+  ])('parses the doc example the same as LF does — %s', (_name, rewrite) => {
+    const asLf = parsedOrThrow(doc);
+    const other = parsedOrThrow(rewrite(doc));
+
+    expect(other.elements.map((element) => element.tag)).toEqual(
+      asLf.elements.map((element) => element.tag),
+    );
+    expect(other.styles.length).toBe(asLf.styles.length);
+  });
+
+  it.each([
+    ['CRLF', CRLF],
+    ['CR', CR],
+  ])('puts a node at the same line and column as LF does — %s', (_name, rewrite) => {
+    const rewritten = rewrite(doc);
+    const [asLf] = parsedOrThrow(doc).elements;
+    const [other] = parsedOrThrow(rewritten).elements;
+
+    expect(lineColumnAt(rewritten, other!.range.start)).toEqual(
+      lineColumnAt(doc, asLf!.range.start),
+    );
+  });
+});
+
 describe('the example in docs/template-authoring.md', () => {
   it('parses, with the frames at the top level and one stylesheet under them', () => {
     const document = parsedOrThrow(doc);

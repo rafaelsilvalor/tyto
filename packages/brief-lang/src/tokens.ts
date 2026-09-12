@@ -10,19 +10,39 @@ import { Frontmatter, virtualNewline } from './brief.parser.terms.js';
  */
 
 const NEWLINE = 10;
+const RETURN = 13;
 const TAB = 9;
 const SPACE = 32;
 const DASH = 45;
 
+type Input = { peek: (offset: number) => number };
+
+/**
+ * True where a line ends: `\n`, `\r\n` or a lone `\r` (TYTO-64).
+ *
+ * The same three the grammar's `lineBreak` accepts. This tokenizer scans by hand and
+ * cannot share that rule, so the two have to be changed together — a fence recognised
+ * here but not there, or the other way round, is a brief that half-parses.
+ */
+function isLineEnd(code: number): boolean {
+  return code === NEWLINE || code === RETURN;
+}
+
+/** Past the line ending at `offset`, however many units it takes. `\r\n` is one break. */
+function afterLineEnd(input: Input, offset: number): number {
+  if (input.peek(offset) === RETURN && input.peek(offset + 1) === NEWLINE) return offset + 2;
+  return offset + 1;
+}
+
 /** True when the line starting at `offset` is exactly `---`, ignoring trailing spaces. */
-function isFence(input: { peek: (offset: number) => number }, offset: number): boolean {
+function isFence(input: Input, offset: number): boolean {
   if (input.peek(offset) !== DASH || input.peek(offset + 1) !== DASH) return false;
   if (input.peek(offset + 2) !== DASH) return false;
 
   let after = offset + 3;
   while (input.peek(after) === SPACE || input.peek(after) === TAB) after += 1;
   const end = input.peek(after);
-  return end === NEWLINE || end < 0;
+  return isLineEnd(end) || end < 0;
 }
 
 /**
@@ -38,20 +58,20 @@ export const frontmatterBlock = new ExternalTokenizer((input) => {
   if (input.pos !== 0 || !isFence(input, 0)) return;
 
   let offset = 0;
-  // Past the opening fence's newline, then on until the closing one.
-  while (input.peek(offset) >= 0 && input.peek(offset) !== NEWLINE) offset += 1;
+  // Past the opening fence's line break, then on until the closing one.
+  while (input.peek(offset) >= 0 && !isLineEnd(input.peek(offset))) offset += 1;
   if (input.peek(offset) < 0) return;
-  offset += 1;
+  offset = afterLineEnd(input, offset);
 
   while (input.peek(offset) >= 0) {
     if (isFence(input, offset)) {
-      while (input.peek(offset) >= 0 && input.peek(offset) !== NEWLINE) offset += 1;
-      if (input.peek(offset) === NEWLINE) offset += 1;
+      while (input.peek(offset) >= 0 && !isLineEnd(input.peek(offset))) offset += 1;
+      if (input.peek(offset) >= 0) offset = afterLineEnd(input, offset);
       input.acceptToken(Frontmatter, offset);
       return;
     }
-    while (input.peek(offset) >= 0 && input.peek(offset) !== NEWLINE) offset += 1;
-    if (input.peek(offset) === NEWLINE) offset += 1;
+    while (input.peek(offset) >= 0 && !isLineEnd(input.peek(offset))) offset += 1;
+    if (input.peek(offset) >= 0) offset = afterLineEnd(input, offset);
   }
 
   // No closing fence: leave it unmatched so the parser reports it rather than swallowing
