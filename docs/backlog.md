@@ -60,6 +60,9 @@ Spec: `docs/template-authoring.md`, ADR 0005.
   writing `slot="texto"`, bound by `<use component="card" texto="slide">`. Substitution
   happens before `checkSlot`, so the existing slot type-checking and `renderedSlots` are
   unchanged. Without it a component only repeats shapes; with it, content. (M)
+- **E4.11** Register the built-in template pack, and say how it merges with `--templates`.
+  Opened straight on the board as TYTO-66 and never written here; this line exists so the
+  gap in the numbering is not read as a typo. (M)
 
 **What E4.9 is not, and what it costs.** Measured against the parser as it shipped in
 TYTO-24, not estimated:
