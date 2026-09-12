@@ -17,4 +17,10 @@
 # Checkouts that need the real bytes (ci.yml, visual.yml) pass `lfs: true`.
 **/__fixtures__/**/*.png filter=lfs diff=lfs merge=lfs -text
 
+# The one place in the repository where a line ending is the subject rather than the
+# medium. `* text=auto eol=lf` above would hand every checkout an LF copy of these, which
+# would leave the test that reads them asserting nothing (TYTO-68). `-text` keeps the bytes
+# exactly as committed, on every platform.
+tools/contract-test/src/fixture/line-endings/** -text
+
 pnpm-lock.yaml linguist-generated=true -diff

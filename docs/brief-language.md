@@ -79,6 +79,13 @@ had to answer them.
   end. The one exception is inside the frontmatter, where `yaml` does not recognise a lone
   `\r`: those are rewritten before it parses, which swaps one code unit for one and
   therefore moves nothing.
+- **Two places spell the rule, and a check keeps them spelling it the same.** The grammar's
+  `lineBreak` token is one; `isLineEnd` and `afterLineEnd` in `tokens.ts` are the other,
+  because an external tokenizer scans for the `---` fences by hand and cannot reach a rule
+  the grammar compiles away. `tools/repo-checks/src/grammar-line-break.test.ts` translates
+  the token and compares, so a fence recognised on one side and not the other fails
+  `pnpm check` instead of becoming a brief that half-parses. Same argument, same shape as
+  the `identifier` check beside it.
 - **`Namespace` includes its slash** (`ai/`), and the space between a directive name and
   its inline body sits inside `InlineBody`. Both are shapes the tokenizer forced, and
   `parseBrief` trims them; the ranges stay exact either way.

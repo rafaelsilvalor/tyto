@@ -1,0 +1,11 @@
+---
+template: cartaz
+formats: [feed]
+cor: laranja
+---
+// Saved by an editor on Windows. The bytes are the point of this file, so it is
+// exempt from the LF normalisation in .gitattributes (TYTO-68).
+::slide
+  Primeiro
+::slide
+  Segundo
