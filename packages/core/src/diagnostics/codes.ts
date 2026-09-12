@@ -268,6 +268,13 @@ export const diagnosticCodes = {
     template: "Slot '{slot}' is set in the brief but template '{template}' does not use it.",
     spec: 'docs/brief-language.md',
   },
+  W_MARKUP_IN_FRONTMATTER: {
+    severity: 'warning',
+    summary: 'A frontmatter scalar on a rich-text slot contains what looks like inline markup.',
+    template:
+      "Slot '{slot}' is set in the frontmatter, where '{markup}' is literal text. Write it as a ::{slot} directive for it to be markup.",
+    spec: 'docs/brief-language.md',
+  },
 } as const satisfies Record<string, DiagnosticCodeDefinition>;
 
 export type DiagnosticCode = keyof typeof diagnosticCodes;
