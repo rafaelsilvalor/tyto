@@ -33,7 +33,12 @@ interface Workflow {
     string,
     {
       env?: Record<string, string | number>;
-      steps?: { uses?: string; run?: string; env?: Record<string, string> }[];
+      steps?: {
+        uses?: string;
+        run?: string;
+        with?: Record<string, unknown>;
+        env?: Record<string, string>;
+      }[];
     }
   >;
 }
@@ -107,6 +112,50 @@ describe('workflows', () => {
       const value = new RegExp(`${field}: '([^']+)'`).exec(release)?.[1];
       expect(value, `release.yml has no ${field}`).toBeDefined();
       expect(value).toMatch(/^\w+(\([\w-]+\))?: TYTO-\d+ [a-z0-9]/);
+    }
+  });
+
+  it('pass changesets/action only input names the pinned major actually reads', () => {
+    // An action ignores an input it does not know rather than failing on it. v2 of this
+    // action renamed all four, so the bump left `commit:` and `title:` sitting in the file
+    // meaning nothing, and fell back to its own defaults — a version PR titled "Version
+    // Packages", with no Jira key and therefore unmergeable for good (TYTO-78). The test
+    // above kept passing the whole time, because it reads those strings out of the file
+    // and the file still had them. So the input *names* are pinned to the major.
+    //
+    // There is no entry for v2 on purpose: this repository is on Changesets CLI v2, which
+    // the action's v2 refuses to run against. Moving to it is a CLI migration, and adding
+    // a list here is the deliberate step that migration has to take.
+    const INPUTS_BY_MAJOR: Record<string, readonly string[]> = {
+      v1: [
+        'version',
+        'publish',
+        'commit',
+        'title',
+        'branch',
+        'cwd',
+        'setupGitUser',
+        'createGithubReleases',
+      ],
+    };
+
+    const steps = Object.values(readYaml<Workflow>(`${WORKFLOWS_DIR}/release.yml`).jobs ?? {})
+      .flatMap((job) => job.steps ?? [])
+      .filter((step) => step.uses?.startsWith('changesets/action@') === true);
+
+    expect(steps, 'release.yml no longer uses changesets/action').toHaveLength(1);
+
+    const major = steps[0]!.uses!.split('@')[1]!;
+    const allowed = INPUTS_BY_MAJOR[major];
+    expect(
+      allowed,
+      `no input list is pinned for changesets/action@${major}; it renamed every input between majors, and an unknown one is ignored rather than refused`,
+    ).toBeDefined();
+
+    for (const name of Object.keys(steps[0]!.with ?? {})) {
+      expect(allowed, `changesets/action@${major} does not read the input '${name}'`).toContain(
+        name,
+      );
     }
   });
 

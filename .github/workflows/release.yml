@@ -17,7 +17,11 @@ jobs:
         with: { node-version: 22, cache: pnpm }
       - run: pnpm install --frozen-lockfile
       - run: pnpm build
-      - uses: changesets/action@v2
+      # Pinned to v1 because this repository is on Changesets CLI v2, and v2 of the action
+      # refuses to run against it: "use Changesets action v1 instead, which is compatible
+      # with CLI v2." Moving to the action's v2 means moving the CLI to v3 first and
+      # renaming all four inputs below, which is TYTO-78's other half — not a bump.
+      - uses: changesets/action@v1
         with:
           version: pnpm changeset version
           publish: pnpm changeset tag
