@@ -28,7 +28,7 @@
     "@tyto/export-svg": "workspace:*",
     "@tyto/pipeline": "workspace:*",
     "@tyto/template-lang": "workspace:*",
-    "zod": "^4.5.4"
+    "zod": "^4.6.1"
   },
   "devDependencies": {
     "@tyto/brief-lang": "workspace:*",

@@ -29,7 +29,7 @@
   "dependencies": {
     "fontkit": "^2.0.4",
     "yaml": "^2.9.0",
-    "zod": "^4.5.4"
+    "zod": "^4.6.1"
   },
   "devDependencies": {
     "@types/fontkit": "^2.0.9"

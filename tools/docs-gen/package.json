@@ -13,7 +13,7 @@
   "dependencies": {
     "@tyto/core": "workspace:*",
     "@tyto/io": "workspace:*",
-    "zod": "^4.5.4"
+    "zod": "^4.6.1"
   },
   "devDependencies": {
     "vitest": "^3.2.4"
