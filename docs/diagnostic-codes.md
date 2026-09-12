@@ -33,13 +33,14 @@ successful result (ADR 0013).
 | `E_SCENE_EMPTY_TEXT` | error | A text node has nothing to draw — no runs at all, or only line breaks. |
 | `E_TEMPLATE_VALUE` | error | A template SDK builder was given a value it cannot turn into IR. |
 | `E_TEMPLATE_CRASH` | error | A template threw while building its scene, which is a bug in the template. |
+| `E_FORMATS_READ` | error | The project's formats.yaml could not be read from the filesystem. |
 | `E_FORMATS_SYNTAX` | error | The project's formats.yaml is not valid YAML. |
 | `E_FORMATS_SHAPE` | error | A formats file parses as YAML but does not match the formats schema. |
 | `E_FORMAT_NOT_DEFINED` | error | A template renders a format the project does not define a size for. |
 | `E_MANIFEST_SYNTAX` | error | A template manifest is not valid YAML. |
 | `E_MANIFEST_SHAPE` | error | A template manifest parses as YAML but does not match the manifest schema. |
 | `E_TEMPLATE_DUPLICATE` | error | Two template folders declare the same manifest name. |
-| `E_TEMPLATE_READ` | error | A template folder or manifest could not be read from the filesystem. |
+| `E_TEMPLATE_READ` | error | A template folder, manifest or markup file could not be read from the filesystem. |
 | `E_INPUT_READ` | error | A file or folder a command was pointed at could not be read. |
 | `E_EXPORT_ASSET_UNRESOLVED` | error | An exporter was given no bytes for an asset the scene draws. |
 | `E_EXPORT_FONT_UNRESOLVED` | error | An exporter was given no bytes for a font the scene draws text in. |
@@ -341,6 +342,18 @@ Template '{template}' failed while building the scene: {problem}.
 
 Parameters: `template`, `problem`
 
+### `E_FORMATS_READ`
+
+**Severity:** error · **Spec:** `docs/template-authoring.md`
+
+The project's formats.yaml could not be read from the filesystem.
+
+```
+Could not read formats file '{path}': {problem}.
+```
+
+Parameters: `path`, `problem`
+
 ### `E_FORMATS_SYNTAX`
 
 **Severity:** error · **Spec:** `docs/template-authoring.md`
@@ -417,10 +430,10 @@ Parameters: `name`, `first`, `second`
 
 **Severity:** error · **Spec:** `docs/template-authoring.md`
 
-A template folder or manifest could not be read from the filesystem.
+A template folder, manifest or markup file could not be read from the filesystem.
 
 ```
-Could not read '{path}': {problem}.
+Could not read template '{path}': {problem}.
 ```
 
 Parameters: `path`, `problem`

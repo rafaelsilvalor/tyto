@@ -142,7 +142,7 @@ describe('reading the file', () => {
 
     expect(result.ok).toBe(false);
     if (!result.ok) {
-      expect(result.error[0]?.code).toBe('E_TEMPLATE_READ');
+      expect(result.error[0]?.code).toBe('E_FORMATS_READ');
       expect(result.error[0]?.message).toContain('formats.yaml');
     }
   });
