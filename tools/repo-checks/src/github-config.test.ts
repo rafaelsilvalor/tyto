@@ -262,7 +262,11 @@ describe('git attributes', () => {
 
 describe('dependabot', () => {
   interface DependabotConfig {
-    updates?: { 'package-ecosystem'?: string; groups?: Record<string, unknown> }[];
+    updates?: {
+      'package-ecosystem'?: string;
+      groups?: Record<string, unknown>;
+      ignore?: { 'dependency-name'?: string; versions?: string[] }[];
+    }[];
   }
 
   const DEPENDABOT_CONFIG = '.github/dependabot.yml';
@@ -308,5 +312,50 @@ describe('dependabot', () => {
       recorded,
       `${DEPENDABOT_CONFIG} explains the npm updater in terms of pnpm ${recorded}, but package.json pins pnpm ${pinned}; re-read the reasoning before inheriting it`,
     ).toBe(pinned);
+  });
+
+  it('ignores no action major the workflows have since moved to', () => {
+    // An `ignore` entry is a refusal with an expiry date nobody writes down. `changesets/
+    // action` 2.x is ignored because the action's v2 will not run against Changesets CLI
+    // v2, which is a migration and not a bump (TYTO-80, TYTO-83) — and the day that
+    // migration lands, the entry stops protecting anything and starts hiding the next
+    // version instead, silently, because Dependabot does not report what it skipped.
+    //
+    // So the refusal is tied to the thing it refuses: the moment a workflow uses the major
+    // being ignored, this fails and the entry has to go. Only the actions ecosystem is
+    // checked, because only there does the repository state the version in a file that can
+    // be read back — an npm ignore would have to be matched against the manifest instead.
+    const actions = (readYaml<DependabotConfig>(DEPENDABOT_CONFIG).updates ?? []).find(
+      (entry) => entry['package-ecosystem'] === 'github-actions',
+    );
+    expect(
+      actions,
+      'dependabot.yml no longer configures the github-actions ecosystem',
+    ).toBeDefined();
+
+    const usedMajors = new Map(
+      workflowFiles
+        .flatMap((file) => Object.values(readYaml<Workflow>(`${WORKFLOWS_DIR}/${file}`).jobs ?? {}))
+        .flatMap((job) => job.steps ?? [])
+        .map((step) => step.uses)
+        .filter((uses) => uses !== undefined)
+        .map((uses) => [uses.split('@')[0]!, uses.split('@')[1]!]),
+    );
+
+    for (const rule of actions!.ignore ?? []) {
+      const name = rule['dependency-name'];
+      const inUse = name === undefined ? undefined : usedMajors.get(name);
+      for (const spec of rule.versions ?? []) {
+        const ignoredMajor = /^(\d+)\./.exec(spec)?.[1];
+        expect(
+          ignoredMajor,
+          `${DEPENDABOT_CONFIG} ignores '${name}' at '${spec}', which names no major`,
+        ).toBeDefined();
+        expect(
+          inUse,
+          `${DEPENDABOT_CONFIG} ignores ${name}@${spec}, but the workflows already use ${inUse}; the entry now hides the next version instead of the one it was written for`,
+        ).not.toBe(`v${ignoredMajor}`);
+      }
+    }
   });
 });
