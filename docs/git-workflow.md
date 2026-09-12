@@ -61,6 +61,8 @@ The move cost less than it looked like it would, which is why it was made rather
 
 `tools/repo-checks/src/github-config.test.ts` holds the pin and the note in `.github/dependabot.yml` to the same pnpm major, so leaving pnpm 11 fails the suite and the reasoning is re-read rather than inherited.
 
+**One `ignore` entry, and it exists because the group is a single pull request.** `changesets/action` 2.x is skipped: the action's v2 refuses to run against Changesets CLI v2, so the bump is the migration carded as TYTO-80 rather than a version number, and `check` fails on it (TYTO-78). Left open, that rejected pull request is the one the weekly run keeps updating, and every other action bump queues behind it — which is what PR #93 was about to become (TYTO-83). The entry is narrow, `2.x` and not `version-update:semver-major`, so a later major is still offered; TYTO-80 deletes it. An `ignore` is a refusal with no expiry date written on it, so `github-config.test.ts` fails once a workflow uses the major being ignored — Dependabot never reports what it skipped, and that is the only way the entry announces that it has gone stale.
+
 ## Line endings in Git
 
 `* text=auto eol=lf` gives every checkout LF, on every platform. One directory is exempt with `-text`: `tools/contract-test/src/fixture/line-endings/`, where a line ending is the subject rather than the medium. `crlf.brief` is a brief saved the way an editor on Windows saves one, and the test beside it asserts the carriage returns are still there **before** it asserts the parser accepts them — without the exemption the fixture would arrive normalised and the test would pass while measuring nothing (TYTO-68).
