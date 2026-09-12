@@ -130,6 +130,14 @@ interface Candidate {
   readonly text: RichText;
   readonly adjustments: readonly ResolvedAdjustment[];
   readonly range: SourceRange;
+  /**
+   * Where the name was written, which is not always where the value was.
+   *
+   * A wrong slot name is a problem with the name: `::rodape` followed by three lines of
+   * body is one misspelled word, and `range` would underline all four lines. A frontmatter
+   * key is its own name, so there the two spans are the same one.
+   */
+  readonly nameRange: SourceRange;
 }
 
 function candidateOf(directive: Directive): Candidate {
@@ -142,6 +150,7 @@ function candidateOf(directive: Directive): Candidate {
       range: adjustment.range,
     })),
     range: directive.range,
+    nameRange: directive.nameRange,
   };
 }
 
@@ -152,6 +161,7 @@ function scalarCandidate(name: string, value: string, range: SourceRange): Candi
     text: [{ kind: 'text', value, range }],
     adjustments: [],
     range,
+    nameRange: range,
   };
 }
 
@@ -183,7 +193,7 @@ class Resolver {
   async take(candidate: Candidate, fromFrontmatter: boolean): Promise<void> {
     const slot = this.manifest.slots[candidate.name];
     if (slot === undefined) {
-      this.report(unknownSlot(candidate.name, this.manifest, candidate.range));
+      this.report(unknownSlot(candidate.name, this.manifest, candidate.nameRange));
       return;
     }
 
@@ -502,7 +512,7 @@ export async function resolve(
         diagnostic(
           'E_UNKNOWN_DIRECTIVE',
           { directive: `${directive.namespace}/${directive.name}` },
-          { range: directive.range },
+          { range: directive.nameRange },
         ),
       );
       continue;

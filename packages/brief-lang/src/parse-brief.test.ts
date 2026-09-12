@@ -242,6 +242,26 @@ describe('the shapes the grammar forced, undone', () => {
     expect(directive?.range).toEqual({ start: 0, end: 31 });
     expect(minimal).toHaveLength(32);
   });
+
+  it('ranges the name apart from the directive, so a body does not widen it', () => {
+    // `::slide` over three indented lines: the name is seven characters into a span of
+    // sixty-odd, and a squiggle for a misspelled name has to be the seven.
+    const [directive] = astOf('indented-block.brief', indentedBlock).directives;
+    expect(directive?.nameRange).toEqual({ start: 2, end: 7 });
+    expect(indentedBlock.slice(2, 7)).toBe('slide');
+    expect(directive?.range.end).toBeGreaterThan(7);
+  });
+
+  it('takes the namespace and its slash into the name range, but never the ::', () => {
+    const [directive] = astOf('plugin-directive.brief', pluginDirective).directives;
+    expect(directive?.nameRange).toEqual({ start: 2, end: 12 });
+    expect(pluginDirective.slice(2, 12)).toBe('ai/caption');
+  });
+
+  it('ranges the name on a directive that has no body at all', () => {
+    const [directive] = astOf('minimal.brief', minimal).directives;
+    expect(minimal.slice(directive!.nameRange.start, directive!.nameRange.end)).toBe('titulo');
+  });
 });
 
 describe('what a directive says', () => {
