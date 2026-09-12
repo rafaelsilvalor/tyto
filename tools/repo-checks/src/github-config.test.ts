@@ -259,3 +259,45 @@ describe('git attributes', () => {
     }
   });
 });
+
+describe('dependabot', () => {
+  interface DependabotConfig {
+    updates?: { 'package-ecosystem'?: string; groups?: Record<string, unknown> }[];
+  }
+
+  const DEPENDABOT_CONFIG = '.github/dependabot.yml';
+
+  it('still groups the npm ecosystem into dev and prod', () => {
+    // One pull request a week is the point: `main` requires branches to be up to date, so
+    // five separate bumps are five update-and-rerun cycles (TYTO-76). The npm updater is
+    // failing for a reason the grouping has nothing to do with (below), which is exactly
+    // why an attempt to revive it must not quietly trade the grouping away.
+    const updates = readYaml<DependabotConfig>(DEPENDABOT_CONFIG).updates ?? [];
+    const npm = updates.find((entry) => entry['package-ecosystem'] === 'npm');
+
+    expect(npm, 'dependabot.yml no longer configures the npm ecosystem').toBeDefined();
+    expect(Object.keys(npm!.groups ?? {}).sort()).toEqual(['dev', 'prod']);
+  });
+
+  it('records the npm finding against the pnpm major package.json still pins', () => {
+    // The npm updater has never completed a run, and the cause is the `packageManager`
+    // pin rather than this configuration: pnpm 12 publishes a launcher instead of the
+    // program, its first run fetches `@pnpm/exe.<platform>`, and that fetch never reaches
+    // the updater container's proxy — 0 of the proxy's 120 requests, in the private job
+    // log of 2026-09-12 (TYTO-79). The note in dependabot.yml is the whole of what is
+    // known, and it is keyed to a major because the launcher is a property of pnpm 12 and
+    // not of 12.3.4: a patch bump leaves the finding true, leaving pnpm 12 turns it into a
+    // claim nobody measured. So the pin and the note are held to agree.
+    const packageManager = (JSON.parse(readRepoFile('package.json')) as { packageManager?: string })
+      .packageManager;
+    const pinned = /^pnpm@(\d+)\./.exec(packageManager ?? '')?.[1];
+    expect(pinned, 'package.json no longer pins a pnpm version in packageManager').toBeDefined();
+
+    const recorded = /pnpm@(\d+)\.\d+\.\d+/.exec(readRepoFile(DEPENDABOT_CONFIG))?.[1];
+    expect(recorded, `${DEPENDABOT_CONFIG} records no pnpm version`).toBeDefined();
+    expect(
+      recorded,
+      `${DEPENDABOT_CONFIG} explains the npm updater in terms of pnpm ${recorded}, but package.json now pins pnpm ${pinned}; re-read the finding before inheriting it`,
+    ).toBe(pinned);
+  });
+});
