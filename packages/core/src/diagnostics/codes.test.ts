@@ -30,6 +30,25 @@ describe('the catalog', () => {
   it.each(diagnosticCodeList)('%s uses only E_ or W_ as its prefix', (code) => {
     expect(code).toMatch(/^[EW]_[A-Z0-9_]+$/);
   });
+
+  it('never gives two codes the same message, because the code is what a handler reads', () => {
+    // A person reads the message, and a path is enough for them. A handler reads the code,
+    // so two codes sharing one sentence means the sentence was carrying the distinction all
+    // along. E_TEMPLATE_READ said "Could not read '{path}'" for a missing formats.yaml —
+    // accurate to a reader, and a lie to anything trying to tell a broken project apart
+    // from a broken template (TYTO-73).
+    const byTemplate = new Map<string, DiagnosticCode[]>();
+    for (const code of diagnosticCodeList) {
+      const { template } = diagnosticCodeDefinition(code);
+      byTemplate.set(template, [...(byTemplate.get(template) ?? []), code]);
+    }
+
+    const shared = [...byTemplate.entries()]
+      .filter(([, codes]) => codes.length > 1)
+      .map(([template, codes]) => `${codes.join(' and ')} both say "${template}"`);
+
+    expect(shared).toEqual([]);
+  });
 });
 
 describe('placeholderNames', () => {

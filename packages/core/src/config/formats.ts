@@ -107,7 +107,7 @@ export async function loadFormats(
     source = await fileSystem.readFile(path);
   } catch (cause) {
     return err([
-      diagnostic('E_TEMPLATE_READ', {
+      diagnostic('E_FORMATS_READ', {
         path,
         problem: cause instanceof Error ? cause.message : String(cause),
       }),
