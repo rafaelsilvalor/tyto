@@ -161,6 +161,11 @@ templates, the compiler knows a template and nothing about the brief that fed it
   _may_ be set; only the template says which are _drawn_, and reading a template is
   `compile`'s job. A caller that has already parsed one passes `renderedSlots` and gets the
   warning; a caller that has not gets silence rather than a guess.
+- **Too few occurrences is blamed on the frontmatter.** Falling short of a repeatable
+  slot's `min` usually means writing none of it, and nothing in the file marks the slide
+  that was never written — so it borrows the span `E_MISSING_REQUIRED_SLOT` falls back to.
+  Too _many_ is different: the first occurrence over the limit is right there, and carries
+  the diagnostic.
 - **A defaulted slot has no range**, because the brief never wrote it. Every other resolved
   slot carries the span of the directive or the frontmatter key that set it.
 - **A name diagnostic lands on the name.** `E_UNKNOWN_SLOT` and `E_UNKNOWN_DIRECTIVE` are
