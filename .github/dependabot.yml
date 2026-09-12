@@ -59,33 +59,26 @@ updates:
     directory: /
     schedule: { interval: weekly }
     groups: { actions: { patterns: ['*'] } }
-    ignore:
-      # `changesets/action` v2 renamed every input and refuses to run against Changesets
-      # CLI v2, which this repository is on — so the bump is a CLI migration rather than a
-      # version number, and it is carded as TYTO-80. The reasoning lives beside the pin in
-      # `release.yml`; `github-config.test.ts` is what makes the bump fail.
-      #
-      # Without this entry the refusal is not free. The `actions` group is one pull
-      # request, so the weekly run updates the rejected one instead of opening another,
-      # and every other action bump — a security one included — queues behind a migration
-      # inside a pull request that cannot merge (TYTO-83).
-      #
-      # Narrow on purpose: only the major being refused. A later major is still offered,
-      # and a broad `version-update:semver-major` would silence this dependency for good.
-      # Remove the whole entry with TYTO-80.
-      #
-      # `'2'` and not `'2.x'`, and the difference is not cosmetic. A GitHub Actions version
-      # is the *ref* the workflow pins — `2`, the way `actions/checkout` is `7` — not a
-      # semver release, so a semver range matches nothing. The first attempt spelled it
-      # `'2.x'`, the updater accepted the condition and printed it, and opened the pull
-      # request anyway (TYTO-83):
-      #
-      #   Checking if changesets/action 1 needs updating
-      #   Ignored versions:
-      #     2.x - from .github/dependabot.yml
-      #   Available release version/ref is 2
-      #
-      # The npm entry below the fold keeps `7.x`, which is right there: npm versions are
-      # real semver and the range is what matches them.
-      - dependency-name: changesets/action
-        versions: ['2']
+    # No `ignore` here, and the empty space is the finished state rather than a gap.
+    # `changesets/action` 2 was ignored while this repository ran Changesets CLI v2, which
+    # the action's v2 refuses — a migration wearing a version number's clothes (TYTO-78,
+    # TYTO-83). TYTO-80 did the migration, `release.yml` pins `changesets/action@v2`, and
+    # the entry went out with it: an `ignore` that outlives its reason stops refusing the
+    # version it was written for and starts hiding the next one, silently, because
+    # Dependabot never reports what it skipped. `github-config.test.ts` fails if a
+    # workflow ever uses a major this file still ignores, which is what forced the
+    # removal to happen here rather than be remembered.
+    #
+    # Worth keeping from that episode, for whoever writes the next entry: a GitHub Actions
+    # version is the *ref* the workflow pins — `2`, the way `actions/checkout` is `7` —
+    # not a semver release, so a semver range matches nothing. The first attempt spelled
+    # it `'2.x'`, the updater accepted the condition, printed it back as an ignored
+    # version, and opened the pull request anyway (TYTO-83):
+    #
+    #   Checking if changesets/action 1 needs updating
+    #   Ignored versions:
+    #     2.x - from .github/dependabot.yml
+    #   Available release version/ref is 2
+    #
+    # The npm entry above keeps `7.x`, which is right there: npm versions are real semver
+    # and the range is what matches them.
