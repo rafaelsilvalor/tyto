@@ -1,0 +1,127 @@
+<!-- promo-curso — a course promotion, in feed and story.
+
+     The type is "Source Sans 3" with no path, which is a `bundled` font: one the
+     repository ships (`fonts/`), not a file beside this template. Two templates carrying
+     their own megabyte of the same face would be a megabyte per template forever, and
+     `FontRef.source` already has a word for the other thing.
+
+     No `overflow: shrink` anywhere. A shrink is resolved by `compile` when it is given
+     faces to measure with, and nothing wires faces into a render job yet — so a template
+     that asked for one would behave differently depending on who rendered it. The sizes
+     below are chosen so the example brief fits at the size it declares. -->
+
+<frame format="feed" bg="var(--bg)">
+  <image slot="imagem" class="photo" />
+  <rect id="veil" class="veil" />
+  <group class="copy">
+    <text slot="titulo" class="title" />
+    <text slot="subtitulo" class="sub" />
+  </group>
+  <rect class="rule" />
+</frame>
+
+<frame format="story" extends="feed" />
+
+<style>
+  /* The template's own palette. `azul` is a word in the brief; only this file knows it is
+     #0c2340, and `@if` is the only way a word becomes a value (ADR 0017). */
+  :root {
+    --bg: #0c2340;
+    --accent: #ff5900;
+  }
+  @if slot(cor) is laranja {
+    :root {
+      --bg: #ff5900;
+      --accent: #0c2340;
+    }
+  }
+  @if slot(cor) is verde {
+    :root {
+      --bg: #0f5132;
+      --accent: #ffd166;
+    }
+  }
+
+  /* The same three words as marks, so {cor:laranja}…{/} in a brief reaches a colour. */
+  .cor-azul {
+    color: #0c2340;
+  }
+  .cor-laranja {
+    color: #ff5900;
+  }
+  .cor-verde {
+    color: #ffd166;
+  }
+
+  .photo {
+    x: 0;
+    y: 0;
+    w: 100%;
+    h: 620;
+  }
+  /* Dropped over the photo so white type stays readable whatever the photograph does.
+     A sibling of the copy rather than a parent, because it is a veil and not a mask. */
+  .veil {
+    x: 0;
+    y: 0;
+    w: 100%;
+    h: 620;
+    fill: linear-gradient(180deg, #00000000 0, #000000aa 1);
+  }
+
+  .copy {
+    x: 80;
+    y: 700;
+  }
+  .title {
+    w: 920;
+    font: 700 96px/1.05 "Source Sans 3";
+    color: white;
+  }
+  .sub {
+    y: 320;
+    w: 920;
+    font: 400 40px/1.3 "Source Sans 3";
+    color: white;
+  }
+  .rule {
+    x: 80;
+    y: 980;
+    w: 160;
+    h: 12;
+    fill: var(--accent);
+  }
+
+  /* After the base rules, not before: there is no specificity here and the last
+     declaration wins, so an @format block above them would override nothing. */
+  @format story {
+    .photo {
+      h: 1100;
+    }
+    .veil {
+      h: 1100;
+    }
+    .copy {
+      y: 1240;
+    }
+    .title {
+      font-size: 112;
+    }
+    .sub {
+      y: 380;
+    }
+    .rule {
+      y: 1740;
+    }
+  }
+
+  /* No photograph means nothing to sit under, so the copy climbs. */
+  @if slot(imagem) is empty {
+    .copy {
+      y: 240;
+    }
+    .rule {
+      y: 560;
+    }
+  }
+</style>

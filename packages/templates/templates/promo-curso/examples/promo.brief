@@ -1,0 +1,14 @@
+---
+template: promo-curso
+formats: [feed, story]
+cor: laranja
+---
+// The example this template is checked against: it has to render in both formats with no
+// text running past its box. `docs/brief-language.md` is the grammar.
+
+::titulo
+  Direito **Constitucional**
+  Turma de setembro
+
+::subtitulo
+  Aulas ao vivo, material incluso e certificado ao final do curso.

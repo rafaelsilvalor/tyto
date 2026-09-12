@@ -126,7 +126,7 @@ paths apart.
   .title { x: 64; y: 720; w: 952; font: 700 72px/1.05 "Inter"; color: white; }
   .sub   { x: 64; y: 880; w: 952; font: 400 36px/1.2 "Inter"; color: white; }
   .logo  { x: 64; y: 64; w: 200; h: 60; }
-  @format story { .title { y: 1400; font-size: 96px; } .sub { y: 1600; } }
+  @format story { .title { y: 1400; font-size: 96; } .sub { y: 1600; } }
   @if slot(imagem) is empty { .title { y: 400; } }
   @each slide { .sub { overflow: shrink; } }
 </style>
@@ -150,7 +150,7 @@ line-height letter-spacing color text-align vertical-align overflow`, `fill stro
 
 | Property         | Written as                                                                                                                     |
 | ---------------- | ------------------------------------------------------------------------------------------------------------------------------ |
-| `font`           | `700 72px/1.05 "Inter"` — weight and `/line-height` optional                                                                   |
+| `font`           | `700 72px/1.05 "Inter"` — weight and `/line-height` optional; the family needs **double** quotes                               |
 | `fill` / `color` | `#ff5900`, a CSS basic colour name, `linear-gradient(180deg, #000 0, #fff 1)`, `radial-gradient(0.5 0.5, 0.7, #000 0, #fff 1)` |
 | `stroke`         | `2px #ffffff` with an optional `inside` / `center` / `outside`                                                                 |
 | `shadow`         | `0 4 12 #00000088`, or `0 4 12 2 #00000088` with a spread                                                                      |
