@@ -1,6 +1,6 @@
 {
   "name": "@tyto/template-lang",
-  "version": "0.2.3",
+  "version": "0.2.4",
   "type": "module",
   "description": "Lezer grammar and parser for the HTML-like template markup; compiles it to a template function.",
   "license": "UNLICENSED",
