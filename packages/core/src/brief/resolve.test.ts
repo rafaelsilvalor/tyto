@@ -325,6 +325,62 @@ describe('one test per diagnostic code', () => {
   });
 });
 
+/**
+ * `core` may not import `brief-lang`, so the markup detector is a second and cruder reader
+ * of the inline syntax. Its whole risk is a false positive — a warning that fired on a
+ * price or a multiplication would teach an author to ignore warnings — so the cases it must
+ * stay quiet for are asserted at the same length as the ones it must fire for.
+ */
+describe('what counts as markup in a frontmatter scalar', () => {
+  async function markupWarnings(value: string): Promise<readonly string[]> {
+    const ast = brief(frontmatter({ template: 'promo-curso', subtitulo: value }), [
+      directive('titulo', 'Direito'),
+      directive('slide', 'Um'),
+    ]);
+    return (await problems(ast))
+      .filter((item) => item.code === 'W_MARKUP_IN_FRONTMATTER')
+      .map((item) => item.message);
+  }
+
+  it.each([
+    ['bold', 'Direito **Constitucional**', "'**'"],
+    ['italic', 'Turma de *setembro*', "'*'"],
+    ['a mark', 'Turma {cor:laranja}nova{/} agora', "'{key:value}…{/}'"],
+    ['a trailing break', 'Direito \\', "'\\'"],
+  ])('warns about %s', async (_what, value, named) => {
+    const [message] = await markupWarnings(value);
+    expect(message).toBeDefined();
+    expect(message).toContain(named);
+  });
+
+  it.each([
+    ['plain words', 'Direito Constitucional'],
+    ['one lone asterisk, which is not italic', 'Promo 2 * 3 vagas'],
+    ['a brace with no closer, which is not a mark', 'Turma {cor:laranja} nova'],
+    ['a closer with no opener', 'Turma nova {/}'],
+    ['a backslash that is not at the end', 'C:\\Users e depois'],
+    ['an asterisk at the end of the line only', 'Vagas limitadas *'],
+  ])('stays quiet for %s', async (_what, value) => {
+    expect(await markupWarnings(value)).toEqual([]);
+  });
+
+  it('never looks at a slot the frontmatter did not set', async () => {
+    // The same asterisks after `::subtitulo` are bold, which is the whole point.
+    const ast = valid({
+      directives: [directive('slide', 'Um'), directive('subtitulo', 'a **b**')],
+    });
+    const codes = (await problems(ast)).map((item) => item.code);
+    expect(codes).not.toContain('W_MARKUP_IN_FRONTMATTER');
+  });
+
+  it('never looks at a slot that is not rich text', async () => {
+    // `imagem: ./a*b*.png` is a path, and `cor` is one of a listed set.
+    const ast = valid({ data: { imagem: './prof-ana.png', cor: 'laranja' } });
+    const codes = (await problems(ast)).map((item) => item.code);
+    expect(codes).not.toContain('W_MARKUP_IN_FRONTMATTER');
+  });
+});
+
 describe('the did-you-mean hint', () => {
   it('suggests the declared slot a typo is closest to', async () => {
     const ast = valid({ directives: [directive('slide', 'Um'), directive('titlo', 'x')] });
@@ -521,6 +577,28 @@ describe('how the problems arrive', () => {
     expect(messages).toContain(
       "Slot 'titulo' is invalid: is set more than once, and only a repeatable slot may be.",
     );
+  });
+
+  it('W_MARKUP_IN_FRONTMATTER — inline markup in a scalar, where it is literal text', async () => {
+    const at = sourceRange(12, 45);
+    const ast = brief(
+      frontmatter(
+        { template: 'promo-curso', subtitulo: 'Direito **Constitucional**' },
+        {
+          subtitulo: at,
+        },
+      ),
+      [directive('titulo', 'Direito'), directive('slide', 'Um')],
+    );
+    const [problem] = (await problems(ast)).filter(
+      (item) => item.code === 'W_MARKUP_IN_FRONTMATTER',
+    );
+    expect(problem?.severity).toBe('warning');
+    expect(problem?.message).toBe(
+      "Slot 'subtitulo' is set in the frontmatter, where '**' is literal text. " +
+        'Write it as a ::subtitulo directive for it to be markup.',
+    );
+    expect(problem?.range).toEqual(at);
   });
 
   it('refuses the repeatable slot written in the frontmatter', async () => {

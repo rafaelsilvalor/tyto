@@ -124,6 +124,31 @@ function badValue(slot: string, problem: string, range: SourceRange | undefined)
   return diagnostic('E_BAD_SLOT_VALUE', { slot, problem }, range === undefined ? {} : { range });
 }
 
+/**
+ * Inline markup a frontmatter scalar cannot express, and the shortest way to name it.
+ *
+ * A frontmatter value is YAML, so it reaches a rich-text slot as one run of plain text:
+ * `titulo: Direito **Constitucional**` renders the asterisks, where the same words after
+ * `::titulo` come out bold. Accepting the scalar stays — `docs/brief-language.md` calls the
+ * frontmatter "metadata and scalar slots" and a one-line title is why — so the answer is to
+ * say so rather than to refuse it or to parse it (TYTO-59).
+ *
+ * Deliberately conservative, and it has to be: `core` may not import `brief-lang`, so this
+ * is a second and cruder reader of the same syntax. A warning that fired on `2 * 3` would
+ * be worse than no warning at all, so a lone `*` is not italic — italic takes two, a mark
+ * takes its closer, and nothing here guesses.
+ */
+const FRONTMATTER_MARKUP: readonly (readonly [RegExp, string])[] = [
+  [/\*\*/u, '**'],
+  [/\*[^*]*\*/u, '*'],
+  [/\{[a-zA-Z_][a-zA-Z0-9_-]*:[^}]*\}[\s\S]*\{\/\}/u, '{key:value}…{/}'],
+  [/\\$/u, '\\'],
+];
+
+function markupIn(plain: string): string | undefined {
+  return FRONTMATTER_MARKUP.find(([pattern]) => pattern.test(plain))?.[1];
+}
+
 /** What the brief said a slot is, before the manifest has had its say. */
 interface Candidate {
   readonly name: string;
@@ -209,7 +234,7 @@ class Resolver {
     }
 
     const adjustments = this.checkAdjustments(candidate, slot);
-    const value = await this.valueOf(candidate, slot);
+    const value = await this.valueOf(candidate, slot, fromFrontmatter);
     if (value === undefined) return;
 
     const resolved: ResolvedSlot = {
@@ -302,11 +327,26 @@ class Resolver {
     return kept;
   }
 
-  private async valueOf(candidate: Candidate, slot: Slot): Promise<SlotValue | undefined> {
+  private async valueOf(
+    candidate: Candidate,
+    slot: Slot,
+    fromFrontmatter: boolean,
+  ): Promise<SlotValue | undefined> {
     const plain = plainText(candidate.text).trim();
 
     switch (slot.type) {
       case 'rich-text': {
+        const markup = fromFrontmatter ? markupIn(plain) : undefined;
+        if (markup !== undefined) {
+          this.report(
+            diagnostic(
+              'W_MARKUP_IN_FRONTMATTER',
+              { slot: candidate.name, markup },
+              { range: candidate.range },
+            ),
+          );
+        }
+
         if (!slot.repeat && slot.max !== undefined && plain.length > slot.max) {
           this.report(
             badValue(
