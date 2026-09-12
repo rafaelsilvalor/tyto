@@ -3,7 +3,6 @@ import type {
   AssetRef,
   Diagnostic,
   Effect,
-  FontRef,
   Frame,
   GroupNode,
   ImageNode,
@@ -11,6 +10,7 @@ import type {
   Paint,
   RectNode,
   Scene,
+  SceneFontFace,
   SceneNode,
   Size,
   Stroke,
@@ -23,6 +23,7 @@ import {
   type SceneVisitor,
   applyMatrix,
   diagnostic,
+  fontFaceKey,
   identityMatrix,
   identityTransform,
   invertMatrix,
@@ -64,12 +65,16 @@ import {
  * than the id rewritten: `#slide-1\.feed\.copy` still says which node it is.
  */
 
-/** One face a document needs: the family, and the weight and style text asked it for. */
-export interface HtmlFontFace {
-  readonly font: FontRef;
-  readonly weight: number;
-  readonly style: 'normal' | 'italic';
-}
+/**
+ * One face a document needs.
+ *
+ * `SceneFontFace` from `core`, under the name this package has always exported. It was
+ * declared here and again in `export-svg`, and the two disagreed — this one carried
+ * `font: FontRef`, that one `family: string` — so the same scene produced two lists that
+ * could not be compared. `core` owns the shape now, because enumerating it belongs to
+ * neither exporter (TYTO-62); the alias stays so that a caller's import keeps working.
+ */
+export type HtmlFontFace = SceneFontFace;
 
 /**
  * Where the bytes come from. The package is pure (ADR 0010) and reads no files, so
@@ -347,9 +352,8 @@ function addRule(emit: Emit, id: string, declarations: readonly string[]): void 
 
 /* ---------------------------------------------------------------------------- text -- */
 
-function fontKey(face: HtmlFontFace): string {
-  return `${face.font.family}|${String(face.weight)}|${face.style}`;
-}
+/** `core`'s key, so a document's faces deduplicate exactly as `sceneResources` counts them. */
+const fontKey = fontFaceKey;
 
 function runDeclarations(run: TextSpan, nodeId: string, emit: Emit): string[] {
   emit.faces.set(fontKey({ font: run.font, weight: run.weight, style: run.style }), {

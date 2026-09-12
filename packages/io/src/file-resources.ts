@@ -1,8 +1,7 @@
-import type { Dirent } from 'node:fs';
-import { readFile, readdir, stat } from 'node:fs/promises';
-import { extname, join, resolve } from 'node:path';
+import { readFile, stat } from 'node:fs/promises';
+import { extname, resolve } from 'node:path';
 
-import type { AssetRef } from '@tyto/core';
+import type { AssetRef, SceneResources } from '@tyto/core';
 import type { ExportResources } from './export-resources.js';
 
 import { EMBEDDABLE_MIME, dataUri } from './mime.js';
@@ -14,18 +13,22 @@ import { EMBEDDABLE_MIME, dataUri } from './mime.js';
  * answers *whether a file exists and what it hashes to*, not what is in it. So somebody
  * has to read the bytes, and on a disk that somebody is here.
  *
- * ## Why this reads the folder up front
+ * ## Why the store is filled late
  *
  * `HtmlResources.asset` and `SvgResources.asset` are **synchronous** — an exporter walks a
- * scene and cannot await. So the bytes have to be in memory before the job starts. And
- * which assets a scene draws is only known after `compile`, which happens *inside* the
- * job. The two facts do not meet, so this reads the asset folder eagerly instead.
+ * scene and cannot await — so the bytes have to be in memory before the first walk. And
+ * which assets a scene draws is only known after `compile`, which happens *inside* the job.
  *
- * That is right for the shape ADR 0011 actually defines — `assets/` is one issue's
- * attachments, a handful of files — and wrong for a shared library of thousands. The
- * proper fix is for the job to resolve resources after `compile`, which is a change to
- * `@tyto/pipeline`'s API and belongs to its own card. Recorded here rather than worked
- * around silently.
+ * This used to resolve the contradiction by reading the whole asset folder before the job
+ * started: right for the shape ADR 0011 defines, where `assets/` is one issue's
+ * attachments, and wrong for a shared library of thousands, where it read a thousand files
+ * to use two. `runJob` now has a `loadResources` port that runs between `compile` and the
+ * first export, so the question can be asked of the scene instead. `load` is what answers
+ * it, and the store the resolvers read is filled by the time anything calls them.
+ *
+ * The resolvers are handed out before the store has anything in it, which is the one thing
+ * to know about this file. That is not a race: nothing calls an exporter until the job has
+ * awaited `load`, and the two ends are wired in the same composition root.
  */
 
 export interface FileResourcesOptions {
@@ -40,67 +43,74 @@ export interface FileResourcesOptions {
    * fail somewhere far less legible.
    */
   readonly maxBytes?: number;
-  /** Descend into subfolders. On by default; `assets/logos/x.png` is an ordinary layout. */
-  readonly recursive?: boolean;
+}
+
+/** The resolvers an exporter is registered with, plus the call that fills what they read. */
+export interface FileResources extends ExportResources {
+  /**
+   * Reads exactly the assets `needed` names, and nothing else in the folder.
+   *
+   * Safe to call more than once: a second call re-reads, which is what a `tyto watch`
+   * rendering the same task twice should do. `needed.faces` is accepted and ignored — the
+   * repo bundles no font yet, so a scene that draws text gets `E_EXPORT_FONT_UNRESOLVED`
+   * per frame, which is the honest answer until TYTO-61 brings a font source.
+   */
+  readonly load: (needed: SceneResources) => Promise<void>;
 }
 
 const DEFAULT_MAX_BYTES = 32 * 1024 * 1024;
 
-async function collect(
-  directory: string,
-  recursive: boolean,
-  maxBytes: number,
-  into: Map<string, string>,
-): Promise<void> {
-  // Annotated rather than inferred: `readdir` is overloaded, and `ReturnType` picks the
-  // last overload — the one that returns `Buffer[]` — so an inferred `entry` has no
-  // `name`.
-  let entries: Dirent[];
-  try {
-    entries = await readdir(directory, { withFileTypes: true });
-  } catch {
-    // No folder is not an error: a brief that references no image needs none, and the
-    // exporter will name any asset that turns out to be missing.
-    return;
-  }
+/**
+ * Where an `AssetRef` points, absolute.
+ *
+ * `path` is what `fileAssetResolver` puts there, so the lookup is an identity rather than a
+ * second guess at how a relative reference resolves. A ref without one — an `inline` or a
+ * hand-built scene — is read relative to the folder, which is what its `id` means there.
+ */
+function pathOf(base: string, ref: AssetRef): string {
+  return ref.path === undefined ? resolve(base, ref.id) : resolve(ref.path);
+}
 
-  for (const entry of entries) {
-    const path = join(directory, entry.name);
-    if (entry.isDirectory()) {
-      if (recursive) await collect(path, recursive, maxBytes, into);
-      continue;
-    }
+async function readOne(path: string, maxBytes: number): Promise<string | undefined> {
+  // Only what a document can embed. A `.psd` beside the logo is not an oversight to
+  // report; it is a working file that has no business in an export.
+  const mime = EMBEDDABLE_MIME[extname(path).toLowerCase()];
+  if (mime === undefined) return undefined;
 
-    const mime = EMBEDDABLE_MIME[extname(entry.name).toLowerCase()];
-    // Only what a document can embed. A `.psd` beside the logo is not an oversight to
-    // report; it is a working file that has no business in an export.
-    if (mime === undefined) continue;
+  const info = await stat(path).catch(() => undefined);
+  if (info === undefined || !info.isFile() || info.size > maxBytes) return undefined;
 
-    const info = await stat(path).catch(() => undefined);
-    if (info === undefined || info.size > maxBytes) continue;
-
-    const bytes = await readFile(path).catch(() => undefined);
-    if (bytes === undefined) continue;
-
-    into.set(resolve(path), dataUri(mime, bytes));
-  }
+  const bytes = await readFile(path).catch(() => undefined);
+  return bytes === undefined ? undefined : dataUri(mime, bytes);
 }
 
 /**
- * Reads the asset folder once and returns resolvers over what it found.
+ * Resolvers over a task's asset folder, filled by `load` once the scene is known.
  *
- * Keyed on the absolute path, which is what `fileAssetResolver` puts in `AssetRef.path` —
- * so the lookup is an identity, not a second guess at how a relative reference resolves.
+ * Not async any more, and that is the point: there is nothing to do until somebody says
+ * what the scene needs.
  */
-export async function fileResources(options: FileResourcesOptions): Promise<ExportResources> {
+export function fileResources(options: FileResourcesOptions): FileResources {
   const base = resolve(options.base);
+  const maxBytes = options.maxBytes ?? DEFAULT_MAX_BYTES;
   const byPath = new Map<string, string>();
-  await collect(base, options.recursive ?? true, options.maxBytes ?? DEFAULT_MAX_BYTES, byPath);
 
-  const asset = (ref: AssetRef): string | undefined =>
-    byPath.get(ref.path === undefined ? resolve(base, ref.id) : resolve(ref.path));
+  const load = async (needed: SceneResources): Promise<void> => {
+    // Sequential rather than in parallel: an asset list is a handful of files, and a
+    // `Promise.all` over an unbounded one would open every descriptor at once — the
+    // failure mode this card exists to remove, in a different disguise.
+    for (const ref of needed.assets) {
+      const path = pathOf(base, ref);
+      const uri = await readOne(path, maxBytes);
+      // A miss is left out rather than stored as undefined, so the exporter reports
+      // `E_EXPORT_ASSET_UNRESOLVED` naming it. No folder and no file are the same answer
+      // here: a brief that references an image that is not there has one problem, and it
+      // is the exporter's to name.
+      if (uri !== undefined) byPath.set(path, uri);
+    }
+  };
 
-  // No `font` resolver: the repo bundles no font yet, so a scene that draws text gets
-  // `E_EXPORT_FONT_UNRESOLVED` per frame — which is the honest answer until TYTO-61.
-  return { html: { asset }, svg: { asset } };
+  const asset = (ref: AssetRef): string | undefined => byPath.get(pathOf(base, ref));
+
+  return { html: { asset }, svg: { asset }, load };
 }

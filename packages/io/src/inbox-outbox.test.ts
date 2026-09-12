@@ -110,7 +110,7 @@ async function render(
   const registry = loaded.value;
 
   const output = await fsOutbox({ root: join(workspace, 'outbox') }).open(task.id);
-  const resources = await fileResources({ base: task.assetBase });
+  const resources = fileResources({ base: task.assetBase });
 
   const result = await runJob(
     { brief: task.brief, outputs: [{ kind: 'png' }, { kind: 'svg' }] },
@@ -119,6 +119,10 @@ async function render(
       templates: markupTemplateSource(fileSystem, registry),
       assets: fileAssetResolver({ base: task.assetBase }),
       exporters: exportersOf(resources),
+      // The whole of TYTO-62 in one line: the exporters above were registered with
+      // resolvers over an empty store, and this is what fills it — after `compile`, with
+      // the scene in hand, reading only what the scene turned out to draw.
+      loadResources: resources.load,
       formats: formatCatalogue({ feed: { w: 1080, h: 1080 } }),
       rasterizer: options.rasterizer ?? fakeRasterizer(),
       sink: output,

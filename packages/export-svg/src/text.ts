@@ -1,4 +1,4 @@
-import type { TextNode, TextSpan } from '@tyto/core';
+import { type TextNode, type TextSpan, fontFaceKey } from '@tyto/core';
 
 import { type Sink, approximated, paintAttributes, paintValue, unsupported } from './defs.js';
 import { attribute, element, escapeXml, svgNumber } from './values.js';
@@ -125,11 +125,10 @@ function runAttributes(run: TextSpan, node: TextNode, sink: Sink): string {
 }
 
 function remember(run: TextSpan, sink: Sink): void {
-  sink.faces.set(`${run.font.family}|${String(run.weight)}|${run.style}`, {
-    family: run.font.family,
-    weight: run.weight,
-    style: run.style,
-  });
+  const face = { font: run.font, weight: run.weight, style: run.style };
+  // `core`'s key, so a document's faces deduplicate exactly as `sceneResources` counts
+  // them — which is what lets a loader be given the list and the exporter find every entry.
+  sink.faces.set(fontFaceKey(face), face);
 }
 
 /** `<text>` with one positioned `<tspan>` per line and a nested one per run. */
