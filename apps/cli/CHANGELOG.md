@@ -1,5 +1,15 @@
 # @tyto/cli
 
+## 0.1.5
+
+### Patch Changes
+
+- Updated dependencies [81026df]
+  - @tyto/export-html@0.3.0
+  - @tyto/io@0.4.1
+  - @tyto/pipeline@0.3.0
+  - @tyto/raster@0.1.0
+
 ## 0.1.4
 
 ### Patch Changes
