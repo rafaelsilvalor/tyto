@@ -1,5 +1,19 @@
 # @tyto/cli
 
+## 0.1.6
+
+### Patch Changes
+
+- Updated dependencies [2f72340]
+  - @tyto/core@0.14.0
+  - @tyto/pipeline@0.4.0
+  - @tyto/export-html@0.3.1
+  - @tyto/export-svg@0.2.1
+  - @tyto/io@0.4.2
+  - @tyto/plugin-api@0.2.1
+  - @tyto/raster@0.1.0
+  - @tyto/template-lang@0.2.1
+
 ## 0.1.5
 
 ### Patch Changes
