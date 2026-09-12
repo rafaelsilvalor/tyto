@@ -275,6 +275,12 @@ describe('dependabot', () => {
    * One ecosystem's `ignore` rules, flattened to one entry per version spec, with the
    * major each spec names. `undefined` for a spec that names no major is deliberate: the
    * callers assert on it rather than skipping it quietly.
+   *
+   * Both spellings of a major are read, because the two ecosystems do not agree on what a
+   * version is. An npm version is semver and `7.x` is the range that matches it; a GitHub
+   * Actions version is the ref a workflow pins — `2`, the way `actions/checkout` is `7` —
+   * and a semver range matches none of them. `'2.x'` was accepted by the updater, printed
+   * back as an ignored version, and ignored nothing (TYTO-83).
    */
   const ignoredMajorsOf = (ecosystem: string) => {
     const update = (readYaml<DependabotConfig>(DEPENDABOT_CONFIG).updates ?? []).find(
@@ -286,7 +292,7 @@ describe('dependabot', () => {
       (rule.versions ?? []).map((spec) => ({
         name: rule['dependency-name'],
         spec,
-        major: /^(\d+)\./.exec(spec)?.[1],
+        major: /^(\d+)(?:\.|$)/.exec(spec)?.[1],
       })),
     );
   };
@@ -370,6 +376,12 @@ describe('dependabot', () => {
     // So the refusal is tied to the thing it refuses: the moment a workflow uses the major
     // being ignored, this fails and the entry has to go. The npm half is the test below —
     // the same rule, read against the manifests instead of against `uses:`.
+    //
+    // What this does not check, and cannot: whether Dependabot honours the entry. It reads
+    // the two files and compares them, and the first version of this entry passed here
+    // while ignoring nothing, because `2.x` is a semver range and an action's version is a
+    // ref. Only a real updater run says — the log line to look for is `Available release
+    // version/ref is <v>` under `Checking if <action> … needs updating` (TYTO-83).
     const usedMajors = new Map(
       workflowFiles
         .flatMap((file) => Object.values(readYaml<Workflow>(`${WORKFLOWS_DIR}/${file}`).jobs ?? {}))
