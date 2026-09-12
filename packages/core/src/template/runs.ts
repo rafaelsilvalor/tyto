@@ -1,4 +1,5 @@
 import { run } from './values.js';
+import { rememberOrigin } from '../text/origin.js';
 import type { ColorChannels } from './values.js';
 import type { Inline, RichText } from '../brief/ast.js';
 import type { TextRun } from '../scene/nodes.js';
@@ -53,10 +54,16 @@ function styled(inline: Inline, style: RunStyle, options: RunsOptions): RunStyle
 function append(target: TextRun[], text: RichText, style: RunStyle, options: RunsOptions): void {
   for (const inline of text) {
     switch (inline.kind) {
-      case 'text':
+      case 'text': {
         // Empty text would produce a run that draws nothing and still counts as one.
-        if (inline.value !== '') target.push(run(inline.value, style));
+        if (inline.value === '') break;
+        const produced = run(inline.value, style);
+        // Where it came from, so W_TEXT_OVERFLOW can point at the directive rather than at
+        // a node id. Kept outside the IR; see `text/origin.ts`.
+        rememberOrigin(produced, inline.range);
+        target.push(produced);
         break;
+      }
       case 'break':
         target.push({ kind: 'break' });
         break;

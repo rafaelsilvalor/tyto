@@ -27,7 +27,11 @@
     "test": "vitest run --passWithNoTests"
   },
   "dependencies": {
+    "fontkit": "^2.0.4",
     "yaml": "^2.9.0",
     "zod": "^4.5.4"
+  },
+  "devDependencies": {
+    "@types/fontkit": "^2.0.9"
   }
 }

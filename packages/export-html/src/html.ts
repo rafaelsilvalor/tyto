@@ -435,7 +435,7 @@ function textDeclarations(node: TextNode, emit: Emit, context: VisitContext): st
       emit,
       node.id,
       "overflow: 'shrink'",
-      'nothing has measured the text yet, so it is clipped like overflow: clip until E4.5 resizes it in the IR',
+      'the scene reached this exporter without being measured, so it is clipped like overflow: clip; compile resolves a shrink into the runs when it is given faces (CompileOptions.faces)',
     );
   }
 

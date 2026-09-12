@@ -154,6 +154,14 @@ ADR 0019 has the reasoning and the rest of the list — `--text-as-paths` takes 
 outlines from a port, a focal point is snapped to `preserveAspectRatio`'s nine alignments,
 and a mask may only name a node drawn in the same frame.
 
+**Since E4.5 a `TextNode` arrives with its lines already decided.** `compile` measures the
+text with the faces it was given (`CompileOptions.faces`) and writes the wrapping back as
+`LineBreak` runs, so neither exporter breaks a line any more — an SVG draws the same lines
+the HTML does, and ADR 0019's "an SVG does not wrap" is closed. `overflow: 'shrink'` is
+resolved the same way: the runs come out at the size that fits and the node's `overflow`
+becomes `'clip'`, because the shrink has happened rather than remaining an intent. A
+compile given no faces changes nothing, and every limit below is what that looks like.
+
 One more bounded disagreement, of the same family: **on a text node whose runs differ in
 size, the two exporters space its lines differently.** `export-html` gives the node one
 leading for every line, from its largest run, because that is what a block's strut is and

@@ -4,6 +4,7 @@ import {
   type BriefAst,
   type Diagnostic,
   type Diagnostics,
+  type FaceCache,
   type FormatCatalogue,
   type Frame,
   type Result,
@@ -124,6 +125,15 @@ export interface JobPorts {
   readonly rasterizer?: Rasterizer;
   /** Absent means the artifacts come back in memory and nothing is written. */
   readonly sink?: ArtifactSink;
+  /**
+   * The faces text is measured against, so `compile` decides the line breaks (ADR 0019).
+   *
+   * Optional, and a job without one behaves exactly as it did before E4.5: every text node
+   * keeps the lines its template wrote, an SVG does not wrap, and `overflow: 'shrink'` is
+   * an intent nobody acted on. Built with `createFaceCache` from a `FontSource`, which is
+   * an adapter's job — `core` is pure and reads no files.
+   */
+  readonly faces?: FaceCache;
   /** Frames rastered at once. Defaults to 2 — see `limit.ts` for why not more. */
   readonly concurrency?: number;
   readonly onEvent?: JobListener;
@@ -320,7 +330,10 @@ export async function runJob(
   /* ---------------------------------------------------------------------- compile -- */
 
   notify(onEvent, { kind: 'stage-started', stage: 'compile' });
-  const compiled = compile(resolved.value, template, { formats: ports.formats });
+  const compiled = compile(resolved.value, template, {
+    formats: ports.formats,
+    ...(ports.faces === undefined ? {} : { faces: ports.faces }),
+  });
   if (!compiled.ok) return err([...problems, ...compiled.error]);
   problems.push(...compiled.warnings);
   notify(onEvent, { kind: 'stage-finished', stage: 'compile' });

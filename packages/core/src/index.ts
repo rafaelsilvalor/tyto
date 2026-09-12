@@ -100,6 +100,18 @@ export {
 
 export type { AssetResolver } from './ports/asset-resolver.js';
 
+export type { FontFace, FontSource } from './ports/font-source.js';
+
+export { type Face, type FaceCache, createFaceCache } from './text/face.js';
+
+export {
+  MINIMUM_SHRINK,
+  type LayoutOptions,
+  type TextMeasurement,
+  measureText,
+  referenceRun,
+} from './text/layout.js';
+
 export type { DirectoryEntry, FileSystem } from './ports/file-system.js';
 
 export {

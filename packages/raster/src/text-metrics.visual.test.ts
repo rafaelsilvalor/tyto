@@ -1,8 +1,8 @@
 import type { Scene, TextNode, TextSpan } from '@tyto/core';
-import { parseScene } from '@tyto/core';
+import { createFaceCache, measureText, parseScene } from '@tyto/core';
 import { exportHtml } from '@tyto/export-html';
 import { exportSvg } from '@tyto/export-svg';
-import { htmlTestFont, svgTestFont } from '@tyto/test-fonts';
+import { htmlTestFont, svgTestFont, testFontSource } from '@tyto/test-fonts';
 import { type Browser, chromium } from 'playwright';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 
@@ -221,6 +221,63 @@ describe('the leading a node declares is the leading it gets', () => {
       expect(Number.parseFloat(computed.lineHeight)).toBeCloseTo(node.lineHeight * run.size, 6);
     },
   );
+});
+
+/**
+ * The acceptance criterion of E4.5, and the only place it can be checked.
+ *
+ * `core` measures text with fontkit and never launches anything; Chromium lays the same
+ * text out and never sees `core`. If the two agree on how many lines there are and how tall
+ * the block is, then a break decided in the IR is the break the raster will draw — which is
+ * the whole premise of ADR 0019 moving wrapping out of the exporters.
+ *
+ * ±1px because Chromium rounds to a 1/64 LayoutUnit and snaps a glyph box's top to a whole
+ * pixel, and the card asked for exactly that tolerance. In practice the fixture lands well
+ * inside it; the assertion prints the measured pair either way, so a drift shows as a number
+ * rather than as `expected true`.
+ */
+describe('the measurement in core against the browser', () => {
+  const faces = createFaceCache(testFontSource);
+
+  it.each(NODES.map((node) => [node.id, node] as const))(
+    '%s: same line count and height as Chromium, within 1px',
+    async (id, node) => {
+      const measured = measureText(node, faces);
+      if (measured === undefined) throw new Error(`Nothing could measure '${id}'.`);
+
+      const { tops, height } = await linesOf(id);
+
+      expect(
+        measured.lines,
+        `${id}: measured ${String(measured.lines)} lines, browser laid out ${String(tops.length)}`,
+      ).toBe(tops.length);
+      expect(
+        Math.abs(measured.height - height),
+        `${id}: measured ${measured.height.toFixed(4)}px tall, browser ${height.toFixed(4)}px`,
+      ).toBeLessThanOrEqual(1);
+    },
+  );
+
+  it('breaks the body paragraph where the browser breaks it', async () => {
+    const body = NODES.find((item) => item.id === 'body');
+    if (body === undefined) throw new Error('The fixture lost its body node.');
+
+    const measured = measureText(body, faces);
+    if (measured === undefined) throw new Error('Nothing could measure the body.');
+
+    // Not just the count: the same *words* on each line. A measurement that wrapped one
+    // word early would still report two lines and still be wrong.
+    const lines: string[] = [''];
+    for (const run of measured.runs) {
+      if (run.kind === 'break') lines.push('');
+      else lines[lines.length - 1] += run.text;
+    }
+
+    expect(lines).toEqual([
+      'Inscrições abertas até o dia 30. Aulas ao vivo, material',
+      'incluso e certificado ao final do curso.',
+    ]);
+  });
 });
 
 describe('export-svg', () => {

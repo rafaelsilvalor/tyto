@@ -166,3 +166,30 @@ export function htmlTestFont(face: {
 export function svgTestFont(face: TestFontFace): string | undefined {
   return testFontDataUri(face);
 }
+
+const outlines = new Map<string, Uint8Array>();
+
+/**
+ * `FontSource` from `@tyto/core`: the outline bytes measurement is taken from.
+ *
+ * The `.ttf`, not the `.woff2` the exporters embed — a measurement has to come from the
+ * same build that gets drawn, which is why both are committed from one upstream release
+ * (`fonts/README.md`). Typed structurally rather than by importing the port, for the same
+ * reason the two resolvers above are: this package describes bytes on a disk and has no
+ * business depending on the compiler to do it.
+ */
+export const testFontSource: {
+  outlines(face: TestFontFace): Uint8Array | undefined;
+} = {
+  outlines(face: TestFontFace): Uint8Array | undefined {
+    const path = testFontOutlinePath(face);
+    if (path === undefined) return undefined;
+
+    const cached = outlines.get(path);
+    if (cached !== undefined) return cached;
+
+    const bytes = new Uint8Array(readFileSync(path));
+    outlines.set(path, bytes);
+    return bytes;
+  },
+};
