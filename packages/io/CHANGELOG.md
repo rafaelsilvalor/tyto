@@ -1,5 +1,13 @@
 # @tyto/io
 
+## 0.4.1
+
+### Patch Changes
+
+- Updated dependencies [81026df]
+  - @tyto/export-html@0.3.0
+  - @tyto/pipeline@0.3.0
+
 ## 0.4.0
 
 ### Minor Changes
