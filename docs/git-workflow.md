@@ -51,7 +51,9 @@ That job also runs with `HUSKY=0`. `prepare: husky` installs the hooks on every 
 
 The version PR is titled `chore(release): TYTO-0 version packages`. `lint` is a required check and reads the PR title, so a title without a key would open a PR that could never be merged; `TYTO-0` is the key this repository uses for work no card asked for.
 
-Weekly grouped Dependabot for npm and actions. Per-package labels (`pkg:core`, `app:cli`, `docs`, `repo`) via `.github/labeler.yml`; the labels themselves have to exist in the repository. CODEOWNERS: maintainer on everything; per package once more people join.
+**Dependabot is the other robot, and it gets an exemption rather than a key.** `chore(deps)` and `chore(deps-dev)` may omit the Jira key — the only subjects that may. Changesets could be given `TYTO-0` because the workflow writes its own title; Dependabot writes both the title and the commits, so the exemption has to live in `commitlint.config.js`, and it is keyed on the **scope** rather than on the author so a person bumping a dependency by hand is held to the same rule as the robot. `tools/repo-checks/src/commit-message.test.ts` pins both sides of the hole. Measured before it was opened: the first five Dependabot PRs failed `lint` and nothing else (TYTO-76).
+
+Weekly grouped Dependabot for npm and actions — `dev`/`prod` for npm, one `actions` group for the workflows, so a week of bumps is one pull request and one update-and-rerun cycle instead of five. Per-package labels (`pkg:core`, `app:cli`, `docs`, `repo`) via `.github/labeler.yml`; the labels themselves have to exist in the repository. CODEOWNERS: maintainer on everything; per package once more people join.
 
 ## Line endings in Git
 
