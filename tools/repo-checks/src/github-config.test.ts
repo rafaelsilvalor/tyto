@@ -269,9 +269,9 @@ describe('dependabot', () => {
 
   it('still groups the npm ecosystem into dev and prod', () => {
     // One pull request a week is the point: `main` requires branches to be up to date, so
-    // five separate bumps are five update-and-rerun cycles (TYTO-76). The npm updater is
-    // failing for a reason the grouping has nothing to do with (below), which is exactly
-    // why an attempt to revive it must not quietly trade the grouping away.
+    // five separate bumps are five update-and-rerun cycles (TYTO-76). The updater spent
+    // its first three runs failing for a reason the grouping had nothing to do with
+    // (below), which is why reviving it was not allowed to trade the grouping away.
     const updates = readYaml<DependabotConfig>(DEPENDABOT_CONFIG).updates ?? [];
     const npm = updates.find((entry) => entry['package-ecosystem'] === 'npm');
 
@@ -279,25 +279,34 @@ describe('dependabot', () => {
     expect(Object.keys(npm!.groups ?? {}).sort()).toEqual(['dev', 'prod']);
   });
 
-  it('records the npm finding against the pnpm major package.json still pins', () => {
-    // The npm updater has never completed a run, and the cause is the `packageManager`
-    // pin rather than this configuration: pnpm 12 publishes a launcher instead of the
-    // program, its first run fetches `@pnpm/exe.<platform>`, and that fetch never reaches
-    // the updater container's proxy — 0 of the proxy's 120 requests, in the private job
-    // log of 2026-09-12 (TYTO-79). The note in dependabot.yml is the whole of what is
-    // known, and it is keyed to a major because the launcher is a property of pnpm 12 and
-    // not of 12.3.4: a patch bump leaves the finding true, leaving pnpm 12 turns it into a
-    // claim nobody measured. So the pin and the note are held to agree.
+  it('explains the pnpm major that package.json actually pins', () => {
+    // `packageManager` is not only the developer's pnpm: Dependabot installs whatever it
+    // names into the updater container, so the pin decides whether the npm half of that
+    // file runs at all. pnpm 12 cannot run there — its Corepack path downloads
+    // `@pnpm/exe.<target>` through a `fetch` with no dispatcher, which cannot honour the
+    // container's proxy — and the run failed 3 of 3 times before the pin moved to 11
+    // (TYTO-79, TYTO-82).
+    //
+    // The coupling is held at the major, because that is the altitude of the mechanism:
+    // the launcher is a property of pnpm 12, not of 12.3.4. A patch bump leaves the note
+    // true and passes; leaving pnpm 11 fails here, which is the point — whoever bumps the
+    // major has to re-read why the pin is where it is and measure the new one, instead of
+    // inheriting a paragraph that was true about a different program.
     const packageManager = (JSON.parse(readRepoFile('package.json')) as { packageManager?: string })
       .packageManager;
     const pinned = /^pnpm@(\d+)\./.exec(packageManager ?? '')?.[1];
     expect(pinned, 'package.json no longer pins a pnpm version in packageManager').toBeDefined();
 
-    const recorded = /pnpm@(\d+)\.\d+\.\d+/.exec(readRepoFile(DEPENDABOT_CONFIG))?.[1];
-    expect(recorded, `${DEPENDABOT_CONFIG} records no pnpm version`).toBeDefined();
+    // Anchored on the phrase rather than on the first `pnpm@…` in the file: the note also
+    // names the versions it ruled out, and those must not be mistaken for the pin.
+    const recorded = /packageManager pnpm@(\d+)\./.exec(readRepoFile(DEPENDABOT_CONFIG))?.[1];
     expect(
       recorded,
-      `${DEPENDABOT_CONFIG} explains the npm updater in terms of pnpm ${recorded}, but package.json now pins pnpm ${pinned}; re-read the finding before inheriting it`,
+      `${DEPENDABOT_CONFIG} does not name the pin as \`packageManager pnpm@<version>\``,
+    ).toBeDefined();
+    expect(
+      recorded,
+      `${DEPENDABOT_CONFIG} explains the npm updater in terms of pnpm ${recorded}, but package.json pins pnpm ${pinned}; re-read the reasoning before inheriting it`,
     ).toBe(pinned);
   });
 });
