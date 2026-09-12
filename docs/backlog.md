@@ -42,7 +42,10 @@ Spec: `docs/template-authoring.md`, ADR 0005.
 - **E4.6** `formats.yaml`: the project's format catalogue (id to size), read by `compile` and handed to a template as `context.size`. Blocks E4.3. AC: invalid file reported with the YAML path and a range; a template rendering an undefined format is a diagnostic. (S)
 - **E4.7** Three loose ends from E3.3 and E4.1. Opened straight on the board as TYTO-57 and
   never written here; this line exists so the gap in the numbering is not read as a typo. (S)
-- **E4.8** Reusable components in the template markup: `<define name="…">` at the top level
+- **E4.8** A slot used only in the stylesheet is not unused. Opened straight on the board as
+  TYTO-63 and never written here; this line exists so the gap in the numbering is not read
+  as a typo. (S)
+- **E4.9** Reusable components in the template markup: `<define name="…">` at the top level
   and `<use component="…">` wherever a node may appear, expanded before the tree reaches
   `build.ts`. A `<use>`'s own classes propagate to every node in the expansion, the way a
   flag adjustment already does (`.chip.second`), which is what gives an instance an
@@ -53,12 +56,15 @@ Spec: `docs/template-authoring.md`, ADR 0005.
   of one `<define>` produce the scene the hand-written triplicate produces; a circular
   `<use>`, an unknown component and an `id` inside a `<define>` are each refused with a
   suggestion. (M)
-- **E4.9** Component parameters: `<define name="card" params="texto">` with the body
+- **E4.10** Component parameters: `<define name="card" params="texto">` with the body
   writing `slot="texto"`, bound by `<use component="card" texto="slide">`. Substitution
   happens before `checkSlot`, so the existing slot type-checking and `renderedSlots` are
   unchanged. Without it a component only repeats shapes; with it, content. (M)
+- **E4.11** Register the built-in template pack, and say how it merges with `--templates`.
+  Opened straight on the board as TYTO-66 and never written here; this line exists so the
+  gap in the numbering is not read as a typo. (M)
 
-**What E4.8 is not, and what it costs.** Measured against the parser as it shipped in
+**What E4.9 is not, and what it costs.** Measured against the parser as it shipped in
 TYTO-24, not estimated:
 
 - **The grammar needs no change.** `TagName`, `AttributeName` and `AtKeyword` are generic
