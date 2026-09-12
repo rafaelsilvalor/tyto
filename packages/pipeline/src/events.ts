@@ -16,8 +16,15 @@ import type { ArtifactKind } from './artifact.js';
  * done. Cancellation goes the other way, through the `AbortSignal`.
  */
 
-/** The stages of `docs/architecture.md`, in the order a job runs them. */
-export type JobStage = 'parse' | 'template' | 'resolve' | 'compile' | 'render';
+/**
+ * The stages of `docs/architecture.md`, in the order a job runs them.
+ *
+ * `resources` sits between `compile` and `render` because that is the only window in
+ * which the question has an answer: a scene has to exist before anyone can say which
+ * bytes it needs, and the bytes have to be in memory before the first synchronous export
+ * walk. It is emitted only when a job was given a `loadResources` port.
+ */
+export type JobStage = 'parse' | 'template' | 'resolve' | 'compile' | 'resources' | 'render';
 
 /** One unit of renderable work: one frame of one artwork, encoded one way. */
 export interface FrameTarget {

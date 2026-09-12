@@ -257,3 +257,10 @@ export {
   sceneBounds,
   unionBounds,
 } from './scene/bounds.js';
+
+export {
+  type SceneFontFace,
+  type SceneResources,
+  fontFaceKey,
+  sceneResources,
+} from './scene/resources.js';

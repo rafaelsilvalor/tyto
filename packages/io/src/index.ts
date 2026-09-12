@@ -25,7 +25,7 @@ export type { ExportResources } from './export-resources.js';
 
 export { type FileAssetResolverOptions, fileAssetResolver } from './file-assets.js';
 
-export { type FileResourcesOptions, fileResources } from './file-resources.js';
+export { type FileResources, type FileResourcesOptions, fileResources } from './file-resources.js';
 
 export {
   type FileTemplateAssets,

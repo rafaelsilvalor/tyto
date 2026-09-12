@@ -20,7 +20,7 @@ import promoFixture from './__fixtures__/promo.json';
 
 const resources: SvgResources = {
   asset: (ref) => `data:image/jpeg;base64,${ref.hash}`,
-  font: (face) => `data:font/woff2;base64,${face.family}-${String(face.weight)}-${face.style}`,
+  font: (face) => `data:font/woff2;base64,${face.font.family}-${String(face.weight)}-${face.style}`,
 };
 
 /** A stand-in for the font machinery E4.5 brings: a box per character, and its width. */

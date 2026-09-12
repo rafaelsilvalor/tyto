@@ -148,11 +148,15 @@ export function testFontDataUri(face: TestFontFace): string | undefined {
 }
 
 /**
- * `HtmlResources.font`, which asks with a `FontRef` rather than a family name.
+ * `HtmlResources.font` and `SvgResources.font`, which are now the same question.
  *
- * Typed structurally instead of importing `HtmlFontFace` from `@tyto/export-html`: this
- * package has no business depending on an exporter to describe bytes on a disk, and the
- * shape is three fields.
+ * They used to differ: the HTML exporter asked with a `FontRef`, the SVG one with a family
+ * name, so this package carried two resolvers over one lookup. TYTO-62 gave both exporters
+ * `core`'s `SceneFontFace`, and the two collapsed into this.
+ *
+ * Typed structurally rather than by importing either exporter's alias: this package has no
+ * business depending on an exporter to describe bytes on a disk, and the shape is three
+ * fields.
  */
 export function htmlTestFont(face: {
   readonly font: { readonly family: string };
@@ -162,10 +166,14 @@ export function htmlTestFont(face: {
   return testFontDataUri({ family: face.font.family, weight: face.weight, style: face.style });
 }
 
-/** `SvgResources.font`, which asks with the family name directly. */
-export function svgTestFont(face: TestFontFace): string | undefined {
-  return testFontDataUri(face);
-}
+/**
+ * The same resolver under the name the SVG call sites use.
+ *
+ * Kept as a name rather than collapsed at every call site, because "the SVG exporter's font
+ * port" is still a thing a reader looks for — and the day it says something different
+ * again, this is where the difference would go.
+ */
+export const svgTestFont = htmlTestFont;
 
 const outlines = new Map<string, Uint8Array>();
 

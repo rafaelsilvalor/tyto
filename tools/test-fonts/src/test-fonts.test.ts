@@ -64,16 +64,19 @@ describe('a face nothing bundles', () => {
   });
 });
 
-describe('the two exporter shapes', () => {
-  it('reach the same face from their own vocabulary', () => {
-    const fromHtml = htmlTestFont({
-      font: { family: 'Source Sans 3' },
-      weight: 700,
-      style: 'normal',
-    });
-    const fromSvg = svgTestFont(BOLD);
+describe('the two exporter ports', () => {
+  it('ask the same question, since TYTO-62 gave both exporters one face shape', () => {
+    const face = { font: { family: BOLD.family }, weight: BOLD.weight, style: BOLD.style };
 
-    expect(fromHtml).toBeDefined();
-    expect(fromHtml).toBe(fromSvg);
+    expect(htmlTestFont(face)).toBeDefined();
+    expect(htmlTestFont(face)).toBe(svgTestFont(face));
+  });
+
+  it('reach the same bytes the outline half is measured from', () => {
+    // One lookup behind both, so a render and a measurement cannot drift onto two
+    // different builds of the same design.
+    expect(htmlTestFont({ font: { family: BOLD.family }, weight: 700, style: 'normal' })).toBe(
+      testFontDataUri(BOLD),
+    );
   });
 });
