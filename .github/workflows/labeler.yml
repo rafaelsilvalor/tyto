@@ -9,5 +9,5 @@ jobs:
       # pull_request_target so the job can label PRs from forks, which the read-only
       # token of a fork `pull_request` run cannot do. Safe here only because the job
       # never checks out or executes the head branch — do not add a checkout step.
-      - uses: actions/labeler@v5
+      - uses: actions/labeler@v7
         with: { sync-labels: true }
