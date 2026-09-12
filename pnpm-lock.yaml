@@ -386,13 +386,25 @@ importers:
 
   tools/contract-test:
     dependencies:
+      '@tyto/brief-lang':
+        specifier: workspace:*
+        version: link:../../packages/brief-lang
       '@tyto/cli':
         specifier: workspace:*
         version: link:../../apps/cli
+      '@tyto/core':
+        specifier: workspace:*
+        version: link:../../packages/core
       '@tyto/io':
         specifier: workspace:*
         version: link:../../packages/io
+      '@tyto/pipeline':
+        specifier: workspace:*
+        version: link:../../packages/pipeline
     devDependencies:
+      '@tyto/test-fonts':
+        specifier: workspace:*
+        version: link:../test-fonts
       ajv:
         specifier: ^8.17.1
         version: 8.20.0

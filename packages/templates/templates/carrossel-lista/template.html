@@ -1,0 +1,108 @@
+<!-- carrossel-lista — a list carousel, in feed and story.
+
+     One artwork per `::item` in the brief, each carrying the list's title and its own
+     item. `@each item` is a scope and not a loop (ADR 0017): `compile` has already called
+     this template once per (artwork, format) with `item` resolved to *this* slide, so
+     there is nothing left here to iterate.
+
+     ## What this is not, and why
+
+     The card asked for "a cover slide plus item slides". **The markup path cannot do
+     that.** A cover is a different layout for the first artwork, and telling the first
+     artwork from the rest is arithmetic on `context.artwork.index` — which
+     `docs/template-authoring.md` puts squarely in `template.ts`, under "what the markup
+     cannot do". Rather than fake it (a `titulo`-only slide is not a cover, it is a slide
+     with an empty item) this template does the thing the markup *can* express and says so:
+     the title rides every slide, which is how a list carousel usually reads anyway.
+
+     Type is "Source Sans 3" with no path — a `bundled` font the repository ships, not a
+     copy beside this template. No `overflow: shrink`; see promo-curso for why. -->
+
+<frame format="feed" bg="var(--bg)">
+  <rect class="chip" />
+  <text slot="titulo" class="kicker" />
+  <text slot="item" class="item" />
+  <rect class="rule" />
+</frame>
+
+<frame format="story" extends="feed" />
+
+<style>
+  :root {
+    --bg: #0c2340;
+    --ink: white;
+    --accent: #ff5900;
+  }
+  /* `tom` is an adjustment, so it is per slide: one slide of the carousel can invert
+     without the others moving. An enum only reaches a value through @if. */
+  @if slot(tom) is claro {
+    :root {
+      --bg: #f4f1ea;
+      --ink: #0c2340;
+      --accent: #ff5900;
+    }
+  }
+  @if slot(tom) is escuro {
+    :root {
+      --bg: #05070f;
+      --ink: white;
+      --accent: #ffd166;
+    }
+  }
+
+  .chip {
+    x: 80;
+    y: 96;
+    w: 96;
+    h: 12;
+    fill: var(--accent);
+  }
+  .kicker {
+    x: 80;
+    y: 152;
+    w: 920;
+    font: 700 36px/1.2 "Source Sans 3";
+    letter-spacing: 2;
+    color: var(--accent);
+  }
+  .item {
+    x: 80;
+    y: 300;
+    w: 920;
+    font: 400 84px/1.1 "Source Sans 3";
+    color: var(--ink);
+  }
+  .rule {
+    x: 80;
+    y: 940;
+    w: 920;
+    h: 4;
+    fill: var(--accent);
+    opacity: 0.4;
+  }
+
+  /* A flag adjustment is ambient — it is on every element of the artwork — so the rule
+     that wants it is written beside the element's own class, never on its own. */
+  .item.destaque {
+    font: 700 96px/1.05 "Source Sans 3";
+  }
+
+  @format story {
+    .chip {
+      y: 240;
+    }
+    .kicker {
+      y: 296;
+    }
+    .item {
+      y: 560;
+      font-size: 96;
+    }
+    .item.destaque {
+      font-size: 112;
+    }
+    .rule {
+      y: 1680;
+    }
+  }
+</style>

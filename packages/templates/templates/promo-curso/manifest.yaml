@@ -1,0 +1,9 @@
+name: promo-curso
+version: 1.0.0
+description: Course promotion with a teacher photo, a headline and a colour variant.
+formats: [feed, story]
+slots:
+  titulo: { type: rich-text, required: true, max: 80 }
+  subtitulo: { type: rich-text, max: 140 }
+  imagem: { type: image }
+  cor: { type: enum, values: [azul, laranja, verde], default: azul }
