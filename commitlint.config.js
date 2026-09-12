@@ -7,15 +7,32 @@
  */
 const JIRA_KEY_IN_SUBJECT = /^TYTO-\d+ [a-z0-9]/;
 
+/**
+ * The one kind of commit that has no card to name, because no person asked for it.
+ *
+ * Dependabot writes both the commit and the pull request title — `chore(deps): Bump
+ * actions/checkout from 4 to 7` — and `lint` is a required status check, so without an
+ * exemption every dependency update it opens is unmergeable. That is measured, not
+ * predicted: the first five it produced all failed on this rule alone (TYTO-76).
+ *
+ * The exemption is the **scope**, not the author. A person bumping a dependency by hand is
+ * held to the same rule as the robot rather than to a stricter one, the hole is one a
+ * reader of this file can see, and it stays lintable offline — a rule keyed on
+ * `github.actor` would live in YAML and mean nothing in the pre-commit hook.
+ */
+const KEYLESS_SCOPES = new Set(['deps', 'deps-dev']);
+
 export default {
   extends: ['@commitlint/config-conventional'],
   plugins: [
     {
       rules: {
-        'subject-jira-key': ({ subject }) => [
-          typeof subject === 'string' && JIRA_KEY_IN_SUBJECT.test(subject),
+        'subject-jira-key': ({ type, scope, subject }) => [
+          (type === 'chore' && typeof scope === 'string' && KEYLESS_SCOPES.has(scope)) ||
+            (typeof subject === 'string' && JIRA_KEY_IN_SUBJECT.test(subject)),
           'subject must start with the Jira key followed by a lowercase description, ' +
-            'e.g. "feat(core): TYTO-123 add Frame schema"',
+            'e.g. "feat(core): TYTO-123 add Frame schema". ' +
+            'Only chore(deps) and chore(deps-dev) may omit it.',
         ],
       },
     },

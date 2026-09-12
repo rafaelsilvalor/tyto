@@ -4,6 +4,10 @@ updates:
     directory: /
     schedule: { interval: weekly }
     groups: { dev: { dependency-type: development }, prod: { dependency-type: production } }
+  # One group, not two: an action has no development/production split, and five separate
+  # pull requests editing the same five workflows is five update-and-rerun cycles for what
+  # is one decision — `main` requires branches to be up to date (TYTO-76).
   - package-ecosystem: github-actions
     directory: /
     schedule: { interval: weekly }
+    groups: { actions: { patterns: ['*'] } }
