@@ -15,6 +15,7 @@ import {
   type SceneVisitor,
   type VisitContext,
   diagnostic,
+  fontFaceKey,
   invertMatrix,
   multiplyMatrix,
   nodeMatrix,
@@ -349,10 +350,11 @@ function resolveMasks(frames: Frames): void {
 /* ------------------------------------------------------------------------ document -- */
 
 function fontStyle(sink: Sink): string {
+  // Sorted by the same key the faces are stored under, so the `<style>` block comes out in
+  // one order for a given scene. Determinism is `docs/architecture.md`'s requirement and a
+  // Map's insertion order is the walk's, which a second format's frame could differ on.
   const faces = [...sink.faces.values()].sort((left, right) =>
-    `${left.family}|${String(left.weight)}|${left.style}`.localeCompare(
-      `${right.family}|${String(right.weight)}|${right.style}`,
-    ),
+    fontFaceKey(left).localeCompare(fontFaceKey(right)),
   );
 
   const rules = faces.flatMap((face) => {
@@ -360,13 +362,13 @@ function fontStyle(sink: Sink): string {
     if (uri === undefined) {
       sink.problems.push(
         diagnostic('E_EXPORT_FONT_UNRESOLVED', {
-          font: `${face.family} ${String(face.weight)} ${face.style}`,
+          font: `${face.font.family} ${String(face.weight)} ${face.style}`,
         }),
       );
       return [];
     }
     return [
-      `@font-face{font-family:"${face.family}";font-weight:${svgNumber(face.weight)};font-style:${face.style};src:url("${uri}")}`,
+      `@font-face{font-family:"${face.font.family}";font-weight:${svgNumber(face.weight)};font-style:${face.style};src:url("${uri}")}`,
     ];
   });
 

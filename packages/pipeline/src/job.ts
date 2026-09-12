@@ -9,6 +9,7 @@ import {
   type Frame,
   type Result,
   type Scene,
+  type SceneResources,
   type Template,
   type TemplateRegistry,
   compile,
@@ -18,6 +19,7 @@ import {
   isError,
   ok,
   resolve,
+  sceneResources,
 } from '@tyto/core';
 import { parseBrief } from '@tyto/brief-lang';
 import type { Exporter, ExporterRegistry } from '@tyto/plugin-api';
@@ -134,6 +136,25 @@ export interface JobPorts {
    * an adapter's job — `core` is pure and reads no files.
    */
   readonly faces?: FaceCache;
+  /**
+   * Loads the bytes the compiled scene turned out to need, before anything is exported.
+   *
+   * The one stage that can ask the question. An exporter's `asset` and `font` lookups are
+   * synchronous — a `SceneVisitor` cannot await — so the bytes have to be in memory before
+   * the first walk; but *which* bytes is known only from a `Scene`, and the scene is made
+   * here. Before this hook the two facts did not meet, and the way out was to read the
+   * whole asset folder before the job started: right for one issue's attachments, wrong
+   * for a shared library, and impossible for fonts, which have no folder to read.
+   *
+   * It runs after `compile` and before the first `exportFrame`, may await, and is handed
+   * exactly `sceneResources(scene)` — every asset the scene draws and every face its runs
+   * ask for, deduplicated. What it does with them is the composition root's business: the
+   * resolvers an exporter was registered with are the ones that have to end up answering,
+   * so a loader fills the store those resolvers read.
+   *
+   * Absent means a caller that loaded eagerly, or one whose scene needs nothing.
+   */
+  readonly loadResources?: (needed: SceneResources) => void | Promise<void>;
   /** Frames rastered at once. Defaults to 2 — see `limit.ts` for why not more. */
   readonly concurrency?: number;
   readonly onEvent?: JobListener;
@@ -337,6 +358,21 @@ export async function runJob(
   if (!compiled.ok) return err([...problems, ...compiled.error]);
   problems.push(...compiled.warnings);
   notify(onEvent, { kind: 'stage-finished', stage: 'compile' });
+
+  /* -------------------------------------------------------------------- resources -- */
+
+  // After `compile` and before the first export, which is the only window where the
+  // question has an answer and the answer is still useful.
+  if (ports.loadResources !== undefined) {
+    notify(onEvent, { kind: 'stage-started', stage: 'resources' });
+    await ports.loadResources(sceneResources(compiled.value));
+    notify(onEvent, { kind: 'stage-finished', stage: 'resources' });
+  }
+
+  if (aborted()) {
+    notify(onEvent, { kind: 'cancelled', done: 0, total: 0 });
+    return ok(empty(true), problems);
+  }
 
   /* ----------------------------------------------------------------------- render -- */
 

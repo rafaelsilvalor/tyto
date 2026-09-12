@@ -72,11 +72,15 @@ export async function renderTask(
   const wiring = templateWiring(context);
   const output = await fsTaskOutput(task.outDirectory, { label: task.id });
 
+  // Handed out empty and filled by `loadResources` below, once the scene says which files
+  // it draws. The folder is no longer read to find out (TYTO-62).
+  const briefResources = fileResources({ base: task.assetBase });
+
   // Per task, because an exporter binds the bytes of the folder it is rendering: two tasks
   // in a `tyto watch` have different `assets/`, and an exporter bound to the wrong one
   // would embed the wrong logo (ADR 0007 — every built-in through the same door).
   const host = activateBuiltIns({
-    resources: combine(await fileResources({ base: task.assetBase }), wiring.resources),
+    resources: combine(briefResources, wiring.resources),
     ...(options.rasterizer === undefined ? {} : { rasterizer: options.rasterizer }),
   });
 
@@ -99,6 +103,11 @@ export async function renderTask(
       // Read back out of the registry rather than passed through: what renders is what was
       // registered, which is the claim the extension point makes.
       ...(registered === undefined ? {} : { rasterizer: registered }),
+      // Runs between `compile` and the first export: the one moment where the scene exists
+      // and nothing has asked an exporter for bytes yet. The template's own `src=` files
+      // are not loaded here — `templateWiring` reads that folder when it loads the
+      // template, which is already after the brief named it.
+      loadResources: briefResources.load,
       ...(options.concurrency === undefined ? {} : { concurrency: options.concurrency }),
       sink: output,
     },

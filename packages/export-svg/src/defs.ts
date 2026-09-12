@@ -1,4 +1,4 @@
-import type { AssetRef, Diagnostic, Effect, Paint, Size, Stroke } from '@tyto/core';
+import type { AssetRef, Diagnostic, Effect, Paint, SceneFontFace, Size, Stroke } from '@tyto/core';
 import { diagnostic } from '@tyto/core';
 
 import { attribute, element, escapeXml, svgColor, svgNumber } from './values.js';
@@ -30,11 +30,17 @@ export interface SvgResources {
   readonly outline?: (request: OutlineRequest) => Outline | undefined;
 }
 
-export interface SvgFontFace {
-  readonly family: string;
-  readonly weight: number;
-  readonly style: 'normal' | 'italic';
-}
+/**
+ * One face a document needs.
+ *
+ * `SceneFontFace` from `core`, under the name this package has always exported. It used to
+ * be declared here with `family: string` where `export-html` declared its own with
+ * `font: FontRef`, so the same scene produced two lists that could not be compared.
+ * `FontRef` won: a family alone cannot tell a bundled face from one in the brief's folder,
+ * and a loader that has to open a file needs the `path`. `face.font.family` is the old
+ * field, one hop further in (TYTO-62).
+ */
+export type SvgFontFace = SceneFontFace;
 
 /**
  * A run drawn as a shape, and how far it advances the pen.

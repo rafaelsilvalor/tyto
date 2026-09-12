@@ -288,13 +288,15 @@ describe('fileResources', () => {
     await mkdir(join(workspace, 'assets'), { recursive: true });
     await writeFile(join(workspace, 'assets', 'logo.png'), PNG);
 
-    const resources = await fileResources({ base: join(workspace, 'assets') });
-    const uri = resources.html?.asset?.({
+    const ref = {
       id: './logo.png',
       source: 'file',
       path: join(workspace, 'assets', 'logo.png'),
       hash: 'sha256-x',
-    });
+    } as const;
+    const resources = fileResources({ base: join(workspace, 'assets') });
+    await resources.load({ assets: [ref], faces: [] });
+    const uri = resources.html?.asset?.(ref);
 
     expect(uri?.startsWith('data:image/png;base64,')).toBe(true);
   });
@@ -303,8 +305,10 @@ describe('fileResources', () => {
     await mkdir(join(workspace, 'assets'), { recursive: true });
     await writeFile(join(workspace, 'assets', 'logo.png'), PNG);
 
-    const resources = await fileResources({ base: join(workspace, 'assets') });
-    const uri = resources.svg?.asset?.({ id: 'logo.png', source: 'inline', hash: 'sha256-x' });
+    const ref = { id: 'logo.png', source: 'inline', hash: 'sha256-x' } as const;
+    const resources = fileResources({ base: join(workspace, 'assets') });
+    await resources.load({ assets: [ref], faces: [] });
+    const uri = resources.svg?.asset?.(ref);
 
     expect(uri?.startsWith('data:image/png;base64,')).toBe(true);
   });
@@ -313,59 +317,59 @@ describe('fileResources', () => {
     await mkdir(join(workspace, 'assets', 'logos'), { recursive: true });
     await writeFile(join(workspace, 'assets', 'logos', 'deep.png'), PNG);
 
-    const resources = await fileResources({ base: join(workspace, 'assets') });
+    const ref = {
+      id: 'logos/deep.png',
+      source: 'file',
+      path: join(workspace, 'assets', 'logos', 'deep.png'),
+      hash: 'sha256-x',
+    } as const;
+    const resources = fileResources({ base: join(workspace, 'assets') });
+    await resources.load({ assets: [ref], faces: [] });
 
-    expect(
-      resources.html?.asset?.({
-        id: 'logos/deep.png',
-        source: 'file',
-        path: join(workspace, 'assets', 'logos', 'deep.png'),
-        hash: 'sha256-x',
-      }),
-    ).toBeDefined();
+    expect(resources.html?.asset?.(ref)).toBeDefined();
   });
 
   it('ignores a file no document could embed', async () => {
     await mkdir(join(workspace, 'assets'), { recursive: true });
     await writeFile(join(workspace, 'assets', 'working.psd'), 'not an image');
 
-    const resources = await fileResources({ base: join(workspace, 'assets') });
+    const ref = {
+      id: 'working.psd',
+      source: 'file',
+      path: join(workspace, 'assets', 'working.psd'),
+      hash: 'sha256-x',
+    } as const;
+    const resources = fileResources({ base: join(workspace, 'assets') });
+    await resources.load({ assets: [ref], faces: [] });
 
     // A working file beside the logo is not an oversight to report.
-    expect(
-      resources.html?.asset?.({
-        id: 'working.psd',
-        source: 'file',
-        path: join(workspace, 'assets', 'working.psd'),
-        hash: 'sha256-x',
-      }),
-    ).toBeUndefined();
+    expect(resources.html?.asset?.(ref)).toBeUndefined();
   });
 
   it('leaves a file over the ceiling unresolved, so the exporter names it', async () => {
     await mkdir(join(workspace, 'assets'), { recursive: true });
     await writeFile(join(workspace, 'assets', 'huge.png'), Buffer.alloc(64));
 
-    const resources = await fileResources({ base: join(workspace, 'assets'), maxBytes: 8 });
+    const ref = {
+      id: 'huge.png',
+      source: 'file',
+      path: join(workspace, 'assets', 'huge.png'),
+      hash: 'sha256-x',
+    } as const;
+    const resources = fileResources({ base: join(workspace, 'assets'), maxBytes: 8 });
+    await resources.load({ assets: [ref], faces: [] });
 
     // Undefined is E_EXPORT_ASSET_UNRESOLVED downstream, which names the asset — and
     // naming the file to shrink is the whole point of refusing it here.
-    expect(
-      resources.html?.asset?.({
-        id: 'huge.png',
-        source: 'file',
-        path: join(workspace, 'assets', 'huge.png'),
-        hash: 'sha256-x',
-      }),
-    ).toBeUndefined();
+    expect(resources.html?.asset?.(ref)).toBeUndefined();
   });
 
   it('treats a missing folder as no assets rather than as an error', async () => {
-    const resources = await fileResources({ base: join(workspace, 'nope') });
+    const ref = { id: 'x.png', source: 'file', hash: 'sha256-x' } as const;
+    const resources = fileResources({ base: join(workspace, 'nope') });
+    await resources.load({ assets: [ref], faces: [] });
 
-    expect(
-      resources.html?.asset?.({ id: 'x.png', source: 'file', hash: 'sha256-x' }),
-    ).toBeUndefined();
+    expect(resources.html?.asset?.(ref)).toBeUndefined();
   });
 });
 

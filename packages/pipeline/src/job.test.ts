@@ -4,9 +4,10 @@ import type {
   Diagnostic,
   DirectoryEntry,
   FileSystem,
+  SceneResources,
   TemplateRegistry,
 } from '@tyto/core';
-import { formatCatalogue, isError, loadTemplateRegistry } from '@tyto/core';
+import { fontFaceKey, formatCatalogue, isError, loadTemplateRegistry } from '@tyto/core';
 import { type HtmlResources, htmlExporterPlugin } from '@tyto/export-html';
 import { type SvgResources, svgExporterPlugin } from '@tyto/export-svg';
 import { type ExporterRegistry, createPluginHost } from '@tyto/plugin-api';
@@ -100,10 +101,10 @@ const htmlResources: HtmlResources = {
 
 const svgResources: SvgResources = {
   asset: (ref) => `data:image/png;base64,${ref.hash}`,
-  // `SvgFontFace` carries `family` where `HtmlFontFace` carries `font: FontRef`. The two
-  // exporters describe a face differently, which is why each binds its own resources when
-  // it is registered instead of the job offering one shape and adapting (TYTO-62).
-  font: (face) => `data:font/woff2;base64,${face.family}-${String(face.weight)}`,
+  // Identical to the HTML one above, which it could not be before TYTO-62: `SvgFontFace`
+  // carried `family` where `HtmlFontFace` carried `font: FontRef`. Both are `SceneFontFace`
+  // now, so the same scene gives the two exporters the same list of faces.
+  font: (face) => `data:font/woff2;base64,${face.font.family}-${String(face.weight)}`,
 };
 
 /**
@@ -113,11 +114,14 @@ const svgResources: SvgResources = {
  * point of TYTO-34: the job asks a registry which exporter produces a kind, and a test that
  * skipped the registry would be testing a path nothing ships.
  */
-function exportersOf(): ExporterRegistry {
+function exportersOf(
+  html: HtmlResources = htmlResources,
+  svg: SvgResources = svgResources,
+): ExporterRegistry {
   const host = createPluginHost();
   for (const plugin of [
-    htmlExporterPlugin({ resources: htmlResources }),
-    svgExporterPlugin({ resources: svgResources }),
+    htmlExporterPlugin({ resources: html }),
+    svgExporterPlugin({ resources: svg }),
   ]) {
     plugin.activate(host.hostFor(plugin.id));
   }
@@ -559,6 +563,143 @@ describe('what the job refuses before it starts', () => {
     );
 
     expect(result.ok && result.value.rendered).toBe(6);
+  });
+});
+
+describe('the resources stage', () => {
+  /**
+   * A folder of many files, of which the brief draws one.
+   *
+   * Counting reads rather than inspecting the loader is the card's acceptance criterion,
+   * and it is the right instrument: "only that one is read" is a claim about behaviour,
+   * and a loader that took the list and then read the folder anyway would pass any test
+   * that merely looked at what came back.
+   */
+  function countingLoader(folder: readonly string[]) {
+    const read: string[] = [];
+    const store = new Map<string, string>();
+
+    const resources: HtmlResources & SvgResources = {
+      asset: (ref) => store.get(ref.id),
+      // Fonts are not what this test is about, and an unresolved one fails the render for
+      // reasons that have nothing to do with counting reads.
+      font: (face) => `data:font/woff2;base64,${face.font.family}-${String(face.weight)}`,
+    };
+
+    const load = (needed: SceneResources): void => {
+      for (const ref of needed.assets) {
+        // The whole folder is on the disk; only what the scene named is opened.
+        if (!folder.includes(ref.id)) continue;
+        read.push(ref.id);
+        store.set(ref.id, `data:image/png;base64,${ref.hash}`);
+      }
+    };
+
+    return { read, load, resources };
+  }
+
+  const FOLDER = ['ana', 'logo', 'banner', 'rodape', 'watermark', 'qr'];
+
+  it('reads only the asset the scene draws, out of a folder of many', async () => {
+    const loader = countingLoader(FOLDER);
+    const result = await runJob(
+      { brief: briefSource, outputs: BOTH },
+      await portsOf({
+        exporters: exportersOf(loader.resources, loader.resources),
+        loadResources: loader.load,
+      }),
+    );
+
+    if (!result.ok) throw new Error(result.error.map((item) => item.message).join('; '));
+
+    // One of six, and the one the brief's `imagem:` names. Six frames draw it; it is read
+    // once, because the enumeration deduplicates before the loader ever sees the list.
+    expect(loader.read).toEqual(['ana']);
+  });
+
+  it('has already loaded by the time the first exporter asks, so the bytes are embedded', async () => {
+    // The exporters were registered with resolvers over an empty store. This is the
+    // assertion that the store is full before anything reads it — without it the loader
+    // could run after the render and every test above would still pass.
+    const loader = countingLoader(FOLDER);
+    const sink = recordingSink();
+    const result = await runJob(
+      { brief: briefSource, outputs: [{ kind: 'svg' }] },
+      await portsOf({
+        sink,
+        exporters: exportersOf(loader.resources, loader.resources),
+        loadResources: loader.load,
+      }),
+    );
+
+    if (!result.ok) throw new Error(result.error.map((item) => item.message).join('; '));
+    expect(result.warnings.some(isError)).toBe(false);
+    expect(textOf(sink.written[0]!)).toContain('data:image/png;base64,sha256-ana');
+  });
+
+  it('runs between compile and render, which is the only window that works', async () => {
+    const loader = countingLoader(FOLDER);
+    const stages: string[] = [];
+    await runJob(
+      { brief: briefSource, outputs: [{ kind: 'svg' }] },
+      await portsOf({
+        exporters: exportersOf(loader.resources, loader.resources),
+        loadResources: loader.load,
+        onEvent: (event) => {
+          if (event.kind === 'stage-started') stages.push(event.stage);
+        },
+      }),
+    );
+
+    expect(stages).toEqual(['parse', 'template', 'resolve', 'compile', 'resources', 'render']);
+  });
+
+  it('emits no resources stage for a job that was given no loader', async () => {
+    const stages: string[] = [];
+    await runJob(
+      { brief: briefSource, outputs: [{ kind: 'svg' }] },
+      await portsOf({
+        onEvent: (event) => {
+          if (event.kind === 'stage-started') stages.push(event.stage);
+        },
+      }),
+    );
+
+    expect(stages).not.toContain('resources');
+  });
+
+  it('gives the two exporters and the loader one list of faces for one scene', async () => {
+    // The second acceptance criterion, measured three ways at once: what the enumeration
+    // says the scene needs, what the HTML exporter asked for, and what the SVG exporter
+    // asked for. Before TYTO-62 the last two could not even be compared — `SvgFontFace`
+    // carried `family` where `HtmlFontFace` carried `font: FontRef`.
+    const asked = { html: new Set<string>(), svg: new Set<string>() };
+    const record = (into: Set<string>): HtmlResources & SvgResources => ({
+      asset: (ref) => `data:image/png;base64,${ref.hash}`,
+      font: (face) => {
+        into.add(fontFaceKey(face));
+        return `data:font/woff2;base64,${face.font.family}`;
+      },
+    });
+
+    let enumerated = new Set<string>();
+    const result = await runJob(
+      { brief: briefSource, outputs: BOTH },
+      await portsOf({
+        exporters: exportersOf(record(asked.html), record(asked.svg)),
+        loadResources: (needed) => {
+          enumerated = new Set(needed.faces.map(fontFaceKey));
+        },
+      }),
+    );
+
+    if (!result.ok) throw new Error(result.error.map((item) => item.message).join('; '));
+
+    // Non-empty first: three sets that agree because all three are empty would prove
+    // nothing at all.
+    expect(asked.html.size).toBeGreaterThan(0);
+    expect([...asked.svg].sort()).toEqual([...asked.html].sort());
+    expect([...enumerated].sort()).toEqual([...asked.html].sort());
   });
 });
 
