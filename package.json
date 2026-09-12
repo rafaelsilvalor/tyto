@@ -9,7 +9,7 @@
     "type": "git",
     "url": "git+https://github.com/rafaelsilvalor/tyto.git"
   },
-  "packageManager": "pnpm@12.3.4",
+  "packageManager": "pnpm@11.27.0",
   "engines": {
     "node": ">=22"
   },
