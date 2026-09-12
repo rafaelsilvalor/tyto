@@ -10,14 +10,14 @@ brief.brief ──parse──▶ AST ──compile──▶ Scene ──export-h
 
 Every arrow is a pure function `(input) → Result<output, Diagnostic[]>`. Stages do not know each other; `pipeline` composes them.
 
-| Stage   | Package                     | Input → Output                                                                                              |
-| ------- | --------------------------- | ----------------------------------------------------------------------------------------------------------- |
-| parse   | `brief-lang`                | text → `BriefAst` (frontmatter + directives + rich text)                                                    |
-| resolve | `core`                      | `BriefAst` + `TemplateRegistry` → `ResolvedBrief` (typed slots, adjustments validated against the manifest) |
-| compile | `core`                      | `ResolvedBrief` × template → `Scene` (one `Artwork` per slide, one `Frame` per format)                      |
-| export  | `export-html`, `export-svg` | `Scene` → string per `Frame`                                                                                |
-| raster  | `raster` (port)             | HTML → image bytes                                                                                          |
-| deliver | `io` (port)                 | artifacts → fs / …                                                                                          |
+| Stage   | Package                     | Input → Output                                                                                                                          |
+| ------- | --------------------------- | --------------------------------------------------------------------------------------------------------------------------------------- |
+| parse   | `brief-lang`                | text → `BriefAst` (frontmatter + directives + rich text)                                                                                |
+| resolve | `core`                      | `BriefAst` + `TemplateRegistry` → `ResolvedBrief` (typed slots, adjustments validated against the manifest)                             |
+| compile | `core`                      | `ResolvedBrief` × template → `Scene` (one `Artwork` per slide, one `Frame` per format; text measured and wrapped when `faces` is given) |
+| export  | `export-html`, `export-svg` | `Scene` → string per `Frame`                                                                                                            |
+| raster  | `raster` (port)             | HTML → image bytes                                                                                                                      |
+| deliver | `io` (port)                 | artifacts → fs / …                                                                                                                      |
 
 ## Packages
 
@@ -46,7 +46,7 @@ Path to the cloud: same pure code; `raster` swaps to Playwright in a container, 
 
 ## Patterns and where they live
 
-- **Hexagonal (ports & adapters)** — a port is declared by the package that _consumes_ it, not in one central place: `FileSystem` and `AssetResolver` in `core` because the pure stages ask them questions, `Rasterizer` in `raster`, `BriefSource`/`OutputSink` in `io`, and `TemplateSource`/`ArtifactSink` in `pipeline`. Adapters live beside their runtime (`raster`, `io`, `sources`); composition only in `apps/*`.
+- **Hexagonal (ports & adapters)** — a port is declared by the package that _consumes_ it, not in one central place: `FileSystem`, `AssetResolver` and `FontSource` in `core` because the pure stages ask them questions, `Rasterizer` in `raster`, `BriefSource`/`OutputSink` in `io`, and `TemplateSource`/`ArtifactSink` in `pipeline`. Adapters live beside their runtime (`raster`, `io`, `sources`); composition only in `apps/*`.
 - **Compiler pipeline** — pure stages, tested in isolation with fixtures.
 - **Visitor** — `SceneVisitor<T>` and `walk()` in `core`; each exporter implements one and none of them writes the recursion again. The walk hands every node its accumulated transform, effective opacity, ancestor chain and frame. New output format = new visitor.
 - **Registry** — `TemplateRegistry` and `PluginRegistry`: folder discovery, manifest read without executing code.
