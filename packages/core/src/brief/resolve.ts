@@ -347,6 +347,23 @@ class Resolver {
           );
         }
 
+        // Both ends, and both errors. `min` and `max` are one documented pair counting
+        // characters here and occurrences on a repeatable slot, and the repeatable branch
+        // in `finish()` already reports both ends with `E_BAD_SLOT_VALUE`. Leaving this
+        // one end unenforced was a rule the manifest accepted and nothing applied
+        // (TYTO-67); making it a warning instead would have given one pair three
+        // behaviours across two slot kinds.
+        if (!slot.repeat && slot.min !== undefined && plain.length < slot.min) {
+          this.report(
+            badValue(
+              candidate.name,
+              `is ${plain.length} characters and the manifest needs ${slot.min}`,
+              candidate.range,
+            ),
+          );
+          return undefined;
+        }
+
         if (!slot.repeat && slot.max !== undefined && plain.length > slot.max) {
           this.report(
             badValue(

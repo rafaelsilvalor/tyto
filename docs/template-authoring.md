@@ -67,6 +67,11 @@ These are the rules it enforces beyond the shape:
   one** — `titulo` above is capped at 60 characters, `slide` at 10 slides. Two meanings for
   two keys is a footgun, and it is the one the example above already writes; renaming them
   is a change to this document, not to the schema alone.
+- **Both ends are errors, on both kinds of slot.** Too short, too long, too few and too many
+  are all `E_BAD_SLOT_VALUE`, carrying the range of the directive that set the value — or,
+  where there is no occurrence to point at, the frontmatter fallback. One pair, one
+  severity: a `min` that only warned would mean the same two keys behaved three different
+  ways depending on `repeat` (TYTO-67).
 - **Neither is accepted where it would count nothing.** Characters only exist on
   `rich-text`, so `{ type: image, max: 60 }` and `{ type: enum, min: 2 }` are errors at
   `slots.<name>.max` and `slots.<name>.min` rather than caps that silently never fire. Add

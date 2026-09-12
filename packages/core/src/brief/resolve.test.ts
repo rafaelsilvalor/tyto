@@ -25,7 +25,7 @@ const MANIFEST = `name: promo-curso
 version: 1.0.0
 formats: [feed, story]
 slots:
-  titulo: { type: rich-text, required: true, max: 20 }
+  titulo: { type: rich-text, required: true, min: 5, max: 20 }
   subtitulo: { type: rich-text }
   imagem: { type: image }
   cor: { type: enum, values: [azul, laranja], default: azul }
@@ -449,15 +449,41 @@ describe('the values a manifest constrains', () => {
     expect(problem?.range).toEqual(at);
   });
 
-  it('refuses rich text longer than the manifest allows', async () => {
-    const ast = valid({
-      directives: [
-        directive('slide', 'Um'),
-        directive('titulo', 'Direito Constitucional e Administrativo'),
-      ],
-    });
+  it('refuses rich text shorter than the manifest needs, and points at the directive', async () => {
+    const short = sourceRange(4, 9);
+    const ast = brief(frontmatter({ template: 'promo-curso' }), [
+      directive('titulo', 'Ola', {}, short),
+      directive('slide', 'Um'),
+    ]);
     const [problem] = (await problems(ast)).filter((item) => item.code === 'E_BAD_SLOT_VALUE');
-    expect(problem?.message).toContain('is 39 characters and the manifest allows 20');
+
+    expect(problem?.message).toBe(
+      "Slot 'titulo' is invalid: is 3 characters and the manifest needs 5.",
+    );
+    expect(problem?.range).toEqual(short);
+  });
+
+  it('accepts rich text of exactly the length the manifest needs', async () => {
+    // The boundary belongs in a test of its own: `min` is "needs", not "needs more than".
+    const ast = brief(frontmatter({ template: 'promo-curso' }), [
+      directive('titulo', 'Legal'),
+      directive('slide', 'Um'),
+    ]);
+
+    expect((await problems(ast)).filter((item) => item.code === 'E_BAD_SLOT_VALUE')).toEqual([]);
+  });
+
+  it('still refuses rich text longer than the manifest allows, unchanged', async () => {
+    // Pinned so this card cannot quietly move the other end of the pair while adding one.
+    const ast = brief(frontmatter({ template: 'promo-curso' }), [
+      directive('titulo', 'Direito Constitucional e Administrativo'),
+      directive('slide', 'Um'),
+    ]);
+    const [problem] = (await problems(ast)).filter((item) => item.code === 'E_BAD_SLOT_VALUE');
+
+    expect(problem?.message).toBe(
+      "Slot 'titulo' is invalid: is 39 characters and the manifest allows 20.",
+    );
   });
 
   it('refuses too few occurrences of the repeatable slot', async () => {
