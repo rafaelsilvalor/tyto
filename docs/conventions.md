@@ -8,6 +8,20 @@ English everywhere in the repo: code, comments, docs, commits, PRs, Jira cards (
 
 pnpm workspaces + Turborepo · TS 5 `strict`, `noUncheckedIndexedAccess`, `exactOptionalPropertyTypes` · Zod · Vitest · Playwright · ESLint flat + Prettier · tsup (libs, ESM) · electron-vite · CodeMirror 6 + Lezer · commander · Changesets.
 
+### `engines.node`
+
+`^22.22.1 || ^24 || >=26`, and that is **the intersection of what the stack accepts, not a
+preference**. The field is documentation of what a contributor needs, so the honest number
+is the tightest constraint among the dependencies rather than the loosest. Two of them set
+the shape: `lint-staged` asks for `>=22.22.1`, which is what puts the floor 22 minors above
+the LTS line, and `@changesets/*` and `vitest` ask for `^22 || ^24 || >=26`, which is what
+excludes the odd majors. Neither of those is where anybody would look.
+
+`tools/repo-checks/src/engines-node.test.ts` recomputes it from the installed tree with
+`semver.subset` and fails **in both directions** — a range admitting a Node some dependency
+refuses, and a range excluding one they all accept. So the field cannot quietly go stale
+the next time a tool raises its own floor.
+
 ## Root scripts
 
 `pnpm dev` (desktop) · `pnpm cli -- …` · `pnpm check` = typecheck + lint + test · `pnpm test:visual` (raster snapshots; needs `pnpm exec playwright install chromium`) · `pnpm build` · `pnpm changeset` · `pnpm format` / `format:check`.
