@@ -37,6 +37,50 @@ import { limiter } from './limit.js';
 import { type TemplateSource, renderedSlotsOf } from './template-source.js';
 
 /**
+ * The code an exporter reports when the store it was registered with had no bytes.
+ *
+ * Written out rather than imported: it is `core`'s shared vocabulary, and a job reaches an
+ * exporter through the extension point and never through its package (ADR 0007).
+ */
+const ASSET_UNRESOLVED = 'E_EXPORT_ASSET_UNRESOLVED';
+
+/**
+ * What to fix when nothing was ever loaded, as a hint on the diagnostic that already fired.
+ *
+ * Generic on purpose. `pipeline` does not know that `@tyto/io` exists, let alone that its
+ * store is called `fileResources`, so the sentence names the port and the shape rather than
+ * the adapter that usually fills it.
+ */
+const NO_LOADER_HINT =
+  'this job was given no loadResources port, so the resolvers the exporter was registered ' +
+  'with were never filled. A composition that binds a resource store to an exporter has to ' +
+  "pass that store's loader as JobPorts.loadResources.";
+
+/**
+ * Adds {@link NO_LOADER_HINT} to an unresolved asset when the job had no loader (TYTO-69).
+ *
+ * `E_EXPORT_ASSET_UNRESOLVED` names the asset, which is the right answer when the file is
+ * missing and the wrong place to look when nobody ever read it. **An exporter cannot tell
+ * those apart** — its resolver answered `undefined` either way — and this stage can, because
+ * it is the one that knows whether `loadResources` was supplied at all. So the message stays
+ * and gains a sentence; the code and the severity do not move, and neither does what a
+ * correctly wired job sees.
+ *
+ * **Assets only.** A font resolver is bound ready-made since ADR 0021 and needs no loader,
+ * so pointing at `loadResources` for an unresolved face would send the reader to a seam that
+ * was never involved.
+ *
+ * A diagnostic that already carries a hint keeps it: whoever wrote that knew more than this.
+ */
+function explainUnloadedAssets(problems: Diagnostics): Diagnostics {
+  return problems.map((problem) =>
+    problem.code === ASSET_UNRESOLVED && problem.hint === undefined
+      ? { ...problem, hint: NO_LOADER_HINT }
+      : problem,
+  );
+}
+
+/**
  * The job: a brief in, artifacts out (`docs/architecture.md`).
  *
  * It composes the stages and owns nothing else. Every stage is somebody else's pure
@@ -401,9 +445,14 @@ export async function runJob(
   function bytesOf(task: Task): Result<string, Diagnostics> {
     // An exporter that does not understand `textAsPaths` ignores it, which is why this is
     // the same call for every kind. The resources were bound when it was registered.
-    return exporterOf(task).exportFrame(scene, task.artwork, task.frame, {
+    const exported = exporterOf(task).exportFrame(scene, task.artwork, task.frame, {
       ...(task.output.textAsPaths === undefined ? {} : { textAsPaths: task.output.textAsPaths }),
     });
+
+    if (ports.loadResources !== undefined) return exported;
+    return exported.ok
+      ? ok(exported.value, explainUnloadedAssets(exported.warnings))
+      : err(explainUnloadedAssets(exported.error));
   }
 
   async function encode(task: Task, document: string): Promise<Result<Uint8Array, Diagnostics>> {
