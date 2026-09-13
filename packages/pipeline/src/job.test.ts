@@ -668,6 +668,82 @@ describe('the resources stage', () => {
     expect(stages).not.toContain('resources');
   });
 
+  /**
+   * Resolvers over a store nobody filled — exactly what a composition that bound the
+   * exporters and forgot `loadResources:` ends up with (TYTO-69).
+   */
+  const emptyStore: HtmlResources & SvgResources = {
+    asset: () => undefined,
+    font: (face) => `data:font/woff2;base64,${face.font.family}-${String(face.weight)}`,
+  };
+
+  const unresolvedAssets = (result: {
+    ok: boolean;
+    warnings?: readonly Diagnostic[];
+    error?: readonly Diagnostic[];
+  }): readonly Diagnostic[] =>
+    (result.ok ? (result.warnings ?? []) : (result.error ?? [])).filter(
+      (item) => item.code === 'E_EXPORT_ASSET_UNRESOLVED',
+    );
+
+  it('names the wiring when an asset is unresolved and no loader was ever given', async () => {
+    const result = await runJob(
+      { brief: briefSource, outputs: [{ kind: 'svg' }] },
+      await portsOf({ exporters: exportersOf(emptyStore, emptyStore) }),
+    );
+
+    const unresolved = unresolvedAssets(result);
+    expect(unresolved.length).toBeGreaterThan(0);
+
+    // The code, the severity and the message do not move: the asset's name is still what an
+    // author needs when the file really is missing. What is added is the sentence only this
+    // stage could write, because only this stage knows the port was absent.
+    expect(unresolved[0]?.code).toBe('E_EXPORT_ASSET_UNRESOLVED');
+    expect(unresolved[0]?.message).toContain('ana');
+
+    // Asserted as present before it is asserted as right, so a job that produced no hint at
+    // all fails saying that, rather than complaining about the shape of `undefined`.
+    expect(unresolved[0]?.hint, 'no hint was added to the unresolved asset').toBeDefined();
+    expect(unresolved[0]?.hint).toContain('loadResources');
+  });
+
+  it('says nothing about wiring when a loader ran and the file was simply not there', async () => {
+    const result = await runJob(
+      { brief: briefSource, outputs: [{ kind: 'svg' }] },
+      await portsOf({
+        exporters: exportersOf(emptyStore, emptyStore),
+        // Wired, and it finds nothing. This is the case the hint must stay quiet for: the
+        // difference between the two tests is a missing file against a missing line, and a
+        // hint that fired for both would be worth nothing.
+        loadResources: () => undefined,
+      }),
+    );
+
+    const unresolved = unresolvedAssets(result);
+    expect(unresolved.length).toBeGreaterThan(0);
+    expect(unresolved[0]?.hint).toBeUndefined();
+  });
+
+  it('leaves a font alone, since a face resolver is bound ready-made and needs no loader', async () => {
+    // ADR 0021: `@tyto/fonts` answers the exporters' font port directly. Pointing an
+    // unresolved face at `loadResources` would send the reader to a seam never involved.
+    const noFonts: HtmlResources & SvgResources = {
+      asset: (ref) => `data:image/png;base64,${ref.hash}`,
+      font: () => undefined,
+    };
+
+    const result = await runJob(
+      { brief: briefSource, outputs: [{ kind: 'svg' }] },
+      await portsOf({ exporters: exportersOf(noFonts, noFonts) }),
+    );
+
+    const produced = result.ok ? result.warnings : result.error;
+    const fonts = produced.filter((item) => item.code === 'E_EXPORT_FONT_UNRESOLVED');
+
+    expect(fonts.length).toBeGreaterThan(0);
+    expect(fonts.every((item) => item.hint === undefined)).toBe(true);
+  });
+
   it('gives the two exporters and the loader one list of faces for one scene', async () => {
     // The second acceptance criterion, measured three ways at once: what the enumeration
     // says the scene needs, what the HTML exporter asked for, and what the SVG exporter
