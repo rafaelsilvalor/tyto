@@ -1,0 +1,18 @@
+---
+template: cartaz
+formats: [feed]
+---
+// A deliberate mistake, kept as a file so it goes through the same reader a real brief
+// does. `cartaz` declares cor, imagem and slide (fixture/templates/cartaz/manifest.yaml)
+// and no slot by the name below. The body under it is three lines, so a range covering
+// the whole directive would be unmistakably wider than one covering just the name.
+
+::slide
+  Inscrições até março 🚀 — acentos e um par substituto antes da diretiva quebrada,
+  porque um offset contado em bytes ou em pontos de código, e não em unidades UTF-16,
+  só erra depois de um deles.
+
+::rodape
+  Três linhas de corpo,
+  para que um range largo
+  não possa ser confundido com um estreito.
