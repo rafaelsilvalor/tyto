@@ -138,14 +138,46 @@ const BRIEF: BriefAst = {
   range: sourceRange(0, 300),
 };
 
+/**
+ * The same headline, split in three by a mark the template never declared.
+ *
+ * This is the shape `runsOf` merges back into one run, and the reason it belongs in *this*
+ * file rather than only in `runs.test.ts`: `provenance` finds a slot by asking which one
+ * *contains* the run's origin, so a merged origin that grew past the directive would send
+ * `W_TEXT_OVERFLOW` back to naming a node id. Every range here sits inside `TITULO_RANGE`,
+ * and the test below is what says the union still does.
+ */
+const MARKED_BRIEF: BriefAst = {
+  ...BRIEF,
+  directives: [
+    directive(
+      'titulo',
+      [
+        { kind: 'text', value: 'uma manchete longa ', range: sourceRange(60, 79) },
+        {
+          kind: 'mark',
+          key: 'cor',
+          value: 'laranja',
+          children: [{ kind: 'text', value: 'demais', range: sourceRange(90, 96) }],
+          range: sourceRange(79, 100),
+        },
+        { kind: 'text', value: ' para esta caixa', range: sourceRange(100, 116) },
+      ],
+      TITULO_RANGE,
+    ),
+    directive('legenda', richText('cabe', { start: 210, end: 250 }), LEGENDA_RANGE),
+  ],
+};
+
 async function compiledWith(
   overflow: 'clip' | 'shrink',
   withFaces = true,
+  source: BriefAst = BRIEF,
 ): Promise<{
   scene: Scene;
   warnings: readonly { code: string; range?: unknown; message: string }[];
 }> {
-  const brief = await resolve(BRIEF, { registry, assets });
+  const brief = await resolve(source, { registry, assets });
   if (!brief.ok) throw new Error(brief.error.map((item) => item.message).join('; '));
 
   const result = compile(brief.value, templateWith(overflow), {
@@ -219,6 +251,26 @@ describe('W_TEXT_OVERFLOW', () => {
     const { warnings } = await compiledWith('clip');
 
     expect(warnings.filter((item) => item.code === 'W_TEXT_OVERFLOW')).toHaveLength(1);
+  });
+
+  it('still finds the slot when a merged run carries the union of three ranges', async () => {
+    const { warnings } = await compiledWith('clip', true, MARKED_BRIEF);
+    const overflow = warnings.find((item) => item.code === 'W_TEXT_OVERFLOW');
+
+    // The merged origin is (60,116) — wider than any inline that produced it, and still
+    // inside the directive at (50,120). Were it wider than the directive, this would say
+    // 'headline' and point nowhere.
+    expect(overflow?.message).toContain("slot 'titulo'");
+    expect(overflow?.range).toEqual(TITULO_RANGE);
+  });
+
+  it('lays the merged text out exactly as the unmerged text, because it draws the same', async () => {
+    const merged = await compiledWith('clip', true, MARKED_BRIEF);
+    const plain = await compiledWith('clip');
+
+    expect(linesOf(nodeById(merged.scene, 'headline'))).toEqual(
+      linesOf(nodeById(plain.scene, 'headline')),
+    );
   });
 
   it('is silent once a shrink has made the text fit', async () => {
