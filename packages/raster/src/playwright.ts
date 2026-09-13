@@ -70,6 +70,20 @@ export interface PlaywrightRasterizerOptions {
   readonly args?: readonly string[];
   /** Passed through to `chromium.launch`; a CI container usually wants `--no-sandbox`. */
   readonly launch?: LaunchOptions;
+  /**
+   * The browser type to drive, instead of importing Playwright's own `chromium`.
+   *
+   * For an embedder that already holds a Playwright instance — and for the one thing a
+   * real browser cannot answer: **how many browsers this adapter started**. That count is
+   * the subject of `browser-reuse.test.ts`, and through Chromium it is observable only as
+   * a process that never exits, which is how TYTO-88 stayed hidden.
+   *
+   * It does not widen what the adapter can drive. `BrowserType` is Playwright's own
+   * interface and the launch flags in {@link DETERMINISM_ARGS} are Chromium's, so handing
+   * in Firefox would produce a browser that ignores half of them (ADR 0002 picked
+   * Chromium, and this option does not reopen it).
+   */
+  readonly browserType?: BrowserType;
 }
 
 export interface PlaywrightRasterizer extends Rasterizer {
@@ -107,10 +121,12 @@ export function createPlaywrightRasterizer(
 ): PlaywrightRasterizer {
   // The promise, not the browser: two `raster` calls that arrive before the first launch
   // finishes have to await the same launch, or the second one starts a browser nobody
-  // will ever close.
+  // will ever close. `browser()` below is where that actually holds, and where it did not.
   let launching: Promise<Browser> | undefined;
 
   async function chromium(): Promise<BrowserType> {
+    if (options.browserType !== undefined) return options.browserType;
+
     try {
       const playwright = await import('playwright');
       return playwright.chromium;
@@ -133,13 +149,29 @@ export function createPlaywrightRasterizer(
     });
   }
 
+  /**
+   * The browser, launched at most once however many callers arrive together.
+   *
+   * **`launching` is assigned before the first `await`, and that is the whole of it.**
+   * `await launching` yields the microtask queue even when there is nothing to await, so
+   * the previous shape — await, check, assign — let two concurrent callers both resume
+   * with `undefined`, both fall through the check, and both assign. Two browsers started;
+   * the first assignment was overwritten, so `close` closed the second and the first
+   * stayed alive with its pipes open. A `tyto render --types png` of any brief with two
+   * frames then wrote every artifact correctly and never exited (TYTO-88).
+   */
   async function browser(): Promise<Browser> {
-    const existing = await launching;
-    if (existing?.isConnected() === true) return existing;
-    // A browser that died — crashed, or killed with the terminal it was started from —
-    // is not an error the next render has to inherit.
-    launching = launch();
-    return launching;
+    const pending = (launching ??= launch());
+    const instance = await pending;
+    if (instance.isConnected()) return instance;
+
+    // A browser that died — crashed, or killed with the terminal it was started from — is
+    // not an error the next render has to inherit. Replaced once, for the same reason it
+    // is launched once: whoever still finds the dead one in `launching` replaces it, and
+    // everybody else takes what that produced rather than starting a third.
+    if (launching === pending) launching = launch();
+    // `close` may have cleared it in between, and then starting over is the right answer.
+    return launching ?? browser();
   }
 
   async function capture(html: string, resolved: ResolvedRasterOptions): Promise<Uint8Array> {
