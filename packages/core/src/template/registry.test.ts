@@ -190,3 +190,113 @@ describe('the one case with no registry to return', () => {
     expect(registry.failures).toEqual([]);
   });
 });
+
+describe('a search path of several roots (ADR 0020)', () => {
+  const twoRoots = () =>
+    fakeFileSystem({
+      'project/promo/manifest.yaml': manifest('promo'),
+      'project/so-do-projeto/manifest.yaml': manifest('so-do-projeto'),
+      'pack/promo/manifest.yaml': manifest('promo', '[feed, story]'),
+      'pack/so-do-pack/manifest.yaml': manifest('so-do-pack'),
+    });
+
+  it('takes the earlier root when two of them declare one name', async () => {
+    // The whole decision in one assertion: a folder the user pointed at beats a package
+    // that came along with the program.
+    const result = await loadTemplateRegistry(twoRoots(), ['project', 'pack']);
+    if (!result.ok) throw new Error('expected a registry');
+
+    expect(result.value.directoryOf('promo')).toBe('project/promo');
+    expect(result.value.formatsOf('promo')).toEqual(['feed']);
+  });
+
+  it('takes the other one when the roots are handed over the other way round', async () => {
+    // Precedence is the order of the list and nothing else — not a rule about which root
+    // is "the project", which this function has no way to know.
+    const result = await loadTemplateRegistry(twoRoots(), ['pack', 'project']);
+    if (!result.ok) throw new Error('expected a registry');
+
+    expect(result.value.directoryOf('promo')).toBe('pack/promo');
+  });
+
+  it('unions what does not collide', async () => {
+    const result = await loadTemplateRegistry(twoRoots(), ['project', 'pack']);
+    if (!result.ok) throw new Error('expected a registry');
+
+    expect(result.value.list().map((entry) => entry.name)).toEqual([
+      'promo',
+      'so-do-pack',
+      'so-do-projeto',
+    ]);
+  });
+
+  it('warns about the shadowed one, naming both folders', async () => {
+    // A warning and not silence: "my edit to the built-in did nothing" is the question this
+    // rule generates, and one line answers it. On the `ok` branch, so the run continues.
+    const result = await loadTemplateRegistry(twoRoots(), ['project', 'pack']);
+    if (!result.ok) throw new Error('expected a registry');
+
+    expect(result.warnings.map((item) => item.code)).toEqual(['W_TEMPLATE_SHADOWED']);
+    expect(result.warnings[0]?.message).toContain('pack/promo');
+    expect(result.warnings[0]?.message).toContain('project/promo');
+    expect(result.value.failures).toEqual([]);
+  });
+
+  it('still refuses two folders inside one root, which is the other collision', async () => {
+    // Different problem, different answer. Directory order is not an order anybody chose,
+    // so picking between them would be arbitrary — that stays `E_TEMPLATE_DUPLICATE`.
+    const fileSystem = fakeFileSystem({
+      'project/a/manifest.yaml': manifest('promo'),
+      'project/b/manifest.yaml': manifest('promo'),
+      'pack/promo/manifest.yaml': manifest('promo'),
+    });
+    const result = await loadTemplateRegistry(fileSystem, ['project', 'pack']);
+    if (!result.ok) throw new Error('expected a registry');
+
+    expect(
+      result.value.failures.flatMap((failure) => failure.diagnostics).map((d) => d.code),
+    ).toEqual(['E_TEMPLATE_DUPLICATE']);
+    expect(result.warnings.map((item) => item.code)).toEqual(['W_TEMPLATE_SHADOWED']);
+  });
+
+  it('does not let a root shadow itself when it is listed twice', async () => {
+    // `--templates <the pack's own folder>` is how the built-in templates were used before
+    // ADR 0020 and still has to work. Without de-duplication every template in it would be
+    // reported as hidden by the copy of itself.
+    const result = await loadTemplateRegistry(twoRoots(), ['pack', 'pack']);
+    if (!result.ok) throw new Error('expected a registry');
+
+    expect(result.warnings).toEqual([]);
+    expect(result.value.list().map((entry) => entry.name)).toEqual(['promo', 'so-do-pack']);
+  });
+
+  it('keeps going when one root is unreadable, and says which', async () => {
+    // A project with no `templates/` folder renders from the pack. It is a failure on that
+    // root rather than an `Err`, because there is a registry to return.
+    const result = await loadTemplateRegistry(twoRoots(), ['nao-existe', 'pack']);
+    if (!result.ok) throw new Error('expected a registry');
+
+    expect(result.value.get('promo')).toBeDefined();
+    expect(result.value.failures.map((failure) => failure.directory)).toEqual(['nao-existe']);
+  });
+
+  it('fails only when every root is unreadable', async () => {
+    const result = await loadTemplateRegistry(twoRoots(), ['nem-esse', 'nao-existe']);
+
+    expect(result.ok).toBe(false);
+    expect(!result.ok && result.error.map((item) => item.code)).toEqual([
+      'E_TEMPLATE_READ',
+      'E_TEMPLATE_READ',
+    ]);
+  });
+
+  it('accepts a single string, and behaves exactly as it always did', async () => {
+    // Every existing caller passes one root. The string form is not a shim; it is the
+    // common case spelled the short way.
+    const result = await loadTemplateRegistry(twoRoots(), 'pack');
+    if (!result.ok) throw new Error('expected a registry');
+
+    expect(result.value.list().map((entry) => entry.name)).toEqual(['promo', 'so-do-pack']);
+    expect(result.warnings).toEqual([]);
+  });
+});

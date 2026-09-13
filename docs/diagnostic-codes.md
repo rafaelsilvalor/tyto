@@ -53,6 +53,7 @@ successful result (ADR 0013).
 | `W_TEXT_OVERFLOW` | warning | Compiled text does not fit its frame in one of the requested formats. |
 | `W_UNUSED_SLOT` | warning | The brief sets a slot the chosen template never renders. |
 | `W_MARKUP_IN_FRONTMATTER` | warning | A frontmatter scalar on a rich-text slot contains what looks like inline markup. |
+| `W_TEMPLATE_SHADOWED` | warning | Two template sources declare the same name; the earlier source is the one used. |
 
 ## Errors
 
@@ -585,3 +586,15 @@ Slot '{slot}' is set in the frontmatter, where '{markup}' is literal text. Write
 ```
 
 Parameters: `slot`, `markup`
+
+### `W_TEMPLATE_SHADOWED`
+
+**Severity:** warning · **Spec:** `docs/adr/0020-built-in-template-pack.md`
+
+Two template sources declare the same name; the earlier source is the one used.
+
+```
+Template '{name}' in '{shadowed}' is shadowed by the one in '{used}', which is searched first.
+```
+
+Parameters: `name`, `shadowed`, `used`

@@ -100,8 +100,34 @@ moment should be able to run a third party's code. Running a template is `compil
 A folder with no manifest is not a template and is skipped in silence; a folder _with_ a
 manifest that does not parse is a `failure` on the registry, and the templates around it
 still work. Two folders declaring the same `name` is a failure on the second one, so which
-template a name means does not depend on the order the filesystem listed them in. The load
-itself fails only when `root` cannot be read at all.
+template a name means does not depend on the order the filesystem listed them in.
+
+### The search path: the project, then the built-in pack
+
+`roots` is a list in precedence order and **earlier wins** (ADR 0020). The CLI passes
+`--templates <dir>` first and the built-in pack second, so:
+
+- `tyto render` finds `promo-curso` and `carrossel-lista` with no flag at all. The pack is
+  `@tyto/templates`' own `templates/` folder, located by resolving that package's
+  `package.json` — which is right in a workspace, in a published install, and inside an
+  Electron `asar`.
+- A project's own `templates/promo-curso/` **wins**, and the built-in it hid is reported as
+  `W_TEMPLATE_SHADOWED` naming both folders. A warning, because nothing is wrong: the run
+  produced the template the user asked for. Not silence, because "my edit to the built-in
+  did nothing" is the question this rule generates.
+- `--templates` pointed at the pack's own folder still works and warns about nothing: a
+  root listed twice is de-duplicated rather than left to shadow itself.
+- The default `templates/` not existing is **not** reported. A project without one renders
+  from the pack, and a complaint about a folder the user never mentioned would open every
+  such run. A folder they _did_ name and do not have is still `E_TEMPLATE_READ`.
+
+The two collisions stay different. Two folders in **one** root is `E_TEMPLATE_DUPLICATE`,
+an error, because directory order is nobody's decision. The same name in a **later** root is
+a warning, because that order is one somebody chose.
+
+The load fails — `Err` rather than a registry with failures in it — only when every root is
+unreadable, which is the one case where there is no registry to return rather than an
+incomplete one.
 
 ## template.html — Tyto markup
 
