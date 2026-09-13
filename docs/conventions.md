@@ -20,6 +20,8 @@ Name `@tyto/<name>`. `src/index.ts` is the only public API. `exports` in package
 
 Every package is _pure_, _Node_ or _DOM_ (ADR 0010). The category is declared twice on purpose: `tsconfig.{pure,node,dom}.json` decide which types the package can even see, and the `boundary/*` blocks in `eslint.config.js` forbid the matching imports and globals with a message that names the way out. `tools/repo-checks` lints throwaway sources against the real config, so weakening a boundary rule fails `pnpm check`.
 
+A pure package's _dependencies_ are the half the lint cannot see. A library that is pure only under a non-`node` export condition — `yaml` and `fontkit` both are — becomes a Node dependency the moment a bundler resolves the wrong condition for a browser target, and that decision lives in a config file, not in a source file. `pure-export-conditions.test.ts` reads the manifests instead: adding a dependency whose `exports` map has a `node` branch fails `pnpm check` until it is declared there with what that branch reaches.
+
 ## Git
 
 See `docs/git-workflow.md`.
