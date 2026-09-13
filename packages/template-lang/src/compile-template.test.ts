@@ -32,6 +32,8 @@ import { describe, expect, it } from 'vitest';
 
 import componentsExpandedMarkup from './__fixtures__/components-expanded.html?raw';
 import componentsMarkup from './__fixtures__/components.html?raw';
+import parametersExpandedMarkup from './__fixtures__/parameters-expanded.html?raw';
+import parametersMarkup from './__fixtures__/parameters.html?raw';
 import promoCursoMarkup from './__fixtures__/promo-curso.html?raw';
 import { compileTemplate } from './compile-template.js';
 
@@ -526,11 +528,15 @@ async function frameOf(styles: string, markup: string, manifest = MINIMAL) {
 }
 
 /** The same thing for a whole `template.html`, which is what a fixture is. */
-async function documentFrame(source: string, manifest = MINIMAL) {
+async function documentFrame(
+  source: string,
+  manifest = MINIMAL,
+  directives: readonly Directive[] = [directive('titulo', textOf('Oi'))],
+) {
   const template = compiledOrThrow(source, manifest);
   const ast: BriefAst = {
     frontmatter: frontmatter({ template: manifest.name }),
-    directives: [directive('titulo', textOf('Oi'))],
+    directives: [...directives],
     range: sourceRange(0, 40),
   };
   const singles: TemplateRegistry = {
@@ -922,8 +928,12 @@ describe('a component the template cannot expand', () => {
       inFrame('<use component="chip" opacity="0.5" />') + define('<rect class="g" />') + style,
     );
 
-    expect(onDefine).toEqual(["a <define> takes name, and this is 'class'"]);
-    expect(onUse).toEqual(["a <use> takes component and class, and this is 'opacity'"]);
+    expect(onDefine).toEqual(["a <define> takes name and params, and this is 'class'"]);
+    // A `<use>`'s own two words are `component` and `class`; every other attribute on it
+    // is a parameter binding, so an unknown one is answered by the component (E4.10).
+    expect(onUse).toEqual([
+      "component 'chip' declares no parameters, and this <use> binds 'opacity'",
+    ]);
   });
 
   it('suggests <use> for a tag that is nearly one', () => {
@@ -944,5 +954,209 @@ describe('a component the template cannot expand', () => {
     );
 
     expect(messages.filter((message) => message.includes('no font declaration'))).toHaveLength(1);
+  });
+});
+
+/* --------------------------------------------- component parameters (E4.10) -- */
+
+const LINHAS = manifestOf(`name: linhas
+version: 1.0.0
+formats: [feed]
+slots:
+  titulo: { type: rich-text, required: true }
+  subtitulo: { type: rich-text }
+  foto: { type: image }
+`);
+
+const BOTH: readonly Directive[] = [
+  directive('titulo', textOf('Direito')),
+  directive('subtitulo', textOf('Turma nova')),
+];
+
+function textsOf(built: Awaited<ReturnType<typeof documentFrame>>): (string | undefined)[] {
+  return (built?.children ?? []).map((linha) => {
+    const node = linha.kind === 'group' ? linha.children[1] : undefined;
+    const run = node?.kind === 'text' ? node.runs[0] : undefined;
+    return run?.kind === 'text' ? run.text : undefined;
+  });
+}
+
+describe('one component, used twice, drawing two different slots', () => {
+  it('produces the frame the two copies written by hand produce', async () => {
+    const fromParameter = await documentFrame(parametersMarkup, LINHAS, BOTH);
+    const byHand = await documentFrame(parametersExpandedMarkup, LINHAS, BOTH);
+
+    expect(fromParameter).toEqual(byHand);
+  });
+
+  it('reads a different slot in each instance', async () => {
+    const built = await documentFrame(parametersMarkup, LINHAS, BOTH);
+
+    expect(textsOf(built)).toEqual(['Direito', 'Turma nova']);
+  });
+
+  it('counts a slot reached only through a parameter as read', () => {
+    const template = compileTemplate(parametersMarkup, { manifest: LINHAS });
+    expect(template.ok).toBe(true);
+    if (!template.ok) return;
+
+    // The markup never writes `subtitulo`; the <use> does. Without this, W_UNUSED_SLOT
+    // would tell a brief to delete the line the second instance draws.
+    expect([...template.value.renderedSlots].sort()).toEqual(['subtitulo', 'titulo']);
+  });
+
+  it('leaves out the instance whose bound slot the brief did not fill', async () => {
+    const built = await documentFrame(parametersMarkup, LINHAS, [
+      directive('titulo', textOf('Direito')),
+    ]);
+
+    // Two <use>, one filled slot: the same rule a hand-written <text> already follows.
+    expect(built?.children).toHaveLength(2);
+    expect((built?.children[1]?.kind === 'group' ? built.children[1].children : []).length).toBe(1);
+  });
+});
+
+describe('a parameter the template cannot bind', () => {
+  const inFrame = (body: string): string => `<frame format="feed">${body}</frame>`;
+  const style = '<style>.t { w: 100; font: 400 20px "Inter"; color: white }</style>';
+  const linha = '<define name="linha" params="texto"><text slot="texto" class="t" /></define>';
+
+  function messagesOf(source: string): string[] {
+    return problemsOf(source, LINHAS).map((item) =>
+      item.message.replace(/^Template markup is invalid: /u, '').replace(/\.$/u, ''),
+    );
+  }
+
+  it('refuses a <use> that binds a parameter the <define> did not declare', () => {
+    const source =
+      inFrame('<use component="linha" texo="titulo" texto="titulo" />') + linha + style;
+
+    expect(messagesOf(source)).toEqual([
+      "component 'linha' declares no parameter 'texo'; try 'texto'",
+    ]);
+    expect(problemsOf(source, LINHAS)[0]?.range).toBeDefined();
+  });
+
+  it('refuses a <use> that omits a declared parameter', () => {
+    const source = inFrame('<use component="linha" />') + linha + style;
+
+    expect(messagesOf(source)).toEqual([
+      "component 'linha' declares parameter 'texto', and this <use> does not bind it",
+    ]);
+    expect(problemsOf(source, LINHAS)[0]?.range).toBeDefined();
+  });
+
+  it('says a typo once, as the binding it should have been', () => {
+    // `texo="titulo"` is both an unknown binding and an unbound parameter. One mistake,
+    // one sentence: the parameter the suggestion already named is not reported unbound.
+    const source = inFrame('<use component="linha" texo="titulo" />') + linha + style;
+
+    expect(messagesOf(source)).toEqual([
+      "component 'linha' declares no parameter 'texo'; try 'texto'",
+    ]);
+  });
+
+  it('lists the parameters when nothing is close enough to be a typo', () => {
+    const source =
+      inFrame('<use component="linha" rodape="titulo" texto="titulo" />') + linha + style;
+
+    expect(messagesOf(source)).toEqual([
+      "component 'linha' declares no parameter 'rodape'; it declares texto",
+    ]);
+  });
+
+  it('reports a slot the manifest does not declare, at the binding that named it', () => {
+    const source = inFrame('<use component="linha" texto="rodape" />') + linha + style;
+    const problems = problemsOf(source, LINHAS);
+    const at = source.indexOf('texto="rodape"') + 'texto="'.length;
+
+    // The <define> is correct and the <use> is wrong, so the range is the binding's —
+    // and the message is the one a hand-written slot="rodape" already produced.
+    expect(problems[0]?.message).toContain("slot 'rodape' is not declared by template 'linhas'");
+    expect(problems[0]?.range).toEqual({ start: at, end: at + 'rodape'.length });
+  });
+
+  it('type-checks the bound slot the way a hand-written one is checked', () => {
+    const source = inFrame('<use component="linha" texto="foto" />') + linha + style;
+
+    expect(messagesOf(source)).toEqual(["<text> draws a rich-text slot and 'foto' is image"]);
+  });
+
+  it('refuses a parameter bound to nothing', () => {
+    const source = inFrame('<use component="linha" texto="" />') + linha + style;
+
+    expect(messagesOf(source)).toEqual([
+      "parameter 'texto' is bound to nothing, and it takes the name of a slot",
+    ]);
+  });
+
+  it('refuses a parameter that shadows a slot the manifest declares', () => {
+    const source =
+      inFrame('<use component="linha" titulo="titulo" />') +
+      '<define name="linha" params="titulo"><text slot="titulo" class="t" /></define>' +
+      style;
+
+    expect(messagesOf(source).join(' | ')).toContain("parameter 'titulo' has the name of a slot");
+  });
+
+  it('refuses a parameter called component or class, which a <use> spends on itself', () => {
+    const source =
+      inFrame('<use component="linha" />') +
+      '<define name="linha" params="class"><text slot="class" class="t" /></define>' +
+      style;
+
+    expect(messagesOf(source)[0]).toContain("a parameter may not be called 'class'");
+  });
+
+  it('refuses a parameter declared twice', () => {
+    const source =
+      inFrame('<use component="linha" texto="titulo" />') +
+      '<define name="linha" params="texto texto"><text slot="texto" class="t" /></define>' +
+      style;
+
+    expect(messagesOf(source)).toContain("component 'linha' declares parameter 'texto' twice");
+  });
+
+  it('refuses a parameter no slot could be named', () => {
+    const source =
+      inFrame('<use component="linha" />') +
+      '<define name="linha" params="2x"><text slot="titulo" class="t" /></define>' +
+      style;
+
+    expect(messagesOf(source)[0]).toContain("parameter '2x' is not a name a slot could have");
+  });
+});
+
+describe('a parameter handed one component further down', () => {
+  const style = '<style>.t { w: 100; font: 400 20px "Inter"; color: white }</style>';
+
+  it('reaches the slot through the inner component', async () => {
+    const built = await documentFrame(
+      '<frame format="feed"><use component="fora" alvo="subtitulo" /></frame>' +
+        '<define name="fora" params="alvo"><group class="g"><use component="dentro" onde="alvo" /></group></define>' +
+        '<define name="dentro" params="onde"><text slot="onde" class="t" /></define>' +
+        style,
+      LINHAS,
+      BOTH,
+    );
+
+    const group = built?.children[0];
+    const node = group?.kind === 'group' ? group.children[0] : undefined;
+    const run = node?.kind === 'text' ? node.runs[0] : undefined;
+
+    expect(run?.kind === 'text' ? run.text : undefined).toBe('Turma nova');
+  });
+
+  it('splices a bound slot into a src the same way', () => {
+    const result = compileTemplate(
+      '<frame format="feed"><use component="marca" arte="foto" /></frame>' +
+        '<define name="marca" params="arte"><image src="{arte}" class="i" /></define>' +
+        '<style>.i { w: 100; h: 100 }</style>',
+      { manifest: LINHAS },
+    );
+
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect([...result.value.renderedSlots]).toEqual(['foto']);
   });
 });

@@ -97,7 +97,7 @@ export function compileTemplate(
   const repeatable = repeatableOf(manifest);
   // Components are resolved away first, so everything below reads the tree the author
   // would have written by hand (ADR 0022).
-  const document = expandComponents(parsed.value, report);
+  const document = expandComponents(parsed.value, manifest, report);
   const frames = collectFrames(document, manifest, report);
   const entries = compileStylesheet(document.styles, {
     formats: manifest.formats,

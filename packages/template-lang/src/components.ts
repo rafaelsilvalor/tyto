@@ -1,7 +1,7 @@
-import { type Diagnostic, type SourceRange, didYouMean } from '@tyto/core';
+import { type Diagnostic, type SourceRange, type TemplateManifest, didYouMean } from '@tyto/core';
 
 import type { TemplateAttribute, TemplateDocument, TemplateElement } from './ast.js';
-import { attributeOf, classesOf } from './frames.js';
+import { attributeOf, classesOf, interpolatedSlots } from './frames.js';
 import type { Report } from './values.js';
 import { markupProblem } from './vocabulary.js';
 
@@ -21,14 +21,27 @@ import { markupProblem } from './vocabulary.js';
  * `<define>` may not write an `id`, because an id is unique in a frame and a `<use>` may
  * be written twice, so the existing "id used twice in one frame" check keeps meaning what
  * it means.
+ *
+ * **A parameter is a slot name, substituted before anything validates it.**
+ * `<define name="linha" params="texto">` writes `slot="texto"` in its body and
+ * `<use component="linha" texto="titulo">` decides which slot that is. The substitution
+ * happens on the component's children _before_ they are expanded, so the tree that reaches
+ * `checkSlot` names real slots: the type check, the "not declared by this template" refusal
+ * and `renderedSlots` all keep working on markup that never mentions a parameter.
  */
 
-/** What each structural tag takes. `params` on a `<define>` is E4.10, not here. */
-const DEFINE_ATTRIBUTES = ['name'] as const;
-const USE_ATTRIBUTES = ['component', 'class'] as const;
+/** What a `<define>` takes. A `<use>` takes `component`, `class` and the declared params. */
+const DEFINE_ATTRIBUTES = ['name', 'params'] as const;
+
+/** The two words a `<use>` spends on itself, and so the two a parameter may not be called. */
+const USE_RESERVED = ['component', 'class'] as const;
+
+/** A parameter is substituted into a slot position, so it is named the way a slot is. */
+const SLOT_NAME = /^[a-zA-Z_][a-zA-Z0-9_-]*$/u;
 
 interface Component {
   readonly name: string;
+  readonly params: readonly string[];
   readonly children: readonly TemplateElement[];
 }
 
@@ -41,8 +54,12 @@ interface Component {
  * duplicate diagnostics that produces for a component that _is_ used are collapsed by
  * `compileTemplate`, which reports one sentence per range.
  */
-export function expandComponents(document: TemplateDocument, report: Report): TemplateDocument {
-  const components = collectComponents(document, report);
+export function expandComponents(
+  document: TemplateDocument,
+  manifest: TemplateManifest,
+  report: Report,
+): TemplateDocument {
+  const components = collectComponents(document, manifest, report);
 
   for (const component of components.values()) {
     expandChildren(component.children, components, [component.name], report);
@@ -74,6 +91,7 @@ function topLevel(
 
 function collectComponents(
   document: TemplateDocument,
+  manifest: TemplateManifest,
   report: Report,
 ): ReadonlyMap<string, Component> {
   const components = new Map<string, Component>();
@@ -102,10 +120,77 @@ function collectComponents(
     }
 
     for (const child of element.children) refuseIds(child, named.value, report);
-    components.set(named.value, { name: named.value, children: element.children });
+    components.set(named.value, {
+      name: named.value,
+      params: parametersOf(element, named.value, manifest, report),
+      children: element.children,
+    });
   }
 
   return components;
+}
+
+/**
+ * The names a `<use>` of this component has to bind, read off `params="a b"`.
+ *
+ * Three of them are refused rather than accepted and left to surprise somebody. A name a
+ * slot could not have would never be substituted into a `slot="…"`. `component` and `class`
+ * are the words a `<use>` spends on itself, so a parameter called either could not be bound.
+ * And a parameter that shadows a real slot would make `slot="titulo"` inside the body mean
+ * the parameter, with no spelling left for the slot — silently, which is the part that
+ * earns a refusal.
+ */
+function parametersOf(
+  element: TemplateElement,
+  component: string,
+  manifest: TemplateManifest,
+  report: Report,
+): string[] {
+  const declared = attributeOf(element, 'params');
+  if (declared === undefined) return [];
+
+  const names: string[] = [];
+  for (const name of declared.value.split(/\s+/u).filter((item) => item !== '')) {
+    if (!SLOT_NAME.test(name)) {
+      report(
+        markupProblem(
+          `parameter '${name}' is not a name a slot could have; a parameter is spelled like a slot`,
+          declared.valueRange,
+        ),
+      );
+      continue;
+    }
+    if ((USE_RESERVED as readonly string[]).includes(name)) {
+      report(
+        markupProblem(
+          `a parameter may not be called '${name}', because that is what a <use> calls its own attribute`,
+          declared.valueRange,
+        ),
+      );
+      continue;
+    }
+    if (manifest.slots[name] !== undefined) {
+      report(
+        markupProblem(
+          `parameter '${name}' has the name of a slot template '${manifest.name}' declares, so slot="${name}" in this body could never reach that slot`,
+          declared.valueRange,
+        ),
+      );
+      continue;
+    }
+    if (names.includes(name)) {
+      report(
+        markupProblem(
+          `component '${component}' declares parameter '${name}' twice`,
+          declared.valueRange,
+        ),
+      );
+      continue;
+    }
+    names.push(name);
+  }
+
+  return names;
 }
 
 function expandChildren(
@@ -140,8 +225,6 @@ function expandUse(
   stack: readonly string[],
   report: Report,
 ): TemplateElement[] {
-  checkAttributes(element, USE_ATTRIBUTES, report);
-
   const named = attributeOf(element, 'component');
   if (named === undefined || named.value === '') {
     report(markupProblem('a <use> needs component="…" naming a <define>', element.tagRange));
@@ -166,12 +249,130 @@ function expandUse(
     return [];
   }
 
-  const body = expandChildren(component.children, components, [...stack, component.name], report);
+  // Before the expansion, not after: a nested `<use>` passes a parameter on by naming it,
+  // and by the time that inner tag is expanded the name has to be the slot it stands for.
+  // A parameter nobody bound has no slot to stand for, so the component is not drawable
+  // and the tree is not expanded: reporting slot='texto' as an undeclared slot would be
+  // the consequence of a mistake the author has already been told about.
+  const bindings = bindingsOf(element, component, report);
+  if (bindings === undefined) return [];
+  const bound = bindings.size === 0 ? component.children : substitute(component.children, bindings);
+
+  const body = expandChildren(bound, components, [...stack, component.name], report);
   const instance = classesOf(element);
   if (instance.length === 0) return body;
 
   const source = attributeOf(element, 'class');
   return body.map((node) => withClasses(node, instance, source));
+}
+
+/**
+ * What this `<use>` binds each parameter to, with both halves of the contract checked.
+ *
+ * A binding nothing declares and a declaration nothing binds are the same mistake seen from
+ * two sides, and a typo produces both at once. So a parameter that an unknown binding was
+ * already told to try is not also reported as unbound: `texo="titulo"` against
+ * `params="texto"` is one sentence naming the fix, not two naming each other.
+ */
+function bindingsOf(
+  element: TemplateElement,
+  component: Component,
+  report: Report,
+): ReadonlyMap<string, TemplateAttribute> | undefined {
+  const bindings = new Map<string, TemplateAttribute>();
+  const named = new Set<string>();
+
+  for (const attribute of element.attributes) {
+    if ((USE_RESERVED as readonly string[]).includes(attribute.name)) continue;
+
+    if (!component.params.includes(attribute.name)) {
+      const suggestion = didYouMean(attribute.name, component.params);
+      if (suggestion !== undefined) named.add(suggestion);
+      report(unknownParameter(component, attribute.name, suggestion, attribute.nameRange));
+      continue;
+    }
+    if (attribute.value === '') {
+      report(
+        markupProblem(
+          `parameter '${attribute.name}' is bound to nothing, and it takes the name of a slot`,
+          attribute.valueRange,
+        ),
+      );
+      named.add(attribute.name);
+      continue;
+    }
+    bindings.set(attribute.name, attribute);
+  }
+
+  for (const parameter of component.params) {
+    if (bindings.has(parameter) || named.has(parameter)) continue;
+    report(
+      markupProblem(
+        `component '${component.name}' declares parameter '${parameter}', and this <use> does not bind it`,
+        element.tagRange,
+      ),
+    );
+  }
+
+  return bindings.size === component.params.length ? bindings : undefined;
+}
+
+/**
+ * The component's body with every parameter replaced by the slot it was bound to.
+ *
+ * Three places name a slot, and all three are rewritten: `slot="texto"`, a `{texto}`
+ * spliced into a `src`, and a nested `<use>`'s own binding, which is how a parameter is
+ * handed one component further down. The rewritten attribute carries the **binding's**
+ * range, because a binding that names a slot the manifest does not declare is a mistake in
+ * the `<use>`, and the `<define>` it lands in is correct.
+ */
+function substitute(
+  elements: readonly TemplateElement[],
+  bindings: ReadonlyMap<string, TemplateAttribute>,
+): TemplateElement[] {
+  return elements.map((element) => ({
+    ...element,
+    attributes: element.attributes.map((attribute) =>
+      substituteAttribute(element, attribute, bindings),
+    ),
+    children: substitute(element.children, bindings),
+  }));
+}
+
+function substituteAttribute(
+  element: TemplateElement,
+  attribute: TemplateAttribute,
+  bindings: ReadonlyMap<string, TemplateAttribute>,
+): TemplateAttribute {
+  const passedOn =
+    element.tag === 'use' && !(USE_RESERVED as readonly string[]).includes(attribute.name);
+
+  if (attribute.name === 'slot' || passedOn) {
+    const binding = bindings.get(attribute.value);
+    return binding === undefined ? attribute : bound(attribute, binding.value, binding);
+  }
+
+  if (attribute.name !== 'src') return attribute;
+
+  let first: TemplateAttribute | undefined;
+  let value = attribute.value;
+  for (const name of new Set(interpolatedSlots(attribute.value))) {
+    const binding = bindings.get(name);
+    if (binding === undefined) continue;
+    first ??= binding;
+    value = value.split(`{${name}}`).join(`{${binding.value}}`);
+  }
+
+  return first === undefined ? attribute : bound(attribute, value, first);
+}
+
+/** The value and where it was written; the name stays where the `<define>` wrote it. */
+function bound(
+  attribute: TemplateAttribute,
+  value: string,
+  binding: TemplateAttribute,
+): TemplateAttribute {
+  return { ...attribute, value, range: binding.range, valueRange: binding.valueRange };
 }
 
 /**
@@ -252,6 +453,26 @@ function unknownComponent(
     defined.length === 0
       ? `no component is defined as '${name}', and this template defines none`
       : `no component is defined as '${name}'; this template defines ${defined.join(', ')}`,
+    range,
+  );
+}
+
+function unknownParameter(
+  component: Component,
+  written: string,
+  suggestion: string | undefined,
+  range: SourceRange,
+): Diagnostic {
+  if (suggestion !== undefined) {
+    return markupProblem(
+      `component '${component.name}' declares no parameter '${written}'; try '${suggestion}'`,
+      range,
+    );
+  }
+  return markupProblem(
+    component.params.length === 0
+      ? `component '${component.name}' declares no parameters, and this <use> binds '${written}'`
+      : `component '${component.name}' declares no parameter '${written}'; it declares ${component.params.join(', ')}`,
     range,
   );
 }

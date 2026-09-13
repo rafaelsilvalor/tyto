@@ -1,0 +1,45 @@
+<!-- `parameters.html` with the component written out by hand: the same two groups, with
+     the slot each one draws typed where the parameter stood. The stylesheet below is byte
+     for byte the other file's. -->
+
+<frame format="feed" bg="#0c2340">
+  <group class="linha topo">
+    <rect class="linha-marca topo" />
+    <text slot="titulo" class="linha-texto topo" />
+  </group>
+  <group class="linha base">
+    <rect class="linha-marca base" />
+    <text slot="subtitulo" class="linha-texto base" />
+  </group>
+</frame>
+
+<style>
+  .linha {
+    x: 80;
+  }
+  .linha.topo {
+    y: 120;
+  }
+  .linha.base {
+    y: 420;
+  }
+
+  .linha-marca {
+    x: 0;
+    y: 0;
+    w: 64;
+    h: 8;
+    fill: #ff5900;
+  }
+
+  .linha-texto {
+    x: 0;
+    y: 24;
+    w: 800;
+    font: 700 40px/1.2 "Source Sans 3";
+    color: white;
+  }
+  .linha-texto.base {
+    font: 400 28px/1.3 "Source Sans 3";
+  }
+</style>
