@@ -20,6 +20,19 @@ floor above the LTS line, and `jsdom` (`^22.22.2 || ^24.15.0 || >=26.0.0`) lifts
 more — it arrived with TYTO-36, as the DOM `@tyto/editor`'s tests mount CodeMirror in, and
 raised the floor by one patch on 22 and three minors on 24.
 
+**That fourth one is a DOM package's test environment, and it is chosen once.**
+`happy-dom` (`>=20.0.0`) would not have moved this line, and it was measured rather than
+assumed: the editor's 20 cases pass under it unchanged, and perturbing the highlighting
+fails the same 2, so the two environments measure the same thing for this package. It was
+not taken because **removing the other one does not remove it**. With
+`auto-install-peers=true` in `.npmrc`, adding `jsdom` once resolves `vitest`'s optional
+`jsdom: '*'` peer, and from then on `pnpm remove jsdom` leaves the package in the lockfile
+and in the installed tree — measured at **18 lockfile references after the removal, against
+2 before the addition**, and `pnpm install --force` does not undo it. Only regenerating the
+lockfile does, which re-resolves the whole tree and is a change of its own — TYTO-82's
+shape, measured on purpose, not a side effect of a card. So the floor is a price already
+paid, and swapping the environment now would add a second DOM library without lowering it.
+
 `tools/repo-checks/src/engines-node.test.ts` recomputes it from the installed tree with
 `semver.subset`, so the field cannot quietly go stale the next time a tool raises its floor.
 It asserts one direction only — that the range promises nothing the tree refuses — because
