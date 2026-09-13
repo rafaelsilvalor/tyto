@@ -21,6 +21,21 @@ import { describe, expect, it } from 'vitest';
  * It reads the installed tree, so it measures what an install actually resolved rather than
  * what a manifest asked for. The cost is that it needs `node_modules`, which is the state
  * every other check here runs in anyway.
+ *
+ * ## It is asymmetric on purpose, because the tree is not the same everywhere
+ *
+ * Optional dependencies are resolved per platform, so a Linux install holds packages a
+ * Windows install does not — `@napi-rs/lzma-linux-x64-gnu` asks for
+ * `^22.20 || ^24.12 || >=25` and simply is not there on Windows. That makes only one
+ * direction safe to assert. "Some installed package refuses this Node" is true wherever it
+ * is observed; "every installed package accepts this Node" is a claim about one platform
+ * wearing the clothes of a claim about the repository.
+ *
+ * So this checks that the range promises nothing the tree refuses, and does **not** check
+ * that the range is as wide as it could be. A developer on Windows can therefore see green
+ * on a range that CI will reject, and CI — Linux, and the platform the cloud will run on —
+ * is the arbiter. That asymmetry cost a red build on the PR that added this file, which is
+ * the only reason it is written down here rather than discovered again.
  */
 const repoRoot = fileURLToPath(new URL('../../../', import.meta.url));
 
@@ -108,29 +123,17 @@ describe('engines.node', () => {
     ).toEqual([]);
   });
 
-  it('is not narrower than it needs to be, so the field stays a fact and not a habit', () => {
+  it('admits at least one Node, so the range is not a contradiction', () => {
     if (declared === undefined) throw new Error('no engines.node');
 
-    // Each of these is a Node the declared range excludes. If one of them is accepted by
-    // every dependency, the declaration is costing a contributor a version for nothing —
-    // which is the failure mode on the other side of the one above.
-    const excluded = ['22.22.1', '23.0.0', '24.0.0', '25.0.0', '26.0.0', '27.0.0'].filter(
-      (version) => !semver.satisfies(version, declared, { loose: true }),
+    // A range nothing satisfies would pass the check above vacuously — every dependency
+    // accepts every version of nothing.
+    const admitted = ['22.22.1', '22.23.2', '24.12.0', '26.0.0', '28.0.0'].filter((version) =>
+      semver.satisfies(version, declared, { loose: true }),
     );
-
-    const wrongly = excluded.filter((version) =>
-      [...ranges.values()].every((range) => {
-        try {
-          return semver.satisfies(version, range, { loose: true });
-        } catch {
-          return true;
-        }
-      }),
-    );
-
     expect(
-      wrongly,
-      `every installed dependency accepts these, and engines.node excludes them anyway`,
-    ).toEqual([]);
+      admitted.length,
+      `engines.node '${declared}' admits none of the current lines`,
+    ).toBeGreaterThan(0);
   });
 });

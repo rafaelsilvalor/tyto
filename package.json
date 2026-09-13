@@ -11,7 +11,7 @@
   },
   "packageManager": "pnpm@11.27.0",
   "engines": {
-    "node": "^22.22.1 || ^24 || >=26"
+    "node": "^22.22.1 || ^24.12 || >=26"
   },
   "scripts": {
     "dev": "turbo run dev --filter=@tyto/desktop",
