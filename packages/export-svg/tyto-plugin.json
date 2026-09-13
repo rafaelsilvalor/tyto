@@ -1,0 +1,7 @@
+{
+  "name": "svg",
+  "version": "1.0.2",
+  "engine": ">=0.1",
+  "contributes": ["exporter"],
+  "permissions": []
+}

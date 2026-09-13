@@ -1,9 +1,13 @@
-import { htmlExporterPlugin } from '@tyto/export-html';
-import { svgExporterPlugin } from '@tyto/export-svg';
+import { htmlExporterManifest, htmlExporterPlugin } from '@tyto/export-html';
+import { svgExporterManifest, svgExporterPlugin } from '@tyto/export-svg';
 import type { ExportResources } from '@tyto/io';
 import { type InProcessHost, type Plugin, createPluginHost } from '@tyto/plugin-api';
 import type { Rasterizer } from '@tyto/raster';
 
+import builtInTemplatesManifest from './built-in-templates.tyto-plugin.json';
+import chromiumManifest from './chromium.tyto-plugin.json';
+import fsInboxManifest from './fs-inbox.tyto-plugin.json';
+import fsOutboxManifest from './fs-outbox.tyto-plugin.json';
 import { rasterizerPlugin } from './rasterizer.js';
 import { templatePackPlugin } from './templates.js';
 
@@ -21,6 +25,29 @@ import { templatePackPlugin } from './templates.js';
  * exporter bound to the wrong one would embed the wrong logo. A host is two maps; building
  * one costs nothing worth caching.
  */
+
+/**
+ * Every built-in's `tyto-plugin.json`, as shipped — what `tyto plugin list` reads.
+ *
+ * A catalog rather than a walk over an activated host, because listing is not activating.
+ * `activateBuiltIns` wires one render: it leaves the rasterizer out when there is nothing
+ * to raster, and it never wires the queue at all, so a listing built from it would be
+ * shorter on some runs than on others. `code --list-extensions` reads manifests off a disk
+ * for the same reason, and listing would otherwise have to launch a browser to tell you a
+ * browser is installed.
+ *
+ * `unknown`, so the command validates these with the same schema a loaded plugin's file
+ * goes through. `plugins.test.ts` asserts each entry is the very object its factory ships,
+ * which is what keeps this list from drifting out of step with the plugins themselves.
+ */
+export const BUILT_IN_MANIFESTS: readonly unknown[] = [
+  htmlExporterManifest,
+  svgExporterManifest,
+  builtInTemplatesManifest,
+  chromiumManifest,
+  fsInboxManifest,
+  fsOutboxManifest,
+];
 
 export interface BuiltInOptions {
   /** Bound into the exporters. Each gets the half it understands. */
@@ -48,7 +75,12 @@ export function activateBuiltIns(options: BuiltInOptions = {}): InProcessHost {
     ...(options.rasterizer === undefined ? [] : [rasterizerPlugin(options.rasterizer)]),
   ];
 
-  for (const plugin of plugins) plugin.activate(host.hostFor(plugin.id));
+  // `host.activate`, not `plugin.activate(host.hostFor(...))`. The host is what validates
+  // the `tyto-plugin.json` each of these ships, checks that its `contributes` matches what
+  // the plugin actually registered, and records the plugin so `tyto plugin list` has
+  // something to print. Calling `hostFor` straight would skip all three — a shortcut
+  // available to a built-in and to nobody else, which is the shape ADR 0007 rules out.
+  for (const plugin of plugins) host.activate(plugin);
 
   return host;
 }

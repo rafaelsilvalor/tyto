@@ -123,7 +123,7 @@ function exportersOf(
     htmlExporterPlugin({ resources: html }),
     svgExporterPlugin({ resources: svg }),
   ]) {
-    plugin.activate(host.hostFor(plugin.id));
+    host.activate(plugin);
   }
   return host.registry.exporters;
 }

@@ -14,6 +14,7 @@ export { exportFrameHtml, exportHtml } from './export-html.js';
 export {
   HTML_EXPORTER_KINDS,
   type HtmlExporterPluginOptions,
+  htmlExporterManifest,
   htmlExporterPlugin,
 } from './plugin.js';
 

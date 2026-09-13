@@ -1,0 +1,7 @@
+{
+  "name": "fs-outbox",
+  "version": "1.0.3",
+  "engine": ">=0.1",
+  "contributes": ["sink"],
+  "permissions": []
+}

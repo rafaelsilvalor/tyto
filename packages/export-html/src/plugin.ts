@@ -1,5 +1,15 @@
 import type { Plugin } from '@tyto/plugin-api';
 
+/**
+ * The manifest, imported rather than declared.
+ *
+ * `tyto-plugin.json` at the package root is the same file a third-party plugin ships, and
+ * the host validates it with the same schema (`docs/plugin-api.md`). Importing it keeps
+ * one copy: the version below is the package's own, and a manifest declared in TypeScript
+ * beside the code would be a second place for it to be wrong.
+ */
+import manifest from '../tyto-plugin.json';
+
 import { exportFrameHtml } from './export-html.js';
 import type { HtmlResources } from './html.js';
 
@@ -28,18 +38,24 @@ export interface HtmlExporterPluginOptions {
   readonly resources?: HtmlResources;
   /** Two spaces of indentation and one node per line. Off here: these bytes feed a browser. */
   readonly pretty?: boolean;
-  /** Defaults to `html`. Only a second HTML exporter would ever need to change it. */
-  readonly id?: string;
 }
 
 /** The raster kinds a Chromium rasterizer turns this exporter's document into. */
 export const HTML_EXPORTER_KINDS: readonly string[] = ['png', 'jpeg', 'webp'];
 
+/**
+ * This package's own `tyto-plugin.json`, exported so a caller can list the plugin without
+ * activating it — `tyto plugin list` does exactly that. `unknown`, because the manifest is
+ * a document to be validated and not a shape to be trusted (see `Plugin.manifest`).
+ */
+export const htmlExporterManifest: unknown = manifest;
+
 export function htmlExporterPlugin(options: HtmlExporterPluginOptions = {}): Plugin {
-  const id = options.id ?? 'html';
+  const id = manifest.name;
 
   return {
     id,
+    manifest,
     activate: (host) =>
       host.registerExporter({
         id,

@@ -85,7 +85,7 @@ function exportersOf(resources: ExportResources): ExporterRegistry {
     htmlExporterPlugin({ ...(resources.html === undefined ? {} : { resources: resources.html }) }),
     svgExporterPlugin({ ...(resources.svg === undefined ? {} : { resources: resources.svg }) }),
   ]) {
-    plugin.activate(host.hostFor(plugin.id));
+    host.activate(plugin);
   }
   return host.registry.exporters;
 }
