@@ -57,6 +57,14 @@ The prose above is the contract; these are the decisions taken while writing the
   reason colour is structured. Leading, trailing and consecutive breaks are all legal: an
   empty line is a thing an author asks for. A `LineBreak` carries no styling, because it
   has no glyph; the runs around it decide what the line looks like.
+- **Adjacent runs that would draw the same thing are one run.** `runsOf` merges a run into
+  its predecessor when `font`, `size`, `weight`, `style`, `color` and `decoration` all
+  match, so a mark the template never declared costs nothing downstream: a sentence split
+  by `{cor:roxo}…{/}` in a template with no `.cor-roxo` rule is one span, not three. This
+  is about a split with no cause — `a **b** c` is three runs with two styles and stays
+  three. A `LineBreak` is never a merge target, so consecutive breaks survive (ADR 0016),
+  and the merged run's origin spans both sources so a `W_TEXT_OVERFLOW` still points at the
+  whole stretch the author wrote.
 
 ## Walking a scene
 
