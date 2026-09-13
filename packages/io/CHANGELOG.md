@@ -1,5 +1,13 @@
 # @tyto/io
 
+## 1.0.10
+
+### Patch Changes
+
+- Updated dependencies [8e6c2ef]
+  - @tyto/template-lang@0.3.0
+  - @tyto/pipeline@0.5.9
+
 ## 1.0.9
 
 ### Patch Changes
