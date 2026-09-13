@@ -1,5 +1,12 @@
 # @tyto/pipeline
 
+## 0.5.6
+
+### Patch Changes
+
+- Updated dependencies [b7fc01a]
+  - @tyto/raster@0.2.0
+
 ## 0.5.5
 
 ### Patch Changes
