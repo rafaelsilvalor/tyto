@@ -172,9 +172,10 @@ paths apart.
 </style>
 ```
 
-**Tags**: `frame`, `group`, `rect`, `text`, `image`, `vector`. Only `group` holds other
-tags, and only `frame` sits at the top level. **There is no text content** — a template
-draws slots, and words between two tags are `E_SYNTAX`.
+**Tags**: `frame`, `group`, `rect`, `text`, `image`, `vector`, plus `define` and `use`, which
+draw nothing and are described under [Components](#components-define-and-use). Only `group`
+holds other tags, and only `frame` and `define` sit at the top level. **There is no text
+content** — a template draws slots, and words between two tags are `E_SYNTAX`.
 
 **Attributes.** Every drawable tag takes `id`, `class`, `name`, `opacity`, `blend`, `mask`,
 `clip`; `text` and `image` also take `slot`; `image` also takes `src` and `fit`; `vector`
@@ -232,6 +233,63 @@ above is a sibling of the group it masks rather than a child of it.
 whoever loaded the template and handed in `assets`; `template-lang` is pure and reads no
 files. `{slot}` interpolates: `src="{imagem}"` alone on an `image` is that slot's asset, and
 `src="assets/{cor}.png"` splices an enum's word into a path.
+
+### Components: `define` and `use`
+
+A block written once and drawn where it is named. `<define name="…">` sits at the top level
+beside the frames, in any order; `<use component="…">` goes wherever a node may appear,
+including inside another `<define>`.
+
+<!-- prettier-ignore -->
+```html
+<frame format="feed" bg="#0c2340">
+  <use component="chip" class="first" />
+  <use component="chip" class="second" />
+</frame>
+
+<define name="chip">
+  <group class="chip">
+    <rect class="chip-bar" />
+    <text slot="titulo" class="chip-label" />
+  </group>
+</define>
+
+<style>
+  .chip       { x: 80; }
+  .chip.first { y: 100; }
+  .chip.second{ y: 340; }
+  .chip-bar   { x: 0; y: 0; w: 96; h: 12; fill: #ff5900; }
+  .chip-bar.second { fill: #ffd166; }
+  .chip-label { x: 0; y: 32; w: 800; font: 700 36px/1.2 "Source Sans 3"; color: white; }
+</style>
+```
+
+**A `<use>` is replaced by the component's tags**, before anything else reads the file. There
+is no wrapper: the scene is the one the block written out twice by hand produces, node for
+node. Which is also how to read a component — as a copy-paste the file does for you.
+
+**The classes on a `<use>` land on every node of the expansion**, however deep. `second` above
+is written on the `<use>` and read by `.chip-bar.second`, three levels down. That is how an
+instance is overridden: this language has no descendant combinator and no specificity, and a
+class that is ambient over an expansion is the same shape a flag adjustment already has over
+an artwork (`.item.destaque`). ADR 0022 records the reasoning.
+
+**A `<define>` writes no `id`.** An id is unique across a frame and a `<use>` may be written
+twice, so a component's nodes are identified by position, like every other node that writes no
+id. A `mask="#grad"` therefore names a `<rect id="grad">` outside the component.
+
+**A component draws the same content every time.** It repeats shape, not words: three chips
+above draw `titulo` three times. Giving each instance its own slot is a parameter, which is
+E4.10 and not in the language yet.
+
+**A `<define>` takes `name` and a `<use>` takes `component` and `class`; anything else is
+refused.** So are an unknown component name (with a suggestion), a `<use>` that runs in a
+circle, a second `<define>` under one name, an empty `<define>`, a `<define>` written anywhere
+but the top level, and a `<use>` written at it. A component nothing draws yet is checked
+anyway, because `tyto template check` is run while a template is being written.
+
+Components live inside one template. There is no library shared between templates, which is
+the point at which a component's classes could collide with its host's; nothing needs one yet.
 
 ### Slots, adjustments and marks
 

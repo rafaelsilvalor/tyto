@@ -18,6 +18,16 @@ import { type Diagnostic, type SourceRange, diagnostic, didYouMean } from '@tyto
 export const TAGS = ['frame', 'group', 'rect', 'text', 'image', 'vector'] as const;
 export type TagName = (typeof TAGS)[number];
 
+/**
+ * Tags that are written and never drawn.
+ *
+ * `<define>` and `<use>` are resolved away by `components.ts` before anything asks `isTag`
+ * a question, so they are not `TagName`s — no node is ever built from one. They are here
+ * because a misspelled `<usse>` has to be answered with `use` and not with the drawable
+ * six, and this is the only place any tag name is enumerated.
+ */
+export const STRUCTURAL_TAGS = ['define', 'use'] as const;
+
 export function isTag(name: string): name is TagName {
   return (TAGS as readonly string[]).includes(name);
 }
@@ -148,7 +158,7 @@ function suggestionFor(
 export function unsupportedTag(tag: string, range: SourceRange): Diagnostic {
   return diagnostic(
     'E_UNSUPPORTED_TAG',
-    { tag, suggestion: suggestionFor(tag, TAGS, TAG_ALIASES) },
+    { tag, suggestion: suggestionFor(tag, [...TAGS, ...STRUCTURAL_TAGS], TAG_ALIASES) },
     { range },
   );
 }

@@ -39,6 +39,7 @@ export { templateHighlighting } from './highlight.js';
 export {
   ATTRIBUTES,
   PROPERTIES,
+  STRUCTURAL_TAGS,
   TAGS,
   type PropertyName,
   type TagName,

@@ -184,7 +184,7 @@ export function collectFrames(
     if (element.tag !== 'frame') {
       report(
         markupProblem(
-          `the top level of a template holds <frame> tags, and this is <${element.tag}>`,
+          `the top level of a template holds <frame> and <define> tags, and this is <${element.tag}>`,
           element.tagRange,
         ),
       );

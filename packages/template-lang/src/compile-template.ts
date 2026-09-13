@@ -12,6 +12,7 @@ import { defineTemplate } from '@tyto/core/template';
 
 import type { TemplateElement } from './ast.js';
 import { type Program, type TemplateAssets, buildFrame, checkStatically } from './build.js';
+import { expandComponents } from './components.js';
 import { attributeOf, collectFrames, interpolatedSlots } from './frames.js';
 import { parseTemplate } from './parse-template.js';
 import { compileStylesheet, referencedSlots } from './style.js';
@@ -80,14 +81,25 @@ export function compileTemplate(
   if (!parsed.ok) return parsed;
 
   const problems: Diagnostic[] = [];
+  // One sentence per range. A component drawn three times is checked three times — the
+  // instance classes differ, so the checks are not redundant — and when all three land on
+  // the same words at the same place they are one mistake in one line of the `<define>`,
+  // which is the line the author has to go and change.
+  const said = new Set<string>();
   const report = (item: Diagnostic): void => {
+    const key = `${item.code} @ ${item.range?.start ?? -1}-${item.range?.end ?? -1} :: ${item.message}`;
+    if (said.has(key)) return;
+    said.add(key);
     problems.push(item);
   };
 
   const { manifest } = options;
   const repeatable = repeatableOf(manifest);
-  const frames = collectFrames(parsed.value, manifest, report);
-  const entries = compileStylesheet(parsed.value.styles, {
+  // Components are resolved away first, so everything below reads the tree the author
+  // would have written by hand (ADR 0022).
+  const document = expandComponents(parsed.value, report);
+  const frames = collectFrames(document, manifest, report);
+  const entries = compileStylesheet(document.styles, {
     formats: manifest.formats,
     slots: Object.keys(manifest.slots),
     repeatable,
