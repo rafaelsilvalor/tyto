@@ -93,6 +93,33 @@ had to answer them.
   belonged and the directives after it still parse, so the editor keeps highlighting a
   half-typed brief.
 
+## Highlighting
+
+`briefHighlighting` in `packages/brief-lang/src/highlight.ts` maps node names to
+`@lezer/highlight` tags, and `@tyto/editor` turns tags into colours. It lives with the
+grammar so that adding a node to the language and forgetting to colour it is one file's
+problem rather than two packages'; the package stays pure, because a tag renders nothing.
+
+Two of Lezer's rules decide how every line of that table is spelled, and **both are silent
+when broken** — which is why `highlight.test.ts` reads the spans a renderer would receive
+instead of asserting the table back at itself.
+
+- **Only a capitalised rule produces a node.** `directiveMark`, `braceOpen`, `valueSep` and
+  the rest are lowercase tokens: real characters in the document with no name in the tree,
+  so a rule spelled after one matches nothing and colours nothing. The punctuation of a
+  construct is styled through the construct instead — a tag on `Adjustments` paints exactly
+  what no child node covers, which is the braces and the commas, and `AdjustmentName` takes
+  its own span back.
+- **A tag stops at the first child unless it is written `Node/...`.** `Bold: tags.strong`
+  bolds the two `**` and leaves the `Text` between them at normal weight. An inherited tag
+  also _adds_ to the child's own rather than replacing it, which is what makes `*b*` inside
+  `**a *b* c**` both `strong` and `emphasis` — and the reason the adjustment list uses two
+  plain rules rather than one `/...`: a name tagged `punctuation attributeName` would leave
+  the colour to stylesheet order.
+
+Both mistakes were in the first table, written before an editor existed to render it; TYTO-36
+is where they showed.
+
 ## Diagnostics
 
 `E_SYNTAX` (from parse); `E_NO_TEMPLATE`, `E_UNKNOWN_TEMPLATE`, `E_UNKNOWN_FORMAT`, `E_UNKNOWN_SLOT`, `E_UNKNOWN_DIRECTIVE`, `E_MISSING_REQUIRED_SLOT`, `E_BAD_SLOT_VALUE`, `E_BAD_ADJUSTMENT`, `E_ASSET_NOT_FOUND`, `W_UNUSED_SLOT` (from resolve); `W_TEXT_OVERFLOW` (from compile). All carry a `range` for the editor. Messages are English; the editor may localize them later via the code.

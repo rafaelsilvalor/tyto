@@ -10,13 +10,15 @@ pnpm workspaces + Turborepo · TS 5 `strict`, `noUncheckedIndexedAccess`, `exact
 
 ### `engines.node`
 
-`^22.22.1 || ^24.12 || >=26`, and that is **the intersection of what the stack accepts, not
+`^22.22.2 || ^24.15 || >=26`, and that is **the intersection of what the stack accepts, not
 a preference**. The field is documentation of what a contributor needs, so the honest
-number is the tightest constraint among the dependencies rather than the loosest. Three set
-the shape, and none of them is where anybody would look: `lint-staged` (`>=22.22.1`) puts
-the floor 22 minors above the LTS line, `@changesets/*` and `vitest` (`^22 || ^24 || >=26`)
-exclude the odd majors, and `@napi-rs/lzma-linux-x64-gnu` (`^22.20 || ^24.12 || >=25`) lifts
-the 24 floor to 24.12.
+number is the tightest constraint among the dependencies rather than the loosest. Four set
+the shape, and none of them is where anybody would look: `@changesets/*` and `vitest`
+(`^22 || ^24 || >=26`) exclude the odd majors, `@napi-rs/lzma-linux-x64-gnu`
+(`^22.20 || ^24.12 || >=25`) lifts the 24 floor, `lint-staged` (`>=22.22.1`) puts the 22
+floor above the LTS line, and `jsdom` (`^22.22.2 || ^24.15.0 || >=26.0.0`) lifts both once
+more — it arrived with TYTO-36, as the DOM `@tyto/editor`'s tests mount CodeMirror in, and
+raised the floor by one patch on 22 and three minors on 24.
 
 `tools/repo-checks/src/engines-node.test.ts` recomputes it from the installed tree with
 `semver.subset`, so the field cannot quietly go stale the next time a tool raises its floor.

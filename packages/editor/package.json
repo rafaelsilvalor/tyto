@@ -18,8 +18,23 @@
   "sideEffects": false,
   "scripts": {
     "build": "tsup",
+    "demo": "vite",
+    "demo:build": "vite build",
     "typecheck": "tsc --noEmit",
     "lint": "eslint . --max-warnings 0",
     "test": "vitest run --passWithNoTests"
+  },
+  "dependencies": {
+    "@codemirror/commands": "^6.11.0",
+    "@codemirror/language": "^6.12.4",
+    "@codemirror/state": "^6.7.4",
+    "@codemirror/view": "^6.43.11",
+    "@lezer/common": "^1.5.2",
+    "@lezer/highlight": "^1.2.3",
+    "@tyto/brief-lang": "workspace:*"
+  },
+  "devDependencies": {
+    "jsdom": "^30.0.1",
+    "vite": "^8.3.0"
   }
 }
