@@ -74,12 +74,33 @@ function textCount(nodes: readonly SceneNode[]): number[] {
   });
 }
 
+/** Text runs anywhere in a subtree — the spans an exporter will emit, one per run. */
+function spanCount(nodes: readonly SceneNode[]): number {
+  let total = 0;
+  for (const node of nodes) {
+    if (node.kind === 'group') total += spanCount(node.children);
+    else if (node.kind === 'text') total += node.runs.filter((run) => run.kind === 'text').length;
+  }
+  return total;
+}
+
 /** Everything the pipeline does to an example brief, short of writing bytes. */
 async function build(example: Example): Promise<{ scene: Scene; warnings: readonly Diagnostic[] }> {
   if (!formats.ok) throw new Error('formats.yaml did not load.');
 
   const directory = join(PACK, example.template);
   const source = await readFile(join(directory, example.brief), 'utf8');
+
+  return buildSource(source, example.template, directory);
+}
+
+/** The same path, given the brief's text instead of a file to read it from. */
+async function buildSource(
+  source: string,
+  templateName: string,
+  directory: string,
+): Promise<{ scene: Scene; warnings: readonly Diagnostic[] }> {
+  if (!formats.ok) throw new Error('formats.yaml did not load.');
 
   const ast = parseBrief(source);
   if (!ast.ok) throw new Error(ast.error.map((item) => item.message).join('; '));
@@ -96,7 +117,7 @@ async function build(example: Example): Promise<{ scene: Scene; warnings: readon
   const templates = markupTemplateSource(fileSystem, registry.value, {
     assets: (await fileTemplateAssets({ base: directory })).assets,
   });
-  const template = await templates.load(example.template);
+  const template = await templates.load(templateName);
   if (!template.ok) throw new Error(template.error.map((item) => item.message).join('; '));
 
   const scene = compile(resolved.value, template.value, { formats: formats.value, faces });
@@ -146,6 +167,82 @@ describe.each(EXAMPLES.map((example) => [example.template, example] as const))(
     }, 60_000);
   },
 );
+
+/**
+ * A mark the template does not declare costs nothing in the output (TYTO-72).
+ *
+ * `markStyleOf` looks for a class spelling the mark out — `{cor:laranja}` reads
+ * `.cor-laranja` — and returns nothing when there is none. So the children of an
+ * undeclared mark take the surrounding style *exactly*, and before this card that arrived
+ * as three runs where one would draw the identical thing: an author who guessed a colour
+ * their template never had paid for the guess in the exported file, with three `<tspan>`
+ * elements an editor shows as three text boxes stacked edge to edge.
+ *
+ * Measured here rather than in a snapshot because the answer worth pinning is a
+ * *difference*. No brief in this repository contains an undeclared mark — every one of
+ * them uses a colour its template declares — so no existing fixture could show the drop,
+ * and a snapshot of a new one would only show a number. Two briefs with the same words,
+ * one of them split, is the shape that says what the split costs.
+ */
+describe('a mark the template never declared', () => {
+  const PROMO = join(PACK, 'promo-curso');
+
+  const briefWith = (titulo: string) =>
+    `---\ntemplate: promo-curso\nformats: [feed]\n---\n::titulo\n  ${titulo}\n`;
+
+  // `roxo` is not among the manifest's [azul, laranja, verde], so no `.cor-roxo` exists.
+  const SPLIT = briefWith('Turma {cor:roxo}nova{/} de setembro');
+  const WHOLE = briefWith('Turma nova de setembro');
+
+  it('produces the same span count as the sentence written without it', async () => {
+    const { scene: split } = await buildSource(SPLIT, 'promo-curso', PROMO);
+    const { scene: whole } = await buildSource(WHOLE, 'promo-curso', PROMO);
+
+    const spansIn = (scene: Scene) =>
+      scene.artworks.flatMap((artwork) => artwork.frames.map((frame) => spanCount(frame.children)));
+
+    expect(spansIn(split)).toEqual(spansIn(whole));
+  }, 60_000);
+
+  it('draws the same words, in the same order', async () => {
+    const { scene: split } = await buildSource(SPLIT, 'promo-curso', PROMO);
+    const { scene: whole } = await buildSource(WHOLE, 'promo-curso', PROMO);
+
+    const textOf = (scene: Scene): string => {
+      const parts: string[] = [];
+      const walk = (nodes: readonly SceneNode[]) => {
+        for (const node of nodes) {
+          if (node.kind === 'group') walk(node.children);
+          else if (node.kind === 'text')
+            for (const run of node.runs) if (run.kind === 'text') parts.push(run.text);
+        }
+      };
+      for (const artwork of scene.artworks)
+        for (const frame of artwork.frames) walk(frame.children);
+      return parts.join('‖');
+    };
+
+    // Joined on a separator rather than concatenated, so a run boundary that moved would
+    // change the string even when the letters did not.
+    expect(textOf(split)).toEqual(textOf(whole));
+  }, 60_000);
+
+  it('still keeps a declared mark apart, which is the case that must not regress', async () => {
+    const { scene: declared } = await buildSource(
+      briefWith('Turma {cor:verde}nova{/} de setembro'),
+      'promo-curso',
+      PROMO,
+    );
+    const { scene: whole } = await buildSource(WHOLE, 'promo-curso', PROMO);
+
+    const spansIn = (scene: Scene) =>
+      scene.artworks
+        .flatMap((artwork) => artwork.frames.map((frame) => spanCount(frame.children)))
+        .reduce((total, count) => total + count, 0);
+
+    expect(spansIn(declared)).toBeGreaterThan(spansIn(whole));
+  }, 60_000);
+});
 
 describe('tyto template check', () => {
   /**

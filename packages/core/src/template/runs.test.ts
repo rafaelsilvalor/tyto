@@ -3,6 +3,7 @@ import { describe, expect, it } from 'vitest';
 import { runsOf } from './runs.js';
 import { font } from './values.js';
 import type { RichText } from '../brief/ast.js';
+import { originOf } from '../text/origin.js';
 import { sourceRange } from '../source/range.js';
 
 /**
@@ -120,8 +121,122 @@ describe('marks are the template’s vocabulary', () => {
   });
 
   it('passes the children through unchanged when nothing maps the mark', () => {
-    // A template that does not use a mark should not have to refuse it.
-    expect(shape(marked)).toEqual(['400/normal/Garanta sua ', '400/normal/vaga']);
+    // A template that does not use a mark should not have to refuse it. Unchanged styling
+    // is also indistinguishable styling, so the two halves arrive as one run — see the
+    // merging tests below for why that is the answer rather than a side effect.
+    expect(shape(marked)).toEqual(['400/normal/Garanta sua vaga']);
+  });
+});
+
+/**
+ * Adjacent runs that would draw the same thing are one run.
+ *
+ * Worth being precise about where these come from: not from `a *b* c`, which is three
+ * inlines with two different styles and correctly stays three runs. The source is a mark
+ * nothing maps, which gives its children the surrounding style exactly — so the split is
+ * an artefact of the directive rather than of the typography.
+ */
+describe('runs that would draw the same thing', () => {
+  const at = (start: number, end: number) => sourceRange(start, end);
+
+  /**
+   * `Direito {cor:laranja}Constitucional{/} hoje`, in a template that never declared it.
+   *
+   * Deliberately not starting at offset 0: a fixture that did would make "the union of the
+   * three" and "from the start of the file" the same answer, and the origin test below
+   * would pass against either.
+   */
+  const unmapped: RichText = [
+    { kind: 'text', value: 'Direito ', range: at(12, 20) },
+    {
+      kind: 'mark',
+      key: 'cor',
+      value: 'laranja',
+      children: [{ kind: 'text', value: 'Constitucional', range: at(34, 48) }],
+      range: at(20, 51),
+    },
+    { kind: 'text', value: ' hoje', range: at(51, 56) },
+  ];
+
+  it('merges three into one when the mark maps to nothing', () => {
+    expect(shape(unmapped)).toEqual(['400/normal/Direito Constitucional hoje']);
+  });
+
+  it('keeps them apart when the mark maps to something', () => {
+    expect(
+      shape(unmapped, {
+        mark: (key: string) => (key === 'cor' ? { color: '#ff5900' } : undefined),
+      }),
+    ).toEqual(['400/normal/Direito ', '400/normal/Constitucional', '400/normal/ hoje']);
+  });
+
+  it('keeps bold apart, because that is a real difference and not a split', () => {
+    expect(
+      shape([
+        { kind: 'text', value: 'a', range: AT },
+        { kind: 'bold', children: plain('b'), range: AT },
+        { kind: 'text', value: 'c', range: AT },
+      ]),
+    ).toEqual(['400/normal/a', '700/normal/b', '400/normal/c']);
+  });
+
+  // A single break between two runs is already covered above, by the ADR 0016 suite —
+  // merging must not change it, and that test fails if it does. What is new here is what
+  // happens on either side of one.
+
+  it('leaves two breaks in a row as two runs, which is how an author asks for a blank line', () => {
+    expect(
+      shape([
+        { kind: 'text', value: 'a', range: AT },
+        { kind: 'break', range: AT },
+        { kind: 'break', range: AT },
+        { kind: 'text', value: 'b', range: AT },
+      ]),
+    ).toEqual(['400/normal/a', '⏎', '⏎', '400/normal/b']);
+  });
+
+  it('merges across a break that separated two otherwise identical stretches, only within each side', () => {
+    const runs = runsOf(
+      [
+        { kind: 'text', value: 'a', range: at(0, 1) },
+        { kind: 'mark', key: 'x', value: 'y', children: plain('b'), range: at(1, 2) },
+        { kind: 'break', range: at(2, 3) },
+        { kind: 'text', value: 'c', range: at(3, 4) },
+        { kind: 'mark', key: 'x', value: 'y', children: plain('d'), range: at(4, 5) },
+      ],
+      BASE,
+    );
+
+    expect(runs.map((r) => (r.kind === 'break' ? '⏎' : r.text))).toEqual(['ab', '⏎', 'cd']);
+  });
+
+  it('gives the merged run an origin spanning both sources, gap included', () => {
+    const runs = runsOf(unmapped, BASE);
+    const merged = runs[0];
+
+    // 12 is where `Direito` starts and 56 is where ` hoje` ends: a W_TEXT_OVERFLOW on this
+    // run points at the whole stretch the author wrote, not at whichever third came first.
+    expect(runs).toHaveLength(1);
+    expect(merged && originOf(merged)).toEqual({ start: 12, end: 56 });
+  });
+
+  it('keeps runs apart when only the decoration differs', () => {
+    const runs = runsOf(
+      [
+        { kind: 'text', value: 'a', range: AT },
+        {
+          kind: 'mark',
+          key: 'link',
+          value: 'x',
+          children: plain('b'),
+          range: AT,
+        },
+      ],
+      BASE,
+      { mark: () => ({ decoration: 'underline' }) },
+    );
+
+    expect(runs).toHaveLength(2);
   });
 });
 
