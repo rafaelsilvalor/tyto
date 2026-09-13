@@ -23,6 +23,9 @@
 'pkg:templates':
   - changed-files:
       - any-glob-to-any-file: 'packages/templates/**'
+'pkg:fonts':
+  - changed-files:
+      - any-glob-to-any-file: 'packages/fonts/**'
 'pkg:plugin-api':
   - changed-files:
       - any-glob-to-any-file: 'packages/plugin-api/**'

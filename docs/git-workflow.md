@@ -16,7 +16,7 @@ Template in `.github/pull_request_template.md`: card, what changed, how to test,
 
 - One card per PR. If the card grew, split the card, not the PR.
 - Claude Code opens the PR as a draft and moves the card to Review; the human reviews, marks ready, merges.
-- CI runs on every PR; `test:visual` only when `packages/export-*`, `raster`, `templates`, `core`, `fonts/` or `tools/test-fonts` change.
+- CI runs on every PR; `test:visual` only when `packages/export-*`, `raster`, `templates`, `core` or `fonts` change.
 - Optional PR bot (Claude Code Action) reviews against `CLAUDE.md`.
 
 ## Versioning and releases
@@ -93,7 +93,7 @@ They live under `packages/raster/src/__fixtures__/reference/`. The shape fixture
 
 `win32` and `linux` are committed; **`darwin` is not.** The first Mac to run the suite gets a failure naming the file to record, which is the same path any missing reference takes. Only the platform itself can record its own file, and the other platforms' files are not substitutes for it.
 
-A font is now part of what a reference depends on: `fonts/` holds the bundled faces and `tools/test-fonts` reads them (`docs/conventions.md`). Changing either re-records the corpus, which is why both are in `visual.yml`'s path filter — a PR that swaps a font version and runs no pixel check would land a corpus nothing compared.
+A font is part of what a reference depends on: `packages/fonts` holds the bundled faces and reads them (`docs/conventions.md`). Changing either the bytes or the reader re-records the corpus, which is why that package is in `visual.yml`'s path filter — a PR that swaps a font version and runs no pixel check would land a corpus nothing compared.
 
 `pnpm test:visual` with no reference on disk **fails**, writes the render it would have compared into `__diff__/`, and names the file to commit; `visual.yml` uploads that folder on failure, so a first reference can be taken from a CI artifact. Recording locally is `UPDATE_VISUAL_REFERENCE=1 pnpm --filter @tyto/raster test:visual`, and needs `pnpm exec playwright install chromium` first.
 
