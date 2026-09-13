@@ -12,9 +12,14 @@ import type { FontFace, FontSource } from '../ports/font-source.js';
  * against 190.65625 — the difference is under a hundredth of a pixel, which is Chromium
  * rounding to its 1/64 LayoutUnit and not a disagreement about the glyphs.
  *
- * It also keeps `core` pure. fontkit publishes a browser build through its `exports` map
- * and `create()` takes bytes, so nothing here opens a file; `fontkit.openSync` is the one
- * function this package may never call.
+ * It also keeps `core` pure, but conditionally, which is the part worth spelling out.
+ * `create()` takes bytes, so nothing here opens a file and `fontkit.openSync` is the one
+ * function this package may never call — that half is on this file. The other half is not:
+ * fontkit ships two builds and its `exports` map picks between them by condition, and the
+ * `node` one imports `fs`. Resolving that condition for a browser target is the only way
+ * this package can end up with a Node dependency, and the decision lives in a bundler
+ * config rather than here. ADR 0010 carries the rule; the same holds for `yaml`, and
+ * `tools/repo-checks/src/pure-export-conditions.test.ts` is what measures both.
  */
 
 /**
