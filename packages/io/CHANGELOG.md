@@ -1,5 +1,12 @@
 # @tyto/io
 
+## 1.0.8
+
+### Patch Changes
+
+- Updated dependencies [2d5b5b8]
+  - @tyto/pipeline@0.5.7
+
 ## 1.0.7
 
 ### Patch Changes
