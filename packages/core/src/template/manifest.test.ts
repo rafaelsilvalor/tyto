@@ -147,9 +147,37 @@ describe('the rules a shape alone cannot state', () => {
     expect(pathsOf(rejected(source))).toEqual(['slots.titulo.values']);
   });
 
-  it('refuses a min above its max', () => {
-    const source = MINIMAL.replace('{ type: rich-text }', '{ type: rich-text, min: 9, max: 2 }');
+  /**
+   * A bound nobody can satisfy, refused while reading the manifest rather than once per
+   * brief written against it (TYTO-81).
+   *
+   * The rule itself has been here since TYTO-22; what these pin is the whole of what the
+   * card asks for, which the single path assertion did not cover: the diagnostic code, the
+   * two numbers in the message, the repeatable case where the pair counts occurrences
+   * instead of characters, and the exact bound that has to stay legal.
+   */
+  it('refuses a min above its max, naming both numbers', () => {
+    const source = MINIMAL.replace('{ type: rich-text }', '{ type: rich-text, min: 30, max: 20 }');
+    const [problem] = rejected(source);
+
     expect(pathsOf(rejected(source))).toEqual(['slots.titulo.min']);
+    expect(problem?.code).toBe('E_MANIFEST_SHAPE');
+    // Both, because a message naming one of them leaves the author guessing which to move.
+    expect(problem?.message).toContain('30');
+    expect(problem?.message).toContain('20');
+  });
+
+  it('refuses it on a repeatable slot too, where the pair counts occurrences', () => {
+    const source = MINIMAL.replace(
+      '{ type: rich-text }',
+      '{ type: rich-text, repeat: true, min: 4, max: 2 }',
+    );
+    expect(pathsOf(rejected(source))).toEqual(['slots.titulo.min']);
+  });
+
+  it('accepts min equal to max, which is an exact length and not a contradiction', () => {
+    const source = MINIMAL.replace('{ type: rich-text }', '{ type: rich-text, min: 20, max: 20 }');
+    expect(accepted(source).slots.titulo).toMatchObject({ min: 20, max: 20 });
   });
 
   it.each(['image', 'enum, values: [a]'])(
