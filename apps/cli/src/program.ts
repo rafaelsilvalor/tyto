@@ -3,6 +3,7 @@ import { Command, CommanderError } from 'commander';
 import type { CliEnvironment } from './environment.js';
 import { EXIT_DIAGNOSTICS, EXIT_INTERNAL, EXIT_OK, type ExitCode } from './exit.js';
 import { parseFormatList, parsePositiveInteger, parseQuality, parseTypes } from './options.js';
+import { pluginListCommand } from './plugin.js';
 import { renderCommand } from './render.js';
 import { templateCheckCommand, templateNewCommand } from './template.js';
 import { watchCommand } from './watch.js';
@@ -137,6 +138,18 @@ export function createProgram(environment: CliEnvironment, captured: Captured): 
     ])
     .action(async (name: string) => {
       captured.code = await templateNewCommand(name, scaffold.opts(), environment);
+    });
+
+  /* --------------------------------------------------------------------------- plugin -- */
+
+  const plugin = program.command('plugin').description('inspect what extends this Tyto');
+
+  const pluginList = plugin
+    .command('list')
+    .description('list every installed plugin: name, version, origin and what it contributes')
+    .option('--json', 'print a machine-readable document instead of prose', false)
+    .action(() => {
+      captured.code = pluginListCommand(pluginList.opts(), environment);
     });
 
   // Applied after the tree is built and to every node of it. Commander copies

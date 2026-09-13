@@ -24,6 +24,8 @@ successful result (ADR 0013).
 | `E_UNSUPPORTED_ATTRIBUTE` | error | A template uses an attribute the tag it sits on does not accept. |
 | `E_TEMPLATE_MARKUP` | error | A template.html parses but does not describe a scene the compiler can build. |
 | `E_PERMISSION` | error | A plugin called a capability it was not granted at install time. |
+| `E_PLUGIN_MANIFEST_SYNTAX` | error | A tyto-plugin.json is not valid JSON. |
+| `E_PLUGIN_MANIFEST_SHAPE` | error | A tyto-plugin.json parses as JSON but does not match the plugin manifest schema. |
 | `E_SCENE_SHAPE` | error | A scene does not match the IR schema. |
 | `E_SCENE_DUPLICATE_ID` | error | The same id is used more than once in one scene. |
 | `E_SCENE_MASK_NOT_FOUND` | error | A mask references a node the scene does not contain. |
@@ -233,6 +235,30 @@ Plugin '{plugin}' called '{capability}' without that permission being granted at
 ```
 
 Parameters: `plugin`, `capability`
+
+### `E_PLUGIN_MANIFEST_SYNTAX`
+
+**Severity:** error · **Spec:** `docs/plugin-api.md`
+
+A tyto-plugin.json is not valid JSON.
+
+```
+Plugin manifest '{path}' is not valid JSON: {problem}.
+```
+
+Parameters: `path`, `problem`
+
+### `E_PLUGIN_MANIFEST_SHAPE`
+
+**Severity:** error · **Spec:** `docs/plugin-api.md`
+
+A tyto-plugin.json parses as JSON but does not match the plugin manifest schema.
+
+```
+Plugin manifest is invalid at '{path}': {problem}.
+```
+
+Parameters: `path`, `problem`
 
 ### `E_SCENE_SHAPE`
 

@@ -13,7 +13,8 @@
     }
   },
   "files": [
-    "dist"
+    "dist",
+    "tyto-plugin.json"
   ],
   "sideEffects": false,
   "scripts": {

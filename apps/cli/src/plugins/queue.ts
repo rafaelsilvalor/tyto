@@ -1,6 +1,9 @@
 import type { BriefSource, OutputSink } from '@tyto/io';
 import type { Plugin } from '@tyto/plugin-api';
 
+import inboxManifest from './fs-inbox.tyto-plugin.json';
+import outboxManifest from './fs-outbox.tyto-plugin.json';
+
 /**
  * The `source` and `sink` extension points' built-ins: the fs inbox and the fs outbox.
  *
@@ -11,10 +14,20 @@ import type { Plugin } from '@tyto/plugin-api';
  * shape are both here.
  */
 
-export function sourcePlugin(source: BriefSource, id = 'fs-inbox'): Plugin {
-  return { id, activate: (host) => host.registerSource<BriefSource>({ id, value: source }) };
+export function sourcePlugin(source: BriefSource): Plugin {
+  const id = inboxManifest.name;
+  return {
+    id,
+    manifest: inboxManifest,
+    activate: (host) => host.registerSource<BriefSource>({ id, value: source }),
+  };
 }
 
-export function sinkPlugin(sink: OutputSink, id = 'fs-outbox'): Plugin {
-  return { id, activate: (host) => host.registerSink<OutputSink>({ id, value: sink }) };
+export function sinkPlugin(sink: OutputSink): Plugin {
+  const id = outboxManifest.name;
+  return {
+    id,
+    manifest: outboxManifest,
+    activate: (host) => host.registerSink<OutputSink>({ id, value: sink }),
+  };
 }

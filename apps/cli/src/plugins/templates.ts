@@ -1,6 +1,8 @@
 import type { TemplateManifest } from '@tyto/core';
 import type { Plugin } from '@tyto/plugin-api';
 
+import manifest from './built-in-templates.tyto-plugin.json';
+
 /**
  * The `template-pack` extension point's built-in.
  *
@@ -17,16 +19,16 @@ import type { Plugin } from '@tyto/plugin-api';
  */
 
 export interface TemplatePackOptions {
-  readonly id?: string;
   readonly templates?: readonly TemplateManifest[];
   readonly directory?: string;
 }
 
 export function templatePackPlugin(options: TemplatePackOptions = {}): Plugin {
-  const id = options.id ?? 'built-in-templates';
+  const id = manifest.name;
 
   return {
     id,
+    manifest,
     activate: (host) =>
       host.registerTemplatePack({
         id,

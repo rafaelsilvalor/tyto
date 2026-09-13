@@ -3,7 +3,8 @@ import { describe, expect, it, vi } from 'vitest';
 import { z } from 'zod';
 
 import type { Exporter } from './contributions.js';
-import { type Disposable, type Logger, createPluginHost } from './host.js';
+import { type Disposable, type Logger, type Plugin, createPluginHost } from './host.js';
+import { CONTRIBUTION_POINTS } from './manifest.js';
 
 /**
  * The host's whole job is identity and withdrawal: which contribution answers to which id,
@@ -215,5 +216,133 @@ describe('events and logging', () => {
     host.hostFor('promo').log.warn('algo');
 
     expect(log.warn).toHaveBeenCalledWith('algo');
+  });
+});
+
+describe('activating a plugin', () => {
+  const manifestOf = (overrides: Record<string, unknown> = {}) => ({
+    name: 'promo',
+    version: '0.1.0',
+    engine: '>=0.1',
+    contributes: ['exporter'],
+    permissions: [],
+    ...overrides,
+  });
+
+  const pluginOf = (overrides: Partial<Plugin> = {}): Plugin => ({
+    id: 'promo',
+    manifest: manifestOf(),
+    activate: (host) => host.registerExporter(exporterOf('promo')),
+    ...overrides,
+  });
+
+  it('validates the manifest, records it, and lists it as built-in', () => {
+    const host = createPluginHost();
+    host.activate(pluginOf());
+
+    expect(host.registry.plugins()).toEqual([{ manifest: manifestOf(), origin: 'built-in' }]);
+    expect(host.registry.exporters.forKind('promo')?.id).toBe('promo');
+  });
+
+  it('records the origin the caller gives it, because a manifest cannot know its own', () => {
+    const host = createPluginHost();
+    host.activate(pluginOf(), 'external');
+
+    expect(host.registry.plugins().map((plugin) => plugin.origin)).toEqual(['external']);
+  });
+
+  it('refuses a manifest that does not validate, saying which field', () => {
+    const host = createPluginHost();
+
+    expect(() => host.activate(pluginOf({ manifest: manifestOf({ version: '0.1' }) }))).toThrow(
+      /tyto-plugin\.json the host cannot read.*'version'/s,
+    );
+    expect(host.registry.plugins()).toEqual([]);
+  });
+
+  it('refuses a manifest whose name disagrees with the plugin id', () => {
+    // One identity, not two. The id keys every extension point and would name a folder on
+    // disk; a listing printing one name while an error prints another is the bug this
+    // forecloses.
+    const host = createPluginHost();
+
+    expect(() => host.activate(pluginOf({ id: 'outro' }))).toThrow(/naming 'promo'/);
+  });
+
+  it('refuses a plugin that registers into a point its manifest does not declare', () => {
+    // `contributes` is a promise about which points a plugin touches, made in a file read
+    // before any of its code runs. Nothing verified it until here, which is exactly how a
+    // listing could have shown contributes nobody had checked (TYTO-35).
+    const host = createPluginHost();
+    const liar = pluginOf({
+      manifest: manifestOf({ contributes: ['exporter'] }),
+      activate: (plugin) => {
+        plugin.registerExporter(exporterOf('promo'));
+        plugin.registerPanel({ id: 'promo-panel', title: 'Promo' });
+      },
+    });
+
+    expect(() => host.activate(liar)).toThrow(/registered into 'panel'/);
+  });
+
+  it('allows a declared point the plugin did not register into', () => {
+    // `templatePackPlugin` contributes an empty pack today and a conditional contribution
+    // is a shape this API has not ruled out, so only the undeclared direction throws.
+    const host = createPluginHost();
+    host.activate(pluginOf({ manifest: manifestOf({ contributes: ['exporter', 'directive'] }) }));
+
+    expect(host.registry.plugins()).toHaveLength(1);
+    expect(host.registry.directives()).toEqual([]);
+  });
+
+  it('forgets the plugin when it is disposed, not just its contributions', () => {
+    const host = createPluginHost();
+    host.activate(pluginOf());
+    host.disposePlugin('promo');
+
+    expect(host.registry.plugins()).toEqual([]);
+    expect(host.registry.exporters.list()).toEqual([]);
+  });
+
+  it('knows the same nine points the manifest vocabulary names', () => {
+    // Two declarations of one vocabulary: `CONTRIBUTION_POINTS` is what a JSON file may
+    // say, and the host's points are what code may register into. This activates one
+    // plugin into all nine and compares what was recorded against the list.
+    const host = createPluginHost();
+    host.activate(
+      pluginOf({
+        manifest: manifestOf({ contributes: [...CONTRIBUTION_POINTS] }),
+        activate: (plugin) => {
+          plugin.registerSource({ id: 'a', value: 1 });
+          plugin.registerSink({ id: 'b', value: 1 });
+          plugin.registerExporter(exporterOf('promo'));
+          plugin.registerRasterizer({ id: 'c', value: 1 });
+          plugin.registerTemplatePack({ id: 'd', templates: [] });
+          plugin.registerDirective({ id: 'e', namespace: 'promo' });
+          plugin.registerCommand({ id: 'f', title: 'Do' });
+          plugin.registerKeymap({ id: 'g', bindings: {} });
+          plugin.registerPanel({ id: 'h', title: 'Promo' });
+        },
+      }),
+    );
+
+    // The real assertion is that this did not throw: a point the host knows and
+    // `CONTRIBUTION_POINTS` does not would have been registered without being declared,
+    // which `activate` refuses. The counts below say the nine arrived rather than that
+    // nothing was attempted.
+    expect(CONTRIBUTION_POINTS).toHaveLength(9);
+    expect(
+      [
+        host.registry.sources(),
+        host.registry.sinks(),
+        host.registry.exporters.list(),
+        host.registry.rasterizers(),
+        host.registry.templatePacks(),
+        host.registry.directives(),
+        host.registry.commands(),
+        host.registry.keymaps(),
+        host.registry.panels(),
+      ].map((point) => point.length),
+    ).toEqual([1, 1, 1, 1, 1, 1, 1, 1, 1]);
   });
 });

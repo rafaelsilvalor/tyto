@@ -24,14 +24,25 @@ export type {
 } from './contributions.js';
 
 export {
+  type ContributionPoint,
+  type PluginManifest,
+  CONTRIBUTION_POINTS,
+  parsePluginManifest,
+  pluginManifestSchema,
+  validatePluginManifest,
+} from './manifest.js';
+
+export {
   type Disposable,
   type HostEventListener,
   type HostEvents,
   type InProcessHost,
+  type InstalledPlugin,
   type Logger,
   type Plugin,
   type PluginHost,
   type PluginHostOptions,
+  type PluginOrigin,
   type PluginRegistry,
   type TypedEmitter,
   createPluginHost,
