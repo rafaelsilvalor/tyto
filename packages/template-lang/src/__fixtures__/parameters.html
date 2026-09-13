@@ -1,0 +1,51 @@
+<!-- One component, two uses, two different slots inside it — beside
+     `parameters-expanded.html`, which is the same template with the component written out
+     twice by hand. The two compile to the same Scene; that equality is the acceptance
+     criterion of TYTO-75.
+
+     `slot="texto"` in the body names the parameter, never a slot. By the time `checkSlot`
+     sees this tree the word is `titulo` in one copy and `subtitulo` in the other, which is
+     why the slot type-check and `renderedSlots` needed no change. -->
+
+<frame format="feed" bg="#0c2340">
+  <use component="linha" class="topo" texto="titulo" />
+  <use component="linha" class="base" texto="subtitulo" />
+</frame>
+
+<define name="linha" params="texto">
+  <group class="linha">
+    <rect class="linha-marca" />
+    <text slot="texto" class="linha-texto" />
+  </group>
+</define>
+
+<style>
+  .linha {
+    x: 80;
+  }
+  .linha.topo {
+    y: 120;
+  }
+  .linha.base {
+    y: 420;
+  }
+
+  .linha-marca {
+    x: 0;
+    y: 0;
+    w: 64;
+    h: 8;
+    fill: #ff5900;
+  }
+
+  .linha-texto {
+    x: 0;
+    y: 24;
+    w: 800;
+    font: 700 40px/1.2 "Source Sans 3";
+    color: white;
+  }
+  .linha-texto.base {
+    font: 400 28px/1.3 "Source Sans 3";
+  }
+</style>
