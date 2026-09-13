@@ -1,0 +1,7 @@
+{
+  "name": "fs-inbox",
+  "version": "1.0.3",
+  "engine": ">=0.1",
+  "contributes": ["source"],
+  "permissions": []
+}

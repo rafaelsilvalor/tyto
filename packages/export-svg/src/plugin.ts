@@ -1,5 +1,15 @@
 import type { Plugin } from '@tyto/plugin-api';
 
+/**
+ * The manifest, imported rather than declared.
+ *
+ * `tyto-plugin.json` at the package root is the same file a third-party plugin ships, and
+ * the host validates it with the same schema (`docs/plugin-api.md`). Importing it keeps
+ * one copy: the version below is the package's own, and a manifest declared in TypeScript
+ * beside the code would be a second place for it to be wrong.
+ */
+import manifest from '../tyto-plugin.json';
+
 import type { SvgResources } from './defs.js';
 import { exportFrameSvg } from './export-svg.js';
 
@@ -19,14 +29,21 @@ export interface SvgExporterPluginOptions {
   readonly resources?: SvgResources;
   /** Draw text as outlines. A caller can still ask per output request. */
   readonly textAsPaths?: boolean;
-  readonly id?: string;
 }
 
+/**
+ * This package's own `tyto-plugin.json`, exported so a caller can list the plugin without
+ * activating it — `tyto plugin list` does exactly that. `unknown`, because the manifest is
+ * a document to be validated and not a shape to be trusted (see `Plugin.manifest`).
+ */
+export const svgExporterManifest: unknown = manifest;
+
 export function svgExporterPlugin(options: SvgExporterPluginOptions = {}): Plugin {
-  const id = options.id ?? 'svg';
+  const id = manifest.name;
 
   return {
     id,
+    manifest,
     activate: (host) =>
       host.registerExporter({
         id,

@@ -1,3 +1,4 @@
+import { isErr } from '@tyto/core';
 import type { ZodType } from 'zod';
 
 import type {
@@ -10,6 +11,7 @@ import type {
   Provided,
   TemplatePack,
 } from './contributions.js';
+import { type ContributionPoint, type PluginManifest, validatePluginManifest } from './manifest.js';
 
 /**
  * `PluginHost` and the in-process implementation of it (`docs/plugin-api.md`, Phase 1).
@@ -81,8 +83,26 @@ export interface PluginHost {
   readonly events: TypedEmitter;
 }
 
+/**
+ * Where a plugin came from, which is the one thing `tyto plugin list` shows that the
+ * manifest cannot say about itself: a manifest is written by its author, and an author has
+ * no way to know whether their plugin ended up bundled or installed.
+ *
+ * `external` has no producer yet — the loader is E11.1 — and exists because the alternative
+ * is a listing that says nothing and has to grow a column later.
+ */
+export type PluginOrigin = 'built-in' | 'external';
+
+/** A plugin the host has activated: its validated manifest, and where it came from. */
+export interface InstalledPlugin {
+  readonly manifest: PluginManifest;
+  readonly origin: PluginOrigin;
+}
+
 /** What the composition root reads back out. The plugins never see this half. */
 export interface PluginRegistry {
+  /** Every activated plugin, in activation order — what `tyto plugin list` prints. */
+  plugins(): readonly InstalledPlugin[];
   readonly exporters: ExporterRegistry;
   sources<T>(): readonly Provided<T>[];
   sinks<T>(): readonly Provided<T>[];
@@ -103,6 +123,22 @@ export interface PluginHostOptions {
 
 /** A host bound to one plugin, plus the registry the composition root reads. */
 export interface InProcessHost {
+  /**
+   * Validates a plugin's manifest, records it, and runs its `activate`.
+   *
+   * The door. A caller *could* reach `hostFor` directly and skip the manifest, and that is
+   * exactly the shortcut this method exists to make unnecessary: a built-in that activated
+   * without a manifest would never exercise the check a loaded plugin cannot avoid.
+   *
+   * Throws on a manifest that does not validate, on a `name` that disagrees with the
+   * plugin's `id`, and on a contribution to a point the manifest did not declare. All
+   * three are `TypeError` for the reason the duplicate-id check is: in Phase 1 every
+   * plugin is a built-in this repository wired itself, so each is a wiring bug rather than
+   * something a brief or a user could cause (`docs/conventions.md`). When the loader
+   * arrives (E11.1) it calls {@link parsePluginManifest} first and reports diagnostics,
+   * because then the manifest is somebody else's file.
+   */
+  activate(plugin: Plugin, origin?: PluginOrigin): Disposable | void;
   /** What one plugin gets. Its `config()` reads that plugin's slice, and nobody else's. */
   hostFor(pluginId: string): PluginHost;
   readonly registry: PluginRegistry;
@@ -127,8 +163,10 @@ class Point<T extends { readonly id: string }> {
   private readonly entries = new Map<string, Entry<T>>();
 
   constructor(
-    private readonly name: string,
+    private readonly name: ContributionPoint,
     private readonly emitter: TypedEmitter,
+    /** Which points each plugin has contributed to, so `activate` can check the manifest. */
+    private readonly contributed: Map<string, Set<ContributionPoint>>,
   ) {}
 
   add(plugin: string, value: T): Disposable {
@@ -147,6 +185,7 @@ class Point<T extends { readonly id: string }> {
     }
 
     this.entries.set(value.id, { plugin, value });
+    this.contributed.set(plugin, (this.contributed.get(plugin) ?? new Set()).add(this.name));
     this.emitter.emit('registered', { point: this.name, id: value.id });
 
     let disposed = false;
@@ -211,15 +250,18 @@ export function createPluginHost(options: PluginHostOptions = {}): InProcessHost
   const emitter = createEmitter();
   const log = options.log ?? NO_LOG;
 
-  const exporters = new Point<Exporter>('exporter', emitter);
-  const sources = new Point<Provided<unknown>>('source', emitter);
-  const sinks = new Point<Provided<unknown>>('sink', emitter);
-  const rasterizers = new Point<Provided<unknown>>('rasterizer', emitter);
-  const templatePacks = new Point<TemplatePack>('template-pack', emitter);
-  const directives = new Point<DirectiveContribution>('directive', emitter);
-  const commands = new Point<EditorCommand>('editor.command', emitter);
-  const keymaps = new Point<EditorKeymap>('editor.keymap', emitter);
-  const panels = new Point<PanelContribution>('panel', emitter);
+  const contributed = new Map<string, Set<ContributionPoint>>();
+  const installed = new Map<string, InstalledPlugin>();
+
+  const exporters = new Point<Exporter>('exporter', emitter, contributed);
+  const sources = new Point<Provided<unknown>>('source', emitter, contributed);
+  const sinks = new Point<Provided<unknown>>('sink', emitter, contributed);
+  const rasterizers = new Point<Provided<unknown>>('rasterizer', emitter, contributed);
+  const templatePacks = new Point<TemplatePack>('template-pack', emitter, contributed);
+  const directives = new Point<DirectiveContribution>('directive', emitter, contributed);
+  const commands = new Point<EditorCommand>('editor.command', emitter, contributed);
+  const keymaps = new Point<EditorKeymap>('editor.keymap', emitter, contributed);
+  const panels = new Point<PanelContribution>('panel', emitter, contributed);
 
   const points = [
     exporters,
@@ -234,6 +276,7 @@ export function createPluginHost(options: PluginHostOptions = {}): InProcessHost
   ];
 
   const registry: PluginRegistry = {
+    plugins: () => [...installed.values()],
     exporters: {
       forKind: (kind) => exporters.list().find((exporter) => exporter.kinds.includes(kind)),
       list: () => exporters.list(),
@@ -250,6 +293,52 @@ export function createPluginHost(options: PluginHostOptions = {}): InProcessHost
 
   return {
     registry,
+
+    activate(plugin: Plugin, origin: PluginOrigin = 'built-in'): Disposable | void {
+      const validated = validatePluginManifest(plugin.manifest);
+      if (isErr(validated)) {
+        throw new TypeError(
+          `Plugin '${plugin.id}' has a tyto-plugin.json the host cannot read: ` +
+            `${validated.error.map((issue) => issue.message).join(' ')}`,
+        );
+      }
+
+      const manifest = validated.value;
+      if (manifest.name !== plugin.id) {
+        // One identity, not two. The id is what every extension point keys on and what a
+        // loader would name a folder; a manifest that disagrees with it leaves `plugin
+        // list` printing one name and an error message printing another.
+        throw new TypeError(
+          `Plugin '${plugin.id}' ships a tyto-plugin.json naming '${manifest.name}'. The ` +
+            `manifest's name is the plugin's id, so the two cannot disagree.`,
+        );
+      }
+
+      const result = plugin.activate(this.hostFor(plugin.id));
+
+      // Checked *after* activation, against what was actually registered. `contributes` is
+      // the manifest's promise about which points this plugin touches, and a promise
+      // nothing verifies is a comment: the first version of `plugin list` would have shown
+      // whatever the file claimed, which is the failure mode the whole card is about.
+      //
+      // One direction only. Registering into an undeclared point is always wrong — a
+      // loader would have granted nothing for it. Declaring a point and not registering is
+      // left alone, because `templatePackPlugin` legitimately contributes an empty pack
+      // and a conditional contribution is a shape this API has not ruled out.
+      const undeclared = [...(contributed.get(plugin.id) ?? [])].filter(
+        (point) => !manifest.contributes.includes(point),
+      );
+      if (undeclared.length > 0) {
+        throw new TypeError(
+          `Plugin '${plugin.id}' registered into ${undeclared.map((point) => `'${point}'`).join(', ')}, ` +
+            `which its tyto-plugin.json does not list under 'contributes'. The manifest is ` +
+            `what a loader reads before any of this code runs, so it has to be the truth.`,
+        );
+      }
+
+      installed.set(plugin.id, { manifest, origin });
+      return result;
+    },
 
     hostFor(pluginId: string): PluginHost {
       return {
@@ -285,6 +374,8 @@ export function createPluginHost(options: PluginHostOptions = {}): InProcessHost
 
     disposePlugin(pluginId: string): void {
       for (const point of points) point.removeAllFrom(pluginId);
+      contributed.delete(pluginId);
+      installed.delete(pluginId);
     },
   };
 }
@@ -298,5 +389,14 @@ export function createPluginHost(options: PluginHostOptions = {}): InProcessHost
  */
 export interface Plugin {
   readonly id: string;
+  /**
+   * The plugin's own `tyto-plugin.json`, as read — **not** as a validated object.
+   *
+   * `unknown` on purpose. A loaded plugin's manifest is a file somebody else wrote, so the
+   * host validates it; typing this field as `PluginManifest` would let a built-in hand
+   * over a shape TypeScript approved and the schema never saw, which is precisely the
+   * private path ADR 0007 says a built-in must not have.
+   */
+  readonly manifest: unknown;
   activate(host: PluginHost): Disposable | void;
 }

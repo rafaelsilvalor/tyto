@@ -115,6 +115,22 @@ export const diagnosticCodes = {
       "Plugin '{plugin}' called '{capability}' without that permission being granted at install time.",
     spec: 'docs/plugin-api.md',
   },
+  // Two codes and not one, the way the template manifest already splits them: "this file
+  // is not JSON" and "this JSON is not a manifest" are different problems for whoever has
+  // to fix it, and only the second has a field to point at. `{path}` is a file path in the
+  // first and a field path in the second, which is the same split E_MANIFEST_* makes.
+  E_PLUGIN_MANIFEST_SYNTAX: {
+    severity: 'error',
+    summary: 'A tyto-plugin.json is not valid JSON.',
+    template: "Plugin manifest '{path}' is not valid JSON: {problem}.",
+    spec: 'docs/plugin-api.md',
+  },
+  E_PLUGIN_MANIFEST_SHAPE: {
+    severity: 'error',
+    summary: 'A tyto-plugin.json parses as JSON but does not match the plugin manifest schema.',
+    template: "Plugin manifest is invalid at '{path}': {problem}.",
+    spec: 'docs/plugin-api.md',
+  },
   E_SCENE_SHAPE: {
     severity: 'error',
     summary: 'A scene does not match the IR schema.',

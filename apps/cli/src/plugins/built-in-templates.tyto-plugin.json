@@ -1,0 +1,7 @@
+{
+  "name": "built-in-templates",
+  "version": "0.1.0",
+  "engine": ">=0.1",
+  "contributes": ["template-pack"],
+  "permissions": []
+}

@@ -21,6 +21,42 @@ my-plugin/
 }
 ```
 
+`pluginManifestSchema` in `@tyto/plugin-api` is that document, and it is the only reader of it. Every field is checked and every rejection carries a **field path** — `contributes.1`, `config.$schema`, `(root)` — because "the manifest is invalid" is not a sentence anybody can act on in a file they typed by hand. Every problem is reported at once, the same promise the compiler makes about a brief.
+
+| Field         | Rule                                                                                             |
+| ------------- | ------------------------------------------------------------------------------------------------ |
+| `name`        | lowercase letters, digits and hyphens. **It is the plugin's id** — see below                     |
+| `version`     | semver, with an optional prerelease tag                                                          |
+| `engine`      | a version range (`>=0.1`, `^1.2.3`, `>=0.1 \|\| ^1`), checked for shape and not for satisfaction |
+| `contributes` | at least one extension point from the table below, no repeats                                    |
+| `permissions` | non-empty strings, no repeats; the vocabulary stays open until the loader (E11.1)                |
+| `config`      | optional `{ "$schema": "…" }`, never dereferenced by the host                                    |
+
+Unknown keys are refused, one complaint per stray key rather than one for the object holding them.
+
+**`name` is the id, and there is only one of them.** VS Code splits `publisher` from `name` and joins them back; nothing here needs that yet, and two names for one plugin is two things to keep in step. The host throws when a `Plugin.id` and its manifest's `name` disagree, because the id is what every extension point keys on and what a loader would name a folder under `~/.tyto/plugins/` — a listing printing one name while an error prints another is the failure that foreclosed.
+
+**`engine` is checked for shape, not for meaning.** This package can see that `lates` is a typo; it cannot see whether the host satisfies `>=99`, because that is a semver comparison against a version only the loader knows. Rejecting the first and deferring the second is the honest split.
+
+### The manifest is a document, not a shape
+
+`Plugin.manifest` is typed `unknown`, and the host validates it at `activate`. A built-in that handed over an object TypeScript had approved and the schema had never seen would be a built-in with a private path into the host — the exact thing ADR 0007 rules out, in the place the temptation is strongest.
+
+So every built-in ships a real file:
+
+| Plugin               | File                                                       |
+| -------------------- | ---------------------------------------------------------- |
+| `html`               | `packages/export-html/tyto-plugin.json`                    |
+| `svg`                | `packages/export-svg/tyto-plugin.json`                     |
+| `built-in-templates` | `apps/cli/src/plugins/built-in-templates.tyto-plugin.json` |
+| `chromium`           | `apps/cli/src/plugins/chromium.tyto-plugin.json`           |
+| `fs-inbox`           | `apps/cli/src/plugins/fs-inbox.tyto-plugin.json`           |
+| `fs-outbox`          | `apps/cli/src/plugins/fs-outbox.tyto-plugin.json`          |
+
+The last four are named `<id>.tyto-plugin.json` and that is the one place a built-in differs from a third party. A plugin package puts the file at its root; those four have no package of their own — they are the composition root's wiring around `@tyto/raster`, `@tyto/io` and `@tyto/templates` — and four files cannot share one name in one folder. The document is the same document, validated by the same schema, and the day one of them gets a package the file moves to that package's root under the ordinary name.
+
+**`contributes` is verified, not believed.** `InProcessHost.activate` watches which points a plugin registers into and throws when one was not declared. Without that, `tyto plugin list` would print a promise nothing had checked — which is how a manifest field becomes a comment.
+
 ## Extension points
 
 | `contributes`     | Registers                                                              | Built-in                                              |
@@ -85,6 +121,24 @@ interface PluginHost {
 ## Lifecycle
 
 `tyto plugin install <folder|git|npm>` → validates `tyto-plugin.json` → shows permissions → copies to `~/.tyto/plugins/` → `activate` on next start. `plugin list`, `plugin disable`, `plugin remove`.
+
+**`plugin list` is the half that exists (TYTO-35).** It prints name, version, origin and contributes, in prose or under `--json`:
+
+```
+$ tyto plugin list
+html                0.4.2  built-in  exporter
+svg                 1.0.2  built-in  exporter
+built-in-templates  0.1.0  built-in  template-pack
+chromium            0.1.0  built-in  rasterizer
+fs-inbox            1.0.3  built-in  source
+fs-outbox           1.0.3  built-in  sink
+```
+
+`install`, `disable` and `remove` are the loader's and are not there: a command that could only ever answer "nothing" is a promise rather than a feature.
+
+**Listing reads manifests; it does not activate.** `activateBuiltIns` wires one render — it leaves the rasterizer out when there is nothing to raster, and never wires the queue at all — so a listing built from it would be shorter on some runs than on others, and listing would have to launch a browser to tell you a browser is installed. The command reads `BUILT_IN_MANIFESTS` and validates each through the same schema a loaded plugin's file will go through; a built-in whose manifest stopped matching is reported there rather than surfacing as a `TypeError` on the next render. It exits **2** in that case, not 1: a manifest this repository ships is its own bug, and ADR 0011 reserves the retryable code for what a caller can fix.
+
+`origin` is the one column a manifest cannot fill in for itself — an author has no way to know whether their plugin ended up bundled or installed — so it is the host's, and `external` has no producer until the loader lands.
 
 ## Phase 1 vs later
 
