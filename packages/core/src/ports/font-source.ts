@@ -10,7 +10,7 @@
  *
  * This asks for the `.ttf`/`.otf`, not the `.woff2` the exporters embed. They are two
  * encodings of one design and a measurement has to be taken from the same one that gets
- * drawn, which is why `fonts/README.md` requires both to come from a single upstream
+ * drawn, which is why `@tyto/fonts`'s README requires both to come from a single upstream
  * release. Handing a WOFF2 here would also drag a Brotli decoder into a pure package for
  * no gain.
  *

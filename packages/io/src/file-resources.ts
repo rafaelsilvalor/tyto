@@ -51,9 +51,15 @@ export interface FileResources extends ExportResources {
    * Reads exactly the assets `needed` names, and nothing else in the folder.
    *
    * Safe to call more than once: a second call re-reads, which is what a `tyto watch`
-   * rendering the same task twice should do. `needed.faces` is accepted and ignored — the
-   * repo bundles no font yet, so a scene that draws text gets `E_EXPORT_FONT_UNRESOLVED`
-   * per frame, which is the honest answer until TYTO-61 brings a font source.
+   * rendering the same task twice should do.
+   *
+   * `needed.faces` is accepted and ignored, and that is now a statement about this folder
+   * rather than about the repository. The faces Tyto ships are answered by `@tyto/fonts`,
+   * which the composition root binds straight to the exporters' `font` port — they are the
+   * same bytes for every task, so there is nothing for a per-task loader to do (ADR 0021).
+   * What is left here is a `FontRef { source: 'file' }`, a font beside the brief, and
+   * nothing loads one yet: such a scene still gets `E_EXPORT_FONT_UNRESOLVED` per frame,
+   * which is the honest answer until something does.
    */
   readonly load: (needed: SceneResources) => Promise<void>;
 }

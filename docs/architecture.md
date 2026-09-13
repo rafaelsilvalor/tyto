@@ -30,6 +30,7 @@ packages/
   export-svg     Scene → SVG (SceneVisitor)
   raster         Rasterizer port + chromium adapter (Electron offscreen or Playwright)
   templates      built-in templates (template-pack plugin)
+  fonts          the faces Tyto ships, and the reader that hands them to the exporters and to measurement
   pipeline       Job: brief → artworks×formats → artifacts; local queue, cancellation, progress
   plugin-api     extension-point types, PluginHost, plugin manifest, permissions
   io             BriefSource/OutputSink ports; fs adapters (inbox/outbox); local watcher
@@ -40,13 +41,13 @@ apps/
   desktop        electron-vite: main (pipeline, plugins, credentials) / preload / renderer (editor, preview, panels)
 ```
 
-Runtime boundary — **pure** (no Node/DOM): core, brief-lang, template-lang, export-*, templates, plugin-api (types). **Node**: raster, pipeline, io, sources, cli. **DOM**: editor, desktop/renderer.
+Runtime boundary — **pure** (no Node/DOM): core, brief-lang, template-lang, export-*, templates, plugin-api (types). **Node**: raster, pipeline, io, fonts, sources, cli. **DOM**: editor, desktop/renderer.
 
 Path to the cloud: same pure code; `raster` swaps to Playwright in a container, `io` swaps to HTTP + bucket, `pipeline` runs as a worker consuming a queue. No pure package changes.
 
 ## Patterns and where they live
 
-- **Hexagonal (ports & adapters)** — a port is declared by the package that _consumes_ it, not in one central place: `FileSystem`, `AssetResolver` and `FontSource` in `core` because the pure stages ask them questions, `Rasterizer` in `raster`, `BriefSource`/`OutputSink` in `io`, and `TemplateSource`/`ArtifactSink` in `pipeline`. Adapters live beside their runtime (`raster`, `io`, `sources`); composition only in `apps/*`.
+- **Hexagonal (ports & adapters)** — a port is declared by the package that _consumes_ it, not in one central place: `FileSystem`, `AssetResolver` and `FontSource` in `core` because the pure stages ask them questions, `Rasterizer` in `raster`, `BriefSource`/`OutputSink` in `io`, and `TemplateSource`/`ArtifactSink` in `pipeline`. Adapters live beside their runtime (`raster`, `io`, `fonts`, `sources`); composition only in `apps/*`.
 - **Compiler pipeline** — pure stages, tested in isolation with fixtures.
 - **Visitor** — `SceneVisitor<T>` and `walk()` in `core`; each exporter implements one and none of them writes the recursion again. The walk hands every node its accumulated transform, effective opacity, ancestor chain and frame. New output format = new visitor.
 - **Registry** — `TemplateRegistry` and `PluginRegistry`: folder discovery, manifest read without executing code.
@@ -73,4 +74,4 @@ Raster on desktop uses an offscreen `BrowserWindow` in main (`webContents.captur
 1. The IR is the single source of truth for the artwork. If it is not in the IR, it does not exist.
 2. Templates produce IR, never HTML. Both the TS path and the HTML-like path converge on `Scene`.
 3. Anything that can be validated without executing code (manifest, plugin.json) is validated before execution.
-4. Determinism: same brief + templates + fonts ⇒ same bytes. Fonts are bundled/pinned; never `system-ui`.
+4. Determinism: same brief + templates + fonts ⇒ same bytes. Fonts are bundled/pinned; never `system-ui`. `@tyto/fonts` is where bundled means something an install has (ADR 0021); a face nobody bundles is `E_EXPORT_FONT_UNRESOLVED` naming it, never a substitute.
