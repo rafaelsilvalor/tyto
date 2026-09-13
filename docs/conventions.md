@@ -8,6 +8,23 @@ English everywhere in the repo: code, comments, docs, commits, PRs, Jira cards (
 
 pnpm workspaces + Turborepo · TS 5 `strict`, `noUncheckedIndexedAccess`, `exactOptionalPropertyTypes` · Zod · Vitest · Playwright · ESLint flat + Prettier · tsup (libs, ESM) · electron-vite · CodeMirror 6 + Lezer · commander · Changesets.
 
+### `engines.node`
+
+`^22.22.1 || ^24.12 || >=26`, and that is **the intersection of what the stack accepts, not
+a preference**. The field is documentation of what a contributor needs, so the honest
+number is the tightest constraint among the dependencies rather than the loosest. Three set
+the shape, and none of them is where anybody would look: `lint-staged` (`>=22.22.1`) puts
+the floor 22 minors above the LTS line, `@changesets/*` and `vitest` (`^22 || ^24 || >=26`)
+exclude the odd majors, and `@napi-rs/lzma-linux-x64-gnu` (`^22.20 || ^24.12 || >=25`) lifts
+the 24 floor to 24.12.
+
+`tools/repo-checks/src/engines-node.test.ts` recomputes it from the installed tree with
+`semver.subset`, so the field cannot quietly go stale the next time a tool raises its floor.
+It asserts one direction only — that the range promises nothing the tree refuses — because
+optional dependencies resolve per platform: that `lzma` package is not installed on Windows
+at all, so "everything here accepts this Node" is a claim about one machine. **CI is the
+arbiter**, and a Windows checkout can see green on a range CI will reject.
+
 ## Root scripts
 
 `pnpm dev` (desktop) · `pnpm cli -- …` · `pnpm check` = typecheck + lint + test · `pnpm test:visual` (raster snapshots; needs `pnpm exec playwright install chromium`) · `pnpm build` · `pnpm changeset` · `pnpm format` / `format:check`.
