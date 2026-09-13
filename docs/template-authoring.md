@@ -278,15 +278,51 @@ an artwork (`.item.destaque`). ADR 0022 records the reasoning.
 twice, so a component's nodes are identified by position, like every other node that writes no
 id. A `mask="#grad"` therefore names a `<rect id="grad">` outside the component.
 
-**A component draws the same content every time.** It repeats shape, not words: three chips
-above draw `titulo` three times. Giving each instance its own slot is a parameter, which is
-E4.10 and not in the language yet.
+**A component takes parameters, and a parameter is a slot name.** `params="texto"` on the
+`<define>` declares one; `slot="texto"` in its body names it; `texto="titulo"` on the `<use>`
+decides which slot that instance draws. Every attribute on a `<use>` other than `component`
+and `class` is a binding.
 
-**A `<define>` takes `name` and a `<use>` takes `component` and `class`; anything else is
-refused.** So are an unknown component name (with a suggestion), a `<use>` that runs in a
-circle, a second `<define>` under one name, an empty `<define>`, a `<define>` written anywhere
-but the top level, and a `<use>` written at it. A component nothing draws yet is checked
-anyway, because `tyto template check` is run while a template is being written.
+<!-- prettier-ignore -->
+```html
+<frame format="feed">
+  <use component="linha" class="topo" texto="titulo" />
+  <use component="linha" class="base" texto="subtitulo" />
+</frame>
+
+<define name="linha" params="texto">
+  <group class="linha">
+    <rect class="linha-marca" />
+    <text slot="texto" class="linha-texto" />
+  </group>
+</define>
+```
+
+The substitution happens **before** anything validates the tree, so nothing downstream knows
+a parameter existed: `slot="rodape"` written by hand and `texto="rodape"` bound to a
+component are the same undeclared slot, with the same `E_TEMPLATE_MARKUP`. The range is the
+binding's, because the `<define>` is correct and the `<use>` is not. `renderedSlots` counts a
+slot reached only through a parameter, so `W_UNUSED_SLOT` does not fire on it.
+
+Three places in a body name a slot, and a parameter is substituted into all three: `slot="…"`,
+a `{…}` spliced into a `src`, and a nested `<use>`'s own binding — which is how a parameter is
+handed one component further down.
+
+**A `<define>` takes `name` and `params`; a `<use>` takes `component`, `class` and one
+attribute per declared parameter — anything else is refused.** So are an unknown component
+name and an unknown parameter name (each with a suggestion), a parameter nothing binds, a
+parameter bound to nothing, a `<use>` that runs in a circle, a second `<define>` under one
+name, an empty `<define>`, a `<define>` written anywhere but the top level, and a `<use>`
+written at it. A component nothing draws yet is checked anyway, because `tyto template check`
+is run while a template is being written.
+
+A parameter may not be called `component` or `class`, which a `<use>` spends on itself, and
+may not carry the name of a slot the manifest declares — `slot="titulo"` inside that body
+would mean the parameter and could never reach the slot.
+
+**A component still does not decide how many of itself there are.** Two `<use>` are two tags
+somebody typed. A carousel whose number of cards depends on how many items the brief brought
+is still a `template.ts`.
 
 Components live inside one template. There is no library shared between templates, which is
 the point at which a component's classes could collide with its host's; nothing needs one yet.
@@ -359,6 +395,9 @@ The middle two are never drawn and still decide what comes out, which is the who
 a template whose background is `@if slot(cor) is laranja { :root { --bg: #ff5900 } }` is
 using `cor`, and telling its author the slot is unused tells them to delete the line that
 makes the template work.
+
+A slot a component reaches through a parameter counts through the first route, not a fifth
+one: `texto="subtitulo"` on a `<use>` is `slot="subtitulo"` by the time anything counts.
 
 One case deliberately counts as no reference: a conditional block with nothing inside it.
 `@if slot(cor) is laranja { }` changes no output, so the slot in its prelude really is used
