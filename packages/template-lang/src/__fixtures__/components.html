@@ -1,0 +1,57 @@
+<!-- Three `<use>` of one `<define>`, beside `components-expanded.html`, which is the same
+     template with the component written out three times by hand. The two compile to the
+     same Scene; that equality is the acceptance criterion of TYTO-74.
+
+     `.chip-bar.second` is the load-bearing line of the stylesheet. `second` is written on
+     the `<use>` and lands on every node of the expansion, so it reaches the `<rect>`
+     inside the component without a descendant combinator — the thing ADR 0017 closed and
+     ADR 0022 declines to reopen. -->
+
+<frame format="feed" bg="#0c2340">
+  <use component="chip" class="first" />
+  <use component="chip" class="second" />
+  <use component="chip" class="third" />
+</frame>
+
+<!-- Below the frame that draws it, deliberately: a template is read layout first, and the
+     order of the two is nothing the expansion depends on. -->
+<define name="chip">
+  <group class="chip">
+    <rect class="chip-bar" />
+    <text slot="titulo" class="chip-label" />
+  </group>
+</define>
+
+<style>
+  .chip {
+    x: 80;
+  }
+  .chip.first {
+    y: 100;
+  }
+  .chip.second {
+    y: 340;
+  }
+  .chip.third {
+    y: 580;
+  }
+
+  .chip-bar {
+    x: 0;
+    y: 0;
+    w: 96;
+    h: 12;
+    fill: #ff5900;
+  }
+  .chip-bar.second {
+    fill: #ffd166;
+  }
+
+  .chip-label {
+    x: 0;
+    y: 32;
+    w: 800;
+    font: 700 36px/1.2 "Source Sans 3";
+    color: white;
+  }
+</style>

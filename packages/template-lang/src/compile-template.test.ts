@@ -30,6 +30,8 @@ import {
 } from '@tyto/core/template';
 import { describe, expect, it } from 'vitest';
 
+import componentsExpandedMarkup from './__fixtures__/components-expanded.html?raw';
+import componentsMarkup from './__fixtures__/components.html?raw';
 import promoCursoMarkup from './__fixtures__/promo-curso.html?raw';
 import { compileTemplate } from './compile-template.js';
 
@@ -520,10 +522,12 @@ slots:
 
 /** One artwork, one format: enough to read a property's effect off the IR. */
 async function frameOf(styles: string, markup: string, manifest = MINIMAL) {
-  const template = compiledOrThrow(
-    `<frame format="feed">${markup}</frame><style>${styles}</style>`,
-    manifest,
-  );
+  return documentFrame(`<frame format="feed">${markup}</frame><style>${styles}</style>`, manifest);
+}
+
+/** The same thing for a whole `template.html`, which is what a fixture is. */
+async function documentFrame(source: string, manifest = MINIMAL) {
+  const template = compiledOrThrow(source, manifest);
   const ast: BriefAst = {
     frontmatter: frontmatter({ template: manifest.name }),
     directives: [directive('titulo', textOf('Oi'))],
@@ -747,5 +751,198 @@ slots:
     expect(result.ok).toBe(false);
     if (result.ok) return;
     expect(result.error[0]?.message).toContain("no SVG file at 'assets/logo.svg'");
+  });
+});
+
+/* ------------------------------------------- components: <define> and <use> (E4.9) -- */
+
+const CHIPS = manifestOf(`name: chips
+version: 1.0.0
+formats: [feed]
+slots:
+  titulo: { type: rich-text, required: true }
+`);
+
+describe('a component drawn three times, and the triplicate written by hand', () => {
+  it('produce the same frame', async () => {
+    const fromComponent = await documentFrame(componentsMarkup, CHIPS);
+    const byHand = await documentFrame(componentsExpandedMarkup, CHIPS);
+
+    expect(fromComponent).toEqual(byHand);
+  });
+
+  it('give an instance the classes of its <use>, on every node of the expansion', async () => {
+    const built = await documentFrame(componentsMarkup, CHIPS);
+    const fills = (built?.children ?? []).map((chip) => {
+      const bar = chip.kind === 'group' ? chip.children[0] : undefined;
+      return bar?.kind === 'rect' ? bar.fill : undefined;
+    });
+
+    // `.chip-bar.second` is written on the <rect> inside the component and `second` on the
+    // <use> that draws it. Nothing else in this language reaches that node from there.
+    expect(fills).toEqual([solid('#ff5900'), solid('#ffd166'), solid('#ff5900')]);
+  });
+
+  it('places each instance where its own class puts it', async () => {
+    const built = await documentFrame(componentsMarkup, CHIPS);
+
+    expect((built?.children ?? []).map((chip) => chip.transform.y)).toEqual([100, 340, 580]);
+  });
+
+  it('counts a slot reached only through a component as read', () => {
+    const template = compileTemplate(componentsMarkup, { manifest: CHIPS });
+    expect(template.ok).toBe(true);
+    if (!template.ok) return;
+
+    expect([...template.value.renderedSlots]).toEqual(['titulo']);
+  });
+});
+
+describe('a component the template cannot expand', () => {
+  const define = (body: string, name = 'chip'): string => `<define name="${name}">${body}</define>`;
+  const inFrame = (body: string): string => `<frame format="feed">${body}</frame>`;
+  const style = '<style>.g { w: 10; h: 10 }</style>';
+
+  /**
+   * The problem, without the sentence `E_TEMPLATE_MARKUP` writes around it.
+   *
+   * What these tests pin is the wording of the refusal — the component name, the id, the
+   * suggestion — and not the catalogue entry that frames it, which `codes.ts` owns.
+   */
+  function messagesOf(source: string): string[] {
+    return problemsOf(source, CHIPS).map((item) =>
+      item.message.replace(/^Template markup is invalid: /u, '').replace(/\.$/u, ''),
+    );
+  }
+
+  it('refuses a <use> that runs in a circle, naming the component it closes on', () => {
+    const source =
+      inFrame('<use component="chip" />') +
+      define('<group class="g"><use component="chip" /></group>') +
+      style;
+
+    expect(messagesOf(source)).toContain("use runs in a circle through 'chip'");
+    expect(problemsOf(source, CHIPS)[0]?.range).toBeDefined();
+  });
+
+  it('refuses a circle that runs through two components', () => {
+    const messages = messagesOf(
+      inFrame('<use component="chip" />') +
+        define('<group class="g"><use component="outro" /></group>') +
+        define('<group class="g"><use component="chip" /></group>', 'outro') +
+        style,
+    );
+
+    expect(messages.join(' | ')).toContain('runs in a circle');
+  });
+
+  it('refuses an unknown component with a did-you-mean', () => {
+    const source = inFrame('<use component="chipp" />') + define('<rect class="g" />') + style;
+
+    expect(messagesOf(source)).toEqual(["no component is defined as 'chipp'; try 'chip'"]);
+    expect(problemsOf(source, CHIPS)[0]?.range).toBeDefined();
+  });
+
+  it('lists what is defined when nothing is close enough to be a typo', () => {
+    const messages = messagesOf(
+      inFrame('<use component="rodape" />') + define('<rect class="g" />') + style,
+    );
+
+    expect(messages).toEqual(["no component is defined as 'rodape'; this template defines chip"]);
+  });
+
+  it('checks a component nobody draws yet', () => {
+    // `tyto template check` is run on a template being written, where the <define> lands
+    // before the <use> that will draw it. A body nothing reaches is still checked.
+    const messages = messagesOf(
+      inFrame('<rect class="g" />') +
+        define('<group class="g"><use component="ausente" /></group>') +
+        style,
+    );
+
+    expect(messages).toEqual(["no component is defined as 'ausente'; this template defines chip"]);
+  });
+
+  it('refuses an id written inside a <define>, whether or not anything uses it', () => {
+    const source = inFrame('<rect class="g" />') + define('<rect id="veil" class="g" />') + style;
+
+    expect(messagesOf(source)[0]).toContain("component 'chip' writes id='veil'");
+    expect(problemsOf(source, CHIPS)[0]?.range).toBeDefined();
+  });
+
+  it('refuses a <define> inside a <define>', () => {
+    const messages = messagesOf(
+      inFrame('<use component="chip" />') +
+        define(`<group class="g">${define('<rect class="g" />', 'interno')}</group>`) +
+        style,
+    );
+
+    expect(messages).toContain('a <define> is only written at the top level');
+  });
+
+  it('refuses a <use> at the top level', () => {
+    const messages = messagesOf(
+      inFrame('<rect class="g" />') +
+        '<use component="chip" />' +
+        define('<rect class="g" />') +
+        style,
+    );
+
+    expect(messages).toContain('a <use> draws inside a <frame>, and this one is at the top level');
+  });
+
+  it('refuses two components defined under one name', () => {
+    const messages = messagesOf(
+      inFrame('<use component="chip" />') +
+        define('<rect class="g" />') +
+        define('<rect class="g" />') +
+        style,
+    );
+
+    expect(messages).toContain("two components are defined as 'chip'");
+  });
+
+  it('refuses a <define> with nothing in it', () => {
+    const messages = messagesOf(
+      inFrame('<rect class="g" />') + '<define name="chip"></define>' + style,
+    );
+
+    expect(messages).toEqual([
+      "component 'chip' holds no tags, so a <use> of it would draw nothing",
+    ]);
+  });
+
+  it('names what a <define> and a <use> take when given something else', () => {
+    const onDefine = messagesOf(
+      inFrame('<rect class="g" />') +
+        '<define name="chip" class="x"><rect class="g" /></define>' +
+        style,
+    );
+    const onUse = messagesOf(
+      inFrame('<use component="chip" opacity="0.5" />') + define('<rect class="g" />') + style,
+    );
+
+    expect(onDefine).toEqual(["a <define> takes name, and this is 'class'"]);
+    expect(onUse).toEqual(["a <use> takes component and class, and this is 'opacity'"]);
+  });
+
+  it('suggests <use> for a tag that is nearly one', () => {
+    const problems = problemsOf(
+      inFrame('<usse component="chip" />') + define('<rect class="g" />') + style,
+      CHIPS,
+    );
+
+    expect(problems[0]?.code).toBe('E_UNSUPPORTED_TAG');
+    expect(problems[0]?.message).toContain("Try 'use'.");
+  });
+
+  it('says a mistake inside a component once, not once per instance', () => {
+    const messages = messagesOf(
+      inFrame('<use component="chip" /><use component="chip" /><use component="chip" />') +
+        '<define name="chip"><text slot="titulo" class="g" /></define>' +
+        style,
+    );
+
+    expect(messages.filter((message) => message.includes('no font declaration'))).toHaveLength(1);
   });
 });

@@ -1,0 +1,53 @@
+<!-- `components.html` with the component written out by hand, which is what a template
+     author writes today. The stylesheet below is byte for byte the other file's: the
+     classes an instance carries are the ones `<use class="…">` propagates, so the rules
+     that read them do not change when the markup stops repeating itself. -->
+
+<frame format="feed" bg="#0c2340">
+  <group class="chip first">
+    <rect class="chip-bar first" />
+    <text slot="titulo" class="chip-label first" />
+  </group>
+  <group class="chip second">
+    <rect class="chip-bar second" />
+    <text slot="titulo" class="chip-label second" />
+  </group>
+  <group class="chip third">
+    <rect class="chip-bar third" />
+    <text slot="titulo" class="chip-label third" />
+  </group>
+</frame>
+
+<style>
+  .chip {
+    x: 80;
+  }
+  .chip.first {
+    y: 100;
+  }
+  .chip.second {
+    y: 340;
+  }
+  .chip.third {
+    y: 580;
+  }
+
+  .chip-bar {
+    x: 0;
+    y: 0;
+    w: 96;
+    h: 12;
+    fill: #ff5900;
+  }
+  .chip-bar.second {
+    fill: #ffd166;
+  }
+
+  .chip-label {
+    x: 0;
+    y: 32;
+    w: 800;
+    font: 700 36px/1.2 "Source Sans 3";
+    color: white;
+  }
+</style>
