@@ -252,7 +252,9 @@ and why an enum needs `@if` to reach a value — is ADR 0017.
 - A **mark** in the brief's rich text takes the run properties of the class that spells it
   out: `{cor:laranja}Turma nova{/}` reads `.cor-laranja`, and `color`, `font`, `font-size`
   and `font-weight` from that rule land on those runs. A mark nothing spells out passes its
-  text through unchanged.
+  text through unchanged — and, because unchanged styling is indistinguishable styling, its
+  text rejoins the runs around it rather than splitting them. Guessing `{cor:roxo}` in a
+  template that has no `.cor-roxo` costs nothing in the exported file.
 
 ### The at-rules
 
