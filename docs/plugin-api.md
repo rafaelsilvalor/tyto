@@ -100,6 +100,25 @@ font or an image has a shape only that exporter knows — `HtmlResources.font` t
 and `svgExporterPlugin` close over theirs. Reconciling the two shapes is a separate question
 (TYTO-62) and the extension point stays out of it.
 
+### `template-pack`, and the host it belongs to
+
+A pack contributes `{ templates, directory }`: the manifests it declares, and the folder
+they were read from. Both, because a manifest says what a template declares and rendering
+still has to find `template.html` and the `src=` files beside it. `directory` is optional for
+a pack that is bundled rather than on a disk; the built-in one has it.
+
+**A pack has a different lifetime from an exporter, and therefore a different host**
+(ADR 0020). `activateBuiltIns` builds a host per render, because an exporter binds the bytes
+of the folder it is rendering and two tasks in a `tyto watch` have different `assets/`. A
+template pack has no such tie: `loadRenderContext` activates it once with the rest of the
+project, and the template registry is built from the directories that host holds. Reading
+every manifest again per task would make the second render slower than the first for
+nothing.
+
+The registry is built from the host's packs and not from a path passed around it, which is
+the difference between an extension point and a decoration: a pack that were registered and
+never read would be one nobody could tell was broken.
+
 ## PluginHost (what the plugin receives)
 
 ```ts

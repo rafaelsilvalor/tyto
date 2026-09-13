@@ -303,6 +303,17 @@ export const diagnosticCodes = {
       "Slot '{slot}' is set in the frontmatter, where '{markup}' is literal text. Write it as a ::{slot} directive for it to be markup.",
     spec: 'docs/brief-language.md',
   },
+  // A warning and not an error, because nothing is wrong: the run produced the template the
+  // user asked for. It exists because "my edit to the built-in did nothing" and "why does
+  // mine look different on this machine" are the two questions shadowing will generate, and
+  // one line answers both (ADR 0020).
+  W_TEMPLATE_SHADOWED: {
+    severity: 'warning',
+    summary: 'Two template sources declare the same name; the earlier source is the one used.',
+    template:
+      "Template '{name}' in '{shadowed}' is shadowed by the one in '{used}', which is searched first.",
+    spec: 'docs/adr/0020-built-in-template-pack.md',
+  },
 } as const satisfies Record<string, DiagnosticCodeDefinition>;
 
 export type DiagnosticCode = keyof typeof diagnosticCodes;

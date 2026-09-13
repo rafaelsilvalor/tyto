@@ -30,6 +30,14 @@ export interface WatchCommandOptions {
   readonly template?: string;
   readonly formats?: readonly string[];
   readonly templates: string;
+  /**
+   * True when `--templates` was typed rather than defaulted.
+   *
+   * A folder the user named and does not have is a mistake worth reporting; the default
+   * `templates/` not existing is not, now that a project with no folder of its own still
+   * renders from the built-in pack (ADR 0020).
+   */
+  readonly templatesNamed?: boolean;
   readonly formatsFile: string;
   readonly interval?: number;
   readonly concurrency?: number;
@@ -50,6 +58,7 @@ export async function watchCommand(
   const context = await loadRenderContext({
     templatesDirectory: resolve(cwd, options.templates),
     formatsFile: resolve(cwd, options.formatsFile),
+    templatesDirectoryIsDefault: options.templatesNamed !== true,
   });
   if (!context.ok) {
     if (options.json) {

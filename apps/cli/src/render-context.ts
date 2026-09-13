@@ -12,8 +12,14 @@ import {
   ok,
 } from '@tyto/core';
 import { type ExportResources, fileTemplateAssets, nodeFileSystem } from '@tyto/io';
+import { createPluginHost } from '@tyto/plugin-api';
 import { TEMPLATE_FILE, type TemplateSource, markupTemplateSource } from '@tyto/pipeline';
 
+import {
+  builtInTemplatesDirectory,
+  packDirectories,
+  templatePackPlugin,
+} from './plugins/templates.js';
 import { registerOrigin } from './report.js';
 
 /**
@@ -26,10 +32,25 @@ import { registerOrigin } from './report.js';
  */
 
 export interface RenderContextOptions {
-  /** The folder holding one subfolder per template. Absolute. */
+  /** The folder holding one subfolder per template. Absolute. Searched first. */
   readonly templatesDirectory: string;
   /** The project's `formats.yaml`. Absolute. */
   readonly formatsFile: string;
+  /**
+   * Where the built-in pack lives, when it is not where `@tyto/templates` put it.
+   *
+   * For a test that wants a pack it built itself. Left out, the real one is resolved.
+   */
+  readonly builtInTemplatesDirectory?: string;
+  /**
+   * True when `templatesDirectory` is the default rather than a folder somebody named.
+   *
+   * It decides one thing: whether the folder not existing is worth saying. A project with
+   * no `templates/` of its own now renders from the built-in pack (ADR 0020), so reporting
+   * a folder the user never mentioned would be noise on every such run. A folder they did
+   * type and do not have is still a mistake worth reading about.
+   */
+  readonly templatesDirectoryIsDefault?: boolean;
 }
 
 export interface RenderContext {
@@ -57,13 +78,49 @@ export async function loadRenderContext(
   const formats = await loadFormats(fileSystem, options.formatsFile);
   if (!formats.ok) return err(formats.error);
 
-  const registry = await loadTemplateRegistry(fileSystem, options.templatesDirectory);
+  // The built-in pack, through the extension point rather than past it (ADR 0007). What
+  // the registry searches below is what the host holds: a pack registered and never read
+  // would be an extension point nobody could tell was broken.
+  //
+  // The host's lifetime is the project's, not the render's. `activateBuiltIns` builds one
+  // per task because an exporter binds the bytes of the folder it is rendering; a template
+  // pack has no such tie, and re-reading its manifests per task would make the second
+  // render slower than the first for nothing.
+  const packDirectory = options.builtInTemplatesDirectory ?? builtInTemplatesDirectory();
+  const pack = await loadTemplateRegistry(fileSystem, packDirectory);
+
+  const host = createPluginHost();
+  host.activate(
+    templatePackPlugin({
+      directory: packDirectory,
+      // Read from the pack's own folder, and not filtered out of the merged registry
+      // below. A pack declares what it ships; what survives a merge it was an input to is
+      // a different question with a different answer.
+      templates: pack.ok ? pack.value.list() : [],
+    }),
+  );
+
+  // Project first: a folder the user pointed at is a more specific statement of intent
+  // than a package that came along with the program, so their `promo-curso` is the one
+  // that renders and the built-in is reported as shadowed (ADR 0020).
+  const registry = await loadTemplateRegistry(fileSystem, [
+    options.templatesDirectory,
+    ...packDirectories(host.registry.templatePacks()),
+  ]);
   if (!registry.ok) return err(registry.error);
+
+  // A failure on the default `templates/` folder is dropped, and only that one: the user
+  // never named it, the pack answered anyway, and every run in a project without one would
+  // otherwise open with a complaint about a folder nobody asked for.
+  const silenced =
+    options.templatesDirectoryIsDefault === true ? options.templatesDirectory : undefined;
 
   const problems = [
     ...formats.warnings,
     ...registry.warnings,
-    ...registry.value.failures.flatMap((failure) => failure.diagnostics),
+    ...registry.value.failures
+      .filter((failure) => failure.directory !== silenced)
+      .flatMap((failure) => failure.diagnostics),
   ];
 
   return ok(

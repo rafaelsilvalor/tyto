@@ -62,6 +62,18 @@ function withOutputOptions(command: Command): Command {
     .option('--json', 'print a machine-readable document instead of prose', false);
 }
 
+/**
+ * Whether an option carries a value the user typed, rather than the default declared above.
+ *
+ * Commander knows; nothing downstream does, because `opts()` flattens both into one string.
+ * `--templates` needs the difference: a folder somebody named and does not have is worth an
+ * error, and the default `templates/` not existing stopped being one when a project with no
+ * folder of its own started rendering from the built-in pack (ADR 0020).
+ */
+function namedOnTheCommandLine(command: Command, option: string): boolean {
+  return command.getOptionValueSource(option) === 'cli';
+}
+
 export function createProgram(environment: CliEnvironment, captured: Captured): Command {
   const program = new Command();
 
@@ -95,7 +107,11 @@ export function createProgram(environment: CliEnvironment, captured: Captured): 
     );
 
   withOutputOptions(withProjectOptions(render)).action(async (brief: string) => {
-    captured.code = await renderCommand(brief, render.opts(), environment);
+    captured.code = await renderCommand(
+      brief,
+      { ...render.opts(), templatesNamed: namedOnTheCommandLine(render, 'templates') },
+      environment,
+    );
   });
 
   /* ---------------------------------------------------------------------------- watch -- */
@@ -112,7 +128,11 @@ export function createProgram(environment: CliEnvironment, captured: Captured): 
     .option('--once', 'handle what is in the inbox now and exit, instead of watching', false);
 
   withOutputOptions(withProjectOptions(watch)).action(async (folder: string) => {
-    captured.code = await watchCommand(folder, watch.opts(), environment);
+    captured.code = await watchCommand(
+      folder,
+      { ...watch.opts(), templatesNamed: namedOnTheCommandLine(watch, 'templates') },
+      environment,
+    );
   });
 
   /* ------------------------------------------------------------------------- template -- */

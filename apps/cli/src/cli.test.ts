@@ -185,10 +185,16 @@ describe('tyto render', () => {
     expect(parsed.value.artifacts).toHaveLength(2);
     // Sizes, not just names: a zero-byte file would satisfy a listing and nothing else.
     expect(parsed.value.artifacts.every((artifact) => artifact.bytes > 0)).toBe(true);
-    expect(parsed.value.tyto).toEqual({
-      version: TYTO_VERSION,
-      templates: [{ name: 'cartaz', version: '2.1.0' }],
-    });
+    // The built-ins are in the list because they are on the search path now (ADR 0020):
+    // `tyto.templates` records which templates were here, and since the pack merged in,
+    // they were. The project's own is still the only one this brief uses.
+    expect(parsed.value.tyto.version).toBe(TYTO_VERSION);
+    expect(parsed.value.tyto.templates).toContainEqual({ name: 'cartaz', version: '2.1.0' });
+    expect(parsed.value.tyto.templates.map((entry) => entry.name).sort()).toEqual([
+      'carrossel-lista',
+      'cartaz',
+      'promo-curso',
+    ]);
   });
 
   it("embeds the template's own <vector src>, which nothing but the CLI resolves", async () => {

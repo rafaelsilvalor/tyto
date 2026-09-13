@@ -9,21 +9,27 @@ import chromiumManifest from './chromium.tyto-plugin.json';
 import fsInboxManifest from './fs-inbox.tyto-plugin.json';
 import fsOutboxManifest from './fs-outbox.tyto-plugin.json';
 import { rasterizerPlugin } from './rasterizer.js';
-import { templatePackPlugin } from './templates.js';
 
 /**
  * Every built-in, through the host, in one place (ADR 0007, `docs/plugin-api.md` Phase 1).
  *
  * *Routes every built-in through it … the API is validated by real use before it opens.*
  * That sentence is the whole reason this file exists: a plugin API whose first real user is
- * a stranger is a plugin API nobody has tried. So the two exporters, the rasterizer and the
- * template pack are activated here exactly the way a third party's would be, and what the
- * rest of the app reads is the registry — never the packages.
+ * a stranger is a plugin API nobody has tried. So the two exporters and the rasterizer are
+ * activated here exactly the way a third party's would be, and what the rest of the app
+ * reads is the registry — never the packages.
  *
  * Built per render rather than once per process, because an exporter binds the bytes of the
  * folder it is rendering: two tasks in a `tyto watch` have different `assets/`, and an
  * exporter bound to the wrong one would embed the wrong logo. A host is two maps; building
  * one costs nothing worth caching.
+ *
+ * **The template pack is not here, and that is the same reason read the other way**
+ * (ADR 0020). A pack is not bound to the folder being rendered, so it belongs to a host
+ * with the project's lifetime — `loadRenderContext` activates it, and the template registry
+ * is built from what that host holds. It used to register an empty pack here, as a
+ * placeholder so that nobody would discover at this point that a pack could not be
+ * registered at all; there is a real one now, in the right place.
  */
 
 /**
@@ -69,9 +75,6 @@ export function activateBuiltIns(options: BuiltInOptions = {}): InProcessHost {
     svgExporterPlugin({
       ...(options.resources?.svg === undefined ? {} : { resources: options.resources.svg }),
     }),
-    // Empty today: `@tyto/templates` is a stub and E4 has shipped no built-in pack. The
-    // registration exists so the extension point is exercised rather than assumed.
-    templatePackPlugin(),
     ...(options.rasterizer === undefined ? [] : [rasterizerPlugin(options.rasterizer)]),
   ];
 
@@ -86,5 +89,10 @@ export function activateBuiltIns(options: BuiltInOptions = {}): InProcessHost {
 }
 
 export { type CloseableRasterizer, defaultRasterizer, rasterizerPlugin } from './rasterizer.js';
-export { type TemplatePackOptions, templatePackPlugin } from './templates.js';
+export {
+  type TemplatePackOptions,
+  builtInTemplatesDirectory,
+  packDirectories,
+  templatePackPlugin,
+} from './templates.js';
 export { sinkPlugin, sourcePlugin } from './queue.js';

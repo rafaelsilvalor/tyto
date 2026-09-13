@@ -1,5 +1,6 @@
 import { execFile } from 'node:child_process';
-import { readFile } from 'node:fs/promises';
+import { mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { promisify } from 'node:util';
@@ -18,7 +19,7 @@ import {
 import { fileAssetResolver, fileTemplateAssets, nodeFileSystem } from '@tyto/io';
 import { markupTemplateSource } from '@tyto/pipeline';
 import { testFontSource } from '@tyto/test-fonts';
-import { beforeAll, describe, expect, it } from 'vitest';
+import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 
 /**
  * The built-in pack's own acceptance criteria, run against the folders as they ship.
@@ -182,5 +183,69 @@ describe('the pack as a whole', () => {
     // A manifest that does not parse becomes a failure rather than an exception, so an
     // empty list and a broken pack look alike unless this is checked.
     expect(registry.value.failures).toEqual([]);
+  }, 60_000);
+});
+
+describe('the pack as the CLI finds it, with no --templates (ADR 0020)', () => {
+  /**
+   * The folder path above and the pack path here, side by side, so the two are checked to
+   * agree rather than assumed to. TYTO-25 shipped the folders and TYTO-66 made them
+   * findable; nothing until now compared what the two ways of reaching them answer.
+   *
+   * Through the binary, from a directory that has no templates of its own, because the
+   * whole claim is about what happens when nobody points at anything.
+   */
+  let project: string;
+
+  beforeAll(async () => {
+    project = await mkdtemp(join(tmpdir(), 'tyto-pack-contract-'));
+    await writeFile(join(project, 'formats.yaml'), await readFile(join(PACK, 'formats.yaml')));
+  }, 60_000);
+
+  afterAll(async () => {
+    await rm(project, { recursive: true, force: true });
+  });
+
+  it.each(EXAMPLES.map((example) => example.template))(
+    '%s is on the search path of a project that has no templates folder',
+    async (name) => {
+      // A brief naming a template that does not exist, so the error lists what does. That
+      // list is the registry seen from outside the process, which is the only place the
+      // resolution rule can be observed without trusting the code that implements it.
+      await writeFile(
+        join(project, 'brief.brief'),
+        '---\ntemplate: nao-existe\nformats: [feed]\n---\n',
+        'utf8',
+      );
+
+      const failed = await runBinary(
+        process.execPath,
+        [CLI, 'render', 'brief.brief', '--out', 'out', '--types', 'svg'],
+        // From the temp project, which is the whole point: a directory with a
+        // `formats.yaml` and no templates of its own.
+        { cwd: project },
+      ).catch((cause: { stderr?: string }) => cause);
+
+      const stderr = 'stderr' in failed ? (failed.stderr ?? '') : '';
+      expect(stderr).toContain('E_UNKNOWN_TEMPLATE');
+      expect(stderr).toContain(name);
+      // And the folder nobody named is not complained about, even though it is absent.
+      expect(stderr).not.toContain('E_TEMPLATE_READ');
+    },
+    120_000,
+  );
+
+  it('answers the same manifest whether reached as a folder or as the pack', async () => {
+    // `--templates <the pack>` is the pre-ADR-0020 way and still has to work, and it has to
+    // mean the same thing. Same names, same versions, and no self-shadowing from the folder
+    // appearing on the search path twice.
+    const asFolder = await loadTemplateRegistry(fileSystem, PACK);
+    if (!asFolder.ok) throw new Error(asFolder.error.map((item) => item.message).join('; '));
+
+    const asBoth = await loadTemplateRegistry(fileSystem, [PACK, PACK]);
+    if (!asBoth.ok) throw new Error(asBoth.error.map((item) => item.message).join('; '));
+
+    expect(asBoth.value.list()).toEqual(asFolder.value.list());
+    expect(asBoth.warnings).toEqual([]);
   }, 60_000);
 });

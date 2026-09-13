@@ -86,6 +86,9 @@ importers:
       '@tyto/template-lang':
         specifier: workspace:*
         version: link:../../packages/template-lang
+      '@tyto/templates':
+        specifier: workspace:*
+        version: link:../../packages/templates
       commander:
         specifier: ^15.0.0
         version: 15.0.0
