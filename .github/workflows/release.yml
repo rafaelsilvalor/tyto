@@ -47,3 +47,10 @@ jobs:
           # already uses for work no card asked for.
           commit-message: 'chore(release): TYTO-0 version packages'
           pr-title: 'chore(release): TYTO-0 version packages'
+          # `push-with-git-cli` is deliberately absent, which leaves it false: v2 pushes
+          # tags through the GitHub API, and an API ref is a lightweight tag. Setting it
+          # true would restore v1's annotated tags, and what those actually carried was a
+          # tagger reading `github-actions[bot]`, a date the commit already has, and a
+          # message repeating the tag's own name — measured on `@tyto/core@0.19.0`, which
+          # carries no signature either. `docs/git-workflow.md` has the decision;
+          # `github-config.test.ts` fails if this line changes without it.

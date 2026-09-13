@@ -129,6 +129,16 @@ const CHANGESETS_ACTION_BY_MAJOR: Record<string, ChangesetsActionMajor> = {
   },
 };
 
+/**
+ * Which kind of tag a release produces, read from the one input that decides it.
+ *
+ * A YAML `true` and the string `'true'` both reach an action as the string `"true"`, so
+ * both are treated as set; anything else, including the input being absent, leaves v2's
+ * API path and its lightweight tags.
+ */
+const tagShape = (inputs: Record<string, unknown>): 'annotated' | 'lightweight' =>
+  String(inputs['push-with-git-cli'] ?? 'false') === 'true' ? 'annotated' : 'lightweight';
+
 /** Input names a major does not read. Empty is the passing case. */
 const unreadInputs = (major: string, inputs: Record<string, unknown>) =>
   Object.keys(inputs).filter(
@@ -233,6 +243,40 @@ describe('workflows', () => {
       ).toBeTypeOf('string');
       expect(value as string).toMatch(/^\w+(\([\w-]+\))?: TYTO-\d+ [a-z0-9]/);
     }
+  });
+
+  it('leave version tags lightweight, which is the shape this repository decided on', () => {
+    // `changesets/action` v2 pushes tags through the GitHub API, and an API ref is a plain
+    // ref — a lightweight tag. `push-with-git-cli: true` restores v1's Git-CLI path and
+    // its annotated tags, so the shape of every release tag is decided by one input that
+    // is easy to add for an unrelated reason.
+    //
+    // The decision is lightweight (TYTO-86, and `docs/git-workflow.md` says why). What
+    // v1's annotated tags carried was a tagger reading `github-actions[bot]`, a date the
+    // tagged commit already has, and a message repeating the tag's own name; they were
+    // not signed — `git cat-file tag '@tyto/core@0.19.0' | grep -c "BEGIN PGP"` is 0 — so
+    // no signature was ever traded away in either direction. Against that, `git describe`
+    // has 0 occurrences in this repository.
+    const { major, inputs } = changesetsActionStep();
+    expect(major, 'the tag shape below is a v2 default; re-read it on another major').toBe('v2');
+
+    expect(
+      tagShape(inputs),
+      `release.yml sets push-with-git-cli, which makes release tags annotated. That is a ` +
+        `defensible answer and it is not the one in docs/git-workflow.md — change the doc ` +
+        `in the same commit or drop the input.`,
+    ).toBe('lightweight');
+  });
+
+  it('read the tag shape from the input rather than from the absence of a line', () => {
+    // The assertion above passes on a file that simply never mentions the input, which is
+    // also what it would do if the input were renamed out from under it. Measured in both
+    // directions against the predicate itself.
+    expect(tagShape({})).toBe('lightweight');
+    expect(tagShape({ 'push-with-git-cli': false })).toBe('lightweight');
+    expect(tagShape({ 'push-with-git-cli': 'false' })).toBe('lightweight');
+    expect(tagShape({ 'push-with-git-cli': true })).toBe('annotated');
+    expect(tagShape({ 'push-with-git-cli': 'true' })).toBe('annotated');
   });
 
   it('key a pull_request_target concurrency group on the pull request, not on github.ref', () => {
