@@ -6,7 +6,7 @@ import type { Diagnostics, Scene } from '@tyto/core';
 import { parseScene } from '@tyto/core';
 import { exportHtml } from '@tyto/export-html';
 import { exportSvg } from '@tyto/export-svg';
-import { htmlTestFont, svgTestFont } from '@tyto/test-fonts';
+import { bundledFont } from '@tyto/fonts';
 import pixelmatch from 'pixelmatch';
 import { PNG } from 'pngjs';
 import { afterAll, describe, expect, it } from 'vitest';
@@ -77,7 +77,7 @@ import textFixture from './__fixtures__/text.json';
  * ## What has glyphs in it
  *
  * `text.feed` is the only fixture with text, and it exists because the repository now
- * bundles a font (`fonts/`, read by `@tyto/test-fonts`). Before that `export-html` refused
+ * bundles a font (`@tyto/fonts`, which owns the bytes and reads them). Before that `export-html` refused
  * to embed a face it had no bytes for and **no fixture carrying text could be rasterized at
  * all**.
  */
@@ -274,7 +274,7 @@ interface Document {
 function documentsOf(fixture: unknown, perPlatform = false): readonly Document[] {
   const scene = sceneOf(fixture);
   const exported = exportHtml(scene, {
-    resources: { asset: () => CHECKERBOARD, font: htmlTestFont },
+    resources: { asset: () => CHECKERBOARD, font: bundledFont },
   });
 
   if (!exported.ok) {
@@ -469,7 +469,7 @@ describe('the bundled font', () => {
   const scene = sceneOf(textFixture);
 
   it('resolves through export-html, and the document carries the real bytes', () => {
-    const exported = exportHtml(scene, { resources: { font: htmlTestFont } });
+    const exported = exportHtml(scene, { resources: { font: bundledFont } });
 
     expect(codesOf(exported)).not.toContain('E_EXPORT_FONT_UNRESOLVED');
     if (!exported.ok) throw new Error('export-html failed on the text fixture.');
@@ -486,7 +486,7 @@ describe('the bundled font', () => {
   });
 
   it('resolves through export-svg too', () => {
-    const exported = exportSvg(scene, { resources: { font: svgTestFont } });
+    const exported = exportSvg(scene, { resources: { font: bundledFont } });
 
     expect(codesOf(exported)).not.toContain('E_EXPORT_FONT_UNRESOLVED');
     if (!exported.ok) throw new Error('export-svg failed on the text fixture.');
@@ -507,10 +507,10 @@ describe('the bundled font', () => {
   it('reports a face it does not bundle rather than substituting one', () => {
     const italic = inItalic();
 
-    expect(codesOf(exportHtml(italic, { resources: { font: htmlTestFont } }))).toContain(
+    expect(codesOf(exportHtml(italic, { resources: { font: bundledFont } }))).toContain(
       'E_EXPORT_FONT_UNRESOLVED',
     );
-    expect(codesOf(exportSvg(italic, { resources: { font: svgTestFont } }))).toContain(
+    expect(codesOf(exportSvg(italic, { resources: { font: bundledFont } }))).toContain(
       'E_EXPORT_FONT_UNRESOLVED',
     );
   });

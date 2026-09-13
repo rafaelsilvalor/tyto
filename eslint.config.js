@@ -27,6 +27,9 @@ const NODE_PACKAGES = [
   'packages/raster',
   'packages/pipeline',
   'packages/io',
+  // Adapter, not data (ADR 0021): it answers `FontSource` and the exporters' `font` port,
+  // and reading bytes off a disk is what answering those means.
+  'packages/fonts',
   'apps/cli',
   'apps/desktop',
   'tools',

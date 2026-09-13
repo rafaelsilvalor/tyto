@@ -71,6 +71,9 @@ importers:
       '@tyto/export-svg':
         specifier: workspace:*
         version: link:../../packages/export-svg
+      '@tyto/fonts':
+        specifier: workspace:*
+        version: link:../../packages/fonts
       '@tyto/io':
         specifier: workspace:*
         version: link:../../packages/io
@@ -159,6 +162,12 @@ importers:
       '@tyto/plugin-api':
         specifier: workspace:*
         version: link:../plugin-api
+
+  packages/fonts:
+    devDependencies:
+      vitest:
+        specifier: ^5.0.0
+        version: 5.0.0(@types/node@22.20.2)(vite@7.3.6(@types/node@22.20.2)(jiti@2.6.1)(yaml@2.9.0))
 
   packages/io:
     dependencies:
@@ -249,9 +258,9 @@ importers:
       '@tyto/export-svg':
         specifier: workspace:*
         version: link:../export-svg
-      '@tyto/test-fonts':
+      '@tyto/fonts':
         specifier: workspace:*
-        version: link:../../tools/test-fonts
+        version: link:../fonts
       pixelmatch:
         specifier: ^7.2.0
         version: 7.2.0
@@ -304,9 +313,9 @@ importers:
         specifier: workspace:*
         version: link:../../packages/pipeline
     devDependencies:
-      '@tyto/test-fonts':
+      '@tyto/fonts':
         specifier: workspace:*
-        version: link:../test-fonts
+        version: link:../../packages/fonts
       ajv:
         specifier: ^8.17.1
         version: 8.20.0
@@ -341,12 +350,6 @@ importers:
       yaml:
         specifier: ^2.9.0
         version: 2.9.0
-
-  tools/test-fonts:
-    devDependencies:
-      vitest:
-        specifier: ^5.0.0
-        version: 5.0.0(@types/node@22.20.2)(vite@7.3.6(@types/node@22.20.2)(jiti@2.6.1)(yaml@2.9.0))
 
 packages:
 

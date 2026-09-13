@@ -1,4 +1,5 @@
 import { type AssetRef, type Diagnostics, hasErrors } from '@tyto/core';
+import { bundledFont } from '@tyto/fonts';
 import {
   type ExportResources,
   type RenderResult,
@@ -55,11 +56,26 @@ export interface RenderTaskReport {
   readonly ok: boolean;
 }
 
-/** The two asset sources a render has, asked in the order that makes a template overridable. */
+/**
+ * Everything an exporter can be asked for, from the places that have it.
+ *
+ * Two asset sources, asked in the order that makes a template overridable — the brief's own
+ * folder first, the template's `src=` files behind it.
+ *
+ * And one font source, which has no such order because there is only one: the faces Tyto
+ * ships (ADR 0021). A brief's own font file is not loaded by anything yet, and
+ * `bundledFont` refuses a `FontRef { source: 'file' }` rather than answering it with a
+ * bundled face of the same family — so that stays `E_EXPORT_FONT_UNRESOLVED` naming the
+ * face, which is the honest answer until something loads one.
+ *
+ * This is the composition root, which is the whole reason the wiring is here and not in a
+ * stage (ADR 0010). `@tyto/fonts` is a Node adapter; `pipeline` and the exporters know only
+ * the ports.
+ */
 function combine(brief: ExportResources, template: ExportResources): ExportResources {
   const asset = (ref: AssetRef): string | undefined =>
     brief.html?.asset?.(ref) ?? template.html?.asset?.(ref);
-  return { html: { asset }, svg: { asset } };
+  return { html: { asset, font: bundledFont }, svg: { asset, font: bundledFont } };
 }
 
 export async function renderTask(

@@ -2,7 +2,7 @@ import type { Scene, TextNode, TextSpan } from '@tyto/core';
 import { createFaceCache, measureText, parseScene } from '@tyto/core';
 import { exportHtml } from '@tyto/export-html';
 import { exportSvg } from '@tyto/export-svg';
-import { htmlTestFont, svgTestFont, testFontSource } from '@tyto/test-fonts';
+import { bundledFont, bundledFontSource } from '@tyto/fonts';
 import { type Browser, chromium } from 'playwright';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 
@@ -103,7 +103,7 @@ let browser: Browser | undefined;
 let documentHtml: string;
 
 beforeAll(async () => {
-  const exported = exportHtml(scene, { resources: { font: htmlTestFont } });
+  const exported = exportHtml(scene, { resources: { font: bundledFont } });
   if (!exported.ok) throw new Error(exported.error.map((item) => item.message).join('; '));
   const frame = exported.value[0];
   if (frame === undefined) throw new Error('The text fixture exported no frames.');
@@ -237,7 +237,7 @@ describe('the leading a node declares is the leading it gets', () => {
  * rather than as `expected true`.
  */
 describe('the measurement in core against the browser', () => {
-  const faces = createFaceCache(testFontSource);
+  const faces = createFaceCache(bundledFontSource);
 
   it.each(NODES.map((node) => [node.id, node] as const))(
     '%s: same line count and height as Chromium, within 1px',
@@ -292,7 +292,7 @@ describe('export-svg', () => {
     // records it beside ADR 0019's wrapping limit, and E4.5 closes both at once by
     // deciding the lines in the IR. Every node in this fixture has one size, so both
     // exporters agree on all of them.
-    const exported = exportSvg(scene, { resources: { font: svgTestFont } });
+    const exported = exportSvg(scene, { resources: { font: bundledFont } });
     if (!exported.ok) throw new Error(exported.error.map((item) => item.message).join('; '));
 
     const frame = exported.value[0];

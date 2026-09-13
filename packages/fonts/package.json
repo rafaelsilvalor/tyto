@@ -1,9 +1,8 @@
 {
-  "name": "@tyto/test-fonts",
+  "name": "@tyto/fonts",
   "version": "0.0.0",
-  "private": true,
   "type": "module",
-  "description": "Reads the fonts bundled in fonts/ and hands them to the exporters as data URIs.",
+  "description": "The fonts Tyto ships, and the reader that hands them to the exporters and to measurement.",
   "license": "UNLICENSED",
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
@@ -11,8 +10,13 @@
     ".": {
       "types": "./dist/index.d.ts",
       "import": "./dist/index.js"
-    }
+    },
+    "./package.json": "./package.json"
   },
+  "files": [
+    "dist",
+    "fonts"
+  ],
   "sideEffects": false,
   "scripts": {
     "build": "tsup",

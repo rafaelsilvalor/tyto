@@ -1,4 +1,5 @@
 import { execFile } from 'node:child_process';
+import { createHash } from 'node:crypto';
 import { mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
@@ -16,9 +17,9 @@ import {
   loadTemplateRegistry,
   resolve,
 } from '@tyto/core';
+import { bundledFontOutlinePath, bundledFontSource, bundledFontsDirectory } from '@tyto/fonts';
 import { fileAssetResolver, fileTemplateAssets, nodeFileSystem } from '@tyto/io';
 import { markupTemplateSource } from '@tyto/pipeline';
-import { testFontSource } from '@tyto/test-fonts';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 
 /**
@@ -32,10 +33,11 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest';
  * ## Why the fonts are wired here and not in a job
  *
  * `compile` only measures text when it is given faces, and nothing supplies them to a
- * render job yet (E4.5 left that seam open on purpose). A test that rendered without them
- * would satisfy "no `W_TEXT_OVERFLOW`" by never being able to produce one, which is the
- * emptiest kind of green. So the faces come from `@tyto/test-fonts` and the assertion is
- * about text that was actually measured.
+ * render job yet (E4.5 left that seam open on purpose, and TYTO-87 left it open again: it
+ * wired the *bytes an exporter embeds*, which is a different port). A test that rendered
+ * without them would satisfy "no `W_TEXT_OVERFLOW`" by never being able to produce one,
+ * which is the emptiest kind of green. So the faces come from `@tyto/fonts` and the
+ * assertion is about text that was actually measured.
  */
 
 const HERE = dirname(fileURLToPath(import.meta.url));
@@ -45,7 +47,7 @@ const CLI = fileURLToPath(new URL('../../../apps/cli/dist/index.js', import.meta
 const runBinary = promisify(execFile);
 
 const fileSystem = nodeFileSystem();
-const faces = createFaceCache(testFontSource);
+const faces = createFaceCache(bundledFontSource);
 
 interface Example {
   readonly template: string;
@@ -248,4 +250,75 @@ describe('the pack as the CLI finds it, with no --templates (ADR 0020)', () => {
     expect(asBoth.value.list()).toEqual(asFolder.value.list());
     expect(asBoth.warnings).toEqual([]);
   }, 60_000);
+});
+
+describe('the fonts the pack draws in, as a render embeds them (ADR 0021)', () => {
+  /**
+   * TYTO-87's criteria, run the way they are written: the binary, from a project that says
+   * nothing about templates or fonts, asserting on the **bytes** and not on the family
+   * name. Before this the same command produced no artifact at all — four
+   * `E_EXPORT_FONT_UNRESOLVED` per run, one per face per frame — because the faces sat in a
+   * folder at the repository root that nothing shippable could reach.
+   *
+   * A family name would pass against a document that embedded nothing: the `font-family` in
+   * the CSS comes from the scene, not from a resolver. The SHA-256 of what came out against
+   * the SHA-256 of what is on disk is the assertion that cannot be satisfied by a
+   * near-miss.
+   */
+  let project: string;
+
+  beforeAll(async () => {
+    project = await mkdtemp(join(tmpdir(), 'tyto-fonts-contract-'));
+    await writeFile(join(project, 'formats.yaml'), await readFile(join(PACK, 'formats.yaml')));
+    await writeFile(
+      join(project, 'promo.brief'),
+      await readFile(join(PACK, 'promo-curso/examples/promo.brief')),
+    );
+  }, 60_000);
+
+  afterAll(async () => {
+    await rm(project, { recursive: true, force: true });
+  });
+
+  it('renders promo-curso with no --templates and no font flag, and embeds the bundled faces', async () => {
+    const { stderr } = await runBinary(
+      process.execPath,
+      [CLI, 'render', 'promo.brief', '--out', 'out', '--types', 'svg'],
+      { cwd: project },
+    );
+
+    // A non-zero exit rejects the promise, so reaching here already says the export did not
+    // refuse. This is the wording that used to be here four times.
+    expect(stderr).not.toContain('E_EXPORT_FONT_UNRESOLVED');
+
+    const svg = await readFile(join(project, 'out/artwork-1-feed.svg'), 'utf8');
+    const embedded = [...svg.matchAll(/url\("data:font\/woff2;base64,([A-Za-z0-9+/=]+)"\)/g)]
+      .map((match) => Buffer.from(match[1] ?? '', 'base64'))
+      .map((bytes) => createHash('sha256').update(bytes).digest('hex'));
+
+    // Both weights the template draws in, and nothing else: an `@font-face` per face the
+    // scene declared.
+    expect(embedded).toHaveLength(2);
+
+    const onDisk = await Promise.all(
+      ['SourceSans3-Regular.ttf.woff2', 'SourceSans3-Bold.ttf.woff2'].map(async (file) =>
+        createHash('sha256')
+          .update(await readFile(join(bundledFontsDirectory(), 'source-sans-3', file)))
+          .digest('hex'),
+      ),
+    );
+
+    expect([...embedded].sort()).toEqual([...onDisk].sort());
+  }, 120_000);
+
+  it('reads its outlines out of the same package, so measuring and drawing cannot drift', () => {
+    // The other half of the port, and the reason `@tyto/fonts`'s README requires the `.ttf`
+    // and the `.woff2` to come from one upstream release. `faces` above is built from this.
+    const path = bundledFontOutlinePath({ family: 'Source Sans 3', weight: 400, style: 'normal' });
+
+    expect(path?.startsWith(bundledFontsDirectory())).toBe(true);
+    expect(
+      bundledFontSource.outlines({ family: 'Source Sans 3', weight: 400, style: 'normal' }),
+    ).toBeDefined();
+  });
 });
