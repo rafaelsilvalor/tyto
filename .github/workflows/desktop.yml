@@ -45,14 +45,46 @@ jobs:
       # the root script is what reaches it.
       - run: pnpm build
 
-      # Signing is optional and absent by default. With `CSC_LINK` unset electron-builder
-      # finds no identity and ships unsigned installers — macOS then warns on first open and
-      # Windows SmartScreen does the same, which is the cost of not having a certificate yet.
-      # Setting the two repository secrets is the whole of turning it on; notarizing a macOS
-      # build additionally wants `APPLE_ID`, `APPLE_APP_SPECIFIC_PASSWORD` and `APPLE_TEAM_ID`
-      # and is a separate decision (`docs/git-workflow.md`).
+      # **A secret that does not exist is not an absent variable.** `${{ secrets.CSC_LINK }}`
+      # in a step's `env:` writes the variable either way — to the empty string when no such
+      # secret is configured — and electron-builder's two platforms disagree about what that
+      # means:
+      #
+      #     // codeSign/windowsSignToolManager.js:76 — guards on empty
+      #     if (cscLink == null || cscLink === "") return Promise.resolve(null);
+      #     // macPackager.js:27 — does not
+      #     if (cscLink == null || process.platform !== "darwin") return null;
+      #
+      # So on macOS `""` reads as *a certificate was provided*, `createKeychain` resolves it
+      # as a path against the project directory, and the job dies at
+      # `⨯ /Users/runner/work/tyto/tyto/apps/desktop not a file`. That is what the first real
+      # tag found: Windows and Linux green, macOS red, on identical environment (TYTO-98).
+      #
+      # A step-level `env:` cannot express "absent", so the decision has to happen before the
+      # write. The secrets reach this step through `env:` rather than `${{ }}` inside the
+      # script, the same rule the tag guard above follows; the heredoc delimiter is random
+      # because a certificate or a password may contain any fixed one.
+      - name: Pass the signing certificate through only when there is one
+        shell: bash
+        run: |
+          if [ -n "$SIGNING_CERTIFICATE" ]; then
+            delimiter="csc-$RANDOM$RANDOM$RANDOM"
+            printf 'CSC_LINK<<%s\n%s\n%s\n' "$delimiter" "$SIGNING_CERTIFICATE" "$delimiter" >> "$GITHUB_ENV"
+            printf 'CSC_KEY_PASSWORD<<%s\n%s\n%s\n' "$delimiter" "$SIGNING_PASSWORD" "$delimiter" >> "$GITHUB_ENV"
+            echo "signing with the configured certificate"
+          else
+            echo "no CSC_LINK secret; the installers will be unsigned"
+          fi
+        env:
+          SIGNING_CERTIFICATE: ${{ secrets.CSC_LINK }}
+          SIGNING_PASSWORD: ${{ secrets.CSC_KEY_PASSWORD }}
+
+      # Signing is optional and off. Unsigned, macOS warns on first open and Windows
+      # SmartScreen does the same, which is the cost of not having a certificate yet. Setting
+      # the two repository secrets is the whole of turning it on — the step above is what
+      # makes *not* setting them work. Notarizing a macOS build additionally wants `APPLE_ID`,
+      # `APPLE_APP_SPECIFIC_PASSWORD` and `APPLE_TEAM_ID`, and is a separate decision
+      # (`docs/git-workflow.md`).
       - run: pnpm --filter @tyto/desktop exec electron-builder --publish always
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          CSC_LINK: ${{ secrets.CSC_LINK }}
-          CSC_KEY_PASSWORD: ${{ secrets.CSC_KEY_PASSWORD }}
