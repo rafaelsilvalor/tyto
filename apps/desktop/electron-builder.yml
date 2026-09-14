@@ -45,10 +45,28 @@ files:
 # `package.json`, but `apps/desktop/package.json` has no `repository` field and the one it
 # falls back to is the workspace root's — a lookup that works today and says nothing about
 # why. `--publish always` uploads here.
+#
+# **The release's tag is composed here, not read off the tag that triggered the run.** Those
+# are two different strings and electron-builder never compares them: the workflow fires on
+# `desktop-v*`, and the publisher builds its own name out of the version and a prefix it
+# defaults —
+#
+#     // electron-publish/out/gitHubPublisher.js:38
+#     this.tag = githubTagPrefix(info) + version;
+#     // builder-util-runtime/out/publishOptions.js:10
+#     if (options.tagNamePrefix) return options.tagNamePrefix;
+#     if (options.vPrefixedTagName ?? true) return "v";
+#
+# — so with neither key set, `desktop-v0.1.0` in produced a release named `v0.1.0` out
+# (TYTO-97). That is both the wrong name and a name this repository should not take: beside
+# per-package tags like `@tyto/core@0.19.0`, a bare `v0.1.0` reads as a version of Tyto as a
+# whole. `desktop-release.test.ts` now reads this string and `desktop.yml`'s trigger together,
+# so changing one alone fails.
 publish:
   provider: github
   owner: rafaelsilvalor
   repo: tyto
+  tagNamePrefix: desktop-v
 
 # One installer per platform, which is the three the card counts. No `zip` beside the `dmg`:
 # electron-updater wants one on macOS and there is no updater yet (epic E9), so today it
