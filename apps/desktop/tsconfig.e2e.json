@@ -1,0 +1,7 @@
+{
+  "$schema": "https://json.schemastore.org/tsconfig",
+  "//": "The end-to-end suite is the one place both libraries are legitimate: it is Node code that also *contains* browser code, because every `page.evaluate` callback is serialised and run inside the window. Giving it DOM as well as node is honest about that; giving either of the two runtime configs the other's library would not be.",
+  "extends": "../../tsconfig.node.json",
+  "compilerOptions": { "lib": ["ES2022", "DOM", "DOM.Iterable"] },
+  "include": ["e2e/**/*.ts"]
+}

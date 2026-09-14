@@ -3,6 +3,18 @@ packages:
   - 'apps/*'
   - 'tools/*'
 
+# Packages allowed to run install scripts. pnpm refuses the whole install with
+# ERR_PNPM_IGNORED_BUILDS until every name it wants to block is answered here, so an entry
+# is mandatory rather than an optimisation.
+#
 # esbuild (via tsup) ships a platform binary that its install script unpacks.
+#
+# electron is listed because pnpm blocks it **by name**, not because it has a script:
+# `electron@44.3.0` has no `scripts` field in its published package.json and the registry
+# advertises no `hasInstallScript`, both checked. So allowing it runs nothing today — what
+# it buys is an install that does not fail. The ~246 MB Chromium download happens on the
+# first `require('electron')` instead, which is a test or a launch and not `pnpm install`;
+# a clean CI run therefore pays for it inside `test:desktop`, not in the install step.
 allowBuilds:
+  electron: true
   esbuild: true

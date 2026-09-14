@@ -69,6 +69,12 @@ renderer (Chromium, no Node)   preload (typed bridge)   main (Node)
 
 Raster on desktop uses an offscreen `BrowserWindow` in main (`webContents.capturePage`); the CLI uses Playwright. Both implement `Rasterizer`.
 
+**One workspace, two runtimes.** `apps/desktop` is the only package that is both, and the split is declared three times so that no one of them can be the only thing holding it: `eslint.config.js` lists `src/main` and `src/preload` as Node and `src/renderer` as DOM, `tsconfig.json` and `tsconfig.renderer.json` give each half only the libraries it may see, and `electron.vite.config.ts` builds them separately. `shared/` is the fourth category — linted as **pure**, because it is the one folder both halves import and neither may shape.
+
+**What crosses the bridge is declared once, in `apps/desktop/shared/ipc.ts`.** One table of channels, each with a Zod schema for the request and one for the response. Main registers its handlers by walking that table, so a channel with no handler is a type error rather than a call that hangs; the preload builds `window.tyto` from the same table, so the API the renderer programs against is the contract by construction. Both sides validate: main because it may not trust another process, the preload because it is the only place that can refuse before the message is sent, on the caller's own stack. `shared/i18n/` is the same idea for strings — one `Catalogue` type, so a locale missing a key does not compile.
+
+**The end-to-end suite is not part of `pnpm check`.** `pnpm --filter @tyto/desktop test:desktop` launches a real Electron through Playwright and asserts what no unit can reach: the three `webPreferences` flags, by name and by consequence, and that the preload actually put the bridge on the page. It downloads a ~246 MB binary on first use, which is why it sits outside the default run, the same arrangement `packages/raster` makes for its visual suite.
+
 ## Design directives
 
 1. The IR is the single source of truth for the artwork. If it is not in the IR, it does not exist.

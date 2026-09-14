@@ -1,0 +1,87 @@
+import { fileURLToPath } from 'node:url';
+import { dirname, join } from 'node:path';
+
+import { app, ipcMain, safeStorage } from 'electron';
+import { nodeFileSystem } from '@tyto/io';
+
+import { localeFor } from '../../shared/i18n/index.js';
+import { fileCredentialStore } from './credential-store.js';
+import { createCredentials } from './credentials.js';
+import { registerIpcHandlers } from './ipc.js';
+import { activateBuiltIns } from './plugins.js';
+import { bundledRenderer, createMainWindow } from './window.js';
+
+/**
+ * The composition root (ADR 0010).
+ *
+ * Everything this app can do is wired here and nowhere else: which filesystem the template
+ * registry reads through, where ciphertext is written, which plugins are activated, and
+ * which channels the renderer may call. No module below this one names an adapter, which is
+ * what keeps the same pure core running here, in the CLI, and later in a cloud worker.
+ *
+ * It is also the only file that knows the app is Electron at all in a way that matters:
+ * `window.ts` takes flags, `ipc.ts` takes an `IpcMain`, `credentials.ts` takes a
+ * `SafeStorage`. That is what lets `pnpm check` test the wiring without launching a
+ * browser, and it leaves exactly one thing that needs a real launch to prove — the flags.
+ */
+
+const here = dirname(fileURLToPath(import.meta.url));
+
+/**
+ * The dev server electron-vite starts, when it started one.
+ *
+ * Set by `electron-vite dev` and absent in a packaged app, which is the whole of how this
+ * file tells the two apart. A built app reads `index.html` off its own folder.
+ */
+const devServerUrl = process.env['ELECTRON_RENDERER_URL'];
+
+async function start(): Promise<void> {
+  // The registry is read before the window opens, not after: the renderer's first question
+  // is which templates exist, and answering it with "not yet" would put a loading state in
+  // front of every panel for the lifetime of a decision made at startup.
+  const host = await activateBuiltIns({ fileSystem: nodeFileSystem() });
+
+  // The one place `safeStorage` is named. Everything below takes it as an argument, which
+  // is what lets the credential module be tested without a keychain and without Electron.
+  const credentials = createCredentials({
+    encryption: safeStorage,
+    store: fileCredentialStore(join(app.getPath('userData'), 'credentials')),
+  });
+
+  registerIpcHandlers(ipcMain, {
+    credentials,
+    info: () => ({
+      version: app.getVersion(),
+      platform: process.platform,
+      // The system's locale, resolved to one this app has. `pt-BR` is where an unknown one
+      // lands, which is a default rather than a hardcoded choice: a machine set to English
+      // opens in English without anybody editing a file.
+      locale: localeFor(app.getLocale()),
+      // Read off the host rather than off the pack, which is the point of registering it
+      // there: what the window reports is what the extension point actually holds, so a
+      // built-in that failed to activate shows as an empty list instead of showing nothing.
+      templates: host.registry
+        .templatePacks()
+        .flatMap((pack) => pack.templates.map((template) => template.name))
+        .sort(),
+    }),
+  });
+
+  createMainWindow({
+    preload: join(here, '..', 'preload', 'index.cjs'),
+    renderer: devServerUrl === undefined ? { file: bundledRenderer(here) } : { url: devServerUrl },
+    // `TYTO_HEADLESS` is the end-to-end suite's: it drives the window through Playwright
+    // and has no screen to show one on. The only thing a test changes about the shipped app.
+    show: process.env['TYTO_HEADLESS'] !== '1',
+  });
+
+  app.on('window-all-closed', () => {
+    // macOS keeps an app alive with no windows; every other platform does not.
+    // Nothing is disposed on the way out: the host's registrations are in-process and the
+    // process is ending. `disposePlugin` is for a plugin being uninstalled while the app
+    // runs, which is E11's, not for shutdown.
+    if (process.platform !== 'darwin') app.quit();
+  });
+}
+
+void app.whenReady().then(start);
