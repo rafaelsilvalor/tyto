@@ -1,5 +1,68 @@
 # @tyto/editor
 
+## 0.3.0
+
+### Minor Changes
+
+- 595c303: TYTO-93 — completion reads the syntax tree, in both languages
+
+  Both completion sources used to decide where the cursor was by matching the text before it
+  with a regular expression. That made the editor a second reader of a syntax this repo already
+  ships a parser for, written twice — once for the brief, once for the template. Both now walk
+  `syntaxTree(state).resolveInner(pos, -1)` and answer by node.
+
+  What changes for somebody writing a file:
+
+  - `slot="…"` inside a `<text>` or an `<image>` now offers the slots the active manifest
+    declares, with each slot's type beside it. Pointing the editor at another manifest changes
+    the list. `templateLint` publishes that manifest to the editor state, so the squiggle and
+    the completion list are always talking about the same template.
+  - A `<` typed inside an attribute value is a character in a value and no longer offers the
+    tag list, and a `::` on an indented body line is body text and no longer offers the slot
+    list. Both were cases a regular expression had to be taught by hand.
+  - A `>` already written puts the cursor outside the opening tag, so attributes stop being
+    offered in an element's body; a property is offered at the start of a declaration and not
+    where a selector goes.
+
+  `TemplateAnalysis` now carries the `manifest` it was computed against, and
+  `templateAnalysisField` / `setTemplateAnalysis` are exported beside the brief's equivalents.
+  A host that mounts `templateCompletion()` without `templateLint()` keeps everything but the
+  slot list.
+
+  One text match survives, in each language, and both are places the grammar leaves nothing to
+  read: the brief's frontmatter is one opaque token whose YAML a real parser handles elsewhere,
+  and an unterminated attribute value in a template is an error node with no structure under
+  it. The tree still says which frontmatter block and which attribute, which is the part that
+  used to be guessed.
+
+### Patch Changes
+
+- 4fad5b9: Quick fixes reach the three cases they were missing (TYTO-92).
+
+  **An adjustment that carries a value is fixable.** `E_BAD_ADJUSTMENT` is ranged over
+  `name: value` for an enum, and the whole-range guard refused it rather than rewrite the
+  author's value. The editor now cuts at the first colon — exact, not approximate, because
+  the grammar forbids a space in front of one — and replaces only the name: `{tomm: claro}`
+  becomes `{tom: claro}`.
+
+  **A property the alias table knows gets a button, not only a message.** `background` is not
+  a typo of anything, so no edit distance would ever find `fill`.
+  `@tyto/template-lang` now exports `propertyAlias`, `tagAlias` and `attributeAlias`, each
+  filtered to the entries that name exactly one accepted thing — the multi-word ones ("x, y
+  and rotation") stay in the message, which is where a sentence belongs.
+
+  **An attribute on the wrong tag gets one too.** Which attributes are legal is a question
+  only the tag answers, and `E_UNSUPPORTED_ATTRIBUTE` does not carry the tag as a field. The
+  editor climbs from the diagnostic's range to the enclosing `Element` in the tree it already
+  has, rather than the diagnostic growing a field for one consumer. `object-fit` is offered as
+  `fit` on an `<image>` and refused on a `<rect>`, which does not take it.
+
+  Also: the editor's test run no longer prints a jsdom `TypeError` from CodeMirror's measuring
+  pass on every test that draws a marker.
+
+- Updated dependencies [4fad5b9]
+  - @tyto/template-lang@0.5.0
+
 ## 0.2.0
 
 ### Minor Changes
