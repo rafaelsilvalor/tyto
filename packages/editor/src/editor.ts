@@ -96,8 +96,12 @@ export interface EditorHandle {
  * Deliberately not CodeMirror's `basicSetup`: that bundle pulls in autocompletion, lint and
  * search, and the first two are E8.2's to configure against a template manifest. What is
  * here is the part an editor is unusable without — a gutter, undo, a cursor you can see,
- * and the keymap that drives them. E8.3 replaces the keymap layer with a registry; until
- * then, an editor that cannot undo would be a worse demo than one whose keymap moves later.
+ * and the keymap that drives them.
+ *
+ * `historyKeymap` stays even though E8.3 put a command registry in front of it. The two do
+ * not fight: the registry's bindings are given higher precedence and hand the keystroke on
+ * when they have nothing to undo, and an editor built with no registry at all still has a
+ * working Ctrl+Z.
  */
 const baseExtensions = (): Extension[] => [
   lineNumbers(),
