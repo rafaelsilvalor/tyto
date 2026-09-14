@@ -1,5 +1,5 @@
 import { type Extension } from '@codemirror/state';
-import { type EditorView, ViewPlugin } from '@codemirror/view';
+import { type EditorView } from '@codemirror/view';
 import { type Diagnostic as LintDiagnostic, linter } from '@codemirror/lint';
 import { type Diagnostic, type DiagnosticCode, didYouMean } from '@tyto/core';
 
@@ -9,6 +9,7 @@ import {
   briefAnalysisField,
   setBriefAnalysis,
 } from './analysis.js';
+import { isMounted, livenessPlugin, spanOf, toMarker } from './diagnostic-markers.js';
 
 /**
  * `parse` + `resolve` diagnostics as CodeMirror lint markers.
@@ -89,78 +90,21 @@ export function suggestionFor(
 }
 
 /**
- * Where the marker goes.
+ * The mapping, with this language's quick fix attached.
  *
- * A diagnostic with no range is one nothing in the file caused — `E_NO_TEMPLATE` is the
- * case: the brief's mistake is a line it never wrote. It lands on the first line rather
- * than at offset zero, because a zero-width marker on an empty document is a squiggle
- * nobody can see or hover.
+ * Everything about *where* the marker goes and *what* it says is shared with the template
+ * linter (`diagnostic-markers.ts`); the only brief-specific part is which declared names a
+ * miswritten one could have meant.
  */
-const spanOf = (item: Diagnostic, view: EditorView): { from: number; to: number } => {
-  const length = view.state.doc.length;
-  if (item.range === undefined) {
-    const first = view.state.doc.line(1);
-    return { from: first.from, to: first.to };
-  }
-  // Clamped because a worker answers about the text it was given, and the author may have
-  // deleted past the end of it while the answer was in flight.
-  const from = Math.min(item.range.start, length);
-  return { from, to: Math.max(from, Math.min(item.range.end, length)) };
-};
-
 const toLintDiagnostic = (
   item: Diagnostic,
   analysis: BriefAnalysis,
   view: EditorView,
 ): LintDiagnostic => {
   const { from, to } = spanOf(item, view);
-  const written = view.state.doc.sliceString(from, to);
-  const suggestion = suggestionFor(item, analysis, written);
-
-  return {
-    from,
-    to,
-    severity: item.severity,
-    // The code, not "tyto": it is what `docs/diagnostic-codes.md` is indexed by, so a
-    // reader who hovers a marker has the string that finds the rule behind it.
-    source: item.code,
-    message: item.hint === undefined ? item.message : `${item.message} ${item.hint}`,
-    ...(suggestion === undefined
-      ? {}
-      : {
-          actions: [
-            {
-              name: `Replace with '${suggestion}'`,
-              // The positions are the ones CodeMirror has mapped forward, not the ones the
-              // diagnostic was built with — which is why the action takes them as
-              // arguments and this closure does not capture `from`/`to`.
-              apply: (target: EditorView, start: number, end: number) => {
-                target.dispatch({ changes: { from: start, to: end, insert: suggestion } });
-              },
-            },
-          ],
-        }),
-  };
+  const suggestion = suggestionFor(item, analysis, view.state.doc.sliceString(from, to));
+  return toMarker(item, view, suggestion);
 };
-
-/**
- * Views currently mounted, so an answer that arrives after `destroy()` is dropped.
- *
- * `EditorView.destroyed` is private, and the window is real: the lint source reads the
- * document, awaits an analyzer that may be a worker, and only then dispatches. A host that
- * swaps files by destroying the editor and building another — which is what the demo's
- * read-only toggle does — closes that window on every swap.
- */
-const mounted = new WeakSet<EditorView>();
-
-const liveness = ViewPlugin.define((view: EditorView) => {
-  mounted.add(view);
-  return {
-    destroy: () => {
-      mounted.delete(view);
-    },
-  };
-});
 
 export interface BriefLintOptions {
   /** Debounce in milliseconds. Defaults to `BRIEF_LINT_DELAY`. */
@@ -188,7 +132,7 @@ export function briefLint(analyzer: BriefAnalyzer, options: BriefLintOptions = {
     const request = issued;
     const analysis = await analyzer.analyze(view.state.doc.toString());
 
-    if (request > newest && mounted.has(view)) {
+    if (request > newest && isMounted(view)) {
       newest = request;
       view.dispatch({ effects: setBriefAnalysis.of(analysis) });
     }
@@ -198,7 +142,7 @@ export function briefLint(analyzer: BriefAnalyzer, options: BriefLintOptions = {
 
   return [
     briefAnalysisField,
-    liveness,
+    livenessPlugin,
     linter(source, { delay: options.delay ?? BRIEF_LINT_DELAY }),
   ];
 }

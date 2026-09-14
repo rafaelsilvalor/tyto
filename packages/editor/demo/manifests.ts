@@ -26,3 +26,14 @@ export const MANIFESTS: readonly TemplateManifest[] = [
   read(promo, 'promo-curso/manifest.yaml'),
   read(carrossel, 'carrossel-lista/manifest.yaml'),
 ];
+
+/**
+ * The same manifests by name, for the template editor (E8.4).
+ *
+ * A brief is checked against *whichever* template its frontmatter names, so the brief
+ * analyzer takes the whole list. A `template.html` is checked against **its own** manifest
+ * and no other — it is the file in the folder next to it — so opening one is a lookup.
+ */
+export const MANIFEST_BY_NAME: Readonly<Record<string, TemplateManifest>> = Object.fromEntries(
+  MANIFESTS.map((manifest) => [manifest.name, manifest]),
+);

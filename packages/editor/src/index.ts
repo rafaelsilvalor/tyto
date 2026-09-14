@@ -6,13 +6,18 @@
  *
  * E8.1 is the brief language, its colours, folding and the two themes. E8.2 adds the lint
  * markers and the manifest-driven completion, both fed by one `BriefAnalyzer` the host
- * supplies. E8.3 is the command registry, the keymap layer and vim mode. The template
- * language (E8.4) becomes a second `LanguageSupport` beside `brief()`.
+ * supplies. E8.3 is the command registry, the keymap layer and vim mode. E8.4 is the second
+ * language: `template()` beside `brief()`, with its own analyzer, linter and completion.
  */
 
 export { brief, briefLanguage } from './brief-language.js';
 
-export { createEditor, type EditorHandle, type EditorOptions } from './editor.js';
+export {
+  createEditor,
+  type EditorHandle,
+  type EditorOptions,
+  type LanguageName,
+} from './editor.js';
 
 export { briefDarkTheme, briefLightTheme, type ThemeName, themes } from './theme.js';
 
@@ -59,3 +64,16 @@ export {
 } from './keymap.js';
 
 export { type VimExCommand, type VimModeOptions, defaultExCommands, vimMode } from './vim-mode.js';
+
+export { template, templateLanguage } from './template-language.js';
+
+export {
+  type TemplateAnalysis,
+  type TemplateAnalyzer,
+  type TemplateAnalyzerOptions,
+  createTemplateAnalyzer,
+} from './template-analysis.js';
+
+export { type TemplateLintOptions, templateLint, templateSuggestionFor } from './template-lint.js';
+
+export { completeTemplate, templateCompletion } from './template-completion.js';

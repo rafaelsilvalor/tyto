@@ -19,3 +19,11 @@ declare module '*.yaml?raw' {
   const content: string;
   export default content;
 }
+
+/**
+ * A `template.html` too, which is what the second language mode is opened against (E8.4).
+ */
+declare module '*.html?raw' {
+  const content: string;
+  export default content;
+}
