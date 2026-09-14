@@ -1,4 +1,6 @@
 {
+  "$schema": "https://json.schemastore.org/tsconfig",
+  "//": "Main, preload and the end-to-end test: Node plus Electron. The renderer has its own config (ADR 0010) and `pnpm typecheck` runs both. `shared/` is in each of them, which is the check that it stays pure enough for both runtimes.",
   "extends": "../../tsconfig.node.json",
-  "include": ["src/**/*.ts", "*.config.ts"]
+  "include": ["src/main/**/*.ts", "src/preload/**/*.ts", "shared/**/*.ts", "*.config.ts"]
 }

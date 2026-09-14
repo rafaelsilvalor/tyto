@@ -1,0 +1,6 @@
+{
+  "$schema": "https://json.schemastore.org/tsconfig",
+  "//": "The renderer: DOM only. No `types: [node]`, so a `process` or a `require` that slipped in fails typecheck before it fails at runtime.",
+  "extends": "../../tsconfig.dom.json",
+  "include": ["src/renderer/**/*.ts", "shared/**/*.ts"]
+}

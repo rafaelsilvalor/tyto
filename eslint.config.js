@@ -31,11 +31,26 @@ const NODE_PACKAGES = [
   // and reading bytes off a disk is what answering those means.
   'packages/fonts',
   'apps/cli',
-  'apps/desktop',
+  // Main and preload only. The renderer is a browser and is listed under DOM_PACKAGES
+  // below — `apps/desktop` is the one workspace that is two runtimes, and writing it out
+  // twice is what makes ADR 0001's `nodeIntegration: false` a rule rather than a habit.
+  'apps/desktop/src/main',
+  'apps/desktop/src/preload',
   'tools',
 ];
 
-const DOM_PACKAGES = ['packages/editor'];
+const DOM_PACKAGES = ['packages/editor', 'apps/desktop/src/renderer'];
+
+/**
+ * Code both halves of the desktop app import, and therefore neither may make Node- or
+ * DOM-shaped. `shared/ipc.ts` and `shared/i18n/` are the whole of it: a contract and a
+ * string table, which is what two runtimes can agree about without either one winning.
+ *
+ * Checked as `pure` for that reason — the same category `packages/core` is in, and for the
+ * same argument. A `process.platform` that crept in here would typecheck under main's
+ * config and fail in the renderer, which is the one failure mode a shared folder invites.
+ */
+const SHARED_PACKAGES = ['apps/desktop/shared'];
 
 /**
  * ADR 0010 also says no package may import another package's adapter — composition belongs
@@ -106,6 +121,9 @@ export default tseslint.config(
   {
     ignores: [
       '**/dist/**',
+      // electron-vite's build output. `dist/` is tsup's name for the same thing; the
+      // desktop app uses the name electron-vite and electron-builder expect.
+      '**/out/**',
       '**/node_modules/**',
       '**/.turbo/**',
       '**/coverage/**',
@@ -143,7 +161,7 @@ export default tseslint.config(
 
   {
     name: 'boundary/pure',
-    files: sourcesIn(PURE_PACKAGES),
+    files: sourcesIn([...PURE_PACKAGES, ...SHARED_PACKAGES]),
     languageOptions: { globals: {} },
     rules: {
       ...restrictedImports(NO_NODE_IN_PURE),
@@ -166,6 +184,24 @@ export default tseslint.config(
       ...restrictedImports(NO_NODE_IN_DOM),
       ...restrictedGlobals([NODE_GLOBALS, NO_NODE_IN_DOM]),
     },
+  },
+
+  {
+    /**
+     * The desktop app's end-to-end suite, which is the one place both runtimes are
+     * legitimate at once.
+     *
+     * It is Node code — it spawns a process and reads `process.platform` — that also
+     * *contains* browser code, because every `page.evaluate` callback is serialised, sent
+     * across, and run inside the window. Linting it as Node would forbid the `document` it
+     * is there to inspect, and linting it as DOM would forbid the launch. So it is linted
+     * as both, scoped to `e2e/` and to nothing else, and `tsconfig.e2e.json` makes the same
+     * call about libraries for the same reason.
+     */
+    name: 'boundary/desktop-e2e',
+    files: ['apps/desktop/e2e/**/*.ts'],
+    languageOptions: { globals: { ...globals.node, ...globals.browser } },
+    rules: { 'no-restricted-globals': 'off' },
   },
 
   {
