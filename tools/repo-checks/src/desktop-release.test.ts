@@ -31,7 +31,13 @@ interface Workflow {
     {
       'runs-on'?: string;
       strategy?: { 'fail-fast'?: boolean; matrix?: { os?: string[] } };
-      steps?: { name?: string; uses?: string; run?: string; shell?: string }[];
+      steps?: {
+        name?: string;
+        uses?: string;
+        run?: string;
+        shell?: string;
+        env?: Record<string, string>;
+      }[];
     }
   >;
 }
@@ -139,6 +145,48 @@ describe('the desktop release workflow', () => {
 
     expect(publishing, `${WORKFLOW} no longer runs electron-builder`).toHaveLength(1);
     expect(publishing[0]?.run).toContain('--publish always');
+  });
+
+  it('hands electron-builder no signing variable it did not mean to set', () => {
+    // `${{ secrets.CSC_LINK }}` in a step's `env:` sets the variable either way — to the
+    // empty string when no such secret exists — and electron-builder's platforms disagree
+    // about what that means. Windows refuses an empty one (`cscLink === ""`,
+    // windowsSignToolManager.js:76); macOS checks only for null (macPackager.js:27), reads
+    // `""` as a certificate, resolves it as a path, and dies at `⨯ <projectDir> not a file`.
+    // The first real tag found it that way: two legs green, macOS red, identical env
+    // (TYTO-98).
+    //
+    // So these names must not appear in the publishing step's own `env:` at all. Absence is
+    // the thing being asserted, which is why this reads the step rather than the file — a
+    // grep would also match the step that writes them conditionally, which is the fix.
+    const publishing = steps().find((step) => step.run?.includes('electron-builder') === true);
+
+    expect(publishing, `${WORKFLOW} no longer runs electron-builder`).toBeDefined();
+    expect(
+      Object.keys(publishing?.env ?? {}).filter((name) => name.startsWith('CSC_')),
+      `${WORKFLOW} sets a CSC_* variable directly on the publishing step; with the secret unset that is an empty string, and the macOS leg reads an empty CSC_LINK as a certificate`,
+    ).toEqual([]);
+
+    // And the step that replaces it, which has to decide before writing. Pinned on the
+    // mechanism rather than on the step's name: `$GITHUB_ENV` is the only place a workflow
+    // can make a variable genuinely absent.
+    //
+    // `CSC_LINK<<`, the heredoc assignment, and not `CSC_LINK` anywhere in the script. The
+    // looser form was written first and measured: renaming the assignment while the step
+    // kept an `echo "no CSC_LINK secret…"` left this passing on a step that no longer wrote
+    // the variable at all — 0 of 116, the perturbation nobody caught.
+    const conditional = steps().find(
+      (step) => step.run?.includes('GITHUB_ENV') === true && step.run.includes('CSC_LINK<<'),
+    );
+
+    expect(
+      conditional,
+      `${WORKFLOW} has no step writing CSC_LINK to $GITHUB_ENV, so a configured certificate would never reach electron-builder`,
+    ).toBeDefined();
+    expect(
+      conditional?.shell,
+      `${WORKFLOW}'s signing step would be read as PowerShell on the Windows runner`,
+    ).toBe('bash');
   });
 });
 
