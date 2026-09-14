@@ -10,3 +10,12 @@ declare module '*.brief?raw' {
   const content: string;
   export default content;
 }
+
+/**
+ * A `manifest.yaml` is read the same way, and for the same reason: the demo checks a brief
+ * against the built-in templates, and `parseManifest` takes the file's text.
+ */
+declare module '*.yaml?raw' {
+  const content: string;
+  export default content;
+}
