@@ -398,10 +398,19 @@ attribute names for the tag being written, and CSS properties inside `<style>`. 
 lists are the same arrays `compileTemplate` refuses against, so a name the editor offers is
 a name the compiler accepts, by construction rather than by both being kept in step.
 
-**A quick fix is offered only for a name edit distance can reach.** `colour` gets a button
-for `color`; `background` does not, because `fill` comes from the hand-written alias table
-rather than from a distance — and the table is not exported. The message still names `fill`
-either way, so what is missing is a click, not an answer.
+**A quick fix has two sources, because there are two kinds of mistake.** `colour` is a typo
+and edit distance finds `color`. `background` is not a typo of anything — nobody arrives at
+this language without CSS in their fingers — and only the hand-written alias table knows it
+means `fill`. `propertyAlias`, `tagAlias` and `attributeAlias` expose the table filtered to
+the entries that are one accepted name, so the multi-word ones ("x, y and rotation") stay in
+the message, which is where a sentence belongs.
+
+**An attribute's suggestion depends on the tag it sits on, and the editor reads that off the
+tree.** `E_UNSUPPORTED_ATTRIBUTE` names the tag in its message but does not carry it as a
+field, and widening the diagnostic so one consumer could read one would be the wrong repair:
+the editor already has the document parsed, so it climbs from the range to the enclosing
+`Element`. `object-fit` is offered as `fit` on an `<image>` and refused on a `<rect>`, which
+does not take it.
 
 ### `renderedSlots`
 

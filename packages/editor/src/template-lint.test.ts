@@ -4,7 +4,7 @@ import { afterEach, describe, expect, it } from 'vitest';
 
 import { createEditor, type EditorHandle } from './editor.js';
 import { createTemplateAnalyzer } from './template-analysis.js';
-import { templateLint, templateSuggestionFor } from './template-lint.js';
+import { templateLint } from './template-lint.js';
 
 import promoManifest from '../../templates/templates/promo-curso/manifest.yaml?raw';
 import promo from '../../templates/templates/promo-curso/template.html?raw';
@@ -102,18 +102,6 @@ describe('templateLint', () => {
     expect(editor.view.state.sliceDoc(marker.from, marker.to)).toBe('div');
   });
 
-  it('offers a fix for a property that is a typo of a real one', async () => {
-    const broken = promo.replace('.photo {', '.photo {\n    colour: #fff;');
-
-    const editor = open(broken);
-    const marker = await waitForMarker(editor, 'E_UNSUPPORTED_CSS', 2000);
-
-    expect(marker.actions?.[0]?.name).toBe("Replace with 'color'");
-
-    marker.actions?.[0]?.apply(editor.view, marker.from, marker.to);
-    expect(editor.getValue()).toContain('color: #fff;');
-  });
-
   it('reports a syntax error, which is raised before anything else is asked', async () => {
     const editor = open('<frame format="feed"\n');
 
@@ -132,27 +120,64 @@ describe('templateLint', () => {
   });
 });
 
-describe('templateSuggestionFor', () => {
-  const item = (code: DiagnosticCode) => ({ severity: 'error', code, message: '' }) as const;
+describe('the quick fix', () => {
+  /**
+   * Driven through the linter rather than by calling the suggestion directly: the
+   * attribute case reads the syntax tree to find the tag it sits on, and a view is the
+   * only thing that has one. Testing the three sources of a suggestion through the same
+   * door also keeps them comparable.
+   */
+  it('fixes a property that is a typo of a real one', async () => {
+    const editor = open(promo.replace('.photo {', '.photo {\n    colour: #fff;'));
+    const marker = await waitForMarker(editor, 'E_UNSUPPORTED_CSS', 2000);
 
-  it('suggests a property for a near-miss', () => {
-    expect(templateSuggestionFor(item('E_UNSUPPORTED_CSS'), 'colour')).toBe('color');
+    expect(marker.actions?.[0]?.name).toBe("Replace with 'color'");
+    marker.actions?.[0]?.apply(editor.view, marker.from, marker.to);
+    expect(editor.getValue()).toContain('color: #fff;');
   });
 
-  it('suggests a tag for a near-miss', () => {
-    expect(templateSuggestionFor(item('E_UNSUPPORTED_TAG'), 'txt')).toBe('text');
+  /** The one edit distance cannot reach — `fill` comes from the alias table. */
+  it('fixes a property the alias table knows, which no distance would find', async () => {
+    const editor = open(promo.replace('.photo {', '.photo {\n    background: #fff;'));
+    const marker = await waitForMarker(editor, 'E_UNSUPPORTED_CSS', 2000);
+
+    expect(marker.actions?.[0]?.name).toBe("Replace with 'fill'");
+    marker.actions?.[0]?.apply(editor.view, marker.from, marker.to);
+    expect(editor.getValue()).toContain('fill: #fff;');
+  });
+
+  it('fixes a tag the alias table knows', async () => {
+    const editor = open(promo.replace('<rect id="veil"', '<div id="veil"'));
+    const marker = await waitForMarker(editor, 'E_UNSUPPORTED_TAG', 2000);
+
+    expect(marker.actions?.[0]?.name).toBe("Replace with 'group'");
+  });
+
+  it('fixes an attribute by asking the tree which tag it sits on', async () => {
+    const editor = open(promo.replace('<image slot="imagem"', '<image clas="x" slot="imagem"'));
+    const marker = await waitForMarker(editor, 'E_UNSUPPORTED_ATTRIBUTE', 2000);
+
+    expect(editor.view.state.sliceDoc(marker.from, marker.to)).toBe('clas');
+    expect(marker.actions?.[0]?.name).toBe("Replace with 'class'");
+    marker.actions?.[0]?.apply(editor.view, marker.from, marker.to);
+    expect(editor.getValue()).toContain('<image class="x"');
+  });
+
+  it('fixes an attribute the alias table knows', async () => {
+    const editor = open(promo.replace('<image slot="imagem"', '<image style="x" slot="imagem"'));
+    const marker = await waitForMarker(editor, 'E_UNSUPPORTED_ATTRIBUTE', 2000);
+
+    expect(marker.actions?.[0]?.name).toBe("Replace with 'class'");
   });
 
   /**
-   * `background` is the alias table's, not edit distance's. The message still carries
-   * `fill`; what is absent is the button, which is the documented cost of not exporting
-   * `vocabulary.ts`'s alias map.
+   * `object-fit` maps to `fit`, which `<image>` takes and `<rect>` does not. The alias is
+   * filtered by the tag, so the same word is offered on one and refused on the other.
    */
-  it('offers nothing for an alias no edit distance could reach', () => {
-    expect(templateSuggestionFor(item('E_UNSUPPORTED_CSS'), 'background')).toBeUndefined();
-  });
+  it('refuses an alias the tag in question does not accept', async () => {
+    const editor = open(promo.replace('<rect id="veil"', '<rect object-fit="cover" id="veil"'));
+    const marker = await waitForMarker(editor, 'E_UNSUPPORTED_ATTRIBUTE', 2000);
 
-  it('offers nothing for a code with no vocabulary behind it', () => {
-    expect(templateSuggestionFor(item('E_UNSUPPORTED_ATTRIBUTE'), 'styl')).toBeUndefined();
+    expect(marker.actions ?? []).toEqual([]);
   });
 });

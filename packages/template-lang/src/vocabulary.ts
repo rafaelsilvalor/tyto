@@ -190,3 +190,33 @@ export function markupProblem(problem: string, range?: SourceRange): Diagnostic 
 export function badValue(field: string, problem: string, range?: SourceRange): Diagnostic {
   return diagnostic('E_TEMPLATE_VALUE', { field, problem }, range === undefined ? {} : { range });
 }
+
+/**
+ * The alias for a written name, but only when the alias is itself a name the language
+ * accepts.
+ *
+ * The tables above serve two readers with one entry each. A *message* can say anything —
+ * `transform` maps to "x, y and rotation" and `content` to "the slot=… attribute", and both
+ * are the right thing to tell an author. A *quick fix* has to be one word it can put in the
+ * document, so it gets the entries that are one word and nothing else.
+ *
+ * Filtered here rather than in the editor, because what counts as an accepted name is this
+ * file's question and answering it anywhere else would be a second copy of the vocabulary
+ * (TYTO-92).
+ */
+export function propertyAlias(written: string): PropertyName | undefined {
+  const alias = PROPERTY_ALIASES[written.toLowerCase()];
+  return alias !== undefined && isProperty(alias) ? alias : undefined;
+}
+
+export function tagAlias(written: string): string | undefined {
+  const alias = TAG_ALIASES[written.toLowerCase()];
+  if (alias === undefined) return undefined;
+  return isTag(alias) || (STRUCTURAL_TAGS as readonly string[]).includes(alias) ? alias : undefined;
+}
+
+/** An attribute alias is accepted only where the tag in question actually takes it. */
+export function attributeAlias(written: string, tag: TagName): string | undefined {
+  const alias = ATTRIBUTE_ALIASES[written.toLowerCase()];
+  return alias !== undefined && ATTRIBUTES[tag].includes(alias) ? alias : undefined;
+}
