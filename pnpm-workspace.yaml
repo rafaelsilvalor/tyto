@@ -15,6 +15,15 @@ packages:
 # it buys is an install that does not fail. The ~246 MB Chromium download happens on the
 # first `require('electron')` instead, which is a test or a launch and not `pnpm install`;
 # a clean CI run therefore pays for it inside `test:desktop`, not in the install step.
+#
+# electron-winstaller is the one `false`, and it is answered rather than allowed. It
+# arrives through `electron-builder-squirrel-windows`, an optional peer of `app-builder-lib`
+# that `auto-install-peers=true` installs whether or not a Squirrel.Windows target is
+# configured. Its install script (`script/select-7z-arch.js`) copies `vendor/7z-<arch>.exe`
+# into place for that target and does nothing else; `electron-builder.yml` builds `nsis`,
+# so the script would prepare a target this repository never asks for. Adopting
+# Squirrel.Windows flips this to `true` in the same commit.
 allowBuilds:
   electron: true
+  electron-winstaller: false
   esbuild: true

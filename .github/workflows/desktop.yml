@@ -5,6 +5,10 @@ permissions: { contents: write }
 jobs:
   build:
     strategy:
+      # One platform failing must not cancel the other two. `--publish always` uploads to the
+      # same release from three jobs, so fail-fast would leave a release holding whichever
+      # installers happened to finish first and no record of what was cancelled.
+      fail-fast: false
       matrix: { os: [macos-latest, windows-latest, ubuntu-latest] }
     runs-on: ${{ matrix.os }}
     steps:
@@ -12,9 +16,43 @@ jobs:
       - uses: pnpm/action-setup@v6
       - uses: actions/setup-node@v7
         with: { node-version: 22, cache: pnpm }
+
+      # Before the install, because it is the cheap failure. electron-builder takes the
+      # version from `apps/desktop/package.json` and the release name from the tag, and it
+      # never compares them: `desktop-v0.2.0` over a package still reading `0.1.0` publishes
+      # `Tyto Setup 0.1.0.exe` into a release called `desktop-v0.2.0`, green.
+      #
+      # `GITHUB_REF_NAME` is read as an environment variable rather than interpolated as
+      # `${{ github.ref_name }}`; a tag is attacker-controllable text and `${{ }}` is
+      # substituted before the shell parses the line. `shell: bash` because the Windows
+      # runner would otherwise read this as PowerShell.
+      - name: The tag names the version being packaged
+        shell: bash
+        run: |
+          packaged="desktop-v$(node -p "require('./apps/desktop/package.json').version")"
+          if [ "$GITHUB_REF_NAME" != "$packaged" ]; then
+            echo "::error::tag $GITHUB_REF_NAME does not name the packaged version; apps/desktop/package.json says $packaged"
+            exit 1
+          fi
+
       - run: pnpm install --frozen-lockfile
-      - run: pnpm --filter @tyto/desktop build
+
+      # `pnpm build`, not `pnpm --filter @tyto/desktop build`. The filtered form runs the
+      # package's own script and nothing else, so on a fresh checkout — which every tag build
+      # is — the workspace packages have no `dist/` and the bundle dies at
+      # `Rolldown failed to resolve import "@tyto/core" from
+      # "apps/desktop/src/main/plugins.ts"`. Turborepo's `^build` is what orders them, and
+      # the root script is what reaches it.
+      - run: pnpm build
+
+      # Signing is optional and absent by default. With `CSC_LINK` unset electron-builder
+      # finds no identity and ships unsigned installers — macOS then warns on first open and
+      # Windows SmartScreen does the same, which is the cost of not having a certificate yet.
+      # Setting the two repository secrets is the whole of turning it on; notarizing a macOS
+      # build additionally wants `APPLE_ID`, `APPLE_APP_SPECIFIC_PASSWORD` and `APPLE_TEAM_ID`
+      # and is a separate decision (`docs/git-workflow.md`).
       - run: pnpm --filter @tyto/desktop exec electron-builder --publish always
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          # signing: CSC_LINK / CSC_KEY_PASSWORD (mac/win) once a certificate exists
+          CSC_LINK: ${{ secrets.CSC_LINK }}
+          CSC_KEY_PASSWORD: ${{ secrets.CSC_KEY_PASSWORD }}

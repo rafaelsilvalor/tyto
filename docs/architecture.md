@@ -75,6 +75,8 @@ Raster on desktop uses an offscreen `BrowserWindow` in main (`webContents.captur
 
 **The end-to-end suite is not part of `pnpm check`.** `pnpm --filter @tyto/desktop test:desktop` launches a real Electron through Playwright and asserts what no unit can reach: the three `webPreferences` flags, by name and by consequence, and that the preload actually put the bridge on the page. It downloads a ~246 MB binary on first use, which is why it sits outside the default run, the same arrangement `packages/raster` makes for its visual suite.
 
+**There is a second one, and it is a different program.** `test:desktop` launches the app this repository has on disk, which can reach a `node_modules` with 472 packages in it; `pnpm --filter @tyto/desktop test:package` runs `electron-builder --dir` first and launches what came out, which reaches only what the `files` list in `electron-builder.yml` carried. The gap is not theoretical: `builtInTemplatesDirectory()` resolves `@tyto/templates/package.json` through `createRequire`, a bundle cannot answer a resolver, and a package built without that folder **opens no window at all** rather than opening one with no templates. `docs/git-workflow.md` has the release this protects.
+
 ## Design directives
 
 1. The IR is the single source of truth for the artwork. If it is not in the IR, it does not exist.

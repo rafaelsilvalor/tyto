@@ -4,7 +4,15 @@
   "tasks": {
     "build": {
       "dependsOn": ["^build", "generate:parser"],
-      "outputs": ["dist/**"]
+      // `out/**` is `apps/desktop`, the one package that does not build to `dist` —
+      // electron-vite writes three bundles there and the name is not configurable per
+      // environment. Declaring only `dist/**` did not make that build uncacheable, which
+      // would have been harmless; it made it cacheable with nothing in the cache, so a
+      // second `pnpm build` printed `@tyto/desktop:build: cache hit, replaying logs` and
+      // left `apps/desktop/out` absent. `desktop.yml` builds and then packages, so the
+      // hit that restores nothing is an installer built around an empty app — measured by
+      // deleting `out/` and running the task twice (TYTO-15).
+      "outputs": ["dist/**", "out/**"]
     },
     "typecheck": {
       "dependsOn": ["^build", "generate:parser"],
@@ -30,6 +38,14 @@
     },
     "test:desktop": {
       "dependsOn": ["^build", "build"],
+      "outputs": []
+    },
+    // Packages the app with electron-builder and launches what came out, so it needs the
+    // same build `test:desktop` does and must never be cached: the thing it measures is a
+    // packaging step that runs outside Turborepo's view.
+    "test:package": {
+      "dependsOn": ["^build", "build"],
+      "cache": false,
       "outputs": []
     }
   }
