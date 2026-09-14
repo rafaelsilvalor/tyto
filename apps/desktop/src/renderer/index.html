@@ -1,0 +1,47 @@
+<!doctype html>
+<html lang="pt-BR">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <!--
+      Content-Security-Policy in the page and not only in `webPreferences`: a policy the
+      document carries survives being loaded from a dev server as well as from disk, and it
+      is what stops a template's `src` from fetching anything. `connect-src 'none'` is the
+      load-bearing one — the renderer talks to main through the preload bridge, never over
+      the network.
+    -->
+    <meta
+      http-equiv="Content-Security-Policy"
+      content="default-src 'self'; img-src 'self' data:; style-src 'self' 'unsafe-inline'; connect-src 'none'; object-src 'none'; base-uri 'none'"
+    />
+    <!-- Painted from the catalogue on load; the literal is only what shows before scripts run. -->
+    <title>Tyto</title>
+    <link rel="stylesheet" href="./shell.css" />
+  </head>
+  <body>
+    <main class="shell">
+      <header class="shell__head">
+        <h1 class="shell__name" data-i18n="app.name"></h1>
+        <p class="shell__tagline" data-i18n="app.tagline"></p>
+      </header>
+
+      <section class="shell__empty">
+        <h2 data-i18n="shell.empty.title"></h2>
+        <p data-i18n="shell.empty.body"></p>
+      </section>
+
+      <footer class="shell__foot">
+        <label class="shell__language">
+          <span data-i18n="shell.language.label"></span>
+          <select id="locale"></select>
+        </label>
+        <dl class="shell__about">
+          <dd data-i18n="shell.about.version"></dd>
+          <dd data-i18n="shell.about.platform"></dd>
+          <dd data-i18n="shell.about.templates"></dd>
+        </dl>
+      </footer>
+    </main>
+    <script type="module" src="./main.ts"></script>
+  </body>
+</html>

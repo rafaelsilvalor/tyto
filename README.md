@@ -50,8 +50,10 @@ linha e gera tudo de novo em segundos, sem refazer doze arquivos à mão. E o me
 sempre produz as mesmas imagens — não "parecidas", idênticas. É isso que permite mandar
 gerar sem ter que conferir peça por peça.
 
-**O que ainda não funciona.** Não existe janela: hoje só roda por linha de comando, e o
-aplicativo de desktop ainda está por fazer. **Texto ainda não é desenhado** — o projeto
+**O que ainda não funciona.** A janela já abre, e ainda não faz nada: o aplicativo de
+desktop existe, sobe, fala português ou inglês conforme a máquina, e mostra uma tela vazia —
+não dá para abrir nem editar um briefing por ela, então gerar arte continua sendo por linha
+de comando. **Texto ainda não é desenhado** — o projeto
 ainda não embarcou nenhuma fonte, então uma peça com palavras não renderiza. O SVG que sai
 ainda não abre direito em Illustrator ou Figma. E não há integração com Jira ou Drive: isso é
 papel do Jacurutu, o outro produto da suíte.

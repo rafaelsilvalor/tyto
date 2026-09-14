@@ -1,0 +1,101 @@
+/*
+ * The shell's own styling, which is deliberately almost nothing.
+ *
+ * E9.2 brings the editor and with it a real theme — `@tyto/editor` already ships a light
+ * and a dark one, and the window should read as the same program as the buffer inside it.
+ * Styling this window properly now would be a second theme to reconcile then.
+ */
+
+:root {
+  color-scheme: light dark;
+  --ink: #1b1b1f;
+  --ground: #fbfbfd;
+  --muted: #5b5b66;
+  --line: #e2e2e8;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --ink: #ececf1;
+    --ground: #17171b;
+    --muted: #a0a0ad;
+    --line: #2c2c33;
+  }
+}
+
+body {
+  margin: 0;
+  background: var(--ground);
+  color: var(--ink);
+  font:
+    15px/1.5 system-ui,
+    sans-serif;
+}
+
+.shell {
+  display: flex;
+  min-height: 100vh;
+  flex-direction: column;
+  gap: 24px;
+  padding: 32px;
+}
+
+.shell__name {
+  margin: 0;
+  font-size: 22px;
+}
+
+.shell__tagline,
+.shell__about {
+  margin: 4px 0 0;
+  color: var(--muted);
+}
+
+.shell__empty {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  gap: 8px;
+  border: 1px dashed var(--line);
+  border-radius: 10px;
+  text-align: center;
+}
+
+.shell__empty h2 {
+  margin: 0;
+  font-size: 17px;
+}
+
+.shell__empty p {
+  margin: 0;
+  color: var(--muted);
+  max-width: 44ch;
+}
+
+.shell__foot {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 16px;
+  align-items: center;
+  justify-content: space-between;
+  border-top: 1px solid var(--line);
+  padding-top: 16px;
+}
+
+.shell__language {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+
+.shell__about {
+  display: flex;
+  gap: 16px;
+  font-size: 13px;
+}
+
+.shell__about dd {
+  margin: 0;
+}

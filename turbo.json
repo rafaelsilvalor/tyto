@@ -27,6 +27,10 @@
     },
     "generate:parser": {
       "outputs": ["src/*.parser.js", "src/*.parser.terms.js"]
+    },
+    "test:desktop": {
+      "dependsOn": ["^build", "build"],
+      "outputs": []
     }
   }
 }
