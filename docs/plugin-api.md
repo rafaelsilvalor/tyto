@@ -119,6 +119,53 @@ The registry is built from the host's packs and not from a path passed around it
 the difference between an extension point and a decoration: a pack that were registered and
 never read would be one nobody could tell was broken.
 
+### `editor.command` and `editor.keymap`, in full
+
+```ts
+interface EditorCommand {
+  id: string; // namespaced by convention: editor.save, preview.toggleFormat, ai.caption
+  label?: string;
+  run(context: { view: EditorView }): void;
+  undo?(context: { view: EditorView }): void;
+}
+
+interface CommandBinding {
+  key: string; // CodeMirror notation: Mod-s, Mod-Shift-z
+  mac?: string; // overrides key on macOS
+  command: string; // an id, never a function
+}
+```
+
+`createCommandRegistry` in `@tyto/editor` is the registry both points feed, and E7 hands a
+plugin the same `register` the built-ins use.
+
+**A command that edits the document must not declare an `undo`, and the registry throws if
+one does.** There is one undo stack and CodeMirror's history is most of it: text is already
+undone by the history, so a second `undo` for the same change would run both and overshoot
+by one edit. `undo` is for what the document does not hold — the active format, an open
+panel, a preview pane. A template switch rewrites the frontmatter, so it is a document
+change and declares nothing; `registry.undo` still reaches it, because `registry.undo` is
+the only undo a host should bind.
+
+**The order is kept by the text history's own depth, not by a second clock.** Running a
+command that declares `undo` records `undoDepth` beside it; a later undo compares that
+number with the current one to decide whether the next step belongs to the command or to
+the text. Nothing counts keystrokes, so nothing can disagree with CodeMirror about how many
+events a burst of typing was.
+
+**A binding names an id, and an id nobody registered is not an error.** The key falls
+through to whatever else wants it — which is what makes `Mod-s` open the browser's own save
+dialog in a host that has not implemented saving yet, rather than being swallowed by a menu
+item that does not exist.
+
+**Vim mode is the same registry, reached through the engine.** `:w` and `:render` are
+`Vim.defineEx` registrations that look the registry up from the view they are handed, and
+the engine's own `u` and `Ctrl-r` are pointed at `registry.undo`/`registry.redo` so that vim
+does not get a second, shallower undo that skips app-level commands. Both registrations are
+global to `@replit/codemirror-vim` — there is one vim engine however many editors are
+mounted — so neither closes over an editor, and two editors with two registries still each
+get their own commands.
+
 ## PluginHost (what the plugin receives)
 
 ```ts
