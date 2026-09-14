@@ -246,9 +246,11 @@ templates, the compiler knows a template and nothing about the brief that fed it
 - **A defaulted slot has no range**, because the brief never wrote it. Every other resolved
   slot carries the span of the directive or the frontmatter key that set it.
 - **A name diagnostic lands on the name.** `E_UNKNOWN_SLOT` and `E_UNKNOWN_DIRECTIVE` are
-  reported against the directive's `nameRange`; every other diagnostic keeps the span of
-  the whole directive, because every other one is about the value. A frontmatter key is its
-  own name, so that half was already right.
+  reported against the directive's `nameRange`, and `E_BAD_ADJUSTMENT` against the
+  adjustment's own `range` — which is the bare name for a flag (`{destaque}`) and
+  `name: value` for an enum, because that is the whole of what the author wrote. Every
+  remaining diagnostic keeps the span of the whole directive, because every remaining one is
+  about the value. A frontmatter key is its own name, so that half was already right.
 - **A frontmatter scalar on a rich-text slot stays plain text, and says so.** A `titulo`
   set in the frontmatter to `Direito **Constitucional**` renders the asterisks; the same
   words after `::titulo` come out bold. The scalar is accepted — a one-line title in the frontmatter is why the
