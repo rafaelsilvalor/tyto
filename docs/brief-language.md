@@ -124,6 +124,36 @@ is where they showed.
 
 `E_SYNTAX` (from parse); `E_NO_TEMPLATE`, `E_UNKNOWN_TEMPLATE`, `E_UNKNOWN_FORMAT`, `E_UNKNOWN_SLOT`, `E_UNKNOWN_DIRECTIVE`, `E_MISSING_REQUIRED_SLOT`, `E_BAD_SLOT_VALUE`, `E_BAD_ADJUSTMENT`, `E_ASSET_NOT_FOUND`, `W_UNUSED_SLOT` (from resolve); `W_TEXT_OVERFLOW` (from compile). All carry a `range` for the editor. Messages are English; the editor may localize them later via the code.
 
+### What the editor shows, and what it cannot
+
+`@tyto/editor` runs `parse` + `resolve` on a debounce and turns every `Diagnostic` into a
+CodeMirror lint marker — same code, same message, same span, because a `SourceRange` is
+already the pair of UTF-16 offsets CodeMirror consumes and nothing is converted on the way
+in. Two of the codes above never reach the gutter, and both absences are deliberate.
+
+- **`W_TEXT_OVERFLOW` does not, because the editor does not `compile`.** Compiling executes
+  a template, which is a third party's code, and it happens when somebody asks for output —
+  not on every keystroke over a brief that is halfway written.
+- **`E_ASSET_NOT_FOUND` does not, unless the host can see a disk.** The renderer cannot
+  (ADR 0010), so the default `BriefAnalyzer` accepts every path. Underlining every image in
+  a brief that renders perfectly well from the CLI would teach an author to ignore the
+  gutter; a host that has a bridge to a filesystem passes an `AssetResolver` and gets the
+  diagnostic back.
+
+**A quick fix is offered only where the text under the diagnostic's range is exactly a
+name.** The ranges differ by code and by shape — `E_UNKNOWN_SLOT` lands on a directive's
+`nameRange`, `E_BAD_ADJUSTMENT` on the adjustment's own range (a bare name for a flag,
+`name: value` for an enum), `E_BAD_SLOT_VALUE` on the whole directive including its body —
+and replacing the last with a slot name would delete what the author wrote. The suggestion
+itself is `didYouMean` from `core`, the same function and the same budget that produced the
+diagnostic's `hint`, so the button and the message can never name different slots.
+
+Completion is driven by the same pass: the manifest the frontmatter named feeds slot names
+after `::`, adjustment names inside `{}` filtered by their `applies`, enum values after
+`:`, and format ids in the frontmatter list. Changing `template:` swaps every one of those
+lists, because none of them is hard-coded — they are the template author's vocabulary, and
+the manifest is the only place it is written down.
+
 ## AST
 
 ```ts

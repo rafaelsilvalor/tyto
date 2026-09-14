@@ -47,7 +47,7 @@ Path to the cloud: same pure code; `raster` swaps to Playwright in a container, 
 
 ## Patterns and where they live
 
-- **Hexagonal (ports & adapters)** — a port is declared by the package that _consumes_ it, not in one central place: `FileSystem`, `AssetResolver` and `FontSource` in `core` because the pure stages ask them questions, `Rasterizer` in `raster`, `BriefSource`/`OutputSink` in `io`, and `TemplateSource`/`ArtifactSink` in `pipeline`. Adapters live beside their runtime (`raster`, `io`, `fonts`, `sources`); composition only in `apps/*`.
+- **Hexagonal (ports & adapters)** — a port is declared by the package that _consumes_ it, not in one central place: `FileSystem`, `AssetResolver` and `FontSource` in `core` because the pure stages ask them questions, `Rasterizer` in `raster`, `BriefSource`/`OutputSink` in `io`, `TemplateSource`/`ArtifactSink` in `pipeline`, and `BriefAnalyzer` in `editor` — the editor is what wants a brief checked as it is typed, and running the check needs a registry and a disk it may not reach, so the host fills the port (in process, or across a worker). Adapters live beside their runtime (`raster`, `io`, `fonts`, `sources`); composition only in `apps/*`.
 - **Compiler pipeline** — pure stages, tested in isolation with fixtures.
 - **Visitor** — `SceneVisitor<T>` and `walk()` in `core`; each exporter implements one and none of them writes the recursion again. The walk hands every node its accumulated transform, effective opacity, ancestor chain and frame. New output format = new visitor.
 - **Registry** — `TemplateRegistry` and `PluginRegistry`: folder discovery, manifest read without executing code.
