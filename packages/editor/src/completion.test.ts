@@ -4,6 +4,7 @@ import { type TemplateManifest, parseManifest } from '@tyto/core';
 import { describe, expect, it } from 'vitest';
 
 import { type BriefAnalysis, briefAnalysisField, setBriefAnalysis } from './analysis.js';
+import { briefLanguage } from './brief-language.js';
 import { completeBrief } from './completion.js';
 
 const manifestOf = (yaml: string): TemplateManifest => {
@@ -48,13 +49,17 @@ const analysisOf = (manifest?: TemplateManifest): BriefAnalysis => ({
  * function of the document, the offset and the manifest, and none of the three needs a DOM
  * to exist. The editor-shaped half — that the source is reached at all — is what
  * `briefCompletion` wires through the language's data facet.
+ *
+ * `briefLanguage` is in the state because the source reads the syntax tree (TYTO-93), and
+ * without a language in the state there is no tree to read — every case would answer
+ * `null` for the wrong reason.
  */
 const completeAt = (marked: string, analysis: BriefAnalysis): CompletionResult | null => {
   const pos = marked.indexOf('|');
   if (pos === -1) throw new Error('the fixture has no | marking the cursor');
   const doc = marked.replace('|', '');
 
-  const created = EditorState.create({ doc, extensions: [briefAnalysisField] });
+  const created = EditorState.create({ doc, extensions: [briefAnalysisField, briefLanguage] });
   const state = created.update({ effects: setBriefAnalysis.of(analysis) }).state;
 
   return completeBrief(new CompletionContext(state, pos, false));
@@ -158,8 +163,56 @@ describe('completeBrief', () => {
     expect(result).toBeNull();
   });
 
+  it('does not read :: inside an inline body as a directive', () => {
+    const result = completeAt(`${frontmatter()}::titulo Direito ::|`, analysisOf(CARROSSEL));
+
+    expect(result).toBeNull();
+  });
+
+  /**
+   * The other case the tree answers for free. "The first `{…}` after a directive name is an
+   * adjustment list" (`docs/brief-language.md`), and a `{` anywhere else in the body opens a
+   * mark — which takes a colour, not an adjustment.
+   */
+  it('does not read a mark in body text as an adjustment list', () => {
+    const result = completeAt(`${frontmatter()}::titulo Direito {|`, analysisOf(CARROSSEL));
+
+    expect(result).toBeNull();
+  });
+
+  it('replaces what has been typed of an adjustment name', () => {
+    const doc = `${frontmatter()}::item {desta|`;
+    const result = completeAt(doc, analysisOf(CARROSSEL));
+
+    expect(result?.from).toBe(doc.indexOf('|') - 5);
+    expect(labelsOf(result)).toEqual(['destaque', 'tom']);
+  });
+
+  it('replaces what has been typed of an enum adjustment value', () => {
+    const doc = `${frontmatter()}::item {tom: cl|`;
+    const result = completeAt(doc, analysisOf(CARROSSEL));
+
+    expect(result?.from).toBe(doc.indexOf('|') - 2);
+    expect(labelsOf(result)).toEqual(['claro', 'escuro']);
+  });
+
+  it('offers the next adjustment after a written pair', () => {
+    const result = completeAt(`${frontmatter()}::item {tom: claro, |`, analysisOf(CARROSSEL));
+
+    expect(labelsOf(result)).toEqual(['destaque', 'tom']);
+  });
+
+  it('offers nothing on a comment line', () => {
+    const result = completeAt(`${frontmatter()}// ::|`, analysisOf(CARROSSEL));
+
+    expect(result).toBeNull();
+  });
+
   it('stands down before the first analysis has arrived', () => {
-    const state = EditorState.create({ doc: '::', extensions: [briefAnalysisField] });
+    const state = EditorState.create({
+      doc: '::',
+      extensions: [briefAnalysisField, briefLanguage],
+    });
     expect(completeBrief(new CompletionContext(state, 2, false))).toBeNull();
   });
 
@@ -175,6 +228,16 @@ describe('completeBrief', () => {
    */
   it('treats an unterminated frontmatter as body, the way the language does', () => {
     const result = completeAt('---\ntemplate: |\n', analysisOf(CARROSSEL));
+
+    expect(result).toBeNull();
+  });
+
+  /**
+   * The wreckage of an unterminated frontmatter carries a `Name` node — `template` is the
+   * same shape as a directive name — and it is not a directive. The parent says so.
+   */
+  it('does not read the key of a broken frontmatter as a directive name', () => {
+    const result = completeAt('---\ntemplate|: carrossel-lista\n', analysisOf(CARROSSEL));
 
     expect(result).toBeNull();
   });

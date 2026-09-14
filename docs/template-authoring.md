@@ -398,6 +398,25 @@ attribute names for the tag being written, and CSS properties inside `<style>`. 
 lists are the same arrays `compileTemplate` refuses against, so a name the editor offers is
 a name the compiler accepts, by construction rather than by both being kept in step.
 
+**`slot="…"` is the fourth list, and the only one a manifest decides.** It offers every slot
+the manifest declares — the same one the buffer is being linted against, published to the
+editor state by `templateLint` so the squiggle and the list cannot disagree about which
+template the file belongs to. Every slot and not the ones whose type suits the tag: naming an
+image slot on a `<text>` is not an error, the node is simply left out of the scene, and a
+list that hid names the compiler accepts would be inventing a rule. The type is shown beside
+each name instead. Nothing is offered on a tag that does not take `slot` at all. Values other
+than a slot name are still not completed: `fit="` suggests nothing.
+
+**Where the cursor is comes from the syntax tree, not from the text before it.** The source
+resolves `syntaxTree(state).resolveInner(pos, -1)` and answers by node, which is what tells
+the two halves of the file apart — a `StyleSheet` node rather than a backwards scan for the
+nearer `<style`, and a `>` already written puts the cursor outside the opening tag rather
+than inside it. One text match survives and the place it survives says why: the grammar has
+no unterminated string, so `slot="ti` parses as an unclosed quote followed by a bogus
+attribute called `ti`. The tree still says which attribute the quote belongs to, so that is
+what it is asked for, and the characters since the quote are read from the document. A `<`
+typed inside a value is therefore a character in a value and not the start of a tag.
+
 **A quick fix has two sources, because there are two kinds of mistake.** `colour` is a typo
 and edit distance finds `color`. `background` is not a typo of anything — nobody arrives at
 this language without CSS in their fingers — and only the hand-written alias table knows it
