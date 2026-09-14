@@ -16,6 +16,7 @@ import { brief } from './brief-language.js';
 import { type CommandRegistry, commandRegistryFacet } from './commands.js';
 import { type EditorKeymap, defaultKeymapSet, keymapExtension } from './keymap.js';
 import { type ThemeName, themes } from './theme.js';
+import { template } from './template-language.js';
 import { vimMode } from './vim-mode.js';
 
 /**
@@ -36,6 +37,14 @@ import { vimMode } from './vim-mode.js';
  * would save the file it has just opened. The annotation keeps the two directions apart.
  */
 const programmatic = Annotation.define<boolean>();
+
+/** The two `LanguageSupport`s this package ships, by the name `createEditor` takes. */
+export type LanguageName = 'brief' | 'template';
+
+const languages: Readonly<Record<LanguageName, () => Extension>> = {
+  brief,
+  template,
+};
 
 export interface EditorOptions {
   /** Initial document. Empty when omitted. */
@@ -62,6 +71,15 @@ export interface EditorOptions {
   readonly keymap?: EditorKeymap;
   /** Starts in vim mode. Toggle later with `setVimMode`. */
   readonly vim?: boolean;
+  /**
+   * Which of the two languages the buffer holds. Defaults to `brief`.
+   *
+   * A name rather than a `LanguageSupport`, so a host still never imports CodeMirror — the
+   * same reason `theme` is `'light' | 'dark'`. It is fixed for the life of the editor: a
+   * buffer is a `.brief` or a `template.html`, and a host that opens the other one is
+   * opening another file.
+   */
+  readonly language?: LanguageName;
 }
 
 export interface EditorHandle {
@@ -166,7 +184,7 @@ export function createEditor(parent: HTMLElement, options: EditorOptions = {}): 
         // element so the caret and the input method never arrive in the first place.
         ...(readOnly ? [EditorState.readOnly.of(true), EditorView.editable.of(false)] : []),
         themeCompartment.of(themes[options.theme ?? 'light']),
-        brief(),
+        languages[options.language ?? 'brief'](),
         ...baseExtensions(),
       ],
     }),

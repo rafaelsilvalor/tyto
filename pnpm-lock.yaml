@@ -178,6 +178,9 @@ importers:
       '@tyto/core':
         specifier: workspace:*
         version: link:../core
+      '@tyto/template-lang':
+        specifier: workspace:*
+        version: link:../template-lang
     devDependencies:
       jsdom:
         specifier: ^30.0.1
