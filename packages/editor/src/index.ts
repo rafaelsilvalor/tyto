@@ -72,6 +72,8 @@ export {
   type TemplateAnalyzer,
   type TemplateAnalyzerOptions,
   createTemplateAnalyzer,
+  setTemplateAnalysis,
+  templateAnalysisField,
 } from './template-analysis.js';
 
 export { type TemplateLintOptions, templateLint, templateSuggestionFor } from './template-lint.js';
