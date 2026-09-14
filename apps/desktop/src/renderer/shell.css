@@ -23,6 +23,18 @@
   }
 }
 
+/*
+ * The padding has to come out of the height, not be added to it. `min-height: 100vh` plus
+ * 32px of padding is a page 64px taller than the window, which put the language picker and
+ * the whole footer below the fold on a freshly opened app — found by looking at it, because
+ * the tests query the DOM and the DOM was correct.
+ */
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
 body {
   margin: 0;
   background: var(--ground);
