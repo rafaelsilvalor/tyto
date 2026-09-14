@@ -1,5 +1,12 @@
 # @tyto/pipeline
 
+## 0.5.12
+
+### Patch Changes
+
+- Updated dependencies [4fad5b9]
+  - @tyto/template-lang@0.5.0
+
 ## 0.5.11
 
 ### Patch Changes
