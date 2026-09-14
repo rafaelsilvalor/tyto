@@ -1,0 +1,74 @@
+# What `desktop.yml` hands to electron-builder when a `desktop-v*` tag is pushed.
+#
+# The version is read from `package.json` and nowhere else, which is why the workflow refuses
+# a tag that does not name it: electron-builder would happily build `0.1.0` under a tag called
+# `desktop-v0.2.0` and publish it to a GitHub Release of that name.
+
+appId: com.tyto.desktop
+productName: Tyto
+
+directories:
+  # `release/` is already in `.gitignore`. `out/` is taken — it is where electron-vite writes
+  # the three bundles this packages.
+  output: release
+
+# **The app is three bundles and one data folder, and that is the whole of it.**
+#
+# electron-vite already bundles `@tyto/core` and the rest into `out/main/index.js` — a
+# deliberate choice, explained in `electron.vite.config.ts`, because a pnpm workspace's
+# `node_modules` is a tree of symlinks and an installer built from one works on the machine
+# that built it. So the default `files`, which collects every production dependency, ships a
+# second copy of code the bundle already contains: measured at **2 161 entries and 20 196 010
+# bytes** of `app.asar`, including 54 Turborepo build logs, 224 `src/` files and 68 test
+# fixtures. Excluding `node_modules` and re-including one folder gives **27 entries and
+# 2 015 370 bytes**.
+#
+# The folder that comes back is not code. `activateBuiltIns` reads the built-in template pack
+# off disk at startup, and `builtInTemplatesDirectory()` finds it with
+# `createRequire(...).resolve('@tyto/templates/package.json')` — a resolver call, so the pack
+# has to be a real package inside the asar rather than bytes inside the bundle. Both lines
+# earn their place: the `package.json` is what `resolve` answers with, and `templates/` is
+# what the registry then reads.
+#
+# Dropping them is silent. Rebuilt without the re-include, the packaged app **opens no window
+# at all** — `builtInTemplatesDirectory()` throws before `createMainWindow` is reached, the
+# rejected promise has nobody to report it, and Playwright times out waiting for a first
+# window. `e2e/packaged.package.test.ts` is that measurement, kept.
+files:
+  - out/**
+  - package.json
+  - '!node_modules/**'
+  - node_modules/@tyto/templates/package.json
+  - node_modules/@tyto/templates/templates/**
+
+# Named rather than inferred. electron-builder can read the repository out of a
+# `package.json`, but `apps/desktop/package.json` has no `repository` field and the one it
+# falls back to is the workspace root's — a lookup that works today and says nothing about
+# why. `--publish always` uploads here.
+publish:
+  provider: github
+  owner: rafaelsilvalor
+  repo: tyto
+
+# One installer per platform, which is the three the card counts. No `zip` beside the `dmg`:
+# electron-updater wants one on macOS and there is no updater yet (epic E9), so today it
+# would be an artifact nothing downloads.
+#
+# No `icon` anywhere, and that is checked rather than hoped. With none set, macOS and Windows
+# use the icon embedded in the Electron skeleton, and `ElectronFramework.getDefaultIcon` hands
+# Linux its bundled `electron-linux` set — so the AppImage build does not fail for the lack of
+# one, it ships Electron's. Read out of `app-builder-lib`; not run on Linux from here. A real
+# icon is design work and belongs to whoever draws it.
+mac:
+  target: dmg
+win:
+  target: nsis
+linux:
+  target: AppImage
+  # Linux is the one platform that does not name the binary after `productName`. Its
+  # packager falls back to `appInfo.sanitizedName.toLowerCase()` — the *package* name, which
+  # here is `@tyto/desktop` — so without this the AppImage would ship an executable called
+  # `@tyto-desktop`. Declared under `linux:` and not at the top level on purpose: the
+  # top-level `executableName` also renames `Tyto.exe` and `Tyto.app`.
+  executableName: tyto
+  category: Graphics

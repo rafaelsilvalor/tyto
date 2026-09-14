@@ -42,7 +42,7 @@ arbiter**, and a Windows checkout can see green on a range CI will reject.
 
 ## Root scripts
 
-`pnpm dev` (desktop) · `pnpm cli -- …` · `pnpm check` = typecheck + lint + test · `pnpm test:visual` (raster snapshots; needs `pnpm exec playwright install chromium`) · `pnpm build` · `pnpm changeset` · `pnpm format` / `format:check`.
+`pnpm dev` (desktop) · `pnpm cli -- …` · `pnpm check` = typecheck + lint + test · `pnpm test:visual` (raster snapshots; needs `pnpm exec playwright install chromium`) · `pnpm --filter @tyto/desktop test:desktop` (real Electron) · `pnpm --filter @tyto/desktop test:package` (packages the app and launches the result) · `pnpm build` · `pnpm changeset` · `pnpm format` / `format:check`.
 
 ## Packages
 
