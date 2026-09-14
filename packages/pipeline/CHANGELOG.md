@@ -1,5 +1,12 @@
 # @tyto/pipeline
 
+## 0.5.11
+
+### Patch Changes
+
+- Updated dependencies [aa6c851]
+  - @tyto/brief-lang@0.5.9
+
 ## 0.5.10
 
 ### Patch Changes
