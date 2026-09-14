@@ -1,24 +1,33 @@
 import { forEachDiagnostic, lintGutter } from '@codemirror/lint';
 
 import lista from '../../templates/templates/carrossel-lista/examples/lista.brief?raw';
+import carrosselTemplate from '../../templates/templates/carrossel-lista/template.html?raw';
 import promo from '../../templates/templates/promo-curso/examples/promo.brief?raw';
+import promoTemplate from '../../templates/templates/promo-curso/template.html?raw';
+
+import { MANIFEST_BY_NAME } from './manifests.js';
 
 import {
   briefCompletion,
   briefLint,
   createCommandRegistry,
   createEditor,
+  createTemplateAnalyzer,
   createWorkerAnalyzer,
   EDITOR_RENDER,
   EDITOR_SAVE,
   type EditorHandle,
+  type LanguageName,
+  templateCompletion,
+  templateLint,
   type ThemeName,
 } from '../src/index.js';
 
 /**
- * The demo E8.1, E8.2 and E8.3 are accepted against: the two example briefs the built-in
- * templates ship, opened in a real editor, with the language, the folding, both themes, the
- * lint markers, the manifest-driven completion, the command registry and vim mode live.
+ * The demo E8.1 through E8.4 are accepted against: the two example briefs *and* the two
+ * `template.html` files the built-in templates ship, opened in a real editor, with both
+ * languages, the folding, both themes, the lint markers, the completion, the command
+ * registry and vim mode live.
  *
  * It is also the smallest possible host, and that is deliberate — it imports `createEditor`
  * and nothing else from CodeMirror, so anything it cannot do here, `apps/desktop` will not
@@ -32,12 +41,34 @@ import {
  * - press Ctrl/Cmd+S, then turn vim on and type `:w` — the same counter moves, because both
  *   name the same command id;
  * - toggle the format and press Ctrl/Cmd+Z, or `u` in vim, to see an app-level command come
- *   back out of the same stack the text does.
+ *   back out of the same stack the text does;
+ * - open a `template.html`, type `<` for the tag list, and write `background: red` into a
+ *   class rule to see `E_UNSUPPORTED_CSS` name `fill` as what to write instead.
  */
 
-const EXAMPLES: ReadonlyArray<{ readonly name: string; readonly source: string }> = [
-  { name: 'promo-curso', source: promo },
-  { name: 'carrossel-lista', source: lista },
+interface Example {
+  readonly name: string;
+  readonly source: string;
+  readonly language: LanguageName;
+  /** Which manifest a `template.html` is checked against. Briefs name their own. */
+  readonly manifest?: string;
+}
+
+const EXAMPLES: readonly Example[] = [
+  { name: 'promo-curso.brief', source: promo, language: 'brief' },
+  { name: 'carrossel-lista.brief', source: lista, language: 'brief' },
+  {
+    name: 'promo-curso/template.html',
+    source: promoTemplate,
+    language: 'template',
+    manifest: 'promo-curso',
+  },
+  {
+    name: 'carrossel-lista/template.html',
+    source: carrosselTemplate,
+    language: 'template',
+    manifest: 'carrossel-lista',
+  },
 ];
 
 const required = <T extends Element>(selector: string): T => {
@@ -138,23 +169,50 @@ commands.register({
 });
 
 /**
+ * A template is linted against its own manifest and nothing else — it is the file in the
+ * folder next to it. Missing it is a broken demo, not a brief an author can fix, so it
+ * throws rather than linting against a guess.
+ */
+const manifestFor = (example: Example) => {
+  const found = example.manifest === undefined ? undefined : MANIFEST_BY_NAME[example.manifest];
+  if (found === undefined) throw new Error(`demo: no manifest named ${example.manifest ?? '—'}`);
+  return found;
+};
+
+/**
  * Read-only is decided when the state is built, so the toggle takes the editor down and
  * puts a new one up — which is the destroy/create pair a host does when it opens another
  * file, exercised by the only thing that ever exercises it before `apps/desktop` exists.
  */
-const mount = (source: string): void => {
+const mount = (example: Example, source = example.source): void => {
   handle?.destroy();
+
+  /**
+   * A template is linted against its own manifest and a brief against whichever one its
+   * frontmatter names — which is why the brief analyzer holds the whole list and this one
+   * is built per file.
+   */
+  const language =
+    example.language === 'template'
+      ? [
+          templateLint(createTemplateAnalyzer({ manifest: manifestFor(example) })),
+          templateCompletion(),
+        ]
+      : [briefLint(analyzer), briefCompletion()];
+
   handle = createEditor(parent, {
     doc: source,
     theme: themePicker.value as ThemeName,
     readOnly: readOnlyToggle.checked,
+    language: example.language,
     // `lintGutter` is the demo's own choice and not the package's: the underline is what
     // E8.2 owes, and whether a host also wants a column of markers beside the line numbers
     // is a decision `apps/desktop` should get to make for itself.
-    extensions: [briefLint(analyzer), briefCompletion(), lintGutter()],
+    extensions: [...language, lintGutter()],
     commands,
     vim: vimToggle.checked,
   });
+  openLanguage = example.language;
   handle.onChange(() => {
     edits += 1;
     report();
@@ -169,13 +227,25 @@ const mount = (source: string): void => {
  */
 setInterval(report, 250);
 
-const currentExample = (): string => EXAMPLES[Number(examplePicker.value)]?.source ?? '';
+const FALLBACK: Example = { name: 'empty', source: '', language: 'brief' };
+
+const currentExample = (): Example => EXAMPLES[Number(examplePicker.value)] ?? FALLBACK;
+
+let openLanguage: LanguageName = 'brief';
 
 examplePicker.addEventListener('change', () => {
-  // `setValue` rather than a remount: the editor stays, the document is replaced, and the
-  // edit counter does not move — which is the point of `setValue` not firing `onChange`.
-  handle?.setValue(currentExample());
-  report();
+  const example = currentExample();
+  if (example.language === openLanguage) {
+    // `setValue` rather than a remount while the language is the same: the editor stays,
+    // the document is replaced, and the edit counter does not move — which is the point of
+    // `setValue` not firing `onChange`.
+    handle?.setValue(example.source);
+    report();
+    return;
+  }
+  // The language is fixed when the state is built, so the other kind of file is a new
+  // editor — which is exactly what `apps/desktop` will do when it opens one.
+  mount(example);
 });
 
 themePicker.addEventListener('change', () => {
@@ -183,7 +253,7 @@ themePicker.addEventListener('change', () => {
 });
 
 readOnlyToggle.addEventListener('change', () => {
-  mount(handle?.getValue() ?? currentExample());
+  mount(currentExample(), handle?.getValue());
 });
 
 /**

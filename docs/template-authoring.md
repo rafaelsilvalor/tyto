@@ -374,6 +374,35 @@ Compose text the brief did not write. A slide that numbers itself `2/3` is arith
 goes for a grid whose column count depends on how many items there are, and for anything else
 the next section calls computation.
 
+### Writing one in the editor
+
+`@tyto/editor` opens a `template.html` as its second language (`language: 'template'`), on
+the same Lezer grammar `compileTemplate` parses with and the same `templateHighlighting`
+table that lives beside it. There is one tree and one colour table, so the editor and the
+compiler cannot disagree about what a tag is.
+
+**The lint markers are `compileTemplate`'s own diagnostics.** The editor runs the compiler
+and throws the compiled template away, keeping only what it said. Running it is safe in a
+way a brief's `compile` is not: compiling a _template_ reads markup, where compiling a
+_brief_ executes a template — which is why the brief side of the editor stops at `resolve`
+and this side does not.
+
+**A template is checked against its own manifest and no other.** A brief names its template
+in the frontmatter; a `template.html` is the file in the folder beside a `manifest.yaml`,
+and the host that opened the file is the only thing that knows which. A host that cannot say
+should not lint the buffer rather than lint it against a guess — every `slot="…"` in the
+file depends on the answer.
+
+**Completion comes out of `vocabulary.ts` and nowhere else**: tag names after `<`,
+attribute names for the tag being written, and CSS properties inside `<style>`. Those three
+lists are the same arrays `compileTemplate` refuses against, so a name the editor offers is
+a name the compiler accepts, by construction rather than by both being kept in step.
+
+**A quick fix is offered only for a name edit distance can reach.** `colour` gets a button
+for `color`; `background` does not, because `fill` comes from the hand-written alias table
+rather than from a distance — and the table is not exported. The message still names `fill`
+either way, so what is missing is a click, not an answer.
+
 ### `renderedSlots`
 
 `compileTemplate` returns the set of slots the template **reads**, alongside the manifest and

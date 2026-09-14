@@ -35,7 +35,8 @@
     "@lezer/highlight": "^1.2.3",
     "@replit/codemirror-vim": "^6.4.0",
     "@tyto/brief-lang": "workspace:*",
-    "@tyto/core": "workspace:*"
+    "@tyto/core": "workspace:*",
+    "@tyto/template-lang": "workspace:*"
   },
   "devDependencies": {
     "jsdom": "^30.0.1",
