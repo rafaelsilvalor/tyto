@@ -1,5 +1,87 @@
 # @tyto/editor
 
+## 0.2.0
+
+### Minor Changes
+
+- 4032fe0: Command registry, keymap layer and vim mode (TYTO-38).
+
+  `createCommandRegistry()` is the Command pattern `docs/architecture.md` puts in the editor:
+  every action has an id, keymaps bind ids rather than functions, and E7 hands a plugin the
+  same `register` the built-ins use. A binding to an id nobody registered falls through
+  instead of failing, so shipping a `Mod-s` binding before anybody implements saving costs
+  nothing.
+
+  **There is one undo stack, and CodeMirror's history is most of it.** A command that changes
+  something outside the document declares an `undo` and joins the stack; the text history's
+  own `undoDepth` is the clock that keeps the two in order, so nothing here counts keystrokes
+  and nothing can disagree with CodeMirror about how many events a burst of typing was. A
+  command that edits the document must **not** declare an `undo` — the history already owns
+  text, and the registry throws rather than letting an undo overshoot by one edit.
+
+  `vimMode()` brings `@replit/codemirror-vim` (ADR 0006) in through the same registry: `:w`
+  and `:render` are ex-commands that dispatch ids, and the engine's `u` and `Ctrl-r` are
+  pointed at the registry so vim does not get a second, shallower undo that skips app-level
+  commands. `EditorHandle` gains `runCommand`, `setVimMode` and `isVimMode`; the toggle is a
+  compartment reconfigure, so the document, the cursor and the undo stack all survive it.
+
+  `EditorOptions` gains `commands`, `keymap` and `vim`. `defaultKeymapSet` and `vimKeymapSet`
+  are the two built-in sets.
+
+- c341c0f: Inline diagnostics and manifest-driven autocomplete (TYTO-37).
+
+  `briefLint(analyzer)` turns every `Diagnostic` `parse` and `resolve` produce into a
+  CodeMirror lint marker — same code, same message, same span, because a `SourceRange` is
+  already the pair of UTF-16 offsets CodeMirror consumes and nothing is converted on the way
+  in. A diagnostic whose range covers exactly a name carries a quick fix built from
+  `didYouMean` in `core`, the same function and budget that produced the message's own hint,
+  so the button and the message can never name different slots.
+
+  `briefCompletion()` reads the manifest the frontmatter named and offers slot names after
+  `::`, adjustment names inside `{}` filtered by their `applies`, enum values after `:`, and
+  format ids in the frontmatter list. Nothing is hard-coded: change `template:` and every
+  list in the file changes with it.
+
+  Both are fed by one `BriefAnalyzer`, the port the host fills. `createBriefAnalyzer` runs
+  the two stages in process; `createWorkerAnalyzer` and `serveBriefAnalysis` are the two
+  halves of a worker protocol for a host that would rather not parse a twelve-slide brief on
+  the thread that paints the caret. The package constructs no worker — that is the bundler's
+  business and therefore the host's.
+
+  Two diagnostics deliberately never reach the gutter: `W_TEXT_OVERFLOW`, because the editor
+  does not `compile` and compiling executes a third party's template, and
+  `E_ASSET_NOT_FOUND`, unless the host passes an `AssetResolver` — a renderer cannot see a
+  disk, and underlining every image path in a brief that renders fine from the CLI would
+  teach an author to ignore the gutter.
+
+- 02e22ec: The template language in the editor (TYTO-39).
+
+  `template()` is the second `LanguageSupport` this package ships, and `createEditor` takes
+  `language: 'brief' | 'template'` to choose between them — a name rather than a
+  `LanguageSupport`, so a host still never imports CodeMirror. It is fixed for the life of an
+  editor: a buffer is a `.brief` or a `template.html`, and opening the other one is opening
+  another file.
+
+  The grammar is the one `compileTemplate` parses with and the colours are
+  `templateHighlighting`, which lives beside it. Folding collapses an element to its opening
+  tag, a rule to its selector and the whole stylesheet to `<style>`. Both themes grew the
+  palette the second language needs — and four tags turned out to be shared with the brief
+  outright, which is the tag vocabulary doing its job.
+
+  `templateLint(analyzer)` puts `compileTemplate`'s diagnostics in the gutter, with a quick
+  fix for a name edit distance can reach. `templateCompletion()` offers tag names after `<`,
+  the attributes the tag being written accepts, and CSS properties inside `<style>` — out of
+  the same arrays the compiler refuses against, so a name the editor offers is a name the
+  compiler accepts by construction.
+
+  `createTemplateAnalyzer({ manifest })` is the port, and it takes **the template's own**
+  manifest rather than a registry: a brief names its template in the frontmatter, a
+  `template.html` is the file beside a `manifest.yaml`, and only the host knows which.
+
+  The demo now opens all four built-in files — two briefs and two templates — and the
+  diagnostic-to-marker mapping the brief linter had is shared with this one rather than
+  written twice.
+
 ## 0.1.0
 
 ### Minor Changes
