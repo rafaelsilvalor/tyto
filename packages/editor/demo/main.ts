@@ -43,7 +43,10 @@ import {
  * - toggle the format and press Ctrl/Cmd+Z, or `u` in vim, to see an app-level command come
  *   back out of the same stack the text does;
  * - open a `template.html`, type `<` for the tag list, and write `background: red` into a
- *   class rule to see `E_UNSUPPORTED_CSS` name `fill` as what to write instead.
+ *   class rule to see `E_UNSUPPORTED_CSS` name `fill` as what to write instead;
+ * - in the same file, type `slot="` inside a `<text>` for the slots that template declares,
+ *   and note that the same `<` inside those quotes offers nothing — completion is reading
+ *   the syntax tree, so a character in a string is a character in a string.
  */
 
 interface Example {

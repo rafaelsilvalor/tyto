@@ -158,6 +158,22 @@ after `::`, adjustment names inside `{}` filtered by their `applies`, enum value
 lists, because none of them is hard-coded — they are the template author's vocabulary, and
 the manifest is the only place it is written down.
 
+**Where the cursor is comes from the syntax tree, not from the text before it.** The source
+resolves `syntaxTree(state).resolveInner(pos, -1)` and answers by node: a `Name` under a
+`Directive` is a directive name, an `AdjustmentValue` is a value, and everything the grammar
+calls something else gets no list. It used to match the line before the cursor with regular
+expressions, which was a second reader of a syntax this repo already ships a parser for, and
+the two cases that reader had to be taught by hand now cost nothing: `::` on an indented body
+line is `Text` under a `BodyLine`, and a `{` in prose is inside a `Mark`. Neither is a node
+completion has a case for.
+
+**The frontmatter is the one place the line is still read, and the grammar is why.** The
+block is taken whole and its YAML left alone, so there is no tree inside it — matching the
+line there is not a second reader of anything. What the tree does answer, and what a
+hand-rolled fence scanner used to answer wrongly, is where the block ends: no closing fence
+means no `Frontmatter` node, so a brief being typed from scratch gets body completion until
+the fence is closed.
+
 ## AST
 
 ```ts

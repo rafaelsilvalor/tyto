@@ -22,7 +22,11 @@ import {
   toMarker,
 } from './diagnostic-markers.js';
 import { BRIEF_LINT_DELAY } from './lint.js';
-import { type TemplateAnalyzer } from './template-analysis.js';
+import {
+  type TemplateAnalyzer,
+  setTemplateAnalysis,
+  templateAnalysisField,
+} from './template-analysis.js';
 
 /**
  * `compileTemplate` diagnostics as CodeMirror lint markers.
@@ -102,6 +106,16 @@ export interface TemplateLintOptions {
   readonly delay?: number;
 }
 
+/**
+ * The lint extension, and the only writer of the analysis field.
+ *
+ * `slot="…"` completion reads the manifest this publishes rather than being handed one of
+ * its own, which is the same arrangement the brief side has: the squiggle and the completion
+ * list cannot disagree about which template the buffer belongs to, because there is one
+ * answer and the host gave it once. No sequence counter here, unlike `briefLint` — the
+ * manifest is fixed for the life of the analyzer, so a late answer carries the same one an
+ * early answer did and cannot put anything stale in front of completion.
+ */
 export function templateLint(
   analyzer: TemplateAnalyzer,
   options: TemplateLintOptions = {},
@@ -109,11 +123,16 @@ export function templateLint(
   const source = async (view: EditorView): Promise<readonly LintDiagnostic[]> => {
     const analysis = await analyzer.analyze(view.state.doc.toString());
     if (!isMounted(view)) return [];
+    view.dispatch({ effects: setTemplateAnalysis.of(analysis) });
     return analysis.diagnostics.map((item) => {
       const span = spanOf(item, view);
       return toMarker(item, view, templateSuggestionFor(item, view, span));
     });
   };
 
-  return [livenessPlugin, linter(source, { delay: options.delay ?? BRIEF_LINT_DELAY })];
+  return [
+    templateAnalysisField,
+    livenessPlugin,
+    linter(source, { delay: options.delay ?? BRIEF_LINT_DELAY }),
+  ];
 }
