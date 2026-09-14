@@ -1,16 +1,41 @@
+import { forEachDiagnostic, lintGutter } from '@codemirror/lint';
+
 import lista from '../../templates/templates/carrossel-lista/examples/lista.brief?raw';
 import promo from '../../templates/templates/promo-curso/examples/promo.brief?raw';
 
-import { createEditor, type EditorHandle, type ThemeName } from '../src/index.js';
+import {
+  briefCompletion,
+  briefLint,
+  createEditor,
+  createWorkerAnalyzer,
+  type EditorHandle,
+  type ThemeName,
+} from '../src/index.js';
 
 /**
- * The demo E8.1 is accepted against: the two example briefs the built-in templates ship,
- * opened in a real editor, with the language, the folding and both themes live.
+ * The demo E8.1 and E8.2 are accepted against: the two example briefs the built-in
+ * templates ship, opened in a real editor, with the language, the folding, both themes,
+ * the lint markers and the manifest-driven completion live.
  *
  * It is also the smallest possible host, and that is deliberate — it imports `createEditor`
  * and nothing else from CodeMirror, so anything it cannot do here, `apps/desktop` will not
  * be able to do either. `pnpm --filter @tyto/editor demo`.
+ *
+ * Try it by hand: type `::` on a blank line for the slot list, break a slot name to see the
+ * underline and its "did you mean" fix, and change `template:` in the frontmatter to watch
+ * every list in the file change with it.
  */
+
+/**
+ * One worker for the life of the page, shared by every editor the toggles build.
+ *
+ * `new Worker(new URL(…), { type: 'module' })` is the incantation a bundler recognises, and
+ * it is the host's to write — which is exactly why `@tyto/editor` ships the two halves of
+ * the protocol and constructs neither end.
+ */
+const analyzer = createWorkerAnalyzer(
+  new Worker(new URL('./analysis.worker.ts', import.meta.url), { type: 'module' }),
+);
 
 const EXAMPLES: ReadonlyArray<{ readonly name: string; readonly source: string }> = [
   { name: 'promo-curso', source: promo },
@@ -41,7 +66,15 @@ let handle: EditorHandle | undefined;
 
 const report = (): void => {
   const lines = handle?.getValue().split('\n').length ?? 0;
-  status.textContent = `${lines} lines · ${edits} edits`;
+  let errors = 0;
+  let warnings = 0;
+  if (handle) {
+    forEachDiagnostic(handle.view.state, (item) => {
+      if (item.severity === 'error') errors += 1;
+      else if (item.severity === 'warning') warnings += 1;
+    });
+  }
+  status.textContent = `${lines} lines · ${edits} edits · ${errors} errors · ${warnings} warnings`;
 };
 
 /**
@@ -55,6 +88,10 @@ const mount = (source: string): void => {
     doc: source,
     theme: themePicker.value as ThemeName,
     readOnly: readOnlyToggle.checked,
+    // `lintGutter` is the demo's own choice and not the package's: the underline is what
+    // E8.2 owes, and whether a host also wants a column of markers beside the line numbers
+    // is a decision `apps/desktop` should get to make for itself.
+    extensions: [briefLint(analyzer), briefCompletion(), lintGutter()],
   });
   handle.onChange(() => {
     edits += 1;
@@ -62,6 +99,13 @@ const mount = (source: string): void => {
   });
   report();
 };
+
+/**
+ * The counts land a debounce after the document does, so the status line is repainted on a
+ * timer rather than only on a keystroke. Cheap, and it keeps the demo honest about when the
+ * markers actually arrive.
+ */
+setInterval(report, 250);
 
 const currentExample = (): string => EXAMPLES[Number(examplePicker.value)]?.source ?? '';
 
