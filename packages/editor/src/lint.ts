@@ -9,7 +9,13 @@ import {
   briefAnalysisField,
   setBriefAnalysis,
 } from './analysis.js';
-import { isMounted, livenessPlugin, spanOf, toMarker } from './diagnostic-markers.js';
+import {
+  isMounted,
+  livenessPlugin,
+  type MarkerFix,
+  spanOf,
+  toMarker,
+} from './diagnostic-markers.js';
 
 /**
  * `parse` + `resolve` diagnostics as CodeMirror lint markers.
@@ -40,9 +46,10 @@ export const BRIEF_LINT_DELAY = 150;
  * is a bare name for a flag (`{destaque}`) and `name: value` for an enum; `E_BAD_SLOT_VALUE`
  * covers the whole directive, body and all. Replacing that last one with a slot name would
  * delete what the author wrote. Rather than keep a list of which codes are name-ranged and
- * watch it drift from `resolve`, the fix asks the range itself — and the cost is that a
- * misspelled `{tom: claro}` goes unfixed while `{destaqe}` does not, which is the safe
- * direction to be wrong in.
+ * watch it drift from `resolve`, the fix asks the range itself. `nameIn` below takes the
+ * name out of an adjustment that carries a value, so `{tom: claro}` is fixable too; what
+ * stays unfixable is a range that is not a name at all, which is the safe direction to be
+ * wrong in.
  */
 const NAME = /^[a-zA-Z_][a-zA-Z0-9_-]*$/u;
 
@@ -79,14 +86,35 @@ const candidatesFor = (code: DiagnosticCode, analysis: BriefAnalysis): readonly 
  * what the diagnostic's own `hint` names — one third of the word, one implementation. A
  * fix that suggested a different slot than the message did would be worse than no fix.
  */
+/**
+ * The name inside a diagnostic's range, and where it sits in it.
+ *
+ * `E_BAD_ADJUSTMENT` is ranged over the adjustment the author wrote, which is a bare name
+ * for a flag (`{destaque}`) and `name: value` for an enum (`{tom: claro}`). The name is the
+ * half a suggestion can replace; the value is the author's and stays where it is. Cutting
+ * at the first colon is exact rather than approximate, because the grammar forbids a space
+ * in front of one (`docs/brief-language.md`).
+ */
+const nameIn = (written: string): { text: string; from: number; to: number } => {
+  const colon = written.indexOf(':');
+  const head = colon === -1 ? written : written.slice(0, colon);
+  const from = head.length - head.trimStart().length;
+  const text = head.slice(from).trimEnd();
+  return { text, from, to: from + text.length };
+};
+
 export function suggestionFor(
   item: Diagnostic,
   analysis: BriefAnalysis,
   written: string,
-): string | undefined {
-  if (!NAME.test(written)) return undefined;
-  const suggestion = didYouMean(written, candidatesFor(item.code, analysis));
-  return suggestion === written ? undefined : suggestion;
+): MarkerFix | undefined {
+  const name = nameIn(written);
+  if (!NAME.test(name.text)) return undefined;
+  const suggestion = didYouMean(name.text, candidatesFor(item.code, analysis));
+  if (suggestion === undefined || suggestion === name.text) return undefined;
+  return name.from === 0 && name.to === written.length
+    ? { text: suggestion }
+    : { text: suggestion, within: { from: name.from, to: name.to } };
 }
 
 /**
@@ -102,8 +130,7 @@ const toLintDiagnostic = (
   view: EditorView,
 ): LintDiagnostic => {
   const { from, to } = spanOf(item, view);
-  const suggestion = suggestionFor(item, analysis, view.state.doc.sliceString(from, to));
-  return toMarker(item, view, suggestion);
+  return toMarker(item, view, suggestionFor(item, analysis, view.state.doc.sliceString(from, to)));
 };
 
 export interface BriefLintOptions {
