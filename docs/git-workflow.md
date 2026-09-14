@@ -28,7 +28,21 @@ Template in `.github/pull_request_template.md`: card, what changed, how to test,
 
 ### The desktop release
 
-**The tag does not set the version; it has to agree with it.** electron-builder reads the version from `apps/desktop/package.json` and takes the release name from the tag, and it never compares the two — `desktop-v0.2.0` pushed over a package still reading `0.1.0` publishes `Tyto Setup 0.1.0.exe` into a release called `desktop-v0.2.0`, green. So `desktop.yml`'s first step after `setup-node` compares `GITHUB_REF_NAME` against the manifest and fails the job before the install. Cutting a desktop release is therefore two steps: bump `apps/desktop/package.json`, then tag the version you bumped to.
+**The tag does not set the version, and the release is not filed under the tag you pushed.** Both halves are the same surprise: electron-builder never reads the triggering ref at all. It takes the version from `apps/desktop/package.json`, and it composes the release's own tag from that version plus a prefix —
+
+```js
+// electron-publish/out/gitHubPublisher.js:38
+this.tag = githubTagPrefix(info) + version;
+// builder-util-runtime/out/publishOptions.js:10
+if (options.tagNamePrefix) return options.tagNamePrefix;
+if (options.vPrefixedTagName ?? true) return 'v';
+```
+
+so `desktop-v0.2.0` pushed over a package still reading `0.1.0` builds `Tyto Setup 0.1.0.exe` and files it under `desktop-v0.1.0`, leaving the tag you actually pushed with nothing attached to it. Two things stop that. `electron-builder.yml` sets `tagNamePrefix: desktop-v`, without which the prefix defaults to `"v"` and the release comes out as `v0.1.0` — the wrong name, and one that reads as a version of Tyto as a whole beside per-package tags like `@tyto/core@0.19.0` (TYTO-97). And `desktop.yml`'s first step after `setup-node` compares `GITHUB_REF_NAME` against the manifest and fails the job before the install, so the version mismatch is refused rather than published.
+
+`desktop-release.test.ts` reads the trigger pattern and `tagNamePrefix` together and fails if either moves alone. Cutting a desktop release is therefore two steps: bump `apps/desktop/package.json`, then tag the version you bumped to.
+
+**The release is created as a draft**, so nothing is visible until somebody publishes it — `releaseType` falls through to `options.draft === false ? "release" : "draft"` and nothing here sets `draft` (`gitHubPublisher.js:55`). Cutting a first release to see what the three runners do is therefore reversible: delete the draft, delete the tag.
 
 Three runners, `fail-fast: false`, one installer each: `dmg`, `nsis`, `AppImage`. All three `--publish always` into the same release, and cancelling the survivors of a failed leg would leave that release holding whichever finished first with nothing saying what was cut short. macOS builds on `macos-latest`, which is Apple Silicon, so the `dmg` is **arm64 only** — an Intel build is a second matrix entry whenever somebody needs one.
 
@@ -42,7 +56,7 @@ The package that comes back is not code. `activateBuiltIns` reads the built-in t
 
 **Signing is optional and off.** With `CSC_LINK` unset electron-builder finds no identity and ships unsigned installers; macOS warns on first open and Windows SmartScreen does the same. Turning it on is two repository secrets, `CSC_LINK` (a base64 `.p12`) and `CSC_KEY_PASSWORD`, which `desktop.yml` already passes through. Notarizing a macOS build additionally wants `APPLE_ID`, `APPLE_APP_SPECIFIC_PASSWORD` and `APPLE_TEAM_ID`, and is a separate decision — an unsigned app that is notarized is not a thing. No icon is set either: macOS and Windows use the one embedded in the Electron skeleton and `ElectronFramework.getDefaultIcon` hands Linux its bundled `electron-linux` set, so the AppImage build does not fail for the lack of one, it ships Electron's.
 
-`tools/repo-checks/src/desktop-release.test.ts` pins the couplings above, because **`desktop.yml` does not run on a pull request** — nothing in CI executes it, so a mistake in it lands green and is found by whoever cuts the release. Measured rather than asserted: five perturbations, each caught by exactly one test, against a baseline of 0 of 113 failing.
+`tools/repo-checks/src/desktop-release.test.ts` pins the couplings above, because **`desktop.yml` does not run on a pull request** — nothing in CI executes it, so a mistake in it lands green and is found by whoever cuts the release. That is not a hypothetical: the tag-prefix defect above did exactly that, landing on `main` and closing its card before anybody noticed (TYTO-97). Measured rather than asserted: ten perturbations across the two cards, each caught by exactly one test, against a baseline of 0 of 115 failing.
 
 **Release tags are lightweight, and that is a decision rather than a leftover.** `changesets/action` v2 pushes tags through the GitHub API instead of the Git CLI, and an API ref is a plain ref — so since TYTO-80 every `@tyto/<pkg>@x.y.z` is a `commit` object where the older ones are `tag` objects (24 lightweight against 125 annotated, measured 2026-09-13). `push-with-git-cli: true` would restore the old shape, and it is deliberately absent from `release.yml`.
 

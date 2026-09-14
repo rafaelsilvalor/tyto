@@ -39,7 +39,13 @@ interface Workflow {
 interface BuilderConfig {
   files?: string[];
   directories?: { output?: string };
-  publish?: { provider?: string; owner?: string; repo?: string };
+  publish?: {
+    provider?: string;
+    owner?: string;
+    repo?: string;
+    tagNamePrefix?: string;
+    vPrefixedTagName?: boolean;
+  };
   mac?: { target?: string };
   win?: { target?: string };
   linux?: { target?: string; executableName?: string };
@@ -49,6 +55,17 @@ const workflow = () => readYaml<Workflow>(WORKFLOW);
 const builder = () => readYaml<BuilderConfig>(BUILDER_CONFIG);
 
 const steps = () => Object.values(workflow().jobs ?? {}).flatMap((job) => job.steps ?? []);
+
+/**
+ * The literal text a `push.tags` pattern matches before its wildcard, or `undefined` when the
+ * pattern is not a plain prefix glob.
+ *
+ * `undefined` is a real answer rather than a skip: the assertion below refuses a pattern this
+ * cannot read, because a trigger nobody can reduce to a prefix cannot be compared against the
+ * one electron-builder composes, and a check that quietly passes on what it cannot parse is
+ * the shape of the bug it is here to catch.
+ */
+const tagPrefixOf = (pattern: string): string | undefined => /^([^*?[\]]+)\*$/.exec(pattern)?.[1];
 
 describe('the desktop release workflow', () => {
   it('builds on all three platforms, and lets each finish on its own', () => {
@@ -183,6 +200,43 @@ describe('the electron-builder configuration', () => {
         .map((line) => line.trim()),
       `.gitignore does not ignore ${output}/, so a local package would offer itself for commit`,
     ).toContain(`${output!}/`);
+  });
+
+  it('files the release under the same tag the workflow triggers on', () => {
+    // The trigger and the release name are two strings in two files, and electron-builder
+    // never compares them: it composes its own out of the version and a prefix it defaults
+    // to `"v"` (`gitHubPublisher.js:38` → `githubTagPrefix`). With neither `tagNamePrefix`
+    // nor `vPrefixedTagName` set, a push of `desktop-v0.1.0` opened a release named
+    // `v0.1.0` — the wrong name, and one this repository should not take beside
+    // `@tyto/core@0.19.0` (TYTO-97). This is the check that was missing when TYTO-15
+    // shipped, which is why the defect reached `main`.
+    const triggers = workflow().on?.push?.tags ?? [];
+
+    expect(triggers, `${WORKFLOW} no longer triggers on exactly one tag pattern`).toHaveLength(1);
+
+    const prefix = tagPrefixOf(triggers[0]!);
+    expect(
+      prefix,
+      `${WORKFLOW} triggers on '${triggers[0]!}', which is not a plain prefix glob; the release name below cannot be compared against it`,
+    ).toBeDefined();
+
+    expect(
+      builder().publish?.tagNamePrefix,
+      `${BUILDER_CONFIG} does not set tagNamePrefix, so electron-builder falls back to 'v' and files the release under a tag ${WORKFLOW} does not trigger on`,
+    ).toBe(prefix);
+  });
+
+  it('reads the prefix out of the pattern rather than trusting a substring', () => {
+    // The assertion above is only as good as its parser, and the failure it guards is
+    // precisely a string that looked right. Measured in both directions against the helper
+    // itself: a prefix glob yields its prefix, and anything that is not one yields
+    // `undefined` rather than a value the comparison would then accept.
+    expect(tagPrefixOf('desktop-v*')).toBe('desktop-v');
+    expect(tagPrefixOf('v*')).toBe('v');
+    expect(tagPrefixOf('desktop-v')).toBeUndefined();
+    expect(tagPrefixOf('*')).toBeUndefined();
+    expect(tagPrefixOf('desktop-v*.*')).toBeUndefined();
+    expect(tagPrefixOf('desktop-v[0-9]*')).toBeUndefined();
   });
 
   it('publishes to the repository this one actually is', () => {
