@@ -39,7 +39,13 @@ beforeAll(async () => {
   }
 
   app = await _electron.launch({
-    args: [built],
+    // The **folder**, not the built file. Electron resolves a directory through its
+    // `package.json`, which is how a packaged app starts and what `electron-builder` will
+    // do — and it is the only form under which `app.getVersion()` reads *this* app's
+    // version. Handed a path to a `.js` it loads the file and reports Electron's own
+    // version instead, which is what the window used to show.
+    args: ['.'],
+    cwd: join(here, '..'),
     // `TYTO_HEADLESS` keeps the window off the screen. It is the only thing this suite
     // changes about the app it is testing; every flag it asserts on is the shipped one.
     env: { ...process.env, TYTO_HEADLESS: '1' },
@@ -139,7 +145,10 @@ describe('the bridge', () => {
     );
 
     expect(info).toMatchObject({
-      version: expect.any(String) as unknown as string,
+      // The app's own version and not Electron's. `app.getVersion()` falls back to the
+      // Electron version when the package has no `version` field, which is what it did
+      // until this card added one — the window reported 44.3.0 as if it were Tyto's.
+      version: '0.1.0',
       platform: process.platform,
       locale: expect.stringMatching(/^(pt-BR|en)$/u) as unknown as string,
       // The composition root's pack, read off the plugin host and reported through the
