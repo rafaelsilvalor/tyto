@@ -13,7 +13,10 @@ import {
 } from '@codemirror/view';
 
 import { brief } from './brief-language.js';
+import { type CommandRegistry, commandRegistryFacet } from './commands.js';
+import { type EditorKeymap, defaultKeymapSet, keymapExtension } from './keymap.js';
 import { type ThemeName, themes } from './theme.js';
+import { vimMode } from './vim-mode.js';
 
 /**
  * `createEditor` is the whole public surface of this package.
@@ -43,10 +46,22 @@ export interface EditorOptions {
   readonly readOnly?: boolean;
   /**
    * Given higher precedence than the defaults — CodeMirror reads an earlier extension as
-   * the stronger one — so a caller's keymap, theme or language wins. This is how E8.2 and
-   * E8.3 add lint markers, completion and vim without this signature changing.
+   * the stronger one — so a caller's keymap, theme or language wins. This is how E8.2 adds
+   * lint markers and completion without this signature changing.
    */
   readonly extensions?: readonly Extension[];
+  /**
+   * The commands bindings and vim ex-commands dispatch to.
+   *
+   * Without one the editor still works and the bindings simply do nothing, because a
+   * binding to an id nobody registered falls through. A host that wants `Mod-s` to save
+   * registers `editor.save` here.
+   */
+  readonly commands?: CommandRegistry;
+  /** Defaults to `defaultKeymapSet`. Ignored while vim mode is on, which brings its own. */
+  readonly keymap?: EditorKeymap;
+  /** Starts in vim mode. Toggle later with `setVimMode`. */
+  readonly vim?: boolean;
 }
 
 export interface EditorHandle {
@@ -61,6 +76,17 @@ export interface EditorHandle {
   /** Returns the function that stops the listener. */
   onChange(listener: (value: string) => void): () => void;
   setTheme(theme: ThemeName): void;
+  /** `false` when no registry was given, or when it has no command with that id. */
+  runCommand(id: string): boolean;
+  /**
+   * Swaps the input layer in place.
+   *
+   * A compartment reconfigure and not a rebuilt state, which is what makes the document,
+   * the cursor, the undo history and the lint markers survive the toggle — the editor does
+   * not blink, it changes what interprets the keys.
+   */
+  setVimMode(enabled: boolean): void;
+  isVimMode(): boolean;
   destroy(): void;
 }
 
@@ -70,8 +96,12 @@ export interface EditorHandle {
  * Deliberately not CodeMirror's `basicSetup`: that bundle pulls in autocompletion, lint and
  * search, and the first two are E8.2's to configure against a template manifest. What is
  * here is the part an editor is unusable without — a gutter, undo, a cursor you can see,
- * and the keymap that drives them. E8.3 replaces the keymap layer with a registry; until
- * then, an editor that cannot undo would be a worse demo than one whose keymap moves later.
+ * and the keymap that drives them.
+ *
+ * `historyKeymap` stays even though E8.3 put a command registry in front of it. The two do
+ * not fight: the registry's bindings are given higher precedence and hand the keystroke on
+ * when they have nothing to undo, and an editor built with no registry at all still has a
+ * working Ctrl+Z.
  */
 const baseExtensions = (): Extension[] => [
   lineNumbers(),
@@ -97,6 +127,17 @@ export function createEditor(parent: HTMLElement, options: EditorOptions = {}): 
   /** Swapped in place by `setTheme`, so switching does not rebuild the state. */
   const themeCompartment = new Compartment();
 
+  /**
+   * One compartment for whatever interprets the keys: a keymap set, or vim.
+   *
+   * Two compartments would let a host end up in vim with the default set's `Mod-z` racing
+   * `u` for the same undo stack. One means the two modes are mutually exclusive by
+   * construction rather than by the host remembering to turn one off.
+   */
+  const inputCompartment = new Compartment();
+  const keys = keymapExtension(options.keymap ?? defaultKeymapSet);
+  let vimEnabled = options.vim ?? false;
+
   const notify = EditorView.updateListener.of((update) => {
     if (!update.docChanged) return;
     if (update.transactions.every((transaction) => transaction.annotation(programmatic) === true)) {
@@ -114,6 +155,11 @@ export function createEditor(parent: HTMLElement, options: EditorOptions = {}): 
       doc: options.doc ?? '',
       extensions: [
         ...(options.extensions ?? []),
+        // Ahead of `baseExtensions`, so this package's `Mod-z` is reached before the
+        // `historyKeymap` in there. Both stay: when there is no registry, or nothing left
+        // to undo, ours returns false and CodeMirror's own binding still works.
+        inputCompartment.of(vimEnabled ? vimMode() : keys),
+        ...(options.commands === undefined ? [] : [commandRegistryFacet.of(options.commands)]),
         notify,
         // Both halves of read-only, because they answer different questions: the facet
         // stops the commands, and `editable` takes the `contenteditable` off the content
@@ -148,6 +194,18 @@ export function createEditor(parent: HTMLElement, options: EditorOptions = {}): 
     setTheme: (theme: ThemeName) => {
       view.dispatch({ effects: themeCompartment.reconfigure(themes[theme]) });
     },
+
+    runCommand: (id: string) => options.commands?.run(id, { view }) ?? false,
+
+    setVimMode: (enabled: boolean) => {
+      if (enabled === vimEnabled) return;
+      vimEnabled = enabled;
+      view.dispatch({
+        effects: inputCompartment.reconfigure(enabled ? vimMode() : keys),
+      });
+    },
+
+    isVimMode: () => vimEnabled,
 
     destroy: () => {
       listeners.clear();
