@@ -37,13 +37,27 @@ export function spanOf(item: Diagnostic, view: EditorView): { from: number; to: 
 }
 
 /**
+ * One word to write, and where inside the marker to write it.
+ *
+ * `within` exists because a diagnostic's range is not always exactly the thing that is
+ * wrong. `E_BAD_ADJUSTMENT` on `{tom: claro}` is ranged over `tom: claro`, and the fix has
+ * to replace `tom` and leave the value alone — without this it would either rewrite the
+ * whole thing or not be offered at all (TYTO-92).
+ */
+export interface MarkerFix {
+  readonly text: string;
+  /** Offsets from the marker's start. The whole marker when omitted. */
+  readonly within?: { readonly from: number; readonly to: number };
+}
+
+/**
  * The marker, with a one-word fix when the caller worked one out.
  *
- * `suggestion` is the caller's because the candidates are: a brief's unknown slot is
- * answered from a manifest, a template's unsupported property from a fixed vocabulary, and
- * neither list belongs here.
+ * The fix is the caller's because the candidates are: a brief's unknown slot is answered
+ * from a manifest, a template's unsupported property from a fixed vocabulary, and neither
+ * list belongs here.
  */
-export function toMarker(item: Diagnostic, view: EditorView, suggestion?: string): LintDiagnostic {
+export function toMarker(item: Diagnostic, view: EditorView, fix?: MarkerFix): LintDiagnostic {
   const { from, to } = spanOf(item, view);
 
   return {
@@ -54,17 +68,26 @@ export function toMarker(item: Diagnostic, view: EditorView, suggestion?: string
     // reader who hovers a marker has the string that finds the rule behind it.
     source: item.code,
     message: item.hint === undefined ? item.message : `${item.message} ${item.hint}`,
-    ...(suggestion === undefined
+    ...(fix === undefined
       ? {}
       : {
           actions: [
             {
-              name: `Replace with '${suggestion}'`,
-              // The positions are the ones CodeMirror has mapped forward, not the ones the
-              // diagnostic was built with — which is why the action takes them as
-              // arguments and this closure does not capture `from`/`to`.
+              name: `Replace with '${fix.text}'`,
+              // `start` and `end` are the positions CodeMirror has mapped forward, not the
+              // ones the diagnostic was built with — which is why the action takes them as
+              // arguments rather than capturing `from`/`to`. `within` is measured from the
+              // marker's start, so it rides along with the mapping for free.
               apply: (target: EditorView, start: number, end: number) => {
-                target.dispatch({ changes: { from: start, to: end, insert: suggestion } });
+                const changes =
+                  fix.within === undefined
+                    ? { from: start, to: end, insert: fix.text }
+                    : {
+                        from: start + fix.within.from,
+                        to: start + fix.within.to,
+                        insert: fix.text,
+                      };
+                target.dispatch({ changes });
               },
             },
           ],

@@ -177,6 +177,21 @@ describe('briefLint', () => {
     expect(marker.actions ?? []).toEqual([]);
   });
 
+  /**
+   * `E_BAD_ADJUSTMENT` on an enum is ranged over `name: value`, so the fix has to replace
+   * the name and leave the value the author chose exactly where it is.
+   */
+  it('fixes a misspelled adjustment that carries a value, without touching the value', async () => {
+    const editor = open(brief('::titulo Lista', '::item {tomm: claro} Um'));
+    const { marker } = await waitForMarker(editor, 'E_BAD_ADJUSTMENT', 2000);
+
+    expect(editor.view.state.sliceDoc(marker.from, marker.to)).toBe('tomm: claro');
+    expect(marker.actions?.[0]?.name).toBe("Replace with 'tom'");
+
+    marker.actions?.[0]?.apply(editor.view, marker.from, marker.to);
+    expect(editor.getValue()).toContain('{tom: claro}');
+  });
+
   it('fixes a misspelled adjustment, which is ranged on its name', async () => {
     const editor = open(brief('::titulo Lista', '::item {destaqe} Um'));
     const { marker } = await waitForMarker(editor, 'E_BAD_ADJUSTMENT', 2000);
@@ -215,17 +230,17 @@ describe('suggestionFor', () => {
 
   it('suggests a slot for an unknown slot', () => {
     const item = { severity: 'error', code: 'E_UNKNOWN_SLOT', message: '' } as const;
-    expect(suggestionFor(item, analysis(CARROSSEL), 'titlo')).toBe('titulo');
+    expect(suggestionFor(item, analysis(CARROSSEL), 'titlo')).toEqual({ text: 'titulo' });
   });
 
   it('suggests a template for an unknown template, which needs no manifest', () => {
     const item = { severity: 'error', code: 'E_UNKNOWN_TEMPLATE', message: '' } as const;
-    expect(suggestionFor(item, analysis(), 'promo-curse')).toBe('promo-curso');
+    expect(suggestionFor(item, analysis(), 'promo-curse')).toEqual({ text: 'promo-curso' });
   });
 
   it('suggests a format for an unknown format', () => {
     const item = { severity: 'error', code: 'E_UNKNOWN_FORMAT', message: '' } as const;
-    expect(suggestionFor(item, analysis(CARROSSEL), 'stor')).toBe('story');
+    expect(suggestionFor(item, analysis(CARROSSEL), 'stor')).toEqual({ text: 'story' });
   });
 
   it('refuses anything that is not a bare name, whatever the code says', () => {
@@ -237,6 +252,15 @@ describe('suggestionFor', () => {
   it('says nothing when nothing is close enough, rather than guessing', () => {
     const item = { severity: 'error', code: 'E_UNKNOWN_SLOT', message: '' } as const;
     expect(suggestionFor(item, analysis(CARROSSEL), 'rodape')).toBeUndefined();
+  });
+
+  it('narrows the fix to the name when the range carries a value too', () => {
+    const item = { severity: 'error', code: 'E_BAD_ADJUSTMENT', message: '' } as const;
+
+    expect(suggestionFor(item, analysis(CARROSSEL), 'tomm: claro')).toEqual({
+      text: 'tom',
+      within: { from: 0, to: 4 },
+    });
   });
 
   it('says nothing for a code that has no list to suggest from', () => {

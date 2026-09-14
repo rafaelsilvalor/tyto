@@ -140,13 +140,17 @@ in. Two of the codes above never reach the gutter, and both absences are deliber
   gutter; a host that has a bridge to a filesystem passes an `AssetResolver` and gets the
   diagnostic back.
 
-**A quick fix is offered only where the text under the diagnostic's range is exactly a
+**A quick fix is offered where the diagnostic's range holds a name, and replaces only the
 name.** The ranges differ by code and by shape — `E_UNKNOWN_SLOT` lands on a directive's
 `nameRange`, `E_BAD_ADJUSTMENT` on the adjustment's own range (a bare name for a flag,
-`name: value` for an enum), `E_BAD_SLOT_VALUE` on the whole directive including its body —
-and replacing the last with a slot name would delete what the author wrote. The suggestion
-itself is `didYouMean` from `core`, the same function and the same budget that produced the
-diagnostic's `hint`, so the button and the message can never name different slots.
+`name: value` for an enum), `E_BAD_SLOT_VALUE` on the whole directive including its body.
+The editor cuts at the first colon, which is exact rather than approximate because the
+grammar forbids a space in front of one: `{tomm: claro}` is fixed to `{tom: claro}` and the
+value the author chose stays where it is. A range that is not a name at all — a whole
+directive, body and all — is left alone, because replacing it with a slot name would delete
+what the author wrote. The suggestion itself is `didYouMean` from `core`, the same function
+and the same budget that produced the diagnostic's `hint`, so the button and the message can
+never name different slots.
 
 Completion is driven by the same pass: the manifest the frontmatter named feeds slot names
 after `::`, adjustment names inside `{}` filtered by their `applies`, enum values after

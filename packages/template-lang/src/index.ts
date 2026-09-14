@@ -43,6 +43,9 @@ export {
   TAGS,
   type PropertyName,
   type TagName,
+  attributeAlias,
   isProperty,
   isTag,
+  propertyAlias,
+  tagAlias,
 } from './vocabulary.js';
