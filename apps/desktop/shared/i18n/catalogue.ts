@@ -63,6 +63,24 @@ export interface Catalogue {
   readonly 'command.shell.toggleLocale': string;
   readonly 'command.editor.toggleVim': string;
 
+  /**
+   * Opening, saving and the recent list (E9.8).
+   *
+   * `command.file.recent` is a prefix and not a whole label: a recent entry reads
+   * "Recente: campanha.brief", because the file's own name is not the catalogue's to
+   * translate and a row that was only a file name would be unfindable by typing "recente".
+   * `document.untitled` and `document.unsaved` are what the window title is built from.
+   * `file.missing` is a diagnostic the desktop raises itself, shown in the problems panel
+   * beside the ones the compiler produced.
+   */
+  readonly 'command.file.open': string;
+  readonly 'command.file.save': string;
+  readonly 'command.file.saveAs': string;
+  readonly 'command.file.recent': string;
+  readonly 'document.untitled': string;
+  readonly 'document.unsaved': string;
+  readonly 'file.missing': string;
+
   readonly 'shell.language.label': string;
   readonly 'shell.about.version': string;
   readonly 'shell.about.platform': string;
@@ -105,6 +123,13 @@ export const CATALOGUE_KEYS = [
   'command.preview.previousSlide',
   'command.shell.toggleLocale',
   'command.editor.toggleVim',
+  'command.file.open',
+  'command.file.save',
+  'command.file.saveAs',
+  'command.file.recent',
+  'document.untitled',
+  'document.unsaved',
+  'file.missing',
   'shell.language.label',
   'shell.about.version',
   'shell.about.platform',

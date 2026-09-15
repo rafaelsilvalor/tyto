@@ -14,11 +14,13 @@ import {
   loadFormats,
   loadTemplateRegistry,
   resolve,
+  sceneResources,
 } from '@tyto/core';
 import { exportHtml } from '@tyto/export-html';
 import { bundledFont, bundledFontSource } from '@tyto/fonts';
 import { BUILT_IN_TEMPLATES_DIRECTORY } from '@tyto/templates';
 import { markupTemplateSource } from '@tyto/pipeline';
+import { fileAssetResolver, fileResources } from '@tyto/io';
 
 /**
  * Brief text in, one HTML document per frame out — the preview's whole job (E9.2).
@@ -88,6 +90,15 @@ export interface PreviewServiceOptions {
   readonly templatesDirectory?: string;
   /** The project's `formats.yaml`. Defaults to the built-in pack's. */
   readonly formatsFile?: string;
+  /**
+   * The folder the open brief lives in, asked afresh on every preview (E9.8).
+   *
+   * A function and not a string, because the answer changes while the service lives: the
+   * window opens with nothing open, somebody opens a `.brief`, and from that keystroke on
+   * `assets/logo.png` is a file that exists. Rebuilding the service on every open would
+   * mean re-reading every template manifest to learn a folder name.
+   */
+  readonly baseDirectory?: () => string | undefined;
 }
 
 export interface PreviewService {
@@ -111,10 +122,11 @@ function builtInTemplates(): string {
 /**
  * A resolver that finds nothing, which is the honest answer until a brief has a folder.
  *
- * The preview compiles text, not a file on disk, so there is no `assets/` beside it to read.
- * A brief that references an asset gets the exporter's own diagnostic naming the missing
- * reference — which is what the author needs to see — rather than a preview that fails to
- * open. Opening a `.brief` from disk gives this a base to resolve against (E9.3).
+ * The preview compiles text, not a file on disk, so until something is opened there is no
+ * `assets/` beside it to read. A brief that references an asset gets the exporter's own
+ * diagnostic naming the missing reference — which is what the author needs to see — rather
+ * than a preview that fails to open. Opening a `.brief` replaces this with a real resolver
+ * rooted at the file's own folder (E9.8), and the images start appearing.
  */
 const noAssets: AssetResolver = {
   // Named, because it is what `E_ASSET_NOT_FOUND` prints as the folder it looked in, and
@@ -128,6 +140,7 @@ export async function createPreviewService(
   options: PreviewServiceOptions,
 ): Promise<PreviewService> {
   const { fileSystem } = options;
+  const baseDirectory = options.baseDirectory ?? ((): string | undefined => undefined);
   const templatesDirectory = options.templatesDirectory ?? builtInTemplates();
   const formatsFile = options.formatsFile ?? fileSystem.join(templatesDirectory, 'formats.yaml');
 
@@ -167,9 +180,16 @@ export async function createPreviewService(
       const ast = parseBrief(brief);
       if (!ast.ok) return failed(ast.error);
 
+      // Built per preview, because the folder is a property of what is open rather than of
+      // the service. `confine` stays on, its default: a brief is often written by something
+      // else (ADR 0011), and `../../../.ssh/id_rsa` embedded in an exported PNG is a real
+      // way to leak a file. An author previewing their own folder is inside it anyway.
+      const folder = baseDirectory();
+      const assets = folder === undefined ? noAssets : fileAssetResolver({ base: folder });
+
       const resolved = await resolve(ast.value, {
         registry: templates,
-        assets: noAssets,
+        assets,
       });
       if (!resolved.ok) return failed([...ast.warnings, ...resolved.error]);
 
@@ -190,11 +210,25 @@ export async function createPreviewService(
         ]);
       }
 
+      // The bytes for the images the scene draws, read between `compile` and the export.
+      // That window is the whole of it (`docs/architecture.md`): an exporter's `asset`
+      // lookup is synchronous because a `SceneVisitor` cannot await, so the bytes must be
+      // in memory before the first walk — and *which* bytes is a question only a `Scene`
+      // answers.
+      //
+      // Finding the file and reading it are two different ports and both are needed. The
+      // `AssetResolver` above tells `resolve` that `assets/logo.png` exists; without this
+      // the exporter would still have nothing to embed and would report
+      // `E_EXPORT_ASSET_UNRESOLVED` naming an asset that is right there on the disk. Found
+      // by opening a file and looking at the preview, not by a unit test.
+      const images = folder === undefined ? undefined : fileResources({ base: folder });
+      if (images !== undefined) await images.load(sceneResources(scene.value));
+
       const exported = exportHtml(scene.value, {
         // The bundled faces, embedded in the document. Never a family name the host might
         // not have: determinism is the rule (`docs/architecture.md`), and a preview drawn in
         // a substituted font is a preview of a different artwork.
-        resources: { font: bundledFont },
+        resources: { font: bundledFont, ...(images?.html ?? {}) },
       });
 
       const before = [
