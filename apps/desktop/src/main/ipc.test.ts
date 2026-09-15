@@ -38,14 +38,26 @@ const preview = () => ({
         brief.trim() === ''
           ? []
           : [{ artwork: 'a1', format: 'feed', width: 1080, height: 1080, html: '<!doctype html>' }],
+      artworks: brief.trim() === '' ? [] : [{ id: 'a1', index: 0, range: { start: 4, end: 9 } }],
       diagnostics: [],
     }),
+});
+
+/** A catalogue that read one folder. `templates.test.ts` drives the real one. */
+const catalogue = () => ({
+  list: () => ({
+    templates: [
+      { name: 'promo', version: '1.0.0', description: 'A promo', formats: ['feed', 'story'] },
+    ],
+    failures: [],
+  }),
 });
 
 const dependencies = () => ({
   credentials: credentials(),
   info: () => ({ version: '0.1.0', platform: 'linux', locale: 'pt-BR', templates: ['promo'] }),
   preview: preview(),
+  templates: catalogue(),
 });
 
 describe('registerIpcHandlers', () => {

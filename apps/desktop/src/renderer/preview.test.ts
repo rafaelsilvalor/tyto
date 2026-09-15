@@ -2,6 +2,7 @@
 import { describe, expect, it } from 'vitest';
 
 import {
+  type Artwork,
   type Frame,
   type PreviewElements,
   type Selection,
@@ -49,6 +50,19 @@ const CAROUSEL: readonly Frame[] = [
   frame('artwork-2', 'story', 1080, 1920),
 ];
 
+/**
+ * The artworks behind {@link CAROUSEL}, which is a separate list on purpose.
+ *
+ * Since E9.3 the slide list is driven by the artworks the brief produced rather than by the
+ * frames, because a slide that renders to one format only would otherwise vanish from the
+ * list when the other tab is picked. The two lists agree here and the tests below are about
+ * what happens when they do not.
+ */
+const SLIDES: readonly Artwork[] = [
+  { id: 'artwork-1', index: 0, range: { start: 20, end: 30 } },
+  { id: 'artwork-2', index: 1, range: { start: 31, end: 41 } },
+];
+
 const NOTHING: Selection = { format: undefined, artwork: undefined };
 
 function pane(document_: Document): PreviewElements {
@@ -72,7 +86,7 @@ function pane(document_: Document): PreviewElements {
 describe('reading a frame list', () => {
   it('lists each format and each artwork once, in the order they appear', () => {
     expect(formatsOf(CAROUSEL)).toEqual(['feed', 'story']);
-    expect(artworksOf(CAROUSEL)).toEqual(['artwork-1', 'artwork-2']);
+    expect(artworksOf(SLIDES)).toEqual(['artwork-1', 'artwork-2']);
   });
 
   it('finds the one frame a selection names', () => {
@@ -91,14 +105,17 @@ describe('reading a frame list', () => {
 
 describe('keeping the selection across a re-render', () => {
   it('starts on the first frame when nothing was selected', () => {
-    expect(keepSelection(NOTHING, CAROUSEL)).toEqual({ format: 'feed', artwork: 'artwork-1' });
+    expect(keepSelection(NOTHING, CAROUSEL, SLIDES)).toEqual({
+      format: 'feed',
+      artwork: 'artwork-1',
+    });
   });
 
   it('keeps what the user picked when it is still there', () => {
     // The whole point. A preview runs per keystroke, so a selection that reset on every
     // answer would drag the pane back to slide 1 while somebody types on slide 2.
     const chosen: Selection = { format: 'story', artwork: 'artwork-2' };
-    expect(keepSelection(chosen, CAROUSEL)).toEqual(chosen);
+    expect(keepSelection(chosen, CAROUSEL, SLIDES)).toEqual(chosen);
   });
 
   it('falls back when what was selected stops existing', () => {
@@ -106,15 +123,19 @@ describe('keeping the selection across a re-render', () => {
     // somewhere rather than showing nothing until the user clicks.
     const chosen: Selection = { format: 'story', artwork: 'artwork-2' };
     const shorter = [frame('artwork-1', 'feed'), frame('artwork-1', 'story', 1080, 1920)];
+    const one = SLIDES.slice(0, 1);
 
-    expect(keepSelection(chosen, shorter)).toEqual({ format: 'story', artwork: 'artwork-1' });
+    expect(keepSelection(chosen, shorter, one)).toEqual({ format: 'story', artwork: 'artwork-1' });
   });
 
   it('keeps each half independently', () => {
     // The format survived and the artwork did not; keeping the format is what stops a
     // deleted slide from also throwing the user back to the first tab.
     const chosen: Selection = { format: 'story', artwork: 'artwork-9' };
-    expect(keepSelection(chosen, CAROUSEL)).toEqual({ format: 'story', artwork: 'artwork-1' });
+    expect(keepSelection(chosen, CAROUSEL, SLIDES)).toEqual({
+      format: 'story',
+      artwork: 'artwork-1',
+    });
   });
 });
 
@@ -128,6 +149,7 @@ describe('switching format', () => {
 
     paintPreview(elements, {
       frames: CAROUSEL,
+      artworks: SLIDES,
       selection: { format: 'feed', artwork: 'artwork-1' },
       zoom: 1,
     });
@@ -135,6 +157,7 @@ describe('switching format', () => {
 
     paintPreview(elements, {
       frames: CAROUSEL,
+      artworks: SLIDES,
       selection: { format: 'story', artwork: 'artwork-1' },
       zoom: 1,
     });
@@ -147,6 +170,7 @@ describe('switching format', () => {
 
     paintPreview(elements, {
       frames: CAROUSEL,
+      artworks: SLIDES,
       selection: { format: 'story', artwork: 'artwork-1' },
       zoom: 1,
     });
@@ -167,6 +191,7 @@ describe('the slide picker', () => {
 
     paintPreview(elements, {
       frames: CAROUSEL,
+      artworks: SLIDES,
       selection: { format: 'feed', artwork: 'artwork-2' },
       zoom: 1,
     });
@@ -182,6 +207,7 @@ describe('the slide picker', () => {
 
     paintPreview(elements, {
       frames: [frame('artwork-1', 'feed')],
+      artworks: SLIDES.slice(0, 1),
       selection: { format: 'feed', artwork: 'artwork-1' },
       zoom: 1,
     });
@@ -201,6 +227,7 @@ describe('showing a frame', () => {
 
     paintPreview(elements, {
       frames: CAROUSEL,
+      artworks: SLIDES,
       selection: { format: 'story', artwork: 'artwork-1' },
       zoom: 0.25,
     });
@@ -217,7 +244,7 @@ describe('showing a frame', () => {
     const { document } = globalThis;
     const elements = pane(document);
 
-    paintPreview(elements, { frames: [], selection: NOTHING, zoom: 'fit' });
+    paintPreview(elements, { frames: [], artworks: [], selection: NOTHING, zoom: 'fit' });
 
     expect(elements.paper.hidden).toBe(true);
     expect(elements.empty.hidden).toBe(false);
@@ -231,6 +258,7 @@ describe('showing a frame', () => {
     const elements = pane(document);
     const state = {
       frames: CAROUSEL,
+      artworks: SLIDES,
       selection: { format: 'feed', artwork: 'artwork-1' },
       zoom: 1 as const,
     };

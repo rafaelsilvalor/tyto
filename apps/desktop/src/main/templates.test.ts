@@ -1,0 +1,129 @@
+import { mkdtempSync, mkdirSync, writeFileSync, rmSync } from 'node:fs';
+import { createRequire } from 'node:module';
+import { tmpdir } from 'node:os';
+import { dirname, join } from 'node:path';
+
+import { nodeFileSystem } from '@tyto/io';
+import { afterAll, beforeAll, describe, expect, it } from 'vitest';
+
+import { createTemplateCatalogue } from './templates.js';
+
+/**
+ * The picker's list, against the pack the app actually ships plus one folder built here.
+ *
+ * The same call `preview.test.ts` makes about using the real pack: what this file wires is
+ * a registry to a channel, and wiring is only wrong against the real thing. The temporary
+ * folder is for the two cases the shipped pack cannot show — a `preview.png` and a manifest
+ * that does not parse — and both are cases the picker has to survive rather than features.
+ */
+
+const require_ = createRequire(import.meta.url);
+const packDirectory = join(dirname(require_.resolve('@tyto/templates/package.json')), 'templates');
+
+/** A one-pixel PNG, so the `data:` URI is checked against bytes that really are a PNG. */
+const PIXEL =
+  'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==';
+
+let scratch: string;
+
+beforeAll(() => {
+  scratch = mkdtempSync(join(tmpdir(), 'tyto-templates-'));
+
+  const good = join(scratch, 'with-preview');
+  mkdirSync(good, { recursive: true });
+  writeFileSync(
+    join(good, 'manifest.yaml'),
+    [
+      'name: with-preview',
+      'version: 1.0.0',
+      'description: Has a picture',
+      'formats: [feed]',
+      'slots:',
+      '  titulo:',
+      '    type: rich-text',
+    ].join('\n'),
+  );
+  writeFileSync(join(good, 'preview.png'), Buffer.from(PIXEL, 'base64'));
+
+  const broken = join(scratch, 'broken');
+  mkdirSync(broken, { recursive: true });
+  writeFileSync(join(broken, 'manifest.yaml'), 'name: 1\nthis is: not a manifest\n');
+});
+
+afterAll(() => {
+  rmSync(scratch, { recursive: true, force: true });
+});
+
+describe('the template catalogue', () => {
+  it('lists the shipped pack with what a picker needs to show it', async () => {
+    const catalogue = await createTemplateCatalogue({
+      fileSystem: nodeFileSystem(),
+      directory: packDirectory,
+    });
+
+    const { templates } = catalogue.list();
+    expect(templates.length).toBeGreaterThan(0);
+
+    for (const template of templates) {
+      expect(template.name).not.toBe('');
+      expect(template.version).toMatch(/^\d+\.\d+\.\d+$/u);
+      // A template renders at least one format; the picker shows them before you choose.
+      expect(template.formats.length).toBeGreaterThan(0);
+    }
+  });
+
+  it('carries a preview.png across as bytes, not as a path', async () => {
+    // A path would be refused by the renderer's `img-src 'self' data:` policy and would be
+    // wrong anyway: the same renderer is meant to run in a browser tab later, where the
+    // template folder is not on a disk it can reach.
+    const catalogue = await createTemplateCatalogue({
+      fileSystem: nodeFileSystem(),
+      directory: scratch,
+    });
+
+    const found = catalogue.list().templates.find((item) => item.name === 'with-preview');
+    expect(found?.description).toBe('Has a picture');
+    expect(found?.preview).toBe(`data:image/png;base64,${PIXEL}`);
+  });
+
+  it('leaves the preview off a template that has none, rather than failing', async () => {
+    // Which is every built-in today. A missing picture must not cost the entry.
+    const catalogue = await createTemplateCatalogue({
+      fileSystem: nodeFileSystem(),
+      directory: packDirectory,
+    });
+
+    for (const template of catalogue.list().templates) {
+      expect(template.preview).toBeUndefined();
+    }
+  });
+
+  it('keeps the working templates when one folder is broken, and names the broken one', async () => {
+    // The registry keeps the two apart on purpose. A picker emptied by one bad manifest
+    // would be a third party breaking the app by shipping a typo.
+    const catalogue = await createTemplateCatalogue({
+      fileSystem: nodeFileSystem(),
+      directory: scratch,
+    });
+
+    const answer = catalogue.list();
+    expect(answer.templates.map((item) => item.name)).toEqual(['with-preview']);
+    expect(answer.failures).toHaveLength(1);
+    expect(answer.failures[0]?.directory).toContain('broken');
+    // The registry's own diagnostics, carried across rather than summarised: the code is
+    // what `docs/diagnostic-codes.md` is indexed by, and the panel draws it as a row.
+    expect(answer.failures[0]?.diagnostics.length).toBeGreaterThan(0);
+    expect(answer.failures[0]?.diagnostics[0]?.code).toMatch(/^E_/u);
+    expect(answer.failures[0]?.diagnostics[0]?.message).not.toBe('');
+  });
+
+  it('answers an empty list for a folder that is not there', async () => {
+    // The desktop should open and say it has no templates, not refuse to start.
+    const catalogue = await createTemplateCatalogue({
+      fileSystem: nodeFileSystem(),
+      directory: join(scratch, 'nowhere'),
+    });
+
+    expect(catalogue.list().templates).toEqual([]);
+  });
+});
