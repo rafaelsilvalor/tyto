@@ -30,18 +30,29 @@ describe('the catalogue', () => {
   });
 
   it('says something different in each locale, except where the word is the same word', () => {
-    // Two keys are deliberately identical, and pinning them is what keeps the list from
+    // Four keys are deliberately identical, and pinning them is what keeps the list from
     // growing by accident. `app.name` is the product. `shell.about.templates` is the domain
     // term this project uses in Portuguese too — `docs/template-authoring.md` and every card
     // say "template", and translating the label to "Modelos" here would make the window
     // disagree with the vocabulary its users already have.
+    //
+    // E9.2 added two of the same kind. `editor.heading` is "Brief", which is the name of the
+    // file format and of the language — a Portuguese speaker writing one calls it a brief,
+    // and "Resumo" would name something else. `preview.slide.label` is "Slide", which
+    // Portuguese borrowed whole; "Lâmina" is what a projector manual says and not what
+    // anybody making a carousel says.
     //
     // So the acceptance criterion is read as it is meant: every string that *has* a
     // translation changes. `shell.test.ts` and the end-to-end suite both count against this
     // list rather than against a hardcoded number.
     const shared = CATALOGUE_KEYS.filter((key) => ptBR[key] === en[key]);
 
-    expect(shared).toEqual(['app.name', 'shell.about.templates']);
+    expect(shared).toEqual([
+      'app.name',
+      'editor.heading',
+      'preview.slide.label',
+      'shell.about.templates',
+    ]);
   });
 });
 

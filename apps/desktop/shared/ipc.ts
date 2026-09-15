@@ -40,6 +40,27 @@ const channel = <Request extends z.ZodType, Response extends z.ZodType>(
 const accountName = z.string().trim().min(1).max(200);
 
 /**
+ * A diagnostic, flattened to what survives a structured clone.
+ *
+ * Declared here rather than imported from `@tyto/core`, and the difference matters: the
+ * renderer may not depend on a Node package, and a `Diagnostic` is a type — erased at
+ * runtime, so importing it would check the one side that was already right. What crosses
+ * the bridge is data, and this is its shape.
+ *
+ * `code` is a plain string and not the union `@tyto/core` narrows it to. The union is the
+ * catalogue's business; a renderer that pinned it would stop compiling every time a
+ * diagnostic was added, which is the opposite of what a contract is for.
+ */
+const diagnostic = z.object({
+  severity: z.enum(['error', 'warning', 'info']),
+  code: z.string(),
+  message: z.string(),
+  /** Absent for a diagnostic about the project rather than about a span of the brief. */
+  range: z.object({ start: z.number().int(), end: z.number().int() }).optional(),
+  hint: z.string().optional(),
+});
+
+/**
  * Every channel the app has, and the only place a channel name is written.
  *
  * Deliberately small. E9.1 opens a window and proves the wiring; the channels a brief, a
@@ -68,6 +89,45 @@ export const IPC_CHANNELS = {
        * themselves and will ask for those; a name is what an empty window can say.
        */
       templates: z.array(z.string()),
+    }),
+  ),
+
+  /**
+   * A brief, compiled to one HTML document per frame (E9.2).
+   *
+   * **HTML and not image bytes.** The renderer is Chromium; asking main to rasterize so that
+   * Chromium can decode the raster is a round trip whose only products are latency and a
+   * lossy copy. `src/main/preview.ts` has the reasoning, and E9.4's export is where bytes
+   * are still the answer.
+   *
+   * `requestId` is echoed back untouched, and it is the whole of how a stale answer is
+   * discarded. Previews are fired per keystroke and resolve out of order — a slow compile of
+   * three slides can land after a fast one of the text that replaced it — so the renderer
+   * keeps the id it last asked for and drops anything else. Main does not cancel; a compile
+   * is milliseconds and cancellation would be more machinery than the thing it saves.
+   *
+   * It never fails: a half-typed brief is the *normal* state of this channel, not an
+   * exceptional one, so what a rejection would carry travels in `diagnostics` instead and
+   * `frames` is empty. A frame list and a diagnostic list are both always present, because a
+   * warning is a document that still renders (ADR 0013).
+   */
+  'brief:preview': channel(
+    z.object({ requestId: z.number().int().nonnegative(), brief: z.string() }),
+    z.object({
+      requestId: z.number().int().nonnegative(),
+      frames: z.array(
+        z.object({
+          /** The artwork this frame belongs to — a slide, for a repeating brief. */
+          artwork: z.string(),
+          /** The format's name, which is what a tab is labelled with. */
+          format: z.string(),
+          width: z.number().int().positive(),
+          height: z.number().int().positive(),
+          /** Self-contained: fonts and assets embedded, no request it could make. */
+          html: z.string(),
+        }),
+      ),
+      diagnostics: z.array(diagnostic),
     }),
   ),
 

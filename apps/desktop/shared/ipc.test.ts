@@ -13,6 +13,7 @@ describe('the IPC contract', () => {
   it('names every channel exactly once, and nothing else', () => {
     expect([...IPC_CHANNEL_NAMES].sort()).toEqual([
       'app:info',
+      'brief:preview',
       'credentials:delete',
       'credentials:get',
       'credentials:set',

@@ -25,9 +25,27 @@ const credentials = (): Credentials => {
   };
 };
 
+/**
+ * A preview that compiles nothing.
+ *
+ * `preview.test.ts` drives the real one against the real pack; what this file is about is
+ * the registration and the contract, and those are the same whichever service answers.
+ */
+const preview = () => ({
+  preview: (brief: string) =>
+    Promise.resolve({
+      frames:
+        brief.trim() === ''
+          ? []
+          : [{ artwork: 'a1', format: 'feed', width: 1080, height: 1080, html: '<!doctype html>' }],
+      diagnostics: [],
+    }),
+});
+
 const dependencies = () => ({
   credentials: credentials(),
   info: () => ({ version: '0.1.0', platform: 'linux', locale: 'pt-BR', templates: ['promo'] }),
+  preview: preview(),
 });
 
 describe('registerIpcHandlers', () => {

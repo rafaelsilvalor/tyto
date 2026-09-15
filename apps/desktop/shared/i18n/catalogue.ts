@@ -16,8 +16,17 @@
 export interface Catalogue {
   readonly 'app.name': string;
   readonly 'app.tagline': string;
-  readonly 'shell.empty.title': string;
-  readonly 'shell.empty.body': string;
+  readonly 'editor.heading': string;
+  readonly 'preview.heading': string;
+  readonly 'preview.slide.label': string;
+  readonly 'preview.zoom.out': string;
+  readonly 'preview.zoom.in': string;
+  readonly 'preview.zoom.fit': string;
+  /** Shown in place of a frame while the brief produces none. */
+  readonly 'preview.empty': string;
+  /** The status line under the stage, with the number of problems spliced in. */
+  readonly 'preview.problems': string;
+  readonly 'preview.ok': string;
   readonly 'shell.language.label': string;
   readonly 'shell.about.version': string;
   readonly 'shell.about.platform': string;
@@ -29,8 +38,15 @@ export type CatalogueKey = keyof Catalogue;
 export const CATALOGUE_KEYS = [
   'app.name',
   'app.tagline',
-  'shell.empty.title',
-  'shell.empty.body',
+  'editor.heading',
+  'preview.heading',
+  'preview.slide.label',
+  'preview.zoom.out',
+  'preview.zoom.in',
+  'preview.zoom.fit',
+  'preview.empty',
+  'preview.problems',
+  'preview.ok',
   'shell.language.label',
   'shell.about.version',
   'shell.about.platform',
