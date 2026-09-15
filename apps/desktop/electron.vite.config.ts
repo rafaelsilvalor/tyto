@@ -33,7 +33,38 @@ export default defineConfig({
     plugins: [externalizeDepsPlugin()],
     build: {
       rollupOptions: {
-        external: ['electron'],
+        // `playwright` is external for the opposite reason `electron` is: not because the
+        // runtime supplies it, but because nothing here ever asks for it.
+        //
+        // E9.2 made main depend on `@tyto/pipeline` for `markupTemplateSource`, and pipeline
+        // takes two functions from `@tyto/raster`, whose index re-exports the Playwright
+        // adapter — so the bundler walks that adapter's `await import('playwright')` and
+        // dies on a dependency of a dependency of Playwright:
+        // `Rolldown failed to resolve import "chromium-bidi/lib/cjs/bidiMapper/BidiMapper"`.
+        //
+        // The desktop rasterizes through its own window (ADR 0002, E5.4), never through
+        // Playwright, so the import is unreachable code the bundle should not contain. Left
+        // external it stays a dynamic `import('playwright')` that nothing calls; if
+        // something ever did, the adapter's own try/catch turns it into the sentence about
+        // installing the optional peer, which is the right failure.
+        // `@tyto/fonts` is external for a third reason again: it is the one workspace package
+        // that reads files *relative to its own module*. `bundledFontsDirectory()` is
+        // `../fonts` from `import.meta.url`, which is right from `src/index.ts` and from
+        // `dist/index.js` and wrong from inside this bundle — inlined, it resolves to
+        // `out/fonts` and every render dies with
+        // `@tyto/fonts lists Source Sans 3 700 normal but cannot read …/out/fonts/…`.
+        //
+        // Found by opening the window, not by a test: the unit suites run from source, where
+        // the path is correct (TYTO-41). Left external, the module keeps its own location and
+        // `electron-builder.yml` ships the package beside the bundle, the same arrangement
+        // `@tyto/templates` already has and for the same underlying reason — a folder of
+        // bytes is not code and cannot be bundled into any amount of JavaScript.
+        external: [
+          'electron',
+          '@tyto/fonts',
+          /^playwright(?:-core)?(?:\/|$)/,
+          /^chromium-bidi(?:\/|$)/,
+        ],
         input: { index: resolve(import.meta.dirname, 'src/main/index.ts') },
       },
     },

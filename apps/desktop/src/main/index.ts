@@ -9,6 +9,7 @@ import { fileCredentialStore } from './credential-store.js';
 import { createCredentials } from './credentials.js';
 import { registerIpcHandlers } from './ipc.js';
 import { activateBuiltIns } from './plugins.js';
+import { createPreviewService } from './preview.js';
 import { bundledRenderer, createMainWindow } from './window.js';
 
 /**
@@ -39,7 +40,13 @@ async function start(): Promise<void> {
   // The registry is read before the window opens, not after: the renderer's first question
   // is which templates exist, and answering it with "not yet" would put a loading state in
   // front of every panel for the lifetime of a decision made at startup.
-  const host = await activateBuiltIns({ fileSystem: nodeFileSystem() });
+  const fileSystem = nodeFileSystem();
+  const host = await activateBuiltIns({ fileSystem });
+
+  // Built before the window, for the same reason the registry is: the preview's first
+  // answer should not wait on a folder read that could have happened during startup. It
+  // reads the same pack the host registered, through the same resolver.
+  const preview = await createPreviewService({ fileSystem });
 
   // The one place `safeStorage` is named. Everything below takes it as an argument, which
   // is what lets the credential module be tested without a keychain and without Electron.
@@ -50,6 +57,7 @@ async function start(): Promise<void> {
 
   registerIpcHandlers(ipcMain, {
     credentials,
+    preview,
     info: () => ({
       version: app.getVersion(),
       platform: process.platform,

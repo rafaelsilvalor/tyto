@@ -17,8 +17,13 @@
     "test:package": "vitest run --config vitest.package.config.ts"
   },
   "dependencies": {
+    "@tyto/brief-lang": "workspace:*",
     "@tyto/core": "workspace:*",
+    "@tyto/editor": "workspace:*",
+    "@tyto/export-html": "workspace:*",
+    "@tyto/fonts": "workspace:*",
     "@tyto/io": "workspace:*",
+    "@tyto/pipeline": "workspace:*",
     "@tyto/plugin-api": "workspace:*",
     "@tyto/templates": "workspace:*",
     "zod": "^4.6.1"

@@ -5,7 +5,7 @@ import { fileURLToPath } from 'node:url';
 import { type ElectronApplication, type Page, _electron } from 'playwright';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 
-import { CATALOGUE_KEYS, translate } from '../shared/i18n/index.js';
+import { type CatalogueKey, CATALOGUE_KEYS, translate } from '../shared/i18n/index.js';
 import { en } from '../shared/i18n/en.js';
 import { ptBR } from '../shared/i18n/pt-BR.js';
 import { I18N_ATTRIBUTE } from '../src/renderer/shell.js';
@@ -185,6 +185,7 @@ describe('the bridge', () => {
 
     expect(channels).toEqual([
       'app:info',
+      'brief:preview',
       'credentials:delete',
       'credentials:get',
       'credentials:set',
@@ -203,12 +204,40 @@ describe('the language picker', () => {
       [I18N_ATTRIBUTE],
     );
 
+  /**
+   * Keys that are deliberately *not* an element's text, pinned so the list cannot grow
+   * quietly — the same shape as the identical-translation pin in `i18n.test.ts`.
+   *
+   * The two zoom buttons show a glyph, which is the right thing to see and nothing at all to
+   * hear, so their words go on `title` and `aria-label` (E9.2). The two status keys are
+   * alternatives: the line says either how many problems there are or that there are none,
+   * so neither is on screen unconditionally and counting both would count a string that is
+   * not there.
+   */
+  const NOT_ELEMENT_TEXT: readonly CatalogueKey[] = [
+    'preview.zoom.out',
+    'preview.zoom.in',
+    'preview.problems',
+    'preview.ok',
+  ];
+
   it('paints every catalogue string on load, with none left blank', async () => {
     const strings = await visibleStrings();
 
-    expect(strings).toHaveLength(CATALOGUE_KEYS.length);
+    expect(strings).toHaveLength(CATALOGUE_KEYS.length - NOT_ELEMENT_TEXT.length);
     expect(strings.filter((text) => text.trim() === '')).toEqual([]);
   });
+
+  it('gives the glyph buttons their words where a screen reader can reach them', () =>
+    Promise.all(
+      [
+        ['#zoom-out', 'preview.zoom.out'],
+        ['#zoom-in', 'preview.zoom.in'],
+      ].map(async ([selector, key]) => {
+        const label = await page.getAttribute(selector!, 'aria-label');
+        expect(label, selector).toBe(translate('en', key as CatalogueKey));
+      }),
+    ));
 
   it('changes every string that differs between the two catalogues', async () => {
     await page.selectOption('#locale', 'pt-BR');
@@ -217,14 +246,17 @@ describe('the language picker', () => {
     await page.selectOption('#locale', 'en');
     const english = await visibleStrings();
 
-    const translated = CATALOGUE_KEYS.filter((key) => ptBR[key] !== en[key]).length;
+    const translated = CATALOGUE_KEYS.filter(
+      (key) => ptBR[key] !== en[key] && !NOT_ELEMENT_TEXT.includes(key),
+    ).length;
     const changed = portuguese.filter((text, index) => text !== english[index]).length;
 
-    // Every key that has a translation. `i18n.test.ts` pins the two that deliberately do
-    // not — the product name and the word "template", which this project uses in both.
+    // Every key that has a translation and is somebody's text. `i18n.test.ts` pins the four
+    // that deliberately read the same in both, and `NOT_ELEMENT_TEXT` above pins the four
+    // that are not an element's text at all.
     expect(changed).toBe(translated);
-    expect(english).toContain(translate('en', 'shell.empty.title'));
-    expect(portuguese).toContain(translate('pt-BR', 'shell.empty.title'));
+    expect(english).toContain(translate('en', 'preview.empty'));
+    expect(portuguese).toContain(translate('pt-BR', 'preview.empty'));
   });
 
   it('changes the document language with it', async () => {

@@ -40,6 +40,16 @@ files:
   - '!node_modules/**'
   - node_modules/@tyto/templates/package.json
   - node_modules/@tyto/templates/templates/**
+  # The second package that is bytes rather than code, and it came back for a different
+  # reason than the first (TYTO-41). `@tyto/fonts` resolves its `fonts/` folder as `../fonts`
+  # from its own module, so it is left out of the bundle by `electron.vite.config.ts` and has
+  # to arrive here as a real package — `dist/` because the bundle now imports it at runtime,
+  # `fonts/` because that is what it reads. Without it every render fails with
+  # `@tyto/fonts lists Source Sans 3 700 normal but cannot read …`, which the E9.1 app never
+  # hit because it never rendered anything.
+  - node_modules/@tyto/fonts/package.json
+  - node_modules/@tyto/fonts/dist/**
+  - node_modules/@tyto/fonts/fonts/**
 
 # Named rather than inferred. electron-builder can read the repository out of a
 # `package.json`, but `apps/desktop/package.json` has no `repository` field and the one it

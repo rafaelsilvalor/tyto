@@ -11,6 +11,7 @@ import {
   parseIpc,
 } from '../../shared/ipc.js';
 import { type Credentials } from './credentials.js';
+import { type PreviewService } from './preview.js';
 
 /**
  * Every handler, registered from the contract rather than beside it.
@@ -31,6 +32,8 @@ export interface IpcDependencies {
   readonly credentials: Credentials;
   /** `app.getVersion()` and friends, injected so the handlers can be tested without Electron. */
   readonly info: () => IpcResponse<'app:info'>;
+  /** Brief text to one document per frame (E9.2). Injected for the same reason `info` is. */
+  readonly preview: PreviewService;
 }
 
 /** One handler per channel, typed against the contract in both directions. */
@@ -39,10 +42,18 @@ type Handlers = {
 };
 
 export function createHandlers(dependencies: IpcDependencies): Handlers {
-  const { credentials, info } = dependencies;
+  const { credentials, info, preview } = dependencies;
 
   return {
     'app:info': () => Promise.resolve(info()),
+
+    'brief:preview': async ({ requestId, brief }) => {
+      const result = await preview.preview(brief);
+      // The id goes back untouched. Main does not know which answer the renderer still
+      // wants — only the renderer knows what it has asked since — so the whole of main's
+      // part in discarding a stale result is not losing the number.
+      return { requestId, frames: [...result.frames], diagnostics: [...result.diagnostics] };
+    },
 
     'credentials:set': async ({ account, secret }) => {
       await credentials.set(account, secret);

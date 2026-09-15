@@ -44,9 +44,25 @@ body {
     sans-serif;
 }
 
+/*
+ * `height`, not `min-height`, and the window never scrolls.
+ *
+ * TYTO-40 fixed this once by making the padding come out of the height; E9.2 put a two-pane
+ * grid inside and it came back, because `min-height` is a floor and a floor lets content
+ * push past it. Measured at 1360x860 with a carousel loaded: the shell was **891.6px in an
+ * 860px viewport**, 32px of overflow — the bottom padding, pushed below the fold by a
+ * scrollbar that should not exist.
+ *
+ * An app shell is the window. What scrolls is inside it: the editor scrolls its buffer and
+ * the stage scrolls a frame too big to fit, both of which already say so. `overflow: hidden`
+ * here is what makes those two the only scrollable things, and it is safe because every box
+ * between here and them carries `min-height: 0` — without that a grid or flex child refuses
+ * to shrink below its content and the clipping would hide the footer instead of the excess.
+ */
 .shell {
   display: flex;
-  min-height: 100vh;
+  height: 100vh;
+  overflow: hidden;
   flex-direction: column;
   gap: 24px;
   padding: 32px;
@@ -61,29 +77,6 @@ body {
 .shell__about {
   margin: 4px 0 0;
   color: var(--muted);
-}
-
-.shell__empty {
-  flex: 1;
-  display: flex;
-  flex-direction: column;
-  justify-content: center;
-  align-items: center;
-  gap: 8px;
-  border: 1px dashed var(--line);
-  border-radius: 10px;
-  text-align: center;
-}
-
-.shell__empty h2 {
-  margin: 0;
-  font-size: 17px;
-}
-
-.shell__empty p {
-  margin: 0;
-  color: var(--muted);
-  max-width: 44ch;
 }
 
 .shell__foot {
@@ -110,4 +103,167 @@ body {
 
 .shell__about dd {
   margin: 0;
+}
+
+/*
+ * E9.2: the split, the preview stage and the checkerboard.
+ *
+ * Still no framework and still not a theme — TYTO-96 is where the app gets a visual language
+ * and every value below becomes a token. What is here is layout, which that card should find
+ * already working rather than have to invent while it is choosing colours.
+ */
+
+.work {
+  flex: 1;
+  display: grid;
+  /* Two equal columns that may both shrink. `1fr` alone would floor each at its content's
+     width, and a 1080px preview would push the editor off the window. */
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  gap: 16px;
+  min-height: 0;
+}
+
+.work__pane {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  min-width: 0;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  overflow: hidden;
+}
+
+.work__bar {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+  padding: 8px 12px;
+  border-bottom: 1px solid var(--line);
+}
+
+.work__title {
+  margin: 0;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.editor {
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+}
+
+/* CodeMirror sizes itself to its content unless told otherwise; without this the editor
+   grows past the pane instead of scrolling inside it. */
+.editor .cm-editor {
+  height: 100%;
+}
+
+.preview__tabs {
+  display: flex;
+  gap: 4px;
+  margin-inline-end: auto;
+}
+
+.preview__tab {
+  border: 1px solid transparent;
+  border-radius: 6px;
+  padding: 3px 10px;
+  background: none;
+  color: var(--muted);
+  font: inherit;
+  font-size: 13px;
+  cursor: pointer;
+}
+
+.preview__tab--on {
+  border-color: var(--line);
+  color: var(--ink);
+  font-weight: 600;
+}
+
+.preview__slide,
+.preview__zoom {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+  font-size: 13px;
+  color: var(--muted);
+}
+
+.preview__zoom button {
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  padding: 2px 8px;
+  background: none;
+  color: var(--ink);
+  font: inherit;
+  font-size: 13px;
+  cursor: pointer;
+}
+
+#zoom-level {
+  min-width: 4ch;
+  text-align: center;
+  font-variant-numeric: tabular-nums;
+}
+
+.preview__stage {
+  flex: 1;
+  min-height: 0;
+  display: grid;
+  place-items: center;
+  overflow: auto;
+  padding: 16px;
+}
+
+/*
+ * The checkerboard, behind the frame rather than inside it.
+ *
+ * A frame with no background is transparent on purpose (`docs/ir-schema.md`), and against a
+ * plain panel that is indistinguishable from a white artwork. The squares are what make
+ * "there is nothing here" visible. They are on the paper and not on the stage so that they
+ * mark exactly the frame's bounds — which is also the only way to see that a frame is
+ * partly transparent.
+ */
+.preview__paper {
+  --square: 8px;
+  background-color: #ffffff;
+  background-image:
+    linear-gradient(45deg, #d9d9e0 25%, transparent 25%, transparent 75%, #d9d9e0 75%),
+    linear-gradient(45deg, #d9d9e0 25%, transparent 25%, transparent 75%, #d9d9e0 75%);
+  background-size: calc(var(--square) * 2) calc(var(--square) * 2);
+  background-position:
+    0 0,
+    var(--square) var(--square);
+  box-shadow: 0 1px 6px rgb(0 0 0 / 18%);
+  /* The iframe is full size and scaled by a transform, which does not shrink the element's
+     own box — so the overflow has to be clipped or a 1080px frame would paint past a 300px
+     paper. */
+  overflow: hidden;
+}
+
+.preview__paper iframe {
+  display: block;
+  border: 0;
+}
+
+.preview__empty,
+.preview__status {
+  margin: 0;
+  color: var(--muted);
+  font-size: 13px;
+}
+
+.preview__status {
+  padding: 8px 12px;
+  border-top: 1px solid var(--line);
+}
+
+.preview__status--bad {
+  color: #b3261e;
 }
