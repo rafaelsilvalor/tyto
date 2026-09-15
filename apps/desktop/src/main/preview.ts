@@ -53,8 +53,24 @@ export interface PreviewFrame {
   readonly html: string;
 }
 
+/**
+ * One artwork the brief produced, and where in the brief it was written (E9.3).
+ *
+ * The `range` is the whole reason this list exists beside `frames`. Selecting a slide
+ * scrolls the editor to the directive that made it, and a `Scene` carries no source
+ * position — by the time a frame exists the brief is three stages behind. `resolve` is the
+ * last stage that still knows, so the number is picked up there and carried forward.
+ */
+export interface PreviewArtwork {
+  readonly id: string;
+  readonly index: number;
+  /** Absent when the template has no repeating slot: one artwork, and no one line for it. */
+  readonly range?: { readonly start: number; readonly end: number };
+}
+
 export interface PreviewResult {
   readonly frames: readonly PreviewFrame[];
+  readonly artworks: readonly PreviewArtwork[];
   /**
    * Everything the stages had to say, errors and warnings together.
    *
@@ -140,6 +156,7 @@ export async function createPreviewService(
 
   const failed = (diagnostics: Diagnostics): PreviewResult => ({
     frames: [],
+    artworks: [],
     diagnostics: [...startup, ...diagnostics],
   });
 
@@ -188,7 +205,20 @@ export async function createPreviewService(
         ...scene.warnings,
       ];
 
-      if (!exported.ok) return { frames: [], diagnostics: [...before, ...exported.error] };
+      // Zipped by position, which is exact rather than close enough: `planArtworks` maps
+      // `resolved.artworks` one to one and in order, and `compile` pushes one `Artwork` per
+      // plan. A brief whose template has no repeating slot has one plan and no resolved
+      // artwork, so the lookup misses and the range is absent — which is the right answer,
+      // not a gap. Matching on the id instead would mean rebuilding `${slot}-${n + 1}` here,
+      // a second copy of a name `compile` owns.
+      const artworks: PreviewArtwork[] = scene.value.artworks.map((artwork, index) => {
+        const source = resolved.value.artworks[index]?.slot.range;
+        return { id: artwork.id, index, ...(source === undefined ? {} : { range: source }) };
+      });
+
+      if (!exported.ok) {
+        return { frames: [], artworks, diagnostics: [...before, ...exported.error] };
+      }
 
       return {
         frames: exported.value.map((frame) => ({
@@ -198,6 +228,7 @@ export async function createPreviewService(
           height: frame.frame.size.h,
           html: frame.html,
         })),
+        artworks,
         diagnostics: [...before, ...exported.warnings],
       };
     },

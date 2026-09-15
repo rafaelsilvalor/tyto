@@ -12,6 +12,7 @@ import {
 } from '../../shared/ipc.js';
 import { type Credentials } from './credentials.js';
 import { type PreviewService } from './preview.js';
+import { type TemplateCatalogue } from './templates.js';
 
 /**
  * Every handler, registered from the contract rather than beside it.
@@ -34,6 +35,8 @@ export interface IpcDependencies {
   readonly info: () => IpcResponse<'app:info'>;
   /** Brief text to one document per frame (E9.2). Injected for the same reason `info` is. */
   readonly preview: PreviewService;
+  /** What the template picker lists (E9.3), read from manifests and held. */
+  readonly templates: TemplateCatalogue;
 }
 
 /** One handler per channel, typed against the contract in both directions. */
@@ -42,7 +45,7 @@ type Handlers = {
 };
 
 export function createHandlers(dependencies: IpcDependencies): Handlers {
-  const { credentials, info, preview } = dependencies;
+  const { credentials, info, preview, templates } = dependencies;
 
   return {
     'app:info': () => Promise.resolve(info()),
@@ -52,8 +55,15 @@ export function createHandlers(dependencies: IpcDependencies): Handlers {
       // The id goes back untouched. Main does not know which answer the renderer still
       // wants — only the renderer knows what it has asked since — so the whole of main's
       // part in discarding a stale result is not losing the number.
-      return { requestId, frames: [...result.frames], diagnostics: [...result.diagnostics] };
+      return {
+        requestId,
+        frames: [...result.frames],
+        artworks: [...result.artworks],
+        diagnostics: [...result.diagnostics],
+      };
     },
+
+    'templates:list': () => Promise.resolve(templates.list()),
 
     'credentials:set': async ({ account, secret }) => {
       await credentials.set(account, secret);

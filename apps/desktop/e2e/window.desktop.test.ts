@@ -189,6 +189,7 @@ describe('the bridge', () => {
       'credentials:delete',
       'credentials:get',
       'credentials:set',
+      'templates:list',
     ]);
   });
 });
@@ -219,6 +220,17 @@ describe('the language picker', () => {
     'preview.zoom.in',
     'preview.problems',
     'preview.ok',
+    // E9.3: the problems panel and the template picker build their own rows, so their
+    // strings reach the screen through `panel.ts` rather than through the `data-i18n` pass
+    // this counts. They are a locale's strings all the same — `panel.test.ts` is what holds
+    // them to it.
+    'problems.empty',
+    'problems.severity.error',
+    'problems.severity.warning',
+    'problems.severity.info',
+    'problems.location',
+    'problems.nowhere',
+    'template.none',
   ];
 
   it('paints every catalogue string on load, with none left blank', async () => {

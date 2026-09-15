@@ -267,3 +267,137 @@ body {
 .preview__status--bad {
   color: #b3261e;
 }
+
+/*
+ * E9.3: the problems panel and the template picker.
+ *
+ * Same rule as above — layout, not a theme. The one colour decision here is the severity
+ * dot, and it is a decision the panel cannot avoid: a list where an error and a warning look
+ * identical is a list nobody reads twice. TYTO-96 turns these three into tokens.
+ */
+
+.work__template {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  margin-inline-start: auto;
+  font-size: 13px;
+  color: var(--muted);
+}
+
+/*
+ * As tall as its contents, up to a ceiling, and the list scrolls past that.
+ *
+ * It was a flat 168px until the window was opened and looked at. A clean brief — which is
+ * the state somebody is in most of the time — then reserved 168px to say "nothing to
+ * report" on one line, and the preview paid for it: a 1080x1080 frame fitted at **32%**
+ * instead of 44%. A fixed height is also what would push the footer off the bottom on a
+ * brief with forty problems, which is the overflow bug TYTO-40 and TYTO-41 each hit once,
+ * so the ceiling is a `max-height` and the list inside it scrolls.
+ *
+ * `flex: 0 0 auto` keeps the panel from being the thing that collapses when the window is
+ * short: the editor and the preview above it already scroll, and this is the only pane
+ * whose content is a list somebody reads top to bottom.
+ */
+.problems {
+  flex: 0 0 auto;
+  display: flex;
+  flex-direction: column;
+  max-height: 30vh;
+  min-height: 0;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  overflow: hidden;
+}
+
+.problems__count {
+  margin-inline-start: auto;
+  font-size: 13px;
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
+}
+
+.problems__list {
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+}
+
+.problems__empty {
+  margin: 0;
+  padding: 12px;
+  color: var(--muted);
+  font-size: 13px;
+}
+
+/*
+ * A grid and not a flex row, so the codes line up down the column.
+ *
+ * A diagnostic list is read by scanning the left edge for the one code you recognise, and a
+ * flex row puts every code at a different x because the message before it is a different
+ * length. `minmax(0, 1fr)` on the message is what lets a long one ellipsize instead of
+ * pushing the location off the panel.
+ */
+.problems__row {
+  display: grid;
+  grid-template-columns: auto auto minmax(0, 1fr) auto;
+  gap: 10px;
+  align-items: baseline;
+  width: 100%;
+  border: 0;
+  border-bottom: 1px solid var(--line);
+  padding: 7px 12px;
+  background: none;
+  color: var(--ink);
+  font: inherit;
+  font-size: 13px;
+  text-align: start;
+}
+
+button.problems__row {
+  cursor: pointer;
+}
+
+button.problems__row:hover,
+button.problems__row:focus-visible {
+  background: color-mix(in srgb, var(--ink) 6%, transparent);
+}
+
+.problems__dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  /* The baseline of a bare box is its bottom edge, which would hang the dot below the text
+     it belongs to. Inline-block with an explicit nudge puts it on the text's own line. */
+  display: inline-block;
+  transform: translateY(-1px);
+}
+
+.problems__dot--error {
+  background: #b3261e;
+}
+
+.problems__dot--warning {
+  background: #a06a00;
+}
+
+.problems__dot--info {
+  background: #4a5bb8;
+}
+
+.problems__code {
+  color: var(--muted);
+  font-family: ui-monospace, monospace;
+  font-size: 12px;
+}
+
+.problems__message {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.problems__where {
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
+}
