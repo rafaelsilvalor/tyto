@@ -17,6 +17,7 @@ describe('the IPC contract', () => {
       'credentials:delete',
       'credentials:get',
       'credentials:set',
+      'templates:list',
     ]);
     expect(new Set(IPC_CHANNEL_NAMES).size).toBe(IPC_CHANNEL_NAMES.length);
   });
@@ -110,10 +111,10 @@ describe('what the contract does not promise', () => {
   });
 
   it('checks every declared channel, not only the ones a test remembers', () => {
-    // `{}` is a valid request for `app:info` and an invalid one for all three credential
-    // channels. Asserting it per channel from the table means a channel added later is
-    // covered by this test the day it is added.
-    const optional: readonly IpcChannelName[] = ['app:info'];
+    // `{}` is a valid request for the two channels that ask the app about itself and an
+    // invalid one for all three credential channels. Asserting it per channel from the
+    // table means a channel added later is covered by this test the day it is added.
+    const optional: readonly IpcChannelName[] = ['app:info', 'templates:list'];
 
     for (const name of IPC_CHANNEL_NAMES) {
       const accepts = IPC_CHANNELS[name].request.safeParse({}).success;

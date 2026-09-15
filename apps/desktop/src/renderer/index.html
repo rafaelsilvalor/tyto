@@ -35,6 +35,15 @@
         <section class="work__pane" aria-labelledby="editor-heading">
           <div class="work__bar">
             <h2 class="work__title" id="editor-heading" data-i18n="editor.heading"></h2>
+            <!--
+              The picker sits over the editor and not over the preview, because what it
+              changes is a line of the brief. Choosing a template is an edit; the preview
+              updating is the consequence, the same as it is for typing the line by hand.
+            -->
+            <label class="work__template">
+              <span data-i18n="template.label"></span>
+              <select id="template"></select>
+            </label>
           </div>
           <!-- CodeMirror mounts here; empty until `main.ts` runs. -->
           <div class="editor" id="editor"></div>
@@ -71,6 +80,20 @@
           <p class="preview__status" id="preview-status"></p>
         </section>
       </div>
+
+      <!--
+        The panel spans both panes rather than sitting under the editor, because a
+        diagnostic can come from any stage: a parse error is about the text on the left and
+        an unresolved font is about the picture on the right, and a panel under one of them
+        would be claiming the other's problems belong to it.
+      -->
+      <section class="problems" aria-labelledby="problems-heading">
+        <div class="work__bar">
+          <h2 class="work__title" id="problems-heading" data-i18n="problems.heading"></h2>
+          <output class="problems__count" id="problems-count"></output>
+        </div>
+        <div class="problems__list" id="problems-list"></div>
+      </section>
 
       <footer class="shell__foot">
         <label class="shell__language">

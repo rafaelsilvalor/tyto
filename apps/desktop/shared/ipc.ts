@@ -127,7 +127,77 @@ export const IPC_CHANNELS = {
           html: z.string(),
         }),
       ),
+      /**
+       * The artworks the brief produced, in the order it wrote them (E9.3).
+       *
+       * Derivable from `frames` by deduplicating on `artwork`, and sent anyway, for the one
+       * field that is not in a frame: `range`. Selecting a slide scrolls the editor to the
+       * directive that created it, and only `resolve` knows where that directive was — a
+       * frame is downstream of a `Scene`, which carries no source position at all.
+       *
+       * Absent `range` is a brief with no repeating slot: one artwork stands for the whole
+       * document, and there is no single line to scroll to.
+       */
+      artworks: z.array(
+        z.object({
+          id: z.string(),
+          /** Its place in the brief, so a list can be numbered without parsing the id. */
+          index: z.number().int().nonnegative(),
+          range: z.object({ start: z.number().int(), end: z.number().int() }).optional(),
+        }),
+      ),
       diagnostics: z.array(diagnostic),
+    }),
+  ),
+
+  /**
+   * Every template the registry holds, with what a picker needs to show one (E9.3).
+   *
+   * Separate from `app:info`'s list of names, which stays: that one answers "did the
+   * composition root wire anything" on a window that has not compiled a brief yet, and it
+   * is one round trip lighter than this. Asked once on load, because a registry is read
+   * once at startup and held (`src/main/preview.ts`) — a picker that re-asked per click
+   * would be re-reading nothing.
+   *
+   * `preview` is a `data:` URI and not a path. The renderer's Content-Security-Policy is
+   * `img-src 'self' data:`, and a `file://` path would be both refused by it and wrong: the
+   * renderer is meant to run in a browser tab later, where the template folder is not on
+   * the same disk. Absent for a template with no `preview.png`, which today is all of them.
+   */
+  'templates:list': channel(
+    z.object({}),
+    z.object({
+      templates: z.array(
+        z.object({
+          name: z.string(),
+          version: z.string(),
+          description: z.string().optional(),
+          /** Format ids the template renders, which is what the preview tabs will become. */
+          formats: z.array(z.string()),
+          preview: z.string().optional(),
+        }),
+      ),
+      /**
+       * Folders that meant to be a template and could not be read as one.
+       *
+       * The registry keeps working templates and failures apart on purpose, so that one
+       * broken manifest does not empty a picker. Carried here so the panel can say a
+       * template is missing *because* it is broken, rather than leaving it silently absent —
+       * `createPreviewService` replays the registry's *warnings* on every preview and these
+       * are not among them, so without this channel nothing would ever say so.
+       *
+       * The registry's own diagnostics, not a string built from them: they already carry a
+       * code from `docs/diagnostic-codes.md` and a message in the user's language, and the
+       * panel draws them the same way it draws a diagnostic about the brief. A `range` would
+       * index a file the editor is not holding, so it is left off and the row is not a
+       * button.
+       */
+      failures: z.array(
+        z.object({
+          directory: z.string(),
+          diagnostics: z.array(diagnostic.omit({ range: true })),
+        }),
+      ),
     }),
   ),
 

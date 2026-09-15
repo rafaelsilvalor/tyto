@@ -8,8 +8,9 @@ import { localeFor } from '../../shared/i18n/index.js';
 import { fileCredentialStore } from './credential-store.js';
 import { createCredentials } from './credentials.js';
 import { registerIpcHandlers } from './ipc.js';
-import { activateBuiltIns } from './plugins.js';
+import { activateBuiltIns, builtInTemplatesDirectory } from './plugins.js';
 import { createPreviewService } from './preview.js';
+import { createTemplateCatalogue } from './templates.js';
 import { bundledRenderer, createMainWindow } from './window.js';
 
 /**
@@ -48,6 +49,14 @@ async function start(): Promise<void> {
   // reads the same pack the host registered, through the same resolver.
   const preview = await createPreviewService({ fileSystem });
 
+  // The picker's list, read once alongside the other two. Its own read rather than the
+  // preview service's registry: compiling a brief and listing what is installed are two
+  // reasons for one object to change, and `src/main/templates.ts` says why that matters.
+  const templates = await createTemplateCatalogue({
+    fileSystem,
+    directory: builtInTemplatesDirectory(),
+  });
+
   // The one place `safeStorage` is named. Everything below takes it as an argument, which
   // is what lets the credential module be tested without a keychain and without Electron.
   const credentials = createCredentials({
@@ -58,6 +67,7 @@ async function start(): Promise<void> {
   registerIpcHandlers(ipcMain, {
     credentials,
     preview,
+    templates,
     info: () => ({
       version: app.getVersion(),
       platform: process.platform,

@@ -51,6 +51,9 @@ describe('the catalogue', () => {
       'app.name',
       'editor.heading',
       'preview.slide.label',
+      // "Template" is the word in both languages, the same way "Slide" is: it is what the
+      // frontmatter key is called and what a Portuguese speaker says out loud.
+      'template.label',
       'shell.about.templates',
     ]);
   });

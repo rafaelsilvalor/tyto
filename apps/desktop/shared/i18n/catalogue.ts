@@ -27,6 +27,20 @@ export interface Catalogue {
   /** The status line under the stage, with the number of problems spliced in. */
   readonly 'preview.problems': string;
   readonly 'preview.ok': string;
+  /** The bottom panel that lists what the stages had to say about the brief. */
+  readonly 'problems.heading': string;
+  readonly 'problems.empty': string;
+  /** Read out for the coloured dot in front of a diagnostic, which says nothing on its own. */
+  readonly 'problems.severity.error': string;
+  readonly 'problems.severity.warning': string;
+  readonly 'problems.severity.info': string;
+  /** Titles the `line:column` a diagnostic points at. */
+  readonly 'problems.location': string;
+  /** A diagnostic about the project rather than about a span of the brief. */
+  readonly 'problems.nowhere': string;
+  readonly 'template.label': string;
+  /** The option standing for a brief whose frontmatter names no template yet. */
+  readonly 'template.none': string;
   readonly 'shell.language.label': string;
   readonly 'shell.about.version': string;
   readonly 'shell.about.platform': string;
@@ -47,6 +61,15 @@ export const CATALOGUE_KEYS = [
   'preview.empty',
   'preview.problems',
   'preview.ok',
+  'problems.heading',
+  'problems.empty',
+  'problems.severity.error',
+  'problems.severity.warning',
+  'problems.severity.info',
+  'problems.location',
+  'problems.nowhere',
+  'template.label',
+  'template.none',
   'shell.language.label',
   'shell.about.version',
   'shell.about.platform',

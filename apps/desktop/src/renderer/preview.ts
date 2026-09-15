@@ -1,4 +1,5 @@
 import { type IpcResponse } from '../../shared/ipc.js';
+import { paintArtworkList } from './panel.js';
 
 /**
  * The preview pane: which frame is showing, at what size, and how it gets on screen.
@@ -12,6 +13,7 @@ import { type IpcResponse } from '../../shared/ipc.js';
 
 /** One frame, as it comes off the bridge. */
 export type Frame = IpcResponse<'brief:preview'>['frames'][number];
+export type Artwork = IpcResponse<'brief:preview'>['artworks'][number];
 export type Diagnostic = IpcResponse<'brief:preview'>['diagnostics'][number];
 
 /** What the pane is currently showing. `undefined` before the first answer arrives. */
@@ -31,8 +33,16 @@ const distinct = (values: readonly string[]): readonly string[] => [...new Set(v
 export const formatsOf = (frames: readonly Frame[]): readonly string[] =>
   distinct(frames.map((frame) => frame.format));
 
-export const artworksOf = (frames: readonly Frame[]): readonly string[] =>
-  distinct(frames.map((frame) => frame.artwork));
+/**
+ * The artworks a brief produced, which is **not** the artworks the current frames show.
+ *
+ * A slide that renders only to `story` has no `feed` frame, so deriving this from frames
+ * would take that slide out of the list the moment somebody clicked the `feed` tab — a
+ * carousel that loses a slide when you change tab. E9.3 sends the artworks themselves for
+ * exactly this, and the frames stay what they were: one picture each.
+ */
+export const artworksOf = (artworks: readonly Artwork[]): readonly string[] =>
+  distinct(artworks.map((artwork) => artwork.id));
 
 /**
  * The selection to use once `frames` replaces what was on screen.
@@ -43,9 +53,13 @@ export const artworksOf = (frames: readonly Frame[]): readonly string[] =>
  * third. It falls back to the first frame's, which is also what the first answer of all
  * gets, since nothing was selected before it.
  */
-export function keepSelection(previous: Selection, frames: readonly Frame[]): Selection {
+export function keepSelection(
+  previous: Selection,
+  frames: readonly Frame[],
+  list: readonly Artwork[],
+): Selection {
   const formats = formatsOf(frames);
-  const artworks = artworksOf(frames);
+  const artworks = artworksOf(list);
 
   return {
     format:
@@ -145,6 +159,8 @@ export interface PreviewElements {
 
 export interface PreviewState {
   readonly frames: readonly Frame[];
+  /** Every artwork the brief wrote, in its own order — see {@link artworksOf}. */
+  readonly artworks: readonly Artwork[];
   readonly selection: Selection;
   readonly zoom: Zoom;
 }
@@ -177,24 +193,14 @@ function paintTabs(tabs: HTMLElement, state: PreviewState): void {
 
 /** Fills the slide picker, and hides it for a brief with only one artwork. */
 function paintSlides(elements: PreviewElements, state: PreviewState): void {
-  const artworks = artworksOf(state.frames);
-  const document_ = elements.slide.ownerDocument;
-
-  elements.slide.replaceChildren(
-    ...artworks.map((artwork, index) => {
-      const option = document_.createElement('option');
-      option.value = artwork;
-      // A number and not the artwork's id: `artwork-1` is the IR's name for it, and a
-      // person counting slides in a carousel is counting 1, 2, 3.
-      option.textContent = String(index + 1);
-      option.selected = artwork === state.selection.artwork;
-      return option;
-    }),
-  );
+  paintArtworkList(elements.slide, {
+    artworks: state.artworks,
+    selected: state.selection.artwork,
+  });
 
   // One slide is not a choice, and a picker with one option in it is furniture that reads
   // like a control. The label goes with it, or it labels nothing.
-  const single = artworks.length <= 1;
+  const single = state.artworks.length <= 1;
   elements.slide.hidden = single;
   elements.slideLabel.hidden = single;
 }
