@@ -408,3 +408,93 @@ button.problems__row:focus-visible {
   color: var(--muted);
   font-variant-numeric: tabular-nums;
 }
+
+/*
+ * The command bar (E9.12).
+ *
+ * `display: contents` while closed and `block` when open, so the element takes up no room
+ * in the layout at all until it has something to show — the same trap `.problems__list`
+ * fell into, with the opposite fix: there, an unknown tag needed a box; here it must not
+ * have one. `[open]` is reflected by the element, which is what lets CSS see the state.
+ */
+tyto-command-bar {
+  display: contents;
+}
+
+tyto-command-bar[open] {
+  position: fixed;
+  inset: 0;
+  z-index: 10;
+  display: flex;
+  justify-content: center;
+  /* Near the top and not centred: the list grows downwards, and a panel centred on an empty
+     query would jump as soon as somebody typed. */
+  padding-top: 12vh;
+  background: rgb(0 0 0 / 25%);
+}
+
+.command-bar__panel {
+  display: flex;
+  width: min(560px, calc(100vw - 32px));
+  max-height: 60vh;
+  flex-direction: column;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--ground);
+  box-shadow: 0 16px 48px rgb(0 0 0 / 18%);
+}
+
+.command-bar__input {
+  border: 0;
+  border-bottom: 1px solid var(--line);
+  border-radius: 8px 8px 0 0;
+  background: none;
+  color: inherit;
+  font: inherit;
+  font-size: 15px;
+  padding: 12px 14px;
+}
+
+.command-bar__input:focus {
+  outline: none;
+}
+
+.command-bar__list {
+  overflow: auto;
+  margin: 0;
+  padding: 4px;
+  list-style: none;
+}
+
+.command-bar__option {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 7px 10px;
+  border-radius: 5px;
+  cursor: default;
+  font-size: 13px;
+}
+
+.command-bar__option--on {
+  /* The same wash a hovered problem row uses, so the two selections read as one idea.
+     TYTO-96 owns the palette; this borrows rather than inventing a token it would have to
+     rename. */
+  background: color-mix(in srgb, var(--ink) 6%, transparent);
+}
+
+.command-bar__key {
+  color: var(--muted);
+  font-family: inherit;
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.command-bar__empty {
+  margin: 0;
+  padding: 14px;
+  color: var(--muted);
+  font-size: 13px;
+}
