@@ -105,12 +105,27 @@ importers:
 
   apps/desktop:
     dependencies:
+      '@tyto/brief-lang':
+        specifier: workspace:*
+        version: link:../../packages/brief-lang
       '@tyto/core':
         specifier: workspace:*
         version: link:../../packages/core
+      '@tyto/editor':
+        specifier: workspace:*
+        version: link:../../packages/editor
+      '@tyto/export-html':
+        specifier: workspace:*
+        version: link:../../packages/export-html
+      '@tyto/fonts':
+        specifier: workspace:*
+        version: link:../../packages/fonts
       '@tyto/io':
         specifier: workspace:*
         version: link:../../packages/io
+      '@tyto/pipeline':
+        specifier: workspace:*
+        version: link:../../packages/pipeline
       '@tyto/plugin-api':
         specifier: workspace:*
         version: link:../../packages/plugin-api

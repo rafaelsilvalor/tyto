@@ -25,6 +25,15 @@ import {
 /** The attribute that marks an element as text the catalogue owns. */
 export const I18N_ATTRIBUTE = 'data-i18n';
 
+/**
+ * The same, for a control whose visible label is a glyph.
+ *
+ * The zoom buttons read `−` and `+`, which are the right thing to *see* and nothing at all
+ * to hear. This puts the catalogue's words on `title` and `aria-label` instead of replacing
+ * the glyph, so the button stays a button and stops being anonymous to a screen reader.
+ */
+export const I18N_TITLE_ATTRIBUTE = 'data-i18n-title';
+
 export interface ShellState {
   readonly locale: Locale;
   readonly version: string;
@@ -65,6 +74,14 @@ export function paint(root: ParentNode, state: ShellState): void {
     const detail = detailOf(key, state);
     const text = translate(state.locale, key);
     element.textContent = detail === undefined ? text : `${text}: ${detail}`;
+  }
+
+  for (const element of root.querySelectorAll(`[${I18N_TITLE_ATTRIBUTE}]`)) {
+    const key = element.getAttribute(I18N_TITLE_ATTRIBUTE);
+    if (key === null || !isCatalogueKey(key)) continue;
+    const text = translate(state.locale, key);
+    element.setAttribute('title', text);
+    element.setAttribute('aria-label', text);
   }
 
   const title = root.querySelector('title');
