@@ -4,7 +4,11 @@ import { type FileDialogs, createDocumentService } from './documents.js';
 import { type RecentEntry, type RecentFiles } from './recent-files.js';
 
 /**
- * Opening, saving and the recent list, with no disk and no Electron under them (E9.8).
+ * Opening, saving and the recent list, with no disk and no Electron under them (E9.8, E9.11).
+ *
+ * Every call names a tab, because with document tabs there is more than one open file and
+ * the id is what says which (`shared/ipc.ts`). `TAB` and `OTHER_TAB` below are two of the
+ * renderer's own ids; the service treats them as opaque keys.
  *
  * The service names neither, which is what this file is proving as much as testing: the
  * dialogs are a port and the disk is injected, so every branch that matters — a dismissed
@@ -20,6 +24,9 @@ const at = (...parts: string[]): string => parts.join(SEP);
 
 const BRIEF = at('briefs', 'campanha.brief');
 const OTHER = at('outros', 'promo.brief');
+
+const TAB = 'document-1';
+const OTHER_TAB = 'document-2';
 
 /** A recent list in memory, with the same two rules the file one has. */
 function recentFiles(initial: readonly RecentEntry[] = []): RecentFiles {
@@ -61,9 +68,12 @@ describe('opening', () => {
       disk: disk({ [BRIEF]: '::titulo Olá' }),
     });
 
-    const document = await service.open();
+    const answer = await service.open(TAB);
 
-    expect(document).toEqual({ path: BRIEF, name: 'campanha.brief', text: '::titulo Olá' });
+    expect(answer).toEqual({
+      document: { path: BRIEF, name: 'campanha.brief', text: '::titulo Olá' },
+      documentId: TAB,
+    });
   });
 
   it('answers nothing for a dismissed dialog, which is not a failure', async () => {
@@ -73,9 +83,9 @@ describe('opening', () => {
       disk: disk({}),
     });
 
-    await expect(service.open()).resolves.toBeNull();
+    await expect(service.open(TAB)).resolves.toEqual({ document: null, documentId: null });
     // And nothing was adopted: the folder is still unknown, so the preview still says so.
-    expect(service.baseDirectory()).toBeUndefined();
+    expect(service.folderOf(TAB)).toBeUndefined();
   });
 
   it('gives the preview a folder to resolve assets against', async () => {
@@ -87,9 +97,11 @@ describe('opening', () => {
       disk: disk({ [BRIEF]: '' }),
     });
 
-    expect(service.baseDirectory()).toBeUndefined();
-    await service.open();
-    expect(service.baseDirectory()).toBe('briefs');
+    expect(service.folderOf(TAB)).toBeUndefined();
+    await service.open(TAB);
+    expect(service.folderOf(TAB)).toBe('briefs');
+    // And only that tab: a second one is still an unsaved brief with nowhere to look.
+    expect(service.folderOf(OTHER_TAB)).toBeUndefined();
   });
 });
 
@@ -109,8 +121,8 @@ describe('saving', () => {
       disk: store,
     });
 
-    await service.save('primeiro', false);
-    await service.save('segundo', false);
+    await service.save(TAB, 'primeiro', false);
+    await service.save(TAB, 'segundo', false);
 
     expect(asked).toEqual(['(none)']);
     expect(store.written[BRIEF]).toBe('segundo');
@@ -124,11 +136,11 @@ describe('saving', () => {
       disk: store,
     });
 
-    const document = await service.save('texto', true);
+    const document = await service.save(TAB, 'texto', true);
 
     expect(document?.name).toBe('promo.brief');
     expect(store.written[OTHER]).toBe('texto');
-    expect(service.baseDirectory()).toBe('outros');
+    expect(service.folderOf(TAB)).toBe('outros');
   });
 
   it('writes nothing when the dialog is dismissed', async () => {
@@ -139,7 +151,7 @@ describe('saving', () => {
       disk: store,
     });
 
-    await expect(service.save('texto', false)).resolves.toBeNull();
+    await expect(service.save(TAB, 'texto', false)).resolves.toBeNull();
     expect(Object.keys(store.written)).toEqual([]);
   });
 });
@@ -155,8 +167,9 @@ describe('reopening from the recent list', () => {
       disk: disk({ [BRIEF]: 'ok', [at('etc', 'passwd')]: 'root:x:0:0' }),
     });
 
-    await expect(service.reopen(at('etc', 'passwd'))).resolves.toEqual({
+    await expect(service.reopen(TAB, at('etc', 'passwd'))).resolves.toEqual({
       document: null,
+      documentId: null,
       missing: false,
     });
   });
@@ -168,10 +181,11 @@ describe('reopening from the recent list', () => {
       disk: disk({ [BRIEF]: '::titulo Olá' }),
     });
 
-    const answer = await service.reopen(BRIEF);
+    const answer = await service.reopen(TAB, BRIEF);
 
     expect(answer.missing).toBe(false);
     expect(answer.document?.text).toBe('::titulo Olá');
+    expect(answer.documentId).toBe(TAB);
   });
 
   it('reports a file that has moved rather than dropping it', async () => {
@@ -184,7 +198,11 @@ describe('reopening from the recent list', () => {
       disk: disk({}),
     });
 
-    await expect(service.reopen(BRIEF)).resolves.toEqual({ document: null, missing: true });
+    await expect(service.reopen(TAB, BRIEF)).resolves.toEqual({
+      document: null,
+      documentId: null,
+      missing: true,
+    });
   });
 });
 
@@ -214,9 +232,71 @@ describe('the recent list the bar shows', () => {
       disk: disk({ [BRIEF]: 'a', [OTHER]: 'b' }),
     });
 
-    await service.open();
+    await service.open(TAB);
 
     const { files } = await service.recent();
     expect(files.map((file) => file.name)).toEqual(['promo.brief', 'campanha.brief']);
+  });
+});
+
+describe('one path per tab', () => {
+  it('gives each tab its own folder, which is what an asset resolves against', async () => {
+    // The whole of why the id exists. With one `let current`, opening a second brief moved
+    // the first one's `assets/logo.png` to the second one's folder — silently, and only on
+    // the next keystroke in the tab nobody was looking at.
+    const service = createDocumentService({
+      dialogs: dialogs({ open: BRIEF }),
+      recent: recentFiles(),
+      disk: disk({ [BRIEF]: 'a', [OTHER]: 'b' }),
+    });
+
+    await service.open(TAB);
+    await service.save(OTHER_TAB, 'b', true);
+
+    expect(service.folderOf(TAB)).toBe('briefs');
+    expect(service.folderOf(OTHER_TAB)).toBeUndefined();
+  });
+
+  it('hands a file that is already open back to the tab that has it', async () => {
+    const service = createDocumentService({
+      dialogs: dialogs({ open: BRIEF }),
+      recent: recentFiles(),
+      disk: disk({ [BRIEF]: 'a' }),
+    });
+
+    await service.open(TAB);
+    const again = await service.open(OTHER_TAB);
+
+    // Not the tab that asked: the renderer goes to the one that already holds the file
+    // rather than opening a second buffer over it, and main is the side that can tell.
+    expect(again.documentId).toBe(TAB);
+    expect(service.folderOf(OTHER_TAB)).toBeUndefined();
+  });
+
+  it('forgets a tab that closed, so the file can be opened fresh', async () => {
+    const service = createDocumentService({
+      dialogs: dialogs({ open: BRIEF }),
+      recent: recentFiles(),
+      disk: disk({ [BRIEF]: 'a' }),
+    });
+
+    await service.open(TAB);
+    service.close(TAB);
+    expect(service.folderOf(TAB)).toBeUndefined();
+
+    const again = await service.open(OTHER_TAB);
+    expect(again.documentId).toBe(OTHER_TAB);
+  });
+
+  it('is not an error to close a tab it never heard of', () => {
+    const service = createDocumentService({
+      dialogs: dialogs({}),
+      recent: recentFiles(),
+      disk: disk({}),
+    });
+
+    expect(() => {
+      service.close('document-99');
+    }).not.toThrow();
   });
 });

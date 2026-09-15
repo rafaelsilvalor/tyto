@@ -1,7 +1,7 @@
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
 
-import { app, dialog, ipcMain, safeStorage } from 'electron';
+import { Menu, app, dialog, ipcMain, safeStorage } from 'electron';
 import { nodeFileSystem } from '@tyto/io';
 
 import { localeFor } from '../../shared/i18n/index.js';
@@ -9,6 +9,7 @@ import { fileCredentialStore } from './credential-store.js';
 import { createCredentials } from './credentials.js';
 import { createDocumentService } from './documents.js';
 import { fileLayoutStore } from './layout-store.js';
+import { menuTemplate } from './menu.js';
 import { fileRecentFiles } from './recent-files.js';
 import { registerIpcHandlers } from './ipc.js';
 import { activateBuiltIns, builtInTemplatesDirectory } from './plugins.js';
@@ -75,12 +76,10 @@ async function start(): Promise<void> {
   // answer should not wait on a folder read that could have happened during startup. It
   // reads the same pack the host registered, through the same resolver.
   //
-  // `baseDirectory` is asked on every preview rather than captured, which is what makes an
-  // asset start resolving the moment a file is opened without this service being rebuilt.
-  const preview = await createPreviewService({
-    fileSystem,
-    baseDirectory: () => documents.baseDirectory(),
-  });
+  // It is told no folder here. Which folder a compile resolves against is a property of the
+  // tab the brief is in, and `ipc.ts` looks it up per request from the id that came with
+  // it (E9.11) — a service holding one folder assumed one open document.
+  const preview = await createPreviewService({ fileSystem });
 
   // The picker's list, read once alongside the other two. Its own read rather than the
   // preview service's registry: compiling a brief and listing what is installed are two
@@ -98,6 +97,20 @@ async function start(): Promise<void> {
   });
 
   registerIpcHandlers(ipcMain, {
+    // The only question this app asks a person that is not a file picker: closing a tab
+    // with unsaved text. `cancelId` and `defaultId` both point at the safe button, so
+    // Escape and Enter each leave the text alone (E9.11).
+    confirm: async ({ message, detail, confirm: yes, cancel: no }) => {
+      const answer = await dialog.showMessageBox({
+        type: 'warning',
+        message,
+        ...(detail === undefined ? {} : { detail }),
+        buttons: [no, yes],
+        defaultId: 0,
+        cancelId: 0,
+      });
+      return answer.response === 1;
+    },
     credentials,
     documents,
     // Beside the credential store and the recent list, for the third time and on the same
@@ -121,6 +134,11 @@ async function start(): Promise<void> {
         .sort(),
     }),
   });
+
+  // Before the window, because the menu is the browser process's and a key pressed while it
+  // is still the default one would be handled by the default one. `menu.ts` says why this
+  // app installs a menu at all.
+  Menu.setApplicationMenu(Menu.buildFromTemplate(menuTemplate(process.platform)));
 
   createMainWindow({
     preload: join(here, '..', 'preload', 'index.cjs'),

@@ -1,7 +1,8 @@
-import { insertNewlineAndIndent } from '@codemirror/commands';
+import { insertNewlineAndIndent, undo as undoCommand } from '@codemirror/commands';
 import { EditorView } from '@codemirror/view';
 import { afterEach, describe, expect, it } from 'vitest';
 
+import { commandRegistryOf, createCommandRegistry } from './commands.js';
 import { createEditor, type EditorHandle } from './editor.js';
 
 /**
@@ -31,6 +32,11 @@ const type = (editor: EditorHandle, text: string): void => {
   editor.view.dispatch({
     changes: { from: editor.view.state.doc.length, insert: text },
   });
+};
+
+/** CodeMirror's own undo, which is the stack an `EditorState` carries. */
+const undo = (editor: EditorHandle): void => {
+  undoCommand({ state: editor.view.state, dispatch: (spec) => editor.view.dispatch(spec) });
 };
 
 describe('createEditor', () => {
@@ -163,5 +169,99 @@ describe('createEditor', () => {
     handle = undefined;
 
     expect(parent.querySelector('.cm-editor')).toBeNull();
+  });
+});
+
+/**
+ * One editor holding several documents, which is what a window with tabs needs (E9.11).
+ *
+ * Every test here is about the property a `setValue` could not have: that the *history* and
+ * the *selection* travel with the document. Swapping text would satisfy "the right words are
+ * on screen" and fail all four.
+ */
+describe('document snapshots', () => {
+  it('puts back the text a snapshot was taken of', () => {
+    handle = createEditor(open().parent, { doc: 'first' });
+    const first = handle.snapshot();
+
+    handle.restore(handle.blank('second'));
+    expect(handle.getValue()).toBe('second');
+
+    handle.restore(first);
+    expect(handle.getValue()).toBe('first');
+  });
+
+  it('keeps each document undo stack to itself', () => {
+    handle = createEditor(open().parent, { doc: 'a' });
+    type(handle, ' edited');
+    const first = handle.snapshot();
+
+    handle.restore(handle.blank('b'));
+    type(handle, ' also edited');
+    // The acceptance criterion in its literal form: this undo belongs to the second
+    // document and takes back only what was typed into it.
+    undo(handle);
+    expect(handle.getValue()).toBe('b');
+
+    handle.restore(first);
+    expect(handle.getValue()).toBe('a edited');
+    undo(handle);
+    expect(handle.getValue()).toBe('a');
+  });
+
+  it('does not put the tab switch itself on the undo stack', () => {
+    handle = createEditor(open().parent, { doc: 'start' });
+    const first = handle.snapshot();
+    handle.restore(handle.blank(''));
+
+    // A change transaction would have made the swap undoable, so one undo in the fresh
+    // document would paste `start` back in. `setState` is what stops that.
+    undo(handle);
+    expect(handle.getValue()).toBe('');
+
+    handle.restore(first);
+    expect(handle.getValue()).toBe('start');
+  });
+
+  it('restores where the cursor was', () => {
+    handle = createEditor(open().parent, { doc: 'abcdef' });
+    handle.view.dispatch({ selection: { anchor: 4 } });
+    const first = handle.snapshot();
+
+    handle.restore(handle.blank('other'));
+    expect(handle.view.state.selection.main.head).toBe(0);
+
+    handle.restore(first);
+    expect(handle.view.state.selection.main.head).toBe(4);
+  });
+
+  it('gives a new document this editor own extensions rather than a bare state', () => {
+    const registry = createCommandRegistry();
+    const { parent } = open();
+    handle = createEditor(parent, { doc: 'x', commands: registry, theme: 'dark' });
+
+    handle.restore(handle.blank('::titulo Direito\n'));
+
+    // The registry, the language and the theme are what make two tabs behave like one
+    // editor rather than like two editors that happen to share a window.
+    expect(commandRegistryOf(handle.view)).toBe(registry);
+    expect(handle.view.state.facet(EditorView.darkTheme)).toBe(true);
+    expect([...parent.querySelectorAll('.cm-line span')].map((span) => span.textContent)).toContain(
+      'titulo',
+    );
+  });
+
+  it('notifies nobody when a document is swapped', () => {
+    handle = createEditor(open().parent, { doc: 'x' });
+    const seen: string[] = [];
+    handle.onChange((value) => seen.push(value));
+
+    const first = handle.snapshot();
+    handle.restore(handle.blank('y'));
+    handle.restore(first);
+
+    // A host switching tabs already knows what it switched to; a notification here would
+    // look to the host exactly like the person having typed the other document.
+    expect(seen).toEqual([]);
   });
 });
