@@ -113,24 +113,136 @@ body {
  * already working rather than have to invent while it is choosing colours.
  */
 
+/*
+ * The docks (E9.10, ADR 0024).
+ *
+ * A flex row and not a grid, because the columns are no longer a fixed set: the left dock
+ * may be empty, the bottom one may be closed, and a grid whose template had to be rewritten
+ * every time a panel opened would put the arrangement back in the stylesheet — which is the
+ * thing this card took out of the markup.
+ *
+ * `centre` takes the remainder and the side docks are given a width in pixels from the
+ * record. `min-width: 0` on the elastic one is load-bearing: without it a 1080px preview
+ * floors the flex item at its content's width and pushes the editor off the window.
+ */
+/*
+ * Everything between the header and the footer, with **no gap of its own**.
+ *
+ * The shell puts 24px between its children, which is right for the header and the footer
+ * and wrong here: a splitter *is* the gap between two docks, and leaving the shell's one in
+ * place stacked 24 + 16 + 24 = 64px of dead space between the panes and the bottom dock.
+ * Found by opening the window — the DOM was correct and the picture was not, which is the
+ * third time on this app (TYTO-40, TYTO-41, and now this).
+ */
+.workspace {
+  display: flex;
+  flex: 1;
+  min-height: 0;
+  flex-direction: column;
+  gap: 0;
+}
+
 .work {
   flex: 1;
-  display: grid;
-  /* Two equal columns that may both shrink. `1fr` alone would floor each at its content's
-     width, and a 1080px preview would push the editor off the window. */
-  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  display: flex;
+  min-height: 0;
+  gap: 0;
+}
+
+.dock {
+  display: flex;
+  min-height: 0;
+  min-width: 0;
+  flex-direction: column;
   gap: 16px;
+}
+
+.dock--centre {
+  flex: 1;
+}
+
+.dock--left,
+.dock--right {
+  flex: 0 0 auto;
+}
+
+.dock--bottom {
+  flex: 0 0 auto;
   min-height: 0;
 }
 
-.work__pane {
+/*
+ * The draggable edge between two docks.
+ *
+ * 16px of room and a 2px line down the middle of it, because the gap between panes was
+ * 16px before this card and the window should not visibly change just because the gap
+ * became grabbable. `touch-action: none` so a drag on a trackpad or a touch screen is a
+ * drag and not a scroll.
+ */
+.splitter {
+  flex: 0 0 16px;
+  position: relative;
+  cursor: col-resize;
+  touch-action: none;
+}
+
+.splitter--row {
+  flex: 0 0 16px;
+  cursor: row-resize;
+}
+
+.splitter::after {
+  content: '';
+  position: absolute;
+  inset: 0 7px;
+  border-radius: 1px;
+  background: transparent;
+}
+
+.splitter--row::after {
+  inset: 7px 0;
+}
+
+.splitter:hover::after,
+.splitter:active::after {
+  background: color-mix(in srgb, var(--ink) 18%, transparent);
+}
+
+/*
+ * A panel is what a dock holds, and it fills it.
+ *
+ * `display: block` for the same reason `.problems__list` needs one: these are custom
+ * elements, and an element the engine has never heard of is `display: inline`, on which
+ * `flex` does nothing at all (ADR 0024).
+ */
+.panel {
   display: flex;
-  flex-direction: column;
+  flex: 1;
   min-height: 0;
   min-width: 0;
+  flex-direction: column;
   border: 1px solid var(--line);
   border-radius: 10px;
   overflow: hidden;
+}
+
+.panel__close {
+  margin-left: auto;
+  padding: 0 6px;
+  border: 0;
+  border-radius: 4px;
+  background: none;
+  color: var(--muted);
+  cursor: default;
+  font: inherit;
+  font-size: 16px;
+  line-height: 1;
+}
+
+.panel__close:hover,
+.panel__close:focus-visible {
+  background: color-mix(in srgb, var(--ink) 8%, transparent);
+  color: inherit;
 }
 
 .work__bar {
@@ -299,16 +411,14 @@ body {
  * short: the editor and the preview above it already scroll, and this is the only pane
  * whose content is a list somebody reads top to bottom.
  */
-.problems {
-  flex: 0 0 auto;
-  display: flex;
-  flex-direction: column;
-  max-height: 30vh;
-  min-height: 0;
-  border: 1px solid var(--line);
-  border-radius: 10px;
-  overflow: hidden;
-}
+/*
+ * The problems panel's own box moved to `.panel`, and its height moved to the record.
+ *
+ * It used to be `max-height: 30vh` here, found by opening the window: a flat 168px made a
+ * clean brief reserve all of it to say "nothing to report" (E9.3). The number is now the
+ * `size` in `shared/layout.ts`, which is the same answer with one difference — a person can
+ * drag it, and the app remembers.
+ */
 
 .problems__count {
   margin-inline-start: auto;

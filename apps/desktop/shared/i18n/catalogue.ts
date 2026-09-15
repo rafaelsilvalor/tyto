@@ -81,6 +81,22 @@ export interface Catalogue {
   readonly 'document.unsaved': string;
   readonly 'file.missing': string;
 
+  /**
+   * The dock, its panels and the commands that show and hide them (E9.10).
+   *
+   * `panel.*` are the panel names a command bar entry reads — "Mostrar ou esconder:
+   * Problemas" — and they are separate from `editor.heading` and friends on purpose: a
+   * heading sits over a pane and names what is in it, and this names the panel itself in a
+   * list of panels. They happen to read the same today and will not once a panel's heading
+   * carries a file name.
+   */
+  readonly 'panel.close': string;
+  readonly 'command.layout.togglePanel': string;
+  readonly 'command.layout.restore': string;
+  readonly 'panel.editor': string;
+  readonly 'panel.preview': string;
+  readonly 'panel.problems': string;
+
   readonly 'shell.language.label': string;
   readonly 'shell.about.version': string;
   readonly 'shell.about.platform': string;
@@ -130,6 +146,12 @@ export const CATALOGUE_KEYS = [
   'document.untitled',
   'document.unsaved',
   'file.missing',
+  'panel.close',
+  'command.layout.togglePanel',
+  'command.layout.restore',
+  'panel.editor',
+  'panel.preview',
+  'panel.problems',
   'shell.language.label',
   'shell.about.version',
   'shell.about.platform',
