@@ -1,9 +1,10 @@
 import { readFile, stat } from 'node:fs/promises';
 import { extname, resolve } from 'node:path';
 
-import type { AssetRef, SceneResources } from '@tyto/core';
+import type { AssetRef, SceneResources, Size } from '@tyto/core';
 import type { ExportResources } from './export-resources.js';
 
+import { imageSize } from './image-size.js';
 import { EMBEDDABLE_MIME, dataUri } from './mime.js';
 
 /**
@@ -77,7 +78,13 @@ function pathOf(base: string, ref: AssetRef): string {
   return ref.path === undefined ? resolve(base, ref.id) : resolve(ref.path);
 }
 
-async function readOne(path: string, maxBytes: number): Promise<string | undefined> {
+/** A file as the exporters want it: a URI to embed, and the size the picture really is. */
+interface Loaded {
+  readonly uri: string;
+  readonly size: Size | undefined;
+}
+
+async function readOne(path: string, maxBytes: number): Promise<Loaded | undefined> {
   // Only what a document can embed. A `.psd` beside the logo is not an oversight to
   // report; it is a working file that has no business in an export.
   const mime = EMBEDDABLE_MIME[extname(path).toLowerCase()];
@@ -87,7 +94,12 @@ async function readOne(path: string, maxBytes: number): Promise<string | undefin
   if (info === undefined || !info.isFile() || info.size > maxBytes) return undefined;
 
   const bytes = await readFile(path).catch(() => undefined);
-  return bytes === undefined ? undefined : dataUri(mime, bytes);
+  if (bytes === undefined) return undefined;
+  // Measured here because the bytes are here. `export-svg` crops a `cover` image itself
+  // rather than leaving it to `preserveAspectRatio`, which Figma drops (TYTO-60), and the
+  // arithmetic needs the picture's own proportions. A header nothing parses is left
+  // unmeasured rather than guessed, and that export falls back to the attribute.
+  return { uri: dataUri(mime, bytes), size: imageSize(bytes) };
 }
 
 /**
@@ -99,7 +111,7 @@ async function readOne(path: string, maxBytes: number): Promise<string | undefin
 export function fileResources(options: FileResourcesOptions): FileResources {
   const base = resolve(options.base);
   const maxBytes = options.maxBytes ?? DEFAULT_MAX_BYTES;
-  const byPath = new Map<string, string>();
+  const byPath = new Map<string, Loaded>();
 
   const load = async (needed: SceneResources): Promise<void> => {
     // Sequential rather than in parallel: an asset list is a handful of files, and a
@@ -107,16 +119,19 @@ export function fileResources(options: FileResourcesOptions): FileResources {
     // failure mode this card exists to remove, in a different disguise.
     for (const ref of needed.assets) {
       const path = pathOf(base, ref);
-      const uri = await readOne(path, maxBytes);
+      const loaded = await readOne(path, maxBytes);
       // A miss is left out rather than stored as undefined, so the exporter reports
       // `E_EXPORT_ASSET_UNRESOLVED` naming it. No folder and no file are the same answer
       // here: a brief that references an image that is not there has one problem, and it
       // is the exporter's to name.
-      if (uri !== undefined) byPath.set(path, uri);
+      if (loaded !== undefined) byPath.set(path, loaded);
     }
   };
 
-  const asset = (ref: AssetRef): string | undefined => byPath.get(pathOf(base, ref));
+  const asset = (ref: AssetRef): string | undefined => byPath.get(pathOf(base, ref))?.uri;
+  const assetSize = (ref: AssetRef): Size | undefined => byPath.get(pathOf(base, ref))?.size;
 
-  return { html: { asset }, svg: { asset }, load };
+  // `assetSize` goes to the SVG half only. HTML has `object-fit`, which is the browser
+  // doing the same arithmetic correctly, so there is nothing for the number to fix there.
+  return { html: { asset }, svg: { asset, assetSize }, load };
 }
