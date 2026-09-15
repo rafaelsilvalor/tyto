@@ -92,7 +92,12 @@
           <h2 class="work__title" id="problems-heading" data-i18n="problems.heading"></h2>
           <output class="problems__count" id="problems-count"></output>
         </div>
-        <div class="problems__list" id="problems-list"></div>
+        <!--
+          A custom element and not a `<div>` the renderer paints into: the panel owns its own
+          strings and its own updates (ADR 0024). It renders into itself rather than into a
+          shadow root, so `shell.css` still reaches every class inside it.
+        -->
+        <tyto-problems class="problems__list" id="problems-list"></tyto-problems>
       </section>
 
       <footer class="shell__foot">

@@ -317,7 +317,14 @@ body {
   font-variant-numeric: tabular-nums;
 }
 
+/*
+ * `display: block` because this is `<tyto-problems>` now (ADR 0024), and an element the
+ * engine has never heard of is `display: inline` — on which `flex: 1` and `overflow: auto`
+ * do nothing whatsoever. A custom element brings no default box with it; the stylesheet is
+ * where that gets said.
+ */
 .problems__list {
+  display: block;
   flex: 1;
   min-height: 0;
   overflow: auto;

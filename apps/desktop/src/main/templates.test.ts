@@ -73,9 +73,9 @@ describe('the template catalogue', () => {
   });
 
   it('carries a preview.png across as bytes, not as a path', async () => {
-    // A path would be refused by the renderer's `img-src 'self' data:` policy and would be
-    // wrong anyway: the same renderer is meant to run in a browser tab later, where the
-    // template folder is not on a disk it can reach.
+    // A path would be refused by the renderer's `img-src 'self' data:` policy, which is the
+    // whole of the reason since ADR 0024 retired the other one — that the renderer would
+    // later run in a browser tab with no disk under it. It will not.
     const catalogue = await createTemplateCatalogue({
       fileSystem: nodeFileSystem(),
       directory: scratch,

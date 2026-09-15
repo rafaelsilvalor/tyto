@@ -24,9 +24,11 @@ import { createBridge } from './bridge.js';
 /**
  * The single global. One name, with nothing on it but the channels.
  *
- * Not `window.electron` or anything that hints at what is underneath: the renderer is meant
- * to be portable to a browser tab later (`docs/architecture.md`, path to the cloud), and a
- * name that promises Electron would be a promise the cloud build could not keep.
+ * Not `window.electron` or anything that hints at what is underneath. The reason used to be
+ * portability to a browser tab; ADR 0024 says the renderer stays a desktop renderer. The
+ * name stays anyway, and for a better reason: what the renderer programs against is the
+ * channel table in `shared/ipc.ts`, and a global named after the transport would invite code
+ * that reaches for Electron's API instead of for the contract.
  */
 contextBridge.exposeInMainWorld(
   'tyto',

@@ -44,10 +44,11 @@ export interface TemplateCatalogue {
 /**
  * A template's `preview.png` as a `data:` URI, or nothing.
  *
- * A path would be the obvious answer and is the wrong one twice. The renderer's policy is
- * `img-src 'self' data:`, so a `file://` URL is refused before it is fetched; and the same
- * renderer is meant to run in a browser tab later, where the template folder is not on a
- * disk it can reach at all. Bytes cross the bridge, the way they do everywhere else here.
+ * A path would be the obvious answer and is refused: the renderer's policy is
+ * `img-src 'self' data:`, so a `file://` URL never gets fetched. This used to carry a second
+ * reason — that the renderer would one day run in a browser tab with no disk under it — and
+ * ADR 0024 retired that one. The first reason is a policy in `index.html` and needs no future
+ * to justify it. Bytes cross the bridge, the way they do everywhere else here.
  *
  * Every failure is the same answer — no image — because there is nothing a user could do
  * with a message about a file they did not write. A template with no preview is the normal

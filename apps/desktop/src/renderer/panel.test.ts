@@ -4,19 +4,18 @@ import { describe, expect, it } from 'vitest';
 
 import {
   type Artwork,
-  type Diagnostic,
   type Template,
   lineColumnAt,
   paintArtworkList,
-  paintProblems,
   paintTemplatePicker,
-  rangeOf,
   rangeOfArtwork,
   revealRange,
 } from './panel.js';
 
 /**
- * The panel, in the only two ways it can be checked without a screen.
+ * The pickers and the cursor, in the only two ways they can be checked without a screen.
+ *
+ * The problems panel moved to `problems-panel.test.ts` with the element itself (ADR 0024).
  *
  * The DOM half is what a node ends up holding, and the cursor half is driven through a
  * **real** editor rather than a double. That is deliberate: the card's criterion is that a
@@ -44,17 +43,8 @@ if (typeof Range.prototype.getClientRects !== 'function') {
   };
 }
 
-const problem = (over: Partial<Diagnostic> = {}): Diagnostic => ({
-  severity: 'error',
-  code: 'E_UNKNOWN_SLOT',
-  message: "'titulo' is not a slot this template declares.",
-  range: { start: 24, end: 30 },
-  ...over,
-});
-
 const BRIEF = ['---', 'template: promo', '---', '::titulo Olá', '::slide', '  Um'].join('\n');
 
-const list = (): HTMLElement => globalThis.document.createElement('div');
 const select = (): HTMLSelectElement => globalThis.document.createElement('select');
 
 describe('turning an offset into a place a person can find', () => {
@@ -75,78 +65,6 @@ describe('turning an offset into a place a person can find', () => {
   it('clamps an offset past the end rather than counting off the edge', () => {
     expect(lineColumnAt('ab', 99)).toEqual({ line: 1, column: 3 });
     expect(lineColumnAt('ab', -5)).toEqual({ line: 1, column: 1 });
-  });
-});
-
-describe('the problems panel', () => {
-  it('shows the code, the message and where to look', () => {
-    const node = list();
-    paintProblems(node, { diagnostics: [problem()], brief: BRIEF, locale: 'pt-BR' });
-
-    const row = node.querySelector('.problems__row');
-    expect(row?.querySelector('.problems__code')?.textContent).toBe('E_UNKNOWN_SLOT');
-    expect(row?.querySelector('.problems__message')?.textContent).toContain('titulo');
-    // Offset 24 is the `::titulo` line, character 1.
-    expect(row?.querySelector('.problems__where')?.textContent).toBe('4:1');
-  });
-
-  it('keeps the diagnostic code untranslated, because the docs are indexed by it', () => {
-    const node = list();
-    paintProblems(node, { diagnostics: [problem()], brief: BRIEF, locale: 'en' });
-
-    expect(node.querySelector('.problems__code')?.textContent).toBe('E_UNKNOWN_SLOT');
-  });
-
-  it('says the severity in words as well as in colour', () => {
-    // A colour alone is not a severity to somebody who cannot see it.
-    const node = list();
-    paintProblems(node, {
-      diagnostics: [problem({ severity: 'warning' })],
-      brief: BRIEF,
-      locale: 'pt-BR',
-    });
-
-    const dot = node.querySelector('.problems__dot');
-    expect(dot?.className).toContain('problems__dot--warning');
-    expect(dot?.getAttribute('aria-label')).toBe('Aviso');
-  });
-
-  it('makes a row with a range a button, and one without a range not', () => {
-    // A diagnostic about the project — an unreadable template folder — is still the reason
-    // nothing rendered, so it is listed. There is nowhere for it to take you, so it is not
-    // a button: a control that does nothing is worse than no control.
-    const node = list();
-    paintProblems(node, {
-      diagnostics: [problem(), problem({ code: 'E_TEMPLATE_READ', range: undefined })],
-      brief: BRIEF,
-      locale: 'pt-BR',
-    });
-
-    const rows = [...node.querySelectorAll('.problems__row')];
-    expect(rows[0]?.tagName).toBe('BUTTON');
-    expect(rows[1]?.tagName).toBe('DIV');
-    expect(rows[1]?.querySelector('.problems__where')?.textContent).toBe('—');
-  });
-
-  it('says so when there is nothing to say', () => {
-    const node = list();
-    paintProblems(node, { diagnostics: [], brief: BRIEF, locale: 'pt-BR' });
-
-    expect(node.querySelector('.problems__empty')?.textContent).toBe(
-      'Nada a relatar sobre este brief',
-    );
-    expect(node.querySelector('.problems__row')).toBeNull();
-  });
-
-  it('reads the range off whatever inside the row was clicked', () => {
-    // The click lands on the code or the message nine times out of ten; a handler reading
-    // `event.target` alone would work for the tenth.
-    const node = list();
-    paintProblems(node, { diagnostics: [problem()], brief: BRIEF, locale: 'pt-BR' });
-
-    expect(rangeOf(node.querySelector('.problems__message'))).toEqual({ start: 24, end: 30 });
-    expect(rangeOf(node.querySelector('.problems__row'))).toEqual({ start: 24, end: 30 });
-    expect(rangeOf(node)).toBeUndefined();
   });
 });
 

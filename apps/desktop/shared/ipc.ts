@@ -159,10 +159,12 @@ export const IPC_CHANNELS = {
    * once at startup and held (`src/main/preview.ts`) — a picker that re-asked per click
    * would be re-reading nothing.
    *
-   * `preview` is a `data:` URI and not a path. The renderer's Content-Security-Policy is
-   * `img-src 'self' data:`, and a `file://` path would be both refused by it and wrong: the
-   * renderer is meant to run in a browser tab later, where the template folder is not on
-   * the same disk. Absent for a template with no `preview.png`, which today is all of them.
+   * `preview` is a `data:` URI and not a path, and the reason outlived the premise it used
+   * to be given with. It was "the renderer runs in a browser tab later, where the folder is
+   * not on the same disk"; ADR 0024 says it does not. What still holds is the renderer's own
+   * Content-Security-Policy: `img-src 'self' data:` refuses a `file://` URL before it is
+   * fetched, in this window, today. Absent for a template with no `preview.png`, which today
+   * is all of them.
    */
   'templates:list': channel(
     z.object({}),
