@@ -8,6 +8,7 @@ import { localeFor } from '../../shared/i18n/index.js';
 import { fileCredentialStore } from './credential-store.js';
 import { createCredentials } from './credentials.js';
 import { createDocumentService } from './documents.js';
+import { fileLayoutStore } from './layout-store.js';
 import { fileRecentFiles } from './recent-files.js';
 import { registerIpcHandlers } from './ipc.js';
 import { activateBuiltIns, builtInTemplatesDirectory } from './plugins.js';
@@ -99,6 +100,9 @@ async function start(): Promise<void> {
   registerIpcHandlers(ipcMain, {
     credentials,
     documents,
+    // Beside the credential store and the recent list, for the third time and on the same
+    // argument: a file a person can read, edit and delete (ADR 0009).
+    layout: fileLayoutStore(join(app.getPath('userData'), 'layout.json')),
     preview,
     templates,
     info: () => ({

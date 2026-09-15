@@ -1,5 +1,7 @@
 import { z } from 'zod';
 
+import { layoutSchema } from './layout.js';
+
 /**
  * The contract between the three processes, written once.
  *
@@ -269,6 +271,21 @@ export const IPC_CHANNELS = {
       files: z.array(z.object({ path: z.string(), name: z.string(), missing: z.boolean() })),
     }),
   ),
+
+  /**
+   * Where the panels were last time (E9.10).
+   *
+   * Asked once, before the first arrange. The whole layout crosses rather than a delta,
+   * because it is four small records and a diff would be a second representation of
+   * something `shared/layout.ts` already defines once.
+   */
+  'layout:get': channel(z.object({}), z.object({ layout: layoutSchema })),
+
+  /**
+   * Remembers it. Answers nothing, because there is nothing a renderer could do about a
+   * layout that failed to persist except show a person an error about a splitter.
+   */
+  'layout:set': channel(z.object({ layout: layoutSchema }), z.object({})),
 
   /**
    * Stores a secret through `safeStorage`, which is the OS keychain (ADR 0001).

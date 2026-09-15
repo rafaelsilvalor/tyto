@@ -21,6 +21,8 @@ describe('the IPC contract', () => {
       'file:reopen',
       'file:save',
       'files:recent',
+      'layout:get',
+      'layout:set',
       'templates:list',
     ]);
     expect(new Set(IPC_CHANNEL_NAMES).size).toBe(IPC_CHANNEL_NAMES.length);
@@ -125,6 +127,8 @@ describe('what the contract does not promise', () => {
       // you opened lately. The paths are main's answer, never the renderer's question.
       'file:open',
       'files:recent',
+      // E9.10. Asking where the panels were takes no arguments; telling it takes a layout.
+      'layout:get',
     ];
 
     for (const name of IPC_CHANNEL_NAMES) {
