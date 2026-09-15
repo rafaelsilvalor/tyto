@@ -26,6 +26,7 @@
     "@tyto/pipeline": "workspace:*",
     "@tyto/plugin-api": "workspace:*",
     "@tyto/templates": "workspace:*",
+    "lit": "^3.3.3",
     "zod": "^4.6.1"
   },
   "devDependencies": {

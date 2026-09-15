@@ -6,13 +6,13 @@ import { planTemplateEdit, templateOf } from './frontmatter.js';
 import {
   type Artwork,
   type Diagnostic,
+  type SourceRange,
   type Template,
-  paintProblems,
   paintTemplatePicker,
-  rangeOf,
   rangeOfArtwork,
   revealRange,
 } from './panel.js';
+import { type ProblemsPanel, PROBLEMS_TAG } from './problems-panel.js';
 import { fillLocalePicker, localeFromPicker, paint } from './shell.js';
 import {
   type Frame,
@@ -40,9 +40,12 @@ declare global {
     /**
      * Optional, and that is not defensive typing.
      *
-     * The same renderer is meant to run in a browser tab later (`docs/architecture.md`,
-     * path to the cloud), where nothing injects a preload. Typing it as always-present
-     * would make the cloud build a type error rather than a code path.
+     * The reason used to be a browser tab with no preload in it; ADR 0024 retired that. The
+     * bridgeless window is not hypothetical though — it is this file's own first paint,
+     * which runs before main has answered anything, and it is every unit test in
+     * `src/renderer`, which drives these functions with no preload at all. `wirePreviewControls`
+     * takes a `bridgeless` flag for exactly that reason. Typing it as always-present would
+     * make the state the window actually starts in a type error.
      */
     readonly tyto?: TytoBridge;
   }
@@ -115,7 +118,11 @@ const elements = {
   editor: byId('editor'),
   locale: byId<HTMLSelectElement>('locale'),
   template: byId<HTMLSelectElement>('template'),
-  problems: byId('problems-list'),
+  // By tag and not by id: the element is the panel, so what identifies it is what it is.
+  // Naming the tag here is also what keeps `problems-panel.js` a runtime import rather than
+  // a type-only one that the bundler would drop — and dropping it would mean the custom
+  // element is never defined and the panel silently stays empty.
+  problems: document.querySelector<ProblemsPanel>(PROBLEMS_TAG),
   problemsCount: byId('problems-count'),
 };
 
@@ -161,7 +168,7 @@ function paintStatus(): void {
 }
 
 /** The card's acceptance criterion, in `panel.ts` where a test can drive it. */
-function reveal(range: { start: number; end: number }): void {
+function reveal(range: SourceRange): void {
   if (editor !== undefined) revealRange(editor.view, range);
 }
 
@@ -169,11 +176,15 @@ function paintPanel(): void {
   const problems = [...panel.installation, ...panel.diagnostics];
 
   if (elements.problems !== null) {
-    paintProblems(elements.problems, {
+    // A property assignment, not a paint: the element schedules its own update and rewrites
+    // only the rows that changed (ADR 0024). Assigning a new object every time is the point
+    // — Lit compares the property by identity, so a fresh object is what says "look again",
+    // and the diffing that follows is what makes doing so cheap.
+    elements.problems.state = {
       diagnostics: problems,
       brief: panel.brief,
       locale: state.locale,
-    });
+    };
   }
 
   if (elements.problemsCount !== null) {
@@ -278,10 +289,11 @@ function wirePreviewControls(bridgeless: boolean): void {
 
 /** The panel's own two controls: a row that moves the cursor, and a picker that edits. */
 function wirePanelControls(): void {
-  elements.problems?.addEventListener('click', (event) => {
-    const range = rangeOf(event.target);
-    if (range !== undefined) reveal(range);
-  });
+  // Handed to the element rather than delegated from it. The hand-written panel wrote each
+  // range into two `data-` attributes so that one listener here could read them back with
+  // `closest()`; the element calls this with the range object itself, and the round trip
+  // through the DOM is gone (ADR 0024).
+  if (elements.problems !== null) elements.problems.reveal = reveal;
 
   elements.template?.addEventListener('change', () => {
     const picker = elements.template;
