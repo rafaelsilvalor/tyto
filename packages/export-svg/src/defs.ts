@@ -1,7 +1,16 @@
-import type { AssetRef, Diagnostic, Effect, Paint, SceneFontFace, Size, Stroke } from '@tyto/core';
+import type {
+  AssetRef,
+  Diagnostic,
+  Effect,
+  Paint,
+  SceneFontFace,
+  Size,
+  Stroke,
+  UnitPoint,
+} from '@tyto/core';
 import { diagnostic } from '@tyto/core';
 
-import { attribute, element, escapeXml, svgColor, svgNumber } from './values.js';
+import { attribute, element, escapeXml, roundedRectPath, svgColor, svgNumber } from './values.js';
 
 /**
  * Everything that has to be declared before it can be referenced.
@@ -18,6 +27,22 @@ import { attribute, element, escapeXml, svgColor, svgNumber } from './values.js'
 export interface SvgResources {
   /** A self-contained URI for an asset's bytes; `undefined` is a diagnostic. */
   readonly asset?: (ref: AssetRef) => string | undefined;
+  /**
+   * The width and height the asset's bytes have, in pixels.
+   *
+   * `cover` and `contain` are a scale and an offset computed from the picture's own
+   * proportions, and SVG will compute them for you — that is what `preserveAspectRatio`
+   * is. Figma drops the attribute and stretches the picture to fill, so TYTO-60 makes the
+   * exporter do the arithmetic and emit the result as geometry, which every renderer
+   * reads. Doing the arithmetic needs the number, and this is where it comes from.
+   *
+   * A port rather than a field on `AssetRef`, for the reason ADR 0018 gives bytes: it is
+   * a property of the file, the pure packages open no files, and a resolver that already
+   * read the bytes to make a `data:` URI has it in hand. Unanswered is not a diagnostic —
+   * an author cannot supply it, only a composition root can — and the export falls back
+   * to `preserveAspectRatio`, which is what it emitted before this port existed.
+   */
+  readonly assetSize?: (ref: AssetRef) => Size | undefined;
   /** A `data:` URI for one font face, embedded in the document's `<style>`. */
   readonly font?: (face: SvgFontFace) => string | undefined;
   /**
@@ -98,6 +123,87 @@ export function assetUri(sink: Sink, node: string, ref: AssetRef): string | unde
     return undefined;
   }
   return uri;
+}
+
+/* -------------------------------------------------------------------------- images -- */
+
+const EPSILON = 1e-6;
+
+/** The centre of the picture, which is what a paint means by `cover` and has no field for. */
+export const CENTRED: UnitPoint = { x: 0.5, y: 0.5 };
+
+/**
+ * A picture drawn at its own size and then moved and scaled into the box, plus the clip
+ * that hides what hangs over the edge.
+ *
+ * This is `preserveAspectRatio` written out. SVG can do the fit itself and did until
+ * TYTO-60, but Figma ignores the attribute — on an `<image>` and inside a `<pattern>` —
+ * and stretches the picture to fill, which destroys the proportions of every `cover`
+ * photo it imports. A transform and a clip are ordinary geometry that no importer has the
+ * option of dropping.
+ *
+ * The offset is `object-position`'s: the same fraction of the leftover, in the same
+ * direction, so a focal point lands where `export-html` puts it rather than at one of the
+ * nine alignments `preserveAspectRatio` could name. That is the second thing this buys —
+ * a focal point off the ninths is now exact instead of snapped and reported.
+ *
+ * `preserveAspectRatio="none"` survives on the element and is not a contradiction. The
+ * `<image>` is given the picture's own width and height, so there is no fitting left to
+ * do, and `none` is what makes a renderer that reads the attribute and one that ignores
+ * it draw the same thing even if the measurement were wrong.
+ */
+export function croppedImage(
+  href: string,
+  natural: Size,
+  box: Size,
+  fit: 'cover' | 'contain' | 'fill',
+  position: UnitPoint,
+  sink: Sink,
+): string {
+  const wide = box.w / natural.w;
+  const tall = box.h / natural.h;
+  const uniform = fit === 'cover' ? Math.max(wide, tall) : Math.min(wide, tall);
+  const scaleX = fit === 'fill' ? wide : uniform;
+  const scaleY = fit === 'fill' ? tall : uniform;
+
+  const drawn: Size = { w: natural.w * scaleX, h: natural.h * scaleY };
+  // `object-position`'s arithmetic: the same fraction of the leftover, in the same
+  // direction, which is what keeps this picture where `export-html` puts the same one.
+  const x = (box.w - drawn.w) * position.x;
+  const y = (box.h - drawn.h) * position.y;
+
+  const parts = [
+    Math.abs(x) > EPSILON || Math.abs(y) > EPSILON
+      ? `translate(${svgNumber(x)} ${svgNumber(y)})`
+      : '',
+    scaleX === scaleY
+      ? Math.abs(scaleX - 1) > EPSILON
+        ? `scale(${svgNumber(scaleX)})`
+        : ''
+      : `scale(${svgNumber(scaleX)} ${svgNumber(scaleY)})`,
+  ].filter((part) => part !== '');
+
+  const image = element('image', [
+    attribute('href', escapeXml(href)),
+    attribute('width', svgNumber(natural.w)),
+    attribute('height', svgNumber(natural.h)),
+    attribute('preserveAspectRatio', 'none'),
+    parts.length === 0 ? '' : attribute('transform', parts.join(' ')),
+  ]);
+
+  // Only `cover` can overflow, and a `cover` on a box of the picture's own proportions
+  // does not. A clip path nothing crosses is a `<defs>` entry and an id for no reason.
+  if (drawn.w <= box.w + EPSILON && drawn.h <= box.h + EPSILON) return image;
+
+  const id = nextId(sink, 'crop');
+  sink.defs.push(
+    element(
+      'clipPath',
+      [attribute('id', id)],
+      element('path', [attribute('d', roundedRectPath(box, [0, 0, 0, 0]))]),
+    ),
+  );
+  return element('g', [attribute('clip-path', `url(#${id})`)], image);
 }
 
 /* -------------------------------------------------------------------------- paints -- */
@@ -201,11 +307,26 @@ export function paintValue(
   const href = assetUri(sink, node, paint.asset);
   if (href === undefined) return undefined;
 
-  const id = nextId(sink, 'paint');
   // User space, not `objectBoundingBox`. In bounding-box units the image's viewport is the
   // unit *square*, so `preserveAspectRatio` fits the picture to a square and the square is
   // then stretched to the node's box — which turns a circle into an ellipse on anything
   // that is not square. Giving the pattern the real box is what makes `cover` mean cover.
+  //
+  // A pattern is the second place `preserveAspectRatio` is dropped on import, so a measured
+  // asset is cropped by hand here exactly as `imageShape` crops a node's own picture. A
+  // paint carries no focal point, so it is centred.
+  const natural = sink.resources.assetSize?.(paint.asset);
+  const inner =
+    natural === undefined
+      ? element('image', [
+          attribute('href', escapeXml(href)),
+          attribute('width', svgNumber(size.w)),
+          attribute('height', svgNumber(size.h)),
+          attribute('preserveAspectRatio', aspectRatio(paint.fit)),
+        ])
+      : croppedImage(href, natural, size, paint.fit, CENTRED, sink);
+
+  const id = nextId(sink, 'paint');
   sink.defs.push(
     element(
       'pattern',
@@ -215,12 +336,7 @@ export function paintValue(
         attribute('height', svgNumber(size.h)),
         attribute('patternUnits', 'userSpaceOnUse'),
       ],
-      element('image', [
-        attribute('href', escapeXml(href)),
-        attribute('width', svgNumber(size.w)),
-        attribute('height', svgNumber(size.h)),
-        attribute('preserveAspectRatio', aspectRatio(paint.fit)),
-      ]),
+      inner,
     ),
   );
   return { value: `url(#${id})`, opacity: 1 };

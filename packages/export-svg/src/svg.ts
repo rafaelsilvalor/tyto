@@ -28,12 +28,14 @@ import {
   approximated,
   aspectRatio,
   assetUri,
+  croppedImage,
   filterMarkup,
   nextId,
   paintAttributes,
   strokeMarkup,
   unsupported,
 } from './defs.js';
+import { fitTransform, readInlineSvg } from './inline.js';
 import { textMarkup } from './text.js';
 import {
   attribute,
@@ -126,25 +128,54 @@ function vectorShape(node: VectorNode, sink: Sink): string {
     return fill + stroke;
   }
 
-  // A nested `<svg>` is how a file keeps its own coordinate system while taking the
-  // node's size: the namespaces inside it stay the file's own, which is what "normalized"
-  // means here — nothing is rewritten, because `template-lang` hands the markup over
-  // verbatim and the schema calls it already sanitized.
-  //
-  // `fill` and `stroke` inherit into it, so a solid paint on the node reaches every shape
-  // in the file that set none. A gradient would need a `<defs>` inside markup this package
-  // does not rewrite, so it is reported instead of dropped.
+  return inlineSvgShape(node, node.geometry.markup, sink);
+}
+
+/**
+ * An inline SVG file as a scaled `<g>`, not as a nested viewport.
+ *
+ * Both say the same thing to a browser — take this file's `viewBox` and draw it at the
+ * node's size — and only one of them survives an import. Figma reads a `<g transform>`
+ * and ignores a nested `<svg>`'s viewport, so a 24×24 mark on a 48×48 node arrived at
+ * 24×24 (TYTO-60). The file itself is still handed over verbatim: what changes is which
+ * element carries the scale, and the root `<svg>`'s namespace declarations move onto the
+ * `<g>` with it.
+ *
+ * `fill` and `stroke` inherit into the group the same way they inherited into the
+ * viewport, so a solid paint on the node still reaches every shape in the file that set
+ * none. A gradient would need a `<defs>` inside markup this package does not rewrite, so
+ * it is reported instead of dropped.
+ */
+function inlineSvgShape(node: VectorNode, markup: string, sink: Sink): string {
+  const attributes = [
+    inheritedPaint('fill', node.fill, node, sink),
+    inheritedPaint('stroke', node.stroke?.paint, node, sink),
+    node.stroke === undefined ? '' : attribute('stroke-width', svgNumber(node.stroke.width)),
+  ];
+
+  const file = readInlineSvg(markup);
+  if (file?.box === undefined) {
+    // A file with neither a `viewBox` nor a width and height has not said what box its
+    // shapes live in, and this package will not guess one: the coordinates it wrote are
+    // drawn as they stand. Reported, because the node declared a size that was ignored.
+    approximated(
+      sink,
+      node.id,
+      'inline SVG that states no viewBox',
+      `there is no box to scale from, so the file is drawn at its own coordinates rather than at ${svgNumber(node.size.w)}×${svgNumber(node.size.h)}`,
+    );
+    return element(
+      'g',
+      [...attributes, file?.namespaces ?? ''],
+      file === undefined ? markup : file.content,
+    );
+  }
+
+  const transform = fitTransform(file.box, node.size);
   return element(
-    'svg',
-    [
-      attribute('width', svgNumber(node.size.w)),
-      attribute('height', svgNumber(node.size.h)),
-      attribute('overflow', 'visible'),
-      inheritedPaint('fill', node.fill, node, sink),
-      inheritedPaint('stroke', node.stroke?.paint, node, sink),
-      node.stroke === undefined ? '' : attribute('stroke-width', svgNumber(node.stroke.width)),
-    ],
-    node.geometry.markup,
+    'g',
+    [attribute('transform', transform), ...attributes, file.namespaces],
+    file.content,
   );
 }
 
@@ -172,16 +203,24 @@ function inheritedPaint(
 }
 
 /**
- * The nine alignments `preserveAspectRatio` has, from the focal point the IR carries.
+ * A picture cropped by this exporter when its size is known, and by the renderer when not.
  *
- * A `UnitPoint` is continuous and `preserveAspectRatio` is not, so anything off the ninths
- * is snapped and reported. Doing it properly means an explicit transform and a clip per
- * image, which is a lot of markup for a case the template language cannot even express
- * today — `fit` is an attribute and the focal point is not.
+ * `croppedImage` is the whole of the first branch: an explicit transform and a clip, which
+ * an importer reads and `preserveAspectRatio` is not (TYTO-60). It also makes the focal
+ * point exact, since the offset is a number rather than one of nine alignments.
+ *
+ * Without `resources.assetSize` there is no picture size to scale from, and the fit goes
+ * back to being the renderer's job. That is the output this exporter emitted before the
+ * port existed, snapping and all: correct in a browser, lossy through Figma.
  */
 function imageShape(node: ImageNode, sink: Sink): string {
   const href = assetUri(sink, node.id, node.asset);
   if (href === undefined) return '';
+
+  const natural = sink.resources.assetSize?.(node.asset);
+  if (natural !== undefined) {
+    return croppedImage(href, natural, node.size, node.fit, node.position, sink);
+  }
 
   const snapped = (value: number): 'Min' | 'Mid' | 'Max' =>
     value < 0.25 ? 'Min' : value > 0.75 ? 'Max' : 'Mid';

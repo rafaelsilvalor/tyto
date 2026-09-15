@@ -131,17 +131,34 @@ function remember(run: TextSpan, sink: Sink): void {
   sink.faces.set(fontFaceKey(face), face);
 }
 
-/** `<text>` with one positioned `<tspan>` per line and a nested one per run. */
+/**
+ * One `<text>` per line, each holding a `<tspan>` per run.
+ *
+ * The obvious shape is one `<text>` with a positioned `<tspan>` per line, and that is what
+ * this drew until TYTO-60. Figma imports such a document as a single text layer with every
+ * line concatenated — the two lines of the `mapping` fixture arrived as one 34px-tall
+ * layer named `Turma nova<matrículas & vagas>` — because a text node in Figma has one
+ * position, and the `y` on each `<tspan>` has nowhere to go. A `<text>` per line is the
+ * same picture in a browser, since every baseline was already an absolute number this file
+ * computed, and it is as many layers as there are lines in a design tool.
+ *
+ * An empty line is skipped rather than drawn as a `<text>` holding a space. It still takes
+ * its vertical room — `top` advances either way — but it has nothing to draw, and what a
+ * designer would get for it is an empty layer to delete.
+ */
 function textElement(node: TextNode, lines: readonly Line[], sink: Sink): string {
   const { x, anchor } = anchorOf(node, sink);
   let top = verticalOffset(node, lines, sink);
+  const drawn: string[] = [];
 
-  const spans = lines.map((line) => {
+  for (const line of lines) {
     // Half-leading above the glyphs and half below, then the ascent: the same place a
     // browser puts the first baseline, which is what keeps the two exports aligned.
     const leading = (line.size * node.lineHeight - line.size) / 2;
     const baseline = top + leading + line.size * ASCENT;
     top += line.size * node.lineHeight;
+
+    if (line.runs.length === 0) continue;
 
     const runs = line.runs
       .map((run) => {
@@ -150,24 +167,26 @@ function textElement(node: TextNode, lines: readonly Line[], sink: Sink): string
       })
       .join('');
 
-    return element(
-      'tspan',
-      [attribute('x', svgNumber(x)), attribute('y', svgNumber(baseline))],
-      runs === '' ? ' ' : runs,
+    drawn.push(
+      element(
+        'text',
+        [
+          attribute('x', svgNumber(x)),
+          attribute('y', svgNumber(baseline)),
+          attribute('text-anchor', anchor),
+          node.letterSpacing === 0
+            ? ''
+            : attribute('letter-spacing', svgNumber(node.letterSpacing)),
+          // The runs carry their own spaces and the IR says where the lines end, so neither
+          // collapsing whitespace nor breaking on it is this exporter's decision.
+          attribute('xml:space', 'preserve'),
+        ],
+        runs,
+      ),
     );
-  });
+  }
 
-  return element(
-    'text',
-    [
-      attribute('text-anchor', anchor),
-      node.letterSpacing === 0 ? '' : attribute('letter-spacing', svgNumber(node.letterSpacing)),
-      // The runs carry their own spaces and the IR says where the lines end, so neither
-      // collapsing whitespace nor breaking on it is this exporter's decision.
-      attribute('xml:space', 'preserve'),
-    ],
-    spans.join(''),
-  );
+  return drawn.join('');
 }
 
 /**

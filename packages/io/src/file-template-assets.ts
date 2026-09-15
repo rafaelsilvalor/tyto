@@ -2,11 +2,12 @@ import type { Dirent } from 'node:fs';
 import { readFile, readdir, stat } from 'node:fs/promises';
 import { extname, join, relative, resolve } from 'node:path';
 
-import type { AssetRef } from '@tyto/core';
+import type { AssetRef, Size } from '@tyto/core';
 import type { ExportResources } from './export-resources.js';
 import type { TemplateAssets } from '@tyto/template-lang';
 
 import { hashOf } from './hash.js';
+import { imageSize } from './image-size.js';
 import { EMBEDDABLE_MIME, dataUri } from './mime.js';
 
 /**
@@ -146,11 +147,20 @@ export async function fileTemplateAssets(
     },
   };
 
+  const entryOf = (ref: AssetRef): Entry | undefined =>
+    ref.path === undefined ? byPath.get(templatePath(ref.id)) : byAbsolute.get(resolve(ref.path));
+
   const asset = (ref: AssetRef): string | undefined => {
-    const entry =
-      ref.path === undefined ? byPath.get(templatePath(ref.id)) : byAbsolute.get(resolve(ref.path));
+    const entry = entryOf(ref);
     return entry === undefined ? undefined : dataUri(entry.mime, entry.bytes);
   };
 
-  return { assets, resources: { html: { asset }, svg: { asset } } };
+  // What a template's own picture measures, for the same reason a brief's does: `export-svg`
+  // crops a `cover` image itself rather than trusting `preserveAspectRatio` (TYTO-60).
+  const assetSize = (ref: AssetRef): Size | undefined => {
+    const entry = entryOf(ref);
+    return entry === undefined ? undefined : imageSize(entry.bytes);
+  };
+
+  return { assets, resources: { html: { asset }, svg: { asset, assetSize } } };
 }
