@@ -39,6 +39,29 @@ export interface ShellState {
   readonly version: string;
   readonly platform: string;
   readonly templates: readonly string[];
+  /** What is open and whether it has been touched since it was last written (E9.8). */
+  readonly document: DocumentState;
+}
+
+export interface DocumentState {
+  /** The file's name, or nothing for a brief that has never been saved. */
+  readonly name: string | undefined;
+  readonly dirty: boolean;
+}
+
+/**
+ * The window's title, which is the whole of how "did I save this" is answered.
+ *
+ * A word and not a bullet for the dirty marker. `•` is what every editor uses and it is
+ * nothing at all to a screen reader or to somebody who has not learned the convention; a
+ * title is plain text and has room for the word. The file's name is never translated — it
+ * is what the person called it.
+ */
+export function windowTitle(state: ShellState): string {
+  const app = translate(state.locale, 'app.name');
+  const name = state.document.name ?? translate(state.locale, 'document.untitled');
+  const mark = state.document.dirty ? ` (${translate(state.locale, 'document.unsaved')})` : '';
+  return `${name}${mark} — ${app}`;
 }
 
 /**
@@ -85,7 +108,7 @@ export function paint(root: ParentNode, state: ShellState): void {
   }
 
   const title = root.querySelector('title');
-  if (title !== null) title.textContent = translate(state.locale, 'app.name');
+  if (title !== null) title.textContent = windowTitle(state);
 
   const html = (root as Document).documentElement as HTMLElement | undefined;
   if (html !== undefined) html.lang = state.locale;

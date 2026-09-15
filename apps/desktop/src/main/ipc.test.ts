@@ -53,8 +53,33 @@ const catalogue = () => ({
   }),
 });
 
+/**
+ * A document service with one file in it and no disk under it (E9.8).
+ *
+ * `documents.test.ts` drives the real one, dialogs and all. What this file needs is
+ * something that answers the four channels, because the registration loop is the subject
+ * here and a channel with no handler is the failure it exists to prevent.
+ */
+const documents = () => ({
+  open: () => Promise.resolve({ path: '/briefs/promo.brief', name: 'promo.brief', text: '::a' }),
+  reopen: (path: string) =>
+    Promise.resolve(
+      path === '/briefs/promo.brief'
+        ? { document: { path, name: 'promo.brief', text: '::a' }, missing: false }
+        : { document: null, missing: true },
+    ),
+  save: (text: string) =>
+    Promise.resolve({ path: '/briefs/promo.brief', name: 'promo.brief', text }),
+  recent: () =>
+    Promise.resolve({
+      files: [{ path: '/briefs/promo.brief', name: 'promo.brief', missing: false }],
+    }),
+  baseDirectory: () => '/briefs',
+});
+
 const dependencies = () => ({
   credentials: credentials(),
+  documents: documents(),
   info: () => ({ version: '0.1.0', platform: 'linux', locale: 'pt-BR', templates: ['promo'] }),
   preview: preview(),
   templates: catalogue(),
