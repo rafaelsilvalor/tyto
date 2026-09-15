@@ -159,8 +159,17 @@ stroke's `align` and a shadow's `spread` precisely and HTML approximates both; H
 text out and SVG cannot, so **an SVG does not wrap**: its lines are exactly the brief's
 `LineBreak` runs until E4.5 measures text, and a baseline sits at an approximated ascent.
 ADR 0019 has the reasoning and the rest of the list — `--text-as-paths` takes glyph
-outlines from a port, a focal point is snapped to `preserveAspectRatio`'s nine alignments,
-and a mask may only name a node drawn in the same frame.
+outlines from a port and a mask may only name a node drawn in the same frame.
+
+**Since E5.5 the SVG states its own geometry where it used to state an intent** (ADR 0023).
+An image carries a computed crop — `<g clip-path><image transform></g>` — instead of a
+`preserveAspectRatio` the renderer resolves, so a focal point is exact rather than snapped
+to one of nine alignments; an inline SVG file is a scaled `<g>` rather than a nested
+viewport; and a text node draws one `<text>` per line rather than positioned `<tspan>`s
+inside one. All three are the same picture in a browser and a very different one through
+Figma's importer, which reads none of the three things they replaced. The crop needs the
+picture's own width and height, which arrive through `SvgResources.assetSize`; without it
+the export falls back to `preserveAspectRatio` and its snapping.
 
 **Since E4.5 a `TextNode` arrives with its lines already decided.** `compile` measures the
 text with the faces it was given (`CompileOptions.faces`) and writes the wrapping back as

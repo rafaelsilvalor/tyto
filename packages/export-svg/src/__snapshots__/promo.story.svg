@@ -1,10 +1,15 @@
 <svg xmlns="http://www.w3.org/2000/svg" width="1080" height="1920" viewBox="0 0 1080 1920">
   <defs>
-    <pattern id="paint0" width="1080" height="1920" patternUnits="userSpaceOnUse">
-      <image href="data:image/jpeg;base64,sha256-1f0a" width="1080" height="1920" preserveAspectRatio="xMidYMid slice"/>
+    <clipPath id="crop0">
+      <path d="M0 0 H1080 V1920 H0 V0 Z"/>
+    </clipPath>
+    <pattern id="paint1" width="1080" height="1920" patternUnits="userSpaceOnUse">
+      <g clip-path="url(#crop0)">
+        <image href="data:image/jpeg;base64,sha256-1f0a" width="1600" height="900" preserveAspectRatio="none" transform="translate(-1166.6667 0) scale(2.1333)"/>
+      </g>
     </pattern>
   </defs>
   <g id="story-bg">
-    <path d="M0 0 H1080 V1920 H0 V0 Z" fill="url(#paint0)"/>
+    <path d="M0 0 H1080 V1920 H0 V0 Z" fill="url(#paint1)"/>
   </g>
 </svg>

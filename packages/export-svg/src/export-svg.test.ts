@@ -18,10 +18,24 @@ import promoFixture from './__fixtures__/promo.json';
  * day a raster exists.
  */
 
-const resources: SvgResources = {
+/**
+ * The pictures behind the two fixtures, at sizes chosen to be awkward.
+ *
+ * `hero` is landscape and `photo` is portrait, so a `cover` on each overflows a different
+ * axis and the crop arithmetic cannot come out right by symmetry.
+ */
+const NATURAL: Readonly<Record<string, { w: number; h: number }>> = {
+  hero: { w: 1600, h: 900 },
+  photo: { w: 800, h: 1200 },
+};
+
+/** What a composition root that wires no sizes gets: bytes, and nothing about them. */
+const unmeasured: SvgResources = {
   asset: (ref) => `data:image/jpeg;base64,${ref.hash}`,
   font: (face) => `data:font/woff2;base64,${face.font.family}-${String(face.weight)}-${face.style}`,
 };
+
+const resources: SvgResources = { ...unmeasured, assetSize: (ref) => NATURAL[ref.id] };
 
 /** A stand-in for the font machinery E4.5 brings: a box per character, and its width. */
 const outlining: SvgResources = {
@@ -104,9 +118,6 @@ describe('a scene becomes one SVG document per frame', () => {
     expect(story).toContain('patternUnits="userSpaceOnUse"');
     expect(story).not.toContain('objectBoundingBox');
     expect(story).toMatch(/<pattern id="paint\d+" width="1080" height="1920"/u);
-    expect(story).toMatch(
-      /<image [^>]*width="1080" height="1920" preserveAspectRatio="xMidYMid slice"/u,
-    );
   });
 
   it('produces well-formed XML, which is what a design tool refuses on', () => {
@@ -136,6 +147,84 @@ describe('a scene becomes one SVG document per frame', () => {
       );
       expect(references.filter((reference) => !reference.startsWith('data:'))).toEqual([]);
     }
+  });
+});
+
+/**
+ * TYTO-60: the same picture, said in geometry an importer cannot drop.
+ *
+ * Every assertion here is about *how* the output says something rather than what it says,
+ * which is unusual and is the point. Figma's importer ignores `preserveAspectRatio` and
+ * a nested viewport, and collapses positioned `<tspan>`s into one layer; all three were
+ * spec-correct SVG that Chrome rendered perfectly. So what is pinned is the construct,
+ * because the construct is the requirement.
+ */
+describe('geometry a design tool imports', () => {
+  it('crops an image itself instead of asking the renderer to', () => {
+    // `portrait` is a 160x120 box over an 800x1200 picture, `cover`, focal point (0.5, 0.25).
+    // Cover scales by max(160/800, 120/1200) = 0.2, so the picture is drawn 160x240 and the
+    // 120 of overflow is taken a quarter from the top: y = (120 - 240) * 0.25 = -30.
+    const [feed = ''] = svgOf(sceneOf(mappingFixture));
+
+    expect(feed).toMatch(
+      /<g clip-path="url\(#crop\d+\)">\s*<image href="[^"]*" width="800" height="1200" preserveAspectRatio="none" transform="translate\(0 -30\) scale\(0\.2\)"\/>\s*<\/g>/u,
+    );
+    expect(feed).not.toContain('slice');
+  });
+
+  it('crops an image paint the same way, inside the pattern', () => {
+    // `story-bg` fills 1080x1920 with the same 1600x900 hero: cover scales by 1920/900 and
+    // the picture comes out 3413.33 wide, so more than half of it is off the frame.
+    const [, story = ''] = svgOf(sceneOf(promoFixture));
+
+    expect(story).toMatch(/<pattern id="paint\d+" width="1080" height="1920"/u);
+    expect(story).toMatch(
+      /<g clip-path="url\(#crop\d+\)">\s*<image [^>]*width="1600" height="900" preserveAspectRatio="none" transform="translate\(-1166\.6667 0\) scale\(2\.1333\)"\/>\s*<\/g>/u,
+    );
+    expect(story).not.toContain('xMidYMid');
+  });
+
+  it('places a focal point exactly, where it used to snap it to a ninth', () => {
+    // 0.25 is not one of `preserveAspectRatio`'s nine alignments, so it used to be rounded
+    // to `YMin` and reported. An offset is a number, and a number has no ninths.
+    const measured = problemsOf(sceneOf(mappingFixture), { resources });
+    const snapping = problemsOf(sceneOf(mappingFixture), { resources: unmeasured });
+
+    expect(measured.map((item) => item.message).join(' ')).not.toContain('focal point');
+    expect(snapping.map((item) => item.message).join(' ')).toContain(
+      'a focal point off the thirds',
+    );
+  });
+
+  it('falls back to preserveAspectRatio when nobody measured the picture', () => {
+    // Not a diagnostic: only a composition root can wire the port, and a brief's author
+    // cannot act on a warning about one. It is the output this exporter emitted before.
+    const [feed = ''] = svgOf(sceneOf(mappingFixture), { resources: unmeasured });
+
+    expect(feed).toContain('preserveAspectRatio="xMidYMid slice"');
+    expect(feed).not.toContain('clip-path="url(#crop');
+  });
+
+  it('scales an inline SVG file with a transform, not with a nested viewport', () => {
+    // `inline-mark` is a 24x24 file on a 48x48 node. Nested, Figma imported it at 24x24.
+    const [feed = ''] = svgOf(sceneOf(mappingFixture));
+    const mark = /<g id="inline-mark"[^>]*>([\s\S]*?)<\/g>\s*<g id="copy"/u.exec(feed)?.[1] ?? '';
+
+    expect(mark).toContain('<g transform="scale(2)" fill="#ffbd00">');
+    expect(mark).toContain('<circle cx="12" cy="12" r="10"/>');
+    // The whole of the fix: there is no second viewport left in the document.
+    expect(feed.match(/<svg/gu)).toHaveLength(1);
+  });
+
+  it('draws one text element per line, so each line is a layer of its own', () => {
+    // `copy` is two lines. As one `<text>` with two positioned `<tspan>`s, Figma imported
+    // them as a single 34px-tall layer named `Turma nova<matrículas & vagas>`.
+    const [feed = ''] = svgOf(sceneOf(mappingFixture));
+    const texts = [...feed.matchAll(/<text [^>]*y="([\d.]+)"/gu)].map((match) => match[1]);
+
+    expect(texts).toEqual(['53.05', '76.5']);
+    // The `<tspan>`s that are left are runs inside a line, which is what a tspan is for.
+    expect(feed).not.toMatch(/<tspan x=/u);
   });
 });
 
