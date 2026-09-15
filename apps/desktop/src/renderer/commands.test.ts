@@ -44,6 +44,8 @@ const actions = () =>
     openDocument: vi.fn<() => void>(),
     saveDocument: vi.fn<(saveAs: boolean) => void>(),
     restoreLayout: vi.fn<() => void>(),
+    closeDocument: vi.fn<() => void>(),
+    stepDocument: vi.fn<(direction: 1 | -1) => void>(),
   }) satisfies DesktopActions;
 
 /**

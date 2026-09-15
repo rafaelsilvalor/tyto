@@ -192,6 +192,8 @@ describe('the bridge', () => {
       'credentials:delete',
       'credentials:get',
       'credentials:set',
+      'dialog:confirm',
+      'file:close',
       'file:open',
       'file:reopen',
       'file:save',
@@ -283,6 +285,20 @@ describe('the language picker', () => {
     'panel.editor',
     'panel.preview',
     'panel.problems',
+    // E9.11: the tab strip is an element and translates inside its own `render`, so the word
+    // on a tab's close button is never in this pass; the four `document.discard.*` are read
+    // out by the OS in a message box, which is not the document at all; and the rest are
+    // command labels the bar builds. `src/renderer/tabs.test.ts` is what holds the strip to
+    // a locale.
+    'document.close',
+    'document.discard.message',
+    'document.discard.detail',
+    'document.discard.confirm',
+    'document.discard.cancel',
+    'command.document.close',
+    'command.document.next',
+    'command.document.previous',
+    'command.document.select',
   ];
 
   it('paints every catalogue string on load, with none left blank', async () => {
