@@ -21,6 +21,8 @@ import {
   bindingsOf,
   createDesktopRegistry,
   keymapSetFor,
+  pathOfRecentCommand,
+  recentCommandId,
 } from './commands.js';
 import { type ProblemsPanel, PROBLEMS_TAG } from './problems-panel.js';
 import { fillLocalePicker, localeFromPicker, paint } from './shell.js';
@@ -78,7 +80,24 @@ const state = {
   version: '—',
   platform: '—',
   templates: [] as readonly string[],
+  /**
+   * What is open (E9.8).
+   *
+   * A name and never a path. Where the file is, is main's — it is what resolves the brief's
+   * assets and what a recent entry is reopened by, and the renderer has no use for it that
+   * is not already a channel.
+   */
+  document: { name: undefined as string | undefined, dirty: false },
 };
+
+/**
+ * The recent list, as commands that unregister themselves.
+ *
+ * Held so the next listing can take the last one down. Re-registering an id would replace
+ * it, but a file that left the top ten has no id to be replaced by and would sit in the bar
+ * forever.
+ */
+let recentCommands: (() => void)[] = [];
 
 const preview = {
   frames: [] as readonly Frame[],
@@ -265,6 +284,23 @@ const registry: CommandRegistry = createDesktopRegistry({
     repaint();
   },
 
+  openDocument: () => {
+    void withBridge(async (bridge) => {
+      const answer = await bridge['file:open']({});
+      adopt(answer.document);
+    });
+  },
+
+  saveDocument: (saveAs) => {
+    void withBridge(async (bridge) => {
+      if (editor === undefined) return;
+      const answer = await bridge['file:save']({ text: editor.getValue(), saveAs });
+      // A dismissed dialog leaves everything alone, dirty marker included. Clearing it
+      // would tell somebody their text was written when it was not.
+      adopt(answer.document);
+    });
+  },
+
   toggleVimMode: () => {
     if (editor === undefined) return;
     editor.setVimMode(!editor.isVimMode());
@@ -291,6 +327,94 @@ function cycle(
   return values[next];
 }
 
+/** Runs `use` with the bridge, or does nothing. The bridgeless window is the test's. */
+async function withBridge(use: (bridge: TytoBridge) => Promise<void>): Promise<void> {
+  const bridge = window.tyto;
+  if (bridge !== undefined) await use(bridge);
+}
+
+/**
+ * Takes on a document main just opened or wrote, or does nothing for a dismissed dialog.
+ *
+ * `setValue` and then `request` by hand, because `setValue` deliberately notifies nobody
+ * (`@tyto/editor`): that is what stops loading a file from looking like the person typed
+ * it, and it is why the preview has to be asked for explicitly here. The dirty marker is
+ * cleared for the same reason — the buffer now matches the disk exactly.
+ */
+function adopt(document_: { name: string; text: string } | null): void {
+  if (document_ === null) return;
+
+  state.document = { name: document_.name, dirty: false };
+  if (editor !== undefined && editor.getValue() !== document_.text) {
+    editor.setValue(document_.text);
+  }
+  repaint();
+  void withBridge((bridge) => request(bridge, editor?.getValue() ?? ''));
+  void refreshRecent();
+}
+
+/**
+ * Rebuilds the recent list as commands, which is the whole of its user interface.
+ *
+ * A palette entry per file rather than a menu or a panel: E9.12 already built the list a
+ * person types into, the entries are ten strings, and a second surface for them would be a
+ * second place to keep in step. It also means the list is reachable with no panel open,
+ * which is the property a recent list most needs on an app that opens empty.
+ */
+async function refreshRecent(): Promise<void> {
+  await withBridge(async (bridge) => {
+    const answer = await bridge['files:recent']({});
+
+    for (const dispose of recentCommands) dispose();
+    recentCommands = answer.files.map((file) =>
+      registry.register({
+        id: recentCommandId(file.path),
+        // The file's own name, untranslated. `commandEntries` puts the catalogue's word in
+        // front of it at display time, so switching language does not need a re-register.
+        label: file.name,
+        run: () => {
+          // The name travels with the call rather than being cut out of the path here.
+          // Splitting a path is the one thing this renderer must never learn to do — it is
+          // the reason main holds the path at all — and the name is already in hand.
+          void reopen(file.path, file.name);
+        },
+      }),
+    );
+
+    paintCommandBar();
+  });
+}
+
+/**
+ * Reopens a recent entry, and says so in the panel when the file has moved.
+ *
+ * The diagnostic goes where every other "why is this not working" goes — the problems panel
+ * — rather than into a dialog. It is the same question as an unreadable template folder and
+ * it belongs beside it, which is what `panel.installation` already is.
+ */
+async function reopen(path: string, name: string): Promise<void> {
+  await withBridge(async (bridge) => {
+    const answer = await bridge['file:reopen']({ path });
+
+    if (answer.missing) {
+      panel.installation = [
+        {
+          severity: 'error',
+          code: 'E_FILE_NOT_FOUND',
+          message: `${translate(state.locale, 'file.missing')}: ${name}`,
+        },
+        ...panel.installation.filter((item) => item.code !== 'E_FILE_NOT_FOUND'),
+      ];
+      repaint();
+      // Listed again, so an entry that is gone is marked gone rather than looking untried.
+      void refreshRecent();
+      return;
+    }
+
+    adopt(answer.document);
+  });
+}
+
 /** Every command the registry holds, translated and with the key that runs it. */
 function commandEntries(): readonly CommandEntry[] {
   const bindings = bindingsOf(keymapSetFor(editor?.isVimMode() ?? false), state.platform);
@@ -298,11 +422,19 @@ function commandEntries(): readonly CommandEntry[] {
   return registry.list().map((command) => {
     const key = COMMAND_LABELS[command.id];
     const binding = bindings[command.id];
+    // A recent file is the one command whose label is half catalogue and half not: the
+    // word in front of it is translated and the file's name never is.
+    const recent = pathOfRecentCommand(command.id) !== undefined;
+    const own = command.label ?? command.id;
+    const label = recent
+      ? `${translate(state.locale, 'command.file.recent')}: ${own}`
+      : key === undefined
+        ? own
+        : translate(state.locale, key);
+
     return {
       id: command.id,
-      // The catalogue first, then whatever label the command brought, then the id. A
-      // plugin's command will land on the last two and is better shown than hidden.
-      label: key === undefined ? (command.label ?? command.id) : translate(state.locale, key),
+      label,
       ...(binding === undefined ? {} : { binding }),
     };
   });
@@ -504,7 +636,14 @@ async function load(): Promise<void> {
     // The registry goes in here, which is what makes `Mod-z` the registry's undo rather
     // than CodeMirror's: an app-level command sitting on top of the stack has to come off
     // before the text underneath it, and only the registry knows about both.
-    editor = createEditor(elements.editor, { doc: '', commands: registry });
+    editor = createEditor(elements.editor, {
+      doc: '',
+      commands: registry,
+      // The desktop's set, which is the editor's plus `Mod-o` and `Mod-Shift-s`. Passed
+      // here rather than bound in a window listener so that the bar and the editor read
+      // one table — `bindingsOf` is given this same set.
+      keymap: keymapSetFor(false),
+    });
     // The bindings are read off the keymap set the editor is running, so the bar can only
     // be painted once there is an editor to ask.
     paintCommandBar();
@@ -514,6 +653,13 @@ async function load(): Promise<void> {
       // Repainted on every keystroke and not only on the answer: the picker shows the
       // template the *brief* names, so typing the line by hand has to move it too.
       editor.onChange(() => {
+        // Repainted only on the edge, not on every keystroke: the title is the only thing
+        // that changes when a document goes from saved to touched, and repainting the
+        // window per character to say so would be the one expensive thing in this path.
+        if (!state.document.dirty) {
+          state.document.dirty = true;
+          repaint();
+        }
         paintPanel();
         ask();
       });
@@ -522,6 +668,11 @@ async function load(): Promise<void> {
       void request(bridge, handle.getValue());
     }
   }
+
+  // Asked once the window is up rather than during startup: the list is what the command
+  // bar shows, nothing on screen depends on it, and a folder read that delays the first
+  // paint buys nothing.
+  void refreshRecent();
 
   repaint();
 }

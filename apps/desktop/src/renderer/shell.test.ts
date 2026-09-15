@@ -4,7 +4,7 @@ import { beforeEach, describe, expect, it } from 'vitest';
 import { CATALOGUE_KEYS, type Locale, translate } from '../../shared/i18n/index.js';
 import { en } from '../../shared/i18n/en.js';
 import { ptBR } from '../../shared/i18n/pt-BR.js';
-import { I18N_ATTRIBUTE, fillLocalePicker, localeFromPicker, paint } from './shell.js';
+import { I18N_ATTRIBUTE, fillLocalePicker, localeFromPicker, paint, windowTitle } from './shell.js';
 
 /**
  * The acceptance criterion — *switching locale changes every visible string* — as a unit.
@@ -18,11 +18,12 @@ import { I18N_ATTRIBUTE, fillLocalePicker, localeFromPicker, paint } from './she
 const markup = (...keys: readonly string[]): string =>
   keys.map((key) => `<p ${I18N_ATTRIBUTE}="${key}">untranslated</p>`).join('');
 
-const state = (locale: Locale) => ({
+const state = (locale: Locale, document?: { name: string | undefined; dirty: boolean }) => ({
   locale,
   version: '0.1.0',
   platform: 'linux',
   templates: ['carrossel-lista', 'promo-curso'],
+  document: document ?? { name: undefined, dirty: false },
 });
 
 describe('paint', () => {
@@ -122,5 +123,39 @@ describe('the language picker', () => {
     picker.value = 'ja-JP';
 
     expect(localeFromPicker(picker, 'pt-BR')).toBe('pt-BR');
+  });
+});
+
+describe('the window title', () => {
+  it('says the app name and that nothing is open, before anything is', () => {
+    // The window opens on an empty buffer with no file behind it, and the title has to say
+    // which of "nothing yet" and "something unnamed" that is.
+    expect(windowTitle(state('pt-BR'))).toBe('Sem título — Tyto');
+    expect(windowTitle(state('en'))).toBe('Untitled — Tyto');
+  });
+
+  it('leads with the file name, which is never translated', () => {
+    const open = { name: 'campanha.brief', dirty: false };
+
+    expect(windowTitle(state('pt-BR', open))).toBe('campanha.brief — Tyto');
+    expect(windowTitle(state('en', open))).toBe('campanha.brief — Tyto');
+  });
+
+  it('says in words that there is unsaved work, not with a bullet', () => {
+    // `•` is what every editor uses and it is nothing at all to a screen reader. A title is
+    // plain text and has room for the word.
+    const touched = { name: 'campanha.brief', dirty: true };
+
+    expect(windowTitle(state('pt-BR', touched))).toBe('campanha.brief (não salvo) — Tyto');
+    expect(windowTitle(state('en', touched))).toBe('campanha.brief (unsaved) — Tyto');
+  });
+
+  it('is what paint writes into the document title', () => {
+    document.body.innerHTML = '';
+    document.head.innerHTML = '<title>Tyto</title>';
+
+    paint(document, state('pt-BR', { name: 'promo.brief', dirty: true }));
+
+    expect(document.querySelector('title')?.textContent).toBe('promo.brief (não salvo) — Tyto');
   });
 });

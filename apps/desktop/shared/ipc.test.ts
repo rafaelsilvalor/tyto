@@ -17,6 +17,10 @@ describe('the IPC contract', () => {
       'credentials:delete',
       'credentials:get',
       'credentials:set',
+      'file:open',
+      'file:reopen',
+      'file:save',
+      'files:recent',
       'templates:list',
     ]);
     expect(new Set(IPC_CHANNEL_NAMES).size).toBe(IPC_CHANNEL_NAMES.length);
@@ -114,7 +118,14 @@ describe('what the contract does not promise', () => {
     // `{}` is a valid request for the two channels that ask the app about itself and an
     // invalid one for all three credential channels. Asserting it per channel from the
     // table means a channel added later is covered by this test the day it is added.
-    const optional: readonly IpcChannelName[] = ['app:info', 'templates:list'];
+    const optional: readonly IpcChannelName[] = [
+      'app:info',
+      'templates:list',
+      // E9.8. Both ask a question with no arguments: which file do you want, and what have
+      // you opened lately. The paths are main's answer, never the renderer's question.
+      'file:open',
+      'files:recent',
+    ];
 
     for (const name of IPC_CHANNEL_NAMES) {
       const accepts = IPC_CHANNELS[name].request.safeParse({}).success;

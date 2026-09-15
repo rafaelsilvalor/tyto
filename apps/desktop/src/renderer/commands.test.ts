@@ -10,6 +10,8 @@ import { describe, expect, it, vi } from 'vitest';
 import {
   type DesktopActions,
   COMMAND_LABELS,
+  EDITOR_OPEN,
+  EDITOR_SAVE_AS,
   EDITOR_TOGGLE_VIM,
   PREVIEW_NEXT_FORMAT,
   PREVIEW_PREVIOUS_SLIDE,
@@ -39,6 +41,8 @@ const actions = () =>
     stepSlide: vi.fn<(direction: 1 | -1) => void>(),
     toggleLocale: vi.fn<() => void>(),
     toggleVimMode: vi.fn<() => void>(),
+    openDocument: vi.fn<() => void>(),
+    saveDocument: vi.fn<(saveAs: boolean) => void>(),
   }) satisfies DesktopActions;
 
 /**
@@ -70,7 +74,23 @@ describe('the ids the window registers', () => {
 
   it('answers false for an id nobody registered, rather than throwing', () => {
     // What a binding to an uninstalled command relies on: the keystroke keeps travelling.
-    expect(createDesktopRegistry(actions()).run('editor.save', NO_VIEW)).toBe(false);
+    // `editor.render` is the remaining one — `@tyto/editor` binds `Mod-Enter` to it and no
+    // host has registered it yet, which is exactly the case this behaviour exists for.
+    expect(createDesktopRegistry(actions()).run('editor.render', NO_VIEW)).toBe(false);
+  });
+
+  it('registers the save id the editor has been binding all along', () => {
+    // `Mod-s` has been in both of `@tyto/editor`'s keymap sets since E8.3 and did nothing,
+    // because a binding to an unregistered id falls through. This is the host registering
+    // it, and the id is the editor's string rather than one invented here.
+    const spies = actions();
+    const registry = createDesktopRegistry(spies);
+
+    expect(registry.run(EDITOR_SAVE, NO_VIEW)).toBe(true);
+    expect(registry.run(EDITOR_OPEN, NO_VIEW)).toBe(true);
+    expect(registry.run(EDITOR_SAVE_AS, NO_VIEW)).toBe(true);
+    expect(spies.saveDocument.mock.calls).toEqual([[false], [true]]);
+    expect(spies.openDocument).toHaveBeenCalledOnce();
   });
 
   it('keeps undo and redo, which the registry brings itself', () => {
@@ -138,7 +158,27 @@ describe('the keystroke shown beside a command', () => {
     expect(bindings[EDITOR_UNDO]).toBeUndefined();
     expect(bindings[EDITOR_SAVE]).toBe('Ctrl+s');
     expect(keymapSetFor(true)).toBe(vimKeymapSet);
-    expect(keymapSetFor(false)).toBe(defaultKeymapSet);
+  });
+
+  it('gives vim none of the desktop keys, because vim mode replaces the whole layer', () => {
+    // `vimMode()` in `@tyto/editor` brings `vimKeymapSet` with it, so `Mod-o` is simply not
+    // bound while vim is on. The bar reads its keystrokes off this, and promising a shortcut
+    // that does nothing is worse than showing none — a person stops looking for the command.
+    const vim = bindingsOf(keymapSetFor(true), 'win32');
+    const normal = bindingsOf(keymapSetFor(false), 'win32');
+
+    expect(normal[EDITOR_OPEN]).toBe('Ctrl+o');
+    expect(normal[EDITOR_SAVE_AS]).toBe('Ctrl+Shift+s');
+    expect(vim[EDITOR_OPEN]).toBeUndefined();
+    expect(vim[EDITOR_SAVE_AS]).toBeUndefined();
+  });
+
+  it('keeps every binding the editor already shipped', () => {
+    // The desktop set is the default set plus two, never a replacement for it: undo, redo
+    // and save are `@tyto/editor`'s and must survive being extended.
+    const desktop = keymapSetFor(false).bindings.map((binding) => binding.key);
+
+    for (const binding of defaultKeymapSet.bindings) expect(desktop).toContain(binding.key);
   });
 
   it('leaves a command nobody bound without a key', () => {

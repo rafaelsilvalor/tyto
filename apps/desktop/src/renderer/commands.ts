@@ -2,6 +2,7 @@ import {
   type CommandRegistry,
   type EditorKeymap,
   EDITOR_REDO,
+  EDITOR_SAVE,
   EDITOR_UNDO,
   createCommandRegistry,
   defaultKeymapSet,
@@ -30,6 +31,20 @@ export const PREVIEW_PREVIOUS_FORMAT = 'preview.previousFormat';
 export const PREVIEW_NEXT_SLIDE = 'preview.nextSlide';
 export const PREVIEW_PREVIOUS_SLIDE = 'preview.previousSlide';
 export const SHELL_TOGGLE_LOCALE = 'shell.toggleLocale';
+export const EDITOR_OPEN = 'editor.open';
+export const EDITOR_SAVE_AS = 'editor.saveAs';
+/**
+ * A recent file, as a command per entry (E9.8).
+ *
+ * The path is in the id, which is what lets the bar list ten of them without a second kind
+ * of row and without the registry learning what a file is. `@tyto/editor`'s convention is a
+ * namespaced id and this keeps it; the part after the prefix is opaque to everything except
+ * the handler that reopens it.
+ */
+export const RECENT_PREFIX = 'file.recent:';
+export const recentCommandId = (path: string): string => `${RECENT_PREFIX}${path}`;
+export const pathOfRecentCommand = (id: string): string | undefined =>
+  id.startsWith(RECENT_PREFIX) ? id.slice(RECENT_PREFIX.length) : undefined;
 export const EDITOR_TOGGLE_VIM = 'editor.toggleVim';
 
 /**
@@ -58,6 +73,9 @@ export const COMMAND_LABELS: Readonly<Record<string, CatalogueKey>> = {
   [PREVIEW_PREVIOUS_SLIDE]: 'command.preview.previousSlide',
   [SHELL_TOGGLE_LOCALE]: 'command.shell.toggleLocale',
   [EDITOR_TOGGLE_VIM]: 'command.editor.toggleVim',
+  [EDITOR_OPEN]: 'command.file.open',
+  [EDITOR_SAVE]: 'command.file.save',
+  [EDITOR_SAVE_AS]: 'command.file.saveAs',
 };
 
 /**
@@ -75,6 +93,9 @@ export interface DesktopActions {
   stepSlide(direction: 1 | -1): void;
   toggleLocale(): void;
   toggleVimMode(): void;
+  /** E9.8. Each of these ends in a round trip to main, which owns every path. */
+  openDocument(): void;
+  saveDocument(saveAs: boolean): void;
 }
 
 /**
@@ -125,6 +146,19 @@ export function createDesktopRegistry(actions: DesktopActions): CommandRegistry 
     actions.toggleVimMode();
   });
 
+  // `editor.save` is `@tyto/editor`'s id and not one invented here, which is the whole
+  // point: the editor has shipped `Mod-s` bound to that string since E8.3, and until a host
+  // registered it the key did nothing. This is the host registering it.
+  add(EDITOR_OPEN, () => {
+    actions.openDocument();
+  });
+  add(EDITOR_SAVE, () => {
+    actions.saveDocument(false);
+  });
+  add(EDITOR_SAVE_AS, () => {
+    actions.saveDocument(true);
+  });
+
   return registry;
 }
 
@@ -161,5 +195,32 @@ export function bindingsOf(
   return bindings;
 }
 
-/** The set that is interpreting the keys right now, which vim mode changes. */
-export const keymapSetFor = (vim: boolean): EditorKeymap => (vim ? vimKeymapSet : defaultKeymapSet);
+/**
+ * The default set plus the two keys only a desktop can mean.
+ *
+ * `Mod-s` is already in both of `@tyto/editor`'s sets — the editor ships the binding and
+ * leaves the command to the host — so opening and "save as" are the only two this adds.
+ * They go in a set rather than in a window listener because they are about the document and
+ * the editor is what owns one; `Mod-K` is the opposite case and is a window listener for
+ * the opposite reason (`main.ts`).
+ */
+export const desktopKeymapSet: EditorKeymap = {
+  id: 'desktop',
+  bindings: [
+    ...defaultKeymapSet.bindings,
+    { key: 'Mod-o', command: EDITOR_OPEN },
+    { key: 'Mod-Shift-s', command: EDITOR_SAVE_AS },
+  ],
+};
+
+/**
+ * The set that is interpreting the keys right now, which vim mode changes.
+ *
+ * **Vim gets the plain set and not the extended one, and that is not an oversight.**
+ * `vimMode()` in `@tyto/editor` replaces the whole input layer and brings `vimKeymapSet`
+ * with it, so `Mod-o` and `Mod-Shift-s` are simply not bound while vim is on. The bar reads
+ * its keystrokes off whatever this returns, so returning the extended set here would make
+ * it promise two shortcuts that do nothing — which is worse than showing none, because a
+ * person would stop looking for the command.
+ */
+export const keymapSetFor = (vim: boolean): EditorKeymap => (vim ? vimKeymapSet : desktopKeymapSet);

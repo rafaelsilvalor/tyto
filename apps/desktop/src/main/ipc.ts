@@ -11,6 +11,7 @@ import {
   parseIpc,
 } from '../../shared/ipc.js';
 import { type Credentials } from './credentials.js';
+import { type DocumentService } from './documents.js';
 import { type PreviewService } from './preview.js';
 import { type TemplateCatalogue } from './templates.js';
 
@@ -37,6 +38,8 @@ export interface IpcDependencies {
   readonly preview: PreviewService;
   /** What the template picker lists (E9.3), read from manifests and held. */
   readonly templates: TemplateCatalogue;
+  /** Opening, saving, and the folder the preview resolves assets against (E9.8). */
+  readonly documents: DocumentService;
 }
 
 /** One handler per channel, typed against the contract in both directions. */
@@ -45,7 +48,7 @@ type Handlers = {
 };
 
 export function createHandlers(dependencies: IpcDependencies): Handlers {
-  const { credentials, info, preview, templates } = dependencies;
+  const { credentials, documents, info, preview, templates } = dependencies;
 
   return {
     'app:info': () => Promise.resolve(info()),
@@ -64,6 +67,15 @@ export function createHandlers(dependencies: IpcDependencies): Handlers {
     },
 
     'templates:list': () => Promise.resolve(templates.list()),
+
+    'file:open': async () => ({ document: await documents.open() }),
+
+    'file:reopen': ({ path }) => documents.reopen(path),
+
+    'file:save': ({ text, saveAs }) =>
+      documents.save(text, saveAs).then((document) => ({ document })),
+
+    'files:recent': () => documents.recent(),
 
     'credentials:set': async ({ account, secret }) => {
       await credentials.set(account, secret);

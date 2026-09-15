@@ -183,12 +183,19 @@ describe('the bridge', () => {
       Object.keys((globalThis as never as { tyto: object }).tyto).sort(),
     );
 
+    // Written out rather than compared against `IPC_CHANNEL_NAMES`, which would pass by
+    // construction and check nothing: the claim is that the preload built the bridge from
+    // the table, and a list this test imports from the same table cannot show that.
     expect(channels).toEqual([
       'app:info',
       'brief:preview',
       'credentials:delete',
       'credentials:get',
       'credentials:set',
+      'file:open',
+      'file:reopen',
+      'file:save',
+      'files:recent',
       'templates:list',
     ]);
   });
@@ -255,6 +262,16 @@ describe('the language picker', () => {
     'command.preview.previousSlide',
     'command.shell.toggleLocale',
     'command.editor.toggleVim',
+    // E9.8: four more command labels, plus the three strings the title bar and the
+    // "this file moved" diagnostic are built from. None of them is an element's text —
+    // `windowTitle` writes into `<title>`, and a diagnostic's message is the panel's.
+    'command.file.open',
+    'command.file.save',
+    'command.file.saveAs',
+    'command.file.recent',
+    'document.untitled',
+    'document.unsaved',
+    'file.missing',
   ];
 
   it('paints every catalogue string on load, with none left blank', async () => {

@@ -61,6 +61,19 @@ const diagnostic = z.object({
 });
 
 /**
+ * A brief the window has open, as both sides agree to describe one.
+ *
+ * `text` is what goes in the editor; `name` is what the title bar shows; `path` is the key
+ * the recent list reopens by. No folder, no extension games, nothing the renderer could
+ * turn into a second way to reach a disk.
+ */
+const openDocument = z.object({
+  path: z.string().min(1),
+  name: z.string().min(1),
+  text: z.string(),
+});
+
+/**
  * Every channel the app has, and the only place a channel name is written.
  *
  * Deliberately small. E9.1 opens a window and proves the wiring; the channels a brief, a
@@ -200,6 +213,60 @@ export const IPC_CHANNELS = {
           diagnostics: z.array(diagnostic.omit({ range: true })),
         }),
       ),
+    }),
+  ),
+
+  /**
+   * A brief on disk, as the renderer is allowed to know it (E9.8).
+   *
+   * `name` and never the folder. The renderer paints a window title and a recent list, and
+   * neither needs to know where the file is — main holds the path, resolves the brief's
+   * assets against it, and is the only side that touches a disk (ADR 0010). `path` is here
+   * for one purpose and it is not navigation: it is the key a recent entry is reopened by,
+   * and main refuses any path that is not already in its own list.
+   */
+  'file:open': channel(
+    z.object({}),
+    z.object({
+      /** Absent when the dialog was dismissed, which is not a failure. */
+      document: openDocument.nullable(),
+    }),
+  ),
+
+  /**
+   * Reopens something from the recent list, by the path that list handed out.
+   *
+   * Main checks the path against the list it wrote before reading anything. That is the
+   * whole of the containment: a renderer that asked for `~/.ssh/id_rsa` gets the same
+   * answer as one that asked for a file the user deleted, because neither is a path this
+   * app ever offered.
+   */
+  'file:reopen': channel(
+    z.object({ path: z.string().min(1) }),
+    z.object({
+      document: openDocument.nullable(),
+      /** Set when the entry is in the list and the file is gone, so the panel can say so. */
+      missing: z.boolean(),
+    }),
+  ),
+
+  /**
+   * Writes the brief, asking for a name when there is not one yet.
+   *
+   * `saveAs` forces the dialog for a document that already has a path. The renderer sends
+   * the text and never a destination; what comes back is the document as it now stands, or
+   * nothing if the dialog was dismissed.
+   */
+  'file:save': channel(
+    z.object({ text: z.string(), saveAs: z.boolean() }),
+    z.object({ document: openDocument.nullable() }),
+  ),
+
+  /** What the command bar offers under "recent". Newest first; `missing` is shown, not hidden. */
+  'files:recent': channel(
+    z.object({}),
+    z.object({
+      files: z.array(z.object({ path: z.string(), name: z.string(), missing: z.boolean() })),
     }),
   ),
 

@@ -1,12 +1,14 @@
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
 
-import { app, ipcMain, safeStorage } from 'electron';
+import { app, dialog, ipcMain, safeStorage } from 'electron';
 import { nodeFileSystem } from '@tyto/io';
 
 import { localeFor } from '../../shared/i18n/index.js';
 import { fileCredentialStore } from './credential-store.js';
 import { createCredentials } from './credentials.js';
+import { createDocumentService } from './documents.js';
+import { fileRecentFiles } from './recent-files.js';
 import { registerIpcHandlers } from './ipc.js';
 import { activateBuiltIns, builtInTemplatesDirectory } from './plugins.js';
 import { createPreviewService } from './preview.js';
@@ -44,10 +46,40 @@ async function start(): Promise<void> {
   const fileSystem = nodeFileSystem();
   const host = await activateBuiltIns({ fileSystem });
 
+  // Opening and saving, and the only object in this app that knows where the open brief
+  // is. The dialogs are wrapped here rather than inside the service for the usual reason —
+  // `dialog` is an Electron API, and a service that named one could not be tested without
+  // launching one (E9.8).
+  const documents = createDocumentService({
+    recent: fileRecentFiles(join(app.getPath('userData'), 'recent-files.json')),
+    dialogs: {
+      openBrief: async () => {
+        const answer = await dialog.showOpenDialog({
+          properties: ['openFile'],
+          filters: [{ name: 'Brief', extensions: ['brief'] }],
+        });
+        return answer.canceled ? undefined : answer.filePaths[0];
+      },
+      saveBrief: async (suggested) => {
+        const answer = await dialog.showSaveDialog({
+          ...(suggested === undefined ? {} : { defaultPath: suggested }),
+          filters: [{ name: 'Brief', extensions: ['brief'] }],
+        });
+        return answer.canceled ? undefined : answer.filePath;
+      },
+    },
+  });
+
   // Built before the window, for the same reason the registry is: the preview's first
   // answer should not wait on a folder read that could have happened during startup. It
   // reads the same pack the host registered, through the same resolver.
-  const preview = await createPreviewService({ fileSystem });
+  //
+  // `baseDirectory` is asked on every preview rather than captured, which is what makes an
+  // asset start resolving the moment a file is opened without this service being rebuilt.
+  const preview = await createPreviewService({
+    fileSystem,
+    baseDirectory: () => documents.baseDirectory(),
+  });
 
   // The picker's list, read once alongside the other two. Its own read rather than the
   // preview service's registry: compiling a brief and listing what is installed are two
@@ -66,6 +98,7 @@ async function start(): Promise<void> {
 
   registerIpcHandlers(ipcMain, {
     credentials,
+    documents,
     preview,
     templates,
     info: () => ({
