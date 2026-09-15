@@ -196,6 +196,8 @@ describe('the bridge', () => {
       'file:reopen',
       'file:save',
       'files:recent',
+      'layout:get',
+      'layout:set',
       'templates:list',
     ]);
   });
@@ -272,6 +274,15 @@ describe('the language picker', () => {
     'document.untitled',
     'document.unsaved',
     'file.missing',
+    // E9.10: the close button's word lives on `title` and `aria-label`, and the rest name
+    // panels and commands inside the bar. The panel *headings* are still element text and
+    // are still counted — what moved is who renders them, not whether they are painted.
+    'panel.close',
+    'command.layout.togglePanel',
+    'command.layout.restore',
+    'panel.editor',
+    'panel.preview',
+    'panel.problems',
   ];
 
   it('paints every catalogue string on load, with none left blank', async () => {

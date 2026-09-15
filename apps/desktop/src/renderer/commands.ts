@@ -31,6 +31,19 @@ export const PREVIEW_PREVIOUS_FORMAT = 'preview.previousFormat';
 export const PREVIEW_NEXT_SLIDE = 'preview.nextSlide';
 export const PREVIEW_PREVIOUS_SLIDE = 'preview.previousSlide';
 export const SHELL_TOGGLE_LOCALE = 'shell.toggleLocale';
+export const LAYOUT_RESTORE = 'layout.restore';
+/**
+ * Showing and hiding one panel, as a command per panel (E9.10).
+ *
+ * Per panel and not one command taking an argument, because the bar runs an id and nothing
+ * else — a person types "problemas" and the row they want is the one that says Problemas.
+ * The same shape the recent list uses, and for the same reason.
+ */
+export const TOGGLE_PANEL_PREFIX = 'layout.togglePanel:';
+export const togglePanelCommandId = (panelId: string): string => `${TOGGLE_PANEL_PREFIX}${panelId}`;
+export const panelOfToggleCommand = (id: string): string | undefined =>
+  id.startsWith(TOGGLE_PANEL_PREFIX) ? id.slice(TOGGLE_PANEL_PREFIX.length) : undefined;
+
 export const EDITOR_OPEN = 'editor.open';
 export const EDITOR_SAVE_AS = 'editor.saveAs';
 /**
@@ -76,6 +89,7 @@ export const COMMAND_LABELS: Readonly<Record<string, CatalogueKey>> = {
   [EDITOR_OPEN]: 'command.file.open',
   [EDITOR_SAVE]: 'command.file.save',
   [EDITOR_SAVE_AS]: 'command.file.saveAs',
+  [LAYOUT_RESTORE]: 'command.layout.restore',
 };
 
 /**
@@ -96,6 +110,8 @@ export interface DesktopActions {
   /** E9.8. Each of these ends in a round trip to main, which owns every path. */
   openDocument(): void;
   saveDocument(saveAs: boolean): void;
+  /** E9.10. Puts every panel back where ADR 0024 says it goes. */
+  restoreLayout(): void;
 }
 
 /**
@@ -157,6 +173,13 @@ export function createDesktopRegistry(actions: DesktopActions): CommandRegistry 
   });
   add(EDITOR_SAVE_AS, () => {
     actions.saveDocument(true);
+  });
+
+  // Reachable with every panel closed, which is the acceptance criterion and the reason it
+  // is a command rather than a button on a panel: the state a person most needs this in is
+  // the one where there is nothing left to click.
+  add(LAYOUT_RESTORE, () => {
+    actions.restoreLayout();
   });
 
   return registry;

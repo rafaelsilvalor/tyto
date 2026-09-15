@@ -1,7 +1,13 @@
 import { type CommandRegistry, type EditorHandle, createEditor } from '@tyto/editor';
 
 import { type TytoBridge } from '../../shared/ipc.js';
-import { type Locale, DEFAULT_LOCALE, isLocale, translate } from '../../shared/i18n/index.js';
+import {
+  type CatalogueKey,
+  type Locale,
+  DEFAULT_LOCALE,
+  isLocale,
+  translate,
+} from '../../shared/i18n/index.js';
 import { planTemplateEdit, templateOf } from './frontmatter.js';
 import {
   type Artwork,
@@ -21,10 +27,21 @@ import {
   bindingsOf,
   createDesktopRegistry,
   keymapSetFor,
+  panelOfToggleCommand,
   pathOfRecentCommand,
   recentCommandId,
+  togglePanelCommandId,
 } from './commands.js';
 import { type ProblemsPanel, PROBLEMS_TAG } from './problems-panel.js';
+import { arrange, wireSplitters } from './dock.js';
+import './panels.js';
+import {
+  type Layout,
+  DEFAULT_LAYOUT,
+  panelOf,
+  withPanelOpen,
+  withPanelSize,
+} from '../../shared/layout.js';
 import { fillLocalePicker, localeFromPicker, paint } from './shell.js';
 import {
   type Frame,
@@ -99,6 +116,16 @@ const state = {
  */
 let recentCommands: (() => void)[] = [];
 
+/**
+ * Where the panels are, which is the only thing that decides what the window looks like.
+ *
+ * Starts at the default and is replaced by whatever main remembered, before the first
+ * arrange. Every change goes through `shared/layout.ts`'s three pure operations and then
+ * through {@link applyLayout}, so "what is on screen" and "what is remembered" cannot be
+ * two things that have to be kept in step.
+ */
+let layout: Layout = DEFAULT_LAYOUT;
+
 const preview = {
   frames: [] as readonly Frame[],
   artworks: [] as readonly Artwork[],
@@ -136,31 +163,49 @@ let editor: EditorHandle | undefined;
 const byId = <T extends HTMLElement>(id: string): T | null =>
   document.getElementById(id) as T | null;
 
-const elements = {
-  tabs: byId('format-tabs'),
-  slide: byId<HTMLSelectElement>('slide'),
-  slideLabel: byId('slide-label'),
-  stage: byId('preview-stage'),
-  paper: byId('preview-paper'),
-  frame: byId<HTMLIFrameElement>('preview-frame'),
-  empty: byId('preview-empty'),
-  zoomLevel: byId('zoom-level'),
-  status: byId('preview-status'),
-  editor: byId('editor'),
-  locale: byId<HTMLSelectElement>('locale'),
-  template: byId<HTMLSelectElement>('template'),
-  // By tag and not by id: the element is the panel, so what identifies it is what it is.
-  // Naming the tag here is also what keeps `problems-panel.js` a runtime import rather than
-  // a type-only one that the bundler would drop — and dropping it would mean the custom
-  // element is never defined and the panel silently stays empty.
-  problems: document.querySelector<ProblemsPanel>(PROBLEMS_TAG),
-  problemsCount: byId('problems-count'),
-  commandBar: document.querySelector<CommandBar>(COMMAND_BAR_TAG),
-};
+/**
+ * The nodes the window writes into, **looked up again every time the dock rearranges**.
+ *
+ * This used to be a frozen object built once at module load, and that table is the thing
+ * TYTO-101 exists to remove: fifteen ids resolved before anything was on screen meant a
+ * panel could never move, close or come back, because the only handle on it was captured
+ * when the document was still the one `index.html` shipped.
+ *
+ * Now the panels are elements the dock creates from a record, so a closed panel's nodes are
+ * gone and a reopened panel's are *new nodes*. Anything holding the old ones would be
+ * writing into a document nobody is looking at — which is the failure this shape prevents,
+ * and it is silent.
+ */
+let elements = resolveElements();
+let pane: PreviewElements | undefined;
 
-/** Every element the preview pane writes into, or `undefined` if the document lacks one. */
+function resolveElements() {
+  return {
+    status: byId('preview-status'),
+    editor: byId('editor'),
+    locale: byId<HTMLSelectElement>('locale'),
+    template: byId<HTMLSelectElement>('template'),
+    // By tag and not by id: the element is the panel, so what identifies it is what it is.
+    // Naming the tag here is also what keeps `problems-panel.js` a runtime import rather
+    // than a type-only one that the bundler would drop — and dropping it would mean the
+    // custom element is never defined and the panel silently stays empty.
+    problems: document.querySelector<ProblemsPanel>(PROBLEMS_TAG),
+    problemsCount: byId('problems-count'),
+    commandBar: document.querySelector<CommandBar>(COMMAND_BAR_TAG),
+  };
+}
+
+/** Every element the preview pane writes into, or `undefined` if the panel is closed. */
 function previewElements(): PreviewElements | undefined {
-  const { tabs, slide, slideLabel, stage, paper, frame, empty, zoomLevel } = elements;
+  const tabs = byId('format-tabs');
+  const slide = byId<HTMLSelectElement>('slide');
+  const slideLabel = byId('slide-label');
+  const stage = byId('preview-stage');
+  const paper = byId('preview-paper');
+  const frame = byId<HTMLIFrameElement>('preview-frame');
+  const empty = byId('preview-empty');
+  const zoomLevel = byId('zoom-level');
+
   if (
     tabs === null ||
     slide === null ||
@@ -171,12 +216,14 @@ function previewElements(): PreviewElements | undefined {
     empty === null ||
     zoomLevel === null
   ) {
+    // Not a failure any more, and that is the change: before the dock, a missing preview
+    // node meant a broken document. Now it means the preview panel is closed, which is a
+    // thing a person is allowed to do.
     return undefined;
   }
   return { tabs, slide, slideLabel, stage, paper, frame, empty, zoomLevel };
 }
 
-const pane = previewElements();
 const gate = createRequestGate();
 
 function paintStatus(): void {
@@ -301,6 +348,10 @@ const registry: CommandRegistry = createDesktopRegistry({
     });
   },
 
+  restoreLayout: () => {
+    void changeLayout(DEFAULT_LAYOUT);
+  },
+
   toggleVimMode: () => {
     if (editor === undefined) return;
     editor.setVimMode(!editor.isVimMode());
@@ -415,6 +466,38 @@ async function reopen(path: string, name: string): Promise<void> {
   });
 }
 
+/**
+ * A show-or-hide command per panel, registered from the record rather than written out.
+ *
+ * Once, at startup, because the set of panels is fixed for a session — what changes is
+ * whether each is open, and that is the command's business rather than the registration's.
+ * A panel added to `DEFAULT_LAYOUT` gets its command with no edit here, which is the claim
+ * the card makes about adding a panel being one entry and an element.
+ */
+function registerPanelCommands(): void {
+  for (const panel of layout.panels) {
+    // A fixed panel gets no command for the same reason it gets no close button: there is
+    // nothing it could do (`shared/layout.ts`).
+    if (panel.fixed) continue;
+    registry.register({
+      id: togglePanelCommandId(panel.id),
+      label: panel.id,
+      run: () => {
+        const current = panelOf(layout, panel.id);
+        if (current === undefined) return;
+        void changeLayout(withPanelOpen(layout, panel.id, !current.open));
+      },
+    });
+  }
+}
+
+/** The catalogue key a panel is named by in a list of panels. */
+const PANEL_NAMES: Readonly<Record<string, CatalogueKey>> = {
+  editor: 'panel.editor',
+  preview: 'panel.preview',
+  problems: 'panel.problems',
+};
+
 /** Every command the registry holds, translated and with the key that runs it. */
 function commandEntries(): readonly CommandEntry[] {
   const bindings = bindingsOf(keymapSetFor(editor?.isVimMode() ?? false), state.platform);
@@ -422,15 +505,23 @@ function commandEntries(): readonly CommandEntry[] {
   return registry.list().map((command) => {
     const key = COMMAND_LABELS[command.id];
     const binding = bindings[command.id];
-    // A recent file is the one command whose label is half catalogue and half not: the
-    // word in front of it is translated and the file's name never is.
-    const recent = pathOfRecentCommand(command.id) !== undefined;
+    // Two commands build their label from a word plus something that is not the
+    // catalogue's: a recent file's own name, and a panel's name. Both are translated at
+    // display time so that switching language needs no re-registration.
     const own = command.label ?? command.id;
-    const label = recent
-      ? `${translate(state.locale, 'command.file.recent')}: ${own}`
-      : key === undefined
-        ? own
-        : translate(state.locale, key);
+    const panelId = panelOfToggleCommand(command.id);
+    const panelName = panelId === undefined ? undefined : PANEL_NAMES[panelId];
+
+    const label =
+      pathOfRecentCommand(command.id) !== undefined
+        ? `${translate(state.locale, 'command.file.recent')}: ${own}`
+        : panelId !== undefined
+          ? `${translate(state.locale, 'command.layout.togglePanel')}: ${
+              panelName === undefined ? own : translate(state.locale, panelName)
+            }`
+          : key === undefined
+            ? own
+            : translate(state.locale, key);
 
     return {
       id: command.id,
@@ -445,6 +536,49 @@ function paintCommandBar(): void {
   if (bar === null) return;
   bar.locale = state.locale;
   bar.commands = commandEntries();
+}
+
+/**
+ * Puts the window in the shape `layout` describes, and re-finds everything in it.
+ *
+ * The order is the whole of it. Arrange first, because a reopened panel's nodes do not
+ * exist until the dock has made them; then look the nodes up again, because the old handles
+ * point at a document nobody is looking at; then wire, because new nodes have no listeners;
+ * then paint. Getting this order wrong produces a window that looks right and answers no
+ * clicks, which is the failure this function is shaped around.
+ */
+async function applyLayout(persist: boolean): Promise<void> {
+  await arrange(document, layout, {
+    locale: state.locale,
+    onClose: (panelId) => {
+      void changeLayout(withPanelOpen(layout, panelId, false));
+    },
+    onResize: (panelId, size, settled) => {
+      layout = withPanelSize(layout, panelId, size);
+      // Only the settled one is written down. A drag is sixty of these a second and the
+      // disk should hear about one of them.
+      void applyLayout(settled);
+    },
+  });
+
+  elements = resolveElements();
+  pane = previewElements();
+  wirePreviewControls(window.tyto === undefined);
+  wirePanelControls();
+  wireCommandBar();
+  repaint();
+
+  if (persist) {
+    void withBridge(async (bridge) => {
+      await bridge['layout:set']({ layout });
+    });
+  }
+}
+
+/** Every layout change is this: a new record, the window rearranged, and a write. */
+async function changeLayout(next: Layout): Promise<void> {
+  layout = next;
+  await applyLayout(true);
 }
 
 function repaint(): void {
@@ -482,13 +616,36 @@ function debounce(run: () => void): () => void {
   };
 }
 
+/**
+ * Nodes that already have their listeners.
+ *
+ * The dock rearranges whenever a panel opens, closes or is resized, and a reopened panel is
+ * made of **new nodes** — so the wiring has to run again. A panel that merely survived the
+ * rearrange keeps the nodes it had, and adding a second `click` listener to one of them
+ * would run the handler twice. A `WeakSet` because the nodes it names are thrown away when
+ * a panel closes, and nothing here should keep them alive.
+ */
+const wired = new WeakSet<EventTarget>();
+
+/** Registers `listener` once per node, whatever a rearrange does afterwards. */
+function once<K extends keyof HTMLElementEventMap>(
+  target: HTMLElement | null,
+  type: K,
+  listener: (event: HTMLElementEventMap[K]) => void,
+): void {
+  if (target === null || wired.has(target)) return;
+  wired.add(target);
+  target.addEventListener(type, listener);
+}
+
 function wirePreviewControls(bridgeless: boolean): void {
   if (pane === undefined) return;
+  const active = pane;
 
   // **Nothing in here asks for a render**, which is the acceptance criterion rather than an
   // optimisation: every frame of every format is already in `preview.frames`, so switching
   // is choosing one of them. The click handler that called the bridge would be the bug.
-  pane.tabs.addEventListener('click', (event) => {
+  once(active.tabs, 'click', (event) => {
     const target = event.target;
     if (!(target instanceof HTMLElement)) return;
     const format = target.getAttribute(FORMAT_ATTRIBUTE);
@@ -497,13 +654,13 @@ function wirePreviewControls(bridgeless: boolean): void {
     repaint();
   });
 
-  pane.slide.addEventListener('change', () => {
-    preview.selection = { ...preview.selection, artwork: pane.slide.value };
+  once(active.slide, 'change', () => {
+    preview.selection = { ...preview.selection, artwork: active.slide.value };
     repaint();
     // The card asks for both halves: the preview follows the choice, and so does the
     // editor. The range is the `::slide` directive that made this artwork, which only
     // `resolve` knew — a `Scene` carries no source position at all.
-    const at = rangeOfArtwork(preview.artworks, pane.slide.value);
+    const at = rangeOfArtwork(preview.artworks, active.slide.value);
     if (at !== undefined) reveal(at);
   });
 
@@ -516,7 +673,7 @@ function wirePreviewControls(bridgeless: boolean): void {
     ['zoom-in', PREVIEW_ZOOM_IN],
     ['zoom-out', PREVIEW_ZOOM_OUT],
   ] as const) {
-    byId<HTMLButtonElement>(id)?.addEventListener('click', () => {
+    once(byId<HTMLButtonElement>(id), 'click', () => {
       runCommand(command);
     });
   }
@@ -552,6 +709,13 @@ function runCommand(id: string): boolean {
  * CodeMirror is focused. An unhandled keystroke in the editor bubbles here anyway, so one
  * window listener covers both and there is no second binding to keep in step.
  */
+/**
+ * The bar's own two callbacks, re-set on every arrange because the bar may be a new element.
+ *
+ * It is not — the bar lives outside the docks and the dock never touches it — but this runs
+ * from `applyLayout` beside the panel wiring and should not be the one thing there that
+ * assumes its node survived.
+ */
 function wireCommandBar(): void {
   const bar = elements.commandBar;
   if (bar === null) return;
@@ -561,8 +725,24 @@ function wireCommandBar(): void {
   };
   bar.close = () => undefined;
   paintCommandBar();
+}
 
+/**
+ * `Mod-K`, on the window and **exactly once for the life of the window**.
+ *
+ * Separate from `wireCommandBar` because that one runs on every rearrange, and this must
+ * not: a second listener toggles the bar a second time on the same keystroke, so with two
+ * of them the palette opens and closes inside one keypress and never appears. Two arranges
+ * is the ordinary case — load, then the first time anybody closes a panel — so the bug
+ * arrives the moment somebody uses the feature this card adds.
+ *
+ * Found by the end-to-end suite, which could not open the bar after closing a panel. No
+ * unit sees it: each function is right on its own and the fault is in how often one runs.
+ */
+function wireCommandBarShortcut(): void {
   window.addEventListener('keydown', (event) => {
+    const bar = elements.commandBar;
+    if (bar === null) return;
     if (!(event.ctrlKey || event.metaKey) || event.altKey) return;
     if (event.key.toLowerCase() !== 'k') return;
     event.preventDefault();
@@ -581,7 +761,7 @@ function wirePanelControls(): void {
   // through the DOM is gone (ADR 0024).
   if (elements.problems !== null) elements.problems.reveal = reveal;
 
-  elements.template?.addEventListener('change', () => {
+  once(elements.template, 'change', () => {
     const picker = elements.template;
     if (picker === null || editor === undefined || picker.value === '') return;
 
@@ -608,18 +788,34 @@ async function load(): Promise<void> {
     if (isLocale(info.locale)) state.locale = info.locale;
   }
 
+  // The layout before the first arrange, so the window opens in the shape it was left in
+  // rather than snapping from the default to it while somebody watches.
+  if (bridge !== undefined) layout = (await bridge['layout:get']({})).layout;
+
+  registerPanelCommands();
+  // Arranged **before** anything is looked up: there are no panels in the document until
+  // the dock has made them, so every `getElementById` before this line would answer null.
+  await applyLayout(false);
+  wireCommandBarShortcut();
+  wireSplitters(document, () => layout, {
+    locale: state.locale,
+    onClose: (panelId) => {
+      void changeLayout(withPanelOpen(layout, panelId, false));
+    },
+    onResize: (panelId, size, settled) => {
+      layout = withPanelSize(layout, panelId, size);
+      void applyLayout(settled);
+    },
+  });
+
   if (elements.locale instanceof HTMLSelectElement) {
     const picker = elements.locale;
     fillLocalePicker(picker, state.locale);
-    picker.addEventListener('change', () => {
+    once(picker, 'change', () => {
       state.locale = localeFromPicker(picker, state.locale);
       repaint();
     });
   }
-
-  wirePreviewControls(bridge === undefined);
-  wirePanelControls();
-  wireCommandBar();
 
   if (bridge !== undefined) {
     // Asked once, because a registry is read at startup and held in main. A picker that
@@ -633,6 +829,10 @@ async function load(): Promise<void> {
   }
 
   if (elements.editor !== null) {
+    // Created once and never again: the editor panel is `fixed`, so the dock never removes
+    // its element and `#editor` is the same node for the life of the window. A panel that
+    // could close would have to hand its buffer somewhere first, which is what makes
+    // `fixed` a record field rather than a rule in the dock (`shared/layout.ts`).
     // The registry goes in here, which is what makes `Mod-z` the registry's undo rather
     // than CodeMirror's: an app-level command sitting on top of the stack has to come off
     // before the text underneath it, and only the registry knows about both.
@@ -677,6 +877,9 @@ async function load(): Promise<void> {
   repaint();
 }
 
+// The shell's own strings — the heading, the footer, the title — before anything is asked
+// of main. The docks are empty at this point and `paint` simply finds nothing in them,
+// which is the correct amount of work for a window that has not been arranged yet.
 // Painted once before the round trip as well, so the window is never blank while main
 // answers — the strings are already correct for the default locale, and only the version
 // and the platform arrive late.

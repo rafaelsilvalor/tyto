@@ -1,3 +1,4 @@
+import { type Layout, DEFAULT_LAYOUT } from '../../shared/layout.js';
 import { describe, expect, it, vi } from 'vitest';
 
 import { IPC_CHANNEL_NAMES, IpcContractError } from '../../shared/ipc.js';
@@ -77,9 +78,22 @@ const documents = () => ({
   baseDirectory: () => '/briefs',
 });
 
+/** A layout store in memory, so the registration loop has one to bind (E9.10). */
+const layoutStore = () => {
+  let held = DEFAULT_LAYOUT;
+  return {
+    read: () => Promise.resolve(held),
+    write: (next: Layout) => {
+      held = next;
+      return Promise.resolve();
+    },
+  };
+};
+
 const dependencies = () => ({
   credentials: credentials(),
   documents: documents(),
+  layout: layoutStore(),
   info: () => ({ version: '0.1.0', platform: 'linux', locale: 'pt-BR', templates: ['promo'] }),
   preview: preview(),
   templates: catalogue(),

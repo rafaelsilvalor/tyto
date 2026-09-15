@@ -12,6 +12,7 @@ import {
 } from '../../shared/ipc.js';
 import { type Credentials } from './credentials.js';
 import { type DocumentService } from './documents.js';
+import { type LayoutStore } from './layout-store.js';
 import { type PreviewService } from './preview.js';
 import { type TemplateCatalogue } from './templates.js';
 
@@ -40,6 +41,8 @@ export interface IpcDependencies {
   readonly templates: TemplateCatalogue;
   /** Opening, saving, and the folder the preview resolves assets against (E9.8). */
   readonly documents: DocumentService;
+  /** Where the panels were last time (E9.10). */
+  readonly layout: LayoutStore;
 }
 
 /** One handler per channel, typed against the contract in both directions. */
@@ -48,7 +51,7 @@ type Handlers = {
 };
 
 export function createHandlers(dependencies: IpcDependencies): Handlers {
-  const { credentials, documents, info, preview, templates } = dependencies;
+  const { credentials, documents, info, layout, preview, templates } = dependencies;
 
   return {
     'app:info': () => Promise.resolve(info()),
@@ -76,6 +79,13 @@ export function createHandlers(dependencies: IpcDependencies): Handlers {
       documents.save(text, saveAs).then((document) => ({ document })),
 
     'files:recent': () => documents.recent(),
+
+    'layout:get': async () => ({ layout: await layout.read() }),
+
+    'layout:set': async (request) => {
+      await layout.write(request.layout);
+      return {};
+    },
 
     'credentials:set': async ({ account, secret }) => {
       await credentials.set(account, secret);

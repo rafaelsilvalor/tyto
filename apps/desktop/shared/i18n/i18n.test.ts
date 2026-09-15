@@ -54,6 +54,11 @@ describe('the catalogue', () => {
       // "Template" is the word in both languages, the same way "Slide" is: it is what the
       // frontmatter key is called and what a Portuguese speaker says out loud.
       'template.label',
+      // E9.10 names the same pane twice: `editor.heading` is the title over it and
+      // `panel.editor` is what a list of panels calls it. Both are "Brief" for the same
+      // reason — it is the name of the file format and of the language, and "Resumo" would
+      // name something else.
+      'panel.editor',
       'shell.about.templates',
     ]);
   });

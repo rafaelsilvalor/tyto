@@ -50,6 +50,23 @@ In the app itself, measured by building the renderer with and without the change
 
 **Neither bundle figure decides anything and neither does line count.** The app ships a ~200 MB Electron; two kilobytes between the candidates is not a number to choose on. The panel is 71 lines hand-written, 65 on Lit and 64 on Preact — a framework does not make a panel shorter, and anybody expecting it to has the wrong reason for wanting one.
 
+### Re-measured with the real panels (E9.10)
+
+The table above was built against a synthetic document — "each extra panel is a dock with sixty rows in it" — and TYTO-101 asked for it again once the panels were real. They are much smaller than the stand-in:
+
+```
+                      sintetico (acima)   real (E9.10)
+paineis                              3               3
+elementos                          944             115
+[data-i18n]                         37              15
+varredura [data-i18n]            0.138 ms       0.005 ms
+layout forcado apos sujar            —          0.043 ms
+```
+
+**The conclusion holds and the magnitudes were overstated.** The forced layout is still the expensive half — nine times the walk here, as against a comparable ratio above — and the walk is still not worth optimising. What changed is the scale: at the size this window actually is, neither number is visible at all, and the point where a repaint approaches a frame is much further away than the synthetic table implied.
+
+The other half of that table was the claim that a closed panel should not be in the document. It is not: closing the problems panel takes the window from 115 elements to 108. A small saving on an empty panel, and a structural one — the queue and the logs are lists, and a list nobody opened is what this keeps out.
+
 ### What does force the change
 
 Not speed and not size: **the window has to become data, and the renderer cannot express that.** A panel that can be closed, reopened and resized must be a record somewhere — which panel, in which dock, open or not, how wide — and today a panel is a `<div>` in `index.html` plus a `getElementById` in a frozen `elements` object plus a bespoke painter. None of those three is addressable by a record. A component model makes a panel one value: a tag name the dock instantiates.

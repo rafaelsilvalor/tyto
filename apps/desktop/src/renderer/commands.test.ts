@@ -43,6 +43,7 @@ const actions = () =>
     toggleVimMode: vi.fn<() => void>(),
     openDocument: vi.fn<() => void>(),
     saveDocument: vi.fn<(saveAs: boolean) => void>(),
+    restoreLayout: vi.fn<() => void>(),
   }) satisfies DesktopActions;
 
 /**

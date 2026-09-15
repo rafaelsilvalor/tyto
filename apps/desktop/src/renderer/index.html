@@ -31,74 +31,30 @@
         <p class="shell__tagline" data-i18n="app.tagline"></p>
       </header>
 
-      <div class="work">
-        <section class="work__pane" aria-labelledby="editor-heading">
-          <div class="work__bar">
-            <h2 class="work__title" id="editor-heading" data-i18n="editor.heading"></h2>
-            <!--
-              The picker sits over the editor and not over the preview, because what it
-              changes is a line of the brief. Choosing a template is an edit; the preview
-              updating is the consequence, the same as it is for typing the line by hand.
-            -->
-            <label class="work__template">
-              <span data-i18n="template.label"></span>
-              <select id="template"></select>
-            </label>
-          </div>
-          <!-- CodeMirror mounts here; empty until `main.ts` runs. -->
-          <div class="editor" id="editor"></div>
-        </section>
-
-        <section class="work__pane" aria-labelledby="preview-heading">
-          <div class="work__bar">
-            <h2 class="work__title" id="preview-heading" data-i18n="preview.heading"></h2>
-            <div class="preview__tabs" id="format-tabs" role="tablist"></div>
-            <label class="preview__slide">
-              <span id="slide-label" data-i18n="preview.slide.label"></span>
-              <select id="slide"></select>
-            </label>
-            <div class="preview__zoom">
-              <button type="button" id="zoom-out" data-i18n-title="preview.zoom.out">−</button>
-              <output id="zoom-level"></output>
-              <button type="button" id="zoom-in" data-i18n-title="preview.zoom.in">+</button>
-              <button type="button" id="zoom-fit" data-i18n="preview.zoom.fit"></button>
-            </div>
-          </div>
-
-          <div class="preview__stage" id="preview-stage">
-            <div class="preview__paper" id="preview-paper" hidden>
-              <!--
-                `sandbox` with no tokens: unique origin, no scripts, no forms, no navigation.
-                A preview document is a picture. The exporter emits no script and this is what
-                makes that a property of the window rather than a habit of the exporter.
-              -->
-              <iframe id="preview-frame" sandbox="" title="Tyto"></iframe>
-            </div>
-            <p class="preview__empty" id="preview-empty" data-i18n="preview.empty"></p>
-          </div>
-
-          <p class="preview__status" id="preview-status"></p>
-        </section>
-      </div>
-
       <!--
-        The panel spans both panes rather than sitting under the editor, because a
-        diagnostic can come from any stage: a parse error is about the text on the left and
-        an unresolved font is about the picture on the right, and a panel under one of them
-        would be claiming the other's problems belong to it.
+        Four empty docks and a splitter each, and **nothing here says what goes in them**
+        (E9.10, ADR 0024). `dock.ts` reads the layout record, creates the element each open
+        panel names, and puts it in its dock. A panel nobody has opened is never created, so
+        it costs the repaint nothing.
+
+        `left` is declared and empty on purpose: the templates list and the file tree are
+        their own cards, and the dock that will hold them exists now so that adding one is
+        an entry in a record rather than a change to this file.
       -->
-      <section class="problems" aria-labelledby="problems-heading">
-        <div class="work__bar">
-          <h2 class="work__title" id="problems-heading" data-i18n="problems.heading"></h2>
-          <output class="problems__count" id="problems-count"></output>
+      <div class="workspace">
+        <div class="work" id="work">
+          <div class="dock dock--left" data-dock="left" hidden></div>
+          <div class="splitter" data-splitter="left" role="separator" aria-orientation="vertical" hidden></div>
+
+          <div class="dock dock--centre" data-dock="centre"></div>
+
+          <div class="splitter" data-splitter="right" role="separator" aria-orientation="vertical"></div>
+          <div class="dock dock--right" data-dock="right"></div>
         </div>
-        <!--
-          A custom element and not a `<div>` the renderer paints into: the panel owns its own
-          strings and its own updates (ADR 0024). It renders into itself rather than into a
-          shadow root, so `shell.css` still reaches every class inside it.
-        -->
-        <tyto-problems class="problems__list" id="problems-list"></tyto-problems>
-      </section>
+
+        <div class="splitter splitter--row" data-splitter="bottom" role="separator" aria-orientation="horizontal"></div>
+        <div class="dock dock--bottom" data-dock="bottom"></div>
+      </div>
 
       <footer class="shell__foot">
         <label class="shell__language">
