@@ -41,6 +41,28 @@ export interface Catalogue {
   readonly 'template.label': string;
   /** The option standing for a brief whose frontmatter names no template yet. */
   readonly 'template.none': string;
+  /**
+   * The command bar (E9.12), and the labels of everything it lists.
+   *
+   * A command's label is a catalogue key here rather than the `label` on the `EditorCommand`
+   * itself: `@tyto/editor` is a package with no locale, its two built-in commands carry
+   * English labels, and a registry that had to be re-registered to change language would be
+   * the wrong shape. `COMMAND_LABELS` in `src/renderer/commands.ts` is the map.
+   */
+  readonly 'command.bar.placeholder': string;
+  readonly 'command.bar.empty': string;
+  readonly 'command.undo': string;
+  readonly 'command.redo': string;
+  readonly 'command.preview.zoomIn': string;
+  readonly 'command.preview.zoomOut': string;
+  readonly 'command.preview.zoomFit': string;
+  readonly 'command.preview.nextFormat': string;
+  readonly 'command.preview.previousFormat': string;
+  readonly 'command.preview.nextSlide': string;
+  readonly 'command.preview.previousSlide': string;
+  readonly 'command.shell.toggleLocale': string;
+  readonly 'command.editor.toggleVim': string;
+
   readonly 'shell.language.label': string;
   readonly 'shell.about.version': string;
   readonly 'shell.about.platform': string;
@@ -70,6 +92,19 @@ export const CATALOGUE_KEYS = [
   'problems.nowhere',
   'template.label',
   'template.none',
+  'command.bar.placeholder',
+  'command.bar.empty',
+  'command.undo',
+  'command.redo',
+  'command.preview.zoomIn',
+  'command.preview.zoomOut',
+  'command.preview.zoomFit',
+  'command.preview.nextFormat',
+  'command.preview.previousFormat',
+  'command.preview.nextSlide',
+  'command.preview.previousSlide',
+  'command.shell.toggleLocale',
+  'command.editor.toggleVim',
   'shell.language.label',
   'shell.about.version',
   'shell.about.platform',

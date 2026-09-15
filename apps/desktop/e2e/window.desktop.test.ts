@@ -214,6 +214,12 @@ describe('the language picker', () => {
    * alternatives: the line says either how many problems there are or that there are none,
    * so neither is on screen unconditionally and counting both would count a string that is
    * not there.
+   *
+   * **The list grows with every component, and that is what ADR 0024 decided.** A component
+   * translates inside its own `render`, so its strings never reach the `[data-i18n]` pass
+   * this counts. The pass is not going away — three painters still use it — but the
+   * invariant it once carried on its own, "every string in the catalogue is on screen", is
+   * now shared between it and the elements, and this list is the seam.
    */
   const NOT_ELEMENT_TEXT: readonly CatalogueKey[] = [
     'preview.zoom.out',
@@ -231,6 +237,24 @@ describe('the language picker', () => {
     'problems.location',
     'problems.nowhere',
     'template.none',
+    // E9.12: the command bar renders its own strings and renders nothing at all while it is
+    // closed, which is most of the time — so none of these is in the document on load, and
+    // the two that are only reachable *inside* the bar never will be by this route. The
+    // element is what holds them to a locale (`src/renderer/command-bar.test.ts`), and
+    // `commands.test.ts` is what holds every registered command to having a key here at all.
+    'command.bar.placeholder',
+    'command.bar.empty',
+    'command.undo',
+    'command.redo',
+    'command.preview.zoomIn',
+    'command.preview.zoomOut',
+    'command.preview.zoomFit',
+    'command.preview.nextFormat',
+    'command.preview.previousFormat',
+    'command.preview.nextSlide',
+    'command.preview.previousSlide',
+    'command.shell.toggleLocale',
+    'command.editor.toggleVim',
   ];
 
   it('paints every catalogue string on load, with none left blank', async () => {

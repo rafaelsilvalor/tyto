@@ -112,6 +112,12 @@
         </dl>
       </footer>
     </main>
+    <!--
+      Outside `.shell`, because it covers the window rather than living in it. Empty until
+      Mod-K: the element renders nothing while closed, so a palette nobody opened costs one
+      element rather than a list of every command in the app.
+    -->
+    <tyto-command-bar></tyto-command-bar>
     <script type="module" src="./main.ts"></script>
   </body>
 </html>

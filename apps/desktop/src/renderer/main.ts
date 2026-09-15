@@ -1,4 +1,4 @@
-import { type EditorHandle, createEditor } from '@tyto/editor';
+import { type CommandRegistry, type EditorHandle, createEditor } from '@tyto/editor';
 
 import { type TytoBridge } from '../../shared/ipc.js';
 import { type Locale, DEFAULT_LOCALE, isLocale, translate } from '../../shared/i18n/index.js';
@@ -12,6 +12,16 @@ import {
   rangeOfArtwork,
   revealRange,
 } from './panel.js';
+import { type CommandEntry, type CommandBar, COMMAND_BAR_TAG } from './command-bar.js';
+import {
+  COMMAND_LABELS,
+  PREVIEW_ZOOM_FIT,
+  PREVIEW_ZOOM_IN,
+  PREVIEW_ZOOM_OUT,
+  bindingsOf,
+  createDesktopRegistry,
+  keymapSetFor,
+} from './commands.js';
 import { type ProblemsPanel, PROBLEMS_TAG } from './problems-panel.js';
 import { fillLocalePicker, localeFromPicker, paint } from './shell.js';
 import {
@@ -20,8 +30,10 @@ import {
   type Selection,
   type Zoom,
   FORMAT_ATTRIBUTE,
+  artworksOf,
   createRequestGate,
   errorCount,
+  formatsOf,
   keepSelection,
   paintPreview,
   stepZoom,
@@ -124,6 +136,7 @@ const elements = {
   // element is never defined and the panel silently stays empty.
   problems: document.querySelector<ProblemsPanel>(PROBLEMS_TAG),
   problemsCount: byId('problems-count'),
+  commandBar: document.querySelector<CommandBar>(COMMAND_BAR_TAG),
 };
 
 /** Every element the preview pane writes into, or `undefined` if the document lacks one. */
@@ -202,11 +215,112 @@ function paintPanel(): void {
   }
 }
 
+/**
+ * The commands, and the one thing in this file that is not wiring.
+ *
+ * Each of these moves a piece of state this module holds and then repaints, which is
+ * exactly what the corresponding button already did — and that is the point: a command is
+ * not a second way to do something, it is the same way with a name. The click handlers
+ * below call `registry.run(id)` rather than the action, so a button and the bar cannot
+ * drift apart the way two copies of a handler would.
+ */
+const registry: CommandRegistry = createDesktopRegistry({
+  stepZoom: (direction) => {
+    if (pane === undefined) return;
+    // A step from whatever is on screen, the same as the buttons: the first step after
+    // `fit` moves from the size the user is looking at.
+    preview.zoom = stepZoom(paintPreview(pane, preview), direction);
+    repaint();
+  },
+
+  zoomToFit: () => {
+    preview.zoom = 'fit';
+    repaint();
+  },
+
+  stepFormat: (direction) => {
+    preview.selection = {
+      ...preview.selection,
+      format: cycle(formatsOf(preview.frames), preview.selection.format, direction),
+    };
+    repaint();
+  },
+
+  stepSlide: (direction) => {
+    const artwork = cycle(artworksOf(preview.artworks), preview.selection.artwork, direction);
+    preview.selection = { ...preview.selection, artwork };
+    repaint();
+    // The editor follows, the same as choosing from the picker does. A command that moved
+    // the picture and left the text behind would be a different feature wearing the same
+    // name.
+    const at = rangeOfArtwork(preview.artworks, artwork);
+    if (at !== undefined) reveal(at);
+  },
+
+  toggleLocale: () => {
+    state.locale = state.locale === 'pt-BR' ? 'en' : 'pt-BR';
+    // The picker is a view of the locale and not its owner, so it is written rather than
+    // read here; leaving it stale would make the footer disagree with the window.
+    if (elements.locale !== null) fillLocalePicker(elements.locale, state.locale);
+    repaint();
+  },
+
+  toggleVimMode: () => {
+    if (editor === undefined) return;
+    editor.setVimMode(!editor.isVimMode());
+    // The bindings change with the mode — vim has no `Mod-z`, because undo is `u` and
+    // belongs to the vim engine — so the bar has to be told what it now shows.
+    paintCommandBar();
+  },
+});
+
+/**
+ * The next value in a ring, or the first one when nothing is selected yet.
+ *
+ * Wrapping rather than stopping: two formats and a "next" that refused at the end would be
+ * a control that does nothing every other press.
+ */
+function cycle(
+  values: readonly string[],
+  current: string | undefined,
+  direction: 1 | -1,
+): string | undefined {
+  if (values.length === 0) return undefined;
+  const at = current === undefined ? -1 : values.indexOf(current);
+  const next = (at + direction + values.length) % values.length;
+  return values[next];
+}
+
+/** Every command the registry holds, translated and with the key that runs it. */
+function commandEntries(): readonly CommandEntry[] {
+  const bindings = bindingsOf(keymapSetFor(editor?.isVimMode() ?? false), state.platform);
+
+  return registry.list().map((command) => {
+    const key = COMMAND_LABELS[command.id];
+    const binding = bindings[command.id];
+    return {
+      id: command.id,
+      // The catalogue first, then whatever label the command brought, then the id. A
+      // plugin's command will land on the last two and is better shown than hidden.
+      label: key === undefined ? (command.label ?? command.id) : translate(state.locale, key),
+      ...(binding === undefined ? {} : { binding }),
+    };
+  });
+}
+
+function paintCommandBar(): void {
+  const bar = elements.commandBar;
+  if (bar === null) return;
+  bar.locale = state.locale;
+  bar.commands = commandEntries();
+}
+
 function repaint(): void {
   paint(document, state);
   if (pane !== undefined) paintPreview(pane, preview);
   paintStatus();
   paintPanel();
+  paintCommandBar();
 }
 
 /** Asks main for the frames of `brief`, and keeps the answer only if it is still the latest. */
@@ -261,20 +375,17 @@ function wirePreviewControls(bridgeless: boolean): void {
     if (at !== undefined) reveal(at);
   });
 
-  byId<HTMLButtonElement>('zoom-fit')?.addEventListener('click', () => {
-    preview.zoom = 'fit';
-    repaint();
-  });
-
-  for (const [id, direction] of [
-    ['zoom-in', 1],
-    ['zoom-out', -1],
+  // The three zoom buttons run commands rather than doing the work. That is the whole of
+  // what E9.12 asks for from the rest of the window: a button, a key and a bar entry are
+  // three ways to say one id, and a handler that did the work here would be a fourth
+  // definition of "zoom in" for the others to drift away from.
+  for (const [id, command] of [
+    ['zoom-fit', PREVIEW_ZOOM_FIT],
+    ['zoom-in', PREVIEW_ZOOM_IN],
+    ['zoom-out', PREVIEW_ZOOM_OUT],
   ] as const) {
     byId<HTMLButtonElement>(id)?.addEventListener('click', () => {
-      // A step from whatever is on screen, so the first click after `fit` moves from the
-      // size the user is looking at rather than jumping to 100%.
-      preview.zoom = stepZoom(paintPreview(pane, preview), direction);
-      repaint();
+      runCommand(command);
     });
   }
 
@@ -285,6 +396,49 @@ function wirePreviewControls(bridgeless: boolean): void {
   });
 
   if (bridgeless) pane.empty.hidden = false;
+}
+
+/**
+ * Runs a command by id, which is the only way anything in this file runs one.
+ *
+ * The registry needs a view because a command may be the editor's — undo and redo are, and
+ * they reach CodeMirror's history through it. Before the editor exists there is nothing to
+ * undo and nothing that needs one, so there is no fallback here and no silent failure
+ * either: `run` answers `false` and the caller was a click on a button that does nothing
+ * yet.
+ */
+function runCommand(id: string): boolean {
+  if (editor === undefined) return false;
+  return registry.run(id, { view: editor.view });
+}
+
+/**
+ * `Mod-K`, on the window rather than in the editor's keymap.
+ *
+ * The bar has to open whether or not the editor has focus — from the preview, from the
+ * problems panel, from nothing at all — and a CodeMirror binding only fires while
+ * CodeMirror is focused. An unhandled keystroke in the editor bubbles here anyway, so one
+ * window listener covers both and there is no second binding to keep in step.
+ */
+function wireCommandBar(): void {
+  const bar = elements.commandBar;
+  if (bar === null) return;
+
+  bar.run = (id) => {
+    runCommand(id);
+  };
+  bar.close = () => undefined;
+  paintCommandBar();
+
+  window.addEventListener('keydown', (event) => {
+    if (!(event.ctrlKey || event.metaKey) || event.altKey) return;
+    if (event.key.toLowerCase() !== 'k') return;
+    event.preventDefault();
+    // A toggle, because the muscle memory for closing a palette is the key that opened it
+    // as often as it is Escape.
+    if (bar.open) bar.dismiss();
+    else bar.show();
+  });
 }
 
 /** The panel's own two controls: a row that moves the cursor, and a picker that edits. */
@@ -333,6 +487,7 @@ async function load(): Promise<void> {
 
   wirePreviewControls(bridge === undefined);
   wirePanelControls();
+  wireCommandBar();
 
   if (bridge !== undefined) {
     // Asked once, because a registry is read at startup and held in main. A picker that
@@ -346,7 +501,13 @@ async function load(): Promise<void> {
   }
 
   if (elements.editor !== null) {
-    editor = createEditor(elements.editor, { doc: '' });
+    // The registry goes in here, which is what makes `Mod-z` the registry's undo rather
+    // than CodeMirror's: an app-level command sitting on top of the stack has to come off
+    // before the text underneath it, and only the registry knows about both.
+    editor = createEditor(elements.editor, { doc: '', commands: registry });
+    // The bindings are read off the keymap set the editor is running, so the bar can only
+    // be painted once there is an editor to ask.
+    paintCommandBar();
     if (bridge !== undefined) {
       const handle = editor;
       const ask = debounce(() => void request(bridge, handle.getValue()));
