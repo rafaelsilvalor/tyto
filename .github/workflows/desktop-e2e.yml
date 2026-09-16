@@ -1,0 +1,102 @@
+name: desktop-e2e
+# The two suites that launch a real Electron. Until TYTO-111 they ran in **no workflow at
+# all**: `ci.yml` runs `pnpm turbo … test`, and `apps/desktop`'s `test` script points at
+# `vitest.config.ts`, whose `include` is `shared/**` and `src/**` — the `e2e/` folder is
+# reached only by `test:desktop` and `test:package`, and neither was in a workflow. So 71
+# tests ran on a maintainer's machine or nowhere, including the three `webPreferences`
+# flags ADR 0001 names and the packaging failure that opens no window at all (TYTO-15).
+#
+# `docs/architecture.md` is right that the suites do not belong in `pnpm check` — they
+# download a ~246 MB Electron and open a window. That is the reason they are here, in a
+# workflow of their own, rather than the reason they are nowhere.
+#
+# **Why this trigger, and what the other two would have cost.** A nightly (or push-only)
+# schedule keeps every PR fast and finds a break within a day — but a day after it landed
+# on `main`, which is the thing this repository already has too much of: `desktop.yml`
+# runs on no pull request and that is exactly how the tag-prefix defect landed green
+# (TYTO-97). Running them inside `desktop.yml`, before packaging, is cheapest in minutes
+# and latest in discovery: a tag is pushed to release, not to find out. Running them here,
+# path-filtered on `apps/desktop/**`, is the only shape that reports before the merge, and
+# it costs the Electron download on desktop PRs only — cached below, so it is paid once.
+#
+# **The `push` trigger is not a duplicate of the `pull_request` one, and the asymmetry is
+# deliberate.** The path filter is what keeps this off unrelated PRs, and it is also this
+# workflow's blind spot: the app bundles nine workspace packages, so a change in
+# `packages/core` can break the window without touching a filtered path. The push side
+# carries no filter for that reason — anything that reaches `main` is checked, whatever it
+# touched.
+#
+# **Not a required status check on `main`**, for the reason `docs/git-workflow.md` gives
+# about `visual.yml`: a path-filtered workflow reports on most PRs never, and a required
+# context that never reports leaves them pending for good. What that costs is real and is
+# worth naming — a red run here does not block the merge button; it is visible on the PR
+# and somebody has to look. Making it required means giving it a second, filter-less job
+# that reports green trivially, which is a decision this card did not take.
+on:
+  pull_request:
+    paths:
+      - 'apps/desktop/**'
+      - '.github/workflows/desktop-e2e.yml'
+  push: { branches: [main] }
+concurrency: { group: 'desktop-e2e-${{ github.ref }}', cancel-in-progress: true }
+jobs:
+  desktop:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: pnpm/action-setup@v6
+      - uses: actions/setup-node@v7
+        with: { node-version: 22, cache: pnpm }
+
+      - run: pnpm install --frozen-lockfile
+
+      # The version, not the lockfile hash. `pnpm-workspace.yaml` explains why the ~246 MB
+      # download does not happen during the install: `electron@44.3.0` publishes no install
+      # script, so the binary is fetched on the first `require('electron')` — inside the
+      # test step below. Keying the cache on `pnpm-lock.yaml` would work and would also
+      # throw the binary away every time any of 472 packages moved, so the key reads the
+      # one thing that decides which bytes are wanted.
+      - name: Read the Electron version the cache is for
+        id: electron
+        run: |
+          version=$(pnpm --filter @tyto/desktop exec node -p "require('electron/package.json').version")
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+      - uses: actions/cache@v4
+        with:
+          path: ~/.cache/electron
+          key: electron-${{ runner.os }}-${{ steps.electron.outputs.version }}
+      # electron-builder's own downloads, which only `test:package` pays for: the Electron
+      # zip it repacks, plus `app-builder` and the AppImage runtime. A separate key because
+      # it moves with electron-builder rather than with Electron.
+      - uses: actions/cache@v4
+        with:
+          path: ~/.cache/electron-builder
+          key: electron-builder-${{ runner.os }}-${{ hashFiles('pnpm-lock.yaml') }}
+
+      # Chromium's shared libraries, which Electron is. `install-deps` and not
+      # `install --with-deps`: this needs the system packages and **not** the browser —
+      # `_electron.launch` runs the Electron in `node_modules`, so a downloaded Chromium
+      # would be ~170 MB nothing opens. Xvfb on top, because `show: false` is not headless
+      # on Linux: Electron still opens a display connection at startup and dies with
+      # `Missing X server or $DISPLAY` without one.
+      - run: pnpm exec playwright install-deps chromium
+      - run: sudo apt-get install -y --no-install-recommends xvfb
+
+      # `pnpm build`, not `pnpm --filter @tyto/desktop build` — the same rule `desktop.yml`
+      # carries and for the same reason: on a fresh checkout the workspace packages have no
+      # `dist/`, and the filtered form runs the package's script and nothing before it.
+      - run: pnpm build
+
+      # ~2 min 40 s and ~1 min 15 s respectively, measured on a maintainer's machine with
+      # both caches warm (TYTO-111). The CI figure is whatever this job reports; it is
+      # recorded on the card rather than guessed at here.
+      - run: xvfb-run -a pnpm --filter @tyto/desktop test:desktop
+      # `!cancelled()` rather than nothing, so a red `test:desktop` does not hide whether
+      # the package is also broken. They answer different questions and one run should
+      # answer both.
+      - if: ${{ !cancelled() }}
+        run: xvfb-run -a pnpm --filter @tyto/desktop test:package
+
+      - uses: actions/upload-artifact@v7
+        if: failure()
+        with: { name: desktop-e2e-results, path: '**/test-results/**' }
