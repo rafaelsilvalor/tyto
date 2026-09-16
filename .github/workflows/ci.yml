@@ -22,6 +22,20 @@ jobs:
       # desktop end-to-end suites before TYTO-111. `github-config.test.ts` fails if it stops
       # being run, or stops being run before a merge.
       - run: pnpm format:check
+      # `changeset status` and not `changeset version`: it reads the `.changeset/` folder and
+      # writes nothing, so it can run on a pull request where versioning cannot.
+      #
+      # **It is here because the release workflow is the only other thing that reads those
+      # files, and it runs after the merge.** A changeset naming a private package beside a
+      # published one is refused by Changesets v3 — `Mixed changesets that contain both
+      # ignored and not ignored packages are not allowed` — and it took `release` down on
+      # `main` twice while every check on the pull request stayed green (TYTO-109, TYTO-0).
+      # `changesets.test.ts` catches that one case in `pnpm check`; this catches the class,
+      # by asking the tool itself.
+      #
+      # Safe on a pull request that adds no changeset: measured, `changeset status` prints an
+      # empty "Packages to be bumped:" and exits 0.
+      - run: pnpm exec changeset status
       - run: pnpm turbo typecheck lint test build
         env:
           TURBO_TOKEN: ${{ secrets.TURBO_TOKEN }}

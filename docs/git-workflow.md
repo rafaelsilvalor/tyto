@@ -72,19 +72,19 @@ The CLI's own major renamed a command: `changeset tag` is `changeset git-tag`. T
 
 **A third one bit.** "Private packages are no longer versioned" means Changesets treats them as _ignored_, and it refuses a file that names an ignored package beside a published one: `Mixed changesets that contain both ignored and not ignored packages are not allowed`. So a change that touches `@tyto/editor` and `@tyto/desktop` together is **two changeset files, not two lines in one** — the same text on each side, which costs nothing.
 
-**The reason this is worth a paragraph is when it fails.** `pnpm check` does not run Changesets and neither does `ci.yml`; `release.yml` only fires on a push to `main`. A mixed file therefore passes every check a pull request has and fails after the merge, on the branch it cannot be fixed on without opening a second PR. That is not hypothetical — one file naming both took `release` down on `main` twice in a row (TYTO-109, fixed by TYTO-0). `tools/repo-checks/src/changesets.test.ts` now fails `pnpm check` instead, which is the point: the rule is cheap, the failure is expensive, and the gap between them was two days of green.
+**The reason this is worth a paragraph is when it fails.** `pnpm check` does not run Changesets and neither does `ci.yml`; `release.yml` only fires on a push to `main`. A mixed file therefore passes every check a pull request has and fails after the merge, on the branch it cannot be fixed on without opening a second PR. That is not hypothetical — one file naming both took `release` down on `main` twice in a row (TYTO-109, fixed by TYTO-0). `tools/repo-checks/src/changesets.test.ts` now fails `pnpm check` instead, which is the point: the rule is cheap, the failure is expensive, and the gap between them was two days of green. **And `ci.yml` runs `changeset status` on every pull request**, which closes the class rather than the one case — it reads the same folder `release.yml` would version, writes nothing, and exits 0 on a branch that adds no changeset (measured, not assumed).
 
 ## Workflows (`.github/workflows/`)
 
-| File              | Trigger                                     | Does                                                                                          |
-| ----------------- | ------------------------------------------- | --------------------------------------------------------------------------------------------- |
-| `ci.yml`          | PR, push to main                            | install (pnpm cache) → format:check → typecheck → lint → test → build. Turborepo remote cache |
-| `visual.yml`      | PR touching export/raster/templates/core    | Playwright + `test:visual`; uploads diffs as artifact on failure                              |
-| `desktop-e2e.yml` | PR touching `apps/desktop/**`, push to main | Xvfb + `test:desktop` and `test:package`, 3 min 13 s, no Electron cache                       |
-| `commitlint.yml`  | PR                                          | validates PR title and commits                                                                |
-| `release.yml`     | push to main                                | Changesets → version PR → tags                                                                |
-| `desktop.yml`     | tag `desktop-v*`                            | tag/version guard → OS matrix → electron-builder → GitHub Release                             |
-| `labeler.yml`     | PR (`pull_request_target`)                  | applies `pkg:*`/`app:*`/`docs`/`repo` labels from `.github/labeler.yml`                       |
+| File              | Trigger                                     | Does                                                                                                             |
+| ----------------- | ------------------------------------------- | ---------------------------------------------------------------------------------------------------------------- |
+| `ci.yml`          | PR, push to main                            | install (pnpm cache) → format:check → changeset status → typecheck → lint → test → build. Turborepo remote cache |
+| `visual.yml`      | PR touching export/raster/templates/core    | Playwright + `test:visual`; uploads diffs as artifact on failure                                                 |
+| `desktop-e2e.yml` | PR touching `apps/desktop/**`, push to main | Xvfb + `test:desktop` and `test:package`, 3 min 13 s, no Electron cache                                          |
+| `commitlint.yml`  | PR                                          | validates PR title and commits                                                                                   |
+| `release.yml`     | push to main                                | Changesets → version PR → tags                                                                                   |
+| `desktop.yml`     | tag `desktop-v*`                            | tag/version guard → OS matrix → electron-builder → GitHub Release                                                |
+| `labeler.yml`     | PR (`pull_request_target`)                  | applies `pkg:*`/`app:*`/`docs`/`repo` labels from `.github/labeler.yml`                                          |
 
 ## Protections and labels
 

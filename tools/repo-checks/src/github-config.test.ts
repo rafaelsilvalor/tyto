@@ -425,6 +425,34 @@ describe('formatting', () => {
   });
 });
 
+/**
+ * `changeset status`, which reads the files `release.yml` would version.
+ *
+ * `changesets.test.ts` holds the one failure that has actually happened — a file naming a
+ * private package beside a published one. This holds the *class*: the tool itself, run on
+ * every pull request, where `release.yml` runs only after the merge. Both exist because the
+ * two answer different questions, and the expensive one is "what else does Changesets
+ * refuse that nobody has hit yet".
+ */
+describe('changeset status', () => {
+  it('is run by a workflow, on a pull request', () => {
+    const running = workflowsRunning('changeset status');
+    expect(running, 'no workflow runs `changeset status`').not.toHaveLength(0);
+
+    const onPullRequest = running.filter((file) =>
+      triggersOf(readYaml<Workflow>(`${WORKFLOWS_DIR}/${file}`)).includes('pull_request'),
+    );
+    expect(onPullRequest, '`changeset status` runs, but not before a merge').not.toHaveLength(0);
+  });
+
+  it('is not `changeset version`, which writes', () => {
+    // The one way this step could be wrong rather than missing. `version` rewrites every
+    // manifest and consumes the folder; on a pull request it would either fail or commit.
+    const ci = readRepoFile(`${WORKFLOWS_DIR}/ci.yml`);
+    expect(ci).not.toMatch(/run:.*changeset version/u);
+  });
+});
+
 describe('labeler', () => {
   type LabelerConfig = Record<string, { 'changed-files': { 'any-glob-to-any-file': unknown }[] }[]>;
 
