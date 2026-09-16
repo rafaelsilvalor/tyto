@@ -1,6 +1,12 @@
 import { defaultKeymap, history, historyKeymap } from '@codemirror/commands';
 import { foldGutter, foldKeymap, indentOnInput } from '@codemirror/language';
-import { Annotation, Compartment, EditorState, type Extension } from '@codemirror/state';
+import {
+  type Extension,
+  type StateEffect,
+  Annotation,
+  Compartment,
+  EditorState,
+} from '@codemirror/state';
 import {
   EditorView,
   drawSelection,
@@ -82,6 +88,25 @@ export interface EditorOptions {
   readonly language?: LanguageName;
 }
 
+/**
+ * Everything one document owns inside an editor: its text, its undo history, where the
+ * cursor is and how far it is scrolled.
+ *
+ * **Opaque to the host.** A window with tabs holds one of these per document and hands it
+ * back; nothing outside this package reads a field. The shape is CodeMirror's because it
+ * *is* CodeMirror's — an `EditorState` already carries the text, the history and the
+ * selection, and rebuilding one from text would be an undo stack thrown away on every tab
+ * switch.
+ *
+ * `scroll` is separate because an `EditorState` does not carry a scroll position: it is a
+ * property of the view, and `scrollSnapshot()` is CodeMirror's own way of putting one in an
+ * effect that can be dispatched later.
+ */
+export interface DocumentSnapshot {
+  readonly state: EditorState;
+  readonly scroll: StateEffect<unknown>;
+}
+
 export interface EditorHandle {
   /**
    * The view underneath, for the extension points this handle does not wrap — a host that
@@ -91,6 +116,18 @@ export interface EditorHandle {
   getValue(): string;
   /** Replaces the whole document. Does not notify `onChange` listeners. */
   setValue(value: string): void;
+  /**
+   * What this editor is holding right now, for a host that has somewhere to put it.
+   *
+   * The three calls below are what a window with tabs needs and nothing else does: take the
+   * document away, put another one in, and make a new one. A host without tabs never calls
+   * them and pays nothing for them.
+   */
+  snapshot(): DocumentSnapshot;
+  /** Puts a snapshot back, history, cursor and scroll included. Notifies nobody. */
+  restore(snapshot: DocumentSnapshot): void;
+  /** A new document with this editor's own extensions — an empty history, no selection. */
+  blank(doc: string): DocumentSnapshot;
   /** Returns the function that stops the listener. */
   onChange(listener: (value: string) => void): () => void;
   setTheme(theme: ThemeName): void;
@@ -167,33 +204,57 @@ export function createEditor(parent: HTMLElement, options: EditorOptions = {}): 
 
   const readOnly = options.readOnly ?? false;
 
+  /**
+   * The extensions every document in this editor gets, held so that `blank` can make a
+   * second one.
+   *
+   * A list and not a closure over `EditorState.create`, because a tab's state has to be
+   * built with *these* extensions: the keymap compartment, the command registry, the
+   * language and the theme are what make two documents behave like the same editor rather
+   * than like two editors that happen to be in one window.
+   */
+  const extensions = [
+    ...(options.extensions ?? []),
+    // Ahead of `baseExtensions`, so this package's `Mod-z` is reached before the
+    // `historyKeymap` in there. Both stay: when there is no registry, or nothing left
+    // to undo, ours returns false and CodeMirror's own binding still works.
+    inputCompartment.of(vimEnabled ? vimMode() : keys),
+    ...(options.commands === undefined ? [] : [commandRegistryFacet.of(options.commands)]),
+    notify,
+    // Both halves of read-only, because they answer different questions: the facet
+    // stops the commands, and `editable` takes the `contenteditable` off the content
+    // element so the caret and the input method never arrive in the first place.
+    ...(readOnly ? [EditorState.readOnly.of(true), EditorView.editable.of(false)] : []),
+    themeCompartment.of(themes[options.theme ?? 'light']),
+    languages[options.language ?? 'brief'](),
+    ...baseExtensions(),
+  ];
+
   const view = new EditorView({
     parent,
-    state: EditorState.create({
-      doc: options.doc ?? '',
-      extensions: [
-        ...(options.extensions ?? []),
-        // Ahead of `baseExtensions`, so this package's `Mod-z` is reached before the
-        // `historyKeymap` in there. Both stay: when there is no registry, or nothing left
-        // to undo, ours returns false and CodeMirror's own binding still works.
-        inputCompartment.of(vimEnabled ? vimMode() : keys),
-        ...(options.commands === undefined ? [] : [commandRegistryFacet.of(options.commands)]),
-        notify,
-        // Both halves of read-only, because they answer different questions: the facet
-        // stops the commands, and `editable` takes the `contenteditable` off the content
-        // element so the caret and the input method never arrive in the first place.
-        ...(readOnly ? [EditorState.readOnly.of(true), EditorView.editable.of(false)] : []),
-        themeCompartment.of(themes[options.theme ?? 'light']),
-        languages[options.language ?? 'brief'](),
-        ...baseExtensions(),
-      ],
-    }),
+    state: EditorState.create({ doc: options.doc ?? '', extensions }),
   });
 
   return {
     view,
 
     getValue: () => view.state.doc.toString(),
+
+    snapshot: () => ({ state: view.state, scroll: view.scrollSnapshot() }),
+
+    restore: (snapshot: DocumentSnapshot) => {
+      // `setState` and not a change transaction: a transaction would put the swap on the
+      // undo stack, so undoing once in a fresh tab would paste the other document back in.
+      view.setState(snapshot.state);
+      // Dispatched after, because a scroll effect is a property of the view and the view
+      // has just been given a different state to measure.
+      view.dispatch({ effects: snapshot.scroll });
+    },
+
+    blank: (doc: string) => ({
+      state: EditorState.create({ doc, extensions }),
+      scroll: EditorView.scrollIntoView(0),
+    }),
 
     setValue: (value: string) => {
       view.dispatch({

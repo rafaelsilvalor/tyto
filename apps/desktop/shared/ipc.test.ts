@@ -17,6 +17,8 @@ describe('the IPC contract', () => {
       'credentials:delete',
       'credentials:get',
       'credentials:set',
+      'dialog:confirm',
+      'file:close',
       'file:open',
       'file:reopen',
       'file:save',
@@ -123,9 +125,10 @@ describe('what the contract does not promise', () => {
     const optional: readonly IpcChannelName[] = [
       'app:info',
       'templates:list',
-      // E9.8. Both ask a question with no arguments: which file do you want, and what have
-      // you opened lately. The paths are main's answer, never the renderer's question.
-      'file:open',
+      // E9.8. Asks what you have opened lately, with no arguments. The paths are main's
+      // answer, never the renderer's question. `file:open` used to be here and is not any
+      // more: with tabs, "which file do you want" has a second half — which tab is it for
+      // (E9.11).
       'files:recent',
       // E9.10. Asking where the panels were takes no arguments; telling it takes a layout.
       'layout:get',

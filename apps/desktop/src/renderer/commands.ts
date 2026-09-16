@@ -60,6 +60,30 @@ export const pathOfRecentCommand = (id: string): string | undefined =>
   id.startsWith(RECENT_PREFIX) ? id.slice(RECENT_PREFIX.length) : undefined;
 export const EDITOR_TOGGLE_VIM = 'editor.toggleVim';
 
+export const DOCUMENT_CLOSE = 'document.close';
+export const DOCUMENT_NEXT = 'document.next';
+export const DOCUMENT_PREVIOUS = 'document.previous';
+
+/**
+ * Going to the nth tab, as a command per slot (E9.11).
+ *
+ * Nine ids and not one command taking a number, for the reason the panel toggles and the
+ * recent list already give: the bar runs an id and nothing else, so a person typing a file
+ * name has to find a row that says it. `main.ts` registers one of these per **open**
+ * document and takes them down again, so the bar lists the tabs that exist rather than nine
+ * rows of which seven do nothing — and the keystroke is attached to the slot rather than to
+ * the document, because `Mod-2` means "the second tab" whatever is in it.
+ */
+export const DOCUMENT_SELECT_PREFIX = 'document.select:';
+export const DOCUMENT_SLOTS = [1, 2, 3, 4, 5, 6, 7, 8, 9] as const;
+export const selectDocumentCommandId = (slot: number): string =>
+  `${DOCUMENT_SELECT_PREFIX}${String(slot)}`;
+export const slotOfSelectCommand = (id: string): number | undefined => {
+  if (!id.startsWith(DOCUMENT_SELECT_PREFIX)) return undefined;
+  const slot = Number.parseInt(id.slice(DOCUMENT_SELECT_PREFIX.length), 10);
+  return Number.isNaN(slot) ? undefined : slot;
+};
+
 /**
  * The catalogue key each command is shown under.
  *
@@ -90,6 +114,9 @@ export const COMMAND_LABELS: Readonly<Record<string, CatalogueKey>> = {
   [EDITOR_SAVE]: 'command.file.save',
   [EDITOR_SAVE_AS]: 'command.file.saveAs',
   [LAYOUT_RESTORE]: 'command.layout.restore',
+  [DOCUMENT_CLOSE]: 'command.document.close',
+  [DOCUMENT_NEXT]: 'command.document.next',
+  [DOCUMENT_PREVIOUS]: 'command.document.previous',
 };
 
 /**
@@ -112,6 +139,9 @@ export interface DesktopActions {
   saveDocument(saveAs: boolean): void;
   /** E9.10. Puts every panel back where ADR 0024 says it goes. */
   restoreLayout(): void;
+  /** E9.11. Closing asks first when the tab has unsaved text, so it answers nothing here. */
+  closeDocument(): void;
+  stepDocument(direction: 1 | -1): void;
 }
 
 /**
@@ -182,6 +212,16 @@ export function createDesktopRegistry(actions: DesktopActions): CommandRegistry 
     actions.restoreLayout();
   });
 
+  add(DOCUMENT_CLOSE, () => {
+    actions.closeDocument();
+  });
+  add(DOCUMENT_NEXT, () => {
+    actions.stepDocument(1);
+  });
+  add(DOCUMENT_PREVIOUS, () => {
+    actions.stepDocument(-1);
+  });
+
   return registry;
 }
 
@@ -233,6 +273,18 @@ export const desktopKeymapSet: EditorKeymap = {
     ...defaultKeymapSet.bindings,
     { key: 'Mod-o', command: EDITOR_OPEN },
     { key: 'Mod-Shift-s', command: EDITOR_SAVE_AS },
+    // The tabs (E9.11). `Mod-w` closes and the two page keys step, which is what Chrome,
+    // Firefox and VS Code all bind on Windows and Linux; `Mod-1`…`Mod-9` go straight to a
+    // slot. They are here rather than in a window listener of their own because the card
+    // asks for one table: the bar reads its keystrokes off this set, so a binding invented
+    // beside it would be a shortcut the palette does not know about.
+    { key: 'Mod-w', command: DOCUMENT_CLOSE },
+    { key: 'Mod-PageDown', command: DOCUMENT_NEXT },
+    { key: 'Mod-PageUp', command: DOCUMENT_PREVIOUS },
+    ...DOCUMENT_SLOTS.map((slot) => ({
+      key: `Mod-${String(slot)}`,
+      command: selectDocumentCommandId(slot),
+    })),
   ],
 };
 

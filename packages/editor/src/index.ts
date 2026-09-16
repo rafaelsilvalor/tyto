@@ -14,6 +14,7 @@ export { brief, briefLanguage } from './brief-language.js';
 
 export {
   createEditor,
+  type DocumentSnapshot,
   type EditorHandle,
   type EditorOptions,
   type LanguageName,

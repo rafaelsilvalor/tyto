@@ -32,6 +32,16 @@
       </header>
 
       <!--
+        The document tabs (E9.11, ADR 0024), across the top of the window and outside the
+        docks. What is open belongs to the window rather than to a panel: the strip must not
+        vanish with the pane it would otherwise sit in, and living here means the dock never
+        rebuilds it, so the tab under the pointer survives a splitter being dragged.
+
+        Empty in the markup, like the docks below it: `main.ts` hands it the workspace.
+      -->
+      <tyto-tabs class="tabs"></tyto-tabs>
+
+      <!--
         Four empty docks and a splitter each, and **nothing here says what goes in them**
         (E9.10, ADR 0024). `dock.ts` reads the layout record, creates the element each open
         panel names, and puts it in its dock. A panel nobody has opened is never created, so

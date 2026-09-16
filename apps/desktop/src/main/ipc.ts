@@ -43,6 +43,13 @@ export interface IpcDependencies {
   readonly documents: DocumentService;
   /** Where the panels were last time (E9.10). */
   readonly layout: LayoutStore;
+  /**
+   * A yes-or-no in front of the window (E9.11), injected for the reason the dialogs are.
+   *
+   * Every string in it is the renderer's, already translated. Main owns the OS dialog and
+   * nothing else about the question.
+   */
+  readonly confirm: (question: IpcRequest<'dialog:confirm'>) => Promise<boolean>;
 }
 
 /** One handler per channel, typed against the contract in both directions. */
@@ -51,13 +58,16 @@ type Handlers = {
 };
 
 export function createHandlers(dependencies: IpcDependencies): Handlers {
-  const { credentials, documents, info, layout, preview, templates } = dependencies;
+  const { confirm, credentials, documents, info, layout, preview, templates } = dependencies;
 
   return {
     'app:info': () => Promise.resolve(info()),
 
-    'brief:preview': async ({ requestId, brief }) => {
-      const result = await preview.preview(brief);
+    'brief:preview': async ({ requestId, documentId, brief }) => {
+      // The folder is looked up from the id **this request carries**, not from whichever
+      // tab is in front. A preview is debounced and answers out of order by design, so the
+      // subject has to travel with the question (`shared/ipc.ts`).
+      const result = await preview.preview(brief, documents.folderOf(documentId));
       // The id goes back untouched. Main does not know which answer the renderer still
       // wants — only the renderer knows what it has asked since — so the whole of main's
       // part in discarding a stale result is not losing the number.
@@ -71,12 +81,19 @@ export function createHandlers(dependencies: IpcDependencies): Handlers {
 
     'templates:list': () => Promise.resolve(templates.list()),
 
-    'file:open': async () => ({ document: await documents.open() }),
+    'file:open': ({ documentId }) => documents.open(documentId),
 
-    'file:reopen': ({ path }) => documents.reopen(path),
+    'file:reopen': ({ documentId, path }) => documents.reopen(documentId, path),
 
-    'file:save': ({ text, saveAs }) =>
-      documents.save(text, saveAs).then((document) => ({ document })),
+    'file:save': ({ documentId, text, saveAs }) =>
+      documents.save(documentId, text, saveAs).then((document) => ({ document })),
+
+    'file:close': ({ documentId }) => {
+      documents.close(documentId);
+      return Promise.resolve({});
+    },
+
+    'dialog:confirm': async (question) => ({ confirmed: await confirm(question) }),
 
     'files:recent': () => documents.recent(),
 
