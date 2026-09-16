@@ -312,8 +312,15 @@ exist in the app), and the cost of D4's LRU.
 The fourteen are not one piece of work and should not arrive as one. They fall into five
 groups, and what separates them is **what each is waiting for** rather than how big it is.
 
-**No card exists for any of them, deliberately.** This note is not merged, so nothing in it
-is ratified; cards follow the merge, not the draft.
+**One card exists, and only one: TYTO-109 for D8.** The rest wait for this note to be
+merged, because until then nothing in it is ratified and fourteen cards off a draft is how a
+board fills with work nobody agreed to.
+
+D8 is the exception for a reason that is worth stating, because it is the test the others
+fail: **it stands whether or not this note is accepted.** The gap it names is missing search,
+measured independently — `@codemirror/search` is in no `package.json` and nothing imports it
+— not a consequence of the buffer/window model. Reject the whole note and `Ctrl+F` still
+does nothing.
 
 | Group                 | Decisions           | Waiting for          | Why                                                                 |
 | --------------------- | ------------------- | -------------------- | ------------------------------------------------------------------- |
@@ -323,7 +330,7 @@ is ratified; cards follow the merge, not the draft.
 | Performance           | D4, D6              | A measurement        | Nothing says the pipeline costs anything today                      |
 | A feature of its own  | D9–D14              | D1 first             | Cross-file search and replace is epic-sized                         |
 
-## D8 first, and the reason is not importance
+## D8 first (TYTO-109), and the reason is not importance
 
 **There is no find-in-file in Tyto at all.** `@codemirror/search` is in no `package.json` and
 nothing in `packages/editor` imports it, so `Ctrl+F` in the editor does nothing today. It is
