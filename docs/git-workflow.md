@@ -70,6 +70,10 @@ Crossing that major renamed every input the workflow passes — `version` → `v
 
 The CLI's own major renamed a command: `changeset tag` is `changeset git-tag`. The old spelling still tags and prints `The 'tag' command is deprecated. Please use 'git-tag' instead.` — a countdown rather than a pass, so `release.yml` runs `git-tag`. Two other v3 changes matter here and neither bites yet: `changeset version` now exits 1 when no unreleased changeset exists (the action only runs it when there are changesets), and private packages are no longer versioned by default (nothing in `tools/` was ever meant to be).
 
+**A third one bit.** "Private packages are no longer versioned" means Changesets treats them as _ignored_, and it refuses a file that names an ignored package beside a published one: `Mixed changesets that contain both ignored and not ignored packages are not allowed`. So a change that touches `@tyto/editor` and `@tyto/desktop` together is **two changeset files, not two lines in one** — the same text on each side, which costs nothing.
+
+**The reason this is worth a paragraph is when it fails.** `pnpm check` does not run Changesets and neither does `ci.yml`; `release.yml` only fires on a push to `main`. A mixed file therefore passes every check a pull request has and fails after the merge, on the branch it cannot be fixed on without opening a second PR. That is not hypothetical — one file naming both took `release` down on `main` twice in a row (TYTO-109, fixed by TYTO-0). `tools/repo-checks/src/changesets.test.ts` now fails `pnpm check` instead, which is the point: the rule is cheap, the failure is expensive, and the gap between them was two days of green.
+
 ## Workflows (`.github/workflows/`)
 
 | File              | Trigger                                     | Does                                                                           |
