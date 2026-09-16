@@ -50,6 +50,28 @@ const SECOND = [
   ...Array.from({ length: 400 }, () => ''),
 ].join('\n');
 
+/**
+ * Every accelerator the built menu ended up with, at any depth.
+ *
+ * Read off the running app rather than off the template, because the two are different
+ * facts: `menu.ts` asks for roles, and which key each role carries is Electron's answer.
+ * That answer is the one that can change under this repository without a line of it moving.
+ */
+const accelerators = async (): Promise<string[]> =>
+  app.evaluate(({ Menu }) => {
+    const found: string[] = [];
+    const walk = (items: Electron.MenuItem[]): void => {
+      for (const item of items) {
+        if (item.accelerator !== undefined && item.accelerator !== null) {
+          found.push(item.accelerator);
+        }
+        if (item.submenu) walk(item.submenu.items);
+      }
+    };
+    walk(Menu.getApplicationMenu()?.items ?? []);
+    return found;
+  });
+
 const editorText = async (): Promise<string> =>
   page.evaluate(() => document.querySelector('#editor .cm-content')?.textContent ?? '');
 
@@ -195,24 +217,27 @@ describe('the window a person opens', () => {
     // accelerator is handled before the page sees it, and Playwright's keys go straight to
     // the renderer through the debugger — so pressing Control+W here would pass either way
     // and tell a person on a real keyboard nothing (`src/main/menu.ts`).
-    const accelerators = await app.evaluate(({ Menu }) => {
-      const found: string[] = [];
-      const walk = (items: Electron.MenuItem[]): void => {
-        for (const item of items) {
-          if (item.accelerator !== undefined && item.accelerator !== null) {
-            found.push(item.accelerator);
-          }
-          if (item.submenu) walk(item.submenu.items);
-        }
-      };
-      walk(Menu.getApplicationMenu()?.items ?? []);
-      return found;
-    });
+    const found = await accelerators();
 
-    expect(accelerators).not.toContain('CommandOrControl+W');
+    expect(found).not.toContain('CommandOrControl+W');
     // And the menu is still there: removing it outright is what takes copy and paste off
     // macOS, where the clipboard shortcuts belong to the menu.
-    expect(accelerators).toContain('CommandOrControl+C');
+    expect(found).toContain('CommandOrControl+C');
+  });
+
+  it('gives Mod-R to nobody, because a reload discards every open tab', async () => {
+    // TYTO-104, and read the same way and for the same reason: this is the assertion that
+    // would catch the accelerator coming back, either because `menu.ts` asked for the role
+    // again or because Electron moved a default onto an item that is still here.
+    // `src/main/menu.test.ts` asserts the template; what a role *becomes* is Electron's,
+    // and this is where Electron is running.
+    const found = await accelerators();
+
+    expect(found).not.toContain('CommandOrControl+R');
+    expect(found).not.toContain('Shift+CommandOrControl+R');
+    // The rest of the View menu survived, so the removal is about reloading rather than
+    // about the submenu.
+    expect(found).toContain('CommandOrControl+0');
   });
 });
 
@@ -433,5 +458,38 @@ describe('the keys', () => {
     expect(labels).toHaveLength(2);
     expect(labels[0]).toContain('campanha.brief');
     expect(labels[1]).toContain('promo.brief');
+  });
+});
+
+describe('a save-as onto a file another tab has open', () => {
+  /**
+   * The bundled loose end of TYTO-104, and the only place it can be seen.
+   *
+   * Main gives the path to the tab that asked — moving somebody away from the text they
+   * just wrote would be worse — so the *other* tab has to let go, and the strip has to say
+   * so. `src/main/documents.test.ts` proves main stops holding it; what nothing below main
+   * can prove is that the tab strip stops claiming a file it no longer has, because the
+   * strip is painted by `src/renderer/main.ts` from an answer that crosses the bridge.
+   */
+  it('leaves one tab holding the file and takes the name off the other', async () => {
+    await answerDialogsWith(firstPath);
+    await runFromBar('editor.open');
+    await answerDialogsWith(secondPath);
+    await runFromBar('editor.open');
+    expect(await tabNames()).toEqual(['campanha.brief', 'promo.brief']);
+
+    // promo.brief is in front; save it over the file the first tab is holding.
+    await answerDialogsWith(undefined, firstPath);
+    await runFromBar('editor.saveAs');
+    await page.waitForTimeout(500);
+
+    // Exactly one tab named after the file, and it is the one that asked. The other keeps
+    // its text and loses the claim that the text is in a file.
+    expect(await tabNames()).toEqual([
+      expect.stringMatching(/^(Sem título|Untitled)$/u),
+      'campanha.brief',
+    ]);
+    expect(await activeTab()).toBe('campanha.brief');
+    expect(await unsavedTabs()).toEqual([expect.stringMatching(/^(Sem título|Untitled)$/u)]);
   });
 });

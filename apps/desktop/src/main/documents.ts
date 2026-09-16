@@ -51,11 +51,17 @@ export interface AdoptedDocument {
   readonly documentId: string | null;
 }
 
+/** What saving produced, and which other tab lost the path to it — see `file:save`. */
+export interface SavedDocument {
+  readonly document: OpenDocument | null;
+  readonly released: string | null;
+}
+
 export interface DocumentService {
   open(documentId: string): Promise<AdoptedDocument>;
   /** Reopens a path the recent list handed out. `missing` when the entry is gone. */
   reopen(documentId: string, path: string): Promise<AdoptedDocument & { missing: boolean }>;
-  save(documentId: string, text: string, saveAs: boolean): Promise<OpenDocument | null>;
+  save(documentId: string, text: string, saveAs: boolean): Promise<SavedDocument>;
   /** Forgets a tab's path. A tab main never heard of is not an error. */
   close(documentId: string): void;
   recent(): Promise<IpcResponse<'files:recent'>>;
@@ -138,17 +144,33 @@ export function createDocumentService(options: DocumentServiceOptions): Document
     async save(documentId, text, saveAs) {
       const current = paths.get(documentId);
       const path = current === undefined || saveAs ? await dialogs.saveBrief(current) : current;
-      if (path === undefined) return null;
+      if (path === undefined) return { document: null, released: null };
 
       await disk.write(path, text);
+
+      // Asked before the claim below, because afterwards both tabs hold it and there is no
+      // longer anything to find. A save-as onto a file another tab has open is the only way
+      // to get here with an answer.
+      const previous = holderOf(path);
+
       // Set directly rather than through `adopt`: saving is the one call that must answer
       // with the tab that asked. `adopt` hands a file to whichever tab already had it, which
       // is right for opening and would, on a save-as onto an open file, move the person away
       // from the text they just wrote.
       paths.set(documentId, path);
+
+      // And the tab that had it lets go, so exactly one tab holds a path (TYTO-104). Both
+      // holding it was a map `holderOf` could answer two ways — the next `open` of this file
+      // would land on whichever came first in insertion order — and a strip showing the name
+      // twice with nothing to tell them apart. The other tab keeps its text; what it loses is
+      // the claim that the text is in a file, which stopped being true when this write
+      // landed.
+      const released = previous !== undefined && previous !== documentId ? previous : null;
+      if (released !== null) paths.delete(released);
+
       const entry: RecentEntry = { path, name: basename(path) };
       await recent.remember(entry);
-      return { path, name: entry.name, text };
+      return { document: { path, name: entry.name, text }, released };
     },
 
     close(documentId) {

@@ -465,6 +465,19 @@ const registry: CommandRegistry = createDesktopRegistry({
         name,
         dirty: false,
       }));
+
+      // A save-as onto a file another tab had open: main gave the path to this tab and took
+      // it off that one, and the strip has to say so (TYTO-104). The other tab keeps every
+      // character it had — what it loses is its name and its clean marker, because its text
+      // is now in no file and the next save there has to ask where to put it.
+      if (answer.released !== null && answer.released !== documentId) {
+        workspace = updateDocument(workspace, answer.released, (document_) => ({
+          ...document_,
+          name: undefined,
+          dirty: true,
+        }));
+      }
+
       repaint();
       void refreshRecent();
     });
