@@ -231,10 +231,23 @@ only main has a disk. ADR 0010 does allow the compiler to run in the renderer �
 — but moving it there splits asset resolution across the bridge, and the renderer's
 Content-Security-Policy refuses a `file://` read.
 
-**Rough size:** large, and the first deliverable is an ADR, not a refactor. A cheaper
-intermediate exists and should be measured first: keep the compile in main and give it D4's
-two `WeakMap`s there, which buys the undo/redo cache hit without moving anything across the
-bridge.
+**Rough size:** large, and the first deliverable is an ADR, not a refactor.
+
+**A cheaper intermediate exists, and it is not D4's `WeakMap`s.** An earlier draft of this
+audit said to keep the compile in main and put the same two `WeakMap`s there. That cannot
+work: a `WeakMap` needs an object key, main never receives a `Text` — `brief:preview` carries
+`brief: z.string()` and a string is a primitive — and main does not import CodeMirror at all.
+Object identity does not survive the bridge.
+
+What does work in main is a cache keyed by **content**: hash the brief text, cache the AST
+under the hash and the `Scene` under the AST's. That still gives the property D4 is after —
+undo restores identical text, which hashes the same, so undo and redo hit the cache — and it
+loses the one D4 gets for free: a `WeakMap` drops an entry when the old `Text` is collected,
+and a content-keyed map grows until something bounds it. So the intermediate needs an LRU,
+which is the machinery D4 only wanted for rasters.
+
+That is a real cost and it is the honest argument _for_ D4's placement rather than against
+it: identity-keyed caching is only available on the side that holds the `EditorState`.
 
 ## Symptom 3 — `view.setState()` on switching files
 
