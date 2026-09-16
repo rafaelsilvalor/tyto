@@ -152,6 +152,7 @@ export class PreviewPanel extends DockedPanel {
           <iframe id="preview-frame" sandbox="" title="Tyto"></iframe>
         </div>
         <p class="preview__empty" id="preview-empty" data-i18n="preview.empty"></p>
+        <p class="preview__stale" id="preview-stale" data-i18n="preview.stale" hidden></p>
       </div>
       <p class="preview__status" id="preview-status"></p>`;
   }

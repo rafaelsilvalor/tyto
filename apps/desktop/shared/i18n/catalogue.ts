@@ -24,6 +24,14 @@ export interface Catalogue {
   readonly 'preview.zoom.fit': string;
   /** Shown in place of a frame while the brief produces none. */
   readonly 'preview.empty': string;
+  /**
+   * The artwork on screen is older than the brief being typed (E9.13).
+   *
+   * A state of the preview and not a second error message: the problems panel already lists
+   * what is wrong, and this says only that the picture and the text have stopped agreeing.
+   * It has to read well with that panel closed, which is the case the card is about.
+   */
+  readonly 'preview.stale': string;
   /** The status line under the stage, with the number of problems spliced in. */
   readonly 'preview.problems': string;
   readonly 'preview.ok': string;
@@ -174,6 +182,7 @@ export const CATALOGUE_KEYS = [
   'preview.zoom.in',
   'preview.zoom.fit',
   'preview.empty',
+  'preview.stale',
   'preview.problems',
   'preview.ok',
   'problems.heading',
