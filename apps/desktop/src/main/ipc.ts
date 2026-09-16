@@ -85,8 +85,7 @@ export function createHandlers(dependencies: IpcDependencies): Handlers {
 
     'file:reopen': ({ documentId, path }) => documents.reopen(documentId, path),
 
-    'file:save': ({ documentId, text, saveAs }) =>
-      documents.save(documentId, text, saveAs).then((document) => ({ document })),
+    'file:save': ({ documentId, text, saveAs }) => documents.save(documentId, text, saveAs),
 
     'file:close': ({ documentId }) => {
       documents.close(documentId);

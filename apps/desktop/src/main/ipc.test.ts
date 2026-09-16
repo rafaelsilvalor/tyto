@@ -80,7 +80,10 @@ const documents = () => {
           : { document: null, documentId: null, missing: true },
       ),
     save: (_documentId: string, text: string) =>
-      Promise.resolve({ path: '/briefs/promo.brief', name: 'promo.brief', text }),
+      Promise.resolve({
+        document: { path: '/briefs/promo.brief', name: 'promo.brief', text },
+        released: null,
+      }),
     close: (documentId: string) => {
       closed.push(documentId);
     },

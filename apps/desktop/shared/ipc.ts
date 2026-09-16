@@ -298,7 +298,23 @@ export const IPC_CHANNELS = {
    */
   'file:save': channel(
     z.object({ documentId, text: z.string(), saveAs: z.boolean() }),
-    z.object({ document: openDocument.nullable() }),
+    z.object({
+      document: openDocument.nullable(),
+      /**
+       * The tab that was holding this path and is not any more (TYTO-104).
+       *
+       * A save-as onto a file another tab has open is the one call that can leave two tabs
+       * claiming one path, and `save` deliberately gives it to the tab that asked — moving
+       * the person away from the text they just wrote would be worse. So the *other* tab
+       * lets go, and this field is how it finds out: main cannot tell it, because every
+       * channel here is a question the renderer asks, so the answer to the save carries it.
+       *
+       * `null` on every ordinary save, which is almost all of them. The renderer's part is
+       * to take the name off that tab and mark it unsaved — its text is now in no file, and
+       * a strip showing the same name twice would say otherwise.
+       */
+      released: documentId.nullable(),
+    }),
   ),
 
   /**
