@@ -8,7 +8,12 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
-        with: { lfs: true }
+        # `fetch-depth: 0` is the whole history, and it is here for one step: `changeset
+        # status` asks git where this branch diverged from `main`, and the default shallow
+        # clone has no `main` and no merge base — `Failed to find where HEAD diverged from
+        # "main"`. Measured rather than reasoned: the step passed locally, where the history
+        # is complete, and failed on the first CI run that had it.
+        with: { lfs: true, fetch-depth: 0 }
       - uses: pnpm/action-setup@v6
       - uses: actions/setup-node@v7
         with: { node-version: 22, cache: pnpm }
