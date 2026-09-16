@@ -50,34 +50,34 @@ jobs:
 
       - run: pnpm install --frozen-lockfile
 
-      # The version, not the lockfile hash. `pnpm-workspace.yaml` explains why the ~246 MB
-      # download does not happen during the install: `electron@44.3.0` publishes no install
-      # script, so the binary is fetched on the first `require('electron')` — inside the
-      # test step below. Keying the cache on `pnpm-lock.yaml` would work and would also
-      # throw the binary away every time any of 472 packages moved, so the key reads the
-      # one thing that decides which bytes are wanted.
-      - name: Read the Electron version the cache is for
-        id: electron
-        run: |
-          version=$(pnpm --filter @tyto/desktop exec node -p "require('electron/package.json').version")
-          echo "version=$version" >> "$GITHUB_OUTPUT"
-      - uses: actions/cache@v4
-        with:
-          path: ~/.cache/electron
-          key: electron-${{ runner.os }}-${{ steps.electron.outputs.version }}
-      # **One cache and not two, which took a run to find out.** A second entry for
-      # `~/.cache/electron-builder` looked obviously right and cached nothing: electron-builder
-      # repacks the zip out of `~/.cache/electron` — the one above, which `test:desktop` has
-      # just filled — and the folder it was supposedly caching never comes into existence.
-      # What that step actually produced was one line of `Path Validation Error: Path(s)
-      # specified in the action for caching do(es) not exist` on every run. It is the reason
-      # `test:package` costs 6 s here against ~70 s on a machine that downloads its own.
+      # **There is no Electron cache here, and that is a measurement rather than an
+      # omission.** The card asked for one. It was built — `actions/cache` on
+      # `~/.cache/electron`, keyed on the Electron version read off the installed package —
+      # run cold and then run warm, and the two runs are the same job to within noise:
       #
-      # **A red job caches nothing.** `actions/cache` declares `post-if: success()`, so the
-      # save step is skipped when anything before it failed — this workflow's first run
-      # downloaded Electron, went red on one test, and left the cache empty. That is the
-      # right default (a cache written from a broken run is a broken cache) and it means the
-      # first *green* run is the one that pays the download forward.
+      #     cold (`Cache not found for input keys: electron-Linux-44.3.0`)
+      #       e2e/tabs.desktop.test.ts, the file that pays for the download … 57.6 s
+      #       job                                                               3 min 34 s
+      #     warm (`Cache restored from key: electron-Linux-44.3.0`, 116.85 MiB)
+      #       e2e/tabs.desktop.test.ts                                        … 58.2 s
+      #       job                                                               3 min 31 s
+      #
+      # The premise was that a ~117 MB download is worth avoiding. On this runner it is not
+      # one: Electron's CDN and GitHub's cache are the same few seconds apart, and the 58 s
+      # is the 17 tests in that file, not the fetch. So the step bought nothing measurable
+      # and spent 116.85 MiB of a 10 GB repository quota that evicts by least-recent-use —
+      # against the pnpm store, which does save real time.
+      #
+      # Two things learned on the way that would otherwise have to be learned again. A
+      # second entry for `~/.cache/electron-builder` cached nothing at all and said so once
+      # per run (`Path Validation Error: Path(s) specified in the action for caching do(es)
+      # not exist`): electron-builder repacks the zip out of `~/.cache/electron`, which is
+      # why `test:package` costs 6 s here against ~70 s on a machine that fetches its own.
+      # And `actions/cache` declares `post-if: success()`, so a red job saves nothing — the
+      # first green run is always the one that would pay a download forward.
+      #
+      # Reinstating it is `actions/cache@v4` and two lines. Do that against a number, not
+      # against the intuition that a big download must be expensive.
 
       # Chromium's shared libraries, which Electron is. `install-deps` and not
       # `install --with-deps`: this needs the system packages and **not** the browser —
@@ -93,11 +93,11 @@ jobs:
       # `dist/`, and the filtered form runs the package's script and nothing before it.
       - run: pnpm build
 
-      # The whole job is 3 min 41 s with nothing cached, of which the Electron download is
-      # 56 s and `test:package` is 6.4 s — measured on this workflow's first run, not
-      # estimated. `test:package` is that cheap because `electron-builder` repacks the zip
-      # out of `~/.cache/electron`, which the step above has just filled: the two suites
-      # share a download rather than each paying for one.
+      # **3 min 31 s for the job, and that is the number this card records as acceptable.**
+      # `test:desktop` is 2 min 17 s of it and `test:package` 6.4 s — measured on this
+      # workflow's own runs, not estimated. `test:package` is that cheap because
+      # `electron-builder` repacks the Electron `test:desktop` has already fetched, so the
+      # two suites share one download whatever caching is or is not in front of them.
       - run: xvfb-run -a pnpm --filter @tyto/desktop test:desktop
       # `!cancelled()` rather than nothing, so a red `test:desktop` does not hide whether
       # the package is also broken. They answer different questions and one run should
