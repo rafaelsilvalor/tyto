@@ -80,6 +80,23 @@ const nodeBuiltinPatterns = [
   ...builtinModules.filter((name) => !name.startsWith('_')).map((name) => `${name}/*`),
 ];
 
+/**
+ * `syntaxTree` is not the tree; it is whatever the last parse happened to finish.
+ *
+ * CodeMirror parses `Math.min(3000, doc.length)` characters up front with a 20 ms budget and
+ * truncates on expiry, so a reader that asks for the tree and resolves a position past that
+ * point gets the top node and answers nothing. It is silent, it is deterministic on any long
+ * document, and the 20 ms being wall clock makes it intermittent on short ones — which is how
+ * it was found, as a test that failed 2 runs in 9 (TYTO-114).
+ *
+ * `treeAt(state, upto)` is the same call with the position it needs to reach.
+ */
+const ONE_READER_OF_THE_SYNTAX_TREE =
+  'Use `treeAt(state, upto)` from ./syntax.js rather than `syntaxTree`. `syntaxTree` returns ' +
+  'the tree the last parse left behind, which stops at 3000 characters on a fresh state, so ' +
+  'resolving a position past that answers with the top node and the reader silently returns ' +
+  'nothing (TYTO-114). `syntax.ts` is the one module allowed to call it.';
+
 const NO_NODE_IN_PURE =
   'Pure packages (ADR 0010) must not import Node built-ins — they have to run unchanged in the ' +
   'browser and in a cloud worker. Declare a port in @tyto/core and put the Node code in an ' +
@@ -99,10 +116,24 @@ const NO_NODE_GLOBALS_IN_PURE =
   'Pure packages (ADR 0010) must not touch Node globals. Take the value as an argument or through ' +
   'a port from @tyto/core.';
 
-const restrictedImports = (message) => ({
+/**
+ * `paths` is for a named export a package may not import, beside the built-ins it may not.
+ *
+ * **Both halves have to be passed together**, which is the trap this signature exists to
+ * make hard to fall into: flat config *replaces* a rule's options rather than merging them,
+ * so a later block that sets `no-restricted-imports` for a narrower `files` glob silently
+ * turns off whatever an earlier block configured for the same rule. Adding the syntax-tree
+ * rule below without re-stating the Node message took the runtime boundary off
+ * `packages/editor/src` — caught by `runtime-boundary.test.ts`, which lints a throwaway
+ * `node:fs` import against the real config and expects it to be refused.
+ */
+const restrictedImports = (message, paths = []) => ({
   '@typescript-eslint/no-restricted-imports': [
     'error',
-    { patterns: [{ group: nodeBuiltinPatterns, message, allowTypeImports: false }] },
+    {
+      patterns: [{ group: nodeBuiltinPatterns, message, allowTypeImports: false }],
+      ...(paths.length === 0 ? {} : { paths }),
+    },
   ],
 });
 
@@ -224,6 +255,24 @@ export default tseslint.config(
         },
       ],
     },
+  },
+
+  {
+    name: 'editor/one-reader-of-the-syntax-tree',
+    // Tests are exempt so a case can still reach for the truncated tree deliberately — that
+    // is how the defect was measured, and a test that cannot reproduce it cannot pin it.
+    files: ['packages/editor/src/**/*.ts'],
+    ignores: ['packages/editor/src/syntax.ts', 'packages/editor/src/**/*.test.ts'],
+    // `NO_NODE_IN_DOM` is repeated rather than inherited: this block sets the same rule as
+    // `boundary/dom` for a subset of its files, and flat config replaces rather than merges.
+    rules: restrictedImports(NO_NODE_IN_DOM, [
+      {
+        name: '@codemirror/language',
+        importNames: ['syntaxTree'],
+        message: ONE_READER_OF_THE_SYNTAX_TREE,
+        allowTypeImports: false,
+      },
+    ]),
   },
 
   {

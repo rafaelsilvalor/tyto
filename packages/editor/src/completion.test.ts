@@ -241,4 +241,44 @@ describe('completeBrief', () => {
 
     expect(result).toBeNull();
   });
+
+  /**
+   * Past the 3 000 characters CodeMirror parses up front, where this source used to answer
+   * nothing at all.
+   *
+   * `syntaxTree(state)` returns whatever the last parse finished, and on a fresh state that
+   * is `Math.min(3000, doc.length)` with a 20 ms budget on top
+   * (`@codemirror/language/dist/index.js:540`). Past the truncation `resolveInner` hands back
+   * the top node, `completeBody` falls through to its `default:`, and the author gets no
+   * suggestions below roughly line 200 of a brief. Measured before the fix: a 400-line
+   * document resolved `Brief` where a 200-line one resolved `Adjustments`, and the labels
+   * went from two to none.
+   *
+   * **This is the same defect as the flake** `completion.test.ts` used to show 2 runs in 9.
+   * The 20 ms is wall clock, so a worker descheduled under load loses it on a document of
+   * any size; this test is the deterministic half of it, and `syntax.ts` explains both.
+   *
+   * The sizes bracket the boundary deliberately. 200 lines is 2 942 characters and passed
+   * before the fix; 400 lines is 5 942 and did not. Both are here, so a regression that
+   * shrank the reachable window rather than removing it would still be caught.
+   */
+  it('completes past the first 3 000 characters, which the initial parse does not reach', () => {
+    const padding = (lines: number): string =>
+      `${Array.from({ length: lines }, (_, index) => `// padding ${String(index)}`).join('\n')}\n`;
+
+    for (const lines of [200, 400, 1000]) {
+      const document_ = `${frontmatter()}${padding(lines)}::item {destaque, |`;
+      // The point of the 400 and 1000 cases, stated rather than left to the reader's
+      // arithmetic: they are past the window, and the 200 case is inside it.
+      expect(document_.length > 3000, `${String(lines)} lines`).toBe(lines > 200);
+
+      const result = completeAt(document_, analysisOf(CARROSSEL));
+
+      // Asserted before the labels, so a future failure says "no tree" rather than being
+      // read as "no suggestions" — the two are indistinguishable through `labelsOf` alone,
+      // which is what made the original flake undiagnosable.
+      expect(result, `${String(lines)} lines`).not.toBeNull();
+      expect(labelsOf(result), `${String(lines)} lines`).toEqual(['destaque', 'tom']);
+    }
+  });
 });

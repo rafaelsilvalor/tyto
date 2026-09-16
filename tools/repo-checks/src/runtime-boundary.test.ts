@@ -122,3 +122,39 @@ describe('DOM packages', () => {
     expect(violation?.message).toContain('nodeIntegration: false');
   });
 });
+
+/**
+ * Not a runtime boundary, but the same shape of rule and the same reason to test it here:
+ * one module may call a thing and the rest of the package may not.
+ *
+ * `syntaxTree(state)` returns whatever the last parse finished — 3 000 characters on a fresh
+ * state, on a 20 ms wall-clock budget — so a reader that resolves a position past that gets
+ * the top node and silently answers nothing. It is not a crash and it is not a wrong answer;
+ * it is an empty one, which is why five readers carried it for two cards without anybody
+ * noticing (TYTO-114). `treeAt` in `syntax.ts` is the call with the position it has to reach.
+ */
+describe('the editor has one reader of the syntax tree', () => {
+  const SOURCE = `import { syntaxTree } from '@codemirror/language';\nexport const t = syntaxTree;\n`;
+
+  it('refuses syntaxTree elsewhere in the package, and says what to use', async () => {
+    const messages = await lint('packages/editor/src/scratch.ts', SOURCE);
+
+    const violation = messages.find((message) => message.ruleId === RESTRICTED_IMPORTS);
+    expect(violation?.message).toContain('treeAt(state, upto)');
+    expect(violation?.message).toContain('3000 characters');
+  });
+
+  it('allows it in syntax.ts, which is the module that wraps it', async () => {
+    const messages = await lint('packages/editor/src/syntax.ts', SOURCE);
+
+    expect(ruleIds(messages)).not.toContain(RESTRICTED_IMPORTS);
+  });
+
+  it('allows it in a test, where reaching for the truncated tree is the point', async () => {
+    // How the defect was measured in the first place, and how `template-language.test.ts`
+    // still has to build a state whose tree covers the document.
+    const messages = await lint('packages/editor/src/scratch.test.ts', SOURCE);
+
+    expect(ruleIds(messages)).not.toContain(RESTRICTED_IMPORTS);
+  });
+});

@@ -4,7 +4,6 @@ import {
   type CompletionResult,
   autocompletion,
 } from '@codemirror/autocomplete';
-import { syntaxTree } from '@codemirror/language';
 import { type EditorState, type Extension } from '@codemirror/state';
 import { type SyntaxNode } from '@lezer/common';
 import { type TemplateManifest } from '@tyto/core';
@@ -12,6 +11,7 @@ import { ATTRIBUTES, PROPERTIES, STRUCTURAL_TAGS, TAGS, isTag } from '@tyto/temp
 
 import { templateLanguage } from './template-language.js';
 import { type TemplateAnalysis, templateAnalysisField } from './template-analysis.js';
+import { treeAt } from './syntax.js';
 
 /**
  * Completion for the template language, positioned by the syntax tree.
@@ -23,7 +23,8 @@ import { type TemplateAnalysis, templateAnalysisField } from './template-analysi
  * `slot="…"` is the one list a manifest decides, and it arrives through the analysis field
  * that `templateLint` publishes, which is the manifest the buffer is being linted against.
  *
- * *Where* the cursor is comes out of `syntaxTree(state).resolveInner(pos, -1)` (TYTO-93).
+ * *Where* the cursor is comes out of `treeAt(state, pos).resolveInner(pos, -1)` (TYTO-93;
+ * `treeAt` rather than `syntaxTree` since TYTO-114, which is why it takes a position).
  * It used to come out of regular expressions over the line before the cursor, which was a
  * second reader of a syntax this package already ships a parser for. The tree answers for
  * free what those had to special-case: a `>` already written puts the cursor outside the
@@ -102,7 +103,7 @@ const textOf = (state: EditorState, node: SyntaxNode): string => state.sliceDoc(
  * into each other.
  */
 const inStyleSheet = (state: EditorState, pos: number): boolean => {
-  const sheets = syntaxTree(state)
+  const sheets = treeAt(state, pos)
     .topNode.getChildren('StyleSheet')
     .filter((sheet) => sheet.from < pos);
   const sheet = sheets.at(-1);
@@ -151,7 +152,7 @@ const completeStyle = (context: CompletionContext, node: SyntaxNode): Completion
  */
 const openAttributeQuote = (state: EditorState, pos: number): SyntaxNode | undefined => {
   const line = state.doc.lineAt(pos);
-  const cursor = syntaxTree(state).cursorAt(pos, -1);
+  const cursor = treeAt(state, pos).cursorAt(pos, -1);
   do {
     if (cursor.to <= line.from) return undefined;
     if (
@@ -272,7 +273,7 @@ const completeMarkup = (
 
 /** Exported so a test can drive it without mounting an editor. */
 export function completeTemplate(context: CompletionContext): CompletionResult | null {
-  const node = syntaxTree(context.state).resolveInner(context.pos, -1);
+  const node = treeAt(context.state, context.pos).resolveInner(context.pos, -1);
 
   return inStyleSheet(context.state, context.pos)
     ? completeStyle(context, node)
