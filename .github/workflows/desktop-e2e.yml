@@ -17,7 +17,8 @@ name: desktop-e2e
 # (TYTO-97). Running them inside `desktop.yml`, before packaging, is cheapest in minutes
 # and latest in discovery: a tag is pushed to release, not to find out. Running them here,
 # path-filtered on `apps/desktop/**`, is the only shape that reports before the merge, and
-# it costs the Electron download on desktop PRs only — cached below, so it is paid once.
+# it costs the Electron download on desktop PRs only — 3 min 13 s a run, whole (see below:
+# caching that download was tried and measured, and bought nothing).
 #
 # **The `push` trigger is not a duplicate of the `pull_request` one, and the asymmetry is
 # deliberate.** The path filter is what keeps this off unrelated PRs, and it is also this
@@ -93,7 +94,7 @@ jobs:
       # `dist/`, and the filtered form runs the package's script and nothing before it.
       - run: pnpm build
 
-      # **3 min 31 s for the job, and that is the number this card records as acceptable.**
+      # **3 min 13 s for the job, and that is the number this card records as acceptable.**
       # `test:desktop` is 2 min 17 s of it and `test:package` 6.4 s — measured on this
       # workflow's own runs, not estimated. `test:package` is that cheap because
       # `electron-builder` repacks the Electron `test:desktop` has already fetched, so the

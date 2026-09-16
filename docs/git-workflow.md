@@ -76,7 +76,7 @@ The CLI's own major renamed a command: `changeset tag` is `changeset git-tag`. T
 | ----------------- | ------------------------------------------- | ------------------------------------------------------------------------------ |
 | `ci.yml`          | PR, push to main                            | install (pnpm cache) → typecheck → lint → test → build. Turborepo remote cache |
 | `visual.yml`      | PR touching export/raster/templates/core    | Playwright + `test:visual`; uploads diffs as artifact on failure               |
-| `desktop-e2e.yml` | PR touching `apps/desktop/**`, push to main | Xvfb + `test:desktop` and `test:package`, 3 min 31 s, no Electron cache        |
+| `desktop-e2e.yml` | PR touching `apps/desktop/**`, push to main | Xvfb + `test:desktop` and `test:package`, 3 min 13 s, no Electron cache        |
 | `commitlint.yml`  | PR                                          | validates PR title and commits                                                 |
 | `release.yml`     | push to main                                | Changesets → version PR → tags                                                 |
 | `desktop.yml`     | tag `desktop-v*`                            | tag/version guard → OS matrix → electron-builder → GitHub Release              |
