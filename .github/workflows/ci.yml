@@ -13,6 +13,15 @@ jobs:
       - uses: actions/setup-node@v7
         with: { node-version: 22, cache: pnpm }
       - run: pnpm install --frozen-lockfile
+      # Before the turbo run, because it is the cheap failure: seconds against two minutes,
+      # and a reformat is the one fix a person can apply without reading the diff.
+      #
+      # **It ran nowhere until now, and three files had drifted.** `pnpm check` was
+      # `turbo run typecheck lint test` and this job ran the same four tasks, so Prettier
+      # was a script in `package.json` that nothing ever called — the same shape as the
+      # desktop end-to-end suites before TYTO-111. `github-config.test.ts` fails if it stops
+      # being run, or stops being run before a merge.
+      - run: pnpm format:check
       - run: pnpm turbo typecheck lint test build
         env:
           TURBO_TOKEN: ${{ secrets.TURBO_TOKEN }}

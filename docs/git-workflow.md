@@ -76,15 +76,15 @@ The CLI's own major renamed a command: `changeset tag` is `changeset git-tag`. T
 
 ## Workflows (`.github/workflows/`)
 
-| File              | Trigger                                     | Does                                                                           |
-| ----------------- | ------------------------------------------- | ------------------------------------------------------------------------------ |
-| `ci.yml`          | PR, push to main                            | install (pnpm cache) → typecheck → lint → test → build. Turborepo remote cache |
-| `visual.yml`      | PR touching export/raster/templates/core    | Playwright + `test:visual`; uploads diffs as artifact on failure               |
-| `desktop-e2e.yml` | PR touching `apps/desktop/**`, push to main | Xvfb + `test:desktop` and `test:package`, 3 min 13 s, no Electron cache        |
-| `commitlint.yml`  | PR                                          | validates PR title and commits                                                 |
-| `release.yml`     | push to main                                | Changesets → version PR → tags                                                 |
-| `desktop.yml`     | tag `desktop-v*`                            | tag/version guard → OS matrix → electron-builder → GitHub Release              |
-| `labeler.yml`     | PR (`pull_request_target`)                  | applies `pkg:*`/`app:*`/`docs`/`repo` labels from `.github/labeler.yml`        |
+| File              | Trigger                                     | Does                                                                                          |
+| ----------------- | ------------------------------------------- | --------------------------------------------------------------------------------------------- |
+| `ci.yml`          | PR, push to main                            | install (pnpm cache) → format:check → typecheck → lint → test → build. Turborepo remote cache |
+| `visual.yml`      | PR touching export/raster/templates/core    | Playwright + `test:visual`; uploads diffs as artifact on failure                              |
+| `desktop-e2e.yml` | PR touching `apps/desktop/**`, push to main | Xvfb + `test:desktop` and `test:package`, 3 min 13 s, no Electron cache                       |
+| `commitlint.yml`  | PR                                          | validates PR title and commits                                                                |
+| `release.yml`     | push to main                                | Changesets → version PR → tags                                                                |
+| `desktop.yml`     | tag `desktop-v*`                            | tag/version guard → OS matrix → electron-builder → GitHub Release                             |
+| `labeler.yml`     | PR (`pull_request_target`)                  | applies `pkg:*`/`app:*`/`docs`/`repo` labels from `.github/labeler.yml`                       |
 
 ## Protections and labels
 
