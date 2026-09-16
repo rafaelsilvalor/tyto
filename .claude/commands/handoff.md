@@ -26,12 +26,13 @@ the one thing it does, and only because that decision was already taken.
      merged branch looking full of unmerged work.
    - **Compare the local tip with the pull request's head.** A commit pushed
      after the merge never travelled in it. If they differ, fetch
-     `refs/pull/<n>/head` and check `git merge-base --is-ancestor <branch>
-<prHead>`: an ancestor is merely behind, and anything else is a local
-     commit that never went through review — confirm its content reached `main`
-     before deleting.
+     `refs/pull/<n>/head` and ask whether the branch is an ancestor of it
+     (`git merge-base --is-ancestor`): an ancestor is merely behind, and
+     anything else is a local commit that never went through review — confirm
+     its content reached `main` before deleting.
    - `git branch -D`, because `-d` refuses every squash-merged branch.
-     Say which branches went, and name any that were kept and why.
+
+   Say which branches went, and name any that were kept and why.
 
 4. **Flag what would be expensive to rediscover.** A measurement that took real
    time, a wrong turn worth not repeating, a tool whose output misled. One line
