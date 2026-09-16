@@ -11,6 +11,7 @@ import {
   documentOf,
   isDisposable,
   newDocument,
+  releaseDocument,
   selectDocument,
   stepDocument,
   updateDocument,
@@ -154,5 +155,50 @@ describe('stepping and slots', () => {
     expect(documentAtSlot(three(), 1)?.id).toBe('a');
     expect(documentAtSlot(three(), 3)?.id).toBe('c');
     expect(documentAtSlot(three(), 4)).toBeUndefined();
+  });
+});
+
+describe('letting go of a file another tab saved over', () => {
+  /**
+   * TYTO-104's bundled loose end, from the side the strip is painted from.
+   *
+   * Main decides *which* tab lets go and `src/main/documents.test.ts` proves it stops
+   * holding the path; what this rule decides is the part a person sees, and it lives here
+   * rather than in `main.ts` so that it can be driven without a window.
+   */
+  const held = (): Workspace => ({
+    documents: [doc('a', { name: 'campanha.brief' }), doc('b', { name: 'promo.brief' })],
+    activeId: 'b',
+  });
+
+  it('takes the name off and marks it unsaved, because its text is now in no file', () => {
+    const after = releaseDocument(held(), 'a');
+
+    expect(documentOf(after, 'a')?.name).toBeUndefined();
+    expect(documentOf(after, 'a')?.dirty).toBe(true);
+  });
+
+  it('keeps every character, the snapshot and the brief it already had', () => {
+    // The whole reason the path moves rather than the text: a released tab is somebody's
+    // work, and the only thing that stopped being true about it is where it is stored.
+    const before = doc('a', { name: 'campanha.brief', brief: '::titulo Campanha' });
+    const after = releaseDocument({ documents: [before], activeId: 'a' }, 'a');
+
+    expect(documentOf(after, 'a')?.brief).toBe('::titulo Campanha');
+    expect(documentOf(after, 'a')?.snapshot).toBe(before.snapshot);
+  });
+
+  it('leaves every other tab exactly as it was, the active one included', () => {
+    const after = releaseDocument(held(), 'a');
+
+    expect(documentOf(after, 'b')).toEqual(documentOf(held(), 'b'));
+    expect(after.activeId).toBe('b');
+  });
+
+  it('ignores an id nobody has, rather than refusing', () => {
+    // Main answers with `released: null` on almost every save, and the renderer guards on
+    // that — but a rule that threw on a stale id would turn a save that worked into an
+    // error about bookkeeping.
+    expect(releaseDocument(held(), 'z')).toEqual(held());
   });
 });

@@ -136,9 +136,9 @@ describe('saving', () => {
       disk: store,
     });
 
-    const document = await service.save(TAB, 'texto', true);
+    const saved = await service.save(TAB, 'texto', true);
 
-    expect(document?.name).toBe('promo.brief');
+    expect(saved.document?.name).toBe('promo.brief');
     expect(store.written[OTHER]).toBe('texto');
     expect(service.folderOf(TAB)).toBe('outros');
   });
@@ -151,8 +151,51 @@ describe('saving', () => {
       disk: store,
     });
 
-    await expect(service.save(TAB, 'texto', false)).resolves.toBeNull();
+    await expect(service.save(TAB, 'texto', false)).resolves.toEqual({
+      document: null,
+      released: null,
+    });
     expect(Object.keys(store.written)).toEqual([]);
+  });
+
+  it('takes the path off the other tab when a save-as lands on its file', async () => {
+    // TYTO-104. Two tabs holding one path is a map `holderOf` can answer two ways, and a
+    // strip showing one name twice with nothing to tell them apart. The tab that asked
+    // keeps the file — moving somebody away from the text they just wrote would be the
+    // worse answer — and the other one is told it let go.
+    const store = disk({ [OTHER]: 'antigo' });
+    const service = createDocumentService({
+      dialogs: dialogs({ open: OTHER, save: OTHER }),
+      recent: recentFiles([{ path: OTHER, name: 'promo.brief' }]),
+      disk: store,
+    });
+
+    await service.open(OTHER_TAB);
+    expect(service.folderOf(OTHER_TAB)).toBe('outros');
+
+    const saved = await service.save(TAB, 'novo', true);
+
+    expect(saved.released).toBe(OTHER_TAB);
+    expect(service.folderOf(TAB)).toBe('outros');
+    // The one that matters: exactly one tab holds it afterwards, so the next open of this
+    // file has one place to go.
+    expect(service.folderOf(OTHER_TAB)).toBeUndefined();
+    expect(store.written[OTHER]).toBe('novo');
+  });
+
+  it('releases nobody on an ordinary save, including a save-as onto its own file', async () => {
+    // The field is `null` on almost every save, and a tab that released *itself* would be a
+    // tab the renderer then stripped of its own name one line after naming it.
+    const store = disk({});
+    const service = createDocumentService({
+      dialogs: dialogs({ save: BRIEF }),
+      recent: recentFiles(),
+      disk: store,
+    });
+
+    expect((await service.save(TAB, 'um', false)).released).toBeNull();
+    expect((await service.save(TAB, 'dois', true)).released).toBeNull();
+    expect(service.folderOf(TAB)).toBe('briefs');
   });
 });
 

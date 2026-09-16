@@ -138,6 +138,32 @@ export const isDisposable = (document: DocumentState): boolean =>
   document.name === undefined && !document.dirty && document.brief === '';
 
 /**
+ * Takes the file off a document, leaving every character of its text alone (TYTO-104).
+ *
+ * A save-as onto a file another tab has open gives the path to the tab that asked — moving
+ * somebody away from the text they just wrote would be worse — so the other tab has to let
+ * go, and main says which one in `file:save`'s `released` (`shared/ipc.ts`).
+ *
+ * What it loses is its name and its clean marker, and the marker is the half worth stating:
+ * the text is now in no file at all, so there is nothing on disk it could be equal to, and
+ * the next save there has to ask where to put it. A tab still showing a name would be
+ * claiming a file that a moment ago stopped being its.
+ *
+ * Here rather than inline in `main.ts` because this is the rule and `main.ts` is the wiring.
+ * `dirty` is a stored boolean today and the exploration in
+ * `docs/explorations/2026-09-16-document-buffer-model.md` (D3) wants it derived from the
+ * saved text instead; when that lands, this function is one of the four places that decide
+ * it, and the only one a unit test can reach.
+ */
+export function releaseDocument(workspace: Workspace, id: string): Workspace {
+  return updateDocument(workspace, id, (document) => ({
+    ...document,
+    name: undefined,
+    dirty: true,
+  }));
+}
+
+/**
  * Closes a tab, and says which document the window is left looking at.
  *
  * `fresh` is called only when the tab being closed is the last one. Closing everything leaves
