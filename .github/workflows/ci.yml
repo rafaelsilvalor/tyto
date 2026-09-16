@@ -27,12 +27,18 @@ jobs:
       # desktop end-to-end suites before TYTO-111. `github-config.test.ts` fails if it stops
       # being run, or stops being run before a merge.
       - run: pnpm format:check
-      # `changeset status` runs `git merge-base main HEAD`, and `actions/checkout` leaves no
-      # ref called `main` — it fetches into `refs/remotes/origin/*` and checks out a detached
-      # merge commit. `fetch-depth: 0` above gives the history; this gives the name. Both are
-      # needed and neither is enough: the step failed on the first CI run with the depth
-      # default, and again with `fetch-depth: 0` and no local branch.
-      - run: git branch -f main origin/main
+      # `changeset status` runs `git merge-base main HEAD`, and on a **pull request**
+      # `actions/checkout` leaves no ref called `main` — it fetches into
+      # `refs/remotes/origin/*` and checks out a detached merge commit. `fetch-depth: 0` above
+      # gives the history; this gives the name.
+      #
+      # **Created only when it is missing, and that guard is the whole of this line.** On a
+      # push to `main` the checkout *is* the branch, and `git branch -f main` refuses to
+      # touch it: `cannot force update the branch 'main' used by worktree at …`. The step
+      # was green on the pull request that added it and red on `main` ten minutes later —
+      # the third distinct failure of one step, after the default depth and after the
+      # missing ref.
+      - run: git rev-parse --verify --quiet main >/dev/null || git branch main origin/main
       # `changeset status` and not `changeset version`: it reads the `.changeset/` folder and
       # writes nothing, so it can run on a pull request where versioning cannot.
       #
