@@ -75,10 +75,12 @@ function pane(document_: Document): PreviewElements {
     paper: make('div'),
     frame: make<HTMLIFrameElement>('iframe'),
     empty: make('p'),
+    stale: make('p'),
     zoomLevel: make('span'),
   };
+  elements.stale.hidden = true;
   elements.paper.append(elements.frame);
-  elements.stage.append(elements.paper, elements.empty);
+  elements.stage.append(elements.paper, elements.empty, elements.stale);
   document_.body.append(elements.tabs, elements.slide, elements.slideLabel, elements.stage);
   return elements;
 }
@@ -148,6 +150,7 @@ describe('switching format', () => {
     const elements = pane(document);
 
     paintPreview(elements, {
+      stale: false,
       frames: CAROUSEL,
       artworks: SLIDES,
       selection: { format: 'feed', artwork: 'artwork-1' },
@@ -156,6 +159,7 @@ describe('switching format', () => {
     expect(elements.frame.getAttribute('srcdoc')).toContain('artwork-1.feed');
 
     paintPreview(elements, {
+      stale: false,
       frames: CAROUSEL,
       artworks: SLIDES,
       selection: { format: 'story', artwork: 'artwork-1' },
@@ -169,6 +173,7 @@ describe('switching format', () => {
     const elements = pane(document);
 
     paintPreview(elements, {
+      stale: false,
       frames: CAROUSEL,
       artworks: SLIDES,
       selection: { format: 'story', artwork: 'artwork-1' },
@@ -190,6 +195,7 @@ describe('the slide picker', () => {
     const elements = pane(document);
 
     paintPreview(elements, {
+      stale: false,
       frames: CAROUSEL,
       artworks: SLIDES,
       selection: { format: 'feed', artwork: 'artwork-2' },
@@ -206,6 +212,7 @@ describe('the slide picker', () => {
     const elements = pane(document);
 
     paintPreview(elements, {
+      stale: false,
       frames: [frame('artwork-1', 'feed')],
       artworks: SLIDES.slice(0, 1),
       selection: { format: 'feed', artwork: 'artwork-1' },
@@ -226,6 +233,7 @@ describe('showing a frame', () => {
     const elements = pane(document);
 
     paintPreview(elements, {
+      stale: false,
       frames: CAROUSEL,
       artworks: SLIDES,
       selection: { format: 'story', artwork: 'artwork-1' },
@@ -244,10 +252,64 @@ describe('showing a frame', () => {
     const { document } = globalThis;
     const elements = pane(document);
 
-    paintPreview(elements, { frames: [], artworks: [], selection: NOTHING, zoom: 'fit' });
+    paintPreview(elements, {
+      frames: [],
+      artworks: [],
+      selection: NOTHING,
+      zoom: 'fit',
+      stale: false,
+    });
 
     expect(elements.paper.hidden).toBe(true);
     expect(elements.empty.hidden).toBe(false);
+  });
+
+  /**
+   * E9.13: the artwork stays and says it is out of date.
+   *
+   * Three claims, and the third is the one a stored flag would get wrong. The marker appears
+   * beside a frame that is still drawn — the pixels are the easy half — it disappears again
+   * on the next good answer with nothing resetting it, and it never appears on the empty
+   * state, where there is no artwork for it to be commenting on.
+   */
+  it('marks the artwork as older than the text, and stops when it is not', () => {
+    const { document } = globalThis;
+    const elements = pane(document);
+    const showing = {
+      frames: CAROUSEL,
+      artworks: SLIDES,
+      selection: { format: 'feed', artwork: 'artwork-1' },
+      zoom: 1,
+    } as const;
+
+    paintPreview(elements, { ...showing, stale: true });
+
+    // The frame is still there. Blanking it is what this card exists to stop.
+    expect(elements.paper.hidden).toBe(false);
+    expect(elements.stale.hidden).toBe(false);
+
+    paintPreview(elements, { ...showing, stale: false });
+
+    expect(elements.paper.hidden).toBe(false);
+    expect(elements.stale.hidden).toBe(true);
+  });
+
+  it('never marks the empty state, which has no artwork to be out of date', () => {
+    const { document } = globalThis;
+    const elements = pane(document);
+
+    // `stale: true` with no frames cannot happen — `isStale` answers `false` without frames
+    // — so this asserts the pane does not depend on that being true elsewhere.
+    paintPreview(elements, {
+      frames: [],
+      artworks: [],
+      selection: NOTHING,
+      zoom: 'fit',
+      stale: true,
+    });
+
+    expect(elements.empty.hidden).toBe(false);
+    expect(elements.stale.hidden).toBe(true);
   });
 
   it('does not rewrite srcdoc for a document that has not changed', () => {
@@ -263,7 +325,7 @@ describe('showing a frame', () => {
       zoom: 1 as const,
     };
 
-    paintPreview(elements, state);
+    paintPreview(elements, { ...state, stale: false });
     let writes = 0;
     elements.frame.setAttribute = new Proxy(elements.frame.setAttribute, {
       apply(target, thisArgument, args: [string, string]) {
@@ -272,7 +334,7 @@ describe('showing a frame', () => {
       },
     });
 
-    paintPreview(elements, { ...state, zoom: 0.5 });
+    paintPreview(elements, { ...state, zoom: 0.5, stale: false });
     expect(writes).toBe(0);
   });
 });

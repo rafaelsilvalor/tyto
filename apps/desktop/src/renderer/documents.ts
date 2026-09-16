@@ -55,7 +55,33 @@ export interface DocumentState {
   /** What the stages said about this brief, and the text their offsets index. */
   readonly diagnostics: readonly Diagnostic[];
   readonly brief: string;
+
+  /**
+   * The text {@link frames} were rendered from, which is not always {@link brief}.
+   *
+   * They part company when a compile fails: `brief:preview` answers with no frames, the
+   * document keeps the artwork it had, and `brief` moves on to the text that failed because
+   * the diagnostics' offsets index *that* (E9.13). So the two being different is exactly the
+   * definition of "what you are looking at is older than what you are typing", and
+   * {@link isStale} is that comparison and nothing else.
+   *
+   * **Stored rather than a boolean**, so the marker cannot be set by one code path and
+   * cleared by another — the failure the unsaved dot has today and TYTO-112 exists to undo.
+   * Empty for a document that has never rendered, which is also when `frames` is empty, so
+   * `isStale` answers `false` and the pane shows its empty state.
+   */
+  readonly renderedBrief: string;
 }
+
+/**
+ * Whether the artwork on screen is older than the text in the editor.
+ *
+ * Derived on every read rather than kept: there is no state to get wrong, and a document
+ * whose compile starts working again stops being stale on the answer that fixes it, without
+ * anybody remembering to clear a flag.
+ */
+export const isStale = (document_: DocumentState): boolean =>
+  document_.frames.length > 0 && document_.renderedBrief !== document_.brief;
 
 export interface Workspace {
   /** In tab order, left to right. **Never empty** — see {@link closeDocument}. */
@@ -78,6 +104,7 @@ export function newDocument(id: string, snapshot?: DocumentSnapshot): DocumentSt
     problems: 0,
     diagnostics: [],
     brief: '',
+    renderedBrief: '',
   };
 }
 
