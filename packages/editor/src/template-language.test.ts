@@ -1,4 +1,4 @@
-import { foldable } from '@codemirror/language';
+import { ensureSyntaxTree, foldable } from '@codemirror/language';
 import { EditorState } from '@codemirror/state';
 import { highlightTree, tagHighlighter, tags } from '@lezer/highlight';
 import { describe, expect, it } from 'vitest';
@@ -52,8 +52,33 @@ describe('the colours come from the grammar', () => {
 });
 
 describe('folding', () => {
-  const stateOf = (doc: string): EditorState =>
-    EditorState.create({ doc, extensions: [templateLanguage] });
+  /**
+   * A state whose tree covers the whole document, which `EditorState.create` does not give.
+   *
+   * `foldable` reads `syntaxTree(state)`, and on a fresh state that is whatever the initial
+   * parse finished: `Math.min(3000, doc.length)` characters on a **20 ms wall-clock** budget,
+   * truncated at wherever the parser stopped when it runs out
+   * (`@codemirror/language/dist/index.js:540`). These documents are fifty characters long, so
+   * the length is never the problem — being descheduled is. Measured: 2 red runs in 20 of the
+   * whole package, both here, both `foldable` answering `null` for a range that exists
+   * (TYTO-114).
+   *
+   * The two lines are one fix and neither works alone. `ensureSyntaxTree` does the parsing on
+   * the context the field holds, but `LanguageState` snapshots `context.tree` in its
+   * constructor — so `syntaxTree(state)` keeps answering with the old tree no matter how much
+   * work is done afterwards. The empty transaction is what promotes it: `apply` returns
+   * `this` only while the snapshot still equals the context's tree, and after the line above
+   * it does not.
+   *
+   * This is the same defect `syntax.ts` describes, in the one consumer `treeAt` cannot reach:
+   * `foldable` is CodeMirror's own and calls `syntaxTree` itself. Production is unaffected —
+   * the fold gutter only offers to fold what is in the viewport, and the viewport is parsed.
+   */
+  const stateOf = (doc: string): EditorState => {
+    const created = EditorState.create({ doc, extensions: [templateLanguage] });
+    ensureSyntaxTree(created, doc.length, 5000);
+    return created.update({}).state;
+  };
 
   it('folds an element to its opening tag, attributes and all', () => {
     const doc = '<group class="copy">\n  <text slot="titulo" />\n</group>\n';

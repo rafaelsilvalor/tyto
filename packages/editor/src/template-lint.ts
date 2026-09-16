@@ -1,4 +1,3 @@
-import { syntaxTree } from '@codemirror/language';
 import { type Diagnostic as LintDiagnostic, linter } from '@codemirror/lint';
 import { type Extension } from '@codemirror/state';
 import { type EditorView } from '@codemirror/view';
@@ -22,6 +21,7 @@ import {
   toMarker,
 } from './diagnostic-markers.js';
 import { BRIEF_LINT_DELAY } from './lint.js';
+import { treeAt } from './syntax.js';
 import {
   type TemplateAnalyzer,
   setTemplateAnalysis,
@@ -50,7 +50,7 @@ const NAME = /^-{0,2}[a-zA-Z_][a-zA-Z0-9_-]*$/u;
  * changes for this (TYTO-92).
  */
 const tagAround = (view: EditorView, at: number): string | undefined => {
-  let node = syntaxTree(view.state).resolveInner(at, 1);
+  let node = treeAt(view.state, at).resolveInner(at, 1);
   while (node.name !== 'Element') {
     const parent = node.parent;
     if (parent === null) return undefined;

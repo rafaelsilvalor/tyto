@@ -230,4 +230,34 @@ describe('completeTemplate — slot values', () => {
       sorted(ATTRIBUTES.text),
     );
   });
+
+  /**
+   * Past the 3 000 characters CodeMirror parses up front — the same defect the brief side
+   * had, found by looking rather than by a failing test (TYTO-114, `syntax.ts`).
+   *
+   * A `template.html` reaches that length sooner than a brief does, because the stylesheet
+   * is in the same file: `docs/template-authoring.md` puts the CSS beside the markup, and
+   * a restricted stylesheet with a dozen rules is already a couple of thousand characters.
+   * Measured before the fix: a 200-line template resolved the top node `Template` where a
+   * 50-line one resolved `TagName`, and the source answered `null` for every size above it.
+   *
+   * Nothing here failed before the fix — the whole suite uses documents of a few dozen
+   * characters — which is why this case is written rather than inherited.
+   */
+  it('completes past the first 3 000 characters, which the initial parse does not reach', () => {
+    const padding = (lines: number): string =>
+      `${Array.from({ length: lines }, (_, index) => `<!-- padding ${String(index)} -->`).join('\n')}\n`;
+
+    for (const lines of [200, 400, 1000]) {
+      const document_ = `<frame>\n${padding(lines)}  <te|`;
+      expect(document_.length, `${String(lines)} lines`).toBeGreaterThan(3000);
+
+      // Asserted before the labels: `null` and "no options" are one value through
+      // `labelsOf`, and telling them apart is the whole diagnosis here.
+      expect(completeAt(document_, CARROSSEL), `${String(lines)} lines`).not.toBeNull();
+      expect(labelsOf(completeAt(document_, CARROSSEL)), `${String(lines)} lines`).toEqual(
+        sorted([...TAGS, ...STRUCTURAL_TAGS]),
+      );
+    }
+  });
 });
