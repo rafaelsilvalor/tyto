@@ -43,6 +43,7 @@ import {
   documentAtSlot,
   documentOf,
   isDisposable,
+  isStale,
   newDocument,
   releaseDocument,
   selectDocument,
@@ -247,6 +248,7 @@ function previewElements(): PreviewElements | undefined {
   const paper = byId('preview-paper');
   const frame = byId<HTMLIFrameElement>('preview-frame');
   const empty = byId('preview-empty');
+  const stale = byId('preview-stale');
   const zoomLevel = byId('zoom-level');
 
   if (
@@ -257,6 +259,7 @@ function previewElements(): PreviewElements | undefined {
     paper === null ||
     frame === null ||
     empty === null ||
+    stale === null ||
     zoomLevel === null
   ) {
     // Not a failure any more, and that is the change: before the dock, a missing preview
@@ -264,7 +267,7 @@ function previewElements(): PreviewElements | undefined {
     // thing a person is allowed to do.
     return undefined;
   }
-  return { tabs, slide, slideLabel, stage, paper, frame, empty, zoomLevel };
+  return { tabs, slide, slideLabel, stage, paper, frame, empty, stale, zoomLevel };
 }
 
 /**
@@ -397,7 +400,7 @@ const registry: CommandRegistry = createDesktopRegistry({
     if (pane === undefined) return;
     // A step from whatever is on screen, the same as the buttons: the first step after
     // `fit` moves from the size the user is looking at.
-    const from = paintPreview(pane, active());
+    const from = paintPreview(pane, { ...active(), stale: isStale(active()) });
     updateActive((document_) => ({ ...document_, zoom: stepZoom(from, direction) }));
     repaint();
   },
@@ -894,7 +897,7 @@ function repaint(): void {
     // The title is the active tab, which is the whole of point 5 of the card.
     document: { name: current.name, dirty: current.dirty },
   });
-  if (pane !== undefined) paintPreview(pane, current);
+  if (pane !== undefined) paintPreview(pane, { ...current, stale: isStale(current) });
   paintStatus();
   paintPanel();
   paintTabs();
@@ -915,18 +918,42 @@ async function request(bridge: TytoBridge, documentId: string, brief: string): P
   const answer = await bridge['brief:preview']({ requestId, documentId, brief });
   if (!gate.accept(answer.requestId)) return;
 
-  workspace = updateDocument(workspace, documentId, (document_) => ({
-    ...document_,
-    frames: answer.frames,
-    artworks: answer.artworks,
-    selection: keepSelection(document_.selection, answer.frames, answer.artworks),
-    problems: answer.diagnostics.length,
-    errors: errorCount(answer.diagnostics),
-    diagnostics: answer.diagnostics,
-    // The brief **as asked**, not as it stands: the ranges index this text, and pairing them
-    // with a buffer two keystrokes further on would show a line number that drifts.
-    brief,
-  }));
+  const errors = errorCount(answer.diagnostics);
+
+  workspace = updateDocument(workspace, documentId, (document_) => {
+    /**
+     * A failed compile keeps the artwork that last worked, marked (E9.13).
+     *
+     * `brief:preview` answers with no frames whenever any stage fails, and taking that
+     * literally is what used to blank the pane on a stray character — at the one moment the
+     * preview is the thing telling you whether the fix worked.
+     *
+     * **The discriminator is the errors, not the empty list.** A brief that compiles to
+     * nothing is a legitimate answer — a template with no artworks written yet — and it
+     * should clear the pane rather than leave yesterday's picture in it. So frames are kept
+     * only when the compile actually failed.
+     */
+    const failed = answer.frames.length === 0 && errors > 0;
+    const frames = failed ? document_.frames : answer.frames;
+    const artworks = failed ? document_.artworks : answer.artworks;
+
+    return {
+      ...document_,
+      frames,
+      artworks,
+      selection: keepSelection(document_.selection, frames, artworks),
+      problems: answer.diagnostics.length,
+      errors,
+      diagnostics: answer.diagnostics,
+      // The brief **as asked**, not as it stands: the ranges index this text, and pairing
+      // them with a buffer two keystrokes further on would show a line number that drifts.
+      brief,
+      // Unchanged on a failure, which is what makes `isStale` true: the frames are still the
+      // ones that older text produced. On success the two meet again and the marker clears
+      // itself, with no keystroke and nothing to remember.
+      renderedBrief: failed ? document_.renderedBrief : brief,
+    };
+  });
 
   if (documentId === workspace.activeId) repaint();
 }

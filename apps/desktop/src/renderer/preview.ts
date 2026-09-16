@@ -155,6 +155,14 @@ export interface PreviewElements {
   readonly frame: HTMLIFrameElement;
   readonly empty: HTMLElement;
   readonly zoomLevel: HTMLElement;
+  /**
+   * The "this is older than your text" marker (E9.13).
+   *
+   * Inside the stage rather than beside the status line, because it has to be legible with
+   * the problems panel closed — which is the case the card is about, and the panel is the
+   * first thing people close.
+   */
+  readonly stale: HTMLElement;
 }
 
 export interface PreviewState {
@@ -163,6 +171,13 @@ export interface PreviewState {
   readonly artworks: readonly Artwork[];
   readonly selection: Selection;
   readonly zoom: Zoom;
+  /**
+   * Whether these frames are older than the brief being typed.
+   *
+   * Passed in rather than worked out here: it is a property of the *document* — its frames
+   * against its text — and `documents.ts` owns both. This pane draws it.
+   */
+  readonly stale: boolean;
 }
 
 /** The attribute a format tab carries, which is how a click knows what it selected. */
@@ -246,12 +261,19 @@ export function paintPreview(elements: PreviewElements, state: PreviewState): nu
   if (frame === undefined) {
     elements.paper.hidden = true;
     elements.empty.hidden = false;
+    // Never on the empty state: there is no artwork to be out of date, and a brief that has
+    // never compiled would otherwise open marked.
+    elements.stale.hidden = true;
     elements.zoomLevel.textContent = '';
     return 1;
   }
 
   elements.paper.hidden = false;
   elements.empty.hidden = true;
+  // A state of the preview rather than a second error message. The problems panel already
+  // lists what is wrong and this does not repeat it; what it says is that the picture and
+  // the text have stopped agreeing.
+  elements.stale.hidden = !state.stale;
 
   const zoom = state.zoom === 'fit' ? fitZoom(frame, stageBox(elements.stage)) : state.zoom;
 

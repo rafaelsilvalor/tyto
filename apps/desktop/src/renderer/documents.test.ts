@@ -10,6 +10,7 @@ import {
   documentAtSlot,
   documentOf,
   isDisposable,
+  isStale,
   newDocument,
   releaseDocument,
   selectDocument,
@@ -200,5 +201,47 @@ describe('letting go of a file another tab saved over', () => {
     // that — but a rule that threw on a stale id would turn a save that worked into an
     // error about bookkeeping.
     expect(releaseDocument(held(), 'z')).toEqual(held());
+  });
+});
+
+/**
+ * The stale marker, which is a comparison and not a flag (E9.13).
+ *
+ * The four cases are the card's acceptance criteria in the order it lists them, and the
+ * fourth is the one worth having: a brief that has **never** rendered is not stale, it is
+ * empty, and a marker that could not tell those apart would greet a new tab with "older than
+ * the text you are writing".
+ */
+describe('isStale', () => {
+  const rendered = (frames: number, renderedBrief: string, brief: string): DocumentState => ({
+    ...newDocument('a'),
+    frames: Array.from({ length: frames }, () => ({
+      artwork: 'artwork-1',
+      format: 'feed',
+      width: 1080,
+      height: 1080,
+      html: '<html></html>',
+    })),
+    renderedBrief,
+    brief,
+  });
+
+  it('is false while the artwork matches the text', () => {
+    expect(isStale(rendered(1, '::titulo Oi', '::titulo Oi'))).toBe(false);
+  });
+
+  it('is true once the text has moved on from the artwork', () => {
+    expect(isStale(rendered(1, '::titulo Oi', '::titulo Oi!'))).toBe(true);
+  });
+
+  it('is false again when the two meet, with nothing to clear', () => {
+    // The second acceptance criterion: fixing the brief clears the marker on the next
+    // answer. Nothing resets anything — the comparison simply stops being true.
+    expect(isStale(rendered(1, '::titulo Oi!', '::titulo Oi!'))).toBe(false);
+  });
+
+  it('is false for a brief that has never rendered, which is empty rather than stale', () => {
+    expect(isStale(rendered(0, '', 'anything at all'))).toBe(false);
+    expect(isStale(newDocument('a'))).toBe(false);
   });
 });

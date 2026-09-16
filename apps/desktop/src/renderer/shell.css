@@ -371,6 +371,36 @@ body {
   font-size: 13px;
 }
 
+/*
+ * E9.13: the artwork is older than the text being typed.
+ *
+ * Every child of the stage is put in the one grid cell so this **overlays** the artwork
+ * rather than sitting above it in a second row. A row would push the paper down and change
+ * what `fit` computes against, so the marker would resize the thing it is commenting on.
+ *
+ * Read as a state and not as an error: `--muted` text on the window's own ground, the way
+ * the empty state reads, rather than the red `--status--bad` uses. The problems panel says
+ * what is wrong; this says only that the picture and the text have stopped agreeing — and it
+ * has to say that with the panel closed, which is why it is inside the stage at all.
+ */
+.preview__stage > * {
+  grid-area: 1 / 1;
+}
+
+.preview__stale {
+  align-self: start;
+  justify-self: center;
+  margin: 0;
+  padding: 4px 10px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: var(--ground);
+  color: var(--muted);
+  font-size: 12px;
+  /* Above the paper, which is the point of sharing the cell. */
+  z-index: 1;
+}
+
 .preview__status {
   padding: 8px 12px;
   border-top: 1px solid var(--line);

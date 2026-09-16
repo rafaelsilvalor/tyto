@@ -164,3 +164,72 @@ describe('the main screen', () => {
     expect(await page.locator('#editor .cm-content').isVisible()).toBe(true);
   });
 });
+
+/**
+ * E9.13's four acceptance criteria, in the order it lists them.
+ *
+ * **This is the only place the mechanism is reachable.** `request` in `main.ts` is what
+ * decides to keep the frames, and `main.ts` has no unit test — measured, not assumed:
+ * replacing its `failed` condition with `false` leaves all 145 renderer unit tests green.
+ * `preview.test.ts` proves the pane draws the marker when told to and `documents.test.ts`
+ * proves `isStale` computes it; what neither can see is the round trip that connects them.
+ */
+describe('a brief that stops compiling', () => {
+  const GOOD = readFileSync(EXAMPLE, 'utf8');
+
+  const paper = () => page.locator('#preview-paper');
+  const stale = () => page.locator('#preview-stale');
+
+  const type = async (text: string): Promise<void> => {
+    await page.click('#editor .cm-content');
+    await page.keyboard.press('Control+a');
+    await page.keyboard.insertText(text);
+  };
+
+  it('renders, unmarked, while the brief is good', async () => {
+    await type(GOOD);
+
+    // Polled on the **marker** and not on the paper, which is the first thing this feature
+    // breaks about testing it: the pane above left a broken brief, so the paper is already
+    // visible — showing the artwork that brief replaced. `stale` going false is the only
+    // signal that the answer for *this* text has landed.
+    await expect.poll(() => stale().isVisible(), { timeout: 10_000 }).toBe(false);
+    expect(await paper().isVisible()).toBe(true);
+  });
+
+  it('keeps the artwork on screen when the text breaks, and marks it', async () => {
+    const before = await shown();
+    expect(before).not.toBe('');
+
+    // A stray character, which is what the card is about — not a brief rewritten into
+    // something else. `::` with no name is a directive the parser cannot finish.
+    await type(`${GOOD}
+::`);
+
+    await expect.poll(() => stale().isVisible(), { timeout: 10_000 }).toBe(true);
+
+    // The artwork is the *same* artwork, not a re-render: this is the assertion that fails
+    // if the frames were thrown away and something else filled the pane.
+    expect(await paper().isVisible()).toBe(true);
+    expect(await shown()).toBe(before);
+    expect(await page.locator('#preview-empty').isVisible()).toBe(false);
+  });
+
+  it('shows the marker with the problems panel closed, which is where it has to work', async () => {
+    // The panel is the first thing people close, and it is where the errors are listed. A
+    // marker only that panel could show would be a marker for the case that does not need it.
+    const close = page.locator('tyto-problems-panel .panel__close');
+    if (await close.count()) await close.click();
+
+    await expect.poll(() => page.locator('#problems-list').isVisible()).toBe(false);
+    expect(await stale().isVisible()).toBe(true);
+    expect(await paper().isVisible()).toBe(true);
+  });
+
+  it('clears the marker on the next good answer, with no extra keystroke', async () => {
+    await type(GOOD);
+
+    await expect.poll(() => stale().isVisible(), { timeout: 10_000 }).toBe(false);
+    expect(await paper().isVisible()).toBe(true);
+  });
+});

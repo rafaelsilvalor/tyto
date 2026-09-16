@@ -11,6 +11,7 @@ export const en: Catalogue = {
   'preview.zoom.in': 'Zoom in',
   'preview.zoom.fit': 'Fit',
   'preview.empty': 'Write a brief to see it here',
+  'preview.stale': 'Older than the text you are writing',
   'preview.problems': 'Problems',
   'preview.ok': 'No problems',
   'problems.heading': 'Problems',
