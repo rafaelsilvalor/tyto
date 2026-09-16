@@ -82,6 +82,25 @@ export interface Catalogue {
   readonly 'file.missing': string;
 
   /**
+   * The document tabs (E9.11).
+   *
+   * `document.close` titles the × on a tab and reads out for it. The four `document.discard.*`
+   * are the question asked before a tab with unsaved text goes away: the renderer translates
+   * all four and hands them to main, because the OS draws the dialog and the window owns
+   * every string in it (`shared/ipc.ts`).
+   */
+  readonly 'document.close': string;
+  readonly 'document.discard.message': string;
+  readonly 'document.discard.detail': string;
+  readonly 'document.discard.confirm': string;
+  readonly 'document.discard.cancel': string;
+  readonly 'command.document.close': string;
+  readonly 'command.document.next': string;
+  readonly 'command.document.previous': string;
+  /** A prefix: the tab's own name follows it, the way a recent entry's does. */
+  readonly 'command.document.select': string;
+
+  /**
    * The dock, its panels and the commands that show and hide them (E9.10).
    *
    * `panel.*` are the panel names a command bar entry reads — "Mostrar ou esconder:
@@ -146,6 +165,15 @@ export const CATALOGUE_KEYS = [
   'document.untitled',
   'document.unsaved',
   'file.missing',
+  'document.close',
+  'document.discard.message',
+  'document.discard.detail',
+  'document.discard.confirm',
+  'document.discard.cancel',
+  'command.document.close',
+  'command.document.next',
+  'command.document.previous',
+  'command.document.select',
   'panel.close',
   'command.layout.togglePanel',
   'command.layout.restore',

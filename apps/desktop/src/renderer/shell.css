@@ -608,3 +608,87 @@ tyto-command-bar[open] {
   color: var(--muted);
   font-size: 13px;
 }
+
+/*
+ * The document tabs (E9.11).
+ *
+ * `display` is spelled out because an unknown tag is `display: inline`, on which `flex` does
+ * nothing and the failure is silent (ADR 0024). The strip scrolls sideways rather than
+ * wrapping: a second row of tabs would move the editor down the window every time somebody
+ * opened a ninth file, and a window that changes height as you work is worse than a strip
+ * you have to scroll.
+ */
+.tabs {
+  display: block;
+  min-height: 0;
+}
+
+.tabs__strip {
+  display: flex;
+  gap: 4px;
+  overflow-x: auto;
+  scrollbar-width: thin;
+}
+
+.tabs__tab {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  border: 1px solid transparent;
+  border-radius: 6px;
+  padding-inline-end: 2px;
+  color: var(--muted);
+  white-space: nowrap;
+}
+
+.tabs__tab--on {
+  border-color: var(--line);
+  color: var(--ink);
+}
+
+.tabs__name {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  border: none;
+  background: none;
+  padding: 4px 4px 4px 10px;
+  color: inherit;
+  font: inherit;
+  font-size: 13px;
+  cursor: pointer;
+}
+
+/* A long file name is cut rather than allowed to push every other tab off the strip. */
+.tabs__label {
+  max-width: 220px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.tabs__tab--on .tabs__name {
+  font-weight: 600;
+}
+
+.tabs__dirty {
+  font-size: 16px;
+  line-height: 1;
+}
+
+.tabs__close {
+  border: none;
+  border-radius: 4px;
+  background: none;
+  padding: 0 5px;
+  color: inherit;
+  font: inherit;
+  font-size: 15px;
+  line-height: 1.4;
+  cursor: pointer;
+}
+
+.tabs__close:hover,
+.tabs__close:focus-visible {
+  background: color-mix(in srgb, var(--ink) 8%, transparent);
+}

@@ -10,7 +10,6 @@ import {
 } from '../../shared/i18n/index.js';
 import { planTemplateEdit, templateOf } from './frontmatter.js';
 import {
-  type Artwork,
   type Diagnostic,
   type SourceRange,
   type Template,
@@ -21,6 +20,7 @@ import {
 import { type CommandEntry, type CommandBar, COMMAND_BAR_TAG } from './command-bar.js';
 import {
   COMMAND_LABELS,
+  DOCUMENT_SLOTS,
   PREVIEW_ZOOM_FIT,
   PREVIEW_ZOOM_IN,
   PREVIEW_ZOOM_OUT,
@@ -30,8 +30,26 @@ import {
   panelOfToggleCommand,
   pathOfRecentCommand,
   recentCommandId,
+  selectDocumentCommandId,
+  slotOfSelectCommand,
   togglePanelCommandId,
 } from './commands.js';
+import {
+  type DocumentState,
+  type Workspace,
+  activeOf,
+  addDocument,
+  closeDocument,
+  documentAtSlot,
+  documentOf,
+  isDisposable,
+  newDocument,
+  selectDocument,
+  stepDocument,
+  updateDocument,
+  workspaceOf,
+} from './documents.js';
+import { type DocumentTabs, TABS_TAG } from './tabs.js';
 import { type ProblemsPanel, PROBLEMS_TAG } from './problems-panel.js';
 import { arrange, wireSplitters } from './dock.js';
 import './panels.js';
@@ -44,9 +62,8 @@ import {
 } from '../../shared/layout.js';
 import { fillLocalePicker, localeFromPicker, paint } from './shell.js';
 import {
-  type Frame,
   type PreviewElements,
-  type Selection,
+  type RequestGate,
   type Zoom,
   FORMAT_ATTRIBUTE,
   artworksOf,
@@ -61,9 +78,15 @@ import {
 /**
  * The renderer's entry point: an editor on the left, the frames it produces on the right.
  *
- * Wiring only. Which frame is showing and at what scale is `preview.ts`, every string is the
- * catalogue's, and compiling is main's — what is left here is the order things happen in and
- * the one decision nothing else can make: **when** to ask.
+ * Wiring only. Which frame is showing and at what scale is `preview.ts`, what is open is
+ * `documents.ts`, every string is the catalogue's, and compiling is main's — what is left
+ * here is the order things happen in and the one decision nothing else can make: **when** to
+ * ask.
+ *
+ * E9.11 took the one thing this file used to own outright: the state. It held one `preview`
+ * object and one `panel` object as module-level singletons and every painter read them
+ * directly. Now there is a {@link Workspace} of several documents and the painters read
+ * whichever one is active, which is the whole of what a tab is.
  */
 
 declare global {
@@ -97,15 +120,36 @@ const state = {
   version: '—',
   platform: '—',
   templates: [] as readonly string[],
-  /**
-   * What is open (E9.8).
-   *
-   * A name and never a path. Where the file is, is main's — it is what resolves the brief's
-   * assets and what a recent entry is reopened by, and the renderer has no use for it that
-   * is not already a channel.
-   */
-  document: { name: undefined as string | undefined, dirty: false },
 };
+
+/**
+ * A name for a tab, and the key main files that tab's path under (E9.11).
+ *
+ * A counter and not the file's path, because a document has no path until it is saved and
+ * gets a different one when it is saved again. `shared/ipc.ts` has the rest of the argument.
+ */
+let documentCount = 0;
+const nextDocumentId = (): string => {
+  documentCount += 1;
+  return `document-${String(documentCount)}`;
+};
+
+/**
+ * What is open, and which one the window is looking at.
+ *
+ * Starts as one untitled document with no snapshot in it: the buffer does not exist yet at
+ * module load, and the first thing the editor is created with *is* this document. Every
+ * later document is born from `editor.blank`.
+ */
+let workspace: Workspace = workspaceOf(newDocument(nextDocumentId()));
+
+/** The document every painter below reads. */
+const active = (): DocumentState => activeOf(workspace);
+
+/** Changes the active document and leaves every other one exactly as it was. */
+function updateActive(change: (document: DocumentState) => DocumentState): void {
+  workspace = updateDocument(workspace, workspace.activeId, change);
+}
 
 /**
  * The recent list, as commands that unregister themselves.
@@ -126,29 +170,18 @@ let recentCommands: (() => void)[] = [];
  */
 let layout: Layout = DEFAULT_LAYOUT;
 
-const preview = {
-  frames: [] as readonly Frame[],
-  artworks: [] as readonly Artwork[],
-  selection: { format: undefined, artwork: undefined } as Selection,
-  zoom: 'fit' as Zoom,
-  errors: 0,
-  problems: 0,
-};
-
 const panel = {
-  diagnostics: [] as readonly Diagnostic[],
   /**
    * Folders that meant to be a template and could not be read as one.
    *
-   * Kept apart from `diagnostics` because they have a different lifetime: these are read
-   * once at startup and never change, and the brief's are replaced on every answer. They
-   * are shown together, at the top, because to somebody reading the panel they are the same
-   * question — why is this not rendering.
+   * Kept apart from a document's diagnostics because they have a different lifetime: these
+   * are read once at startup and never change, and a brief's are replaced on every answer.
+   * They are shown together, at the top, because to somebody reading the panel they are the
+   * same question — why is this not rendering. They belong to the app rather than to a tab,
+   * which is why they stayed here when everything else moved into the workspace.
    */
   installation: [] as readonly Diagnostic[],
   templates: [] as readonly Template[],
-  /** The text the diagnostics were computed against, which is what their offsets index. */
-  brief: '',
 };
 
 /**
@@ -157,6 +190,11 @@ const panel = {
  * It used to be a local in `load`, which was right while nothing outside the bridge touched
  * it. A diagnostic row scrolls it, the slide picker scrolls it and the template picker
  * edits it, so the handle is state rather than a local now.
+ *
+ * **One editor and several documents**, not one editor per tab. Switching hands the buffer,
+ * the undo history, the cursor and the scroll over as a `DocumentSnapshot`; a second
+ * CodeMirror per tab would be a second set of extensions, a second keymap and a second
+ * command registry for the window to keep in step.
  */
 let editor: EditorHandle | undefined;
 
@@ -192,6 +230,9 @@ function resolveElements() {
     problems: document.querySelector<ProblemsPanel>(PROBLEMS_TAG),
     problemsCount: byId('problems-count'),
     commandBar: document.querySelector<CommandBar>(COMMAND_BAR_TAG),
+    // Outside the docks, like the command bar: the strip lists what the *window* has open,
+    // so it must not disappear with a panel.
+    tabs: document.querySelector<DocumentTabs>(TABS_TAG),
   };
 }
 
@@ -224,26 +265,65 @@ function previewElements(): PreviewElements | undefined {
   return { tabs, slide, slideLabel, stage, paper, frame, empty, zoomLevel };
 }
 
-const gate = createRequestGate();
+/**
+ * One request gate per document, because two tabs compile independently.
+ *
+ * A single gate remembers only the last id it issued anywhere, so with two documents typing
+ * into one would throw away the other's answer — the gate would be discarding a *fresh*
+ * result for a different brief rather than a stale one for the same brief, which is the
+ * opposite of what it is for.
+ */
+const gates = new Map<string, RequestGate>();
+
+function gateFor(documentId: string): RequestGate {
+  const existing = gates.get(documentId);
+  if (existing !== undefined) return existing;
+  const created = createRequestGate();
+  gates.set(documentId, created);
+  return created;
+}
+
+/**
+ * One pending compile per document, holding the text as it was when the key was pressed.
+ *
+ * Per document and carrying its own brief, because a person types, switches tab and types
+ * again inside 200 ms. One shared timer would cancel the first document's compile and then
+ * ask for the *editor's* text, which by then is the other document's — so the first tab
+ * would never see its own edit and the second would be compiled twice.
+ */
+const pending = new Map<string, ReturnType<typeof setTimeout>>();
+
+function ask(bridge: TytoBridge, documentId: string, brief: string): void {
+  const existing = pending.get(documentId);
+  if (existing !== undefined) clearTimeout(existing);
+  pending.set(
+    documentId,
+    setTimeout(() => {
+      pending.delete(documentId);
+      void request(bridge, documentId, brief);
+    }, PREVIEW_DELAY),
+  );
+}
 
 function paintStatus(): void {
   const status = elements.status;
   if (status === null) return;
+  const current = active();
 
   // No frames and nothing to say about them is the state before anybody types, which the
   // stage already covers with its own message. A second empty sentence under it would be
   // noise.
-  if (preview.problems === 0) {
-    status.textContent = preview.frames.length === 0 ? '' : translate(state.locale, 'preview.ok');
+  if (current.problems === 0) {
+    status.textContent = current.frames.length === 0 ? '' : translate(state.locale, 'preview.ok');
     status.classList.remove('preview__status--bad');
     return;
   }
 
   const label = translate(state.locale, 'preview.problems');
-  status.textContent = `${label}: ${String(preview.problems)}`;
+  status.textContent = `${label}: ${String(current.problems)}`;
   // Only errors colour it. A warning is a document that still renders (ADR 0013), and
   // painting it red would make every unused slot look like a failure.
-  status.classList.toggle('preview__status--bad', preview.errors > 0);
+  status.classList.toggle('preview__status--bad', current.errors > 0);
 }
 
 /** The card's acceptance criterion, in `panel.ts` where a test can drive it. */
@@ -252,7 +332,8 @@ function reveal(range: SourceRange): void {
 }
 
 function paintPanel(): void {
-  const problems = [...panel.installation, ...panel.diagnostics];
+  const current = active();
+  const problems = [...panel.installation, ...current.diagnostics];
 
   if (elements.problems !== null) {
     // A property assignment, not a paint: the element schedules its own update and rewrites
@@ -261,7 +342,7 @@ function paintPanel(): void {
     // and the diffing that follows is what makes doing so cheap.
     elements.problems.state = {
       diagnostics: problems,
-      brief: panel.brief,
+      brief: current.brief,
       locale: state.locale,
     };
   }
@@ -281,6 +362,25 @@ function paintPanel(): void {
   }
 }
 
+/** The name a tab and the window title show, which is the catalogue's when there is none. */
+const labelOf = (document_: DocumentState): string =>
+  document_.name ?? translate(state.locale, 'document.untitled');
+
+function paintTabs(): void {
+  const strip = elements.tabs;
+  if (strip === null) return;
+  strip.locale = state.locale;
+  strip.activeId = workspace.activeId;
+  // A fresh array every time, for the reason the problems panel's state object is fresh:
+  // Lit compares by identity and `repeat` keyed by document id is what makes rebuilding
+  // this list cost only the tabs that changed.
+  strip.tabs = workspace.documents.map((document_) => ({
+    id: document_.id,
+    label: labelOf(document_),
+    dirty: document_.dirty,
+  }));
+}
+
 /**
  * The commands, and the one thing in this file that is not wiring.
  *
@@ -295,31 +395,39 @@ const registry: CommandRegistry = createDesktopRegistry({
     if (pane === undefined) return;
     // A step from whatever is on screen, the same as the buttons: the first step after
     // `fit` moves from the size the user is looking at.
-    preview.zoom = stepZoom(paintPreview(pane, preview), direction);
+    const from = paintPreview(pane, active());
+    updateActive((document_) => ({ ...document_, zoom: stepZoom(from, direction) }));
     repaint();
   },
 
   zoomToFit: () => {
-    preview.zoom = 'fit';
+    updateActive((document_) => ({ ...document_, zoom: 'fit' as Zoom }));
     repaint();
   },
 
   stepFormat: (direction) => {
-    preview.selection = {
-      ...preview.selection,
-      format: cycle(formatsOf(preview.frames), preview.selection.format, direction),
-    };
+    updateActive((document_) => ({
+      ...document_,
+      selection: {
+        ...document_.selection,
+        format: cycle(formatsOf(document_.frames), document_.selection.format, direction),
+      },
+    }));
     repaint();
   },
 
   stepSlide: (direction) => {
-    const artwork = cycle(artworksOf(preview.artworks), preview.selection.artwork, direction);
-    preview.selection = { ...preview.selection, artwork };
+    const current = active();
+    const artwork = cycle(artworksOf(current.artworks), current.selection.artwork, direction);
+    updateActive((document_) => ({
+      ...document_,
+      selection: { ...document_.selection, artwork },
+    }));
     repaint();
     // The editor follows, the same as choosing from the picker does. A command that moved
     // the picture and left the text behind would be a different feature wearing the same
     // name.
-    const at = rangeOfArtwork(preview.artworks, artwork);
+    const at = rangeOfArtwork(current.artworks, artwork);
     if (at !== undefined) reveal(at);
   },
 
@@ -333,23 +441,45 @@ const registry: CommandRegistry = createDesktopRegistry({
 
   openDocument: () => {
     void withBridge(async (bridge) => {
-      const answer = await bridge['file:open']({});
-      adopt(answer.document);
+      const wanted = nextDocumentId();
+      const answer = await bridge['file:open']({ documentId: wanted });
+      adopt(answer.document, answer.documentId, wanted);
     });
   },
 
   saveDocument: (saveAs) => {
     void withBridge(async (bridge) => {
       if (editor === undefined) return;
-      const answer = await bridge['file:save']({ text: editor.getValue(), saveAs });
+      const documentId = workspace.activeId;
+      const answer = await bridge['file:save']({
+        documentId,
+        text: editor.getValue(),
+        saveAs,
+      });
       // A dismissed dialog leaves everything alone, dirty marker included. Clearing it
       // would tell somebody their text was written when it was not.
-      adopt(answer.document);
+      if (answer.document === null) return;
+      const name = answer.document.name;
+      workspace = updateDocument(workspace, documentId, (document_) => ({
+        ...document_,
+        name,
+        dirty: false,
+      }));
+      repaint();
+      void refreshRecent();
     });
   },
 
   restoreLayout: () => {
     void changeLayout(DEFAULT_LAYOUT);
+  },
+
+  closeDocument: () => {
+    void requestClose(workspace.activeId);
+  },
+
+  stepDocument: (direction) => {
+    activate(stepDocument(workspace, direction));
   },
 
   toggleVimMode: () => {
@@ -385,22 +515,86 @@ async function withBridge(use: (bridge: TytoBridge) => Promise<void>): Promise<v
 }
 
 /**
- * Takes on a document main just opened or wrote, or does nothing for a dismissed dialog.
+ * Writes the editor's buffer back into the active document, before anything takes it away.
  *
- * `setValue` and then `request` by hand, because `setValue` deliberately notifies nobody
- * (`@tyto/editor`): that is what stops loading a file from looking like the person typed
- * it, and it is why the preview has to be asked for explicitly here. The dirty marker is
- * cleared for the same reason — the buffer now matches the disk exactly.
+ * The one call that keeps a tab a place rather than a reload: the snapshot carries the undo
+ * history, the cursor and the scroll, none of which a string would. Everything that changes
+ * which document the editor is holding calls this first.
  */
-function adopt(document_: { name: string; text: string } | null): void {
-  if (document_ === null) return;
+function captureActive(): void {
+  if (editor === undefined) return;
+  const snapshot = editor.snapshot();
+  updateActive((document_) => ({ ...document_, snapshot }));
+}
 
-  state.document = { name: document_.name, dirty: false };
-  if (editor !== undefined && editor.getValue() !== document_.text) {
-    editor.setValue(document_.text);
-  }
+/** Puts a document in the editor and in front of every panel. */
+function activate(id: string): void {
+  if (id === workspace.activeId || documentOf(workspace, id) === undefined) return;
+  captureActive();
+  workspace = selectDocument(workspace, id);
+  restoreActive();
   repaint();
-  void withBridge((bridge) => request(bridge, editor?.getValue() ?? ''));
+}
+
+/**
+ * Hands the editor whatever the active document was holding when it was put down.
+ *
+ * And puts the caret back in it. Clicking a tab moves focus to the tab's own button, and a
+ * person who has just chosen a document wants to type into it — every editor does this, and
+ * without it the first keystroke after a switch goes nowhere a person can see.
+ */
+function restoreActive(): void {
+  if (editor === undefined) return;
+  const snapshot = active().snapshot;
+  if (snapshot !== undefined) editor.restore(snapshot);
+  editor.view.focus();
+}
+
+/**
+ * Takes on a document main just opened, in the tab main says is holding it.
+ *
+ * `wanted` is the tab the renderer offered. Main answers with a different one when the file
+ * was **already open**, and the window goes there instead of making a second buffer over one
+ * file — with the text it already has, not the disk's, because the tab may hold edits
+ * somebody has not saved yet and reading over them is the one unrecoverable thing here.
+ *
+ * `blank` and then `restore`, never `setValue`: a new tab needs its own undo history, and
+ * rebuilding a state from a string is exactly what throws one away.
+ */
+function adopt(
+  opened: { name: string; text: string } | null,
+  documentId: string | null,
+  wanted: string,
+): void {
+  if (opened === null || documentId === null) return;
+
+  if (documentId !== wanted) {
+    activate(documentId);
+    return;
+  }
+  if (editor === undefined) return;
+
+  const created: DocumentState = {
+    ...newDocument(documentId, editor.blank(opened.text)),
+    name: opened.name,
+  };
+
+  captureActive();
+  const current = active();
+  workspace = isDisposable(current)
+    ? {
+        // The empty tab the window opened on is replaced rather than pushed aside, and only
+        // that one: `isDisposable` is false the moment anybody types a character.
+        documents: workspace.documents.map((document_) =>
+          document_.id === current.id ? created : document_,
+        ),
+        activeId: created.id,
+      }
+    : addDocument(workspace, created);
+
+  restoreActive();
+  repaint();
+  void withBridge((bridge) => request(bridge, created.id, opened.text));
   void refreshRecent();
 }
 
@@ -445,7 +639,8 @@ async function refreshRecent(): Promise<void> {
  */
 async function reopen(path: string, name: string): Promise<void> {
   await withBridge(async (bridge) => {
-    const answer = await bridge['file:reopen']({ path });
+    const wanted = nextDocumentId();
+    const answer = await bridge['file:reopen']({ documentId: wanted, path });
 
     if (answer.missing) {
       panel.installation = [
@@ -462,8 +657,55 @@ async function reopen(path: string, name: string): Promise<void> {
       return;
     }
 
-    adopt(answer.document);
+    adopt(answer.document, answer.documentId, wanted);
   });
+}
+
+/**
+ * Closing a tab, which is the one thing in this window that asks before it acts.
+ *
+ * The question is main's dialog and not the renderer's `confirm()`: the buttons have to be
+ * in the language the window is in (`shared/ipc.ts`). With no bridge there is no disk to
+ * lose anything to, so the answer is yes — a unit test driving this must not hang on a
+ * dialog that cannot appear.
+ */
+async function requestClose(id: string): Promise<void> {
+  const target = documentOf(workspace, id);
+  if (target === undefined) return;
+
+  if (target.dirty) {
+    const bridge = window.tyto;
+    if (bridge !== undefined) {
+      const answer = await bridge['dialog:confirm']({
+        message: translate(state.locale, 'document.discard.message'),
+        detail: `${labelOf(target)}: ${translate(state.locale, 'document.discard.detail')}`,
+        confirm: translate(state.locale, 'document.discard.confirm'),
+        cancel: translate(state.locale, 'document.discard.cancel'),
+      });
+      if (!answer.confirmed) return;
+    }
+  }
+
+  closeTab(id);
+}
+
+/** Takes a tab out of the window, and tells main to stop holding its path. */
+function closeTab(id: string): void {
+  const timer = pending.get(id);
+  if (timer !== undefined) clearTimeout(timer);
+  pending.delete(id);
+  gates.delete(id);
+  void withBridge(async (bridge) => {
+    await bridge['file:close']({ documentId: id });
+  });
+
+  const before = workspace.activeId;
+  if (id === before) captureActive();
+  // Closing the last tab leaves an empty one rather than an empty window: there would be
+  // nowhere to type, and typing is the state this app opens in.
+  workspace = closeDocument(workspace, id, () => newDocument(nextDocumentId(), editor?.blank('')));
+  if (workspace.activeId !== before) restoreActive();
+  repaint();
 }
 
 /**
@@ -491,6 +733,28 @@ function registerPanelCommands(): void {
   }
 }
 
+/**
+ * `Mod-1`…`Mod-9`, registered once and never again.
+ *
+ * Nine commands for a window that usually has two tabs, and that is deliberate: the id is
+ * the *slot*, so the keystroke is a fixed table the editor's keymap can carry, and the
+ * document it lands on is looked up when the command runs. Registering per open document
+ * instead would mean nine ids appearing and disappearing under a keymap that had already
+ * been built. `commandEntries` is what keeps the empty slots out of the palette.
+ */
+function registerDocumentCommands(): void {
+  for (const slot of DOCUMENT_SLOTS) {
+    registry.register({
+      id: selectDocumentCommandId(slot),
+      label: String(slot),
+      run: () => {
+        const target = documentAtSlot(workspace, slot);
+        if (target !== undefined) activate(target.id);
+      },
+    });
+  }
+}
+
 /** The catalogue key a panel is named by in a list of panels. */
 const PANEL_NAMES: Readonly<Record<string, CatalogueKey>> = {
   editor: 'panel.editor',
@@ -502,32 +766,43 @@ const PANEL_NAMES: Readonly<Record<string, CatalogueKey>> = {
 function commandEntries(): readonly CommandEntry[] {
   const bindings = bindingsOf(keymapSetFor(editor?.isVimMode() ?? false), state.platform);
 
-  return registry.list().map((command) => {
+  return registry.list().flatMap((command) => {
     const key = COMMAND_LABELS[command.id];
     const binding = bindings[command.id];
-    // Two commands build their label from a word plus something that is not the
-    // catalogue's: a recent file's own name, and a panel's name. Both are translated at
-    // display time so that switching language needs no re-registration.
+    // Three commands build their label from a word plus something that is not the
+    // catalogue's: a recent file's own name, a panel's name, and a tab's. All are resolved
+    // at display time so that switching language needs no re-registration.
     const own = command.label ?? command.id;
     const panelId = panelOfToggleCommand(command.id);
     const panelName = panelId === undefined ? undefined : PANEL_NAMES[panelId];
+    const slot = slotOfSelectCommand(command.id);
+
+    // A slot past the last tab is left out rather than shown doing nothing. The command
+    // stays registered, because the keystroke table is fixed and a `Mod-7` pressed with six
+    // tabs open should be a key that does nothing, not a key that runs the wrong tab.
+    const tab = slot === undefined ? undefined : documentAtSlot(workspace, slot);
+    if (slot !== undefined && tab === undefined) return [];
 
     const label =
       pathOfRecentCommand(command.id) !== undefined
         ? `${translate(state.locale, 'command.file.recent')}: ${own}`
-        : panelId !== undefined
-          ? `${translate(state.locale, 'command.layout.togglePanel')}: ${
-              panelName === undefined ? own : translate(state.locale, panelName)
-            }`
-          : key === undefined
-            ? own
-            : translate(state.locale, key);
+        : tab !== undefined
+          ? `${translate(state.locale, 'command.document.select')}: ${labelOf(tab)}`
+          : panelId !== undefined
+            ? `${translate(state.locale, 'command.layout.togglePanel')}: ${
+                panelName === undefined ? own : translate(state.locale, panelName)
+              }`
+            : key === undefined
+              ? own
+              : translate(state.locale, key);
 
-    return {
-      id: command.id,
-      label,
-      ...(binding === undefined ? {} : { binding }),
-    };
+    return [
+      {
+        id: command.id,
+        label,
+        ...(binding === undefined ? {} : { binding }),
+      },
+    ];
   });
 }
 
@@ -566,6 +841,7 @@ async function applyLayout(persist: boolean): Promise<void> {
   wirePreviewControls(window.tyto === undefined);
   wirePanelControls();
   wireCommandBar();
+  wireTabs();
   repaint();
 
   if (persist) {
@@ -582,38 +858,47 @@ async function changeLayout(next: Layout): Promise<void> {
 }
 
 function repaint(): void {
-  paint(document, state);
-  if (pane !== undefined) paintPreview(pane, preview);
+  const current = active();
+  paint(document, {
+    ...state,
+    // The title is the active tab, which is the whole of point 5 of the card.
+    document: { name: current.name, dirty: current.dirty },
+  });
+  if (pane !== undefined) paintPreview(pane, current);
   paintStatus();
   paintPanel();
+  paintTabs();
   paintCommandBar();
 }
 
-/** Asks main for the frames of `brief`, and keeps the answer only if it is still the latest. */
-async function request(bridge: TytoBridge, brief: string): Promise<void> {
+/**
+ * Asks main for the frames of `brief`, and keeps the answer only if it is still the latest.
+ *
+ * "Latest" is per document (see {@link gates}), and the answer lands in the document it was
+ * asked for even when that is not the one on screen — a tab compiled in the background is
+ * finished when a person comes back to it rather than started then. **Nothing repaints for
+ * a document nobody is looking at**, which is the card's third point in its literal form.
+ */
+async function request(bridge: TytoBridge, documentId: string, brief: string): Promise<void> {
+  const gate = gateFor(documentId);
   const requestId = gate.next();
-  const answer = await bridge['brief:preview']({ requestId, brief });
+  const answer = await bridge['brief:preview']({ requestId, documentId, brief });
   if (!gate.accept(answer.requestId)) return;
 
-  preview.frames = answer.frames;
-  preview.artworks = answer.artworks;
-  preview.selection = keepSelection(preview.selection, answer.frames, answer.artworks);
-  preview.problems = answer.diagnostics.length;
-  preview.errors = errorCount(answer.diagnostics);
-  panel.diagnostics = answer.diagnostics;
-  // The brief **as asked**, not as it stands: the ranges index this text, and pairing them
-  // with a buffer two keystrokes further on would show a line number that drifts.
-  panel.brief = brief;
-  repaint();
-}
+  workspace = updateDocument(workspace, documentId, (document_) => ({
+    ...document_,
+    frames: answer.frames,
+    artworks: answer.artworks,
+    selection: keepSelection(document_.selection, answer.frames, answer.artworks),
+    problems: answer.diagnostics.length,
+    errors: errorCount(answer.diagnostics),
+    diagnostics: answer.diagnostics,
+    // The brief **as asked**, not as it stands: the ranges index this text, and pairing them
+    // with a buffer two keystrokes further on would show a line number that drifts.
+    brief,
+  }));
 
-/** Calls `run` once the caller has stopped calling for `PREVIEW_DELAY`. */
-function debounce(run: () => void): () => void {
-  let timer: ReturnType<typeof setTimeout> | undefined;
-  return () => {
-    if (timer !== undefined) clearTimeout(timer);
-    timer = setTimeout(run, PREVIEW_DELAY);
-  };
+  if (documentId === workspace.activeId) repaint();
 }
 
 /**
@@ -640,27 +925,35 @@ function once<K extends keyof HTMLElementEventMap>(
 
 function wirePreviewControls(bridgeless: boolean): void {
   if (pane === undefined) return;
-  const active = pane;
+  const active_ = pane;
 
   // **Nothing in here asks for a render**, which is the acceptance criterion rather than an
-  // optimisation: every frame of every format is already in `preview.frames`, so switching
-  // is choosing one of them. The click handler that called the bridge would be the bug.
-  once(active.tabs, 'click', (event) => {
+  // optimisation: every frame of every format is already in the document's own `frames`, so
+  // switching is choosing one of them. The click handler that called the bridge would be
+  // the bug.
+  once(active_.tabs, 'click', (event) => {
     const target = event.target;
     if (!(target instanceof HTMLElement)) return;
     const format = target.getAttribute(FORMAT_ATTRIBUTE);
     if (format === null) return;
-    preview.selection = { ...preview.selection, format };
+    updateActive((document_) => ({
+      ...document_,
+      selection: { ...document_.selection, format },
+    }));
     repaint();
   });
 
-  once(active.slide, 'change', () => {
-    preview.selection = { ...preview.selection, artwork: active.slide.value };
+  once(active_.slide, 'change', () => {
+    const artwork = active_.slide.value;
+    updateActive((document_) => ({
+      ...document_,
+      selection: { ...document_.selection, artwork },
+    }));
     repaint();
     // The card asks for both halves: the preview follows the choice, and so does the
     // editor. The range is the `::slide` directive that made this artwork, which only
     // `resolve` knew — a `Scene` carries no source position at all.
-    const at = rangeOfArtwork(preview.artworks, active.slide.value);
+    const at = rangeOfArtwork(active().artworks, artwork);
     if (at !== undefined) reveal(at);
   });
 
@@ -681,7 +974,7 @@ function wirePreviewControls(bridgeless: boolean): void {
   // `fit` is a function of the stage, and the stage changes with the window without any
   // state changing to notice it.
   window.addEventListener('resize', () => {
-    if (preview.zoom === 'fit') repaint();
+    if (active().zoom === 'fit') repaint();
   });
 
   if (bridgeless) pane.empty.hidden = false;
@@ -702,14 +995,6 @@ function runCommand(id: string): boolean {
 }
 
 /**
- * `Mod-K`, on the window rather than in the editor's keymap.
- *
- * The bar has to open whether or not the editor has focus — from the preview, from the
- * problems panel, from nothing at all — and a CodeMirror binding only fires while
- * CodeMirror is focused. An unhandled keystroke in the editor bubbles here anyway, so one
- * window listener covers both and there is no second binding to keep in step.
- */
-/**
  * The bar's own two callbacks, re-set on every arrange because the bar may be a new element.
  *
  * It is not — the bar lives outside the docks and the dock never touches it — but this runs
@@ -725,6 +1010,20 @@ function wireCommandBar(): void {
   };
   bar.close = () => undefined;
   paintCommandBar();
+}
+
+/** The strip's two callbacks, set for the same reason and at the same time as the bar's. */
+function wireTabs(): void {
+  const strip = elements.tabs;
+  if (strip === null) return;
+
+  strip.select = (id) => {
+    activate(id);
+  };
+  strip.close = (id) => {
+    void requestClose(id);
+  };
+  paintTabs();
 }
 
 /**
@@ -793,6 +1092,7 @@ async function load(): Promise<void> {
   if (bridge !== undefined) layout = (await bridge['layout:get']({})).layout;
 
   registerPanelCommands();
+  registerDocumentCommands();
   // Arranged **before** anything is looked up: there are no panels in the document until
   // the dock has made them, so every `getElementById` before this line would answer null.
   await applyLayout(false);
@@ -839,9 +1139,9 @@ async function load(): Promise<void> {
     editor = createEditor(elements.editor, {
       doc: '',
       commands: registry,
-      // The desktop's set, which is the editor's plus `Mod-o` and `Mod-Shift-s`. Passed
-      // here rather than bound in a window listener so that the bar and the editor read
-      // one table — `bindingsOf` is given this same set.
+      // The desktop's set, which is the editor's plus `Mod-o`, `Mod-Shift-s` and the tab
+      // keys. Passed here rather than bound in a window listener so that the bar and the
+      // editor read one table — `bindingsOf` is given this same set.
       keymap: keymapSetFor(false),
     });
     // The bindings are read off the keymap set the editor is running, so the bar can only
@@ -849,23 +1149,27 @@ async function load(): Promise<void> {
     paintCommandBar();
     if (bridge !== undefined) {
       const handle = editor;
-      const ask = debounce(() => void request(bridge, handle.getValue()));
       // Repainted on every keystroke and not only on the answer: the picker shows the
       // template the *brief* names, so typing the line by hand has to move it too.
-      editor.onChange(() => {
-        // Repainted only on the edge, not on every keystroke: the title is the only thing
-        // that changes when a document goes from saved to touched, and repainting the
-        // window per character to say so would be the one expensive thing in this path.
-        if (!state.document.dirty) {
-          state.document.dirty = true;
+      handle.onChange(() => {
+        // The id is read now rather than inside the timeout: a person can switch tabs
+        // before the compile fires, and this edit belongs to the document that was in the
+        // editor when the key was pressed.
+        const documentId = workspace.activeId;
+        // Repainted only on the edge, not on every keystroke: the title and the tab are the
+        // only things that change when a document goes from saved to touched, and
+        // repainting the window per character to say so would be the one expensive thing in
+        // this path.
+        if (!active().dirty) {
+          updateActive((document_) => ({ ...document_, dirty: true }));
           repaint();
         }
         paintPanel();
-        ask();
+        ask(bridge, documentId, handle.getValue());
       });
       // Once on load as well: a brief restored into the buffer should show, and the first
-      // answer is what fills the tab strip.
-      void request(bridge, handle.getValue());
+      // answer is what fills the format tabs.
+      void request(bridge, workspace.activeId, handle.getValue());
     }
   }
 

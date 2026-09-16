@@ -90,20 +90,19 @@ export interface PreviewServiceOptions {
   readonly templatesDirectory?: string;
   /** The project's `formats.yaml`. Defaults to the built-in pack's. */
   readonly formatsFile?: string;
-  /**
-   * The folder the open brief lives in, asked afresh on every preview (E9.8).
-   *
-   * A function and not a string, because the answer changes while the service lives: the
-   * window opens with nothing open, somebody opens a `.brief`, and from that keystroke on
-   * `assets/logo.png` is a file that exists. Rebuilding the service on every open would
-   * mean re-reading every template manifest to learn a folder name.
-   */
-  readonly baseDirectory?: () => string | undefined;
 }
 
 export interface PreviewService {
-  /** The frames `brief` produces right now, and what was wrong with it. Never rejects. */
-  preview(brief: string): Promise<PreviewResult>;
+  /**
+   * The frames `brief` produces right now, and what was wrong with it. Never rejects.
+   *
+   * `baseDirectory` is the folder that brief lives in, and it is an argument rather than
+   * something the service holds (E9.11). It used to be a getter passed at construction,
+   * which quietly assumed there was one open document to ask about; with tabs there are
+   * several, and the only side that knows which one a given compile is for is the caller
+   * that was handed the request's `documentId`.
+   */
+  preview(brief: string, baseDirectory?: string): Promise<PreviewResult>;
 }
 
 /**
@@ -140,7 +139,6 @@ export async function createPreviewService(
   options: PreviewServiceOptions,
 ): Promise<PreviewService> {
   const { fileSystem } = options;
-  const baseDirectory = options.baseDirectory ?? ((): string | undefined => undefined);
   const templatesDirectory = options.templatesDirectory ?? builtInTemplates();
   const formatsFile = options.formatsFile ?? fileSystem.join(templatesDirectory, 'formats.yaml');
 
@@ -174,7 +172,7 @@ export async function createPreviewService(
   });
 
   return {
-    async preview(brief: string): Promise<PreviewResult> {
+    async preview(brief: string, baseDirectory?: string): Promise<PreviewResult> {
       if (templates === undefined || catalogue === undefined) return failed([]);
 
       const ast = parseBrief(brief);
@@ -184,8 +182,8 @@ export async function createPreviewService(
       // the service. `confine` stays on, its default: a brief is often written by something
       // else (ADR 0011), and `../../../.ssh/id_rsa` embedded in an exported PNG is a real
       // way to leak a file. An author previewing their own folder is inside it anyway.
-      const folder = baseDirectory();
-      const assets = folder === undefined ? noAssets : fileAssetResolver({ base: folder });
+      const assets =
+        baseDirectory === undefined ? noAssets : fileAssetResolver({ base: baseDirectory });
 
       const resolved = await resolve(ast.value, {
         registry: templates,
@@ -221,7 +219,8 @@ export async function createPreviewService(
       // the exporter would still have nothing to embed and would report
       // `E_EXPORT_ASSET_UNRESOLVED` naming an asset that is right there on the disk. Found
       // by opening a file and looking at the preview, not by a unit test.
-      const images = folder === undefined ? undefined : fileResources({ base: folder });
+      const images =
+        baseDirectory === undefined ? undefined : fileResources({ base: baseDirectory });
       if (images !== undefined) await images.load(sceneResources(scene.value));
 
       const exported = exportHtml(scene.value, {

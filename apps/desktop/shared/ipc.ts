@@ -76,6 +76,24 @@ const openDocument = z.object({
 });
 
 /**
+ * Which tab a message is about (E9.11).
+ *
+ * **The renderer invents these and main files paths under them.** With one document open,
+ * "the open file" was a single `let` in `src/main/documents.ts`; with tabs there are several
+ * and something has to say which. The id is opaque to main — it is a key, never a path and
+ * never an index — and it is the renderer's because the renderer is the side that knows
+ * when a tab is born and when it is closed.
+ *
+ * It travels on `brief:preview` rather than being set by a channel of its own, and that is
+ * the decision the card left open. A pointer moved by one message and read by another would
+ * race: previews are debounced and deliberately resolve out of order (`requestId` exists for
+ * exactly that), so an activate arriving between a request and its compile would resolve one
+ * document's `assets/logo.png` against another document's folder. A request that carries its
+ * own subject cannot be wrong about it.
+ */
+const documentId = z.string().min(1).max(100);
+
+/**
  * Every channel the app has, and the only place a channel name is written.
  *
  * Deliberately small. E9.1 opens a window and proves the wiring; the channels a brief, a
@@ -127,7 +145,12 @@ export const IPC_CHANNELS = {
    * warning is a document that still renders (ADR 0013).
    */
   'brief:preview': channel(
-    z.object({ requestId: z.number().int().nonnegative(), brief: z.string() }),
+    z.object({
+      requestId: z.number().int().nonnegative(),
+      /** Which tab this brief is in, which is how main knows what folder to resolve against. */
+      documentId,
+      brief: z.string(),
+    }),
     z.object({
       requestId: z.number().int().nonnegative(),
       frames: z.array(
@@ -228,10 +251,22 @@ export const IPC_CHANNELS = {
    * and main refuses any path that is not already in its own list.
    */
   'file:open': channel(
-    z.object({}),
+    z.object({
+      /** The tab the renderer made to receive the file, if the dialog produces one. */
+      documentId,
+    }),
     z.object({
       /** Absent when the dialog was dismissed, which is not a failure. */
       document: openDocument.nullable(),
+      /**
+       * Which tab ended up holding it, which is **not always the one that was asked for**.
+       *
+       * A file already open in another tab is that tab, and main is the side that can say
+       * so: it holds the id-to-path map, and the renderer holds names. Without this the
+       * window would open a second buffer over one file and the two would race to save.
+       * Absent for a dismissed dialog.
+       */
+      documentId: documentId.nullable(),
     }),
   ),
 
@@ -244,9 +279,11 @@ export const IPC_CHANNELS = {
    * app ever offered.
    */
   'file:reopen': channel(
-    z.object({ path: z.string().min(1) }),
+    z.object({ documentId, path: z.string().min(1) }),
     z.object({
       document: openDocument.nullable(),
+      /** The tab holding it — see `file:open`. Absent when nothing was opened. */
+      documentId: documentId.nullable(),
       /** Set when the entry is in the list and the file is gone, so the panel can say so. */
       missing: z.boolean(),
     }),
@@ -260,8 +297,37 @@ export const IPC_CHANNELS = {
    * nothing if the dialog was dismissed.
    */
   'file:save': channel(
-    z.object({ text: z.string(), saveAs: z.boolean() }),
+    z.object({ documentId, text: z.string(), saveAs: z.boolean() }),
     z.object({ document: openDocument.nullable() }),
+  ),
+
+  /**
+   * Tells main a tab is gone, so it stops holding that document's path (E9.11).
+   *
+   * Nothing comes back and nothing on screen depends on it. It is here because the
+   * alternative is a map that only grows: every file opened in a session would keep its
+   * entry for the life of the window, and reopening a closed file would find the *old* tab's
+   * id still claiming it.
+   */
+  'file:close': channel(z.object({ documentId }), z.object({})),
+
+  /**
+   * A yes-or-no the renderer cannot ask for itself (E9.11).
+   *
+   * Closing a tab with unsaved text has to ask, and the renderer's own `confirm()` would put
+   * the browser's buttons — in the OS's language, not the window's — in front of somebody
+   * who chose Portuguese in the footer. Main owns the OS dialog; the renderer owns every
+   * string, so the labels travel with the request rather than being written twice.
+   */
+  'dialog:confirm': channel(
+    z.object({
+      message: z.string().min(1).max(500),
+      detail: z.string().max(500).optional(),
+      /** The button that means yes, and the one that means no. Both already translated. */
+      confirm: z.string().min(1).max(100),
+      cancel: z.string().min(1).max(100),
+    }),
+    z.object({ confirmed: z.boolean() }),
   ),
 
   /** What the command bar offers under "recent". Newest first; `missing` is shown, not hidden. */

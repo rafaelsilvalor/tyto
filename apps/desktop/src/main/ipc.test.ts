@@ -33,15 +33,18 @@ const credentials = (): Credentials => {
  * the registration and the contract, and those are the same whichever service answers.
  */
 const preview = () => ({
-  preview: (brief: string) =>
-    Promise.resolve({
+  folders: [] as (string | undefined)[],
+  preview(brief: string, baseDirectory?: string) {
+    this.folders.push(baseDirectory);
+    return Promise.resolve({
       frames:
         brief.trim() === ''
           ? []
           : [{ artwork: 'a1', format: 'feed', width: 1080, height: 1080, html: '<!doctype html>' }],
       artworks: brief.trim() === '' ? [] : [{ id: 'a1', index: 0, range: { start: 4, end: 9 } }],
       diagnostics: [],
-    }),
+    });
+  },
 });
 
 /** A catalogue that read one folder. `templates.test.ts` drives the real one. */
@@ -61,22 +64,34 @@ const catalogue = () => ({
  * something that answers the four channels, because the registration loop is the subject
  * here and a channel with no handler is the failure it exists to prevent.
  */
-const documents = () => ({
-  open: () => Promise.resolve({ path: '/briefs/promo.brief', name: 'promo.brief', text: '::a' }),
-  reopen: (path: string) =>
-    Promise.resolve(
-      path === '/briefs/promo.brief'
-        ? { document: { path, name: 'promo.brief', text: '::a' }, missing: false }
-        : { document: null, missing: true },
-    ),
-  save: (text: string) =>
-    Promise.resolve({ path: '/briefs/promo.brief', name: 'promo.brief', text }),
-  recent: () =>
-    Promise.resolve({
-      files: [{ path: '/briefs/promo.brief', name: 'promo.brief', missing: false }],
-    }),
-  baseDirectory: () => '/briefs',
-});
+const documents = () => {
+  const closed: string[] = [];
+  return {
+    closed,
+    open: (documentId: string) =>
+      Promise.resolve({
+        document: { path: '/briefs/promo.brief', name: 'promo.brief', text: '::a' },
+        documentId,
+      }),
+    reopen: (documentId: string, path: string) =>
+      Promise.resolve(
+        path === '/briefs/promo.brief'
+          ? { document: { path, name: 'promo.brief', text: '::a' }, documentId, missing: false }
+          : { document: null, documentId: null, missing: true },
+      ),
+    save: (_documentId: string, text: string) =>
+      Promise.resolve({ path: '/briefs/promo.brief', name: 'promo.brief', text }),
+    close: (documentId: string) => {
+      closed.push(documentId);
+    },
+    recent: () =>
+      Promise.resolve({
+        files: [{ path: '/briefs/promo.brief', name: 'promo.brief', missing: false }],
+      }),
+    // One folder per tab, which is what `brief:preview` looks up from the id it is given.
+    folderOf: (documentId: string) => (documentId === 'document-1' ? '/briefs' : undefined),
+  };
+};
 
 /** A layout store in memory, so the registration loop has one to bind (E9.10). */
 const layoutStore = () => {
@@ -91,6 +106,7 @@ const layoutStore = () => {
 };
 
 const dependencies = () => ({
+  confirm: () => Promise.resolve(true),
   credentials: credentials(),
   documents: documents(),
   layout: layoutStore(),
@@ -147,6 +163,49 @@ describe('the handlers', () => {
       locale: 'pt-BR',
       templates: ['promo'],
     });
+  });
+});
+
+describe('the tab a message is about (E9.11)', () => {
+  it('resolves the preview against the folder of the tab the request names', async () => {
+    const injected = dependencies();
+    const handlers = createHandlers(injected);
+
+    await handlers['brief:preview']({ requestId: 1, documentId: 'document-1', brief: '::a' });
+    await handlers['brief:preview']({ requestId: 2, documentId: 'document-2', brief: '::a' });
+
+    // The whole reason the id travels on this channel: two tabs, two folders, and the
+    // answer must not depend on which one happens to be in front when the compile lands.
+    expect(injected.preview.folders).toEqual(['/briefs', undefined]);
+  });
+
+  it('tells the service when a tab is gone', async () => {
+    const injected = dependencies();
+    const handlers = createHandlers(injected);
+
+    expect(await handlers['file:close']({ documentId: 'document-7' })).toEqual({});
+    expect(injected.documents.closed).toEqual(['document-7']);
+  });
+
+  it('passes a confirmation straight through, strings and all', async () => {
+    const asked: unknown[] = [];
+    const handlers = createHandlers({
+      ...dependencies(),
+      confirm: (question) => {
+        asked.push(question);
+        return Promise.resolve(false);
+      },
+    });
+
+    const question = {
+      message: 'Fechar sem salvar?',
+      detail: 'promo.brief',
+      confirm: 'Fechar sem salvar',
+      cancel: 'Cancelar',
+    };
+    expect(await handlers['dialog:confirm'](question)).toEqual({ confirmed: false });
+    // Main writes none of these: the window owns every string a person reads.
+    expect(asked).toEqual([question]);
   });
 });
 
