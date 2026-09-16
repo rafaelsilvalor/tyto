@@ -116,6 +116,46 @@ export interface Catalogue {
   readonly 'panel.preview': string;
   readonly 'panel.problems': string;
 
+  /**
+   * The find-and-replace panel (E8.5), which is CodeMirror's own DOM.
+   *
+   * These are the only strings in the catalogue that never reach the screen through this
+   * app's markup. `@codemirror/search` renders all seventeen through `EditorState.phrases`,
+   * and `@tyto/editor` takes them as an option — so the words are still the catalogue's and
+   * the panel is still CodeMirror's. `src/renderer/search-phrases.ts` is the mapping, and
+   * `packages/editor/src/search.test.ts` is what holds the panel to a locale, because
+   * `e2e/window.desktop.test.ts` counts `[data-i18n]` elements and cannot see any of them.
+   *
+   * The last four are not on the panel: two are read out when the selection moves to a
+   * match, and the two with `$` are announced after a replace — the `$` is CodeMirror's own
+   * placeholder for the line number or the count, and has to survive translation.
+   */
+  readonly 'search.find': string;
+  readonly 'search.replace': string;
+  readonly 'search.next': string;
+  readonly 'search.previous': string;
+  readonly 'search.all': string;
+  readonly 'search.matchCase': string;
+  readonly 'search.regexp': string;
+  readonly 'search.byWord': string;
+  readonly 'search.replaceOne': string;
+  readonly 'search.replaceAll': string;
+  readonly 'search.close': string;
+  readonly 'search.gotoLine': string;
+  readonly 'search.go': string;
+  readonly 'search.currentMatch': string;
+  readonly 'search.onLine': string;
+  readonly 'search.replacedOnLine': string;
+  readonly 'search.replacedCount': string;
+
+  /** The six commands the search panel brings, for the command bar. */
+  readonly 'command.editor.find': string;
+  readonly 'command.editor.findNext': string;
+  readonly 'command.editor.findPrevious': string;
+  readonly 'command.editor.replaceNext': string;
+  readonly 'command.editor.replaceAll': string;
+  readonly 'command.editor.gotoLine': string;
+
   readonly 'shell.language.label': string;
   readonly 'shell.about.version': string;
   readonly 'shell.about.platform': string;
@@ -180,6 +220,29 @@ export const CATALOGUE_KEYS = [
   'panel.editor',
   'panel.preview',
   'panel.problems',
+  'search.find',
+  'search.replace',
+  'search.next',
+  'search.previous',
+  'search.all',
+  'search.matchCase',
+  'search.regexp',
+  'search.byWord',
+  'search.replaceOne',
+  'search.replaceAll',
+  'search.close',
+  'search.gotoLine',
+  'search.go',
+  'search.currentMatch',
+  'search.onLine',
+  'search.replacedOnLine',
+  'search.replacedCount',
+  'command.editor.find',
+  'command.editor.findNext',
+  'command.editor.findPrevious',
+  'command.editor.replaceNext',
+  'command.editor.replaceAll',
+  'command.editor.gotoLine',
   'shell.language.label',
   'shell.about.version',
   'shell.about.platform',
