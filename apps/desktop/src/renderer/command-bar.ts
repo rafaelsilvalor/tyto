@@ -228,10 +228,10 @@ export class CommandBar extends LitElement {
           ? html`<p class="command-bar__empty">${say('command.bar.empty')}</p>`
           : html`<ul class="command-bar__list" id="command-bar-list" role="listbox">
               ${repeat(
-              visible,
-              (entry) => entry.id,
-              (entry, index) => this.option(entry, index),
-            )}
+                visible,
+                (entry) => entry.id,
+                (entry, index) => this.option(entry, index),
+              )}
             </ul>`
       }
     </div>`;
