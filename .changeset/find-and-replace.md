@@ -1,6 +1,5 @@
 ---
 '@tyto/editor': minor
-'@tyto/desktop': minor
 ---
 
 TYTO-109 — find and replace, in the window's own language
