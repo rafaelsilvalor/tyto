@@ -4,13 +4,13 @@ import {
   type CompletionResult,
   autocompletion,
 } from '@codemirror/autocomplete';
-import { syntaxTree } from '@codemirror/language';
 import { type Extension } from '@codemirror/state';
 import { type SyntaxNode } from '@lezer/common';
 import { type TemplateManifest } from '@tyto/core';
 
 import { type BriefAnalysis, briefAnalysisField } from './analysis.js';
 import { briefLanguage } from './brief-language.js';
+import { treeAt } from './syntax.js';
 
 /**
  * Completion driven by the active template's manifest, positioned by the syntax tree.
@@ -22,7 +22,7 @@ import { briefLanguage } from './brief-language.js';
  * through the analysis field that `briefLint` publishes — the same pass that produced the
  * squiggles — so the two can never disagree about which template is active.
  *
- * *Where* the cursor is comes out of `syntaxTree(state).resolveInner(pos, -1)`: the tree
+ * *Where* the cursor is comes out of `treeAt(state, pos).resolveInner(pos, -1)`: the tree
  * `@tyto/brief-lang` builds and `parseBrief` reads. It used to come out of a regular
  * expression over the text before the cursor, which was a second reader of a syntax this
  * package already ships a parser for (TYTO-93). The node the cursor resolves to *is* the
@@ -286,7 +286,7 @@ export function completeBrief(context: CompletionContext): CompletionResult | nu
   const analysis = context.state.field(briefAnalysisField, false);
   if (analysis === undefined) return null;
 
-  const node = syntaxTree(context.state).resolveInner(context.pos, -1);
+  const node = treeAt(context.state, context.pos).resolveInner(context.pos, -1);
 
   return inFrontmatter(node)
     ? completeFrontmatter(context, analysis)
