@@ -65,9 +65,16 @@ jobs:
         with:
           path: ~/.cache/electron
           key: electron-${{ runner.os }}-${{ steps.electron.outputs.version }}
-      # electron-builder's own downloads, which only `test:package` pays for: the Electron
-      # zip it repacks, plus `app-builder` and the AppImage runtime. A separate key because
-      # it moves with electron-builder rather than with Electron.
+      # **A red job caches nothing.** `actions/cache` declares `post-if: success()`, so the
+      # save step is skipped when anything before it failed — the first run here downloaded
+      # Electron, went red on one test, and left the cache empty. That is the right default
+      # (a cache written from a broken run is a broken cache) and it means the first *green*
+      # run is the one that pays the download forward.
+      #
+      # electron-builder's own downloads, which only `test:package` pays for: `app-builder`
+      # and the AppImage runtime. Not the Electron zip — that comes out of `~/.cache/electron`
+      # above, which is why the packaging suite costs 6 s here and a minute on a cold machine.
+      # A separate key because it moves with electron-builder rather than with Electron.
       - uses: actions/cache@v4
         with:
           path: ~/.cache/electron-builder
@@ -87,16 +94,21 @@ jobs:
       # `dist/`, and the filtered form runs the package's script and nothing before it.
       - run: pnpm build
 
-      # ~2 min 40 s and ~1 min 15 s respectively, measured on a maintainer's machine with
-      # both caches warm (TYTO-111). The CI figure is whatever this job reports; it is
-      # recorded on the card rather than guessed at here.
+      # The whole job is 3 min 41 s with nothing cached, of which the Electron download is
+      # 56 s and `test:package` is 6.4 s — measured on this workflow's first run, not
+      # estimated. `test:package` is that cheap because `electron-builder` repacks the zip
+      # out of `~/.cache/electron`, which the step above has just filled: the two suites
+      # share a download rather than each paying for one.
       - run: xvfb-run -a pnpm --filter @tyto/desktop test:desktop
       # `!cancelled()` rather than nothing, so a red `test:desktop` does not hide whether
       # the package is also broken. They answer different questions and one run should
       # answer both.
       - if: ${{ !cancelled() }}
         run: xvfb-run -a pnpm --filter @tyto/desktop test:package
-
-      - uses: actions/upload-artifact@v7
-        if: failure()
-        with: { name: desktop-e2e-results, path: '**/test-results/**' }
+      #
+      # No artifact upload. `ci.yml` and `visual.yml` each have one because they produce a
+      # file worth keeping — a Playwright report, a pixel diff. These two suites write
+      # nothing to disk: everything they found is in the log above, and a step pointed at
+      # `**/test-results/**` reports `No files were found with the provided path` on every
+      # red run, which is a warning that reads like a second failure. Measured on the first
+      # run rather than assumed.
