@@ -65,20 +65,19 @@ jobs:
         with:
           path: ~/.cache/electron
           key: electron-${{ runner.os }}-${{ steps.electron.outputs.version }}
-      # **A red job caches nothing.** `actions/cache` declares `post-if: success()`, so the
-      # save step is skipped when anything before it failed — the first run here downloaded
-      # Electron, went red on one test, and left the cache empty. That is the right default
-      # (a cache written from a broken run is a broken cache) and it means the first *green*
-      # run is the one that pays the download forward.
+      # **One cache and not two, which took a run to find out.** A second entry for
+      # `~/.cache/electron-builder` looked obviously right and cached nothing: electron-builder
+      # repacks the zip out of `~/.cache/electron` — the one above, which `test:desktop` has
+      # just filled — and the folder it was supposedly caching never comes into existence.
+      # What that step actually produced was one line of `Path Validation Error: Path(s)
+      # specified in the action for caching do(es) not exist` on every run. It is the reason
+      # `test:package` costs 6 s here against ~70 s on a machine that downloads its own.
       #
-      # electron-builder's own downloads, which only `test:package` pays for: `app-builder`
-      # and the AppImage runtime. Not the Electron zip — that comes out of `~/.cache/electron`
-      # above, which is why the packaging suite costs 6 s here and a minute on a cold machine.
-      # A separate key because it moves with electron-builder rather than with Electron.
-      - uses: actions/cache@v4
-        with:
-          path: ~/.cache/electron-builder
-          key: electron-builder-${{ runner.os }}-${{ hashFiles('pnpm-lock.yaml') }}
+      # **A red job caches nothing.** `actions/cache` declares `post-if: success()`, so the
+      # save step is skipped when anything before it failed — this workflow's first run
+      # downloaded Electron, went red on one test, and left the cache empty. That is the
+      # right default (a cache written from a broken run is a broken cache) and it means the
+      # first *green* run is the one that pays the download forward.
 
       # Chromium's shared libraries, which Electron is. `install-deps` and not
       # `install --with-deps`: this needs the system packages and **not** the browser —
