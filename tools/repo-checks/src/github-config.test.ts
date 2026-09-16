@@ -319,6 +319,69 @@ describe('workflows', () => {
   });
 });
 
+/**
+ * The desktop end-to-end suites, and whether anything runs them.
+ *
+ * They are reachable only through their own scripts: `apps/desktop`'s `test` script — the
+ * one `turbo test` calls, and therefore the one `ci.yml` calls — points at
+ * `vitest.config.ts`, whose `include` is `shared/**` and `src/**`. The `e2e/` folder is
+ * `vitest.desktop.config.ts`'s and `vitest.package.config.ts`'s. So 71 tests sat outside
+ * every workflow for as long as the app existed, and nothing said so: `ci.yml` was green,
+ * the scripts were in `package.json`, and `--passWithNoTests` meant the gap looked like a
+ * pass (TYTO-111).
+ *
+ * That is a gap no failing test can announce, because the tests that would fail are the
+ * ones not being run. It is announced here instead.
+ */
+describe('desktop end-to-end suites', () => {
+  const E2E_SCRIPTS = ['test:desktop', 'test:package'] as const;
+
+  /** Workflow files with a `run:` step invoking `script`, read from the parsed YAML. */
+  const workflowsRunning = (script: string) =>
+    workflowFiles.filter((file) =>
+      Object.values(readYaml<Workflow>(`${WORKFLOWS_DIR}/${file}`).jobs ?? {}).some((job) =>
+        (job.steps ?? []).some((step) => step.run?.includes(script) === true),
+      ),
+    );
+
+  it.each(E2E_SCRIPTS)('are still the scripts apps/desktop calls them, %s', (script) => {
+    const manifest = JSON.parse(readRepoFile('apps/desktop/package.json')) as {
+      scripts?: Record<string, string>;
+    };
+    expect(
+      Object.keys(manifest.scripts ?? {}),
+      'the pins below name a script that no longer exists, so they measure nothing',
+    ).toContain(script);
+  });
+
+  it.each(E2E_SCRIPTS)('are run by at least one workflow, %s', (script) => {
+    expect(
+      workflowsRunning(script),
+      `no workflow runs \`${script}\`; it runs on a maintainer's machine or nowhere`,
+    ).not.toHaveLength(0);
+  });
+
+  it.each(E2E_SCRIPTS)('are run before the merge and not only after it, %s', (script) => {
+    // The trigger is the decision TYTO-111 took, and it is one line away from being
+    // undone: moving this to `schedule` or to `push` alone would keep every assertion
+    // above green while putting the discovery back after the merge, which is what
+    // `desktop.yml` already costs this repository (TYTO-97).
+    const onPullRequest = workflowsRunning(script).filter((file) =>
+      triggersOf(readYaml<Workflow>(`${WORKFLOWS_DIR}/${file}`)).includes('pull_request'),
+    );
+    expect(
+      onPullRequest,
+      `\`${script}\` runs in a workflow, but none that a pull request fires`,
+    ).not.toHaveLength(0);
+  });
+
+  it('say no for a script nothing runs', () => {
+    // The three assertions above are only as good as their predicate, and a predicate that
+    // matched everything would read green on the very file that has the defect.
+    expect(workflowsRunning('test:a-script-no-workflow-runs')).toEqual([]);
+  });
+});
+
 describe('labeler', () => {
   type LabelerConfig = Record<string, { 'changed-files': { 'any-glob-to-any-file': unknown }[] }[]>;
 

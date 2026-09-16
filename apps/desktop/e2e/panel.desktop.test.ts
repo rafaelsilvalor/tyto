@@ -55,11 +55,29 @@ const editorScrollTop = async (): Promise<number> =>
 const activeLine = async (): Promise<string> =>
   page.evaluate(() => document.querySelector('#editor .cm-activeLine')?.textContent ?? '');
 
+/**
+ * Scrolls the editor to the top and waits until it is still there.
+ *
+ * One `scrollTo` is not enough, and the 200ms pause that used to follow it was measuring
+ * nothing. `type()` leaves the cursor at the end of a buffer taller than the pane, and
+ * CodeMirror's `scrollIntoView` lands on its next measuring pass rather than inside the
+ * dispatch — so a scroll issued before that pass is simply undone by it, and the test's
+ * own `expect(…).toBe(0)` read 2232 the first time this suite ran on a slower machine
+ * (TYTO-111, `desktop-e2e.yml`'s first run). The re-issue inside the predicate is what
+ * makes the loser of that race the loop rather than the assertion.
+ */
 const scrollEditorToTop = async (): Promise<void> => {
-  await page.evaluate(() => {
-    document.querySelector('#editor .cm-scroller')?.scrollTo(0, 0);
-  });
-  await page.waitForTimeout(200);
+  await page.waitForFunction(
+    () => {
+      const scroller = document.querySelector('#editor .cm-scroller');
+      if (scroller === null) return false;
+      if (scroller.scrollTop === 0) return true;
+      scroller.scrollTo(0, 0);
+      return false;
+    },
+    undefined,
+    { timeout: 5000 },
+  );
 };
 
 /**

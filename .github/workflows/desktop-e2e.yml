@@ -1,0 +1,114 @@
+name: desktop-e2e
+# The two suites that launch a real Electron. Until TYTO-111 they ran in **no workflow at
+# all**: `ci.yml` runs `pnpm turbo … test`, and `apps/desktop`'s `test` script points at
+# `vitest.config.ts`, whose `include` is `shared/**` and `src/**` — the `e2e/` folder is
+# reached only by `test:desktop` and `test:package`, and neither was in a workflow. So 71
+# tests ran on a maintainer's machine or nowhere, including the three `webPreferences`
+# flags ADR 0001 names and the packaging failure that opens no window at all (TYTO-15).
+#
+# `docs/architecture.md` is right that the suites do not belong in `pnpm check` — they
+# download a ~246 MB Electron and open a window. That is the reason they are here, in a
+# workflow of their own, rather than the reason they are nowhere.
+#
+# **Why this trigger, and what the other two would have cost.** A nightly (or push-only)
+# schedule keeps every PR fast and finds a break within a day — but a day after it landed
+# on `main`, which is the thing this repository already has too much of: `desktop.yml`
+# runs on no pull request and that is exactly how the tag-prefix defect landed green
+# (TYTO-97). Running them inside `desktop.yml`, before packaging, is cheapest in minutes
+# and latest in discovery: a tag is pushed to release, not to find out. Running them here,
+# path-filtered on `apps/desktop/**`, is the only shape that reports before the merge, and
+# it costs the Electron download on desktop PRs only — 3 min 13 s a run, whole (see below:
+# caching that download was tried and measured, and bought nothing).
+#
+# **The `push` trigger is not a duplicate of the `pull_request` one, and the asymmetry is
+# deliberate.** The path filter is what keeps this off unrelated PRs, and it is also this
+# workflow's blind spot: the app bundles nine workspace packages, so a change in
+# `packages/core` can break the window without touching a filtered path. The push side
+# carries no filter for that reason — anything that reaches `main` is checked, whatever it
+# touched.
+#
+# **Not a required status check on `main`**, for the reason `docs/git-workflow.md` gives
+# about `visual.yml`: a path-filtered workflow reports on most PRs never, and a required
+# context that never reports leaves them pending for good. What that costs is real and is
+# worth naming — a red run here does not block the merge button; it is visible on the PR
+# and somebody has to look. Making it required means giving it a second, filter-less job
+# that reports green trivially, which is a decision this card did not take.
+on:
+  pull_request:
+    paths:
+      - 'apps/desktop/**'
+      - '.github/workflows/desktop-e2e.yml'
+  push: { branches: [main] }
+concurrency: { group: 'desktop-e2e-${{ github.ref }}', cancel-in-progress: true }
+jobs:
+  desktop:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: pnpm/action-setup@v6
+      - uses: actions/setup-node@v7
+        with: { node-version: 22, cache: pnpm }
+
+      - run: pnpm install --frozen-lockfile
+
+      # **There is no Electron cache here, and that is a measurement rather than an
+      # omission.** The card asked for one. It was built — `actions/cache` on
+      # `~/.cache/electron`, keyed on the Electron version read off the installed package —
+      # run cold and then run warm, and the two runs are the same job to within noise:
+      #
+      #     cold (`Cache not found for input keys: electron-Linux-44.3.0`)
+      #       e2e/tabs.desktop.test.ts, the file that pays for the download … 57.6 s
+      #       job                                                               3 min 34 s
+      #     warm (`Cache restored from key: electron-Linux-44.3.0`, 116.85 MiB)
+      #       e2e/tabs.desktop.test.ts                                        … 58.2 s
+      #       job                                                               3 min 31 s
+      #
+      # The premise was that a ~117 MB download is worth avoiding. On this runner it is not
+      # one: Electron's CDN and GitHub's cache are the same few seconds apart, and the 58 s
+      # is the 17 tests in that file, not the fetch. So the step bought nothing measurable
+      # and spent 116.85 MiB of a 10 GB repository quota that evicts by least-recent-use —
+      # against the pnpm store, which does save real time.
+      #
+      # Two things learned on the way that would otherwise have to be learned again. A
+      # second entry for `~/.cache/electron-builder` cached nothing at all and said so once
+      # per run (`Path Validation Error: Path(s) specified in the action for caching do(es)
+      # not exist`): electron-builder repacks the zip out of `~/.cache/electron`, which is
+      # why `test:package` costs 6 s here against ~70 s on a machine that fetches its own.
+      # And `actions/cache` declares `post-if: success()`, so a red job saves nothing — the
+      # first green run is always the one that would pay a download forward.
+      #
+      # Reinstating it is `actions/cache@v4` and two lines. Do that against a number, not
+      # against the intuition that a big download must be expensive.
+
+      # Chromium's shared libraries, which Electron is. `install-deps` and not
+      # `install --with-deps`: this needs the system packages and **not** the browser —
+      # `_electron.launch` runs the Electron in `node_modules`, so a downloaded Chromium
+      # would be ~170 MB nothing opens. Xvfb on top, because `show: false` is not headless
+      # on Linux: Electron still opens a display connection at startup and dies with
+      # `Missing X server or $DISPLAY` without one.
+      - run: pnpm exec playwright install-deps chromium
+      - run: sudo apt-get install -y --no-install-recommends xvfb
+
+      # `pnpm build`, not `pnpm --filter @tyto/desktop build` — the same rule `desktop.yml`
+      # carries and for the same reason: on a fresh checkout the workspace packages have no
+      # `dist/`, and the filtered form runs the package's script and nothing before it.
+      - run: pnpm build
+
+      # **3 min 13 s for the job, and that is the number this card records as acceptable.**
+      # `test:desktop` is 2 min 17 s of it and `test:package` 6.4 s — measured on this
+      # workflow's own runs, not estimated. `test:package` is that cheap because
+      # `electron-builder` repacks the Electron `test:desktop` has already fetched, so the
+      # two suites share one download whatever caching is or is not in front of them.
+      - run: xvfb-run -a pnpm --filter @tyto/desktop test:desktop
+      # `!cancelled()` rather than nothing, so a red `test:desktop` does not hide whether
+      # the package is also broken. They answer different questions and one run should
+      # answer both.
+      - if: ${{ !cancelled() }}
+        run: xvfb-run -a pnpm --filter @tyto/desktop test:package
+      #
+      # No artifact upload. `ci.yml` and `visual.yml` each have one because they produce a
+      # file worth keeping — a Playwright report, a pixel diff. These two suites write
+      # nothing to disk: everything they found is in the log above, and a step pointed at
+      # `**/test-results/**` reports `No files were found with the provided path` on every
+      # red run, which is a warning that reads like a second failure. Measured on the first
+      # run rather than assumed.

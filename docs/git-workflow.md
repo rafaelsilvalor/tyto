@@ -72,20 +72,25 @@ The CLI's own major renamed a command: `changeset tag` is `changeset git-tag`. T
 
 ## Workflows (`.github/workflows/`)
 
-| File             | Trigger                                  | Does                                                                           |
-| ---------------- | ---------------------------------------- | ------------------------------------------------------------------------------ |
-| `ci.yml`         | PR, push to main                         | install (pnpm cache) → typecheck → lint → test → build. Turborepo remote cache |
-| `visual.yml`     | PR touching export/raster/templates/core | Playwright + `test:visual`; uploads diffs as artifact on failure               |
-| `commitlint.yml` | PR                                       | validates PR title and commits                                                 |
-| `release.yml`    | push to main                             | Changesets → version PR → tags                                                 |
-| `desktop.yml`    | tag `desktop-v*`                         | tag/version guard → OS matrix → electron-builder → GitHub Release              |
-| `labeler.yml`    | PR (`pull_request_target`)               | applies `pkg:*`/`app:*`/`docs`/`repo` labels from `.github/labeler.yml`        |
+| File              | Trigger                                     | Does                                                                           |
+| ----------------- | ------------------------------------------- | ------------------------------------------------------------------------------ |
+| `ci.yml`          | PR, push to main                            | install (pnpm cache) → typecheck → lint → test → build. Turborepo remote cache |
+| `visual.yml`      | PR touching export/raster/templates/core    | Playwright + `test:visual`; uploads diffs as artifact on failure               |
+| `desktop-e2e.yml` | PR touching `apps/desktop/**`, push to main | Xvfb + `test:desktop` and `test:package`, 3 min 13 s, no Electron cache        |
+| `commitlint.yml`  | PR                                          | validates PR title and commits                                                 |
+| `release.yml`     | push to main                                | Changesets → version PR → tags                                                 |
+| `desktop.yml`     | tag `desktop-v*`                            | tag/version guard → OS matrix → electron-builder → GitHub Release              |
+| `labeler.yml`     | PR (`pull_request_target`)                  | applies `pkg:*`/`app:*`/`docs`/`repo` labels from `.github/labeler.yml`        |
 
 ## Protections and labels
 
 Branch protection on `main`: require PR, dismiss stale reviews, linear history, no force pushes, no deletions, and the rule applies to administrators too.
 
-Required status checks are stored as job names, not workflow names: `check` (from `ci.yml`) and `lint` (from `commitlint.yml`). `visual.yml` is deliberately not required — it is path-filtered, and a check that never reports on most PRs would leave them permanently pending. Renaming either job changes the required context, so `tools/repo-checks/src/github-config.test.ts` fails when the names drift.
+Required status checks are stored as job names, not workflow names: `check` (from `ci.yml`) and `lint` (from `commitlint.yml`). `visual.yml` and `desktop-e2e.yml` are deliberately not required — both are path-filtered, and a check that never reports on most PRs would leave them permanently pending. Renaming either required job changes the required context, so `tools/repo-checks/src/github-config.test.ts` fails when the names drift.
+
+**The Electron download is not cached, and the cache is what measured that.** TYTO-111 built one — `actions/cache` on `~/.cache/electron`, keyed on the Electron version — and then ran the job cold and warm: `e2e/tabs.desktop.test.ts`, the file that pays for the download, took 57.6 s on the cold run and 58.2 s on the one that restored 116.85 MiB; the jobs were 3 min 34 s and 3 min 31 s. The 58 s is the 17 tests in that file, not the fetch. So the step went out, and reinstating it is two lines whenever somebody has a number that wants it. A companion entry for `~/.cache/electron-builder` never cached a byte at all — electron-builder repacks the zip out of `~/.cache/electron`, which is also why `test:package` costs 6 s in CI against ~70 s on a machine that fetches its own.
+
+**What a non-required check costs, said once rather than implied twice.** `desktop-e2e` reports on every PR that touches `apps/desktop/**` and goes red where the suite goes red, but the merge button does not read it. Somebody has to look. The alternative is a second, filter-less job that reports green trivially so the required context always exists; that is a real option and it is not the one TYTO-111 took, because a green-by-construction context is a check whose name lies about what it measured.
 
 Required approvals are **0** while the project has one maintainer. Requiring one, with administrators included in the rule, would leave nobody able to merge: GitHub does not let an author approve their own PR. It goes to 1 the day a second maintainer joins.
 
