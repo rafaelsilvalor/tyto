@@ -44,6 +44,7 @@ import {
   documentOf,
   isDisposable,
   newDocument,
+  releaseDocument,
   selectDocument,
   stepDocument,
   updateDocument,
@@ -467,15 +468,15 @@ const registry: CommandRegistry = createDesktopRegistry({
       }));
 
       // A save-as onto a file another tab had open: main gave the path to this tab and took
-      // it off that one, and the strip has to say so (TYTO-104). The other tab keeps every
-      // character it had — what it loses is its name and its clean marker, because its text
-      // is now in no file and the next save there has to ask where to put it.
+      // it off that one, and the strip has to say so (TYTO-104). What that costs the other
+      // tab is `releaseDocument`'s to say.
+      //
+      // The `!== documentId` guard is defence and not logic: main already answers with the
+      // tab that let go, never with the one that asked. Were it ever to answer with this
+      // one, the two lines above would name the tab and this one would immediately take the
+      // name back off it — a bug that looks like a repaint.
       if (answer.released !== null && answer.released !== documentId) {
-        workspace = updateDocument(workspace, answer.released, (document_) => ({
-          ...document_,
-          name: undefined,
-          dirty: true,
-        }));
+        workspace = releaseDocument(workspace, answer.released);
       }
 
       repaint();
