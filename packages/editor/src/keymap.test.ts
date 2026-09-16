@@ -10,6 +10,14 @@ import {
 } from './commands.js';
 import { createEditor, type EditorHandle } from './editor.js';
 import { EDITOR_RENDER, EDITOR_SAVE, defaultKeymapSet, vimKeymapSet } from './keymap.js';
+import {
+  EDITOR_FIND,
+  EDITOR_FIND_NEXT,
+  EDITOR_FIND_PREVIOUS,
+  EDITOR_GOTO_LINE,
+  EDITOR_REPLACE_ALL,
+  EDITOR_REPLACE_NEXT,
+} from './search.js';
 
 let handle: EditorHandle | undefined;
 
@@ -136,14 +144,37 @@ describe('the built-in sets', () => {
   const idsOf = (set: { bindings: readonly { command: string }[] }): string[] =>
     set.bindings.map((binding) => binding.command);
 
-  it('binds undo, redo, save and render in the default set', () => {
+  it('binds undo, redo, save, render and find in the default set', () => {
     expect(idsOf(defaultKeymapSet)).toEqual([
       EDITOR_UNDO,
       EDITOR_REDO,
       EDITOR_REDO,
       EDITOR_SAVE,
       EDITOR_RENDER,
+      EDITOR_FIND,
+      EDITOR_FIND_NEXT,
+      EDITOR_FIND_PREVIOUS,
+      EDITOR_GOTO_LINE,
     ]);
+  });
+
+  it('binds no key to either replace command, which is the list CodeMirror binds', () => {
+    // Not an omission: the panel has one opener and puts the replace fields inside it, so a
+    // second binding would be a second name for `Mod-f`. The two commands are reachable from
+    // the panel's buttons and from the command bar, and `bindingsOf` shows them with no
+    // keystroke rather than with an invented one (E8.5).
+    expect(idsOf(defaultKeymapSet)).not.toContain(EDITOR_REPLACE_NEXT);
+    expect(idsOf(defaultKeymapSet)).not.toContain(EDITOR_REPLACE_ALL);
+  });
+
+  it('leaves find to the vim engine in the vim set, the way it leaves undo', () => {
+    // `/`, `?`, `n` and `N` are vim's, and `@replit/codemirror-vim` drives the *same*
+    // `SearchQuery` state the panel does — so search is not missing in vim, it is spelled
+    // differently. What is missing is the panel and its toggles, and the command bar still
+    // reaches all six by id.
+    for (const id of [EDITOR_FIND, EDITOR_FIND_NEXT, EDITOR_GOTO_LINE]) {
+      expect(idsOf(vimKeymapSet), id).not.toContain(id);
+    }
   });
 
   it('leaves undo and redo to the engine in the vim set', () => {

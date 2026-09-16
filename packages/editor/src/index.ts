@@ -64,6 +64,18 @@ export {
   vimKeymapSet,
 } from './keymap.js';
 
+export {
+  type SearchPhraseKey,
+  type SearchPhrases,
+  EDITOR_FIND,
+  EDITOR_FIND_NEXT,
+  EDITOR_FIND_PREVIOUS,
+  EDITOR_GOTO_LINE,
+  EDITOR_REPLACE_ALL,
+  EDITOR_REPLACE_NEXT,
+  SEARCH_PHRASE_KEYS,
+} from './search.js';
+
 export { type VimExCommand, type VimModeOptions, defaultExCommands, vimMode } from './vim-mode.js';
 
 export { template, templateLanguage } from './template-language.js';

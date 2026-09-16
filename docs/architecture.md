@@ -35,7 +35,7 @@ packages/
   plugin-api     extension-point types, PluginHost, plugin manifest, permissions
   io             BriefSource/OutputSink ports; fs adapters (inbox/outbox); local watcher
   sources        (deferred, ADR 0011) jira/trello/notion/sheets/drive plugins
-  editor         CodeMirror 6: brief and template languages, vim, diagnostics, manifest-driven autocomplete
+  editor         CodeMirror 6: brief and template languages, vim, diagnostics, manifest-driven autocomplete, find/replace
 apps/
   cli            commander: render, watch, template new|check, plugin install|list
   desktop        electron-vite: main (pipeline, plugins, credentials) / preload / renderer (editor, preview, panels)
@@ -94,6 +94,20 @@ The menu is otherwise Electron's own roles — `editMenu` is what makes copy and
 **One workspace, two runtimes.** `apps/desktop` is the only package that is both, and the split is declared three times so that no one of them can be the only thing holding it: `eslint.config.js` lists `src/main` and `src/preload` as Node and `src/renderer` as DOM, `tsconfig.json` and `tsconfig.renderer.json` give each half only the libraries it may see, and `electron.vite.config.ts` builds them separately. `shared/` is the fourth category — linted as **pure**, because it is the one folder both halves import and neither may shape.
 
 **What crosses the bridge is declared once, in `apps/desktop/shared/ipc.ts`.** One table of channels, each with a Zod schema for the request and one for the response. Main registers its handlers by walking that table, so a channel with no handler is a type error rather than a call that hangs; the preload builds `window.tyto` from the same table, so the API the renderer programs against is the contract by construction. Both sides validate: main because it may not trust another process, the preload because it is the only place that can refuse before the message is sent, on the caller's own stack. `shared/i18n/` is the same idea for strings — one `Catalogue` type, so a locale missing a key does not compile.
+
+**`@tyto/editor` owns no words, with one exception it had to take** (E8.5). Every other
+user-facing string in that package is a label the desktop overrides at the point of display —
+`COMMAND_LABELS` maps `editor.undo` to a catalogue key, and the English in `commands.ts` is
+what a host with no catalogue falls back to. The find-and-replace panel cannot work that way:
+it is `@codemirror/search`'s own DOM and nothing outside reaches into it. CodeMirror's answer
+is the `EditorState.phrases` facet, and the measurement that made this safe is that **all
+seventeen of the panel's strings go through it** — checked against the installed package,
+because one literal rendered any other way would have meant writing a replacement panel. So
+`EditorOptions.searchPhrases` takes them, `src/renderer/search-phrases.ts` in the desktop maps
+each of CodeMirror's keys to a catalogue key, and the panel is translated rather than rebuilt.
+The strings are held in a state field reading a mutable holder rather than in a compartment,
+because `blank()` builds a document from the extension list `createEditor` captured once and a
+compartment's initial content would be the language the window opened in.
 
 **A diagnostic's `range` survives the whole pipeline; an artwork's has to be caught on the way past.** The problems panel (E9.3) lists what the stages said and puts the cursor on the span each one names, which costs nothing: a `Diagnostic` carries its `range` to the end. Selecting a slide scrolls the editor to the `::directive` that made it, and that number exists only in `resolve` — a `Scene` has no source position at all, so by the time a frame exists it is three stages gone. `brief:preview` therefore answers with an `artworks` list beside `frames`, built by zipping `scene.artworks` against `resolved.artworks` by position, which `compile` guarantees is one to one. The template picker is the same shape in reverse: it rewrites the frontmatter's `template:` line as an ordinary editor edit, so the preview, the panel and the undo history all follow the path typing already takes.
 

@@ -9,6 +9,14 @@ import {
   createCommandRegistry,
 } from './commands.js';
 import { createEditor, type EditorHandle } from './editor.js';
+import {
+  EDITOR_FIND,
+  EDITOR_FIND_NEXT,
+  EDITOR_FIND_PREVIOUS,
+  EDITOR_GOTO_LINE,
+  EDITOR_REPLACE_ALL,
+  EDITOR_REPLACE_NEXT,
+} from './search.js';
 
 /**
  * Driven through a real `EditorView`, because the claim being tested is about the order of
@@ -54,10 +62,18 @@ describe('createCommandRegistry', () => {
     registry.register({ id: 'a.two', run: () => {} });
 
     expect(registry.get('a.one')?.id).toBe('a.one');
-    // Undo and redo are registered by the registry itself and come first.
+    // Undo, redo and the six search commands are registered by the registry itself and come
+    // first. The order is the order a palette shows, so it is asserted whole rather than by
+    // containment: a command that quietly moved to the end would still pass a `toContain`.
     expect(registry.list().map((command) => command.id)).toEqual([
       EDITOR_UNDO,
       EDITOR_REDO,
+      EDITOR_FIND,
+      EDITOR_FIND_NEXT,
+      EDITOR_FIND_PREVIOUS,
+      EDITOR_REPLACE_NEXT,
+      EDITOR_REPLACE_ALL,
+      EDITOR_GOTO_LINE,
       'a.one',
       'a.two',
     ]);

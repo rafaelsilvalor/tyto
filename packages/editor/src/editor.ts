@@ -20,6 +20,7 @@ import {
 
 import { brief } from './brief-language.js';
 import { type CommandRegistry, commandRegistryFacet } from './commands.js';
+import { type SearchPhrases, searchSupport, setSearchPhrases } from './search.js';
 import { type EditorKeymap, defaultKeymapSet, keymapExtension } from './keymap.js';
 import { type ThemeName, themes } from './theme.js';
 import { template } from './template-language.js';
@@ -86,6 +87,14 @@ export interface EditorOptions {
    * opening another file.
    */
   readonly language?: LanguageName;
+  /**
+   * What the find-and-replace panel says, keyed by `SEARCH_PHRASE_KEYS`.
+   *
+   * The one place this package takes user-facing words, and it takes them because it cannot
+   * translate them at the point of display the way `commands.ts` does for a label: the panel
+   * is CodeMirror's own DOM. A key left out shows CodeMirror's English rather than nothing.
+   */
+  readonly searchPhrases?: SearchPhrases;
 }
 
 /**
@@ -131,6 +140,14 @@ export interface EditorHandle {
   /** Returns the function that stops the listener. */
   onChange(listener: (value: string) => void): () => void;
   setTheme(theme: ThemeName): void;
+  /**
+   * Changes the search panel's language, now and for every document opened afterwards.
+   *
+   * A host that switches locale at runtime calls this; one that does not never has to. It is
+   * a method rather than a re-creation because `createEditor` is called once in a window with
+   * tabs, and rebuilding the editor to change a word would throw away every buffer in it.
+   */
+  setSearchPhrases(phrases: SearchPhrases): void;
   /** `false` when no registry was given, or when it has no command with that id. */
   runCommand(id: string): boolean;
   /**
@@ -148,10 +165,14 @@ export interface EditorHandle {
 /**
  * What every brief editor gets before the caller's own extensions.
  *
- * Deliberately not CodeMirror's `basicSetup`: that bundle pulls in autocompletion, lint and
- * search, and the first two are E8.2's to configure against a template manifest. What is
- * here is the part an editor is unusable without — a gutter, undo, a cursor you can see,
- * and the keymap that drives them.
+ * Deliberately not CodeMirror's `basicSetup`: that bundle pulls in autocompletion and lint,
+ * which are E8.2's to configure against a template manifest. What is here is the part an
+ * editor is unusable without — a gutter, undo, a cursor you can see, and the keymap that
+ * drives them.
+ *
+ * Search *is* in, since E8.5, and it is not in this list: `searchSupport` goes beside the
+ * theme in the per-editor extensions because it needs the phrases this editor was given, and
+ * `baseExtensions` takes no arguments on purpose.
  *
  * `historyKeymap` stays even though E8.3 put a command registry in front of it. The two do
  * not fight: the registry's bindings are given higher precedence and hand the keystroke on
@@ -190,6 +211,17 @@ export function createEditor(parent: HTMLElement, options: EditorOptions = {}): 
    * construction rather than by the host remembering to turn one off.
    */
   const inputCompartment = new Compartment();
+
+  /**
+   * The phrases as a mutable holder rather than a value baked into the extension list.
+   *
+   * `blank()` builds a second state from the same `extensions` array, so anything captured
+   * there is captured at construction — which is the bug `themeCompartment` would have if
+   * the desktop ever switched theme with two tabs open. The field in `search.ts` reads this
+   * when a state is created, so a tab opened after a locale switch is born in the new
+   * language rather than the one the window started in.
+   */
+  let searchPhrases = options.searchPhrases ?? {};
   const keys = keymapExtension(options.keymap ?? defaultKeymapSet);
   let vimEnabled = options.vim ?? false;
 
@@ -226,6 +258,7 @@ export function createEditor(parent: HTMLElement, options: EditorOptions = {}): 
     // element so the caret and the input method never arrive in the first place.
     ...(readOnly ? [EditorState.readOnly.of(true), EditorView.editable.of(false)] : []),
     themeCompartment.of(themes[options.theme ?? 'light']),
+    searchSupport(() => searchPhrases),
     languages[options.language ?? 'brief'](),
     ...baseExtensions(),
   ];
@@ -247,8 +280,10 @@ export function createEditor(parent: HTMLElement, options: EditorOptions = {}): 
       // undo stack, so undoing once in a fresh tab would paste the other document back in.
       view.setState(snapshot.state);
       // Dispatched after, because a scroll effect is a property of the view and the view
-      // has just been given a different state to measure.
-      view.dispatch({ effects: snapshot.scroll });
+      // has just been given a different state to measure. The phrases ride along: a snapshot
+      // carries the language it was taken in, so a tab that was away while the window
+      // switched would come back with the panel in the old one.
+      view.dispatch({ effects: [snapshot.scroll, setSearchPhrases.of(searchPhrases)] });
     },
 
     blank: (doc: string) => ({
@@ -272,6 +307,11 @@ export function createEditor(parent: HTMLElement, options: EditorOptions = {}): 
 
     setTheme: (theme: ThemeName) => {
       view.dispatch({ effects: themeCompartment.reconfigure(themes[theme]) });
+    },
+
+    setSearchPhrases: (phrases: SearchPhrases) => {
+      searchPhrases = phrases;
+      view.dispatch({ effects: setSearchPhrases.of(phrases) });
     },
 
     runCommand: (id: string) => options.commands?.run(id, { view }) ?? false,
