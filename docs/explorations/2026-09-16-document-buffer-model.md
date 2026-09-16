@@ -304,3 +304,63 @@ Only the three symptoms asked for, plus the decisions that happened to be checka
 grep. Not examined: whether `mirrors` and `subscribers` have any analogue today (they do
 not), the search decisions D9–D14 against any existing code (there is none — search does not
 exist in the app), and the cost of D4's LRU.
+
+---
+
+# When each decision is worth doing
+
+The fourteen are not one piece of work and should not arrive as one. They fall into five
+groups, and what separates them is **what each is waiting for** rather than how big it is.
+
+**One card exists, and only one: TYTO-109 for D8.** The rest wait for this note to be
+merged, because until then nothing in it is ratified and fourteen cards off a draft is how a
+board fills with work nobody agreed to.
+
+D8 is the exception for a reason that is worth stating, because it is the test the others
+fail: **it stands whether or not this note is accepted.** The gap it names is missing search,
+measured independently — `@codemirror/search` is in no `package.json` and nothing imports it
+— not a consequence of the buffer/window model. Reject the whole note and `Ctrl+F` still
+does nothing.
+
+| Group                 | Decisions           | Waiting for          | Why                                                                 |
+| --------------------- | ------------------- | -------------------- | ------------------------------------------------------------------- |
+| Already true          | D5                  | Nothing              | The compiler does not use `syntaxTree`. This note is the guard rail |
+| Cheap and independent | D8                  | Nothing              | See below                                                           |
+| The refactor          | D1, D3, D7, then D2 | A card that needs it | On its own it delivers nothing a person can see                     |
+| Performance           | D4, D6              | A measurement        | Nothing says the pipeline costs anything today                      |
+| A feature of its own  | D9–D14              | D1 first             | Cross-file search and replace is epic-sized                         |
+
+## D8 first (TYTO-109), and the reason is not importance
+
+**There is no find-in-file in Tyto at all.** `@codemirror/search` is in no `package.json` and
+nothing in `packages/editor` imports it, so `Ctrl+F` in the editor does nothing today. It is
+the only decision in the note that waits for nothing: no measurement, no prior refactor, no
+decision anybody has to make first. Everything else is blocked on something.
+
+## The refactor should be paid for by a feature
+
+D1 changes who owns the content, D3 falls out of it, D7 is already half-true, and D2 — the
+one a person would actually notice, two briefs side by side — cannot happen without D1.
+
+**The card most likely to want it is TYTO-44 (E9.5, "Edit template mode with multi-format
+preview").** Its acceptance criterion is _saving a template recompiles the open briefs_:
+several briefs open, plus a template open in a different language, with one rendering while
+the other is edited. That is the buffer/window distinction arriving whether or not anybody
+planned it.
+
+**Not a certainty.** E9.5 can be built by pushing the template into the current tab model and
+paying for the refactor later, larger.
+
+**The cost of waiting is countable rather than felt.** Six call sites read the content off
+the view today; the audit lists them. Counting them again in three cards' time says whether
+delaying was expensive — if it is ten, it was.
+
+## The performance group needs a number it does not have
+
+ADR 0024 re-measured the window with the real panels and found the repaint costs invisible at
+this size. Nothing has measured the _pipeline_ under a large brief, and D4 and D6 are both
+answers to a cost nobody has weighed.
+
+The trigger is the ordinary one: typing lags on a real brief. Until then, adding a cache is
+buying a fix for a problem that has not been shown to exist — and the audit's correction
+above shows the cheap version of D4 is not as cheap as it looked.
