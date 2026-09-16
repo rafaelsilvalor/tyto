@@ -61,6 +61,7 @@ import {
   withPanelOpen,
   withPanelSize,
 } from '../../shared/layout.js';
+import { searchPhrasesFor } from './search-phrases.js';
 import { fillLocalePicker, localeFromPicker, paint } from './shell.js';
 import {
   type PreviewElements,
@@ -433,11 +434,10 @@ const registry: CommandRegistry = createDesktopRegistry({
   },
 
   toggleLocale: () => {
-    state.locale = state.locale === 'pt-BR' ? 'en' : 'pt-BR';
-    // The picker is a view of the locale and not its owner, so it is written rather than
-    // read here; leaving it stale would make the footer disagree with the window.
-    if (elements.locale !== null) fillLocalePicker(elements.locale, state.locale);
-    repaint();
+    // The picker is a view of the locale and not its owner, so `applyLocale` writes it
+    // rather than reading it; leaving it stale would make the footer disagree with the
+    // window.
+    applyLocale(state.locale === 'pt-BR' ? 'en' : 'pt-BR');
   },
 
   openDocument: () => {
@@ -871,6 +871,22 @@ async function changeLayout(next: Layout): Promise<void> {
   await applyLayout(true);
 }
 
+/**
+ * Changes the window's language, which is two things and not one.
+ *
+ * Everything this app draws itself is re-read from the catalogue by `repaint`. The search
+ * panel is not: it is CodeMirror's DOM and its words arrive through `EditorState.phrases`,
+ * so the editor has to be told separately (E8.5). Both callers go through here rather than
+ * setting `state.locale` and remembering — forgetting the second half would leave the panel
+ * in whatever language the window opened in, and nothing on screen would say why.
+ */
+function applyLocale(next: Locale): void {
+  state.locale = next;
+  if (elements.locale !== null) fillLocalePicker(elements.locale, state.locale);
+  editor?.setSearchPhrases(searchPhrasesFor(state.locale));
+  repaint();
+}
+
 function repaint(): void {
   const current = active();
   paint(document, {
@@ -1126,8 +1142,7 @@ async function load(): Promise<void> {
     const picker = elements.locale;
     fillLocalePicker(picker, state.locale);
     once(picker, 'change', () => {
-      state.locale = localeFromPicker(picker, state.locale);
-      repaint();
+      applyLocale(localeFromPicker(picker, state.locale));
     });
   }
 
@@ -1157,6 +1172,9 @@ async function load(): Promise<void> {
       // keys. Passed here rather than bound in a window listener so that the bar and the
       // editor read one table — `bindingsOf` is given this same set.
       keymap: keymapSetFor(false),
+      // The search panel's words, which are the catalogue's even though the panel is
+      // CodeMirror's. `applyLocale` is what keeps them current afterwards.
+      searchPhrases: searchPhrasesFor(state.locale),
     });
     // The bindings are read off the keymap set the editor is running, so the bar can only
     // be painted once there is an editor to ask.

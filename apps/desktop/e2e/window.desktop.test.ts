@@ -299,6 +299,39 @@ describe('the language picker', () => {
     'command.document.next',
     'command.document.previous',
     'command.document.select',
+    // E8.5: the find-and-replace panel is `@codemirror/search`'s own DOM, reached through
+    // `EditorState.phrases` rather than through this app's markup, and it is not in the
+    // document at all until somebody presses `Ctrl+F`. So none of its seventeen strings can
+    // ever be in this pass, and the six command labels are the bar's like the rest.
+    //
+    // **This is the largest single growth this list has had, and the seam it gives up is
+    // covered twice.** `src/renderer/search-phrases.test.ts` holds every one of the
+    // seventeen to having a catalogue entry that differs between the two languages, and
+    // `packages/editor/src/search.test.ts` mounts the real panel and reads the words back
+    // off it. Adding a key here without one of those is how a string goes quietly English.
+    'search.find',
+    'search.replace',
+    'search.next',
+    'search.previous',
+    'search.all',
+    'search.matchCase',
+    'search.regexp',
+    'search.byWord',
+    'search.replaceOne',
+    'search.replaceAll',
+    'search.close',
+    'search.gotoLine',
+    'search.go',
+    'search.currentMatch',
+    'search.onLine',
+    'search.replacedOnLine',
+    'search.replacedCount',
+    'command.editor.find',
+    'command.editor.findNext',
+    'command.editor.findPrevious',
+    'command.editor.replaceNext',
+    'command.editor.replaceAll',
+    'command.editor.gotoLine',
   ];
 
   it('paints every catalogue string on load, with none left blank', async () => {

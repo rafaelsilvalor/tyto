@@ -2,6 +2,7 @@ import { type Extension } from '@codemirror/state';
 import { type KeyBinding, keymap } from '@codemirror/view';
 
 import { EDITOR_REDO, EDITOR_UNDO, commandRegistryOf } from './commands.js';
+import { EDITOR_FIND, EDITOR_FIND_NEXT, EDITOR_FIND_PREVIOUS, EDITOR_GOTO_LINE } from './search.js';
 
 /**
  * A keymap is a list of bindings to command **ids**, not to functions.
@@ -68,6 +69,24 @@ export const defaultKeymapSet: EditorKeymap = {
     { key: 'Ctrl-Shift-z', command: EDITOR_REDO },
     { key: 'Mod-s', command: EDITOR_SAVE },
     { key: 'Mod-Enter', command: EDITOR_RENDER },
+    // Find and replace (E8.5). The keys are CodeMirror's own from `searchKeymap`, rebound
+    // through ids so the palette and the editor read one table — `Mod-Alt-g` for go-to-line
+    // included, odd as it looks, because changing it would make this repository's editor
+    // disagree with every other CodeMirror one for no reason.
+    //
+    // **Replace has no key, and that is the whole list CodeMirror binds.** Its panel has one
+    // opener and puts the replace fields inside it, so a second opener would be a second
+    // name for `Mod-f`; `replaceNext` and `replaceAll` are the panel's two buttons and the
+    // palette's two entries. Inventing a keystroke for them would be this card deciding
+    // something nobody asked about, and `bindingsOf` shows an entry with no key honestly.
+    //
+    // `Mod-Shift-g` is written out because a `CommandBinding` has no `shift`, where
+    // CodeMirror writes `{ key: 'Mod-g', shift: findPrevious }` — one binding there, two ids
+    // here, which is what having ids costs and buys.
+    { key: 'Mod-f', command: EDITOR_FIND },
+    { key: 'Mod-g', command: EDITOR_FIND_NEXT },
+    { key: 'Mod-Shift-g', command: EDITOR_FIND_PREVIOUS },
+    { key: 'Mod-Alt-g', command: EDITOR_GOTO_LINE },
   ],
 };
 
@@ -80,6 +99,19 @@ export const defaultKeymapSet: EditorKeymap = {
  *
  * `Mod-s` survives, because a person in vim mode still has the muscle memory, and because
  * losing it would make the mode a worse editor rather than a different one.
+ *
+ * **Find is absent for the same reason undo is, and search still works.** In vim, finding is
+ * `/`, `?`, `n` and `N`, and replacing is `:s` — the engine's to interpret, not a key to
+ * rebind. And it is not a separate implementation: `@replit/codemirror-vim` imports
+ * `SearchQuery` and `setSearchQuery` from `@codemirror/search` and drives the same query
+ * state the panel does, so a `/carrossel` typed in vim leaves `carrossel` in the field when
+ * `Mod-f` is pressed after switching the mode off. One copy of the package is what makes that
+ * true — two would be two `StateEffect` identities and two silently separate searches, which
+ * is why `@codemirror/search` is a direct dependency pinned to the version vim already
+ * resolved rather than a range.
+ *
+ * What a person in vim mode does *not* get is the panel, its six toggles and go-to-line by
+ * keystroke. The command bar still reaches all six, because it runs ids rather than keys.
  */
 export const vimKeymapSet: EditorKeymap = {
   id: 'vim',

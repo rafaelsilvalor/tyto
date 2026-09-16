@@ -2,6 +2,8 @@ import { redo as redoText, redoDepth, undo as undoText, undoDepth } from '@codem
 import { Facet, type Text } from '@codemirror/state';
 import { type EditorView } from '@codemirror/view';
 
+import { SEARCH_COMMANDS } from './search.js';
+
 /**
  * The Command pattern, as `docs/architecture.md` puts it in the editor: every action has an
  * id, keymaps map bindings to ids, and plugins will register their own through this same
@@ -179,6 +181,23 @@ export function createCommandRegistry(): CommandRegistry {
       registry.redo(context);
     },
   });
+
+  // Find, replace and go to line, from `search.ts`. They are here rather than left to the
+  // host because this package *can* run them — the commands are CodeMirror's — where
+  // `editor.save` genuinely cannot be. None declares an `undo`: `replaceAll` edits the
+  // document, and CodeMirror's history already owns text (see `EditorCommand.undo`).
+  for (const command of SEARCH_COMMANDS) {
+    registry.register({
+      id: command.id,
+      label: command.label,
+      // The boolean is dropped. CodeMirror reads `false` as "not my turn, let the keystroke
+      // travel", and a registry command is already past that decision — it was asked for by
+      // id. `replaceAll` with no query set does nothing, which is the honest answer.
+      run: (context) => {
+        command.run(context.view);
+      },
+    });
+  }
 
   return registry;
 }
