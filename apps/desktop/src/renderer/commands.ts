@@ -1,7 +1,13 @@
 import {
   type CommandRegistry,
   type EditorKeymap,
+  EDITOR_FIND,
+  EDITOR_FIND_NEXT,
+  EDITOR_FIND_PREVIOUS,
+  EDITOR_GOTO_LINE,
   EDITOR_REDO,
+  EDITOR_REPLACE_ALL,
+  EDITOR_REPLACE_NEXT,
   EDITOR_SAVE,
   EDITOR_UNDO,
   createCommandRegistry,
@@ -117,6 +123,15 @@ export const COMMAND_LABELS: Readonly<Record<string, CatalogueKey>> = {
   [DOCUMENT_CLOSE]: 'command.document.close',
   [DOCUMENT_NEXT]: 'command.document.next',
   [DOCUMENT_PREVIOUS]: 'command.document.previous',
+  // The six `@tyto/editor` brings with the search panel (E8.5). Their ids and their English
+  // labels are the editor's, the same as undo and redo above; what this table adds is the
+  // catalogue key, so the bar shows them in the window's language.
+  [EDITOR_FIND]: 'command.editor.find',
+  [EDITOR_FIND_NEXT]: 'command.editor.findNext',
+  [EDITOR_FIND_PREVIOUS]: 'command.editor.findPrevious',
+  [EDITOR_REPLACE_NEXT]: 'command.editor.replaceNext',
+  [EDITOR_REPLACE_ALL]: 'command.editor.replaceAll',
+  [EDITOR_GOTO_LINE]: 'command.editor.gotoLine',
 };
 
 /**
