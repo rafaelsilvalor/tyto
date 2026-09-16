@@ -88,8 +88,8 @@ export abstract class DockedPanel extends LitElement {
               title=${this.say('panel.close')}
               aria-label=${this.say('panel.close')}
               @click=${() => {
-              this.onClose(this.panelId);
-            }}
+                this.onClose(this.panelId);
+              }}
             >
               ×
             </button>`

@@ -333,16 +333,23 @@ describe('workflows', () => {
  * That is a gap no failing test can announce, because the tests that would fail are the
  * ones not being run. It is announced here instead.
  */
+/**
+ * Workflow files with a `run:` step invoking `script`, read from the parsed YAML.
+ *
+ * The one question a script in `package.json` cannot answer about itself: **is anything
+ * running it?** Two have turned out not to be — the desktop end-to-end suites (TYTO-111) and
+ * `format:check` (TYTO-0, below) — and neither failure was visible, because a script nobody
+ * calls is indistinguishable from a script that passes.
+ */
+const workflowsRunning = (script: string) =>
+  workflowFiles.filter((file) =>
+    Object.values(readYaml<Workflow>(`${WORKFLOWS_DIR}/${file}`).jobs ?? {}).some((job) =>
+      (job.steps ?? []).some((step) => step.run?.includes(script) === true),
+    ),
+  );
+
 describe('desktop end-to-end suites', () => {
   const E2E_SCRIPTS = ['test:desktop', 'test:package'] as const;
-
-  /** Workflow files with a `run:` step invoking `script`, read from the parsed YAML. */
-  const workflowsRunning = (script: string) =>
-    workflowFiles.filter((file) =>
-      Object.values(readYaml<Workflow>(`${WORKFLOWS_DIR}/${file}`).jobs ?? {}).some((job) =>
-        (job.steps ?? []).some((step) => step.run?.includes(script) === true),
-      ),
-    );
 
   it.each(E2E_SCRIPTS)('are still the scripts apps/desktop calls them, %s', (script) => {
     const manifest = JSON.parse(readRepoFile('apps/desktop/package.json')) as {
@@ -379,6 +386,70 @@ describe('desktop end-to-end suites', () => {
     // The three assertions above are only as good as their predicate, and a predicate that
     // matched everything would read green on the very file that has the defect.
     expect(workflowsRunning('test:a-script-no-workflow-runs')).toEqual([]);
+  });
+});
+
+/**
+ * Prettier, which was a script nothing called.
+ *
+ * `pnpm check` was `turbo run typecheck lint test` and `ci.yml` ran the same four tasks, so
+ * `format:check` existed in `package.json` and ran in no workflow and no local check. Three
+ * files had drifted on `main` by the time anybody looked, and the only reason anybody looked
+ * is that a `prettier --write` on a folder reformatted files a card had never touched.
+ *
+ * Same shape as the desktop suites above, same instrument.
+ */
+describe('formatting', () => {
+  it('is a script the root package still has', () => {
+    const manifest = JSON.parse(readRepoFile('package.json')) as {
+      scripts?: Record<string, string>;
+    };
+    expect(Object.keys(manifest.scripts ?? {})).toContain('format:check');
+  });
+
+  it('is part of `pnpm check`, so a person finds it before CI does', () => {
+    const manifest = JSON.parse(readRepoFile('package.json')) as {
+      scripts?: Record<string, string>;
+    };
+    expect(manifest.scripts?.check).toContain('format:check');
+  });
+
+  it('is run by a workflow, on a pull request', () => {
+    const running = workflowsRunning('format:check');
+    expect(running, 'no workflow runs `format:check`').not.toHaveLength(0);
+
+    const onPullRequest = running.filter((file) =>
+      triggersOf(readYaml<Workflow>(`${WORKFLOWS_DIR}/${file}`)).includes('pull_request'),
+    );
+    expect(onPullRequest, '`format:check` runs, but not before a merge').not.toHaveLength(0);
+  });
+});
+
+/**
+ * `changeset status`, which reads the files `release.yml` would version.
+ *
+ * `changesets.test.ts` holds the one failure that has actually happened — a file naming a
+ * private package beside a published one. This holds the *class*: the tool itself, run on
+ * every pull request, where `release.yml` runs only after the merge. Both exist because the
+ * two answer different questions, and the expensive one is "what else does Changesets
+ * refuse that nobody has hit yet".
+ */
+describe('changeset status', () => {
+  it('is run by a workflow, on a pull request', () => {
+    const running = workflowsRunning('changeset status');
+    expect(running, 'no workflow runs `changeset status`').not.toHaveLength(0);
+
+    const onPullRequest = running.filter((file) =>
+      triggersOf(readYaml<Workflow>(`${WORKFLOWS_DIR}/${file}`)).includes('pull_request'),
+    );
+    expect(onPullRequest, '`changeset status` runs, but not before a merge').not.toHaveLength(0);
+  });
+
+  it('is not `changeset version`, which writes', () => {
+    // The one way this step could be wrong rather than missing. `version` rewrites every
+    // manifest and consumes the folder; on a pull request it would either fail or commit.
+    const ci = readRepoFile(`${WORKFLOWS_DIR}/ci.yml`);
+    expect(ci).not.toMatch(/run:.*changeset version/u);
   });
 });
 

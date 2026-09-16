@@ -16,7 +16,7 @@
   "scripts": {
     "dev": "turbo run dev --filter=@tyto/desktop",
     "cli": "turbo run build --filter=@tyto/cli && node apps/cli/dist/index.js",
-    "check": "turbo run typecheck lint test",
+    "check": "pnpm format:check && turbo run typecheck lint test",
     "test": "turbo run test",
     "test:visual": "turbo run test:visual",
     "build": "turbo run build",
