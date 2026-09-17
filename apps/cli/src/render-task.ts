@@ -97,9 +97,11 @@ export async function renderTask(
   inherited: Diagnostics = [],
 ): Promise<RenderTaskReport> {
   const wiring = templateWiring(context);
-  const output =
+  // Typed as the wider one where there is one, because the template it used is only known
+  // once the job has run and `TaskOutput` has nowhere to put that.
+  const delivery =
     task.delivery === undefined
-      ? await fsTaskOutput(task.outDirectory, { label: task.id })
+      ? undefined
       : await fsDeliveryOutput(task.outDirectory, {
           name: task.delivery.name,
           // The source this run actually compiled, not a second read of the file. A brief
@@ -109,6 +111,7 @@ export async function renderTask(
           brief: new TextEncoder().encode(task.brief),
           label: task.id,
         });
+  const output = delivery ?? (await fsTaskOutput(task.outDirectory, { label: task.id }));
 
   // Handed out empty and filled by `loadResources` below, once the scene says which files
   // it draws. The folder is no longer read to find out (TYTO-62).
@@ -165,6 +168,18 @@ export async function renderTask(
     version: options.version,
     templates: context.templateVersions,
   });
+
+  // Before `finish`, so `result.json` is still the last file to appear. A run that never
+  // loaded a template names none — a brief that does not parse has no template to point at,
+  // and inventing one would be the delivery claiming something the run did not do.
+  if (delivery !== undefined && job.ok && job.value.template !== undefined) {
+    const { name, version, description } = job.value.template;
+    await delivery.describeTemplate({
+      name,
+      version,
+      ...(description === undefined ? {} : { description }),
+    });
+  }
 
   // Written even for a failed run: `result.json` is the only thing the other side of ADR
   // 0011 reads, and a task that produced nothing but errors has to say so in the one file

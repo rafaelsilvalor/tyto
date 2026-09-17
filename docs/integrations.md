@@ -53,6 +53,7 @@ reads and which nothing here may move. With it, `--out` becomes the parent and T
   <artwork>-<format>.png        artwork and nothing else at this level
   editaveis/
     <brief-name>.brief          the brief that produced the files above
+    template.txt                which template made it — a pointer, never a copy
     result.json
 ```
 
@@ -67,6 +68,19 @@ every one of, and a sibling would be a second copy of that surface, its help and
 **An existing folder is written into and not cleared**, the same rule `--out` has — so a brief
 edited from three slides down to two leaves the third one in the delivery, and `result.json`
 does not mention it, because it lists what that run wrote.
+
+**`template.txt` names the template and does not carry it.** One line — `promo-curso 1.0.0`
+— plus the template's own description and a sentence saying where the template actually
+lives. A copy per delivery would fill a remote with duplicates of a file that has one home,
+and turn "which version is the real one" into a question; what a delivery owes its reader is
+the identity of the version that produced these exact files.
+
+It is written because **nothing else in the folder always answers it**. The copied brief
+names the template in its frontmatter only when the author wrote it there — a run that took
+the template from the `--template` fallback leaves no trace of it — and `result.json`'s
+`tyto.templates` lists every template that was on the search path, which is a different
+question and answers two names on a project with two templates. `JobReport.template` is the
+one thing that knows, because resolving that name is the job's own rule.
 
 Portuguese in `editaveis/` is deliberate and is the only user-facing name in the repository
 that is: it is read by whoever receives the folder rather than by a program (`docs/git-workflow.md`

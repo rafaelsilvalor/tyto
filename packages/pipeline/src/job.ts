@@ -11,6 +11,7 @@ import {
   type Scene,
   type SceneResources,
   type Template,
+  type TemplateManifest,
   type TemplateRegistry,
   compile,
   diagnostic,
@@ -212,6 +213,22 @@ export interface JobReport {
   readonly planned: number;
   readonly rendered: number;
   readonly failed: number;
+  /**
+   * The template this job actually loaded and compiled with.
+   *
+   * **Which template made this is a property of the run, and until now nothing outside the
+   * job could answer it.** The name is the brief's frontmatter or the `--template` fallback,
+   * and the job is the one place that rule is applied — `result.json`'s `tyto.templates`
+   * lists every template that was on the search path, which is a different question and
+   * answered two names on a corpus with two templates in it (TYTO-121).
+   *
+   * Absent when the run never got as far as loading one: a brief that does not parse, or a
+   * name no registry has. The manifest is carried whole rather than copied field by field
+   * because the template itself is **not** copied anywhere — a delivery names the template
+   * it used and points at it, and filling a folder with duplicates of a template that lives
+   * in a repository is the thing that would not make sense.
+   */
+  readonly template?: TemplateManifest;
 }
 
 const DEFAULT_CONCURRENCY = 2;
@@ -314,12 +331,18 @@ export async function runJob(
    */
   const aborted = (): boolean => signal?.aborted === true;
   const problems: Diagnostic[] = [];
+  // `template` is filled in as soon as the template stage loads one, so the three early
+  // returns below carry it too: a cancelled run still produced a `result.json`, and "which
+  // template was this going to be" is as true then as it is at the end.
+  let loaded: Template | undefined;
+
   const empty = (cancelled: boolean): JobReport => ({
     artifacts: [],
     cancelled,
     planned: 0,
     rendered: 0,
     failed: 0,
+    ...(loaded === undefined ? {} : { template: loaded.manifest }),
   });
 
   /* ------------------------------------------------------------------------ parse -- */
@@ -346,10 +369,11 @@ export async function runJob(
   let template: Template | undefined;
 
   if (name !== undefined && ports.registry.get(name) !== undefined) {
-    const loaded = await ports.templates.load(name);
-    if (!loaded.ok) return err([...problems, ...loaded.error]);
-    template = loaded.value;
-    problems.push(...loaded.diagnostics);
+    const load = await ports.templates.load(name);
+    if (!load.ok) return err([...problems, ...load.error]);
+    template = load.value;
+    loaded = load.value;
+    problems.push(...load.diagnostics);
   }
   notify(onEvent, { kind: 'stage-finished', stage: 'template' });
 
@@ -592,6 +616,7 @@ export async function runJob(
       0,
     ),
     failed,
+    template: template.manifest,
   };
 
   // ADR 0025: a **fatal** diagnostic replaces the report; everything else rides with it.

@@ -372,7 +372,63 @@ describe('tyto render --folder', () => {
       'slide-1-feed.svg',
       'slide-2-feed.svg',
     ]);
-    expect(await outFiles('entregas', NAME, 'editaveis')).toEqual([`${NAME}.brief`, 'result.json']);
+    expect(await outFiles('entregas', NAME, 'editaveis')).toEqual([
+      `${NAME}.brief`,
+      'result.json',
+      'template.txt',
+    ]);
+  });
+
+  it('names the template that made the artwork, without copying it', async () => {
+    await run(
+      ['render', `task/${NAME}.brief`, '--out', 'entregas', '--folder', '--types', 'svg'],
+      environment(),
+    );
+
+    const note = await readFile(
+      join(workspace, 'entregas', NAME, 'editaveis', 'template.txt'),
+      'utf8',
+    );
+
+    // Name **and** version. `result.json`'s `tyto.templates` lists every template that was on
+    // the search path — two, on this fixture — so it cannot answer which one drew these files.
+    // The job reports the one it loaded, and that is what lands here.
+    expect(note).toContain('cartaz 2.1.0');
+    // Nothing of the template itself. A folder per delivery holding a copy of a template that
+    // lives in a repository is the thing this deliberately does not do.
+    expect(await outFiles('entregas', NAME)).not.toContain('template.html');
+    expect(await outFiles('entregas', NAME, 'editaveis')).not.toContain('manifest.yaml');
+  });
+
+  it('names the template the --template fallback chose, which the brief does not record', async () => {
+    // The case the copied brief cannot cover on its own: the frontmatter names no template, so
+    // the only thing that knows which one was used is the run itself.
+    // The `cartaz` fixture's own slot, and no frontmatter at all — so the template can only
+    // come from the flag.
+    await writeFile(join(workspace, 'task', 'sem-frontmatter.brief'), '::slide\n  Primeiro\n');
+
+    const code = await run(
+      [
+        'render',
+        'task/sem-frontmatter.brief',
+        '--out',
+        'entregas',
+        '--folder',
+        '--template',
+        'cartaz',
+        '--types',
+        'svg',
+      ],
+      environment(),
+    );
+
+    expect(code, stderr()).toBe(EXIT_OK);
+    expect(
+      await readFile(
+        join(workspace, 'entregas', 'sem-frontmatter', 'editaveis', 'template.txt'),
+        'utf8',
+      ),
+    ).toContain('cartaz 2.1.0');
   });
 
   it('keeps the brief byte for byte, so the copy is the text that made the artwork', async () => {
