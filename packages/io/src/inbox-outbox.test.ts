@@ -2,7 +2,7 @@ import { mkdir, mkdtemp, readFile, readdir, rm, writeFile } from 'node:fs/promis
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
-import { loadTemplateRegistry, formatCatalogue } from '@tyto/core';
+import { hasErrors, loadTemplateRegistry, formatCatalogue } from '@tyto/core';
 import { htmlExporterPlugin } from '@tyto/export-html';
 import { svgExporterPlugin } from '@tyto/export-svg';
 import { type ExporterRegistry, createPluginHost } from '@tyto/plugin-api';
@@ -134,18 +134,18 @@ async function render(
       cancelled: result.ok ? result.value.cancelled : false,
       planned: result.ok ? result.value.planned : 0,
       artifacts: result.ok ? result.value.artifacts : [],
-      diagnostics: result.ok ? result.warnings : result.error,
+      diagnostics: result.ok ? result.diagnostics : result.error,
       version: TYTO_VERSION,
       templates: registry.list().map((entry) => ({ name: entry.name, version: entry.version })),
     }),
   );
 
-  // The messages come back so a failing assertion says *why* the job failed instead of
-  // only that it did.
-  return {
-    ok: result.ok,
-    messages: (result.ok ? result.warnings : result.error).map((item) => item.message),
-  };
+  // `ok` is read off the diagnostics and not off the branch, which is what `renderTask`
+  // does and what ADR 0011 fixes the exit code to. Since ADR 0025 the two answers differ:
+  // a job that lost three frames of twelve comes back on the ok branch carrying the
+  // report, and it is still a failed run.
+  const produced = result.ok ? result.diagnostics : result.error;
+  return { ok: !hasErrors(produced), messages: produced.map((item) => item.message) };
 }
 
 async function outFiles(id: string): Promise<readonly string[]> {
@@ -276,9 +276,15 @@ describe('a task that failed', () => {
     // and let it run again. Asserted by not calling `ack` and looking.
     expect(await readdir(join(workspace, 'inbox'))).toEqual(['issue-99']);
 
-    // And the two frames that did work are still on disk beside the failure.
+    // And the two frames that did work are still on disk beside the failure — and now
+    // named by the document that is supposed to describe the folder. `artifacts` used to
+    // be empty here, which is the state ADR 0025 calls "rendered, with errors".
     expect(await outFiles('issue-99')).toEqual([
       'result.json',
+      'slide-1-feed.svg',
+      'slide-2-feed.svg',
+    ]);
+    expect(parsed.value.artifacts.map((artifact) => artifact.name)).toEqual([
       'slide-1-feed.svg',
       'slide-2-feed.svg',
     ]);

@@ -129,7 +129,7 @@ export async function renderTask(
     },
   );
 
-  const produced = job.ok ? job.warnings : job.error;
+  const produced = job.ok ? job.diagnostics : job.error;
   // The brief is what a range indexes unless something more specific claimed it — which
   // `templateWiring` already did for the template's own diagnostics.
   registerOrigin(produced, { path: task.briefPath, source: task.brief });

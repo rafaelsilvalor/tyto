@@ -105,7 +105,7 @@ describe('templateLint', () => {
   it('reports a syntax error, which is raised before anything else is asked', async () => {
     const editor = open('<frame format="feed"\n');
 
-    const marker = await waitForMarker(editor, 'E_SYNTAX', 2000);
+    const marker = await waitForMarker(editor, 'E_TEMPLATE_SYNTAX', 2000);
     expect(marker.severity).toBe('error');
   });
 

@@ -1,6 +1,6 @@
 # 0013 — Warnings travel on the Ok branch of Result
 
-Status: accepted · 2026-09-05
+Status: accepted · 2026-09-05 · extended by ADR 0025, which renamed the field
 
 ## Context
 
@@ -11,6 +11,14 @@ Status: accepted · 2026-09-05
 `Ok<T>` carries `warnings: readonly Diagnostic[]` in addition to `value`. The stage signature is unchanged — failure is still `Diagnostic[]` — so the rule in `CLAUDE.md` holds as written. `andThen` and `all` concatenate warnings across steps; `fromDiagnostics` splits a mixed list, failing when any item has severity `error` and otherwise passing the whole list through as warnings.
 
 A failed batch drops the warnings of the successes inside it: there is no value left for them to describe.
+
+## Amended by ADR 0025
+
+The field below is called `diagnostics`, not `warnings`, since 2026-09-17: a stage may now
+put a non-fatal **error** on the ok branch beside the part of its value that survived, so a
+name that said "warnings" would make every reader of that branch wonder whether an error in
+it was a bug. Everything else here stands — warnings still ride along, `andThen` and `all`
+still accumulate, and `fromDiagnostics` still means exactly what it meant.
 
 ## Consequences
 

@@ -60,7 +60,7 @@ function svgOf(scene: Scene, options: SvgExportOptions = { resources }): readonl
 
 function problemsOf(scene: Scene, options: SvgExportOptions): readonly Diagnostic[] {
   const result = exportSvg(scene, options);
-  return result.ok ? result.warnings : result.error;
+  return result.ok ? result.diagnostics : result.error;
 }
 
 /**
@@ -286,7 +286,7 @@ describe('what SVG can say precisely and export-html cannot', () => {
     expect(feed).toContain('operator="dilate"');
     expect(feed).toContain('radius="3"');
     // And nothing is reported about it: this exporter drew what the IR asked for.
-    expect(result.warnings.map((item) => item.message).join(' ')).not.toContain('spread');
+    expect(result.diagnostics.map((item) => item.message).join(' ')).not.toContain('spread');
   });
 
   it('uses the short feDropShadow when there is no spread to draw', () => {
@@ -303,7 +303,7 @@ describe('what SVG cannot say, it reports', () => {
     expect(result.ok).toBe(true);
     if (!result.ok) return;
 
-    expect(result.warnings.map((item) => item.message)).toContain(
+    expect(result.diagnostics.map((item) => item.message)).toContain(
       "'copy': a background blur is approximated by export-svg — SVG has no backdrop filter, so the blur behind the node is not drawn; the raster and the HTML export do draw it.",
     );
   });
@@ -313,7 +313,7 @@ describe('what SVG cannot say, it reports', () => {
     expect(result.ok).toBe(true);
     if (!result.ok) return;
 
-    expect(result.warnings.map((item) => item.message)).toContain(
+    expect(result.diagnostics.map((item) => item.message)).toContain(
       "'clipped': clip on a group is approximated by export-svg — there is no box to clip to; put the flag on the node that declares one.",
     );
     // The inside stroke on `gradient-stroke` uses a clip path of its own, so the check is

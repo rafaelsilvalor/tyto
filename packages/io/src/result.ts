@@ -112,7 +112,7 @@ export function renderResult(input: RenderResultInput): RenderResult {
 export function parseRenderResult(input: unknown): Result<RenderResult, readonly string[]> {
   const parsed = renderResultSchema.safeParse(input);
   return parsed.success
-    ? { ok: true, value: parsed.data, warnings: [] }
+    ? { ok: true, value: parsed.data, diagnostics: [] }
     : {
         ok: false,
         error: parsed.error.issues.map(

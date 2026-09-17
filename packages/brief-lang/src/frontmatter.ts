@@ -141,8 +141,8 @@ export function parseFrontmatter(
       ranges: {},
       diagnostics: document.errors.map((error) =>
         diagnostic(
-          'E_SYNTAX',
-          { problem: `the frontmatter is not valid YAML (${firstLine(error.message)})` },
+          'E_FRONTMATTER_SYNTAX',
+          { problem: `not valid YAML (${firstLine(error.message)})` },
           { range: sourceRange(start + error.pos[0], start + Math.min(error.pos[1], body.length)) },
         ),
       ),
@@ -159,8 +159,8 @@ export function parseFrontmatter(
       ranges: {},
       diagnostics: [
         diagnostic(
-          'E_SYNTAX',
-          { problem: 'the frontmatter must be a mapping of keys to values' },
+          'E_FRONTMATTER_SYNTAX',
+          { problem: 'it must be a mapping of keys to values' },
           { range: sourceRange(start, end) },
         ),
       ],

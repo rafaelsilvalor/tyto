@@ -186,7 +186,7 @@ async function compiledWith(
   });
   if (!result.ok) throw new Error(result.error.map((item) => item.message).join('; '));
 
-  return { scene: result.value, warnings: result.warnings };
+  return { scene: result.value, warnings: result.diagnostics };
 }
 
 function nodeById(scene: Scene, id: string): TextNode {

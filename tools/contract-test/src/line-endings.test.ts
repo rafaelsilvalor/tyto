@@ -44,7 +44,7 @@ describe('a brief saved with CRLF line endings', () => {
     );
     if (!parsed.ok) return;
 
-    expect(parsed.warnings).toEqual([]);
+    expect(parsed.diagnostics).toEqual([]);
     expect(parsed.value.frontmatter?.data).toMatchObject({
       template: 'cartaz',
       formats: ['feed'],

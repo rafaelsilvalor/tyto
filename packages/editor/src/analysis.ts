@@ -152,8 +152,8 @@ export function createBriefAnalyzer(options: BriefAnalyzerOptions): BriefAnalyze
       // Both branches carry diagnostics: `resolve` succeeds with warnings (ADR 0013), and
       // a brief with a `W_UNUSED_SLOT` in it is one the gutter should still mark.
       const diagnostics = resolved.ok
-        ? [...parsed.warnings, ...resolved.warnings]
-        : [...parsed.warnings, ...resolved.error];
+        ? [...parsed.diagnostics, ...resolved.diagnostics]
+        : [...parsed.diagnostics, ...resolved.error];
 
       return {
         source,

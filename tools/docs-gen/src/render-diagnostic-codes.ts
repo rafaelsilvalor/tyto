@@ -18,6 +18,8 @@ export const GENERATED_HEADER =
 /** A pipe inside a summary would end the Markdown table cell early. */
 const escapeCell = (text: string) => text.replaceAll('|', String.raw`\|`);
 
+const yesNo = (fatal: boolean) => (fatal ? 'yes' : 'no');
+
 function renderCode(code: DiagnosticCode): string {
   const definition = diagnosticCodeDefinition(code);
   const parameters = placeholderNames(definition.template);
@@ -25,9 +27,12 @@ function renderCode(code: DiagnosticCode): string {
   return [
     `### \`${code}\``,
     '',
-    `**Severity:** ${definition.severity} · **Spec:** \`${definition.spec}\``,
+    `**Severity:** ${definition.severity} · **Fatal:** ${yesNo(definition.fatal)} · ` +
+      `**Spec:** \`${definition.spec}\``,
     '',
     definition.summary,
+    '',
+    definition.fatality,
     '',
     '```',
     definition.template,
@@ -44,11 +49,23 @@ export function renderDiagnosticCodes(): string {
   const warnings = diagnosticCodeList.filter((code) => code.startsWith('W_'));
 
   const summaryTable = [
-    '| Code | Severity | Summary |',
-    '| --- | --- | --- |',
+    '| Code | Severity | Fatal | Summary |',
+    '| --- | --- | --- | --- |',
     ...diagnosticCodeList.map((code) => {
       const definition = diagnosticCodeDefinition(code);
-      return `| \`${code}\` | ${definition.severity} | ${escapeCell(definition.summary)} |`;
+      return (
+        `| \`${code}\` | ${definition.severity} | ${yesNo(definition.fatal)} | ` +
+        `${escapeCell(definition.summary)} |`
+      );
+    }),
+  ].join('\n');
+
+  const fatalTable = [
+    '| Code | Fatal | Why |',
+    '| --- | --- | --- |',
+    ...errors.map((code) => {
+      const definition = diagnosticCodeDefinition(code);
+      return `| \`${code}\` | ${yesNo(definition.fatal)} | ${escapeCell(definition.fatality)} |`;
     }),
   ].join('\n');
 
@@ -59,10 +76,30 @@ export function renderDiagnosticCodes(): string {
     '',
     'Every error and warning Tyto can report. A stage names a code and supplies its',
     'parameters; the message is rendered from the template below, so a code and its',
-    'wording cannot drift apart. Errors fail their stage; warnings ride along with a',
-    'successful result (ADR 0013).',
+    'wording cannot drift apart.',
+    '',
+    'Two properties, and they are not the same question (ADR 0025). **Severity** says how',
+    'bad it is for the author: an error fails a build and a warning does not, wherever the',
+    'diagnostic ended up. **Fatality** says whether the stage that met it could still hand',
+    'back a value. A warning has ridden the ok branch since ADR 0013; since ADR 0025 a',
+    'non-fatal *error* rides there too, beside the part of the value it did not cost — so a',
+    'brief with one unreadable directive renders the other nineteen slots, and still exits',
+    'non-zero.',
     '',
     summaryTable,
+    '',
+    '## What is fatal, and why',
+    '',
+    'Fatal means **nothing can be drawn**, not "serious". The test is whether a frame could',
+    'exist without the thing that is missing. A warning is never fatal, so only the errors',
+    'are listed here.',
+    '',
+    'Two entries are fatal for a reason that is a deadline rather than a principle:',
+    '`E_MISSING_REQUIRED_SLOT` and the unresolved-export codes would each leave a hole in',
+    'the artwork that nothing in the artwork names, and "it is non-fatal only if the gap is',
+    'visible" is the rule ADR 0025 set for them. They move when something draws the gap.',
+    '',
+    fatalTable,
     '',
     '## Errors',
     '',

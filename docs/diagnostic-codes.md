@@ -4,64 +4,131 @@
 
 Every error and warning Tyto can report. A stage names a code and supplies its
 parameters; the message is rendered from the template below, so a code and its
-wording cannot drift apart. Errors fail their stage; warnings ride along with a
-successful result (ADR 0013).
+wording cannot drift apart.
 
-| Code | Severity | Summary |
+Two properties, and they are not the same question (ADR 0025). **Severity** says how
+bad it is for the author: an error fails a build and a warning does not, wherever the
+diagnostic ended up. **Fatality** says whether the stage that met it could still hand
+back a value. A warning has ridden the ok branch since ADR 0013; since ADR 0025 a
+non-fatal *error* rides there too, beside the part of the value it did not cost — so a
+brief with one unreadable directive renders the other nineteen slots, and still exits
+non-zero.
+
+| Code | Severity | Fatal | Summary |
+| --- | --- | --- | --- |
+| `E_SYNTAX` | error | no | A line of the brief body does not match the grammar. |
+| `E_FRONTMATTER_SYNTAX` | error | yes | A brief's frontmatter is not valid YAML, or is not a mapping. |
+| `E_NO_TEMPLATE` | error | yes | A brief names no template and none was supplied on the command line. |
+| `E_UNKNOWN_TEMPLATE` | error | yes | A brief names a template the registry does not have. |
+| `E_UNKNOWN_FORMAT` | error | no | A requested format is not one the chosen template renders. |
+| `E_BAD_SLOT_VALUE` | error | no | A slot is set to something the manifest does not allow for it. |
+| `E_UNKNOWN_SLOT` | error | no | A directive names a slot the template manifest does not declare. |
+| `E_UNKNOWN_DIRECTIVE` | error | no | A directive matches no template slot and no installed plugin. |
+| `E_MISSING_REQUIRED_SLOT` | error | yes | The manifest marks a slot as required and the brief leaves it unset. |
+| `E_BAD_ADJUSTMENT` | error | no | An adjustment is not declared for the slot it is applied to. |
+| `E_ASSET_NOT_FOUND` | error | no | An asset path in the brief does not resolve to a file. |
+| `E_UNSUPPORTED_CSS` | error | yes | A template uses a CSS property outside the accepted set. |
+| `E_UNSUPPORTED_TAG` | error | yes | A template uses a tag the template language does not define. |
+| `E_UNSUPPORTED_ATTRIBUTE` | error | yes | A template uses an attribute the tag it sits on does not accept. |
+| `E_TEMPLATE_SYNTAX` | error | yes | A template.html does not match the template grammar. |
+| `E_TEMPLATE_MARKUP` | error | yes | A template.html parses but does not describe a scene the compiler can build. |
+| `E_PERMISSION` | error | yes | A plugin called a capability it was not granted at install time. |
+| `E_PLUGIN_MANIFEST_SYNTAX` | error | yes | A tyto-plugin.json is not valid JSON. |
+| `E_PLUGIN_MANIFEST_SHAPE` | error | yes | A tyto-plugin.json parses as JSON but does not match the plugin manifest schema. |
+| `E_SCENE_SHAPE` | error | yes | A scene does not match the IR schema. |
+| `E_SCENE_DUPLICATE_ID` | error | yes | The same id is used more than once in one scene. |
+| `E_SCENE_MASK_NOT_FOUND` | error | yes | A mask references a node the scene does not contain. |
+| `E_SCENE_MASK_DESCENDANT` | error | yes | A mask references a descendant of the node it masks. |
+| `E_SCENE_FONT_NOT_DECLARED` | error | yes | Text uses a font family the scene does not declare. |
+| `E_SCENE_ASSET_NOT_DECLARED` | error | yes | A node or paint uses an asset the scene does not declare. |
+| `E_SCENE_EMPTY_TEXT` | error | yes | A text node has nothing to draw — no runs at all, or only line breaks. |
+| `E_TEMPLATE_VALUE` | error | yes | A template SDK builder was given a value it cannot turn into IR. |
+| `E_TEMPLATE_CRASH` | error | yes | A template threw while building its scene, which is a bug in the template. |
+| `E_FORMATS_READ` | error | yes | The project's formats.yaml could not be read from the filesystem. |
+| `E_FORMATS_SYNTAX` | error | yes | The project's formats.yaml is not valid YAML. |
+| `E_FORMATS_SHAPE` | error | yes | A formats file parses as YAML but does not match the formats schema. |
+| `E_FORMAT_NOT_DEFINED` | error | yes | A template renders a format the project does not define a size for. |
+| `E_MANIFEST_SYNTAX` | error | yes | A template manifest is not valid YAML. |
+| `E_MANIFEST_SHAPE` | error | yes | A template manifest parses as YAML but does not match the manifest schema. |
+| `E_TEMPLATE_DUPLICATE` | error | yes | Two template folders declare the same manifest name. |
+| `E_TEMPLATE_READ` | error | yes | A template folder, manifest or markup file could not be read from the filesystem. |
+| `E_INPUT_READ` | error | yes | A file or folder a command was pointed at could not be read. |
+| `E_EXPORT_ASSET_UNRESOLVED` | error | yes | An exporter was given no bytes for an asset the scene draws. |
+| `E_EXPORT_FONT_UNRESOLVED` | error | yes | An exporter was given no bytes for a font the scene draws text in. |
+| `E_EXPORT_UNSUPPORTED` | error | yes | A scene uses something the chosen exporter cannot express at all. |
+| `W_EXPORT_APPROXIMATED` | warning | no | An exporter rendered something close to, but not exactly, what the IR asked for. |
+| `E_RENDER_FAILED` | error | no | A frame could not be turned into bytes by the exporter or the rasterizer. |
+| `E_OUTPUT_WRITE` | error | no | An artifact was rendered but could not be written to the output. |
+| `W_TEXT_OVERFLOW` | warning | no | Compiled text does not fit its frame in one of the requested formats. |
+| `W_UNUSED_SLOT` | warning | no | The brief sets a slot the chosen template never renders. |
+| `W_MARKUP_IN_FRONTMATTER` | warning | no | A frontmatter scalar on a rich-text slot contains what looks like inline markup. |
+| `W_TEMPLATE_SHADOWED` | warning | no | Two template sources declare the same name; the earlier source is the one used. |
+
+## What is fatal, and why
+
+Fatal means **nothing can be drawn**, not "serious". The test is whether a frame could
+exist without the thing that is missing. A warning is never fatal, so only the errors
+are listed here.
+
+Two entries are fatal for a reason that is a deadline rather than a principle:
+`E_MISSING_REQUIRED_SLOT` and the unresolved-export codes would each leave a hole in
+the artwork that nothing in the artwork names, and "it is non-fatal only if the gap is
+visible" is the rule ADR 0025 set for them. They move when something draws the gap.
+
+| Code | Fatal | Why |
 | --- | --- | --- |
-| `E_SYNTAX` | error | The brief does not match the grammar, or its frontmatter is not valid YAML. |
-| `E_NO_TEMPLATE` | error | A brief names no template and none was supplied on the command line. |
-| `E_UNKNOWN_TEMPLATE` | error | A brief names a template the registry does not have. |
-| `E_UNKNOWN_FORMAT` | error | A requested format is not one the chosen template renders. |
-| `E_BAD_SLOT_VALUE` | error | A slot is set to something the manifest does not allow for it. |
-| `E_UNKNOWN_SLOT` | error | A directive names a slot the template manifest does not declare. |
-| `E_UNKNOWN_DIRECTIVE` | error | A directive matches no template slot and no installed plugin. |
-| `E_MISSING_REQUIRED_SLOT` | error | The manifest marks a slot as required and the brief leaves it unset. |
-| `E_BAD_ADJUSTMENT` | error | An adjustment is not declared for the slot it is applied to. |
-| `E_ASSET_NOT_FOUND` | error | An asset path in the brief does not resolve to a file. |
-| `E_UNSUPPORTED_CSS` | error | A template uses a CSS property outside the accepted set. |
-| `E_UNSUPPORTED_TAG` | error | A template uses a tag the template language does not define. |
-| `E_UNSUPPORTED_ATTRIBUTE` | error | A template uses an attribute the tag it sits on does not accept. |
-| `E_TEMPLATE_MARKUP` | error | A template.html parses but does not describe a scene the compiler can build. |
-| `E_PERMISSION` | error | A plugin called a capability it was not granted at install time. |
-| `E_PLUGIN_MANIFEST_SYNTAX` | error | A tyto-plugin.json is not valid JSON. |
-| `E_PLUGIN_MANIFEST_SHAPE` | error | A tyto-plugin.json parses as JSON but does not match the plugin manifest schema. |
-| `E_SCENE_SHAPE` | error | A scene does not match the IR schema. |
-| `E_SCENE_DUPLICATE_ID` | error | The same id is used more than once in one scene. |
-| `E_SCENE_MASK_NOT_FOUND` | error | A mask references a node the scene does not contain. |
-| `E_SCENE_MASK_DESCENDANT` | error | A mask references a descendant of the node it masks. |
-| `E_SCENE_FONT_NOT_DECLARED` | error | Text uses a font family the scene does not declare. |
-| `E_SCENE_ASSET_NOT_DECLARED` | error | A node or paint uses an asset the scene does not declare. |
-| `E_SCENE_EMPTY_TEXT` | error | A text node has nothing to draw — no runs at all, or only line breaks. |
-| `E_TEMPLATE_VALUE` | error | A template SDK builder was given a value it cannot turn into IR. |
-| `E_TEMPLATE_CRASH` | error | A template threw while building its scene, which is a bug in the template. |
-| `E_FORMATS_READ` | error | The project's formats.yaml could not be read from the filesystem. |
-| `E_FORMATS_SYNTAX` | error | The project's formats.yaml is not valid YAML. |
-| `E_FORMATS_SHAPE` | error | A formats file parses as YAML but does not match the formats schema. |
-| `E_FORMAT_NOT_DEFINED` | error | A template renders a format the project does not define a size for. |
-| `E_MANIFEST_SYNTAX` | error | A template manifest is not valid YAML. |
-| `E_MANIFEST_SHAPE` | error | A template manifest parses as YAML but does not match the manifest schema. |
-| `E_TEMPLATE_DUPLICATE` | error | Two template folders declare the same manifest name. |
-| `E_TEMPLATE_READ` | error | A template folder, manifest or markup file could not be read from the filesystem. |
-| `E_INPUT_READ` | error | A file or folder a command was pointed at could not be read. |
-| `E_EXPORT_ASSET_UNRESOLVED` | error | An exporter was given no bytes for an asset the scene draws. |
-| `E_EXPORT_FONT_UNRESOLVED` | error | An exporter was given no bytes for a font the scene draws text in. |
-| `E_EXPORT_UNSUPPORTED` | error | A scene uses something the chosen exporter cannot express at all. |
-| `W_EXPORT_APPROXIMATED` | warning | An exporter rendered something close to, but not exactly, what the IR asked for. |
-| `E_RENDER_FAILED` | error | A frame could not be turned into bytes by the exporter or the rasterizer. |
-| `E_OUTPUT_WRITE` | error | An artifact was rendered but could not be written to the output. |
-| `W_TEXT_OVERFLOW` | warning | Compiled text does not fit its frame in one of the requested formats. |
-| `W_UNUSED_SLOT` | warning | The brief sets a slot the chosen template never renders. |
-| `W_MARKUP_IN_FRONTMATTER` | warning | A frontmatter scalar on a rich-text slot contains what looks like inline markup. |
-| `W_TEMPLATE_SHADOWED` | warning | Two template sources declare the same name; the earlier source is the one used. |
+| `E_SYNTAX` | no | One directive is unreadable and the parser already recovered the others. |
+| `E_FRONTMATTER_SYNTAX` | yes | The frontmatter is where the template is named, so one that does not parse leaves nothing to render against. |
+| `E_NO_TEMPLATE` | yes | There is no template to render against, so no frame can exist. |
+| `E_UNKNOWN_TEMPLATE` | yes | The same, one step later: a name the registry cannot answer is no template at all. |
+| `E_UNKNOWN_FORMAT` | no | The formats the template does render are unaffected. |
+| `E_BAD_SLOT_VALUE` | no | The value of one slot; it stays unset and the rest of the artwork is drawn anyway. |
+| `E_UNKNOWN_SLOT` | no | The slot does not exist, and the ones that do are unaffected. |
+| `E_UNKNOWN_DIRECTIVE` | no | The same: a directive nothing claims contributes nothing to skip. |
+| `E_MISSING_REQUIRED_SLOT` | yes | Non-fatal in principle — the artwork renders with a hole — and fatal until that hole is visible in the artwork rather than only in the problems panel (ADR 0025). |
+| `E_BAD_ADJUSTMENT` | no | One adjustment on one slot; the slot keeps the adjustments that are declared. |
+| `E_ASSET_NOT_FOUND` | no | One image the brief named. The slot stays unset, so the scene never references bytes nobody can supply. |
+| `E_UNSUPPORTED_CSS` | yes | The template is what every artwork is drawn through, so a broken one breaks all of them rather than one slot. |
+| `E_UNSUPPORTED_TAG` | yes | The template is what every artwork is drawn through, so a broken one breaks all of them rather than one slot. |
+| `E_UNSUPPORTED_ATTRIBUTE` | yes | The template is what every artwork is drawn through, so a broken one breaks all of them rather than one slot. |
+| `E_TEMPLATE_SYNTAX` | yes | The template is what every artwork is drawn through, so a broken one breaks all of them rather than one slot. |
+| `E_TEMPLATE_MARKUP` | yes | The template is what every artwork is drawn through, so a broken one breaks all of them rather than one slot. |
+| `E_PERMISSION` | yes | A plugin that did not load contributed no slot to skip. |
+| `E_PLUGIN_MANIFEST_SYNTAX` | yes | A plugin that did not load contributed no slot to skip. |
+| `E_PLUGIN_MANIFEST_SHAPE` | yes | A plugin that did not load contributed no slot to skip. |
+| `E_SCENE_SHAPE` | yes | The IR is malformed, so the exporter has nothing it can draw. |
+| `E_SCENE_DUPLICATE_ID` | yes | The IR is malformed, so the exporter has nothing it can draw. |
+| `E_SCENE_MASK_NOT_FOUND` | yes | The IR is malformed, so the exporter has nothing it can draw. |
+| `E_SCENE_MASK_DESCENDANT` | yes | The IR is malformed, so the exporter has nothing it can draw. |
+| `E_SCENE_FONT_NOT_DECLARED` | yes | The IR is malformed, so the exporter has nothing it can draw. |
+| `E_SCENE_ASSET_NOT_DECLARED` | yes | The IR is malformed, so the exporter has nothing it can draw. |
+| `E_SCENE_EMPTY_TEXT` | yes | The IR is malformed, so the exporter has nothing it can draw. |
+| `E_TEMPLATE_VALUE` | yes | The template is what every artwork is drawn through, so a broken one breaks all of them rather than one slot. |
+| `E_TEMPLATE_CRASH` | yes | The template is what every artwork is drawn through, so a broken one breaks all of them rather than one slot. |
+| `E_FORMATS_READ` | yes | No formats file means no frame has a size. |
+| `E_FORMATS_SYNTAX` | yes | No formats file means no frame has a size. |
+| `E_FORMATS_SHAPE` | yes | No formats file means no frame has a size. |
+| `E_FORMAT_NOT_DEFINED` | yes | A frame with no size cannot be drawn, and `compile` refuses before it builds anything — so the formats that are defined do not render either, which is what would have to change first. |
+| `E_MANIFEST_SYNTAX` | yes | The registry answers with no manifest at all, and a manifest is what every slot is checked against. |
+| `E_MANIFEST_SHAPE` | yes | The registry answers with no manifest at all, and a manifest is what every slot is checked against. |
+| `E_TEMPLATE_DUPLICATE` | yes | The registry answers with no manifest at all, and a manifest is what every slot is checked against. |
+| `E_TEMPLATE_READ` | yes | The registry answers with no manifest at all, and a manifest is what every slot is checked against. |
+| `E_INPUT_READ` | yes | There is no brief to render. |
+| `E_EXPORT_ASSET_UNRESOLVED` | yes | The bytes were never loaded, which is a wiring failure rather than something the brief said — and drawing around it leaves a hole nothing in the artwork names. |
+| `E_EXPORT_FONT_UNRESOLVED` | yes | Text drawn in whatever the viewer has is a different artwork, and the substitution is invisible in the output. |
+| `E_EXPORT_UNSUPPORTED` | yes | The exporter leaves out the node it cannot express, and that gap is invisible in the artwork. |
+| `E_RENDER_FAILED` | no | One frame of twelve. The others are already written, and a file that is missing from `result.json` is visible in a way a hole inside an artwork is not. |
+| `E_OUTPUT_WRITE` | no | The same: one artifact that did not reach the output, counted against `planned`. |
 
 ## Errors
 
 ### `E_SYNTAX`
 
-**Severity:** error · **Spec:** `docs/brief-language.md`
+**Severity:** error · **Fatal:** no · **Spec:** `docs/brief-language.md`
 
-The brief does not match the grammar, or its frontmatter is not valid YAML.
+A line of the brief body does not match the grammar.
+
+One directive is unreadable and the parser already recovered the others.
 
 ```
 Syntax error: {problem}.
@@ -69,11 +136,27 @@ Syntax error: {problem}.
 
 Parameters: `problem`
 
+### `E_FRONTMATTER_SYNTAX`
+
+**Severity:** error · **Fatal:** yes · **Spec:** `docs/brief-language.md`
+
+A brief's frontmatter is not valid YAML, or is not a mapping.
+
+The frontmatter is where the template is named, so one that does not parse leaves nothing to render against.
+
+```
+Frontmatter error: {problem}.
+```
+
+Parameters: `problem`
+
 ### `E_NO_TEMPLATE`
 
-**Severity:** error · **Spec:** `docs/brief-language.md`
+**Severity:** error · **Fatal:** yes · **Spec:** `docs/brief-language.md`
 
 A brief names no template and none was supplied on the command line.
+
+There is no template to render against, so no frame can exist.
 
 ```
 The brief sets no 'template' in its frontmatter, and none was given.
@@ -83,9 +166,11 @@ Parameters: none
 
 ### `E_UNKNOWN_TEMPLATE`
 
-**Severity:** error · **Spec:** `docs/brief-language.md`
+**Severity:** error · **Fatal:** yes · **Spec:** `docs/brief-language.md`
 
 A brief names a template the registry does not have.
+
+The same, one step later: a name the registry cannot answer is no template at all.
 
 ```
 No template named '{template}'. Available: {available}.
@@ -95,9 +180,11 @@ Parameters: `template`, `available`
 
 ### `E_UNKNOWN_FORMAT`
 
-**Severity:** error · **Spec:** `docs/brief-language.md`
+**Severity:** error · **Fatal:** no · **Spec:** `docs/brief-language.md`
 
 A requested format is not one the chosen template renders.
+
+The formats the template does render are unaffected.
 
 ```
 Format '{format}' is not rendered by template '{template}'. It renders: {declared}.
@@ -107,9 +194,11 @@ Parameters: `format`, `template`, `declared`
 
 ### `E_BAD_SLOT_VALUE`
 
-**Severity:** error · **Spec:** `docs/brief-language.md`
+**Severity:** error · **Fatal:** no · **Spec:** `docs/brief-language.md`
 
 A slot is set to something the manifest does not allow for it.
+
+The value of one slot; it stays unset and the rest of the artwork is drawn anyway.
 
 ```
 Slot '{slot}' is invalid: {problem}.
@@ -119,9 +208,11 @@ Parameters: `slot`, `problem`
 
 ### `E_UNKNOWN_SLOT`
 
-**Severity:** error · **Spec:** `docs/brief-language.md`
+**Severity:** error · **Fatal:** no · **Spec:** `docs/brief-language.md`
 
 A directive names a slot the template manifest does not declare.
+
+The slot does not exist, and the ones that do are unaffected.
 
 ```
 Unknown slot '{slot}'. Template '{template}' declares: {declared}.
@@ -131,9 +222,11 @@ Parameters: `slot`, `template`, `declared`
 
 ### `E_UNKNOWN_DIRECTIVE`
 
-**Severity:** error · **Spec:** `docs/brief-language.md`
+**Severity:** error · **Fatal:** no · **Spec:** `docs/brief-language.md`
 
 A directive matches no template slot and no installed plugin.
+
+The same: a directive nothing claims contributes nothing to skip.
 
 ```
 Unknown directive '::{directive}'. No template slot or installed plugin provides it.
@@ -143,9 +236,11 @@ Parameters: `directive`
 
 ### `E_MISSING_REQUIRED_SLOT`
 
-**Severity:** error · **Spec:** `docs/brief-language.md`
+**Severity:** error · **Fatal:** yes · **Spec:** `docs/brief-language.md`
 
 The manifest marks a slot as required and the brief leaves it unset.
+
+Non-fatal in principle — the artwork renders with a hole — and fatal until that hole is visible in the artwork rather than only in the problems panel (ADR 0025).
 
 ```
 Template '{template}' requires slot '{slot}', which the brief does not set.
@@ -155,9 +250,11 @@ Parameters: `template`, `slot`
 
 ### `E_BAD_ADJUSTMENT`
 
-**Severity:** error · **Spec:** `docs/brief-language.md`
+**Severity:** error · **Fatal:** no · **Spec:** `docs/brief-language.md`
 
 An adjustment is not declared for the slot it is applied to.
+
+One adjustment on one slot; the slot keeps the adjustments that are declared.
 
 ```
 Adjustment '{adjustment}' is not declared for slot '{slot}'. Declared: {declared}.
@@ -167,9 +264,11 @@ Parameters: `adjustment`, `slot`, `declared`
 
 ### `E_ASSET_NOT_FOUND`
 
-**Severity:** error · **Spec:** `docs/brief-language.md`
+**Severity:** error · **Fatal:** no · **Spec:** `docs/brief-language.md`
 
 An asset path in the brief does not resolve to a file.
+
+One image the brief named. The slot stays unset, so the scene never references bytes nobody can supply.
 
 ```
 Asset '{path}' was not found relative to the brief at '{base}'.
@@ -179,9 +278,11 @@ Parameters: `path`, `base`
 
 ### `E_UNSUPPORTED_CSS`
 
-**Severity:** error · **Spec:** `docs/template-authoring.md`
+**Severity:** error · **Fatal:** yes · **Spec:** `docs/template-authoring.md`
 
 A template uses a CSS property outside the accepted set.
+
+The template is what every artwork is drawn through, so a broken one breaks all of them rather than one slot.
 
 ```
 CSS property '{property}' is not supported by the template language. Try '{suggestion}'.
@@ -191,9 +292,11 @@ Parameters: `property`, `suggestion`
 
 ### `E_UNSUPPORTED_TAG`
 
-**Severity:** error · **Spec:** `docs/template-authoring.md`
+**Severity:** error · **Fatal:** yes · **Spec:** `docs/template-authoring.md`
 
 A template uses a tag the template language does not define.
+
+The template is what every artwork is drawn through, so a broken one breaks all of them rather than one slot.
 
 ```
 Tag '<{tag}>' is not part of the template language. Try '{suggestion}'.
@@ -203,9 +306,11 @@ Parameters: `tag`, `suggestion`
 
 ### `E_UNSUPPORTED_ATTRIBUTE`
 
-**Severity:** error · **Spec:** `docs/template-authoring.md`
+**Severity:** error · **Fatal:** yes · **Spec:** `docs/template-authoring.md`
 
 A template uses an attribute the tag it sits on does not accept.
+
+The template is what every artwork is drawn through, so a broken one breaks all of them rather than one slot.
 
 ```
 Attribute '{attribute}' is not accepted on '<{tag}>'. Try '{suggestion}'.
@@ -213,11 +318,27 @@ Attribute '{attribute}' is not accepted on '<{tag}>'. Try '{suggestion}'.
 
 Parameters: `attribute`, `tag`, `suggestion`
 
+### `E_TEMPLATE_SYNTAX`
+
+**Severity:** error · **Fatal:** yes · **Spec:** `docs/template-authoring.md`
+
+A template.html does not match the template grammar.
+
+The template is what every artwork is drawn through, so a broken one breaks all of them rather than one slot.
+
+```
+Template syntax error: {problem}.
+```
+
+Parameters: `problem`
+
 ### `E_TEMPLATE_MARKUP`
 
-**Severity:** error · **Spec:** `docs/template-authoring.md`
+**Severity:** error · **Fatal:** yes · **Spec:** `docs/template-authoring.md`
 
 A template.html parses but does not describe a scene the compiler can build.
+
+The template is what every artwork is drawn through, so a broken one breaks all of them rather than one slot.
 
 ```
 Template markup is invalid: {problem}.
@@ -227,9 +348,11 @@ Parameters: `problem`
 
 ### `E_PERMISSION`
 
-**Severity:** error · **Spec:** `docs/plugin-api.md`
+**Severity:** error · **Fatal:** yes · **Spec:** `docs/plugin-api.md`
 
 A plugin called a capability it was not granted at install time.
+
+A plugin that did not load contributed no slot to skip.
 
 ```
 Plugin '{plugin}' called '{capability}' without that permission being granted at install time.
@@ -239,9 +362,11 @@ Parameters: `plugin`, `capability`
 
 ### `E_PLUGIN_MANIFEST_SYNTAX`
 
-**Severity:** error · **Spec:** `docs/plugin-api.md`
+**Severity:** error · **Fatal:** yes · **Spec:** `docs/plugin-api.md`
 
 A tyto-plugin.json is not valid JSON.
+
+A plugin that did not load contributed no slot to skip.
 
 ```
 Plugin manifest '{path}' is not valid JSON: {problem}.
@@ -251,9 +376,11 @@ Parameters: `path`, `problem`
 
 ### `E_PLUGIN_MANIFEST_SHAPE`
 
-**Severity:** error · **Spec:** `docs/plugin-api.md`
+**Severity:** error · **Fatal:** yes · **Spec:** `docs/plugin-api.md`
 
 A tyto-plugin.json parses as JSON but does not match the plugin manifest schema.
+
+A plugin that did not load contributed no slot to skip.
 
 ```
 Plugin manifest is invalid at '{path}': {problem}.
@@ -263,9 +390,11 @@ Parameters: `path`, `problem`
 
 ### `E_SCENE_SHAPE`
 
-**Severity:** error · **Spec:** `docs/ir-schema.md`
+**Severity:** error · **Fatal:** yes · **Spec:** `docs/ir-schema.md`
 
 A scene does not match the IR schema.
+
+The IR is malformed, so the exporter has nothing it can draw.
 
 ```
 Scene is invalid at '{path}': {problem}.
@@ -275,9 +404,11 @@ Parameters: `path`, `problem`
 
 ### `E_SCENE_DUPLICATE_ID`
 
-**Severity:** error · **Spec:** `docs/ir-schema.md`
+**Severity:** error · **Fatal:** yes · **Spec:** `docs/ir-schema.md`
 
 The same id is used more than once in one scene.
+
+The IR is malformed, so the exporter has nothing it can draw.
 
 ```
 Id '{id}' is used {count} times; ids must be unique within a scene.
@@ -287,9 +418,11 @@ Parameters: `id`, `count`
 
 ### `E_SCENE_MASK_NOT_FOUND`
 
-**Severity:** error · **Spec:** `docs/ir-schema.md`
+**Severity:** error · **Fatal:** yes · **Spec:** `docs/ir-schema.md`
 
 A mask references a node the scene does not contain.
+
+The IR is malformed, so the exporter has nothing it can draw.
 
 ```
 Node '{id}' is masked by '{maskId}', which no node in the scene defines.
@@ -299,9 +432,11 @@ Parameters: `id`, `maskId`
 
 ### `E_SCENE_MASK_DESCENDANT`
 
-**Severity:** error · **Spec:** `docs/ir-schema.md`
+**Severity:** error · **Fatal:** yes · **Spec:** `docs/ir-schema.md`
 
 A mask references a descendant of the node it masks.
+
+The IR is malformed, so the exporter has nothing it can draw.
 
 ```
 Node '{id}' is masked by '{maskId}', which is one of its own descendants.
@@ -311,9 +446,11 @@ Parameters: `id`, `maskId`
 
 ### `E_SCENE_FONT_NOT_DECLARED`
 
-**Severity:** error · **Spec:** `docs/ir-schema.md`
+**Severity:** error · **Fatal:** yes · **Spec:** `docs/ir-schema.md`
 
 Text uses a font family the scene does not declare.
+
+The IR is malformed, so the exporter has nothing it can draw.
 
 ```
 Node '{id}' uses font family '{family}', which the scene does not declare.
@@ -323,9 +460,11 @@ Parameters: `id`, `family`
 
 ### `E_SCENE_ASSET_NOT_DECLARED`
 
-**Severity:** error · **Spec:** `docs/ir-schema.md`
+**Severity:** error · **Fatal:** yes · **Spec:** `docs/ir-schema.md`
 
 A node or paint uses an asset the scene does not declare.
+
+The IR is malformed, so the exporter has nothing it can draw.
 
 ```
 Node '{id}' uses asset '{assetId}', which the scene does not declare.
@@ -335,9 +474,11 @@ Parameters: `id`, `assetId`
 
 ### `E_SCENE_EMPTY_TEXT`
 
-**Severity:** error · **Spec:** `docs/ir-schema.md`
+**Severity:** error · **Fatal:** yes · **Spec:** `docs/ir-schema.md`
 
 A text node has nothing to draw — no runs at all, or only line breaks.
+
+The IR is malformed, so the exporter has nothing it can draw.
 
 ```
 Text node '{id}' has nothing to draw; it needs at least one run of text.
@@ -347,9 +488,11 @@ Parameters: `id`
 
 ### `E_TEMPLATE_VALUE`
 
-**Severity:** error · **Spec:** `docs/template-authoring.md`
+**Severity:** error · **Fatal:** yes · **Spec:** `docs/template-authoring.md`
 
 A template SDK builder was given a value it cannot turn into IR.
+
+The template is what every artwork is drawn through, so a broken one breaks all of them rather than one slot.
 
 ```
 Template value for '{field}' is invalid: {problem}.
@@ -359,9 +502,11 @@ Parameters: `field`, `problem`
 
 ### `E_TEMPLATE_CRASH`
 
-**Severity:** error · **Spec:** `docs/template-authoring.md`
+**Severity:** error · **Fatal:** yes · **Spec:** `docs/template-authoring.md`
 
 A template threw while building its scene, which is a bug in the template.
+
+The template is what every artwork is drawn through, so a broken one breaks all of them rather than one slot.
 
 ```
 Template '{template}' failed while building the scene: {problem}.
@@ -371,9 +516,11 @@ Parameters: `template`, `problem`
 
 ### `E_FORMATS_READ`
 
-**Severity:** error · **Spec:** `docs/template-authoring.md`
+**Severity:** error · **Fatal:** yes · **Spec:** `docs/template-authoring.md`
 
 The project's formats.yaml could not be read from the filesystem.
+
+No formats file means no frame has a size.
 
 ```
 Could not read formats file '{path}': {problem}.
@@ -383,9 +530,11 @@ Parameters: `path`, `problem`
 
 ### `E_FORMATS_SYNTAX`
 
-**Severity:** error · **Spec:** `docs/template-authoring.md`
+**Severity:** error · **Fatal:** yes · **Spec:** `docs/template-authoring.md`
 
 The project's formats.yaml is not valid YAML.
+
+No formats file means no frame has a size.
 
 ```
 Formats file '{path}' is not valid YAML: {problem}.
@@ -395,9 +544,11 @@ Parameters: `path`, `problem`
 
 ### `E_FORMATS_SHAPE`
 
-**Severity:** error · **Spec:** `docs/template-authoring.md`
+**Severity:** error · **Fatal:** yes · **Spec:** `docs/template-authoring.md`
 
 A formats file parses as YAML but does not match the formats schema.
+
+No formats file means no frame has a size.
 
 ```
 Formats are invalid at '{path}': {problem}.
@@ -407,9 +558,11 @@ Parameters: `path`, `problem`
 
 ### `E_FORMAT_NOT_DEFINED`
 
-**Severity:** error · **Spec:** `docs/template-authoring.md`
+**Severity:** error · **Fatal:** yes · **Spec:** `docs/template-authoring.md`
 
 A template renders a format the project does not define a size for.
+
+A frame with no size cannot be drawn, and `compile` refuses before it builds anything — so the formats that are defined do not render either, which is what would have to change first.
 
 ```
 Template '{template}' renders format '{format}', which the project does not define. Defined: {defined}.
@@ -419,9 +572,11 @@ Parameters: `template`, `format`, `defined`
 
 ### `E_MANIFEST_SYNTAX`
 
-**Severity:** error · **Spec:** `docs/template-authoring.md`
+**Severity:** error · **Fatal:** yes · **Spec:** `docs/template-authoring.md`
 
 A template manifest is not valid YAML.
+
+The registry answers with no manifest at all, and a manifest is what every slot is checked against.
 
 ```
 Manifest '{path}' is not valid YAML: {problem}.
@@ -431,9 +586,11 @@ Parameters: `path`, `problem`
 
 ### `E_MANIFEST_SHAPE`
 
-**Severity:** error · **Spec:** `docs/template-authoring.md`
+**Severity:** error · **Fatal:** yes · **Spec:** `docs/template-authoring.md`
 
 A template manifest parses as YAML but does not match the manifest schema.
+
+The registry answers with no manifest at all, and a manifest is what every slot is checked against.
 
 ```
 Manifest is invalid at '{path}': {problem}.
@@ -443,9 +600,11 @@ Parameters: `path`, `problem`
 
 ### `E_TEMPLATE_DUPLICATE`
 
-**Severity:** error · **Spec:** `docs/template-authoring.md`
+**Severity:** error · **Fatal:** yes · **Spec:** `docs/template-authoring.md`
 
 Two template folders declare the same manifest name.
+
+The registry answers with no manifest at all, and a manifest is what every slot is checked against.
 
 ```
 Template name '{name}' is declared by both '{first}' and '{second}'.
@@ -455,9 +614,11 @@ Parameters: `name`, `first`, `second`
 
 ### `E_TEMPLATE_READ`
 
-**Severity:** error · **Spec:** `docs/template-authoring.md`
+**Severity:** error · **Fatal:** yes · **Spec:** `docs/template-authoring.md`
 
 A template folder, manifest or markup file could not be read from the filesystem.
+
+The registry answers with no manifest at all, and a manifest is what every slot is checked against.
 
 ```
 Could not read template '{path}': {problem}.
@@ -467,9 +628,11 @@ Parameters: `path`, `problem`
 
 ### `E_INPUT_READ`
 
-**Severity:** error · **Spec:** `docs/integrations.md`
+**Severity:** error · **Fatal:** yes · **Spec:** `docs/integrations.md`
 
 A file or folder a command was pointed at could not be read.
+
+There is no brief to render.
 
 ```
 Could not read '{path}': {problem}.
@@ -479,9 +642,11 @@ Parameters: `path`, `problem`
 
 ### `E_EXPORT_ASSET_UNRESOLVED`
 
-**Severity:** error · **Spec:** `docs/ir-schema.md`
+**Severity:** error · **Fatal:** yes · **Spec:** `docs/ir-schema.md`
 
 An exporter was given no bytes for an asset the scene draws.
+
+The bytes were never loaded, which is a wiring failure rather than something the brief said — and drawing around it leaves a hole nothing in the artwork names.
 
 ```
 Asset '{asset}' on '{node}' was not resolved to embeddable bytes, and an export makes no network requests.
@@ -491,9 +656,11 @@ Parameters: `asset`, `node`
 
 ### `E_EXPORT_FONT_UNRESOLVED`
 
-**Severity:** error · **Spec:** `docs/ir-schema.md`
+**Severity:** error · **Fatal:** yes · **Spec:** `docs/ir-schema.md`
 
 An exporter was given no bytes for a font the scene draws text in.
+
+Text drawn in whatever the viewer has is a different artwork, and the substitution is invisible in the output.
 
 ```
 Font '{font}' was not resolved to embeddable bytes; text would render in whatever the viewer has, and the output must be deterministic.
@@ -503,9 +670,11 @@ Parameters: `font`
 
 ### `E_EXPORT_UNSUPPORTED`
 
-**Severity:** error · **Spec:** `docs/ir-schema.md`
+**Severity:** error · **Fatal:** yes · **Spec:** `docs/ir-schema.md`
 
 A scene uses something the chosen exporter cannot express at all.
+
+The exporter leaves out the node it cannot express, and that gap is invisible in the artwork.
 
 ```
 '{node}' uses {feature}, which {exporter} cannot express: {detail}.
@@ -515,9 +684,11 @@ Parameters: `node`, `feature`, `exporter`, `detail`
 
 ### `E_RENDER_FAILED`
 
-**Severity:** error · **Spec:** `docs/architecture.md`
+**Severity:** error · **Fatal:** no · **Spec:** `docs/architecture.md`
 
 A frame could not be turned into bytes by the exporter or the rasterizer.
+
+One frame of twelve. The others are already written, and a file that is missing from `result.json` is visible in a way a hole inside an artwork is not.
 
 ```
 Frame '{frame}' could not be rendered as {kind}: {problem}.
@@ -527,9 +698,11 @@ Parameters: `frame`, `kind`, `problem`
 
 ### `E_OUTPUT_WRITE`
 
-**Severity:** error · **Spec:** `docs/architecture.md`
+**Severity:** error · **Fatal:** no · **Spec:** `docs/architecture.md`
 
 An artifact was rendered but could not be written to the output.
+
+The same: one artifact that did not reach the output, counted against `planned`.
 
 ```
 Could not write '{artifact}': {problem}.
@@ -541,9 +714,11 @@ Parameters: `artifact`, `problem`
 
 ### `W_EXPORT_APPROXIMATED`
 
-**Severity:** warning · **Spec:** `docs/ir-schema.md`
+**Severity:** warning · **Fatal:** no · **Spec:** `docs/ir-schema.md`
 
 An exporter rendered something close to, but not exactly, what the IR asked for.
+
+A warning never replaces a value (ADR 0013).
 
 ```
 '{node}': {feature} is approximated by {exporter} — {detail}.
@@ -553,9 +728,11 @@ Parameters: `node`, `feature`, `exporter`, `detail`
 
 ### `W_TEXT_OVERFLOW`
 
-**Severity:** warning · **Spec:** `docs/brief-language.md`
+**Severity:** warning · **Fatal:** no · **Spec:** `docs/brief-language.md`
 
 Compiled text does not fit its frame in one of the requested formats.
+
+A warning never replaces a value (ADR 0013).
 
 ```
 Text in slot '{slot}' overflows its frame by {overflow}px in format '{format}'.
@@ -565,9 +742,11 @@ Parameters: `slot`, `overflow`, `format`
 
 ### `W_UNUSED_SLOT`
 
-**Severity:** warning · **Spec:** `docs/brief-language.md`
+**Severity:** warning · **Fatal:** no · **Spec:** `docs/brief-language.md`
 
 The brief sets a slot the chosen template never renders.
+
+A warning never replaces a value (ADR 0013).
 
 ```
 Slot '{slot}' is set in the brief but template '{template}' does not use it.
@@ -577,9 +756,11 @@ Parameters: `slot`, `template`
 
 ### `W_MARKUP_IN_FRONTMATTER`
 
-**Severity:** warning · **Spec:** `docs/brief-language.md`
+**Severity:** warning · **Fatal:** no · **Spec:** `docs/brief-language.md`
 
 A frontmatter scalar on a rich-text slot contains what looks like inline markup.
+
+A warning never replaces a value (ADR 0013).
 
 ```
 Slot '{slot}' is set in the frontmatter, where '{markup}' is literal text. Write it as a ::{slot} directive for it to be markup.
@@ -589,9 +770,11 @@ Parameters: `slot`, `markup`
 
 ### `W_TEMPLATE_SHADOWED`
 
-**Severity:** warning · **Spec:** `docs/adr/0020-built-in-template-pack.md`
+**Severity:** warning · **Fatal:** no · **Spec:** `docs/adr/0020-built-in-template-pack.md`
 
 Two template sources declare the same name; the earlier source is the one used.
+
+A warning never replaces a value (ADR 0013).
 
 ```
 Template '{name}' in '{shadowed}' is shadowed by the one in '{used}', which is searched first.

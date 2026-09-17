@@ -11,8 +11,7 @@ import {
   type RichText,
   type SourceRange,
   diagnostic,
-  err,
-  ok,
+  fromPartial,
   sortDiagnostics,
   sourceRange,
 } from '@tyto/core';
@@ -30,8 +29,10 @@ import { parseFrontmatter } from './frontmatter.js';
  * inline body, and the `Space` nodes that split one run of text into several because a
  * `Text` token may not begin with a space.
  *
- * Errors are data, never exceptions (ADR 0013): a brief that does not parse comes back as
- * `Err` with one `E_SYNTAX` per place the author has to fix. Pure: no Node, no DOM.
+ * Errors are data, never exceptions (ADR 0013): a brief that does not parse comes back with
+ * one `E_SYNTAX` per place the author has to fix. Whether it comes back as `Err` is a
+ * separate question, and ADR 0025 is where it is answered — the AST survives a broken line
+ * in the body and does not survive a frontmatter that will not parse. Pure: no Node, no DOM.
  */
 
 /** Children in document order, error nodes included. */
@@ -286,10 +287,18 @@ function directiveOf(node: SyntaxNode, text: string): Directive {
 }
 
 /**
- * Parses a brief into its AST, or into the diagnostics that say why it cannot be one.
+ * Parses a brief into its AST, and into whatever the parser had to say about it.
  *
  * Comments and blank lines are dropped: they are how a brief is written, not what it
  * says, and nothing downstream renders them.
+ *
+ * **A broken line does not cost the brief.** Lezer recovers by marking the span as an
+ * error node and carrying on, so the loop below has already built the frontmatter and
+ * every directive the author did write; `fromPartial` hands that back with the `E_SYNTAX`
+ * riding along, and only a fatal diagnostic replaces it (ADR 0025). What is fatal here is
+ * `E_FRONTMATTER_SYNTAX`, which comes from `parseFrontmatter` rather than from the tree —
+ * the frontmatter is one external token, so a Lezer error node can never be inside it and
+ * there is no position test to write.
  */
 export function parseBrief(text: string): Result<BriefAst, Diagnostics> {
   const tree = parser.parse(text);
@@ -309,7 +318,8 @@ export function parseBrief(text: string): Result<BriefAst, Diagnostics> {
     }
   }
 
-  if (diagnostics.length > 0) return err(sortDiagnostics(diagnostics));
-
-  return ok({ frontmatter, directives, range: rangeOf(top) });
+  return fromPartial(
+    { frontmatter, directives, range: rangeOf(top) },
+    sortDiagnostics(diagnostics),
+  );
 }
