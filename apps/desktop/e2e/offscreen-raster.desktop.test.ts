@@ -26,6 +26,21 @@ import sceneFixture from './__fixtures__/offscreen.scene.json';
  * accident. This suite asks the question on the other platform, in the job `desktop-e2e.yml`
  * already runs on `ubuntu-latest` for every pull request touching `apps/desktop/**`.
  *
+ * ## The answer, and it is half a yes
+ *
+ * Linux paints. First run in CI: `frames=3 size=1080x1024 pngBytes=335224 paintedShare=100.00%
+ * whitePixels=22941` — a real picture, gradient and glyphs, on the machine the card said would
+ * be needed and then was not.
+ *
+ * **1024, for a document that is 1080 tall.** The frame is clipped to the primary display's
+ * work area, and it is one rule on both platforms rather than a Linux quirk: win32 with
+ * `workArea=3072x1680` returns 1080×1080 for a feed post and 1080×**1680** for a story. So the
+ * route paints, and it cannot carry a 1080×1920 story on any display shorter than 1920 — which
+ * is every display this project runs on, CI's `xvfb` 1280×1024 included. That is why this PR
+ * stops here: `capturePage` fails and `paint` crops, and choosing between them is a decision,
+ * not an implementation detail. `enableDeviceEmulation`, the documented way to render past the
+ * window size, **crashes the main process** on an offscreen window — tried, not assumed.
+ *
  * ## The instrument lied first, and that is why the assertions look the way they do
  *
  * The first probe finished on the first `paint` whose `toPNG()` was non-empty and reported
@@ -80,6 +95,15 @@ const built = join(here, '..', 'out', 'main', 'index.js');
 const FRAME = { width: 1080, height: 1080 } as const;
 
 /**
+ * A story, asked for at the same document, to find the ceiling.
+ *
+ * Not a second fixture: the document is 1080 tall either way, so the extra 840 px comes back
+ * transparent and `paintedShare` drops to 64.29% by arithmetic rather than by failure. The
+ * only thing this size is asked for is the **height that comes back**.
+ */
+const STORY = { width: 1080, height: 1920 } as const;
+
+/**
  * How long the capture waits for the frames to stop arriving, and how long it waits at all.
  *
  * Quiet-then-take rather than take-the-nth: how many frames a page produces is Chromium's
@@ -131,6 +155,8 @@ interface Capture {
   readonly painting: boolean;
   /** How many times damage was asked for, the first request included. */
   readonly invalidations: number;
+  readonly display: { readonly width: number; readonly height: number };
+  readonly workArea: { readonly width: number; readonly height: number };
 }
 
 let scratch: string;
@@ -166,9 +192,9 @@ function documentHtml(): string {
  * cheapest of the three routes the card names, and it is the one being exercised here —
  * whether the adapter ships that or a `protocol.handle` scheme is still open.
  */
-async function capture(): Promise<Capture> {
+async function capture(asked: { width: number; height: number } = FRAME): Promise<Capture> {
   return app.evaluate(
-    async ({ BrowserWindow }, options) => {
+    async ({ BrowserWindow, screen }, options) => {
       const window = new BrowserWindow({
         show: false,
         width: options.width,
@@ -248,6 +274,8 @@ async function capture(): Promise<Capture> {
           png: last === undefined ? '' : last.toPNG().toString('base64'),
           width: size.width,
           height: size.height,
+          display: screen.getPrimaryDisplay().size,
+          workArea: screen.getPrimaryDisplay().workAreaSize,
           offscreen: contents.isOffscreen(),
           painting: contents.isPainting(),
           invalidations,
@@ -258,8 +286,8 @@ async function capture(): Promise<Capture> {
     },
     {
       file: documentFile,
-      width: FRAME.width,
-      height: FRAME.height,
+      width: asked.width,
+      height: asked.height,
       quietMs: QUIET_MS,
       timeoutMs: SETTLE_TIMEOUT_MS,
       nudgeMs: NUDGE_MS,
@@ -326,20 +354,47 @@ afterAll(async () => {
   rmSync(scratch, { recursive: true, force: true });
 });
 
-describe('an offscreen BrowserWindow, through the paint event', () => {
-  it('hands back a frame the size the document asked for, with a picture in it', async () => {
-    const captured = await capture();
+/**
+ * What the window can actually give back, which is **not** what was asked for.
+ *
+ * Measured on both platforms and it is one rule, not two: the frame is clipped to the
+ * primary display's **work area**. win32, `display=3072x1728 workArea=3072x1680`, asked
+ * 1080×1920, got 1080×**1680**. linux under `xvfb-run -a` (1280×1024), asked 1080×1080, got
+ * 1080×**1024**. Asked 1080×1080 on win32, got 1080×1080, because it fits.
+ *
+ * So this is the size every assertion below compares against — a literal 1080 would be
+ * asserting the maintainer's monitor. **It is also the finding that stops this route from
+ * being the adapter**: a story is 1080×1920 and no display in the CI fleet is 1920 tall, so
+ * the artwork would come back cropped, at 100% painted coverage, saying nothing.
+ */
+function clipped(asked: { width: number; height: number }, capture: Capture) {
+  return {
+    width: Math.min(asked.width, capture.workArea.width),
+    height: Math.min(asked.height, capture.workArea.height),
+  };
+}
 
+function report(captured: Capture, coverage: Coverage | undefined): string {
+  return (
+    `[TYTO-30] platform=${process.platform} frames=${String(captured.frames)} ` +
+    `emptyFrames=${String(captured.emptyFrames)} ` +
+    `invalidations=${String(captured.invalidations)} ` +
+    `offscreen=${String(captured.offscreen)} painting=${String(captured.painting)} ` +
+    `size=${String(captured.width)}x${String(captured.height)} ` +
+    `display=${String(captured.display.width)}x${String(captured.display.height)} ` +
+    `workArea=${String(captured.workArea.width)}x${String(captured.workArea.height)} ` +
+    `pngBytes=${String(Buffer.from(captured.png, 'base64').byteLength)} ` +
+    `paintedShare=${((coverage?.paintedShare ?? 0) * 100).toFixed(2)}% ` +
+    `whitePixels=${String(coverage?.whitePixels ?? 0)}`
+  );
+}
+
+describe('an offscreen BrowserWindow, through the paint event', () => {
+  it('paints a real picture — a settled frame, with the text in it', async () => {
+    const captured = await capture();
     const coverage = captured.png === '' ? undefined : coverageOf(captured.png);
-    const measurement =
-      `[TYTO-30] platform=${process.platform} frames=${String(captured.frames)} ` +
-      `emptyFrames=${String(captured.emptyFrames)} ` +
-      `invalidations=${String(captured.invalidations)} ` +
-      `offscreen=${String(captured.offscreen)} painting=${String(captured.painting)} ` +
-      `size=${String(captured.width)}x${String(captured.height)} ` +
-      `pngBytes=${String(Buffer.from(captured.png, 'base64').byteLength)} ` +
-      `paintedShare=${((coverage?.paintedShare ?? 0) * 100).toFixed(2)}% ` +
-      `whitePixels=${String(coverage?.whitePixels ?? 0)}`;
+    const measurement = report(captured, coverage);
+
     // **`process.stdout` and not `console.log`, because a green run has to carry the number.**
     // Measured rather than assumed: under the reporter `desktop-e2e.yml` actually runs — the
     // default one — a passing test's `console.log` is captured and never printed. `grep -c
@@ -350,9 +405,9 @@ describe('an offscreen BrowserWindow, through the paint event', () => {
     // The measurement rides along on every assertion too, so a red run names it where a reader
     // of a failure looks first rather than fifty lines up.
     expect(captured.frames, measurement).toBeGreaterThan(0);
-    expect({ width: captured.width, height: captured.height }, measurement).toEqual({
-      width: FRAME.width,
-      height: FRAME.height,
+    expect({ offscreen: captured.offscreen, painting: captured.painting }, measurement).toEqual({
+      offscreen: true,
+      painting: true,
     });
 
     // Not a byte count. A blank first frame encodes to ~7 KB and would pass one.
@@ -360,6 +415,24 @@ describe('an offscreen BrowserWindow, through the paint event', () => {
     // Layout ran and the text was drawn. Which face drew it is the visual half of TYTO-30
     // and is not answered here.
     expect(coverage?.whitePixels ?? 0, measurement).toBeGreaterThan(0);
+  });
+
+  /**
+   * *The frame is the screen's, not the document's* — the thing this suite was opened to find
+   * out and the reason the adapter is not written in this PR.
+   *
+   * Asserted as `min(asked, workArea)` rather than as a number, so it says the same true thing
+   * on a 1280×1024 CI display and on a 3072×1728 desktop, and goes **red** the day the clamp
+   * stops applying — which is the day this route can carry a story.
+   */
+  it('clips the frame to the display work area, at both a square and a story', async () => {
+    const square = await capture(FRAME);
+    const story = await capture(STORY);
+
+    process.stdout.write(`${report(story, coverageOf(story.png))}\n`);
+
+    expect({ width: square.width, height: square.height }).toEqual(clipped(FRAME, square));
+    expect({ width: story.width, height: story.height }).toEqual(clipped(STORY, story));
   });
 
   it('gives the same bytes twice, so the settle is a rule rather than a race', async () => {
