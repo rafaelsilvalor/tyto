@@ -1,4 +1,4 @@
-import { type EditorState, type ScrollPosition } from '@tyto/editor';
+import { type EditorState, type ScrollPosition, textOf } from '@tyto/editor';
 
 import { type Artwork, type Diagnostic, type Frame, type Selection, type Zoom } from './preview.js';
 
@@ -28,7 +28,32 @@ export interface DocumentState {
   readonly id: string;
   /** The file's name, or nothing for a brief that has never been saved. */
   readonly name: string | undefined;
-  readonly dirty: boolean;
+  /**
+   * The text that is in the file — and the **empty string for a document that is in no
+   * file at all** (ADR 0026, ratifying D3).
+   *
+   * It is what {@link isUnsaved} compares against, and it is the whole of the unsaved
+   * marker: there is no flag anywhere that says a document has been typed in. It moves in
+   * four places and no others. Three are a moment when this document and a disk agreed —
+   * {@link newDocument} (nothing, in no file), a file arriving from `file:open` or
+   * `file:reopen` — read back out of the buffer CodeMirror built from it, because CodeMirror
+   * normalises line endings and a CR LF brief is a supported input (TYTO-64) — and the string
+   * `file:save` reports having written. The fourth is
+   * {@link releaseDocument}, which empties it, because the tab has stopped being in a file
+   * at all.
+   *
+   * **A string and not CodeMirror's `Text`**, which is what D3 names. `textOf` is the only
+   * read `@tyto/editor` offers and a `Text` is not reachable through it — and it is also not
+   * wanted here, because both ends of the comparison cross the bridge as strings anyway:
+   * `openDocument.text` in `shared/ipc.ts` is what main read off the disk and what main says
+   * it wrote. The rule D3 states survives; the type it states does not.
+   *
+   * **The empty string is a real answer and not a placeholder.** A document with no file has
+   * nothing on disk it could differ from, so the comparison reads it as unsaved the moment
+   * it holds a character and as saved while it holds none — which is exactly the tab the
+   * window opens on, and exactly what a released tab becomes (ADR 0026).
+   */
+  readonly savedText: string;
   /**
    * The text, the undo history and the cursor — the document itself, which this record owns
    * (D1, TYTO-115).
@@ -81,7 +106,8 @@ export interface DocumentState {
    * {@link isStale} is that comparison and nothing else.
    *
    * **Stored rather than a boolean**, so the marker cannot be set by one code path and
-   * cleared by another — the failure the unsaved dot has today and TYTO-112 exists to undo.
+   * cleared by another — the failure the unsaved dot had until TYTO-112, which made
+   * {@link savedText} the same shape for the same reason.
    * Empty for a document that has never rendered, which is also when `frames` is empty, so
    * `isStale` answers `false` and the pane shows its empty state.
    */
@@ -98,6 +124,35 @@ export interface DocumentState {
 export const isStale = (document_: DocumentState): boolean =>
   document_.frames.length > 0 && document_.renderedBrief !== document_.brief;
 
+/**
+ * What this document says right now, which is a question the store answers (D1, TYTO-115).
+ *
+ * The empty string before CodeMirror is mounted, which is the one paint between module load
+ * and `load()` in `main.ts` — the same window in which the old `editor?.getValue() ?? ''`
+ * answered the same empty string. A document with no state has never been shown anything,
+ * so there is nothing in it.
+ */
+export const contentOf = (document_: DocumentState): string =>
+  document_.state === undefined ? '' : textOf(document_.state);
+
+/**
+ * Whether this document holds text that is not in a file — the unsaved dot, and the window
+ * title's `(não salvo)` (ADR 0026, ratifying D3).
+ *
+ * **Compared on every read rather than remembered**, which is the whole card: a marker set
+ * by one code path and cleared by another drifts, and the drift it had was visible — typing
+ * a character and undoing it left the dot on, because the undo took the text back and
+ * nothing took the flag back. There is no flag now, so there is nothing to take back.
+ *
+ * The comparison is total: {@link savedText} is the empty string for a document in no file,
+ * so "unsaved against what?" has an answer for every document rather than for most of them.
+ * The consequences are named in ADR 0026 and the one worth knowing here is that a tab that
+ * lost its file (TYTO-104) is unsaved for as long as it holds a character, and clean when it
+ * holds none.
+ */
+export const isUnsaved = (document_: DocumentState): boolean =>
+  contentOf(document_) !== document_.savedText;
+
 export interface Workspace {
   /** In tab order, left to right. **Never empty** — see {@link closeDocument}. */
   readonly documents: readonly DocumentState[];
@@ -109,7 +164,10 @@ export function newDocument(id: string, state?: EditorState): DocumentState {
   return {
     id,
     name: undefined,
-    dirty: false,
+    // In no file, and holding nothing — so `isUnsaved` answers false and goes on answering
+    // it until somebody types. The tab the window opens on is clean by comparison rather
+    // than by a `dirty: false` anybody had to write here.
+    savedText: '',
     state,
     // Nothing has shown it, so there is nowhere to put it back to but the top.
     scroll: undefined,
@@ -173,13 +231,30 @@ export function addDocument(workspace: Workspace, document: DocumentState): Work
 /**
  * Whether a document can be replaced rather than pushed aside when a file is opened.
  *
- * The empty tab the window starts on, and nothing else: no name, nothing typed, no text.
- * Every editor does this — opening a file from a blank window gives you one tab, not two —
- * and the rule has to be exactly this narrow, because getting it wrong throws away something
- * a person wrote.
+ * An empty tab in no file, and nothing else. Every editor does this — opening a file from a
+ * blank window gives you one tab, not two — and the rule has to be exactly this narrow,
+ * because getting it wrong throws away something a person wrote.
+ *
+ * **Two clauses where there were three, and the third stopped being true rather than being
+ * dropped.** It used to also require `brief === ''`, because text restored into a buffer
+ * notified nobody and a stored `dirty` could therefore be false with a whole brief in the
+ * tab. A derived marker cannot be wrong about that: text in a document whose `savedText` is
+ * empty *is* unsaved, whoever put it there and whether or not anything was notified.
+ *
+ * **"An empty tab in no file" now includes a released one** (TYTO-104), and one that was
+ * typed into and then emptied — both of which a stored `dirty: true` used to keep out. It is
+ * reached only for the document in front — `adopt` in `main.ts` asks about `active()` — and
+ * an active, unnamed, empty tab is the scratch tab whatever it used to hold.
+ *
+ * **What that costs is the tab and its undo history**, which is worth saying because the
+ * buffer being empty does not mean the `EditorState` is: the paragraph somebody typed and
+ * deleted stops being recoverable when the next file replaces the document holding it. The
+ * question this rule would rather ask is "has anything ever been typed here", which is
+ * CodeMirror's `undoDepth` and a second read from `@tyto/editor` — a decision about that
+ * package's surface rather than a line here (ADR 0026).
  */
 export const isDisposable = (document: DocumentState): boolean =>
-  document.name === undefined && !document.dirty && document.brief === '';
+  document.name === undefined && !isUnsaved(document);
 
 /**
  * Takes the file off a document, leaving every character of its text alone (TYTO-104).
@@ -188,22 +263,25 @@ export const isDisposable = (document: DocumentState): boolean =>
  * somebody away from the text they just wrote would be worse — so the other tab has to let
  * go, and main says which one in `file:save`'s `released` (`shared/ipc.ts`).
  *
- * What it loses is its name and its clean marker, and the marker is the half worth stating:
- * the text is now in no file at all, so there is nothing on disk it could be equal to, and
- * the next save there has to ask where to put it. A tab still showing a name would be
- * claiming a file that a moment ago stopped being its.
+ * What it loses is its name and the file its text was in, and the second half is the one
+ * worth stating: the text is now in no file at all, so there is nothing on disk it could be
+ * equal to, and the next save there has to ask where to put it. A tab still showing a name
+ * would be claiming a file that a moment ago stopped being its.
+ *
+ * **It marks nothing.** It empties {@link DocumentState.savedText}, and being unsaved
+ * follows from the comparison: a released tab holding characters differs from the empty
+ * string, so the dot appears, and one holding none does not, so it stays clean. That is the
+ * question TYTO-112 had to answer and ADR 0026 is where the two rejected answers are —
+ * keeping the old saved text (a tab clean against a file another tab now owns) and a `null`
+ * that reads as always unsaved (which would put the dot on the tab the window opens on).
  *
  * Here rather than inline in `main.ts` because this is the rule and `main.ts` is the wiring.
- * `dirty` is a stored boolean today and the exploration in
- * `docs/explorations/2026-09-16-document-buffer-model.md` (D3) wants it derived from the
- * saved text instead; when that lands, this function is one of the four places that decide
- * it, and the only one a unit test can reach.
  */
 export function releaseDocument(workspace: Workspace, id: string): Workspace {
   return updateDocument(workspace, id, (document) => ({
     ...document,
     name: undefined,
-    dirty: true,
+    savedText: '',
   }));
 }
 

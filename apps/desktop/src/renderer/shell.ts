@@ -46,6 +46,14 @@ export interface ShellState {
 export interface DocumentState {
   /** The file's name, or nothing for a brief that has never been saved. */
   readonly name: string | undefined;
+  /**
+   * Whether the text in front of the person is not in a file.
+   *
+   * A boolean here and a comparison where it comes from: `isUnsaved` in `documents.ts` is
+   * what answers it, and this is a view being told the answer (TYTO-112). A shell that
+   * derived it would need the document, the editor state and the text on disk to paint a
+   * title.
+   */
   readonly dirty: boolean;
 }
 
@@ -62,6 +70,20 @@ export function windowTitle(state: ShellState): string {
   const name = state.document.name ?? translate(state.locale, 'document.untitled');
   const mark = state.document.dirty ? ` (${translate(state.locale, 'document.unsaved')})` : '';
   return `${name}${mark} — ${app}`;
+}
+
+/**
+ * The window's name alone, which is the one thing in the shell that moves per keystroke.
+ *
+ * Apart from {@link paint} because the unsaved marker is derived now and nothing watches for
+ * the moment it changes: the title is repainted on every edit instead, and walking every
+ * `[data-i18n]` node to do it *would be* the one expensive thing on that path — which is
+ * exactly why the walk stays in {@link paint} and this does not have it (TYTO-112). `paint`
+ * calls this rather than repeating it, so there is one definition of the title.
+ */
+export function paintTitle(root: ParentNode, state: ShellState): void {
+  const title = root.querySelector('title');
+  if (title !== null) title.textContent = windowTitle(state);
 }
 
 /**
@@ -107,8 +129,7 @@ export function paint(root: ParentNode, state: ShellState): void {
     element.setAttribute('aria-label', text);
   }
 
-  const title = root.querySelector('title');
-  if (title !== null) title.textContent = windowTitle(state);
+  paintTitle(root, state);
 
   const html = (root as Document).documentElement as HTMLElement | undefined;
   if (html !== undefined) html.lang = state.locale;
