@@ -98,23 +98,42 @@ export interface EditorOptions {
 }
 
 /**
- * Everything one document owns inside an editor: its text, its undo history, where the
- * cursor is and how far it is scrolled.
+ * The document of record, which the **host** owns and a view only shows (D1).
  *
- * **Opaque to the host.** A window with tabs holds one of these per document and hands it
- * back; nothing outside this package reads a field. The shape is CodeMirror's because it
- * *is* CodeMirror's — an `EditorState` already carries the text, the history and the
- * selection, and rebuilding one from text would be an undo stack thrown away on every tab
- * switch.
+ * Re-exported rather than left for the host to import from `@codemirror/state`, for the
+ * reason `theme` is `'light' | 'dark'`: this package owns the CodeMirror dependency and a
+ * window with tabs should not have to declare it to name the thing it is holding. The shape
+ * is CodeMirror's because it *is* CodeMirror's — an `EditorState` already carries the text,
+ * the undo history and the selection, and rebuilding one from a string is exactly what
+ * throws an undo stack away.
  *
- * `scroll` is separate because an `EditorState` does not carry a scroll position: it is a
- * property of the view, and `scrollSnapshot()` is CodeMirror's own way of putting one in an
- * effect that can be dispatched later.
+ * It stays opaque all the same: {@link textOf} is the only field read this package offers,
+ * and nothing outside reaches past it.
  */
-export interface DocumentSnapshot {
-  readonly state: EditorState;
-  readonly scroll: StateEffect<unknown>;
-}
+export type { EditorState };
+
+/**
+ * Where a pane is looking, as an effect that can be dispatched into one later.
+ *
+ * A type of its own because it is the half of an open document that is **not** the document:
+ * an `EditorState` carries no scroll position at all, since scroll is a property of the view
+ * and two views on one document scroll independently (D7). `scrollSnapshot()` is
+ * CodeMirror's own way of naming one.
+ */
+export type ScrollPosition = StateEffect<unknown>;
+
+/**
+ * What a document says, read without a view.
+ *
+ * The point of D1 in one function. A host that keeps the state can answer "what is in this
+ * document" for **every** document it holds, not only for the one a view happens to be
+ * showing — which is what the store needs before it can derive anything from the text, and
+ * what an editor that owned the content could never offer.
+ *
+ * Derived on every call rather than carried beside the state: `Text` is immutable, so the
+ * string is a fact about the state and never a second copy that can disagree with it.
+ */
+export const textOf = (state: EditorState): string => state.doc.toString();
 
 export interface EditorHandle {
   /**
@@ -126,17 +145,37 @@ export interface EditorHandle {
   /** Replaces the whole document. Does not notify `onChange` listeners. */
   setValue(value: string): void;
   /**
-   * What this editor is holding right now, for a host that has somewhere to put it.
+   * The document this view is showing, so that a store can take ownership of it (D1).
    *
-   * The three calls below are what a window with tabs needs and nothing else does: take the
-   * document away, put another one in, and make a new one. A host without tabs never calls
-   * them and pays nothing for them.
+   * The calls below are what a window with tabs needs and nothing else does: keep the
+   * document, learn when it moves, take it away, put another one in, and make a new one. A
+   * host without tabs never calls them and pays nothing for them.
    */
-  snapshot(): DocumentSnapshot;
-  /** Puts a snapshot back, history, cursor and scroll included. Notifies nobody. */
-  restore(snapshot: DocumentSnapshot): void;
+  state(): EditorState;
+  /**
+   * Where this view is scrolled, **measured** — which is why it is a call and not something
+   * {@link onUpdate} hands over.
+   *
+   * Reading it costs a layout flush, so a host asks for it when a pane is about to be
+   * pointed at another document rather than on every keystroke.
+   */
+  scroll(): ScrollPosition;
+  /**
+   * The state that came out of every transaction, for the store that owns it.
+   *
+   * Fires for the host's own `setValue` too: the store tracks what the document *is*,
+   * irrespective of who moved it. Returns the function that stops the listener.
+   */
+  onUpdate(listener: (state: EditorState) => void): () => void;
+  /**
+   * Puts a document back in the view, undo history, cursor and scroll included. Notifies
+   * `onChange` listeners of nothing.
+   *
+   * `scroll` left out means the top, which is where a document no pane has shown yet is.
+   */
+  restore(state: EditorState, scroll?: ScrollPosition): void;
   /** A new document with this editor's own extensions — an empty history, no selection. */
-  blank(doc: string): DocumentSnapshot;
+  blank(doc: string): EditorState;
   /** Returns the function that stops the listener. */
   onChange(listener: (value: string) => void): () => void;
   setTheme(theme: ThemeName): void;
@@ -198,7 +237,8 @@ const baseExtensions = (): Extension[] => [
 ];
 
 export function createEditor(parent: HTMLElement, options: EditorOptions = {}): EditorHandle {
-  const listeners = new Set<(value: string) => void>();
+  const changeListeners = new Set<(value: string) => void>();
+  const updateListeners = new Set<(state: EditorState) => void>();
 
   /** Swapped in place by `setTheme`, so switching does not rebuild the state. */
   const themeCompartment = new Compartment();
@@ -225,13 +265,28 @@ export function createEditor(parent: HTMLElement, options: EditorOptions = {}): 
   const keys = keymapExtension(options.keymap ?? defaultKeymapSet);
   let vimEnabled = options.vim ?? false;
 
+  /**
+   * One listener for both directions, and the order inside it carries weight.
+   *
+   * The store is told first, so a host that reads its own record from `onChange` finds the
+   * text of the transaction that has just run rather than the one before it — which is the
+   * whole of what D1 buys and the one way to lose it. Two separate `updateListener`s would
+   * leave that order to the extension array, where it would be reversed one day by an edit
+   * that looked like a reordering of imports.
+   */
   const notify = EditorView.updateListener.of((update) => {
+    // A view update with no transaction behind it is a measure, a viewport change or a
+    // `setState` — the document has not moved, and D1 is about transactions.
+    if (update.transactions.length === 0) return;
+
+    for (const listener of updateListeners) listener(update.state);
+
     if (!update.docChanged) return;
     if (update.transactions.every((transaction) => transaction.annotation(programmatic) === true)) {
       return;
     }
-    const value = update.state.doc.toString();
-    for (const listener of listeners) listener(value);
+    const value = textOf(update.state);
+    for (const listener of changeListeners) listener(value);
   });
 
   const readOnly = options.readOnly ?? false;
@@ -271,25 +326,33 @@ export function createEditor(parent: HTMLElement, options: EditorOptions = {}): 
   return {
     view,
 
-    getValue: () => view.state.doc.toString(),
+    getValue: () => textOf(view.state),
 
-    snapshot: () => ({ state: view.state, scroll: view.scrollSnapshot() }),
+    state: () => view.state,
 
-    restore: (snapshot: DocumentSnapshot) => {
-      // `setState` and not a change transaction: a transaction would put the swap on the
-      // undo stack, so undoing once in a fresh tab would paste the other document back in.
-      view.setState(snapshot.state);
-      // Dispatched after, because a scroll effect is a property of the view and the view
-      // has just been given a different state to measure. The phrases ride along: a snapshot
-      // carries the language it was taken in, so a tab that was away while the window
-      // switched would come back with the panel in the old one.
-      view.dispatch({ effects: [snapshot.scroll, setSearchPhrases.of(searchPhrases)] });
+    scroll: () => view.scrollSnapshot(),
+
+    onUpdate: (listener: (state: EditorState) => void) => {
+      updateListeners.add(listener);
+      return () => {
+        updateListeners.delete(listener);
+      };
     },
 
-    blank: (doc: string) => ({
-      state: EditorState.create({ doc, extensions }),
-      scroll: EditorView.scrollIntoView(0),
-    }),
+    restore: (state: EditorState, scroll?: ScrollPosition) => {
+      // `setState` and not a change transaction: a transaction would put the swap on the
+      // undo stack, so undoing once in a fresh tab would paste the other document back in.
+      view.setState(state);
+      // Dispatched after, because a scroll effect is a property of the view and the view
+      // has just been given a different state to measure. The phrases ride along: a state
+      // carries the language it was built in, so a tab that was away while the window
+      // switched would come back with the panel in the old one.
+      view.dispatch({
+        effects: [scroll ?? EditorView.scrollIntoView(0), setSearchPhrases.of(searchPhrases)],
+      });
+    },
+
+    blank: (doc: string) => EditorState.create({ doc, extensions }),
 
     setValue: (value: string) => {
       view.dispatch({
@@ -299,9 +362,9 @@ export function createEditor(parent: HTMLElement, options: EditorOptions = {}): 
     },
 
     onChange: (listener: (value: string) => void) => {
-      listeners.add(listener);
+      changeListeners.add(listener);
       return () => {
-        listeners.delete(listener);
+        changeListeners.delete(listener);
       };
     },
 
@@ -327,7 +390,8 @@ export function createEditor(parent: HTMLElement, options: EditorOptions = {}): 
     isVimMode: () => vimEnabled,
 
     destroy: () => {
-      listeners.clear();
+      changeListeners.clear();
+      updateListeners.clear();
       view.destroy();
     },
   };

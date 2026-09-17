@@ -3,7 +3,7 @@ import { EditorView } from '@codemirror/view';
 import { afterEach, describe, expect, it } from 'vitest';
 
 import { commandRegistryOf, createCommandRegistry } from './commands.js';
-import { createEditor, type EditorHandle } from './editor.js';
+import { createEditor, type EditorHandle, textOf } from './editor.js';
 
 /**
  * The handle is tested through a real `EditorView` in jsdom rather than through a stub.
@@ -179,10 +179,10 @@ describe('createEditor', () => {
  * the *selection* travel with the document. Swapping text would satisfy "the right words are
  * on screen" and fail all four.
  */
-describe('document snapshots', () => {
-  it('puts back the text a snapshot was taken of', () => {
+describe('document states', () => {
+  it('puts back the text a state was taken of', () => {
     handle = createEditor(open().parent, { doc: 'first' });
-    const first = handle.snapshot();
+    const first = handle.state();
 
     handle.restore(handle.blank('second'));
     expect(handle.getValue()).toBe('second');
@@ -194,7 +194,7 @@ describe('document snapshots', () => {
   it('keeps each document undo stack to itself', () => {
     handle = createEditor(open().parent, { doc: 'a' });
     type(handle, ' edited');
-    const first = handle.snapshot();
+    const first = handle.state();
 
     handle.restore(handle.blank('b'));
     type(handle, ' also edited');
@@ -211,7 +211,7 @@ describe('document snapshots', () => {
 
   it('does not put the tab switch itself on the undo stack', () => {
     handle = createEditor(open().parent, { doc: 'start' });
-    const first = handle.snapshot();
+    const first = handle.state();
     handle.restore(handle.blank(''));
 
     // A change transaction would have made the swap undoable, so one undo in the fresh
@@ -226,7 +226,7 @@ describe('document snapshots', () => {
   it('restores where the cursor was', () => {
     handle = createEditor(open().parent, { doc: 'abcdef' });
     handle.view.dispatch({ selection: { anchor: 4 } });
-    const first = handle.snapshot();
+    const first = handle.state();
 
     handle.restore(handle.blank('other'));
     expect(handle.view.state.selection.main.head).toBe(0);
@@ -256,12 +256,79 @@ describe('document snapshots', () => {
     const seen: string[] = [];
     handle.onChange((value) => seen.push(value));
 
-    const first = handle.snapshot();
+    const first = handle.state();
     handle.restore(handle.blank('y'));
     handle.restore(first);
 
     // A host switching tabs already knows what it switched to; a notification here would
     // look to the host exactly like the person having typed the other document.
     expect(seen).toEqual([]);
+  });
+});
+
+/**
+ * The store as the owner of the content, which is D1 of
+ * `docs/explorations/2026-09-16-document-buffer-model.md` (TYTO-115).
+ *
+ * What these four hold is the difference between a host that *asks* the view what it is
+ * holding and one that already knows. The first cannot answer for a document the view is not
+ * showing; the second can, which is what an unsaved marker derived from the text and a
+ * session restore both need.
+ */
+describe('onUpdate', () => {
+  it('hands over the state of every transaction, typed or dispatched', () => {
+    handle = createEditor(open().parent, { doc: 'a' });
+    const seen: string[] = [];
+    handle.onUpdate((state) => seen.push(textOf(state)));
+
+    type(handle, 'b');
+    handle.view.dispatch({ changes: { from: 2, insert: 'c' } });
+
+    expect(seen).toEqual(['ab', 'abc']);
+  });
+
+  it('reports a write the host made itself, which onChange deliberately does not', () => {
+    handle = createEditor(open().parent, { doc: 'a' });
+    const updated: string[] = [];
+    const changed: string[] = [];
+    handle.onUpdate((state) => updated.push(textOf(state)));
+    handle.onChange((value) => changed.push(value));
+
+    handle.setValue('written by the host');
+
+    // The two answer different questions. `onChange` is "what did the author do", and
+    // `setValue` is not the author; `onUpdate` is "what is in this document now", and a
+    // store that missed this one would hold text nobody could see.
+    expect(updated).toEqual(['written by the host']);
+    expect(changed).toEqual([]);
+  });
+
+  it('is told before onChange is, so a store read from onChange is already current', () => {
+    handle = createEditor(open().parent, { doc: '' });
+    let store = '';
+    handle.onUpdate((state) => {
+      store = textOf(state);
+    });
+    const readFromChange: string[] = [];
+    handle.onChange(() => readFromChange.push(store));
+
+    type(handle, 'oi');
+
+    // The order is the mechanism, not a coincidence of registration: `main.ts` reads its
+    // own workspace inside `onChange` and would otherwise compile the text from before the
+    // keystroke, one character behind, forever.
+    expect(readFromChange).toEqual(['oi']);
+  });
+
+  it('stops when the host unsubscribes', () => {
+    handle = createEditor(open().parent, { doc: '' });
+    const seen: string[] = [];
+    const stop = handle.onUpdate((state) => seen.push(textOf(state)));
+
+    type(handle, 'a');
+    stop();
+    type(handle, 'b');
+
+    expect(seen).toEqual(['a']);
   });
 });

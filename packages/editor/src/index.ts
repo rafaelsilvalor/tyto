@@ -14,10 +14,12 @@ export { brief, briefLanguage } from './brief-language.js';
 
 export {
   createEditor,
-  type DocumentSnapshot,
   type EditorHandle,
   type EditorOptions,
+  type EditorState,
   type LanguageName,
+  type ScrollPosition,
+  textOf,
 } from './editor.js';
 
 export { briefDarkTheme, briefLightTheme, type ThemeName, themes } from './theme.js';

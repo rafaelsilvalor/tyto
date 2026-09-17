@@ -9,10 +9,10 @@ import type { MenuItemConstructorOptions } from 'electron';
  * by reading the accelerators back off a running app. A menu accelerator is handled by the
  * browser process before the page ever sees the key, so with the default menu in place
  * `Mod-W` would shut the window instead of closing the tab the person meant (E9.11), and
- * `Mod-R` would tear the renderer down and build it again — taking every `DocumentSnapshot`
- * in the workspace with it, which is the text, the undo history, the cursor and the scroll
- * of **every** open tab, unsaved ones included, with nothing asked and nothing written
- * first (TYTO-104).
+ * `Mod-R` would tear the renderer down and build it again — taking every `EditorState` in
+ * the workspace with it, which is the text, the undo history, the cursor and the scroll of
+ * **every** open tab, unsaved ones included, with nothing asked and nothing written first
+ * (TYTO-104).
  *
  * That failure is invisible to the end-to-end suite. Playwright dispatches keys through the
  * debugger protocol, straight into the renderer, so a menu accelerator never fires there and

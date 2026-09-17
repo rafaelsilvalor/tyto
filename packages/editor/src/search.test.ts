@@ -112,16 +112,16 @@ describe('the search panel', () => {
     handle = editorWith(marked('pt'));
     handle.setSearchPhrases(marked('en'));
 
-    expect(handle.blank('outro documento\n').state.phrase('Find')).toBe('en:Find');
+    expect(handle.blank('outro documento\n').phrase('Find')).toBe('en:Find');
   });
 
-  it('puts a snapshot taken in the other language back in this one', () => {
+  it('puts a state taken in the other language back in this one', () => {
     // The other direction, and the one `blank` cannot cover: a tab that was away while the
     // window switched carries a state built before the switch. `restore` re-dispatches for
     // exactly that, and this is what fails if it stops.
     handle = editorWith(marked('pt'));
-    const taken = handle.snapshot();
-    expect(taken.state.phrase('Find')).toBe('pt:Find');
+    const taken = handle.state();
+    expect(taken.phrase('Find')).toBe('pt:Find');
 
     handle.setSearchPhrases(marked('en'));
     handle.restore(taken);

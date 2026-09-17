@@ -84,7 +84,8 @@ export const setSearchPhrases = StateEffect.define<SearchPhrases>();
  * captured in the extension array `createEditor` builds once — so a state made by `blank()`
  * after a switch would carry the *original* value. A field's `create` runs when the state is
  * made and reads the current one instead. `restore` re-dispatches for the other direction: a
- * snapshot taken before a switch carries the language it was taken in.
+ * state the store has been holding since before a switch carries the language it was built
+ * in.
  */
 const phrasesField = (current: () => SearchPhrases): Extension => {
   const field = StateField.define<SearchPhrases>({

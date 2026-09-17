@@ -1,4 +1,4 @@
-import { type DocumentSnapshot } from '@tyto/editor';
+import { type EditorState } from '@tyto/editor';
 import { describe, expect, it } from 'vitest';
 
 import {
@@ -22,19 +22,20 @@ import {
 /**
  * The workspace, driven as the value it is (E9.11).
  *
- * No DOM and no CodeMirror: a snapshot is opaque to everything outside `@tyto/editor`, so a
- * marker object is as much of one as this file can meaningfully hold. What is tested here is
- * the part that decides what a person sees — which tab is in front after a close, which one
- * a key lands on, and whether the empty tab the app opens on may be replaced.
+ * No DOM and no CodeMirror: an `EditorState` is opaque to everything outside `@tyto/editor`,
+ * so a marker object is as much of one as this file can meaningfully hold. What is tested
+ * here is the part that decides what a person sees — which tab is in front after a close,
+ * which one a key lands on, and whether the empty tab the app opens on may be replaced.
  *
- * `editor.test.ts` in `packages/editor` is where the snapshots themselves are proved against
- * a real editor, buffer, history and all.
+ * `editor.test.ts` in `packages/editor` is where the states themselves are proved against a
+ * real editor, buffer, history and all, `onUpdate` included — which is what makes the field
+ * below the document of record rather than a copy taken at a hand-off (D1, TYTO-115).
  */
 
-const snapshot = (mark: string): DocumentSnapshot => ({ mark }) as unknown as DocumentSnapshot;
+const state = (mark: string): EditorState => ({ mark }) as unknown as EditorState;
 
 const doc = (id: string, over: Partial<DocumentState> = {}): DocumentState => ({
-  ...newDocument(id, snapshot(id)),
+  ...newDocument(id, state(id)),
   ...over,
 });
 
@@ -179,14 +180,16 @@ describe('letting go of a file another tab saved over', () => {
     expect(documentOf(after, 'a')?.dirty).toBe(true);
   });
 
-  it('keeps every character, the snapshot and the brief it already had', () => {
+  it('keeps every character, the state and the brief it already had', () => {
     // The whole reason the path moves rather than the text: a released tab is somebody's
     // work, and the only thing that stopped being true about it is where it is stored.
     const before = doc('a', { name: 'campanha.brief', brief: '::titulo Campanha' });
     const after = releaseDocument({ documents: [before], activeId: 'a' }, 'a');
 
     expect(documentOf(after, 'a')?.brief).toBe('::titulo Campanha');
-    expect(documentOf(after, 'a')?.snapshot).toBe(before.snapshot);
+    // By identity: losing a file must not cost the undo history, and the document of record
+    // is what carries it.
+    expect(documentOf(after, 'a')?.state).toBe(before.state);
   });
 
   it('leaves every other tab exactly as it was, the active one included', () => {

@@ -1,4 +1,4 @@
-import { type DocumentSnapshot } from '@tyto/editor';
+import { type EditorState, type ScrollPosition } from '@tyto/editor';
 
 import { type Artwork, type Diagnostic, type Frame, type Selection, type Zoom } from './preview.js';
 
@@ -13,8 +13,9 @@ import { type Artwork, type Diagnostic, type Frame, type Selection, type Zoom } 
  * for the same reason: what is on screen and what is remembered cannot be two things that
  * have to be kept in step.
  *
- * Nothing here touches the DOM, the bridge or CodeMirror. A `DocumentSnapshot` is opaque —
- * `@tyto/editor` says what is in one and nothing outside that package reads a field.
+ * Nothing here touches the DOM, the bridge or CodeMirror. An `EditorState` is opaque —
+ * `@tyto/editor` owns the dependency, hands the type back, and `textOf` is the one field
+ * read anything outside that package is offered.
  */
 
 export interface DocumentState {
@@ -29,20 +30,34 @@ export interface DocumentState {
   readonly name: string | undefined;
   readonly dirty: boolean;
   /**
-   * The text, the undo history, the cursor and the scroll.
+   * The text, the undo history and the cursor — the document itself, which this record owns
+   * (D1, TYTO-115).
    *
-   * Refreshed from the editor whenever this document stops being the active one, and stale
-   * for exactly as long as it *is* active — which is safe because the editor is then the
-   * truth and nothing reads this. `captureActive` in `main.ts` is the one place that
-   * matters.
+   * **Live, not refreshed at a hand-off.** An update listener in `main.ts` writes the state
+   * of every transaction here, so "what does this tab say right now" is a question the
+   * workspace answers for *every* document rather than only for the one CodeMirror happens
+   * to be showing. It used to be the opposite — written back when the document stopped being
+   * active, and stale on purpose for exactly as long as it was in front — and that is what
+   * made a derived unsaved marker (TYTO-112) and a session restore (TYTO-113) impossible to
+   * write: both have to ask a question the editor was the only one who could answer.
    *
-   * Absent only for the document the window opens on, which exists before the editor does:
-   * `main.ts` builds the workspace at module load and mounts CodeMirror after the dock has
-   * arranged. Every later document is born from `editor.blank`, and this one is snapshotted
-   * the first time anything takes it out of the editor — which is always before anything
-   * puts it back.
+   * Absent only for the document the window opens on, before CodeMirror is mounted:
+   * `main.ts` builds the workspace at module load and creates the editor after the dock has
+   * arranged, which is one paint wide. Every later document is born from `editor.blank`.
    */
-  readonly snapshot: DocumentSnapshot | undefined;
+  readonly state: EditorState | undefined;
+
+  /**
+   * How far the pane showing this document was scrolled, or nothing for a document no pane
+   * has shown yet.
+   *
+   * Apart from {@link state} because it is not the document's: scroll is a property of the
+   * view, and two views on one document scroll independently (D7). So it is the one thing
+   * that still has to be *captured* before a pane is pointed somewhere else — `captureScroll`
+   * in `main.ts` — and reading it costs a layout flush, which is why it is not kept live the
+   * way the state is.
+   */
+  readonly scroll: ScrollPosition | undefined;
 
   /** Everything the preview pane shows, which is per document because the frames are. */
   readonly frames: readonly Frame[];
@@ -90,12 +105,14 @@ export interface Workspace {
 }
 
 /** A document nobody has typed in and nobody has named, as the app opens on one. */
-export function newDocument(id: string, snapshot?: DocumentSnapshot): DocumentState {
+export function newDocument(id: string, state?: EditorState): DocumentState {
   return {
     id,
     name: undefined,
     dirty: false,
-    snapshot,
+    state,
+    // Nothing has shown it, so there is nowhere to put it back to but the top.
+    scroll: undefined,
     frames: [],
     artworks: [],
     selection: { format: undefined, artwork: undefined },
