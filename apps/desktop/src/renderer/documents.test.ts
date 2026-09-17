@@ -11,6 +11,7 @@ import {
   documentOf,
   isDisposable,
   isStale,
+  isUnsaved,
   newDocument,
   releaseDocument,
   selectDocument,
@@ -23,20 +24,52 @@ import {
  * The workspace, driven as the value it is (E9.11).
  *
  * No DOM and no CodeMirror: an `EditorState` is opaque to everything outside `@tyto/editor`,
- * so a marker object is as much of one as this file can meaningfully hold. What is tested
- * here is the part that decides what a person sees — which tab is in front after a close,
- * which one a key lands on, and whether the empty tab the app opens on may be replaced.
+ * so what this file holds is a stand-in that answers `textOf` and nothing else — which is
+ * enough, because `textOf` is also the only read `documents.ts` makes. What is tested here is
+ * the part that decides what a person sees — which tab is in front after a close, which one a
+ * key lands on, whether the empty tab the app opens on may be replaced, and whether a tab is
+ * showing the unsaved dot.
  *
  * `editor.test.ts` in `packages/editor` is where the states themselves are proved against a
  * real editor, buffer, history and all, `onUpdate` included — which is what makes the field
  * below the document of record rather than a copy taken at a hand-off (D1, TYTO-115).
  */
 
-const state = (mark: string): EditorState => ({ mark }) as unknown as EditorState;
+/**
+ * A stand-in for an `EditorState`, which is opaque outside `@tyto/editor`.
+ *
+ * It answers `textOf` and nothing else, because `textOf` is the only read that package
+ * offers and therefore the only one `documents.ts` is able to make. Distinct objects per
+ * call, so the tests that assert a state survived a change can do it by identity.
+ *
+ * A class and not an object literal with a `toString` on it: a function property is equal
+ * only to itself, so two fixtures built the same way would fail the `toEqual` comparisons
+ * below for a reason that has nothing to do with the rule under test.
+ */
+class FakeDocument {
+  constructor(private readonly text: string) {}
+  toString(): string {
+    return this.text;
+  }
+}
 
+const state = (text: string): EditorState =>
+  ({ doc: new FakeDocument(text) }) as unknown as EditorState;
+
+/** A document holding nothing, in no file — the tab the window opens on. */
 const doc = (id: string, over: Partial<DocumentState> = {}): DocumentState => ({
-  ...newDocument(id, state(id)),
+  ...newDocument(id, state('')),
   ...over,
+});
+
+/** Two briefs, only ever compared with each other — the content is not the point. */
+const FIRST = ['---', 'template: promo-curso', '---', '::titulo Campanha'].join('\n');
+const SECOND = ['---', 'template: promo-curso', '---', '::titulo Promo'].join('\n');
+
+/** A document whose buffer says `text` and whose file says `savedText`. */
+const holding = (id: string, text: string, savedText: string): DocumentState => ({
+  ...newDocument(id, state(text)),
+  savedText,
 });
 
 const three = (): Workspace => ({
@@ -66,18 +99,18 @@ describe('what is in front', () => {
 describe('changing one document', () => {
   it('leaves every other one alone, and its own object identity behind', () => {
     const before = three();
-    const after = updateDocument(before, 'a', (item) => ({ ...item, dirty: true }));
+    const after = updateDocument(before, 'a', (item) => ({ ...item, name: 'campanha.brief' }));
 
-    expect(documentOf(after, 'a')?.dirty).toBe(true);
+    expect(documentOf(after, 'a')?.name).toBe('campanha.brief');
     expect(documentOf(after, 'b')).toBe(documentOf(before, 'b'));
     // The state is replaced rather than mutated, which is what lets a repaint compare.
-    expect(documentOf(before, 'a')?.dirty).toBe(false);
+    expect(documentOf(before, 'a')?.name).toBeUndefined();
   });
 
   it('is a no-op for a document that has been closed under it', () => {
     // A preview answer can land after its tab is gone; `request` in `main.ts` relies on
     // this rather than checking first.
-    const after = updateDocument(three(), 'gone', (item) => ({ ...item, dirty: true }));
+    const after = updateDocument(three(), 'gone', (item) => ({ ...item, name: 'gone.brief' }));
     expect(ids(after)).toEqual(['a', 'b', 'c']);
   });
 });
@@ -91,17 +124,94 @@ describe('opening another one', () => {
   });
 });
 
+describe('the unsaved marker', () => {
+  it('is off for a brief that has never been typed in', () => {
+    expect(isUnsaved(doc('a'))).toBe(false);
+  });
+
+  it('is off for a file that was just read, because the two say the same thing', () => {
+    expect(isUnsaved(holding('a', FIRST, FIRST))).toBe(false);
+  });
+
+  it('comes on when the buffer and the file stop saying the same thing', () => {
+    expect(isUnsaved(holding('a', `${FIRST} primeira`, FIRST))).toBe(true);
+  });
+
+  it('goes off again when an undo puts the saved text back', () => {
+    // **The card, in one assertion.** Under the stored flag this document was unsaved: the
+    // flag went on at the first keystroke and only a save took it off, so undoing back to
+    // the file left the dot on saying the opposite of the truth. There is no flag to leave
+    // behind now — the two strings are equal, so the answer is no (TYTO-112).
+    const typed = holding('a', `${FIRST} primeira`, FIRST);
+    const undone = { ...typed, state: state(FIRST) };
+
+    expect(isUnsaved(typed)).toBe(true);
+    expect(isUnsaved(undone)).toBe(false);
+  });
+
+  it('is off before CodeMirror is mounted, which is one paint wide', () => {
+    // `main.ts` builds the workspace at module load and creates the editor after the dock
+    // has arranged, so the first document exists for a paint with no state in it. Nothing
+    // has been typed into a document that has never been shown.
+    expect(isUnsaved(newDocument('a'))).toBe(false);
+  });
+
+  describe('on a tab that lost its file (TYTO-104, ADR 0026)', () => {
+    const released = (text: string): DocumentState =>
+      // What `releaseDocument` leaves behind: no name, nothing to compare against.
+      ({ ...holding('a', text, FIRST), name: undefined, savedText: '' });
+
+    it('is on while it holds a character, because that text is in no file', () => {
+      expect(isUnsaved(released(FIRST))).toBe(true);
+    });
+
+    it('is off when it holds none, because there is nothing in it to lose', () => {
+      // The shape this card chose, stated where it can be read: an empty tab in no file is
+      // the tab the window opens on, however it got there. The two rejected shapes are in
+      // ADR 0026 — one would leave this tab claiming a file another tab now owns, the other
+      // would put the dot on every untitled tab in the window.
+      expect(isUnsaved(released(''))).toBe(false);
+    });
+  });
+
+  it('is off for an untitled tab that was typed in and then emptied', () => {
+    // The same rule as the released tab above and not a second one: neither is in a file,
+    // both hold nothing, and the comparison cannot tell them apart.
+    expect(isUnsaved(holding('a', '', ''))).toBe(false);
+  });
+});
+
 describe('the empty tab the window opens on', () => {
   it('may be replaced, because there is nothing in it to lose', () => {
     expect(isDisposable(doc('a'))).toBe(true);
   });
 
-  it('may not, the moment it has a name, a keystroke or any text at all', () => {
+  it('may not, the moment it has a name or any text at all', () => {
     expect(isDisposable(doc('a', { name: 'campanha.brief' }))).toBe(false);
-    expect(isDisposable(doc('a', { dirty: true }))).toBe(false);
-    // The third is the one a `dirty` check alone would miss: text restored into a buffer
-    // does not notify anybody, so a document can hold a brief and be clean.
-    expect(isDisposable(doc('a', { brief: '::titulo Oi' }))).toBe(false);
+    expect(isDisposable(holding('a', '::titulo Oi', ''))).toBe(false);
+  });
+
+  it('may, for a tab that lost its file and was then emptied', () => {
+    // The one behaviour this card changed here, pinned where it can be seen. A stored
+    // `dirty: true` kept a released tab out of this rule for good; a comparison lets it back
+    // in the moment there is nothing in it, and the `brief` left over from its last compile
+    // does not hold it open either (ADR 0026).
+    const released: DocumentState = {
+      ...holding('a', '', ''),
+      name: undefined,
+      brief: '::titulo Campanha',
+    };
+
+    expect(isDisposable(released)).toBe(true);
+  });
+
+  it('may, when the last compile said something and the buffer no longer does', () => {
+    // The clause that was dropped, and the one behaviour that changed with it. It used to
+    // read `brief === ''` because text put into a buffer without a keystroke left the
+    // stored `dirty` false — so the last compiled text was the only witness. A derived
+    // marker sees the buffer itself, and this document's buffer is empty: there is nothing
+    // in it to lose, whatever it said two hundred milliseconds ago (TYTO-112).
+    expect(isDisposable(doc('a', { brief: '::titulo Oi' }))).toBe(true);
   });
 });
 
@@ -169,21 +279,30 @@ describe('letting go of a file another tab saved over', () => {
    * rather than in `main.ts` so that it can be driven without a window.
    */
   const held = (): Workspace => ({
-    documents: [doc('a', { name: 'campanha.brief' }), doc('b', { name: 'promo.brief' })],
+    documents: [
+      { ...holding('a', FIRST, FIRST), name: 'campanha.brief' },
+      { ...holding('b', SECOND, SECOND), name: 'promo.brief' },
+    ],
     activeId: 'b',
   });
 
-  it('takes the name off and marks it unsaved, because its text is now in no file', () => {
+  it('takes the name off and empties the text it compares against', () => {
     const after = releaseDocument(held(), 'a');
 
     expect(documentOf(after, 'a')?.name).toBeUndefined();
-    expect(documentOf(after, 'a')?.dirty).toBe(true);
+    // Not a marker: the tab is unsaved because its text now differs from the empty string,
+    // which is what a document in no file compares against (ADR 0026).
+    expect(documentOf(after, 'a')?.savedText).toBe('');
   });
 
   it('keeps every character, the state and the brief it already had', () => {
     // The whole reason the path moves rather than the text: a released tab is somebody's
     // work, and the only thing that stopped being true about it is where it is stored.
-    const before = doc('a', { name: 'campanha.brief', brief: '::titulo Campanha' });
+    const before = {
+      ...holding('a', FIRST, FIRST),
+      name: 'campanha.brief',
+      brief: '::titulo Campanha',
+    };
     const after = releaseDocument({ documents: [before], activeId: 'a' }, 'a');
 
     expect(documentOf(after, 'a')?.brief).toBe('::titulo Campanha');

@@ -30,6 +30,7 @@ let page: Page;
 let scratch: string;
 let firstPath: string;
 let secondPath: string;
+let windowsPath: string;
 
 const FIRST = ['---', 'template: promo-curso', '---', '::titulo Campanha'].join('\n');
 
@@ -185,8 +186,14 @@ beforeAll(async () => {
   scratch = mkdtempSync(join(tmpdir(), 'tyto-tabs-'));
   firstPath = join(scratch, 'campanha.brief');
   secondPath = join(scratch, 'promo.brief');
+  windowsPath = join(scratch, 'windows.brief');
   writeFileSync(firstPath, FIRST, 'utf8');
   writeFileSync(secondPath, SECOND, 'utf8');
+  // The same brief with the line endings a Windows editor leaves behind, written here
+  // rather than committed because `.gitattributes` normalises every path in this repository
+  // to LF and a committed fixture would arrive as the one thing it is not (TYTO-64 keeps a
+  // real one under `tools/contract-test/` with an exemption beside it).
+  writeFileSync(windowsPath, FIRST.split('\n').join('\r\n'), 'utf8');
 
   app = await _electron.launch({
     args: ['.', `--user-data-dir=${join(scratch, 'userData')}`],
@@ -238,6 +245,49 @@ describe('the window a person opens', () => {
     // The rest of the View menu survived, so the removal is about reloading rather than
     // about the submenu.
     expect(found).toContain('CommandOrControl+0');
+  });
+});
+
+describe('the unsaved dot, timed rather than assumed (TYTO-112, ADR 0026)', () => {
+  /**
+   * How long the dot is given to appear, and the whole of why this test is here.
+   *
+   * `PREVIEW_DELAY` in `src/renderer/main.ts` is 200 ms, and the compile's answer ends in a
+   * full `repaint()`. So an assertion that sleeps before looking cannot tell the dot painted
+   * by the keystroke from the dot painted by the compile a fifth of a second later — which
+   * is not a hypothetical: deleting the `paintTabs()` and `paintTitle()` calls from
+   * `handle.onChange` leaves this whole suite green if every assertion waits first. Under
+   * this bound it does not.
+   *
+   * Polled in the page on animation frames, so what is measured is the browser's clock and
+   * not a round trip.
+   */
+  const BEFORE_THE_COMPILE = 150;
+
+  const dotWithin = (present: boolean): Promise<unknown> =>
+    page.waitForFunction(
+      (want) => (document.querySelector('.tabs__dirty') !== null) === want,
+      present,
+      { timeout: BEFORE_THE_COMPILE, polling: 'raf' },
+    );
+
+  it('appears on the keystroke, not on the compile that follows it', async () => {
+    await page.click('#editor .cm-content');
+    await page.keyboard.type('x');
+
+    await dotWithin(true);
+  });
+
+  it('goes again on the undo, which is the whole card', async () => {
+    // And a flag could not do this: it went on at the first keystroke and only a save took
+    // it off, so the text went back to empty and the dot stayed. The buffer is the empty
+    // string again and so is what this tab compares against, so there is nothing to clear.
+    await page.keyboard.press('Control+z');
+
+    await dotWithin(false);
+    // Left exactly as the window opened, because the next describe replaces this tab and
+    // `isDisposable` refuses a tab with anything in it.
+    expect(await editorText()).toBe('');
   });
 });
 
@@ -362,19 +412,30 @@ describe('switching between them', () => {
 });
 
 describe('saving one and closing the other', () => {
-  it('marks each tab that was typed in', async () => {
-    // Both, because both were: the undo above took the text back but not the fact that
-    // somebody edited the buffer, which is what the marker has meant since E9.8.
-    expect(await unsavedTabs()).toEqual(['campanha.brief', 'promo.brief']);
+  it('marks the tab whose text differs from its file, and not the one that was typed in', async () => {
+    // **This expectation inverted with TYTO-112, on purpose** (ADR 0026). It used to name
+    // both tabs, because the marker was a stored flag: it went on at the first keystroke
+    // and only a save took it off, so the undo above took promo's text back and left the
+    // dot on saying the opposite of the truth. The marker is a comparison now, promo's
+    // buffer is the file again, and only campanha still holds ` primeira`.
+    //
+    // It is also the only instrument this suite has for *"the undo restored the file's text
+    // exactly"*: `.cm-content` holds the viewport, and promo.brief is four hundred lines, so
+    // the text itself cannot be compared here. A partial undo would leave the dot on.
+    expect(await unsavedTabs()).toEqual(['campanha.brief']);
   });
 
-  it('writes the tab that was saved and clears its marker alone', async () => {
+  it('writes the tab that was saved, and leaves nothing marked', async () => {
     await clickTab('campanha.brief');
     await runFromBar('editor.save');
 
     expect(readFileSync(firstPath, 'utf8')).toContain('primeira');
-    // The other tab is untouched on disk and still marked, which is the whole claim.
-    expect(await unsavedTabs()).toEqual(['promo.brief']);
+    // Nothing, and that inverted with the assertion above: campanha's buffer is now the file
+    // because it was just written, promo's was already the file because it was undone back
+    // to it, and no dot survives a tab agreeing with its disk (ADR 0026). The claim the old
+    // `['promo.brief']` made — that a save touches one tab and not the other — is made by
+    // the two `readFileSync` lines around it, which is where it always belonged.
+    expect(await unsavedTabs()).toEqual([]);
     expect(readFileSync(secondPath, 'utf8')).not.toContain('segunda');
     expect(await page.title()).toBe('campanha.brief — Tyto');
   });
@@ -491,5 +552,38 @@ describe('a save-as onto a file another tab has open', () => {
     ]);
     expect(await activeTab()).toBe('campanha.brief');
     expect(await unsavedTabs()).toEqual([expect.stringMatching(/^(Sem título|Untitled)$/u)]);
+  });
+});
+
+describe('a brief written on Windows', () => {
+  /**
+   * The one file that can make a derived marker lie, and the reason it is opened for real.
+   *
+   * CodeMirror normalises line endings when it builds a document, so the buffer of a CR LF
+   * brief says LF. A marker comparing that buffer against the bytes main read would be true
+   * from the first paint — a dot nobody caused, a title that says `(não salvo)`, and a
+   * discard dialog in front of closing a file that was never edited. `adopt` therefore reads
+   * the saved text back out of the buffer (TYTO-112, ADR 0026), and this is the only place
+   * in the repository where that is exercised end to end: every committed fixture is LF
+   * because `.gitattributes` says so, and the unit stand-in for an `EditorState` returns its
+   * string unchanged and so cannot see it at all.
+   */
+  it('opens with nothing marked, having been read through CodeMirror', async () => {
+    await answerDialogsWith(windowsPath);
+    await runFromBar('editor.open');
+
+    expect(await tabNames()).toContain('windows.brief');
+    expect(await activeTab()).toBe('windows.brief');
+    expect(await unsavedTabs()).not.toContain('windows.brief');
+    expect(await page.title()).toBe('windows.brief — Tyto');
+  });
+
+  it('closes without a question, because there is nothing in it to lose', async () => {
+    await answerConfirmWith(true);
+    await runFromBar('document.close');
+    await page.waitForTimeout(400);
+
+    expect(await timesAsked()).toBe(0);
+    expect(await tabNames()).not.toContain('windows.brief');
   });
 });

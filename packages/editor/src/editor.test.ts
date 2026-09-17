@@ -192,6 +192,20 @@ describe('document states', () => {
     expect(handle.getValue()).toBe('first');
   });
 
+  it('normalises the line endings of the text it is given', () => {
+    // Not a curiosity: it is the reason a host that keeps "what is in the file" has to read
+    // that string back **out of the state** rather than keep the one it passed in. A CRLF
+    // brief is a supported input (TYTO-64), so a host comparing a buffer against the bytes
+    // it handed over would find them different for every such file and never for a reason
+    // anybody caused. `apps/desktop`'s unsaved marker is the host that depends on this
+    // (TYTO-112, ADR 0026).
+    handle = createEditor(open().parent);
+
+    const onDisk = ['a', 'b'].join('\r\n') + '\r\n' + ['c', 'd'].join('\r');
+
+    expect(textOf(handle.blank(onDisk))).toBe(['a', 'b', 'c', 'd'].join('\n'));
+  });
+
   it('keeps each document undo stack to itself', () => {
     handle = createEditor(open().parent, { doc: 'a' });
     type(handle, ' edited');
