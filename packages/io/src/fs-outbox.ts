@@ -33,6 +33,37 @@ export const EDITABLE_DIR = 'editaveis';
 /** Without the dot, and matching `BRIEF_FILE`'s. */
 const BRIEF_EXTENSION = 'brief';
 
+/** Where a delivery says which template made it. Beside the brief, because it is about it. */
+export const TEMPLATE_FILE = 'template.txt';
+
+/**
+ * Enough to identify a template, and deliberately not enough to rebuild one.
+ *
+ * Structural rather than `TemplateManifest`: this writes three lines for a person, and a
+ * manifest also carries `formats` and `slots`, which are the template's business and not the
+ * delivery's.
+ */
+export interface DeliveryTemplate {
+  readonly name: string;
+  readonly version: string;
+  readonly description?: string;
+}
+
+/**
+ * A `TaskOutput` that can also say which template produced the artwork.
+ *
+ * Separate from `write` because the answer is not known when the output is opened: the job
+ * resolves the template from the brief's frontmatter or the `--template` fallback while it
+ * runs, so the delivery learns it between the last artifact and `finish`.
+ */
+export interface DeliveryOutput extends TaskOutput {
+  /**
+   * Writes {@link TEMPLATE_FILE}. Call it **before** `finish`, so `result.json` stays the
+   * last file to appear and keeps meaning "this delivery is complete".
+   */
+  describeTemplate(template: DeliveryTemplate): Promise<void>;
+}
+
 export interface FsDeliveryOutputOptions {
   /**
    * The folder's name, and the copied brief's. `basename(briefPath, '.brief')` at the caller.
@@ -160,6 +191,7 @@ function taskOutput(directories: TaskOutputDirectories): TaskOutput {
  *   <artwork>-<format>.png        nothing but artwork at this level
  *   editaveis/
  *     <name>.brief                the brief that produced the files above
+ *     template.txt                which template made it — a pointer, never a copy
  *     result.json
  * ```
  *
@@ -193,7 +225,7 @@ function taskOutput(directories: TaskOutputDirectories): TaskOutput {
 export async function fsDeliveryOutput(
   destination: string,
   options: FsDeliveryOutputOptions,
-): Promise<TaskOutput> {
+): Promise<DeliveryOutput> {
   // Refused, not rewritten. A guard is not the second sanitiser the doc comment argues
   // against: it changes no name, it declines one that would put the delivery somewhere the
   // caller did not name. `basename` at the caller already guarantees this; an embedder
@@ -214,12 +246,42 @@ export async function fsDeliveryOutput(
   // `result.json` is the finished signal and is still the last thing written.
   await writeAtomic(join(editable, `${options.name}.${BRIEF_EXTENSION}`), options.brief);
 
-  return taskOutput({
-    artifacts: folder,
-    result: editable,
-    ...(options.validate === undefined ? {} : { validate: options.validate }),
-    label: options.label ?? folder,
-  });
+  return {
+    ...taskOutput({
+      artifacts: folder,
+      result: editable,
+      ...(options.validate === undefined ? {} : { validate: options.validate }),
+      label: options.label ?? folder,
+    }),
+
+    async describeTemplate(template: DeliveryTemplate): Promise<void> {
+      await writeAtomic(join(editable, TEMPLATE_FILE), templateNote(template));
+    },
+  };
+}
+
+/**
+ * Three lines naming the template, and a sentence saying it is not here.
+ *
+ * **A pointer, never a copy.** The template lives in a repository somebody maintains and is
+ * shared by every delivery made from it; duplicating it into each folder would fill a remote
+ * with copies of the same thing and make "which version is the real one" a question. What a
+ * delivery owes its reader is the identity — the name and the version that produced these
+ * exact files — and that fits in a line.
+ *
+ * Portuguese for the sentence, like `editaveis/` itself and for the same reason: it is read
+ * by whoever receives the folder. The description is the template author's own words and is
+ * copied as written rather than translated.
+ */
+function templateNote(template: DeliveryTemplate): string {
+  const lines = [`${template.name} ${template.version}`];
+  if (template.description !== undefined) lines.push(template.description);
+  lines.push(
+    '',
+    'O template não está nesta pasta: ele vive no repositório de templates da equipe.',
+    'Estas artes foram feitas com a versão acima.',
+  );
+  return `${lines.join('\n')}\n`;
 }
 
 export function fsOutbox(options: FsOutboxOptions): OutputSink {
