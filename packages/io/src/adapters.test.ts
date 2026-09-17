@@ -210,6 +210,45 @@ describe('fsDeliveryOutput', () => {
     ]);
   });
 
+  it('names the template that made the artwork, and says it is not in the folder', async () => {
+    const output = await fsDeliveryOutput(join(workspace, 'entregas'), {
+      name: 'campanha',
+      brief: BRIEF,
+    });
+    await output.describeTemplate({
+      name: 'promo-curso',
+      version: '1.0.0',
+      description: 'Course promotion with a teacher photo.',
+    });
+    await output.finish(emptyResult());
+
+    const note = await readFile(
+      join(workspace, 'entregas', 'campanha', 'editaveis', 'template.txt'),
+      'utf8',
+    );
+    // The identity, which is what a delivery owes its reader — the name alone would not say
+    // which version drew these files, and two runs a month apart are two versions.
+    expect(note).toContain('promo-curso 1.0.0');
+    expect(note).toContain('Course promotion with a teacher photo.');
+    // And the sentence that stops somebody looking for a template that was never copied.
+    expect(note).toContain('não está nesta pasta');
+  });
+
+  it('leaves the pointer out when nothing named a template', async () => {
+    // A brief that does not parse never loads one, and a delivery that invented a name would
+    // be claiming something the run did not do.
+    const output = await fsDeliveryOutput(join(workspace, 'entregas'), {
+      name: 'campanha',
+      brief: BRIEF,
+    });
+    await output.finish(emptyResult());
+
+    expect((await readdir(join(workspace, 'entregas', 'campanha', 'editaveis'))).sort()).toEqual([
+      'campanha.brief',
+      'result.json',
+    ]);
+  });
+
   it('refuses a name that is not one path segment, rather than delivering elsewhere', async () => {
     // Refused, not rewritten. `artifact.ts`'s `fileSafe` would turn this into a folder with a
     // different name; a second sanitiser is how one delivery ends up called two things.

@@ -13,8 +13,18 @@ the brief and `result.json` underneath, in `editaveis/`:
   <artwork>-<format>.png
   editaveis/
     <name>.brief
+    template.txt
     result.json
 ```
+
+**`template.txt` names the template and never carries it.** `describeTemplate` writes the
+name, the version and the template's own description, plus a sentence saying the template
+lives in a repository and not in this folder. A copy per delivery would fill a remote with
+duplicates of a file that has one home and make "which version is the real one" a question;
+what a delivery owes its reader is the identity of the version that produced these exact
+files. It is a separate call rather than an option because the answer is not known when the
+output is opened — the run resolves it — and it goes in before `finish`, so `result.json`
+stays the last file to appear.
 
 **The top level holds artwork and nothing else, and that is the whole of the layout.** A
 folder with a report in it is a folder somebody tidies before sending it on, and the one file
