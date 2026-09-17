@@ -36,10 +36,13 @@ export {
 export { ASSETS_DIR, BRIEF_FILE, type FsInboxOptions, fsInbox } from './fs-inbox.js';
 
 export {
+  EDITABLE_DIR,
   OUT_DIR,
   RESULT_FILE,
+  type FsDeliveryOutputOptions,
   type FsOutboxOptions,
   type FsTaskOutputOptions,
+  fsDeliveryOutput,
   fsOutbox,
   fsTaskOutput,
 } from './fs-outbox.js';

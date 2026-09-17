@@ -135,6 +135,7 @@ describe('--help', () => {
         '--concurrency',
         '--json',
         '--out',
+        '--folder',
       ]) {
         // Only the flags this command actually has; the point is that whatever it has is
         // documented, not that every command has everything.
@@ -336,6 +337,105 @@ describe('tyto render', () => {
 
     expect(code).toBe(EXIT_DIAGNOSTICS);
     expect(stderr()).toContain('E_UNKNOWN_FORMAT');
+  });
+});
+
+/* --------------------------------------------------------------------------- folder -- */
+
+/**
+ * `--folder`: the delivery layout of TYTO-121.
+ *
+ * The acceptance criterion is a **shape on disk**, so these read the disk rather than the
+ * report. The brief used here is deliberately not `task/brief.brief`: its name would make the
+ * folder `brief/`, which reads as a fixture rather than as a delivery, and a name with a space
+ * and an accent in it is the case the card says must not be sanitised.
+ */
+describe('tyto render --folder', () => {
+  /** What a person would actually call a brief, saved where the `assets/` beside it is found. */
+  const NAME = 'campanha de setembro';
+
+  beforeEach(async () => {
+    await writeFile(join(workspace, 'task', `${NAME}.brief`), briefSource);
+  });
+
+  it('puts the artwork at the top and the brief underneath, in a folder named after it', async () => {
+    const code = await run(
+      ['render', `task/${NAME}.brief`, '--out', 'entregas', '--folder', '--types', 'svg'],
+      environment(),
+    );
+
+    expect(code, stderr()).toBe(EXIT_OK);
+    // Nothing but artwork at this level — the whole point of the layout. A `result.json`
+    // here would be the one file somebody has to delete before sending the folder on.
+    expect(await outFiles('entregas', NAME)).toEqual([
+      'editaveis',
+      'slide-1-feed.svg',
+      'slide-2-feed.svg',
+    ]);
+    expect(await outFiles('entregas', NAME, 'editaveis')).toEqual([`${NAME}.brief`, 'result.json']);
+  });
+
+  it('keeps the brief byte for byte, so the copy is the text that made the artwork', async () => {
+    await run(
+      ['render', `task/${NAME}.brief`, '--out', 'entregas', '--folder', '--types', 'svg'],
+      environment(),
+    );
+
+    // Read as bytes rather than as a string: a copy that normalised CR LF or dropped a BOM
+    // would compare equal as text and be a different file, and a CR LF brief is supported
+    // input (TYTO-64).
+    const copied = await readFile(join(workspace, 'entregas', NAME, 'editaveis', `${NAME}.brief`));
+    expect(copied.equals(Buffer.from(briefSource, 'utf8'))).toBe(true);
+  });
+
+  it('writes a result.json its own schema accepts, one level down', async () => {
+    await run(
+      ['render', `task/${NAME}.brief`, '--out', 'entregas', '--folder', '--types', 'svg'],
+      environment(),
+    );
+
+    const parsed = parseRenderResult(await resultAt('entregas', NAME, 'editaveis'));
+    if (!parsed.ok) throw new Error(parsed.error.join('; '));
+
+    expect(parsed.value.status).toBe('ok');
+    // The names are the same names `--out` produces. Only the folder around them moved, and
+    // an artifact list that suddenly carried a path would be a change to the ADR 0011 schema.
+    expect(parsed.value.artifacts.map((artifact) => artifact.name)).toEqual([
+      'slide-1-feed.svg',
+      'slide-2-feed.svg',
+    ]);
+  });
+
+  it('leaves --out alone when the flag is absent, which is what Jacurutu relies on', async () => {
+    // The same brief, the same destination, without the flag. `docs/render-contract.md` says
+    // `--out` **is** the output folder, and this is the assertion that a flag added beside it
+    // did not quietly make it a parent.
+    await run(
+      ['render', `task/${NAME}.brief`, '--out', 'entregas', '--types', 'svg'],
+      environment(),
+    );
+
+    expect(await outFiles('entregas')).toEqual([
+      'result.json',
+      'slide-1-feed.svg',
+      'slide-2-feed.svg',
+    ]);
+  });
+
+  it('reuses an existing folder and overwrites by name, leaving what it did not produce', async () => {
+    const delivery = join(workspace, 'entregas', NAME);
+    await mkdir(delivery, { recursive: true });
+    await writeFile(join(delivery, 'slide-3-feed.svg'), 'from a run that made three slides');
+
+    await run(
+      ['render', `task/${NAME}.brief`, '--out', 'entregas', '--folder', '--types', 'svg'],
+      environment(),
+    );
+
+    // The documented rule, and the hazard it carries, pinned rather than left to be
+    // discovered: a brief edited from three slides down to two leaves the third in the
+    // delivery, and `result.json` does not mention it because it lists what this run wrote.
+    expect(await outFiles('entregas', NAME)).toContain('slide-3-feed.svg');
   });
 });
 

@@ -5,6 +5,7 @@ import {
   type RenderResult,
   fileAssetResolver,
   fileResources,
+  fsDeliveryOutput,
   fsTaskOutput,
   renderResult,
 } from '@tyto/io';
@@ -34,6 +35,16 @@ export interface RenderTask {
   readonly assetBase: string;
   /** Where the artifacts and `result.json` go. Created if it is not there. */
   readonly outDirectory: string;
+  /**
+   * When present, {@link outDirectory} is the **parent** and this names the folder inside it.
+   *
+   * The delivery layout of `tyto render --folder` (TYTO-121): artwork at the top of
+   * `<outDirectory>/<name>/`, the brief and `result.json` under `editaveis/`. Absent is the
+   * ADR 0011 contract, where `--out` is the output folder and nothing is nested — and absent
+   * is what `tyto watch` and Jacurutu always pass, which is why this is an extra field rather
+   * than a change to the one above.
+   */
+  readonly delivery?: { readonly name: string };
 }
 
 export interface RenderTaskOptions {
@@ -86,7 +97,18 @@ export async function renderTask(
   inherited: Diagnostics = [],
 ): Promise<RenderTaskReport> {
   const wiring = templateWiring(context);
-  const output = await fsTaskOutput(task.outDirectory, { label: task.id });
+  const output =
+    task.delivery === undefined
+      ? await fsTaskOutput(task.outDirectory, { label: task.id })
+      : await fsDeliveryOutput(task.outDirectory, {
+          name: task.delivery.name,
+          // The source this run actually compiled, not a second read of the file. A brief
+          // edited between the read and the copy would otherwise put text in `editaveis/`
+          // that did not produce the artwork beside it, which is the one thing the folder
+          // exists to promise.
+          brief: new TextEncoder().encode(task.brief),
+          label: task.id,
+        });
 
   // Handed out empty and filled by `loadResources` below, once the scene says which files
   // it draws. The folder is no longer read to find out (TYTO-62).

@@ -1,5 +1,5 @@
 import { readFile, stat } from 'node:fs/promises';
-import { isAbsolute, join, relative, resolve } from 'node:path';
+import { basename, isAbsolute, join, relative, resolve } from 'node:path';
 
 import type { Diagnostics } from '@tyto/core';
 import { ASSETS_DIR } from '@tyto/io';
@@ -21,6 +21,13 @@ import { diagnosticsDocument, formatDiagnostics, json } from './report.js';
 
 export interface RenderCommandOptions {
   readonly out: string;
+  /**
+   * `--folder`: deliver into `<out>/<brief-name>/` instead of into `<out>` itself.
+   *
+   * Off by default and off for every caller that does not type it, which is what keeps the
+   * ADR 0011 contract byte for byte what `docs/render-contract.md` publishes.
+   */
+  readonly folder?: boolean;
   readonly template?: string;
   readonly formats?: readonly string[];
   readonly types: readonly OutputKind[];
@@ -40,6 +47,14 @@ export interface RenderCommandOptions {
   readonly concurrency?: number;
   readonly json: boolean;
 }
+
+/**
+ * Stripped from the brief's file name to get the delivery folder's, and nothing else.
+ *
+ * A brief named something other than `.brief` keeps its whole name as the folder's, which is
+ * the honest answer: `basename` removes a suffix only when it is there.
+ */
+const BRIEF_SUFFIX = '.brief';
 
 /** Paths are printed as the user would type them, not as this machine stores them. */
 export function displayPath(cwd: string, path: string): string {
@@ -123,6 +138,11 @@ export async function renderCommand(
         briefPath: shownBrief,
         assetBase: await assetBaseFor(resolve(briefPath, '..'), options.assets),
         outDirectory: resolve(cwd, options.out),
+        // `basename` and nothing else. The name comes off a file that exists, so it is
+        // already legal here, and a second sanitiser is what `artifact.ts` warns against.
+        ...(options.folder === true
+          ? { delivery: { name: basename(briefPath, BRIEF_SUFFIX) } }
+          : {}),
       },
       {
         outputs: outputRequests(options),

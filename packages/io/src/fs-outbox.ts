@@ -1,5 +1,5 @@
 import { mkdir, rename, rm, writeFile } from 'node:fs/promises';
-import { join, resolve } from 'node:path';
+import { basename, join, resolve } from 'node:path';
 
 import type { Artifact } from '@tyto/pipeline';
 
@@ -18,6 +18,35 @@ import { type RenderResult, renderResultSchema } from './result.js';
 /** The name the contract fixes for the folder and for the manifest inside it. */
 export const OUT_DIR = 'out';
 export const RESULT_FILE = 'result.json';
+
+/**
+ * The subfolder of a delivery holding what a person would open to change something.
+ *
+ * **Portuguese, deliberately, and the only user-facing name in this package that is.** It is
+ * read by whoever receives the folder rather than by a program — `docs/git-workflow.md` keeps
+ * the repository English, and this is a word on somebody's desktop, not an identifier. Spelled
+ * without the accent because a folder name travels through zip tools, shells and browsers that
+ * still disagree about one.
+ */
+export const EDITABLE_DIR = 'editaveis';
+
+/** Without the dot, and matching `BRIEF_FILE`'s. */
+const BRIEF_EXTENSION = 'brief';
+
+export interface FsDeliveryOutputOptions {
+  /**
+   * The folder's name, and the copied brief's. `basename(briefPath, '.brief')` at the caller.
+   *
+   * One path segment: a `/` in it would silently deliver somewhere else.
+   */
+  readonly name: string;
+  /** The brief that produced the artwork, copied into {@link EDITABLE_DIR} unchanged. */
+  readonly brief: Uint8Array;
+  /** See {@link FsOutboxOptions.validate}. On by default. */
+  readonly validate?: boolean;
+  /** Named in the schema-mismatch message, so a reader knows which task produced it. */
+  readonly label?: string;
+}
 
 export interface FsOutboxOptions {
   /** The folder that gets one subfolder per task. */
@@ -72,13 +101,32 @@ export async function fsTaskOutput(
   options: FsTaskOutputOptions = {},
 ): Promise<TaskOutput> {
   const full = resolve(directory);
-  const validate = options.validate ?? true;
-  const label = options.label ?? full;
   await mkdir(full, { recursive: true });
+  return taskOutput({ artifacts: full, result: full, ...options, label: options.label ?? full });
+}
+
+/**
+ * The two directories a `TaskOutput` writes into, which are the same one until they are not.
+ *
+ * `fsTaskOutput` puts artifacts and `result.json` in one folder; `fsDeliveryOutput` puts the
+ * artwork at the top and the report underneath. Everything else about writing — the atomic
+ * rename, the schema check, `result.json` going last — is identical, and this is the one copy
+ * of it. Two adapters with their own copies would be two ways for a half-written PNG to
+ * reach a watcher.
+ */
+interface TaskOutputDirectories {
+  readonly artifacts: string;
+  readonly result: string;
+  readonly validate?: boolean;
+  readonly label: string;
+}
+
+function taskOutput(directories: TaskOutputDirectories): TaskOutput {
+  const validate = directories.validate ?? true;
 
   return {
     async write(artifact: Artifact): Promise<void> {
-      await writeAtomic(join(full, artifact.name), artifact.bytes);
+      await writeAtomic(join(directories.artifacts, artifact.name), artifact.bytes);
     },
 
     async finish(result: RenderResult): Promise<void> {
@@ -86,7 +134,7 @@ export async function fsTaskOutput(
         const parsed = renderResultSchema.safeParse(result);
         if (!parsed.success) {
           throw new Error(
-            `result.json for '${label}' does not match its schema: ${parsed.error.issues
+            `result.json for '${directories.label}' does not match its schema: ${parsed.error.issues
               .map((issue) => `${issue.path.map(String).join('.') || '(root)'} ${issue.message}`)
               .join('; ')}`,
           );
@@ -95,9 +143,83 @@ export async function fsTaskOutput(
 
       // Last, and atomically. `result.json` appearing is how a reader knows the task is
       // finished, so it must not appear before the artifacts it lists.
-      await writeAtomic(join(full, RESULT_FILE), `${JSON.stringify(result, null, 2)}\n`);
+      await writeAtomic(
+        join(directories.result, RESULT_FILE),
+        `${JSON.stringify(result, null, 2)}\n`,
+      );
     },
   };
+}
+
+/**
+ * The folder a person sends out: `<destination>/<name>/`, artwork at the top, the rest under
+ * {@link EDITABLE_DIR}.
+ *
+ * ```
+ * <destination>/<name>/
+ *   <artwork>-<format>.png        nothing but artwork at this level
+ *   editaveis/
+ *     <name>.brief                the brief that produced the files above
+ *     result.json
+ * ```
+ *
+ * **The top level holds artwork and nothing else, and that is the whole point of the
+ * layout.** A folder with a report in it is a folder somebody has to tidy before dropping it
+ * into a delivery, and the one file they would have to delete is the one file Tyto's own
+ * contract says never to move (ADR 0011). So it goes down a level instead, where it is still
+ * exactly where a reader of `editaveis/` expects to find it.
+ *
+ * **This is not `--out`.** `tyto render --out <dir>` writes into exactly the directory named
+ * and that is published behaviour Jacurutu reads (`docs/render-contract.md`); this is a
+ * second layout that a caller opts into, under which the directory named becomes the parent.
+ *
+ * ## The name is the brief's, unsanitised, on purpose
+ *
+ * `name` comes from a file that already exists on disk, so it is already legal for this
+ * filesystem. Running it through the `fileSafe` of `artifactName` would be a second
+ * sanitiser with its own opinion, and two sanitisers is how one folder ends up named two
+ * things.
+ *
+ * ## An existing folder is written into, not cleared
+ *
+ * Exporting the same brief twice reuses the folder and overwrites by name — the same rule
+ * `--out` has today, chosen for that reason rather than invented here. **What it costs is
+ * worth naming: a file from a previous run that this one does not produce survives.** A
+ * brief edited from three slides down to two leaves `slide-3-feed.png` in the delivery, and
+ * nothing in `result.json` mentions it, because `result.json` lists what this run wrote.
+ * Cleaning the folder, or refusing a non-empty one, is a decision with a blast radius —
+ * deleting somebody's files — and it is not this card's to take.
+ */
+export async function fsDeliveryOutput(
+  destination: string,
+  options: FsDeliveryOutputOptions,
+): Promise<TaskOutput> {
+  // Refused, not rewritten. A guard is not the second sanitiser the doc comment argues
+  // against: it changes no name, it declines one that would put the delivery somewhere the
+  // caller did not name. `basename` at the caller already guarantees this; an embedder
+  // calling the port directly does not.
+  if (options.name === '' || options.name !== basename(options.name)) {
+    throw new TypeError(
+      `A delivery folder's name is one path segment, got '${options.name}'. It is the brief's ` +
+        "own file name without the extension — basename(briefPath, '.brief').",
+    );
+  }
+
+  const folder = join(resolve(destination), options.name);
+  const editable = join(folder, EDITABLE_DIR);
+  // One `mkdir -p` makes both: `editaveis/` is inside the folder it is created under.
+  await mkdir(editable, { recursive: true });
+
+  // Before any artifact, so a run that dies half way still shows what it was rendering.
+  // `result.json` is the finished signal and is still the last thing written.
+  await writeAtomic(join(editable, `${options.name}.${BRIEF_EXTENSION}`), options.brief);
+
+  return taskOutput({
+    artifacts: folder,
+    result: editable,
+    ...(options.validate === undefined ? {} : { validate: options.validate }),
+    label: options.label ?? folder,
+  });
 }
 
 export function fsOutbox(options: FsOutboxOptions): OutputSink {
