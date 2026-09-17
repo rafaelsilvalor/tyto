@@ -123,7 +123,7 @@ async function problems(
   extra: Partial<ResolveOptions> = {},
 ): Promise<readonly Diagnostic[]> {
   const result = await resolve(ast, optionsFor(extra));
-  return result.ok ? result.warnings : result.error;
+  return result.ok ? result.diagnostics : result.error;
 }
 
 async function codes(ast: BriefAst, extra: Partial<ResolveOptions> = {}): Promise<string[]> {
@@ -574,9 +574,14 @@ describe('the values a manifest constrains', () => {
       ],
     });
     const result = await resolve(ast, optionsFor());
-    expect(result.ok).toBe(false);
-    // The good one survives into the value even though the brief as a whole is refused,
-    // which is what lets an editor show the slot while the author fixes the other.
+    // An undeclared adjustment costs that adjustment and nothing else, so the brief is not
+    // refused: the artwork renders and the error rides along beside it (ADR 0025).
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect(result.value.artworks[0]?.slot.adjustments.map((item) => item.name)).toEqual([
+      'destaque',
+    ]);
+    expect(result.diagnostics.map((item) => item.code)).toEqual(['E_BAD_ADJUSTMENT']);
     expect(await codes(ast)).toEqual(['E_BAD_ADJUSTMENT']);
   });
 });
@@ -639,7 +644,7 @@ describe('how the problems arrive', () => {
     const result = await resolve(valid(), optionsFor({ renderedSlots: ['titulo', 'slide'] }));
     expect(result.ok).toBe(true);
     if (result.ok) {
-      expect(result.warnings.map((item) => item.code)).toEqual(['W_UNUSED_SLOT']);
+      expect(result.diagnostics.map((item) => item.code)).toEqual(['W_UNUSED_SLOT']);
       expect(result.value.slots.cor).toBeDefined();
     }
   });

@@ -66,7 +66,7 @@ describe('what the builders produce', () => {
     const result = parseScene(sceneOf([everyKind()]));
 
     if (!result.ok) throw new Error(`expected ok, got: ${codes(result.error).join(', ')}`);
-    expect(result.warnings).toEqual([]);
+    expect(result.diagnostics).toEqual([]);
   });
 
   it('survives the round trip unchanged: the builders already fill every default', () => {

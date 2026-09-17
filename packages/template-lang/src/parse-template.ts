@@ -35,7 +35,7 @@ import { parser } from './template.parser.js';
  * are undone here.
  *
  * Errors are data, never exceptions (ADR 0013): markup that does not parse comes back as
- * `Err` with one `E_SYNTAX` per place the author has to fix. Pure: no Node, no DOM.
+ * `Err` with one `E_TEMPLATE_SYNTAX` per place the author has to fix. Pure: no Node, no DOM.
  */
 
 function* children(node: SyntaxNode): Generator<SyntaxNode> {
@@ -114,7 +114,7 @@ function syntaxProblems(tree: Tree, source: string): Diagnostic[] {
             : (INCOMPLETE[parent] ?? 'something is missing here');
 
       problems.push(
-        diagnostic('E_SYNTAX', { problem }, { range: sourceRange(node.from, node.to) }),
+        diagnostic('E_TEMPLATE_SYNTAX', { problem }, { range: sourceRange(node.from, node.to) }),
       );
     },
   });
@@ -253,7 +253,7 @@ function closeTagProblems(source: string, tree: Tree): Diagnostic[] {
       if (open === close) return;
       problems.push(
         diagnostic(
-          'E_SYNTAX',
+          'E_TEMPLATE_SYNTAX',
           { problem: `<${open}> is closed by </${close}>` },
           { range: rangeOf(closer) },
         ),

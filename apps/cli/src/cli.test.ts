@@ -197,6 +197,61 @@ describe('tyto render', () => {
     ]);
   });
 
+  it('renders the slots that are fine, and says so in result.json (ADR 0025)', async () => {
+    // `rodape` is not a slot this manifest declares. It is an error the author has to fix,
+    // and it costs that directive and nothing else — so the two slides are still drawn,
+    // still written, and still listed. The third state: `status: error` with artifacts.
+    await writeFile(
+      join(workspace, 'task', 'brief.brief'),
+      `${briefSource}\n::rodape Inscreva-se\n`,
+    );
+
+    const code = await run(
+      ['render', 'task/brief.brief', '--out', 'task/out', '--types', 'svg'],
+      environment(),
+    );
+
+    expect(code, stderr()).toBe(EXIT_DIAGNOSTICS);
+    expect(await outFiles('task', 'out')).toEqual([
+      'result.json',
+      'slide-1-feed.svg',
+      'slide-2-feed.svg',
+    ]);
+
+    const parsed = parseRenderResult(await resultAt('task', 'out'));
+    if (!parsed.ok) throw new Error(parsed.error.join('; '));
+    expect(parsed.value.status).toBe('error');
+    expect(parsed.value.planned).toBe(2);
+    expect(parsed.value.artifacts.map((artifact) => artifact.name)).toEqual([
+      'slide-1-feed.svg',
+      'slide-2-feed.svg',
+    ]);
+    expect(parsed.value.diagnostics.some((item) => item.code === 'E_UNKNOWN_SLOT')).toBe(true);
+  });
+
+  it('writes no artifact at all when the brief names a template that does not exist', async () => {
+    // The other side of the same rule: fatal means nothing is drawn, and `result.json` is
+    // still written so the caller on the other end of ADR 0011 has something to read.
+    await writeFile(
+      join(workspace, 'task', 'brief.brief'),
+      briefSource.replace('template: cartaz', 'template: nao-existe'),
+    );
+
+    const code = await run(
+      ['render', 'task/brief.brief', '--out', 'task/out', '--types', 'svg'],
+      environment(),
+    );
+
+    expect(code).toBe(EXIT_DIAGNOSTICS);
+    expect(await outFiles('task', 'out')).toEqual(['result.json']);
+
+    const parsed = parseRenderResult(await resultAt('task', 'out'));
+    if (!parsed.ok) throw new Error(parsed.error.join('; '));
+    expect(parsed.value.status).toBe('error');
+    expect(parsed.value.artifacts).toEqual([]);
+    expect(parsed.value.diagnostics.some((item) => item.code === 'E_UNKNOWN_TEMPLATE')).toBe(true);
+  });
+
   it("embeds the template's own <vector src>, which nothing but the CLI resolves", async () => {
     await run(['render', 'task/brief.brief', '--out', 'task/out', '--types', 'svg'], environment());
 
@@ -322,6 +377,10 @@ describe('the three exit codes ADR 0011 fixes', () => {
     if (!parsed.ok) throw new Error(parsed.error.join('; '));
     expect(parsed.value.status).toBe('error');
     expect(parsed.value.diagnostics.some((item) => item.code === 'E_RENDER_FAILED')).toBe(true);
+    // Every frame failed here, so the honest report is two planned and none produced —
+    // not the absent report an `Err` used to leave behind.
+    expect(parsed.value.planned).toBe(2);
+    expect(parsed.value.artifacts).toEqual([]);
   });
 
   it('exits 1 for a brief that is not on disk', async () => {

@@ -154,8 +154,8 @@ export async function createPreviewService(
   // whose template folder is unreadable should open, show the editor, and say what is wrong
   // — not refuse to start. `PreviewResult` already has the place to say it.
   const startup: Diagnostic[] = [
-    ...(registry.ok ? registry.warnings : registry.error),
-    ...(formats.ok ? formats.warnings : formats.error),
+    ...(registry.ok ? registry.diagnostics : registry.error),
+    ...(formats.ok ? formats.diagnostics : formats.error),
   ];
 
   const catalogue: FormatCatalogue | undefined = formats.ok ? formats.value : undefined;
@@ -189,21 +189,21 @@ export async function createPreviewService(
         registry: templates,
         assets,
       });
-      if (!resolved.ok) return failed([...ast.warnings, ...resolved.error]);
+      if (!resolved.ok) return failed([...ast.diagnostics, ...resolved.error]);
 
       const template = await markupTemplateSource(fileSystem, templates).load(
         resolved.value.template,
       );
       if (!template.ok) {
-        return failed([...ast.warnings, ...resolved.warnings, ...template.error]);
+        return failed([...ast.diagnostics, ...resolved.diagnostics, ...template.error]);
       }
 
       const scene = compile(resolved.value, template.value, { formats: catalogue, faces });
       if (!scene.ok) {
         return failed([
-          ...ast.warnings,
-          ...resolved.warnings,
-          ...template.warnings,
+          ...ast.diagnostics,
+          ...resolved.diagnostics,
+          ...template.diagnostics,
           ...scene.error,
         ]);
       }
@@ -232,10 +232,10 @@ export async function createPreviewService(
 
       const before = [
         ...startup,
-        ...ast.warnings,
-        ...resolved.warnings,
-        ...template.warnings,
-        ...scene.warnings,
+        ...ast.diagnostics,
+        ...resolved.diagnostics,
+        ...template.diagnostics,
+        ...scene.diagnostics,
       ];
 
       // Zipped by position, which is exact rather than close enough: `planArtworks` maps
@@ -262,7 +262,7 @@ export async function createPreviewService(
           html: frame.html,
         })),
         artworks,
-        diagnostics: [...before, ...exported.warnings],
+        diagnostics: [...before, ...exported.diagnostics],
       };
     },
   };

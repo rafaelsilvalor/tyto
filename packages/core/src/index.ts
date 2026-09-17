@@ -26,8 +26,11 @@ export {
   type DiagnosticOptions,
   diagnostic,
   hasErrors,
+  hasFatal,
   isError,
+  isFatal,
   isWarning,
+  partitionByFatality,
   sortDiagnostics,
 } from './diagnostics/diagnostic.js';
 
@@ -40,6 +43,7 @@ export {
   andThen,
   err,
   fromDiagnostics,
+  fromPartial,
   isErr,
   isOk,
   map,
@@ -48,7 +52,7 @@ export {
   ok,
   unwrapOr,
   unwrapOrElse,
-  withWarnings,
+  withDiagnostics,
 } from './result/result.js';
 
 export type {

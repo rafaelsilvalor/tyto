@@ -15,8 +15,7 @@ import {
   compile,
   diagnostic,
   err,
-  fromDiagnostics,
-  isError,
+  fromPartial,
   ok,
   resolve,
   sceneResources,
@@ -328,7 +327,7 @@ export async function runJob(
   notify(onEvent, { kind: 'stage-started', stage: 'parse' });
   const parsed = parseBrief(request.brief);
   if (!parsed.ok) return err(parsed.error);
-  problems.push(...parsed.warnings);
+  problems.push(...parsed.diagnostics);
   notify(onEvent, { kind: 'stage-finished', stage: 'parse' });
 
   if (aborted()) {
@@ -350,7 +349,7 @@ export async function runJob(
     const loaded = await ports.templates.load(name);
     if (!loaded.ok) return err([...problems, ...loaded.error]);
     template = loaded.value;
-    problems.push(...loaded.warnings);
+    problems.push(...loaded.diagnostics);
   }
   notify(onEvent, { kind: 'stage-finished', stage: 'template' });
 
@@ -367,7 +366,7 @@ export async function runJob(
     ...(renderedSlots === undefined ? {} : { renderedSlots }),
   });
   if (!resolved.ok) return err([...problems, ...resolved.error]);
-  problems.push(...resolved.warnings);
+  problems.push(...resolved.diagnostics);
   notify(onEvent, { kind: 'stage-finished', stage: 'resolve' });
 
   // Unreachable in practice: `resolve` succeeded, so it found a manifest for the same name
@@ -400,7 +399,7 @@ export async function runJob(
     ...(ports.faces === undefined ? {} : { faces: ports.faces }),
   });
   if (!compiled.ok) return err([...problems, ...compiled.error]);
-  problems.push(...compiled.warnings);
+  problems.push(...compiled.diagnostics);
   notify(onEvent, { kind: 'stage-finished', stage: 'compile' });
 
   /* -------------------------------------------------------------------- resources -- */
@@ -451,7 +450,7 @@ export async function runJob(
 
     if (ports.loadResources !== undefined) return exported;
     return exported.ok
-      ? ok(exported.value, explainUnloadedAssets(exported.warnings))
+      ? ok(exported.value, explainUnloadedAssets(exported.diagnostics))
       : err(explainUnloadedAssets(exported.error));
   }
 
@@ -509,10 +508,10 @@ export async function runJob(
 
     const document = bytesOf(task);
     const encoded = document.ok ? await encode(task, document.value) : err(document.error);
-    const warnings = document.ok ? document.warnings : [];
+    const carried = document.ok ? document.diagnostics : [];
 
     if (!encoded.ok) {
-      const collected = [...warnings, ...encoded.error];
+      const collected = [...carried, ...encoded.error];
       failures[index] = collected;
       done += 1;
       failed += 1;
@@ -546,7 +545,7 @@ export async function runJob(
       await ports.sink?.write(artifact);
     } catch (cause) {
       const collected = [
-        ...warnings,
+        ...carried,
         diagnostic('E_OUTPUT_WRITE', { artifact: artifact.name, problem: messageOf(cause) }),
       ];
       failures[index] = collected;
@@ -562,7 +561,7 @@ export async function runJob(
       return;
     }
 
-    failures[index] = [...warnings];
+    failures[index] = [...carried];
     artifacts[index] = artifact;
     done += 1;
     notify(onEvent, {
@@ -595,9 +594,13 @@ export async function runJob(
     failed,
   };
 
-  // ADR 0013: warnings ride the success branch, an error replaces the value. A frame that
-  // failed makes the job an `Err` carrying every diagnostic — which is what `tyto render`
-  // turns into a non-zero exit (ADR 0011) — and the artifacts that did render have already
-  // reached the sink, so a caller that wants partial output supplies one.
-  return problems.some(isError) ? err(problems) : fromDiagnostics(report, problems);
+  // ADR 0025: a **fatal** diagnostic replaces the report; everything else rides with it.
+  //
+  // A frame that failed used to make the whole job an `Err`, and the report went with it —
+  // so `result.json` said `artifacts: []` while eleven of twelve files sat in the output
+  // folder it had already written. `E_RENDER_FAILED` and `E_OUTPUT_WRITE` are one frame
+  // each and the other eleven are drawn, so neither is fatal, and the report that names
+  // them survives. What does not change is the exit code: `hasErrors` is what `tyto
+  // render` reads (ADR 0011), and a run with one broken frame still fails.
+  return fromPartial(report, problems);
 }

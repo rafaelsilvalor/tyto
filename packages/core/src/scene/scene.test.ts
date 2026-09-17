@@ -43,7 +43,7 @@ describe('a valid scene', () => {
 
   it('reports no warnings, because nothing in the IR is merely suspicious yet', () => {
     const result = parseScene(validPromo);
-    expect(result.ok && result.warnings).toEqual([]);
+    expect(result.ok && result.diagnostics).toEqual([]);
   });
 
   it('fills the defaults so an exporter never has to', () => {

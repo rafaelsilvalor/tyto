@@ -246,7 +246,7 @@ describe('promo-curso in markup and promo-curso in TypeScript', () => {
     });
     expect(resolved.ok).toBe(true);
     if (!resolved.ok) return;
-    expect(resolved.warnings.map((item) => item.code)).toEqual([]);
+    expect(resolved.diagnostics.map((item) => item.code)).toEqual([]);
   });
 });
 
@@ -365,8 +365,8 @@ describe('what the warning still has to catch', () => {
     );
 
     if (!resolved.ok) throw new Error(resolved.error.map((item) => item.message).join('; '));
-    expect(resolved.warnings.map((item) => item.code)).toEqual(['W_UNUSED_SLOT']);
-    expect(resolved.warnings[0]?.message).toContain("Slot 'fundo'");
+    expect(resolved.diagnostics.map((item) => item.code)).toEqual(['W_UNUSED_SLOT']);
+    expect(resolved.diagnostics[0]?.message).toContain("Slot 'fundo'");
   });
 
   it('an empty conditional block reads nothing, because it changes nothing', () => {
@@ -439,12 +439,12 @@ describe('what the language refuses, and where', () => {
 
   it('reports the syntax it could not read rather than guessing at meaning', () => {
     const [problem] = problemsOf('<frame format="feed">hello</frame>', MINIMAL);
-    expect(problem?.code).toBe('E_SYNTAX');
+    expect(problem?.code).toBe('E_TEMPLATE_SYNTAX');
   });
 
   it('catches a closing tag that names a different element', () => {
     const [problem] = problemsOf('<frame format="feed"><group class="t"></frame></group>', MINIMAL);
-    expect(problem?.code).toBe('E_SYNTAX');
+    expect(problem?.code).toBe('E_TEMPLATE_SYNTAX');
     expect(problem?.message).toContain('<group> is closed by </frame>');
   });
 

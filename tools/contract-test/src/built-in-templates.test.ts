@@ -123,7 +123,7 @@ async function buildSource(
   const scene = compile(resolved.value, template.value, { formats: formats.value, faces });
   if (!scene.ok) throw new Error(scene.error.map((item) => item.message).join('; '));
 
-  return { scene: scene.value, warnings: [...resolved.warnings, ...scene.warnings] };
+  return { scene: scene.value, warnings: [...resolved.diagnostics, ...scene.diagnostics] };
 }
 
 describe.each(EXAMPLES.map((example) => [example.template, example] as const))(
@@ -345,7 +345,7 @@ describe('the pack as the CLI finds it, with no --templates (ADR 0020)', () => {
     if (!asBoth.ok) throw new Error(asBoth.error.map((item) => item.message).join('; '));
 
     expect(asBoth.value.list()).toEqual(asFolder.value.list());
-    expect(asBoth.warnings).toEqual([]);
+    expect(asBoth.diagnostics).toEqual([]);
   }, 60_000);
 });
 
