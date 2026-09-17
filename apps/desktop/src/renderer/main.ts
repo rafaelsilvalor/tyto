@@ -1,4 +1,4 @@
-import { type CommandRegistry, type EditorHandle, createEditor } from '@tyto/editor';
+import { type CommandRegistry, type EditorHandle, createEditor, textOf } from '@tyto/editor';
 
 import { type TytoBridge } from '../../shared/ipc.js';
 import {
@@ -140,14 +140,33 @@ const nextDocumentId = (): string => {
 /**
  * What is open, and which one the window is looking at.
  *
- * Starts as one untitled document with no snapshot in it: the buffer does not exist yet at
- * module load, and the first thing the editor is created with *is* this document. Every
- * later document is born from `editor.blank`.
+ * Starts as one untitled document with no state in it: CodeMirror does not exist yet at
+ * module load, and the first thing the editor is created with *is* this document, whose
+ * state is adopted the moment there is one ({@link adoptEditorState}). Every later document
+ * is born from `editor.blank`.
  */
 let workspace: Workspace = workspaceOf(newDocument(nextDocumentId()));
 
 /** The document every painter below reads. */
 const active = (): DocumentState => activeOf(workspace);
+
+/**
+ * What the document in front says, read from the workspace and never from the editor.
+ *
+ * **The whole of TYTO-115 lands here.** Five call sites used to ask CodeMirror for the text
+ * — the template picker twice, the save, the debounced compile and the first compile — and
+ * each of them was therefore an answer only the *active* document could give. They all read
+ * this now, the workspace is what holds the content, and the editor is the pane it is shown
+ * in (D1 of `docs/explorations/2026-09-16-document-buffer-model.md`).
+ *
+ * Empty before CodeMirror is mounted, which is the one paint between module load and
+ * {@link load} — the same window in which the old `editor?.getValue() ?? ''` answered the
+ * same empty string.
+ */
+function activeText(): string {
+  const { state } = active();
+  return state === undefined ? '' : textOf(state);
+}
 
 /** Changes the active document and leaves every other one exactly as it was. */
 function updateActive(change: (document: DocumentState) => DocumentState): void {
@@ -194,10 +213,10 @@ const panel = {
  * it. A diagnostic row scrolls it, the slide picker scrolls it and the template picker
  * edits it, so the handle is state rather than a local now.
  *
- * **One editor and several documents**, not one editor per tab. Switching hands the buffer,
- * the undo history, the cursor and the scroll over as a `DocumentSnapshot`; a second
- * CodeMirror per tab would be a second set of extensions, a second keymap and a second
- * command registry for the window to keep in step.
+ * **One pane and several documents**, not one editor per tab. The workspace holds every
+ * document's `EditorState` and this view shows one of them at a time; a second CodeMirror
+ * per tab would be a second set of extensions, a second keymap and a second command registry
+ * for the window to keep in step.
  */
 let editor: EditorHandle | undefined;
 
@@ -361,7 +380,7 @@ function paintPanel(): void {
   if (elements.template !== null) {
     paintTemplatePicker(elements.template, {
       templates: panel.templates,
-      current: templateOf(editor?.getValue() ?? ''),
+      current: templateOf(activeText()),
       locale: state.locale,
     });
   }
@@ -453,11 +472,16 @@ const registry: CommandRegistry = createDesktopRegistry({
 
   saveDocument: (saveAs) => {
     void withBridge(async (bridge) => {
+      // Still the pane, and deliberately: the guard asks whether the window is up, not
+      // where the text comes from. A save fired in the paint before CodeMirror is mounted
+      // would write the empty string over a file.
       if (editor === undefined) return;
       const documentId = workspace.activeId;
       const answer = await bridge['file:save']({
         documentId,
-        text: editor.getValue(),
+        // The workspace's text and not the pane's, which is what makes this call one a
+        // future "save all" could make about a tab that is not in front.
+        text: activeText(),
         saveAs,
       });
       // A dismissed dialog leaves everything alone, dirty marker included. Clearing it
@@ -532,39 +556,57 @@ async function withBridge(use: (bridge: TytoBridge) => Promise<void>): Promise<v
 }
 
 /**
- * Writes the editor's buffer back into the active document, before anything takes it away.
+ * Remembers where the pane was looking, before it is pointed at another document.
  *
- * The one call that keeps a tab a place rather than a reload: the snapshot carries the undo
- * history, the cursor and the scroll, none of which a string would. Everything that changes
- * which document the editor is holding calls this first.
+ * **This used to capture the document too, and no longer has to** (TYTO-115). The state
+ * arrives here on every transaction, so what is left is the half that is genuinely the
+ * pane's: scroll is a property of the view and the store cannot derive it (D7). It is
+ * measured rather than watched because reading it costs a layout flush, and a pane is about
+ * to change document at most as often as somebody clicks a tab.
  */
-function captureActive(): void {
+function captureScroll(): void {
   if (editor === undefined) return;
-  const snapshot = editor.snapshot();
-  updateActive((document_) => ({ ...document_, snapshot }));
+  const scroll = editor.scroll();
+  updateActive((document_) => ({ ...document_, scroll }));
 }
 
 /** Puts a document in the editor and in front of every panel. */
 function activate(id: string): void {
   if (id === workspace.activeId || documentOf(workspace, id) === undefined) return;
-  captureActive();
+  captureScroll();
   workspace = selectDocument(workspace, id);
   restoreActive();
   repaint();
 }
 
 /**
- * Hands the editor whatever the active document was holding when it was put down.
+ * Shows the active document in the pane, undo history, cursor and scroll included.
  *
  * And puts the caret back in it. Clicking a tab moves focus to the tab's own button, and a
  * person who has just chosen a document wants to type into it — every editor does this, and
  * without it the first keystroke after a switch goes nowhere a person can see.
+ *
+ * Nothing is read *out* of the pane here, which is the direction the refactor removed: the
+ * workspace is holding the state already and this only points a viewport at it.
  */
 function restoreActive(): void {
   if (editor === undefined) return;
-  const snapshot = active().snapshot;
-  if (snapshot !== undefined) editor.restore(snapshot);
+  const current = active();
+  if (current.state !== undefined) editor.restore(current.state, current.scroll);
   editor.view.focus();
+}
+
+/**
+ * Takes the state CodeMirror was born holding into the document the window opened on.
+ *
+ * The one seam where the store is *behind* the pane, and it lasts one statement: the
+ * workspace is built at module load and the editor is created after the dock has arranged,
+ * so the first document exists for a paint with no state in it. Called the moment there is
+ * one, before any listener or any compile, so that every later read finds a document the
+ * store can answer for.
+ */
+function adoptEditorState(handle: EditorHandle): void {
+  updateActive((document_) => ({ ...document_, state: handle.state() }));
 }
 
 /**
@@ -596,7 +638,7 @@ function adopt(
     name: opened.name,
   };
 
-  captureActive();
+  captureScroll();
   const current = active();
   workspace = isDisposable(current)
     ? {
@@ -717,7 +759,7 @@ function closeTab(id: string): void {
   });
 
   const before = workspace.activeId;
-  if (id === before) captureActive();
+  if (id === before) captureScroll();
   // Closing the last tab leaves an empty one rather than an empty window: there would be
   // nowhere to type, and typing is the state this app opens in.
   workspace = closeDocument(workspace, id, () => newDocument(nextDocumentId(), editor?.blank('')));
@@ -1132,7 +1174,7 @@ function wirePanelControls(): void {
     // where it was, puts the old template back under Ctrl+Z, and — the part that matters
     // most — notifies `onChange`, so the preview refreshes through the same path typing
     // uses. `setValue` deliberately notifies nobody.
-    const edit = planTemplateEdit(editor.getValue(), picker.value);
+    const edit = planTemplateEdit(activeText(), picker.value);
     if (edit === undefined) return;
     editor.view.dispatch({
       changes: { from: edit.from, to: edit.to, insert: edit.insert },
@@ -1210,11 +1252,26 @@ async function load(): Promise<void> {
       // CodeMirror's. `applyLocale` is what keeps them current afterwards.
       searchPhrases: searchPhrasesFor(state.locale),
     });
+    // Narrowed once, because `editor` is a module-level `let` and TypeScript widens it
+    // again inside every callback below.
+    const handle = editor;
+    // Both before anything else can touch the document, and in this order: the workspace
+    // takes the state CodeMirror was born with, and then subscribes to every transaction
+    // that moves it. From here the store is the owner and the view is a viewport onto it
+    // (D1, TYTO-115) — there is no window in which a keystroke lands somewhere this record
+    // does not follow.
+    adoptEditorState(handle);
+    handle.onUpdate((next) => {
+      // Into the active document, which is the one this pane is showing. A transaction can
+      // only have come from the document in front of the person who caused it, and
+      // everything that changes which one that is has already moved `activeId` by the time
+      // the view is handed the other state.
+      updateActive((document_) => ({ ...document_, state: next }));
+    });
     // The bindings are read off the keymap set the editor is running, so the bar can only
     // be painted once there is an editor to ask.
     paintCommandBar();
     if (bridge !== undefined) {
-      const handle = editor;
       // Repainted on every keystroke and not only on the answer: the picker shows the
       // template the *brief* names, so typing the line by hand has to move it too.
       handle.onChange(() => {
@@ -1231,11 +1288,16 @@ async function load(): Promise<void> {
           repaint();
         }
         paintPanel();
-        ask(bridge, documentId, handle.getValue());
+        // The workspace's text, which `onUpdate` has already written for this very
+        // transaction — the editor tells the store before it tells anybody else, and that
+        // order is asserted in `packages/editor/src/editor.test.ts`. Reading the pane here
+        // would give the same string today and the wrong one the moment a second pane
+        // exists.
+        ask(bridge, documentId, activeText());
       });
       // Once on load as well: a brief restored into the buffer should show, and the first
       // answer is what fills the format tabs.
-      void request(bridge, workspace.activeId, handle.getValue());
+      void request(bridge, workspace.activeId, activeText());
     }
   }
 
