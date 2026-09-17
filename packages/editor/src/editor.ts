@@ -5,7 +5,13 @@ import {
   type StateEffect,
   Annotation,
   Compartment,
-  EditorState,
+  // Aliased so that the type this package re-exports below can be an **alias** rather than a
+  // re-export. `export type { EditorState }` reads correctly in the source and comes out of
+  // tsup's declaration rollup as `export { EditorState } from '@codemirror/state'` with the
+  // `type` modifier dropped — a published `.d.ts` promising a value the bundle does not
+  // carry, so `import { EditorState } from '@tyto/editor'` would typecheck and then fail to
+  // link. Measured on the built `dist/`, not predicted.
+  EditorState as CodeMirrorEditorState,
 } from '@codemirror/state';
 import {
   EditorView,
@@ -110,7 +116,7 @@ export interface EditorOptions {
  * It stays opaque all the same: {@link textOf} is the only field read this package offers,
  * and nothing outside reaches past it.
  */
-export type { EditorState };
+export type EditorState = CodeMirrorEditorState;
 
 /**
  * Where a pane is looking, as an effect that can be dispatched into one later.
@@ -228,7 +234,7 @@ const baseExtensions = (): Extension[] => [
   dropCursor(),
   rectangularSelection(),
   indentOnInput(),
-  EditorState.allowMultipleSelections.of(true),
+  CodeMirrorEditorState.allowMultipleSelections.of(true),
   // A brief is prose, and an author typing a subtitle into a narrow pane should see the
   // whole of it. Where the line actually breaks in the artwork is the IR's answer, not
   // this one (ADR 0016).
@@ -295,7 +301,7 @@ export function createEditor(parent: HTMLElement, options: EditorOptions = {}): 
    * The extensions every document in this editor gets, held so that `blank` can make a
    * second one.
    *
-   * A list and not a closure over `EditorState.create`, because a tab's state has to be
+   * A list and not a closure over `CodeMirrorEditorState.create`, because a tab's state has to be
    * built with *these* extensions: the keymap compartment, the command registry, the
    * language and the theme are what make two documents behave like the same editor rather
    * than like two editors that happen to be in one window.
@@ -311,7 +317,7 @@ export function createEditor(parent: HTMLElement, options: EditorOptions = {}): 
     // Both halves of read-only, because they answer different questions: the facet
     // stops the commands, and `editable` takes the `contenteditable` off the content
     // element so the caret and the input method never arrive in the first place.
-    ...(readOnly ? [EditorState.readOnly.of(true), EditorView.editable.of(false)] : []),
+    ...(readOnly ? [CodeMirrorEditorState.readOnly.of(true), EditorView.editable.of(false)] : []),
     themeCompartment.of(themes[options.theme ?? 'light']),
     searchSupport(() => searchPhrases),
     languages[options.language ?? 'brief'](),
@@ -320,7 +326,7 @@ export function createEditor(parent: HTMLElement, options: EditorOptions = {}): 
 
   const view = new EditorView({
     parent,
-    state: EditorState.create({ doc: options.doc ?? '', extensions }),
+    state: CodeMirrorEditorState.create({ doc: options.doc ?? '', extensions }),
   });
 
   return {
@@ -352,7 +358,7 @@ export function createEditor(parent: HTMLElement, options: EditorOptions = {}): 
       });
     },
 
-    blank: (doc: string) => EditorState.create({ doc, extensions }),
+    blank: (doc: string) => CodeMirrorEditorState.create({ doc, extensions }),
 
     setValue: (value: string) => {
       view.dispatch({
