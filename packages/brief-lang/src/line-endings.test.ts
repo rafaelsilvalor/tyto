@@ -178,9 +178,13 @@ describe('the diagnostics on a broken brief', () => {
   const BROKEN = 'oi\n\n:: sem nome\n';
 
   const reported = (text: string) => {
+    // Both branches: these are body errors, so since ADR 0025 the brief parses and the
+    // diagnostics ride along. What this describe is about is where they point, and that
+    // is the same question on either branch.
     const result = parseBrief(text);
-    if (result.ok) throw new Error('this brief does not parse, and the test needs that');
-    return result.error.map((item) => ({
+    const problems = result.ok ? result.diagnostics : result.error;
+    if (problems.length === 0) throw new Error('this brief is broken, and the test needs that');
+    return problems.map((item) => ({
       code: item.code,
       message: item.message,
       at: lineColumnRange(text, item.range!),

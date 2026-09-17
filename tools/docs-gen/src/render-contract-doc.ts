@@ -28,8 +28,10 @@ function resultFields(): readonly string[] {
 const FIELD_NOTES: Readonly<Record<string, string>> = {
   status:
     'Did anything go wrong, and nothing else. **Not** "did everything finish" — a run the ' +
-    'caller cancelled is `ok` with fewer artifacts, because nothing went wrong. Derived ' +
-    'from the diagnostics, so it cannot say `ok` over a page of errors.',
+    'caller cancelled is `ok` with fewer artifacts, because nothing went wrong — and ' +
+    '**not** "was anything produced": a partly rendered brief is `error` with artifacts ' +
+    'beside it (see *Rendered, with errors*). Derived from the diagnostics, so it cannot ' +
+    'say `ok` over a page of errors.',
   cancelled: 'The caller stopped the run before the last frame was written.',
   planned:
     'Artworks × formats × encodings the run set out to produce, counted before anything ' +
@@ -121,6 +123,25 @@ ${fieldRows}
 
 The machine-readable schema is **[\`render-result.schema.json\`](./render-result.schema.json)**,
 generated from the same Zod schema that validates the document before Tyto writes it.
+
+### Rendered, with errors
+
+There are three outcomes and two \`status\` values, on purpose: adding a third would break
+every consumer validating strictly (see *Versioning*). The third one is read from
+\`status\` **together with** \`artifacts\`.
+
+| \`status\` | \`artifacts\` | What happened |
+| --- | --- | --- |
+| \`ok\` | one per planned frame | Nothing went wrong. |
+| \`error\` | empty | Nothing could be drawn. Something fatal — no template, a frontmatter that does not parse, a template that does not compile — stopped the run before there was anything to write. |
+| \`error\` | some of them | **Rendered, with errors.** A directive the parser could not read, a slot the manifest does not declare, a frame that failed to raster: each cost its own piece and nothing else (ADR 0025). The files listed are on disk and are the ones the run stands behind. |
+
+A caller that wants "did everything I asked for get made" compares \`artifacts.length\`
+with \`planned\` — which is what that field has always been for. A caller that wants "is
+this safe to publish" reads \`status\`, and \`error\` means no whatever the folder holds.
+
+\`docs/diagnostic-codes.md\` lists which codes are fatal and why, so a caller can tell in
+advance which of the three a given diagnostic produces.
 
 ## Versioning
 

@@ -1,5 +1,6 @@
-import { existsSync, readFileSync } from 'node:fs';
+import { existsSync, mkdtempSync, readFileSync, rmSync } from 'node:fs';
 import { createRequire } from 'node:module';
+import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -38,6 +39,17 @@ const CAROUSEL = readFileSync(
 /** Taller than any pane the app could give the editor, so "it scrolled" is a real claim. */
 const PADDING = Array.from({ length: 120 }, (_, i) => `// padding ${String(i)}`).join('\n');
 
+/**
+ * Its own user-data folder, like `dock.desktop.test.ts`.
+ *
+ * The suites share one `app.getPath('userData')` otherwise, and `layout.json` lives in it
+ * (ADR 0009) — so a suite that closes a panel closes it for whichever suite Vitest runs
+ * next. That is not hypothetical: the panel suite reads `.problems__row`, the preview suite
+ * closes the problems panel on purpose, and Vitest's default sequencer orders files by
+ * **size**. Growing one test file by thirty lines swapped the two and left four panel tests
+ * measuring a panel that was not on screen, with nothing in either diff to point at.
+ */
+let scratch: string;
 let app: ElectronApplication;
 let page: Page;
 
@@ -103,8 +115,9 @@ beforeAll(async () => {
     );
   }
 
+  scratch = mkdtempSync(join(tmpdir(), 'tyto-panel-'));
   app = await _electron.launch({
-    args: ['.'],
+    args: ['.', `--user-data-dir=${join(scratch, 'userData')}`],
     cwd: join(here, '..'),
     env: { ...process.env, TYTO_HEADLESS: '1' },
   });
@@ -115,6 +128,7 @@ beforeAll(async () => {
 
 afterAll(async () => {
   await app?.close();
+  rmSync(scratch, { recursive: true, force: true });
 });
 
 describe('clicking a diagnostic', () => {

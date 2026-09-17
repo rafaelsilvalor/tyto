@@ -1,5 +1,6 @@
-import { existsSync, readFileSync } from 'node:fs';
+import { existsSync, mkdtempSync, readFileSync, rmSync } from 'node:fs';
 import { createRequire } from 'node:module';
+import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -31,6 +32,17 @@ const packDirectory = join(
 
 const EXAMPLE = join(packDirectory, 'promo-curso', 'examples', 'promo.brief');
 
+/**
+ * Its own user-data folder, like `dock.desktop.test.ts`.
+ *
+ * The suites share one `app.getPath('userData')` otherwise, and `layout.json` lives in it
+ * (ADR 0009) — so a suite that closes a panel closes it for whichever suite Vitest runs
+ * next. That is not hypothetical: the panel suite reads `.problems__row`, the preview suite
+ * closes the problems panel on purpose, and Vitest's default sequencer orders files by
+ * **size**. Growing one test file by thirty lines swapped the two and left four panel tests
+ * measuring a panel that was not on screen, with nothing in either diff to point at.
+ */
+let scratch: string;
 let app: ElectronApplication;
 let page: Page;
 
@@ -45,8 +57,9 @@ beforeAll(async () => {
     );
   }
 
+  scratch = mkdtempSync(join(tmpdir(), 'tyto-preview-'));
   app = await _electron.launch({
-    args: ['.'],
+    args: ['.', `--user-data-dir=${join(scratch, 'userData')}`],
     cwd: join(here, '..'),
     env: { ...process.env, TYTO_HEADLESS: '1' },
   });
@@ -56,6 +69,7 @@ beforeAll(async () => {
 
 afterAll(async () => {
   await app?.close();
+  rmSync(scratch, { recursive: true, force: true });
 });
 
 describe('the main screen', () => {
@@ -197,14 +211,16 @@ describe('a brief that stops compiling', () => {
     expect(await paper().isVisible()).toBe(true);
   });
 
-  it('keeps the artwork on screen when the text breaks, and marks it', async () => {
+  it('keeps the artwork on screen when the text breaks fatally, and marks it', async () => {
     const before = await shown();
     expect(before).not.toBe('');
 
-    // A stray character, which is what the card is about — not a brief rewritten into
-    // something else. `::` with no name is a directive the parser cannot finish.
-    await type(`${GOOD}
-::`);
+    // A stray character, which is what this card is about — not a brief rewritten into
+    // something else. The character is a `[` in the frontmatter, and it has to be there
+    // rather than in the body: since ADR 0025 a broken body line costs that directive and
+    // the preview re-renders without it, so the marker would never appear. A frontmatter
+    // that will not parse is fatal, and fatal is what this feature is now for.
+    await type(GOOD.replace('template: promo-curso', 'template: [promo-curso'));
 
     await expect.poll(() => stale().isVisible(), { timeout: 10_000 }).toBe(true);
 
@@ -231,5 +247,31 @@ describe('a brief that stops compiling', () => {
 
     await expect.poll(() => stale().isVisible(), { timeout: 10_000 }).toBe(false);
     expect(await paper().isVisible()).toBe(true);
+  });
+
+  it('redraws rather than going stale when the break costs only one directive', async () => {
+    // TYTO-107, through the same round trip: an unclosed `**` is an error the author has to
+    // fix and it is not fatal, so what comes back is the artwork **as it now stands** — not
+    // the one before the keystroke with a marker over it. The stale pane is the fatal case
+    // and this is the other one, which is why they are asserted against each other.
+    const before = await shown();
+    expect(before).not.toBe('');
+    expect(before).not.toContain('Zephyr4242');
+
+    // The word is nonsense and the `**` is unclosed: one edit carrying both a change to
+    // see and the error that used to hide it. A word rather than a phrase, because text is
+    // wrapped into lines in the IR (ADR 0019) and a phrase never appears contiguously.
+    await type(GOOD.replace('Turma de setembro', 'Turma de **Zephyr4242'));
+
+    // Polled on the new word, which is what "it redrew" means here — a marker that never
+    // appeared would prove nothing on its own, and an unclosed `**` leaves the recovered
+    // text identical, so comparing documents would pass on a pane that never moved.
+    await expect.poll(() => shown(), { timeout: 10_000 }).toContain('Zephyr4242');
+
+    expect(await stale().isVisible()).toBe(false);
+    expect(await paper().isVisible()).toBe(true);
+    expect(await page.locator('#preview-empty').isVisible()).toBe(false);
+    // And the problem is still reported, on the surface that lists them.
+    expect(await page.locator('#preview-status').textContent()).toMatch(/\d/u);
   });
 });

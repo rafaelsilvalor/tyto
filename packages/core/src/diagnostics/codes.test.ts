@@ -22,6 +22,22 @@ describe('the catalog', () => {
     expect(definition.spec).toMatch(/^docs\/.+\.md$/);
   });
 
+  it.each(diagnosticCodeList)('%s says why it is or is not fatal', (code) => {
+    // The fatal list is a deliverable of TYTO-107 and `docs/diagnostic-codes.md` publishes
+    // it, so a code with a blank reason would ship a table cell that explains nothing.
+    const definition = diagnosticCodeDefinition(code);
+    expect(definition.fatality).not.toBe('');
+    expect(definition.fatality).toMatch(/\.$/);
+  });
+
+  it('never marks a warning fatal, because a warning has never replaced a value', () => {
+    const fatalWarnings = diagnosticCodeList
+      .filter((code) => code.startsWith('W_'))
+      .filter((code) => diagnosticCodeDefinition(code).fatal);
+
+    expect(fatalWarnings).toEqual([]);
+  });
+
   it.each(diagnosticCodeList)('%s carries the severity its prefix promises', (code) => {
     const expected = code.startsWith('E_') ? 'error' : 'warning';
     expect(diagnosticCodeDefinition(code).severity).toBe(expected);

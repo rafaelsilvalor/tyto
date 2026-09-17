@@ -69,7 +69,7 @@ beforeAll(async () => {
 
   // Both branches: `resolve` puts errors on `err` and warnings on the `ok` branch
   // (ADR 0013), and which one this brief lands on is not what the file is about.
-  problems = resolved.ok ? resolved.warnings : resolved.error;
+  problems = resolved.ok ? resolved.diagnostics : resolved.error;
 }, 60_000);
 
 const unknownSlots = (): readonly Diagnostic[] =>

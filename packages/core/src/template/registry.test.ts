@@ -236,9 +236,9 @@ describe('a search path of several roots (ADR 0020)', () => {
     const result = await loadTemplateRegistry(twoRoots(), ['project', 'pack']);
     if (!result.ok) throw new Error('expected a registry');
 
-    expect(result.warnings.map((item) => item.code)).toEqual(['W_TEMPLATE_SHADOWED']);
-    expect(result.warnings[0]?.message).toContain('pack/promo');
-    expect(result.warnings[0]?.message).toContain('project/promo');
+    expect(result.diagnostics.map((item) => item.code)).toEqual(['W_TEMPLATE_SHADOWED']);
+    expect(result.diagnostics[0]?.message).toContain('pack/promo');
+    expect(result.diagnostics[0]?.message).toContain('project/promo');
     expect(result.value.failures).toEqual([]);
   });
 
@@ -256,7 +256,7 @@ describe('a search path of several roots (ADR 0020)', () => {
     expect(
       result.value.failures.flatMap((failure) => failure.diagnostics).map((d) => d.code),
     ).toEqual(['E_TEMPLATE_DUPLICATE']);
-    expect(result.warnings.map((item) => item.code)).toEqual(['W_TEMPLATE_SHADOWED']);
+    expect(result.diagnostics.map((item) => item.code)).toEqual(['W_TEMPLATE_SHADOWED']);
   });
 
   it('does not let a root shadow itself when it is listed twice', async () => {
@@ -266,7 +266,7 @@ describe('a search path of several roots (ADR 0020)', () => {
     const result = await loadTemplateRegistry(twoRoots(), ['pack', 'pack']);
     if (!result.ok) throw new Error('expected a registry');
 
-    expect(result.warnings).toEqual([]);
+    expect(result.diagnostics).toEqual([]);
     expect(result.value.list().map((entry) => entry.name)).toEqual(['promo', 'so-do-pack']);
   });
 
@@ -297,6 +297,6 @@ describe('a search path of several roots (ADR 0020)', () => {
     if (!result.ok) throw new Error('expected a registry');
 
     expect(result.value.list().map((entry) => entry.name)).toEqual(['promo', 'so-do-pack']);
-    expect(result.warnings).toEqual([]);
+    expect(result.diagnostics).toEqual([]);
   });
 });

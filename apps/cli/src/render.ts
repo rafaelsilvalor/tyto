@@ -132,7 +132,7 @@ export async function renderCommand(
         ...(rasterizer === undefined ? {} : { rasterizer }),
         ...(options.concurrency === undefined ? {} : { concurrency: options.concurrency }),
       },
-      context.warnings,
+      context.diagnostics,
     );
 
     const scope = { primary: { path: shownBrief, source } };

@@ -1,7 +1,7 @@
 import type { ResolvedBrief, ResolvedSlot } from './resolve.js';
 import { type FormatCatalogue, undefinedFormats } from '../config/formats.js';
-import { type Diagnostic, diagnostic, isError } from '../diagnostics/diagnostic.js';
-import { type Diagnostics, type Result, err, withWarnings } from '../result/result.js';
+import { type Diagnostic, diagnostic, hasFatal } from '../diagnostics/diagnostic.js';
+import { type Diagnostics, type Result, err, withDiagnostics } from '../result/result.js';
 import type { SceneNode, TextNode } from '../scene/nodes.js';
 import type { FaceCache } from '../text/face.js';
 import { measureText } from '../text/layout.js';
@@ -295,15 +295,20 @@ export function compile(
     artworks.push({ id: plan.id, frames });
   }
 
-  // Errors replace the scene; warnings ride along with it (ADR 0013). Until text was
-  // measured here nothing in this function produced a warning, so `problems.length > 0`
-  // was the same test — `W_TEXT_OVERFLOW` is the first diagnostic a compile can emit and
-  // still have something to hand back.
-  if (problems.some(isError)) return err(problems);
+  // Fatal diagnostics replace the scene; everything else rides along with it (ADR 0025,
+  // extending ADR 0013). Until text was measured here nothing in this function produced a
+  // warning, so `problems.length > 0` was the same test — `W_TEXT_OVERFLOW` is the first
+  // diagnostic a compile can emit and still have something to hand back.
+  //
+  // Every error this stage can emit is fatal today: a template that throws or returns the
+  // wrong frame has broken every artwork, not one slot. The test is written in terms of
+  // fatality anyway, so a later non-fatal compile error needs no second reading of this
+  // line.
+  if (hasFatal(problems)) return err(problems);
 
   // Straight to `parseScene`: a template is code, and code that produces IR is exactly the
   // code whose output is validated rather than trusted (E2.1).
-  return withWarnings(
+  return withDiagnostics(
     parseScene({
       version: 1,
       artworks,

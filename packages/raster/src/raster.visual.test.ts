@@ -422,8 +422,12 @@ describe('reference renders', () => {
  * means the assertion says "nothing reported it" rather than "the call happened to
  * succeed", and the two are not the same sentence once a warning is added.
  */
-function codesOf(result: { ok: boolean; warnings?: Diagnostics; error?: Diagnostics }): string[] {
-  return [...(result.ok ? (result.warnings ?? []) : (result.error ?? []))].map(
+function codesOf(result: {
+  ok: boolean;
+  diagnostics?: Diagnostics;
+  error?: Diagnostics;
+}): string[] {
+  return [...(result.ok ? (result.diagnostics ?? []) : (result.error ?? []))].map(
     (problem) => problem.code,
   );
 }

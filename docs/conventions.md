@@ -82,6 +82,8 @@ See `docs/git-workflow.md`.
 
 `Result<T, Diagnostic[]>` from `@tyto/core`. `Diagnostic { severity, code, message, range?, hint? }`. Codes `E_*`/`W_*` catalogued in `core/src/diagnostics/codes.ts`.
 
+**Severity and fatality are two fields, and a stage reads the second one** (ADR 0025). Severity is what the author is told and what fails a build; fatality is whether the stage could still hand back a value. A stage with a partial value to offer ends on `fromPartial(value, items)` — fatal diagnostics replace the value, everything else rides on `Ok<T>.diagnostics` beside it; a stage with nothing partial to offer ends on `fromDiagnostics` as before. A **caller** never re-decides: `if (!result.ok)` already means the stage failed fatally. `hasErrors` stays the test for an exit code, `hasFatal` for whether there is anything to draw, and `docs/diagnostic-codes.md` publishes which codes are which and why.
+
 A port is the exception, and only for what it cannot predict: `FileSystem`, `AssetResolver` and `Rasterizer` reject rather than returning a `Result` when the runtime refuses them — an unreadable path or a browser that will not launch is the operating system's answer, not a diagnostic any brief could have caused. The caller that owns a user-facing edge catches and writes the diagnostic there. What a port _can_ predict from its arguments alone is a programmer error and throws `TypeError`, which is why `resolveRasterOptions` refuses `quality` on a PNG instead of inventing a code for it.
 
 ## Docs

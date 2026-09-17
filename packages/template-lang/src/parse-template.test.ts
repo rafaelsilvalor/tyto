@@ -123,7 +123,7 @@ describe('markup that does not parse', () => {
 
     expect(result.ok).toBe(false);
     if (result.ok) return;
-    expect(result.error[0]?.code).toBe('E_SYNTAX');
+    expect(result.error[0]?.code).toBe('E_TEMPLATE_SYNTAX');
     expect(result.error[0]?.range).toBeDefined();
   });
 

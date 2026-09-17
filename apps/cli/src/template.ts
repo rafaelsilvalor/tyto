@@ -67,8 +67,8 @@ export async function templateCheckCommand(
     problems.push(...manifest.error);
     return report();
   }
-  registerOrigin(manifest.warnings, { path: manifestPath, source: manifestSource });
-  problems.push(...manifest.warnings);
+  registerOrigin(manifest.diagnostics, { path: manifestPath, source: manifestSource });
+  problems.push(...manifest.diagnostics);
 
   let templateSource: string;
   try {
@@ -86,7 +86,7 @@ export async function templateCheckCommand(
   // file really is missing is still named, which is the half worth keeping.
   const { assets } = await fileTemplateAssets({ base: directory });
   const compiled = compileTemplate(templateSource, { manifest: manifest.value, assets });
-  const produced = compiled.ok ? compiled.warnings : compiled.error;
+  const produced = compiled.ok ? compiled.diagnostics : compiled.error;
   registerOrigin(produced, { path: templatePath, source: templateSource });
   problems.push(...produced);
 

@@ -89,6 +89,72 @@ describe('the preview service', () => {
     for (const item of result.diagnostics) expect(item.code).toMatch(/^[EW]_/u);
   });
 
+  it('keeps drawing while one directive is half-typed', async () => {
+    // The complaint TYTO-107 was opened for, as a test: an unclosed `**` used to empty the
+    // preview at the moment the preview is what tells you whether the fix worked. The
+    // parser recovers the line, `E_SYNTAX` is not fatal, and the frames still come back
+    // (ADR 0025).
+    const brief = exampleBrief('promo-curso', 'promo.brief').replace(
+      'Aulas ao vivo',
+      'Aulas **ao vivo',
+    );
+
+    const result = await preview.preview(brief);
+
+    expect(result.frames.length).toBeGreaterThan(0);
+    expect(result.diagnostics.map((item) => item.code)).toContain('E_SYNTAX');
+    // The slot that is fine is drawn, which is what "renders the other slots" means here.
+    expect(result.frames[0]?.html).toContain('Constitucional');
+  });
+
+  it('renders the slots that are fine and names the one that is not', async () => {
+    const brief = `${exampleBrief('promo-curso', 'promo.brief')}\n::rodape Inscreva-se\n`;
+
+    const result = await preview.preview(brief);
+
+    expect(result.frames.length).toBeGreaterThan(0);
+    const unknown = result.diagnostics.find((item) => item.code === 'E_UNKNOWN_SLOT');
+    expect(unknown?.message).toContain('rodape');
+    // Still an error, so the same brief run through `tyto render` exits non-zero. Fatality
+    // decides what is drawn; severity decides what fails.
+    expect(unknown?.severity).toBe('error');
+  });
+
+  it('draws nothing when the brief names no usable template, and says why', async () => {
+    const withoutTemplate = exampleBrief('promo-curso', 'promo.brief').replace(
+      'template: promo-curso',
+      'template: nao-existe',
+    );
+
+    const result = await preview.preview(withoutTemplate);
+
+    expect(result.frames).toEqual([]);
+    expect(result.diagnostics.map((item) => item.code)).toContain('E_UNKNOWN_TEMPLATE');
+  });
+
+  it('draws nothing when a required slot is missing, rather than a hole that looks finished', async () => {
+    // `titulo` is `required: true`, and the danger the card named is art that looks
+    // finished with a slot silently empty. Until the gap is drawn in the artwork itself,
+    // `E_MISSING_REQUIRED_SLOT` stays fatal — the one entry in the fatal list that is a
+    // deadline rather than a principle (ADR 0025).
+    const withoutTitle = exampleBrief('promo-curso', 'promo.brief').replace(
+      /::titulo[\s\S]*?\n\n/u,
+      '',
+    );
+
+    const result = await preview.preview(withoutTitle);
+
+    expect(result.frames).toEqual([]);
+    expect(result.diagnostics.map((item) => item.code)).toContain('E_MISSING_REQUIRED_SLOT');
+  });
+
+  it('draws nothing when the frontmatter itself will not parse', async () => {
+    const result = await preview.preview('---\ntemplate: [promo-curso\n---\n::titulo Um\n');
+
+    expect(result.frames).toEqual([]);
+    expect(result.diagnostics.map((item) => item.code)).toEqual(['E_FRONTMATTER_SYNTAX']);
+  });
+
   it('answers an empty document without throwing', async () => {
     // The state the window opens in, before anybody types.
     await expect(preview.preview('')).resolves.toMatchObject({ frames: [] });

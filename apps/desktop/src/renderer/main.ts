@@ -924,14 +924,21 @@ async function request(bridge: TytoBridge, documentId: string, brief: string): P
     /**
      * A failed compile keeps the artwork that last worked, marked (E9.13).
      *
-     * `brief:preview` answers with no frames whenever any stage fails, and taking that
-     * literally is what used to blank the pane on a stray character — at the one moment the
-     * preview is the thing telling you whether the fix worked.
+     * `brief:preview` answers with no frames when a stage fails **fatally**, and taking
+     * that literally is what used to blank the pane at the one moment the preview is the
+     * thing telling you whether the fix worked.
      *
      * **The discriminator is the errors, not the empty list.** A brief that compiles to
      * nothing is a legitimate answer — a template with no artworks written yet — and it
      * should clear the pane rather than leave yesterday's picture in it. So frames are kept
      * only when the compile actually failed.
+     *
+     * **TYTO-107 narrowed what reaches here without touching this line**, which is the
+     * sign the condition was written about the right thing. A stray `**` is not fatal
+     * since ADR 0025: the answer arrives with frames in it, `failed` is false, and the
+     * pane shows the artwork the author is typing rather than the one before it. What
+     * still lands here is the fatal half — no template, a frontmatter that will not parse,
+     * a required slot left unset — where there is genuinely nothing new to draw.
      */
     const failed = answer.frames.length === 0 && errors > 0;
     const frames = failed ? document_.frames : answer.frames;

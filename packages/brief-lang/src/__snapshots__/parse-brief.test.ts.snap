@@ -2,6 +2,7 @@
 
 exports[`the corpus, one level up from the tree > matches the recorded AST of every fixture > adjustments-flag.brief 1`] = `
 {
+  "diagnostics": [],
   "ok": true,
   "value": {
     "directives": [
@@ -45,12 +46,12 @@ exports[`the corpus, one level up from the tree > matches the recorded AST of ev
       "start": 0,
     },
   },
-  "warnings": [],
 }
 `;
 
 exports[`the corpus, one level up from the tree > matches the recorded AST of every fixture > adjustments-many.brief 1`] = `
 {
+  "diagnostics": [],
   "ok": true,
   "value": {
     "directives": [
@@ -102,12 +103,12 @@ exports[`the corpus, one level up from the tree > matches the recorded AST of ev
       "start": 0,
     },
   },
-  "warnings": [],
 }
 `;
 
 exports[`the corpus, one level up from the tree > matches the recorded AST of every fixture > adjustments-pair.brief 1`] = `
 {
+  "diagnostics": [],
   "ok": true,
   "value": {
     "directives": [
@@ -152,12 +153,12 @@ exports[`the corpus, one level up from the tree > matches the recorded AST of ev
       "start": 0,
     },
   },
-  "warnings": [],
 }
 `;
 
 exports[`the corpus, one level up from the tree > matches the recorded AST of every fixture > blank-lines.brief 1`] = `
 {
+  "diagnostics": [],
   "ok": true,
   "value": {
     "directives": [
@@ -237,13 +238,12 @@ exports[`the corpus, one level up from the tree > matches the recorded AST of ev
       "start": 0,
     },
   },
-  "warnings": [],
 }
 `;
 
 exports[`the corpus, one level up from the tree > matches the recorded AST of every fixture > broken-adjacent-emphasis.brief 1`] = `
 {
-  "error": [
+  "diagnostics": [
     {
       "code": "E_SYNTAX",
       "message": "Syntax error: an italic run is missing its closing *.",
@@ -254,13 +254,98 @@ exports[`the corpus, one level up from the tree > matches the recorded AST of ev
       "severity": "error",
     },
   ],
-  "ok": false,
+  "ok": true,
+  "value": {
+    "directives": [
+      {
+        "adjustments": [],
+        "body": [
+          {
+            "kind": "text",
+            "range": {
+              "end": 17,
+              "start": 9,
+            },
+            "value": "Direito ",
+          },
+          {
+            "children": [
+              {
+                "kind": "text",
+                "range": {
+                  "end": 34,
+                  "start": 19,
+                },
+                "value": "Constitucional ",
+              },
+              {
+                "children": [
+                  {
+                    "kind": "text",
+                    "range": {
+                      "end": 43,
+                      "start": 35,
+                    },
+                    "value": "aplicado",
+                  },
+                  {
+                    "children": [
+                      {
+                        "children": [],
+                        "kind": "italic",
+                        "range": {
+                          "end": 46,
+                          "start": 45,
+                        },
+                      },
+                    ],
+                    "kind": "bold",
+                    "range": {
+                      "end": 46,
+                      "start": 43,
+                    },
+                  },
+                ],
+                "kind": "italic",
+                "range": {
+                  "end": 46,
+                  "start": 34,
+                },
+              },
+            ],
+            "kind": "bold",
+            "range": {
+              "end": 46,
+              "start": 17,
+            },
+          },
+        ],
+        "name": "titulo",
+        "nameRange": {
+          "end": 8,
+          "start": 2,
+        },
+        "range": {
+          "end": 46,
+          "start": 0,
+        },
+      },
+    ],
+    "frontmatter": {
+      "data": {},
+      "ranges": {},
+    },
+    "range": {
+      "end": 47,
+      "start": 0,
+    },
+  },
 }
 `;
 
 exports[`the corpus, one level up from the tree > matches the recorded AST of every fixture > broken-frontmatter.brief 1`] = `
 {
-  "error": [
+  "diagnostics": [
     {
       "code": "E_SYNTAX",
       "message": "Syntax error: unexpected '---'.",
@@ -289,13 +374,47 @@ exports[`the corpus, one level up from the tree > matches the recorded AST of ev
       "severity": "error",
     },
   ],
-  "ok": false,
+  "ok": true,
+  "value": {
+    "directives": [
+      {
+        "adjustments": [],
+        "body": [
+          {
+            "kind": "text",
+            "range": {
+              "end": 59,
+              "start": 35,
+            },
+            "value": "Sem fechar o frontmatter",
+          },
+        ],
+        "name": "titulo",
+        "nameRange": {
+          "end": 34,
+          "start": 28,
+        },
+        "range": {
+          "end": 59,
+          "start": 26,
+        },
+      },
+    ],
+    "frontmatter": {
+      "data": {},
+      "ranges": {},
+    },
+    "range": {
+      "end": 60,
+      "start": 0,
+    },
+  },
 }
 `;
 
 exports[`the corpus, one level up from the tree > matches the recorded AST of every fixture > broken-nameless-directive.brief 1`] = `
 {
-  "error": [
+  "diagnostics": [
     {
       "code": "E_SYNTAX",
       "message": "Syntax error: this directive is incomplete.",
@@ -306,13 +425,47 @@ exports[`the corpus, one level up from the tree > matches the recorded AST of ev
       "severity": "error",
     },
   ],
-  "ok": false,
+  "ok": true,
+  "value": {
+    "directives": [
+      {
+        "adjustments": [],
+        "body": [
+          {
+            "kind": "text",
+            "range": {
+              "end": 11,
+              "start": 7,
+            },
+            "value": "nome",
+          },
+        ],
+        "name": "sem",
+        "nameRange": {
+          "end": 6,
+          "start": 3,
+        },
+        "range": {
+          "end": 11,
+          "start": 0,
+        },
+      },
+    ],
+    "frontmatter": {
+      "data": {},
+      "ranges": {},
+    },
+    "range": {
+      "end": 12,
+      "start": 0,
+    },
+  },
 }
 `;
 
 exports[`the corpus, one level up from the tree > matches the recorded AST of every fixture > broken-orphan-indent.brief 1`] = `
 {
-  "error": [
+  "diagnostics": [
     {
       "code": "E_SYNTAX",
       "message": "Syntax error: an indented line must follow a directive.",
@@ -332,13 +485,47 @@ exports[`the corpus, one level up from the tree > matches the recorded AST of ev
       "severity": "error",
     },
   ],
-  "ok": false,
+  "ok": true,
+  "value": {
+    "directives": [
+      {
+        "adjustments": [],
+        "body": [
+          {
+            "kind": "text",
+            "range": {
+              "end": 30,
+              "start": 8,
+            },
+            "value": "indentada sem diretiva",
+          },
+        ],
+        "name": "linha",
+        "nameRange": {
+          "end": 7,
+          "start": 2,
+        },
+        "range": {
+          "end": 30,
+          "start": 2,
+        },
+      },
+    ],
+    "frontmatter": {
+      "data": {},
+      "ranges": {},
+    },
+    "range": {
+      "end": 31,
+      "start": 0,
+    },
+  },
 }
 `;
 
 exports[`the corpus, one level up from the tree > matches the recorded AST of every fixture > broken-unclosed-adjustment.brief 1`] = `
 {
-  "error": [
+  "diagnostics": [
     {
       "code": "E_SYNTAX",
       "message": "Syntax error: an adjustment list is missing its closing }.",
@@ -349,13 +536,55 @@ exports[`the corpus, one level up from the tree > matches the recorded AST of ev
       "severity": "error",
     },
   ],
-  "ok": false,
+  "ok": true,
+  "value": {
+    "directives": [
+      {
+        "adjustments": [
+          {
+            "name": "destaque",
+            "range": {
+              "end": 17,
+              "start": 9,
+            },
+          },
+        ],
+        "body": [
+          {
+            "kind": "text",
+            "range": {
+              "end": 32,
+              "start": 20,
+            },
+            "value": "Como estudar",
+          },
+        ],
+        "name": "slide",
+        "nameRange": {
+          "end": 7,
+          "start": 2,
+        },
+        "range": {
+          "end": 32,
+          "start": 0,
+        },
+      },
+    ],
+    "frontmatter": {
+      "data": {},
+      "ranges": {},
+    },
+    "range": {
+      "end": 33,
+      "start": 0,
+    },
+  },
 }
 `;
 
 exports[`the corpus, one level up from the tree > matches the recorded AST of every fixture > broken-unclosed-bold.brief 1`] = `
 {
-  "error": [
+  "diagnostics": [
     {
       "code": "E_SYNTAX",
       "message": "Syntax error: a bold run is missing its closing **.",
@@ -366,13 +595,64 @@ exports[`the corpus, one level up from the tree > matches the recorded AST of ev
       "severity": "error",
     },
   ],
-  "ok": false,
+  "ok": true,
+  "value": {
+    "directives": [
+      {
+        "adjustments": [],
+        "body": [
+          {
+            "kind": "text",
+            "range": {
+              "end": 17,
+              "start": 9,
+            },
+            "value": "Direito ",
+          },
+          {
+            "children": [
+              {
+                "kind": "text",
+                "range": {
+                  "end": 33,
+                  "start": 19,
+                },
+                "value": "Constitucional",
+              },
+            ],
+            "kind": "bold",
+            "range": {
+              "end": 33,
+              "start": 17,
+            },
+          },
+        ],
+        "name": "titulo",
+        "nameRange": {
+          "end": 8,
+          "start": 2,
+        },
+        "range": {
+          "end": 33,
+          "start": 0,
+        },
+      },
+    ],
+    "frontmatter": {
+      "data": {},
+      "ranges": {},
+    },
+    "range": {
+      "end": 34,
+      "start": 0,
+    },
+  },
 }
 `;
 
 exports[`the corpus, one level up from the tree > matches the recorded AST of every fixture > broken-unclosed-mark.brief 1`] = `
 {
-  "error": [
+  "diagnostics": [
     {
       "code": "E_SYNTAX",
       "message": "Syntax error: a mark is missing its closing {/}.",
@@ -383,12 +663,66 @@ exports[`the corpus, one level up from the tree > matches the recorded AST of ev
       "severity": "error",
     },
   ],
-  "ok": false,
+  "ok": true,
+  "value": {
+    "directives": [
+      {
+        "adjustments": [],
+        "body": [
+          {
+            "kind": "text",
+            "range": {
+              "end": 15,
+              "start": 9,
+            },
+            "value": "Turma ",
+          },
+          {
+            "children": [
+              {
+                "kind": "text",
+                "range": {
+                  "end": 38,
+                  "start": 28,
+                },
+                "value": "nova agora",
+              },
+            ],
+            "key": "cor",
+            "kind": "mark",
+            "range": {
+              "end": 38,
+              "start": 15,
+            },
+            "value": "laranja",
+          },
+        ],
+        "name": "titulo",
+        "nameRange": {
+          "end": 8,
+          "start": 2,
+        },
+        "range": {
+          "end": 38,
+          "start": 0,
+        },
+      },
+    ],
+    "frontmatter": {
+      "data": {},
+      "ranges": {},
+    },
+    "range": {
+      "end": 39,
+      "start": 0,
+    },
+  },
 }
 `;
 
 exports[`the corpus, one level up from the tree > matches the recorded AST of every fixture > comments.brief 1`] = `
 {
+  "diagnostics": [],
   "ok": true,
   "value": {
     "directives": [
@@ -424,12 +758,12 @@ exports[`the corpus, one level up from the tree > matches the recorded AST of ev
       "start": 0,
     },
   },
-  "warnings": [],
 }
 `;
 
 exports[`the corpus, one level up from the tree > matches the recorded AST of every fixture > escaped-directive.brief 1`] = `
 {
+  "diagnostics": [],
   "ok": true,
   "value": {
     "directives": [
@@ -465,12 +799,12 @@ exports[`the corpus, one level up from the tree > matches the recorded AST of ev
       "start": 0,
     },
   },
-  "warnings": [],
 }
 `;
 
 exports[`the corpus, one level up from the tree > matches the recorded AST of every fixture > frontmatter.brief 1`] = `
 {
+  "diagnostics": [],
   "ok": true,
   "value": {
     "directives": [
@@ -530,12 +864,12 @@ exports[`the corpus, one level up from the tree > matches the recorded AST of ev
       "start": 0,
     },
   },
-  "warnings": [],
 }
 `;
 
 exports[`the corpus, one level up from the tree > matches the recorded AST of every fixture > frontmatter-only.brief 1`] = `
 {
+  "diagnostics": [],
   "ok": true,
   "value": {
     "directives": [],
@@ -559,12 +893,12 @@ exports[`the corpus, one level up from the tree > matches the recorded AST of ev
       "start": 0,
     },
   },
-  "warnings": [],
 }
 `;
 
 exports[`the corpus, one level up from the tree > matches the recorded AST of every fixture > full.brief 1`] = `
 {
+  "diagnostics": [],
   "ok": true,
   "value": {
     "directives": [
@@ -795,12 +1129,12 @@ exports[`the corpus, one level up from the tree > matches the recorded AST of ev
       "start": 0,
     },
   },
-  "warnings": [],
 }
 `;
 
 exports[`the corpus, one level up from the tree > matches the recorded AST of every fixture > indented-block.brief 1`] = `
 {
+  "diagnostics": [],
   "ok": true,
   "value": {
     "directives": [
@@ -866,12 +1200,12 @@ exports[`the corpus, one level up from the tree > matches the recorded AST of ev
       "start": 0,
     },
   },
-  "warnings": [],
 }
 `;
 
 exports[`the corpus, one level up from the tree > matches the recorded AST of every fixture > inline-bold-italic.brief 1`] = `
 {
+  "diagnostics": [],
   "ok": true,
   "value": {
     "directives": [
@@ -949,12 +1283,12 @@ exports[`the corpus, one level up from the tree > matches the recorded AST of ev
       "start": 0,
     },
   },
-  "warnings": [],
 }
 `;
 
 exports[`the corpus, one level up from the tree > matches the recorded AST of every fixture > line-break.brief 1`] = `
 {
+  "diagnostics": [],
   "ok": true,
   "value": {
     "directives": [
@@ -997,12 +1331,12 @@ exports[`the corpus, one level up from the tree > matches the recorded AST of ev
       "start": 0,
     },
   },
-  "warnings": [],
 }
 `;
 
 exports[`the corpus, one level up from the tree > matches the recorded AST of every fixture > mark.brief 1`] = `
 {
+  "diagnostics": [],
   "ok": true,
   "value": {
     "directives": [
@@ -1065,12 +1399,12 @@ exports[`the corpus, one level up from the tree > matches the recorded AST of ev
       "start": 0,
     },
   },
-  "warnings": [],
 }
 `;
 
 exports[`the corpus, one level up from the tree > matches the recorded AST of every fixture > minimal.brief 1`] = `
 {
+  "diagnostics": [],
   "ok": true,
   "value": {
     "directives": [
@@ -1106,12 +1440,12 @@ exports[`the corpus, one level up from the tree > matches the recorded AST of ev
       "start": 0,
     },
   },
-  "warnings": [],
 }
 `;
 
 exports[`the corpus, one level up from the tree > matches the recorded AST of every fixture > nested-emphasis.brief 1`] = `
 {
+  "diagnostics": [],
   "ok": true,
   "value": {
     "directives": [
@@ -1237,12 +1571,12 @@ exports[`the corpus, one level up from the tree > matches the recorded AST of ev
       "start": 0,
     },
   },
-  "warnings": [],
 }
 `;
 
 exports[`the corpus, one level up from the tree > matches the recorded AST of every fixture > no-trailing-newline.brief 1`] = `
 {
+  "diagnostics": [],
   "ok": true,
   "value": {
     "directives": [
@@ -1278,12 +1612,12 @@ exports[`the corpus, one level up from the tree > matches the recorded AST of ev
       "start": 0,
     },
   },
-  "warnings": [],
 }
 `;
 
 exports[`the corpus, one level up from the tree > matches the recorded AST of every fixture > plugin-directive.brief 1`] = `
 {
+  "diagnostics": [],
   "ok": true,
   "value": {
     "directives": [
@@ -1320,12 +1654,12 @@ exports[`the corpus, one level up from the tree > matches the recorded AST of ev
       "start": 0,
     },
   },
-  "warnings": [],
 }
 `;
 
 exports[`the corpus, one level up from the tree > matches the recorded AST of every fixture > repeatable.brief 1`] = `
 {
+  "diagnostics": [],
   "ok": true,
   "value": {
     "directives": [
@@ -1413,6 +1747,5 @@ exports[`the corpus, one level up from the tree > matches the recorded AST of ev
       "start": 0,
     },
   },
-  "warnings": [],
 }
 `;

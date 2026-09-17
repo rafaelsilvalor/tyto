@@ -71,7 +71,7 @@ export async function watchCommand(
 
   // Destructured past the guard above, so the closure below reads a `RenderContext` and
   // not a `Result` it would have to re-narrow on every task.
-  const { value: project, warnings: projectProblems } = context;
+  const { value: project, diagnostics: projectProblems } = context;
 
   const inbox = fsInbox({ root: join(root, 'inbox'), done: join(root, 'done') });
   const rasterizer = needsRasterizer(options.types) ? environment.rasterizer() : undefined;

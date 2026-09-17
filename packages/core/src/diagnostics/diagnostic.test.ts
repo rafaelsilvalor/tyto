@@ -1,6 +1,16 @@
 import { describe, expect, it } from 'vitest';
 
-import { diagnostic, hasErrors, isError, isWarning, sortDiagnostics } from './diagnostic.js';
+import {
+  type Diagnostic,
+  diagnostic,
+  hasErrors,
+  hasFatal,
+  isError,
+  isFatal,
+  isWarning,
+  partitionByFatality,
+  sortDiagnostics,
+} from './diagnostic.js';
 import { sourceRange } from '../source/range.js';
 
 const unknownSlot = (slot: string) =>
@@ -107,5 +117,53 @@ describe('sortDiagnostics', () => {
     sortDiagnostics(items);
 
     expect(items).toEqual(before);
+  });
+});
+
+describe('isFatal', () => {
+  it('reads the answer off the code and not off the severity', () => {
+    // Both are errors. One costs the brief, the other costs one directive (ADR 0025).
+    expect(isFatal(diagnostic('E_NO_TEMPLATE', {}))).toBe(true);
+    expect(isFatal(unknownSlot('a'))).toBe(false);
+  });
+
+  it('is false for a warning whatever its entry says', () => {
+    expect(isFatal(diagnostic('W_UNUSED_SLOT', { slot: 'cor', template: 'x' }))).toBe(false);
+  });
+
+  it('counts a code it has never heard of as fatal', () => {
+    // A `Diagnostic` can arrive from a `result.json` or across the desktop's bridge. A
+    // build that cannot weigh the consequences refuses to draw rather than guessing.
+    const alien = { ...unknownSlot('a'), code: 'E_FROM_THE_FUTURE' } as unknown as Diagnostic;
+    expect(isFatal(alien)).toBe(true);
+  });
+});
+
+describe('hasFatal', () => {
+  it('is false for a list of errors that each cost only their own piece', () => {
+    expect(hasFatal([unknownSlot('a'), unknownSlot('b')])).toBe(false);
+    // The same list is still a failed build, which is the whole point of two properties.
+    expect(hasErrors([unknownSlot('a')])).toBe(true);
+  });
+
+  it('is true as soon as one fatal diagnostic appears', () => {
+    expect(hasFatal([unknownSlot('a'), diagnostic('E_NO_TEMPLATE', {})])).toBe(true);
+  });
+
+  it('is false for an empty list', () => {
+    expect(hasFatal([])).toBe(false);
+  });
+});
+
+describe('partitionByFatality', () => {
+  it('splits what replaces the value from what rides with it', () => {
+    const fatal = diagnostic('E_NO_TEMPLATE', {});
+    const survivable = unknownSlot('a');
+    const warning = diagnostic('W_UNUSED_SLOT', { slot: 'cor', template: 'x' });
+
+    expect(partitionByFatality([survivable, fatal, warning])).toEqual([
+      [fatal],
+      [survivable, warning],
+    ]);
   });
 });

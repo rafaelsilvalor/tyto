@@ -40,7 +40,7 @@ function sceneOf(fixture: unknown): Scene {
 
 function problemsOf(scene: Scene, options = { resources }): readonly Diagnostic[] {
   const result = exportHtml(scene, options);
-  return result.ok ? result.warnings : result.error;
+  return result.ok ? result.diagnostics : result.error;
 }
 
 function htmlOf(scene: Scene): readonly string[] {
@@ -204,7 +204,7 @@ describe('what the exporter cannot do, it says', () => {
 
     expect(result.ok).toBe(true);
     if (!result.ok) return;
-    expect(result.warnings.map((item) => item.message)).toContain(
+    expect(result.diagnostics.map((item) => item.message)).toContain(
       "'spun': a shadow with a spread is approximated by export-html — CSS drop-shadow() has no spread, so 3px of it is not drawn.",
     );
     expect(result.value[0]?.html).toContain('drop-shadow(0px 4px 12px rgba(0, 0, 0, 0.5))');

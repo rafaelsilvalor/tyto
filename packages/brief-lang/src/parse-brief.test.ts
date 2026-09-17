@@ -1,4 +1,4 @@
-import type { BriefAst, Directive, Inline } from '@tyto/core';
+import type { BriefAst, Diagnostics, Directive, Inline } from '@tyto/core';
 import { type SourceRange, isOk, sliceRange } from '@tyto/core';
 import { describe, expect, it } from 'vitest';
 
@@ -77,9 +77,21 @@ function astOf(name: string, text: string): BriefAst {
   return result.value;
 }
 
+/**
+ * What the parser said, from whichever branch it came back on.
+ *
+ * Both branches, because since ADR 0025 a brief with a broken line comes back on the *ok*
+ * one with the diagnostic riding along. A helper that read only `error` would have gone
+ * quiet on every test below rather than failing them.
+ */
 function messagesOf(text: string): string[] {
   const result = parseBrief(text);
-  return isOk(result) ? [] : result.error.map((item) => item.message);
+  return (isOk(result) ? result.diagnostics : result.error).map((item) => item.message);
+}
+
+function problemsOf(text: string): Diagnostics {
+  const result = parseBrief(text);
+  return isOk(result) ? result.diagnostics : result.error;
 }
 
 interface Visited {
@@ -125,15 +137,30 @@ describe('the corpus, one level up from the tree', () => {
     }
   });
 
-  it('turns every broken brief into diagnostics instead of an AST', () => {
+  it('says what is wrong with every broken brief, and still hands back the AST', () => {
+    // Every fixture in this corpus is broken in the *body*, which ADR 0025 makes
+    // survivable: the parser recovered the directives around the bad line, so the value
+    // comes back on the ok branch with the error beside it. Nothing was weakened — the
+    // same diagnostics, at the same spans, are asserted one describe down.
     for (const [name, text] of Object.entries(broken)) {
       const result = parseBrief(text);
-      expect(result.ok, `${name} should not parse`).toBe(false);
-      if (!result.ok) {
-        expect(result.error.length, `${name} should say why`).toBeGreaterThan(0);
-        for (const item of result.error) expect(item.code).toBe('E_SYNTAX');
-      }
+      expect(result.ok, `${name} is broken in the body, so it still parses`).toBe(true);
+      if (!result.ok) continue;
+      expect(result.diagnostics.length, `${name} should say why`).toBeGreaterThan(0);
+      for (const item of result.diagnostics) expect(item.code).toBe('E_SYNTAX');
     }
+  });
+
+  it('keeps the directives the author did write when one line is unreadable', () => {
+    // The complaint this answers: a stray character used to blank the whole preview.
+    const result = parseBrief(
+      '---\ntemplate: promo\n---\n::titulo Direito **Constitucional\n::cor laranja\n',
+    );
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect(result.value.frontmatter.data).toEqual({ template: 'promo' });
+    expect(result.value.directives.map((item) => item.name)).toEqual(['titulo', 'cor']);
+    expect(result.diagnostics.map((item) => item.code)).toEqual(['E_SYNTAX']);
   });
 
   it('matches the recorded AST of every fixture', () => {
@@ -368,12 +395,15 @@ describe('the frontmatter', () => {
     expect(isOk(result) && result.value.frontmatter.data).toEqual({});
   });
 
-  it('reports invalid YAML at the offset inside the block', () => {
+  it('reports invalid YAML at the offset inside the block, and gives up the brief', () => {
+    // Fatal, unlike a broken body line: the frontmatter is where the template is named, so
+    // a block that does not parse leaves nothing to render against (ADR 0025).
     const text = '---\ntemplate: [feed\n---\n::titulo Um\n';
     const result = parseBrief(text);
     expect(result.ok).toBe(false);
     if (!result.ok) {
-      expect(result.error[0]?.message).toMatch(/frontmatter is not valid YAML/u);
+      expect(result.error[0]?.code).toBe('E_FRONTMATTER_SYNTAX');
+      expect(result.error[0]?.message).toMatch(/Frontmatter error: not valid YAML/u);
       const range = result.error[0]?.range;
       expect(range?.start).toBeGreaterThanOrEqual(4);
       expect(range?.end).toBeLessThanOrEqual(text.length);
@@ -381,8 +411,9 @@ describe('the frontmatter', () => {
   });
 
   it('refuses a block that is valid YAML but not a mapping', () => {
+    expect(parseBrief('---\n- feed\n- story\n---\n').ok).toBe(false);
     expect(messagesOf('---\n- feed\n- story\n---\n')).toEqual([
-      'Syntax error: the frontmatter must be a mapping of keys to values.',
+      'Frontmatter error: it must be a mapping of keys to values.',
     ]);
   });
 
@@ -417,18 +448,13 @@ describe('what a syntax error says', () => {
     expect(messagesOf(brokenAdjacentEmphasis)).toEqual([
       'Syntax error: an italic run is missing its closing *.',
     ]);
-    expect(parseBrief(brokenAdjacentEmphasis).ok).toBe(false);
+    expect(parseBrief(brokenAdjacentEmphasis).ok).toBe(true);
   });
 
   it('blames the indent of a line that belongs to no directive', () => {
-    const result = parseBrief(brokenOrphanIndent);
-    expect(result.ok).toBe(false);
-    if (!result.ok) {
-      expect(result.error[0]?.message).toBe(
-        'Syntax error: an indented line must follow a directive.',
-      );
-      expect(result.error[0]?.range).toEqual({ start: 0, end: 2 });
-    }
+    const problems = problemsOf(brokenOrphanIndent);
+    expect(problems[0]?.message).toBe('Syntax error: an indented line must follow a directive.');
+    expect(problems[0]?.range).toEqual({ start: 0, end: 2 });
   });
 
   it('quotes what it did not expect when there is something to quote', () => {
@@ -437,13 +463,10 @@ describe('what a syntax error says', () => {
   });
 
   it('reports every problem in one pass, in source order', () => {
-    const result = parseBrief(brokenFrontmatter);
-    expect(result.ok).toBe(false);
-    if (!result.ok) {
-      expect(result.error.length).toBeGreaterThan(1);
-      const starts = result.error.map((item) => item.range?.start ?? -1);
-      expect([...starts].sort((a, b) => a - b)).toEqual(starts);
-    }
+    const problems = problemsOf(brokenFrontmatter);
+    expect(problems.length).toBeGreaterThan(1);
+    const starts = problems.map((item) => item.range?.start ?? -1);
+    expect([...starts].sort((a, b) => a - b)).toEqual(starts);
   });
 
   it('falls back to the enclosing construct when the gap has no text', () => {
@@ -462,7 +485,7 @@ describe('the edges', () => {
         directives: [],
         range: { start: 0, end: 0 },
       },
-      warnings: [],
+      diagnostics: [],
     });
   });
 

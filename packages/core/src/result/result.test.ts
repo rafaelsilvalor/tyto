@@ -5,6 +5,7 @@ import {
   andThen,
   err,
   fromDiagnostics,
+  fromPartial,
   isErr,
   isOk,
   map,
@@ -13,26 +14,27 @@ import {
   ok,
   unwrapOr,
   unwrapOrElse,
-  withWarnings,
+  withDiagnostics,
 } from './result.js';
-import { diagnostic } from '../diagnostics/diagnostic.js';
+import { diagnostic, hasErrors } from '../diagnostics/diagnostic.js';
 
 const overflow = (slot: string) =>
   diagnostic('W_TEXT_OVERFLOW', { slot, overflow: 12, format: 'story' });
 const unknownSlot = (slot: string) =>
   diagnostic('E_UNKNOWN_SLOT', { slot, template: 'promo-curso', declared: 'titulo' });
+const noTemplate = () => diagnostic('E_NO_TEMPLATE', {});
 
 describe('constructors', () => {
   it('starts a success with no warnings', () => {
     const result = ok(42);
 
-    expect(result).toEqual({ ok: true, value: 42, warnings: [] });
+    expect(result).toEqual({ ok: true, value: 42, diagnostics: [] });
     expect(isOk(result)).toBe(true);
     expect(isErr(result)).toBe(false);
   });
 
   it('carries warnings on success, which is the point of ADR 0013', () => {
-    expect(ok('scene', [overflow('titulo')]).warnings).toHaveLength(1);
+    expect(ok('scene', [overflow('titulo')]).diagnostics).toHaveLength(1);
   });
 
   it('carries the diagnostics on failure', () => {
@@ -47,7 +49,7 @@ describe('map', () => {
   it('transforms the value and keeps the warnings', () => {
     const result = map(ok(2, [overflow('titulo')]), (n) => n * 3);
 
-    expect(result).toEqual({ ok: true, value: 6, warnings: [overflow('titulo')] });
+    expect(result).toEqual({ ok: true, value: 6, diagnostics: [overflow('titulo')] });
   });
 
   it('leaves a failure untouched', () => {
@@ -74,7 +76,7 @@ describe('andThen', () => {
     const result = andThen(ok(1, [overflow('titulo')]), (n) => ok(n + 1, [overflow('subtitulo')]));
 
     expect(result.ok && result.value).toBe(2);
-    expect(result.ok && result.warnings.map((w) => w.message)).toEqual([
+    expect(result.ok && result.diagnostics.map((w) => w.message)).toEqual([
       overflow('titulo').message,
       overflow('subtitulo').message,
     ]);
@@ -123,7 +125,7 @@ describe('all', () => {
     const result = all([ok(1, [overflow('a')]), ok(2), ok(3, [overflow('b')])]);
 
     expect(result.ok && result.value).toEqual([1, 2, 3]);
-    expect(result.ok && result.warnings).toHaveLength(2);
+    expect(result.ok && result.diagnostics).toHaveLength(2);
   });
 
   it('accumulates every failure instead of stopping at the first', () => {
@@ -141,7 +143,7 @@ describe('all', () => {
   });
 
   it('succeeds on an empty batch', () => {
-    expect(all([])).toEqual({ ok: true, value: [], warnings: [] });
+    expect(all([])).toEqual({ ok: true, value: [], diagnostics: [] });
   });
 });
 
@@ -150,7 +152,7 @@ describe('fromDiagnostics', () => {
     const result = fromDiagnostics('scene', [overflow('titulo')]);
 
     expect(result.ok && result.value).toBe('scene');
-    expect(result.ok && result.warnings).toHaveLength(1);
+    expect(result.ok && result.diagnostics).toHaveLength(1);
   });
 
   it('fails as soon as one diagnostic is an error, keeping the warnings alongside it', () => {
@@ -161,16 +163,46 @@ describe('fromDiagnostics', () => {
   });
 });
 
-describe('withWarnings', () => {
+describe('withDiagnostics', () => {
   it('appends to a success', () => {
-    expect(withWarnings(ok(1, [overflow('a')]), [overflow('b')]).ok).toBe(true);
-    const result = withWarnings(ok(1, [overflow('a')]), [overflow('b')]);
-    expect(result.ok && result.warnings).toHaveLength(2);
+    expect(withDiagnostics(ok(1, [overflow('a')]), [overflow('b')]).ok).toBe(true);
+    const result = withDiagnostics(ok(1, [overflow('a')]), [overflow('b')]);
+    expect(result.ok && result.diagnostics).toHaveLength(2);
   });
 
   it('leaves a failure untouched', () => {
     const failure = err([unknownSlot('a')]);
 
-    expect(withWarnings(failure, [overflow('b')])).toBe(failure);
+    expect(withDiagnostics(failure, [overflow('b')])).toBe(failure);
+  });
+});
+
+describe('fromPartial', () => {
+  it('keeps the value when every error is one the value survived', () => {
+    const result = fromPartial(1, [unknownSlot('rodape')]);
+
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect(result.value).toBe(1);
+    // The error is on the ok branch, and it is still an error: `hasErrors` is what fails a
+    // build, and nothing here softened it into a warning (ADR 0025).
+    expect(result.diagnostics.map((item) => item.code)).toEqual(['E_UNKNOWN_SLOT']);
+    expect(hasErrors(result.diagnostics)).toBe(true);
+  });
+
+  it('gives up the value as soon as one diagnostic is fatal', () => {
+    const result = fromPartial(1, [unknownSlot('rodape'), noTemplate()]);
+
+    expect(result.ok).toBe(false);
+    if (result.ok) return;
+    // Everything, not only the fatal one: the author wants the whole list in one pass.
+    expect(result.error.map((item) => item.code)).toEqual(['E_UNKNOWN_SLOT', 'E_NO_TEMPLATE']);
+  });
+
+  it('differs from fromDiagnostics on exactly the non-fatal errors', () => {
+    const items = [unknownSlot('rodape')];
+
+    expect(fromDiagnostics(1, items).ok).toBe(false);
+    expect(fromPartial(1, items).ok).toBe(true);
   });
 });

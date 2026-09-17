@@ -400,9 +400,18 @@ describe('one broken frame', () => {
       await portsOf({ sink, rasterizer: rasterizer() }),
     );
 
-    // An error replaces the value (ADR 0013), so the job is an `Err` — but the nine
-    // frames that worked were still rendered and still written.
-    expect(result.ok).toBe(false);
+    // The nine frames that worked were rendered, written **and reported**. Until ADR 0025
+    // the first two were true and the third was not: `E_RENDER_FAILED` made the whole job
+    // an `Err`, the report went with it, and `result.json` said `artifacts: []` over an
+    // output folder with nine files in it.
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect(result.value.rendered).toBe(9);
+    expect(result.value.failed).toBe(3);
+    expect(result.value.planned).toBe(12);
+    expect(result.value.artifacts.map((artifact) => artifact.name).sort()).toEqual(
+      [...sink.written].map((artifact) => artifact.name).sort(),
+    );
     expect([...sink.written].map((artifact) => artifact.name).sort()).toEqual([
       'slide-1-feed.png',
       'slide-1-feed.svg',
@@ -422,9 +431,12 @@ describe('one broken frame', () => {
       await portsOf({ rasterizer: rasterizer() }),
     );
 
-    if (result.ok) throw new Error('three frames failed; the job should not be ok');
+    if (!result.ok) throw new Error('nine frames rendered, so the report survives');
 
-    const failures = result.error.filter((item) => item.code === 'E_RENDER_FAILED');
+    // Still errors, and `hasErrors` is what turns them into exit 1 — what changed is that
+    // they no longer take the report with them (ADR 0025).
+    const failures = result.diagnostics.filter((item) => item.code === 'E_RENDER_FAILED');
+    expect(failures.every(isError)).toBe(true);
     expect(failures).toHaveLength(3);
     expect(failures.map((item: Diagnostic) => item.message)).toEqual([
       "Frame 'slide-1:story' could not be rendered as png: the tab crashed.",
@@ -452,10 +464,11 @@ describe('one broken frame', () => {
 
     const result = await runJob({ brief: briefSource, outputs: BOTH }, await portsOf({ sink }));
 
-    if (result.ok) throw new Error('a write that failed is an error');
+    if (!result.ok) throw new Error('eleven files were written, so the report survives');
 
-    expect(result.error.filter((item) => item.code === 'E_OUTPUT_WRITE')).toHaveLength(1);
+    expect(result.diagnostics.filter((item) => item.code === 'E_OUTPUT_WRITE')).toHaveLength(1);
     expect(sink.written).toHaveLength(11);
+    expect(result.value.artifacts).toHaveLength(11);
   });
 });
 
@@ -466,9 +479,13 @@ describe('a frame with no pixels', () => {
       await portsOf({ formats: formatCatalogue({ feed: { w: 0, h: 0 }, story: { w: 0, h: 0 } }) }),
     );
 
-    if (result.ok) throw new Error('a zero-size frame cannot be rendered');
+    if (!result.ok) throw new Error('a failed frame is not fatal; the report says so');
 
-    const failures = result.error.filter((item) => item.code === 'E_RENDER_FAILED');
+    // Every frame failed, which is the honest zero: a report of six planned and none
+    // rendered, not an absent report.
+    expect(result.value.artifacts).toHaveLength(0);
+    expect(result.value.planned).toBe(6);
+    const failures = result.diagnostics.filter((item) => item.code === 'E_RENDER_FAILED');
     expect(failures).toHaveLength(6);
     expect(failures[0]?.message).toContain('which is no pixels at all');
   });
@@ -633,7 +650,7 @@ describe('the resources stage', () => {
     );
 
     if (!result.ok) throw new Error(result.error.map((item) => item.message).join('; '));
-    expect(result.warnings.some(isError)).toBe(false);
+    expect(result.diagnostics.some(isError)).toBe(false);
     expect(textOf(sink.written[0]!)).toContain('data:image/png;base64,sha256-ana');
   });
 
@@ -679,10 +696,10 @@ describe('the resources stage', () => {
 
   const unresolvedAssets = (result: {
     ok: boolean;
-    warnings?: readonly Diagnostic[];
+    diagnostics?: readonly Diagnostic[];
     error?: readonly Diagnostic[];
   }): readonly Diagnostic[] =>
-    (result.ok ? (result.warnings ?? []) : (result.error ?? [])).filter(
+    (result.ok ? (result.diagnostics ?? []) : (result.error ?? [])).filter(
       (item) => item.code === 'E_EXPORT_ASSET_UNRESOLVED',
     );
 
@@ -737,7 +754,7 @@ describe('the resources stage', () => {
       await portsOf({ exporters: exportersOf(noFonts, noFonts) }),
     );
 
-    const produced = result.ok ? result.warnings : result.error;
+    const produced = result.ok ? result.diagnostics : result.error;
     const fonts = produced.filter((item) => item.code === 'E_EXPORT_FONT_UNRESOLVED');
 
     expect(fonts.length).toBeGreaterThan(0);
@@ -842,16 +859,21 @@ describe('the stages before the render', () => {
     ]);
   });
 
-  it('carries the warnings from every stage onto the success branch', async () => {
+  it('carries what every stage said onto the success branch, errors included', async () => {
     // `subtitulo` is not a slot this manifest declares, so `resolve` reports it — as an
-    // error, since an unknown slot is a typo. The point of the case is that the job does
-    // not swallow what a stage said on its way past.
+    // error, since an unknown slot is a typo. It is not a *fatal* one: the slot the brief
+    // invented is the only thing lost, and the artwork is drawn from the slots that exist
+    // (ADR 0025). The point of the case is that the job neither swallows it nor lets it
+    // cost the render.
     const result = await runJob(
       { brief: briefSource.replace('::titulo', '::subtitulo Aulas\n::titulo'), outputs: BOTH },
       await portsOf(),
     );
 
-    if (result.ok) throw new Error('an unknown slot is an error');
-    expect(result.error.some((item) => item.code === 'E_UNKNOWN_SLOT' && isError(item))).toBe(true);
+    if (!result.ok) throw new Error('an unknown slot costs that slot, not the artwork');
+    expect(result.diagnostics.some((item) => item.code === 'E_UNKNOWN_SLOT' && isError(item))).toBe(
+      true,
+    );
+    expect(result.value.artifacts).toHaveLength(12);
   });
 });

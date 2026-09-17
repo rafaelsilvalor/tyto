@@ -65,7 +65,7 @@ export function createTemplateAnalyzer(options: TemplateAnalyzerOptions): Templa
       });
       return Promise.resolve({
         source,
-        diagnostics: compiled.ok ? compiled.warnings : compiled.error,
+        diagnostics: compiled.ok ? compiled.diagnostics : compiled.error,
         manifest: options.manifest,
       });
     },

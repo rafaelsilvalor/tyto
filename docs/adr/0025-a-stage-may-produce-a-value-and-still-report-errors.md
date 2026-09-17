@@ -1,6 +1,6 @@
 # 0025 — A stage may produce a value and still report errors
 
-Status: **proposed** · 2026-09-16 · TYTO-107 · extends ADR 0013
+Status: accepted · proposed 2026-09-16, accepted 2026-09-17 · TYTO-107 · extends ADR 0013
 
 ## Context
 
@@ -60,9 +60,9 @@ the first failure.
 
 ## Decision
 
-**Not taken. This ADR is the decision, written for the maintainer to accept or refuse**, and
-TYTO-107 does not start until it is. What follows is the shape recommended and the two
-alternatives, with what each costs.
+**The recommended shape, accepted by the maintainer on 2026-09-17** and built in the same
+card. The two alternatives below are kept as the record of what was weighed; _What the
+building corrected_ at the end is what the proposal got wrong.
 
 ### Recommended: separate the two axes, because they are two things
 
@@ -157,3 +157,53 @@ Whether TYTO-107 is worth doing. Its own `When:` is a trigger that has not fired
 real brief spends perceptible time being corrected with the preview marked stale"_ — and
 TYTO-108, which creates that marker, shipped hours before this was written. The recommendation
 here is what to build **if** it is built, not a case for building it now.
+
+## What the building corrected
+
+Written after the code, because a proposal that is never checked against its own
+implementation is a doc that ages without anybody noticing.
+
+**`E_SYNTAX` had to split three ways, not two.** `packages/template-lang` reports the same
+code for a `template.html` that does not parse, and a broken template breaks every artwork
+drawn through it. One code cannot be fatal in one place and not in another — the argument
+this ADR makes for the frontmatter — so there is an `E_TEMPLATE_SYNTAX` beside
+`E_FRONTMATTER_SYNTAX`, and `E_SYNTAX` now means a line of the brief **body** and nothing
+else.
+
+**The frontmatter split needed no position test.** `Frontmatter` is one external token in
+the Lezer grammar, so an error node can never be inside it: every `E_FRONTMATTER_SYNTAX`
+comes from `frontmatter.ts` and every `E_SYNTAX` from the tree walk. The split is by which
+file emits it, which is stronger than a range comparison and was not what this ADR expected.
+
+**The twelve early returns did not become twelve decisions — none of them changed.** The
+partition belongs to the stage, because the stage is the only side that knows what is left
+of its value; by the time a caller reads `if (!result.ok)`, that already means _fatally_.
+The five in the desktop preview and the seven in the pipeline job kept their conditions
+exactly. What changed in `runJob` is its **last** line, which is not one of the twelve:
+`problems.some(isError) ? err(problems) : …` became `fromPartial(report, problems)`.
+
+That line was hiding a defect. `E_RENDER_FAILED` and `E_OUTPUT_WRITE` are one frame each and
+the job draws the other eleven, so neither is fatal — and until this card the whole report
+went into the `Err` with them, so `result.json` said `artifacts: []` over an output folder
+the same run had already written nine files into. `packages/io`'s own test asserted the
+files on disk and never the document that is supposed to describe them.
+
+**The fatal list in this ADR was incomplete.** Eleven of the catalogue's codes were not in
+the table: `E_FORMAT_NOT_DEFINED`, the four registry codes, `E_INPUT_READ`, the three
+`E_EXPORT_*` and the two above. The generated `docs/diagnostic-codes.md` now carries every
+one with its reason, which is where the list belongs — a table in an ADR is a snapshot, and
+a field on the code cannot go stale.
+
+Two of those eleven are fatal for the same reason `E_MISSING_REQUIRED_SLOT` is:
+`E_EXPORT_ASSET_UNRESOLVED` and `E_EXPORT_UNSUPPORTED` would each leave a hole in the
+artwork that nothing in the artwork names. "Non-fatal only if the gap is visible" is one
+rule with three entries under it, not a special case for required slots.
+
+**`docs/contracts.md` does not exist.** The contract is `docs/render-contract.md`, generated
+from `tools/docs-gen/src/render-contract-doc.ts`, so the third state is written in the
+generator. And it is a third _state_, not a third `status`: adding a value to that enum is
+a documented break for every strict consumer, so "rendered, with errors" is `status: error`
+read together with a non-empty `artifacts` — a table in the contract says so.
+
+**The rename cost 76 lines in 25 files**, against the 77 reads in 19 counted above. The
+compiler named every one, which is what the estimate said it would.

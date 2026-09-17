@@ -116,8 +116,8 @@ export async function loadRenderContext(
     options.templatesDirectoryIsDefault === true ? options.templatesDirectory : undefined;
 
   const problems = [
-    ...formats.warnings,
-    ...registry.warnings,
+    ...formats.diagnostics,
+    ...registry.diagnostics,
     ...registry.value.failures
       .filter((failure) => failure.directory !== silenced)
       .flatMap((failure) => failure.diagnostics),
@@ -191,7 +191,7 @@ export function templateWiring(context: RenderContext): TemplateWiring {
 
       // The template file is the source these ranges index, not the brief. Recorded here
       // because this is the only place that knows both.
-      const problems = result.ok ? result.warnings : result.error;
+      const problems = result.ok ? result.diagnostics : result.error;
       if (problems.length > 0) {
         const path = context.fileSystem.join(directory, TEMPLATE_FILE);
         const source = await context.fileSystem.readFile(path).catch(() => undefined);

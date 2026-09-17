@@ -2,7 +2,7 @@ import type { BriefAst, Directive, RichText } from './ast.js';
 import { type Diagnostic, diagnostic } from '../diagnostics/diagnostic.js';
 import { didYouMean } from '../diagnostics/suggest.js';
 import type { AssetResolver } from '../ports/asset-resolver.js';
-import { type Diagnostics, type Result, err, fromDiagnostics } from '../result/result.js';
+import { type Diagnostics, type Result, err, fromPartial } from '../result/result.js';
 import type { AssetRef } from '../scene/primitives.js';
 import type { SourceRange } from '../source/range.js';
 import type { Slot, TemplateManifest } from '../template/manifest.js';
@@ -20,6 +20,12 @@ import type { TemplateRegistry } from '../template/registry.js';
  * It reports everything it finds in one pass. An author fixing a brief wants the list, not
  * the first line of it — the two exceptions are a missing or unknown template, where there
  * is no manifest to ask anything else against.
+ *
+ * **And it hands back what it did resolve.** A slot the manifest refuses is one slot: the
+ * value never enters `slots`, the diagnostic rides along on the ok branch, and the other
+ * nineteen directives are still there to be compiled (ADR 0025). The two exceptions above
+ * are exactly the fatal ones; the third is `E_MISSING_REQUIRED_SLOT`, which is fatal
+ * because an artwork with a hole where the manifest promised content looks finished.
  */
 
 export interface ResolvedAdjustment {
@@ -587,5 +593,5 @@ export async function resolve(
 
   resolver.finish(ast.frontmatter.range ?? ast.range);
 
-  return fromDiagnostics(resolver.build(formats), resolver.diagnostics);
+  return fromPartial(resolver.build(formats), resolver.diagnostics);
 }

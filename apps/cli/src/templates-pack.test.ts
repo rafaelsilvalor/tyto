@@ -126,7 +126,7 @@ describe('a project with no templates folder of its own', () => {
     });
     if (!context.ok) throw new Error('expected a context');
 
-    expect(context.warnings).toEqual([]);
+    expect(context.diagnostics).toEqual([]);
   });
 
   it('still reports a folder the user named and does not have', async () => {
@@ -137,7 +137,7 @@ describe('a project with no templates folder of its own', () => {
     });
     if (!context.ok) throw new Error('expected a context');
 
-    expect(context.warnings.map((item) => item.code)).toEqual(['E_TEMPLATE_READ']);
+    expect(context.diagnostics.map((item) => item.code)).toEqual(['E_TEMPLATE_READ']);
   });
 });
 
@@ -160,8 +160,8 @@ describe('a project that has a template of the same name', () => {
     expect(context.value.registry.get('promo-curso')?.version).toBe('9.9.9');
     // Exactly one template answers the name, which is the acceptance criterion, and the
     // other is named rather than dropped in silence.
-    expect(context.warnings.map((item) => item.code)).toEqual(['W_TEMPLATE_SHADOWED']);
-    expect(context.warnings[0]?.message).toContain(theirs);
+    expect(context.diagnostics.map((item) => item.code)).toEqual(['W_TEMPLATE_SHADOWED']);
+    expect(context.diagnostics[0]?.message).toContain(theirs);
     // And the pack's other template is still there: shadowing is per name, not per pack.
     expect(context.value.registry.get('so-do-pack')).toBeDefined();
   });
