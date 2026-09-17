@@ -34,6 +34,7 @@ Boundary rules:
 | Command                        | Does                                                                                |
 | ------------------------------ | ----------------------------------------------------------------------------------- |
 | `tyto render <brief> --out`    | one brief → artifacts + `result.json` in `--out`. The contract above                |
+| `tyto render … --folder`       | the same, delivered as `<out>/<brief-name>/` with the brief kept beside the artwork |
 | `tyto watch <folder>`          | `<folder>/inbox/<id>/` → `<folder>/outbox/<id>/out/`, forever. `--once` for a sweep |
 | `tyto template check <folder>` | manifest, then markup, with line and column. No brief, no `formats.yaml`            |
 | `tyto template new <name>`     | scaffolds a template folder from `docs/template-authoring.md`                       |
@@ -42,6 +43,35 @@ A project is two paths, both overridable: `--templates` (default `templates/`, o
 per template) and `--formats-file` (default `formats.yaml`). `--types png,jpeg,webp,svg`
 chooses the encodings and defaults to `png`; `--scale` and `--quality` apply only to the
 raster ones, and `--types svg` never launches a browser at all.
+
+**`--folder` is the one flag that changes what `--out` means, and it is off by default**
+(TYTO-121). Without it, `--out` **is** the output folder — the contract above, which Jacurutu
+reads and which nothing here may move. With it, `--out` becomes the parent and Tyto writes:
+
+```
+<out>/<brief-name>/
+  <artwork>-<format>.png        artwork and nothing else at this level
+  editaveis/
+    <brief-name>.brief          the brief that produced the files above
+    result.json
+```
+
+`<brief-name>` is the brief's own file name without `.brief`, used as it is: it names a file
+that already exists on this filesystem, so a second sanitiser beside `artifactName`'s would
+only be a second opinion about what to call the same folder. The top level holds artwork alone
+because the folder is meant to be dropped into a delivery, and `result.json` is the one file
+somebody would otherwise have to delete first.
+
+**A flag rather than a second command**, because `render` carries ten options a delivery needs
+every one of, and a sibling would be a second copy of that surface, its help and its tests.
+**An existing folder is written into and not cleared**, the same rule `--out` has — so a brief
+edited from three slides down to two leaves the third one in the delivery, and `result.json`
+does not mention it, because it lists what that run wrote.
+
+Portuguese in `editaveis/` is deliberate and is the only user-facing name in the repository
+that is: it is read by whoever receives the folder rather than by a program (`docs/git-workflow.md`
+keeps everything else English), and it is spelled without the accent because a folder name
+travels through zip tools and browsers that still disagree about one.
 
 **`--template` and `--formats` are fallbacks, not overrides.** Each is used only when the
 brief's frontmatter says nothing on that subject, so what a brief says about itself always

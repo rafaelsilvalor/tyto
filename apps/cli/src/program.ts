@@ -101,6 +101,16 @@ export function createProgram(environment: CliEnvironment, captured: Captured): 
     .description('render one brief into an output folder (the ADR 0011 contract)')
     .argument('<brief>', 'path to the .brief file')
     .requiredOption('-o, --out <dir>', 'folder for the artifacts and result.json')
+    // A flag on `render` rather than a command beside it, and the choice is worth one line:
+    // `render` carries ten options that a delivery needs every one of, so a sibling command
+    // would be a second copy of the whole surface, its help, its docs and its tests. Off by
+    // default is what keeps `--out` exactly what `docs/render-contract.md` publishes —
+    // Jacurutu never types this (TYTO-121).
+    .option(
+      '--folder',
+      'deliver into <out>/<brief-name>/ — artwork at the top, brief and result.json in editaveis/',
+      false,
+    )
     .option(
       '--assets <dir>',
       "what relative asset paths resolve against (default: assets/ beside the brief, else the brief's folder)",
