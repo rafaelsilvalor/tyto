@@ -1,4 +1,4 @@
-import { mkdir, mkdtemp, readdir, rm, writeFile } from 'node:fs/promises';
+import { mkdir, mkdtemp, readFile, readdir, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
@@ -10,11 +10,11 @@ import { isInside } from './contain.js';
 import { fileResources } from './file-resources.js';
 import { fsInbox } from './fs-inbox.js';
 import { fileTemplateAssets } from './file-template-assets.js';
-import { fsOutbox, fsTaskOutput } from './fs-outbox.js';
+import { fsDeliveryOutput, fsOutbox, fsTaskOutput } from './fs-outbox.js';
 import { nodeFileSystem } from './node-file-system.js';
 import { pollSource } from './poll.js';
 import type { BriefSource, BriefTask } from './ports.js';
-import { parseRenderResult, renderResult } from './result.js';
+import { type RenderResult, parseRenderResult, renderResult } from './result.js';
 
 let workspace: string;
 
@@ -150,6 +150,82 @@ describe('fsTaskOutput', () => {
 
     await expect(output.finish({ status: 'ok' } as never)).rejects.toThrow(
       /does not match its schema/,
+    );
+  });
+});
+
+describe('fsDeliveryOutput', () => {
+  const BRIEF = new TextEncoder().encode('::titulo Inscrições\n');
+
+  /** A valid empty report: these tests are about where files land, not what is in them. */
+  const emptyResult = (): RenderResult =>
+    renderResult({
+      cancelled: false,
+      planned: 0,
+      artifacts: [],
+      diagnostics: [],
+      version: '0.0.0-test',
+      templates: [],
+    });
+
+  it('puts artwork at the top and the brief and result.json under editaveis/', async () => {
+    const output = await fsDeliveryOutput(join(workspace, 'entregas'), {
+      name: 'campanha',
+      brief: BRIEF,
+    });
+    await output.write(artifactOf('slide-1-feed.png'));
+    await output.finish(emptyResult());
+
+    const folder = join(workspace, 'entregas', 'campanha');
+    // The top level is the delivery. A `result.json` here is the one file somebody would
+    // have to delete before sending the folder on, which is what the layout is avoiding.
+    expect((await readdir(folder)).sort()).toEqual(['editaveis', 'slide-1-feed.png']);
+    expect((await readdir(join(folder, 'editaveis'))).sort()).toEqual([
+      'campanha.brief',
+      'result.json',
+    ]);
+  });
+
+  it('copies the brief unchanged, bytes and all', async () => {
+    const output = await fsDeliveryOutput(join(workspace, 'entregas'), {
+      name: 'campanha',
+      brief: BRIEF,
+    });
+    await output.finish(emptyResult());
+
+    const copied = await readFile(
+      join(workspace, 'entregas', 'campanha', 'editaveis', 'campanha.brief'),
+    );
+    expect(copied.equals(Buffer.from(BRIEF))).toBe(true);
+  });
+
+  it('writes the brief before any artifact, so a run that dies says what it was rendering', async () => {
+    // The factory is where it happens, and that is the claim: the folder is never a set of
+    // images with nothing to explain them. `result.json` is still last — it is the finished
+    // signal — so the brief cannot wait for `finish`.
+    await fsDeliveryOutput(join(workspace, 'entregas'), { name: 'campanha', brief: BRIEF });
+
+    expect(await readdir(join(workspace, 'entregas', 'campanha', 'editaveis'))).toEqual([
+      'campanha.brief',
+    ]);
+  });
+
+  it('refuses a name that is not one path segment, rather than delivering elsewhere', async () => {
+    // Refused, not rewritten. `artifact.ts`'s `fileSafe` would turn this into a folder with a
+    // different name; a second sanitiser is how one delivery ends up called two things.
+    await expect(
+      fsDeliveryOutput(join(workspace, 'entregas'), { name: '../escaped', brief: BRIEF }),
+    ).rejects.toThrow(/one path segment/u);
+  });
+
+  it('validates result.json the same way the task output does', async () => {
+    const output = await fsDeliveryOutput(join(workspace, 'entregas'), {
+      name: 'campanha',
+      brief: BRIEF,
+    });
+
+    await expect(output.finish({ status: 'ok' } as never)).rejects.toThrow(
+      /does not match its schema/u,
     );
   });
 });
