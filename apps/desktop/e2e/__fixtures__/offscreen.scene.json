@@ -1,0 +1,92 @@
+{
+  "version": 1,
+  "artworks": [
+    {
+      "id": "offscreen",
+      "label": "One production-sized frame with the two things a blank capture hides: a gradient and embedded glyphs",
+      "frames": [
+        {
+          "format": "feed",
+          "size": { "w": 1080, "h": 1080 },
+          "background": {
+            "kind": "linear-gradient",
+            "angle": 160,
+            "stops": [
+              { "offset": 0, "color": { "r": 12, "g": 18, "b": 38 } },
+              { "offset": 1, "color": { "r": 60, "g": 20, "b": 80 } }
+            ]
+          },
+          "children": [
+            {
+              "kind": "text",
+              "id": "headline",
+              "name": "the bundled face, large enough that a fallback would be obvious to a reader",
+              "transform": { "x": 96, "y": 180 },
+              "box": { "w": 888 },
+              "align": "left",
+              "valign": "top",
+              "lineHeight": 1.1,
+              "letterSpacing": 0,
+              "overflow": "clip",
+              "runs": [
+                {
+                  "kind": "text",
+                  "text": "Turma nova",
+                  "font": { "family": "Source Sans 3", "source": "bundled" },
+                  "size": 132,
+                  "weight": 700,
+                  "style": "normal",
+                  "color": { "kind": "solid", "color": { "r": 255, "g": 255, "b": 255 } }
+                },
+                { "kind": "break" },
+                {
+                  "kind": "text",
+                  "text": "de setembro",
+                  "font": { "family": "Source Sans 3", "source": "bundled" },
+                  "size": 132,
+                  "weight": 700,
+                  "style": "normal",
+                  "color": { "kind": "solid", "color": { "r": 255, "g": 137, "b": 0 } }
+                }
+              ]
+            },
+            {
+              "kind": "text",
+              "id": "body",
+              "name": "accented characters, so a face that failed to embed shows as tofu rather than as a different shape",
+              "transform": { "x": 96, "y": 640 },
+              "box": { "w": 888 },
+              "align": "left",
+              "valign": "top",
+              "lineHeight": 1.45,
+              "letterSpacing": 0,
+              "overflow": "clip",
+              "runs": [
+                {
+                  "kind": "text",
+                  "text": "Inscrições abertas até o dia 30. Aulas ao vivo, material incluso e certificado ao final do curso.",
+                  "font": { "family": "Source Sans 3", "source": "bundled" },
+                  "size": 40,
+                  "weight": 400,
+                  "style": "normal",
+                  "color": { "kind": "solid", "color": { "r": 176, "g": 184, "b": 204 } }
+                }
+              ]
+            },
+            {
+              "kind": "rect",
+              "id": "rule",
+              "name": "a solid block, so paintedShare does not depend on glyph coverage alone",
+              "transform": { "x": 96, "y": 880 },
+              "size": { "w": 400, "h": 16 },
+              "radius": [8, 8, 8, 8],
+              "fill": { "kind": "solid", "color": { "r": 255, "g": 137, "b": 0 } }
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "fonts": [{ "family": "Source Sans 3", "source": "bundled" }],
+  "assets": []
+}
