@@ -4,7 +4,14 @@ import { beforeEach, describe, expect, it } from 'vitest';
 import { CATALOGUE_KEYS, type Locale, translate } from '../../shared/i18n/index.js';
 import { en } from '../../shared/i18n/en.js';
 import { ptBR } from '../../shared/i18n/pt-BR.js';
-import { I18N_ATTRIBUTE, fillLocalePicker, localeFromPicker, paint, windowTitle } from './shell.js';
+import {
+  I18N_ATTRIBUTE,
+  fillLocalePicker,
+  localeFromPicker,
+  paint,
+  paintTitle,
+  windowTitle,
+} from './shell.js';
 
 /**
  * The acceptance criterion — *switching locale changes every visible string* — as a unit.
@@ -157,5 +164,19 @@ describe('the window title', () => {
     paint(document, state('pt-BR', { name: 'promo.brief', dirty: true }));
 
     expect(document.querySelector('title')?.textContent).toBe('promo.brief (não salvo) — Tyto');
+  });
+
+  it('can be written on its own, which is what an edit does', () => {
+    // The unsaved marker is compared rather than remembered (ADR 0026), so there is no
+    // first keystroke to watch for and the title is rewritten on every edit. This is the
+    // call that path makes, and what it must *not* do is the `[data-i18n]` walk — the
+    // heading below is left in English to prove it was not touched.
+    document.body.innerHTML = `<h1 ${I18N_ATTRIBUTE}="app.name">stale</h1>`;
+    document.head.innerHTML = '<title>Tyto</title>';
+
+    paintTitle(document, state('pt-BR', { name: 'promo.brief', dirty: true }));
+
+    expect(document.querySelector('title')?.textContent).toBe('promo.brief (não salvo) — Tyto');
+    expect(document.querySelector('h1')?.textContent).toBe('stale');
   });
 });

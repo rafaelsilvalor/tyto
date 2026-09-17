@@ -1,4 +1,4 @@
-import { type CommandRegistry, type EditorHandle, createEditor, textOf } from '@tyto/editor';
+import { type CommandRegistry, type EditorHandle, createEditor } from '@tyto/editor';
 
 import { type TytoBridge } from '../../shared/ipc.js';
 import {
@@ -40,10 +40,12 @@ import {
   activeOf,
   addDocument,
   closeDocument,
+  contentOf,
   documentAtSlot,
   documentOf,
   isDisposable,
   isStale,
+  isUnsaved,
   newDocument,
   releaseDocument,
   selectDocument,
@@ -63,7 +65,7 @@ import {
   withPanelSize,
 } from '../../shared/layout.js';
 import { searchPhrasesFor } from './search-phrases.js';
-import { fillLocalePicker, localeFromPicker, paint } from './shell.js';
+import { type ShellState, fillLocalePicker, localeFromPicker, paint, paintTitle } from './shell.js';
 import {
   type PreviewElements,
   type RequestGate,
@@ -162,11 +164,12 @@ const active = (): DocumentState => activeOf(workspace);
  * Empty before CodeMirror is mounted, which is the one paint between module load and
  * {@link load} — the same window in which the old `editor?.getValue() ?? ''` answered the
  * same empty string.
+ *
+ * The question itself moved to `documents.ts` in TYTO-112, because the unsaved marker asks
+ * it about documents that are **not** in front: this is now that function applied to the
+ * active one, and not a second way of reading a document.
  */
-function activeText(): string {
-  const { state } = active();
-  return state === undefined ? '' : textOf(state);
-}
+const activeText = (): string => contentOf(active());
 
 /** Changes the active document and leaves every other one exactly as it was. */
 function updateActive(change: (document: DocumentState) => DocumentState): void {
@@ -401,7 +404,9 @@ function paintTabs(): void {
   strip.tabs = workspace.documents.map((document_) => ({
     id: document_.id,
     label: labelOf(document_),
-    dirty: document_.dirty,
+    // Compared, never looked up: there is no field on a document that says it has been
+    // typed in, and this is the only place the strip learns of one that has (TYTO-112).
+    dirty: isUnsaved(document_),
   }));
 }
 
@@ -484,14 +489,21 @@ const registry: CommandRegistry = createDesktopRegistry({
         text: activeText(),
         saveAs,
       });
-      // A dismissed dialog leaves everything alone, dirty marker included. Clearing it
-      // would tell somebody their text was written when it was not.
+      // A dismissed dialog leaves everything alone, the unsaved marker included. There is
+      // nothing to clear now — the marker is a comparison — but there is something not to
+      // move: taking `savedText` forward here would tell somebody their text was written
+      // when it was not.
       if (answer.document === null) return;
-      const name = answer.document.name;
+      const { name, text: written } = answer.document;
       workspace = updateDocument(workspace, documentId, (document_) => ({
         ...document_,
         name,
-        dirty: false,
+        // **What main says it wrote**, and not the string sent up or the buffer as it now
+        // stands. A save-as puts a dialog in front of somebody who can go on typing behind
+        // it, so the text at the end of this round trip is not always the text at the start
+        // of it; taking the buffer here would call those extra characters saved. The old
+        // `dirty: false` did exactly that (TYTO-112).
+        savedText: written,
       }));
 
       // A save-as onto a file another tab had open: main gave the path to this tab and took
@@ -633,17 +645,33 @@ function adopt(
   }
   if (editor === undefined) return;
 
+  const born = newDocument(documentId, editor.blank(opened.text));
   const created: DocumentState = {
-    ...newDocument(documentId, editor.blank(opened.text)),
+    ...born,
     name: opened.name,
+    // Born saved, because it was just read: the buffer and the file say the same thing and
+    // the comparison that paints the dot says so without anybody writing `dirty: false`.
+    //
+    // **Read back out of the buffer, and not the string main handed over.** CodeMirror
+    // normalises line endings when it builds a document, so a file whose lines end in CR LF
+    // becomes a buffer whose lines end in LF — asserted against the real editor in
+    // `packages/editor/src/editor.test.ts` — and such a brief is a supported input (TYTO-64,
+    // `tools/contract-test/src/fixture/line-endings/`). So comparing the buffer against the
+    // bytes would put the dot on every one of those files the instant it opened, and a
+    // discard dialog in front of closing it, for a difference this app cannot keep anyway: a
+    // save writes the buffer. The dot means "text you would lose", and there is none.
+    savedText: contentOf(born),
   };
 
   captureScroll();
   const current = active();
   workspace = isDisposable(current)
     ? {
-        // The empty tab the window opened on is replaced rather than pushed aside, and only
-        // that one: `isDisposable` is false the moment anybody types a character.
+        // An empty tab in no file is replaced rather than pushed aside, and only that:
+        // `isDisposable` is false the moment there is a character in it or a name on it.
+        // Usually that is the tab the window opened on, and since TYTO-112 it can also be
+        // one emptied of everything or one that lost its file (ADR 0026) — the rule is
+        // about what is in the tab and not about how it got that way.
         documents: workspace.documents.map((document_) =>
           document_.id === current.id ? created : document_,
         ),
@@ -732,7 +760,7 @@ async function requestClose(id: string): Promise<void> {
   const target = documentOf(workspace, id);
   if (target === undefined) return;
 
-  if (target.dirty) {
+  if (isUnsaved(target)) {
     const bridge = window.tyto;
     if (bridge !== undefined) {
       const answer = await bridge['dialog:confirm']({
@@ -932,13 +960,21 @@ function applyLocale(next: Locale): void {
   repaint();
 }
 
+/**
+ * What the shell paints, which is this module's own state plus the tab in front.
+ *
+ * A function and not a value: the unsaved marker is compared on every read (TYTO-112), so
+ * anything holding one of these would be holding an answer from before the last keystroke.
+ */
+function shellState(): ShellState {
+  const current = active();
+  // The title is the active tab, which is the whole of point 5 of E9.11's card.
+  return { ...state, document: { name: current.name, dirty: isUnsaved(current) } };
+}
+
 function repaint(): void {
   const current = active();
-  paint(document, {
-    ...state,
-    // The title is the active tab, which is the whole of point 5 of the card.
-    document: { name: current.name, dirty: current.dirty },
-  });
+  paint(document, shellState());
   if (pane !== undefined) paintPreview(pane, { ...current, stale: isStale(current) });
   paintStatus();
   paintPanel();
@@ -1279,14 +1315,24 @@ async function load(): Promise<void> {
         // before the compile fires, and this edit belongs to the document that was in the
         // editor when the key was pressed.
         const documentId = workspace.activeId;
-        // Repainted only on the edge, not on every keystroke: the title and the tab are the
-        // only things that change when a document goes from saved to touched, and
-        // repainting the window per character to say so would be the one expensive thing in
-        // this path.
-        if (!active().dirty) {
-          updateActive((document_) => ({ ...document_, dirty: true }));
-          repaint();
-        }
+        // The two things the unsaved marker paints, and only those two (TYTO-112).
+        //
+        // There used to be an `if` here, because the marker was a flag and a flag has an
+        // edge: it was set on the first keystroke and the window was repainted once. A
+        // comparison has no edge — it can change back — so the dot and the title are
+        // repainted per keystroke instead, and the `if` was replaced by making that cheap
+        // rather than by looking for the moment it flipped. `paintTabs` is Lit keyed by
+        // document id and rewrites only the tab that moved (ADR 0024); `paintTitle` is one
+        // `textContent`. What stays out of this path is `repaint`, whose `[data-i18n]` walk
+        // over the whole window is the expensive part and has nothing to do with the dot.
+        //
+        // What the comparison itself costs was measured rather than assumed, because it is
+        // one `doc.toString()` per **open** tab and not per window: 0.0074 ms per keystroke
+        // for five tabs of 1 KB, 0.053 ms for five of 10 KB, 0.43 ms for five of 100 KB.
+        // A frame is 16.7 ms. It stops being free at five tabs of a megabyte (7.3 ms), and
+        // a brief that size is not a thing this app has seen.
+        paintTabs();
+        paintTitle(document, shellState());
         paintPanel();
         // The workspace's text, which `onUpdate` has already written for this very
         // transaction — the editor tells the store before it tells anybody else, and that
