@@ -53,7 +53,8 @@ interface BuilderConfig {
     vPrefixedTagName?: boolean;
   };
   mac?: { target?: string };
-  win?: { target?: string };
+  /** An array since TYTO-136 — Windows is the one platform with two. */
+  win?: { target?: string | string[] };
   linux?: { target?: string; executableName?: string };
 }
 
@@ -191,16 +192,27 @@ describe('the desktop release workflow', () => {
 });
 
 describe('the electron-builder configuration', () => {
-  it('names one installer target per platform in the matrix', () => {
+  it('names every target the matrix builds, and Windows is the one platform with two', () => {
     // Read as three keys rather than as three strings: a platform with no block builds
     // nothing on its runner, and the job would still go green.
+    //
+    // **Windows carries `portable` beside `nsis` because it is the only platform whose
+    // artifact cannot be run without installing** (TYTO-136). Linux's AppImage is a single
+    // runnable file by definition and macOS's `dmg` is mounted and dragged, so neither
+    // needs a second one — which is why this asserts an exact array rather than
+    // `toContain`: dropping `portable` and adding a fourth target are both meant to fail
+    // here, and so is quietly giving macOS or Linux a second artifact.
+    //
+    // It is deliberately *not* the `zip`-beside-the-`dmg` case the configuration refuses a
+    // few lines above. That one would exist for electron-updater, which does not exist yet;
+    // this one exists for a person who wants to carry the app.
     const config = builder();
 
     expect({
       mac: config.mac?.target,
       win: config.win?.target,
       linux: config.linux?.target,
-    }).toEqual({ mac: 'dmg', win: 'nsis', linux: 'AppImage' });
+    }).toEqual({ mac: 'dmg', win: ['nsis', 'portable'], linux: 'AppImage' });
   });
 
   it('keeps the built-in template pack inside the package', () => {
