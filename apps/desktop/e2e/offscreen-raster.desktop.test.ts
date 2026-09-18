@@ -471,6 +471,11 @@ describe('an offscreen BrowserWindow, through the paint event', () => {
  *
  * No `startPainting`, no `invalidate`, no quiet-then-take: `Page.captureScreenshot` resolves once
  * with the bytes, so none of the settle machinery above applies to it.
+ *
+ * **Linux is the platform this route had to be proved on**, and it is the harsher of the two: the
+ * work area here is 1024 tall against win32's 1680, so a 1920 frame is not 240 px past the clamp
+ * but 896. First run in CI: `created=800x600 asked=1080x1920 got=1080x1920 workArea=1280x1024`,
+ * beside the paint route's `size=1080x1024` on the same machine and the same document.
  */
 async function captureThroughDebugger({
   asked,

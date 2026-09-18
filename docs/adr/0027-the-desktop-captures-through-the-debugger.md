@@ -78,4 +78,21 @@ The desktop adapter (TYTO-133) is a debugger session rather than a paint loop: n
 
 `DETERMINISM_ARGS` still matter and still arrive on the command line; the third open question TYTO-30 recorded — whether the shipped app applies them at startup — is untouched by this ADR and belongs to TYTO-133. Reference PNGs are still keyed per platform, the way `packages/raster/src/raster.visual.test.ts` keys `text.feed` on `process.platform`.
 
-**What this ADR does not decide:** whether the capture window is merely hidden or also offscreen. Both returned a full-size frame on win32 and the offscreen one produced bytes identical to the paint route's; the hidden window is the simpler of the two and is what the decision above names. `offscreen-raster.desktop.test.ts` takes the same measurement on `ubuntu-latest` on every desktop pull request, and it is that suite, not this file, that gets to change the answer.
+**The window is hidden and not offscreen, and Linux is what settled that.** Everything above was
+measured on win32, where the work area is 1680 tall and a 1920 frame is only 240 px past it.
+`offscreen-raster.desktop.test.ts` asks the same questions on `ubuntu-latest` on every desktop
+pull request, and the run that carried this ADR had a **1024-tall** work area:
+
+```
+[TYTO-30]  platform=linux offscreen=true painting=true size=1080x1024 display=1280x1024 workArea=1280x1024
+[TYTO-125] platform=linux route=debugger created=800x600 asked=1080x1920 got=1080x1920 workArea=1280x1024
+[TYTO-125] platform=linux route=debugger size=1080x1080 paintedShare=100.00% whitePixels=22941 deterministic=true
+[TYTO-125] platform=linux route=debugger webpBytes=25996 webpMagic=52494646/57454250 jpegBytes=51907 jpegMagic=ffd8ff
+[TYTO-125] platform=linux route=debugger scale=2 got=2160x2160
+```
+
+A frame 1920 tall out of a machine whose screen is 1024, from a window created at 800×600 — the
+clamp is not merely stretched here, it is absent, and the plain `show: false` window is enough to
+get there on both platforms. The size assertion compares against the literal 1080×1920 rather than
+against `min(asked, workArea)`, which is the opposite of the rule the paint route's assertions
+follow, so the day this stops being true the suite says so instead of shipping a short story.
