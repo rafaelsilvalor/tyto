@@ -55,6 +55,15 @@ export const EDITOR_SAVE_AS = 'editor.saveAs';
 /** E9.4. Opens the export dialog; the exporting itself is main's. */
 export const FILE_EXPORT = 'file.export';
 /**
+ * TYTO-122. Points the app at a folder of templates, or goes back to the built-in pack.
+ *
+ * Two commands and not one toggle, because a toggle would have to say which state it is in
+ * and the bar lists a verb. No keybinding either: this is a setting somebody changes once,
+ * not a key anybody presses.
+ */
+export const TEMPLATES_CHOOSE_FOLDER = 'templates.chooseFolder';
+export const TEMPLATES_CLEAR_FOLDER = 'templates.clearFolder';
+/**
  * A recent file, as a command per entry (E9.8).
  *
  * The path is in the id, which is what lets the bar list ten of them without a second kind
@@ -122,6 +131,8 @@ export const COMMAND_LABELS: Readonly<Record<string, CatalogueKey>> = {
   [EDITOR_SAVE]: 'command.file.save',
   [EDITOR_SAVE_AS]: 'command.file.saveAs',
   [FILE_EXPORT]: 'command.file.export',
+  [TEMPLATES_CHOOSE_FOLDER]: 'command.templates.chooseFolder',
+  [TEMPLATES_CLEAR_FOLDER]: 'command.templates.clearFolder',
   [LAYOUT_RESTORE]: 'command.layout.restore',
   [DOCUMENT_CLOSE]: 'command.document.close',
   [DOCUMENT_NEXT]: 'command.document.next',
@@ -162,6 +173,15 @@ export interface DesktopActions {
   stepDocument(direction: 1 | -1): void;
   /** E9.4. Shows the export dialog. Everything it then does is a round trip to main. */
   openExport(): void;
+  /**
+   * TYTO-122. Points the app at a folder of templates, or clears the choice.
+   *
+   * Both end in a round trip to main the way `openDocument` does, and for the same reason:
+   * the picker is an Electron dialog and the folder is read from a disk, and neither is the
+   * window's.
+   */
+  chooseTemplateFolder(): void;
+  clearTemplateFolder(): void;
 }
 
 /**
@@ -227,6 +247,16 @@ export function createDesktopRegistry(actions: DesktopActions): CommandRegistry 
 
   add(FILE_EXPORT, () => {
     actions.openExport();
+  });
+
+  // Registration order is display order, so these land next to Export rather than at the
+  // bottom of a list of zoom levels.
+  add(TEMPLATES_CHOOSE_FOLDER, () => {
+    actions.chooseTemplateFolder();
+  });
+
+  add(TEMPLATES_CLEAR_FOLDER, () => {
+    actions.clearTemplateFolder();
   });
 
   // Reachable with every panel closed, which is the acceptance criterion and the reason it

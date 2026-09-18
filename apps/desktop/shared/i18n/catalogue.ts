@@ -49,6 +49,23 @@ export interface Catalogue {
   readonly 'template.label': string;
   /** The option standing for a brief whose frontmatter names no template yet. */
   readonly 'template.none': string;
+
+  /**
+   * The folder of templates this app searches before the built-in pack (TYTO-122).
+   *
+   * `templates.folder.label` titles the footer row and `templates.folder.none` is what stands
+   * in it when nobody has chosen one — a word, not a path, because "internos" reads as a
+   * state and an empty cell reads as a bug.
+   *
+   * `templates.folder.empty` is a diagnostic the window mints itself, the way `file.missing`
+   * is: main can tell that a folder produced no templates, but only the renderer knows which
+   * language to say it in.
+   */
+  readonly 'templates.folder.label': string;
+  readonly 'templates.folder.none': string;
+  readonly 'templates.folder.empty': string;
+  readonly 'command.templates.chooseFolder': string;
+  readonly 'command.templates.clearFolder': string;
   /**
    * The command bar (E9.12), and the labels of everything it lists.
    *
@@ -246,6 +263,11 @@ export const CATALOGUE_KEYS = [
   'problems.nowhere',
   'template.label',
   'template.none',
+  'templates.folder.label',
+  'templates.folder.none',
+  'templates.folder.empty',
+  'command.templates.chooseFolder',
+  'command.templates.clearFolder',
   'command.bar.placeholder',
   'command.bar.empty',
   'command.undo',

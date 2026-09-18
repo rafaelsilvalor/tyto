@@ -238,7 +238,9 @@ describe('the bridge', () => {
       'log:reveal',
       'log:write',
       'on',
+      'templates:folder',
       'templates:list',
+      'templates:set-folder',
     ]);
   });
 });
@@ -286,6 +288,13 @@ describe('the language picker', () => {
     'problems.location',
     'problems.nowhere',
     'template.none',
+    // TYTO-122: three of the five are the picker's and the bar's, and the fourth is minted as
+    // a diagnostic rather than painted. `templates.folder.label` is the one that *is* element
+    // text and is deliberately not here — `src/renderer/shell.test.ts` pins what it says.
+    'templates.folder.none',
+    'templates.folder.empty',
+    'command.templates.chooseFolder',
+    'command.templates.clearFolder',
     // E9.12: the command bar renders its own strings and renders nothing at all while it is
     // closed, which is most of the time — so none of these is in the document on load, and
     // the two that are only reachable *inside* the bar never will be by this route. The

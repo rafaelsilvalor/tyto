@@ -49,13 +49,37 @@ const preview = () => ({
 
 /** A catalogue that read one folder. `templates.test.ts` drives the real one. */
 const catalogue = () => ({
-  list: () => ({
-    templates: [
-      { name: 'promo', version: '1.0.0', description: 'A promo', formats: ['feed', 'story'] },
-    ],
-    failures: [],
-  }),
+  // A promise since TYTO-122: choosing a template folder means new `preview.png` files to
+  // read, so the answer is rebuilt rather than held for the life of the app.
+  list: () =>
+    Promise.resolve({
+      templates: [
+        { name: 'promo', version: '1.0.0', description: 'A promo', formats: ['feed', 'story'] },
+      ],
+      failures: [],
+    }),
 });
+
+/**
+ * The template folder, recorded rather than chosen (TYTO-122).
+ *
+ * The picker and the disk are the composition root's — `index.ts` wraps both — so what a
+ * handler test can assert is that the message carries the right thing in and the right thing
+ * back, which is what this records.
+ */
+const projectFolder = () => {
+  const asked: boolean[] = [];
+  let folder: string | null = null;
+  return {
+    asked,
+    folder: () => ({ folder, found: folder === null ? 0 : 2 }),
+    setFolder: (choose: boolean) => {
+      asked.push(choose);
+      folder = choose ? '/home/rafael/meus-templates' : null;
+      return Promise.resolve({ folder, found: folder === null ? 0 : 2 });
+    },
+  };
+};
 
 /**
  * A document service with one file in it and no disk under it (E9.8).
@@ -191,6 +215,7 @@ const dependencies = () => ({
   layout: layoutStore(),
   info: () => ({ version: '0.1.0', platform: 'linux', locale: 'pt-BR', templates: ['promo'] }),
   preview: preview(),
+  project: projectFolder(),
   templates: catalogue(),
 });
 
@@ -473,5 +498,57 @@ describe('log:write', () => {
     await handlers['log:reveal']({});
 
     expect(folders.revealed).toEqual([log.directory]);
+  });
+});
+
+/**
+ * The template folder, as a message (TYTO-122).
+ *
+ * What is *not* here is the precedence — a chosen folder shadowing a built-in template is a
+ * property of `loadTemplateRegistry` and is pinned in `project.test.ts` against real folders.
+ * This file is about the channels.
+ */
+describe('the template folder channels', () => {
+  it('answers with nothing chosen on a fresh install', async () => {
+    const handlers = createHandlers(dependencies());
+
+    expect(await handlers['templates:folder']({})).toEqual({ folder: null, found: 0 });
+  });
+
+  it('carries a chosen folder and how many templates it brought', async () => {
+    const project = projectFolder();
+    const handlers = createHandlers({ ...dependencies(), project });
+
+    const chosen = await handlers['templates:set-folder']({ choose: true });
+
+    expect(project.asked).toEqual([true]);
+    expect(chosen).toEqual({ folder: '/home/rafael/meus-templates', found: 2 });
+    // And the question that follows agrees with the answer that was just given, which is what
+    // makes a reload and a fresh window show the same thing.
+    expect(await handlers['templates:folder']({})).toEqual(chosen);
+  });
+
+  it('goes back to the built-in pack when the folder is cleared', async () => {
+    const project = projectFolder();
+    const handlers = createHandlers({ ...dependencies(), project });
+
+    await handlers['templates:set-folder']({ choose: true });
+    const cleared = await handlers['templates:set-folder']({ choose: false });
+
+    expect(project.asked).toEqual([true, false]);
+    expect(cleared).toEqual({ folder: null, found: 0 });
+  });
+
+  it('refuses a request that does not say which of the two it wants', async () => {
+    const project = projectFolder();
+    const guarded = guard(
+      'templates:set-folder',
+      createHandlers({ ...dependencies(), project })['templates:set-folder'],
+    );
+
+    await expect(guarded({})).rejects.toBeInstanceOf(IpcContractError);
+    // The point: a missing `choose` must not reach a handler that would read it as falsy and
+    // silently clear somebody's folder.
+    expect(project.asked).toEqual([]);
   });
 });
