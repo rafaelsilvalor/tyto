@@ -1,7 +1,7 @@
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
 
-import { Menu, app, dialog, ipcMain, safeStorage, shell } from 'electron';
+import { type BrowserWindow, Menu, app, dialog, ipcMain, safeStorage, shell } from 'electron';
 import { nodeFileSystem } from '@tyto/io';
 import type { Rasterizer } from '@tyto/raster';
 
@@ -13,9 +13,10 @@ import { createExportService } from './export.js';
 import { fileLayoutStore } from './layout-store.js';
 import { menuTemplate } from './menu.js';
 import { fileRecentFiles } from './recent-files.js';
-import { registerIpcHandlers } from './ipc.js';
+import { registerIpcHandlers, sendIpcEvent } from './ipc.js';
 import { activateBuiltIns, builtInTemplatesDirectory } from './plugins.js';
 import { createPreviewService } from './preview.js';
+import { createExitGuard } from './quit.js';
 import { createTemplateCatalogue } from './templates.js';
 import { bundledRenderer, createMainWindow } from './window.js';
 
@@ -110,10 +111,32 @@ async function start(): Promise<void> {
       : { rasterizer: host.registry.rasterizers<Rasterizer>()[0]!.value }),
   });
 
+  // The window, held rather than discarded, because main now has something to say to it
+  // (ADR 0029). A `let` and not a `const`: the handler table is registered before the window
+  // is built — it has to be, or the renderer's first question could arrive with nothing to
+  // answer it — and both halves of the exit need the same guard.
+  // Initialised explicitly rather than left bare, because a `let` assigned exactly once reads
+  // to `prefer-const` as a `const` written the long way round. It is genuinely reassigned —
+  // below, after the window exists.
+  let mainWindow: BrowserWindow | undefined = undefined;
+
+  // The one question main asks. `send` is deliberately the whole of what this file lends it:
+  // `quit.ts` holds the latch and the ids and knows nothing about Electron, which is what
+  // lets the decision be tested without launching one (ADR 0010).
+  const exit = createExitGuard({
+    send: (askId) => {
+      const contents = mainWindow?.webContents;
+      if (contents === undefined || contents.isDestroyed()) return false;
+      sendIpcEvent(contents, 'app:exit-requested', { askId });
+      return true;
+    },
+  });
+
   registerIpcHandlers(ipcMain, {
     // The only question this app asks a person that is not a file picker: closing a tab
     // with unsaved text. `cancelId` and `defaultId` both point at the safe button, so
-    // Escape and Enter each leave the text alone (E9.11).
+    // Escape and Enter each leave the text alone (E9.11). The quit question reuses this
+    // untouched, which is how it inherits the safe default rather than copying it.
     confirm: async ({ message, detail, confirm: yes, cancel: no }) => {
       const answer = await dialog.showMessageBox({
         type: 'warning',
@@ -127,6 +150,7 @@ async function start(): Promise<void> {
     },
     credentials,
     documents,
+    exit,
     exports: exports_,
     // `dialog` and `shell` are Electron main-process APIs, so they are wrapped here and the
     // handlers take functions — the same arrangement the brief dialogs above already have.
@@ -170,12 +194,38 @@ async function start(): Promise<void> {
   // app installs a menu at all.
   Menu.setApplicationMenu(Menu.buildFromTemplate(menuTemplate(process.platform)));
 
-  createMainWindow({
+  mainWindow = createMainWindow({
     preload: join(here, '..', 'preload', 'index.cjs'),
     renderer: devServerUrl === undefined ? { file: bundledRenderer(here) } : { url: devServerUrl },
     // `TYTO_HEADLESS` is the end-to-end suite's: it drives the window through Playwright
     // and has no screen to show one on. The only thing a test changes about the shipped app.
     show: process.env['TYTO_HEADLESS'] !== '1',
+  });
+
+  // **Two doors, one latch** (TYTO-123). They are not redundant and dropping either one is a
+  // silent regression:
+  //
+  // `close` is the X button and `Mod-W`. On win32 and linux it destroys the renderer first
+  // and only *then* runs `window-all-closed` → `app.quit()` → `before-quit`, so a guard that
+  // waited for `before-quit` would be asking a window that no longer exists — which is
+  // precisely the door this card is named after.
+  //
+  // `before-quit` is Cmd+Q, the macOS dock's Quit, and a shutdown. On macOS closing the last
+  // window quits nothing, so `close` alone would leave that platform unguarded.
+  //
+  // The guard is shared, so whichever fires second finds the permission the first one already
+  // got instead of putting a second dialog in front of one click.
+  mainWindow.on('close', (event) => {
+    if (!exit.mayExit(() => mainWindow?.close())) event.preventDefault();
+  });
+
+  app.on('before-quit', (event) => {
+    if (
+      !exit.mayExit(() => {
+        app.quit();
+      })
+    )
+      event.preventDefault();
   });
 
   app.on('window-all-closed', () => {

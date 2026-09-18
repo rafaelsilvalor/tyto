@@ -1,6 +1,6 @@
 import { contextBridge, ipcRenderer } from 'electron';
 
-import { type IpcChannelName } from '../../shared/ipc.js';
+import { type IpcChannelName, type IpcEventName } from '../../shared/ipc.js';
 import { createBridge } from './bridge.js';
 
 /**
@@ -32,5 +32,23 @@ import { createBridge } from './bridge.js';
  */
 contextBridge.exposeInMainWorld(
   'tyto',
-  createBridge((channel: IpcChannelName, request: unknown) => ipcRenderer.invoke(channel, request)),
+  createBridge(
+    (channel: IpcChannelName, request: unknown) => ipcRenderer.invoke(channel, request),
+    // The receive direction (ADR 0029). `ipcRenderer.on` and `removeListener` are both in the
+    // set a sandboxed preload keeps — `sandbox: true` is set in `src/main/window.ts` — so this
+    // needs nothing the request direction did not already have.
+    //
+    // The `event` Electron hands the handler is deliberately dropped rather than forwarded.
+    // It carries a `sender`, and it is the one object in this file that would put a handle to
+    // another process inside the page's world, which is the thing `contextIsolation` is for.
+    (channel: IpcEventName, listen: (payload: unknown) => void) => {
+      const handler = (_event: unknown, payload: unknown): void => {
+        listen(payload);
+      };
+      ipcRenderer.on(channel, handler);
+      return () => {
+        ipcRenderer.removeListener(channel, handler);
+      };
+    },
+  ),
 );

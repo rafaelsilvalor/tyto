@@ -1,14 +1,17 @@
 // `import type` and not an inline `{ type IpcMain }`: under `verbatimModuleSyntax` the
 // inline form still emits `import {} from 'electron'`, which outside a running Electron
 // resolves to a path string and would make this module unloadable in a test.
-import type { IpcMain } from 'electron';
+import type { IpcMain, WebContents } from 'electron';
 
 import {
   type IpcChannelName,
+  type IpcEventName,
+  type IpcEventPayload,
   type IpcRequest,
   type IpcResponse,
   IPC_CHANNEL_NAMES,
   parseIpc,
+  parseIpcEvent,
 } from '../../shared/ipc.js';
 import { type Credentials } from './credentials.js';
 import { type DocumentService } from './documents.js';
@@ -51,6 +54,14 @@ export interface IpcDependencies {
    * nothing else about the question.
    */
   readonly confirm: (question: IpcRequest<'dialog:confirm'>) => Promise<boolean>;
+  /**
+   * The return leg of the one question main asks (TYTO-123, ADR 0029).
+   *
+   * Here rather than in `quit.ts` for the reason everything else in this interface is here:
+   * the handler table is the contract's half, and what it is wired to is the composition
+   * root's business.
+   */
+  readonly exit: { readonly answer: (askId: number, allow: boolean) => void };
   /** Brief text to files on disk (E9.4). Injected for the reason `preview` is. */
   readonly exports: ExportService;
   /**
@@ -70,8 +81,18 @@ type Handlers = {
 };
 
 export function createHandlers(dependencies: IpcDependencies): Handlers {
-  const { confirm, credentials, documents, exports, folders, info, layout, preview, templates } =
-    dependencies;
+  const {
+    confirm,
+    credentials,
+    documents,
+    exit,
+    exports,
+    folders,
+    info,
+    layout,
+    preview,
+    templates,
+  } = dependencies;
 
   return {
     'app:info': () => Promise.resolve(info()),
@@ -106,6 +127,11 @@ export function createHandlers(dependencies: IpcDependencies): Handlers {
     },
 
     'dialog:confirm': async (question) => ({ confirmed: await confirm(question) }),
+
+    'app:exit-answer': ({ askId, allow }) => {
+      exit.answer(askId, allow);
+      return Promise.resolve({});
+    },
 
     'files:recent': () => documents.recent(),
 
@@ -203,6 +229,24 @@ export function guard<Name extends IpcChannelName>(
     const response = await handler(parsed);
     return parseIpc(name, 'response', response) as IpcResponse<Name>;
   };
+}
+
+/**
+ * Puts a message on the wire in the other direction (ADR 0029).
+ *
+ * Validated before it is sent, which is the mirror of `guard`'s reason: main is the side that
+ * can refuse a bad push *before* the process boundary, and a payload the preload rejects
+ * would otherwise be a listener that silently never fires.
+ *
+ * `send` and not `invoke`: a push carries no reply. What the renderer has to say about this
+ * one comes back on `app:exit-answer`, an ordinary channel in the table above.
+ */
+export function sendIpcEvent<Name extends IpcEventName>(
+  webContents: WebContents,
+  name: Name,
+  payload: IpcEventPayload<Name>,
+): void {
+  webContents.send(name, parseIpcEvent(name, payload));
 }
 
 /**

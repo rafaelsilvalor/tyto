@@ -156,10 +156,17 @@ const layoutStore = () => {
   };
 };
 
+/** The guard's half of the exit question (ADR 0029), recorded rather than acted on. */
+const exitAnswers = () => {
+  const given: { askId: number; allow: boolean }[] = [];
+  return { given, answer: (askId: number, allow: boolean) => given.push({ askId, allow }) };
+};
+
 const dependencies = () => ({
   confirm: () => Promise.resolve(true),
   credentials: credentials(),
   documents: documents(),
+  exit: exitAnswers(),
   exports: exportService(),
   folders: folderDialogs(),
   layout: layoutStore(),
@@ -354,5 +361,40 @@ describe('the export handlers (E9.4)', () => {
 
     expect(deps.exports.cancelled).toEqual(['export-1']);
     expect(deps.folders.revealed).toEqual(['/out/promo']);
+  });
+});
+
+/**
+ * The return leg of the one question main asks (TYTO-123, ADR 0029).
+ *
+ * What is asserted here is only that the channel carries the answer through untouched — the
+ * decision it feeds lives in `quit.ts` and is tested there, without Electron and without this
+ * table.
+ */
+describe('app:exit-answer', () => {
+  it('hands the answer to the guard, verbatim', async () => {
+    const exit = exitAnswers();
+    const handlers = createHandlers({ ...dependencies(), exit });
+
+    await handlers['app:exit-answer']({ askId: 4, allow: false });
+    await handlers['app:exit-answer']({ askId: 5, allow: true });
+
+    expect(exit.given).toEqual([
+      { askId: 4, allow: false },
+      { askId: 5, allow: true },
+    ]);
+  });
+
+  it('refuses an answer with no verdict before the guard is reached', async () => {
+    const exit = exitAnswers();
+    const guarded = guard(
+      'app:exit-answer',
+      createHandlers({ ...dependencies(), exit })['app:exit-answer'],
+    );
+
+    await expect(guarded({ askId: 4 })).rejects.toBeInstanceOf(IpcContractError);
+    // The point: a missing `allow` must not reach a latch that would read it as `undefined`
+    // and quit — the contract refuses it a layer earlier.
+    expect(exit.given).toEqual([]);
   });
 });

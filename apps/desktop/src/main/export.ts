@@ -32,11 +32,12 @@ import { BUILT_IN_TEMPLATES_DIRECTORY } from '@tyto/templates';
  * `render-task.ts` is the sibling to read beside this one; where the two differ, the
  * difference is named here rather than left for somebody to find by diffing the outputs.
  *
- * **Progress is asked for, not pushed.** Every one of this app's IPC channels is a question
- * with an answer (`shared/ipc.ts`), and a one-way main→renderer message would be a new
- * transport shape — the same one TYTO-123 needs for its quit confirmation. Whichever card
- * invents it decides it for the other, and this one has no claim to that decision. So a run
- * accumulates its state here and the dialog reads it with `export:progress` while it works.
+ * **Progress is asked for, not pushed, and it stays that way now that pushes exist.** When
+ * this was written a one-way main→renderer message was a shape the app did not have, and the
+ * decision belonged to TYTO-123; ADR 0029 is what it decided. This run still accumulates its
+ * state here and the dialog still reads it with `export:progress`, because progress is state
+ * a dialog reads rather than a question that needs answering — a push would have to carry the
+ * whole record anyway, and a dialog opened mid-run would have to ask once to catch up.
  * The cost is honest and small: the renderer learns about a finished frame up to one poll
  * late, and a poll is cheap because the answer is four numbers.
  *

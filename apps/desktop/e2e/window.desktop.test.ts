@@ -212,7 +212,11 @@ describe('the bridge', () => {
     // Written out rather than compared against `IPC_CHANNEL_NAMES`, which would pass by
     // construction and check nothing: the claim is that the preload built the bridge from
     // the table, and a list this test imports from the same table cannot show that.
+    //
+    // `on` sorts in among them and is the one member that is not a channel: it is the receive
+    // direction (ADR 0029), built from `IPC_EVENTS` rather than from the channel table.
     expect(channels).toEqual([
+      'app:exit-answer',
       'app:info',
       'brief:preview',
       'credentials:delete',
@@ -231,6 +235,7 @@ describe('the bridge', () => {
       'files:recent',
       'layout:get',
       'layout:set',
+      'on',
       'templates:list',
     ]);
   });
@@ -326,6 +331,15 @@ describe('the language picker', () => {
     'document.discard.detail',
     'document.discard.confirm',
     'document.discard.cancel',
+    // TYTO-123: the same five for the whole window, read out by the OS on the way out. A
+    // message box is not the document either, and `{n}` in two of them is a placeholder the
+    // renderer substitutes — `e2e/quit.desktop.test.ts` is what holds these to a locale and
+    // to the count.
+    'exit.discard.message',
+    'exit.discard.detail.one',
+    'exit.discard.detail.many',
+    'exit.discard.confirm',
+    'exit.discard.cancel',
     'command.document.close',
     'command.document.next',
     'command.document.previous',
