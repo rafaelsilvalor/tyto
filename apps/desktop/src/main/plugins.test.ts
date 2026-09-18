@@ -1,4 +1,5 @@
 import { type DirectoryEntry, type FileSystem } from '@tyto/core';
+import type { Rasterizer } from '@tyto/raster';
 import { describe, expect, it } from 'vitest';
 
 import { activateBuiltIns, builtInTemplatesDirectory } from './plugins.js';
@@ -82,7 +83,38 @@ describe('activateBuiltIns', () => {
     // contributed only what its manifest declared.
     expect(host.registry.plugins().map((plugin) => plugin.manifest.name)).toEqual([
       'built-in-templates',
+      'chromium',
     ]);
+  });
+
+  it('registers a rasterizer, and nothing below the root knows which one', async () => {
+    // The swappability ADR 0010 asks for, proved rather than asserted: a fake goes in
+    // through the same door the debugger-captured window uses, and what comes back out of
+    // the registry is that fake. The app's own choice is made one line above, in
+    // `activateBuiltIns`, and nowhere else.
+    const captured: string[] = [];
+    const fake = {
+      raster: async (html: string): Promise<Uint8Array> => {
+        captured.push(html);
+        return new Uint8Array([1, 2, 3]);
+      },
+    };
+
+    const host = await activateBuiltIns({
+      fileSystem: fakeFileSystem(['promo-curso']),
+      directory: '/packs/built-in',
+      rasterizer: fake,
+    });
+
+    const registered = host.registry.rasterizers<Rasterizer>();
+
+    expect(registered).toHaveLength(1);
+    expect(registered[0]?.id).toBe('chromium');
+
+    const bytes = await registered[0]?.value.raster('<!doctype html>', { width: 10, height: 10 });
+
+    expect(Array.from(bytes ?? [])).toEqual([1, 2, 3]);
+    expect(captured).toEqual(['<!doctype html>']);
   });
 
   it('still opens when the pack folder cannot be read, with an empty pack', async () => {
