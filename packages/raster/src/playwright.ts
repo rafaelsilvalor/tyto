@@ -17,8 +17,10 @@ import {
  * `close`.
  *
  * `playwright` is an optional peer dependency, imported dynamically at launch. The
- * desktop app implements the same port with an offscreen `BrowserWindow` (E5.4) and has
- * no use for a second Chromium on disk — so importing `@tyto/raster` costs nothing until
+ * desktop app implements the same port with a `BrowserWindow` captured through
+ * `webContents.debugger` (ADR 0027, E5.4) and has no use for a second Chromium on disk
+ * — measured while deciding that, on Windows x64: the packaged app's unpacked tree is
+ * 390 026 472 B and Playwright's headless shell beside it would be another 283 239 610 B — so importing `@tyto/raster` costs nothing until
  * somebody actually asks for this adapter, and a missing `playwright` reports itself as
  * one sentence about installing it rather than a module that will not resolve.
  */
