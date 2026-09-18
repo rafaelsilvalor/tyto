@@ -25,6 +25,7 @@ Template in `.github/pull_request_template.md`: card, what changed, how to test,
 - Merge to `main` ⇒ `release` workflow opens/updates the "Version Packages" PR. Merging it ⇒ tags `@tyto/<pkg>@x.y.z` and per-package `CHANGELOG.md`.
 - Desktop: tag `desktop-vX.Y.Z` triggers macOS/Windows/Linux builds with electron-builder and publishes a GitHub Release with installers. Auto-update via `electron-updater` pointing at releases (epic E9).
 - Pre-1.0: minor breaks, patch does not. From 1.0: regular semver.
+- The desktop beta is an ordinary minor — `desktop-v0.3.0` — and what follows it is `0.4.0`, `0.5.0`. No pre-release identifier; see [The beta, and how what follows it is numbered](#the-beta-and-how-what-follows-it-is-numbered).
 
 ### The desktop release
 
@@ -57,6 +58,42 @@ The package that comes back is not code. `activateBuiltIns` reads the built-in t
 **Signing is optional and off, and making it optional took a step of its own.** `${{ secrets.CSC_LINK }}` in a step's `env:` sets the variable either way — to the empty string when no such secret is configured — and electron-builder's platforms disagree about that: Windows refuses an empty `cscLink` (`windowsSignToolManager.js:76`), macOS checks only for null (`macPackager.js:27`), so `""` reads as a certificate, gets resolved as a path, and fails the job at `⨯ <projectDir> not a file`. The first real tag found it — Windows and Linux green, macOS red, on identical environment (TYTO-98). `desktop.yml` therefore writes the two variables to `$GITHUB_ENV` from a preceding step, and only when the secret is non-empty; they are absent rather than empty otherwise. Unsigned, macOS warns on first open and Windows SmartScreen does the same. Turning signing on is the two repository secrets, `CSC_LINK` (a base64 `.p12`) and `CSC_KEY_PASSWORD`, and nothing else. Notarizing a macOS build additionally wants `APPLE_ID`, `APPLE_APP_SPECIFIC_PASSWORD` and `APPLE_TEAM_ID`, and is a separate decision — an unsigned app that is notarized is not a thing. No icon is set either: macOS and Windows use the one embedded in the Electron skeleton and `ElectronFramework.getDefaultIcon` hands Linux its bundled `electron-linux` set, so the AppImage build does not fail for the lack of one, it ships Electron's.
 
 `tools/repo-checks/src/desktop-release.test.ts` pins the couplings above, because **`desktop.yml` does not run on a pull request** — nothing in CI executes it, so a mistake in it lands green and is found by whoever cuts the release. That is not a hypothetical: the tag-prefix defect above did exactly that, landing on `main` and closing its card before anybody noticed (TYTO-97). Measured rather than asserted: ten perturbations across the two cards, each caught by exactly one test, against a baseline of 0 of 115 failing.
+
+### The beta, and how what follows it is numbered
+
+**The beta is an ordinary minor, and the word "beta" lives in the release page rather than in the version** (TYTO-130). The first public build is `desktop-v0.3.0`; the releases after it are `0.4.0`, `0.5.0`, and a fix on top of one of them is a patch. Pre-1.0 already means "minor breaks, patch does not", which is the honest promise a beta makes, so a pre-release identifier would be saying the same thing twice.
+
+The alternative was measured and rejected on cost, not on taste. `0.3.0-beta.1` cannot come out of the version PR: Changesets only writes a pre-release identifier in pre mode, `changeset pre enter beta`, which is **not** a per-package setting — turning it on changes how every published package is versioned, `@tyto/core` included, and would want an ADR of its own to turn back off. Editing `apps/desktop/package.json` by hand instead survives exactly until the next version PR overwrites it, and `desktop.yml`'s tag-versus-manifest guard would refuse the tag in between. A straight minor costs nothing and is what the machinery already produces.
+
+**So the number is never chosen; it is read.** The version PR decides it, and the tag names what the manifest already says — the guard exists to make that non-negotiable. Cutting a release is therefore:
+
+```bash
+# 0 — the gate. The beta ships when this returns nothing:
+#     project = TYTO AND labels = beta AND status != Done
+
+# 1 — merge the version PR; it is what sets the number
+gh pr merge <n> --squash
+
+# 2 — read the number it left, never assume one
+git checkout main && git pull
+node -p "require('./apps/desktop/package.json').version"
+
+# 3, 4 — the tag is "desktop-v" plus exactly that
+git tag desktop-v0.3.0
+git push origin desktop-v0.3.0
+
+# 5 — automatic from here: the guard, three runners, four artifacts, `--publish always`
+
+# 6 — the draft is invisible to everybody until this
+gh release view desktop-v0.3.0 --json isDraft,assets
+gh release edit desktop-v0.3.0 --notes-file docs/releases/desktop-v0.3.0.md --draft=false
+```
+
+**Step 6 is the one nothing automates and nothing else in this document mentions.** electron-builder creates the release as a draft and stops; a tag pushed and a workflow gone green still leaves a page nobody outside this repository can see. The draft from 2026-09-14 is the proof — `desktop-v0.1.0`, still unpublished, with its assets parked under an `untagged-…` prefix until somebody publishes it.
+
+**The release body is written in Portuguese and kept in the repository**, at `docs/releases/`. Portuguese on the catalogue's rule — everything here is English except what a user reads, and a release page is read by the person installing it — and in the repository rather than typed into the web form so that what was promised to testers is reviewable and survives the page being edited. It says what the build can do and what it cannot, including the two things the machinery cannot hide: the installers are unsigned, so Windows SmartScreen and macOS Gatekeeper both warn on first open, and the `dmg` is arm64 only, so an Intel Mac needs a second matrix entry that does not exist yet.
+
+**Nothing in the beta updates itself.** `latest.yml`, `latest-mac.yml` and `latest-linux.yml` go up with every release because electron-builder writes them, but `electron-updater` is not wired in — that is TYTO-131, and until it lands a fix means downloading the installer again. The release body says so rather than leaving somebody to find out.
 
 **Release tags are lightweight, and that is a decision rather than a leftover.** `changesets/action` v2 pushes tags through the GitHub API instead of the Git CLI, and an API ref is a plain ref — so since TYTO-80 every `@tyto/<pkg>@x.y.z` is a `commit` object where the older ones are `tag` objects (24 lightweight against 125 annotated, measured 2026-09-13). `push-with-git-cli: true` would restore the old shape, and it is deliberately absent from `release.yml`.
 
