@@ -51,8 +51,26 @@ jobs:
       # by asking the tool itself.
       #
       # Safe on a pull request that adds no changeset: measured, `changeset status` prints an
-      # empty "Packages to be bumped:" and exits 0.
-      - run: pnpm exec changeset status
+      # empty "Packages to be bumped:" and exits 0 — because the folder still holds whatever
+      # is waiting for the next release.
+      #
+      # **The version PR is the one pull request where that folder is empty, and the step
+      # fails on it.** `changeset status` errors when packages changed against the base *and*
+      # there is no changeset to explain them, which is exactly what
+      # `chore(release): version packages` is: every changeset consumed, every manifest
+      # rewritten. It passed by accident until TYTO-94 — private packages were not versioned,
+      # so eight or nine of them were left behind on every run (#171, #176) and the folder was
+      # never empty. The first version PR after that config change went red in a minute:
+      #
+      #     Some packages have been changed but no changesets were found.
+      #     Run changeset add to resolve this error.
+      #     🦋 Exited with code 1
+      #
+      # Excluded by branch name and not by `always()` or `continue-on-error`, so the step still
+      # fails a real pull request. `github-config.test.ts` pins both halves: that it runs before
+      # a merge, and that this is the only thing it is skipped for.
+      - if: github.head_ref != 'changeset-release/main'
+        run: pnpm exec changeset status
       - run: pnpm turbo typecheck lint test build
         env:
           TURBO_TOKEN: ${{ secrets.TURBO_TOKEN }}
