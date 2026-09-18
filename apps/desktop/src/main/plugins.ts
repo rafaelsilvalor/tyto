@@ -3,9 +3,12 @@ import { dirname, join } from 'node:path';
 
 import { type FileSystem, loadTemplateRegistry } from '@tyto/core';
 import { type InProcessHost, type Plugin, createPluginHost } from '@tyto/plugin-api';
+import type { Rasterizer } from '@tyto/raster';
 import { BUILT_IN_TEMPLATES_DIRECTORY } from '@tyto/templates';
 
 import manifest from './built-in-templates.tyto-plugin.json';
+import chromiumManifest from './chromium.tyto-plugin.json';
+import { createDebuggerRasterizer } from './rasterizer.js';
 
 /**
  * The desktop app's composition root for plugins (ADR 0007, ADR 0010).
@@ -43,16 +46,27 @@ export interface BuiltInsOptions {
   readonly fileSystem: FileSystem;
   /** Overrides the resolved folder, for a test with a pack of its own. */
   readonly directory?: string;
+  /**
+   * The rasterizer to register, instead of the debugger-captured window.
+   *
+   * For a test that wants to see what was registered without an Electron to capture in.
+   * Nothing below this root chooses — that is the swappability ADR 0010 asks for, and this
+   * option is what proves it rather than asserting it.
+   */
+  readonly rasterizer?: Rasterizer;
 }
 
 /**
  * Activates every built-in this app ships, and hands back the host holding them.
  *
- * One pack today. The exporters and the rasterizer are deliberately absent: the CLI binds
- * an exporter to the bytes of the folder it is rendering, and the desktop has not rendered
- * anything yet — an exporter registered now would be bound to nothing, which is a worse
- * answer than not being registered. They arrive with the card that renders (E9.3), and the
- * desktop rasterizer with E5.4 — a debugger-captured window since ADR 0027, not an offscreen one.
+ * A template pack and a rasterizer. The exporters are still deliberately absent: the CLI
+ * binds an exporter to the bytes of the folder it is rendering, and the desktop has not
+ * rendered anything yet — an exporter registered now would be bound to nothing, which is a
+ * worse answer than not being registered. They arrive with the card that renders (E9.3).
+ *
+ * The rasterizer is different, and that is why it arrives first: it binds to nothing. It is
+ * handed a string and a size, so registering it costs a window nobody opens until somebody
+ * asks for pixels (TYTO-133, ADR 0027).
  */
 export async function activateBuiltIns(options: BuiltInsOptions): Promise<InProcessHost> {
   const host = createPluginHost();
@@ -81,6 +95,21 @@ export async function activateBuiltIns(options: BuiltInsOptions): Promise<InProc
   // straight would skip all three — a shortcut available to a built-in and to nobody else,
   // which is the shape ADR 0007 rules out.
   host.activate(templatePack);
+
+  // The second copy of the CLI's `chromium` plugin (`apps/cli/src/plugins/rasterizer.ts`),
+  // and deliberately not shared with it: the id and the extension point are the same, the
+  // adapter behind them is not. The CLI launches Playwright's Chromium; this app captures
+  // the one it is already running in. Two apps making different choices about which adapter
+  // exists is what a composition root is for.
+  const rasterizer = options.rasterizer ?? createDebuggerRasterizer();
+  const chromium: Plugin = {
+    id: chromiumManifest.name,
+    manifest: chromiumManifest,
+    activate: (host) =>
+      host.registerRasterizer<Rasterizer>({ id: chromiumManifest.name, value: rasterizer }),
+  };
+
+  host.activate(chromium);
 
   return host;
 }

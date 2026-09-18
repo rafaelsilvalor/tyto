@@ -532,7 +532,11 @@ describe('git attributes', () => {
   it('are honoured by the workflows that need the real bytes', () => {
     // A default checkout leaves LFS pointer files on disk, and a pixel diff against a
     // 130-byte text file fails in a way that reads like a rendering bug.
-    for (const file of ['ci.yml', 'visual.yml']) {
+    //
+    // `desktop-e2e.yml` joined the list in TYTO-133: `raster.desktop.test.ts` compares the
+    // debugger-captured adapter against the same reference corpus, so it needs the real
+    // bytes for exactly the same reason the other two do.
+    for (const file of ['ci.yml', 'visual.yml', 'desktop-e2e.yml']) {
       expect(readRepoFile(`${WORKFLOWS_DIR}/${file}`), `${file} checks out without LFS`).toMatch(
         /lfs:\s*true/,
       );
