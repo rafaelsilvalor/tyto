@@ -14,8 +14,9 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import sceneFixture from './__fixtures__/offscreen.scene.json';
 
 /**
- * **Can an offscreen `BrowserWindow` produce a finished picture on Linux?** TYTO-30's first
- * deliverable, and deliberately the only one in this file: the adapter is not written here.
+ * **Can a `BrowserWindow` in main produce a finished picture on Linux, and at the size asked
+ * for?** TYTO-30's first deliverable and TYTO-125's evidence. The adapter is still not written
+ * here — that is TYTO-133.
  *
  * The card was probed twice on the maintainer's Windows box and the two probes disagree
  * with each other and with ADR 0002. `capturePage` on a hidden window — **the mechanism
@@ -36,10 +37,19 @@ import sceneFixture from './__fixtures__/offscreen.scene.json';
  * work area, and it is one rule on both platforms rather than a Linux quirk: win32 with
  * `workArea=3072x1680` returns 1080×1080 for a feed post and 1080×**1680** for a story. So the
  * route paints, and it cannot carry a 1080×1920 story on any display shorter than 1920 — which
- * is every display this project runs on, CI's `xvfb` 1280×1024 included. That is why this PR
- * stops here: `capturePage` fails and `paint` crops, and choosing between them is a decision,
- * not an implementation detail. `enableDeviceEmulation`, the documented way to render past the
- * window size, **crashes the main process** on an offscreen window — tried, not assumed.
+ * is every display this project runs on, CI's `xvfb` 1280×1024 included. That is what made the
+ * choice a decision rather than an implementation detail, and **ADR 0027 took it: the desktop
+ * captures through `webContents.debugger`**, which renders past the viewport and is measured in
+ * the second `describe` below.
+ *
+ * Two claims of the paragraph above were corrected while taking that decision, and both are
+ * kept here rather than quietly dropped. `capturePage` does not always throw: without the five
+ * {@link DETERMINISM_ARGS} it fails verbatim with `UnknownVizError`, and with `--disable-gpu`
+ * among them the no-argument form returns a real image — the **same clipped frame**, upscaled by
+ * the display's 1.25 scale factor to 1350×2100, which a byte count reads as *more* than was
+ * asked for. And `enableDeviceEmulation` no longer **crashes the main process** on Electron
+ * 44.3.0; it survives and resamples the render onto the window's own surface, which lifts
+ * nothing. Both re-measured on win32 for TYTO-125.
  *
  * ## The instrument lied first, and that is why the assertions look the way they do
  *
@@ -76,10 +86,12 @@ import sceneFixture from './__fixtures__/offscreen.scene.json';
  * that suite is still part of TYTO-30. `whitePixels > 0` says text was drawn; it does not
  * say which face drew it.
  *
- * It also does not decide anything. Whether ADR 0002 gets an amendment for `paint` against
- * `capturePage`, how the adapter refuses `webp` (Electron's `NativeImage` encodes `png` and
- * `jpeg` and nothing else), and whether the shipped app applies {@link DETERMINISM_ARGS} at
- * startup are three open decisions this file only measures around. The switches come in on
+ * Of the three open decisions this file used to only measure around, two are closed and one is
+ * not. ADR 0002 was amended — by ADR 0027, and for the debugger rather than for `paint` against
+ * `capturePage`. The adapter does not refuse `webp` at all, because `Page.captureScreenshot`
+ * encodes it where `NativeImage` encodes only `png` and `jpeg`; that is asserted below. Whether
+ * the shipped app applies {@link DETERMINISM_ARGS} at startup is still open and belongs to
+ * TYTO-133. The switches come in on
  * the **command line** here — Electron forwards unrecognised arguments to Chromium — so the
  * app under test is the shipped one, unmodified, exactly as `TYTO_HEADLESS` is the only
  * other thing this suite changes about it.
@@ -445,5 +457,198 @@ describe('an offscreen BrowserWindow, through the paint event', () => {
 
     expect(first.png).not.toBe('');
     expect(second.png).toBe(first.png);
+  });
+});
+
+/**
+ * One capture through the Chrome DevTools Protocol, run in the app's own main process.
+ *
+ * The route ADR 0027 picked, and the reason it is measured here rather than argued: every other
+ * way of getting bytes out of a `BrowserWindow` reads the window's composited surface, which the
+ * platform clips to the display's work area. `Emulation.setDeviceMetricsOverride` sets the page's
+ * own size and `captureBeyondViewport` renders past the viewport, so the window's size stops
+ * being part of the answer — which is exactly what `createdAt` exists to prove.
+ *
+ * No `startPainting`, no `invalidate`, no quiet-then-take: `Page.captureScreenshot` resolves once
+ * with the bytes, so none of the settle machinery above applies to it.
+ *
+ * **Linux is the platform this route had to be proved on**, and it is the harsher of the two: the
+ * work area here is 1024 tall against win32's 1680, so a 1920 frame is not 240 px past the clamp
+ * but 896. First run in CI: `created=800x600 asked=1080x1920 got=1080x1920 workArea=1280x1024`,
+ * beside the paint route's `size=1080x1024` on the same machine and the same document.
+ */
+async function captureThroughDebugger({
+  asked,
+  createdAt = { width: 800, height: 600 },
+  format = 'png',
+  quality,
+  scale = 1,
+}: {
+  asked: { width: number; height: number };
+  createdAt?: { width: number; height: number };
+  format?: 'png' | 'jpeg' | 'webp';
+  quality?: number;
+  scale?: number;
+}): Promise<DebuggerCapture> {
+  return app.evaluate(
+    async ({ BrowserWindow, screen }, options) => {
+      const window = new BrowserWindow({
+        show: false,
+        width: options.createdWidth,
+        height: options.createdHeight,
+        useContentSize: true,
+        frame: false,
+        transparent: true,
+        webPreferences: { contextIsolation: true, nodeIntegration: false, sandbox: true },
+      });
+
+      const contents = window.webContents;
+      try {
+        await window.loadFile(options.file);
+        await contents.executeJavaScript('document.fonts.ready.then(() => true)');
+
+        contents.debugger.attach('1.3');
+        await contents.debugger.sendCommand('Page.enable');
+        await contents.debugger.sendCommand('Emulation.setDeviceMetricsOverride', {
+          width: options.width,
+          height: options.height,
+          deviceScaleFactor: options.scale,
+          mobile: false,
+        });
+
+        const shot = (await contents.debugger.sendCommand('Page.captureScreenshot', {
+          format: options.format,
+          ...(options.quality === undefined ? {} : { quality: options.quality }),
+          captureBeyondViewport: true,
+          clip: { x: 0, y: 0, width: options.width, height: options.height, scale: 1 },
+        })) as { data: string };
+
+        return {
+          data: shot.data,
+          attached: contents.debugger.isAttached(),
+          offscreen: contents.isOffscreen(),
+          display: screen.getPrimaryDisplay().size,
+          workArea: screen.getPrimaryDisplay().workAreaSize,
+        };
+      } finally {
+        if (contents.debugger.isAttached()) contents.debugger.detach();
+        window.destroy();
+      }
+    },
+    {
+      file: documentFile,
+      width: asked.width,
+      height: asked.height,
+      createdWidth: createdAt.width,
+      createdHeight: createdAt.height,
+      format,
+      quality,
+      scale,
+    },
+  );
+}
+
+interface DebuggerCapture {
+  /** Base64, because this crosses Playwright's protocol as JSON. */
+  readonly data: string;
+  readonly attached: boolean;
+  /** Carried back so a red run says whether the window was the one this route expects. */
+  readonly offscreen: boolean;
+  readonly display: { readonly width: number; readonly height: number };
+  readonly workArea: { readonly width: number; readonly height: number };
+}
+
+/** The first bytes, as hex, for asserting a container rather than trusting the call. */
+function magic(bytes: Buffer, from: number, length: number): string {
+  return bytes.subarray(from, from + length).toString('hex');
+}
+
+describe('a hidden BrowserWindow, through the debugger (ADR 0027)', () => {
+  it('captures a story at full height, from a window that was never that size', async () => {
+    // **The headline, and the assertion that made ADR 0027 possible.** It compares against the
+    // literal 1080×1920 rather than against `min(asked, workArea)` — the opposite of the paint
+    // route's rule above — so the day this route starts obeying the work area it goes red here
+    // instead of shipping a story with its bottom third missing.
+    const captured = await captureThroughDebugger({ asked: STORY });
+    const bytes = Buffer.from(captured.data, 'base64');
+    const image = PNG.sync.read(bytes);
+
+    process.stdout.write(
+      `[TYTO-125] platform=${process.platform} route=debugger created=800x600 ` +
+        `asked=${String(STORY.width)}x${String(STORY.height)} ` +
+        `got=${String(image.width)}x${String(image.height)} ` +
+        `workArea=${String(captured.workArea.width)}x${String(captured.workArea.height)} ` +
+        `attached=${String(captured.attached)} pngBytes=${String(bytes.byteLength)}\n`,
+    );
+
+    expect({ width: image.width, height: image.height }).toEqual({
+      width: STORY.width,
+      height: STORY.height,
+    });
+  });
+
+  it('paints the document, and gives the same bytes twice', async () => {
+    // At the document's own size, so the coverage numbers are comparable with the paint route's
+    // above: same fixture, same floor, same `whitePixels > 0` for "layout ran and text was drawn".
+    const first = await captureThroughDebugger({ asked: FRAME });
+    const second = await captureThroughDebugger({ asked: FRAME });
+    const coverage = coverageOf(first.data);
+    const image = PNG.sync.read(Buffer.from(first.data, 'base64'));
+
+    process.stdout.write(
+      `[TYTO-125] platform=${process.platform} route=debugger ` +
+        `size=${String(image.width)}x${String(image.height)} ` +
+        `paintedShare=${(coverage.paintedShare * 100).toFixed(2)}% ` +
+        `whitePixels=${String(coverage.whitePixels)} ` +
+        `deterministic=${String(second.data === first.data)}\n`,
+    );
+
+    expect({ width: image.width, height: image.height }).toEqual(FRAME);
+    expect(coverage.paintedShare).toBeGreaterThan(PAINTED_FLOOR);
+    expect(coverage.whitePixels).toBeGreaterThan(0);
+    expect(second.data).toBe(first.data);
+  });
+
+  it('encodes webp and jpeg, which NativeImage cannot both do', async () => {
+    // The port declares three formats and Electron's `NativeImage` encodes two, which would have
+    // made `RasterFormat` mean something different per runtime. Checked in the container's own
+    // magic bytes rather than in the call succeeding: a base64 string comes back either way.
+    const webp = Buffer.from(
+      (await captureThroughDebugger({ asked: FRAME, format: 'webp', quality: 80 })).data,
+      'base64',
+    );
+    const jpeg = Buffer.from(
+      (await captureThroughDebugger({ asked: FRAME, format: 'jpeg', quality: 80 })).data,
+      'base64',
+    );
+
+    process.stdout.write(
+      `[TYTO-125] platform=${process.platform} route=debugger ` +
+        `webpBytes=${String(webp.byteLength)} webpMagic=${magic(webp, 0, 4)}/${magic(webp, 8, 4)} ` +
+        `jpegBytes=${String(jpeg.byteLength)} jpegMagic=${magic(jpeg, 0, 3)}\n`,
+    );
+
+    // "RIFF" then "WEBP", the two halves of the container's header.
+    expect(magic(webp, 0, 4)).toBe('52494646');
+    expect(magic(webp, 8, 4)).toBe('57454250');
+    expect(magic(jpeg, 0, 3)).toBe('ffd8ff');
+  });
+
+  it('multiplies the pixels and not the layout, which is what scale means', async () => {
+    // `RasterOptions.scale` promises "the same design at twice the resolution, not a design given
+    // twice the room", and a device scale factor is the only honest way to keep that promise —
+    // the zoom trade measured for TYTO-125 returns a different picture at half the resolution.
+    const captured = await captureThroughDebugger({ asked: FRAME, scale: 2 });
+    const image = PNG.sync.read(Buffer.from(captured.data, 'base64'));
+
+    process.stdout.write(
+      `[TYTO-125] platform=${process.platform} route=debugger scale=2 ` +
+        `got=${String(image.width)}x${String(image.height)}\n`,
+    );
+
+    expect({ width: image.width, height: image.height }).toEqual({
+      width: FRAME.width * 2,
+      height: FRAME.height * 2,
+    });
   });
 });

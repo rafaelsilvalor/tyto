@@ -35,8 +35,8 @@ import { fileAssetResolver, fileResources } from '@tyto/io';
  * port, reached by the job (E9.4). The two are different questions that happened to share a
  * paragraph: "what does this look like while I type" and "what bytes do I hand somebody".
  *
- * It also makes the preview independent of E5.4, which is unfinished and, on the maintainer's
- * machine, unverifiable (TYTO-30).
+ * It also makes the preview independent of E5.4, which is decided and not yet built: the
+ * capture mechanism is ADR 0027's and the adapter is TYTO-133's.
  *
  * Everything here is composition, so it lives in `apps/*` (ADR 0010). The stages it calls are
  * the same pure ones the CLI calls, in the same order, and the ordering is the only thing
