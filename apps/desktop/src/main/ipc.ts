@@ -82,6 +82,17 @@ export interface IpcDependencies {
    * that knows.
    */
   readonly log: DesktopLog;
+  /**
+   * The template folder this app searches before the built-in pack (TYTO-122).
+   *
+   * Wrapped here for the reason `folders` is: choosing one opens a native dialog and writes a
+   * file, and both are Electron's and the composition root's. What the handler owns is the
+   * message, not the picker and not the disk.
+   */
+  readonly project: {
+    folder: () => { folder: string | null; found: number };
+    setFolder: (choose: boolean) => Promise<{ folder: string | null; found: number }>;
+  };
 }
 
 /** One handler per channel, typed against the contract in both directions. */
@@ -101,6 +112,7 @@ export function createHandlers(dependencies: IpcDependencies): Handlers {
     layout,
     log,
     preview,
+    project,
     templates,
   } = dependencies;
 
@@ -123,7 +135,13 @@ export function createHandlers(dependencies: IpcDependencies): Handlers {
       };
     },
 
-    'templates:list': () => Promise.resolve(templates.list()),
+    // No `Promise.resolve` any more: `list()` is async since TYTO-122, because a folder change
+    // means new `preview.png` files to read.
+    'templates:list': () => templates.list(),
+
+    'templates:folder': () => Promise.resolve(project.folder()),
+
+    'templates:set-folder': ({ choose }) => project.setFolder(choose),
 
     'file:open': ({ documentId }) => documents.open(documentId),
 

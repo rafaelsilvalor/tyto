@@ -37,7 +37,9 @@ describe('the IPC contract', () => {
       'layout:set',
       'log:reveal',
       'log:write',
+      'templates:folder',
       'templates:list',
+      'templates:set-folder',
     ]);
     expect(new Set(IPC_CHANNEL_NAMES).size).toBe(IPC_CHANNEL_NAMES.length);
   });
@@ -201,6 +203,9 @@ describe('what the contract does not promise', () => {
       // is, is main's — a renderer that named the folder would be naming a path it has no
       // business holding.
       'log:reveal',
+      // TYTO-122. "Which folder is searched" has no subject either: there is one setting, and
+      // where it points is main's.
+      'templates:folder',
     ];
 
     for (const name of IPC_CHANNEL_NAMES) {

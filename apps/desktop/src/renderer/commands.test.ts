@@ -18,6 +18,8 @@ import {
   PREVIEW_ZOOM_FIT,
   PREVIEW_ZOOM_IN,
   PREVIEW_ZOOM_OUT,
+  TEMPLATES_CHOOSE_FOLDER,
+  TEMPLATES_CLEAR_FOLDER,
   SHELL_TOGGLE_LOCALE,
   bindingsOf,
   createDesktopRegistry,
@@ -47,6 +49,8 @@ const actions = () =>
     closeDocument: vi.fn<() => void>(),
     stepDocument: vi.fn<(direction: 1 | -1) => void>(),
     openExport: vi.fn<() => void>(),
+    chooseTemplateFolder: vi.fn<() => void>(),
+    clearTemplateFolder: vi.fn<() => void>(),
   }) satisfies DesktopActions;
 
 /**
@@ -95,6 +99,28 @@ describe('the ids the window registers', () => {
     expect(registry.run(EDITOR_SAVE_AS, NO_VIEW)).toBe(true);
     expect(spies.saveDocument.mock.calls).toEqual([[false], [true]]);
     expect(spies.openDocument).toHaveBeenCalledOnce();
+  });
+
+  it('runs the template folder commands the bar lists, and nothing else', () => {
+    const spies = actions();
+    const registry = createDesktopRegistry(spies);
+
+    expect(registry.run(TEMPLATES_CHOOSE_FOLDER, NO_VIEW)).toBe(true);
+    expect(registry.run(TEMPLATES_CLEAR_FOLDER, NO_VIEW)).toBe(true);
+
+    // Two commands and not one toggle, because a toggle would have to say which state it is
+    // in and the bar lists a verb (TYTO-122).
+    expect(spies.chooseTemplateFolder).toHaveBeenCalledOnce();
+    expect(spies.clearTemplateFolder).toHaveBeenCalledOnce();
+  });
+
+  it('gives the template folder commands no keystroke', () => {
+    // A setting somebody changes once, not a key anybody presses. A binding here would be one
+    // more accelerator competing with the editor's for no one's benefit.
+    const bindings = bindingsOf(defaultKeymapSet, 'linux');
+
+    expect(bindings[TEMPLATES_CHOOSE_FOLDER]).toBeUndefined();
+    expect(bindings[TEMPLATES_CLEAR_FOLDER]).toBeUndefined();
   });
 
   it('keeps undo and redo, which the registry brings itself', () => {

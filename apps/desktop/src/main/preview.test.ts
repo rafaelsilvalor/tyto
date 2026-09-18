@@ -6,6 +6,7 @@ import { nodeFileSystem } from '@tyto/io';
 import { beforeAll, describe, expect, it } from 'vitest';
 
 import { type PreviewService, createPreviewService } from './preview.js';
+import { createProjectSources } from './project.js';
 
 /**
  * The preview, against the pack the app actually ships.
@@ -25,7 +26,15 @@ const exampleBrief = (template: string, file: string): string =>
 let preview: PreviewService;
 
 beforeAll(async () => {
-  preview = await createPreviewService({ fileSystem: nodeFileSystem() });
+  preview = await createPreviewService({
+    fileSystem: nodeFileSystem(),
+    // The production holder over the real pack, not a fake: what is asserted here is that a
+    // registry reaches a compile, and a fake holder would assert the fake (TYTO-122).
+    sources: await createProjectSources({
+      fileSystem: nodeFileSystem(),
+      builtIn: packDirectory,
+    }),
+  });
 });
 
 describe('the preview service', () => {

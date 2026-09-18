@@ -39,6 +39,13 @@ export interface ShellState {
   readonly version: string;
   readonly platform: string;
   readonly templates: readonly string[];
+  /**
+   * The folder searched before the built-in pack, or nothing (TYTO-122).
+   *
+   * A path in the footer and not a silent setting, because the whole failure this guards
+   * against is somebody wondering why their template is not in the picker.
+   */
+  readonly templatesFolder: string | null;
   /** What is open and whether it has been touched since it was last written (E9.8). */
   readonly document: DocumentState;
 }
@@ -101,6 +108,11 @@ const detailOf = (key: CatalogueKey, state: ShellState): string | undefined => {
   // with the number of installed packs would be a layout that breaks on somebody else's
   // machine.
   if (key === 'shell.about.templates') return String(state.templates.length);
+  // A word rather than a blank when nobody has chosen one: an empty cell in a row that has a
+  // label reads as something that failed to load.
+  if (key === 'templates.folder.label') {
+    return state.templatesFolder ?? translate(state.locale, 'templates.folder.none');
+  }
   return undefined;
 };
 

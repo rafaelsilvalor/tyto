@@ -6,6 +6,7 @@ import { dirname, join } from 'node:path';
 import { nodeFileSystem } from '@tyto/io';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 
+import { createProjectSources } from './project.js';
 import { createTemplateCatalogue } from './templates.js';
 
 /**
@@ -23,6 +24,19 @@ const packDirectory = join(dirname(require_.resolve('@tyto/templates/package.jso
 /** A one-pixel PNG, so the `data:` URI is checked against bytes that really are a PNG. */
 const PIXEL =
   'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==';
+
+/**
+ * A `ProjectSources` over real folders, which is what these suites want.
+ *
+ * `createProjectSources` is the production object and not a fake: what is being asserted is
+ * that a registry reaches a service, and a fake holder would assert the fake.
+ */
+const sourcesOver = async (builtIn: string, folder?: string) =>
+  createProjectSources({
+    fileSystem: nodeFileSystem(),
+    builtIn,
+    ...(folder === undefined ? {} : { folder }),
+  });
 
 let scratch: string;
 
@@ -57,11 +71,10 @@ afterAll(() => {
 describe('the template catalogue', () => {
   it('lists the shipped pack with what a picker needs to show it', async () => {
     const catalogue = await createTemplateCatalogue({
-      fileSystem: nodeFileSystem(),
-      directory: packDirectory,
+      sources: await sourcesOver(packDirectory),
     });
 
-    const { templates } = catalogue.list();
+    const { templates } = await catalogue.list();
     expect(templates.length).toBeGreaterThan(0);
 
     for (const template of templates) {
@@ -77,11 +90,10 @@ describe('the template catalogue', () => {
     // whole of the reason since ADR 0024 retired the other one — that the renderer would
     // later run in a browser tab with no disk under it. It will not.
     const catalogue = await createTemplateCatalogue({
-      fileSystem: nodeFileSystem(),
-      directory: scratch,
+      sources: await sourcesOver(scratch),
     });
 
-    const found = catalogue.list().templates.find((item) => item.name === 'with-preview');
+    const found = (await catalogue.list()).templates.find((item) => item.name === 'with-preview');
     expect(found?.description).toBe('Has a picture');
     expect(found?.preview).toBe(`data:image/png;base64,${PIXEL}`);
   });
@@ -89,11 +101,10 @@ describe('the template catalogue', () => {
   it('leaves the preview off a template that has none, rather than failing', async () => {
     // Which is every built-in today. A missing picture must not cost the entry.
     const catalogue = await createTemplateCatalogue({
-      fileSystem: nodeFileSystem(),
-      directory: packDirectory,
+      sources: await sourcesOver(packDirectory),
     });
 
-    for (const template of catalogue.list().templates) {
+    for (const template of (await catalogue.list()).templates) {
       expect(template.preview).toBeUndefined();
     }
   });
@@ -102,11 +113,10 @@ describe('the template catalogue', () => {
     // The registry keeps the two apart on purpose. A picker emptied by one bad manifest
     // would be a third party breaking the app by shipping a typo.
     const catalogue = await createTemplateCatalogue({
-      fileSystem: nodeFileSystem(),
-      directory: scratch,
+      sources: await sourcesOver(scratch),
     });
 
-    const answer = catalogue.list();
+    const answer = await catalogue.list();
     expect(answer.templates.map((item) => item.name)).toEqual(['with-preview']);
     expect(answer.failures).toHaveLength(1);
     expect(answer.failures[0]?.directory).toContain('broken');
@@ -120,10 +130,9 @@ describe('the template catalogue', () => {
   it('answers an empty list for a folder that is not there', async () => {
     // The desktop should open and say it has no templates, not refuse to start.
     const catalogue = await createTemplateCatalogue({
-      fileSystem: nodeFileSystem(),
-      directory: join(scratch, 'nowhere'),
+      sources: await sourcesOver(join(scratch, 'nowhere')),
     });
 
-    expect(catalogue.list().templates).toEqual([]);
+    expect((await catalogue.list()).templates).toEqual([]);
   });
 });
