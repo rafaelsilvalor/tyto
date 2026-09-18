@@ -4,7 +4,7 @@ import { join } from 'node:path';
 
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { LOG_FILE, PREVIOUS_LOG_FILE, fileLog, installCrashHandlers } from './log.js';
+import { LOG_FILE, PREVIOUS_LOG_FILE, crashSummary, fileLog, installCrashHandlers } from './log.js';
 
 /**
  * Driven against a real folder, which `recent-files.test.ts` already does and for its reason:
@@ -170,5 +170,96 @@ describe('installCrashHandlers', () => {
     handlers.get('unhandledRejection')?.('nobody caught this' as never);
 
     expect(log.error).toHaveBeenCalledWith('unhandled rejection in main', 'nobody caught this');
+  });
+});
+
+/**
+ * The half TYTO-140 added: a crash that reaches a screen as well as a file.
+ *
+ * The box itself is `dialog.showErrorBox`, which is Electron's and so the composition root's.
+ * What is testable here is the port — that it is called, with what, for both kinds of crash,
+ * and that it cannot take the process down.
+ */
+describe('installCrashHandlers, reporting', () => {
+  const wired = (onCrash?: (reason: unknown) => void) => {
+    const handlers = new Map<string, (value: never) => void>();
+    const log = { debug: vi.fn(), info: vi.fn(), warn: vi.fn(), error: vi.fn() };
+    installCrashHandlers(
+      {
+        on: (event: string, handler: (value: never) => void) => handlers.set(event, handler),
+      } as never,
+      log,
+      onCrash,
+    );
+    return { handlers, log };
+  };
+
+  it('reports an uncaught exception, after writing it down', () => {
+    const onCrash = vi.fn();
+    const { handlers, log } = wired(onCrash);
+    const error = new Error('main fell over');
+
+    handlers.get('uncaughtException')?.(error as never);
+
+    // Written first, reported second, and the order is the point: the box can fail and the
+    // line is what a report is made of.
+    expect(log.error).toHaveBeenCalledWith('uncaught exception in main', error);
+    expect(onCrash).toHaveBeenCalledTimes(1);
+    expect(onCrash).toHaveBeenCalledWith(error);
+  });
+
+  it('reports an unhandled rejection too, which is the startup case', () => {
+    const onCrash = vi.fn();
+    const { handlers } = wired(onCrash);
+
+    // A `throw` inside `start()` is this, not an exception — and Electron runs with
+    // `--unhandled-rejections` in `warn` mode, so this path never had a box to lose.
+    handlers.get('unhandledRejection')?.('boom' as never);
+
+    expect(onCrash).toHaveBeenCalledWith('boom');
+  });
+
+  it('survives a report that throws, and writes that down as well', () => {
+    const onCrash = vi.fn(() => {
+      throw new Error('no display');
+    });
+    const { handlers, log } = wired(onCrash);
+
+    // **The case this guard exists for.** This runs inside an `uncaughtException` listener,
+    // where Node treats a raised exception as fatal — so a box that failed to draw would turn
+    // a reported crash into a silently killed process, which is worse than the state the card
+    // started from.
+    expect(() => handlers.get('uncaughtException')?.(new Error('x') as never)).not.toThrow();
+    expect(log.error).toHaveBeenCalledWith('the crash report itself failed', expect.any(Error));
+  });
+
+  it('still works with no reporter at all, which is every test that has one', () => {
+    const { handlers, log } = wired();
+
+    expect(() => handlers.get('uncaughtException')?.(new Error('x') as never)).not.toThrow();
+    expect(log.error).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe('crashSummary', () => {
+  it('gives an error its name and message, on one line', () => {
+    const error = new Error('EACCES: permission denied');
+    error.stack = 'Error: EACCES: permission denied\n    at open (node:fs:1)';
+
+    // Not the stack, which is what the log keeps: a box holding nine lines of frames is a box
+    // whose first line — the only part that says anything — is off the top.
+    expect(crashSummary(error)).toBe('Error: EACCES: permission denied');
+  });
+
+  it('says something for a rejection that carried no error', () => {
+    // A rejection can carry anything at all, and a blank box is the failure this card removes.
+    expect(crashSummary(undefined)).toBe('unknown error');
+    expect(crashSummary('')).toBe('unknown error');
+    expect(crashSummary({ code: 'ENOENT' })).toContain('object');
+  });
+
+  it('caps a long one rather than filling the screen', () => {
+    expect(crashSummary('x'.repeat(1000))).toHaveLength(300);
+    expect(crashSummary('x'.repeat(1000)).endsWith('…')).toBe(true);
   });
 });

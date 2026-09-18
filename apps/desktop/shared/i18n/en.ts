@@ -60,6 +60,10 @@ export const en: Catalogue = {
   'exit.discard.confirm': 'Quit without saving',
   'exit.discard.cancel': 'Cancel',
   'menu.revealLogs': 'Open the log folder',
+  'crash.title': 'Tyto hit an error it did not expect',
+  'crash.detail': 'What happened was written down here. Send me this folder:',
+  'crash.noLog':
+    'This one could not even be written down: Tyto is not allowed to write to its own settings folder.',
   'menu.file': 'File',
   'command.document.new': 'New brief',
   'command.document.close': 'Close the tab',

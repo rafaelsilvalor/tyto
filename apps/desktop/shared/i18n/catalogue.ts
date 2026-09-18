@@ -163,6 +163,26 @@ export interface Catalogue {
    */
   readonly 'menu.revealLogs': string;
   /**
+   * What a crash in main puts on screen (TYTO-140).
+   *
+   * Three strings and not one, because the box says three things: that something broke, where
+   * the record of it is, and — in the one case where there is no record — that there is none.
+   * `crash.noLog` is reached when `fileLog` itself failed, which is a `userData` this app is
+   * not allowed to write to; a box naming a folder that was never written would send somebody
+   * looking for a file that is not there.
+   *
+   * The folder's path and the error's own first line are appended at the point of use, the way
+   * `file.missing` appends a name. They are not the catalogue's: one is a path and the other
+   * is whatever the system said, and neither is translatable.
+   *
+   * These follow the window's language, not the system's — `app:locale` tells main which one
+   * that is (TYTO-124), and the startup locale is the system's because it is the only one main
+   * has before the window has answered anything.
+   */
+  readonly 'crash.title': string;
+  readonly 'crash.detail': string;
+  readonly 'crash.noLog': string;
+  /**
    * The File submenu's own title (TYTO-124).
    *
    * Written by this app rather than left to `role: 'fileMenu'`, because that role's entire
@@ -321,6 +341,9 @@ export const CATALOGUE_KEYS = [
   'exit.discard.confirm',
   'exit.discard.cancel',
   'menu.revealLogs',
+  'crash.title',
+  'crash.detail',
+  'crash.noLog',
   'menu.file',
   'command.document.new',
   'command.document.close',

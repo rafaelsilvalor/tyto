@@ -21,9 +21,15 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest';
  * built-in template pack with `createRequire(...).resolve('@tyto/templates/package.json')` —
  * a resolver call, which a bundle cannot answer. Built without the two lines that re-include
  * that package, this app opens **no window at all**: the resolve throws inside the promise
- * `app.whenReady().then(start)` returns, nothing is listening for the rejection, and the
- * process sits there having logged nothing. Measured that way, and this is the measurement
- * kept.
+ * `app.whenReady().then(start)` returns. Measured that way, and this is the measurement kept.
+ *
+ * The sentence that used to end there — *"nothing is listening for the rejection, and the
+ * process sits there having logged nothing"* — was true when this file was written and stopped
+ * being true twice since. TYTO-132 gave the rejection a listener that writes a line, and
+ * TYTO-140 gave it a `.catch` that puts an error box on screen naming the folder that line is
+ * in. **The observable this suite asserts has not changed**: no window is still no window, and
+ * that is what makes the two re-included lines worth a packaged launch to prove. What changed
+ * is that the failure is no longer silent.
  *
  * **Not part of `pnpm check`**, and not part of `test:desktop` either. It runs
  * `electron-builder --dir` first — a full package, ~23 s once the Electron zip is cached and
