@@ -93,6 +93,17 @@ export interface IpcDependencies {
     folder: () => { folder: string | null; found: number };
     setFolder: (choose: boolean) => Promise<{ folder: string | null; found: number }>;
   };
+  /**
+   * Rebuilds the application menu in a language (TYTO-124).
+   *
+   * A function and not the menu, for the reason every other Electron thing here arrives as
+   * one: `Menu.setApplicationMenu` is the browser process's and this module is tested without
+   * a browser process. An unknown locale string is the composition root's to resolve, which is
+   * why this takes what the window sent rather than a `Locale`.
+   */
+  readonly menu: {
+    setLocale: (locale: string) => void;
+  };
 }
 
 /** One handler per channel, typed against the contract in both directions. */
@@ -111,6 +122,7 @@ export function createHandlers(dependencies: IpcDependencies): Handlers {
     info,
     layout,
     log,
+    menu,
     preview,
     project,
     templates,
@@ -248,6 +260,11 @@ export function createHandlers(dependencies: IpcDependencies): Handlers {
     'log:reveal': async () => {
       await folders.reveal(log.directory);
       return {};
+    },
+
+    'app:locale': ({ locale }) => {
+      menu.setLocale(locale);
+      return Promise.resolve({});
     },
   };
 }

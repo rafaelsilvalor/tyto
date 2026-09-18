@@ -105,6 +105,16 @@ export interface Catalogue {
   readonly 'document.untitled': string;
   readonly 'document.unsaved': string;
   readonly 'file.missing': string;
+  /**
+   * A save that did not write, shown the way `file.missing` is (TYTO-124).
+   *
+   * A sentence and not a question: the panel is where *why is this not working* already goes,
+   * and a box interrupting on a full disk would be the second interrupting box this window
+   * has — the first one, the quit question, is deliberate about being the only one. The file's
+   * name and the reason the system gave are appended at the point of use, the way
+   * `file.missing` appends the name.
+   */
+  readonly 'file.saveFailed': string;
 
   /**
    * The document tabs (E9.11).
@@ -138,18 +148,29 @@ export interface Catalogue {
   readonly 'exit.discard.confirm': string;
   readonly 'exit.discard.cancel': string;
   /**
-   * The only string this app writes into the application menu (TYTO-132).
+   * The first string this app wrote into the application menu (TYTO-132).
    *
-   * Every other entry there is an Electron role whose label is the system's, in the system's
+   * Most entries there are an Electron role whose label is the system's, in the system's
    * language — `src/main/menu.ts` says why. This one names a folder that belongs to Tyto, so
-   * Electron has no word for it.
+   * Electron has no word for it. The File menu below is the other exception, and it is the
+   * larger one: Electron has words for *Open* and *Save*, but not for a menu that runs this
+   * app's own registry.
    *
-   * **It follows the system's language and not the footer picker's.** The menu is built once
-   * at startup, in main, and the picker changes the window's locale in the renderer with no
-   * message going the other way about it. So a person who switches the footer to English
-   * keeps a Portuguese menu item until TYTO-124 gives the menu a way to be told.
+   * **It followed the system's language and not the footer picker's, and no longer does.**
+   * TYTO-124 gave the menu the way to be told: `app:locale` carries the window's choice to
+   * main, which rebuilds the menu in it. The startup locale is still the system's, because
+   * that is the only one main has before the window has answered anything.
    */
   readonly 'menu.revealLogs': string;
+  /**
+   * The File submenu's own title (TYTO-124).
+   *
+   * Written by this app rather than left to `role: 'fileMenu'`, because that role's entire
+   * content on Windows and Linux is Quit — and on macOS it brings *Close Window* on `Mod-W`,
+   * which is the accelerator `src/main/menu.ts` exists to keep away from the page.
+   */
+  readonly 'menu.file': string;
+  readonly 'command.document.new': string;
   readonly 'command.document.close': string;
   readonly 'command.document.next': string;
   readonly 'command.document.previous': string;
@@ -288,6 +309,7 @@ export const CATALOGUE_KEYS = [
   'document.untitled',
   'document.unsaved',
   'file.missing',
+  'file.saveFailed',
   'document.close',
   'document.discard.message',
   'document.discard.detail',
@@ -299,6 +321,8 @@ export const CATALOGUE_KEYS = [
   'exit.discard.confirm',
   'exit.discard.cancel',
   'menu.revealLogs',
+  'menu.file',
+  'command.document.new',
   'command.document.close',
   'command.document.next',
   'command.document.previous',

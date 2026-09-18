@@ -1,5 +1,6 @@
 import type { MenuItemConstructorOptions } from 'electron';
 
+import { FILE_MENU_GROUPS } from '../../shared/commands.js';
 import type { CatalogueKey } from '../../shared/i18n/index.js';
 
 /**
@@ -31,12 +32,16 @@ import type { CatalogueKey } from '../../shared/i18n/index.js';
  * `electron-vite dev` already replaces with a reload of its own. Session restore, which
  * would make a reload harmless, is a feature and not this card.
  *
- * Roles and not labels, **almost** everywhere. A role's label is Electron's own, in the
- * system's language, which is the right answer for *Minimize* and *Quit*. TYTO-132 added the
- * one exception: the Help submenu carries an item this app names itself, so this file now
- * takes a translator. The submenu's own title is still Electron's, because `role: 'help'`
- * keeps it. A menu of the app's own *commands* is still a card of its own, and it would read
- * `src/renderer/commands.ts` rather than invent entries.
+ * Roles and not labels, **where the label is the system's to write**. A role's label is
+ * Electron's own, in the system's language, which is the right answer for *Minimize* and
+ * *Quit*. TYTO-132 added the first exception, the Help submenu's one item; TYTO-124 added the
+ * larger one, the File submenu, which is this app's verbs and so this app's words. The two
+ * submenu titles Electron still owns are Help's and Edit's, because their roles keep them.
+ *
+ * **The File items name commands rather than implement them.** `shared/commands.ts` is the
+ * table both processes read — the renderer registers those ids, this file draws them, and
+ * `onCommand` carries the id back across. That is the acceptance criterion literally: a menu
+ * item and a command-bar row are the same command, not two that agree today.
  *
  * `import type` and nothing else from `electron`, the same call `ipc.ts` makes: the template
  * is a value a test can read without a running Electron, and `index.ts` is where it is
@@ -52,6 +57,14 @@ export interface MenuOptions {
   readonly t: (key: CatalogueKey) => string;
   /** Opens the folder the log lives in. An Electron call, so it arrives as a function. */
   readonly onRevealLogs: () => void;
+  /**
+   * Runs a command out of the renderer's registry, by id (TYTO-124).
+   *
+   * A function for the same reason `onRevealLogs` is one: reaching the renderer means a
+   * `WebContents`, and a template that named one could not be read by a test without a
+   * running Electron. The composition root is where the id becomes a message.
+   */
+  readonly onCommand: (id: string) => void;
 }
 
 export function menuTemplate(platform: string, options: MenuOptions): MenuItemConstructorOptions[] {
@@ -59,9 +72,41 @@ export function menuTemplate(platform: string, options: MenuOptions): MenuItemCo
 
   return [
     // On macOS the app menu is where Quit lives and the first submenu is always the app's.
-    // Everywhere else `fileMenu` is Quit alone — and on macOS it is *Close Window*, which is
-    // exactly the item this file exists to leave out, so macOS gets no File menu at all.
-    ...(mac ? [{ role: 'appMenu' } as const] : [{ role: 'fileMenu' } as const]),
+    ...(mac ? [{ role: 'appMenu' } as const] : []),
+    // **The File menu, written out rather than `role: 'fileMenu'`** (TYTO-124). That role is
+    // Quit alone on Windows and Linux, and on macOS it is *Close Window* on `Mod-W` — the one
+    // accelerator this file exists to keep away from the page. So neither platform got a File
+    // menu worth opening, and the app's own verbs were reachable only by a keystroke somebody
+    // had to already know.
+    //
+    // Every item runs a command id out of `shared/commands.ts` through `onCommand`, which
+    // reaches the renderer's registry — the same `registry.run` the command bar calls. Nothing
+    // here knows what any of the ids do.
+    {
+      label: options.t('menu.file'),
+      submenu: [
+        ...FILE_MENU_GROUPS.flatMap((group, index) => [
+          ...(index === 0 ? [] : [{ type: 'separator' } as const]),
+          ...group.map((command) => ({
+            // The id is the command's, which is what lets the end-to-end suite find an item
+            // without matching a translated label.
+            id: command.id,
+            label: options.t(command.label),
+            click: () => {
+              options.onCommand(command.id);
+            },
+          })),
+        ]),
+        // **No accelerators anywhere in this submenu, and that is the decision.** A menu
+        // accelerator is handled by the browser process before the page sees the key, so one
+        // written here would take that key away from `desktopKeymapSet` unconditionally —
+        // including in vim mode, where the desktop bindings are deliberately not in force and
+        // `Ctrl-O` belongs to the vim engine. The menu's job in this card is to *teach the
+        // verbs*; the keystrokes stay the page's, and `e2e/tabs.desktop.test.ts`'s accelerator
+        // table staying green unchanged is the evidence nothing was taken.
+        ...(mac ? [] : [{ type: 'separator' } as const, { role: 'quit' } as const]),
+      ],
+    },
     // Left as Electron built them. `editMenu` is what makes copy and paste work on macOS,
     // where the clipboard shortcuts are the menu's rather than the page's.
     { role: 'editMenu' },
