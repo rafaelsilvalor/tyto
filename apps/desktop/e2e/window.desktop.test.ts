@@ -364,6 +364,11 @@ describe('the language picker', () => {
     // title is menu chrome for the reason above; the label is the command bar's, like every
     // other `command.*` here, and the bar is closed. `src/main/menu.test.ts` holds the item
     // to the key and `e2e/menu.desktop.test.ts` holds it to the running app.
+    // TYTO-140: what a crash in main puts in a native error box. Not the document by the same
+    // argument as the menu, and not reachable from a window that is working.
+    'crash.title',
+    'crash.detail',
+    'crash.noLog',
     'menu.file',
     'command.document.new',
     'command.document.close',

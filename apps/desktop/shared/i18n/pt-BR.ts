@@ -60,6 +60,10 @@ export const ptBR: Catalogue = {
   'exit.discard.confirm': 'Sair sem salvar',
   'exit.discard.cancel': 'Cancelar',
   'menu.revealLogs': 'Abrir a pasta do log',
+  'crash.title': 'O Tyto encontrou um erro que não esperava',
+  'crash.detail': 'O que aconteceu ficou anotado aqui. Me mande esta pasta:',
+  'crash.noLog':
+    'Este não deu nem para anotar: o Tyto não tem permissão de escrever na própria pasta de configuração.',
   'menu.file': 'Arquivo',
   'command.document.new': 'Novo brief',
   'command.document.close': 'Fechar a aba',
