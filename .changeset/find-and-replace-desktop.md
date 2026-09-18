@@ -18,8 +18,9 @@ single growth. The coverage it gives up is replaced twice: `search-phrases.test.
 every key to a catalogue entry that differs between the two languages, and
 `packages/editor/src/search.test.ts` mounts the real panel and reads the words back off it.
 
-**This is a second file rather than a second line in the editor's changeset**, and that is
-not style. Changesets v3 treats a private package as _ignored_, and refuses a changeset that
-names both an ignored and a published package: `Mixed changesets that contain both ignored
-and not ignored packages are not allowed`. One file naming both took the release workflow
-down on `main` (TYTO-0).
+**This was a second file rather than a second line in the editor's changeset**, and at the
+time that was not style. Changesets v3 treated a private package as _ignored_ and refused a
+changeset naming an ignored and a published package together — `Mixed changesets that contain
+both ignored and not ignored packages are not allowed` — after one file naming both took the
+release workflow down on `main` (TYTO-0). TYTO-94 turned private versioning back on, so the
+refusal has nothing left to refuse and one file is fine again.

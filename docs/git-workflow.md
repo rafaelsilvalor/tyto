@@ -68,11 +68,45 @@ So the annotated form would buy a bot's name and a duplicate date, and the API f
 
 Crossing that major renamed every input the workflow passes — `version` → `version-script`, `publish` → `publish-script`, `commit` → `commit-message`, `title` → `pr-title` — and **an action ignores an input it does not know rather than failing on it**, so the whole class of mistake is silent. The v1 → v2 bump left `commit:` and `title:` in the file meaning nothing and opened the version PR under the action's own default title, "Version Packages": a green run and a pull request with no Jira key, unmergeable for good (TYTO-78). `github-config.test.ts` pins each major's full input list from its `action.yml` and reads the linted strings through the names the pinned major uses, so a leftover name fails instead of doing nothing. Measured both ways rather than asserted: `title:` under v2 fails **2 of 30** tests, and the same file with v2's names passes **30 of 30**.
 
-The CLI's own major renamed a command: `changeset tag` is `changeset git-tag`. The old spelling still tags and prints `The 'tag' command is deprecated. Please use 'git-tag' instead.` — a countdown rather than a pass, so `release.yml` runs `git-tag`. Two other v3 changes matter here and neither bites yet: `changeset version` now exits 1 when no unreleased changeset exists (the action only runs it when there are changesets), and private packages are no longer versioned by default (nothing in `tools/` was ever meant to be).
+The CLI's own major renamed a command: `changeset tag` is `changeset git-tag`. The old spelling still tags and prints `The 'tag' command is deprecated. Please use 'git-tag' instead.` — a countdown rather than a pass, so `release.yml` runs `git-tag`. Two other v3 changes matter here. `changeset version` now exits 1 when no unreleased changeset exists, which the action never reaches because it only runs the script when there are changesets. And **private packages stopped being versioned by default** — which in this repository meant the two apps and not `tools/`, because `@tyto/cli` and `@tyto/desktop` are the only private packages that carry a `version` field at all. `@tyto/cli` read `0.1.13` from #91 through eleven version PRs while `@tyto/core` went `0.19.0` → `0.22.0`, nine desktop changesets piled up unconsumed, and #171 opened with an empty diff (TYTO-94).
 
-**A third one bit.** "Private packages are no longer versioned" means Changesets treats them as _ignored_, and it refuses a file that names an ignored package beside a published one: `Mixed changesets that contain both ignored and not ignored packages are not allowed`. So a change that touches `@tyto/editor` and `@tyto/desktop` together is **two changeset files, not two lines in one** — the same text on each side, which costs nothing.
+**Both apps are versioned again, and neither is tagged.** `privatePackages: { version: true, tag: false }` in `.changeset/config.json` is the whole change, measured on the same nine files:
 
-**The reason this is worth a paragraph is when it fails.** `pnpm check` does not run Changesets and neither does `ci.yml`; `release.yml` only fires on a push to `main`. A mixed file therefore passes every check a pull request has and fails after the merge, on the branch it cannot be fixed on without opening a second PR. That is not hypothetical — one file naming both took `release` down on `main` twice in a row (TYTO-109, fixed by TYTO-0). `tools/repo-checks/src/changesets.test.ts` now fails `pnpm check` instead, which is the point: the rule is cheap, the failure is expensive, and the gap between them was two days of green. **And `ci.yml` runs `changeset status` on every pull request**, which closes the class rather than the one case — it reads the same folder `release.yml` would version, writes nothing, and exits 0 on a branch that adds no changeset (measured, not assumed).
+```
+$ pnpm changeset status          # before
+Packages to be bumped:
+
+$ pnpm changeset status          # after
+Packages to be bumped:
+- minor
+  - @tyto/cli
+  - @tyto/desktop
+```
+
+`version: true` restores the bumps and writes both `CHANGELOG.md` — `apps/desktop` had never had one. `tag: false` keeps both out of `changeset git-tag`, which reads that key and nothing else, so no `@tyto/cli@x.y.z` ref is pushed for a package no registry holds; the desktop's own tag stays `desktop-v*`, pushed by hand. Both apps now also take a **patch** whenever a package they depend on is released — `workspace:*` resolves to the dependency's exact old version, so any bump is out of range — which is the behaviour `apps/cli/CHANGELOG.md` already records up to `0.1.13`, where v3 stopped it. So the version to tag is whatever the last version PR left, never a number chosen in advance, and `desktop.yml`'s tag-versus-manifest guard refuses the mismatch before it installs anything.
+
+**`tools/*` stay unversioned, and this config is not what keeps them out.** The three of them carry no `version` field and never did. `shouldSkipPackage` ends `return !packageJson.version`, _after_ the private check rather than before it, so a manifest with no version is skipped whatever `privatePackages` says — and adding one to tidy `@tyto/repo-checks` would put it in the release plan with nothing anywhere saying so. `tools/repo-checks/src/changesets.test.ts` pins the absence for that reason.
+
+**A third one bit, and turning private versioning back on is what retired it.** "Private packages are no longer versioned" meant Changesets treated them as _ignored_, and it refuses a file that names an ignored package beside a published one: `Mixed changesets that contain both ignored and not ignored packages are not allowed`. One file naming `@tyto/editor` and `@tyto/desktop` together took `release` down on `main` twice in a row (TYTO-109, fixed by TYTO-0), and for a while a change touching both meant two changeset files instead of two lines in one. It does not any more — measured on that exact file, both ways:
+
+```
+$ pnpm changeset status   # the mixed file, with privatePackages
+Packages to be bumped:
+- minor
+  - @tyto/cli
+  - @tyto/desktop
+  - @tyto/editor
+
+$ pnpm changeset status   # the same file, without it
+Error: Found mixed changeset tmp-mixed-probe
+Found ignored packages: @tyto/desktop
+Found not ignored packages: @tyto/editor
+Mixed changesets that contain both ignored and not ignored packages are not allowed
+```
+
+One file is fine again, and the repo-check that enforced the split went with the rule it enforced.
+
+**What has not changed is when a release-config mistake becomes visible.** `pnpm check` does not run Changesets and neither does `ci.yml`; `release.yml` only fires on a push to `main`, so anything wrong with the release plan passes every check a pull request has and fails on the branch it cannot be fixed on without opening a second PR. That gap is two days wide — it is how the mixed file above stayed green until it was merged — and it is what the two cheap guards are for. **`ci.yml` runs `changeset status` on every pull request**: it reads the same folder `release.yml` would version, writes nothing, and exits 0 on a branch that adds no changeset (measured, not assumed). And `tools/repo-checks/src/changesets.test.ts` holds `.changeset/config.json` to the decision above, so `privatePackages` cannot be dropped by a merge that looks unrelated.
 
 ## Workflows (`.github/workflows/`)
 

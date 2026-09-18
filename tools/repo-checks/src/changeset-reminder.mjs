@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /**
- * Reminds, and never blocks, when a commit touches a publishable package while the branch
+ * Reminds, and never blocks, when a commit touches a versioned package while the branch
  * carries no changeset (docs/git-workflow.md).
  *
  * Warning instead of failing is the point, not a compromise. A changeset is usually
@@ -15,18 +15,28 @@
 import { execFileSync } from 'node:child_process';
 import { existsSync, readdirSync, readFileSync } from 'node:fs';
 
-/** Where workspace packages live. `tools/*` is deliberately absent: those are never published. */
+/**
+ * Where workspace packages live. `tools/*` is deliberately absent, and since TYTO-94 the
+ * reason is the one Changesets itself uses: those three manifests carry no `version` field,
+ * so nothing there can ever be in a release plan. Reading the roots rather than the field
+ * here only saves three `package.json` reads per commit.
+ */
 const WORKSPACE_ROOTS = ['packages', 'apps'];
 
 /**
- * Publishable means "not marked private", the same thing Changesets means by it. Reading
- * the flag rather than hardcoding a list of directories is what keeps this correct the day
- * a publishable package appears outside `packages/`.
+ * Versioned means what `shouldSkipPackage` means by it: a manifest with a `version` field.
+ *
+ * It used to read `private` instead, and that was the same set until TYTO-94 turned
+ * `privatePackages.version` on. Since then `@tyto/cli` and `@tyto/desktop` are versioned and
+ * written into a `CHANGELOG.md` like any other package, so a desktop-only branch wants this
+ * reminder too — and reading the private flag would have stayed silent for exactly the two
+ * packages whose nine changesets went unconsumed. `tools/*` carry no `version` and are
+ * skipped by the same clause Changesets skips them with.
  *
  * @param {string} repoRoot
  * @returns {{ directory: string, name: string }[]}
  */
-export function publishablePackages(repoRoot) {
+export function versionedPackages(repoRoot) {
   return WORKSPACE_ROOTS.flatMap((root) => {
     const rootPath = `${repoRoot}/${root}`;
     if (!existsSync(rootPath)) return [];
@@ -39,7 +49,7 @@ export function publishablePackages(repoRoot) {
         if (!existsSync(manifestPath)) return [];
 
         const manifest = JSON.parse(readFileSync(manifestPath, 'utf8'));
-        if (manifest.private === true) return [];
+        if (manifest.version === undefined) return [];
         return [{ directory, name: manifest.name ?? directory }];
       });
   });
@@ -77,13 +87,13 @@ export function pendingChangesets(repoRoot) {
 }
 
 /**
- * @param {{ staged: string[], changesets: string[], publishable: { directory: string, name: string }[] }} input
+ * @param {{ staged: string[], changesets: string[], versioned: { directory: string, name: string }[] }} input
  * @returns {string | null} the warning, or null when there is nothing to say
  */
-export function missingChangesetWarning({ staged, changesets, publishable }) {
+export function missingChangesetWarning({ staged, changesets, versioned }) {
   if (changesets.length > 0) return null;
 
-  const touched = publishable
+  const touched = versioned
     .filter(({ directory }) => staged.some((file) => file.startsWith(`${directory}/`)))
     .map(({ name }) => name);
 
@@ -91,7 +101,7 @@ export function missingChangesetWarning({ staged, changesets, publishable }) {
 
   return [
     `This commit touches ${touched.join(', ')} and the branch has no changeset.`,
-    'A PR touching a publishable package needs one (docs/git-workflow.md):',
+    'A PR touching a versioned package needs one (docs/git-workflow.md):',
     '  pnpm changeset',
     'Reminder only — the commit went through.',
   ].join('\n');
@@ -103,7 +113,7 @@ function main() {
     const warning = missingChangesetWarning({
       staged: stagedFiles(repoRoot),
       changesets: pendingChangesets(repoRoot),
-      publishable: publishablePackages(repoRoot),
+      versioned: versionedPackages(repoRoot),
     });
     if (warning) console.warn(`\n${warning}\n`);
   } catch (error) {
