@@ -18,6 +18,7 @@ describe('the IPC contract', () => {
     expect([...IPC_CHANNEL_NAMES].sort()).toEqual([
       'app:exit-answer',
       'app:info',
+      'app:locale',
       'brief:preview',
       'credentials:delete',
       'credentials:get',
@@ -70,7 +71,7 @@ describe('the IPC contract', () => {
  */
 describe('the event table', () => {
   it('names every event exactly once, and nothing else', () => {
-    expect([...IPC_EVENT_NAMES].sort()).toEqual(['app:exit-requested']);
+    expect([...IPC_EVENT_NAMES].sort()).toEqual(['app:exit-requested', 'command:run']);
     expect(new Set(IPC_EVENT_NAMES).size).toBe(IPC_EVENT_NAMES.length);
   });
 

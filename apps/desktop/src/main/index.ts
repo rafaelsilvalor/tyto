@@ -5,7 +5,7 @@ import { type BrowserWindow, Menu, app, dialog, ipcMain, safeStorage, shell } fr
 import { nodeFileSystem } from '@tyto/io';
 import type { Rasterizer } from '@tyto/raster';
 
-import { localeFor, translate } from '../../shared/i18n/index.js';
+import { type Locale, localeFor, translate } from '../../shared/i18n/index.js';
 import { fileCredentialStore } from './credential-store.js';
 import { createCredentials } from './credentials.js';
 import { createDocumentService } from './documents.js';
@@ -163,6 +163,35 @@ async function start(): Promise<void> {
     },
   });
 
+  /**
+   * Builds the application menu in one language, and is called again when that changes.
+   *
+   * A function rather than a statement, because the File submenu is this app's own words
+   * (TYTO-124) and the footer picker can change which language those words are in. Declared
+   * before the handler table below so `app:locale` can reach it without a forward reference,
+   * and closing over `mainWindow` the way the exit guard does — the window does not exist yet
+   * and the menu does not need it to.
+   */
+  const installMenu = (locale: Locale): void => {
+    Menu.setApplicationMenu(
+      Menu.buildFromTemplate(
+        menuTemplate(process.platform, {
+          t: (key) => translate(locale, key),
+          onRevealLogs: () => {
+            void shell.openPath(log.directory);
+          },
+          // The id and nothing else. Main does not know what `editor.save` does, and the whole
+          // point of the table in `shared/commands.ts` is that it never needs to.
+          onCommand: (id) => {
+            const contents = mainWindow?.webContents;
+            if (contents === undefined || contents.isDestroyed()) return;
+            sendIpcEvent(contents, 'command:run', { id });
+          },
+        }),
+      ),
+    );
+  };
+
   registerIpcHandlers(ipcMain, {
     // The only question this app asks a person that is not a file picker: closing a tab
     // with unsaved text. `cancelId` and `defaultId` both point at the safe button, so
@@ -202,6 +231,13 @@ async function start(): Promise<void> {
     // argument: a file a person can read, edit and delete (ADR 0009).
     layout: fileLayoutStore(join(app.getPath('userData'), 'layout.json')),
     log,
+    // `localeFor` and not a cast: the window sends a string and this is the one place that
+    // decides what an unrecognised one means, which is the same fallback `app:info` uses.
+    menu: {
+      setLocale: (locale) => {
+        installMenu(localeFor(locale));
+      },
+    },
     project: {
       folder: () => {
         const chosen = sources.current().folder;
@@ -254,19 +290,9 @@ async function start(): Promise<void> {
   // is still the default one would be handled by the default one. `menu.ts` says why this
   // app installs a menu at all.
   //
-  // The menu carries exactly one string of this app's own (TYTO-132), and it is resolved here
-  // against the **system's** locale rather than the window's: the picker in the footer changes
-  // the renderer's locale and main is never told, so this is the only locale main has.
-  Menu.setApplicationMenu(
-    Menu.buildFromTemplate(
-      menuTemplate(process.platform, {
-        t: (key) => translate(localeFor(app.getLocale()), key),
-        onRevealLogs: () => {
-          void shell.openPath(log.directory);
-        },
-      }),
-    ),
-  );
+  // The startup locale is the system's, which is the only one main has before the window has
+  // said anything. `app:locale` is what replaces it afterwards.
+  installMenu(localeFor(app.getLocale()));
 
   mainWindow = createMainWindow({
     preload: join(here, '..', 'preload', 'index.cjs'),

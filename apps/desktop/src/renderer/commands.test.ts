@@ -7,9 +7,11 @@ import {
 } from '@tyto/editor';
 import { describe, expect, it, vi } from 'vitest';
 
+import { FILE_MENU_COMMANDS } from '../../shared/commands.js';
 import {
   type DesktopActions,
   COMMAND_LABELS,
+  DOCUMENT_NEW,
   EDITOR_OPEN,
   EDITOR_SAVE_AS,
   EDITOR_TOGGLE_VIM,
@@ -43,6 +45,7 @@ const actions = () =>
     stepSlide: vi.fn<(direction: 1 | -1) => void>(),
     toggleLocale: vi.fn<() => void>(),
     toggleVimMode: vi.fn<() => void>(),
+    newDocument: vi.fn<() => void>(),
     openDocument: vi.fn<() => void>(),
     saveDocument: vi.fn<(saveAs: boolean) => void>(),
     restoreLayout: vi.fn<() => void>(),
@@ -217,5 +220,64 @@ describe('the keystroke shown beside a command', () => {
 
     expect(bindings[SHELL_TOGGLE_LOCALE]).toBeUndefined();
     expect(bindings[EDITOR_TOGGLE_VIM]).toBeUndefined();
+  });
+});
+
+/**
+ * The contract between the two processes' idea of what the File menu runs (TYTO-124).
+ *
+ * `shared/commands.ts` writes the ids as strings, because main cannot import this module —
+ * it pulls in `@tyto/editor`, which is CodeMirror, and the browser process has no document to
+ * put one in. Strings in one file and registrations in another is exactly the drift the
+ * acceptance criterion forbids, so this is where the two are held together.
+ */
+describe('the File menu table', () => {
+  it('names only commands this window actually registers', () => {
+    const registry = createDesktopRegistry(actions());
+
+    for (const command of FILE_MENU_COMMANDS) {
+      // `get` and not `run`: a menu item that reached nothing would return `false` from `run`
+      // and look like a command that declined, which is a different bug.
+      expect(registry.get(command.id), command.id).toBeDefined();
+    }
+  });
+
+  it('runs the same action the command bar runs, for each of them', () => {
+    const spies = actions();
+    const registry = createDesktopRegistry(spies);
+
+    for (const command of FILE_MENU_COMMANDS) registry.run(command.id, NO_VIEW);
+
+    // One call each, through the port — which is the whole claim: the menu is not a second
+    // implementation, it is the same five commands reached by a different door.
+    expect(spies.newDocument).toHaveBeenCalledTimes(1);
+    expect(spies.openDocument).toHaveBeenCalledTimes(1);
+    expect(spies.openExport).toHaveBeenCalledTimes(1);
+    expect(spies.closeDocument).toHaveBeenCalledTimes(1);
+    expect(spies.saveDocument.mock.calls).toEqual([[false], [true]]);
+  });
+
+  it('pins `editor.save` to the id `@tyto/editor` ships', () => {
+    // The one id in the table this app did not invent. Written as a literal over there, so
+    // this is what would fail if the package ever renamed it.
+    expect(FILE_MENU_COMMANDS.map((command) => command.id)).toContain(EDITOR_SAVE);
+  });
+
+  it('shows every one of them under a catalogue key', () => {
+    for (const command of FILE_MENU_COMMANDS) {
+      // The menu resolves `command.label` itself, in main; the bar resolves `COMMAND_LABELS`.
+      // Both have to be the same word, or the same verb reads two ways in one app.
+      expect(COMMAND_LABELS[command.id], command.id).toBe(command.label);
+    }
+  });
+});
+
+describe('the New command', () => {
+  it('is bound to `Mod-n` in the desktop set and to nothing in vim', () => {
+    // Vim gets the plain set on purpose (`commands.ts`), and `Ctrl-N` is the vim engine's in
+    // insert mode. This is also why the menu item carries no accelerator: one there would
+    // fire in vim too, because a menu accelerator is the browser process's.
+    expect(bindingsOf(keymapSetFor(false), 'linux')[DOCUMENT_NEW]).toBe('Ctrl+n');
+    expect(bindingsOf(keymapSetFor(true), 'linux')[DOCUMENT_NEW]).toBeUndefined();
   });
 });

@@ -1,6 +1,7 @@
 import type { MenuItemConstructorOptions } from 'electron';
 import { describe, expect, it, vi } from 'vitest';
 
+import { FILE_MENU_COMMANDS } from '../../shared/commands.js';
 import { menuTemplate } from './menu.js';
 
 /**
@@ -10,8 +11,19 @@ import { menuTemplate } from './menu.js';
  * the item carries *the catalogue's word for it*, and `shared/i18n/i18n.test.ts` is what holds
  * that key to having a word in both languages.
  */
-const template = (platform: string, onRevealLogs: () => void = () => {}) =>
-  menuTemplate(platform, { t: (key) => key, onRevealLogs });
+const template = (
+  platform: string,
+  onRevealLogs: () => void = () => {},
+  onCommand: (id: string) => void = () => {},
+) => menuTemplate(platform, { t: (key) => key, onRevealLogs, onCommand });
+
+/** The File submenu, found by its label rather than by a role — it has none (TYTO-124). */
+const fileSubmenu = (
+  built: readonly MenuItemConstructorOptions[],
+): readonly MenuItemConstructorOptions[] => {
+  const found = built.find((item) => item.label === 'menu.file');
+  return Array.isArray(found?.submenu) ? found.submenu : [];
+};
 
 /**
  * What the application menu may and may not carry, with no Electron under it.
@@ -133,5 +145,98 @@ describe('the Help submenu', () => {
     const help = template('linux').find((item) => item.role === 'help');
 
     expect(help?.label).toBeUndefined();
+  });
+});
+
+/**
+ * The File menu, which before TYTO-124 was `{ role: 'fileMenu' }` — Quit alone on Windows and
+ * Linux, and on macOS not present at all.
+ *
+ * The lesson the View menu taught above applies here in reverse. There, a delegated role could
+ * not be shown to be missing an item, so what was asserted was that the submenu is this
+ * repository's. Here the submenu **is** this repository's, so its items can be read directly:
+ * every one of them is a row of `FILE_MENU_GROUPS`, in order, and nothing else.
+ */
+describe('the File submenu', () => {
+  it.each(['win32', 'darwin', 'linux'])("is this repository's and not a role on %s", (platform) => {
+    const built = template(platform);
+
+    // No `fileMenu` anywhere, on any platform. That role brought Quit alone on two of them and
+    // *Close Window* on `Mod-W` on the third, which is the accelerator `menu.ts` exists for.
+    expect(roles(built)).not.toContain('fileMenu');
+    expect(built.find((item) => item.label === 'menu.file')).toBeDefined();
+  });
+
+  it.each(['win32', 'darwin', 'linux'])(
+    'carries every command in the table, in order, on %s',
+    (platform) => {
+      const items = fileSubmenu(template(platform));
+      const commands = items.filter((item) => item.id !== undefined);
+
+      expect(commands.map((item) => item.id)).toEqual(
+        FILE_MENU_COMMANDS.map((command) => command.id),
+      );
+      // The label is the catalogue's word for the command, which is the same key the command bar
+      // shows the row under — the fake `t` here answers with the key, so this reads as the key.
+      expect(commands.map((item) => item.label)).toEqual(
+        FILE_MENU_COMMANDS.map((command) => command.label),
+      );
+    },
+  );
+
+  it('draws a separator between groups and nowhere else', () => {
+    const items = fileSubmenu(template('linux'));
+    const shape = items.map((item) => (item.type === 'separator' ? '—' : (item.id ?? item.role)));
+
+    // Four groups, so three separators between them — plus the fourth before Quit, which is
+    // appended on this platform rather than coming from the table.
+    expect(shape).toEqual([
+      'document.new',
+      'editor.open',
+      '—',
+      'editor.save',
+      'editor.saveAs',
+      '—',
+      'file.export',
+      '—',
+      'document.close',
+      '—',
+      'quit',
+    ]);
+  });
+
+  it('leaves Quit to the application menu on macOS', () => {
+    // `role: 'appMenu'` is where macOS puts Quit, and a second one in File would be the same
+    // verb twice. Windows and Linux have no app menu, so File is the only place it can go.
+    expect(roles(fileSubmenu(template('darwin')))).not.toContain('quit');
+    expect(roles(template('darwin'))).toContain('appMenu');
+    expect(roles(fileSubmenu(template('win32')))).toContain('quit');
+  });
+
+  it('runs the command it names, by id, once', () => {
+    const onCommand = vi.fn();
+    const items = fileSubmenu(template('linux', () => {}, onCommand));
+    const save = items.find((item) => item.id === 'editor.save');
+
+    (save?.click as (() => void) | undefined)?.();
+
+    // The id and nothing else crosses: what `editor.save` does is the renderer's registry's,
+    // which is the whole of how a menu item and a command-bar row stay one command.
+    expect(onCommand).toHaveBeenCalledTimes(1);
+    expect(onCommand).toHaveBeenCalledWith('editor.save');
+  });
+
+  it('gives no item an accelerator, on any platform', () => {
+    // **The decision, asserted.** A menu accelerator is handled by the browser process before
+    // the page sees the key, so one here would override `desktopKeymapSet` unconditionally —
+    // vim mode included, where those bindings are deliberately absent and `Ctrl-N` and
+    // `Ctrl-O` belong to the vim engine. The menu teaches the verbs; the page keeps the keys.
+    for (const platform of ['win32', 'darwin', 'linux']) {
+      const withAccelerator = fileSubmenu(template(platform)).filter(
+        (item) => item.accelerator !== undefined,
+      );
+
+      expect(withAccelerator, platform).toEqual([]);
+    }
   });
 });

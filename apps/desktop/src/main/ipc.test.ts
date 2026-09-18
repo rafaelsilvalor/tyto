@@ -204,6 +204,17 @@ const recordingLog = () => {
   };
 };
 
+/** Records the locales the menu was asked to rebuild in, in order (TYTO-124). */
+const menuRebuilds = () => {
+  const locales: string[] = [];
+  return {
+    locales,
+    setLocale: (locale: string) => {
+      locales.push(locale);
+    },
+  };
+};
+
 const dependencies = () => ({
   confirm: () => Promise.resolve(true),
   log: recordingLog(),
@@ -213,6 +224,7 @@ const dependencies = () => ({
   exports: exportService(),
   folders: folderDialogs(),
   layout: layoutStore(),
+  menu: menuRebuilds(),
   info: () => ({ version: '0.1.0', platform: 'linux', locale: 'pt-BR', templates: ['promo'] }),
   preview: preview(),
   project: projectFolder(),
