@@ -36,6 +36,8 @@ interface Workflow {
       steps?: {
         uses?: string;
         run?: string;
+        if?: string;
+        'continue-on-error'?: boolean;
         with?: Record<string, unknown>;
         env?: Record<string, string>;
       }[];
@@ -450,6 +452,30 @@ describe('changeset status', () => {
     // manifest and consumes the folder; on a pull request it would either fail or commit.
     const ci = readRepoFile(`${WORKFLOWS_DIR}/ci.yml`);
     expect(ci).not.toMatch(/run:.*changeset version/u);
+  });
+
+  it('is skipped on the version PR, and on nothing else', () => {
+    // **The version PR is the one pull request that must have no changeset**, because it
+    // exists to consume them, and `changeset status` errors when packages changed against
+    // the base and the folder is empty. It passed by accident until TYTO-94: private
+    // packages were not versioned, so eight or nine files were left behind on every run and
+    // the folder was never empty. The first version PR after that config change went red
+    // (TYTO-134).
+    //
+    // The condition is asserted as a literal string on purpose. Anything broader —
+    // `always()`, `continue-on-error`, a `startsWith` on the ref — would keep this describe
+    // green while switching the step off for the pull requests it exists for, and the two
+    // assertions above cannot tell those apart. Widening it should cost a reading of this
+    // comment.
+    const steps = Object.values(readYaml<Workflow>(`${WORKFLOWS_DIR}/ci.yml`).jobs ?? {})
+      .flatMap((job) => job.steps ?? [])
+      .filter((step) => step.run?.includes('changeset status') === true);
+
+    expect(steps, 'ci.yml no longer runs `changeset status` exactly once').toHaveLength(1);
+    expect(steps[0]!.if).toBe("github.head_ref != 'changeset-release/main'");
+    // On the step, not on the file: `ci.yml` uses `continue-on-error` legitimately on the
+    // artifact upload, and a file-wide match reads that one as this one.
+    expect(steps[0]!['continue-on-error']).toBeUndefined();
   });
 });
 
