@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { missingChangesetWarning, publishablePackages } from './changeset-reminder.mjs';
+import { missingChangesetWarning, versionedPackages } from './changeset-reminder.mjs';
 
 /**
  * The three cases the hook has to get right are about when it stays quiet. A reminder that
@@ -9,14 +9,14 @@ import { missingChangesetWarning, publishablePackages } from './changeset-remind
  */
 const CORE = { directory: 'packages/core', name: '@tyto/core' };
 const EXPORT_SVG = { directory: 'packages/export-svg', name: '@tyto/export-svg' };
-const publishable = [CORE, EXPORT_SVG];
+const versioned = [CORE, EXPORT_SVG];
 
 describe('missingChangesetWarning', () => {
-  it('warns when a publishable package changes with no changeset on the branch', () => {
+  it('warns when a versioned package changes with no changeset on the branch', () => {
     const warning = missingChangesetWarning({
       staged: ['packages/core/src/result/index.ts'],
       changesets: [],
-      publishable,
+      versioned,
     });
 
     expect(warning).toContain('@tyto/core');
@@ -29,27 +29,29 @@ describe('missingChangesetWarning', () => {
     const warning = missingChangesetWarning({
       staged: ['packages/core/src/result/index.ts'],
       changesets: ['warm-poems-shout.md'],
-      publishable,
+      versioned,
     });
 
     expect(warning).toBeNull();
   });
 
-  it('says nothing when only private packages and docs change', () => {
+  it('says nothing when only unversioned packages and docs change', () => {
+    // `tools/*` carry no `version` field, which is the same clause Changesets skips them
+    // with. Private is no longer the line: both apps are private and both are versioned.
     const warning = missingChangesetWarning({
       staged: ['tools/repo-checks/src/github-config.test.ts', 'docs/git-workflow.md'],
       changesets: [],
-      publishable,
+      versioned,
     });
 
     expect(warning).toBeNull();
   });
 
-  it('names every publishable package the commit touched', () => {
+  it('names every versioned package the commit touched', () => {
     const warning = missingChangesetWarning({
       staged: ['packages/core/src/index.ts', 'packages/export-svg/src/index.ts'],
       changesets: [],
-      publishable,
+      versioned,
     });
 
     expect(warning).toContain('@tyto/core');
@@ -62,23 +64,25 @@ describe('missingChangesetWarning', () => {
     const warning = missingChangesetWarning({
       staged: ['packages/core-utils/src/index.ts'],
       changesets: [],
-      publishable,
+      versioned,
     });
 
     expect(warning).toBeNull();
   });
 });
 
-describe('publishablePackages', () => {
+describe('versionedPackages', () => {
   const repoRoot = new URL('../../../', import.meta.url).pathname.replace(/^\/([A-Za-z]:)/, '$1');
 
-  it('reads the private flag rather than trusting the directory name', () => {
-    const found = publishablePackages(repoRoot);
+  it('reads the version field rather than the private flag or the directory name', () => {
+    const found = versionedPackages(repoRoot);
     const names = found.map(({ name }) => name);
 
     expect(names).toContain('@tyto/core');
-    // apps/* and tools/* are private today; the flag is what decides, not the path.
-    expect(names).not.toContain('@tyto/cli');
+    // Private and versioned are two different questions since TYTO-94: `@tyto/cli` is
+    // private and is versioned, so a branch that only touches it wants the reminder.
+    expect(names).toContain('@tyto/cli');
+    // `tools/*` carry no `version` at all, which is what keeps them out — not the path.
     expect(names).not.toContain('@tyto/repo-checks');
   });
 });
