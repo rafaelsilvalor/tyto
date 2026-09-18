@@ -392,6 +392,91 @@ export const IPC_CHANNELS = {
     z.object({ account: accountName }),
     z.object({ deleted: z.boolean() }),
   ),
+
+  /**
+   * Starts an export and answers with its id — not with its result (E9.4, TYTO-43).
+   *
+   * A render is seconds, not milliseconds, and a channel that answered with the finished
+   * folder would be a dialog frozen until it was done. So this returns as soon as the run
+   * has a name, and `export:export-progress` is how the dialog follows it.
+   */
+  'export:start': channel(
+    z.object({
+      documentId,
+      /**
+       * The brief's text, carried by the request the way `brief:preview` carries it.
+       *
+       * Main holds paths, not text — `DocumentService` is a map of tab to file — and the
+       * editor's buffer is the only place the *unsaved* brief exists. Exporting what is on
+       * disk instead would quietly export the last save.
+       */
+      brief: z.string(),
+      /** Where the files go. Chosen through the native picker in main, not typed here. */
+      directory: z.string().min(1),
+      /** At least one, because an export of nothing is a dialog that should not have opened. */
+      outputs: z
+        .array(
+          z.object({
+            kind: z.enum(['png', 'jpeg', 'webp', 'svg']),
+            /** 1–100, and only for `jpeg` and `webp`; the raster port refuses it on `png`. */
+            quality: z.number().int().min(1).max(100).optional(),
+            scale: z.number().positive().max(8).optional(),
+          }),
+        )
+        .min(1),
+      /** Absent renders every format the template declares, which is `tyto render`'s default. */
+      formats: z.array(z.string().min(1)).optional(),
+    }),
+    z.object({ exportId: z.string().min(1) }),
+  ),
+
+  /**
+   * How far along, asked rather than pushed.
+   *
+   * **The one place this app's transport shows through, and it is deliberate.** Every other
+   * channel here is a question because that is the only shape the bridge has; a one-way
+   * main→renderer message is a new shape, and it is the shape TYTO-123 needs for its quit
+   * confirmation. Whichever card invents it decides it for the other, and this one has no
+   * claim to that decision — so the dialog asks while it works. The answer is four numbers
+   * and a verdict, which is cheap enough to ask for a few times a second.
+   */
+  'export:progress': channel(
+    z.object({ exportId: z.string().min(1) }),
+    z.object({
+      /** Absent for an id nothing was ever started under — a typo, or a stale dialog. */
+      progress: z
+        .object({
+          status: z.enum(['running', 'finished', 'cancelled']),
+          total: z.number().int().nonnegative(),
+          done: z.number().int().nonnegative(),
+          failed: z.number().int().nonnegative(),
+          /** The folder the files went to, so "open folder" has somewhere to open. */
+          directory: z.string(),
+          diagnostics: z.array(diagnostic),
+          /**
+           * Set when the run died of something that is not a diagnostic — a disk that would
+           * not take the file. `docs/diagnostic-codes.md` is a closed catalogue and this is
+           * not in it, which is exactly why it travels as its own field.
+           */
+          failure: z.string().optional(),
+        })
+        .optional(),
+    }),
+  ),
+
+  /** Fires the run's `AbortSignal`. Answers nothing: the verdict arrives through progress. */
+  'export:cancel': channel(z.object({ exportId: z.string().min(1) }), z.object({})),
+
+  /** Shows a folder in the OS file manager, which is what "open folder" means. */
+  'export:reveal': channel(z.object({ directory: z.string().min(1) }), z.object({})),
+
+  /**
+   * The native folder picker, and the last folder it was pointed at.
+   *
+   * In main because `dialog` is an Electron main-process API — the same arrangement
+   * `file:open` already has, and for the same reason `index.ts` gives as its rule.
+   */
+  'export:choose-directory': channel(z.object({}), z.object({ directory: z.string().optional() })),
 } as const;
 
 export type IpcChannels = typeof IPC_CHANNELS;

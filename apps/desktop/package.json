@@ -21,6 +21,7 @@
     "@tyto/core": "workspace:*",
     "@tyto/editor": "workspace:*",
     "@tyto/export-html": "workspace:*",
+    "@tyto/export-svg": "workspace:*",
     "@tyto/fonts": "workspace:*",
     "@tyto/io": "workspace:*",
     "@tyto/pipeline": "workspace:*",

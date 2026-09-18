@@ -52,6 +52,8 @@ export const panelOfToggleCommand = (id: string): string | undefined =>
 
 export const EDITOR_OPEN = 'editor.open';
 export const EDITOR_SAVE_AS = 'editor.saveAs';
+/** E9.4. Opens the export dialog; the exporting itself is main's. */
+export const FILE_EXPORT = 'file.export';
 /**
  * A recent file, as a command per entry (E9.8).
  *
@@ -119,6 +121,7 @@ export const COMMAND_LABELS: Readonly<Record<string, CatalogueKey>> = {
   [EDITOR_OPEN]: 'command.file.open',
   [EDITOR_SAVE]: 'command.file.save',
   [EDITOR_SAVE_AS]: 'command.file.saveAs',
+  [FILE_EXPORT]: 'command.file.export',
   [LAYOUT_RESTORE]: 'command.layout.restore',
   [DOCUMENT_CLOSE]: 'command.document.close',
   [DOCUMENT_NEXT]: 'command.document.next',
@@ -157,6 +160,8 @@ export interface DesktopActions {
   /** E9.11. Closing asks first when the tab has unsaved text, so it answers nothing here. */
   closeDocument(): void;
   stepDocument(direction: 1 | -1): void;
+  /** E9.4. Shows the export dialog. Everything it then does is a round trip to main. */
+  openExport(): void;
 }
 
 /**
@@ -218,6 +223,10 @@ export function createDesktopRegistry(actions: DesktopActions): CommandRegistry 
   });
   add(EDITOR_SAVE_AS, () => {
     actions.saveDocument(true);
+  });
+
+  add(FILE_EXPORT, () => {
+    actions.openExport();
   });
 
   // Reachable with every panel closed, which is the acceptance criterion and the reason it
