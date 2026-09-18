@@ -21,7 +21,7 @@ Template in `.github/pull_request_template.md`: card, what changed, how to test,
 
 ## Versioning and releases
 
-- Changesets: every PR touching a publishable package adds `.changeset/*.md` (the hook warns if missing).
+- Changesets: every PR touching a **versioned** package adds `.changeset/*.md` (the hook warns if missing). Since TYTO-94 that includes `apps/cli` and `apps/desktop`, which are versioned without being published; a change that ships nothing — a test, a comment — takes `pnpm changeset add --empty`.
 - Merge to `main` ⇒ `release` workflow opens/updates the "Version Packages" PR. Merging it ⇒ tags `@tyto/<pkg>@x.y.z` and per-package `CHANGELOG.md`.
 - Desktop: tag `desktop-vX.Y.Z` triggers macOS/Windows/Linux builds with electron-builder and publishes a GitHub Release with installers. Auto-update via `electron-updater` pointing at releases (epic E9).
 - Pre-1.0: minor breaks, patch does not. From 1.0: regular semver.
@@ -106,7 +106,9 @@ Mixed changesets that contain both ignored and not ignored packages are not allo
 
 One file is fine again, and the repo-check that enforced the split went with the rule it enforced.
 
-**What has not changed is when a release-config mistake becomes visible.** `pnpm check` does not run Changesets and neither does `ci.yml`; `release.yml` only fires on a push to `main`, so anything wrong with the release plan passes every check a pull request has and fails on the branch it cannot be fixed on without opening a second PR. That gap is two days wide — it is how the mixed file above stayed green until it was merged — and it is what the two cheap guards are for. **`ci.yml` runs `changeset status` on every pull request**: it reads the same folder `release.yml` would version, writes nothing, and exits 0 on a branch that adds no changeset (measured, not assumed). And `tools/repo-checks/src/changesets.test.ts` holds `.changeset/config.json` to the decision above, so `privatePackages` cannot be dropped by a merge that looks unrelated.
+**What has not changed is when a release-config mistake becomes visible.** `pnpm check` runs no Changesets command at all, and `release.yml` only fires on a push to `main` — so anything wrong with the release plan would pass every check a person runs and fail on the branch it cannot be fixed on without opening a second PR. That gap is two days wide, it is how the mixed file above stayed green until it was merged, and it is what the two cheap guards are for. **`ci.yml` runs `changeset status` on every pull request**: it reads the same folder `release.yml` would version and writes nothing. And `tools/repo-checks/src/changesets.test.ts` holds `.changeset/config.json` to the decision above, so `privatePackages` cannot be dropped by a merge that looks unrelated.
+
+**That step is the one thing a green `pnpm check` does not tell you about**, and turning private versioning on gave it two new ways to fire. `changeset status` exits 1 when packages changed against the base and no changeset explains them — so a branch touching `apps/desktop` alone now needs one, where before the package was ignored and nothing was asked. And the **version PR** itself, which consumes every changeset, is the one pull request where that folder is legitimately empty; `ci.yml` skips the step on `changeset-release/main` for exactly that (TYTO-134), and only there. Both were found the same way: green locally, red in CI, on a step nothing local runs.
 
 ## Workflows (`.github/workflows/`)
 
