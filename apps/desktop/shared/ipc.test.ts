@@ -18,6 +18,11 @@ describe('the IPC contract', () => {
       'credentials:get',
       'credentials:set',
       'dialog:confirm',
+      'export:cancel',
+      'export:choose-directory',
+      'export:progress',
+      'export:reveal',
+      'export:start',
       'file:close',
       'file:open',
       'file:reopen',
@@ -132,6 +137,10 @@ describe('what the contract does not promise', () => {
       'files:recent',
       // E9.10. Asking where the panels were takes no arguments; telling it takes a layout.
       'layout:get',
+      // E9.4. "Where should this go" takes nothing: the answer is a folder the person picks
+      // in a native dialog, and the question has no subject. Every other export channel
+      // names either a document or a run, so this is the only one of the five here.
+      'export:choose-directory',
     ];
 
     for (const name of IPC_CHANNEL_NAMES) {

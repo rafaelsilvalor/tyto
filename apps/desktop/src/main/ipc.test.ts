@@ -93,6 +93,54 @@ const documents = () => {
       }),
     // One folder per tab, which is what `brief:preview` looks up from the id it is given.
     folderOf: (documentId: string) => (documentId === 'document-1' ? '/briefs' : undefined),
+    nameOf: (documentId: string) => (documentId === 'document-1' ? 'promo' : undefined),
+  };
+};
+
+/**
+ * An export service that records what it was asked for and finishes immediately.
+ *
+ * The real one runs a job; what these tests are about is the handler in front of it — that
+ * the brief comes from the request, the label from the document, and an unknown id answers
+ * with nothing rather than with an empty progress.
+ */
+const exportService = () => {
+  const started: unknown[] = [];
+  const cancelled: string[] = [];
+  return {
+    started,
+    cancelled,
+    start: (request: unknown) => {
+      started.push(request);
+      return Promise.resolve({ exportId: 'export-1' });
+    },
+    progress: (exportId: string) =>
+      exportId === 'export-1'
+        ? {
+            status: 'finished' as const,
+            directory: '/out',
+            total: 2,
+            done: 2,
+            failed: 0,
+            diagnostics: [],
+          }
+        : undefined,
+    cancel: (exportId: string) => {
+      cancelled.push(exportId);
+    },
+  };
+};
+
+/** The native picker and the file manager, which main owns because Electron owns them. */
+const folderDialogs = () => {
+  const revealed: string[] = [];
+  return {
+    revealed,
+    choose: () => Promise.resolve('/chosen'),
+    reveal: (directory: string) => {
+      revealed.push(directory);
+      return Promise.resolve();
+    },
   };
 };
 
@@ -112,6 +160,8 @@ const dependencies = () => ({
   confirm: () => Promise.resolve(true),
   credentials: credentials(),
   documents: documents(),
+  exports: exportService(),
+  folders: folderDialogs(),
   layout: layoutStore(),
   info: () => ({ version: '0.1.0', platform: 'linux', locale: 'pt-BR', templates: ['promo'] }),
   preview: preview(),
@@ -237,5 +287,72 @@ describe('guard', () => {
     // Trimmed by the schema and stripped of the key nobody declared: the handler sees the
     // contract's shape, so it never has to defend itself.
     expect(handler).toHaveBeenCalledWith({ account: 'jira' });
+  });
+});
+
+describe('the export handlers (E9.4)', () => {
+  it('takes the brief from the request and the name from the document', async () => {
+    // The split `brief:preview` already makes, and the reason is unsaved text: main holds
+    // paths, so the only place a brief that has never been saved exists is the editor's
+    // buffer. A handler that read the file would quietly export the last save.
+    const deps = dependencies();
+    const handlers = createHandlers(deps);
+
+    const answer = await handlers['export:start']({
+      documentId: 'document-1',
+      brief: 'title: edited but not saved',
+      directory: '/out',
+      outputs: [{ kind: 'svg' }],
+    });
+
+    expect(answer).toEqual({ exportId: 'export-1' });
+    expect(deps.exports.started).toEqual([
+      {
+        brief: 'title: edited but not saved',
+        directory: '/out',
+        label: 'promo',
+        assetBase: '/briefs',
+        outputs: [{ kind: 'svg' }],
+      },
+    ]);
+  });
+
+  it('calls an unsaved tab untitled rather than filing a run under nothing', async () => {
+    const deps = dependencies();
+    const handlers = createHandlers(deps);
+
+    await handlers['export:start']({
+      documentId: 'document-2',
+      brief: 'x',
+      directory: '/out',
+      outputs: [{ kind: 'svg' }],
+    });
+
+    const [request] = deps.exports.started as { label: string; assetBase?: string }[];
+
+    expect(request?.label).toBe('untitled');
+    // And no `assetBase` at all, rather than one pointing at the output folder: a brief with
+    // no folder beside it resolves no relative asset, which is what `preview.ts` already
+    // decided for the same state.
+    expect(request).not.toHaveProperty('assetBase');
+  });
+
+  it('answers nothing for a run it never started', async () => {
+    const handlers = createHandlers(dependencies());
+
+    // `{}` and not a zeroed progress: a dialog polling a stale id should find out, rather
+    // than watch a bar that will never move.
+    await expect(handlers['export:progress']({ exportId: 'export-gone' })).resolves.toEqual({});
+  });
+
+  it('cancels by id, and reveals the folder it is given', async () => {
+    const deps = dependencies();
+    const handlers = createHandlers(deps);
+
+    await handlers['export:cancel']({ exportId: 'export-1' });
+    await handlers['export:reveal']({ directory: '/out/promo' });
+
+    expect(deps.exports.cancelled).toEqual(['export-1']);
+    expect(deps.folders.revealed).toEqual(['/out/promo']);
   });
 });

@@ -46,6 +46,7 @@ const actions = () =>
     restoreLayout: vi.fn<() => void>(),
     closeDocument: vi.fn<() => void>(),
     stepDocument: vi.fn<(direction: 1 | -1) => void>(),
+    openExport: vi.fn<() => void>(),
   }) satisfies DesktopActions;
 
 /**

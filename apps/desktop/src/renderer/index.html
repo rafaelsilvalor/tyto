@@ -100,6 +100,12 @@
       element rather than a list of every command in the app.
     -->
     <tyto-command-bar></tyto-command-bar>
+
+    <!--
+      The export dialog (E9.4), outside `.shell` for the command bar's reason: it covers the
+      window rather than living in a dock, and it renders nothing while closed.
+    -->
+    <tyto-export-dialog></tyto-export-dialog>
     <script type="module" src="./main.ts"></script>
   </body>
 </html>

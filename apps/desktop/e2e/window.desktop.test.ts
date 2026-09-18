@@ -219,6 +219,11 @@ describe('the bridge', () => {
       'credentials:get',
       'credentials:set',
       'dialog:confirm',
+      'export:cancel',
+      'export:choose-directory',
+      'export:progress',
+      'export:reveal',
+      'export:start',
       'file:close',
       'file:open',
       'file:reopen',
@@ -358,6 +363,34 @@ describe('the language picker', () => {
     'command.editor.replaceNext',
     'command.editor.replaceAll',
     'command.editor.gotoLine',
+    // E9.4: the export dialog renders its own strings and renders nothing at all while it
+    // is closed — the command bar's case exactly, one card later. None of these is in the
+    // document on load, and most of them are only reachable *inside* the dialog.
+    //
+    // **The seam is covered twice, the way the search panel's is.**
+    // `src/renderer/export-dialog.test.ts` drives the element and reads its buttons back,
+    // and `e2e/export.desktop.test.ts` opens the real dialog in the real window and
+    // measures that it is on screen and big enough to use. A key added here without one of
+    // those is how a string goes quietly English.
+    'export.heading',
+    'export.destination',
+    'export.destination.choose',
+    'export.destination.none',
+    'export.fileTypes',
+    'export.formats',
+    'export.formats.all',
+    'export.quality',
+    'export.scale',
+    'export.start',
+    'export.cancel',
+    'export.close',
+    'export.openFolder',
+    'export.progress',
+    'export.done',
+    'export.cancelled',
+    'export.failed',
+    'export.problems',
+    'command.file.export',
   ];
 
   it('paints every catalogue string on load, with none left blank', async () => {

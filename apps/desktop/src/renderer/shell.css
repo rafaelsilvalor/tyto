@@ -722,3 +722,141 @@ tyto-command-bar[open] {
 .tabs__close:focus-visible {
   background: color-mix(in srgb, var(--ink) 8%, transparent);
 }
+
+/* The export dialog (E9.4, TYTO-43).
+
+   Positioned the way the command bar is, and for the same reason: it covers the window
+   rather than living in a dock, so the host element is `display: contents` until it has
+   something to show. Centred rather than near the top, because unlike the palette this
+   panel does not grow as somebody types — its height is the same before and after a run
+   starts, apart from the status block. */
+tyto-export-dialog {
+  display: contents;
+}
+
+tyto-export-dialog[open] {
+  position: fixed;
+  inset: 0;
+  z-index: 10;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgb(0 0 0 / 25%);
+}
+
+.export__panel {
+  display: flex;
+  width: min(480px, calc(100vw - 32px));
+  flex-direction: column;
+  padding: 16px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  margin: 16px;
+  background: var(--ground);
+  box-shadow: 0 16px 48px rgb(0 0 0 / 18%);
+  gap: 12px;
+}
+
+.export__title {
+  margin: 0;
+  font-size: 15px;
+  font-weight: 600;
+}
+
+.export__row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.export__label {
+  color: var(--muted);
+  font-size: 12px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+/* `min-width: 0` and the ellipsis together: a chosen path is arbitrarily long and a flex
+   item will not shrink below its content without the first of the two. */
+.export__value {
+  overflow: hidden;
+  min-width: 0;
+  flex: 1;
+  font-size: 13px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.export__types {
+  display: flex;
+  border: 0;
+  padding: 0;
+  margin: 0;
+  gap: 12px;
+}
+
+.export__type {
+  display: flex;
+  align-items: center;
+  font-size: 13px;
+  gap: 4px;
+}
+
+.export__note {
+  margin: 0;
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.export__status {
+  display: flex;
+  flex-direction: column;
+  padding-top: 8px;
+  border-top: 1px solid var(--line);
+  gap: 6px;
+}
+
+.export__heading {
+  margin: 0;
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.export__count {
+  margin: 0;
+  color: var(--muted);
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+}
+
+.export__bar {
+  overflow: hidden;
+  height: 4px;
+  border-radius: 2px;
+  background: var(--line);
+}
+
+.export__bar-fill {
+  height: 100%;
+  background: var(--ink);
+  /* The width is the only thing that moves, so the transition is on the width alone: a
+     bar that eased its colour too would be animating something nothing changes. */
+  transition: width 120ms linear;
+}
+
+.export__failure,
+.export__problems {
+  margin: 0;
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.export__problems {
+  padding-left: 16px;
+}
+
+.export__actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+}

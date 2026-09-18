@@ -1,13 +1,15 @@
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
 
-import { Menu, app, dialog, ipcMain, safeStorage } from 'electron';
+import { Menu, app, dialog, ipcMain, safeStorage, shell } from 'electron';
 import { nodeFileSystem } from '@tyto/io';
+import type { Rasterizer } from '@tyto/raster';
 
 import { localeFor } from '../../shared/i18n/index.js';
 import { fileCredentialStore } from './credential-store.js';
 import { createCredentials } from './credentials.js';
 import { createDocumentService } from './documents.js';
+import { createExportService } from './export.js';
 import { fileLayoutStore } from './layout-store.js';
 import { menuTemplate } from './menu.js';
 import { fileRecentFiles } from './recent-files.js';
@@ -96,6 +98,18 @@ async function start(): Promise<void> {
     store: fileCredentialStore(join(app.getPath('userData'), 'credentials')),
   });
 
+  // The export, composed here for the reason everything else is (ADR 0010): it needs a
+  // `Rasterizer`, and the only place allowed to know which adapter exists is this file. It
+  // is read back out of the plugin registry rather than constructed a second time — what
+  // exports is what TYTO-133 registered, which is the claim the extension point makes.
+  const exports_ = await createExportService({
+    fileSystem,
+    version: app.getVersion(),
+    ...(host.registry.rasterizers<Rasterizer>()[0]?.value === undefined
+      ? {}
+      : { rasterizer: host.registry.rasterizers<Rasterizer>()[0]!.value }),
+  });
+
   registerIpcHandlers(ipcMain, {
     // The only question this app asks a person that is not a file picker: closing a tab
     // with unsaved text. `cancelId` and `defaultId` both point at the safe button, so
@@ -113,6 +127,22 @@ async function start(): Promise<void> {
     },
     credentials,
     documents,
+    exports: exports_,
+    // `dialog` and `shell` are Electron main-process APIs, so they are wrapped here and the
+    // handlers take functions — the same arrangement the brief dialogs above already have.
+    folders: {
+      choose: async () => {
+        const answer = await dialog.showOpenDialog({
+          properties: ['openDirectory', 'createDirectory'],
+        });
+        return answer.canceled ? undefined : answer.filePaths[0];
+      },
+      // `openPath` and not `showItemInFolder`: the export produced a folder, and what a
+      // person asked for is that folder open, not its parent with the folder selected.
+      reveal: async (directory) => {
+        await shell.openPath(directory);
+      },
+    },
     // Beside the credential store and the recent list, for the third time and on the same
     // argument: a file a person can read, edit and delete (ADR 0009).
     layout: fileLayoutStore(join(app.getPath('userData'), 'layout.json')),

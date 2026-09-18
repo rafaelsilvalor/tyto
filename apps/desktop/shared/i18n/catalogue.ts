@@ -168,6 +168,27 @@ export interface Catalogue {
   readonly 'shell.about.version': string;
   readonly 'shell.about.platform': string;
   readonly 'shell.about.templates': string;
+
+  /** The export dialog (E9.4). */
+  readonly 'export.heading': string;
+  readonly 'export.destination': string;
+  readonly 'export.destination.choose': string;
+  readonly 'export.destination.none': string;
+  readonly 'export.fileTypes': string;
+  readonly 'export.formats': string;
+  readonly 'export.formats.all': string;
+  readonly 'export.quality': string;
+  readonly 'export.scale': string;
+  readonly 'export.start': string;
+  readonly 'export.cancel': string;
+  readonly 'export.close': string;
+  readonly 'export.openFolder': string;
+  readonly 'export.progress': string;
+  readonly 'export.done': string;
+  readonly 'export.cancelled': string;
+  readonly 'export.failed': string;
+  readonly 'export.problems': string;
+  readonly 'command.file.export': string;
 }
 
 export type CatalogueKey = keyof Catalogue;
@@ -256,4 +277,23 @@ export const CATALOGUE_KEYS = [
   'shell.about.version',
   'shell.about.platform',
   'shell.about.templates',
+  'export.heading',
+  'export.destination',
+  'export.destination.choose',
+  'export.destination.none',
+  'export.fileTypes',
+  'export.formats',
+  'export.formats.all',
+  'export.quality',
+  'export.scale',
+  'export.start',
+  'export.cancel',
+  'export.close',
+  'export.openFolder',
+  'export.progress',
+  'export.done',
+  'export.cancelled',
+  'export.failed',
+  'export.problems',
+  'command.file.export',
 ] as const satisfies readonly CatalogueKey[];
