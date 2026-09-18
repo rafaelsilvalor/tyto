@@ -11,7 +11,7 @@ import { createCredentials } from './credentials.js';
 import { createDocumentService } from './documents.js';
 import { createExportService } from './export.js';
 import { fileLayoutStore } from './layout-store.js';
-import { fileLog, installCrashHandlers } from './log.js';
+import { crashSummary, fileLog, installCrashHandlers } from './log.js';
 import { menuTemplate } from './menu.js';
 import { fileRecentFiles } from './recent-files.js';
 import { registerIpcHandlers, sendIpcEvent } from './ipc.js';
@@ -47,6 +47,30 @@ const here = dirname(fileURLToPath(import.meta.url));
  */
 const devServerUrl = process.env['ELECTRON_RENDERER_URL'];
 
+/**
+ * Puts a crash on screen (TYTO-140).
+ *
+ * Module-level, and replaced inside {@link start} the moment the log exists, because the two
+ * callers below cannot both be inside it. `installCrashHandlers` is inside; the `.catch` on
+ * `whenReady().then(start)` is not — and that catch is the one that matters, because a throw
+ * during startup is a *rejection*, which Electron's own box never covered: it runs with
+ * `--unhandled-rejections` in `warn` mode, so that path was silent before TYTO-132 and after
+ * it. A packaged app failing there opens no window at all, which is a double-click that did
+ * nothing.
+ *
+ * This first version is the one used while there is no log yet — `fileLog` itself can fail on
+ * a `userData` the machine will not let this app write to, and a crash reporter that needed
+ * the log to exist would be silent in exactly that case. It says there is no file rather than
+ * naming one that was never written.
+ */
+let reportCrash = (reason: unknown): void => {
+  const locale = localeFor(app.getLocale());
+  dialog.showErrorBox(
+    translate(locale, 'crash.title'),
+    `${crashSummary(reason)}\n\n${translate(locale, 'crash.noLog')}`,
+  );
+};
+
 async function start(): Promise<void> {
   // **First, before anything that can fail.** A registry that will not read and a built-in
   // that will not activate both happen here, before a window exists to say so in — so a log
@@ -58,7 +82,72 @@ async function start(): Promise<void> {
     version: app.getVersion(),
     platform: process.platform,
   });
-  installCrashHandlers(process, log);
+  // The window, held rather than discarded, because main now has something to say to it
+  // (ADR 0029). A `let` and not a `const`: the handler table is registered before the window
+  // is built — it has to be, or the renderer's first question could arrive with nothing to
+  // answer it — and both halves of the exit need the same guard.
+  // Initialised explicitly rather than left bare, because a `let` assigned exactly once reads
+  // to `prefer-const` as a `const` written the long way round. It is genuinely reassigned —
+  // below, after the window exists.
+  let mainWindow: BrowserWindow | undefined = undefined;
+
+  // The language everything main draws is in: the menu, and the crash box below. It starts as
+  // the system's, because that is the only one main has before the window has said anything,
+  // and `app:locale` replaces it when the footer picker moves (TYTO-124).
+  let uiLocale: Locale = localeFor(app.getLocale());
+
+  /**
+   * Builds the application menu in one language, and is called again when that changes.
+   *
+   * A function rather than a statement, because the File submenu is this app's own words
+   * (TYTO-124) and the footer picker can change which language those words are in. Declared
+   * before the handler table below so `app:locale` can reach it without a forward reference,
+   * and closing over `mainWindow` the way the exit guard does — the window does not exist yet
+   * and the menu does not need it to.
+   */
+  const installMenu = (locale: Locale): void => {
+    uiLocale = locale;
+    Menu.setApplicationMenu(
+      Menu.buildFromTemplate(
+        menuTemplate(process.platform, {
+          t: (key) => translate(locale, key),
+          onRevealLogs: () => {
+            void shell.openPath(log.directory);
+          },
+          // The id and nothing else. Main does not know what `editor.save` does, and the whole
+          // point of the table in `shared/commands.ts` is that it never needs to.
+          onCommand: (id) => {
+            const contents = mainWindow?.webContents;
+            if (contents === undefined || contents.isDestroyed()) return;
+            sendIpcEvent(contents, 'command:run', { id });
+          },
+        }),
+      ),
+    );
+  };
+
+  // **Here, and not after the services, which is the whole of TYTO-140's third part.** The
+  // menu used to be built last, after settings, sources, preview, catalogue and export — so a
+  // startup that threw left the app with no window *and* no Help ▸ open the log folder, which
+  // is the one door to the line that had just been written. The menu needs none of what comes
+  // below it; it needed only to be asked earlier.
+  //
+  // It is also still before the window, because the menu is the browser process's and a key
+  // pressed while it is still the default one would be handled by the default one.
+  installMenu(uiLocale);
+
+  // What a crash looks like, now that the log line alone is not enough (TYTO-140). Assigned
+  // over the module-level fallback as soon as there is a folder worth naming.
+  reportCrash = (reason) => {
+    dialog.showErrorBox(
+      translate(uiLocale, 'crash.title'),
+      `${crashSummary(reason)}\n\n${translate(uiLocale, 'crash.detail')}\n${log.directory}`,
+    );
+  };
+
+  installCrashHandlers(process, log, (reason) => {
+    reportCrash(reason);
+  });
 
   // The registry is read before the window opens, not after: the renderer's first question
   // is which templates exist, and answering it with "not yet" would put a loading state in
@@ -142,15 +231,6 @@ async function start(): Promise<void> {
       : { rasterizer: host.registry.rasterizers<Rasterizer>()[0]!.value }),
   });
 
-  // The window, held rather than discarded, because main now has something to say to it
-  // (ADR 0029). A `let` and not a `const`: the handler table is registered before the window
-  // is built — it has to be, or the renderer's first question could arrive with nothing to
-  // answer it — and both halves of the exit need the same guard.
-  // Initialised explicitly rather than left bare, because a `let` assigned exactly once reads
-  // to `prefer-const` as a `const` written the long way round. It is genuinely reassigned —
-  // below, after the window exists.
-  let mainWindow: BrowserWindow | undefined = undefined;
-
   // The one question main asks. `send` is deliberately the whole of what this file lends it:
   // `quit.ts` holds the latch and the ids and knows nothing about Electron, which is what
   // lets the decision be tested without launching one (ADR 0010).
@@ -162,35 +242,6 @@ async function start(): Promise<void> {
       return true;
     },
   });
-
-  /**
-   * Builds the application menu in one language, and is called again when that changes.
-   *
-   * A function rather than a statement, because the File submenu is this app's own words
-   * (TYTO-124) and the footer picker can change which language those words are in. Declared
-   * before the handler table below so `app:locale` can reach it without a forward reference,
-   * and closing over `mainWindow` the way the exit guard does — the window does not exist yet
-   * and the menu does not need it to.
-   */
-  const installMenu = (locale: Locale): void => {
-    Menu.setApplicationMenu(
-      Menu.buildFromTemplate(
-        menuTemplate(process.platform, {
-          t: (key) => translate(locale, key),
-          onRevealLogs: () => {
-            void shell.openPath(log.directory);
-          },
-          // The id and nothing else. Main does not know what `editor.save` does, and the whole
-          // point of the table in `shared/commands.ts` is that it never needs to.
-          onCommand: (id) => {
-            const contents = mainWindow?.webContents;
-            if (contents === undefined || contents.isDestroyed()) return;
-            sendIpcEvent(contents, 'command:run', { id });
-          },
-        }),
-      ),
-    );
-  };
 
   registerIpcHandlers(ipcMain, {
     // The only question this app asks a person that is not a file picker: closing a tab
@@ -286,14 +337,6 @@ async function start(): Promise<void> {
     }),
   });
 
-  // Before the window, because the menu is the browser process's and a key pressed while it
-  // is still the default one would be handled by the default one. `menu.ts` says why this
-  // app installs a menu at all.
-  //
-  // The startup locale is the system's, which is the only one main has before the window has
-  // said anything. `app:locale` is what replaces it afterwards.
-  installMenu(localeFor(app.getLocale()));
-
   mainWindow = createMainWindow({
     preload: join(here, '..', 'preload', 'index.cjs'),
     renderer: devServerUrl === undefined ? { file: bundledRenderer(here) } : { url: devServerUrl },
@@ -337,4 +380,14 @@ async function start(): Promise<void> {
   });
 }
 
-void app.whenReady().then(start);
+// **The `.catch` is the card, not a tidy-up** (TYTO-140). `start` is `async`, so anything it
+// throws — `builtInTemplatesDirectory()` is a bare `createRequire(...).resolve(...)` with no
+// `Result`, and it is the one that has actually failed in a packaged app — comes back as a
+// rejected promise. Without this the process stays alive with no window, having written a log
+// line nobody can reach, and the person who double-clicked watches nothing happen.
+void app
+  .whenReady()
+  .then(start)
+  .catch((reason: unknown) => {
+    reportCrash(reason);
+  });

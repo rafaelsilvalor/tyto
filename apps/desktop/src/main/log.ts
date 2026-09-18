@@ -155,26 +155,82 @@ export function fileLog({
 }
 
 /**
- * What the process writes down when nobody caught something.
+ * A crash reduced to the one line a box can show, or nothing.
  *
- * **This changes behaviour and the change is stated rather than hidden.** Electron shows its
- * own error box for an `uncaughtException` only while nothing else is listening; a listener
- * takes that over. So after this card a main-process crash leaves a line in the log and no
- * box on screen. Re-throwing from inside the handler does not give the box back — Node treats
- * an exception raised inside an `uncaughtException` listener as fatal and ends the process
- * printing to a stream a packaged app has nobody reading. Putting the box back means calling
- * `dialog.showErrorBox`, which is an Electron API and therefore the composition root's, not
- * this file's; it is recorded in the PR as an open end rather than guessed at here.
+ * Not {@link describe}, which keeps the whole stack because that is what the log is for. A
+ * dialog is read by somebody who is not going to read a stack, and a box holding nine lines
+ * of frames is a box whose first line — the only part that says anything — is off the top.
+ * So: the message, its first line, and a ceiling.
+ *
+ * Exported because the composition root builds the box and this is the part of it that is a
+ * function of a value rather than of Electron.
+ */
+export function crashSummary(reason: unknown): string {
+  // `undefined` and `null` are taken out before `String` sees them, and that is not tidiness:
+  // a promise can reject with either, and a box reading "undefined" tells a person strictly
+  // less than a box reading "unknown error" — it looks like the app is broken twice.
+  if (reason === undefined || reason === null) return 'unknown error';
+
+  const raw =
+    reason instanceof Error
+      ? `${reason.name}: ${reason.message}`
+      : typeof reason === 'string'
+        ? reason
+        : String(reason);
+  const line = raw.split('\n')[0]?.trim() ?? '';
+  if (line === '') return 'unknown error';
+  return line.length > 300 ? `${line.slice(0, 299)}…` : line;
+}
+
+/**
+ * What the process writes down when nobody caught something, and what it puts on screen.
+ *
+ * **Installing a listener takes Electron's own error box away, which is why `onCrash` exists.**
+ * Electron shows that box for an `uncaughtException` only while nothing else is listening —
+ * measured, by dumping its default handler at runtime, whose first expression is
+ * `process.listenerCount("uncaughtException")>1||…`. So TYTO-132 traded a box for a log line,
+ * and TYTO-140 is the card that gives both.
+ *
+ * Re-throwing would not give the box back: Node treats an exception raised **inside** an
+ * `uncaughtException` listener as fatal, and the process ends printing to a stream a packaged
+ * app has nobody reading. The box therefore has to be drawn by somebody who can call
+ * `dialog.showErrorBox`, which is an Electron API and so the composition root's — this file
+ * imports no Electron on purpose, and that is what lets the whole decision be unit-tested.
+ *
+ * **`onCrash` is called inside a `try`, and that is not defensive.** It runs in a handler
+ * whose own exception is fatal, so a box that failed to draw would turn a reported crash into
+ * a silent one — the exact failure this card exists to remove. Whatever it throws is logged
+ * and swallowed; the log line is already written by then, which is the half that matters.
+ *
+ * **It covers rejections too, and that is the half the card's title does not say.** A `throw`
+ * inside `start()` is a rejected promise, and Electron runs with `--unhandled-rejections` in
+ * `warn` mode, so that path never reached Electron's box — before this card or after it. It
+ * is also the path a packaged app fails on: see `e2e/packaged.package.test.ts`.
  *
  * `process` is taken as an argument for the reason everything else in main is injected — so
  * this can be driven by a test without a running Electron (ADR 0010).
  */
-export function installCrashHandlers(target: Pick<NodeJS.Process, 'on'>, log: Logger): void {
+export function installCrashHandlers(
+  target: Pick<NodeJS.Process, 'on'>,
+  log: Logger,
+  onCrash?: (reason: unknown) => void,
+): void {
+  const report = (reason: unknown): void => {
+    if (onCrash === undefined) return;
+    try {
+      onCrash(reason);
+    } catch (failure) {
+      log.error('the crash report itself failed', failure);
+    }
+  };
+
   target.on('uncaughtException', (error: Error) => {
     log.error('uncaught exception in main', error);
+    report(error);
   });
 
   target.on('unhandledRejection', (reason: unknown) => {
     log.error('unhandled rejection in main', reason);
+    report(reason);
   });
 }
