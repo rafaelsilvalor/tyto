@@ -162,8 +162,27 @@ const exitAnswers = () => {
   return { given, answer: (askId: number, allow: boolean) => given.push({ askId, allow }) };
 };
 
+/** A log that records instead of writing, so a test can read what would have reached a file. */
+const recordingLog = () => {
+  const entries: { level: string; message: string; detail?: unknown }[] = [];
+  const at =
+    (level: string) =>
+    (message: string, detail?: unknown): void => {
+      entries.push(detail === undefined ? { level, message } : { level, message, detail });
+    };
+  return {
+    entries,
+    directory: '/tmp/tyto-logs',
+    debug: at('debug'),
+    info: at('info'),
+    warn: at('warn'),
+    error: at('error'),
+  };
+};
+
 const dependencies = () => ({
   confirm: () => Promise.resolve(true),
+  log: recordingLog(),
   credentials: credentials(),
   documents: documents(),
   exit: exitAnswers(),
@@ -396,5 +415,63 @@ describe('app:exit-answer', () => {
     // The point: a missing `allow` must not reach a latch that would read it as `undefined`
     // and quit — the contract refuses it a layer earlier.
     expect(exit.given).toEqual([]);
+  });
+});
+
+/**
+ * The window's failures, reaching main's log (TYTO-132).
+ *
+ * The interesting assertion is the refusal: "no brief text reaches the log" is a claim about a
+ * *mechanism*, and the mechanism is the contract's length caps, not the discipline of the four
+ * call sites. So the test drives `guard` rather than the handler.
+ */
+describe('log:write', () => {
+  it('files the failure at the level the window asked for', async () => {
+    const log = recordingLog();
+    const handlers = createHandlers({ ...dependencies(), log });
+
+    await handlers['log:write']({
+      level: 'error',
+      message: 'renderer error: boom',
+      detail: 'at x',
+    });
+    await handlers['log:write']({ level: 'warn', message: 'preview was slow' });
+
+    expect(log.entries).toEqual([
+      { level: 'error', message: 'renderer error: boom', detail: 'at x' },
+      { level: 'warn', message: 'preview was slow' },
+    ]);
+  });
+
+  it('refuses a message big enough to be a brief, before the log is reached', async () => {
+    const log = recordingLog();
+    const guarded = guard('log:write', createHandlers({ ...dependencies(), log })['log:write']);
+
+    await expect(guarded({ level: 'error', message: 'x'.repeat(10_000) })).rejects.toBeInstanceOf(
+      IpcContractError,
+    );
+    // This is the card's "no brief text and no file contents" criterion, made mechanical: a
+    // renderer cannot push a document across however hard it tries.
+    expect(log.entries).toEqual([]);
+  });
+
+  it('refuses a level the renderer has no business filing', async () => {
+    const log = recordingLog();
+    const guarded = guard('log:write', createHandlers({ ...dependencies(), log })['log:write']);
+
+    await expect(guarded({ level: 'debug', message: 'chatter' })).rejects.toBeInstanceOf(
+      IpcContractError,
+    );
+    expect(log.entries).toEqual([]);
+  });
+
+  it('opens the folder the log actually lives in, not a path written twice', async () => {
+    const log = recordingLog();
+    const folders = folderDialogs();
+    const handlers = createHandlers({ ...dependencies(), folders, log });
+
+    await handlers['log:reveal']({});
+
+    expect(folders.revealed).toEqual([log.directory]);
   });
 });

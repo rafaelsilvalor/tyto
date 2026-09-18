@@ -1,5 +1,7 @@
 import type { MenuItemConstructorOptions } from 'electron';
 
+import type { CatalogueKey } from '../../shared/i18n/index.js';
+
 /**
  * The application menu, which exists for one reason: **two of its default accelerators
  * destroy work.**
@@ -29,16 +31,30 @@ import type { MenuItemConstructorOptions } from 'electron';
  * `electron-vite dev` already replaces with a reload of its own. Session restore, which
  * would make a reload harmless, is a feature and not this card.
  *
- * Roles and not labels, everywhere. A role's label is Electron's own, in the system's
- * language — which is the right answer for *Minimize* and *Quit*, and is the only reason
- * this file does not need the catalogue. A menu of the app's own commands would; that is a
- * card of its own, and it would read `src/renderer/commands.ts` rather than invent entries.
+ * Roles and not labels, **almost** everywhere. A role's label is Electron's own, in the
+ * system's language, which is the right answer for *Minimize* and *Quit*. TYTO-132 added the
+ * one exception: the Help submenu carries an item this app names itself, so this file now
+ * takes a translator. The submenu's own title is still Electron's, because `role: 'help'`
+ * keeps it. A menu of the app's own *commands* is still a card of its own, and it would read
+ * `src/renderer/commands.ts` rather than invent entries.
  *
  * `import type` and nothing else from `electron`, the same call `ipc.ts` makes: the template
  * is a value a test can read without a running Electron, and `index.ts` is where it is
  * handed to `Menu.buildFromTemplate`.
  */
-export function menuTemplate(platform: string): MenuItemConstructorOptions[] {
+export interface MenuOptions {
+  /**
+   * The catalogue, resolved to the window's language by the composition root.
+   *
+   * A function and not a `Locale`, so this file never imports the catalogue itself — which is
+   * what keeps it a value a test can read with a fake translator and no i18n behind it.
+   */
+  readonly t: (key: CatalogueKey) => string;
+  /** Opens the folder the log lives in. An Electron call, so it arrives as a function. */
+  readonly onRevealLogs: () => void;
+}
+
+export function menuTemplate(platform: string, options: MenuOptions): MenuItemConstructorOptions[] {
   const mac = platform === 'darwin';
 
   return [
@@ -75,6 +91,16 @@ export function menuTemplate(platform: string): MenuItemConstructorOptions[] {
         { role: 'zoom' },
         ...(mac ? [{ role: 'front' } as const] : []),
       ],
+    },
+    // TYTO-132. `role: 'help'` rather than a labelled top-level item, so the submenu's title
+    // stays Electron's in the system's language and only the item inside it is this app's.
+    //
+    // A menu item and not a path printed somewhere: the acceptance criterion is that a person
+    // reaches the file **without being told a path**, and a tester who has to be talked
+    // through `%APPDATA%` is a tester whose report never arrives.
+    {
+      role: 'help',
+      submenu: [{ label: options.t('menu.revealLogs'), click: options.onRevealLogs }],
     },
   ];
 }

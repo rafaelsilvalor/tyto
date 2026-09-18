@@ -235,6 +235,8 @@ describe('the bridge', () => {
       'files:recent',
       'layout:get',
       'layout:set',
+      'log:reveal',
+      'log:write',
       'on',
       'templates:list',
     ]);
@@ -340,6 +342,10 @@ describe('the language picker', () => {
     'exit.discard.detail.many',
     'exit.discard.confirm',
     'exit.discard.cancel',
+    // TYTO-132: the one string this app writes into the application menu. A menu is the
+    // browser process's chrome, not the document, so it can never be in this pass —
+    // `src/main/menu.test.ts` is what holds the item to carrying the catalogue's word.
+    'menu.revealLogs',
     'command.document.close',
     'command.document.next',
     'command.document.previous',

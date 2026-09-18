@@ -120,6 +120,19 @@ export interface Catalogue {
   readonly 'exit.discard.detail.many': string;
   readonly 'exit.discard.confirm': string;
   readonly 'exit.discard.cancel': string;
+  /**
+   * The only string this app writes into the application menu (TYTO-132).
+   *
+   * Every other entry there is an Electron role whose label is the system's, in the system's
+   * language — `src/main/menu.ts` says why. This one names a folder that belongs to Tyto, so
+   * Electron has no word for it.
+   *
+   * **It follows the system's language and not the footer picker's.** The menu is built once
+   * at startup, in main, and the picker changes the window's locale in the renderer with no
+   * message going the other way about it. So a person who switches the footer to English
+   * keeps a Portuguese menu item until TYTO-124 gives the menu a way to be told.
+   */
+  readonly 'menu.revealLogs': string;
   readonly 'command.document.close': string;
   readonly 'command.document.next': string;
   readonly 'command.document.previous': string;
@@ -263,6 +276,7 @@ export const CATALOGUE_KEYS = [
   'exit.discard.detail.many',
   'exit.discard.confirm',
   'exit.discard.cancel',
+  'menu.revealLogs',
   'command.document.close',
   'command.document.next',
   'command.document.previous',
