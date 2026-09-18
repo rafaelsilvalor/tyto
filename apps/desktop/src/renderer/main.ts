@@ -18,6 +18,7 @@ import {
   revealRange,
 } from './panel.js';
 import { type CommandEntry, type CommandBar, COMMAND_BAR_TAG } from './command-bar.js';
+import { type ExportDialog, type ExportProgressView, EXPORT_DIALOG_TAG } from './export-dialog.js';
 import {
   COMMAND_LABELS,
   DOCUMENT_SLOTS,
@@ -255,6 +256,7 @@ function resolveElements() {
     problems: document.querySelector<ProblemsPanel>(PROBLEMS_TAG),
     problemsCount: byId('problems-count'),
     commandBar: document.querySelector<CommandBar>(COMMAND_BAR_TAG),
+    exportDialog: document.querySelector<ExportDialog>(EXPORT_DIALOG_TAG),
     // Outside the docks, like the command bar: the strip lists what the *window* has open,
     // so it must not disappear with a panel.
     tabs: document.querySelector<DocumentTabs>(TABS_TAG),
@@ -419,6 +421,122 @@ function paintTabs(): void {
  * below call `registry.run(id)` rather than the action, so a button and the bar cannot
  * drift apart the way two copies of a handler would.
  */
+/**
+ * The export dialog's state that outlives an opening: the folder, and the run in flight.
+ *
+ * Held here rather than on the element for the reason the element's own doc gives — the
+ * dialog runs nothing and remembers nothing about the app. A folder that reset every time
+ * the dialog was closed would make a second export of the same brief a second folder hunt.
+ */
+let exportDirectory: string | undefined;
+let exportId: string | undefined;
+let exportPoll: ReturnType<typeof setInterval> | undefined;
+
+/** How often the dialog asks how far along the run is. */
+const EXPORT_POLL_MS = 150;
+
+function paintExport(progress: ExportProgressView | undefined): void {
+  const dialog = elements.exportDialog;
+  if (dialog === null || dialog === undefined) return;
+  dialog.locale = state.locale;
+  dialog.directory = exportDirectory;
+  dialog.progress = progress;
+}
+
+/**
+ * Asks main how the run is going until it stops running.
+ *
+ * **The whole of the polling decision, in eight lines** (`src/main/export.ts` has the why).
+ * The interval is cleared the moment the answer is not `running`, so a finished export
+ * costs nothing and a window left open overnight is not asking anybody anything.
+ */
+function watchExport(): void {
+  if (exportPoll !== undefined) clearInterval(exportPoll);
+  exportPoll = setInterval(() => {
+    void withBridge(async (bridge) => {
+      if (exportId === undefined) return;
+      const answer = await bridge['export:progress']({ exportId });
+      // An id main has never heard of — a window reloaded mid-export, say. Stop asking
+      // rather than poll forever against a run that no longer exists.
+      if (answer.progress === undefined) {
+        stopWatchingExport();
+        return;
+      }
+      paintExport(answer.progress);
+      if (answer.progress.status !== 'running') stopWatchingExport();
+    });
+  }, EXPORT_POLL_MS);
+}
+
+function stopWatchingExport(): void {
+  if (exportPoll !== undefined) clearInterval(exportPoll);
+  exportPoll = undefined;
+}
+
+function openExportDialog(): void {
+  const dialog = elements.exportDialog;
+  if (dialog === null || dialog === undefined) return;
+
+  dialog.chooseDirectory = () => {
+    void withBridge(async (bridge) => {
+      const answer = await bridge['export:choose-directory']({});
+      // A dismissed picker leaves the previous folder alone, the way a dismissed save
+      // dialog leaves the path alone.
+      if (answer.directory === undefined) return;
+      exportDirectory = answer.directory;
+      paintExport(dialog.progress);
+    });
+  };
+
+  dialog.start = (request) => {
+    void withBridge(async (bridge) => {
+      const answer = await bridge['export:start']({
+        documentId: workspace.activeId,
+        // The buffer, not the file: an unsaved edit is still what the person is looking at.
+        brief: activeText(),
+        directory: request.directory,
+        outputs: request.outputs.map((output) => ({
+          kind: output.kind,
+          ...(output.quality === undefined ? {} : { quality: output.quality }),
+        })),
+      });
+      exportId = answer.exportId;
+      // Painted before the first poll answers, so the dialog switches to Cancel on the
+      // click rather than a beat later.
+      paintExport({
+        status: 'running',
+        total: 0,
+        done: 0,
+        failed: 0,
+        directory: request.directory,
+        diagnostics: [],
+      });
+      watchExport();
+    });
+  };
+
+  dialog.cancel = () => {
+    void withBridge(async (bridge) => {
+      if (exportId === undefined) return;
+      await bridge['export:cancel']({ exportId });
+    });
+  };
+
+  dialog.reveal = (directory) => {
+    void withBridge(async (bridge) => {
+      await bridge['export:reveal']({ directory });
+    });
+  };
+
+  dialog.close = () => {
+    stopWatchingExport();
+    dialog.open = false;
+  };
+
+  paintExport(dialog.progress);
+  dialog.open = true;
+}
+
 const registry: CommandRegistry = createDesktopRegistry({
   stepZoom: (direction) => {
     if (pane === undefined) return;
@@ -465,6 +583,10 @@ const registry: CommandRegistry = createDesktopRegistry({
     // rather than reading it; leaving it stale would make the footer disagree with the
     // window.
     applyLocale(state.locale === 'pt-BR' ? 'en' : 'pt-BR');
+  },
+
+  openExport: () => {
+    openExportDialog();
   },
 
   openDocument: () => {

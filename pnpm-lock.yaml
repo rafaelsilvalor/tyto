@@ -117,6 +117,9 @@ importers:
       '@tyto/export-html':
         specifier: workspace:*
         version: link:../../packages/export-html
+      '@tyto/export-svg':
+        specifier: workspace:*
+        version: link:../../packages/export-svg
       '@tyto/fonts':
         specifier: workspace:*
         version: link:../../packages/fonts

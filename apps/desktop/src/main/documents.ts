@@ -73,6 +73,14 @@ export interface DocumentService {
    * says so rather than guessing (`preview.ts`).
    */
   folderOf(documentId: string): string | undefined;
+  /**
+   * The brief's own name, without folder or extension — what the artifacts are named after.
+   *
+   * `tyto render` names a run after the brief file, and an export from the window has to
+   * agree or the two produce differently-named folders from the same document. `undefined`
+   * for a tab that was never saved, and the caller decides what an unsaved brief is called.
+   */
+  nameOf(documentId: string): string | undefined;
 }
 
 const nodeDisk = {
@@ -193,6 +201,14 @@ export function createDocumentService(options: DocumentServiceOptions): Document
     folderOf: (documentId) => {
       const path = paths.get(documentId);
       return path === undefined ? undefined : dirname(path);
+    },
+
+    nameOf: (documentId) => {
+      const path = paths.get(documentId);
+      // `.brief` stripped, and nothing else: `tyto render promo.brief` names its run
+      // `promo`, and an export from the window has to agree or one document produces two
+      // differently-named folders depending on which program rendered it.
+      return path === undefined ? undefined : basename(path).replace(/\.brief$/iu, '');
     },
   };
 }

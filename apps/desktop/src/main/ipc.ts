@@ -12,6 +12,7 @@ import {
 } from '../../shared/ipc.js';
 import { type Credentials } from './credentials.js';
 import { type DocumentService } from './documents.js';
+import { type ExportService } from './export.js';
 import { type LayoutStore } from './layout-store.js';
 import { type PreviewService } from './preview.js';
 import { type TemplateCatalogue } from './templates.js';
@@ -50,6 +51,17 @@ export interface IpcDependencies {
    * nothing else about the question.
    */
   readonly confirm: (question: IpcRequest<'dialog:confirm'>) => Promise<boolean>;
+  /** Brief text to files on disk (E9.4). Injected for the reason `preview` is. */
+  readonly exports: ExportService;
+  /**
+   * The native folder picker and the OS file manager, wrapped here for the reason the other
+   * dialogs are: `dialog` and `shell` are Electron main-process APIs, and a service that
+   * named one could not be tested without launching one.
+   */
+  readonly folders: {
+    choose: () => Promise<string | undefined>;
+    reveal: (directory: string) => Promise<void>;
+  };
 }
 
 /** One handler per channel, typed against the contract in both directions. */
@@ -58,7 +70,8 @@ type Handlers = {
 };
 
 export function createHandlers(dependencies: IpcDependencies): Handlers {
-  const { confirm, credentials, documents, info, layout, preview, templates } = dependencies;
+  const { confirm, credentials, documents, exports, folders, info, layout, preview, templates } =
+    dependencies;
 
   return {
     'app:info': () => Promise.resolve(info()),
@@ -111,6 +124,67 @@ export function createHandlers(dependencies: IpcDependencies): Handlers {
     'credentials:get': async ({ account }) => ({ secret: await credentials.get(account) }),
 
     'credentials:delete': async ({ account }) => ({ deleted: await credentials.delete(account) }),
+
+    'export:start': ({ documentId, brief, directory, outputs, formats }) => {
+      // The text is the request's and the folder is main's, which is `brief:preview`'s
+      // split exactly: the editor's buffer is the only place an unsaved brief exists, and
+      // the path is the only thing main keeps about a tab.
+      const assetBase = documents.folderOf(documentId);
+      return exports.start({
+        brief,
+        directory,
+        // A tab that was never saved has no name to render under. `untitled` rather than a
+        // blank, because the label reaches `result.json` and a run filed under '' is a run
+        // nobody can find.
+        label: documents.nameOf(documentId) ?? 'untitled',
+        // Rebuilt field by field rather than spread, because `exactOptionalPropertyTypes`
+        // distinguishes an absent key from an undefined one and Zod's `.optional()` gives
+        // the second. `OutputRequest` wants the first.
+        outputs: outputs.map((output) => ({
+          kind: output.kind,
+          ...(output.quality === undefined ? {} : { quality: output.quality }),
+          ...(output.scale === undefined ? {} : { scale: output.scale }),
+        })),
+        ...(assetBase === undefined ? {} : { assetBase }),
+        ...(formats === undefined ? {} : { formats: [...formats] }),
+      });
+    },
+
+    'export:progress': ({ exportId }) => {
+      const progress = exports.progress(exportId);
+      if (progress === undefined) return Promise.resolve({});
+      return Promise.resolve({
+        progress: {
+          status: progress.status,
+          total: progress.total,
+          done: progress.done,
+          failed: progress.failed,
+          directory: progress.directory,
+          diagnostics: progress.diagnostics.map((item) => ({
+            severity: item.severity,
+            code: item.code,
+            message: item.message,
+            ...(item.range === undefined ? {} : { range: item.range }),
+          })),
+          ...(progress.failure === undefined ? {} : { failure: progress.failure }),
+        },
+      });
+    },
+
+    'export:cancel': ({ exportId }) => {
+      exports.cancel(exportId);
+      return Promise.resolve({});
+    },
+
+    'export:reveal': async ({ directory }) => {
+      await folders.reveal(directory);
+      return {};
+    },
+
+    'export:choose-directory': async () => {
+      const directory = await folders.choose();
+      return directory === undefined ? {} : { directory };
+    },
   };
 }
 
