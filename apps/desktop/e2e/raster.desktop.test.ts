@@ -36,9 +36,10 @@ import { type CaptureWindow, createDebuggerRasterizer } from '../src/main/raster
  * launches:
  *
  * ```
- * shapes.feed   0.0656%   within the 0.1% tolerance
- * alpha.square  0.0000%   identical
- * text.feed     1.2219%   twelve times the tolerance
+ *               win32     linux (ubuntu-latest)
+ * shapes.feed   0.0656%   0.0000%   within the 0.1% tolerance on both
+ * alpha.square  0.0000%   0.0000%   identical on both
+ * text.feed     1.2219%   0.9587%   ten times the tolerance on both
  * ```
  *
  * So `shapes.feed` and `alpha.square` carry E5.4's acceptance criterion — *the same fixtures
