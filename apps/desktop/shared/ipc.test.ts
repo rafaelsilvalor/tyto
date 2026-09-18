@@ -35,6 +35,8 @@ describe('the IPC contract', () => {
       'files:recent',
       'layout:get',
       'layout:set',
+      'log:reveal',
+      'log:write',
       'templates:list',
     ]);
     expect(new Set(IPC_CHANNEL_NAMES).size).toBe(IPC_CHANNEL_NAMES.length);
@@ -195,11 +197,59 @@ describe('what the contract does not promise', () => {
       // in a native dialog, and the question has no subject. Every other export channel
       // names either a document or a run, so this is the only one of the five here.
       'export:choose-directory',
+      // TYTO-132. "Open the log folder" has no subject either: there is one log, and where it
+      // is, is main's — a renderer that named the folder would be naming a path it has no
+      // business holding.
+      'log:reveal',
     ];
 
     for (const name of IPC_CHANNEL_NAMES) {
       const accepts = IPC_CHANNELS[name].request.safeParse({}).success;
       expect(accepts, name).toBe(optional.includes(name));
     }
+  });
+});
+
+/**
+ * The caps on `log:write`, asserted as a mechanism rather than trusted as a convention.
+ *
+ * TYTO-132's criterion is that no brief text and no file contents reach the log. A rule kept
+ * by four call sites lasts until the fifth; a rule kept by the schema cannot be broken by a
+ * call site at all, because the preload refuses it before the message is sent.
+ */
+describe('what may be written to the log', () => {
+  it('refuses a message long enough to be a brief', () => {
+    expect(() =>
+      parseIpc('log:write', 'request', { level: 'error', message: 'x'.repeat(201) }),
+    ).toThrow(IpcContractError);
+  });
+
+  it('refuses a detail long enough to be a file', () => {
+    expect(() =>
+      parseIpc('log:write', 'request', {
+        level: 'error',
+        message: 'save failed',
+        detail: 'y'.repeat(4001),
+      }),
+    ).toThrow(IpcContractError);
+  });
+
+  it('refuses a level the renderer has no business filing', () => {
+    // `debug` and `info` exist on the log itself — main uses them — and are deliberately not
+    // reachable from the window: every level it can reach is one more that can spend the
+    // file's ceiling.
+    expect(() => parseIpc('log:write', 'request', { level: 'debug', message: 'chatter' })).toThrow(
+      IpcContractError,
+    );
+  });
+
+  it('takes an honest report', () => {
+    expect(
+      parseIpc('log:write', 'request', {
+        level: 'error',
+        message: 'renderer error: Error: the preview blew up',
+        detail: 'Error: the preview blew up ⏎ at paint (preview.ts:1:1)',
+      }),
+    ).toMatchObject({ level: 'error' });
   });
 });
