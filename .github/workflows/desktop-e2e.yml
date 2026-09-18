@@ -44,7 +44,13 @@ jobs:
   desktop:
     runs-on: ubuntu-latest
     steps:
+      # `lfs: true` because `raster.desktop.test.ts` compares against reference PNGs, and
+      # `.gitattributes` routes `**/__fixtures__/**/*.png` through Git LFS. Without it those
+      # files arrive as 130-byte pointers, `PNG.sync.read` fails on the first one, and the
+      # comparison that was supposed to guard the rasterizer never runs — `ci.yml` has
+      # carried the same flag since the visual suite existed (TYTO-133).
       - uses: actions/checkout@v7
+        with: { lfs: true }
       - uses: pnpm/action-setup@v6
       - uses: actions/setup-node@v7
         with: { node-version: 22, cache: pnpm }
@@ -105,10 +111,27 @@ jobs:
       # answer both.
       - if: ${{ !cancelled() }}
         run: xvfb-run -a pnpm --filter @tyto/desktop test:package
+
+      # **One artifact, and only since there is finally something in it.** The note this
+      # replaces was right when it was written: these suites wrote nothing to disk, and a
+      # step pointed at a path that never exists warns on every red run in a way that reads
+      # like a second failure. `raster.desktop.test.ts` changed that — it writes into
+      # `e2e/__diff__/` in exactly two cases, and both are cases where the file is the
+      # answer:
       #
-      # No artifact upload. `ci.yml` and `visual.yml` each have one because they produce a
-      # file worth keeping — a Playwright report, a pixel diff. These two suites write
-      # nothing to disk: everything they found is in the log above, and a step pointed at
-      # `**/test-results/**` reports `No files were found with the provided path` on every
-      # red run, which is a warning that reads like a second failure. Measured on the first
-      # run rather than assumed.
+      #   * a pixel comparison went past tolerance, and the render and the diff are what a
+      #     reviewer needs to tell a real regression from a re-record;
+      #   * this platform has no glyph reference yet, and the render written here is the
+      #     file to commit. A linux reference cannot be recorded on the maintainer's
+      #     Windows machine, so downloading it from a run is the only way one ever exists
+      #     (ADR 0028).
+      #
+      # `if-no-files-found: ignore` keeps the green path silent, which is the whole of what
+      # the old note was protecting.
+      - if: ${{ !cancelled() }}
+        uses: actions/upload-artifact@v7
+        with:
+          name: desktop-raster-diffs
+          path: apps/desktop/e2e/__diff__/
+          if-no-files-found: ignore
+          retention-days: 14
