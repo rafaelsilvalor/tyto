@@ -898,6 +898,49 @@ async function requestClose(id: string): Promise<void> {
   closeTab(id);
 }
 
+/**
+ * The same question about the whole window, asked because main asked first (TYTO-123).
+ *
+ * This is the only thing in the renderer that main starts, and the shape is the reason it
+ * reads so much like `requestClose` above: main cannot count the unsaved tabs — `isUnsaved`
+ * is a comparison over a workspace that lives here (ADR 0026) — and it cannot pick the
+ * language, which the footer picker changes at runtime and main was told once at startup. So
+ * it pushes `app:exit-requested` and this answers on `app:exit-answer` (ADR 0029).
+ *
+ * **The `try`/`finally` is load-bearing.** An answer that never goes back leaves main holding
+ * a prevented quit until its timeout, so a throw anywhere above — a dialog that rejects, a
+ * locale key that is missing — must still release the app. The default is `false`: a failure
+ * to ask is not permission to discard.
+ */
+async function answerExitRequest(bridge: TytoBridge, askId: number): Promise<void> {
+  let allow = false;
+  try {
+    const unsaved = workspace.documents.filter(isUnsaved).length;
+    if (unsaved === 0) {
+      // Nothing to lose, so nothing to ask. The card's second criterion, and it is a branch
+      // rather than a dialog with a trivial answer because a box that appeared on every quit
+      // would train a person to dismiss the one that matters.
+      allow = true;
+      return;
+    }
+
+    const detail = translate(
+      state.locale,
+      unsaved === 1 ? 'exit.discard.detail.one' : 'exit.discard.detail.many',
+    ).replace('{n}', String(unsaved));
+
+    const answer = await bridge['dialog:confirm']({
+      message: translate(state.locale, 'exit.discard.message'),
+      detail,
+      confirm: translate(state.locale, 'exit.discard.confirm'),
+      cancel: translate(state.locale, 'exit.discard.cancel'),
+    });
+    allow = answer.confirmed;
+  } finally {
+    await bridge['app:exit-answer']({ askId, allow });
+  }
+}
+
 /** Takes a tab out of the window, and tells main to stop holding its path. */
 function closeTab(id: string): void {
   const timer = pending.get(id);
@@ -1377,6 +1420,15 @@ async function load(): Promise<void> {
     fillLocalePicker(picker, state.locale);
     once(picker, 'change', () => {
       applyLocale(localeFromPicker(picker, state.locale));
+    });
+  }
+
+  if (bridge !== undefined) {
+    // The one thing this window listens for rather than asks (ADR 0029). No unsubscribe is
+    // kept: the subscription and the window have the same lifetime by construction, and a
+    // handle nobody can call is a handle that only looks like cleanup.
+    bridge.on('app:exit-requested', ({ askId }) => {
+      void answerExitRequest(bridge, askId);
     });
   }
 

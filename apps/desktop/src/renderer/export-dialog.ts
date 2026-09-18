@@ -11,11 +11,11 @@ import { type Locale, DEFAULT_LOCALE, translate } from '../../shared/i18n/index.
  * the bridge by whoever mounted this. What lives here is the form and the arithmetic of a
  * progress bar, which is what a test can drive without an Electron.
  *
- * **Progress arrives by polling and the dialog is what polls.** Every channel this app has
- * is a question with an answer (`shared/ipc.ts`), and the one-way message a push would need
- * is the transport TYTO-123 has to design for its quit confirmation — so this card does not
- * invent it. `src/main/export.ts` has the full reasoning. The practical shape is here: a
- * timer that asks while the run is `running` and stops the moment it is not.
+ * **Progress arrives by polling and the dialog is what polls.** The one-way message a push
+ * would need exists since TYTO-123 (ADR 0029) and this channel deliberately does not use it:
+ * progress is state to read, not a question to answer. `src/main/export.ts` has the full
+ * reasoning. The practical shape is here: a timer that asks while the run is `running` and
+ * stops the moment it is not.
  */
 
 export const EXPORT_DIALOG_TAG = 'tyto-export-dialog';

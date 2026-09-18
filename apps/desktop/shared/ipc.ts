@@ -346,6 +346,25 @@ export const IPC_CHANNELS = {
     z.object({ confirmed: z.boolean() }),
   ),
 
+  /**
+   * The renderer's half of the one question main asks (TYTO-123, ADR 0029).
+   *
+   * Main pushes `app:exit-requested` and the answer comes back **here**, on an ordinary
+   * request channel, which is the whole of why this app gains one new transport shape rather
+   * than two: a push carries no reply, and the renderer keeps answering through the
+   * direction it already had.
+   *
+   * `askId` is `brief:preview`'s `requestId` idea, and it is load-bearing for the same
+   * reason. A prevented quit that is answered late must not release a *later* one: somebody
+   * who cancels, keeps typing and then quits again is asked a second question, and the first
+   * answer arriving after it would otherwise let the app out with the text still unsaved.
+   * Main ignores any id that is not the one outstanding.
+   */
+  'app:exit-answer': channel(
+    z.object({ askId: z.number().int().nonnegative(), allow: z.boolean() }),
+    z.object({}),
+  ),
+
   /** What the command bar offers under "recent". Newest first; `missing` is shown, not hidden. */
   'files:recent': channel(
     z.object({}),
@@ -433,12 +452,13 @@ export const IPC_CHANNELS = {
   /**
    * How far along, asked rather than pushed.
    *
-   * **The one place this app's transport shows through, and it is deliberate.** Every other
-   * channel here is a question because that is the only shape the bridge has; a one-way
-   * main→renderer message is a new shape, and it is the shape TYTO-123 needs for its quit
-   * confirmation. Whichever card invents it decides it for the other, and this one has no
-   * claim to that decision — so the dialog asks while it works. The answer is four numbers
-   * and a verdict, which is cheap enough to ask for a few times a second.
+   * **Polled, and it stays polled now that the alternative exists.** When this was written a
+   * one-way main→renderer message was a shape the app did not have, and the decision belonged
+   * to TYTO-123; `IPC_EVENTS` below is what TYTO-123 built (ADR 0029). This channel is not
+   * rewritten on top of it, because progress is *state a dialog reads* rather than a question
+   * that needs answering: a push would have to carry the whole record anyway, and a dialog
+   * that opened after a run started would still have to ask once to catch up. The answer is
+   * four numbers and a verdict, which is cheap enough to ask for a few times a second.
    */
   'export:progress': channel(
     z.object({ exportId: z.string().min(1) }),
@@ -486,14 +506,63 @@ export type IpcRequest<Name extends IpcChannelName> = z.infer<IpcChannels[Name][
 export type IpcResponse<Name extends IpcChannelName> = z.infer<IpcChannels[Name]['response']>;
 
 /**
+ * The other direction: what main may tell the window, unasked (ADR 0029).
+ *
+ * A second table and not a third kind of entry in the first one, because the two are not the
+ * same thing and a reader should not have to check a flag to know which way a name travels.
+ * Every channel above is a question the renderer asks and a response it gets back; every
+ * name here is a message main pushes, and **a push carries no reply** — the answer, when
+ * there is one, travels back on an ordinary channel above.
+ *
+ * That rule is the whole economy of the decision. Making pushes answerable would have meant
+ * a second transport shape with its own correlation, its own timeouts and its own failure
+ * modes; this way the app gained one.
+ *
+ * Deliberately small, for the reason `IPC_CHANNELS` is: the messages arrive with the cards
+ * that need them.
+ */
+export const IPC_EVENTS = {
+  /**
+   * The app is trying to exit and wants to know whether the window minds (TYTO-123).
+   *
+   * Main cannot answer this itself: the workspace is the renderer's, `isUnsaved` is a
+   * comparison computed from it (ADR 0026), and the language the question has to be asked in
+   * is the one the footer picker last chose — which main was told exactly once, at startup.
+   *
+   * The renderer answers on `app:exit-answer`, carrying this `askId` back.
+   */
+  'app:exit-requested': z.object({ askId: z.number().int().nonnegative() }),
+} as const;
+
+export type IpcEvents = typeof IPC_EVENTS;
+export type IpcEventName = keyof IpcEvents;
+export type IpcEventPayload<Name extends IpcEventName> = z.infer<IpcEvents[Name]>;
+
+export const IPC_EVENT_NAMES = Object.keys(IPC_EVENTS) as readonly IpcEventName[];
+
+export function isIpcEventName(name: string): name is IpcEventName {
+  return Object.prototype.hasOwnProperty.call(IPC_EVENTS, name);
+}
+
+/**
  * The API the preload puts on `window.tyto`.
  *
  * Derived from the table rather than written beside it, so a channel added above is a
  * method the renderer can call with no second declaration — and a channel removed is a
  * compile error at every call site rather than a rejected promise at runtime.
+ *
+ * `on` is the one member that is not a channel, and it is an intersection rather than
+ * another key in the mapped type because the two halves are derived from two different
+ * tables. It returns the function that unsubscribes, which is the only shape that does not
+ * ask a caller to keep the listener around to take it off again.
  */
 export type TytoBridge = {
   readonly [Name in IpcChannelName]: (request: IpcRequest<Name>) => Promise<IpcResponse<Name>>;
+} & {
+  readonly on: <Name extends IpcEventName>(
+    event: Name,
+    listen: (payload: IpcEventPayload<Name>) => void,
+  ) => () => void;
 };
 
 export const IPC_CHANNEL_NAMES = Object.keys(IPC_CHANNELS) as readonly IpcChannelName[];
@@ -509,11 +578,18 @@ export function isIpcChannelName(name: string): name is IpcChannelName {
  * *brief* can be wrong about, and reserves a throw for what a caller could have predicted
  * from its own arguments. A renderer sending the wrong shape down a channel it imported the
  * schema for is the second kind — nothing a user typed produced it.
+ *
+ * `direction` carries `'event'` as well as the two halves of a request, and it is not a
+ * synonym for `'request'`: the whole point of naming a direction is that it says **whose bug
+ * it is**. A bad request is the renderer's, a bad response is main's, and a bad push is
+ * main's too but reaches the renderer from the other side — a reader chasing an
+ * `IpcContractError` should not have to know the channel table to work out which way the
+ * message was going.
  */
 export class IpcContractError extends TypeError {
   constructor(
     readonly channel: string,
-    readonly direction: 'request' | 'response',
+    readonly direction: 'request' | 'response' | 'event',
     readonly issues: string,
   ) {
     super(`ipc ${channel}: ${direction} does not match the contract — ${issues}`);
@@ -545,4 +621,21 @@ export function parseIpc<Name extends IpcChannelName, Direction extends 'request
   const parsed = schema.safeParse(value);
   if (!parsed.success) throw new IpcContractError(name, direction, describe(parsed.error));
   return parsed.data as Direction extends 'request' ? IpcRequest<Name> : IpcResponse<Name>;
+}
+
+/**
+ * The same check for a push, and it runs on both sides for the same reason `parseIpc` does.
+ *
+ * Main validates before sending, so it cannot put a shape on the wire that the preload is
+ * going to refuse; the preload validates on arrival, because a renderer may not trust
+ * another process however typed it looked at compile time. The roles are the mirror of the
+ * request direction, which is why they are one function and not two.
+ */
+export function parseIpcEvent<Name extends IpcEventName>(
+  name: Name,
+  value: unknown,
+): IpcEventPayload<Name> {
+  const parsed = IPC_EVENTS[name].safeParse(value);
+  if (!parsed.success) throw new IpcContractError(name, 'event', describe(parsed.error));
+  return parsed.data as IpcEventPayload<Name>;
 }

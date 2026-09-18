@@ -102,6 +102,24 @@ export interface Catalogue {
   readonly 'document.discard.detail': string;
   readonly 'document.discard.confirm': string;
   readonly 'document.discard.cancel': string;
+
+  /**
+   * The same question asked about the whole window, on the way out (TYTO-123).
+   *
+   * Four strings and the same shape as `document.discard.*` above, for the same reason and
+   * through the same channel — main draws the box, the renderer owns every word in it.
+   *
+   * **`{n}` is a placeholder, and it is the first one in this catalogue.** The renderer
+   * substitutes the count; nothing here interpolates on its own. Two detail strings and not
+   * one because agreement changes on the number in Portuguese — *1 aba tem* against *3 abas
+   * têm* — and a single string with a parenthesised plural is the thing a catalogue exists
+   * to make unnecessary.
+   */
+  readonly 'exit.discard.message': string;
+  readonly 'exit.discard.detail.one': string;
+  readonly 'exit.discard.detail.many': string;
+  readonly 'exit.discard.confirm': string;
+  readonly 'exit.discard.cancel': string;
   readonly 'command.document.close': string;
   readonly 'command.document.next': string;
   readonly 'command.document.previous': string;
@@ -240,6 +258,11 @@ export const CATALOGUE_KEYS = [
   'document.discard.detail',
   'document.discard.confirm',
   'document.discard.cancel',
+  'exit.discard.message',
+  'exit.discard.detail.one',
+  'exit.discard.detail.many',
+  'exit.discard.confirm',
+  'exit.discard.cancel',
   'command.document.close',
   'command.document.next',
   'command.document.previous',

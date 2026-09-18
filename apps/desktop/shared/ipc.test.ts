@@ -4,14 +4,19 @@ import {
   type IpcChannelName,
   IPC_CHANNELS,
   IPC_CHANNEL_NAMES,
+  IPC_EVENTS,
+  IPC_EVENT_NAMES,
   IpcContractError,
   isIpcChannelName,
+  isIpcEventName,
   parseIpc,
+  parseIpcEvent,
 } from './ipc.js';
 
 describe('the IPC contract', () => {
   it('names every channel exactly once, and nothing else', () => {
     expect([...IPC_CHANNEL_NAMES].sort()).toEqual([
+      'app:exit-answer',
       'app:info',
       'brief:preview',
       'credentials:delete',
@@ -49,6 +54,55 @@ describe('the IPC contract', () => {
     expect(isIpcChannelName('app:quit')).toBe(false);
     // Not a channel either, and the one a plain `in` check would have got wrong.
     expect(isIpcChannelName('toString')).toBe(false);
+  });
+});
+
+/**
+ * The second table (ADR 0029), asserted separately because it is a separate direction.
+ *
+ * The property worth pinning is that the two tables do not leak into each other: an event
+ * name is not a channel name and cannot be invoked, which is what keeps "a push carries no
+ * reply" a rule of the contract rather than a habit of the callers.
+ */
+describe('the event table', () => {
+  it('names every event exactly once, and nothing else', () => {
+    expect([...IPC_EVENT_NAMES].sort()).toEqual(['app:exit-requested']);
+    expect(new Set(IPC_EVENT_NAMES).size).toBe(IPC_EVENT_NAMES.length);
+  });
+
+  it('keeps the two directions apart', () => {
+    // An event the renderer could `invoke` would be a push with a reply, which is the shape
+    // this app decided not to have.
+    for (const name of IPC_EVENT_NAMES) {
+      expect(isIpcChannelName(name), name).toBe(false);
+      expect(IPC_EVENTS[name], name).toBeDefined();
+    }
+    expect(isIpcEventName('app:exit-answer')).toBe(false);
+  });
+
+  it('recognises its own event names and refuses a made-up one', () => {
+    expect(isIpcEventName('app:exit-requested')).toBe(true);
+    expect(isIpcEventName('app:something-else')).toBe(false);
+    expect(isIpcEventName('toString')).toBe(false);
+  });
+
+  it('refuses a payload that does not match, and says which direction it was going', () => {
+    let thrown: unknown;
+    try {
+      parseIpcEvent('app:exit-requested', {});
+    } catch (error) {
+      thrown = error;
+    }
+
+    expect(thrown).toBeInstanceOf(IpcContractError);
+    // `'event'` and not `'request'`: the direction names whose bug it is, and a bad push is
+    // main's. Reusing `'request'` would make the message blame the renderer.
+    expect((thrown as IpcContractError).direction).toBe('event');
+    expect((thrown as IpcContractError).channel).toBe('app:exit-requested');
+  });
+
+  it('passes a payload that matches', () => {
+    expect(parseIpcEvent('app:exit-requested', { askId: 3 })).toEqual({ askId: 3 });
   });
 });
 
