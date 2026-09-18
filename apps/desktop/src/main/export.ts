@@ -19,7 +19,7 @@ import {
   fsTaskOutput,
   renderResult,
 } from '@tyto/io';
-import { type InProcessHost, createPluginHost } from '@tyto/plugin-api';
+import { type InProcessHost, type Logger, createPluginHost } from '@tyto/plugin-api';
 import { type JobEvent, type OutputRequest, markupTemplateSource, runJob } from '@tyto/pipeline';
 import type { Rasterizer } from '@tyto/raster';
 import { BUILT_IN_TEMPLATES_DIRECTORY } from '@tyto/templates';
@@ -117,6 +117,15 @@ export interface ExportServiceOptions {
   readonly formatsFile?: string;
   /** `tyto`'s own version, for `result.json`. */
   readonly version: string;
+  /**
+   * Where a run that died is written down (TYTO-132).
+   *
+   * Optional, and absent in every existing test: a service that required a log to be built
+   * would make a logger a dependency of exporting, which it is not. What it changes when it
+   * is there is the one place in main where a render's death currently lands — a string in
+   * memory that the dialog may or may not still be polling for.
+   */
+  readonly log?: Logger;
 }
 
 /** A run in flight, and what the poller reads. */
@@ -295,6 +304,10 @@ export async function createExportService(options: ExportServiceOptions): Promis
       // otherwise have nobody listening, so it is caught and turned into the run's own
       // state — an export that died is a finished export with a diagnostic, not a silent one.
       void execute(request, run).catch((error: unknown) => {
+        // Written down before it is turned into state, because `run.failure` is only ever read
+        // by a dialog that is still open: close it, or export from a window that then quits,
+        // and the only record of a dead render was gone (TYTO-132).
+        options.log?.error('export failed', error);
         run.status = 'finished';
         run.failure = error instanceof Error ? error.message : String(error);
       });

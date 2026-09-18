@@ -65,6 +65,7 @@ import {
   withPanelOpen,
   withPanelSize,
 } from '../../shared/layout.js';
+import { installErrorReporting } from './report-errors.js';
 import { searchPhrasesFor } from './search-phrases.js';
 import { type ShellState, fillLocalePicker, localeFromPicker, paint, paintTitle } from './shell.js';
 import {
@@ -1535,5 +1536,10 @@ async function load(): Promise<void> {
 // Painted once before the round trip as well, so the window is never blank while main
 // answers — the strings are already correct for the default locale, and only the version
 // and the platform arrive late.
+// Before both, because `load()` is async and its rejection is one of the two things this
+// catches, and a throw inside `repaint()` on a locale that is missing a key is the other
+// (TYTO-132).
+installErrorReporting(window, window.tyto);
+
 repaint();
 void load();

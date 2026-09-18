@@ -2,7 +2,7 @@ import { createRequire } from 'node:module';
 import { dirname, join } from 'node:path';
 
 import { type FileSystem, loadTemplateRegistry } from '@tyto/core';
-import { type InProcessHost, type Plugin, createPluginHost } from '@tyto/plugin-api';
+import { type InProcessHost, type Logger, type Plugin, createPluginHost } from '@tyto/plugin-api';
 import type { Rasterizer } from '@tyto/raster';
 import { BUILT_IN_TEMPLATES_DIRECTORY } from '@tyto/templates';
 
@@ -54,6 +54,14 @@ export interface BuiltInsOptions {
    * option is what proves it rather than asserting it.
    */
   readonly rasterizer?: Rasterizer;
+  /**
+   * Where the host writes what it did, if anywhere (TYTO-132).
+   *
+   * `createPluginHost` already takes one and already defaults to dropping everything, so a
+   * built-in that failed to activate has until now vanished without a word. Passing the app's
+   * log is the whole of the fix.
+   */
+  readonly log?: Logger;
 }
 
 /**
@@ -69,7 +77,7 @@ export interface BuiltInsOptions {
  * asks for pixels (TYTO-133, ADR 0027).
  */
 export async function activateBuiltIns(options: BuiltInsOptions): Promise<InProcessHost> {
-  const host = createPluginHost();
+  const host = createPluginHost(options.log === undefined ? {} : { log: options.log });
   const directory = options.directory ?? builtInTemplatesDirectory();
 
   // Read here rather than inside the plugin: reading manifests is the registry's job, and

@@ -53,6 +53,7 @@ export const ptBR: Catalogue = {
   'exit.discard.detail.many': '{n} abas têm alterações que ainda não foram escritas no disco',
   'exit.discard.confirm': 'Sair sem salvar',
   'exit.discard.cancel': 'Cancelar',
+  'menu.revealLogs': 'Abrir a pasta do log',
   'command.document.close': 'Fechar a aba',
   'command.document.next': 'Próxima aba',
   'command.document.previous': 'Aba anterior',

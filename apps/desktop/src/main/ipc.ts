@@ -14,6 +14,7 @@ import {
   parseIpcEvent,
 } from '../../shared/ipc.js';
 import { type Credentials } from './credentials.js';
+import { type DesktopLog } from './log.js';
 import { type DocumentService } from './documents.js';
 import { type ExportService } from './export.js';
 import { type LayoutStore } from './layout-store.js';
@@ -73,6 +74,14 @@ export interface IpcDependencies {
     choose: () => Promise<string | undefined>;
     reveal: (directory: string) => Promise<void>;
   };
+  /**
+   * Where a failure gets written down (TYTO-132).
+   *
+   * Injected like everything else here, and typed as the whole log rather than as `Logger`
+   * because `log:reveal` needs to know which folder to open and the log is the only thing
+   * that knows.
+   */
+  readonly log: DesktopLog;
 }
 
 /** One handler per channel, typed against the contract in both directions. */
@@ -90,6 +99,7 @@ export function createHandlers(dependencies: IpcDependencies): Handlers {
     folders,
     info,
     layout,
+    log,
     preview,
     templates,
   } = dependencies;
@@ -210,6 +220,16 @@ export function createHandlers(dependencies: IpcDependencies): Handlers {
     'export:choose-directory': async () => {
       const directory = await folders.choose();
       return directory === undefined ? {} : { directory };
+    },
+
+    'log:write': ({ level, message, detail }) => {
+      log[level](message, detail);
+      return Promise.resolve({});
+    },
+
+    'log:reveal': async () => {
+      await folders.reveal(log.directory);
+      return {};
     },
   };
 }

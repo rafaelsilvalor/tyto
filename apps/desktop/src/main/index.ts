@@ -5,12 +5,13 @@ import { type BrowserWindow, Menu, app, dialog, ipcMain, safeStorage, shell } fr
 import { nodeFileSystem } from '@tyto/io';
 import type { Rasterizer } from '@tyto/raster';
 
-import { localeFor } from '../../shared/i18n/index.js';
+import { localeFor, translate } from '../../shared/i18n/index.js';
 import { fileCredentialStore } from './credential-store.js';
 import { createCredentials } from './credentials.js';
 import { createDocumentService } from './documents.js';
 import { createExportService } from './export.js';
 import { fileLayoutStore } from './layout-store.js';
+import { fileLog, installCrashHandlers } from './log.js';
 import { menuTemplate } from './menu.js';
 import { fileRecentFiles } from './recent-files.js';
 import { registerIpcHandlers, sendIpcEvent } from './ipc.js';
@@ -45,11 +46,23 @@ const here = dirname(fileURLToPath(import.meta.url));
 const devServerUrl = process.env['ELECTRON_RENDERER_URL'];
 
 async function start(): Promise<void> {
+  // **First, before anything that can fail.** A registry that will not read and a built-in
+  // that will not activate both happen here, before a window exists to say so in — so a log
+  // built after them is a log that cannot explain the one failure a person sees as "it did
+  // not start". `src/main/log.ts` says why it goes in its own folder and why it writes
+  // synchronously (TYTO-132).
+  const log = fileLog({
+    directory: join(app.getPath('userData'), 'logs'),
+    version: app.getVersion(),
+    platform: process.platform,
+  });
+  installCrashHandlers(process, log);
+
   // The registry is read before the window opens, not after: the renderer's first question
   // is which templates exist, and answering it with "not yet" would put a loading state in
   // front of every panel for the lifetime of a decision made at startup.
   const fileSystem = nodeFileSystem();
-  const host = await activateBuiltIns({ fileSystem });
+  const host = await activateBuiltIns({ fileSystem, log });
 
   // Opening and saving, and the only object in this app that knows where the open brief
   // is. The dialogs are wrapped here rather than inside the service for the usual reason —
@@ -105,6 +118,7 @@ async function start(): Promise<void> {
   // exports is what TYTO-133 registered, which is the claim the extension point makes.
   const exports_ = await createExportService({
     fileSystem,
+    log,
     version: app.getVersion(),
     ...(host.registry.rasterizers<Rasterizer>()[0]?.value === undefined
       ? {}
@@ -170,6 +184,7 @@ async function start(): Promise<void> {
     // Beside the credential store and the recent list, for the third time and on the same
     // argument: a file a person can read, edit and delete (ADR 0009).
     layout: fileLayoutStore(join(app.getPath('userData'), 'layout.json')),
+    log,
     preview,
     templates,
     info: () => ({
@@ -192,7 +207,20 @@ async function start(): Promise<void> {
   // Before the window, because the menu is the browser process's and a key pressed while it
   // is still the default one would be handled by the default one. `menu.ts` says why this
   // app installs a menu at all.
-  Menu.setApplicationMenu(Menu.buildFromTemplate(menuTemplate(process.platform)));
+  //
+  // The menu carries exactly one string of this app's own (TYTO-132), and it is resolved here
+  // against the **system's** locale rather than the window's: the picker in the footer changes
+  // the renderer's locale and main is never told, so this is the only locale main has.
+  Menu.setApplicationMenu(
+    Menu.buildFromTemplate(
+      menuTemplate(process.platform, {
+        t: (key) => translate(localeFor(app.getLocale()), key),
+        onRevealLogs: () => {
+          void shell.openPath(log.directory);
+        },
+      }),
+    ),
+  );
 
   mainWindow = createMainWindow({
     preload: join(here, '..', 'preload', 'index.cjs'),

@@ -53,6 +53,7 @@ export const en: Catalogue = {
   'exit.discard.detail.many': '{n} tabs have changes that have not been written to disk',
   'exit.discard.confirm': 'Quit without saving',
   'exit.discard.cancel': 'Cancel',
+  'menu.revealLogs': 'Open the log folder',
   'command.document.close': 'Close the tab',
   'command.document.next': 'Next tab',
   'command.document.previous': 'Previous tab',

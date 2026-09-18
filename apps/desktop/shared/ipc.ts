@@ -497,6 +497,33 @@ export const IPC_CHANNELS = {
    * `file:open` already has, and for the same reason `index.ts` gives as its rule.
    */
   'export:choose-directory': channel(z.object({}), z.object({ directory: z.string().optional() })),
+
+  /**
+   * Something went wrong in the window, written down where a report can reach it (TYTO-132).
+   *
+   * An ordinary question and deliberately not a push: the renderer is the side that *has* the
+   * failure, so this travels the direction the bridge already had. `IPC_EVENTS` exists (ADR
+   * 0029) and this channel has no business using it.
+   *
+   * **The two length caps are the mechanism, not a courtesy.** The card's rule is that no
+   * brief text and no file contents reach the log, and a rule enforced by call sites is a rule
+   * that survives until somebody adds a fifth call site. At 200 and 4000 the renderer *cannot*
+   * push a brief across: `parseIpc` refuses it in the preload, before the message is sent.
+   *
+   * `warn` and `error` only. The renderer has no reason to file debug chatter, and every level
+   * it can reach is one more thing that can spend the file's ceiling.
+   */
+  'log:write': channel(
+    z.object({
+      level: z.enum(['warn', 'error']),
+      message: z.string().min(1).max(200),
+      detail: z.string().max(4000).optional(),
+    }),
+    z.object({}),
+  ),
+
+  /** Opens the folder the log lives in, which is how a tester reaches it without a path. */
+  'log:reveal': channel(z.object({}), z.object({})),
 } as const;
 
 export type IpcChannels = typeof IPC_CHANNELS;
