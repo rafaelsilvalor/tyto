@@ -52,7 +52,7 @@ export interface BuiltInsOptions {
  * an exporter to the bytes of the folder it is rendering, and the desktop has not rendered
  * anything yet — an exporter registered now would be bound to nothing, which is a worse
  * answer than not being registered. They arrive with the card that renders (E9.3), and the
- * offscreen rasterizer with E5.4.
+ * desktop rasterizer with E5.4 — a debugger-captured window since ADR 0027, not an offscreen one.
  */
 export async function activateBuiltIns(options: BuiltInsOptions): Promise<InProcessHost> {
   const host = createPluginHost();

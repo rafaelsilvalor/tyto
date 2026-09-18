@@ -97,7 +97,7 @@ Spec: `docs/ir-schema.md` (mapping table), ADR 0002.
 - **E5.1** `export-html`: full visitor incl. blend, mask, clip, effects, bundled `@font-face`. AC: HTML snapshots per fixture. (L)
 - **E5.2** `export-svg`: full visitor incl. `<mask>`, `<clipPath>`, `<filter>`, embedded fonts or text→path (flag). AC: snapshots; SVG opens in Figma and Illustrator without errors. (L)
 - **E5.3** `raster` port + Playwright adapter; alpha via `omitBackground`; JPG/WebP with quality. AC: reference PNG per fixture with diff ≤ 0.1%. (M)
-- **E5.4** Chromium adapter via offscreen BrowserWindow (desktop). AC: same output as Playwright within tolerance. (S)
+- **E5.4** Chromium adapter on the desktop: a hidden `BrowserWindow` captured through `webContents.debugger` (ADR 0027 — an offscreen window's frame is clipped to the display's work area, so a story came back short). AC: same output as Playwright within tolerance, at story size too. (S)
 
 ## E6 — Pipeline and CLI
 

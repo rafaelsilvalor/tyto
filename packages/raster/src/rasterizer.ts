@@ -5,7 +5,8 @@
  * — fonts and assets already embedded, no network requests — and hands back the bytes of
  * one image. Nothing in it knows about a `Scene`, a brief or a file: a rasterizer is
  * handed a string and a size, which is what lets the same port be served by Playwright on
- * the CLI, an offscreen `BrowserWindow` on the desktop and a container in the cloud.
+ * the CLI, a debugger-captured `BrowserWindow` on the desktop (ADR 0027) and a container in
+ * the cloud.
  *
  * This module is types and arithmetic only — no Node, no DOM — so a consumer can depend
  * on the contract without dragging a browser in. The adapters are the parts that pick a
@@ -107,6 +108,12 @@ function positiveInteger(name: string, value: number): number {
  * Exported because every adapter has to agree on it. The Electron one in E5.4 has to
  * produce the same bytes as this one within tolerance, and two adapters that each decide
  * for themselves what `quality: 0` means have already stopped agreeing.
+ *
+ * All three formats survive that agreement, which was not a given: Electron's `NativeImage`
+ * encodes `png` and `jpeg` and nothing else, so an adapter built on it would have had to
+ * refuse `webp` and the port would have meant two different things per runtime. ADR 0027
+ * captures through the debugger, and `Page.captureScreenshot({ format: 'webp' })` returns
+ * real `RIFF`/`WEBP` bytes — checked in the bytes, on Chromium 152.
  */
 export function resolveRasterOptions(options: RasterOptions): ResolvedRasterOptions {
   const width = positiveInteger('width', options.width);
