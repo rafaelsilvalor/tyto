@@ -218,6 +218,7 @@ describe('the bridge', () => {
     expect(channels).toEqual([
       'app:exit-answer',
       'app:info',
+      'app:locale',
       'brief:preview',
       'credentials:delete',
       'credentials:get',
@@ -323,6 +324,10 @@ describe('the language picker', () => {
     'document.untitled',
     'document.unsaved',
     'file.missing',
+    // TYTO-124: a save that did not write, minted as a diagnostic the way `file.missing` is
+    // and in the document only after a save has failed. `src/renderer/save-failure.test.ts`
+    // is what holds it to a locale.
+    'file.saveFailed',
     // E9.10: the close button's word lives on `title` and `aria-label`, and the rest name
     // panels and commands inside the bar. The panel *headings* are still element text and
     // are still counted — what moved is who renders them, not whether they are painted.
@@ -355,6 +360,12 @@ describe('the language picker', () => {
     // browser process's chrome, not the document, so it can never be in this pass —
     // `src/main/menu.test.ts` is what holds the item to carrying the catalogue's word.
     'menu.revealLogs',
+    // TYTO-124: the File submenu's own title, and the label of the command it added. The
+    // title is menu chrome for the reason above; the label is the command bar's, like every
+    // other `command.*` here, and the bar is closed. `src/main/menu.test.ts` holds the item
+    // to the key and `e2e/menu.desktop.test.ts` holds it to the running app.
+    'menu.file',
+    'command.document.new',
     'command.document.close',
     'command.document.next',
     'command.document.previous',

@@ -570,6 +570,20 @@ export const IPC_CHANNELS = {
 
   /** Opens the folder the log lives in, which is how a tester reaches it without a path. */
   'log:reveal': channel(z.object({}), z.object({})),
+
+  /**
+   * The window telling main which language it is now in, so the menu can be rebuilt (TYTO-124).
+   *
+   * Main learns the locale once, at startup, off `app.getLocale()` — and until this card the
+   * menu carried exactly one string of this app's own, so a footer picker that disagreed with
+   * it cost a single line reading the wrong language. A File menu of five verbs makes that
+   * divergence the first thing a person sees, which is what turns a known wart into a channel.
+   *
+   * A request and not an event, because the direction is the renderer's: main is being told,
+   * not asked. The empty response is an acknowledgement and nothing more — the menu is a side
+   * effect in the browser process and there is nothing for the window to do with the outcome.
+   */
+  'app:locale': channel(z.object({ locale: z.string().min(1) }), z.object({})),
 } as const;
 
 export type IpcChannels = typeof IPC_CHANNELS;
@@ -605,6 +619,20 @@ export const IPC_EVENTS = {
    * The renderer answers on `app:exit-answer`, carrying this `askId` back.
    */
   'app:exit-requested': z.object({ askId: z.number().int().nonnegative() }),
+
+  /**
+   * Somebody picked a File menu item; run the command it names (TYTO-124).
+   *
+   * The id and not the action, which is the whole of how the menu avoids being a second
+   * implementation: main knows the table in `shared/commands.ts` and nothing about what any
+   * of it does, and the renderer answers by calling the same `registry.run` the command bar
+   * calls. A menu item that grew a behaviour of its own would be a behaviour the bar did not
+   * have, and the two would drift on the first card that changed either.
+   *
+   * No reply, per the rule above: a menu item is not a question. A command that fails does
+   * what it does when the bar runs it — which for a save is now a row in the problems panel.
+   */
+  'command:run': z.object({ id: z.string().min(1) }),
 } as const;
 
 export type IpcEvents = typeof IPC_EVENTS;
