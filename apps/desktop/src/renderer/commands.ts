@@ -77,6 +77,15 @@ export const pathOfRecentCommand = (id: string): string | undefined =>
   id.startsWith(RECENT_PREFIX) ? id.slice(RECENT_PREFIX.length) : undefined;
 export const EDITOR_TOGGLE_VIM = 'editor.toggleVim';
 
+/**
+ * A new, empty tab (TYTO-124).
+ *
+ * The only way to reach an empty buffer before this was to close the last tab, which the
+ * window replaces with a fresh one — a side effect standing in for a verb. It registers next
+ * to Open rather than beside the tab commands because that is where a person looks for it,
+ * and registration order is display order.
+ */
+export const DOCUMENT_NEW = 'document.new';
 export const DOCUMENT_CLOSE = 'document.close';
 export const DOCUMENT_NEXT = 'document.next';
 export const DOCUMENT_PREVIOUS = 'document.previous';
@@ -127,6 +136,7 @@ export const COMMAND_LABELS: Readonly<Record<string, CatalogueKey>> = {
   [PREVIEW_PREVIOUS_SLIDE]: 'command.preview.previousSlide',
   [SHELL_TOGGLE_LOCALE]: 'command.shell.toggleLocale',
   [EDITOR_TOGGLE_VIM]: 'command.editor.toggleVim',
+  [DOCUMENT_NEW]: 'command.document.new',
   [EDITOR_OPEN]: 'command.file.open',
   [EDITOR_SAVE]: 'command.file.save',
   [EDITOR_SAVE_AS]: 'command.file.saveAs',
@@ -164,6 +174,7 @@ export interface DesktopActions {
   toggleLocale(): void;
   toggleVimMode(): void;
   /** E9.8. Each of these ends in a round trip to main, which owns every path. */
+  newDocument(): void;
   openDocument(): void;
   saveDocument(saveAs: boolean): void;
   /** E9.10. Puts every panel back where ADR 0024 says it goes. */
@@ -235,6 +246,9 @@ export function createDesktopRegistry(actions: DesktopActions): CommandRegistry 
   // `editor.save` is `@tyto/editor`'s id and not one invented here, which is the whole
   // point: the editor has shipped `Mod-s` bound to that string since E8.3, and until a host
   // registered it the key did nothing. This is the host registering it.
+  add(DOCUMENT_NEW, () => {
+    actions.newDocument();
+  });
   add(EDITOR_OPEN, () => {
     actions.openDocument();
   });
@@ -316,15 +330,22 @@ export function bindingsOf(
  * The default set plus the two keys only a desktop can mean.
  *
  * `Mod-s` is already in both of `@tyto/editor`'s sets — the editor ships the binding and
- * leaves the command to the host — so opening and "save as" are the only two this adds.
+ * leaves the command to the host — so new, open and "save as" are the three this adds.
  * They go in a set rather than in a window listener because they are about the document and
  * the editor is what owns one; `Mod-K` is the opposite case and is a window listener for
  * the opposite reason (`main.ts`).
+ *
+ * **`Mod-n` is here and not on the File menu item, which is the rule for all five verbs**
+ * (TYTO-124). A menu accelerator is the browser process's and fires before the page, so it
+ * would override this set unconditionally — vim mode included, where these bindings are
+ * deliberately absent and `Ctrl-N` and `Ctrl-O` belong to the vim engine. `src/main/menu.ts`
+ * carries the reasoning where somebody would go to add one.
  */
 export const desktopKeymapSet: EditorKeymap = {
   id: 'desktop',
   bindings: [
     ...defaultKeymapSet.bindings,
+    { key: 'Mod-n', command: DOCUMENT_NEW },
     { key: 'Mod-o', command: EDITOR_OPEN },
     { key: 'Mod-Shift-s', command: EDITOR_SAVE_AS },
     // The tabs (E9.11). `Mod-w` closes and the two page keys step, which is what Chrome,

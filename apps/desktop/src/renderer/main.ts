@@ -1,6 +1,6 @@
 import { type CommandRegistry, type EditorHandle, createEditor } from '@tyto/editor';
 
-import { type TytoBridge } from '../../shared/ipc.js';
+import { type IpcResponse, type TytoBridge } from '../../shared/ipc.js';
 import {
   type CatalogueKey,
   type Locale,
@@ -54,6 +54,7 @@ import {
   updateDocument,
   workspaceOf,
 } from './documents.js';
+import { SAVE_FAILED, saveFailureDiagnostic } from './save-failure.js';
 import { type DocumentTabs, TABS_TAG } from './tabs.js';
 import { type ProblemsPanel, PROBLEMS_TAG } from './problems-panel.js';
 import { arrange, wireSplitters } from './dock.js';
@@ -599,6 +600,18 @@ const registry: CommandRegistry = createDesktopRegistry({
     openExportDialog();
   },
 
+  newDocument: () => {
+    // **Added and never substituted, which is the whole of the card's second criterion.**
+    // `adopt` replaces the tab in front when `isDisposable` says it holds nothing — right for
+    // opening a file, wrong here: a New pressed on an empty tab would open no tab at all, and
+    // the person who asked for a blank page would watch nothing happen. So `isDisposable`'s
+    // rule is not consulted and not changed.
+    captureScroll();
+    workspace = addDocument(workspace, newDocument(nextDocumentId(), editor?.blank('')));
+    restoreActive();
+    repaint();
+  },
+
   openDocument: () => {
     void withBridge(async (bridge) => {
       const wanted = nextDocumentId();
@@ -614,13 +627,36 @@ const registry: CommandRegistry = createDesktopRegistry({
       // would write the empty string over a file.
       if (editor === undefined) return;
       const documentId = workspace.activeId;
-      const answer = await bridge['file:save']({
-        documentId,
-        // The workspace's text and not the pane's, which is what makes this call one a
-        // future "save all" could make about a tab that is not in front.
-        text: activeText(),
-        saveAs,
-      });
+
+      // **The one call in this file that is caught** (TYTO-124). A full disk, a folder gone
+      // read-only, a path that vanished under a save-as: `file:save` rejects, and until this
+      // card the rejection went to `installErrorReporting`, which writes it to a log file the
+      // person has no reason to open. The unsaved marker stayed lit — true, and silent.
+      //
+      // Caught here rather than in `withBridge` on purpose. The other twelve callers reject
+      // for reasons a person did not ask for and cannot act on; this one is the answer to a
+      // key somebody just pressed about text they would lose.
+      let answer: IpcResponse<'file:save'>;
+      try {
+        answer = await bridge['file:save']({
+          documentId,
+          // The workspace's text and not the pane's, which is what makes this call one a
+          // future "save all" could make about a tab that is not in front.
+          text: activeText(),
+          saveAs,
+        });
+      } catch (cause) {
+        // Rebuilt and not appended to, the way `E_FILE_NOT_FOUND` above is: a second failed
+        // save is the same problem said again, not a second problem.
+        panel.installation = [
+          saveFailureDiagnostic(state.locale, documentOf(workspace, documentId)?.name, cause),
+          ...panel.installation.filter((item) => item.code !== SAVE_FAILED),
+        ];
+        repaint();
+        // Re-thrown so `installErrorReporting` still files it: the sentence on screen is for
+        // the person, and the line in the log is for whoever reads their report.
+        throw cause;
+      }
       // A dismissed dialog leaves everything alone, the unsaved marker included. There is
       // nothing to clear now — the marker is a comparison — but there is something not to
       // move: taking `savedText` forward here would tell somebody their text was written
@@ -1172,7 +1208,7 @@ async function changeLayout(next: Layout): Promise<void> {
 }
 
 /**
- * Changes the window's language, which is two things and not one.
+ * Changes the window's language, which is three things and not one.
  *
  * Everything this app draws itself is re-read from the catalogue by `repaint`. The search
  * panel is not: it is CodeMirror's DOM and its words arrive through `EditorState.phrases`,
@@ -1185,6 +1221,13 @@ function applyLocale(next: Locale): void {
   if (elements.locale !== null) fillLocalePicker(elements.locale, state.locale);
   editor?.setSearchPhrases(searchPhrasesFor(state.locale));
   repaint();
+  // And three things, since TYTO-124: the application menu is main's and now carries this
+  // app's own verbs, so main has to be told which language to draw them in. Fire and forget —
+  // a menu that stayed in the old language is a cosmetic failure, and the log is where it
+  // belongs if the message never lands.
+  void withBridge(async (bridge) => {
+    await bridge['app:locale']({ locale: next });
+  });
 }
 
 /**
@@ -1491,6 +1534,17 @@ async function load(): Promise<void> {
     // handle nobody can call is a handle that only looks like cleanup.
     bridge.on('app:exit-requested', ({ askId }) => {
       void answerExitRequest(bridge, askId);
+    });
+
+    // A File menu item was picked (TYTO-124). Straight into `runCommand`, which is the same
+    // door the command bar knocks on — the id crossed the bridge precisely so that nothing
+    // else had to.
+    //
+    // A command the registry does not hold returns `false` and is ignored, which is the right
+    // answer to a menu built against an older table: a window that threw here would be a
+    // window a stale menu could crash.
+    bridge.on('command:run', ({ id }) => {
+      runCommand(id);
     });
   }
 
