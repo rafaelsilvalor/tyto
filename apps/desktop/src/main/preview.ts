@@ -1,26 +1,19 @@
-import { createRequire } from 'node:module';
-import { dirname, join } from 'node:path';
-
 import { parseBrief } from '@tyto/brief-lang';
 import {
   type AssetResolver,
-  type Diagnostic,
   type Diagnostics,
   type FileSystem,
-  type FormatCatalogue,
-  type TemplateRegistry,
   compile,
   createFaceCache,
-  loadFormats,
-  loadTemplateRegistry,
   resolve,
   sceneResources,
 } from '@tyto/core';
 import { exportHtml } from '@tyto/export-html';
 import { bundledFont, bundledFontSource } from '@tyto/fonts';
-import { BUILT_IN_TEMPLATES_DIRECTORY } from '@tyto/templates';
 import { markupTemplateSource } from '@tyto/pipeline';
 import { fileAssetResolver, fileResources } from '@tyto/io';
+
+import { type ProjectSources } from './project.js';
 
 /**
  * Brief text in, one HTML document per frame out — the preview's whole job (E9.2).
@@ -86,10 +79,14 @@ export interface PreviewResult {
 
 export interface PreviewServiceOptions {
   readonly fileSystem: FileSystem;
-  /** The folder holding one subfolder per template. Defaults to the built-in pack's. */
-  readonly templatesDirectory?: string;
-  /** The project's `formats.yaml`. Defaults to the built-in pack's. */
-  readonly formatsFile?: string;
+  /**
+   * Which folders are searched, read **per compile** rather than held (TYTO-122).
+   *
+   * It used to be two paths resolved at construction, which quietly made the template folder
+   * a property of the service's lifetime. `src/main/project.ts` says why one holder read per
+   * call is cheaper and safer than rebuilding this service when a person picks a folder.
+   */
+  readonly sources: ProjectSources;
 }
 
 export interface PreviewService {
@@ -103,19 +100,6 @@ export interface PreviewService {
    * that was handed the request's `documentId`.
    */
   preview(brief: string, baseDirectory?: string): Promise<PreviewResult>;
-}
-
-/**
- * Where `@tyto/templates` put its folder on this machine.
- *
- * The same resolver `plugins.ts` uses and for the same reason — through the package's own
- * `package.json`, which is the one form that is right in a pnpm workspace, in a published
- * install, and inside an Electron `asar`. `electron-builder.yml` re-includes that package
- * for exactly this call (TYTO-15).
- */
-function builtInTemplates(): string {
-  const packageJson = createRequire(import.meta.url).resolve('@tyto/templates/package.json');
-  return join(dirname(packageJson), BUILT_IN_TEMPLATES_DIRECTORY);
 }
 
 /**
@@ -138,41 +122,32 @@ const noAssets: AssetResolver = {
 export async function createPreviewService(
   options: PreviewServiceOptions,
 ): Promise<PreviewService> {
-  const { fileSystem } = options;
-  const templatesDirectory = options.templatesDirectory ?? builtInTemplates();
-  const formatsFile = options.formatsFile ?? fileSystem.join(templatesDirectory, 'formats.yaml');
-
-  // Read once and held, because a preview runs on every keystroke and re-reading every
-  // manifest per keystroke would make the editor's latency a function of how many templates
-  // are installed. The same argument `loadRenderContext` makes for `tyto watch`.
-  const [registry, formats] = await Promise.all([
-    loadTemplateRegistry(fileSystem, templatesDirectory),
-    loadFormats(fileSystem, formatsFile),
-  ]);
-
-  // Startup problems, kept and replayed on every preview rather than thrown. A desktop app
-  // whose template folder is unreadable should open, show the editor, and say what is wrong
-  // — not refuse to start. `PreviewResult` already has the place to say it.
-  const startup: Diagnostic[] = [
-    ...(registry.ok ? registry.diagnostics : registry.error),
-    ...(formats.ok ? formats.diagnostics : formats.error),
-  ];
-
-  const catalogue: FormatCatalogue | undefined = formats.ok ? formats.value : undefined;
-  const templates: TemplateRegistry | undefined = registry.ok ? registry.value : undefined;
+  const { fileSystem, sources } = options;
 
   // One cache for the life of the service: parsing a font to measure a string is the
-  // expensive part of `compile`, and the faces do not change between keystrokes.
+  // expensive part of `compile`, the faces are the bundled ones, and neither is a function
+  // of which template folder is in force. This is the one thing here that is still held.
   const faces = createFaceCache(bundledFontSource);
-
-  const failed = (diagnostics: Diagnostics): PreviewResult => ({
-    frames: [],
-    artworks: [],
-    diagnostics: [...startup, ...diagnostics],
-  });
 
   return {
     async preview(brief: string, baseDirectory?: string): Promise<PreviewResult> {
+      // Read once per compile, not per frame, and not at construction (TYTO-122). Per
+      // compile is what lets a folder chosen at 11am be searched at 11:01 with no restart;
+      // once, so a reload landing mid-compile cannot change the registry under it.
+      const {
+        registry: templates,
+        formats: catalogue,
+        // Startup problems, replayed on every preview rather than thrown. A desktop app whose
+        // template folder is unreadable should open, show the editor, and say what is wrong.
+        diagnostics: startup,
+      } = sources.current();
+
+      const failed = (diagnostics: Diagnostics): PreviewResult => ({
+        frames: [],
+        artworks: [],
+        diagnostics: [...startup, ...diagnostics],
+      });
+
       if (templates === undefined || catalogue === undefined) return failed([]);
 
       const ast = parseBrief(brief);

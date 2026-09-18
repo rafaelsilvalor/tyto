@@ -30,6 +30,7 @@ const state = (locale: Locale, document?: { name: string | undefined; dirty: boo
   version: '0.1.0',
   platform: 'linux',
   templates: ['carrossel-lista', 'promo-curso'],
+  templatesFolder: null,
   document: document ?? { name: undefined, dirty: false },
 });
 
@@ -81,6 +82,22 @@ describe('paint', () => {
     );
     expect(document.querySelector('[data-i18n="shell.about.templates"]')?.textContent).toBe(
       `${translate('pt-BR', 'shell.about.templates')}: 2`,
+    );
+  });
+
+  it('names the template folder in force, and says so when there is none', () => {
+    // The whole failure this setting guards against is somebody wondering why their template
+    // is not in the picker, so the answer is on screen rather than buried in a settings file
+    // (TYTO-122). A word and not a blank when nobody has chosen one: an empty cell in a row
+    // that has a label reads as something that failed to load.
+    paint(document, state('pt-BR'));
+    expect(document.querySelector('[data-i18n="templates.folder.label"]')?.textContent).toBe(
+      `${translate('pt-BR', 'templates.folder.label')}: ${translate('pt-BR', 'templates.folder.none')}`,
+    );
+
+    paint(document, { ...state('pt-BR'), templatesFolder: '/home/rafael/meus-templates' });
+    expect(document.querySelector('[data-i18n="templates.folder.label"]')?.textContent).toBe(
+      `${translate('pt-BR', 'templates.folder.label')}: /home/rafael/meus-templates`,
     );
   });
 

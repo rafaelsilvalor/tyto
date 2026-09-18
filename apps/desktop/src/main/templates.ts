@@ -1,10 +1,10 @@
 import { readFile } from 'node:fs/promises';
 import { join } from 'node:path';
 
-import { type TemplateRegistry, loadTemplateRegistry } from '@tyto/core';
-import type { FileSystem } from '@tyto/core';
+import { type TemplateRegistry } from '@tyto/core';
 
 import { type IpcResponse } from '../../shared/ipc.js';
+import { type ProjectSnapshot, type ProjectSources } from './project.js';
 
 /**
  * What a template picker shows, read from the manifests and from nothing else (E9.3).
@@ -16,12 +16,13 @@ import { type IpcResponse } from '../../shared/ipc.js';
  * they scrolled past it. So this reads manifests, and `compile` stays the only thing that
  * executes one.
  *
- * The preview service reads the same registry and holds it for the life of the app. This
- * reads its own rather than sharing that one, and the reason is a boundary rather than an
- * oversight: `PreviewService` exposes a `preview(brief)` and nothing else, and widening it to
- * hand out its registry would make "compile a brief" and "list what is installed" one object
- * with two unrelated reasons to change. Reading a folder of manifests once at startup is
- * cheap, and the composition root already has the pieces.
+ * The preview service reads the same folders. This used to read its own registry rather than
+ * sharing that one, on a boundary argument: `PreviewService` exposes `preview(brief)` and
+ * nothing else, and widening it to hand out its registry would make "compile a brief" and
+ * "list what is installed" one object with two reasons to change. That argument still holds
+ * and TYTO-122 did not weaken it. What is shared now is `ProjectSources`, which is *neither*
+ * service and whose only job is to say which folders are searched: both read it, neither owns
+ * the other.
  */
 
 /** The image beside a `manifest.yaml`, by convention; absent from every built-in today. */
@@ -31,14 +32,20 @@ const PREVIEW_FILE = 'preview.png';
 const MAX_PREVIEW_BYTES = 2 * 1024 * 1024;
 
 export interface TemplateCatalogueOptions {
-  readonly fileSystem: FileSystem;
-  /** The folder holding one subfolder per template. The built-in pack's, in the app. */
-  readonly directory: string;
+  /** Which folders are searched, and the thing that changes when a person picks one. */
+  readonly sources: ProjectSources;
 }
 
 export interface TemplateCatalogue {
-  /** Everything `templates:list` answers with, built once and held. */
-  list(): IpcResponse<'templates:list'>;
+  /**
+   * Everything `templates:list` answers with.
+   *
+   * A promise since TYTO-122, and `previewUri` is the reason: a folder change means different
+   * templates and different `preview.png` files, and those are read from a disk. Memoised on
+   * the **identity of the snapshot**, so the promise the doc comment below makes still holds
+   * for every call that is not the first after a folder change.
+   */
+  list(): Promise<IpcResponse<'templates:list'>>;
 }
 
 /**
@@ -72,54 +79,76 @@ function entriesOf(registry: TemplateRegistry): IpcResponse<'templates:list'>['t
 }
 
 /**
- * Reads the folder once and answers from memory after that.
+ * Reads the folders once and answers from memory until they change.
  *
- * A registry is read at startup and held everywhere else in this app, and a picker asking
- * per click would be re-reading manifests that cannot have changed without the app being
- * restarted. Reloading when they *can* change is what E9.5's "edit template" mode will need,
- * and it will need a reason to reload rather than a habit of it.
+ * A picker asking per click would be re-reading manifests that cannot have changed — and
+ * "cannot have changed" is precisely what TYTO-122 made conditional. So the cache is keyed on
+ * the snapshot object rather than on nothing: choosing a folder makes the next call read, and
+ * clicking the picker a hundred times still does not.
  */
 export async function createTemplateCatalogue(
   options: TemplateCatalogueOptions,
 ): Promise<TemplateCatalogue> {
-  const { fileSystem, directory } = options;
-  const loaded = await loadTemplateRegistry(fileSystem, directory);
+  const { sources } = options;
 
-  // A registry that would not load is an empty picker plus the reason, not a crash. The
-  // desktop opens and says it has no templates; that is the same call `plugins.ts` makes.
-  const registry = loaded.ok ? loaded.value : undefined;
+  const build = async (snapshot: ProjectSnapshot): Promise<IpcResponse<'templates:list'>> => {
+    // A registry that would not load is an empty picker plus the reason, not a crash. The
+    // desktop opens and says it has no templates; that is the same call `plugins.ts` makes.
+    const registry = snapshot.registry;
 
-  const templates = registry === undefined ? [] : entriesOf(registry);
+    const templates = registry === undefined ? [] : entriesOf(registry);
 
-  // The preview image is per template and optional, so it is read after the list exists
-  // rather than being folded into the map above — a missing file must not cost the entry.
-  const withPreviews = await Promise.all(
-    templates.map(async (template) => {
-      const folder = registry?.directoryOf(template.name);
-      const preview = folder === undefined ? undefined : await previewUri(folder);
-      return preview === undefined ? template : { ...template, preview };
-    }),
-  );
+    // The preview image is per template and optional, so it is read after the list exists
+    // rather than being folded into the map above — a missing file must not cost the entry.
+    const withPreviews = await Promise.all(
+      templates.map(async (template) => {
+        const folder = registry?.directoryOf(template.name);
+        const preview = folder === undefined ? undefined : await previewUri(folder);
+        return preview === undefined ? template : { ...template, preview };
+      }),
+    );
 
-  // The registry's own diagnostics, carried across rather than summarised: each one already
-  // has a code the docs are indexed by and a message in the user's language. The `range` is
-  // dropped because it would index a `manifest.yaml` the editor is not holding, and a panel
-  // row that scrolled an unrelated buffer to offset 40 would be worse than one that does not.
-  const flatten = (diagnostics: readonly { code: string; message: string; severity: string }[]) =>
-    diagnostics.map((problem) => ({
-      severity: problem.severity === 'warning' ? ('warning' as const) : ('error' as const),
-      code: problem.code,
-      message: problem.message,
-    }));
+    // The registry's own diagnostics, carried across rather than summarised: each one already
+    // has a code the docs are indexed by and a message in the user's language. The `range` is
+    // dropped because it would index a `manifest.yaml` the editor is not holding, and a panel
+    // row that scrolled an unrelated buffer to offset 40 would be worse than one that does not.
+    const flatten = (diagnostics: readonly { code: string; message: string; severity: string }[]) =>
+      diagnostics.map((problem) => ({
+        severity: problem.severity === 'warning' ? ('warning' as const) : ('error' as const),
+        code: problem.code,
+        message: problem.message,
+      }));
 
-  const failures = [
-    ...(loaded.ok ? [] : [{ directory, diagnostics: flatten(loaded.error) }]),
-    ...(registry?.failures ?? []).map((failure) => ({
-      directory: failure.directory,
-      diagnostics: flatten(failure.diagnostics),
-    })),
-  ];
+    const failures = [
+      // Only when the read produced no registry at all. A snapshot that has one already
+      // carries its per-folder failures below, and listing both would report one broken
+      // template twice.
+      ...(registry === undefined
+        ? snapshot.roots.map((root) => ({
+            directory: root,
+            diagnostics: flatten(snapshot.diagnostics),
+          }))
+        : []),
+      ...(registry?.failures ?? []).map((failure) => ({
+        directory: failure.directory,
+        diagnostics: flatten(failure.diagnostics),
+      })),
+    ];
 
-  const answer: IpcResponse<'templates:list'> = { templates: withPreviews, failures };
-  return { list: () => answer };
+    return { templates: withPreviews, failures };
+  };
+
+  let cached: { snapshot: ProjectSnapshot; answer: IpcResponse<'templates:list'> } = {
+    snapshot: sources.current(),
+    answer: await build(sources.current()),
+  };
+
+  return {
+    list: async () => {
+      const snapshot = sources.current();
+      if (cached.snapshot === snapshot) return cached.answer;
+      cached = { snapshot, answer: await build(snapshot) };
+      return cached.answer;
+    },
+  };
 }

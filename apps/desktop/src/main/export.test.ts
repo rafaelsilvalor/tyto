@@ -7,6 +7,7 @@ import { nodeFileSystem } from '@tyto/io';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
 import { type ExportProgress, type ExportService, createExportService } from './export.js';
+import { createProjectSources } from './project.js';
 
 /**
  * The export, against the pack the app actually ships.
@@ -36,7 +37,14 @@ let out: string;
 
 beforeEach(async () => {
   out = mkdtempSync(join(tmpdir(), 'tyto-export-'));
-  service = await createExportService({ fileSystem: nodeFileSystem(), version: '0.0.0-test' });
+  service = await createExportService({
+    fileSystem: nodeFileSystem(),
+    sources: await createProjectSources({
+      fileSystem: nodeFileSystem(),
+      builtIn: packDirectory,
+    }),
+    version: '0.0.0-test',
+  });
 });
 
 afterEach(() => {

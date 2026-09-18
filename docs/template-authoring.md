@@ -134,6 +134,26 @@ The load fails — `Err` rather than a registry with failures in it — only whe
 unreadable, which is the one case where there is no registry to return rather than an
 incomplete one.
 
+### In the desktop app
+
+The window has the same door, with the same precedence. **Settings → choose a template
+folder** (the command bar lists it as _Escolher pasta de templates…_) points the app at a
+folder of template subfolders; it is searched before the built-in pack, so a template of yours
+with a built-in one's name wins, exactly as `templates/` beside a brief does for the CLI.
+
+The choice is remembered in `settings.json` beside `layout.json` in the app's data folder, so
+it survives a restart, and _Voltar aos templates internos_ clears it with no restart either.
+The footer shows which folder is in force, or `internos` when none is.
+
+**One rule the CLI does not have.** A chosen folder's own `formats.yaml` replaces the built-in
+pack's when it has one, and falls back to the built-in one when it does not — so a folder that
+is only templates does not have to carry a formats file to be usable. A `formats.yaml` that is
+there and will not parse keeps the built-in formats and reports the error in the problems
+panel, rather than leaving the app with no formats at all.
+
+A folder that is readable and holds no `manifest.yaml` anywhere is reported in the problems
+panel as having no templates, and the built-in pack keeps working.
+
 ## template.html — Tyto markup
 
 Looks like HTML+CSS, but every tag is an IR node and the CSS is a controlled subset. No JS.

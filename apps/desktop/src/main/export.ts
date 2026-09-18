@@ -1,14 +1,4 @@
-import { createRequire } from 'node:module';
-import { dirname, join } from 'node:path';
-
-import {
-  type Diagnostics,
-  type FileSystem,
-  type FormatCatalogue,
-  type TemplateRegistry,
-  loadFormats,
-  loadTemplateRegistry,
-} from '@tyto/core';
+import { type Diagnostics, type FileSystem } from '@tyto/core';
 import { htmlExporterPlugin } from '@tyto/export-html';
 import { svgExporterPlugin } from '@tyto/export-svg';
 import { bundledFont } from '@tyto/fonts';
@@ -22,7 +12,8 @@ import {
 import { type InProcessHost, type Logger, createPluginHost } from '@tyto/plugin-api';
 import { type JobEvent, type OutputRequest, markupTemplateSource, runJob } from '@tyto/pipeline';
 import type { Rasterizer } from '@tyto/raster';
-import { BUILT_IN_TEMPLATES_DIRECTORY } from '@tyto/templates';
+
+import { type ProjectSources } from './project.js';
 
 /**
  * Brief text in, files on disk out — the export's whole job (E9.4, TYTO-43).
@@ -45,12 +36,6 @@ import { BUILT_IN_TEMPLATES_DIRECTORY } from '@tyto/templates';
  * `cancelled` in its result, so `export:cancel` is an ordinary request that fires a
  * controller this service holds.
  */
-
-/** Where `@tyto/templates` put its folder — `preview.ts`'s resolver, for its reasons. */
-function builtInTemplates(): string {
-  const packageJson = createRequire(import.meta.url).resolve('@tyto/templates/package.json');
-  return join(dirname(packageJson), BUILT_IN_TEMPLATES_DIRECTORY);
-}
 
 export interface ExportRequest {
   /** The brief's text, as the editor has it — not a second read of the file. */
@@ -113,8 +98,14 @@ export interface ExportServiceOptions {
    * job's own diagnostic naming the missing rasterizer, which is the honest answer.
    */
   readonly rasterizer?: Rasterizer;
-  readonly templatesDirectory?: string;
-  readonly formatsFile?: string;
+  /**
+   * Which folders are searched, read once **per run** rather than held (TYTO-122).
+   *
+   * Per run and not per frame, deliberately: a folder changed while an export is going must
+   * not swap the registry under a job that has already planned its frames. `project.ts` has
+   * the rest of the argument.
+   */
+  readonly sources: ProjectSources;
   /** `tyto`'s own version, for `result.json`. */
   readonly version: string;
   /**
@@ -185,35 +176,20 @@ function exporterHost(
 }
 
 export async function createExportService(options: ExportServiceOptions): Promise<ExportService> {
-  const { fileSystem } = options;
-  const templatesDirectory = options.templatesDirectory ?? builtInTemplates();
-  const formatsFile = options.formatsFile ?? fileSystem.join(templatesDirectory, 'formats.yaml');
-
-  // Read once and held, the same arrangement `createPreviewService` makes: an export should
-  // not pay to re-read every manifest, and the two services are looking at the same folder.
-  const [registry, formats] = await Promise.all([
-    loadTemplateRegistry(fileSystem, templatesDirectory),
-    loadFormats(fileSystem, formatsFile),
-  ]);
-
-  // Startup problems are kept and replayed into every run's diagnostics rather than thrown,
-  // for `preview.ts`'s reason: an app whose template folder is unreadable should open and
-  // say so.
-  const startup: Diagnostics = [
-    ...(registry.ok ? registry.diagnostics : registry.error),
-    ...(formats.ok ? formats.diagnostics : formats.error),
-  ];
-
-  const catalogue: FormatCatalogue | undefined = formats.ok ? formats.value : undefined;
-  const templates: TemplateRegistry | undefined = registry.ok ? registry.value : undefined;
+  const { fileSystem, sources } = options;
 
   const runs = new Map<string, Run>();
   let counter = 0;
 
   async function execute(request: ExportRequest, run: Run): Promise<void> {
+    // The snapshot this run is exporting under, taken once at the top. Startup problems are
+    // replayed into the run's diagnostics rather than thrown, for `preview.ts`'s reason: an
+    // app whose template folder is unreadable should open and say so.
+    const { registry: templates, formats: catalogue, diagnostics: startup } = sources.current();
+
     if (templates === undefined || catalogue === undefined) {
       run.status = 'finished';
-      run.diagnostics = startup;
+      run.diagnostics = [...startup];
       return;
     }
 

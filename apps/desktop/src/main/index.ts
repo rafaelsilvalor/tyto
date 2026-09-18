@@ -17,7 +17,9 @@ import { fileRecentFiles } from './recent-files.js';
 import { registerIpcHandlers, sendIpcEvent } from './ipc.js';
 import { activateBuiltIns, builtInTemplatesDirectory } from './plugins.js';
 import { createPreviewService } from './preview.js';
+import { createProjectSources } from './project.js';
 import { createExitGuard } from './quit.js';
+import { fileSettingsStore } from './settings-store.js';
 import { createTemplateCatalogue } from './templates.js';
 import { bundledRenderer, createMainWindow } from './window.js';
 
@@ -64,6 +66,23 @@ async function start(): Promise<void> {
   const fileSystem = nodeFileSystem();
   const host = await activateBuiltIns({ fileSystem, log });
 
+  // Which folders this app searches for templates, and the only thing below that is rebuilt
+  // when a person picks one (TYTO-122). The built-in pack is always the last root, so
+  // clearing the setting is a reload with no folder rather than a different code path.
+  //
+  // `activateBuiltIns` above deliberately stays out of it: it registers the *built-in pack*
+  // through the plugin extension point, and a folder somebody points at is not a plugin —
+  // that is the whole of why this card is not TYTO-47.
+  const settings = fileSettingsStore(join(app.getPath('userData'), 'settings.json'));
+  const saved = await settings.read();
+  const sources = await createProjectSources({
+    fileSystem,
+    builtIn: builtInTemplatesDirectory(),
+    // Spread rather than `?? undefined`, because `exactOptionalPropertyTypes` tells an absent
+    // key and an explicit `undefined` apart and the option wants the first.
+    ...(saved.templatesFolder === null ? {} : { folder: saved.templatesFolder }),
+  });
+
   // Opening and saving, and the only object in this app that knows where the open brief
   // is. The dialogs are wrapped here rather than inside the service for the usual reason —
   // `dialog` is an Electron API, and a service that named one could not be tested without
@@ -95,15 +114,12 @@ async function start(): Promise<void> {
   // It is told no folder here. Which folder a compile resolves against is a property of the
   // tab the brief is in, and `ipc.ts` looks it up per request from the id that came with
   // it (E9.11) — a service holding one folder assumed one open document.
-  const preview = await createPreviewService({ fileSystem });
+  const preview = await createPreviewService({ fileSystem, sources });
 
   // The picker's list, read once alongside the other two. Its own read rather than the
   // preview service's registry: compiling a brief and listing what is installed are two
   // reasons for one object to change, and `src/main/templates.ts` says why that matters.
-  const templates = await createTemplateCatalogue({
-    fileSystem,
-    directory: builtInTemplatesDirectory(),
-  });
+  const templates = await createTemplateCatalogue({ sources });
 
   // The one place `safeStorage` is named. Everything below takes it as an argument, which
   // is what lets the credential module be tested without a keychain and without Electron.
@@ -119,6 +135,7 @@ async function start(): Promise<void> {
   const exports_ = await createExportService({
     fileSystem,
     log,
+    sources,
     version: app.getVersion(),
     ...(host.registry.rasterizers<Rasterizer>()[0]?.value === undefined
       ? {}
@@ -185,6 +202,35 @@ async function start(): Promise<void> {
     // argument: a file a person can read, edit and delete (ADR 0009).
     layout: fileLayoutStore(join(app.getPath('userData'), 'layout.json')),
     log,
+    project: {
+      folder: () => {
+        const chosen = sources.current().folder;
+        return { folder: chosen?.path ?? null, found: chosen?.found ?? 0 };
+      },
+      setFolder: async (choose) => {
+        const inForce = (): { folder: string | null; found: number } => {
+          const chosen = sources.current().folder;
+          return { folder: chosen?.path ?? null, found: chosen?.found ?? 0 };
+        };
+
+        let chosen: string | undefined;
+        if (choose) {
+          // No `createDirectory`, unlike the export's picker above: an export chooses a
+          // destination that may not exist yet, and a template folder that does not exist has
+          // nothing in it to find.
+          const answer = await dialog.showOpenDialog({ properties: ['openDirectory'] });
+          // A dismissed picker is not a clear. Whatever was in force stays in force.
+          if (answer.canceled) return inForce();
+          chosen = answer.filePaths[0];
+        }
+
+        // Written before the reload, so a disk that refuses the file still leaves this session
+        // searching the folder the person just picked — they lose the memory, not the choice.
+        await settings.write({ templatesFolder: chosen ?? null });
+        await sources.reload(chosen);
+        return inForce();
+      },
+    },
     preview,
     templates,
     info: () => ({

@@ -242,6 +242,52 @@ export const IPC_CHANNELS = {
   ),
 
   /**
+   * Which folder is searched before the built-in pack, right now (TYTO-122).
+   *
+   * Asked once on load, beside `templates:list`. `folder` is `null` on an install that has
+   * never chosen one, which is where everybody starts and where clearing goes back to.
+   *
+   * `found` is how many templates that folder contributed, and it is a **count rather than a
+   * boolean** for two reasons. The window says how many, so a person can tell a folder that
+   * worked from one that was accepted and did nothing; and `found: 0` on a set folder is
+   * exactly the card's "a folder that is not a template pack", which is a different report
+   * from a folder that could not be read at all — that one arrives as a diagnostic.
+   *
+   * The renderer is told the path so it can show it. That is the only thing it can do with
+   * it: every read still happens in main (ADR 0010), and no channel here takes a folder.
+   */
+  'templates:folder': channel(
+    z.object({}),
+    z.object({
+      folder: z.string().nullable(),
+      found: z.number().int().nonnegative(),
+    }),
+  ),
+
+  /**
+   * Chooses that folder, or clears it, and answers with what is in force afterwards.
+   *
+   * One channel and not two, because it is one setting written two ways and both writes have
+   * the same answer. `choose: true` opens the native picker in main — `dialog` is a
+   * main-process API, the same arrangement `file:open` and `export:choose-directory` already
+   * have — and `choose: false` goes back to the built-in pack.
+   *
+   * **No template list comes back.** The renderer re-asks `templates:list`, which is already
+   * the single source of the picker's rows and of the problems panel's installation
+   * diagnostics; answering with a second copy here would be two paths to one screen.
+   *
+   * A dismissed picker is not a failure and not a clear: the answer is whatever was already
+   * in force.
+   */
+  'templates:set-folder': channel(
+    z.object({ choose: z.boolean() }),
+    z.object({
+      folder: z.string().nullable(),
+      found: z.number().int().nonnegative(),
+    }),
+  ),
+
+  /**
    * A brief on disk, as the renderer is allowed to know it (E9.8).
    *
    * `name` and never the folder. The renderer paints a window title and a recent list, and

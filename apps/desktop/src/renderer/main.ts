@@ -127,6 +127,9 @@ const state = {
   version: '—',
   platform: '—',
   templates: [] as readonly string[],
+  /** The folder searched before the built-in pack, and how many it brought (TYTO-122). */
+  templatesFolder: null as string | null,
+  templatesFound: 0,
 };
 
 /**
@@ -586,6 +589,12 @@ const registry: CommandRegistry = createDesktopRegistry({
     applyLocale(state.locale === 'pt-BR' ? 'en' : 'pt-BR');
   },
 
+  chooseTemplateFolder: () => {
+    void setTemplateFolder(true);
+  },
+  clearTemplateFolder: () => {
+    void setTemplateFolder(false);
+  },
   openExport: () => {
     openExportDialog();
   },
@@ -868,6 +877,58 @@ async function reopen(path: string, name: string): Promise<void> {
     }
 
     adopt(answer.document, answer.documentId, wanted);
+  });
+}
+
+/**
+ * The picker's rows and the installation problems, from one answer (TYTO-122).
+ *
+ * Lifted out of {@link load} so that opening the window and changing the folder are the same
+ * code rather than two that have to be kept in step — the second is exactly where a list that
+ * silently did not reload would have hidden.
+ *
+ * `panel.installation` is **rebuilt and never appended to**, which is the card's fifth
+ * criterion in its literal form: clearing the folder has to make the "this folder has no
+ * templates" row go away without a restart, and a list that accumulated could not.
+ */
+async function refreshTemplates(bridge: TytoBridge): Promise<void> {
+  const answer = await bridge['templates:list']({});
+  panel.templates = answer.templates;
+  state.templates = answer.templates.map((template) => template.name);
+
+  // A folder that meant to be a template and is broken is why a template is missing from the
+  // picker, and nothing else in the app would ever say so: the preview service replays the
+  // registry's warnings and these are not among them.
+  panel.installation = [
+    ...answer.failures.flatMap((failure) => failure.diagnostics),
+    // Minted here and not in main, the way `E_FILE_NOT_FOUND` is: main can tell that a folder
+    // produced nothing, and only the window knows which language to say it in.
+    ...(state.templatesFolder !== null && state.templatesFound === 0
+      ? [
+          {
+            severity: 'warning' as const,
+            code: 'E_TEMPLATE_FOLDER_EMPTY',
+            message: `${translate(state.locale, 'templates.folder.empty')}: ${state.templatesFolder}`,
+          },
+        ]
+      : []),
+  ];
+}
+
+/**
+ * Points the app at a folder of templates, or clears the choice (TYTO-122).
+ *
+ * The picker and the disk are main's — every read still happens there (ADR 0010) — so what
+ * this does is ask, remember what came back, and then re-ask the one channel that already
+ * feeds both the picker and the problems panel.
+ */
+async function setTemplateFolder(choose: boolean): Promise<void> {
+  await withBridge(async (bridge) => {
+    const answer = await bridge['templates:set-folder']({ choose });
+    state.templatesFolder = answer.folder;
+    state.templatesFound = answer.found;
+    await refreshTemplates(bridge);
+    repaint();
   });
 }
 
@@ -1434,14 +1495,16 @@ async function load(): Promise<void> {
   }
 
   if (bridge !== undefined) {
-    // Asked once, because a registry is read at startup and held in main. A picker that
-    // re-asked per click would be re-reading manifests that cannot have changed.
-    const answer = await bridge['templates:list']({});
-    panel.templates = answer.templates;
-    // A folder that meant to be a template and is broken is why a template is missing from
-    // the picker, and nothing else in the app would ever say so: the preview service replays
-    // the registry's warnings and these are not among them.
-    panel.installation = answer.failures.flatMap((failure) => failure.diagnostics);
+    // Before the list, because the list's diagnostics depend on it: a folder that brought no
+    // templates is a row in the problems panel, and that row cannot be built without knowing
+    // there is a folder (TYTO-122).
+    const chosen = await bridge['templates:folder']({});
+    state.templatesFolder = chosen.folder;
+    state.templatesFound = chosen.found;
+
+    // Asked once here, and again only when the folder changes. A picker that re-asked per
+    // click would be re-reading manifests that cannot have changed in between.
+    await refreshTemplates(bridge);
   }
 
   if (elements.editor !== null) {
