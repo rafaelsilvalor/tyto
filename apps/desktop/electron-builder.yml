@@ -78,9 +78,24 @@ publish:
   repo: tyto
   tagNamePrefix: desktop-v
 
-# One installer per platform, which is the three the card counts. No `zip` beside the `dmg`:
-# electron-updater wants one on macOS and there is no updater yet (epic E9), so today it
-# would be an artifact nothing downloads.
+# One installer per platform, and on Windows a second artifact that is not an installer.
+#
+# **`portable` is there because Windows is the only platform whose release artifact cannot be
+# run without installing.** Linux ships an AppImage, which is a single runnable file by
+# definition; macOS ships a `dmg` you mount and drag; Windows shipped `nsis` and nothing
+# beside it, so handing somebody the app meant handing them an installer. A `portable` build
+# is one self-extracting `.exe` that runs from wherever it sits — a folder, a stick, or beside
+# another version of itself.
+#
+# **This is not the `zip`-beside-the-`dmg` case, and the difference is who downloads it.** No
+# `zip` on macOS because electron-updater wants one and there is no updater yet (epic E9), so
+# it would be an artifact nothing downloads — a file added for a machine that does not exist.
+# The portable `.exe` is for a person, and the person exists now: the beta testers TYTO-130
+# cuts the release for. `test:package`'s `--dir` build already covers *run the packaged app
+# without installing it, here*; what it cannot do is leave the machine that built it, because
+# what it leaves behind is a folder.
+#
+# macOS and Linux keep one target each, for the reason already written above.
 #
 # No `icon` anywhere, and that is checked rather than hoped. With none set, macOS and Windows
 # use the icon embedded in the Electron skeleton, and `ElectronFramework.getDefaultIcon` hands
@@ -90,7 +105,9 @@ publish:
 mac:
   target: dmg
 win:
-  target: nsis
+  target:
+    - nsis
+    - portable
 linux:
   target: AppImage
   # Linux is the one platform that does not name the binary after `productName`. Its
