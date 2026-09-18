@@ -1,4 +1,4 @@
-import { existsSync } from 'node:fs';
+import { existsSync, readFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -27,6 +27,20 @@ import { I18N_ATTRIBUTE } from '../src/renderer/shell.js';
 
 const here = dirname(fileURLToPath(import.meta.url));
 const built = join(here, '..', 'out', 'main', 'index.js');
+
+/**
+ * What `apps/desktop/package.json` declares, read rather than written down.
+ *
+ * This was the literal `'0.1.0'` until TYTO-135, and it was safe only while the number could
+ * not move. Changesets v3 had stopped versioning private packages, so the field was set by
+ * hand once (TYTO-40) and sat through eleven version PRs; TYTO-94 turned versioning back on
+ * and the first release after it bumped the app to `0.2.0` and reddened `main` on a line that
+ * was never about which number it is.
+ */
+const manifest = JSON.parse(readFileSync(join(here, '..', 'package.json'), 'utf8')) as {
+  version: string;
+  devDependencies: Record<string, string>;
+};
 
 let app: ElectronApplication;
 let page: Page;
@@ -147,8 +161,8 @@ describe('the bridge', () => {
     expect(info).toMatchObject({
       // The app's own version and not Electron's. `app.getVersion()` falls back to the
       // Electron version when the package has no `version` field, which is what it did
-      // until this card added one — the window reported 44.3.0 as if it were Tyto's.
-      version: '0.1.0',
+      // until TYTO-40 added one — the window reported 44.3.0 as if it were Tyto's.
+      version: manifest.version,
       platform: process.platform,
       locale: expect.stringMatching(/^(pt-BR|en)$/u) as unknown as string,
       // The composition root's pack, read off the plugin host and reported through the
@@ -156,6 +170,18 @@ describe('the bridge', () => {
       // PluginHost". An empty list here would mean the extension point wired nothing.
       templates: ['carrossel-lista', 'promo-curso'],
     });
+
+    // **Reading the manifest keeps the comparison true and drops the claim**, so the claim is
+    // asserted separately: a bridge answering with the Electron fallback would match
+    // `manifest.version` the day somebody deletes the field, because both sides would then be
+    // `undefined`. This is the shape of the bug TYTO-40 found, held directly.
+    expect(manifest.version, 'apps/desktop declares no version').toMatch(/^\d+\.\d+\.\d+$/u);
+    const electronMajor = /(\d+)\./.exec(manifest.devDependencies.electron ?? '')?.[1];
+    expect(electronMajor, 'apps/desktop no longer declares an electron dependency').toBeDefined();
+    expect(
+      (info as { version: string }).version.startsWith(`${electronMajor!}.`),
+      `the window reports ${(info as { version: string }).version}, which is Electron ${electronMajor!}'s major and not Tyto's`,
+    ).toBe(false);
   });
 
   it('rejects an invalid payload, naming the channel and the field', async () => {
