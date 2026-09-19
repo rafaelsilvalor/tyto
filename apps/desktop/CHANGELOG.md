@@ -1,5 +1,174 @@
 # @tyto/desktop
 
+## 0.3.0
+
+### Minor Changes
+
+- b8811de: TYTO-122 — point the app at a folder of your own templates.
+
+  The CLI needed no flag for this: a `templates/` folder beside a brief has been searched before
+  the built-in pack since ADR 0020. The window had no such door — it was hard-wired to the two
+  templates the app ships, so anybody with a template of their own had to leave the app and use
+  a terminal.
+
+  Now there is a setting. Choose a folder, and it is searched **first**: your `promo-curso`
+  shadows the built-in one, and the built-in ones you did not name are still there. The picker,
+  the preview and the export all see it — all three, with nothing rebuilt — and clearing the
+  choice goes back to the built-in pack with no restart. It survives a restart too, in
+  `settings.json` beside `layout.json`. The footer says which folder is in force.
+
+  A folder that turns out to hold no templates is reported in the problems panel and does not
+  take the built-in pack down with it. The folder's own `formats.yaml` replaces the built-in
+  one when it has one, and falls back when it does not — so a folder that is only templates
+  does not have to carry a formats file to work.
+
+  What it does not do: it does not install a template from a published package, and it does not
+  notice somebody editing that folder while the app is open.
+
+- a193362: TYTO-123 — quitting with unsaved tabs asks first, and a no keeps the app open.
+
+  Closing a single tab with unsaved text already asked. Closing the window asked nothing: every
+  open tab went, unsaved ones included. Both doors are now guarded — the window button and
+  `Mod-W` through `BrowserWindow.on('close')`, Cmd+Q and the dock's Quit through
+  `app.on('before-quit')` — sharing one latch, so one click produces one question. The box names
+  how many tabs would be lost, in the window's own language, with the cancelling button as the
+  default.
+
+  This is also the card that gave the app its first main→renderer message (ADR 0029). Main could
+  answer before; it could not speak first. There is now a second table, `IPC_EVENTS`, one-way,
+  and the rule that **a push carries no reply** — when an answer is needed it comes back on an
+  ordinary request channel. `export:progress` keeps polling on purpose: progress is state a
+  dialog reads, not a question that needs answering.
+
+  One case still loses work, deliberately: a renderer that never answers holds the app open for
+  two seconds and then the exit proceeds. An app that cannot be closed is worse than the loss it
+  would have reported, and ADR 0029 records the trade.
+
+- c3e1a4a: TYTO-124 — the File menu carries the app's own verbs, there is a New, and a save that fails
+  says so.
+
+  Three things a person meets in the first five minutes, which is why they were one card.
+
+  **The File menu.** It used to be `{ role: 'fileMenu' }`, whose entire content on Windows and
+  Linux is Quit — and on macOS is _Close Window_ on `Mod-W`, the one accelerator this app removes
+  on purpose, so macOS had no File menu at all. Open, Save, Save as and Export all existed and
+  answered only to `Ctrl+K` or a keystroke somebody had to already know. They are now in the menu,
+  on all three platforms, each one running **the same command the command bar runs**: the ids live
+  in one table both processes read, main sends the id across and the renderer calls the registry.
+  Nothing in the browser process knows what any of them does.
+
+  **New.** There was no such verb. The only way to reach an empty tab was to close the last one and
+  let the window replace it — a side effect standing in for a command. `Ctrl+N` and File ▸ New now
+  add a tab without disturbing any other; the rule that lets an empty untitled tab be replaced when
+  you open a file is untouched, and deliberately not consulted here, or a New pressed on a blank
+  tab would open nothing.
+
+  **A failed save.** A rejected write — full disk, read-only folder, a path that vanished — became
+  an unhandled rejection: a line in a log file, and on screen nothing but the unsaved dot, which
+  was already lit and so said nothing new. It is now a row in the problems panel naming the file
+  and the reason the system gave, in the window's language. The panel rather than a dialog,
+  because that is where _why is this not working_ already goes and because the quit question is
+  meant to be the only box that interrupts.
+
+  Two smaller consequences. The menu is **rebuilt when the footer changes language** — it was built
+  once in the system's locale, which cost one wrong word when it carried one string and would cost
+  five now. And **no File item carries an accelerator**: a menu accelerator is handled before the
+  page sees the key, so one there would fire in vim mode too, where `Ctrl-N` and `Ctrl-O` belong to
+  the vim engine.
+
+  What it does not do: no right-click menu, no recent-files list inside the menu, and a save that
+  failed is not retried on its own.
+
+- 75669b0: TYTO-132 — the app writes down what broke, so a beta report is not somebody's memory.
+
+  The desktop wrote no log at all. A render that threw, a preview that never answered and a save
+  that failed each left the process with nothing on disk, so a tester who hit something could only
+  describe it afterwards. There is now a rolling file in `userData/logs/`, a line per failure
+  naming what broke, when, in which version and on which platform, and a Help menu item that opens
+  the folder — a person reaches it without being told a path.
+
+  Four things now write to it: an uncaught exception or unhandled rejection in main, an IPC handler
+  that rejects, an export whose render died, and a failure in the window (through a new `log:write`
+  channel). The plugin host's own log, which until now dropped everything, goes to the same file —
+  so a built-in that fails to activate stops vanishing.
+
+  **It stays on the machine.** Nothing is sent anywhere, and that is not a switch somebody turned
+  off: ADR 0011 plus a dependency list with no network client in it leaves nowhere for it to go.
+  Anything that phones home needs an ADR first. The file also carries no brief text and no file
+  contents, enforced by length caps on the channel rather than by the discipline of the call sites.
+
+  Two consequences worth knowing: the file is capped at half a megabyte across two generations, so
+  the oldest entries are dropped rather than archived; and Electron's own crash box for an uncaught
+  exception in main is replaced by a log line, because installing a listener takes that over.
+
+- e308855: TYTO-133 — the desktop can turn artwork into image bytes.
+
+  `createDebuggerRasterizer` implements the `Rasterizer` port on a hidden `BrowserWindow`
+  captured through `webContents.debugger` (ADR 0027), registered through the plugin host under
+  the same `chromium` id the CLI uses for its Playwright one. All three formats the port
+  promises come back with the right container, and `scale` reaches the pixels rather than the
+  layout.
+
+  A `minor` and not a `patch`: nothing the window does today changes, but the app gained a
+  capability it did not have, and the next card is the one that puts a button in front of it.
+
+- bb08c00: TYTO-136 — a `desktop-v*` release now carries a portable Windows build beside the installer.
+
+  Windows was the only platform whose artifact could not be run without installing: Linux ships
+  an AppImage and macOS a `dmg`, both of which already give you something runnable. The
+  `portable` target adds one self-extracting `.exe` that runs from wherever it sits — measured
+  at 112 216 510 B beside the installer's 112 383 465 B, from the same 390 134 058 B tree, with
+  no filename collision (`Tyto 0.2.0.exe` against `Tyto Setup 0.2.0.exe`).
+
+  macOS and Linux are untouched, and `desktop-release.test.ts` now pins all four targets, so
+  dropping the portable and quietly giving another platform a second artifact both fail.
+
+- 60f0256: TYTO-140 — a crash says so on screen again, and for the first time when it happens at startup.
+
+  The log card traded a box for a line without meaning to. Electron draws its own error box for
+  an uncaught exception **only while nothing else is listening**, and `installCrashHandlers`
+  started listening — so a crash in main became something written down and invisible. Measured
+  this time rather than read: Electron's default handler opens with
+  `process.listenerCount("uncaughtException")>1||…`, dumped at runtime from the Electron this
+  repo installs.
+
+  `installCrashHandlers` now takes an `onCrash` port and the composition root supplies
+  `dialog.showErrorBox`, which keeps `log.ts` free of Electron and unit-testable. The box carries
+  the error's first line and **the path of the log folder**, because that folder is what a tester
+  is asked to send. It is called inside a `try`: it runs where a raised exception is fatal, and a
+  box that failed to draw would turn a reported crash into a silently killed process — worse than
+  the state this started from.
+
+  **The bigger half is the one the card's title does not say.** A `throw` during startup is a
+  rejected _promise_, and Electron runs with `--unhandled-rejections` in `warn` mode, so that path
+  never reached Electron's box — before the log card or after it. It is also the path that has
+  actually failed in a packaged app, and what it looks like is a double-click that does nothing:
+  no window, no box, a process alive and invisible, and a log line sitting in a folder whose only
+  door — Help ▸ Open the log folder — was built last, after everything that can fail. Two changes
+  close it: a `.catch` on `app.whenReady().then(start)`, and the application menu built **first**,
+  before the settings, the sources, the preview, the catalogue and the export. The menu needed
+  none of them; it only needed to be asked earlier.
+
+  The box follows the window's language rather than the system's, over the channel the File menu
+  card added. Three catalogue strings arrive with it, one of them for the case where `fileLog`
+  itself failed — a box naming a folder that was never written would send somebody looking for a
+  file that is not there.
+
+  What it does not do: it does not prevent the crash and it does not recover what was open. It
+  makes sure the person knows it happened and has something to send.
+
+- b06f3fd: TYTO-43 — the window exports.
+
+  An export dialog with a destination folder, file types, a progress bar, cancel and "open
+  folder", running the same `runJob` the CLI runs. Measured rather than asserted: the same
+  brief rendered through the window and through `tyto render` produces byte-identical
+  artifacts (`e2e/export.desktop.test.ts`).
+
+  Progress is polled rather than pushed. Every channel in `shared/ipc.ts` is a question with
+  an answer, and the one-way main→renderer message a push would need is the transport TYTO-123
+  has to design for its quit confirmation — so this card asks instead of deciding that for
+  another card.
+
 ## 0.2.0
 
 ### Minor Changes
