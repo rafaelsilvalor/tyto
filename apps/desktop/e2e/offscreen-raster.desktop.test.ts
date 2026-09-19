@@ -11,6 +11,8 @@ import { PNG } from 'pngjs';
 import { type ElectronApplication, _electron } from 'playwright';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 
+import { closeApp } from './close-app.js';
+
 import sceneFixture from './__fixtures__/offscreen.scene.json';
 
 /**
@@ -362,7 +364,7 @@ beforeAll(async () => {
 });
 
 afterAll(async () => {
-  await app?.close();
+  await closeApp(app);
   rmSync(scratch, { recursive: true, force: true });
 });
 

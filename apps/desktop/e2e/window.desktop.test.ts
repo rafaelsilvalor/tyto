@@ -5,6 +5,8 @@ import { fileURLToPath } from 'node:url';
 import { type ElectronApplication, type Page, _electron } from 'playwright';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 
+import { closeApp } from './close-app.js';
+
 import { type CatalogueKey, CATALOGUE_KEYS, translate } from '../shared/i18n/index.js';
 import { en } from '../shared/i18n/en.js';
 import { ptBR } from '../shared/i18n/pt-BR.js';
@@ -72,7 +74,7 @@ beforeAll(async () => {
 });
 
 afterAll(async () => {
-  await app?.close();
+  await closeApp(app);
 });
 
 /** *App opens an empty window; `window.require` is undefined in the renderer.* */
@@ -216,6 +218,7 @@ describe('the bridge', () => {
     // `on` sorts in among them and is the one member that is not a channel: it is the receive
     // direction (ADR 0029), built from `IPC_EVENTS` rather than from the channel table.
     expect(channels).toEqual([
+      'app:exit-ack',
       'app:exit-answer',
       'app:info',
       'app:locale',
