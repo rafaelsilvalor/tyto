@@ -19,6 +19,13 @@
  * deadline bounds `acknowledge` alone; after that the guard waits with no clock at all, and
  * `windowGone` is what releases it when there is no longer anybody to wait for.
  *
+ * **And no clock in this file quits the app any more.** The remaining deadline drops the
+ * question and leaves the window standing. The box is a warning, and the only party entitled to
+ * trade a document for a closed app is the person looking at it — somebody who hits the X by
+ * accident and walks away from the desk has to find their work when they come back. The cost is
+ * stated where it lands: a window that is alive but wedged can no longer be quit from inside the
+ * app, and the operating system is what ends it.
+ *
  * **One latch for two hooks, and that is the part worth reading twice.** The window's X
  * button and Cmd+Q are different doors: on win32 and linux the X destroys the renderer and
  * only then reaches `window-all-closed` → `app.quit()` → `before-quit`, so a guard on
@@ -38,29 +45,31 @@ export interface ExitGuardOptions {
    */
   readonly send: (askId: number) => boolean;
   /**
-   * How long an **unacknowledged** question holds the app open (TYTO-147, ADR 0031).
+   * How long an **unacknowledged** question stays outstanding (TYTO-147, ADR 0031).
    *
    * What it bounds is a push reaching a listener that is already registered and one `invoke`
-   * coming back: a window that has not said "I have it" by then is not slow, it is wedged, and
-   * an app that cannot be closed is worse than the loss it would have reported.
+   * coming back.
    *
    * It is deliberately **not** how long an answer may take. That wait has no deadline, because
    * the thing on the other end of it is a person; ADR 0031 has the argument.
    *
-   * **Five seconds, and the first number tried was two.** The round trip measures 0-2 ms on an
-   * idle machine and 44 ms at the worst of twenty, so two seconds looked like 45x headroom. It
-   * was not: the end-to-end case that answers slower than the deadline failed **3 of 13 runs**
-   * against a built app, every failure the app exiting at ~2.02 s — the clock running on time
-   * and the acknowledgement simply not back yet. A budget that a real launch misses about a
-   * fifth of the time is the card's own bug with a smaller window, so the budget moved rather
-   * than the test. Five seconds is ~113x the worst round trip measured, and the only thing it
-   * costs is three more seconds before a genuinely wedged window lets the app go.
+   * **And when it runs out, the app stays.** The callback is `abandon`, not `release`: the quit
+   * that was prevented is dropped and the window keeps its text. That is what makes the number
+   * cheap to be wrong about in the generous direction and impossible to be wrong about in the
+   * dangerous one — no length of this timer can cost anybody a tab.
+   *
+   * **Thirty seconds, and two earlier numbers were tried.** Two was the shipped one and it
+   * quit; five was measured to stop the end-to-end flake at ~2.02 s but still quit. Once the
+   * deadline stopped deciding, a small number stopped buying anything: all it does now is clear
+   * the latch so a later quit asks again, and thirty seconds is ~680x the worst round trip
+   * measured (44 ms, worst of twenty; 0-2 ms idle) while still not leaving a stuck question
+   * behind for a whole session.
    *
    * **What it can honestly measure is narrower than the wording suggests, and ADR 0031 records
    * the gap.** This is a `setTimeout` on *main's* event loop, so a main process blocked past the
-   * deadline runs `release` the moment it is free with the window's acknowledgement queued
-   * behind it, unread — measured against the built app: block main for longer than the deadline
-   * and it quits with the renderer answering normally.
+   * deadline runs its callback the moment it is free with the window's acknowledgement queued
+   * behind it, unread. Since the callback now only drops the question, the cost of that is one
+   * quit attempt that has to be repeated rather than a lost document.
    */
   readonly ackTimeoutMs?: number;
 }
@@ -97,7 +106,7 @@ export interface ExitGuard {
   windowGone: () => void;
 }
 
-export function createExitGuard({ send, ackTimeoutMs = 5000 }: ExitGuardOptions): ExitGuard {
+export function createExitGuard({ send, ackTimeoutMs = 30_000 }: ExitGuardOptions): ExitGuard {
   /**
    * Permission, once given, is not asked for again.
    *
@@ -133,6 +142,27 @@ export function createExitGuard({ send, ackTimeoutMs = 5000 }: ExitGuardOptions)
     outstanding.resume();
   };
 
+  /**
+   * Drop the question and stay. **This is what a deadline does now, and it is the whole of
+   * TYTO-147's second half** (ADR 0031).
+   *
+   * It is deliberately not `release`: nothing is granted, nothing resumes, the exit that was
+   * prevented simply never happens and the window is still there with its text in it. The
+   * latch is cleared so the *next* quit asks again rather than finding a question nobody will
+   * ever answer.
+   *
+   * The box is a warning and the person it warns is the one entitled to decide. Somebody who
+   * closes the app by accident and walks away from the desk must find their work when they come
+   * back — which is the ordinary case, not a rare one. A timer that decided for them would be
+   * the same bug this card exists to close, wearing a bigger number.
+   */
+  const abandon = (): void => {
+    const outstanding = pending;
+    if (outstanding === undefined) return;
+    disarm(outstanding);
+    pending = undefined;
+  };
+
   return {
     mayExit: (resume) => {
       if (confirmed) return true;
@@ -152,7 +182,7 @@ export function createExitGuard({ send, ackTimeoutMs = 5000 }: ExitGuardOptions)
       pending = {
         askId,
         resume,
-        timer: setTimeout(release, ackTimeoutMs),
+        timer: setTimeout(abandon, ackTimeoutMs),
       };
       return false;
     },

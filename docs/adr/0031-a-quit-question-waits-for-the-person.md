@@ -34,21 +34,27 @@ test and the suite was green over the whole of it.
    `app:exit-requested` listener** — before it counts unsaved documents, before it reads the
    locale, before anything is drawn. The acknowledgement carries the `askId` and no verdict.
 2. `ackTimeoutMs` bounds that acknowledgement and nothing else. What it is pointed at is a push
-   reaching a listener that is already registered and one `invoke` coming back. A window silent
-   that long is genuinely wedged, and the old argument — an app that cannot be closed is worse than
-   the loss it would have reported — holds for it unchanged.
-   **The number is 5000, and the first one tried was the old 2000.** Keeping two seconds looked
-   free: the round trip measures 0-2 ms idle and 44 ms at the worst of twenty, so it read as 45x of
-   headroom. It was not. The new end-to-end case — the one that answers the box slower than the
-   deadline — failed **3 runs in 13** against a built app, every failure the exit firing at
-   ~2.02 s with the acknowledgement simply not back yet. A budget a real launch misses about a
-   fifth of the time is this card's own bug with a smaller window, so the budget moved and the test
-   did not. Five seconds is ~113x the worst round trip measured; what it costs is three further
-   seconds before a wedged window lets go, which is the cheap side of that trade.
+   reaching a listener that is already registered and one `invoke` coming back.
+3. **When it runs out, the app stays.** The callback drops the question and returns the person to
+   the window they were in; it does not grant the exit. **This reverses ADR 0029's trade, and it
+   is the half of this card that matters most.** The old rule was that an unanswered question
+   resolves towards quitting, on the argument that an app which cannot be closed is worse than the
+   loss it would report. That argument weighs the app's convenience against a person's work, and
+   it weighs it on the app's behalf. The box is a **warning**, and the only party entitled to
+   trade a document for a closed app is the person reading it. Somebody who hits the X by mistake
+   and walks away from the desk — for a glass of water, for the bathroom — has to find their work
+   when they come back. That is the ordinary case, not the exotic one.
+   **The number is 30 000, and two smaller ones were tried first.** Two seconds shipped and quit;
+   five was measured to clear the end-to-end flake at ~2.02 s and still quit. Once the deadline
+   stopped deciding anything, a small number stopped buying anything: all it does now is clear the
+   latch so a later attempt asks again. Thirty seconds is ~680x the worst round trip measured
+   (44 ms, worst of twenty; 0-2 ms idle), and **no length of it can cost a tab**, which is what
+   makes it safe to be generous with.
    **What a `setTimeout` can actually measure is narrower than that, and the difference is
    recorded in the Consequences rather than papered over**: main runs the clock, so it bounds
-   main's own availability too.
-3. Once acknowledged, the guard clears the timer and waits **with no deadline**, because what it is
+   main's own availability too. Since the callback now only drops the question, that costs a quit
+   attempt somebody has to repeat rather than a document.
+4. Once acknowledged, the guard clears the timer and waits **with no deadline**, because what it is
    waiting for is a person.
 
 **The acknowledgement is sent from the renderer's own listener, not from the preload.** The preload
@@ -93,7 +99,7 @@ unsaved document with it, so `windowGone`'s own argument covers it: there is not
   the app open protects nothing, so there is nothing to buy with the extra time.
 
 The counter-argument, recorded because it is real: `before-quit` is also a Windows logoff and a
-macOS restart, and the unbounded wait — item 3 of the Decision above — now prevents those with no
+macOS restart, and the unbounded wait — item 4 of the Decision above — now prevents those with no
 deadline of our own. That is bounded in practice by the OS, which force-kills after its own timeout
 — **asserted from general knowledge and not measured here**, and it is the strongest case for the
 rejected option. It does not change the
@@ -126,11 +132,17 @@ whole suite still green. `src/main/quit.test.ts` has a case whose only job is th
   released at ~2.02 s, which is a clock that was **not** late and therefore nothing a re-arm can
   see. The alternative, a slack tight enough to catch ordinary jitter, is a clock that re-arms
   forever against a genuinely wedged window — the hang this ADR spent its open question avoiding.
-  What those reds did settle is that two seconds was the wrong budget, which is why the number
-  moved to five and is now pinned by a unit test rather than by a comment.
-- **A wedged window still cannot hold the app hostage**, and it now takes five seconds rather than
-  two to establish that. What changed is what those seconds are pointed at, and how many of them
-  a launch is allowed to spend before the app decides nobody is listening.
+  What those reds did settle is that two seconds was the wrong budget. The number is thirty now,
+  for a different reason — a deadline that no longer decides anything can afford to be generous —
+  and it is pinned by a unit test rather than by a comment.
+- **A window that is alive but wedged can no longer be quit from inside the app, and that is the
+  price of the reversal.** The old deadline existed precisely for that case and paid for it with
+  everybody else's text. Stated rather than hidden: the exit attempt is dropped after thirty
+  seconds, the app stays up, and what ends a frozen window is the operating system — Task Manager
+  on Windows, Force Quit on macOS, a signal on Linux. That is a worse afternoon for a rare user
+  and a saved document for the common one, which is the trade this card was opened to make.
+  `windowGone` still covers the cases that are not a freeze: a crash, a closed window and a
+  reload all release the exit, because a page that is gone has no text left to protect.
 - **A push that needs an answer may now need two return legs**, and ADR 0029's correlation-id rule
   covers both: `acknowledge` and `answer` each ignore an id that is not the outstanding question, a
   stale ack being exactly as dangerous as a stale yes. A later card adding an expensive question

@@ -13,17 +13,24 @@ lost every unsaved tab at the two-second mark, which is the ordinary case and no
 
 The wait is in two stages now. The window acknowledges the question on a new `app:exit-ack` channel
 as the first thing its listener does — before it counts unsaved documents and before anything is
-drawn — and a deadline bounds that acknowledgement and nothing else. A window silent that long is
-genuinely wedged, and the app still gets out. After the acknowledgement there is **no deadline at
-all**, because the thing on the other end is a person.
+drawn — and a deadline bounds that acknowledgement and nothing else. After the acknowledgement
+there is **no deadline at all**, because the thing on the other end is a person.
 
-**That deadline is five seconds, and keeping the old two was tried first.** The round trip it has
-to cover measures 0-2 ms on an idle machine and 44 ms at the worst of twenty, so two seconds read
-as ample headroom — but the new end-to-end case, the one that answers the box slower than the
-deadline, failed 3 runs in 13 against a built app, every failure the app exiting at ~2.02 s with
-the acknowledgement not yet back. A budget a real launch misses about a fifth of the time is this
-same bug with a smaller window, so the budget moved rather than the test, and a unit test now pins
-the number so it cannot drift back to a guess on a green suite.
+**And when that deadline runs out, the app stays put.** It does not quit — it drops the attempt
+and leaves you in the window with your text. The box is a warning, and the only person entitled to
+trade a document for a closed app is the one reading it: close the app by accident, walk away for a
+glass of water, come back, and your work is where you left it. Nothing in here decides that for
+you any more.
+
+That is a reversal of what ADR 0029 wrote down, and it has a price that is stated rather than
+hidden: a window that is frozen but still alive can no longer be quit from inside the app, and
+ending it is the operating system's job. A crash, a closed window and a reload are all still
+handled — a page that is gone has no text left to protect.
+
+The deadline itself is thirty seconds, and two smaller numbers were tried first: two shipped and
+quit, five cleared a measured end-to-end flake at ~2.02 s and still quit. Once the clock stopped
+deciding, being generous with it became free — no length of it can cost a tab — and a unit test
+now pins the number so it cannot drift back to a guess on a green suite.
 
 What ends the unbounded wait when the page that was asked goes away is a hard check and not a
 second, longer timer: a crash, the window closing and a reload all release the exit. The reload is

@@ -98,7 +98,7 @@ describe('createExitGuard', () => {
     expect(send).toHaveBeenCalledTimes(1);
   });
 
-  it('gives up on a window that never acknowledged, which is the wedged case', () => {
+  it('drops the question when nothing acknowledged, and does not quit on its way past', () => {
     vi.useFakeTimers();
     const guard = createExitGuard({ send: () => true, ackTimeoutMs: 2000 });
     const resume = vi.fn();
@@ -108,29 +108,46 @@ describe('createExitGuard', () => {
 
     vi.advanceTimersByTime(2000);
 
-    // Nothing said it had the question, so there is nobody reading anything and an app that
-    // could not be closed would be worse than the loss it would have reported.
-    expect(resume).toHaveBeenCalledTimes(1);
-    expect(guard.mayExit(vi.fn())).toBe(true);
+    // **The deadline is not a vote.** Nothing acknowledged, so the app has no answer — and no
+    // answer is not permission. The exit that was prevented is simply dropped and the window
+    // keeps its text, because the only party entitled to trade a document for a closed app is
+    // the person looking at the box (TYTO-147, ADR 0031).
+    expect(resume).not.toHaveBeenCalled();
   });
 
-  it('defaults the acknowledgement budget to five seconds, which is the number that shipped', () => {
-    // The composition root names no budget, so the default IS the product's behaviour, and it
-    // is a measured number rather than a round one: two seconds failed 3 of 13 end-to-end runs
-    // against a built app, every failure the exit firing at ~2.02 s with the acknowledgement
-    // not yet back (TYTO-147, ADR 0031). Without this test the default can be moved back to a
-    // guess on a green suite.
+  it('asks again on the next attempt after a question was dropped', () => {
     vi.useFakeTimers();
-    const guard = createExitGuard({ send: () => true });
-    const resume = vi.fn();
+    const send = vi.fn(() => true);
+    const guard = createExitGuard({ send, ackTimeoutMs: 2000 });
 
-    guard.mayExit(resume);
+    guard.mayExit(vi.fn());
+    vi.advanceTimersByTime(2000);
 
-    vi.advanceTimersByTime(4999);
-    expect(resume).not.toHaveBeenCalled();
+    // The latch has to come off with the question, or the dropped attempt would wedge every
+    // later one: `mayExit` refuses while anything is outstanding. This is the whole reason the
+    // deadline still exists now that it no longer decides anything.
+    expect(guard.mayExit(vi.fn())).toBe(false);
+    expect(send).toHaveBeenCalledTimes(2);
+  });
+
+  it('defaults the acknowledgement budget to thirty seconds', () => {
+    // The composition root names no budget, so the default IS the product's behaviour. It is
+    // generous on purpose: since running out only drops the question, no length of this timer
+    // can cost a tab, and a short one buys nothing (TYTO-147, ADR 0031). Without this test the
+    // default drifts back to a guess on a green suite, which is how two seconds got there.
+    vi.useFakeTimers();
+    const send = vi.fn(() => true);
+    const guard = createExitGuard({ send });
+
+    guard.mayExit(vi.fn());
+
+    vi.advanceTimersByTime(29_999);
+    expect(guard.mayExit(vi.fn())).toBe(false);
+    expect(send).toHaveBeenCalledTimes(1);
 
     vi.advanceTimersByTime(1);
-    expect(resume).toHaveBeenCalledTimes(1);
+    expect(guard.mayExit(vi.fn())).toBe(false);
+    expect(send).toHaveBeenCalledTimes(2);
   });
 
   it('does not fire the timeout after an answer has already arrived', () => {
@@ -189,7 +206,8 @@ describe('the deadline is over the acknowledgement, not over the person', () => 
 
   it('ignores an acknowledgement for a question that is not the outstanding one', () => {
     vi.useFakeTimers();
-    const guard = createExitGuard({ send: () => true, ackTimeoutMs: 2000 });
+    const send = vi.fn(() => true);
+    const guard = createExitGuard({ send, ackTimeoutMs: 2000 });
     const resume = vi.fn();
 
     guard.mayExit(resume);
@@ -198,7 +216,27 @@ describe('the deadline is over the acknowledgement, not over the person', () => 
     guard.acknowledge(99);
     vi.advanceTimersByTime(2000);
 
-    expect(resume).toHaveBeenCalledTimes(1);
+    // The clock was not disarmed, so the question was dropped: a later attempt has to ask again.
+    // `resume` is the assertion that matters as much — a dropped question is not permission.
+    guard.mayExit(vi.fn());
+    expect(send).toHaveBeenCalledTimes(2);
+    expect(resume).not.toHaveBeenCalled();
+  });
+
+  it('keeps the question alive past the deadline once the right window acknowledged', () => {
+    vi.useFakeTimers();
+    const send = vi.fn(() => true);
+    const guard = createExitGuard({ send, ackTimeoutMs: 2000 });
+
+    guard.mayExit(vi.fn());
+    // The contrast that gives the case above its force: the *outstanding* id disarms the clock,
+    // so the question survives the deadline and a later attempt finds it still standing rather
+    // than asking a person who is already reading.
+    guard.acknowledge(0);
+    vi.advanceTimersByTime(60_000);
+
+    expect(guard.mayExit(vi.fn())).toBe(false);
+    expect(send).toHaveBeenCalledTimes(1);
   });
 
   it('releases the exit when a window that acknowledged then dies', () => {
