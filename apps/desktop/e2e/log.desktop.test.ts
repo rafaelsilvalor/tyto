@@ -6,6 +6,8 @@ import { fileURLToPath } from 'node:url';
 import { type ElectronApplication, type Page, _electron } from 'playwright';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 
+import { closeApp } from './close-app.js';
+
 /**
  * The log, from a failure in a real window to a line on a real disk (TYTO-132).
  *
@@ -72,7 +74,7 @@ beforeAll(async () => {
 });
 
 afterAll(async () => {
-  await app?.close();
+  await closeApp(app);
   rmSync(scratch, { recursive: true, force: true });
 });
 
