@@ -63,9 +63,14 @@ construção, e é a única pasta do programa que pode ser mandada inteira sem p
 
 ## O que baixar
 
+Os nomes abaixo são os dos arquivos como eles aparecem na página.
+
 | Sistema               | Arquivo                                                                     |
 | --------------------- | --------------------------------------------------------------------------- |
-| Windows, instalando   | `Tyto Setup 0.3.0.exe`                                                      |
-| Windows, sem instalar | `Tyto 0.3.0.exe` — um arquivo só, roda de onde estiver, serve para pendrive |
+| Windows, instalando   | `Tyto-Setup-0.3.0.exe`                                                      |
+| Windows, sem instalar | `Tyto-0.3.0.exe` — um arquivo só, roda de onde estiver, serve para pendrive |
 | macOS (Apple Silicon) | `Tyto-0.3.0-arm64.dmg`                                                      |
 | Linux                 | `Tyto-0.3.0.AppImage` — dê permissão de execução e rode                     |
+
+Os arquivos `.blockmap` e `latest*.yml` que aparecem na lista não são para você: são do mecanismo
+de atualização automática, que ainda não está ligado. Ignore.
