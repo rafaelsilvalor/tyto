@@ -55,8 +55,15 @@ recentes estão no `Ctrl+K`.
 Se o programa quebrar ou não abrir, me mande a pasta do log:
 
 - Com a janela aberta: menu **Ajuda ▸ Abrir a pasta do log**.
-- Se nem abriu: no Windows, cole `%APPDATA%\Tyto\logs` na barra do Explorador de Arquivos; no
-  Mac, `~/Library/Application Support/Tyto/logs`; no Linux, `~/.config/Tyto/logs`.
+- Se nem abriu: no Windows, cole `%APPDATA%\@tyto\desktop\logs` na barra do Explorador de
+  Arquivos; no Mac, `~/Library/Application Support/@tyto/desktop/logs`; no Linux,
+  `~/.config/@tyto/desktop/logs`.
+
+O nome esquisito com `@` é o desta versão e só dela. A 0.3.0 nomeou a pasta a partir do nome
+interno do pacote em vez do nome do programa, o que este texto errou quando saiu: ele mandava
+você abrir `%APPDATA%\Tyto\logs`, que na maioria das máquinas não existe — e, em algumas, existe
+vazia, o que é pior, porque parece que não há nada a mandar. A partir da próxima versão cada uma
+tem a sua própria pasta, no formato `%APPDATA%\Tyto\<versão>` (TYTO-150), e este parágrafo some.
 
 Essa pasta tem só o registro de falhas — nenhum texto dos seus briefs vai para lá, por
 construção, e é a única pasta do programa que pode ser mandada inteira sem pensar duas vezes.

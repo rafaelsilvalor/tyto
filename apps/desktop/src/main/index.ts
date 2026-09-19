@@ -21,6 +21,7 @@ import { createProjectSources } from './project.js';
 import { createExitGuard } from './quit.js';
 import { fileSettingsStore } from './settings-store.js';
 import { createTemplateCatalogue } from './templates.js';
+import { chooseUserDataPath } from './user-data.js';
 import { bundledRenderer, createMainWindow } from './window.js';
 
 /**
@@ -70,6 +71,37 @@ let reportCrash = (reason: unknown): void => {
     `${crashSummary(reason)}\n\n${translate(locale, 'crash.noLog')}`,
   );
 };
+
+// **Where this app's data lives, moved before Electron has opened anything** (TYTO-150,
+// ADR 0032). Every version gets its own folder under one product root, so a 0.4.0 a tester
+// downloads cannot open with the layout, the recent files or the settings 0.3.0 left behind.
+//
+// **At module scope, and not at the top of `start`, and that is the measured part.** `start`
+// runs on `whenReady`, and by then Chromium has already opened the folder it was handed.
+// Measured with a probe app on win32: setting the path after `ready` leaves a `Local State`
+// file behind in the old folder and creates it; setting it here leaves that folder uncreated.
+// The app's own five paths — logs, settings, recent files, credentials, layout — are all
+// composed inside `start` from `getPath('userData')`, so those follow either way. Chromium's
+// do not, and the one that does not follow is the one nobody would go looking for.
+//
+// Wrapped, because a throw at module scope is a main script that failed to evaluate: no
+// window, no box, a double-click that did nothing — which is the failure TYTO-140 exists to
+// have taken away. Reporting and carrying on leaves the app in the shared folder, which is
+// the old behaviour and still a running app. `reportCrash` works here: before `ready`,
+// `app.getLocale()` answers with the empty string rather than throwing, and `localeFor` maps
+// that to the default locale.
+try {
+  const userData = chooseUserDataPath({
+    appData: app.getPath('appData'),
+    version: app.getVersion(),
+    explicitUserDataDir: app.commandLine.hasSwitch('user-data-dir')
+      ? app.commandLine.getSwitchValue('user-data-dir')
+      : undefined,
+  });
+  if (userData !== undefined) app.setPath('userData', userData);
+} catch (reason) {
+  reportCrash(reason);
+}
 
 async function start(): Promise<void> {
   // **First, before anything that can fail.** A registry that will not read and a built-in
