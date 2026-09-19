@@ -78,6 +78,31 @@ afterAll(async () => {
   rmSync(scratch, { recursive: true, force: true });
 });
 
+describe('a start with nothing wrong', () => {
+  // Deliberately the first block in this file, because what it asserts is the state *before*
+  // anything has failed — the block below provokes a failure, and running after it would be
+  // asserting that folder against a log the suite itself had caused (TYTO-149).
+  it('leaves a folder with a line in it, before anything has broken', async () => {
+    const text = await waitForLog('app started');
+
+    expect(existsSync(logsDirectory)).toBe(true);
+    expect(text).toContain('app started');
+    expect(text).toContain('INFO');
+    // Read off the manifest rather than written down, for TYTO-135's reason.
+    expect(text).toContain(manifest.version);
+    expect(text).toContain(process.platform);
+  });
+
+  it('puts it first, so the file dates the session a report is about', () => {
+    // Not "the only line": something else logging at startup later would be a change worth
+    // making, and a count would refuse it for no reason. What must hold is that a tester who
+    // opens the file sees when their session began.
+    const [first = ''] = logText().split('\n').filter(Boolean);
+
+    expect(first).toContain('app started');
+  });
+});
+
 describe('a failure in the window', () => {
   it('reaches a file, naming what broke, the version and the platform', async () => {
     await page.click('#editor .cm-content');

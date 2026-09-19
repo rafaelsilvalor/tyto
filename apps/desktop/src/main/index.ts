@@ -114,6 +114,23 @@ async function start(): Promise<void> {
     version: app.getVersion(),
     platform: process.platform,
   });
+
+  // **One line, so the folder exists before anything has gone wrong** (TYTO-149). `fileLog`
+  // creates its folder on the first write and not before, which is right — an app whose log
+  // needed somebody to make its folder would write nothing on the machine it matters most on.
+  // But the whole beta support story is *send me the log folder*, and until this line there
+  // was nothing to send after the one failure that needs it most: an app that started cleanly
+  // and then **hung** has logged nothing, so the folder does not exist, so Help ▸ open the log
+  // folder opens nothing and the release body names a folder that is not there. A hang is the
+  // failure least likely to write a line and the most likely to need one.
+  //
+  // **This does not reopen the synchronous-write trade.** `log.ts` defends `appendFileSync` on
+  // the grounds that the log takes failures and nothing else, and warns that the first caller
+  // logging per keystroke makes it wrong. This is one write per process launch, before a window
+  // exists — the version and the platform are already on every line, so what it adds is a
+  // timestamp, which dates the session a report is about.
+  log.info('app started');
+
   // The window, held rather than discarded, because main now has something to say to it
   // (ADR 0029). A `let` and not a `const`: the handler table is registered before the window
   // is built — it has to be, or the renderer's first question could arrive with nothing to
