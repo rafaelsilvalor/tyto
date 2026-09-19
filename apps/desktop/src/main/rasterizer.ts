@@ -32,8 +32,8 @@ import {
  * the bytes, and the window it is taken on does not have to be offscreen.
  *
  * **Except when it does not resolve at all, which is what TYTO-148 measured and ADR 0030
- * records.** In the packaged app 15 of 80 captures never answered `Page.captureScreenshot`, at
- * any length of wait; the dev build answered 20 of 20. So every step here has a deadline
+ * records.** In the packaged app 15 of 80 captures never answered `Page.captureScreenshot` inside
+ * the probe's 8 s cap; the dev build answered 20 of 20. So every step here has a deadline
  * ({@link CAPTURE_DEADLINE_MS}), a capture that misses it is tried once more on a fresh window,
  * and a frame that fails twice is reported as a failed frame rather than stalling the export.
  */
@@ -54,10 +54,14 @@ const CREATED_SIZE = { width: 800, height: 600 } as const;
  * maintainer's machine" is not a property a CI runner under `xvfb` inherits. Anybody deleting
  * it should expect a green suite and should not read that as permission.
  *
- * TYTO-148 put a number beside that. Instrumented inside the packaged app, `document.fonts.ready`
- * settled in **0–2 ms on every one of 100 captures**, the 15 that then hung on
- * `Page.captureScreenshot` included. So the line is cheap, and it is not where an export stalls —
- * which is worth writing down, because the fonts wait was the first suspect and it was wrong.
+ * TYTO-148 put a number beside that, and the denominator is smaller than the card's headline one.
+ * Only the per-step probe ever timed this wait — packaged 0.2.0, a 15 s cap on each step — and
+ * there it settled in **0–2 ms on every capture**, the ones that then timed out on
+ * `Page.captureScreenshot` included. The 100 captures quoted elsewhere in this card did not time
+ * it; they awaited it without a clock, which is weaker evidence of the same thing — a wait that
+ * never settled would have hung the probe, and none of the 100 did. So the line is cheap, and it
+ * is not where an export stalls, which is worth writing down because the fonts wait was the first
+ * suspect and it was wrong.
  */
 const FONTS_READY = 'document.fonts.ready.then(() => true)';
 
@@ -76,12 +80,16 @@ const FONTS_READY = 'document.fonts.ready.then(() => true)';
  *
  * **30 s is ~28× the slowest capture ever measured here.** Across 100 captures on win32 in
  * TYTO-148 — 20 in the dev build, 80 across four packaged shapes — every capture that answered
- * answered in **39–1 075 ms**, and 15 of the 80 packaged ones never answered at any length of
- * wait. So there is no observed latency between "slow but real" and "gone", and the number only
- * has to clear the first with room for a machine slower than this one. It is also Playwright's
- * own default action timeout, which is the number the other `Rasterizer` in this repo already
- * lives under (`packages/raster/src/playwright.ts`) — two adapters disagreeing about how long
- * patience lasts would be a difference nobody asked for.
+ * answered in **39–1 075 ms**, and 15 of the 80 packaged ones did not answer inside the probe's
+ * 8 s cap. Nothing here waited 30 s, so the number this file ships was never itself measured:
+ * what the 19% belongs to is an 8 s deadline, and a capture that would have answered between 8 s
+ * and 30 s is excluded by nothing. What is measured is the bound the number has to clear, and it
+ * clears it 28× over. It is also Playwright's own default action timeout, which is the number the
+ * other `Rasterizer` in this repo already lives under (`packages/raster/src/playwright.ts`) — two
+ * adapters disagreeing about how long patience lasts would be a difference nobody asked for.
+ * That parity is partial, and the gap is on this card's own subject: `setContent` and `screenshot`
+ * carry Playwright's default, while the `page.evaluate` that waits for the fonts there carries no
+ * clock at all.
  *
  * Exported so the tests assert against the constant instead of retyping the number.
  */
@@ -91,16 +99,17 @@ export const CAPTURE_DEADLINE_MS = 30_000;
  * How many times one frame's capture is attempted before the frame is reported failed.
  *
  * **Two, and it is containment rather than a cure — the measurement says so.** In the packaged
- * app 15 of 80 captures hung (19%); retrying each of those once on a fresh window recovered
- * **9 of 15**, and the other 6 hung again. So after the deadline and this retry roughly **7% of
- * packaged captures still fail** (6 of 80), and they fail as a `frame-failed` event with the
- * other frames written — which is the whole of what this card buys. The dev build hung 0 of 20,
+ * app 15 of 80 captures hung past the probe's 8 s cap (19%); retrying each of those once on a
+ * fresh window recovered **9 of 15**, and the other 6 hung again. So after the deadline and this
+ * retry roughly **7% of packaged captures still fail** (6 of 80) — a residual that belongs to the
+ * probe's 8 s cap, since nothing measured here ever waited the 30 s that ships. They fail as a
+ * `frame-failed` event with the other frames written — which is the whole of what this card buys. The dev build hung 0 of 20,
  * so on that shape the retry never fires.
  *
  * Why the packaged build differs from the dev build at all is **not** answered here and is not
- * explained by the deadline: not the fonts wait (`document.fonts.ready` settled in 0–2 ms on
- * every capture, hung ones included), not asar packing, not the GPU, and not a 0.2.0 → 0.3.0
- * regression. It is a Chromium-level question with its own card.
+ * explained by the deadline: not the fonts wait (see {@link FONTS_READY} for what was and was not
+ * timed there), not asar packing, not the GPU, and not a 0.2.0 → 0.3.0 regression. It is a
+ * Chromium-level question with its own card.
  */
 const CAPTURE_ATTEMPTS = 2;
 
@@ -110,13 +119,22 @@ const CAPTURE_ATTEMPTS = 2;
  * A class and not a string match on the message: the retry must fire for this and for nothing
  * else — a protocol error or a `TypeError` from the arguments is a real answer, and answering
  * it twice would only produce two of the same error a little later.
+ *
+ * **The "this is known" half of the message is attached only to the step it is true of.** The
+ * whole message becomes `E_RENDER_FAILED`'s `{problem}` and a beta tester reads it verbatim;
+ * `Page.captureScreenshot` is the one step TYTO-148 measured never answering, so naming it to
+ * somebody whose `loadFile` stalled would point them away from what actually happened — which
+ * is the opposite of why the deadline is budgeted per step in the first place.
  */
 class CaptureDeadlineError extends Error {
   constructor(step: string, ms: number) {
+    const known =
+      step === 'Page.captureScreenshot'
+        ? ' This has been seen in the packaged app, where that command sometimes never answers.'
+        : '';
     super(
-      `The capture did not answer ${step} within ${ms} ms, so the frame was abandoned. ` +
-        `This has been seen in the packaged app, where Page.captureScreenshot sometimes never ` +
-        `answers; the frame is reported failed and the rest of the export continues.`,
+      `The capture did not answer ${step} within ${ms} ms, so the frame was abandoned.${known} ` +
+        `The frame is reported failed and the rest of the export continues.`,
     );
     this.name = 'CaptureDeadlineError';
   }
@@ -134,7 +152,11 @@ class CaptureDeadlineError extends Error {
  * hand.
  *
  * The timer is cleared on the settled path so a finished export does not hold the loop open, and
- * `unref`ed so that even an uncleared one could not keep the process alive.
+ * `unref`ed so that even an uncleared one could not keep the process alive. **Neither of those two
+ * is caught by a test, and that is stated rather than left to be discovered**, the way the
+ * {@link FONTS_READY} comment states its own: deleting the `clearTimeout` or the `unref` leaves
+ * the suite green, because an unref'd stray timer changes nothing this file can observe. They are
+ * hygiene, not a guard, and a green run is not permission to drop them.
  */
 async function withDeadline<T>(step: string, work: Promise<T>, ms: number): Promise<T> {
   let timer: NodeJS.Timeout | undefined;
@@ -375,7 +397,12 @@ export function createDebuggerRasterizer(options: DebuggerRasterizerOptions = {}
           }
         }
       } finally {
-        await rm(directory, { recursive: true, force: true });
+        // **`maxRetries` because this `finally` is newly reachable while the window is still
+        // letting go.** Before TYTO-148 a hang meant this block was never reached at all; now it
+        // runs immediately after `window.destroy()`, and Windows releases the loaded document's
+        // handle asynchronously. An `EBUSY` rejecting out of a `finally` would replace the
+        // capture error, which is the whole diagnostic. Not measured — the path is new.
+        await rm(directory, { recursive: true, force: true, maxRetries: 3 });
       }
     },
   };

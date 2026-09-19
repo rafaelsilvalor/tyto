@@ -27,7 +27,9 @@ packaged 0.2.0, asar extracted loose    3 / 20     1 of 3
 packaged 0.2.0, --disable-gpu           2 / 20     1 of 2
 ```
 
-Packaged overall **15 hangs in 80 captures (19%)**; dev **0 in 20**. Per step, from the same probe:
+Packaged overall **15 hangs in 80 captures (19%)**; dev **0 in 20**. That probe put a clock on the
+last step only. Per step, from the earlier run — a 15 s cap on _each_ step, against the packaged
+**0.2.0** build, before the rebuild — which is the only measurement that ever timed the other four:
 
 ```
 r1a: loadFile=111ms/OK  fontsReady=0ms/OK  Page.enable=0ms/OK  setDeviceMetrics=1ms/OK  captureScreenshot=59ms/OK
@@ -35,9 +37,10 @@ r1b: loadFile=105ms/OK  fontsReady=0ms/OK  Page.enable=0ms/OK  setDeviceMetrics=
 ```
 
 **Four hypotheses died in that table, and one of them was this repository's own.** It is not the
-fonts wait — `document.fonts.ready` settled in 0–2 ms on every capture, the hung ones included,
-and the faces are `data:` URIs `export-html` embedded rather than files inside `app.asar`. It is
-not asar packing — extracting the archive loose gave 3 of 20 against 6 of 20 packed. It is not the
+fonts wait — in the per-step run above `document.fonts.ready` settled in 0–2 ms on every capture,
+the ones that then timed out included, and in the 100 captures it was awaited with no clock on it
+and never once failed to settle; the faces are `data:` URIs `export-html` embedded rather than
+files inside `app.asar`. It is not asar packing — extracting the archive loose gave 3 of 20 against 6 of 20 packed. It is not the
 GPU — `--disable-gpu` gave 2 of 20. It is not a 0.2.0 → 0.3.0 regression — it reproduces at both.
 Every capture that answered answered in **39–1 075 ms**, on both build shapes, so there is no
 measured middle ground between _slow_ and _gone_.
@@ -67,10 +70,21 @@ fresh window, and a capture that misses twice is a reported failed frame.**
 
 ### Why 30 000 ms
 
-~28× the slowest capture ever measured here (1 075 ms), and the only latency between "slow but
-real" and "never" that anybody has seen is the whole of that gap. It is also Playwright's own
-default action timeout, which is the number the repo's other `Rasterizer` already lives under; two
-adapters disagreeing about how long patience lasts would be a difference nobody asked for.
+~28× the slowest capture ever measured here (1 075 ms), and nothing at all has been seen in the gap
+between that and "never". It is also Playwright's own default action timeout, which is the number
+the repo's other `Rasterizer` already lives under; two adapters disagreeing about how long patience
+lasts would be a difference nobody asked for. **That parity is partial, and what it misses is this
+card's own subject:** `page.setContent` and `page.screenshot` carry Playwright's default, while
+`page.evaluate(FONTS_READY)` at `packages/raster/src/playwright.ts:195` carries no clock at all, so
+on the fonts wait specifically the two adapters still disagree. Closing that is not this card.
+
+**The instrument never reached the number it chose, and that comes before the findings.** No probe
+here waited longer than 15 s, and the 100-capture run capped each capture at 8 s. So the 19% and
+the retry's 9 of 15 are the residuals of an **8 s** deadline, not of the 30 s one that ships: a
+capture that would have answered somewhere between 8 s and 30 s is excluded by nothing measured,
+and if any such capture exists the shipped deadline fails fewer frames than the table above says.
+What the measurements do settle is the lower bound the number has to clear — every capture that
+answered answered under 1.1 s — and 30 s clears it 28× over.
 
 ## What was rejected, and what it would have cost
 

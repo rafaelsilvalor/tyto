@@ -397,6 +397,64 @@ describe('createDebuggerRasterizer, when a step never answers', () => {
     ).rejects.toThrow(/did not answer document\.fonts\.ready within 25 ms/);
   });
 
+  it('deadlines Page.enable, which nothing has ever been seen to stall', async () => {
+    // Here because the hole the card names is that *no* step had a clock — not because this one
+    // hung. Without a test the wrapper survives no perturbation, and the next reader deletes it
+    // on a green run.
+    const stalled = [recorder({ stall: 'Page.enable' }), recorder({ stall: 'Page.enable' })];
+    const windows = windowsFor(stalled);
+
+    await expect(
+      createDebuggerRasterizer({
+        createWindow: windows.createWindow,
+        scratchDirectory: scratch,
+        captureDeadlineMs: 25,
+      }).raster('<!doctype html>', { width: 10, height: 10 }),
+    ).rejects.toThrow(/did not answer Page\.enable within 25 ms/);
+
+    expect(windows.created()).toBe(2);
+  });
+
+  it('deadlines Emulation.setDeviceMetricsOverride for the same reason', async () => {
+    const stall = 'Emulation.setDeviceMetricsOverride';
+    const stalled = [recorder({ stall }), recorder({ stall })];
+    const windows = windowsFor(stalled);
+
+    await expect(
+      createDebuggerRasterizer({
+        createWindow: windows.createWindow,
+        scratchDirectory: scratch,
+        captureDeadlineMs: 25,
+      }).raster('<!doctype html>', { width: 10, height: 10 }),
+    ).rejects.toThrow(/did not answer Emulation\.setDeviceMetricsOverride within 25 ms/);
+
+    expect(windows.created()).toBe(2);
+  });
+
+  it('names the known packaged hang only for the step it was measured on', async () => {
+    // The message is `E_RENDER_FAILED`'s `{problem}` verbatim. A `loadFile` deadline that told a
+    // tester about `Page.captureScreenshot` would point them away from what happened.
+    const onLoad = [recorder({ stall: 'loadFile' }), recorder({ stall: 'loadFile' })];
+    const onShot = [
+      recorder({ stall: 'Page.captureScreenshot' }),
+      recorder({ stall: 'Page.captureScreenshot' }),
+    ];
+    const deadlined = async (recorders: readonly Recorder[]): Promise<string> =>
+      createDebuggerRasterizer({
+        createWindow: windowsFor(recorders).createWindow,
+        scratchDirectory: scratch,
+        captureDeadlineMs: 25,
+      })
+        .raster('<!doctype html>', { width: 10, height: 10 })
+        .then(
+          () => 'it resolved',
+          (cause: unknown) => (cause as Error).message,
+        );
+
+    expect(await deadlined(onLoad)).not.toContain('packaged app');
+    expect(await deadlined(onShot)).toContain('packaged app');
+  });
+
   it('does not abort a capture that is slow but real', async () => {
     // The measured spread of a capture that *does* answer is 39–1 075 ms, and the packaged
     // build's slow mode sits near the top of it. This is the test that stops a future
