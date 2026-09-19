@@ -65,6 +65,11 @@ você abrir `%APPDATA%\Tyto\logs`, que na maioria das máquinas não existe — 
 vazia, o que é pior, porque parece que não há nada a mandar. A partir da próxima versão cada uma
 tem a sua própria pasta, no formato `%APPDATA%\Tyto\<versão>` (TYTO-150), e este parágrafo some.
 
+**Nesta versão, a pasta `logs` só nasce quando alguma coisa dá errado e é anotada.** Se você
+procurar e ela não estiver lá, isso já é uma informação, e é a que eu preciso: quer dizer que o
+programa parou sem chegar a anotar nada. Me diga isso em vez de procurar mais — a partir da
+próxima versão a pasta existe desde a primeira vez que você abre o programa (TYTO-149).
+
 Essa pasta tem só o registro de falhas — nenhum texto dos seus briefs vai para lá, por
 construção, e é a única pasta do programa que pode ser mandada inteira sem pensar duas vezes.
 
