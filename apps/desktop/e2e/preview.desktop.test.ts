@@ -7,6 +7,8 @@ import { fileURLToPath } from 'node:url';
 import { type ElectronApplication, type Page, _electron } from 'playwright';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 
+import { closeApp } from './close-app.js';
+
 /**
  * *Open an example brief → preview visible → edit the title → preview changes* — E9.2's
  * third acceptance criterion, through a real window.
@@ -68,7 +70,7 @@ beforeAll(async () => {
 });
 
 afterAll(async () => {
-  await app?.close();
+  await closeApp(app);
   rmSync(scratch, { recursive: true, force: true });
 });
 

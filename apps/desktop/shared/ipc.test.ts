@@ -16,6 +16,7 @@ import {
 describe('the IPC contract', () => {
   it('names every channel exactly once, and nothing else', () => {
     expect([...IPC_CHANNEL_NAMES].sort()).toEqual([
+      'app:exit-ack',
       'app:exit-answer',
       'app:info',
       'app:locale',
