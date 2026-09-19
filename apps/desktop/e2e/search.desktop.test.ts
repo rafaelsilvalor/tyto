@@ -5,6 +5,8 @@ import { fileURLToPath } from 'node:url';
 import { type ElectronApplication, type Page, _electron } from 'playwright';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 
+import { closeApp } from './close-app.js';
+
 import { translate } from '../shared/i18n/index.js';
 
 /**
@@ -62,7 +64,7 @@ beforeAll(async () => {
 });
 
 afterAll(async () => {
-  await app?.close();
+  await closeApp(app);
 });
 
 describe('the find panel', () => {

@@ -1005,9 +1005,11 @@ async function requestClose(id: string): Promise<void> {
  * language, which the footer picker changes at runtime and main was told once at startup. So
  * it pushes `app:exit-requested` and this answers on `app:exit-answer` (ADR 0029).
  *
- * **The `try`/`finally` is load-bearing.** An answer that never goes back leaves main holding
- * a prevented quit until its timeout, so a throw anywhere above — a dialog that rejects, a
- * locale key that is missing — must still release the app. The default is `false`: a failure
+ * **The `try`/`finally` is load-bearing, and it is more so since TYTO-147.** The
+ * acknowledgement its caller already sent bought this function unlimited time, which means an
+ * answer that never goes back now leaves main holding a prevented quit **with no deadline at
+ * all** — until the window dies (ADR 0031). So a throw anywhere above — a dialog that rejects,
+ * a locale key that is missing — must still release the app. The default is `false`: a failure
  * to ask is not permission to discard.
  */
 async function answerExitRequest(bridge: TytoBridge, askId: number): Promise<void> {
@@ -1533,6 +1535,18 @@ async function load(): Promise<void> {
     // kept: the subscription and the window have the same lifetime by construction, and a
     // handle nobody can call is a handle that only looks like cleanup.
     bridge.on('app:exit-requested', ({ askId }) => {
+      // **The acknowledgement goes first, and it is first on purpose** (TYTO-147, ADR 0031).
+      // Main's deadline covers this line and nothing after it, so nothing may be computed
+      // before it — `answerExitRequest` opens by filtering the whole workspace, and beyond that
+      // is a box a person has to read. Putting the ack inside that function would put the count
+      // inside the deadline again, which is the shape this card exists to undo.
+      //
+      // Here in the listener and not in the preload, which could speak a beat earlier: a preload
+      // ack proves only that the renderer *process* is alive, and a page whose script has thrown
+      // would still send it, leaving main waiting forever for an answer nobody will write. This
+      // line proves the thing main actually needs — JS in this window is running and has the
+      // question.
+      void bridge['app:exit-ack']({ askId });
       void answerExitRequest(bridge, askId);
     });
 

@@ -6,6 +6,8 @@ import { fileURLToPath } from 'node:url';
 import { type ElectronApplication, type Page, _electron } from 'playwright';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 
+import { closeApp } from './close-app.js';
+
 /**
  * The dock, through a real window (E9.10).
  *
@@ -73,7 +75,7 @@ beforeAll(async () => {
 });
 
 afterAll(async () => {
-  await app?.close();
+  await closeApp(app);
   rmSync(scratch, { recursive: true, force: true });
 });
 
@@ -152,7 +154,7 @@ describe('quitting and reopening', () => {
     const width = await dockWidth(page, 'right');
     expect(width).toBeGreaterThan(560);
 
-    await app.close();
+    await closeApp(app);
     ({ app, page } = await launch());
 
     expect(await openPanels(page)).toEqual(['editor', 'preview']);
@@ -173,7 +175,7 @@ describe('restoring the default', () => {
   });
 
   it('is remembered too, so the restore is not undone by the next launch', async () => {
-    await app.close();
+    await closeApp(app);
     ({ app, page } = await launch());
 
     expect(await openPanels(page)).toEqual(['editor', 'preview', 'problems']);

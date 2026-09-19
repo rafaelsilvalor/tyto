@@ -6,6 +6,8 @@ import { fileURLToPath } from 'node:url';
 import { type ElectronApplication, type Page, _electron } from 'playwright';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 
+import { closeApp } from './close-app.js';
+
 import { FILE_MENU_COMMANDS } from '../shared/commands.js';
 import { translate } from '../shared/i18n/index.js';
 
@@ -78,7 +80,7 @@ beforeAll(async () => {
 }, 120_000);
 
 afterAll(async () => {
-  await app.close();
+  await closeApp(app);
   rmSync(scratch, { recursive: true, force: true });
 });
 

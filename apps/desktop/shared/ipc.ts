@@ -393,7 +393,23 @@ export const IPC_CHANNELS = {
   ),
 
   /**
-   * The renderer's half of the one question main asks (TYTO-123, ADR 0029).
+   * Stage one of the quit question: "this window has the message" (TYTO-147, ADR 0031).
+   *
+   * It carries no verdict and it is not an answer. It exists because the two legs of the quit
+   * question have wildly different costs and only one of them can be given a deadline. Getting
+   * the push into a running renderer is machine work and is over in microseconds; deciding
+   * whether to discard the text is a **person** reading a box, and no number can bound that
+   * without eventually taking somebody's work away mid-read (ADR 0031).
+   *
+   * So the deadline in `src/main/quit.ts` bounds this message and nothing else. It is sent from
+   * the `app:exit-requested` listener **before** the renderer counts anything or draws anything,
+   * because what main needs to know at that point is only that JS in this window is running and
+   * has the question.
+   */
+  'app:exit-ack': channel(z.object({ askId: z.number().int().nonnegative() }), z.object({})),
+
+  /**
+   * Stage two: the renderer's half of the one question main asks (TYTO-123, ADR 0029).
    *
    * Main pushes `app:exit-requested` and the answer comes back **here**, on an ordinary
    * request channel, which is the whole of why this app gains one new transport shape rather
@@ -616,7 +632,9 @@ export const IPC_EVENTS = {
    * comparison computed from it (ADR 0026), and the language the question has to be asked in
    * is the one the footer picker last chose — which main was told exactly once, at startup.
    *
-   * The renderer answers on `app:exit-answer`, carrying this `askId` back.
+   * **Two return legs, not one** (TYTO-147, ADR 0031). The renderer acknowledges receipt on
+   * `app:exit-ack` immediately, and answers on `app:exit-answer` whenever the person has
+   * decided. Both carry this `askId` back. Only the first leg has a deadline.
    */
   'app:exit-requested': z.object({ askId: z.number().int().nonnegative() }),
 
