@@ -12,7 +12,11 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 
 import { closeApp } from './close-app.js';
 
-import { type CaptureWindow, createDebuggerRasterizer } from '../src/main/rasterizer.js';
+import {
+  CAPTURE_WINDOW_OPTIONS,
+  type CaptureWindow,
+  createDebuggerRasterizer,
+} from '../src/main/rasterizer.js';
 
 /**
  * **E5.4's acceptance criterion, which had no home until this file.** TYTO-133.
@@ -159,28 +163,34 @@ function referenceFile(document: Document): string {
  * `BrowserWindow` cannot cross. The map lives on the main process's `globalThis` for the
  * lifetime of the launch; the adapter destroys each window it is handed, and `destroy`
  * drops the entry so a long suite does not accumulate them.
+ *
+ * **The options come from `CAPTURE_WINDOW_OPTIONS` and are not retyped here, since TYTO-152.**
+ * They used to be a copy, and a copy made this suite blind to the one thing it is the gate for:
+ * that card changed the production window to an offscreen one and every pixel here would have
+ * stayed green against a window the app no longer creates. They cross as data because
+ * `app.evaluate` serialises its argument — which also means a future non-serialisable option
+ * would fail loudly here rather than silently diverge.
  */
 async function remoteWindow(size: { width: number; height: number }): Promise<CaptureWindow> {
-  const id = await app.evaluate(({ BrowserWindow }, wanted) => {
-    const store = ((globalThis as Record<string, unknown>)['__tytoCaptureWindows'] ??= new Map<
-      number,
-      Electron.BrowserWindow
-    >()) as Map<number, Electron.BrowserWindow>;
+  const id = await app.evaluate(
+    ({ BrowserWindow }, wanted) => {
+      const store = ((globalThis as Record<string, unknown>)['__tytoCaptureWindows'] ??= new Map<
+        number,
+        Electron.BrowserWindow
+      >()) as Map<number, Electron.BrowserWindow>;
 
-    const window = new BrowserWindow({
-      show: false,
-      width: wanted.width,
-      height: wanted.height,
-      useContentSize: true,
-      frame: false,
-      transparent: true,
-      webPreferences: { contextIsolation: true, nodeIntegration: false, sandbox: true },
-    });
+      const window = new BrowserWindow({
+        ...wanted.options,
+        width: wanted.width,
+        height: wanted.height,
+      });
 
-    const handle = store.size + 1;
-    store.set(handle, window);
-    return handle;
-  }, size);
+      const handle = store.size + 1;
+      store.set(handle, window);
+      return handle;
+    },
+    { ...size, options: CAPTURE_WINDOW_OPTIONS as Electron.BrowserWindowConstructorOptions },
+  );
 
   return {
     loadFile: async (file) => {
