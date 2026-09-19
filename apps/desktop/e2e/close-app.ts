@@ -42,3 +42,5 @@ export async function closeApp(app: ElectronApplication | undefined): Promise<vo
 
   await app.close();
 }
+
+// TYTO-154 baseline probe — throwaway branch, not for merge.
