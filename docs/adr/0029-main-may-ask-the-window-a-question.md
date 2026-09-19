@@ -1,6 +1,6 @@
 # 0029 — Main may ask the window a question, and a push carries no reply
 
-Status: accepted · 2026-09-18 · decided by TYTO-123
+Status: accepted · 2026-09-18 · decided by TYTO-123 · amended by ADR 0031, which corrects the trade recorded in the Consequences below
 
 ## Context
 
@@ -50,6 +50,30 @@ copy of the count _and_ the window's current language _and_ keep both fresh, whi
 pieces of renderer state instead of one. It would also need a second dialog beside the `confirm`
 dependency the tab question already uses, so "the safe button is the default" would be a copy
 that has to be kept in step rather than a property inherited by construction.
+
+## Amended by ADR 0031
+
+One bullet in the Consequences below is wrong as written, since 2026-09-19. Verbatim:
+
+> **The exit can still lose work, in one case, on purpose.** A renderer that never answers holds
+> the app open for two seconds and then the exit proceeds. That trades "lose the unsaved text of a
+> window that is already wedged" against "an app that cannot be closed", and the second is worse.
+> It is the only remaining path where TYTO-123's guarantee does not hold.
+
+**The case it names was not the case the timer caught.** It describes a renderer that never
+answers; what the two seconds actually bounded was a **person reading the box** — drawn by main
+with `dialog.showMessageBox` at `src/main/index.ts`, answered only after a human clicks — so every
+quit where somebody read before choosing lost every unsaved tab at the two-second mark. Not an edge
+case and not a wedged window: the ordinary one (TYTO-147, severity Alta).
+
+The deadline now bounds an **acknowledgement** and nothing else, and the wait for the answer has no
+deadline at all. What ends that wait when there is nobody left to wait for is the window dying, not
+a clock. ADR 0031 has the shape, the rejected alternative and the argument.
+
+Everything else here stands: the one-way `IPC_EVENTS` table, the rule that a push carries no reply,
+both-sides validation, `'event'` as a third direction, the rejected dirty-count alternative and the
+`export:progress` bullet are untouched. The correlation-id bullet is in fact strengthened — there
+are now two return legs carrying `askId`, and both are checked against the outstanding question.
 
 ## Consequences
 

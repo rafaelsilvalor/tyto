@@ -98,9 +98,9 @@ describe('createExitGuard', () => {
     expect(send).toHaveBeenCalledTimes(1);
   });
 
-  it('gives up waiting and quits, which is the one place it can still lose work', () => {
+  it('gives up on a window that never acknowledged, which is the wedged case', () => {
     vi.useFakeTimers();
-    const guard = createExitGuard({ send: () => true, timeoutMs: 2000 });
+    const guard = createExitGuard({ send: () => true, ackTimeoutMs: 2000 });
     const resume = vi.fn();
 
     guard.mayExit(resume);
@@ -108,13 +108,15 @@ describe('createExitGuard', () => {
 
     vi.advanceTimersByTime(2000);
 
+    // Nothing said it had the question, so there is nobody reading anything and an app that
+    // could not be closed would be worse than the loss it would have reported.
     expect(resume).toHaveBeenCalledTimes(1);
     expect(guard.mayExit(vi.fn())).toBe(true);
   });
 
   it('does not fire the timeout after an answer has already arrived', () => {
     vi.useFakeTimers();
-    const guard = createExitGuard({ send: () => true, timeoutMs: 2000 });
+    const guard = createExitGuard({ send: () => true, ackTimeoutMs: 2000 });
     const resume = vi.fn();
 
     guard.mayExit(resume);
@@ -127,7 +129,7 @@ describe('createExitGuard', () => {
 
   it('does not quit later because of a timer left over from a refusal', () => {
     vi.useFakeTimers();
-    const guard = createExitGuard({ send: () => true, timeoutMs: 2000 });
+    const guard = createExitGuard({ send: () => true, ackTimeoutMs: 2000 });
     const resume = vi.fn();
 
     guard.mayExit(resume);
@@ -137,5 +139,77 @@ describe('createExitGuard', () => {
     // The window said no. An uncleared timer would close the app two seconds later, with the
     // person looking at the text they just chose to keep.
     expect(resume).not.toHaveBeenCalled();
+  });
+});
+
+/**
+ * The card, in one describe (TYTO-147, ADR 0031).
+ *
+ * The deadline used to cover the whole question — delivery *and* a person reading a box main
+ * itself draws — so anybody who read before clicking had their tabs taken at two seconds. These
+ * cases pin the two-stage shape that replaced it: the clock bounds the acknowledgement, the wait
+ * after it has none, and a window that dies is what ends it.
+ */
+describe('the deadline is over the acknowledgement, not over the person', () => {
+  it('waits with no deadline at all once the window has acknowledged', () => {
+    vi.useFakeTimers();
+    const guard = createExitGuard({ send: () => true, ackTimeoutMs: 2000 });
+    const resume = vi.fn();
+
+    guard.mayExit(resume);
+    guard.acknowledge(0);
+
+    // Ten minutes. There is no number a person reading a box can be held to, which is the
+    // whole of the decision — the shipped bug is this assertion failing at two seconds.
+    vi.advanceTimersByTime(600_000);
+    expect(resume).not.toHaveBeenCalled();
+
+    guard.answer(0, true);
+    expect(resume).toHaveBeenCalledTimes(1);
+  });
+
+  it('ignores an acknowledgement for a question that is not the outstanding one', () => {
+    vi.useFakeTimers();
+    const guard = createExitGuard({ send: () => true, ackTimeoutMs: 2000 });
+    const resume = vi.fn();
+
+    guard.mayExit(resume);
+    // A stale ack — from a question already refused, or from a window answering out of order.
+    // Honouring it would disarm the deadline on a question nobody has actually received.
+    guard.acknowledge(99);
+    vi.advanceTimersByTime(2000);
+
+    expect(resume).toHaveBeenCalledTimes(1);
+  });
+
+  it('releases the exit when a window that acknowledged then dies', () => {
+    vi.useFakeTimers();
+    const guard = createExitGuard({ send: () => true, ackTimeoutMs: 2000 });
+    const resume = vi.fn();
+
+    guard.mayExit(resume);
+    guard.acknowledge(0);
+    vi.advanceTimersByTime(600_000);
+
+    // The hang the no-deadline wait would otherwise create: `pending` stays set forever, and
+    // `mayExit` refuses every later attempt while it is. A dead renderer's unsaved text is
+    // already gone, so there is nothing left to protect by holding on.
+    guard.windowGone();
+
+    expect(resume).toHaveBeenCalledTimes(1);
+    expect(guard.mayExit(vi.fn())).toBe(true);
+  });
+
+  it('does not latch when the window goes with no question outstanding', () => {
+    const send = vi.fn(() => true);
+    const guard = createExitGuard({ send });
+
+    // Every ordinary quit reaches `closed` too, after `release` already cleared the question.
+    // A `windowGone` that set the latch directly instead of delegating to `release` would make
+    // the next quit skip the question entirely — TYTO-123's bug, restored, with a green suite.
+    guard.windowGone();
+
+    expect(guard.mayExit(vi.fn())).toBe(false);
+    expect(send).toHaveBeenCalledTimes(1);
   });
 });

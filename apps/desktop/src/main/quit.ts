@@ -9,8 +9,15 @@
  *
  * **No Electron import, on purpose.** `send` is the port — "the question was delivered" — and
  * `resume` is what to do once permission exists. That is what lets the whole of this
- * decision be unit-tested, leaving `index.ts` holding nothing but two event hooks, which is
+ * decision be unit-tested, leaving `index.ts` holding nothing but event hooks, which is
  * the arrangement `ipc.ts` and `credentials.ts` already have (ADR 0010).
+ *
+ * **The wait is in two stages, and only the first one has a clock** (TYTO-147, ADR 0031).
+ * Delivering the question is machine work; answering it is a person reading a box that main
+ * itself draws. A single deadline over both was a deadline over the reading, so it took the
+ * text of anybody slower than it — which was the common case, not the wedged one. So the
+ * deadline bounds `acknowledge` alone; after that the guard waits with no clock at all, and
+ * `windowGone` is what releases it when there is no longer anybody to wait for.
  *
  * **One latch for two hooks, and that is the part worth reading twice.** The window's X
  * button and Cmd+Q are different doors: on win32 and linux the X destroys the renderer and
@@ -31,14 +38,17 @@ export interface ExitGuardOptions {
    */
   readonly send: (askId: number) => boolean;
   /**
-   * How long an unanswered question holds the app open.
+   * How long an **unacknowledged** question holds the app open (TYTO-147, ADR 0031).
    *
-   * It resolves towards quitting, which is the one place this guard can still lose work, and
-   * it is a deliberate trade rather than an oversight — see ADR 0029. Two seconds because the
-   * renderer's part is a filter over an array and an OS dialog: a window that has not answered
-   * by then is not slow, it is wedged.
+   * Two seconds because what it bounds is a push reaching a listener that is already
+   * registered and one `invoke` coming back: a window that has not said "I have it" by then is
+   * not slow, it is wedged, and an app that cannot be closed is worse than the loss it would
+   * have reported.
+   *
+   * It is deliberately **not** how long an answer may take. That wait has no deadline, because
+   * the thing on the other end of it is a person; ADR 0031 has the argument.
    */
-  readonly timeoutMs?: number;
+  readonly ackTimeoutMs?: number;
 }
 
 export interface ExitGuard {
@@ -49,11 +59,29 @@ export interface ExitGuard {
    * called later, from the answer, and only on the path that did not already return `true`.
    */
   mayExit: (resume: () => void) => boolean;
+  /**
+   * The window saying it has the question, arriving on `app:exit-ack` (TYTO-147, ADR 0031).
+   *
+   * It proves one thing and it is the only thing the deadline was ever able to measure
+   * honestly: JS in that window is running and has been handed the question. Receiving it
+   * stops the clock; what follows is a person's and is not timed.
+   */
+  acknowledge: (askId: number) => void;
   /** The renderer's answer, arriving on `app:exit-answer`. */
   answer: (askId: number, allow: boolean) => void;
+  /**
+   * There is no longer a window to wait for (TYTO-147, ADR 0031).
+   *
+   * Wired in the composition root to `render-process-gone` and to the window's `closed`. Since
+   * the wait after an acknowledgement has no deadline, this is what keeps a renderer that died
+   * mid-question from holding the app open forever *and* refusing every later quit — `mayExit`
+   * returns `false` for as long as a question is outstanding. A dead renderer's unsaved text is
+   * already gone, so there is nothing left here to protect.
+   */
+  windowGone: () => void;
 }
 
-export function createExitGuard({ send, timeoutMs = 2000 }: ExitGuardOptions): ExitGuard {
+export function createExitGuard({ send, ackTimeoutMs = 2000 }: ExitGuardOptions): ExitGuard {
   /**
    * Permission, once given, is not asked for again.
    *
@@ -64,14 +92,26 @@ export function createExitGuard({ send, timeoutMs = 2000 }: ExitGuardOptions): E
    */
   let confirmed = false;
   let nextAskId = 0;
-  /** The one question outstanding, if any. One window, one exit, one question. */
+  /**
+   * The one question outstanding, if any. One window, one exit, one question.
+   *
+   * `timer` is `undefined` once the window has acknowledged: that is the whole representation
+   * of stage two, and it is the same field rather than a second flag so that "the clock is
+   * running" and "the clock has been stopped" cannot disagree.
+   */
   let pending:
-    { askId: number; resume: () => void; timer: ReturnType<typeof setTimeout> } | undefined;
+    | { askId: number; resume: () => void; timer: ReturnType<typeof setTimeout> | undefined }
+    | undefined;
+
+  /** Stops whatever clock is running, if one still is. Safe after an acknowledgement. */
+  const disarm = (outstanding: { timer: ReturnType<typeof setTimeout> | undefined }): void => {
+    if (outstanding.timer !== undefined) clearTimeout(outstanding.timer);
+  };
 
   const release = (): void => {
     const outstanding = pending;
     if (outstanding === undefined) return;
-    clearTimeout(outstanding.timer);
+    disarm(outstanding);
     pending = undefined;
     confirmed = true;
     outstanding.resume();
@@ -96,9 +136,28 @@ export function createExitGuard({ send, timeoutMs = 2000 }: ExitGuardOptions): E
       pending = {
         askId,
         resume,
-        timer: setTimeout(release, timeoutMs),
+        timer: setTimeout(release, ackTimeoutMs),
       };
       return false;
+    },
+
+    acknowledge: (askId) => {
+      // The id is checked for `answer`'s reason: a stale ack, from a question the person has
+      // since refused, must not disarm the deadline on the one they have not yet been asked.
+      // A duplicate for the *current* id is harmless and lands here as `disarm` finding no
+      // clock, which is why the timer is the representation and not a second flag.
+      if (pending === undefined || pending.askId !== askId) return;
+
+      disarm(pending);
+      pending = { ...pending, timer: undefined };
+    },
+
+    windowGone: () => {
+      // Deliberately `release` and not `confirmed = true`. With nothing outstanding — which is
+      // every ordinary quit, since `release` cleared `pending` before the window went — this
+      // returns early and changes nothing. Setting the latch directly here would mean the next
+      // quit asked nobody, which is the bug TYTO-123 exists to have closed.
+      release();
     },
 
     answer: (askId, allow) => {
@@ -112,7 +171,7 @@ export function createExitGuard({ send, timeoutMs = 2000 }: ExitGuardOptions): E
         return;
       }
 
-      clearTimeout(pending.timer);
+      disarm(pending);
       pending = undefined;
       // `confirmed` deliberately stays false: a no is about *this* attempt. Quitting again
       // asks again, which is what makes the refusal a pause rather than a permanent veto.

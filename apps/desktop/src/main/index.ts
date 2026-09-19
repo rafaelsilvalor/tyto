@@ -371,6 +371,24 @@ async function start(): Promise<void> {
       event.preventDefault();
   });
 
+  // **The other end of the no-deadline wait** (TYTO-147, ADR 0031). Once the window has
+  // acknowledged, main waits for the person with no clock of its own, so something has to say
+  // when there is no longer a person to wait for. These two events are that something, and they
+  // are the only liveness signal main has that is not taken at send time.
+  //
+  // Both, because they are different deaths: `render-process-gone` is the renderer crashing or
+  // being killed while the box is still up, and `closed` is the window going away by any other
+  // route. On the ordinary quit both fire and both do nothing, because `release` cleared the
+  // outstanding question before the window went — which is exactly why `windowGone` delegates to
+  // `release` instead of setting the latch itself.
+  mainWindow.webContents.on('render-process-gone', () => {
+    exit.windowGone();
+  });
+
+  mainWindow.on('closed', () => {
+    exit.windowGone();
+  });
+
   app.on('window-all-closed', () => {
     // macOS keeps an app alive with no windows; every other platform does not.
     // Nothing is disposed on the way out: the host's registrations are in-process and the

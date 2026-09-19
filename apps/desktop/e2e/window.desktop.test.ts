@@ -216,6 +216,7 @@ describe('the bridge', () => {
     // `on` sorts in among them and is the one member that is not a channel: it is the receive
     // direction (ADR 0029), built from `IPC_EVENTS` rather than from the channel table.
     expect(channels).toEqual([
+      'app:exit-ack',
       'app:exit-answer',
       'app:info',
       'app:locale',

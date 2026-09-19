@@ -180,10 +180,16 @@ const layoutStore = () => {
   };
 };
 
-/** The guard's half of the exit question (ADR 0029), recorded rather than acted on. */
+/** The guard's two legs of the exit question (ADR 0029, ADR 0031), recorded rather than acted on. */
 const exitAnswers = () => {
   const given: { askId: number; allow: boolean }[] = [];
-  return { given, answer: (askId: number, allow: boolean) => given.push({ askId, allow }) };
+  const acknowledged: number[] = [];
+  return {
+    given,
+    acknowledged,
+    acknowledge: (askId: number) => acknowledged.push(askId),
+    answer: (askId: number, allow: boolean) => given.push({ askId, allow }),
+  };
 };
 
 /** A log that records instead of writing, so a test can read what would have reached a file. */
@@ -417,6 +423,37 @@ describe('the export handlers (E9.4)', () => {
 
     expect(deps.exports.cancelled).toEqual(['export-1']);
     expect(deps.folders.revealed).toEqual(['/out/promo']);
+  });
+});
+
+/**
+ * The first return leg: "this window has the question" (TYTO-147, ADR 0031).
+ *
+ * Same division of labour as the channel below — the table carries the id, and what stopping
+ * the clock means lives in `quit.ts`.
+ */
+describe('app:exit-ack', () => {
+  it('hands the id to the guard, verbatim', async () => {
+    const exit = exitAnswers();
+    const handlers = createHandlers({ ...dependencies(), exit });
+
+    await handlers['app:exit-ack']({ askId: 7 });
+
+    expect(exit.acknowledged).toEqual([7]);
+  });
+
+  it('refuses an acknowledgement with no id before the guard is reached', async () => {
+    const exit = exitAnswers();
+    const guarded = guard(
+      'app:exit-ack',
+      createHandlers({ ...dependencies(), exit })['app:exit-ack'],
+    );
+
+    await expect(guarded({})).rejects.toBeInstanceOf(IpcContractError);
+    // The point: `acknowledge` compares the id against the outstanding question, so an
+    // `undefined` reaching it would match nothing and silently leave a deadline running that
+    // the handler table appears to have disarmed.
+    expect(exit.acknowledged).toEqual([]);
   });
 });
 

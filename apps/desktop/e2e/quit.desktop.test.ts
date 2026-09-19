@@ -15,9 +15,10 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest';
  * is unit-tested for the decision and `src/preload/bridge.test.ts` for the receive direction;
  * what neither can say is that main and the renderer are actually wired to each other.
  *
- * Two launches, because a passing quit ends the app: an app that has been told to go and went
+ * Three launches, because a passing quit ends the app: an app that has been told to go and went
  * cannot then be asked whether it asks when there is nothing to lose. The clean case is its
- * own describe with its own window.
+ * own describe with its own window, and so is the slow-answer case (TYTO-147), which needs a
+ * window that is still there to be measured while a box is on screen.
  *
  * `dialog.showMessageBox` is replaced from main, the same seam `tabs.desktop.test.ts` uses
  * and for its reason: `app.evaluate` runs with the `electron` module in scope, so nothing
@@ -63,6 +64,42 @@ const captureBoxes = async (app: ElectronApplication, confirmed: boolean): Promi
       return Promise.resolve({ response: yes ? 1 : 0, checkboxChecked: false });
     }) as never;
   }, confirmed);
+};
+
+/**
+ * The same seam, answering **slower than main's deadline** (TYTO-147, ADR 0031).
+ *
+ * The helper above answers in microseconds, which is precisely why no test in this file ever
+ * saw the bug this card fixes: the box is drawn by main with `dialog.showMessageBox`, so the
+ * seconds it is on screen are a person reading, and a stub that answers instantly measures a
+ * question nobody was ever asked. `delayMs` is that person.
+ */
+const captureSlowBoxes = async (
+  app: ElectronApplication,
+  confirmed: boolean,
+  delayMs: number,
+): Promise<void> => {
+  await app.evaluate(
+    ({ dialog }, [yes, wait]) => {
+      const shared = globalThis as unknown as { tytoBoxes?: unknown[] };
+      shared.tytoBoxes = [];
+      dialog.showMessageBox = ((options: Record<string, unknown>): Promise<unknown> => {
+        shared.tytoBoxes?.push({
+          message: options['message'],
+          detail: options['detail'],
+          buttons: options['buttons'],
+          defaultId: options['defaultId'],
+          cancelId: options['cancelId'],
+        });
+        return new Promise((resolve) => {
+          setTimeout(() => {
+            resolve({ response: (yes as boolean) ? 1 : 0, checkboxChecked: false });
+          }, wait as number);
+        });
+      }) as never;
+    },
+    [confirmed, delayMs] as [boolean, number],
+  );
 };
 
 const boxes = async (app: ElectronApplication): Promise<CapturedBox[]> =>
@@ -184,6 +221,73 @@ describe('quitting with unsaved text', () => {
     closed = true;
 
     expect(closed).toBe(true);
+  });
+});
+
+/**
+ * The card, end to end (TYTO-147, ADR 0031).
+ *
+ * **A third launch, and the reason is the file's own**: the describes above end with an app
+ * that has been told to go and went. This one needs a window that is still there to be
+ * measured, and it needs it while a box is on screen.
+ *
+ * **The test that answers fast proves nothing here.** Every other case in this file replaces
+ * `showMessageBox` with a resolved promise, so main's clock never got to run out — which is how
+ * a guard that took a person's tabs at two seconds shipped under a green suite. This one takes
+ * four seconds to answer, deliberately more than the two the deadline is set to, and looks at
+ * the app in between.
+ *
+ * Margins are wide and nothing here asserts a stopwatch: 4 s of box, observed at 3 s. What is
+ * asserted is that the window **answers** and still holds its text, because that is the claim —
+ * not that anything happened at a particular instant on a CI machine under load.
+ */
+describe('quitting while somebody is still reading the box', () => {
+  let app: ElectronApplication;
+  let page: Page;
+
+  beforeAll(async () => {
+    ({ app, page } = await launch('slow'));
+    await page.click('#editor .cm-content');
+    await page.keyboard.type('::titulo Campanha');
+    await page.waitForSelector('.tabs__dirty');
+  });
+
+  afterAll(async () => {
+    // **The box has to be put back before the app can be closed at all**, and finding that out
+    // is itself a measurement of the fix: with the slow stub still installed, `app.close()`
+    // sat for the full 300 s hook timeout, because a dirty window now refuses the exit for as
+    // long as the person takes — and this "person" answers cancel, every time, forever.
+    await captureBoxes(app, true);
+    await app?.close();
+  });
+
+  it('is still running, with the text intact, after the deadline has passed', async () => {
+    await captureSlowBoxes(app, false, 4000);
+    await app.evaluate(({ app: electronApp }) => {
+      electronApp.quit();
+    });
+
+    // Past the two seconds the acknowledgement is bounded by, and still well inside the box.
+    // Before this card the app was gone by now and every line below rejected against a closed
+    // target — with the typed text never written anywhere.
+    await page.waitForTimeout(3000);
+
+    expect(await boxes(app)).toHaveLength(1);
+    expect(await page.evaluate(() => document.querySelectorAll('.tabs__tab').length)).toBe(1);
+    expect(await page.evaluate(() => document.querySelectorAll('.tabs__dirty').length)).toBe(1);
+    expect(await page.evaluate(() => document.querySelector('.cm-content')?.textContent)).toContain(
+      'Campanha',
+    );
+  });
+
+  it('honours the answer whenever it finally arrives', async () => {
+    // The box resolves at 4 s with cancel. An answer arriving that long after the question is
+    // still the answer: the guard has no clock running by then, and a `no` leaves the app up
+    // and unlatched.
+    await page.waitForTimeout(2000);
+
+    expect(await page.evaluate(() => document.querySelectorAll('.tabs__tab').length)).toBe(1);
+    expect(await app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows().length)).toBe(1);
   });
 });
 
