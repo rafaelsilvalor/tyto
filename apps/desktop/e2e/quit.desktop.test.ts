@@ -285,8 +285,23 @@ describe('quitting while somebody is still reading the box', () => {
     // still the answer: the guard has no clock running by then, and a `no` leaves the app up
     // and unlatched.
     await page.waitForTimeout(2000);
-
     expect(await page.evaluate(() => document.querySelectorAll('.tabs__tab').length)).toBe(1);
+
+    // **Asking again is the only assertion a honoured answer can produce, and the line above is
+    // not it.** One tab and one window is equally the state of a guard that ignored the answer
+    // and is still holding the question — `mayExit` returns `false` without asking anybody for
+    // as long as one is outstanding, so a second quit that draws a second box is the whole
+    // difference. Measured: with `answer` made a no-op, nothing is asked here and this is the
+    // case that goes red.
+    //
+    // A fast box from here on, which is also what leaves the app closable in `afterAll`.
+    await captureBoxes(app, false);
+    await app.evaluate(({ app: electronApp }) => {
+      electronApp.quit();
+    });
+    await page.waitForTimeout(500);
+
+    expect(await boxes(app)).toHaveLength(1);
     expect(await app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows().length)).toBe(1);
   });
 });

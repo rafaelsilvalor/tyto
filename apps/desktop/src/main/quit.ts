@@ -40,13 +40,27 @@ export interface ExitGuardOptions {
   /**
    * How long an **unacknowledged** question holds the app open (TYTO-147, ADR 0031).
    *
-   * Two seconds because what it bounds is a push reaching a listener that is already
-   * registered and one `invoke` coming back: a window that has not said "I have it" by then is
-   * not slow, it is wedged, and an app that cannot be closed is worse than the loss it would
-   * have reported.
+   * What it bounds is a push reaching a listener that is already registered and one `invoke`
+   * coming back: a window that has not said "I have it" by then is not slow, it is wedged, and
+   * an app that cannot be closed is worse than the loss it would have reported.
    *
    * It is deliberately **not** how long an answer may take. That wait has no deadline, because
    * the thing on the other end of it is a person; ADR 0031 has the argument.
+   *
+   * **Five seconds, and the first number tried was two.** The round trip measures 0-2 ms on an
+   * idle machine and 44 ms at the worst of twenty, so two seconds looked like 45x headroom. It
+   * was not: the end-to-end case that answers slower than the deadline failed **3 of 13 runs**
+   * against a built app, every failure the app exiting at ~2.02 s — the clock running on time
+   * and the acknowledgement simply not back yet. A budget that a real launch misses about a
+   * fifth of the time is the card's own bug with a smaller window, so the budget moved rather
+   * than the test. Five seconds is ~113x the worst round trip measured, and the only thing it
+   * costs is three more seconds before a genuinely wedged window lets the app go.
+   *
+   * **What it can honestly measure is narrower than the wording suggests, and ADR 0031 records
+   * the gap.** This is a `setTimeout` on *main's* event loop, so a main process blocked past the
+   * deadline runs `release` the moment it is free with the window's acknowledgement queued
+   * behind it, unread — measured against the built app: block main for longer than the deadline
+   * and it quits with the renderer answering normally.
    */
   readonly ackTimeoutMs?: number;
 }
@@ -72,16 +86,18 @@ export interface ExitGuard {
   /**
    * There is no longer a window to wait for (TYTO-147, ADR 0031).
    *
-   * Wired in the composition root to `render-process-gone` and to the window's `closed`. Since
-   * the wait after an acknowledgement has no deadline, this is what keeps a renderer that died
-   * mid-question from holding the app open forever *and* refusing every later quit — `mayExit`
-   * returns `false` for as long as a question is outstanding. A dead renderer's unsaved text is
-   * already gone, so there is nothing left here to protect.
+   * Wired in the composition root to `render-process-gone`, to the window's `closed`, and to a
+   * main-frame navigation — a reload keeps the process and throws away the page that had the
+   * question, which is a death this file cannot tell apart from the others and must not miss.
+   * Since the wait after an acknowledgement has no deadline, this is what keeps a window that
+   * died mid-question from holding the app open forever *and* refusing every later quit —
+   * `mayExit` returns `false` for as long as a question is outstanding. The unsaved text of a
+   * page that is gone is gone with it, so there is nothing left here to protect.
    */
   windowGone: () => void;
 }
 
-export function createExitGuard({ send, ackTimeoutMs = 2000 }: ExitGuardOptions): ExitGuard {
+export function createExitGuard({ send, ackTimeoutMs = 5000 }: ExitGuardOptions): ExitGuard {
   /**
    * Permission, once given, is not asked for again.
    *

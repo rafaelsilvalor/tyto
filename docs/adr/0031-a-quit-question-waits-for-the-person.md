@@ -33,10 +33,21 @@ test and the suite was green over the whole of it.
 1. The renderer acknowledges on a new channel, `app:exit-ack`, **as the first statement of the
    `app:exit-requested` listener** — before it counts unsaved documents, before it reads the
    locale, before anything is drawn. The acknowledgement carries the `askId` and no verdict.
-2. `ackTimeoutMs`, still 2000, bounds that acknowledgement and nothing else. What it now measures
-   is a push reaching a listener that is already registered and one `invoke` coming back. A window
-   silent for two seconds of that is genuinely wedged, and the old argument — an app that cannot be
-   closed is worse than the loss it would have reported — holds for it unchanged.
+2. `ackTimeoutMs` bounds that acknowledgement and nothing else. What it is pointed at is a push
+   reaching a listener that is already registered and one `invoke` coming back. A window silent
+   that long is genuinely wedged, and the old argument — an app that cannot be closed is worse than
+   the loss it would have reported — holds for it unchanged.
+   **The number is 5000, and the first one tried was the old 2000.** Keeping two seconds looked
+   free: the round trip measures 0-2 ms idle and 44 ms at the worst of twenty, so it read as 45x of
+   headroom. It was not. The new end-to-end case — the one that answers the box slower than the
+   deadline — failed **3 runs in 13** against a built app, every failure the exit firing at
+   ~2.02 s with the acknowledgement simply not back yet. A budget a real launch misses about a
+   fifth of the time is this card's own bug with a smaller window, so the budget moved and the test
+   did not. Five seconds is ~113x the worst round trip measured; what it costs is three further
+   seconds before a wedged window lets go, which is the cheap side of that trade.
+   **What a `setTimeout` can actually measure is narrower than that, and the difference is
+   recorded in the Consequences rather than papered over**: main runs the clock, so it bounds
+   main's own availability too.
 3. Once acknowledged, the guard clears the timer and waits **with no deadline**, because what it is
    waiting for is a person.
 
@@ -54,10 +65,19 @@ question is outstanding — so the app would not only stay up, it could never be
 answers were available.
 
 **Chosen: a hard "the window is gone" check.** The guard gains `windowGone()`, and the composition
-root wires it to `webContents.on('render-process-gone')` and `BrowserWindow.on('closed')` — a crash
-or kill, and the window going away by any other route. Electron 44.3.0 carries both. `windowGone`
-delegates to the existing `release()`, which returns early when nothing is outstanding, so on every
-ordinary quit both events fire and both do nothing.
+root wires it to three events: `webContents.on('render-process-gone')` (a crash or a kill),
+`BrowserWindow.on('closed')` (the window going away by any other route) and a main-frame
+`did-start-navigation` that is not same-document (**a reload**, which keeps the renderer process and
+throws away the page that had the question). `windowGone` delegates to the existing `release()`,
+which returns early when nothing is outstanding, so on every ordinary quit — and on the first load —
+they fire and do nothing.
+
+**The third one was missed first, and the app it shipped could never be quit again.** With only the
+first two hooked, one `page.reload()` while a box was up left `pending` set with no event able to
+clear it: every later `app.quit()` refused, the X button refused with it, and no question ever asked
+again. Measured against the built app on this branch, and reachable in the shipped build — `menu.ts`
+keeps `toggleDevTools`, and reloading from there is the premise of TYTO-104. A reload takes every
+unsaved document with it, so `windowGone`'s own argument covers it: there is nothing left to protect.
 
 **Rejected: a second, much longer deadline.** It was rejected on three counts.
 
@@ -73,9 +93,10 @@ ordinary quit both events fire and both do nothing.
   the app open protects nothing, so there is nothing to buy with the extra time.
 
 The counter-argument, recorded because it is real: `before-quit` is also a Windows logoff and a
-macOS restart, and stage three now prevents those with no deadline of our own. That is bounded in
-practice by the OS, which force-kills after its own timeout — **asserted from general knowledge and
-not measured here**, and it is the strongest case for the rejected option. It does not change the
+macOS restart, and the unbounded wait — item 3 of the Decision above — now prevents those with no
+deadline of our own. That is bounded in practice by the OS, which force-kills after its own timeout
+— **asserted from general knowledge and not measured here**, and it is the strongest case for the
+rejected option. It does not change the
 answer, because a second timer short enough to beat a logoff is a second timer short enough to take
 a person's tabs, which is the bug.
 
@@ -86,16 +107,37 @@ whole suite still green. `src/main/quit.test.ts` has a case whose only job is th
 ## Consequences
 
 - **The app no longer has a clock over a person.** The one path where TYTO-123's guarantee did not
-  hold is closed, and the guarantee is now unconditional for a window that is alive.
-- **A wedged window still cannot hold the app hostage**, and it is the same two seconds as before.
-  What changed is what those two seconds are pointed at.
+  hold is closed, for as long as the page that was asked is the page still on screen. A window that
+  is alive but has _navigated_ is not that page, and it is released rather than waited for.
+- **The deadline bounds main's own availability, not the window's, and that is the residue of this
+  card.** `setTimeout` runs on main's event loop: block main past the deadline and the callback runs
+  the moment it is free, with the acknowledgement queued behind it and unread, releasing the exit
+  on the strength of main's stall. **Measured** against the built app — main's loop blocked for
+  2.5 s while the renderer answered normally, and the app quit and took the tab. The same holds for
+  a renderer stalled that long before it can reach its own listener. What is _not_ at risk is
+  ordinary work: 20 quits on an idle machine put the whole renderer round trip at 0-2 ms, 44 ms at
+  the worst, which is 45x of headroom, so what is left is a machine-level pause and not a slow
+  window. A fix would need a liveness question main can ask at the moment the clock fires, which is
+  a port the guard does not have and a card this one does not open.
+- **A re-armed clock was tried for that and rejected, measured.** Re-arming the deadline whenever
+  its callback comes back more than half of it late covers a long main stall and nothing else: the
+  2.5 s stall above is inside the ratio and still takes the tab. The reds that prompted the attempt
+  — the new e2e case failing 3 times in 13 on a reviewer's machine, and not once in 10 here —
+  released at ~2.02 s, which is a clock that was **not** late and therefore nothing a re-arm can
+  see. The alternative, a slack tight enough to catch ordinary jitter, is a clock that re-arms
+  forever against a genuinely wedged window — the hang this ADR spent its open question avoiding.
+  What those reds did settle is that two seconds was the wrong budget, which is why the number
+  moved to five and is now pinned by a unit test rather than by a comment.
+- **A wedged window still cannot hold the app hostage**, and it now takes five seconds rather than
+  two to establish that. What changed is what those seconds are pointed at, and how many of them
+  a launch is allowed to spend before the app decides nobody is listening.
 - **A push that needs an answer may now need two return legs**, and ADR 0029's correlation-id rule
   covers both: `acknowledge` and `answer` each ignore an id that is not the outstanding question, a
   stale ack being exactly as dangerous as a stale yes. A later card adding an expensive question
   has a shape to copy.
 - **The composition root now hears about the window dying**, which it did not before — the only
-  liveness main had was `isDestroyed()` taken at send time. That is two listeners in `index.ts` and
-  nothing in `quit.ts`, which still imports no Electron.
+  liveness main had was `isDestroyed()` taken at send time. That is three listeners in `index.ts`
+  and nothing in `quit.ts`, which still imports no Electron.
 - **A test that answers a box instantly proves nothing about a box.** The new e2e case takes four
   seconds to answer and looks at the app at three, which is the only test in the repository that
   fails against the shipped 0.3.0 behaviour. Wide margins and no stopwatch assertions: what it

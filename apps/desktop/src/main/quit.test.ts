@@ -114,6 +114,25 @@ describe('createExitGuard', () => {
     expect(guard.mayExit(vi.fn())).toBe(true);
   });
 
+  it('defaults the acknowledgement budget to five seconds, which is the number that shipped', () => {
+    // The composition root names no budget, so the default IS the product's behaviour, and it
+    // is a measured number rather than a round one: two seconds failed 3 of 13 end-to-end runs
+    // against a built app, every failure the exit firing at ~2.02 s with the acknowledgement
+    // not yet back (TYTO-147, ADR 0031). Without this test the default can be moved back to a
+    // guess on a green suite.
+    vi.useFakeTimers();
+    const guard = createExitGuard({ send: () => true });
+    const resume = vi.fn();
+
+    guard.mayExit(resume);
+
+    vi.advanceTimersByTime(4999);
+    expect(resume).not.toHaveBeenCalled();
+
+    vi.advanceTimersByTime(1);
+    expect(resume).toHaveBeenCalledTimes(1);
+  });
+
   it('does not fire the timeout after an answer has already arrived', () => {
     vi.useFakeTimers();
     const guard = createExitGuard({ send: () => true, ackTimeoutMs: 2000 });

@@ -373,20 +373,37 @@ async function start(): Promise<void> {
 
   // **The other end of the no-deadline wait** (TYTO-147, ADR 0031). Once the window has
   // acknowledged, main waits for the person with no clock of its own, so something has to say
-  // when there is no longer a person to wait for. These two events are that something, and they
-  // are the only liveness signal main has that is not taken at send time.
+  // when there is no longer a person to wait for. These events are that something, and they are
+  // the only liveness signal main has that is not taken at send time.
   //
-  // Both, because they are different deaths: `render-process-gone` is the renderer crashing or
-  // being killed while the box is still up, and `closed` is the window going away by any other
-  // route. On the ordinary quit both fire and both do nothing, because `release` cleared the
-  // outstanding question before the window went — which is exactly why `windowGone` delegates to
-  // `release` instead of setting the latch itself.
+  // Three, because they are different deaths and no two of them cover the third:
+  // `render-process-gone` is the renderer crashing or being killed while the box is still up;
+  // `closed` is the window going away by any other route; and a **navigation** is the page that
+  // had the question being replaced while its process lives on. On the ordinary quit they fire
+  // and do nothing, because `release` cleared the outstanding question before the window went —
+  // which is exactly why `windowGone` delegates to `release` instead of setting the latch itself.
   mainWindow.webContents.on('render-process-gone', () => {
     exit.windowGone();
   });
 
   mainWindow.on('closed', () => {
     exit.windowGone();
+  });
+
+  // **Measured, against the built app, and it is why this third hook exists.** A reload keeps the
+  // renderer *process* and throws its JS context away, so neither event above fires and nothing
+  // was left to end the unbounded wait: with a box on screen, one `page.reload()` left `pending`
+  // set forever, every later quit refused by `mayExit`, the X button refused with it — an app
+  // that could never be closed again. Reload is reachable in the shipped build through
+  // DevTools (`menu.ts` keeps `toggleDevTools`), which is the whole premise of TYTO-104.
+  //
+  // The outgoing page is the one that had the question, and it takes every unsaved document with
+  // it (TYTO-104) — so there is nothing left to protect here either, which is `windowGone`'s own
+  // argument. `isSameDocument` is excluded because a fragment or `pushState` navigation keeps the
+  // context, the listener and the person; on the first load nothing is outstanding and `release`
+  // returns early, exactly as it does for the other two.
+  mainWindow.webContents.on('did-start-navigation', ({ isMainFrame, isSameDocument }) => {
+    if (isMainFrame && !isSameDocument) exit.windowGone();
   });
 
   app.on('window-all-closed', () => {
