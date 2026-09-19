@@ -29,13 +29,20 @@ import {
  *
  * **No paint loop.** ADR 0027's Consequences: no `startPainting`, no `invalidate`, no
  * quiet-then-take, no empty-first-frame filter. `Page.captureScreenshot` resolves once with
- * the bytes, and the window it is taken on does not have to be offscreen.
+ * the bytes. The window it is taken on *is* offscreen since TYTO-152 — see
+ * {@link CAPTURE_WINDOW_OPTIONS} for the measurement that put it there — but nothing here reads
+ * a frame from it: the capture is still one command and one answer.
  *
  * **Except when it does not resolve at all, which is what TYTO-148 measured and ADR 0030
  * records.** In the packaged app 15 of 80 captures never answered `Page.captureScreenshot` inside
  * the probe's 8 s cap; the dev build answered 20 of 20. So every step here has a deadline
  * ({@link CAPTURE_DEADLINE_MS}), a capture that misses it is tried once more on a fresh window,
  * and a frame that fails twice is reported as a failed frame rather than stalling the export.
+ *
+ * **TYTO-152 then found what the packaged app was waiting for and removed it, and the deadline
+ * stays anyway.** The window is offscreen now ({@link CAPTURE_WINDOW_OPTIONS}), which took the
+ * measured hang to 0 of 20 — but "no hang on this machine, on this platform, in this build" is
+ * not the same as "no step can stall", and the deadline is what makes any future one legible.
  */
 
 /** The 800×600 ADR 0027 measured from, and the size has no bearing on the picture. */
@@ -216,20 +223,69 @@ export interface DebuggerRasterizerOptions {
   readonly captureDeadlineMs?: number;
 }
 
+/**
+ * The window every capture runs on, as one object so that the thing measured and the thing
+ * shipped cannot drift apart.
+ *
+ * **Exported because `e2e/raster.desktop.test.ts` used to retype these options.** That suite is
+ * the pixel-parity gate, it builds its window inside the launched Electron through the
+ * {@link CaptureWindow} seam, and its copy of the options was a second source of truth: this
+ * card changed the window and the gate would have gone green without ever creating one. It now
+ * passes this object across.
+ *
+ * **`offscreen: true` is the fix TYTO-152 measured, and `show: false` alone was the bug.** A
+ * hidden window is still an ordinary window: `Page.captureScreenshot` asks the browser for a
+ * frame of its *surface*, and in the packaged app nothing draws that surface, so the frame
+ * arrives about a second late or never. Offscreen rendering is a different mechanism — Chromium
+ * produces frames into a bitmap continuously, whether or not anything is on screen. Measured on
+ * win32, the packaged build rebuilt from `main`, 20 captures per arm, round-robin, an 8 s cap:
+ *
+ * ```
+ * arm                              hangs   <500 ms   ~1 s   latency
+ * show: false (what shipped)       4 / 20     9        7     60–1104 ms
+ * backgroundThrottling: false      6 / 20     5        9     70–1084 ms
+ * transparent: false               3 / 20    11        6     64–1089 ms
+ * show: true                       0 / 20    20        0     75–133 ms
+ * offscreen: true                  0 / 20    20        0     59–104 ms
+ * ```
+ *
+ * Both arms that give Chromium a reason to draw answer every time and answer fast; the ~1 s
+ * cluster disappears with the hang, which is what says they are the same mechanism. `show: true`
+ * is rejected for the obvious reason — a window on the exporting person's screen, once per frame.
+ *
+ * **Changing the request instead of the window was tried and is worse**, 20 captures each:
+ * `fromSurface: false` hung 20 of 20, and a `Page.startScreencast` before the capture hung 20 of
+ * 20 *after* its own frame had arrived in 25–86 ms every time — which is the measurement that
+ * says the renderer can produce a frame here and the browser surface is what cannot.
+ *
+ * ADR 0027 is amended, not overturned: its V3 row already measured this exact pair — the debugger
+ * capture on an offscreen window — at the full 1080×1920, so the size question it decided is
+ * unaffected. ADR 0033 records the change.
+ */
+export const CAPTURE_WINDOW_OPTIONS = {
+  show: false,
+  useContentSize: true,
+  frame: false,
+  // From ADR 0027's decision snippet. It is *not* what carries alpha into the bytes —
+  // perturbed to `false` and `alpha.square` still came back 0.0000% against the Playwright
+  // reference, so `Page.captureScreenshot` is doing that on its own. Kept because the ADR
+  // has it and an ADR is not reopened by a comment. TYTO-152 perturbed it again for a
+  // different question and it is not the hang either: 3 of 20 without it.
+  transparent: true,
+  webPreferences: {
+    contextIsolation: true,
+    nodeIntegration: false,
+    sandbox: true,
+    offscreen: true,
+  },
+} as const;
+
 async function defaultWindow(size: { width: number; height: number }): Promise<CaptureWindow> {
   const { BrowserWindow } = await import('electron');
   const window: BrowserWindow = new BrowserWindow({
-    show: false,
+    ...CAPTURE_WINDOW_OPTIONS,
     width: size.width,
     height: size.height,
-    useContentSize: true,
-    frame: false,
-    // From ADR 0027's decision snippet. It is *not* what carries alpha into the bytes —
-    // perturbed to `false` and `alpha.square` still came back 0.0000% against the Playwright
-    // reference, so `Page.captureScreenshot` is doing that on its own. Kept because the ADR
-    // has it and an ADR is not reopened by a comment.
-    transparent: true,
-    webPreferences: { contextIsolation: true, nodeIntegration: false, sandbox: true },
   });
 
   const { webContents } = window;
