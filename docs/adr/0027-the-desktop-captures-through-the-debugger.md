@@ -1,6 +1,6 @@
 # 0027 — The desktop captures through the debugger, because a window's frame is clipped to the screen
 
-Status: accepted · 2026-09-18 · TYTO-125 · amends the desktop half of ADR 0002
+Status: accepted · 2026-09-18 · TYTO-125 · amends the desktop half of ADR 0002, amended by ADR 0030, which corrects the failure mode predicted below
 
 ## Context
 
@@ -69,6 +69,21 @@ Determinism holds on both: two runs of the same document in one launch are byte-
 **Lift the clamp by rendering small and scaling up** — V5, `zoomFactor: 0.5` in a window half the size. It is not the same picture and the numbers say so: `innerWidth=2160 innerHeight=1920 devicePixelRatio=0.5`, the 1080-wide document occupying the left half of the frame at 540×540 device pixels, `paintedShare` 28.13% = 540·540/(1080·960) exactly. The honest form of the trade is half the linear resolution, which is not what `scale` means.
 
 **`enableDeviceEmulation` no longer crashes, and it still does not help.** The card records it killing the main process on an offscreen window; on Electron 44.3.0 it survived two launches of its own. What it produces is a render at `dpr=2` resampled onto the window's own surface — a 400×302 window still paints 400×302 — so it lifts nothing. The stale claim is corrected in `apps/desktop/e2e/offscreen-raster.desktop.test.ts` in the same pull request.
+
+## Amended by ADR 0030
+
+The **failure mode** named in the Consequences below is the wrong one, since 2026-09-19. That
+paragraph predicts `webContents.debugger.attach` throwing, and says in as many words that it is not
+measured. Both halves have since been measured and both are wrong: DevTools and the debugger API
+are separate sessions, so the collision is not reachable on a window created and destroyed inside
+one capture (probed in `apps/desktop/src/main/rasterizer.ts`); and what actually fails is the
+opposite shape. `Page.captureScreenshot` **never answers** — 15 of 80 captures in the packaged app
+against 0 of 20 in the dev build — which is not a throw the pipeline can turn into a failed frame
+but a stall with no end. Every step of the capture now has a deadline and a frame that misses it
+twice is reported failed (ADR 0030, TYTO-148).
+
+Everything else here stands: the mechanism, the seven-route table, the `webp` and size arguments,
+and the hidden-not-offscreen decision are untouched.
 
 ## Consequences
 
