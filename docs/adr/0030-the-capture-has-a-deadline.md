@@ -127,8 +127,9 @@ free-text `{problem}`.
 
 **This is containment and not a cure, and the cause is still open.** Why a packaged build hangs
 where the dev build does not is a Chromium-level question that this card localised and did not
-answer, and it has a follow-up card of its own. Nothing here explains the hang; it only stops the
-hang from being the end of the export.
+answer, and it has a follow-up card of its own in TYTO-152, which carries the table above and the
+four suspects it already rules out. Nothing here explains the hang; it only stops the hang from
+being the end of the export.
 
 **Everything above is win32, one machine, one session.** No hang has been observed on Linux or in
 CI, whose `xvfb` is the environment ADR 0027 and ADR 0028 keyed their references on, and no

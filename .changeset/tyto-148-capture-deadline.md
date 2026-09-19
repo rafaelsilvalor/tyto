@@ -29,7 +29,8 @@ no measurement here ever waited the 30 s that ships, so a capture answering some
 ruled out by nothing. What changes is that they fail as a reported failed frame, with
 the frames that worked written to disk and named in `result.json`, and the run reaching an end.
 Why a packaged build hangs where the dev build does not is a Chromium-level question this card
-localised and did not answer; it has a follow-up of its own, and the deadline does not explain it.
+localised and did not answer; it has a follow-up of its own in TYTO-152, and the deadline does not
+explain it.
 
 ADR 0030 records the decision and corrects ADR 0027, whose Consequences predicted the wrong failure
 mode — an `attach` collision — and said it was not measured. It is measured now, and it was the
