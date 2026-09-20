@@ -441,6 +441,22 @@ let exportPoll: ReturnType<typeof setInterval> | undefined;
 /** How often the dialog asks how far along the run is. */
 const EXPORT_POLL_MS = 150;
 
+/**
+ * The formats the brief in front will render, for the dialog's checklist (TYTO-137).
+ *
+ * **No channel of its own, because the window already has both halves.** `templates:list`
+ * answers with each template's format ids and `panel.templates` is holding that answer; the
+ * brief's frontmatter names which template it is. So this is a lookup rather than a round
+ * trip — and an empty array is the honest answer for a brief that names no template, or one
+ * whose manifest this window does not have, which the dialog draws as *every format the
+ * template has* rather than as an empty list.
+ */
+function formatsOfActiveBrief(): readonly string[] {
+  const wanted = templateOf(activeText());
+  if (wanted === undefined) return [];
+  return panel.templates.find((template) => template.name === wanted)?.formats ?? [];
+}
+
 function paintExport(progress: ExportProgressView | undefined): void {
   const dialog = elements.exportDialog;
   if (dialog === null || dialog === undefined) return;
@@ -504,7 +520,11 @@ function openExportDialog(): void {
         outputs: request.outputs.map((output) => ({
           kind: output.kind,
           ...(output.quality === undefined ? {} : { quality: output.quality }),
+          ...(output.scale === undefined ? {} : { scale: output.scale }),
         })),
+        // Absent when every format is wanted, which is what the channel already reads as
+        // "all of them" and what this window sent before TYTO-137.
+        ...(request.formats === undefined ? {} : { formats: [...request.formats] }),
       });
       exportId = answer.exportId;
       // Painted before the first poll answers, so the dialog switches to Cancel on the
@@ -538,6 +558,12 @@ function openExportDialog(): void {
     stopWatchingExport();
     dialog.open = false;
   };
+
+  // **Read on the way in, not watched** (TYTO-137). The brief behind an open dialog cannot
+  // be typed in — the panel is modal — so the formats cannot go stale while it is up, and a
+  // checklist that rebuilt itself under somebody's hand would be worse than one that does
+  // not. Opening it again on another tab reads again, and the dialog re-ticks everything.
+  dialog.formats = formatsOfActiveBrief();
 
   paintExport(dialog.progress);
   dialog.open = true;

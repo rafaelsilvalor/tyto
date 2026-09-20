@@ -185,3 +185,188 @@ describe('the export dialog', () => {
     expect(element.querySelector('.export__failure')?.textContent).toContain('ENOSPC');
   });
 });
+
+/**
+ * Formats, scale and quality — the three choices TYTO-43 declared and did not ship (TYTO-137).
+ *
+ * **The rule every case here circles is that the untouched form is the old behaviour.** The
+ * dialog shipped sending every format at scale 1 with quality 90, and a person who opens it and
+ * clicks Export has to keep getting exactly that — so `formats` is absent when all of them are
+ * ticked and `scale` is absent at 1×, rather than being sent as a full list and a 1.
+ */
+describe('the export dialog, choosing what to render', () => {
+  const withFormats = async (formats: readonly string[]): Promise<ExportDialog> => {
+    const element = dialog();
+    element.directory = '/out';
+    element.formats = formats;
+    await element.updateComplete;
+    return element;
+  };
+
+  const startAndCapture = async (
+    element: ExportDialog,
+  ): Promise<ExportStartRequest | undefined> => {
+    const requests: ExportStartRequest[] = [];
+    element.start = (request) => requests.push(request);
+    await element.updateComplete;
+    element.querySelector<HTMLButtonElement>('.export__start')?.click();
+    return requests[0];
+  };
+
+  it('ticks every format it is given, and sends none of them', async () => {
+    const element = await withFormats(['feed', 'story']);
+
+    const ticked = [...element.querySelectorAll<HTMLInputElement>('.export__format input')];
+    expect(ticked.map((input) => input.value)).toEqual(['feed', 'story']);
+    expect(ticked.every((input) => input.checked)).toBe(true);
+
+    // **Absent, not the full list.** The channel reads an absent `formats` as every format the
+    // *manifest* declares; sending the list this window is holding would quietly narrow the
+    // export to what it happened to know about.
+    expect(await startAndCapture(element)).not.toHaveProperty('formats');
+  });
+
+  it('sends the formats that stayed ticked', async () => {
+    const element = await withFormats(['feed', 'story']);
+
+    element.querySelector<HTMLInputElement>('.export__format input[value="story"]')?.click();
+    await element.updateComplete;
+
+    expect((await startAndCapture(element))?.formats).toEqual(['feed']);
+  });
+
+  it('will not start with every format unticked', async () => {
+    const element = await withFormats(['feed', 'story']);
+
+    const boxes = [...element.querySelectorAll<HTMLInputElement>('.export__format input')];
+    for (const input of boxes) input.click();
+    await element.updateComplete;
+
+    // An export of no formats is an export of nothing, the same state as no file types, and
+    // it must not be read as "all of them".
+    expect(element.querySelector<HTMLButtonElement>('.export__start')?.disabled).toBe(true);
+  });
+
+  it('draws the note instead of a checklist when the brief names no template', async () => {
+    const element = dialog();
+    element.directory = '/out';
+    await element.updateComplete;
+
+    // The honest state: nobody knows the list, and the request will render all of them —
+    // which is what the note says.
+    expect(element.querySelector('.export__formats')).toBeNull();
+    expect(element.querySelector('.export__note')).not.toBeNull();
+    expect(await startAndCapture(element)).not.toHaveProperty('formats');
+  });
+
+  it('re-ticks everything when the list changes under it', async () => {
+    const element = await withFormats(['feed', 'story']);
+    element.querySelector<HTMLInputElement>('.export__format input[value="story"]')?.click();
+    await element.updateComplete;
+
+    // Another tab, another template. A selection naming formats the new template does not
+    // have would be an export of nothing wearing a full checklist.
+    element.formats = ['quadrado'];
+    await element.updateComplete;
+
+    const ticked = [...element.querySelectorAll<HTMLInputElement>('.export__format input')];
+    expect(ticked.map((input) => input.value)).toEqual(['quadrado']);
+    expect(ticked.every((input) => input.checked)).toBe(true);
+  });
+
+  it('puts scale on the raster types and never on svg', async () => {
+    const element = dialog();
+    element.directory = '/out';
+    await element.updateComplete;
+    element.querySelector<HTMLInputElement>('input[value="png"]')?.click();
+    element.querySelector<HTMLInputElement>('input[value="jpeg"]')?.click();
+    await element.updateComplete;
+
+    const picker = element.querySelector<HTMLSelectElement>('[data-testid="export-scale"]');
+    expect(picker).not.toBeNull();
+    picker!.value = '2';
+    picker!.dispatchEvent(new Event('change'));
+    await element.updateComplete;
+
+    const outputs = (await startAndCapture(element))?.outputs ?? [];
+
+    expect(outputs.find((output) => output.kind === 'png')?.scale).toBe(2);
+    expect(outputs.find((output) => output.kind === 'jpeg')?.scale).toBe(2);
+    // An SVG is instructions, not pixels: there is no resolution in it to double.
+    expect(outputs.find((output) => output.kind === 'svg')).not.toHaveProperty('scale');
+  });
+
+  it('leaves scale off entirely at 1x, which is what shipped', async () => {
+    const element = dialog();
+    element.directory = '/out';
+    await element.updateComplete;
+    element.querySelector<HTMLInputElement>('input[value="png"]')?.click();
+
+    const outputs = (await startAndCapture(element))?.outputs ?? [];
+
+    expect(outputs.find((output) => output.kind === 'png')).not.toHaveProperty('scale');
+  });
+
+  it('offers no scale at all when only svg is ticked', async () => {
+    const element = dialog();
+    element.directory = '/out';
+    await element.updateComplete;
+
+    expect(element.querySelector('[data-testid="export-scale"]')).toBeNull();
+  });
+
+  it('offers quality only while a lossy type is ticked, so png can never be asked', async () => {
+    const element = dialog();
+    element.directory = '/out';
+    await element.updateComplete;
+
+    // SVG alone, then PNG: neither can be compressed, so the control is not on screen. That
+    // is the card's criterion in its literal form — impossible from the form rather than
+    // refused afterwards by the raster port's `TypeError`.
+    expect(element.querySelector('[data-testid="export-quality"]')).toBeNull();
+    element.querySelector<HTMLInputElement>('input[value="png"]')?.click();
+    await element.updateComplete;
+    expect(element.querySelector('[data-testid="export-quality"]')).toBeNull();
+
+    element.querySelector<HTMLInputElement>('input[value="webp"]')?.click();
+    await element.updateComplete;
+    expect(element.querySelector('[data-testid="export-quality"]')).not.toBeNull();
+  });
+
+  it('carries a chosen quality to the lossy types only', async () => {
+    const element = dialog();
+    element.directory = '/out';
+    await element.updateComplete;
+    element.querySelector<HTMLInputElement>('input[value="png"]')?.click();
+    element.querySelector<HTMLInputElement>('input[value="jpeg"]')?.click();
+    await element.updateComplete;
+
+    const box = element.querySelector<HTMLInputElement>('[data-testid="export-quality"]');
+    box!.value = '55';
+    box!.dispatchEvent(new Event('change'));
+    await element.updateComplete;
+
+    const outputs = (await startAndCapture(element))?.outputs ?? [];
+
+    expect(outputs.find((output) => output.kind === 'jpeg')?.quality).toBe(55);
+    expect(outputs.find((output) => output.kind === 'png')).not.toHaveProperty('quality');
+  });
+
+  it('clamps a quality nobody could mean', async () => {
+    const element = dialog();
+    element.directory = '/out';
+    await element.updateComplete;
+    element.querySelector<HTMLInputElement>('input[value="jpeg"]')?.click();
+    await element.updateComplete;
+
+    const box = element.querySelector<HTMLInputElement>('[data-testid="export-quality"]');
+    box!.value = '0';
+    box!.dispatchEvent(new Event('change'));
+    await element.updateComplete;
+
+    // Clamped here rather than left to the contract: `quality: 0` fails validation on the
+    // wire, and that failure would report a bug in this window to somebody who typed a zero.
+    const outputs = (await startAndCapture(element))?.outputs ?? [];
+    expect(outputs.find((output) => output.kind === 'jpeg')?.quality).toBe(1);
+  });
+});

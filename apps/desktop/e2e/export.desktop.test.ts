@@ -5,6 +5,7 @@ import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
+import { PNG } from 'pngjs';
 import { type ElectronApplication, type Page, _electron } from 'playwright';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 
@@ -362,4 +363,110 @@ describe('exporting from the window (E9.4)', () => {
       expect(svg.trimEnd().endsWith('</svg>'), `${name} is truncated`).toBe(true);
     }
   }, 120_000);
+});
+
+/**
+ * Choosing formats and scale, measured in the files that land (TYTO-137).
+ *
+ * **PNG here, and the suite above is deliberately SVG** — the docstring at the top says why,
+ * and this is the exception that proves the rule rather than a drift away from it: the card's
+ * criterion is *twice the pixels*, and an SVG has none. What makes it safe is that nothing
+ * here compares against the CLI. It compares this program's own 1× against its own 2×, so a
+ * red run cannot be ambiguous between the rasterizer and the plumbing — both sides of the
+ * comparison went through the same rasterizer.
+ *
+ * `promo-curso` declares `feed` and `story`, which is what makes it the fixture for this: one
+ * of the two can be unticked, and the frame that lands says which one stayed by its size.
+ */
+describe('choosing formats and scale (TYTO-137)', () => {
+  /** Ticks exactly the file types named, whatever was ticked before. */
+  const tickTypes = async (wanted: readonly string[]): Promise<void> => {
+    for (const kind of ['png', 'jpeg', 'webp', 'svg']) {
+      const box = window.locator(`.export__type input[value="${kind}"]`);
+      const on = await box.isChecked();
+      if (on !== wanted.includes(kind)) await box.click();
+    }
+  };
+
+  const exportInto = async (
+    out: string,
+    options: { formats?: readonly string[]; scale?: 1 | 2 } = {},
+  ): Promise<void> => {
+    await answerPickers({ directory: out });
+    await run('file.export');
+    await window.locator('.export__panel').waitFor({ state: 'visible' });
+    await window.locator('.export__choose').click();
+    await window.waitForFunction(
+      (expected) =>
+        document.querySelector('[data-testid="export-directory"]')?.textContent?.trim() ===
+        expected,
+      out,
+    );
+
+    await tickTypes(['png']);
+
+    if (options.formats !== undefined) {
+      const boxes = window.locator('.export__format input');
+      const count = await boxes.count();
+      for (let index = 0; index < count; index++) {
+        const box = boxes.nth(index);
+        const value = (await box.getAttribute('value')) ?? '';
+        const on = await box.isChecked();
+        if (on !== options.formats.includes(value)) await box.click();
+      }
+    }
+
+    if (options.scale !== undefined) {
+      await window.locator('[data-testid="export-scale"]').selectOption(String(options.scale));
+    }
+
+    await window.locator('.export__start').click();
+    await window.waitForSelector('[data-testid="export-status"][data-state="finished"]', {
+      timeout: 120_000,
+    });
+    await window.locator('.export__close').click();
+  };
+
+  const framesIn = (out: string): { name: string; width: number; height: number }[] =>
+    readdirSync(out)
+      .filter((name) => name.endsWith('.png'))
+      .sort()
+      .map((name) => {
+        const png = PNG.sync.read(readFileSync(join(out, name)));
+        return { name, width: png.width, height: png.height };
+      });
+
+  beforeAll(async () => {
+    // The cancel case above opened another brief, and this one is about `promo-curso`'s two
+    // formats. Reopening is also what re-reads the checklist: the dialog is handed the list
+    // when it opens, so the tab has to be right first.
+    await openBrief();
+  }, 60_000);
+
+  it('renders only the formats that stayed ticked', async () => {
+    const out = join(scratch, 'feed-only');
+    await exportInto(out, { formats: ['feed'] });
+
+    const frames = framesIn(out);
+
+    // One frame and not two, and 1080×1080 rather than 1080×1920: the count says a format was
+    // dropped and the size says **which one**, which a count alone could not.
+    expect(frames).toHaveLength(1);
+    expect([frames[0]?.width, frames[0]?.height]).toEqual([1080, 1080]);
+    expect(readdirSync(out)).toContain('result.json');
+  }, 180_000);
+
+  it('doubles the pixels at 2x, and not the room the design gets', async () => {
+    const out = join(scratch, 'feed-retina');
+    await exportInto(out, { formats: ['feed'], scale: 2 });
+
+    const frames = framesIn(out);
+
+    expect(frames).toHaveLength(1);
+    // **Twice the pixels of the 1× export above**, which is the card's second criterion. The
+    // same design at more resolution is what `deviceScaleFactor` means; a design given twice
+    // the room would come back 2160 wide with the artwork still 1080 across, and
+    // `packages/raster` holds that distinction against a reference image.
+    expect([frames[0]?.width, frames[0]?.height]).toEqual([2160, 2160]);
+  }, 180_000);
 });
