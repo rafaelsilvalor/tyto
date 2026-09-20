@@ -131,10 +131,15 @@ export interface Catalogue {
   readonly 'document.discard.cancel': string;
 
   /**
-   * The same question asked about the whole window, on the way out (TYTO-123).
+   * The question asked about the whole window, on the way out (TYTO-123, TYTO-153).
    *
-   * Four strings and the same shape as `document.discard.*` above, for the same reason and
-   * through the same channel — main draws the box, the renderer owns every word in it.
+   * Five strings, drawn through `dialog:save-changes` — main draws the box, the renderer owns
+   * every word in it, the same arrangement `document.discard.*` above has.
+   *
+   * **It used to ask *Sair sem salvar?* and offer two answers, neither of which saved**
+   * (TYTO-153). The keys are named for what the box asks now: `confirm` is the button that
+   * writes the work, `discard` is the one the old `exit.discard.confirm` was, and `cancel`
+   * still returns to the editor.
    *
    * **`{n}` is a placeholder, and it is the first one in this catalogue.** The renderer
    * substitutes the count; nothing here interpolates on its own. Two detail strings and not
@@ -142,11 +147,12 @@ export interface Catalogue {
    * têm* — and a single string with a parenthesised plural is the thing a catalogue exists
    * to make unnecessary.
    */
-  readonly 'exit.discard.message': string;
-  readonly 'exit.discard.detail.one': string;
-  readonly 'exit.discard.detail.many': string;
-  readonly 'exit.discard.confirm': string;
-  readonly 'exit.discard.cancel': string;
+  readonly 'exit.save.message': string;
+  readonly 'exit.save.detail.one': string;
+  readonly 'exit.save.detail.many': string;
+  readonly 'exit.save.confirm': string;
+  readonly 'exit.save.discard': string;
+  readonly 'exit.save.cancel': string;
   /**
    * The first string this app wrote into the application menu (TYTO-132).
    *
@@ -335,11 +341,12 @@ export const CATALOGUE_KEYS = [
   'document.discard.detail',
   'document.discard.confirm',
   'document.discard.cancel',
-  'exit.discard.message',
-  'exit.discard.detail.one',
-  'exit.discard.detail.many',
-  'exit.discard.confirm',
-  'exit.discard.cancel',
+  'exit.save.message',
+  'exit.save.detail.one',
+  'exit.save.detail.many',
+  'exit.save.confirm',
+  'exit.save.discard',
+  'exit.save.cancel',
   'menu.revealLogs',
   'crash.title',
   'crash.detail',

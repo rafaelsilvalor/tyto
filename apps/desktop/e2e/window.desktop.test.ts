@@ -227,6 +227,7 @@ describe('the bridge', () => {
       'credentials:get',
       'credentials:set',
       'dialog:confirm',
+      'dialog:save-changes',
       'export:cancel',
       'export:choose-directory',
       'export:progress',
@@ -350,15 +351,16 @@ describe('the language picker', () => {
     'document.discard.detail',
     'document.discard.confirm',
     'document.discard.cancel',
-    // TYTO-123: the same five for the whole window, read out by the OS on the way out. A
-    // message box is not the document either, and `{n}` in two of them is a placeholder the
-    // renderer substitutes — `e2e/quit.desktop.test.ts` is what holds these to a locale and
-    // to the count.
-    'exit.discard.message',
-    'exit.discard.detail.one',
-    'exit.discard.detail.many',
-    'exit.discard.confirm',
-    'exit.discard.cancel',
+    // TYTO-123, TYTO-153: the same for the whole window, read out by the OS on the way out —
+    // six since the box gained a third button. A message box is not the document either, and
+    // `{n}` in two of them is a placeholder the renderer substitutes —
+    // `e2e/quit.desktop.test.ts` is what holds these to a locale and to the count.
+    'exit.save.message',
+    'exit.save.detail.one',
+    'exit.save.detail.many',
+    'exit.save.confirm',
+    'exit.save.discard',
+    'exit.save.cancel',
     // TYTO-132: the one string this app writes into the application menu. A menu is the
     // browser process's chrome, not the document, so it can never be in this pass —
     // `src/main/menu.test.ts` is what holds the item to carrying the catalogue's word.
