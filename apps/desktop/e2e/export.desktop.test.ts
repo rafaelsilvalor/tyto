@@ -78,10 +78,46 @@ async function answerPickers(paths: {
 async function openBrief(): Promise<void> {
   await answerPickers({ file: briefPath });
   await run('editor.open');
-  await window.waitForFunction(
-    (expected) => document.querySelector('.cm-content')?.textContent?.includes(expected) === true,
-    'Exportado pela janela',
-  );
+  await waitForBriefText('Exportado pela janela');
+}
+
+/**
+ * Waits for an opened brief to be readable in the editor, and **says what failed if it is not**.
+ *
+ * Shared by the two places that open a file, so a red run reports the same four-stage picture
+ * wherever it happened.
+ */
+async function waitForBriefText(expected: string): Promise<void> {
+  try {
+    await window.waitForFunction(
+      (wanted) => document.querySelector('.cm-content')?.textContent?.includes(wanted) === true,
+      expected,
+    );
+  } catch (cause) {
+    // **A red run says which stage did not happen** (TYTO-154). The wait above can expire for
+    // four different reasons and used to report one sentence for all of them: thirty seconds
+    // passed. The command was proved to have run by `run` itself, so what is left to tell
+    // apart is whether main answered, whether the document reached the window, and whether
+    // CodeMirror had drawn it — and the tab's own label is what separates the middle two,
+    // because a document that arrived renames the tab whether or not a glyph is on screen yet.
+    const seen = await window.evaluate(() => ({
+      tabs: [...document.querySelectorAll('.tabs__label')].map((node) => node.textContent?.trim()),
+      // `.cm-content` holds the **viewport** and not the buffer, which is a trap this
+      // repository has been caught by before: an empty string here can mean "nothing was
+      // opened" or "opened and scrolled past". The tab labels above are what disambiguate it.
+      viewport: document.querySelector('.cm-content')?.textContent?.slice(0, 120) ?? null,
+      editorMounted: document.querySelector('#editor .cm-content') !== null,
+    }));
+    throw new Error(
+      `the brief never reached the editor: no '${expected}' in the viewport.\n` +
+        `  tabs:           ${JSON.stringify(seen.tabs)}\n` +
+        `  editor mounted: ${String(seen.editorMounted)}\n` +
+        `  viewport:       ${JSON.stringify(seen.viewport)}\n` +
+        `  A tab named promo.brief with an empty viewport means main answered and the draw is\n` +
+        `  the problem; an untitled tab means the open never came back from main.`,
+      { cause },
+    );
+  }
 }
 
 beforeAll(async () => {
@@ -103,7 +139,13 @@ beforeAll(async () => {
     env: { ...process.env, TYTO_HEADLESS: '1' },
   });
   window = await app.firstWindow();
-  await window.waitForSelector('.shell');
+  // **`.shell` is in `index.html` and is therefore no signal at all** (TYTO-154): it is there
+  // before a line of the renderer has run, so waiting for it was waiting for nothing. Every
+  // other suite here waits for something the script builds; this one now waits for the same
+  // two things, and `#editor .cm-content` is the load-bearing one — `runCommand` refuses
+  // every command until the editor exists, and the tab strip is painted before it does.
+  await window.waitForSelector('#editor .cm-content');
+  await window.waitForSelector('.tabs__tab');
   await openBrief();
 });
 
@@ -112,12 +154,33 @@ afterAll(async () => {
   rmSync(scratch, { recursive: true, force: true });
 });
 
-/** Runs the command by id, the way the command bar would. */
+/**
+ * Runs the command by id, the way the command bar would — and **checks that it ran**.
+ *
+ * **This is the flake TYTO-154 was opened for.** The bar's `run` is a no-op until the window
+ * has finished loading, and `runCommand` answers `false` for as long as the editor is not
+ * mounted, so a command fired too early was swallowed in silence and the wait after it spent
+ * thirty seconds on a document nobody had asked for. Measured on this machine: the editor
+ * mounts 32-80 ms after `.shell` exists, and a probe firing at `.shell` lost that race in 2
+ * of 6 launches while the same probe waiting for the editor won it 6 of 6.
+ *
+ * The wait in `beforeAll` is what closes the race; this is what stops it coming back silently
+ * if anything ever fires a command before the window is ready again.
+ */
 async function run(commandId: string): Promise<void> {
-  await window.evaluate((id) => {
-    const bar = document.querySelector('tyto-command-bar') as { run?: (id: string) => void } | null;
-    bar?.run?.(id);
+  const ran = await window.evaluate((id) => {
+    const bar = document.querySelector('tyto-command-bar') as {
+      run?: (id: string) => boolean;
+    } | null;
+    return bar?.run?.(id) ?? false;
   }, commandId);
+
+  if (!ran) {
+    throw new Error(
+      `the command bar refused '${commandId}' — the window was not ready to run it. ` +
+        `Nothing was sent to main, so whatever this test waits for next will never arrive.`,
+    );
+  }
 }
 
 describe('exporting from the window (E9.4)', () => {
@@ -251,10 +314,7 @@ describe('exporting from the window (E9.4)', () => {
     await window.locator('.export__close').click();
     await answerPickers({ file: manyPath });
     await run('editor.open');
-    await window.waitForFunction(
-      (expected) => document.querySelector('.cm-content')?.textContent?.includes(expected) === true,
-      'Muitos slides',
-    );
+    await waitForBriefText('Muitos slides');
 
     await answerPickers({ directory: out });
     await run('file.export');

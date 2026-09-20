@@ -1451,9 +1451,7 @@ function wireCommandBar(): void {
   const bar = elements.commandBar;
   if (bar === null) return;
 
-  bar.run = (id) => {
-    runCommand(id);
-  };
+  bar.run = (id) => runCommand(id);
   bar.close = () => undefined;
   paintCommandBar();
 }
