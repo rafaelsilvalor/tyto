@@ -64,8 +64,17 @@ export class CommandBar extends LitElement {
   declare open: boolean;
   declare commands: readonly CommandEntry[];
   declare locale: Locale;
-  /** Called with the id of the chosen command. Closing afterwards is the caller's call. */
-  declare run: (id: string) => void;
+  /**
+   * Called with the id of the chosen command. Closing afterwards is the caller's call.
+   *
+   * **It answers whether the command actually ran** (TYTO-154). The registry already knows —
+   * `runCommand` returns `false` for a window whose editor is not mounted yet, which is the
+   * right answer to a click on something that cannot work and was, until this card, thrown
+   * away at this line. A person clicking has nothing to do with the answer; a test driving
+   * the bar has, and a refusal that looks identical to success is what made
+   * `e2e/export.desktop.test.ts` wait thirty seconds for a command nobody ever ran.
+   */
+  declare run: (id: string) => boolean;
   declare close: () => void;
 
   /** What has been typed. Cleared on every open, so the bar never remembers last time. */
@@ -81,7 +90,7 @@ export class CommandBar extends LitElement {
     this.open = false;
     this.commands = [];
     this.locale = DEFAULT_LOCALE;
-    this.run = () => undefined;
+    this.run = () => false;
     this.close = () => undefined;
     this.query = '';
     this.active = 0;

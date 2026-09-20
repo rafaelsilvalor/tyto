@@ -22,8 +22,14 @@ import type { ElectronApplication } from 'playwright';
  *
  * The stub is installed from main, the same seam the quit suite uses and for its reason:
  * `app.evaluate` runs with the `electron` module in scope, so nothing in the shipped code has to
- * grow a hook for the tests. `response: 1` is the confirm button — `index.ts` builds the box as
- * `buttons: [cancel, confirm]`.
+ * grow a hook for the tests.
+ *
+ * **`response: 1` is the button that quits without saving, and the box it answers changed under
+ * this line** (TYTO-153). The quit box used to be `buttons: [cancel, confirm]`; it is
+ * `[save, discard, cancel]` now, so index 1 moved from *confirm* to *discard* — the same act
+ * under a different name, which is why no suite here went red when it moved. Stated rather than
+ * left to be rediscovered: this helper deliberately answers *do not save*, and a box built in
+ * another order would need this number changed with it.
  */
 export async function closeApp(app: ElectronApplication | undefined): Promise<void> {
   if (app === undefined) return;
