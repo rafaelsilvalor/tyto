@@ -1,5 +1,148 @@
 # @tyto/desktop
 
+## 0.3.2
+
+### Patch Changes
+
+- 91b6bc5: Dependency bumps in the prod group: `yaml` 2.9.0 → 2.9.1, `zod` 4.6.1 → 4.6.5, and
+  `@codemirror/commands`, `@codemirror/state` and `@codemirror/view` to their latest patches.
+
+  These are dependencies of what ships, so they get a patch and a line in the changelog rather
+  than passing through unnamed. Written by hand because Dependabot cannot write a changeset — it
+  has no idea this repository uses them — which is what makes every one of its PRs arrive red on
+  `changeset status`. TYTO-155 is the card for fixing that properly.
+
+- 7d02738: TYTO-137 — the export dialog can now choose which formats to render, at 1× or 2×, and how hard
+  to compress the lossy types. Until now it rendered every format the template declares, at scale
+  1, with quality 90 that nobody picked.
+
+  **Three controls, and the defaults are exactly today's behaviour.** Open the dialog, click
+  Export, and the request that goes out is byte-identical to the one before this card: every
+  format ticked, no scale, quality 90.
+
+  - **Formats** — a checklist of the formats this brief's template declares, all ticked. Untick
+    `story` and only the feed frames land. Unticking all of them disables Export, the same way
+    unticking every file type already did: an export of no formats is an export of nothing, and
+    it must not be read as "all of them".
+  - **Scale** — 1× or 2×, and it only appears when a type made of pixels is ticked. 2× is the same
+    design at twice the resolution, not a design given twice the room.
+  - **Quality** — 1-100 for JPEG and WebP. It only appears when one of those two is ticked, so
+    asking for quality on PNG is impossible from the form rather than refused afterwards: the
+    raster port throws a `TypeError` for it, because PNG is lossless and a caller who thought it
+    had asked for a smaller file deserves to be told it had not.
+
+  **Nothing in main changed, and no channel was added.** `export:start` has accepted `formats` and
+  a per-output `scale` since TYTO-43; this fills in two fields the window was leaving empty. The
+  format list is a lookup rather than a round trip — `templates:list` already answers with each
+  template's format ids and the window is holding that answer, so the dialog is handed the list
+  for the template the brief names. A brief that names no template, or one whose manifest this
+  window does not have, keeps the note that says every format will be rendered, which is what the
+  request will do.
+
+  **Measured through the window, in the files that landed.** `promo-curso` declares `feed` and
+  `story`: unticking `story` and exporting PNG produced one frame at 1080×1080 (the count says a
+  format was dropped, the size says which one), and the same export at 2× produced 2160×2160. Both
+  are new end-to-end cases; the suite is otherwise SVG on purpose, and this is the exception the
+  criterion requires, since an SVG has no pixels to double.
+
+  Two things it deliberately does not do: it does not remember the choices between exports, and it
+  does not re-read the checklist while the dialog is open — the brief behind a modal cannot be
+  typed in, and a checklist rebuilding itself under somebody's hand would be worse than one that
+  does not.
+
+- 9cd091f: TYTO-153 — closing the app with unsaved tabs now offers **Sim**, **Não** and **Cancelar**, the way
+  every editor does, instead of offering only two answers of which neither saved.
+
+  The box used to ask _Sair sem salvar?_ and give you two ways out: lose the work, or stay in the
+  program. The answer almost everybody wants after hitting the X by mistake — save it, then go — was
+  not on screen at all. Its absence does not read as a deliberate choice; it reads as an app that
+  cannot save.
+
+  It asks _Deseja salvar o trabalho?_ now. **Sim** writes every dirty tab and then quits, opening a
+  Save-As dialog for each tab that has never been saved, so three untitled tabs mean three file
+  pickers and one question rather than three questions. **Não** quits without saving, which is what
+  the old confirm button did. **Cancelar** puts you back in the editor with everything exactly as it
+  was, and the app still quits normally on the next attempt.
+
+  **Anything short of every tab being written cancels the quit.** A save that fails — a full disk, a
+  folder gone read-only — leaves the app up and says what went wrong in the problems panel, where
+  save failures have gone since TYTO-124. So does a Save-As you dismiss, which is how somebody
+  changes their mind halfway through an answer. Quitting anyway would be the app discarding the work
+  of somebody who had just asked for it to be kept, which is the bug TYTO-147 closed wearing the
+  label of a feature.
+
+  **Enter saves and Escape stays.** That reverses the old box, where the default was Cancel, and it
+  is safe here for a reason the old one did not have: neither of those two keys can now cost you a
+  word. The tab-closing box is unchanged and still points both keys at the safe button, because both
+  of its answers can lose a document.
+
+  The third button needed a shape the app did not have: `dialog:confirm` is a two-button channel
+  whose answer is a boolean. It travels on a channel of its own, `dialog:save-changes`, rather than
+  on a widened `confirm` or on a generic "draw me these buttons" message — the renderer never sees a
+  button index, because main builds the button order and reading an index back belongs where the
+  order is. ADR 0034 records that and the three other decisions inside this card; ADR 0031's staging
+  and its deadlines are untouched, and its unbounded wait is what makes a quit with three file
+  pickers in it possible at all.
+
+  Also here, because the quit question needed it: a failed save is now an answer rather than a
+  re-thrown exception, and the line in the log is written directly. The sentence in the problems
+  panel is unchanged.
+
+- b1fc1c2: TYTO-154 — the export end-to-end suite went red at random, and the cause was a command the
+  window silently refused rather than anything about exporting.
+
+  **What was happening.** The suite waited for `.shell` before driving the app. `.shell` is in
+  `index.html`, so it is on the page before a single line of the renderer has run — it was a wait
+  for nothing. The suite then ran `editor.open` through the command bar, and two gates decline a
+  command that early: the bar's `run` is a no-op until the window has finished loading, and
+  `runCommand` answers `false` for as long as the editor is not mounted. Both decline in silence,
+  which is right for a person clicking a button that cannot work yet and useless for a test. The
+  open never reached main, the file picker was never opened, and the next line waited thirty
+  seconds for text that was never coming.
+
+  **Measured, on Windows, against the built app.** The editor mounts **32-80 ms** after `.shell`
+  exists (6 launches). A probe firing the command at `.shell` lost that race in **2 of 6**
+  launches, and in both of them the editor was not mounted at the instant of the click; the same
+  probe waiting for the editor won it **6 of 6**. The flake reproduced here on the **second**
+  consecutive run of the unchanged suite, at the line the card recorded.
+
+  **The trigger is machine load, which is why an idle loop is the wrong instrument.** With the old
+  wait left in place the suite went 8 of 8 green on an idle machine and then red on the **4th** run
+  with six CPU-burning workers alongside it. The fixed suite under that same load: **6 of 6 green**.
+  That also explains the card's own asymmetry — 1 red of 2 on a CI runner, 2 of 8 here with both
+  reds first and back to back.
+
+  **The fix is in three parts.**
+
+  - The suite waits for `#editor .cm-content` and `.tabs__tab`, which is what the other thirteen
+    suites already wait for. That closes the race.
+  - `CommandBar.run` now answers whether the command actually ran. The registry always knew; the
+    answer was thrown away at the call site. The suite's helper checks it and fails immediately
+    with _the command bar refused 'editor.open'_ instead of waiting thirty seconds for a
+    consequence that cannot happen.
+  - When the wait does expire, the failure now names the stage: the tab labels, whether the editor
+    is mounted, and the first 120 characters of the viewport. A tab named `promo.brief` with an
+    empty viewport means main answered and the drawing is the problem; an untitled tab means the
+    open never came back from main. `.cm-content` holds the viewport and not the buffer, so the
+    tab label is what tells those two apart.
+
+  Nothing about a timeout was raised. The 30 s was never the problem, and a bigger number would
+  have made the red runs slower rather than rarer.
+
+  Also here, one line of it: `e2e/close-app.ts` said it answers the quit box's _confirm_ button at
+  index 1, which was true of the two-button box TYTO-153 replaced. Index 1 is _Não_ now — the same
+  act, a different name — and the comment says so rather than leaving the next reader to find it.
+
+- Updated dependencies [91b6bc5]
+  - @tyto/brief-lang@0.6.1
+  - @tyto/core@0.22.1
+  - @tyto/editor@0.6.1
+  - @tyto/io@1.3.2
+  - @tyto/plugin-api@0.3.4
+  - @tyto/pipeline@0.7.2
+  - @tyto/export-html@0.5.4
+  - @tyto/export-svg@1.2.2
+
 ## 0.3.1
 
 ### Patch Changes
