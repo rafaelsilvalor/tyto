@@ -223,6 +223,7 @@ const menuRebuilds = () => {
 
 const dependencies = () => ({
   confirm: () => Promise.resolve(true),
+  askToSave: () => Promise.resolve('cancel' as const),
   log: recordingLog(),
   credentials: credentials(),
   documents: documents(),
@@ -327,6 +328,29 @@ describe('the tab a message is about (E9.11)', () => {
     };
     expect(await handlers['dialog:confirm'](question)).toEqual({ confirmed: false });
     // Main writes none of these: the window owns every string a person reads.
+    expect(asked).toEqual([question]);
+  });
+
+  it('passes the three-way question through, and answers with a meaning', async () => {
+    const asked: unknown[] = [];
+    const handlers = createHandlers({
+      ...dependencies(),
+      askToSave: (question) => {
+        asked.push(question);
+        return Promise.resolve('save' as const);
+      },
+    });
+
+    const question = {
+      message: 'Deseja salvar o trabalho?',
+      detail: '2 abas tem alteracoes que ainda nao foram escritas no disco',
+      save: 'Sim',
+      discard: 'Nao',
+      cancel: 'Cancelar',
+    };
+    // Never an index (TYTO-153). The button order is built in `src/main/index.ts`, so a
+    // renderer reading a number back would be a renderer holding a copy of that order.
+    expect(await handlers['dialog:save-changes'](question)).toEqual({ answer: 'save' });
     expect(asked).toEqual([question]);
   });
 });

@@ -56,6 +56,17 @@ export interface IpcDependencies {
    */
   readonly confirm: (question: IpcRequest<'dialog:confirm'>) => Promise<boolean>;
   /**
+   * The three-way question on the way out (TYTO-153), injected for the reason `confirm` is.
+   *
+   * It answers with the meaning and never with a button index. The order the buttons are
+   * drawn in is main's — `src/main/index.ts` builds it — so reading an index back is main's
+   * too, and what crosses this interface is what the person chose rather than where they
+   * clicked.
+   */
+  readonly askToSave: (
+    question: IpcRequest<'dialog:save-changes'>,
+  ) => Promise<IpcResponse<'dialog:save-changes'>['answer']>;
+  /**
    * The two return legs of the one question main asks (TYTO-123, ADR 0029; TYTO-147, ADR 0031).
    *
    * Here rather than in `quit.ts` for the reason everything else in this interface is here:
@@ -117,6 +128,7 @@ type Handlers = {
 
 export function createHandlers(dependencies: IpcDependencies): Handlers {
   const {
+    askToSave,
     confirm,
     credentials,
     documents,
@@ -171,6 +183,8 @@ export function createHandlers(dependencies: IpcDependencies): Handlers {
     },
 
     'dialog:confirm': async (question) => ({ confirmed: await confirm(question) }),
+
+    'dialog:save-changes': async (question) => ({ answer: await askToSave(question) }),
 
     'app:exit-ack': ({ askId }) => {
       exit.acknowledge(askId);

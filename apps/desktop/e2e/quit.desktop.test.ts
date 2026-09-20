@@ -1,4 +1,4 @@
-import { existsSync, mkdtempSync, rmSync } from 'node:fs';
+import { existsSync, mkdtempSync, readFileSync, rmSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { tmpdir } from 'node:os';
 import { fileURLToPath } from 'node:url';
@@ -15,10 +15,11 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest';
  * is unit-tested for the decision and `src/preload/bridge.test.ts` for the receive direction;
  * what neither can say is that main and the renderer are actually wired to each other.
  *
- * Three launches, because a passing quit ends the app: an app that has been told to go and went
+ * Four launches, because a passing quit ends the app: an app that has been told to go and went
  * cannot then be asked whether it asks when there is nothing to lose. The clean case is its
  * own describe with its own window, and so is the slow-answer case (TYTO-147), which needs a
- * window that is still there to be measured while a box is on screen.
+ * window that is still there to be measured while a box is on screen, and so is **Sim**
+ * (TYTO-153), which ends with a file on disk and an app that went after writing it.
  *
  * `dialog.showMessageBox` is replaced from main, the same seam `tabs.desktop.test.ts` uses
  * and for its reason: `app.evaluate` runs with the `electron` module in scope, so nothing
@@ -41,14 +42,24 @@ interface CapturedBox {
 let scratch: string;
 
 /**
+ * The three answers, by the name they have in the app rather than by index (TYTO-153).
+ *
+ * `src/main/index.ts` builds the buttons as `[save, discard, cancel]`, so the index is main's
+ * business and writing `1` in a test would be a second copy of that order — one that goes on
+ * passing after somebody reorders the real one.
+ */
+const BUTTON = { save: 0, discard: 1, cancel: 2 } as const;
+type Answer = keyof typeof BUTTON;
+
+/**
  * Replaces the box, records every call, and answers the same way each time.
  *
  * The recording is what the count alone could not do: `showMessageBox` is one seam and the
  * app draws more than one question through it, so "asked once" is only meaningful next to
  * *what* was asked.
  */
-const captureBoxes = async (app: ElectronApplication, confirmed: boolean): Promise<void> => {
-  await app.evaluate(({ dialog }, yes) => {
+const captureBoxes = async (app: ElectronApplication, answer: Answer): Promise<void> => {
+  await app.evaluate(({ dialog }, response) => {
     const shared = globalThis as unknown as { tytoBoxes?: unknown[] };
     shared.tytoBoxes = [];
     dialog.showMessageBox = ((options: Record<string, unknown>): Promise<unknown> => {
@@ -59,11 +70,25 @@ const captureBoxes = async (app: ElectronApplication, confirmed: boolean): Promi
         defaultId: options['defaultId'],
         cancelId: options['cancelId'],
       });
-      // Index 1 confirms and index 0 cancels, which is the order `src/main/index.ts` builds
-      // them in — and why cancel is both `defaultId` and `cancelId`.
-      return Promise.resolve({ response: yes ? 1 : 0, checkboxChecked: false });
+      return Promise.resolve({ response, checkboxChecked: false });
     }) as never;
-  }, confirmed);
+  }, BUTTON[answer]);
+};
+
+/**
+ * The Save-As picker, answering with a path or with nothing (TYTO-153).
+ *
+ * The same seam `documents.desktop.test.ts` uses, and it is here because **Sim** on a tab that
+ * has never been saved opens one: what the card promises is a file on disk holding the text
+ * that was in the tab, and a stub that only says "the picker opened" would not be that claim.
+ */
+const answerSaveDialog = async (app: ElectronApplication, path: string | null): Promise<void> => {
+  await app.evaluate(({ dialog }, chosen) => {
+    dialog.showSaveDialog = (() =>
+      Promise.resolve(
+        chosen === null ? { canceled: true, filePath: '' } : { canceled: false, filePath: chosen },
+      )) as never;
+  }, path);
 };
 
 /**
@@ -76,11 +101,11 @@ const captureBoxes = async (app: ElectronApplication, confirmed: boolean): Promi
  */
 const captureSlowBoxes = async (
   app: ElectronApplication,
-  confirmed: boolean,
+  answer: Answer,
   delayMs: number,
 ): Promise<void> => {
   await app.evaluate(
-    ({ dialog }, [yes, wait]) => {
+    ({ dialog }, [response, wait]) => {
       const shared = globalThis as unknown as { tytoBoxes?: unknown[] };
       shared.tytoBoxes = [];
       dialog.showMessageBox = ((options: Record<string, unknown>): Promise<unknown> => {
@@ -93,12 +118,12 @@ const captureSlowBoxes = async (
         });
         return new Promise((resolve) => {
           setTimeout(() => {
-            resolve({ response: (yes as boolean) ? 1 : 0, checkboxChecked: false });
+            resolve({ response: response as number, checkboxChecked: false });
           }, wait as number);
         });
       }) as never;
     },
-    [confirmed, delayMs] as [boolean, number],
+    [BUTTON[answer], delayMs] as [number, number],
   );
 };
 
@@ -156,7 +181,7 @@ describe('quitting with unsaved text', () => {
   });
 
   it('asks before it goes, naming how many tabs would be lost', async () => {
-    await captureBoxes(app, false);
+    await captureBoxes(app, 'cancel');
     await app.evaluate(({ app: electronApp }) => {
       electronApp.quit();
     });
@@ -164,25 +189,34 @@ describe('quitting with unsaved text', () => {
 
     const asked = await boxes(app);
     expect(asked).toHaveLength(1);
-    expect(asked[0]?.message).toMatch(/^(Sair sem salvar\?|Quit without saving\?)$/u);
+    expect(asked[0]?.message).toMatch(
+      /^(Deseja salvar o trabalho\?|Do you want to save your work\?)$/u,
+    );
     // The count, spliced into the string the catalogue holds. One tab is dirty, so it is the
     // singular form and the `{n}` placeholder is gone.
     expect(asked[0]?.detail).toMatch(/^1 (aba|tab) /u);
     expect(asked[0]?.detail).not.toContain('{n}');
-    // The safe button is the default and the escape, inherited from `confirm` rather than
-    // written a second time.
+    // Three buttons since TYTO-153, in the order `src/main/index.ts` builds them, with the
+    // one that saves first.
+    expect(asked[0]?.buttons).toHaveLength(3);
+    expect(asked[0]?.buttons?.[0]).toMatch(/^(Sim|Yes)$/u);
+    expect(asked[0]?.buttons?.[1]).toMatch(/^(Não|No)$/u);
+    expect(asked[0]?.buttons?.[2]).toMatch(/^(Cancelar|Cancel)$/u);
+    // **Enter saves and Escape stays**, which is the one place this box disagrees with
+    // `dialog:confirm` — that one points both at the same button because both of its answers
+    // could cost a document, and neither of these two keys can.
     expect(asked[0]?.defaultId).toBe(0);
-    expect(asked[0]?.cancelId).toBe(0);
+    expect(asked[0]?.cancelId).toBe(2);
   });
 
-  it('honours a no by still being there', async () => {
-    // The app answered the question with `false` above. If the veto had not travelled, this
+  it('honours a cancel by still being there', async () => {
+    // The app answered the question with `cancel` above. If the veto had not travelled, this
     // window would be gone and `evaluate` would reject.
     expect(await page.evaluate(() => document.querySelectorAll('.tabs__tab').length)).toBe(1);
     expect(await page.evaluate(() => document.title)).toBeTruthy();
   });
 
-  it('asks again on the next attempt, because a no is not a permanent veto', async () => {
+  it('asks again on the next attempt, because a cancel is not a permanent veto', async () => {
     await app.evaluate(({ app: electronApp }) => {
       electronApp.quit();
     });
@@ -200,7 +234,7 @@ describe('quitting with unsaved text', () => {
     // directly. On win32 and linux the X button destroys the renderer first and only then
     // arrives there, so the guard would have nobody to ask and the app would go silently.
     // This is the only case that fails when that hook is gone.
-    await captureBoxes(app, false);
+    await captureBoxes(app, 'cancel');
     await app.evaluate(({ BrowserWindow }) => {
       BrowserWindow.getAllWindows()[0]?.close();
     });
@@ -211,8 +245,10 @@ describe('quitting with unsaved text', () => {
     expect(await page.evaluate(() => document.querySelectorAll('.tabs__tab').length)).toBe(1);
   });
 
-  it('goes on a yes', async () => {
-    await captureBoxes(app, true);
+  it('goes on a Não, writing nothing', async () => {
+    // The button the old box called *Sair sem salvar*, and the one behaviour of that box
+    // TYTO-153 keeps unchanged.
+    await captureBoxes(app, 'discard');
     const gone = app.waitForEvent('close');
     await app.evaluate(({ app: electronApp }) => {
       electronApp.quit();
@@ -257,12 +293,12 @@ describe('quitting while somebody is still reading the box', () => {
     // is itself a measurement of the fix: with the slow stub still installed, `app.close()`
     // sat for the full 300 s hook timeout, because a dirty window now refuses the exit for as
     // long as the person takes — and this "person" answers cancel, every time, forever.
-    await captureBoxes(app, true);
+    await captureBoxes(app, 'discard');
     await app?.close();
   });
 
   it('is still running, with the text intact, after the deadline has passed', async () => {
-    await captureSlowBoxes(app, false, 4000);
+    await captureSlowBoxes(app, 'cancel', 4000);
     await app.evaluate(({ app: electronApp }) => {
       electronApp.quit();
     });
@@ -295,7 +331,7 @@ describe('quitting while somebody is still reading the box', () => {
     // case that goes red.
     //
     // A fast box from here on, which is also what leaves the app closable in `afterAll`.
-    await captureBoxes(app, false);
+    await captureBoxes(app, 'cancel');
     await app.evaluate(({ app: electronApp }) => {
       electronApp.quit();
     });
@@ -303,6 +339,76 @@ describe('quitting while somebody is still reading the box', () => {
 
     expect(await boxes(app)).toHaveLength(1);
     expect(await app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows().length)).toBe(1);
+  });
+});
+
+/**
+ * **Sim**, which is the button the card exists for (TYTO-153).
+ *
+ * A fourth launch, for this file's standing reason: the answer that works ends the app, so the
+ * case that has to find the app still standing — a dismissed picker — goes first, in the same
+ * window.
+ *
+ * **Both halves are measured against a real file.** The tab has never been saved, so **Sim**
+ * opens a Save-As, and the claim the card makes is not that a picker appeared but that the
+ * bytes on disk afterwards are the text that was in the tab. `showSaveDialog` is stubbed for
+ * the path and nothing else: `documents.save`, `disk.write` and the recent-files list all run
+ * as they ship.
+ */
+describe('quitting with Sim, the button that saves', () => {
+  let app: ElectronApplication;
+  let page: Page;
+  let closed = false;
+  let target: string;
+
+  beforeAll(async () => {
+    ({ app, page } = await launch('save'));
+    target = join(scratch, 'campanha.brief');
+    await page.click('#editor .cm-content');
+    await page.keyboard.type('::titulo Campanha');
+    await page.waitForSelector('.tabs__dirty');
+  });
+
+  afterAll(async () => {
+    if (!closed) {
+      // Back to a box that lets the app out with no disk in the way, for the reason the slow
+      // describe gives: a window that refuses the exit hangs `close()` for the whole hook
+      // timeout.
+      await captureBoxes(app, 'discard');
+      await app?.close();
+    }
+  });
+
+  it('cancels the quit when the Save-As picker is dismissed, keeping the text', async () => {
+    await captureBoxes(app, 'save');
+    await answerSaveDialog(app, null);
+    await app.evaluate(({ app: electronApp }) => {
+      electronApp.quit();
+    });
+    await page.waitForTimeout(1000);
+
+    // **Dismissing a picker is how somebody changes their mind halfway through an answer.**
+    // Quitting anyway would discard the tab of a person who had just asked for it to be kept,
+    // which is the same class of bug ADR 0031 closed.
+    expect(await page.evaluate(() => document.querySelectorAll('.tabs__tab').length)).toBe(1);
+    expect(await page.evaluate(() => document.querySelectorAll('.tabs__dirty').length)).toBe(1);
+    expect(existsSync(target)).toBe(false);
+  });
+
+  it('writes the tab to the file the picker named, and then goes', async () => {
+    await captureBoxes(app, 'save');
+    await answerSaveDialog(app, target);
+    const gone = app.waitForEvent('close');
+    await app.evaluate(({ app: electronApp }) => {
+      electronApp.quit();
+    });
+    await gone;
+    closed = true;
+
+    // The file and its contents, and not the dirty marker: the window is gone by now, which
+    // is itself half the claim — the app quit *after* the write rather than instead of it.
+    expect(existsSync(target)).toBe(true);
+    expect(readFileSync(target, 'utf8')).toContain('::titulo Campanha');
   });
 });
 

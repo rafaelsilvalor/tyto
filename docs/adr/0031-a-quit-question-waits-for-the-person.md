@@ -1,6 +1,6 @@
 # 0031 — A quit question waits for the person, and only the delivery has a deadline
 
-Status: accepted · 2026-09-19 · TYTO-147 · amends the exit bullet of ADR 0029
+Status: accepted · 2026-09-19 · TYTO-147 · amends the exit bullet of ADR 0029 · the box it describes has three buttons since ADR 0034, which changes none of the staging below
 
 ## Context
 
@@ -160,3 +160,10 @@ whole suite still green. `src/main/quit.test.ts` has a case whose only job is th
   field report in TYTO-147 is the only observation of a person meeting it.
 - **The quit question still covers one window.** ADR 0029's bullet about a second window is
   untouched and still unanswered.
+- **The box is no longer a two-way question** (ADR 0034, TYTO-153). It offers _Sim_, _Não_ and
+  _Cancelar_, and **Sim** can now open a Save-As dialog per pathless tab before the answer goes
+  back. Nothing in the staging above moves: the acknowledgement is still sent as the first
+  statement of the listener, before anything is counted or drawn, so the thirty seconds bound
+  exactly what they bounded before. What the third button lengthens is the untimed half — which
+  is the half this ADR argued no clock may be put over, and the reason the argument had to be
+  settled before this card could be written.

@@ -308,6 +308,31 @@ async function start(): Promise<void> {
       });
       return answer.response === 1;
     },
+    // The way out, and the one box in this app with three answers (TYTO-153). The order is
+    // the one every editor draws — save, do not save, stay — and it is **here** rather than
+    // on the wire, which is why the handler answers with a meaning and the renderer never
+    // sees an index.
+    //
+    // **`defaultId` and `cancelId` point at different buttons, and that is deliberate**:
+    // `confirm` above puts both on the safe one because its two answers are *lose the text*
+    // and *keep it*. Here Enter saves and Escape stays, so neither key can cost anybody a
+    // word — which is the property that lets the default be the one that acts.
+    askToSave: async ({ message, detail, save, discard, cancel }) => {
+      const answer = await dialog.showMessageBox({
+        type: 'warning',
+        message,
+        ...(detail === undefined ? {} : { detail }),
+        buttons: [save, discard, cancel],
+        defaultId: 0,
+        cancelId: 2,
+      });
+      // Anything that is not one of the three is read as *stay*. A message box cannot
+      // answer outside its own button list, so this is unreachable rather than defensive —
+      // and if it ever were reached, staying is the answer that cannot lose a document.
+      if (answer.response === 0) return 'save';
+      if (answer.response === 1) return 'discard';
+      return 'cancel';
+    },
     credentials,
     documents,
     exit,
