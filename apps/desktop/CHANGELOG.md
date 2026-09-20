@@ -1,5 +1,201 @@
 # @tyto/desktop
 
+## 0.3.1
+
+### Patch Changes
+
+- c45e3b8: TYTO-147 — quitting with unsaved tabs now waits for you to answer the box, however long you take,
+  instead of taking your work two seconds after showing it to you.
+
+  The quit question was guarded by a single two-second timer, and when it fired it did not cancel the
+  question — it _was_ the exit. The box that asks is drawn by main with `dialog.showMessageBox` and
+  the window sends its answer only after somebody clicks, so what those two seconds bounded was never
+  a renderer computing anything. It was a person reading. Anybody who read the box before choosing
+  lost every unsaved tab at the two-second mark, which is the ordinary case and not a rare one.
+
+  The wait is in two stages now. The window acknowledges the question on a new `app:exit-ack` channel
+  as the first thing its listener does — before it counts unsaved documents and before anything is
+  drawn — and a deadline bounds that acknowledgement and nothing else. After the acknowledgement
+  there is **no deadline at all**, because the thing on the other end is a person.
+
+  **And when that deadline runs out, the app stays put.** It does not quit — it drops the attempt
+  and leaves you in the window with your text. The box is a warning, and the only person entitled to
+  trade a document for a closed app is the one reading it: close the app by accident, walk away for a
+  glass of water, come back, and your work is where you left it. Nothing in here decides that for
+  you any more.
+
+  That is a reversal of what ADR 0029 wrote down, and it has a price that is stated rather than
+  hidden: a window that is frozen but still alive can no longer be quit from inside the app, and
+  ending it is the operating system's job. A crash, a closed window and a reload are all still
+  handled — a page that is gone has no text left to protect.
+
+  The deadline itself is thirty seconds, and two smaller numbers were tried first: two shipped and
+  quit, five cleared a measured end-to-end flake at ~2.02 s and still quit. Once the clock stopped
+  deciding, being generous with it became free — no length of it can cost a tab — and a unit test
+  now pins the number so it cannot drift back to a guess on a green suite.
+
+  What ends the unbounded wait when the page that was asked goes away is a hard check and not a
+  second, longer timer: a crash, the window closing and a reload all release the exit. The reload is
+  the one worth naming — it keeps the renderer process and throws away the page holding the question,
+  and without it a single reload with the box up left an app that could never be quit again. A second
+  number would have been picked the same way the first one was, and a dead renderer's unsaved text is
+  already gone, so holding the app open would protect nothing. ADR 0031 records that, the rejected
+  alternative, and the one counter-argument — an OS logoff is now bounded by the OS rather than by us.
+
+  **Correcting the 0.3.0 entry below rather than rewriting it.** That entry says "a renderer that
+  never answers holds the app open for two seconds and then the exit proceeds", and ADR 0029 said the
+  same. Both name the wrong case: the timer was not catching wedged renderers, it was catching
+  readers. The published note is the shipped record of a version that was built and tagged, so it
+  stays as history and the correction arrives here, where it is auditable; ADR 0029 carries the same
+  correction as an amendment, in the form ADR 0027 already uses.
+
+  No test in the repository could see any of this, because every one of them replaced the box with an
+  already-resolved promise and answered in microseconds. There is now an end-to-end case that takes
+  four seconds to answer and looks at the app at three — the only test here that fails against the
+  shipped behaviour.
+
+- 8d673c6: TYTO-148 — an export that cannot capture a frame now says so and finishes, instead of sitting at
+  eleven frames of twelve forever.
+
+  Nothing in the desktop's capture path had a clock. The five steps between `loadFile` and
+  `Page.captureScreenshot` were awaited without a deadline, and both cleanups — the hidden window
+  and the temp folder — sit in `finally` blocks that a never-settling `await` never reaches. So one
+  stalled frame took the window, the folder and the whole run with it.
+
+  It is not hypothetical and it is not rare. Measured on win32 across 100 captures with an 8 s cap on
+  each, the packaged app failed to answer `Page.captureScreenshot` on **15 of 80** across four
+  packaged shapes — 19%, and 4 of 20 in the shape that ships — while the dev build answered 20 of 20.
+  Four suspects died in the same table: not the fonts wait (the per-step probe timed
+  `document.fonts.ready` at 0–2 ms on every capture, the ones that then hung included), not asar
+  packing, not the GPU, not a 0.2.0 → 0.3.0 regression. Every capture that did answer answered in
+  39–1 075 ms.
+
+  Every step now has a **30 s deadline** — ~19× the slowest capture ever measured (1 609 ms), and the
+  same number Playwright's adapter already lives under — and a capture that misses it is retried once
+  on a fresh window. The deadline is per step so that the failure names the command that stopped
+  answering, because that name is what the export report carries.
+
+  **What this does not do, stated plainly: the retry does not recover every hang.** That residual has
+  now been measured at the deadline that actually ships, which nothing in this card had done — 40
+  captures against a package rebuilt from `main`, a 30 s cap on all five steps, win32, one machine
+  (TYTO-152, 2026-09-19). **8 of 40 first attempts never answered, the retry recovered 7 of them, and
+  1 of 40 — 2.5% — still failed.** The 8 s probe had put that residual at 6 of 80, roughly 7%; the
+  shipped deadline's own number is the smaller of the two and both samples are small.
+
+  **The same run closes the gap this paragraph used to declare open, and it closed against the
+  hopeful answer: 0 of 40 captures answered between 8 s and 30 s.** The extra patience buys nothing —
+  a capture that passes ~1.1 s does not come back at all — so the 19% was never an artifact of the
+  probe's cap, and the hang rate at the shipped deadline is the same 8 of 40. What changes is that
+  those frames fail as a reported failed frame, with the frames that worked written to disk and named
+  in `result.json`, and the run reaching an end. Why a packaged build hangs where the dev build does
+  not is a Chromium-level question this card localised and did not answer; it has a follow-up of its
+  own in TYTO-152, and the deadline does not explain it.
+
+  ADR 0030 records the decision and corrects ADR 0027, whose Consequences predicted the wrong failure
+  mode — an `attach` collision — and said it was not measured. It is measured now, and it was the
+  other command. ADR 0030's own Consequences still quote the 8 s probe's residual and its 28× margin,
+  because an ADR is amended by another ADR and not by a changeset; TYTO-152 carries both numbers and
+  is where that amendment belongs.
+
+- b586614: TYTO-149 — the app writes one line when it starts, so the log folder a beta tester is asked for
+  exists from the first run instead of only after something has already been written down.
+
+  The whole beta support story is _if something breaks, send me the log folder_: it is in the
+  release body, it is the one item in the Help menu, and TYTO-140 ships a crash box whose job is to
+  name it. `fileLog` creates its folder on the first write and not before, which is the right
+  behaviour on its own — a log that needed somebody to create its own folder would write nothing on
+  the machine it matters most on. The consequence was that the folder was missing after exactly the
+  failure that needs it most. An app that starts cleanly and then hangs has logged nothing, so
+  Help ▸ _Open the log folder_ opened nothing, and a tester following the release body found a path
+  that was not there and had nothing to send.
+
+  Measured on the shipped 0.3.0 portable rather than read off a config file — launched from
+  `release/win-unpacked` and left running, with `Local State`, `Preferences` and `blob_storage`
+  touched under `%APPDATA%\@tyto\desktop`, no `%APPDATA%\Tyto` in existence, and no `logs/` folder
+  at all.
+
+  The line carries the version, the platform and a timestamp, which is what dates the session a
+  report is about. It does not reopen the synchronous-write trade `log.ts` defends: one write per
+  process launch, before a window exists.
+
+  `docs/releases/desktop-v0.3.0.md` now says plainly that on that version a missing `logs` folder is
+  itself the answer — the app stopped before it could write anything — because that release is
+  already in testers' hands and this change cannot reach it.
+
+- 9a38c07: TYTO-150 — every version of the app now keeps its data in its own folder, so a build you download
+  cannot open with the one before it still in it.
+
+  Until now the packaged portable, the installed build and `electron-vite dev` all wrote to a single
+  folder per machine, which is the opposite of what the `portable` target exists for: a build meant
+  to run beside another version of itself opened with that version's layout, recent files and
+  settings, and a tester could not tell the behaviour they were looking at from residue. The data
+  now lives in `<appData>/Tyto/<version>/` — `%APPDATA%\Tyto\0.3.0` on Windows,
+  `~/Library/Application Support/Tyto/0.3.0` and `~/.config/Tyto/0.3.0` on the other two — and the
+  five things that folder holds (logs, settings, recent files, credentials, layout) move with it.
+
+  The product root is a literal and not `app.getName()`, which settles the question TYTO-149 opened.
+  `getName()` answers with the package name, `@tyto/desktop`, while electron-builder ships
+  `productName: Tyto` — read out of the shipped 0.3.0's `app.asar` rather than off a config file —
+  and that is how a release body could send beta testers to `%APPDATA%\Tyto\logs` while the app
+  wrote to `%APPDATA%\@tyto\desktop`. A test reads `electron-builder.yml` so the two cannot drift
+  apart again. `docs/releases/desktop-v0.3.0.md` is corrected to the folder the shipped 0.3.0 really
+  uses rather than to this one, because it describes a binary people already hold.
+
+  The path is set at module scope, before `app.whenReady()`, and that is measured rather than
+  stylistic: moving it after ready leaves a Chromium `Local State` file behind in the old folder.
+  `--user-data-dir` is honoured wherever it is passed, which is what keeps fourteen end-to-end
+  suites isolated from each other.
+
+  Anybody on a version before this one keeps their data where it is, and nothing here reads it.
+  Bringing settings across from the previous version is the next card, and the auto-updater waits on
+  that one: an update that silently moves somebody into an empty folder is worse than no update.
+  Credentials are part of what does not travel — `safeStorage` ciphertext lives in the folder that
+  moved, so a new version asks for them again.
+
+  Decided in ADR 0032.
+
+- 46f99f4: TYTO-152 — the export stops losing frames in the installed app: a capture that used to hang forever
+  now answers every time, because the window it is taken on is one Chromium actually draws.
+
+  TYTO-148 measured the hang and contained it with a deadline; it did not explain it, and said so.
+  The explanation is that `show: false` hides a window without making it offscreen.
+  `Page.captureScreenshot` asks for a frame of that window's **surface**, and in the packaged app
+  nothing composes a surface for a window nobody can see — so the frame turns up about a second late,
+  or never. The window now uses `webPreferences.offscreen: true`, which is a different mechanism:
+  Chromium produces frames into a bitmap on its own clock, screen or no screen.
+
+  Measured on win32, the packaged app rebuilt from this change, 20 captures per arm, round-robin:
+
+  ```
+  arm      hangs   fast(<500ms)  ~1s(>=500ms)  latency
+  before   6 / 20       4             10       75–1550 ms
+  after    0 / 20      20              0       63–128 ms
+  ```
+
+  The ~1 s cluster disappears with the hang, which is what says they were one mechanism. Across
+  everything this card measured without the fix, 18 of 80 packaged captures hung (22.5%); with it,
+  0 of 20 here and 0 of 20 in the arm that first tried it. Four more suspects died on the way: not
+  background throttling (6 of 20), not the window's transparency (3 of 20), not the test harness
+  hiding the main window (5 of 20 with it visible — the shape a person runs), and not the request
+  itself — `fromSurface: false` hung 20 of 20 and forcing a frame with `Page.startScreencast` hung
+  20 of 20 after its own frame had arrived in under 100 ms every time.
+
+  **What changes in the picture, stated rather than discovered later: text is antialiased slightly
+  differently**, because offscreen rendering composites in software. Against the Playwright
+  adapter's references, the desktop's output moved _closer_ on both fixtures that were not already
+  identical — `shapes.feed` 0.0656% → 0.0219% and `text.feed` 1.2219% → 1.0613% — and `alpha.square`
+  stays byte-identical. The desktop's own `text.feed` reference, which is a regression check, was
+  re-recorded: the diff is glyph-edge pixels with no layout shift.
+
+  **The 30 s deadline from TYTO-148 stays.** No hang on one machine, on one platform, in one build is
+  not the same as no step ever stalling, and the deadline is what keeps the next one legible.
+
+  ADR 0033 records the decision, amends ADR 0027's window and supersedes the measurements in
+  ADR 0030 — including its residual: at the deadline that actually ships, 8 of 40 captures hung, 0 of
+  40 answered anywhere between 8 s and 30 s, and the retry left 1 of 40 failing rather than the ~7%
+  that ADR quotes. **Why a packaged build differs from the dev build at all is still not named**, and
+  the fix does not depend on the answer.
+
 ## 0.3.0
 
 ### Minor Changes
