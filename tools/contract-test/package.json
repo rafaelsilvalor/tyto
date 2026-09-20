@@ -19,6 +19,6 @@
   "devDependencies": {
     "@tyto/fonts": "workspace:*",
     "ajv": "^8.17.1",
-    "vitest": "^5.0.0"
+    "vitest": "^5.0.1"
   }
 }
