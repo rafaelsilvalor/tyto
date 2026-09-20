@@ -1,5 +1,20 @@
 # @tyto/plugin-api
 
+## 0.3.4
+
+### Patch Changes
+
+- 91b6bc5: Dependency bumps in the prod group: `yaml` 2.9.0 → 2.9.1, `zod` 4.6.1 → 4.6.5, and
+  `@codemirror/commands`, `@codemirror/state` and `@codemirror/view` to their latest patches.
+
+  These are dependencies of what ships, so they get a patch and a line in the changelog rather
+  than passing through unnamed. Written by hand because Dependabot cannot write a changeset — it
+  has no idea this repository uses them — which is what makes every one of its PRs arrive red on
+  `changeset status`. TYTO-155 is the card for fixing that properly.
+
+- Updated dependencies [91b6bc5]
+  - @tyto/core@0.22.1
+
 ## 0.3.3
 
 ### Patch Changes
