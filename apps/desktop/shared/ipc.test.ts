@@ -25,6 +25,7 @@ describe('the IPC contract', () => {
       'credentials:get',
       'credentials:set',
       'dialog:confirm',
+      'dialog:save-changes',
       'export:cancel',
       'export:choose-directory',
       'export:progress',

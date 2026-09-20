@@ -393,6 +393,38 @@ export const IPC_CHANNELS = {
   ),
 
   /**
+   * The three-way question on the way out: save, do not save, or stay (TYTO-153).
+   *
+   * **A channel of its own rather than a third label on `dialog:confirm`**, and the choice is
+   * the card's one genuinely new decision. Widening `confirm` would mean a request whose
+   * third button is optional and a response that is no longer a boolean, so every one of its
+   * five existing callers would carry a shape they never use; and the two dialogs disagree
+   * about which button is safe — `confirm` points `defaultId` and `cancelId` at the same
+   * index deliberately, and here they are two different buttons. The alternative that was
+   * *not* taken is a generic `dialog:message` carrying `buttons: string[]`: it would fit any
+   * future box, and that is the objection. A renderer would then choose how many buttons main
+   * draws and what each index means, which puts the mapping from an answer to an act on the
+   * wire instead of in the two files that hold it.
+   *
+   * Every string is the renderer's and already translated, the way `dialog:confirm`'s are.
+   * What comes back is the **meaning** and never an index: main builds the button order, so
+   * main is where the order is read back.
+   */
+  'dialog:save-changes': channel(
+    z.object({
+      message: z.string().min(1).max(500),
+      detail: z.string().max(500).optional(),
+      /** Write the work and then go. The default button, because it cannot lose anything. */
+      save: z.string().min(1).max(100),
+      /** Go without writing it — what `exit.discard.confirm` used to be on its own. */
+      discard: z.string().min(1).max(100),
+      /** Stay. The Escape key, and the button `dialog:confirm` would have made the default. */
+      cancel: z.string().min(1).max(100),
+    }),
+    z.object({ answer: z.enum(['save', 'discard', 'cancel']) }),
+  ),
+
+  /**
    * Stage one of the quit question: "this window has the message" (TYTO-147, ADR 0031).
    *
    * It carries no verdict and it is not an answer. It exists because the two legs of the quit

@@ -66,7 +66,8 @@ import {
   withPanelOpen,
   withPanelSize,
 } from '../../shared/layout.js';
-import { installErrorReporting } from './report-errors.js';
+import { type SaveOutcome, resolveExit } from './exit.js';
+import { installErrorReporting, reportToLog } from './report-errors.js';
 import { searchPhrasesFor } from './search-phrases.js';
 import { type ShellState, fillLocalePicker, localeFromPicker, paint, paintTitle } from './shell.js';
 import {
@@ -626,68 +627,7 @@ const registry: CommandRegistry = createDesktopRegistry({
       // where the text comes from. A save fired in the paint before CodeMirror is mounted
       // would write the empty string over a file.
       if (editor === undefined) return;
-      const documentId = workspace.activeId;
-
-      // **The one call in this file that is caught** (TYTO-124). A full disk, a folder gone
-      // read-only, a path that vanished under a save-as: `file:save` rejects, and until this
-      // card the rejection went to `installErrorReporting`, which writes it to a log file the
-      // person has no reason to open. The unsaved marker stayed lit — true, and silent.
-      //
-      // Caught here rather than in `withBridge` on purpose. The other twelve callers reject
-      // for reasons a person did not ask for and cannot act on; this one is the answer to a
-      // key somebody just pressed about text they would lose.
-      let answer: IpcResponse<'file:save'>;
-      try {
-        answer = await bridge['file:save']({
-          documentId,
-          // The workspace's text and not the pane's, which is what makes this call one a
-          // future "save all" could make about a tab that is not in front.
-          text: activeText(),
-          saveAs,
-        });
-      } catch (cause) {
-        // Rebuilt and not appended to, the way `E_FILE_NOT_FOUND` above is: a second failed
-        // save is the same problem said again, not a second problem.
-        panel.installation = [
-          saveFailureDiagnostic(state.locale, documentOf(workspace, documentId)?.name, cause),
-          ...panel.installation.filter((item) => item.code !== SAVE_FAILED),
-        ];
-        repaint();
-        // Re-thrown so `installErrorReporting` still files it: the sentence on screen is for
-        // the person, and the line in the log is for whoever reads their report.
-        throw cause;
-      }
-      // A dismissed dialog leaves everything alone, the unsaved marker included. There is
-      // nothing to clear now — the marker is a comparison — but there is something not to
-      // move: taking `savedText` forward here would tell somebody their text was written
-      // when it was not.
-      if (answer.document === null) return;
-      const { name, text: written } = answer.document;
-      workspace = updateDocument(workspace, documentId, (document_) => ({
-        ...document_,
-        name,
-        // **What main says it wrote**, and not the string sent up or the buffer as it now
-        // stands. A save-as puts a dialog in front of somebody who can go on typing behind
-        // it, so the text at the end of this round trip is not always the text at the start
-        // of it; taking the buffer here would call those extra characters saved. The old
-        // `dirty: false` did exactly that (TYTO-112).
-        savedText: written,
-      }));
-
-      // A save-as onto a file another tab had open: main gave the path to this tab and took
-      // it off that one, and the strip has to say so (TYTO-104). What that costs the other
-      // tab is `releaseDocument`'s to say.
-      //
-      // The `!== documentId` guard is defence and not logic: main already answers with the
-      // tab that let go, never with the one that asked. Were it ever to answer with this
-      // one, the two lines above would name the tab and this one would immediately take the
-      // name back off it — a bug that looks like a repaint.
-      if (answer.released !== null && answer.released !== documentId) {
-        workspace = releaseDocument(workspace, answer.released);
-      }
-
-      repaint();
-      void refreshRecent();
+      await saveOneDocument(bridge, workspace.activeId, saveAs);
     });
   },
 
@@ -997,6 +937,93 @@ async function requestClose(id: string): Promise<void> {
 }
 
 /**
+ * Writes one tab, asking for a name when it has none, and says how it went (TYTO-124, TYTO-153).
+ *
+ * **Taken out of the Save command and given a document id**, because the quit question now
+ * saves tabs that are not in front: `contentOf` answers for any document in the workspace —
+ * the state is the store's since TYTO-115 — so nothing has to be activated first, and nobody
+ * watches the app flick through three tabs on its way out.
+ *
+ * **It answers rather than throwing, which is the one behaviour this card changed here.** The
+ * rejection used to be re-thrown so `installErrorReporting` would file it; a failed save is an
+ * *answer* now — it cancels the quit — and a caller that has to know cannot be handed an
+ * exception to let past. The log line is still written, by `reportToLog` and directly.
+ */
+async function saveOneDocument(
+  bridge: TytoBridge,
+  documentId: string,
+  saveAs: boolean,
+): Promise<SaveOutcome> {
+  const target = documentOf(workspace, documentId);
+  if (target === undefined) return 'failed';
+
+  // **The one call in this file that is caught** (TYTO-124). A full disk, a folder gone
+  // read-only, a path that vanished under a save-as: `file:save` rejects, and until that
+  // card the rejection went to `installErrorReporting`, which writes it to a log file the
+  // person has no reason to open. The unsaved marker stayed lit — true, and silent.
+  //
+  // Caught here rather than in `withBridge` on purpose. The other twelve callers reject
+  // for reasons a person did not ask for and cannot act on; this one is the answer to a
+  // key somebody just pressed about text they would lose.
+  let answer: IpcResponse<'file:save'>;
+  try {
+    answer = await bridge['file:save']({
+      documentId,
+      // The workspace's text and not the pane's, which is what makes this a call about a tab
+      // that need not be in front — and what the quit question relies on.
+      text: contentOf(target),
+      saveAs,
+    });
+  } catch (cause) {
+    // Rebuilt and not appended to, the way `E_FILE_NOT_FOUND` above is: a second failed
+    // save is the same problem said again, not a second problem.
+    panel.installation = [
+      saveFailureDiagnostic(state.locale, target.name, cause),
+      ...panel.installation.filter((item) => item.code !== SAVE_FAILED),
+    ];
+    repaint();
+    // The sentence on screen is for the person, and the line in the log is for whoever reads
+    // their report. Both, and no exception left travelling.
+    reportToLog(bridge, cause, 'save failed');
+    return 'failed';
+  }
+
+  // A dismissed dialog leaves everything alone, the unsaved marker included. There is
+  // nothing to clear now — the marker is a comparison — but there is something not to
+  // move: taking `savedText` forward here would tell somebody their text was written
+  // when it was not.
+  if (answer.document === null) return 'dismissed';
+
+  const { name, text: written } = answer.document;
+  workspace = updateDocument(workspace, documentId, (document_) => ({
+    ...document_,
+    name,
+    // **What main says it wrote**, and not the string sent up or the buffer as it now
+    // stands. A save-as puts a dialog in front of somebody who can go on typing behind
+    // it, so the text at the end of this round trip is not always the text at the start
+    // of it; taking the buffer here would call those extra characters saved. The old
+    // `dirty: false` did exactly that (TYTO-112).
+    savedText: written,
+  }));
+
+  // A save-as onto a file another tab had open: main gave the path to this tab and took
+  // it off that one, and the strip has to say so (TYTO-104). What that costs the other
+  // tab is `releaseDocument`'s to say.
+  //
+  // The `!== documentId` guard is defence and not logic: main already answers with the
+  // tab that let go, never with the one that asked. Were it ever to answer with this
+  // one, the two lines above would name the tab and this one would immediately take the
+  // name back off it — a bug that looks like a repaint.
+  if (answer.released !== null && answer.released !== documentId) {
+    workspace = releaseDocument(workspace, answer.released);
+  }
+
+  repaint();
+  void refreshRecent();
+  return 'saved';
+}
+
+/**
  * The same question about the whole window, asked because main asked first (TYTO-123).
  *
  * This is the only thing in the renderer that main starts, and the shape is the reason it
@@ -1015,27 +1042,32 @@ async function requestClose(id: string): Promise<void> {
 async function answerExitRequest(bridge: TytoBridge, askId: number): Promise<void> {
   let allow = false;
   try {
-    const unsaved = workspace.documents.filter(isUnsaved).length;
-    if (unsaved === 0) {
-      // Nothing to lose, so nothing to ask. The card's second criterion, and it is a branch
-      // rather than a dialog with a trivial answer because a box that appeared on every quit
-      // would train a person to dismiss the one that matters.
-      allow = true;
-      return;
-    }
+    allow = await resolveExit({
+      unsaved: () => workspace.documents.filter(isUnsaved).map((document_) => document_.id),
 
-    const detail = translate(
-      state.locale,
-      unsaved === 1 ? 'exit.discard.detail.one' : 'exit.discard.detail.many',
-    ).replace('{n}', String(unsaved));
+      ask: async (count) => {
+        const detail = translate(
+          state.locale,
+          count === 1 ? 'exit.save.detail.one' : 'exit.save.detail.many',
+        ).replace('{n}', String(count));
 
-    const answer = await bridge['dialog:confirm']({
-      message: translate(state.locale, 'exit.discard.message'),
-      detail,
-      confirm: translate(state.locale, 'exit.discard.confirm'),
-      cancel: translate(state.locale, 'exit.discard.cancel'),
+        // A channel of its own and not `dialog:confirm`, because the answer is not a boolean
+        // and the two boxes disagree about which button is safe (`shared/ipc.ts`, TYTO-153).
+        const answer = await bridge['dialog:save-changes']({
+          message: translate(state.locale, 'exit.save.message'),
+          detail,
+          save: translate(state.locale, 'exit.save.confirm'),
+          discard: translate(state.locale, 'exit.save.discard'),
+          cancel: translate(state.locale, 'exit.save.cancel'),
+        });
+        return answer.answer;
+      },
+
+      // `saveAs: false`, so a tab that already has a file is written where it lives and only
+      // a tab with no path gets a picker. `documents.save` is where that fallback is, and it
+      // has been there since E9.8 — which is most of why this card is an M.
+      save: (documentId) => saveOneDocument(bridge, documentId, false),
     });
-    allow = answer.confirmed;
   } finally {
     await bridge['app:exit-answer']({ askId, allow });
   }

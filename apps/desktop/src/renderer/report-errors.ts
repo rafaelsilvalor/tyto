@@ -40,28 +40,40 @@ function describe(reason: unknown): { message: string; detail?: string } {
   return { message: clip(text === '' ? 'unknown renderer failure' : text, MESSAGE_LIMIT) };
 }
 
-export function installErrorReporting(target: Window, bridge: TytoBridge | undefined): void {
-  // No bridge is a real state, not a defensive branch: every unit test in `src/renderer` runs
-  // with no preload at all, and so does this window's own first paint.
+/**
+ * One line in the log, for a failure somebody already handled (TYTO-153).
+ *
+ * Exported because a caught failure is now a real case rather than a contradiction. `save`
+ * used to re-throw so that the listener below would file it, which worked while a failed save
+ * was nobody's answer; it is an answer now — the quit question's **Sim** cancels the exit on
+ * one — and a caller that has to know the outcome cannot be handed an exception to let past.
+ * So the report is made directly, and what the listeners do is call this too.
+ *
+ * No bridge is a real state and not a defensive branch: every unit test in `src/renderer` runs
+ * with no preload at all, and so does this window's own first paint.
+ */
+export function reportToLog(bridge: TytoBridge | undefined, reason: unknown, kind: string): void {
   if (bridge === undefined) return;
 
-  const report = (reason: unknown, kind: string): void => {
-    const { message, detail } = describe(reason);
-    // The send is fire-and-forget **and its own rejection is swallowed**. A logger that throws
-    // from inside an error handler is a loop, and the thing that just failed is the thing that
-    // would have reported it.
-    void bridge['log:write']({
-      level: 'error',
-      message: `${kind}: ${message}`.slice(0, MESSAGE_LIMIT),
-      ...(detail === undefined ? {} : { detail }),
-    }).catch(() => undefined);
-  };
+  const { message, detail } = describe(reason);
+  // The send is fire-and-forget **and its own rejection is swallowed**. A logger that throws
+  // from inside an error handler is a loop, and the thing that just failed is the thing that
+  // would have reported it.
+  void bridge['log:write']({
+    level: 'error',
+    message: `${kind}: ${message}`.slice(0, MESSAGE_LIMIT),
+    ...(detail === undefined ? {} : { detail }),
+  }).catch(() => undefined);
+}
+
+export function installErrorReporting(target: Window, bridge: TytoBridge | undefined): void {
+  if (bridge === undefined) return;
 
   target.addEventListener('error', (event: ErrorEvent) => {
-    report(event.error ?? event.message, 'renderer error');
+    reportToLog(bridge, event.error ?? event.message, 'renderer error');
   });
 
   target.addEventListener('unhandledrejection', (event: PromiseRejectionEvent) => {
-    report(event.reason, 'renderer rejection');
+    reportToLog(bridge, event.reason, 'renderer rejection');
   });
 }
