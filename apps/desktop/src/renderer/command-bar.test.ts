@@ -32,7 +32,10 @@ function mount(): { bar: CommandBar; ran: string[] } {
   const ran: string[] = [];
   bar.commands = ENTRIES;
   bar.locale = 'pt-BR';
-  bar.run = (id) => ran.push(id);
+  bar.run = (id) => {
+    ran.push(id);
+    return true;
+  };
   globalThis.document.body.append(bar);
   return { bar, ran };
 }
