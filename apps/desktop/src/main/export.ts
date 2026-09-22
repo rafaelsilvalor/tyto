@@ -10,7 +10,14 @@ import {
   renderResult,
 } from '@tyto/io';
 import { type InProcessHost, type Logger, createPluginHost } from '@tyto/plugin-api';
-import { type JobEvent, type OutputRequest, markupTemplateSource, runJob } from '@tyto/pipeline';
+import {
+  type JobEvent,
+  type OutputRequest,
+  bundledTemplateSource,
+  markupTemplateSource,
+  runJob,
+} from '@tyto/pipeline';
+import { BUILT_IN_TEMPLATE_BUILDS } from '@tyto/templates';
 import type { Rasterizer } from '@tyto/raster';
 
 import { type ProjectSources } from './project.js';
@@ -207,7 +214,14 @@ export async function createExportService(options: ExportServiceOptions): Promis
       },
       {
         registry: templates,
-        templates: markupTemplateSource(fileSystem, templates),
+        // Bundled in front of markup, so a template whose body is code draws here the
+        // same way it draws through the CLI. Nothing is loaded from a folder either way.
+        templates: bundledTemplateSource({
+          registry: templates,
+          fileSystem,
+          bundled: BUILT_IN_TEMPLATE_BUILDS,
+          markup: markupTemplateSource(fileSystem, templates),
+        }),
         assets: fileAssetResolver({
           // `confine` stays on, its default: a brief is often written by something else
           // (ADR 0011), and `../../../.ssh/id_rsa` embedded in an exported PNG is a real way

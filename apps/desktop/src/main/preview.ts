@@ -10,7 +10,8 @@ import {
 } from '@tyto/core';
 import { exportHtml } from '@tyto/export-html';
 import { bundledFont, bundledFontSource } from '@tyto/fonts';
-import { markupTemplateSource } from '@tyto/pipeline';
+import { bundledTemplateSource, markupTemplateSource } from '@tyto/pipeline';
+import { BUILT_IN_TEMPLATE_BUILDS } from '@tyto/templates';
 import { fileAssetResolver, fileResources } from '@tyto/io';
 
 import { type ProjectSources } from './project.js';
@@ -166,9 +167,14 @@ export async function createPreviewService(
       });
       if (!resolved.ok) return failed([...ast.diagnostics, ...resolved.error]);
 
-      const template = await markupTemplateSource(fileSystem, templates).load(
-        resolved.value.template,
-      );
+      // The same pairing the export path uses: a preview that could not draw a code
+      // template would send somebody to the CLI to find out whether their work rendered.
+      const template = await bundledTemplateSource({
+        registry: templates,
+        fileSystem,
+        bundled: BUILT_IN_TEMPLATE_BUILDS,
+        markup: markupTemplateSource(fileSystem, templates),
+      }).load(resolved.value.template);
       if (!template.ok) {
         return failed([...ast.diagnostics, ...resolved.diagnostics, ...template.error]);
       }

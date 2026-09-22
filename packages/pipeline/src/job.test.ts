@@ -7,7 +7,9 @@ import type {
   SceneResources,
   TemplateRegistry,
 } from '@tyto/core';
+import type { TemplateBuild } from '@tyto/core';
 import { fontFaceKey, formatCatalogue, isError, loadTemplateRegistry } from '@tyto/core';
+import { frame, rect, solid } from '@tyto/core/template';
 import { type HtmlResources, htmlExporterPlugin } from '@tyto/export-html';
 import { type SvgResources, svgExporterPlugin } from '@tyto/export-svg';
 import { type ExporterRegistry, createPluginHost } from '@tyto/plugin-api';
@@ -17,6 +19,7 @@ import { describe, expect, it } from 'vitest';
 import type { Artifact, ArtifactSink } from './artifact.js';
 import type { JobEvent } from './events.js';
 import { type JobPorts, type OutputRequest, runJob } from './job.js';
+import { bundledTemplateSource } from './bundled-template-source.js';
 import { markupTemplateSource } from './template-source.js';
 
 import briefSource from './__fixtures__/promo-curso.brief?raw';
@@ -44,9 +47,23 @@ import templateMarkup from './__fixtures__/template.html?raw';
 
 /* ------------------------------------------------------------- the world on a disk -- */
 
+/**
+ * A folder with a manifest and no markup body, for the code route.
+ *
+ * Deliberately not `promo-curso`: a name with both bodies is the ambiguity
+ * `bundledTemplateSource` refuses, and the case for that lives beside that module.
+ */
+const FICHA_MANIFEST = `name: ficha
+version: 1.0.0
+formats: [feed]
+slots:
+  titulo: { type: rich-text, max: 40 }
+`;
+
 const FILES: Readonly<Record<string, string>> = {
   'templates/promo-curso/manifest.yaml': manifestSource,
   'templates/promo-curso/template.html': templateMarkup,
+  'templates/ficha/manifest.yaml': FICHA_MANIFEST,
 };
 
 /** Directory listings derived from the file map, so the two cannot drift apart. */
@@ -875,5 +892,79 @@ describe('the stages before the render', () => {
       true,
     );
     expect(result.value.artifacts).toHaveLength(12);
+  });
+});
+
+describe('a template whose body is code', () => {
+  /**
+   * The other half of ADR 0005, driven through the same `runJob` as the markup route: the
+   * brief is parsed by the real parser, `resolve` checks it against the YAML manifest the
+   * registry read, and the exporters are the shipped ones. Only the body is a function.
+   *
+   * It draws a rect rather than text on purpose. Whether a scene with type comes out right
+   * is a question for the exporters and for the font work; what this case is for is that a
+   * build shipped in the application reaches `compile` at all.
+   */
+  it('renders end to end, to png and to svg', async () => {
+    const registry = await registryOf();
+    const build: TemplateBuild = (context) =>
+      frame({
+        format: context.format,
+        size: context.size,
+        idPrefix: context.idPrefix,
+        children: [rect({ size: context.size, fill: solid({ r: 12, g: 35, b: 64, a: 1 }) })],
+      });
+
+    const result = await runJob(
+      { brief: '---\ntemplate: ficha\nformats: [feed]\n---\n\n::titulo Agenda\n', outputs: BOTH },
+      await portsOf({
+        templates: bundledTemplateSource({
+          registry,
+          fileSystem,
+          bundled: { ficha: build },
+          markup: markupTemplateSource(fileSystem, registry),
+        }),
+      }),
+    );
+
+    if (!result.ok) throw new Error(result.error.map((item) => item.message).join('; '));
+
+    expect(result.value.rendered).toBe(2);
+    expect(result.value.failed).toBe(0);
+    expect(result.value.artifacts.map((artifact) => artifact.kind).sort()).toEqual(['png', 'svg']);
+  });
+
+  /**
+   * `renderedSlots` is what the markup route derives by reading a body, and a function has
+   * no body to read. So `W_UNUSED_SLOT` cannot fire for a code template — a silence worth
+   * asserting, because the alternative reading is "this template uses every slot".
+   */
+  it('reports no unused slot, because nobody can tell', async () => {
+    const registry = await registryOf();
+    const build: TemplateBuild = (context) =>
+      frame({
+        format: context.format,
+        size: context.size,
+        idPrefix: context.idPrefix,
+        children: [],
+      });
+
+    const result = await runJob(
+      {
+        brief: '---\ntemplate: ficha\nformats: [feed]\n---\n\n::titulo Nunca desenhado\n',
+        outputs: BOTH,
+      },
+      await portsOf({
+        templates: bundledTemplateSource({
+          registry,
+          fileSystem,
+          bundled: { ficha: build },
+          markup: markupTemplateSource(fileSystem, registry),
+        }),
+      }),
+    );
+
+    if (!result.ok) throw new Error(result.error.map((item) => item.message).join('; '));
+    expect(result.diagnostics.map((item) => item.code)).not.toContain('W_UNUSED_SLOT');
   });
 });

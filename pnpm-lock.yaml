@@ -417,7 +417,11 @@ importers:
         specifier: ^1.8.0
         version: 1.8.0
 
-  packages/templates: {}
+  packages/templates:
+    dependencies:
+      '@tyto/core':
+        specifier: workspace:*
+        version: link:../core
 
   tools/contract-test:
     dependencies:
