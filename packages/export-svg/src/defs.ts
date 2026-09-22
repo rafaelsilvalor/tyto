@@ -8,7 +8,7 @@ import type {
   Stroke,
   UnitPoint,
 } from '@tyto/core';
-import { diagnostic } from '@tyto/core';
+import { GAP_ASSET_URI, diagnostic } from '@tyto/core';
 
 import { attribute, element, escapeXml, roundedRectPath, svgColor, svgNumber } from './values.js';
 
@@ -116,11 +116,18 @@ export function approximated(sink: Sink, node: string, feature: string, detail: 
   );
 }
 
-export function assetUri(sink: Sink, node: string, ref: AssetRef): string | undefined {
+/**
+ * The bytes for an asset, or the mark that says there were none (ADR 0035).
+ *
+ * Every caller wants an `href`, so the gap is drawn by answering with one rather than by
+ * each call site learning what an unresolved asset looks like. It stays an error — the
+ * export fails the build — and what changes is that the failure is now in the picture.
+ */
+export function assetUri(sink: Sink, node: string, ref: AssetRef): string {
   const uri = sink.resources.asset?.(ref);
   if (uri === undefined) {
     sink.problems.push(diagnostic('E_EXPORT_ASSET_UNRESOLVED', { asset: ref.id, node }));
-    return undefined;
+    return GAP_ASSET_URI;
   }
   return uri;
 }
@@ -305,7 +312,6 @@ export function paintValue(
   }
 
   const href = assetUri(sink, node, paint.asset);
-  if (href === undefined) return undefined;
 
   // User space, not `objectBoundingBox`. In bounding-box units the image's viewport is the
   // unit *square*, so `preserveAspectRatio` fits the picture to a square and the square is

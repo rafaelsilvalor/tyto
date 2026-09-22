@@ -24,7 +24,7 @@ non-zero.
 | `E_BAD_SLOT_VALUE` | error | no | A slot is set to something the manifest does not allow for it. |
 | `E_UNKNOWN_SLOT` | error | no | A directive names a slot the template manifest does not declare. |
 | `E_UNKNOWN_DIRECTIVE` | error | no | A directive matches no template slot and no installed plugin. |
-| `E_MISSING_REQUIRED_SLOT` | error | yes | The manifest marks a slot as required and the brief leaves it unset. |
+| `E_MISSING_REQUIRED_SLOT` | error | no | The manifest marks a slot as required and the brief leaves it unset. |
 | `E_BAD_ADJUSTMENT` | error | no | An adjustment is not declared for the slot it is applied to. |
 | `E_ASSET_NOT_FOUND` | error | no | An asset path in the brief does not resolve to a file. |
 | `E_UNSUPPORTED_CSS` | error | yes | A template uses a CSS property outside the accepted set. |
@@ -54,9 +54,9 @@ non-zero.
 | `E_TEMPLATE_AMBIGUOUS` | error | yes | A template name has both bundled code and a markup file, and nothing decides which is drawn. |
 | `E_TEMPLATE_READ` | error | yes | A template folder, manifest or markup file could not be read from the filesystem. |
 | `E_INPUT_READ` | error | yes | A file or folder a command was pointed at could not be read. |
-| `E_EXPORT_ASSET_UNRESOLVED` | error | yes | An exporter was given no bytes for an asset the scene draws. |
+| `E_EXPORT_ASSET_UNRESOLVED` | error | no | An exporter was given no bytes for an asset the scene draws. |
 | `E_EXPORT_FONT_UNRESOLVED` | error | yes | An exporter was given no bytes for a font the scene draws text in. |
-| `E_EXPORT_UNSUPPORTED` | error | yes | A scene uses something the chosen exporter cannot express at all. |
+| `E_EXPORT_UNSUPPORTED` | error | no | A scene uses something the chosen exporter cannot express at all. |
 | `W_EXPORT_APPROXIMATED` | warning | no | An exporter rendered something close to, but not exactly, what the IR asked for. |
 | `E_RENDER_FAILED` | error | no | A frame could not be turned into bytes by the exporter or the rasterizer. |
 | `E_OUTPUT_WRITE` | error | no | An artifact was rendered but could not be written to the output. |
@@ -71,10 +71,12 @@ Fatal means **nothing can be drawn**, not "serious". The test is whether a frame
 exist without the thing that is missing. A warning is never fatal, so only the errors
 are listed here.
 
-Two entries are fatal for a reason that is a deadline rather than a principle:
-`E_MISSING_REQUIRED_SLOT` and the unresolved-export codes would each leave a hole in
-the artwork that nothing in the artwork names, and "it is non-fatal only if the gap is
-visible" is the rule ADR 0025 set for them. They move when something draws the gap.
+Three entries were fatal for a reason that was a deadline rather than a principle,
+and ADR 0035 is the thing they were waiting for. `E_MISSING_REQUIRED_SLOT`,
+`E_EXPORT_ASSET_UNRESOLVED` and `E_EXPORT_UNSUPPORTED` each left a hole in the artwork
+that nothing in the artwork named; the rule ADR 0025 set for them was "non-fatal only
+if the gap is visible", and the gap is now drawn — a stamp on every frame of an
+incomplete brief, and a crossed box where a picture the exporter could not load goes.
 
 | Code | Fatal | Why |
 | --- | --- | --- |
@@ -86,7 +88,7 @@ visible" is the rule ADR 0025 set for them. They move when something draws the g
 | `E_BAD_SLOT_VALUE` | no | The value of one slot; it stays unset and the rest of the artwork is drawn anyway. |
 | `E_UNKNOWN_SLOT` | no | The slot does not exist, and the ones that do are unaffected. |
 | `E_UNKNOWN_DIRECTIVE` | no | The same: a directive nothing claims contributes nothing to skip. |
-| `E_MISSING_REQUIRED_SLOT` | yes | Non-fatal in principle — the artwork renders with a hole — and fatal until that hole is visible in the artwork rather than only in the problems panel (ADR 0025). |
+| `E_MISSING_REQUIRED_SLOT` | no | The artwork renders with a hole, and since ADR 0035 the hole is drawn: `compile` stamps every frame built from a brief that left a required slot unset, so the gap is in the exported bytes and not only in the problems panel. |
 | `E_BAD_ADJUSTMENT` | no | One adjustment on one slot; the slot keeps the adjustments that are declared. |
 | `E_ASSET_NOT_FOUND` | no | One image the brief named. The slot stays unset, so the scene never references bytes nobody can supply. |
 | `E_UNSUPPORTED_CSS` | yes | The template is what every artwork is drawn through, so a broken one breaks all of them rather than one slot. |
@@ -116,9 +118,9 @@ visible" is the rule ADR 0025 set for them. They move when something draws the g
 | `E_TEMPLATE_AMBIGUOUS` | yes | There is no template to build with, and a template is what every artwork is drawn through. |
 | `E_TEMPLATE_READ` | yes | The registry answers with no manifest at all, and a manifest is what every slot is checked against. |
 | `E_INPUT_READ` | yes | There is no brief to render. |
-| `E_EXPORT_ASSET_UNRESOLVED` | yes | The bytes were never loaded, which is a wiring failure rather than something the brief said — and drawing around it leaves a hole nothing in the artwork names. |
+| `E_EXPORT_ASSET_UNRESOLVED` | no | The bytes were never loaded, which is a wiring failure rather than something the brief said — and since ADR 0035 the exporter draws the gap mark in the box the picture would have filled, so the artwork names the hole itself. |
 | `E_EXPORT_FONT_UNRESOLVED` | yes | Text drawn in whatever the viewer has is a different artwork, and the substitution is invisible in the output. |
-| `E_EXPORT_UNSUPPORTED` | yes | The exporter leaves out the node it cannot express, and that gap is invisible in the artwork. |
+| `E_EXPORT_UNSUPPORTED` | no | Every producer of this code now leaves the node visible rather than leaving it out (ADR 0035): a mask that cannot be built is dropped instead of hiding what it was applied to, and text that cannot be drawn as outlines is drawn as text. |
 | `E_RENDER_FAILED` | no | One frame of twelve. The others are already written, and a file that is missing from `result.json` is visible in a way a hole inside an artwork is not. |
 | `E_OUTPUT_WRITE` | no | The same: one artifact that did not reach the output, counted against `planned`. |
 
@@ -238,11 +240,11 @@ Parameters: `directive`
 
 ### `E_MISSING_REQUIRED_SLOT`
 
-**Severity:** error · **Fatal:** yes · **Spec:** `docs/brief-language.md`
+**Severity:** error · **Fatal:** no · **Spec:** `docs/brief-language.md`
 
 The manifest marks a slot as required and the brief leaves it unset.
 
-Non-fatal in principle — the artwork renders with a hole — and fatal until that hole is visible in the artwork rather than only in the problems panel (ADR 0025).
+The artwork renders with a hole, and since ADR 0035 the hole is drawn: `compile` stamps every frame built from a brief that left a required slot unset, so the gap is in the exported bytes and not only in the problems panel.
 
 ```
 Template '{template}' requires slot '{slot}', which the brief does not set.
@@ -658,11 +660,11 @@ Parameters: `path`, `problem`
 
 ### `E_EXPORT_ASSET_UNRESOLVED`
 
-**Severity:** error · **Fatal:** yes · **Spec:** `docs/ir-schema.md`
+**Severity:** error · **Fatal:** no · **Spec:** `docs/ir-schema.md`
 
 An exporter was given no bytes for an asset the scene draws.
 
-The bytes were never loaded, which is a wiring failure rather than something the brief said — and drawing around it leaves a hole nothing in the artwork names.
+The bytes were never loaded, which is a wiring failure rather than something the brief said — and since ADR 0035 the exporter draws the gap mark in the box the picture would have filled, so the artwork names the hole itself.
 
 ```
 Asset '{asset}' on '{node}' was not resolved to embeddable bytes, and an export makes no network requests.
@@ -686,11 +688,11 @@ Parameters: `font`
 
 ### `E_EXPORT_UNSUPPORTED`
 
-**Severity:** error · **Fatal:** yes · **Spec:** `docs/ir-schema.md`
+**Severity:** error · **Fatal:** no · **Spec:** `docs/ir-schema.md`
 
 A scene uses something the chosen exporter cannot express at all.
 
-The exporter leaves out the node it cannot express, and that gap is invisible in the artwork.
+Every producer of this code now leaves the node visible rather than leaving it out (ADR 0035): a mask that cannot be built is dropped instead of hiding what it was applied to, and text that cannot be drawn as outlines is drawn as text.
 
 ```
 '{node}' uses {feature}, which {exporter} cannot express: {detail}.

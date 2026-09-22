@@ -8,6 +8,7 @@ import { measureText } from '../text/layout.js';
 import { originOf } from '../text/origin.js';
 import type { SourceRange } from '../source/range.js';
 import type { AssetRef, FontRef, Paint } from '../scene/primitives.js';
+import { gapStampNode } from '../scene/gap.js';
 import { type Artwork, type Frame, type Scene, parseScene } from '../scene/scene.js';
 import { TemplateError } from '../template/errors.js';
 import type { Template, TemplateContext } from '../template/define.js';
@@ -24,6 +25,14 @@ import type { Template, TemplateContext } from '../template/define.js';
  * Nothing a template throws escapes (ADR 0014): a `TemplateError` carries the diagnostic
  * it wanted, and anything else is a bug in third-party code and becomes
  * `E_TEMPLATE_CRASH`. A broken template produces diagnostics, never a crash.
+ *
+ * **And it stamps a frame the brief could not fill.** A required slot the brief left unset
+ * used to stop this stage before it started, because an artwork with a hole where the
+ * manifest promised content looks finished (ADR 0025). Since ADR 0035 the artwork is built
+ * and marked: `gapStampNode` goes on every frame, after the template's own children, so
+ * the incompleteness is in the exported bytes and not only in the problems panel. This
+ * stage is where it happens because it is the last one that reads a `ResolvedBrief` and
+ * the first that holds a `Frame`.
  */
 
 /** `slide-1.feed` — unique per artwork *and* per format; either alone collides. */
@@ -287,8 +296,17 @@ export function compile(
         };
       }
 
+      // The stamp goes on last, so it sits over everything the template drew (ADR 0035).
+      // `collect` runs before it because the stamp references neither a font nor an asset
+      // and has nothing to contribute to either list.
       collect(frame.children, fonts, assets);
       for (const asset of paintAssets(frame.background)) assets.set(asset.id, asset);
+      if (resolved.missingRequiredSlots.length > 0) {
+        frame = {
+          ...frame,
+          children: [...frame.children, gapStampNode(`${context.idPrefix}.gap`, frame.size)],
+        };
+      }
       frames.push(frame);
     }
 

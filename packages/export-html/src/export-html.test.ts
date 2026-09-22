@@ -1,9 +1,9 @@
 import type { Diagnostic, Scene } from '@tyto/core';
-import { parseScene } from '@tyto/core';
+import { GAP_ASSET_URI, parseScene } from '@tyto/core';
 import { describe, expect, it } from 'vitest';
 
 import { exportHtml } from './export-html.js';
-import type { HtmlResources } from './html.js';
+import type { HtmlFontFace, HtmlResources } from './html.js';
 import mappingFixture from './__fixtures__/mapping.json';
 import promoFixture from './__fixtures__/promo.json';
 
@@ -27,10 +27,16 @@ import promoFixture from './__fixtures__/promo.json';
  * content hash so the same brief produces the same bytes — so echoing it is a stand-in
  * that would change if the fixture's asset changed.
  */
+const fontUri = (face: HtmlFontFace): string =>
+  `data:font/woff2;base64,${face.font.family}-${String(face.weight)}-${face.style}`;
+
 const resources: HtmlResources = {
   asset: (ref) => `data:image/jpeg;base64,${ref.hash}`,
-  font: (face) => `data:font/woff2;base64,${face.font.family}-${String(face.weight)}-${face.style}`,
+  font: fontUri,
 };
+
+/** Fonts and nothing else, for the tests about an asset that did not resolve. */
+const fontsOnly: HtmlResources = { font: fontUri };
 
 function sceneOf(fixture: unknown): Scene {
   const parsed = parseScene(fixture);
@@ -180,12 +186,82 @@ describe('a node carries its own transform, and the browser composes the rest', 
   });
 });
 
-describe('what the exporter cannot do, it says', () => {
-  it('refuses an asset nobody resolved rather than leaving a hole', () => {
-    const problems = problemsOf(sceneOf(promoFixture), { resources: {} });
+/**
+ * A rect masked by a text, which `export-html` cannot express: a mask becomes an
+ * isolated SVG document and that document cannot reach the page's `@font-face`.
+ * Built twice over — once to assert the report, once to assert the node survives it.
+ */
+function textMaskFixture(): unknown {
+  return {
+    version: 1,
+    fonts: [{ family: 'Inter', source: 'bundled' }],
+    artworks: [
+      {
+        id: 'a',
+        frames: [
+          {
+            format: 'feed',
+            size: { w: 100, h: 100 },
+            children: [
+              {
+                kind: 'rect',
+                id: 'masked',
+                size: { w: 50, h: 50 },
+                radius: [0, 0, 0, 0],
+                mask: { nodeId: 'letters', mode: 'alpha' },
+              },
+              {
+                kind: 'text',
+                id: 'letters',
+                visible: false,
+                box: { w: 50, h: 50 },
+                align: 'left',
+                valign: 'top',
+                lineHeight: 1.2,
+                overflow: 'clip',
+                runs: [
+                  {
+                    kind: 'text',
+                    text: 'A',
+                    font: { family: 'Inter', source: 'bundled' },
+                    size: 40,
+                    weight: 400,
+                    style: 'normal',
+                    color: { kind: 'solid', color: { r: 255, g: 255, b: 255 } },
+                  },
+                ],
+              },
+            ],
+          },
+        ],
+      },
+    ],
+  };
+}
 
-    expect(problems.map((item) => item.code)).toContain('E_EXPORT_ASSET_UNRESOLVED');
-    expect(problems[0]?.severity).toBe('error');
+describe('what the exporter cannot do, it says', () => {
+  it('draws the gap mark where an asset nobody resolved would have gone', () => {
+    // Until ADR 0035 this refused the whole scene, because an `<img>` with no source is a
+    // hole that looks like a design choice. Now the box is filled with the mark and the
+    // error still rides along, so the export fails the build and shows why.
+    // Fonts still resolve: `E_EXPORT_FONT_UNRESOLVED` stays fatal, and leaving it in would
+    // have made this test pass for the wrong reason.
+    const scene = sceneOf(promoFixture);
+    const bare = exportHtml(scene, { resources: fontsOnly });
+
+    expect(bare.ok).toBe(true);
+    if (!bare.ok) return;
+
+    const unresolved = bare.diagnostics.filter((item) => item.code === 'E_EXPORT_ASSET_UNRESOLVED');
+    expect(unresolved.length).toBeGreaterThan(0);
+    expect(unresolved[0]?.severity).toBe('error');
+    expect(bare.value.map((frame) => frame.html).join('')).toContain(GAP_ASSET_URI);
+  });
+
+  it('puts nothing of the mark in an export where every asset resolved', () => {
+    // The control: the mark is a failure signal, so a healthy scene carrying it would be
+    // worse than one that never drew it at all.
+    expect(htmlOf(sceneOf(promoFixture)).join('')).not.toContain('ff00aa');
   });
 
   it('refuses a font nobody resolved, because the output has to be the same every time', () => {
@@ -211,56 +287,25 @@ describe('what the exporter cannot do, it says', () => {
   });
 
   it('refuses a text used as a mask instead of dropping it silently', () => {
-    const scene = sceneOf({
-      version: 1,
-      fonts: [{ family: 'Inter', source: 'bundled' }],
-      artworks: [
-        {
-          id: 'a',
-          frames: [
-            {
-              format: 'feed',
-              size: { w: 100, h: 100 },
-              children: [
-                {
-                  kind: 'rect',
-                  id: 'masked',
-                  size: { w: 50, h: 50 },
-                  radius: [0, 0, 0, 0],
-                  mask: { nodeId: 'letters', mode: 'alpha' },
-                },
-                {
-                  kind: 'text',
-                  id: 'letters',
-                  visible: false,
-                  box: { w: 50, h: 50 },
-                  align: 'left',
-                  valign: 'top',
-                  lineHeight: 1.2,
-                  overflow: 'clip',
-                  runs: [
-                    {
-                      kind: 'text',
-                      text: 'A',
-                      font: { family: 'Inter', source: 'bundled' },
-                      size: 40,
-                      weight: 400,
-                      style: 'normal',
-                      color: { kind: 'solid', color: { r: 255, g: 255, b: 255 } },
-                    },
-                  ],
-                },
-              ],
-            },
-          ],
-        },
-      ],
-    });
+    const scene = sceneOf(textMaskFixture());
 
     const problems = problemsOf(scene);
 
     expect(problems.map((item) => item.code)).toEqual(['E_EXPORT_UNSUPPORTED']);
     expect(problems[0]?.message).toContain('a text node inside a mask');
+  });
+
+  it('leaves the masked node visible when the mask cannot be drawn', () => {
+    // What makes `E_EXPORT_UNSUPPORTED` non-fatal (ADR 0035): the mask is dropped rather
+    // than pointed at an empty document, which would have hidden `masked` entirely — the
+    // hole nothing in the artwork names. Perturbed to prove it: masking with a rect
+    // instead of a text produces the declaration this asserts is absent.
+    const scene = sceneOf(textMaskFixture());
+    const [feed = ''] = htmlOf(scene);
+
+    expect(problemsOf(scene).map((item) => item.code)).toEqual(['E_EXPORT_UNSUPPORTED']);
+    expect(feed).toContain('id="masked"');
+    expect(feed).not.toContain('mask-image');
   });
 });
 

@@ -1,5 +1,5 @@
 import type { Artwork, Diagnostic, Diagnostics, Frame, Result, Scene } from '@tyto/core';
-import { fromDiagnostics } from '@tyto/core';
+import { fromPartial } from '@tyto/core';
 
 import { type HtmlExportOptions, type HtmlFrame, indexNodes, renderFrame } from './html.js';
 
@@ -10,9 +10,13 @@ import { type HtmlExportOptions, type HtmlFrame, indexNodes, renderFrame } from 
  * nothing else — no AST, no brief — because what an exporter is allowed to know is the
  * IR, and anything that has to reach the output entered the IR first.
  *
- * Diagnostics follow ADR 0013: a warning rides along with the documents, an error
- * replaces them. Both are worth having as data — the rasterizer downstream turns the
- * first into a note on `result.json` and the second into a non-zero exit.
+ * Diagnostics follow ADR 0025 rather than ADR 0013 alone: what replaces the documents is
+ * a **fatal** diagnostic, and a non-fatal error rides along with them. Both are worth
+ * having as data — the rasterizer downstream turns a warning into a note on `result.json`
+ * and any error into a non-zero exit. This is what lets an unresolved asset and a node
+ * this exporter cannot express be drawn as the gap mark instead of cancelling the frame
+ * (ADR 0035); a font nobody resolved is still fatal, because text in whatever face the
+ * viewer happens to have is a different artwork and nothing in the output says so.
  *
  * The node index is built once for the whole scene rather than once per frame. A mask may
  * name a node in any frame of any artwork — the invariant only forbids a descendant of
@@ -35,7 +39,7 @@ export function exportHtml(
     }
   }
 
-  return fromDiagnostics(frames, problems);
+  return fromPartial(frames, problems);
 }
 
 /**
@@ -49,5 +53,5 @@ export function exportFrameHtml(
   options: HtmlExportOptions = {},
 ): Result<string, Diagnostics> {
   const rendered = renderFrame(scene, artwork, frame, options, indexNodes(scene));
-  return fromDiagnostics(rendered.html, [...rendered.problems]);
+  return fromPartial(rendered.html, [...rendered.problems]);
 }

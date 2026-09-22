@@ -148,6 +148,17 @@ reported where it does not, and bytes for fonts and assets arrive through a reso
 caller supplies — an exporter is pure and opens no files, so a path it could not resolve
 is `E_EXPORT_ASSET_UNRESOLVED` rather than a link the output would follow.
 
+**And what it draws in that box is the gap mark** (ADR 0035). Reporting the asset was never
+the problem; an `<img>` with no source is a hole that looks like a design choice, and it is
+why `E_EXPORT_ASSET_UNRESOLVED` was fatal. `GAP_ASSET_URI` in `core` is one crossed-box SVG
+document, handed back by the one function in each exporter that answers _the bytes of an
+asset_ — so an `<img src>`, a CSS `background-image` and an SVG `<image href>` all get it
+without a call site branching. `E_EXPORT_UNSUPPORTED` moved with it, once every producer of
+that code was made to leave its node visible: in `export-svg` a mask naming a node outside
+the frame gets a pass-through `<mask>` rather than a dangling reference, and
+`--text-as-paths` with no outline resolver draws `<text>` rather than nothing.
+`E_EXPORT_FONT_UNRESOLVED` stays fatal — the mark carries no glyph for that reason.
+
 `packages/export-html` is the first of the two. It nests its output, so each element
 carries `nodeMatrix(node)` and the browser composes the rest; per-node styling goes in the
 document's stylesheet under an escaped `#id`, because a mask is a whole SVG document

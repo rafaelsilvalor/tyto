@@ -275,6 +275,19 @@ describe('one test per diagnostic code', () => {
     expect(problem?.range).toBeDefined();
   });
 
+  it('names the same slots in the value, because compile has to draw the gap', async () => {
+    // Carried as value and not only as a diagnostic (ADR 0035): `compile` reads its
+    // predecessor's value, and a stage that had to sift its predecessor's problems to
+    // know what to draw would be reading the wrong channel.
+    const ast = brief(frontmatter({ template: 'promo-curso' }), [directive('slide', 'Um')]);
+
+    expect((await accepted(ast)).missingRequiredSlots).toEqual(['titulo']);
+  });
+
+  it('names none when the brief is whole, which is the control', async () => {
+    expect((await accepted(valid())).missingRequiredSlots).toEqual([]);
+  });
+
   it('E_BAD_ADJUSTMENT — an adjustment that does not apply to this slot', async () => {
     const at = sourceRange(5, 13);
     const ast = valid({
