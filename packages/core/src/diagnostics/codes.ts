@@ -114,9 +114,11 @@ export const diagnosticCodes = {
     summary: 'The manifest marks a slot as required and the brief leaves it unset.',
     template: "Template '{template}' requires slot '{slot}', which the brief does not set.",
     spec: 'docs/brief-language.md',
-    fatal: true,
+    fatal: false,
     fatality:
-      'Non-fatal in principle — the artwork renders with a hole — and fatal until that hole is visible in the artwork rather than only in the problems panel (ADR 0025).',
+      'The artwork renders with a hole, and since ADR 0035 the hole is drawn: `compile` ' +
+      'stamps every frame built from a brief that left a required slot unset, so the gap ' +
+      'is in the exported bytes and not only in the problems panel.',
   },
   E_BAD_ADJUSTMENT: {
     severity: 'error',
@@ -391,9 +393,11 @@ export const diagnosticCodes = {
     template:
       "Asset '{asset}' on '{node}' was not resolved to embeddable bytes, and an export makes no network requests.",
     spec: 'docs/ir-schema.md',
-    fatal: true,
+    fatal: false,
     fatality:
-      'The bytes were never loaded, which is a wiring failure rather than something the brief said — and drawing around it leaves a hole nothing in the artwork names.',
+      'The bytes were never loaded, which is a wiring failure rather than something the ' +
+      'brief said — and since ADR 0035 the exporter draws the gap mark in the box the ' +
+      'picture would have filled, so the artwork names the hole itself.',
   },
   E_EXPORT_FONT_UNRESOLVED: {
     severity: 'error',
@@ -410,9 +414,11 @@ export const diagnosticCodes = {
     summary: 'A scene uses something the chosen exporter cannot express at all.',
     template: "'{node}' uses {feature}, which {exporter} cannot express: {detail}.",
     spec: 'docs/ir-schema.md',
-    fatal: true,
+    fatal: false,
     fatality:
-      'The exporter leaves out the node it cannot express, and that gap is invisible in the artwork.',
+      'Every producer of this code now leaves the node visible rather than leaving it out ' +
+      '(ADR 0035): a mask that cannot be built is dropped instead of hiding what it was ' +
+      'applied to, and text that cannot be drawn as outlines is drawn as text.',
   },
   W_EXPORT_APPROXIMATED: {
     severity: 'warning',

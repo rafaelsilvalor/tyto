@@ -1,8 +1,8 @@
 import type { Diagnostic, Scene } from '@tyto/core';
-import { parseScene } from '@tyto/core';
+import { GAP_ASSET_URI, parseScene } from '@tyto/core';
 import { describe, expect, it } from 'vitest';
 
-import type { SvgResources } from './defs.js';
+import type { SvgFontFace, SvgResources } from './defs.js';
 import { exportSvg } from './export-svg.js';
 import type { SvgExportOptions } from './svg.js';
 import mappingFixture from './__fixtures__/mapping.json';
@@ -30,10 +30,16 @@ const NATURAL: Readonly<Record<string, { w: number; h: number }>> = {
 };
 
 /** What a composition root that wires no sizes gets: bytes, and nothing about them. */
+const fontUri = (face: SvgFontFace): string =>
+  `data:font/woff2;base64,${face.font.family}-${String(face.weight)}-${face.style}`;
+
 const unmeasured: SvgResources = {
   asset: (ref) => `data:image/jpeg;base64,${ref.hash}`,
-  font: (face) => `data:font/woff2;base64,${face.font.family}-${String(face.weight)}-${face.style}`,
+  font: fontUri,
 };
+
+/** Fonts and nothing else, for the tests about an asset that did not resolve. */
+const fontsOnly: SvgResources = { font: fontUri };
 
 const resources: SvgResources = { ...unmeasured, assetSize: (ref) => NATURAL[ref.id] };
 
@@ -249,13 +255,21 @@ describe('--text-as-paths leaves no text behind', () => {
     expect(feed).toContain('@font-face');
   });
 
-  it('refuses the flag rather than silently leaving text, when nobody can outline it', () => {
-    const problems = problemsOf(sceneOf(mappingFixture), { resources, textAsPaths: true });
+  it('reports the flag it could not honour, and draws the words as text anyway', () => {
+    // `?? ''` was the old answer and it dropped the headline out of the picture, which is
+    // the hole that kept `E_EXPORT_UNSUPPORTED` fatal (ADR 0035). The error still rides
+    // along — the export asked for a document depending on no font and did not get one —
+    // and the reader gets the words, through the faces every other SVG here embeds.
+    const result = exportSvg(sceneOf(mappingFixture), { resources, textAsPaths: true });
 
-    expect(problems.map((item) => item.code)).toContain('E_EXPORT_UNSUPPORTED');
-    expect(problems.find((item) => item.code === 'E_EXPORT_UNSUPPORTED')?.message).toContain(
-      'no outline resolver was supplied',
-    );
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+
+    const unsupported = result.diagnostics.filter((item) => item.code === 'E_EXPORT_UNSUPPORTED');
+    expect(unsupported.length).toBeGreaterThan(0);
+    expect(unsupported[0]?.message).toContain('no outline resolver was supplied');
+    expect(result.value[0]?.svg).toContain('<text');
+    expect(result.value[0]?.svg).toContain('@font-face');
   });
 });
 
@@ -327,9 +341,87 @@ describe('what SVG cannot say, it reports', () => {
     expect(codes).toContain('E_EXPORT_ASSET_UNRESOLVED');
     expect(codes).toContain('E_EXPORT_FONT_UNRESOLVED');
   });
+
+  it('draws the gap mark where an asset nobody resolved would have gone', () => {
+    // The font resolver stays: `E_EXPORT_FONT_UNRESOLVED` is still fatal, and leaving it
+    // out would make this pass for the wrong reason.
+    const result = exportSvg(sceneOf(promoFixture), { resources: fontsOnly });
+
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect(result.diagnostics.map((item) => item.code)).toContain('E_EXPORT_ASSET_UNRESOLVED');
+    expect(result.value.map((frame) => frame.svg).join('')).toContain(GAP_ASSET_URI);
+  });
+
+  it('puts nothing of the mark in an export where every asset resolved', () => {
+    // The control: a healthy scene carrying a failure signal would be worse than one that
+    // never drew it.
+    expect(svgOf(sceneOf(promoFixture)).join('')).not.toContain('ff00aa');
+  });
 });
 
 describe('a mask is a def, drawn in the masked node’s coordinates', () => {
+  it('answers a mask naming a node outside the frame with one that hides nothing', () => {
+    // The invariant only forbids masking by a *descendant*, so a scene may legally name a
+    // node drawn in another frame — and an SVG document is built one frame at a time, so
+    // this one cannot reach it. The `mask` attribute is already written by the time that
+    // is known, so leaving the def out would point it at nothing and let each renderer
+    // decide what to do; a pass-through mask says *this mask does nothing* in a vocabulary
+    // they all read the same way (ADR 0035).
+    const scene = sceneOf({
+      version: 1,
+      fonts: [],
+      assets: [],
+      artworks: [
+        {
+          id: 'here',
+          frames: [
+            {
+              format: 'feed',
+              size: { w: 100, h: 100 },
+              children: [
+                {
+                  kind: 'rect',
+                  id: 'masked',
+                  size: { w: 50, h: 50 },
+                  radius: [0, 0, 0, 0],
+                  fill: { kind: 'solid', color: { r: 0, g: 0, b: 0 } },
+                  mask: { nodeId: 'elsewhere', mode: 'alpha' },
+                },
+              ],
+            },
+          ],
+        },
+        {
+          id: 'there',
+          frames: [
+            {
+              format: 'feed',
+              size: { w: 100, h: 100 },
+              children: [
+                { kind: 'rect', id: 'elsewhere', size: { w: 50, h: 50 }, radius: [0, 0, 0, 0] },
+              ],
+            },
+          ],
+        },
+      ],
+    });
+
+    const result = exportSvg(scene, { resources });
+
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect(result.diagnostics.map((item) => item.code)).toContain('E_EXPORT_UNSUPPORTED');
+
+    const [feed = ''] = result.value.map((frame) => frame.svg);
+    const reference = /mask="url\(#(mask\d+)\)"/u.exec(feed)?.[1];
+    expect(reference).toBeDefined();
+    // The def exists, so the reference resolves, and its one rect is white — opaque under
+    // a luminance mask and fully opaque under an alpha one.
+    expect(feed).toContain(`<mask id="${String(reference)}"`);
+    expect(feed).toContain('fill="#ffffff"');
+  });
+
   it('places a mask that shares its target’s transform at the origin', () => {
     const [feed = ''] = svgOf(sceneOf(mappingFixture));
     const mask = /<mask id="mask\d+"[^>]*>([\s\S]*?)<\/mask>/u.exec(feed)?.[1] ?? '';

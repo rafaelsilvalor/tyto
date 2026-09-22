@@ -1,5 +1,5 @@
 import type { Artwork, Diagnostic, Diagnostics, Frame, Result, Scene } from '@tyto/core';
-import { fromDiagnostics } from '@tyto/core';
+import { fromPartial } from '@tyto/core';
 
 import { type SvgExportOptions, type SvgFrame, renderFrame } from './svg.js';
 
@@ -7,8 +7,10 @@ import { type SvgExportOptions, type SvgFrame, renderFrame } from './svg.js';
  * `Scene` → one SVG document per frame (`docs/architecture.md`).
  *
  * The second of the two exporters, and the one a designer opens. It takes a `Scene` and
- * nothing else — no AST, no brief — and follows ADR 0013 on diagnostics: a warning rides
- * along with the documents, an error replaces them.
+ * nothing else — no AST, no brief — and follows ADR 0025 on diagnostics: what replaces the
+ * documents is a **fatal** diagnostic, while a warning and a non-fatal error ride along
+ * with them. An asset nobody resolved and a mask this exporter cannot build are drawn as
+ * the gap mark and reported (ADR 0035); a font nobody resolved is still fatal.
  *
  * Unlike `export-html`, each document is built on its own: an SVG's ids have to be unique
  * inside it and mean nothing outside it, so there is nothing for a scene-wide index to
@@ -30,7 +32,7 @@ export function exportSvg(
     }
   }
 
-  return fromDiagnostics(frames, problems);
+  return fromPartial(frames, problems);
 }
 
 /** One frame, for a caller that already picked one. */
@@ -41,5 +43,5 @@ export function exportFrameSvg(
   options: SvgExportOptions = {},
 ): Result<string, Diagnostics> {
   const rendered = renderFrame(scene, artwork, frame, options);
-  return fromDiagnostics(rendered.svg, [...rendered.problems]);
+  return fromPartial(rendered.svg, [...rendered.problems]);
 }

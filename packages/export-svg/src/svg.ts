@@ -14,6 +14,7 @@ import type {
 import {
   type SceneVisitor,
   type VisitContext,
+  applyMatrix,
   diagnostic,
   fontFaceKey,
   invertMatrix,
@@ -215,7 +216,6 @@ function inheritedPaint(
  */
 function imageShape(node: ImageNode, sink: Sink): string {
   const href = assetUri(sink, node.id, node.asset);
-  if (href === undefined) return '';
 
   const natural = sink.resources.assetSize?.(node.asset);
   if (natural !== undefined) {
@@ -341,13 +341,48 @@ function record(node: SceneNode, context: VisitContext, frames: Frames, inner: s
 /* ---------------------------------------------------------------------------- masks -- */
 
 /**
+ * A `<mask>` that hides nothing, covering the whole frame in the masked node's own space.
+ *
+ * `maskUnits="userSpaceOnUse"` resolves the content in the space the masked element's own
+ * transform establishes, so the frame's box has to be carried into it — the four corners
+ * through `item.inverse`, which is the same arithmetic `export-html`'s `maskRegion` does
+ * for the same reason. White is opaque under a luminance mask and alpha 1 under an alpha
+ * one, so one rect answers both modes.
+ */
+function passThroughMask(item: Pending, size: Size): string {
+  const corners = [
+    { x: 0, y: 0 },
+    { x: size.w, y: 0 },
+    { x: size.w, y: size.h },
+    { x: 0, y: size.h },
+  ].map((corner) => applyMatrix(item.inverse, corner));
+
+  const xs = corners.map((corner) => corner.x);
+  const ys = corners.map((corner) => corner.y);
+  const x = Math.min(...xs);
+  const y = Math.min(...ys);
+
+  return element(
+    'mask',
+    [attribute('id', item.maskId), attribute('maskUnits', 'userSpaceOnUse')],
+    element('rect', [
+      attribute('x', svgNumber(x)),
+      attribute('y', svgNumber(y)),
+      attribute('width', svgNumber(Math.max(...xs) - x)),
+      attribute('height', svgNumber(Math.max(...ys) - y)),
+      attribute('fill', '#ffffff'),
+    ]),
+  );
+}
+
+/**
  * The `<mask>` elements, built once the walk has seen every node it could name.
  *
  * `inverse(masked) × mask` puts the mask node in the masked node's own coordinates, which
  * is the space SVG resolves a mask in — the element's `transform` establishes it, and
  * clip, mask and filter are read there.
  */
-function resolveMasks(frames: Frames): void {
+function resolveMasks(frames: Frames, size: Size): void {
   for (const item of frames.pending) {
     const target = frames.recorded.get(item.targetId);
     if (target === undefined) {
@@ -357,6 +392,14 @@ function resolveMasks(frames: Frames): void {
         'a mask naming a node outside this frame',
         `no node with the id '${item.targetId}' is drawn in this frame; a mask names a node in the same frame (docs/template-authoring.md)`,
       );
+      // The reference is already written into the element's `mask` attribute — it was
+      // emitted during the walk, before this could be known — so leaving the `<mask>` out
+      // points it at nothing, and what a renderer does with a dangling reference is the
+      // renderer's business. A pass-through mask says *this mask does nothing* in the one
+      // vocabulary every renderer reads the same way, which is what `export-html` already
+      // does by dropping the declaration (ADR 0035). The node stays visible; the error
+      // still fails the build.
+      frames.sink.defs.push(passThroughMask(item, size));
       continue;
     }
 
@@ -489,7 +532,7 @@ export function renderFrame(
   };
 
   const children = walkFrame(scene, artwork, frame, visitor).join('');
-  resolveMasks(frames);
+  resolveMasks(frames, frame.size);
   // Before the defs are read, not after: a frame background can be a gradient or an image,
   // and both declare an entry. The first draft built `<defs>` first and left the
   // background pointing at a `url(#…)` no element defined, which renders as nothing.

@@ -5,6 +5,7 @@ import { compile } from './compile.js';
 import { type ResolvedBrief, resolve } from './resolve.js';
 import { formatCatalogue } from '../config/formats.js';
 import type { AssetResolver } from '../ports/asset-resolver.js';
+import { GAP_COLOR } from '../scene/gap.js';
 import type { AssetRef } from '../scene/primitives.js';
 import type { Frame, Scene } from '../scene/scene.js';
 import { sourceRange } from '../source/range.js';
@@ -108,15 +109,26 @@ const promoCurso: Template = defineTemplate(MANIFEST, (context) => {
               }),
             ],
           }),
-          text({
-            box: { w: 920 },
-            lineHeight: 1.05,
-            runs: runsOf(
-              titulo?.kind === 'rich-text' ? titulo.text : [],
-              { font: inter, size: 96, color: '#ffffff' },
-              { mark: (key, value) => (key === 'cor' ? { color: PALETTE[value] ?? '#fff' } : {}) },
-            ) as [ReturnType<typeof run>, ...ReturnType<typeof run>[]],
-          }),
+          // Guarded, the way `agenda-semana` guards its own cover. A required slot the
+          // brief left unset reaches a template as an absent slot, and a `text` node with
+          // no runs is `E_SCENE_EMPTY_TEXT` — which is fatal, and would replace the gap
+          // stamp with a scene that does not parse (ADR 0035).
+          ...(titulo?.kind === 'rich-text'
+            ? [
+                text({
+                  box: { w: 920 },
+                  lineHeight: 1.05,
+                  runs: runsOf(
+                    titulo.text,
+                    { font: inter, size: 96, color: '#ffffff' },
+                    {
+                      mark: (key, value) =>
+                        key === 'cor' ? { color: PALETTE[value] ?? '#fff' } : {},
+                    },
+                  ) as [ReturnType<typeof run>, ...ReturnType<typeof run>[]],
+                }),
+              ]
+            : []),
           text({
             box: { w: 920 },
             runs: runsOf(slide?.kind === 'rich-text' ? slide.text : [], {
@@ -434,5 +446,67 @@ describe('the frame size comes from the project, not from the template', () => {
       expect(result.error.map((item) => item.code)).toEqual(['E_FORMAT_NOT_DEFINED']);
       expect(result.error[0]?.message).toContain("format 'story'");
     }
+  });
+});
+
+describe('a brief that left a required slot unset is drawn, and stamped', () => {
+  const WITHOUT_TITLE: BriefAst = {
+    ...BRIEF,
+    directives: BRIEF.directives.filter((item) => item.name !== 'titulo'),
+  };
+
+  async function partial(): Promise<ReturnType<typeof compile>> {
+    const result = await resolve(WITHOUT_TITLE, { registry, assets });
+    if (!result.ok) throw new Error(result.error.map((item) => item.message).join('; '));
+    expect(result.diagnostics.map((item) => item.code)).toContain('E_MISSING_REQUIRED_SLOT');
+    return compile(result.value, promoCurso, { formats: FORMATS });
+  }
+
+  it('compiles rather than refusing, which is what ADR 0035 bought', async () => {
+    const scene = await partial();
+
+    expect(scene.ok).toBe(true);
+    if (!scene.ok) return;
+    expect(scene.value.artworks).toHaveLength(3);
+  });
+
+  it('puts the stamp on every frame, under an id derived from the frame it marks', async () => {
+    const scene = await partial();
+    if (!scene.ok) throw new Error('expected a scene');
+
+    const frames = framesOf(scene.value);
+    expect(frames).toHaveLength(6);
+    for (const item of frames) {
+      const stamp = item.children.at(-1);
+      expect(stamp?.id).toMatch(/\.gap$/u);
+      expect(stamp?.kind).toBe('rect');
+      // Last, so it sits over everything the template drew; sized to the frame, so it
+      // reads as a band around the whole artwork rather than as part of it.
+      if (stamp?.kind !== 'rect') continue;
+      expect(stamp.size).toEqual(item.size);
+      expect(stamp.stroke?.paint).toEqual({ kind: 'solid', color: GAP_COLOR });
+      expect(stamp.stroke?.align).toBe('inside');
+      expect(stamp.fill).toBeUndefined();
+    }
+  });
+
+  it('leaves a whole brief unstamped, which is the control', async () => {
+    const scene = await compiled();
+
+    expect(framesOf(scene).flatMap((item) => item.children.map((node) => node.id))).not.toContain(
+      'slide-1.feed.gap',
+    );
+  });
+
+  it('contributes no font and no asset, so the stamp cannot fail an export', async () => {
+    // A `Text` marker would need a face declared in the scene and resolved to bytes, and
+    // `E_EXPORT_FONT_UNRESOLVED` is still fatal — a marker that can disappear in exactly
+    // the runs it exists for is no marker. Geometry is why this list is unchanged.
+    const whole = await compiled();
+    const partialScene = await partial();
+    if (!partialScene.ok) throw new Error('expected a scene');
+
+    expect(partialScene.value.fonts).toEqual(whole.fonts);
+    expect(partialScene.value.assets).toEqual(whole.assets);
   });
 });

@@ -270,9 +270,18 @@ export interface TextOptions {
   readonly textAsPaths: boolean;
 }
 
-/** What a `<text>` node draws, as `<text>` or as paths. Empty when it cannot be drawn. */
+/**
+ * What a `<text>` node draws, as `<text>` or as paths.
+ *
+ * **Outlines that cannot be had fall back to `<text>` rather than to nothing** (ADR 0035).
+ * `?? ''` was the old answer and it dropped the words out of the picture, which is exactly
+ * the hole that kept `E_EXPORT_UNSUPPORTED` fatal. The error is still reported — an export
+ * asked for a document that depends on no font and did not get one — and the reader gets
+ * the text, drawn through the same embedded faces every other SVG this exporter writes
+ * uses. Something wrong on the page beats a page that is quietly missing a headline.
+ */
 export function textMarkup(node: TextNode, sink: Sink, options: TextOptions): string {
   const lines = linesOf(node);
-  if (options.textAsPaths) return pathElement(node, lines, sink) ?? '';
+  if (options.textAsPaths) return pathElement(node, lines, sink) ?? textElement(node, lines, sink);
   return textElement(node, lines, sink);
 }

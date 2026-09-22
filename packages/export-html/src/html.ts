@@ -20,6 +20,7 @@ import type {
   VisitContext,
 } from '@tyto/core';
 import {
+  GAP_ASSET_URI,
   type SceneVisitor,
   applyMatrix,
   diagnostic,
@@ -115,11 +116,19 @@ function approximated(emit: Emit, node: string, feature: string, detail: string)
   );
 }
 
-function assetUri(emit: Emit, node: string, ref: AssetRef): string | undefined {
+/**
+ * The bytes for an asset, or the mark that says there were none (ADR 0035).
+ *
+ * Every caller of this wants a URI — an `<img src>`, a CSS `background-image`, an SVG
+ * `<image href>` — so answering with `GAP_ASSET_URI` rather than with nothing puts the gap
+ * in all three without a call site learning anything new. It stays an error: the export
+ * fails the build, it just does not fail silently and invisibly.
+ */
+function assetUri(emit: Emit, node: string, ref: AssetRef): string {
   const uri = emit.resources.asset?.(ref);
   if (uri === undefined) {
     emit.problems.push(diagnostic('E_EXPORT_ASSET_UNRESOLVED', { asset: ref.id, node }));
-    return undefined;
+    return GAP_ASSET_URI;
   }
   return uri;
 }
@@ -159,7 +168,6 @@ function backgroundDeclarations(paint: Paint, emit: Emit, node: string): readonl
   }
 
   const uri = assetUri(emit, node, paint.asset);
-  if (uri === undefined) return [];
   return [
     `background-image: url("${uri}")`,
     `background-size: ${cssBackgroundSize(paint.fit)}`,
@@ -543,7 +551,6 @@ function imageHtml(node: ImageNode, context: VisitContext, emit: Emit): string {
     `object-position: ${cssObjectPosition(node.position)}`,
   ]);
 
-  if (uri === undefined) return `<div${attributesFor(node)}></div>`;
   return `<img${attributesFor(node)} src="${escapeHtml(uri)}" alt="">`;
 }
 

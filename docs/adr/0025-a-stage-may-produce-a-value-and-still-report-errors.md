@@ -137,6 +137,14 @@ as something, and what that something is — a placeholder node in the IR, a mar
 adds — is an open question this ADR does not answer. Until it has an answer,
 `E_MISSING_REQUIRED_SLOT` stays fatal, whatever the table above says.
 
+> **Answered by ADR 0035** (TYTO-116), which is both: a `Rect` stamp `compile` puts on the
+> frame, and a crossed box the exporters draw in the box of a node they could not fill. The
+> three codes held fatal by this paragraph — `E_MISSING_REQUIRED_SLOT`,
+> `E_EXPORT_ASSET_UNRESOLVED` and `E_EXPORT_UNSUPPORTED` — are non-fatal from that card on.
+> It also found that flipping the field would not have been enough on its own: the two
+> exporters still weighed diagnostics with `fromDiagnostics`, which reads severity, so they
+> now call `fromPartial` like every stage this ADR converted.
+
 **Twelve early returns become decisions.** Each of the five in the desktop preview and seven in
 the pipeline job currently reads "if this failed, stop". Each has to become "if this failed
 _fatally_, stop", and a caller that forgets is a stage answering partially into a consumer that

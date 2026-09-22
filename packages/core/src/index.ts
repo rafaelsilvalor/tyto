@@ -268,3 +268,12 @@ export {
   fontFaceKey,
   sceneResources,
 } from './scene/resources.js';
+
+export {
+  GAP_ASSET_URI,
+  GAP_COLOR,
+  GAP_COLOR_CSS,
+  GAP_MARK_SVG,
+  gapStampNode,
+  gapStampWidth,
+} from './scene/gap.js';

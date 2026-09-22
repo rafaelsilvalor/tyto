@@ -2,6 +2,7 @@ import { readFileSync } from 'node:fs';
 import { createRequire } from 'node:module';
 import { dirname, join } from 'node:path';
 
+import { GAP_COLOR_CSS } from '@tyto/core';
 import { nodeFileSystem } from '@tyto/io';
 import { beforeAll, describe, expect, it } from 'vitest';
 
@@ -141,11 +142,11 @@ describe('the preview service', () => {
     expect(result.diagnostics.map((item) => item.code)).toContain('E_UNKNOWN_TEMPLATE');
   });
 
-  it('draws nothing when a required slot is missing, rather than a hole that looks finished', async () => {
+  it('draws the artwork with a required slot missing, and stamps it as incomplete', async () => {
     // `titulo` is `required: true`, and the danger the card named is art that looks
-    // finished with a slot silently empty. Until the gap is drawn in the artwork itself,
-    // `E_MISSING_REQUIRED_SLOT` stays fatal — the one entry in the fatal list that is a
-    // deadline rather than a principle (ADR 0025).
+    // finished with a slot silently empty. ADR 0035 answers it by drawing the gap instead
+    // of refusing: the frames come back, every one of them carries the stamp, and the
+    // error rides along so `tyto render` on the same brief still exits non-zero.
     const withoutTitle = exampleBrief('promo-curso', 'promo.brief').replace(
       /::titulo[\s\S]*?\n\n/u,
       '',
@@ -153,8 +154,18 @@ describe('the preview service', () => {
 
     const result = await preview.preview(withoutTitle);
 
-    expect(result.frames).toEqual([]);
-    expect(result.diagnostics.map((item) => item.code)).toContain('E_MISSING_REQUIRED_SLOT');
+    expect(result.frames.length).toBeGreaterThan(0);
+    const missing = result.diagnostics.find((item) => item.code === 'E_MISSING_REQUIRED_SLOT');
+    expect(missing?.severity).toBe('error');
+    // In the document the window shows, not only in the problems panel — which is the
+    // pane most likely to be closed.
+    for (const frame of result.frames) expect(frame.html).toContain(GAP_COLOR_CSS);
+  });
+
+  it('stamps nothing on a whole brief, which is the control', async () => {
+    const result = await preview.preview(exampleBrief('promo-curso', 'promo.brief'));
+
+    for (const frame of result.frames) expect(frame.html).not.toContain(GAP_COLOR_CSS);
   });
 
   it('draws nothing when the frontmatter itself will not parse', async () => {
