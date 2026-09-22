@@ -51,6 +51,7 @@ non-zero.
 | `E_MANIFEST_SYNTAX` | error | yes | A template manifest is not valid YAML. |
 | `E_MANIFEST_SHAPE` | error | yes | A template manifest parses as YAML but does not match the manifest schema. |
 | `E_TEMPLATE_DUPLICATE` | error | yes | Two template folders declare the same manifest name. |
+| `E_TEMPLATE_AMBIGUOUS` | error | yes | A template name has both bundled code and a markup file, and nothing decides which is drawn. |
 | `E_TEMPLATE_READ` | error | yes | A template folder, manifest or markup file could not be read from the filesystem. |
 | `E_INPUT_READ` | error | yes | A file or folder a command was pointed at could not be read. |
 | `E_EXPORT_ASSET_UNRESOLVED` | error | yes | An exporter was given no bytes for an asset the scene draws. |
@@ -112,6 +113,7 @@ visible" is the rule ADR 0025 set for them. They move when something draws the g
 | `E_MANIFEST_SYNTAX` | yes | The registry answers with no manifest at all, and a manifest is what every slot is checked against. |
 | `E_MANIFEST_SHAPE` | yes | The registry answers with no manifest at all, and a manifest is what every slot is checked against. |
 | `E_TEMPLATE_DUPLICATE` | yes | The registry answers with no manifest at all, and a manifest is what every slot is checked against. |
+| `E_TEMPLATE_AMBIGUOUS` | yes | There is no template to build with, and a template is what every artwork is drawn through. |
 | `E_TEMPLATE_READ` | yes | The registry answers with no manifest at all, and a manifest is what every slot is checked against. |
 | `E_INPUT_READ` | yes | There is no brief to render. |
 | `E_EXPORT_ASSET_UNRESOLVED` | yes | The bytes were never loaded, which is a wiring failure rather than something the brief said — and drawing around it leaves a hole nothing in the artwork names. |
@@ -611,6 +613,20 @@ Template name '{name}' is declared by both '{first}' and '{second}'.
 ```
 
 Parameters: `name`, `first`, `second`
+
+### `E_TEMPLATE_AMBIGUOUS`
+
+**Severity:** error · **Fatal:** yes · **Spec:** `docs/template-authoring.md`
+
+A template name has both bundled code and a markup file, and nothing decides which is drawn.
+
+There is no template to build with, and a template is what every artwork is drawn through.
+
+```
+Template '{name}' ships code and also has '{file}' in '{directory}'; keep one of the two.
+```
+
+Parameters: `name`, `file`, `directory`
 
 ### `E_TEMPLATE_READ`
 

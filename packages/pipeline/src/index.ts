@@ -37,3 +37,9 @@ export {
   markupTemplateSource,
   renderedSlotsOf,
 } from './template-source.js';
+
+export {
+  type BundledTemplateSourceOptions,
+  type BundledTemplates,
+  bundledTemplateSource,
+} from './bundled-template-source.js';

@@ -1,3 +1,5 @@
+import type { TemplateBuild } from '@tyto/core';
+
 /**
  * @tyto/templates — the built-in template pack.
  *
@@ -37,3 +39,19 @@ export const BUILT_IN_TEMPLATES_DIRECTORY = 'templates';
 
 /** The names this pack ships, for a caller that wants them without reading a disk. */
 export const BUILT_IN_TEMPLATE_NAMES: readonly string[] = ['carrossel-lista', 'promo-curso'];
+
+/**
+ * The build functions this pack ships, by the manifest name each one draws.
+ *
+ * ADR 0005's other route. A template here is **code compiled into the application**, not a
+ * file discovered in a folder: the manifest still lives in `templates/<name>/manifest.yaml`
+ * and is read without executing anything, and only whoever renders pairs the two. Nothing
+ * imports a path — running code that arrived in a folder is the plugin host's job, with
+ * its permissions and its isolation (ADR 0007).
+ *
+ * Empty on purpose, for now. The wiring that serves this map exists and is tested
+ * (`bundledTemplateSource`), and the first template to fill it is the Agenda carousel
+ * (TYTO-167). A pack that shipped a code template before anybody had written one would be
+ * the mistake ADR 0022 recorded about itself.
+ */
+export const BUILT_IN_TEMPLATE_BUILDS: Readonly<Record<string, TemplateBuild>> = {};
