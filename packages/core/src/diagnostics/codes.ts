@@ -349,6 +349,22 @@ export const diagnosticCodes = {
     fatality:
       'The registry answers with no manifest at all, and a manifest is what every slot is checked against.',
   },
+  // A name with two bodies rather than two folders, which is why it is not
+  // `E_TEMPLATE_DUPLICATE`: the registry sees one manifest and is right to. Only whoever
+  // loads the build knows there are two ways to produce it, so this is the earliest
+  // anybody could report it — and reporting beats picking, because a silent winner is a
+  // template that changes behaviour when somebody edits the file it was ignoring.
+  E_TEMPLATE_AMBIGUOUS: {
+    severity: 'error',
+    summary:
+      'A template name has both bundled code and a markup file, and nothing decides which is drawn.',
+    template:
+      "Template '{name}' ships code and also has '{file}' in '{directory}'; keep one of the two.",
+    spec: 'docs/template-authoring.md',
+    fatal: true,
+    fatality:
+      'There is no template to build with, and a template is what every artwork is drawn through.',
+  },
   // Says template, and now only means template: a folder, a manifest.yaml or a
   // template.html. What the path points at is in the message, so a reader does not have to
   // recognise a filename to know which of the three it was.

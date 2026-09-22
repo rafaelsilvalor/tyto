@@ -547,6 +547,32 @@ scene would otherwise render the story layout under the feed's name.
 **Frame size comes from `context.size`**, which `compile` reads from `formats.yaml`. A
 template that hardcodes one is writing down a number the project already knows.
 
+### How a code template reaches a render
+
+**Nothing loads it from a folder, and that is deliberate.** Dropping a `template.ts` beside a
+`manifest.yaml` makes it inert: the registry reads manifests and executes nothing, and
+`markupTemplateSource` refuses to import code because running code that arrived in a folder
+is the plugin host's job, with its permissions and its isolation (ADR 0007).
+
+What runs is code **compiled into the application**. `BUILT_IN_TEMPLATE_BUILDS` in
+`@tyto/templates` maps a manifest name to its build function, and `bundledTemplateSource`
+pairs each with the manifest the registry already parsed. The CLI and the desktop compose it
+in front of the markup route, so a name the build does not ship reaches markup unchanged.
+
+A name that is **both** — shipped code and a `template.html` in its folder — is
+`E_TEMPLATE_AMBIGUOUS` rather than a winner picked quietly. A silent winner is a template
+that changes behaviour the day somebody edits the file it was ignoring.
+
+### `W_UNUSED_SLOT` does not fire for a code template
+
+A brief that fills a slot the template never draws is worth a warning, and on the markup
+route it gets one: `compileTemplate` derives `renderedSlots` by reading the body.
+
+**A function has no body to read**, so a code template carries no `renderedSlots`, and
+`resolve` is told nothing rather than told "none". The warning therefore never fires on this
+route. Read the silence as _nobody checked_, not as _every slot is drawn_ — it is the same
+distinction `renderedSlotsOf` makes by answering `undefined` instead of `[]`.
+
 ### The SDK
 
 ```ts

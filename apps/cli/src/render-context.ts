@@ -12,8 +12,15 @@ import {
   ok,
 } from '@tyto/core';
 import { type ExportResources, fileTemplateAssets, nodeFileSystem } from '@tyto/io';
+import { BUILT_IN_TEMPLATE_BUILDS } from '@tyto/templates';
 import { createPluginHost } from '@tyto/plugin-api';
-import { TEMPLATE_FILE, type TemplateSource, markupTemplateSource } from '@tyto/pipeline';
+import {
+  TEMPLATE_FILE,
+  type BundledTemplates,
+  type TemplateSource,
+  bundledTemplateSource,
+  markupTemplateSource,
+} from '@tyto/pipeline';
 
 import {
   builtInTemplatesDirectory,
@@ -161,7 +168,10 @@ export interface TemplateWiring {
  * template's assets means reading a folder eagerly and deciding what counts as one —
  * which is a composition root's call and not a stage's.
  */
-export function templateWiring(context: RenderContext): TemplateWiring {
+export function templateWiring(
+  context: RenderContext,
+  bundled: BundledTemplates = BUILT_IN_TEMPLATE_BUILDS,
+): TemplateWiring {
   const loaded: ExportResources[] = [];
 
   const asset = (ref: AssetRef): string | undefined => {
@@ -172,7 +182,7 @@ export function templateWiring(context: RenderContext): TemplateWiring {
     return undefined;
   };
 
-  const source: TemplateSource = {
+  const markup: TemplateSource = {
     async load(name) {
       const directory = context.registry.directoryOf(name);
       if (directory === undefined) {
@@ -201,6 +211,15 @@ export function templateWiring(context: RenderContext): TemplateWiring {
       return result;
     },
   };
+
+  // Bundled in front of markup, delegating rather than deciding: a name this build does
+  // not ship reaches the markup route with its wording and its asset resolution intact.
+  const source = bundledTemplateSource({
+    registry: context.registry,
+    fileSystem: context.fileSystem,
+    bundled,
+    markup,
+  });
 
   return { source, resources: { html: { asset }, svg: { asset } } };
 }
