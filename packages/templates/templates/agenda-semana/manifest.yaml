@@ -1,0 +1,17 @@
+name: agenda-semana
+version: 1.0.0
+description: The week's agenda as a carousel — a cover on the first slide, one discipline per slide.
+formats: [feed, story]
+slots:
+  # The cover words, drawn on the first slide only. The template decides that, not the
+  # brief: `context.artwork.index === 0` is what a markup body has no guard for.
+  titulo: { type: rich-text, required: true, max: 40 }
+  # The calendar illustration. Many shapes and many colours, so it enters as an image
+  # rather than as geometry (docs/template-conventions.md, "Geometry in, colour out").
+  # Optional: it does not change from week to week, and a cover with words and no picture
+  # is still a cover.
+  ilustracao: { type: image }
+  # The one slot that may repeat, and therefore the one that decides how many slides there
+  # are. Its first line is the discipline; every line after it is a session written as
+  # `date | title | professor`. `max` counts occurrences here, not characters.
+  disciplina: { type: rich-text, repeat: true, min: 1, max: 12 }

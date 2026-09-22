@@ -19,7 +19,8 @@ import {
 } from '@tyto/core';
 import { bundledFontOutlinePath, bundledFontSource, bundledFontsDirectory } from '@tyto/fonts';
 import { fileAssetResolver, fileTemplateAssets, nodeFileSystem } from '@tyto/io';
-import { markupTemplateSource } from '@tyto/pipeline';
+import { bundledTemplateSource, markupTemplateSource } from '@tyto/pipeline';
+import { BUILT_IN_TEMPLATE_BUILDS } from '@tyto/templates';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 
 /**
@@ -57,7 +58,20 @@ interface Example {
 const EXAMPLES: readonly Example[] = [
   { template: 'promo-curso', brief: 'examples/promo.brief' },
   { template: 'carrossel-lista', brief: 'examples/lista.brief' },
+  { template: 'agenda-semana', brief: 'examples/agenda.brief' },
 ];
+
+/**
+ * The templates `tyto template check` can be run against.
+ *
+ * `agenda-semana` is not among them, and the omission is the finding rather than an
+ * oversight: `check` reads `manifest.yaml` and `template.html`, and a folder whose body is
+ * a `template.ts` has no second file for it to read — so it reports `E_TEMPLATE_READ` for
+ * a template that renders correctly. `apps/cli/src/template.ts` says why it only checks
+ * markup (running code from a folder is the plugin host's job, ADR 0007), which explains
+ * the behaviour without making it useful. TYTO-170 is the gap.
+ */
+const CHECKABLE: readonly string[] = ['promo-curso', 'carrossel-lista'];
 
 let formats: Awaited<ReturnType<typeof loadFormats>>;
 
@@ -114,8 +128,16 @@ async function buildSource(
   });
   if (!resolved.ok) throw new Error(resolved.error.map((item) => item.message).join('; '));
 
-  const templates = markupTemplateSource(fileSystem, registry.value, {
-    assets: (await fileTemplateAssets({ base: directory })).assets,
+  // Bundled in front of markup, the way `apps/cli` composes them: a code template is
+  // served from the build's own module graph and every other name falls through to the
+  // folder, with one wording for a name nobody declared.
+  const templates = bundledTemplateSource({
+    registry: registry.value,
+    fileSystem,
+    bundled: BUILT_IN_TEMPLATE_BUILDS,
+    markup: markupTemplateSource(fileSystem, registry.value, {
+      assets: (await fileTemplateAssets({ base: directory })).assets,
+    }),
   });
   const template = await templates.load(templateName);
   if (!template.ok) throw new Error(template.error.map((item) => item.message).join('; '));
@@ -244,13 +266,64 @@ describe('a mark the template never declared', () => {
   }, 60_000);
 });
 
+/**
+ * The wall TYTO-167 exists to hit, measured rather than described.
+ *
+ * `agenda-semana` draws a session title into a pill whose height is fixed, because a
+ * template cannot measure text: `build` decides every coordinate before `layoutText` runs.
+ * The template's answer is to state the text box's height as well, so that a title too long
+ * for the pill is a `W_TEXT_OVERFLOW` naming the directive the author wrote — rather than a
+ * silent wrap out of the pill and onto the paper.
+ *
+ * Two briefs with the same shape and different title lengths is what says that. A single
+ * brief could only show a number.
+ */
+describe('the pill that cannot grow (TYTO-162)', () => {
+  const AGENDA = join(PACK, 'agenda-semana');
+
+  const briefWith = (titulo: string) =>
+    `---
+template: agenda-semana
+formats: [feed]
+---
+` +
+    `::titulo
+  Agenda da semana
+
+` +
+    `::disciplina
+  Clínica Médica
+  22/09 | ${titulo} | Dra. Helena Prado
+`;
+
+  const overflowIn = async (titulo: string) => {
+    const { warnings } = await buildSource(briefWith(titulo), 'agenda-semana', AGENDA);
+    return warnings.filter((item) => item.code === 'W_TEXT_OVERFLOW');
+  };
+
+  it('says nothing about a title that fits', async () => {
+    expect((await overflowIn('Insuficiência cardíaca')).map((item) => item.message)).toEqual([]);
+  }, 60_000);
+
+  it('warns about a title that does not, and names the directive that wrote it', async () => {
+    const warnings = await overflowIn(
+      'Insuficiência cardíaca descompensada com congestão pulmonar e indicação de suporte ventilatório',
+    );
+
+    expect(warnings).not.toEqual([]);
+    // The slot, not the node id: the author's answer is what has to change, and the only
+    // fix available until TYTO-162 lands is writing a shorter one.
+    expect(warnings.map((item) => item.message).join(' ')).toContain('disciplina');
+  }, 60_000);
+});
+
 describe('tyto template check', () => {
   /**
    * The card's second criterion, run the way it is written: the binary, not the function
    * behind it. `check` reads the manifest and the markup and nothing else — no brief, no
    * formats.yaml — so it is the one thing that can say a template is wrong on its own.
    */
-  it.each(EXAMPLES.map((example) => example.template))(
+  it.each(CHECKABLE)(
     '%s: no problems found',
     async (name) => {
       const { stderr } = await runBinary(process.execPath, [
@@ -278,7 +351,7 @@ describe('the pack as a whole', () => {
         .list()
         .map((entry) => entry.name)
         .sort(),
-    ).toEqual(['carrossel-lista', 'promo-curso']);
+    ).toEqual(['agenda-semana', 'carrossel-lista', 'promo-curso']);
     // A manifest that does not parse becomes a failure rather than an exception, so an
     // empty list and a broken pack look alike unless this is checked.
     expect(registry.value.failures).toEqual([]);

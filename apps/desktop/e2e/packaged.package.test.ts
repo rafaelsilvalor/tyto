@@ -134,7 +134,7 @@ describe('the packaged app', () => {
       ).tyto['app:info']({}),
     );
 
-    expect(info.templates).toEqual(['carrossel-lista', 'promo-curso']);
+    expect(info.templates).toEqual(['agenda-semana', 'carrossel-lista', 'promo-curso']);
   });
 
   it('reports its own version, which is the one the tag has to name', async () => {

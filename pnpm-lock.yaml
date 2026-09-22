@@ -422,6 +422,9 @@ importers:
       '@tyto/core':
         specifier: workspace:*
         version: link:../core
+      '@tyto/template-kit':
+        specifier: workspace:*
+        version: link:../template-kit
 
   tools/contract-test:
     dependencies:
@@ -440,6 +443,9 @@ importers:
       '@tyto/pipeline':
         specifier: workspace:*
         version: link:../../packages/pipeline
+      '@tyto/templates':
+        specifier: workspace:*
+        version: link:../../packages/templates
     devDependencies:
       '@tyto/fonts':
         specifier: workspace:*

@@ -170,7 +170,7 @@ describe('the bridge', () => {
       // The composition root's pack, read off the plugin host and reported through the
       // bridge — which is the end-to-end form of "registers built-in plugins through the
       // PluginHost". An empty list here would mean the extension point wired nothing.
-      templates: ['carrossel-lista', 'promo-curso'],
+      templates: ['agenda-semana', 'carrossel-lista', 'promo-curso'],
     });
 
     // **Reading the manifest keeps the comparison true and drops the claim**, so the claim is

@@ -192,6 +192,7 @@ describe('tyto render', () => {
     expect(parsed.value.tyto.version).toBe(TYTO_VERSION);
     expect(parsed.value.tyto.templates).toContainEqual({ name: 'cartaz', version: '2.1.0' });
     expect(parsed.value.tyto.templates.map((entry) => entry.name).sort()).toEqual([
+      'agenda-semana',
       'carrossel-lista',
       'cartaz',
       'promo-curso',
