@@ -22,6 +22,14 @@ agenda-semana/
 Same folder as the markup route, with `template.ts` where `template.html` would be. A
 folder holds one or the other, never both.
 
+**A template that ships _with the application_ keeps that folder and adds one import.** Nothing
+resolves a path at runtime — running code that arrived in a folder is the plugin host's job
+(ADR 0007) — so the pack's `src/index.ts` imports the `build` and puts it in
+`BUILT_IN_TEMPLATE_BUILDS`, which is what makes it bundled. The manifest still comes off the
+disk, and the two meet in `bundledTemplateSource`. The consequence to remember is dull and
+bites once: the package's `tsconfig.json` has to _include_ the template folder, or the code is
+built by the bundler and typechecked by nobody.
+
 ## The manifest stays YAML, and the module never imports it
 
 **This is a constraint, not a taste.** The registry's whole job is answering "what templates
@@ -117,6 +125,17 @@ today.
 Lifting only the geometry has a second payoff: the same owl is white on a dark frame and
 blue on a light one without a second file.
 
+**A path vector's `size` is its viewport, not the size it is drawn at.** `export-html` emits
+`<svg width="size.w" height="size.h" viewBox="0 0 size.w size.h">` around the `d`, so anything
+outside that box is clipped, and `export-svg` writes the `d` straight into the node's own
+transform. So `size` is the box the `d` was **drawn in**, and a mark appears at a chosen size
+through `transform: { scaleX, scaleY }`, which composes as translate-then-scale about an anchor
+of `(0, 0)` and therefore leaves the coordinate a caller placed it at alone.
+
+Getting this backwards — passing the drawn size — clips the geometry to a fraction of itself,
+in both exporters, with **no diagnostic anywhere**. It is caught by looking at a render, so
+look at one.
+
 ## What a template may not do
 
 - **No Node, no DOM.** A template runs wherever the compiler runs (ADR 0010). It cannot
@@ -134,8 +153,22 @@ blue on a light one without a second file.
 A box still cannot grow with the text inside it. A template cannot measure text — the font
 cache is not in its context, and measurement happens after `build` has returned — so every
 height a `Block` states is a height somebody chose. TYTO-162 is that gap; until it closes,
-a long title is handled by choosing a size that fits the longest one you accept, and the
-manifest's `max` is what keeps a brief inside it.
+a long title is handled by choosing a size that fits the longest one you accept.
+
+**`max` is not always the guard it looks like.** On a non-repeatable `rich-text` slot it caps
+characters, and that does keep a brief inside a box somebody sized. On a **repeatable** slot it
+counts occurrences instead (`packages/core/src/template/manifest.ts`), so a manifest can cap how
+many slides a carousel has and cannot cap how long one line inside a slide is. A template whose
+varying text arrives through the repeatable slot therefore has no manifest-level guard at all.
+
+What it has instead is a choice about `box.h`, and the choice matters:
+
+| `box`        | a title too long for its box                                                 |
+| ------------ | ---------------------------------------------------------------------------- |
+| `{ w }` only | wraps out of the shape around it, silently — "as large as the content needs" |
+| `{ w, h }`   | `W_TEXT_OVERFLOW`, naming the directive the author wrote and the format      |
+
+**State the height.** The wall is the same either way; only one of the two says so.
 
 ## How the second template reuses the first
 
@@ -146,3 +179,39 @@ when it wants a different look from the same part, the part takes a parameter.
 Move a part into a shared module when the **second** template needs it, not in advance.
 ADR 0022 shipped a reuse mechanism ahead of its evidence and measured zero consumers five
 days later; the lesson was written down there and applies here unchanged.
+
+## What the first template taught
+
+`agenda-semana` (TYTO-167) is the first production template written this way — deliberately a
+hard case: 27 drawable nodes in a slide against an 8-tag high-water mark in the markup pack, and
+20 of the 27 are four copies of one five-node row. What follows is what it cost, so the second
+template does not pay it again.
+
+**The three layers held, and the payoff was bigger than stacking.** `template.ts` is composition
+and nothing else; every number is in `tokens.ts` and every shape in `parts.ts`. The unexpected
+win is that a `Block` carrying its own height lets a template _place itself_: the body is
+centred in the room between the header and the footer, computed from the stack's measured
+height, so a slide with one session and a slide with four are both balanced. The markup route
+cannot do that at all — a group there has no size to read back.
+
+**Repetition inside one slide costs the brief a separator.** A manifest may declare one
+repeatable slot and its occurrences become artworks, so a carousel that repeats _slides_ has
+nothing left to repeat _rows_ with. The template reads them out of the occurrence's own lines
+instead — first line the heading, each line after it `a | b | c`. It works, it needs no card,
+and it asks the brief's author to learn a convention the language does not enforce. TYTO-163 is
+the version where nobody learns one.
+
+**Split a rich-text line at top level only.** A separator inside `**bold**` or a mark is the
+author doing something else, and cutting there silently reflows their words into a different
+column. Nested inlines are atomic and join whichever field is open.
+
+**A field the brief left empty must produce no node, not an empty one.** `text()` takes
+`NonEmpty<TextRun>` because an empty text node is `E_SCENE_EMPTY_TEXT`. Give the part a helper
+that turns "no runs" into "no node" while keeping the block's stated size, so a missing
+professor leaves the row exactly as tall as its neighbours.
+
+**What should change before the second template.** Nothing moves into a shared module yet —
+that is this document's own rule and the evidence is not in. Two things are worth fixing first:
+`tyto template check` reads `manifest.yaml` and `template.html`, so it reports a read failure
+for a folder whose body is a `template.ts` (TYTO-170), and the wrong-`size` clip above deserves
+a diagnostic rather than a paragraph.

@@ -14,7 +14,8 @@
     "@tyto/cli": "workspace:*",
     "@tyto/core": "workspace:*",
     "@tyto/io": "workspace:*",
-    "@tyto/pipeline": "workspace:*"
+    "@tyto/pipeline": "workspace:*",
+    "@tyto/templates": "workspace:*"
   },
   "devDependencies": {
     "@tyto/fonts": "workspace:*",

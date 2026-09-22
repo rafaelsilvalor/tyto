@@ -1,0 +1,29 @@
+---
+template: agenda-semana
+formats: [feed, story]
+---
+// Three disciplines, so `compile` produces three artworks of two frames each. The first
+// one carries the cover; the other two do not, and nothing in this file says so — the
+// template reads `context.artwork.index`.
+//
+// The session count is different on every slide on purpose: two, three, then one. That is
+// the whole claim of this template, and a brief that used the same count everywhere would
+// not check it.
+
+::titulo
+  Agenda da semana
+
+::disciplina
+  Clínica Médica
+  22/09 | Insuficiência cardíaca | Dra. Helena Prado
+  24/09 | Arritmias na emergência | Dr. Vitor Salles
+
+::disciplina
+  Cirurgia Geral
+  23/09 | Abdome agudo | Dr. Caio Nunes
+  25/09 | Trauma torácico | Dra. Marina Reis
+  26/09 | Pré-operatório | Dr. Caio Nunes
+
+::disciplina
+  Pediatria
+  27/09 | Febre sem foco | Dra. Lúcia Amaral
