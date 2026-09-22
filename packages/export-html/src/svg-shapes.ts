@@ -10,7 +10,7 @@ import type {
   Stroke,
   VectorNode,
 } from '@tyto/core';
-import { nodeMatrix } from '@tyto/core';
+import { GAP_ASSET_URI, nodeMatrix } from '@tyto/core';
 
 import { escapeHtml } from './escape.js';
 import { cssColor, cssLength, cssMatrix, cssNumber, isIdentity } from './values.js';
@@ -127,11 +127,11 @@ function paintValue(
     return { value: `url(#${id})` };
   }
 
-  const href = context.asset(paint.asset);
-  if (href === undefined) {
-    context.report({ kind: 'asset', node: nodeId, asset: paint.asset.id });
-    return undefined;
-  }
+  // Reported and then drawn as the gap mark, which is the same trade `assetUri` makes one
+  // file over (ADR 0035): a mask painted with a picture nobody loaded is still a mask.
+  const bytes = context.asset(paint.asset);
+  if (bytes === undefined) context.report({ kind: 'asset', node: nodeId, asset: paint.asset.id });
+  const href = bytes ?? GAP_ASSET_URI;
   const ratio =
     paint.fit === 'fill' ? 'none' : paint.fit === 'cover' ? 'xMidYMid slice' : 'xMidYMid meet';
   // User space with the node's real box, not `objectBoundingBox`. In bounding-box units the
@@ -230,11 +230,9 @@ function vectorShape(node: VectorNode, defs: Defs, context: ShapeContext): strin
 }
 
 function imageShape(node: ImageNode, context: ShapeContext): string {
-  const href = context.asset(node.asset);
-  if (href === undefined) {
-    context.report({ kind: 'asset', node: node.id, asset: node.asset.id });
-    return '';
-  }
+  const bytes = context.asset(node.asset);
+  if (bytes === undefined) context.report({ kind: 'asset', node: node.id, asset: node.asset.id });
+  const href = bytes ?? GAP_ASSET_URI;
   const ratio =
     node.fit === 'fill' ? 'none' : node.fit === 'cover' ? 'xMidYMid slice' : 'xMidYMid meet';
   return `<image href="${escapeHtml(href)}" width="${cssNumber(node.size.w)}" height="${cssNumber(node.size.h)}" preserveAspectRatio="${ratio}"/>`;

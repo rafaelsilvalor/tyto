@@ -2,6 +2,7 @@ import { mkdir, mkdtemp, readFile, readdir, rm, writeFile } from 'node:fs/promis
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
+import { GAP_COLOR_CSS } from '@tyto/core';
 import { parseRenderResult } from '@tyto/io';
 import type { Rasterizer } from '@tyto/raster';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
@@ -229,6 +230,52 @@ describe('tyto render', () => {
       'slide-2-feed.svg',
     ]);
     expect(parsed.value.diagnostics.some((item) => item.code === 'E_UNKNOWN_SLOT')).toBe(true);
+  });
+
+  it('draws and stamps a brief that left a required slot unset (ADR 0035)', async () => {
+    // The acceptance criterion this closes is "the marker is in the exported bytes, not
+    // only in the live preview": a CLI run has no preview and no problems panel, so an
+    // artwork with a hole used to be indistinguishable from a finished one. The manifest
+    // is rewritten rather than the shipped fixture changed, because every other test here
+    // wants `imagem` optional.
+    await writeFile(
+      join(workspace, 'templates', 'cartaz', 'manifest.yaml'),
+      manifestSource.replace('imagem: { type: image }', 'imagem: { type: image, required: true }'),
+    );
+    await writeFile(
+      join(workspace, 'task', 'brief.brief'),
+      briefSource.replace(/imagem: \.\/logo\.png\r?\n/u, ''),
+    );
+
+    const code = await run(
+      ['render', 'task/brief.brief', '--out', 'task/out', '--types', 'svg'],
+      environment(),
+    );
+
+    // Still non-zero: fatality decides what is drawn, severity decides what fails.
+    expect(code, stderr()).toBe(EXIT_DIAGNOSTICS);
+    expect(await outFiles('task', 'out')).toEqual([
+      'result.json',
+      'slide-1-feed.svg',
+      'slide-2-feed.svg',
+    ]);
+
+    const svg = await readFile(join(workspace, 'task', 'out', 'slide-1-feed.svg'), 'utf8');
+    expect(svg).toContain(GAP_COLOR_CSS);
+
+    const parsed = parseRenderResult(await resultAt('task', 'out'));
+    if (!parsed.ok) throw new Error(parsed.error.join('; '));
+    expect(parsed.value.status).toBe('error');
+    expect(parsed.value.diagnostics.some((item) => item.code === 'E_MISSING_REQUIRED_SLOT')).toBe(
+      true,
+    );
+  });
+
+  it('leaves the mark out of an artwork with nothing missing, which is the control', async () => {
+    await run(['render', 'task/brief.brief', '--out', 'task/out', '--types', 'svg'], environment());
+
+    const svg = await readFile(join(workspace, 'task', 'out', 'slide-1-feed.svg'), 'utf8');
+    expect(svg).not.toContain(GAP_COLOR_CSS);
   });
 
   it('writes no artifact at all when the brief names a template that does not exist', async () => {

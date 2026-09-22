@@ -24,8 +24,10 @@ import type { TemplateRegistry } from '../template/registry.js';
  * **And it hands back what it did resolve.** A slot the manifest refuses is one slot: the
  * value never enters `slots`, the diagnostic rides along on the ok branch, and the other
  * nineteen directives are still there to be compiled (ADR 0025). The two exceptions above
- * are exactly the fatal ones; the third is `E_MISSING_REQUIRED_SLOT`, which is fatal
- * because an artwork with a hole where the manifest promised content looks finished.
+ * are exactly the fatal ones. `E_MISSING_REQUIRED_SLOT` was a third until ADR 0035 — an
+ * artwork with a hole where the manifest promised content looks finished — and what makes
+ * it non-fatal now is that the hole is drawn: the names go out in `missingRequiredSlots`
+ * and `compile` stamps every frame built from them.
  */
 
 export interface ResolvedAdjustment {
@@ -62,6 +64,15 @@ export interface ResolvedBrief {
   readonly artworks: readonly ResolvedArtwork[];
   /** Deduplicated, in the order the brief referenced them — what `Scene.assets` wants. */
   readonly assets: readonly AssetRef[];
+  /**
+   * The required slots the brief left unset, in manifest order.
+   *
+   * The same thing `E_MISSING_REQUIRED_SLOT` reports, carried as *value* rather than only
+   * as a diagnostic, because `compile` has to draw something for it (ADR 0035) and a stage
+   * reads its predecessor's value, not its predecessor's problems. Empty is the normal
+   * case and means the artwork is whole.
+   */
+  readonly missingRequiredSlots: readonly string[];
 }
 
 export interface ResolveOptions {
@@ -201,6 +212,7 @@ class Resolver {
   private readonly slots = new Map<string, ResolvedSlot>();
   private readonly artworks: ResolvedArtwork[] = [];
   private readonly assets = new Map<string, AssetRef>();
+  private readonly missingRequired: string[] = [];
 
   constructor(
     private readonly manifest: TemplateManifest,
@@ -432,6 +444,7 @@ class Resolver {
 
       const set = slot.repeat ? this.artworks.length > 0 : this.slots.has(name);
       if (slot.required && !set) {
+        this.missingRequired.push(name);
         this.report(
           diagnostic(
             'E_MISSING_REQUIRED_SLOT',
@@ -490,6 +503,7 @@ class Resolver {
       slots: Object.fromEntries(this.slots),
       artworks: this.artworks,
       assets: [...this.assets.values()],
+      missingRequiredSlots: this.missingRequired,
     };
   }
 }
