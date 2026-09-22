@@ -1,3 +1,5 @@
+import { build as agendaSemana } from '../templates/agenda-semana/template.js';
+
 import type { TemplateBuild } from '@tyto/core';
 
 /**
@@ -38,7 +40,11 @@ import type { TemplateBuild } from '@tyto/core';
 export const BUILT_IN_TEMPLATES_DIRECTORY = 'templates';
 
 /** The names this pack ships, for a caller that wants them without reading a disk. */
-export const BUILT_IN_TEMPLATE_NAMES: readonly string[] = ['carrossel-lista', 'promo-curso'];
+export const BUILT_IN_TEMPLATE_NAMES: readonly string[] = [
+  'agenda-semana',
+  'carrossel-lista',
+  'promo-curso',
+];
 
 /**
  * The build functions this pack ships, by the manifest name each one draws.
@@ -49,9 +55,12 @@ export const BUILT_IN_TEMPLATE_NAMES: readonly string[] = ['carrossel-lista', 'p
  * imports a path — running code that arrived in a folder is the plugin host's job, with
  * its permissions and its isolation (ADR 0007).
  *
- * Empty on purpose, for now. The wiring that serves this map exists and is tested
- * (`bundledTemplateSource`), and the first template to fill it is the Agenda carousel
- * (TYTO-167). A pack that shipped a code template before anybody had written one would be
- * the mistake ADR 0022 recorded about itself.
+ * `agenda-semana` is the first entry (TYTO-167). Its manifest sits beside the other two in
+ * `templates/agenda-semana/`, next to the code that draws it, so a designer opening the
+ * folder finds the whole template; what makes it *bundled* is this import, which puts the
+ * build function in the application's own module graph rather than on a path somebody
+ * resolves at runtime.
  */
-export const BUILT_IN_TEMPLATE_BUILDS: Readonly<Record<string, TemplateBuild>> = {};
+export const BUILT_IN_TEMPLATE_BUILDS: Readonly<Record<string, TemplateBuild>> = {
+  'agenda-semana': agendaSemana,
+};

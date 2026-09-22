@@ -112,7 +112,7 @@ template a name means does not depend on the order the filesystem listed them in
 `roots` is a list in precedence order and **earlier wins** (ADR 0020). The CLI passes
 `--templates <dir>` first and the built-in pack second, so:
 
-- `tyto render` finds `promo-curso` and `carrossel-lista` with no flag at all. The pack is
+- `tyto render` finds `agenda-semana`, `promo-curso` and `carrossel-lista` with no flag at all. The pack is
   `@tyto/templates`' own `templates/` folder, located by resolving that package's
   `package.json` — which is right in a workspace, in a published install, and inside an
   Electron `asar`.

@@ -277,3 +277,58 @@ describe('a brief that stops compiling', () => {
     expect(await page.locator('#preview-status').textContent()).toMatch(/\d/u);
   });
 });
+
+/**
+ * A template whose body is **code**, previewed in the window (TYTO-167).
+ *
+ * Everything above this point previews `promo-curso`, which is markup. The desktop composes
+ * `bundledTemplateSource` in `preview.ts` exactly as the CLI does, and until now nothing at
+ * window level had ever asked it to serve a build function — so "the preview draws a code
+ * template" was a claim resting on two composition roots being spelled the same way.
+ *
+ * `agenda-semana` is also the first built-in with more than one artwork, which is what makes
+ * the slide picker appear: the assertion above says it stays hidden for a single-artwork
+ * brief, and this is the other half of that pair.
+ */
+describe('a template whose body is code', () => {
+  const AGENDA = join(packDirectory, 'agenda-semana', 'examples', 'agenda.brief');
+
+  beforeAll(async () => {
+    await page.click('#editor .cm-content');
+    await page.keyboard.press('Control+a');
+    await page.keyboard.insertText(readFileSync(AGENDA, 'utf8'));
+
+    // Spelled out rather than `expect.poll`, which Vitest only allows inside a test. The
+    // wait is still on the condition and never on a duration: the round trip goes through
+    // a debounce, an IPC hop and a compile, and a fixed pause would be a flake with a
+    // number on it.
+    const deadline = Date.now() + 20_000;
+    while (Date.now() < deadline && !(await shown()).includes('Clínica')) {
+      await page.waitForTimeout(200);
+    }
+  }, 60_000);
+
+  it('draws the brief it was given, through the bundled build function', async () => {
+    const html = await shown();
+
+    // The brief's own words, and the handle the *template* supplies — the second is what
+    // says a build function ran, since no directive in the brief writes it.
+    expect(html).toContain('Clínica');
+    expect(html).toContain('@estrategia.saude');
+  });
+
+  it('offers the slide picker, because the brief made more than one artwork', async () => {
+    await expect.poll(() => page.locator('#slide').isVisible()).toBe(true);
+  });
+
+  it('paints the frame, and not only the markup of it', async () => {
+    const frame = page.frameLocator('#preview-frame');
+
+    expect(await frame.locator('.tyto-frame .tyto-node').count()).toBeGreaterThan(0);
+    expect(
+      await frame
+        .locator('.tyto-frame')
+        .evaluate(() => document.fonts.check('700 48px "Source Sans 3"')),
+    ).toBe(true);
+  });
+});
