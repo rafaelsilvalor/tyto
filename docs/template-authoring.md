@@ -489,6 +489,13 @@ export default defineTemplate(manifest, ({ slots, format, adjustments }) => fram
 
 Same nodes, same output. Use it when you need computation (text auto-fit, dynamic grids).
 
+**`docs/template-conventions.md` is how to organise one.** It settles the parts this section
+leaves open: how the YAML manifest reaches the module — it is not imported, and the sketch
+above is the shape a _test_ uses — where tokens and reusable parts live, and what
+arrangement a template composes with (`@tyto/template-kit`). Read it before writing a
+second template, because the conventions are what make the second one cheaper than the
+first.
+
 `defineTemplate(manifest, build)` pairs a manifest with the function `compile` calls **once
 per (artwork, format)**. It does nothing else — no registration, no lifecycle, no state. A
 template that needs to know where it is in a scene reads its context rather than
