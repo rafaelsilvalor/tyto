@@ -14,6 +14,9 @@
 'pkg:template-lang':
   - changed-files:
       - any-glob-to-any-file: 'packages/template-lang/**'
+'pkg:template-kit':
+  - changed-files:
+      - any-glob-to-any-file: 'packages/template-kit/**'
 'pkg:export-html':
   - changed-files:
       - any-glob-to-any-file: 'packages/export-html/**'
