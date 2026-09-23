@@ -1,5 +1,29 @@
 # @tyto/desktop
 
+## 0.4.0
+
+### Minor Changes
+
+- 8b24969: TYTO-151 — a new version of the desktop app offers, once, to bring the templates folder, the
+  panel layout and the recent files across from the highest older version on the machine (ADR
+  0036). The older version's folder is copied, never moved; declining is recorded in the new
+  folder and not asked again. Saved sign-ins travel only when the person ticks a separate,
+  unticked box. Anything the older folder could not give is a new `W_IMPORT_SKIPPED` warning in
+  the log, and never stops the app from opening.
+
+### Patch Changes
+
+- Updated dependencies [8b24969]
+  - @tyto/core@0.24.0
+  - @tyto/brief-lang@0.6.4
+  - @tyto/editor@0.6.4
+  - @tyto/export-html@0.6.1
+  - @tyto/export-svg@1.3.1
+  - @tyto/io@1.3.5
+  - @tyto/pipeline@0.8.2
+  - @tyto/plugin-api@0.3.7
+  - @tyto/templates@0.4.1
+
 ## 0.3.4
 
 ### Patch Changes

@@ -1,6 +1,6 @@
 {
   "name": "@tyto/plugin-api",
-  "version": "0.3.6",
+  "version": "0.3.7",
   "type": "module",
   "description": "Extension-point types and the in-process plugin host.",
   "license": "UNLICENSED",
