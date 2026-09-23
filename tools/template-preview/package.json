@@ -1,0 +1,23 @@
+{
+  "name": "@tyto/template-preview",
+  "private": true,
+  "type": "module",
+  "description": "Serves, on localhost, the images `tyto render` writes for a template, re-rendered on every save.",
+  "license": "UNLICENSED",
+  "scripts": {
+    "start": "node --experimental-strip-types src/main.ts",
+    "typecheck": "tsc --noEmit",
+    "lint": "eslint . --max-warnings 0",
+    "test": "vitest run",
+    "test:visual": "vitest run --config vitest.visual.config.ts"
+  },
+  "dependencies": {
+    "@tyto/cli": "workspace:*",
+    "@tyto/templates": "workspace:*",
+    "tsup": "^8.5.0"
+  },
+  "devDependencies": {
+    "typescript": "^5.9.3",
+    "vitest": "^5.0.1"
+  }
+}
