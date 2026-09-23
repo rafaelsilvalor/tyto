@@ -2,6 +2,7 @@ import { existsSync, readFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
+import { BUILT_IN_TEMPLATE_NAMES } from '@tyto/templates';
 import { type ElectronApplication, type Page, _electron } from 'playwright';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 
@@ -169,8 +170,10 @@ describe('the bridge', () => {
       locale: expect.stringMatching(/^(pt-BR|en)$/u) as unknown as string,
       // The composition root's pack, read off the plugin host and reported through the
       // bridge — which is the end-to-end form of "registers built-in plugins through the
-      // PluginHost". An empty list here would mean the extension point wired nothing.
-      templates: ['agenda-semana', 'carrossel-lista', 'promo-curso'],
+      // PluginHost". An empty list here would mean the extension point wired nothing. The
+      // expected list is the pack's own constant rather than a copy of it, so shipping a
+      // template does not redden this file (TYTO-171); the comparison stays whole-list.
+      templates: [...BUILT_IN_TEMPLATE_NAMES],
     });
 
     // **Reading the manifest keeps the comparison true and drops the claim**, so the claim is

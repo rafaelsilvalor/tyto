@@ -5,6 +5,7 @@ import { join } from 'node:path';
 import { GAP_COLOR_CSS } from '@tyto/core';
 import { parseRenderResult } from '@tyto/io';
 import type { Rasterizer } from '@tyto/raster';
+import { BUILT_IN_TEMPLATE_NAMES } from '@tyto/templates';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
 import type { CliEnvironment } from './environment.js';
@@ -192,12 +193,13 @@ describe('tyto render', () => {
     // they were. The project's own is still the only one this brief uses.
     expect(parsed.value.tyto.version).toBe(TYTO_VERSION);
     expect(parsed.value.tyto.templates).toContainEqual({ name: 'cartaz', version: '2.1.0' });
-    expect(parsed.value.tyto.templates.map((entry) => entry.name).sort()).toEqual([
-      'agenda-semana',
-      'carrossel-lista',
-      'cartaz',
-      'promo-curso',
-    ]);
+    // The whole list and not a `toContain`: a host that wired half the pack would pass a
+    // containment check. The pack's half comes from its own constant, so shipping a template
+    // does not redden this file (TYTO-171); the project's `cartaz` is added by hand, because
+    // it is this project's and not the pack's. The `Set` is the shadowing rule: were the pack
+    // ever to ship a `cartaz`, the project's would replace it rather than sit beside it.
+    const expected = [...new Set([...BUILT_IN_TEMPLATE_NAMES, 'cartaz'])].sort();
+    expect(parsed.value.tyto.templates.map((entry) => entry.name).sort()).toEqual(expected);
   });
 
   it('renders the slots that are fine, and says so in result.json (ADR 0025)', async () => {
