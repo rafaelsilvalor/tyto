@@ -151,6 +151,7 @@ describe('changesets', () => {
       '@tyto/contract-test',
       '@tyto/docs-gen',
       '@tyto/repo-checks',
+      '@tyto/template-preview',
     ]);
     expect([...tools].filter(([, version]) => version !== undefined).map(([name]) => name)).toEqual(
       [],
