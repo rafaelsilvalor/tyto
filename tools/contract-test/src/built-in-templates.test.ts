@@ -1,6 +1,6 @@
 import { execFile } from 'node:child_process';
 import { createHash } from 'node:crypto';
-import { mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
+import { mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -13,11 +13,17 @@ import {
   type SceneNode,
   compile,
   createFaceCache,
+  describeFace,
   loadFormats,
   loadTemplateRegistry,
   resolve,
 } from '@tyto/core';
-import { bundledFontOutlinePath, bundledFontSource, bundledFontsDirectory } from '@tyto/fonts';
+import {
+  bundledFontOutlinePath,
+  bundledFontSource,
+  bundledFontsDirectory,
+  createFontLibrary,
+} from '@tyto/fonts';
 import { fileAssetResolver, fileTemplateAssets, nodeFileSystem } from '@tyto/io';
 import { bundledTemplateSource, markupTemplateSource } from '@tyto/pipeline';
 import { BUILT_IN_TEMPLATE_BUILDS } from '@tyto/templates';
@@ -39,6 +45,11 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest';
  * without them would satisfy "no `W_TEXT_OVERFLOW`" by never being able to produce one,
  * which is the emptiest kind of green. So the faces come from `@tyto/fonts` and the
  * assertion is about text that was actually measured.
+ *
+ * Through the same library the CLI uses, but as a machine with no fonts installed
+ * (ADR 0037): `agenda-semana` asks the machine for CircularXX, and a suite that found it on
+ * one laptop and not on CI would measure two different artworks. With no folders to read,
+ * every machine measures the substitute CI draws.
  */
 
 const HERE = dirname(fileURLToPath(import.meta.url));
@@ -48,7 +59,9 @@ const CLI = fileURLToPath(new URL('../../../apps/cli/dist/index.js', import.meta
 const runBinary = promisify(execFile);
 
 const fileSystem = nodeFileSystem();
-const faces = createFaceCache(bundledFontSource);
+const faces = createFaceCache(
+  createFontLibrary({ describe: describeFace, directories: [] }).source,
+);
 
 interface Example {
   readonly template: string;
@@ -190,9 +203,14 @@ describe.each(EXAMPLES.map((example) => [example.template, example] as const))(
       );
       expect(texts.reduce((total, count) => total + count, 0)).toBeGreaterThan(0);
 
-      // Bundled, not a file beside the template: the repository ships one copy in `fonts/`.
-      expect(scene.fonts.map((entry) => entry.family)).toContain('Source Sans 3');
-      for (const entry of scene.fonts) expect(entry.source).toBe('bundled');
+      // Never a file beside the template. Bundled — the repository ships one copy in
+      // `fonts/` — except the agenda, whose brand face is read from the machine (ADR 0037).
+      const expected =
+        name === 'agenda-semana'
+          ? { family: 'CircularXX', source: 'system' }
+          : { family: 'Source Sans 3', source: 'bundled' };
+      expect(scene.fonts).toContainEqual(expected);
+      for (const entry of scene.fonts) expect(entry.source).toBe(expected.source);
     }, 60_000);
   },
 );
@@ -514,6 +532,78 @@ describe('the fonts the pack draws in, as a render embeds them (ADR 0021)', () =
     );
 
     expect([...embedded].sort()).toEqual([...onDisk].sort());
+  }, 120_000);
+
+  /**
+   * ADR 0037, through the binary: `agenda-semana` asks the machine for CircularXX. Which
+   * branch runs depends on the machine, and each branch asserts the whole of its own
+   * outcome — the maintainer's laptop has the face, CI has not, so both are exercised.
+   */
+  it('renders agenda-semana in the installed CircularXX, or in the substitute and says so', async () => {
+    const agenda = join(project, 'agenda');
+    await mkdir(join(agenda, 'assets'), { recursive: true });
+    await writeFile(join(agenda, 'formats.yaml'), await readFile(join(PACK, 'formats.yaml')));
+    const examples = join(PACK, 'agenda-semana/examples');
+    await writeFile(join(agenda, 'agenda.brief'), await readFile(join(examples, 'agenda.brief')));
+    await writeFile(
+      join(agenda, 'assets/calendario.png'),
+      await readFile(join(examples, 'assets/calendario.png')),
+    );
+
+    await runBinary(
+      process.execPath,
+      [CLI, 'render', 'agenda.brief', '--out', 'out', '--types', 'svg'],
+      {
+        cwd: agenda,
+      },
+    );
+
+    const svg = await readFile(join(agenda, 'out/slide-1-retrato.svg'), 'utf8');
+    const sha = (bytes: Buffer): string => createHash('sha256').update(bytes).digest('hex');
+    const embedded = [...svg.matchAll(/url\("data:font\/[a-z0-9]+;base64,([A-Za-z0-9+/=]+)"\)/g)]
+      .map((match) => sha(Buffer.from(match[1] ?? '', 'base64')))
+      .sort();
+    const result = JSON.parse(await readFile(join(agenda, 'out/result.json'), 'utf8')) as {
+      diagnostics?: { code: string; message: string }[];
+    };
+    const substituted = (result.diagnostics ?? []).filter(
+      (item) => item.code === 'W_FONT_SUBSTITUTED',
+    );
+
+    const machine = createFontLibrary({ describe: describeFace });
+    const weights = [300, 500, 900];
+    const asked = weights.map(
+      (weight) =>
+        ({
+          font: { family: 'CircularXX', source: 'system' },
+          weight,
+          style: 'normal',
+        }) as const,
+    );
+    const expected = asked
+      .map((face) => {
+        const uri = machine.font(face) ?? '';
+        return sha(Buffer.from(uri.slice(uri.indexOf(',') + 1), 'base64'));
+      })
+      .sort();
+
+    // Three weights, three `@font-face` rules — Light, Medium, Black — whatever drew them.
+    expect(embedded).toEqual(expected);
+
+    if (machine.substitutions(asked).length === 0) {
+      expect(substituted).toEqual([]);
+      // The installed files, not the substitute: three different faces.
+      expect(new Set(embedded).size).toBe(3);
+    } else {
+      // One per face the runs draw, in the order the scene is walked, and no fourth for the
+      // declaration: a `400` nobody draws is not a substitution anybody sees.
+      expect(
+        substituted.map((item) => /'CircularXX (\d+) normal'/.exec(item.message)?.[1]).sort(),
+      ).toEqual(['300', '500', '900']);
+      expect(substituted.every((item) => item.message.includes("'Source Sans 3 "))).toBe(true);
+      // Light and Medium both land on the bundled Regular, Black on the Bold.
+      expect(new Set(embedded).size).toBe(2);
+    }
   }, 120_000);
 
   it('reads its outlines out of the same package, so measuring and drawing cannot drift', () => {

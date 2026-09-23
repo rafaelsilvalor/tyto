@@ -428,6 +428,17 @@ export const diagnosticCodes = {
     fatal: false,
     fatality: 'A warning never replaces a value (ADR 0013).',
   },
+  W_FONT_SUBSTITUTED: {
+    severity: 'warning',
+    summary: 'A face the scene asks this machine for is not installed, so a bundled one drew it.',
+    template:
+      "Font '{font}' is not installed on this machine; drawn in '{substitute}' instead. Install the face to render it as designed.",
+    spec: 'docs/adr/0037-a-face-can-come-from-the-machine.md',
+    fatal: false,
+    fatality:
+      'The artwork is complete and measured against the face that was drawn, so the line ' +
+      'breaks match the pixels; only the typeface differs, and this is what says so.',
+  },
   E_RENDER_FAILED: {
     severity: 'error',
     summary: 'A frame could not be turned into bytes by the exporter or the rasterizer.',

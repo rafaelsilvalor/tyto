@@ -1,5 +1,11 @@
-import { type AssetRef, type Diagnostics, createFaceCache, hasErrors } from '@tyto/core';
-import { bundledFont, bundledFontSource } from '@tyto/fonts';
+import {
+  type AssetRef,
+  type Diagnostics,
+  createFaceCache,
+  describeFace,
+  hasErrors,
+} from '@tyto/core';
+import { createFontLibrary } from '@tyto/fonts';
 import {
   type ExportResources,
   type RenderResult,
@@ -9,7 +15,7 @@ import {
   fsTaskOutput,
   renderResult,
 } from '@tyto/io';
-import { type OutputRequest, runJob } from '@tyto/pipeline';
+import { type OutputRequest, fontSubstitutionWarnings, runJob } from '@tyto/pipeline';
 import type { Rasterizer } from '@tyto/raster';
 
 import { activateBuiltIns } from './plugins/index.js';
@@ -75,8 +81,13 @@ export interface RenderTaskReport {
  * `W_EXPORT_APPROXIMATED` and is clipped, and `W_TEXT_OVERFLOW` is never raised — while
  * the desktop preview, which does pass them, measures the same brief. Measured for
  * TYTO-173. One cache for the process, because the bundled faces never change under it.
+ *
+ * Bundled and installed faces through one library (ADR 0037), so a `system` face the
+ * machine lacks is measured and drawn in the same substitute. The machine's font folders
+ * are read once per process: a face installed while `tyto watch` runs is seen on restart.
  */
-const faces = createFaceCache(bundledFontSource);
+const fonts = createFontLibrary({ describe: describeFace });
+const faces = createFaceCache(fonts.source);
 
 /**
  * Everything an exporter can be asked for, from the places that have it.
@@ -84,11 +95,11 @@ const faces = createFaceCache(bundledFontSource);
  * Two asset sources, asked in the order that makes a template overridable — the brief's own
  * folder first, the template's `src=` files behind it.
  *
- * And one font source, which has no such order because there is only one: the faces Tyto
- * ships (ADR 0021). A brief's own font file is not loaded by anything yet, and
- * `bundledFont` refuses a `FontRef { source: 'file' }` rather than answering it with a
- * bundled face of the same family — so that stays `E_EXPORT_FONT_UNRESOLVED` naming the
- * face, which is the honest answer until something loads one.
+ * And one font library: the faces Tyto ships (ADR 0021) and the ones this machine has
+ * installed (ADR 0037). A brief's own font file is not loaded by anything yet, and the
+ * library refuses a `FontRef { source: 'file' }` rather than answering it with a face of the
+ * same family — so that stays `E_EXPORT_FONT_UNRESOLVED` naming the face, which is the
+ * honest answer until something loads one.
  *
  * This is the composition root, which is the whole reason the wiring is here and not in a
  * stage (ADR 0010). `@tyto/fonts` is a Node adapter; `pipeline` and the exporters know only
@@ -97,7 +108,8 @@ const faces = createFaceCache(bundledFontSource);
 function combine(brief: ExportResources, template: ExportResources): ExportResources {
   const asset = (ref: AssetRef): string | undefined =>
     brief.html?.asset?.(ref) ?? template.html?.asset?.(ref);
-  return { html: { asset, font: bundledFont }, svg: { asset, font: bundledFont } };
+  const font = fonts.font;
+  return { html: { asset, font }, svg: { asset, font } };
 }
 
 export async function renderTask(
@@ -160,7 +172,10 @@ export async function renderTask(
       // and nothing has asked an exporter for bytes yet. The template's own `src=` files
       // are not loaded here — `templateWiring` reads that folder when it loads the
       // template, which is already after the brief named it.
-      loadResources: briefResources.load,
+      loadResources: async (needed) => {
+        await briefResources.load(needed);
+        return fontSubstitutionWarnings(fonts.substitutions(needed.faces));
+      },
       ...(options.concurrency === undefined ? {} : { concurrency: options.concurrency }),
       sink: output,
     },

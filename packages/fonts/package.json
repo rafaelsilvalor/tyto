@@ -25,6 +25,7 @@
     "test": "vitest run"
   },
   "devDependencies": {
+    "@tyto/core": "workspace:*",
     "vitest": "^5.0.1"
   }
 }

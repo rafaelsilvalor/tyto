@@ -46,14 +46,22 @@ describe('what a scene asks the outside world for', () => {
     expect(sceneResources(promo).assets.map((ref) => ref.id)).toEqual(['hero']);
   });
 
-  it('lists a declared font as a face, at the weight and style a run would default to', () => {
+  it('lists a drawn font at the faces its runs draw, and at no weight nobody draws', () => {
+    // The fixture draws Inter at 700 only. A `400` beside it would be a file loaded for
+    // nothing and, for a machine's face, a substitution warning about no text (TYTO-182).
+    expect(sceneResources(promo).faces).toEqual([
+      { font: { family: 'Inter', source: 'bundled' }, weight: 700, style: 'normal' },
+    ]);
+  });
+
+  it('lists a declared font no run draws, at the weight and style a run would default to', () => {
     // `Scene.fonts` names a family and nothing else — there is no run behind a declaration
     // — so `400`/`normal` is what a `TextSpan` silent about both would carry.
-    expect(sceneResources(promo).faces).toContainEqual({
-      font: { family: 'Inter', source: 'bundled' },
-      weight: 400,
-      style: 'normal',
-    });
+    const scene = sceneWith({ fonts: [{ family: 'Inter', source: 'bundled' }] });
+
+    expect(sceneResources(scene).faces).toEqual([
+      { font: { family: 'Inter', source: 'bundled' }, weight: 400, style: 'normal' },
+    ]);
   });
 
   it('finds an asset used only as a frame background, which is not a node', () => {

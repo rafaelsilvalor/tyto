@@ -197,8 +197,14 @@ export interface JobPorts {
    * so a loader fills the store those resolvers read.
    *
    * Absent means a caller that loaded eagerly, or one whose scene needs nothing.
+   *
+   * It may answer with diagnostics, which join the job's own. A loader is the one place
+   * that learns a face was substituted (`W_FONT_SUBSTITUTED`, ADR 0037): the resolvers it
+   * fills answer with bytes and have no channel for saying whose bytes they were.
    */
-  readonly loadResources?: (needed: SceneResources) => void | Promise<void>;
+  readonly loadResources?: (
+    needed: SceneResources,
+  ) => void | Diagnostics | Promise<void | Diagnostics>;
   /** Frames rastered at once. Defaults to 2 — see `limit.ts` for why not more. */
   readonly concurrency?: number;
   readonly onEvent?: JobListener;
@@ -432,7 +438,8 @@ export async function runJob(
   // question has an answer and the answer is still useful.
   if (ports.loadResources !== undefined) {
     notify(onEvent, { kind: 'stage-started', stage: 'resources' });
-    await ports.loadResources(sceneResources(compiled.value));
+    const loaded = await ports.loadResources(sceneResources(compiled.value));
+    if (loaded !== undefined) problems.push(...loaded);
     notify(onEvent, { kind: 'stage-finished', stage: 'resources' });
   }
 
