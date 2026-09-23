@@ -25,7 +25,12 @@ afterEach(async () => {
   preview = undefined;
 });
 
-describe.each(['agenda-semana', 'promo-curso'])('the %s preview', (template) => {
+// Each template's own manifest decides its formats: the agenda is cut to the 4:5 portrait
+// the published carousel uses (TYTO-173), the promo to the square feed and the story.
+describe.each([
+  { template: 'agenda-semana', formats: ['retrato'] },
+  { template: 'promo-curso', formats: ['feed', 'story'] },
+])('the $template preview', ({ template, formats }) => {
   it('serves every image with the sha256 of the file `tyto render` writes', async () => {
     const target = resolveTarget({ template }, REPOSITORY_ROOT);
     preview = await startPreview(target);
@@ -33,7 +38,7 @@ describe.each(['agenda-semana', 'promo-curso'])('the %s preview', (template) => 
 
     const state = await preview.state();
     expect(state.status, JSON.stringify(state.diagnostics)).toBe('ok');
-    expect(new Set(state.images.map((image) => image.format))).toEqual(new Set(['feed', 'story']));
+    expect(new Set(state.images.map((image) => image.format))).toEqual(new Set(formats));
 
     const served = await preview.servedHashes();
     const byHand = await renderByHand(target);
