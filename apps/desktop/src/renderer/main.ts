@@ -19,6 +19,7 @@ import {
 } from './panel.js';
 import { type CommandEntry, type CommandBar, COMMAND_BAR_TAG } from './command-bar.js';
 import { type ExportDialog, type ExportProgressView, EXPORT_DIALOG_TAG } from './export-dialog.js';
+import { type TemplateMode, TEMPLATE_MODE_TAG } from './template-mode.js';
 import {
   COMMAND_LABELS,
   DOCUMENT_SLOTS,
@@ -263,6 +264,8 @@ function resolveElements() {
     problemsCount: byId('problems-count'),
     commandBar: document.querySelector<CommandBar>(COMMAND_BAR_TAG),
     exportDialog: document.querySelector<ExportDialog>(EXPORT_DIALOG_TAG),
+    // TYTO-44. Outside `.shell` for the export dialog's reason: it covers the window.
+    templateMode: document.querySelector<TemplateMode>(TEMPLATE_MODE_TAG),
     // Outside the docks, like the command bar: the strip lists what the *window* has open,
     // so it must not disappear with a panel.
     tabs: document.querySelector<DocumentTabs>(TABS_TAG),
@@ -625,6 +628,19 @@ const registry: CommandRegistry = createDesktopRegistry({
   },
   openExport: () => {
     openExportDialog();
+  },
+
+  editTemplate: () => {
+    void elements.templateMode?.openFolder(null);
+  },
+  newTemplate: () => {
+    const mode = elements.templateMode;
+    if (mode === null || mode === undefined) return;
+    mode.open = true;
+    // Straight to the name, which is the only thing a New needs from the person.
+    void mode.updateComplete.then(() => {
+      mode.querySelector<HTMLInputElement>('.template-mode__new-name')?.focus();
+    });
   },
 
   newDocument: () => {
@@ -1069,7 +1085,12 @@ async function answerExitRequest(bridge: TytoBridge, askId: number): Promise<voi
   let allow = false;
   try {
     allow = await resolveExit({
-      unsaved: () => workspace.documents.filter(isUnsaved).map((document_) => document_.id),
+      unsaved: () => [
+        ...workspace.documents.filter(isUnsaved).map((document_) => document_.id),
+        // The template mode's two buffers, as one entry: the box counts things a person would
+        // lose, and a template is one thing (TYTO-44).
+        ...(elements.templateMode?.unsaved === true ? [TEMPLATE_MODE_ID] : []),
+      ],
 
       ask: async (count) => {
         const detail = translate(
@@ -1092,7 +1113,13 @@ async function answerExitRequest(bridge: TytoBridge, askId: number): Promise<voi
       // `saveAs: false`, so a tab that already has a file is written where it lives and only
       // a tab with no path gets a picker. `documents.save` is where that fallback is, and it
       // has been there since E9.8 — which is most of why this card is an M.
-      save: (documentId) => saveOneDocument(bridge, documentId, false),
+      save: async (documentId) => {
+        if (documentId !== TEMPLATE_MODE_ID) return saveOneDocument(bridge, documentId, false);
+        // A manifest that does not parse is refused, and a refused save is a failed one: the
+        // quit is cancelled with the reason on screen, which is ADR 0034's rule for any save.
+        const saved = (await elements.templateMode?.save()) ?? false;
+        return saved ? 'saved' : 'failed';
+      },
     });
   } finally {
     await bridge['app:exit-answer']({ askId, allow });
@@ -1278,6 +1305,9 @@ async function changeLayout(next: Layout): Promise<void> {
  */
 function applyLocale(next: Locale): void {
   state.locale = next;
+  if (elements.templateMode !== null && elements.templateMode !== undefined) {
+    elements.templateMode.locale = next;
+  }
   if (elements.locale !== null) fillLocalePicker(elements.locale, state.locale);
   editor?.setSearchPhrases(searchPhrasesFor(state.locale));
   repaint();
@@ -1546,6 +1576,66 @@ function wirePanelControls(): void {
   });
 }
 
+/**
+ * The id the quit question files the template mode under (TYTO-44).
+ *
+ * The mode is not a tab, and the question counts tabs: `resolveExit` asks for ids, then saves
+ * each one. Filing the mode under an id of its own is what lets unsaved template work stop a
+ * quit without a second question or a second box — and it cannot collide with a tab, whose ids
+ * are `doc-<n>`.
+ */
+const TEMPLATE_MODE_ID = 'template-mode';
+
+/**
+ * Hands the template mode its ports (TYTO-44). Every one is a round trip to main except the
+ * last, which is what saving means to the rest of the window.
+ */
+function wireTemplateMode(bridge: TytoBridge): void {
+  const mode = elements.templateMode;
+  if (mode === null || mode === undefined) return;
+  mode.locale = state.locale;
+  mode.ports = {
+    open: async (directory) => (await bridge['template:open']({ directory })).template,
+    preview: (request) => bridge['template:preview'](request),
+    save: (request) => bridge['template:save'](request),
+    create: (name) => bridge['template:new']({ name }),
+    confirmDiscard: async () =>
+      (
+        await bridge['dialog:confirm']({
+          message: translate(state.locale, 'templateMode.discard.message'),
+          detail: translate(state.locale, 'templateMode.discard.detail'),
+          confirm: translate(state.locale, 'templateMode.discard.confirm'),
+          cancel: translate(state.locale, 'templateMode.discard.cancel'),
+        })
+      ).confirmed,
+    saved: () => {
+      void afterTemplateSaved(bridge);
+    },
+  };
+}
+
+/**
+ * A template was saved and main has read the folders again: every open brief is compiled again
+ * — the third acceptance criterion.
+ *
+ * **Every** open brief and not only the ones naming the template, because a save can rename
+ * it: a brief that named the old name stops resolving and one that named the new name starts,
+ * and both need the answer. It is one compile per tab, and background tabs are updated without
+ * a repaint, exactly as a late answer to their own typing is (`request`).
+ */
+async function afterTemplateSaved(bridge: TytoBridge): Promise<void> {
+  // The folder may now hold one template more, or one fewer — the picker's list and the
+  // footer's count come from the same read.
+  const chosen = await bridge['templates:folder']({});
+  state.templatesFolder = chosen.folder;
+  state.templatesFound = chosen.found;
+  await refreshTemplates(bridge);
+  await Promise.all(
+    workspace.documents.map((document_) => request(bridge, document_.id, contentOf(document_))),
+  );
+  repaint();
+}
+
 async function load(): Promise<void> {
   const bridge = window.tyto;
 
@@ -1629,6 +1719,8 @@ async function load(): Promise<void> {
     // Asked once here, and again only when the folder changes. A picker that re-asked per
     // click would be re-reading manifests that cannot have changed in between.
     await refreshTemplates(bridge);
+
+    wireTemplateMode(bridge);
   }
 
   if (elements.editor !== null) {

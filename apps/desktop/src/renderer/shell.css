@@ -860,3 +860,236 @@ tyto-export-dialog[open] {
   justify-content: flex-end;
   gap: 8px;
 }
+
+/*
+ * The template mode (TYTO-44). A fixed layer over the whole window, like the export dialog's,
+ * and not a dialog: it is where the work happens while it is open, so it takes the window
+ * rather than a box in the middle of it.
+ *
+ * `:not([open])` hides it instead of the element rendering nothing, because the two editor
+ * hosts inside must outlive a close (`template-mode.ts`). And every `[hidden]` inside is
+ * restated, because a `display` on a class outranks the attribute's own rule.
+ */
+tyto-template-mode {
+  position: fixed;
+  z-index: 9;
+  display: flex;
+  inset: 0;
+  background: var(--ground);
+}
+
+tyto-template-mode:not([open]),
+tyto-template-mode [hidden] {
+  display: none !important;
+}
+
+.template-mode__panel {
+  display: flex;
+  min-width: 0;
+  min-height: 0;
+  flex: 1;
+  flex-direction: column;
+  padding: 16px 24px;
+  gap: 12px;
+}
+
+.template-mode__head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px 16px;
+}
+
+.template-mode__title {
+  display: flex;
+  min-width: 0;
+  align-items: baseline;
+  gap: 12px;
+}
+
+.template-mode__heading {
+  margin: 0;
+  font-size: 18px;
+  white-space: nowrap;
+}
+
+.template-mode__folder {
+  overflow: hidden;
+  color: var(--muted);
+  font-size: 13px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.template-mode__actions,
+.template-mode__new {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.template-mode__problem {
+  width: 100%;
+  margin: 0;
+  color: #b3261e;
+}
+
+.template-mode__refusal {
+  max-width: 60ch;
+  padding: 16px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  margin: 0;
+}
+
+/* Two columns: the buffers at the left, the formats at the right. `min-height: 0` all the way
+   down, for `.shell`'s reason — without it a grid child refuses to shrink and the editor
+   pushes the problems off the bottom of the window. */
+.template-mode__work {
+  display: grid;
+  min-height: 0;
+  flex: 1;
+  gap: 16px;
+  grid-template-columns: minmax(320px, 1fr) minmax(320px, 1.1fr);
+}
+
+.template-mode__buffers,
+.template-mode__preview {
+  display: flex;
+  min-width: 0;
+  min-height: 0;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.template-mode__tabs {
+  display: flex;
+  gap: 4px;
+}
+
+.template-mode__tab {
+  padding: 4px 12px;
+  border: 1px solid var(--line);
+  border-radius: 6px 6px 0 0;
+  background: transparent;
+  color: var(--muted);
+  font: inherit;
+  font-family: ui-monospace, monospace;
+  font-size: 13px;
+}
+
+.template-mode__tab[aria-selected='true'] {
+  border-bottom-color: transparent;
+  color: var(--ink);
+  font-weight: 600;
+}
+
+.template-mode__dirty {
+  margin-left: 6px;
+  font-size: 10px;
+}
+
+.template-mode__buffer {
+  min-height: 0;
+  flex: 1;
+  border: 1px solid var(--line);
+  border-radius: 0 6px 6px;
+}
+
+.template-mode__buffer .cm-editor {
+  height: 100%;
+}
+
+.template-mode__sample {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 16px;
+}
+
+.template-mode__row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+/* The grid scrolls, and nothing else in the mode does: a manifest with five formats is a grid
+   taller than the window, and the buffers beside it must stay where they are. */
+.template-mode__grid {
+  display: flex;
+  min-height: 0;
+  flex: 1;
+  flex-wrap: wrap;
+  align-content: flex-start;
+  gap: 16px;
+  overflow: auto;
+}
+
+.template-mode__cell {
+  display: flex;
+  flex-direction: column;
+  margin: 0;
+  gap: 4px;
+}
+
+.template-mode__paper {
+  overflow: hidden;
+  box-shadow: 0 1px 4px rgb(0 0 0 / 20%);
+}
+
+.template-mode__frame {
+  display: block;
+  border: 0;
+}
+
+.template-mode__cell figcaption,
+.template-mode__note {
+  margin: 0;
+  color: var(--muted);
+  font-size: 13px;
+}
+
+.template-mode__problems {
+  max-height: 25vh;
+  overflow: auto;
+}
+
+.template-mode__subheading {
+  margin: 0 0 4px;
+  font-size: 14px;
+}
+
+.template-mode__notice {
+  margin: 0 0 4px;
+}
+
+.template-mode__notice--refused {
+  color: #b3261e;
+}
+
+.template-mode__list {
+  padding: 0;
+  margin: 0;
+  list-style: none;
+}
+
+.template-mode__problem-row {
+  display: flex;
+  padding: 2px 4px;
+  cursor: pointer;
+  font-size: 13px;
+  gap: 8px;
+}
+
+.template-mode__problem-row:hover {
+  background: var(--line);
+}
+
+.template-mode__problem-row--error code {
+  color: #b3261e;
+}
+
+.template-mode__file {
+  color: var(--muted);
+  font-family: ui-monospace, monospace;
+}

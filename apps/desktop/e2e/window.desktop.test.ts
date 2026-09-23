@@ -246,6 +246,10 @@ describe('the bridge', () => {
       'log:reveal',
       'log:write',
       'on',
+      'template:new',
+      'template:open',
+      'template:preview',
+      'template:save',
       'templates:folder',
       'templates:list',
       'templates:set-folder',
@@ -451,6 +455,12 @@ describe('the language picker', () => {
     'export.failed',
     'export.problems',
     'command.file.export',
+    // TYTO-44: the template mode renders its own strings, the export dialog's way, and the two
+    // commands that open it are the bar's and the menu's. `template-mode.test.ts` renders the
+    // element; `i18n.test.ts` holds every key to both locales.
+    'command.template.edit',
+    'command.template.new',
+    ...CATALOGUE_KEYS.filter((key) => key.startsWith('templateMode.')),
   ];
 
   it('paints every catalogue string on load, with none left blank', async () => {

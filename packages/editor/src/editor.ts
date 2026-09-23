@@ -52,11 +52,18 @@ import { vimMode } from './vim-mode.js';
 const programmatic = Annotation.define<boolean>();
 
 /** The two `LanguageSupport`s this package ships, by the name `createEditor` takes. */
-export type LanguageName = 'brief' | 'template';
+/**
+ * `plain` is a buffer with no grammar at all — the `manifest.yaml` beside a template, which
+ * the desktop's template mode edits in a tab of its own (TYTO-44). No YAML grammar is
+ * shipped: what makes a manifest right is `parseManifest`, and a colour table would only say
+ * that a line is YAML, which every line in that file is.
+ */
+export type LanguageName = 'brief' | 'template' | 'plain';
 
 const languages: Readonly<Record<LanguageName, () => Extension>> = {
   brief,
   template,
+  plain: () => [],
 };
 
 export interface EditorOptions {
@@ -85,7 +92,7 @@ export interface EditorOptions {
   /** Starts in vim mode. Toggle later with `setVimMode`. */
   readonly vim?: boolean;
   /**
-   * Which of the two languages the buffer holds. Defaults to `brief`.
+   * Which language the buffer holds. Defaults to `brief`.
    *
    * A name rather than a `LanguageSupport`, so a host still never imports CodeMirror — the
    * same reason `theme` is `'light' | 'dark'`. It is fixed for the life of the editor: a
