@@ -563,6 +563,34 @@ A name that is **both** — shipped code and a `template.html` in its folder —
 `E_TEMPLATE_AMBIGUOUS` rather than a winner picked quietly. A silent winner is a template
 that changes behaviour the day somebody edits the file it was ignoring.
 
+### What `tyto template check` covers on this route
+
+**On a code template, `check` verifies the manifest and states that the body was not
+checked.** It takes a folder along the route a render would (TYTO-170): a manifest name the
+build ships code for, with no `template.html` beside it, is a code template.
+
+```
+$ node apps/cli/dist/index.js template check packages/templates/templates/agenda-semana
+packages\templates\templates\agenda-semana: manifest: no problems found
+packages\templates\templates\agenda-semana: not checked: the template body — 'agenda-semana' is code compiled into this build, and check does not run code (ADR 0007). The manifest is what a render checks every brief against.
+```
+
+| Folder                                             | What `check` does                                                                | Exit                |
+| -------------------------------------------------- | -------------------------------------------------------------------------------- | ------------------- |
+| `template.html`, name not shipped                  | parses the manifest, compiles the markup against it                              | 1 on any error      |
+| no `template.html`, name shipped (`agenda-semana`) | parses the manifest; says the body was **not checked**                           | 0 if manifest clean |
+| `template.html` **and** name shipped               | `E_TEMPLATE_AMBIGUOUS`, the error a render gives                                 | 1                   |
+| `template.ts` only, name not shipped               | `E_INPUT_READ` for `template.html`, with a hint that folder code is never loaded | 1                   |
+
+**Exit 0 on a code template means the manifest is clean, not that the template is.** ADR
+0011 fixes three exit codes and none means "partly checked", so the difference is in the
+report: a `not checked:` line in prose, a `notChecked` array under `--json` (absent on the
+markup route, whose document is unchanged). What stands in for the unchecked half is the
+build: `template.ts` is type-checked by `pnpm check` and exercised by the pack's own tests,
+which `check` would only repeat less well. The body is never executed to find out
+(ADR 0007), which is also why `renderedSlots` — and so `W_UNUSED_SLOT`, below — has nothing
+to report on this route.
+
 ### `W_UNUSED_SLOT` does not fire for a code template
 
 A brief that fills a slot the template never draws is worth a warning, and on the markup
@@ -691,7 +719,9 @@ manifest declares; a brief that names fewer gets fewer.
 
 1. Read `manifest.yaml` and this document.
 2. Write `template.html`.
-3. Run `tyto template check templates/<name>` — returns diagnostics with line numbers.
+3. Run `tyto template check templates/<name>` — returns diagnostics with line numbers. On a
+   code template it checks the manifest only and says so; see
+   [What `tyto template check` covers on this route](#what-tyto-template-check-covers-on-this-route).
 4. Run `tyto render examples/<name>.brief --template <name> --out /tmp/x` and inspect the PNG —
    or keep `pnpm template:preview <folder>` open and read `/api/state` after each save.
 5. Iterate until `check` is clean and there is no `W_TEXT_OVERFLOW`.

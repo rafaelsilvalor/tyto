@@ -151,7 +151,9 @@ export function createProgram(environment: CliEnvironment, captured: Captured): 
 
   const check = template
     .command('check')
-    .description('validate a template folder: its manifest, then its markup')
+    .description(
+      'validate a template folder: its manifest, then its markup (a code body is named, not run)',
+    )
     .argument('<folder>', 'the templates/<name>/ folder to check')
     .option('--json', 'print a machine-readable document instead of prose', false)
     .action(async (folder: string) => {

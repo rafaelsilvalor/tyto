@@ -53,25 +53,19 @@ const faces = createFaceCache(bundledFontSource);
 interface Example {
   readonly template: string;
   readonly brief: string;
+  /**
+   * What the body is written in, stated here rather than read off the build: the check
+   * below asserts `tyto template check` tells the two apart, and deriving the expectation
+   * from the table the command itself consults would test the table against itself.
+   */
+  readonly body: 'markup' | 'code';
 }
 
 const EXAMPLES: readonly Example[] = [
-  { template: 'promo-curso', brief: 'examples/promo.brief' },
-  { template: 'carrossel-lista', brief: 'examples/lista.brief' },
-  { template: 'agenda-semana', brief: 'examples/agenda.brief' },
+  { template: 'promo-curso', brief: 'examples/promo.brief', body: 'markup' },
+  { template: 'carrossel-lista', brief: 'examples/lista.brief', body: 'markup' },
+  { template: 'agenda-semana', brief: 'examples/agenda.brief', body: 'code' },
 ];
-
-/**
- * The templates `tyto template check` can be run against.
- *
- * `agenda-semana` is not among them, and the omission is the finding rather than an
- * oversight: `check` reads `manifest.yaml` and `template.html`, and a folder whose body is
- * a `template.ts` has no second file for it to read — so it reports `E_TEMPLATE_READ` for
- * a template that renders correctly. `apps/cli/src/template.ts` says why it only checks
- * markup (running code from a folder is the plugin host's job, ADR 0007), which explains
- * the behaviour without making it useful. TYTO-170 is the gap.
- */
-const CHECKABLE: readonly string[] = ['promo-curso', 'carrossel-lista'];
 
 let formats: Awaited<ReturnType<typeof loadFormats>>;
 
@@ -323,19 +317,27 @@ describe('tyto template check', () => {
    * behind it. `check` reads the manifest and the markup and nothing else — no brief, no
    * formats.yaml — so it is the one thing that can say a template is wrong on its own.
    */
-  it.each(CHECKABLE)(
-    '%s: no problems found',
-    async (name) => {
+  it.each(EXAMPLES.map((example) => [example.template, example] as const))(
+    '%s: no problems found, and says what it did not check',
+    async (_name, example) => {
       const { stderr } = await runBinary(process.execPath, [
         CLI,
         'template',
         'check',
-        join(PACK, name),
+        join(PACK, example.template),
       ]);
 
       // `check` writes its report to stderr and exits 0 when nothing is wrong; a non-zero
       // exit rejects the promise, so reaching here is already half the assertion.
       expect(stderr).toContain('no problems found');
+      // The other half, per route (TYTO-170): a code body is named as unchecked, and a
+      // markup body — which was compiled against the manifest — is not.
+      if (example.body === 'code') {
+        expect(stderr).toContain('manifest: no problems found');
+        expect(stderr).toContain('not checked: the template body');
+      } else {
+        expect(stderr).not.toContain('not checked');
+      }
     },
     120_000,
   );
