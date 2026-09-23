@@ -86,7 +86,8 @@ than inferred from a suite that would have gone on passing while quietly sharing
 
 **Credentials do not travel.** `safeStorage` ciphertext lives under `credentials/`, so it moves
 with the folder and a person re-enters what they had until the import card lands. Stated in the
-release body rather than discovered.
+release body rather than discovered. _Amended by ADR 0036 (TYTO-151): they travel when the
+person ticks a separate, unticked box in the first-run question._
 
 **Every beta tester on a version before this one keeps their data where it is**, in
 `%APPDATA%\@tyto\desktop`, and nothing here reads it. `docs/releases/desktop-v0.3.0.md` is

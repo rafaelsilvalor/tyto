@@ -189,6 +189,22 @@ export interface Catalogue {
   readonly 'crash.detail': string;
   readonly 'crash.noLog': string;
   /**
+   * The one question a new version asks on its first run (TYTO-151, ADR 0036).
+   *
+   * `{version}` is the older version's folder name, spliced in at the point of use the way
+   * `{n}` is for the quit box. The detail says what comes across and that the older version
+   * keeps its copy, because "bring" read alone could mean "move".
+   *
+   * `import.credentials` is a checkbox of its own, unticked, and shown only when the older
+   * version had stored any: copying secrets is a different act from copying a panel width
+   * and gets its own sentence.
+   */
+  readonly 'import.message': string;
+  readonly 'import.detail': string;
+  readonly 'import.credentials': string;
+  readonly 'import.confirm': string;
+  readonly 'import.decline': string;
+  /**
    * The File submenu's own title (TYTO-124).
    *
    * Written by this app rather than left to `role: 'fileMenu'`, because that role's entire
@@ -351,6 +367,11 @@ export const CATALOGUE_KEYS = [
   'crash.title',
   'crash.detail',
   'crash.noLog',
+  'import.message',
+  'import.detail',
+  'import.credentials',
+  'import.confirm',
+  'import.decline',
   'menu.file',
   'command.document.new',
   'command.document.close',

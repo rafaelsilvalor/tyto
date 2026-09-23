@@ -377,6 +377,13 @@ describe('the language picker', () => {
     'crash.title',
     'crash.detail',
     'crash.noLog',
+    // TYTO-151: the first-run question about the previous version's settings, a native box
+    // main shows before the window exists — and never under `TYTO_HEADLESS`, which is here.
+    'import.message',
+    'import.detail',
+    'import.credentials',
+    'import.confirm',
+    'import.decline',
     'menu.file',
     'command.document.new',
     'command.document.close',

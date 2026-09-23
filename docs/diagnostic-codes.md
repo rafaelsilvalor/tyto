@@ -64,6 +64,7 @@ non-zero.
 | `W_UNUSED_SLOT` | warning | no | The brief sets a slot the chosen template never renders. |
 | `W_MARKUP_IN_FRONTMATTER` | warning | no | A frontmatter scalar on a rich-text slot contains what looks like inline markup. |
 | `W_TEMPLATE_SHADOWED` | warning | no | Two template sources declare the same name; the earlier source is the one used. |
+| `W_IMPORT_SKIPPED` | warning | no | Something in the previous version's data folder could not be brought across to this one. |
 
 ## What is fatal, and why
 
@@ -799,3 +800,17 @@ Template '{name}' in '{shadowed}' is shadowed by the one in '{used}', which is s
 ```
 
 Parameters: `name`, `shadowed`, `used`
+
+### `W_IMPORT_SKIPPED`
+
+**Severity:** warning · **Fatal:** no · **Spec:** `docs/adr/0036-the-previous-version-is-offered-once.md`
+
+Something in the previous version's data folder could not be brought across to this one.
+
+A warning never replaces a value (ADR 0013).
+
+```
+Could not bring '{item}' across from version {version}: {problem}.
+```
+
+Parameters: `item`, `version`, `problem`

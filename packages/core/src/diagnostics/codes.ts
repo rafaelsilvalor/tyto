@@ -483,6 +483,19 @@ export const diagnosticCodes = {
     fatal: false,
     fatality: 'A warning never replaces a value (ADR 0013).',
   },
+  // A warning and not an error, because nothing the person wrote is wrong: the new version
+  // opens either way, with whatever the older folder could give it. It exists so that "my
+  // recent files did not come across" has a line in the log that says which file and why
+  // (TYTO-151, ADR 0036).
+  W_IMPORT_SKIPPED: {
+    severity: 'warning',
+    summary:
+      "Something in the previous version's data folder could not be brought across to this one.",
+    template: "Could not bring '{item}' across from version {version}: {problem}.",
+    spec: 'docs/adr/0036-the-previous-version-is-offered-once.md',
+    fatal: false,
+    fatality: 'A warning never replaces a value (ADR 0013).',
+  },
 } as const satisfies Record<string, DiagnosticCodeDefinition>;
 
 export type DiagnosticCode = keyof typeof diagnosticCodes;
