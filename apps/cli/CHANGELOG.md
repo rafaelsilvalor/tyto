@@ -1,5 +1,25 @@
 # @tyto/cli
 
+## 0.2.4
+
+### Patch Changes
+
+- 63f24dc: TYTO-174 — `tyto render` places a markup template's diagnostics in `template.html` again. The
+  brief's origin was registered over the one `templateWiring` had already recorded, so a
+  broken tag on line 15 of the template printed as `promo.brief:15:1`: a real line of a file
+  with nothing wrong in it. The first registration now wins, which is what the comment beside
+  the second one always said.
+- Updated dependencies [8b24969]
+  - @tyto/core@0.24.0
+  - @tyto/export-html@0.6.1
+  - @tyto/export-svg@1.3.1
+  - @tyto/io@1.3.5
+  - @tyto/pipeline@0.8.2
+  - @tyto/plugin-api@0.3.7
+  - @tyto/raster@0.2.1
+  - @tyto/template-lang@0.6.4
+  - @tyto/templates@0.4.1
+
 ## 0.2.3
 
 ### Patch Changes

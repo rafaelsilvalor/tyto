@@ -1,5 +1,16 @@
 # @tyto/io
 
+## 1.3.5
+
+### Patch Changes
+
+- Updated dependencies [8b24969]
+  - @tyto/core@0.24.0
+  - @tyto/export-html@0.6.1
+  - @tyto/export-svg@1.3.1
+  - @tyto/pipeline@0.8.2
+  - @tyto/template-lang@0.6.4
+
 ## 1.3.4
 
 ### Patch Changes
