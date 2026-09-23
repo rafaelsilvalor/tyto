@@ -11,11 +11,10 @@
  * The fill is decided where the mark is placed, which is what lets the same owl be blue on
  * paper and white on a dark panel without a second copy of the geometry.
  *
- * **Both are drawn here rather than lifted from the brand files.** The Casa owl and
- * arrow were measured for TYTO-167 — 6 subpaths and 1486 characters for the owl, 70 for
- * the arrow — but the source SVGs are not in this repository, so what follows is geometry
- * written for this card. Swapping in the real artwork is changing `d` and `box` on these
- * two constants and nothing else: no call site names a coordinate.
+ * **Both are lifted from the brand files**, supplied by the maintainer for TYTO-173. The
+ * files themselves are not in this repository; the geometry is, and swapping it again is
+ * changing `d` and `box` on these two constants and nothing else: no call site names a
+ * coordinate.
  */
 
 import { font } from '@tyto/core/template';
@@ -24,17 +23,23 @@ import type { FontRef } from '@tyto/core';
 
 /* ------------------------------------------------------------------------- colour -- */
 
-/** The paper. Light, because the artwork's chrome is blue and its pills are grey. */
-export const PAPER = '#f2f5fa';
+// Read by eye off the reference slide of 2026-09-22, not off a brand file, which is not in
+// this repository. Provisional in the same way the two marks below are.
+
+/** The paper. White, as the published slide is. */
+export const PAPER = '#ffffff';
 
 /** The brand blue: the owl, the arrow, the discipline headings, the date pills. */
-export const INK = '#12306b';
+export const INK = '#009fe3';
+
+/** The cover words. A dark grey, so the blue is kept for what changes week to week. */
+export const COVER_INK = '#4a4a4a';
 
 /** The grey pill that holds a session's title and professor. */
-export const PILL = '#e2e8f2';
+export const PILL = '#dddddd';
 
-/** Type on the grey pill. Darker than `INK` so the pill does not read as a second button. */
-export const PILL_INK = '#1f2a3d';
+/** Type on the grey pill. */
+export const PILL_INK = '#3c3c3c';
 
 /** Type on a blue field — the date pill, the footer handle. */
 export const ON_INK = '#ffffff';
@@ -54,34 +59,48 @@ export const BOLD = 700;
 
 /** Sizes, named by what they are rather than by how big they are. */
 export const TYPE = {
-  cover: 88,
-  coverStory: 104,
-  discipline: 48,
-  sessionTitle: 30,
-  professor: 26,
-  date: 28,
-  handle: 30,
+  cover: 72,
+  discipline: 64,
+  sessionTitle: 22,
+  professor: 22,
+  date: 26,
+  handle: 26,
 } as const;
 
 /* ------------------------------------------------------------------------- spacing -- */
 
-/** The gutter every format measures from. */
-export const MARGIN = 80;
+// The spacing below was read off the maintainer's annotated reference of 2026-09-23, in
+// pixels of a 1089-wide export, so each is good to a few pixels rather than exact.
+
+/** The side gutter, left and right. */
+export const MARGIN = 70;
+
+/** Paper above the header band and below the footer band. */
+export const EDGE = { top: 60, bottom: 26 } as const;
+
+/** The two chrome bands: the owl sits in the header, the handle and arrow in the footer. */
+export const BAND = { header: 74, footer: 92 } as const;
 
 /** How far apart the pieces of a slide sit. */
 export const GAP = {
-  /** Between the date pill and the grey pill of one session. */
-  row: 20,
-  /** Between two sessions. */
-  sessions: 16,
-  /** Between a discipline's heading and its first session. */
-  heading: 24,
-  /** Between the cover block and the discipline below it. */
-  cover: 48,
+  /** Between two sessions of one discipline — the published slide's 4 px. */
+  sessions: 4,
+  /**
+   * Between a discipline's heading box and its first session. The box is taller than the
+   * letters, so this is about 20 px less than the ~36 px the eye measures to the glyphs.
+   */
+  heading: 16,
+  /** Between the cover words and the first discipline heading below them. */
+  cover: 24,
+  /**
+   * Between the last session of one discipline and the heading of the next — about 36 px
+   * to the glyphs once the heading box's own leading above the letters is counted.
+   */
+  disciplines: 24,
 } as const;
 
-/** Corner radius shared by both pills, so they read as one family. */
-export const RADIUS = 16;
+/** Corner radius shared by both pills: half their height, so their ends are round. */
+export const RADIUS = 43;
 
 /* ------------------------------------------------------------------------ geometry -- */
 
@@ -99,26 +118,50 @@ export interface Mark {
 }
 
 /**
- * The owl: one silhouette with two eyes and a beak punched out of it.
+ * The owl, from the brand file `Marks/SVG/White.svg` (supplied 2026-09-23).
  *
- * The brand file draws one of its subpaths three times, invisibly, because the fill is
- * opaque over itself. This one does not, which is the state the brand file should arrive
- * in: the duplicates are dropped on the way in, before anybody applies opacity and sees
- * them.
+ * Its six distinct subpaths are joined into one `d`, in the file's order. The file draws the
+ * body's lower half three times, invisibly, because the fill is opaque over itself; the two
+ * repeats are dropped here, before anybody applies opacity and sees them. The file's white
+ * fill is dropped too — geometry in, colour out.
+ *
+ * `nonzero`, as the file is drawn: the pupils are holes by winding direction, and no two of
+ * the joined subpaths overlap, so joining them changes nothing a fill rule decides.
  */
 export const OWL: Mark = {
-  box: { w: 120, h: 150 },
+  box: { w: 186.09, h: 376.79 },
   d:
-    // A placeholder (ADR 0065): a rounded rectangle with a round hole.
-    'M12,0H108A12,12,0,0,1,120,12V138A12,12,0,0,1,108,150H12A12,12,0,0,1,0,138V12A12,12,0,0,1,12,0Z' +
-    'M33,48A27,27,0,1,0,87,48A27,27,0,1,0,33,48Z',
-  fillRule: 'evenodd',
+    // The right eye, its pupil punched out by winding.
+    'M0,0h1v1h-1ZM0,0h1v1h-1Z' +
+    // The beak.
+    'M0,0h1v1h-1Z' +
+    // The left eye.
+    'M0,0h1v1h-1ZM0,0h1v1h-1Z' +
+    // The left wing.
+    'M0,0h1v1h-1Z' +
+    // The body's lower half, once.
+    'M0,0h1v1h-1Z' +
+    // The head and brow.
+    'M0,0h1v1h-1Z',
+  fillRule: 'nonzero',
 };
 
-/** The footer arrow: one shape, one colour, pointing at the handle beside it. */
+/**
+ * The footer arrow, from the brand file `seta.svg` (supplied 2026-09-23), colour dropped.
+ *
+ * The head is the file's; the shaft is longer. The published slide draws the same head on
+ * a tail about six times the arrow's height, and the file's tail is barely more than one.
+ * The shaft is the `H0` run, so lengthening it moves the head right by the same amount and
+ * leaves every other coordinate as the file has it.
+ */
+const ARROW_SHAFT = 2130;
+const ARROW_HEAD = 230.92;
+
 export const ARROW: Mark = {
-  box: { w: 24, h: 24 },
-  d: 'M2 11h15.2l-5.6-5.6L13 4l8 8-8 8-1.4-1.4 5.6-5.6H2z',
+  box: { w: ARROW_SHAFT + ARROW_HEAD, h: 377.81 },
+  d:
+    `M${ARROW_SHAFT},377.81v-134.18H0v-108.75h${ARROW_SHAFT}` +
+    `V0l${ARROW_HEAD},189.26-${ARROW_HEAD},188.55Z`,
   fillRule: 'nonzero',
 };
 

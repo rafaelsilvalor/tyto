@@ -11,11 +11,13 @@
  */
 
 import { group, image, rect, run, runsOf, solid, text, vector } from '@tyto/core/template';
-import { type Block, at, block, row, stack } from '@tyto/template-kit';
+import { type Block, at, block, stack } from '@tyto/template-kit';
 
 import {
   ARROW,
+  BAND,
   BOLD,
+  COVER_INK,
   FACE,
   GAP,
   HANDLE,
@@ -105,30 +107,39 @@ export function mark(shape: Mark, height: number, fill: string, name: string): B
 
 /** The owl, top left of every slide. */
 export function header(): Block {
-  return mark(OWL, 96, INK, 'owl');
+  return mark(OWL, 64, INK, 'owl');
 }
 
+/** The footer band's height; the handle and the arrow are centred on it. */
+const FOOTER_H = BAND.footer;
+
 /**
- * The handle and the arrow that points at it, bottom left of every slide.
+ * The handle, centred, and the arrow at the right edge pointing on to the next slide.
  *
  * The handle is a token and not a slot: it is the account the carousel is published from,
  * it is the same on every slide of every week, and a slot would be one more thing for a
- * brief to fill in correctly every time.
+ * brief to fill in correctly every time. Regular and tracked out, as the published slide
+ * sets it, so the signature reads quieter than the agenda above it.
  */
-export function footer(): Block {
-  const glyph = mark(ARROW, 30, INK, 'arrow');
-  const handle = block(
-    280,
-    38,
-    text({
-      name: 'handle',
-      runs: [run(HANDLE, { font: FACE, size: TYPE.handle, weight: BOLD, color: INK })],
-      box: { w: 280, h: 38 },
-      valign: 'middle',
+export function footer(width: number): Block {
+  const glyph = mark(ARROW, 26, INK, 'arrow');
+  const handle = text({
+    name: 'handle',
+    runs: [run(HANDLE, { font: FACE, size: TYPE.handle, weight: REGULAR, color: INK })],
+    box: { w: width, h: FOOTER_H },
+    align: 'center',
+    valign: 'middle',
+    letterSpacing: 4,
+  });
+
+  return block(
+    width,
+    FOOTER_H,
+    group({
+      name: 'footer',
+      children: [handle, at(width - glyph.width, (FOOTER_H - glyph.height) / 2, glyph)],
     }),
   );
-
-  return row({ name: 'footer', gap: 12, align: 'center', items: [glyph, handle] });
 }
 
 /* ------------------------------------------------------------------------ the cover -- */
@@ -154,8 +165,8 @@ export function cover(options: CoverOptions): Block {
   const words = label(
     options.titulo,
     { w: options.width, h: height },
-    { size: options.size, weight: BOLD, color: INK },
-    { name: 'cover-title', lineHeight: 1.05 },
+    { size: options.size, weight: BOLD, color: COVER_INK },
+    { name: 'cover-title', lineHeight: 1.05, align: 'center' },
   );
 
   if (options.ilustracao === undefined) return stack({ name: 'cover', items: [words] });
@@ -171,10 +182,18 @@ export function cover(options: CoverOptions): Block {
     }),
   );
 
-  return stack({ name: 'cover', gap: 24, items: [illustration, words] });
+  // Centred over the words, as the published slide sets it. A stack places its items at
+  // x = 0, so the offset is a block of the full width with the picture inside it.
+  const centred = block(
+    options.width,
+    ILLUSTRATION,
+    group({ children: [at((options.width - ILLUSTRATION) / 2, 0, illustration)] }),
+  );
+
+  return stack({ name: 'cover', gap: 16, items: [centred, words] });
 }
 
-const ILLUSTRATION = 220;
+const ILLUSTRATION = 180;
 
 /* ---------------------------------------------------------------------- a discipline -- */
 
@@ -186,10 +205,10 @@ export interface Session {
 }
 
 /** The pill sizes. Both rows are one height, which is the wall `sessionPill` describes. */
-const DATE = { w: 132, h: 96 } as const;
+const DATE = { w: 220, h: 86 } as const;
 
 /** Room between the grey pill's edge and the words inside it. */
-const PAD = { top: 12, right: 24, left: 24 } as const;
+const PAD = { top: 14, right: 32, left: 32 } as const;
 
 /** The blue pill on the left of a row, holding the date. */
 function datePill(data: RichText): Block {
@@ -211,44 +230,37 @@ function datePill(data: RichText): Block {
 }
 
 /**
- * The grey pill on the right of a row, holding the session and its professor.
+ * The grey pill of a row, holding the session and its professor.
  *
- * **This is where the route runs out.** Both text boxes state a height, and the pill states
- * one too, because a template cannot measure text: `build` decides every coordinate before
- * `layoutText` ever runs (`packages/core/src/brief/compile.ts`), so the height a title
- * needs does not exist yet when the height of the pill around it has to be written down.
+ * **It starts under the date pill, not beside it.** The published slide draws the two as
+ * one shape: the grey runs the full width of the row and the blue sits on top of its left
+ * end, so there is no gap and no second rounded edge between them. The words therefore
+ * start after the date pill, not after the grey pill's own edge.
  *
- * Stating `h` rather than leaving it absent is the deliberate half of that. An absent
- * height means "as large as the content needs", which would let a long title wrap *out of*
- * the pill with nothing said about it; a stated one overflows, and an overflow is a
- * `W_TEXT_OVERFLOW` naming the `disciplina` directive and the format. The wall is the same
- * either way — this makes it announce itself instead of shipping a slide with type lying
- * across the paper.
- *
- * And there is no second guard available: `max` on a repeatable slot counts occurrences,
- * not characters (`packages/core/src/template/manifest.ts`), so the manifest can cap how
- * many slides a week has and cannot cap how long one session's title is.
- *
- * TYTO-162 is the card that removes this. Until it lands, a title longer than one line is a
- * warning whose only answer is a shorter title.
+ * Both text boxes state a height, and so does the pill, because a template cannot measure
+ * text: `build` decides every coordinate before `layoutText` runs
+ * (`packages/core/src/brief/compile.ts`). What keeps a long title inside is `shrink`: the
+ * published pills are all one height and what varies is the type inside them, which
+ * `compile` resolves against the faces (docs/ir-schema.md). A box that grows with its text
+ * instead is TYTO-162.
  */
 function sessionPill(session: Session, width: number): Block {
-  const inner = width - PAD.left - PAD.right;
+  const inner = width - DATE.w - PAD.left - PAD.right;
 
   const copy = stack({
     gap: 4,
     items: [
       label(
         session.titulo,
-        { w: inner, h: 36 },
+        { w: inner, h: 30 },
         { size: TYPE.sessionTitle, weight: BOLD, color: PILL_INK },
-        { name: 'session-title' },
+        { name: 'session-title', overflow: 'shrink' },
       ),
       label(
         session.professor,
-        { w: inner, h: 32 },
+        { w: inner, h: 28 },
         { size: TYPE.professor, weight: REGULAR, color: PILL_INK },
-        { name: 'professor' },
+        { name: 'professor', overflow: 'shrink' },
       ),
     ],
   });
@@ -260,24 +272,33 @@ function sessionPill(session: Session, width: number): Block {
       name: 'session-pill',
       children: [
         rect({ size: { w: width, h: DATE.h }, radius: RADIUS, fill: solid(PILL) }),
-        at(PAD.left, PAD.top, copy),
+        at(DATE.w + PAD.left, (DATE.h - copy.height) / 2, copy),
       ],
     }),
   );
 }
 
-/** One session, drawn: the date beside the pill that holds the words. */
+/** One session, drawn: the grey pill across the row, and the date pill on top of its end. */
 export function sessionRow(session: Session, width: number): Block {
-  return row({
-    name: 'session',
-    gap: GAP.row,
-    align: 'center',
-    items: [datePill(session.data), sessionPill(session, width - DATE.w - GAP.row)],
-  });
+  const date = datePill(session.data);
+
+  return block(
+    width,
+    DATE.h,
+    group({
+      name: 'session',
+      // Painted in order, so the date is last: it covers the grey pill's rounded left end.
+      children: [sessionPill(session, width).draft, date.draft],
+    }),
+  );
 }
 
 /**
- * A discipline and its sessions, stacked.
+ * The discipline component: a heading and the sessions written under it, stacked.
+ *
+ * This is the unit a slide repeats — the maintainer's own word for it is "component" — so
+ * the slide never places a session, only disciplines, and a discipline never knows how many
+ * of its siblings share the slide.
  *
  * The `.map()` is the whole of "the number of sessions comes from the brief". Nothing above
  * it counts anything, and the `y` of the second session is the height of the first — a
@@ -286,12 +307,13 @@ export function sessionRow(session: Session, width: number): Block {
 export function discipline(name: RichText, sessions: readonly Session[], width: number): Block {
   const heading = label(
     name,
-    { w: width, h: 58 },
+    { w: width, h: 78 },
     { size: TYPE.discipline, weight: BOLD, color: INK },
-    { name: 'discipline' },
+    { name: 'discipline', align: 'center', overflow: 'shrink' },
   );
 
   const rows = stack({
+    name: 'eventos',
     gap: GAP.sessions,
     items: sessions.map((session) => sessionRow(session, width)),
   });
