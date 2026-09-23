@@ -221,62 +221,6 @@ const menuRebuilds = () => {
   };
 };
 
-/**
- * The template mode's service, recording what it was asked (TYTO-44).
- *
- * `template-editor.test.ts` drives the real one against folders. What is asserted here is the
- * handlers' own decisions: which folder a New goes into, what a dismissed picker answers, and
- * that a diagnostic crosses with the contract's fields and no others.
- */
-const templateEditor = () => {
-  const scaffolded: { parent: string; name: string }[] = [];
-  const opened: string[] = [];
-  return {
-    scaffolded,
-    opened,
-    open: (directory: string) => {
-      opened.push(directory);
-      return Promise.resolve({ kind: 'code' as const, directory });
-    },
-    preview: () =>
-      Promise.resolve({
-        frames: [],
-        diagnostics: [
-          {
-            severity: 'error' as const,
-            code: 'E_UNSUPPORTED_CSS' as const,
-            message: 'no',
-            file: 'markup' as const,
-            range: { start: 1, end: 2 },
-            // A field of core's that the contract does not carry.
-            fatal: true,
-          },
-        ],
-      }),
-    save: () => Promise.resolve({ saved: true, registered: true, name: 'cartaz', diagnostics: [] }),
-    scaffold: (parent: string, name: string) => {
-      scaffolded.push({ parent, name });
-      return Promise.resolve({ ok: true as const, directory: `${parent}/${name}` });
-    },
-  };
-};
-
-/** `null` is a dismissed picker; a default parameter would read `undefined` as "use the default". */
-const templateDialogs = (answer: string | null = '/escolhida') => {
-  const asked: string[] = [];
-  return {
-    asked,
-    chooseTemplate: () => {
-      asked.push('template');
-      return Promise.resolve(answer ?? undefined);
-    },
-    chooseParent: () => {
-      asked.push('parent');
-      return Promise.resolve(answer ?? undefined);
-    },
-  };
-};
-
 const dependencies = () => ({
   confirm: () => Promise.resolve(true),
   askToSave: () => Promise.resolve('cancel' as const),
@@ -292,8 +236,6 @@ const dependencies = () => ({
   preview: preview(),
   project: projectFolder(),
   templates: catalogue(),
-  templateEditor: templateEditor(),
-  templateDialogs: templateDialogs(),
 });
 
 describe('registerIpcHandlers', () => {
@@ -681,95 +623,5 @@ describe('the template folder channels', () => {
     // The point: a missing `choose` must not reach a handler that would read it as falsy and
     // silently clear somebody's folder.
     expect(project.asked).toEqual([]);
-  });
-});
-
-describe('the template mode channels (TYTO-44)', () => {
-  it('opens the folder it is given without asking, and asks when it is given none', async () => {
-    const editor = templateEditor();
-    const dialogs = templateDialogs();
-    const handlers = createHandlers({
-      ...dependencies(),
-      templateEditor: editor,
-      templateDialogs: dialogs,
-    });
-
-    await handlers['template:open']({ directory: '/dada' });
-    expect(dialogs.asked).toEqual([]);
-
-    await handlers['template:open']({ directory: null });
-    expect(dialogs.asked).toEqual(['template']);
-    expect(editor.opened).toEqual(['/dada', '/escolhida']);
-  });
-
-  it('answers a dismissed picker with no template, and opens nothing', async () => {
-    const editor = templateEditor();
-    const handlers = createHandlers({
-      ...dependencies(),
-      templateEditor: editor,
-      templateDialogs: templateDialogs(null),
-    });
-
-    expect(await handlers['template:open']({ directory: null })).toEqual({ template: null });
-    expect(editor.opened).toEqual([]);
-  });
-
-  it('scaffolds into the chosen template folder, so briefs can name it at once', async () => {
-    const editor = templateEditor();
-    const dialogs = templateDialogs();
-    const project = projectFolder();
-    await project.setFolder(true);
-    const handlers = createHandlers({
-      ...dependencies(),
-      project,
-      templateEditor: editor,
-      templateDialogs: dialogs,
-    });
-
-    const answer = await handlers['template:new']({ name: 'novo' });
-
-    expect(dialogs.asked).toEqual([]);
-    expect(editor.scaffolded).toEqual([{ parent: '/home/rafael/meus-templates', name: 'novo' }]);
-    expect(answer).toEqual({ directory: '/home/rafael/meus-templates/novo' });
-  });
-
-  it('asks where when no template folder is chosen, and does nothing when dismissed', async () => {
-    const editor = templateEditor();
-    const dialogs = templateDialogs(null);
-    const handlers = createHandlers({
-      ...dependencies(),
-      templateEditor: editor,
-      templateDialogs: dialogs,
-    });
-
-    expect(await handlers['template:new']({ name: 'novo' })).toEqual({ directory: null });
-    expect(dialogs.asked).toEqual(['parent']);
-    expect(editor.scaffolded).toEqual([]);
-  });
-
-  it('sends a diagnostic with its file and the contract fields, and nothing else', async () => {
-    const guarded = guard('template:preview', createHandlers(dependencies())['template:preview']);
-
-    const answer = await guarded({
-      requestId: 3,
-      directory: '/t',
-      manifest: '',
-      markup: '',
-      brief: '',
-    });
-
-    expect(answer).toEqual({
-      requestId: 3,
-      frames: [],
-      diagnostics: [
-        {
-          severity: 'error',
-          code: 'E_UNSUPPORTED_CSS',
-          message: 'no',
-          file: 'markup',
-          range: { start: 1, end: 2 },
-        },
-      ],
-    });
   });
 });

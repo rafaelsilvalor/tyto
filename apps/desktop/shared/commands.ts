@@ -49,12 +49,6 @@ export const FILE_MENU_GROUPS: readonly (readonly MenuCommand[])[] = [
     { id: 'editor.saveAs', label: 'command.file.saveAs' },
   ],
   [{ id: 'file.export', label: 'command.file.export' }],
-  // TYTO-44. Beside Export rather than under Open: a template is not a document this window
-  // tabs, and the mode it opens is the one place in the app that writes one.
-  [
-    { id: 'template.new', label: 'command.template.new' },
-    { id: 'template.edit', label: 'command.template.edit' },
-  ],
   [{ id: 'document.close', label: 'command.document.close' }],
 ];
 

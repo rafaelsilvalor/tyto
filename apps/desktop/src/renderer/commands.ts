@@ -64,15 +64,6 @@ export const FILE_EXPORT = 'file.export';
 export const TEMPLATES_CHOOSE_FOLDER = 'templates.chooseFolder';
 export const TEMPLATES_CLEAR_FOLDER = 'templates.clearFolder';
 /**
- * TYTO-44. The template mode: open a template folder to edit, or scaffold a new one.
- *
- * Two verbs for the File menu's reason — the bar lists what a person can do, and "edit" and
- * "make" are different things to want. `template.new` opens the mode on its name field rather
- * than asking in a box, because the mode is where the new template is going to be written.
- */
-export const TEMPLATE_EDIT = 'template.edit';
-export const TEMPLATE_NEW = 'template.new';
-/**
  * A recent file, as a command per entry (E9.8).
  *
  * The path is in the id, which is what lets the bar list ten of them without a second kind
@@ -152,8 +143,6 @@ export const COMMAND_LABELS: Readonly<Record<string, CatalogueKey>> = {
   [FILE_EXPORT]: 'command.file.export',
   [TEMPLATES_CHOOSE_FOLDER]: 'command.templates.chooseFolder',
   [TEMPLATES_CLEAR_FOLDER]: 'command.templates.clearFolder',
-  [TEMPLATE_EDIT]: 'command.template.edit',
-  [TEMPLATE_NEW]: 'command.template.new',
   [LAYOUT_RESTORE]: 'command.layout.restore',
   [DOCUMENT_CLOSE]: 'command.document.close',
   [DOCUMENT_NEXT]: 'command.document.next',
@@ -204,9 +193,6 @@ export interface DesktopActions {
    */
   chooseTemplateFolder(): void;
   clearTemplateFolder(): void;
-  /** TYTO-44. Both open the template mode; what happens in it is a round trip to main. */
-  editTemplate(): void;
-  newTemplate(): void;
 }
 
 /**
@@ -285,13 +271,6 @@ export function createDesktopRegistry(actions: DesktopActions): CommandRegistry 
 
   add(TEMPLATES_CLEAR_FOLDER, () => {
     actions.clearTemplateFolder();
-  });
-
-  add(TEMPLATE_EDIT, () => {
-    actions.editTemplate();
-  });
-  add(TEMPLATE_NEW, () => {
-    actions.newTemplate();
   });
 
   // Reachable with every panel closed, which is the acceptance criterion and the reason it

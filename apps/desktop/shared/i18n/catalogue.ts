@@ -300,36 +300,6 @@ export interface Catalogue {
   readonly 'export.failed': string;
   readonly 'export.problems': string;
   readonly 'command.file.export': string;
-
-  /** The template mode (TYTO-44). */
-  readonly 'command.template.edit': string;
-  readonly 'command.template.new': string;
-  readonly 'templateMode.heading': string;
-  readonly 'templateMode.save': string;
-  readonly 'templateMode.close': string;
-  readonly 'templateMode.openOther': string;
-  readonly 'templateMode.example': string;
-  readonly 'templateMode.noExample': string;
-  readonly 'templateMode.slide': string;
-  readonly 'templateMode.empty': string;
-  readonly 'templateMode.problems': string;
-  readonly 'templateMode.clean': string;
-  readonly 'templateMode.file.render': string;
-  readonly 'templateMode.unsaved': string;
-  readonly 'templateMode.saved': string;
-  readonly 'templateMode.savedUnregistered': string;
-  readonly 'templateMode.saveRefused': string;
-  readonly 'templateMode.code': string;
-  readonly 'templateMode.refused': string;
-  readonly 'templateMode.new.name': string;
-  readonly 'templateMode.new.create': string;
-  readonly 'templateMode.new.problem.name': string;
-  readonly 'templateMode.new.problem.exists': string;
-  readonly 'templateMode.new.problem.write': string;
-  readonly 'templateMode.discard.message': string;
-  readonly 'templateMode.discard.detail': string;
-  readonly 'templateMode.discard.confirm': string;
-  readonly 'templateMode.discard.cancel': string;
 }
 
 export type CatalogueKey = keyof Catalogue;
@@ -460,32 +430,4 @@ export const CATALOGUE_KEYS = [
   'export.failed',
   'export.problems',
   'command.file.export',
-  'command.template.edit',
-  'command.template.new',
-  'templateMode.heading',
-  'templateMode.save',
-  'templateMode.close',
-  'templateMode.openOther',
-  'templateMode.example',
-  'templateMode.noExample',
-  'templateMode.slide',
-  'templateMode.empty',
-  'templateMode.problems',
-  'templateMode.clean',
-  'templateMode.file.render',
-  'templateMode.unsaved',
-  'templateMode.saved',
-  'templateMode.savedUnregistered',
-  'templateMode.saveRefused',
-  'templateMode.code',
-  'templateMode.refused',
-  'templateMode.new.name',
-  'templateMode.new.create',
-  'templateMode.new.problem.name',
-  'templateMode.new.problem.exists',
-  'templateMode.new.problem.write',
-  'templateMode.discard.message',
-  'templateMode.discard.detail',
-  'templateMode.discard.confirm',
-  'templateMode.discard.cancel',
 ] as const satisfies readonly CatalogueKey[];
