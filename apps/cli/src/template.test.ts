@@ -4,9 +4,12 @@ import { join } from 'node:path';
 
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
+import type { BundledTemplates } from '@tyto/pipeline';
+
 import type { CliEnvironment } from './environment.js';
 import { EXIT_DIAGNOSTICS, EXIT_OK } from './exit.js';
 import { run } from './program.js';
+import { templateCheckCommand } from './template.js';
 
 import manifestSource from './__fixtures__/cartaz.manifest.yaml?raw';
 import markSource from './__fixtures__/mark.svg?raw';
@@ -133,6 +136,100 @@ describe('tyto template check', () => {
 
     expect(code).toBe(EXIT_OK);
     expect(JSON.parse(stdout())).toEqual({ status: 'ok', diagnostics: [] });
+  });
+});
+
+describe('tyto template check on a code template (TYTO-170)', () => {
+  /**
+   * A build that fails the test if anything calls it. The claim is that `check` names the
+   * body without running it (ADR 0007), and a build that only returned a frame would let a
+   * `check` that quietly executed it pass.
+   */
+  const shipped = (name: string): BundledTemplates => ({
+    [name]: () => {
+      throw new Error('template check must never run a template body');
+    },
+  });
+
+  async function installCodeTemplate(name: string, manifest = manifestSource): Promise<string> {
+    const directory = join(workspace, 'templates', name);
+    await mkdir(directory, { recursive: true });
+    await writeFile(
+      join(directory, 'manifest.yaml'),
+      manifest.replace('name: cartaz', `name: ${name}`),
+    );
+    await writeFile(join(directory, 'template.ts'), 'export const build = () => undefined;\n');
+    return directory;
+  }
+
+  it('checks the manifest, exits 0, and says the body was not checked', async () => {
+    await installCodeTemplate('agenda');
+
+    const code = await templateCheckCommand(
+      'templates/agenda',
+      { json: false },
+      environment(),
+      shipped('agenda'),
+    );
+
+    expect(code, stderr()).toBe(EXIT_OK);
+    expect(stderr()).toContain('manifest: no problems found');
+    expect(stderr()).toContain('not checked: the template body');
+    expect(stderr()).not.toContain('template.html');
+  });
+
+  it('puts what was not checked in the --json document too', async () => {
+    await installCodeTemplate('agenda');
+
+    const code = await templateCheckCommand(
+      'templates/agenda',
+      { json: true },
+      environment(),
+      shipped('agenda'),
+    );
+
+    expect(code).toBe(EXIT_OK);
+    const document = JSON.parse(stdout()) as { notChecked?: { subject: string }[] };
+    expect(document).toMatchObject({ status: 'ok', diagnostics: [] });
+    expect(document.notChecked?.map((item) => item.subject)).toEqual(['the template body']);
+  });
+
+  it('still fails on a manifest that does not parse — exit 0 is earned by the manifest', async () => {
+    await installCodeTemplate('agenda', 'name: cartaz\nslots: [this is not a mapping]\n');
+
+    const code = await templateCheckCommand(
+      'templates/agenda',
+      { json: false },
+      environment(),
+      shipped('agenda'),
+    );
+
+    expect(code).toBe(EXIT_DIAGNOSTICS);
+    expect(stderr()).toMatch(/manifest\.yaml/u);
+  });
+
+  it('reports shipped code with a template.html beside it, as a render would', async () => {
+    await installTemplate('agenda');
+
+    const code = await templateCheckCommand(
+      'templates/agenda',
+      { json: false },
+      environment(),
+      shipped('agenda'),
+    );
+
+    expect(code).toBe(EXIT_DIAGNOSTICS);
+    expect(stderr()).toContain('E_TEMPLATE_AMBIGUOUS');
+  });
+
+  it('fails a template.ts nothing ships, and says why the file is not enough', async () => {
+    await installCodeTemplate('proprio');
+
+    const code = await run(['template', 'check', 'templates/proprio'], environment());
+
+    expect(code).toBe(EXIT_DIAGNOSTICS);
+    expect(stderr()).toContain('E_INPUT_READ');
+    expect(stderr()).toContain('ships no code template named');
   });
 });
 

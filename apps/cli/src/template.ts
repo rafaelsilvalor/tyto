@@ -1,10 +1,11 @@
-import { mkdir, readFile, writeFile } from 'node:fs/promises';
+import { access, mkdir, readFile, writeFile } from 'node:fs/promises';
 import { basename, join, resolve } from 'node:path';
 
-import { type Diagnostic, parseManifest } from '@tyto/core';
+import { type Diagnostic, diagnostic, parseManifest } from '@tyto/core';
 import { fileTemplateAssets } from '@tyto/io';
 import { compileTemplate } from '@tyto/template-lang';
-import { TEMPLATE_FILE } from '@tyto/pipeline';
+import { TEMPLATE_FILE, type BundledTemplates } from '@tyto/pipeline';
+import { BUILT_IN_TEMPLATE_BUILDS } from '@tyto/templates';
 
 import type { CliEnvironment } from './environment.js';
 import { EXIT_DIAGNOSTICS, EXIT_OK, type ExitCode } from './exit.js';
@@ -20,18 +21,42 @@ import { diagnosticsDocument, formatDiagnostics, json, registerOrigin } from './
  * command rather than "render something and see": it reads the manifest and the markup and
  * reports on both, without a brief, without a project's `formats.yaml`, and without ever
  * building a scene. A template can be wrong in ways no brief would reveal.
+ *
+ * ## The two routes, decided the way `tyto render` decides them
+ *
+ * A folder is checked along the route a render would take it, so `check` and `render`
+ * cannot disagree about what a folder is. A manifest name this build ships code for, with
+ * no `template.html` beside it, is a **code template**: its manifest is parsed and reported
+ * exactly as a markup template's is, and its body is not checked — and the report says so
+ * in words, because a clean report that silently skipped half the template reads as a
+ * clean template. The body is not run to find out (ADR 0007), and it is not type-checked
+ * either: that is the build's job, and `check` would be a second, weaker compiler.
+ *
+ * **Exit 0 on that route means the manifest is clean**, not that the template is. ADR 0011
+ * fixes three exit codes and none of them means "partly checked", so the difference lives
+ * in the report, where a person and `--json` both read it. Every other folder takes the
+ * markup route, unchanged.
  */
 
 const MANIFEST_FILE = 'manifest.yaml';
+const CODE_FILE = 'template.ts';
 
 export interface TemplateCheckOptions {
   readonly json: boolean;
+}
+
+/** Something `check` looked at and did not verify, stated rather than implied. */
+interface NotChecked {
+  readonly subject: string;
+  readonly reason: string;
 }
 
 export async function templateCheckCommand(
   folder: string,
   options: TemplateCheckOptions,
   environment: CliEnvironment,
+  // The CLI's own build: the same table `tyto render` composes in front of markup.
+  bundled: BundledTemplates = BUILT_IN_TEMPLATE_BUILDS,
 ): Promise<ExitCode> {
   const { cwd } = environment;
   const directory = resolve(cwd, folder);
@@ -39,13 +64,27 @@ export async function templateCheckCommand(
   const templatePath = displayPath(cwd, join(directory, TEMPLATE_FILE));
 
   const problems: Diagnostic[] = [];
+  const notChecked: NotChecked[] = [];
   const report = (): ExitCode => {
     if (options.json) {
-      environment.console.out(json(diagnosticsDocument(problems)));
-    } else if (problems.length === 0) {
-      environment.console.err(`${displayPath(cwd, directory)}: no problems found\n`);
+      const document = diagnosticsDocument(problems);
+      // Absent rather than empty on the markup route, so its document is what it was.
+      environment.console.out(
+        json(notChecked.length === 0 ? document : { ...document, notChecked }),
+      );
     } else {
-      environment.console.err(formatDiagnostics(problems));
+      const where = displayPath(cwd, directory);
+      if (problems.length > 0) environment.console.err(formatDiagnostics(problems));
+      if (notChecked.length > 0) {
+        if (problems.length === 0) {
+          environment.console.err(`${where}: manifest: no problems found\n`);
+        }
+        for (const item of notChecked) {
+          environment.console.err(`${where}: not checked: ${item.subject} — ${item.reason}\n`);
+        }
+      } else if (problems.length === 0) {
+        environment.console.err(`${where}: no problems found\n`);
+      }
     }
     return problems.some((item) => item.severity === 'error') ? EXIT_DIAGNOSTICS : EXIT_OK;
   };
@@ -70,13 +109,35 @@ export async function templateCheckCommand(
   registerOrigin(manifest.diagnostics, { path: manifestPath, source: manifestSource });
   problems.push(...manifest.diagnostics);
 
+  const name = manifest.value.name;
+  const shipped = bundled[name] !== undefined;
+
   let templateSource: string;
   try {
     templateSource = await readFile(join(directory, TEMPLATE_FILE), 'utf8');
   } catch (cause) {
-    // Only the markup path is checked: a `template.ts` is code, and running code that
-    // arrived from a folder is the plugin host's job with its permissions (ADR 0007).
-    problems.push(...readFailure(templatePath, cause));
+    if (shipped) {
+      notChecked.push({
+        subject: 'the template body',
+        reason:
+          `'${name}' is code compiled into this build, and check does not run code ` +
+          '(ADR 0007). The manifest is what a render checks every brief against.',
+      });
+      return report();
+    }
+    problems.push(...(await markupReadFailure(directory, templatePath, name, cause)));
+    return report();
+  }
+
+  if (shipped) {
+    // What `bundledTemplateSource` answers at render time, said before a render has to.
+    problems.push(
+      diagnostic('E_TEMPLATE_AMBIGUOUS', {
+        name,
+        file: TEMPLATE_FILE,
+        directory: displayPath(cwd, directory),
+      }),
+    );
     return report();
   }
 
@@ -91,6 +152,33 @@ export async function templateCheckCommand(
   problems.push(...produced);
 
   return report();
+}
+
+/**
+ * No `template.html`, and no shipped code under this name.
+ *
+ * A `template.ts` beside the manifest earns a hint, because the read failure alone reads
+ * like a forgotten file when the author wrote the body on purpose — as code, in a folder,
+ * where nothing will ever load it (ADR 0007).
+ */
+async function markupReadFailure(
+  directory: string,
+  templatePath: string,
+  name: string,
+  cause: unknown,
+): Promise<Diagnostic[]> {
+  const failures = readFailure(templatePath, cause);
+  const hasCode = await access(join(directory, CODE_FILE)).then(
+    () => true,
+    () => false,
+  );
+  if (!hasCode) return [...failures];
+  return failures.map((failure) => ({
+    ...failure,
+    hint:
+      `'${CODE_FILE}' is here, but this build ships no code template named '${name}', and ` +
+      'code in a folder is never loaded (ADR 0007). A render fails the same way.',
+  }));
 }
 
 /* ------------------------------------------------------------------------------ new -- */
