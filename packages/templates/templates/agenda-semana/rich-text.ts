@@ -3,17 +3,18 @@
  *
  * A manifest may declare **at most one** repeatable slot, and its occurrences become
  * artworks (`packages/core/src/template/manifest.ts`). This carousel spends that repeat on
- * "one slide per discipline", which leaves the sessions inside a slide with nothing to
- * repeat with — and the sessions are exactly what has to vary.
+ * the slide, as the published one is cut (TYTO-173), which leaves the disciplines on a slide
+ * and the sessions under each with nothing to repeat with — and both have to vary.
  *
- * So the occurrence carries both. Its first line is the discipline, and every line after it
- * is one session written as `date | title | professor`:
+ * So the occurrence carries both. A line with no `|` starts a discipline, and every line
+ * under it is one session written as `date | title | professor`:
  *
  * ```
- * ::disciplina
- *   Clínica Médica
- *   22/09 | Insuficiência cardíaca descompensada | Dr. Fulano
- *   24/09 | Arritmias na emergência | Dra. Beltrana
+ * ::slide
+ *   FARMÁCIA
+ *   16/09 - 14:00 | Farmacologia Geral | Profª. Rafaela Gomes
+ *   SERVIÇO SOCIAL
+ *   15/09 - 19:00 | Serviço Social no âmbito hospitalar | Profª. Nilza Ciciliati
  * ```
  *
  * The language already hands that over as structure: "the line between two block lines is a

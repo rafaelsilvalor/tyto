@@ -1,5 +1,5 @@
-import { type AssetRef, type Diagnostics, hasErrors } from '@tyto/core';
-import { bundledFont } from '@tyto/fonts';
+import { type AssetRef, type Diagnostics, createFaceCache, hasErrors } from '@tyto/core';
+import { bundledFont, bundledFontSource } from '@tyto/fonts';
 import {
   type ExportResources,
   type RenderResult,
@@ -66,6 +66,17 @@ export interface RenderTaskReport {
   /** False when anything in `diagnostics` is an error, which is what exit 1 means. */
   readonly ok: boolean;
 }
+
+/**
+ * The faces `compile` measures text against, so it decides the line breaks and resolves an
+ * `overflow: 'shrink'` into the runs (ADR 0019).
+ *
+ * Without them `compile` skips measurement entirely: a shrink reaches `export-html` as
+ * `W_EXPORT_APPROXIMATED` and is clipped, and `W_TEXT_OVERFLOW` is never raised — while
+ * the desktop preview, which does pass them, measures the same brief. Measured for
+ * TYTO-173. One cache for the process, because the bundled faces never change under it.
+ */
+const faces = createFaceCache(bundledFontSource);
 
 /**
  * Everything an exporter can be asked for, from the places that have it.
@@ -141,6 +152,7 @@ export async function renderTask(
       assets: fileAssetResolver({ base: task.assetBase }),
       exporters: host.registry.exporters,
       formats: context.formats,
+      faces,
       // Read back out of the registry rather than passed through: what renders is what was
       // registered, which is the claim the extension point makes.
       ...(registered === undefined ? {} : { rasterizer: registered }),

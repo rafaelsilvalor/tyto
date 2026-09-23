@@ -36,7 +36,7 @@ Boundary rules:
 | `tyto render <brief> --out`    | one brief → artifacts + `result.json` in `--out`. The contract above                |
 | `tyto render … --folder`       | the same, delivered as `<out>/<brief-name>/` with the brief kept beside the artwork |
 | `tyto watch <folder>`          | `<folder>/inbox/<id>/` → `<folder>/outbox/<id>/out/`, forever. `--once` for a sweep |
-| `tyto template check <folder>` | manifest, then markup, with line and column. No brief, no `formats.yaml`            |
+| `tyto template check <folder>` | manifest, then markup (or, for a code body, the manifest and a `not checked` line)  |
 | `tyto template new <name>`     | scaffolds a template folder from `docs/template-authoring.md`                       |
 
 A project is two paths, both overridable: `--templates` (default `templates/`, one subfolder

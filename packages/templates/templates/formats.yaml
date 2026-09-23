@@ -3,3 +3,5 @@
 # A project overrides this with its own; a template states its layout, not its canvas.
 feed: { w: 1080, h: 1080 }
 story: { w: 1080, h: 1920, label: Story }
+# Instagram's portrait post, 4:5. The published Agenda da semana carousel is cut to it.
+retrato: { w: 1080, h: 1350, label: Retrato }
