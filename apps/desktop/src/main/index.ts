@@ -16,6 +16,7 @@ import { menuTemplate } from './menu.js';
 import { fileRecentFiles } from './recent-files.js';
 import { registerIpcHandlers, sendIpcEvent } from './ipc.js';
 import { activateBuiltIns, builtInTemplatesDirectory } from './plugins.js';
+import { offerPreviousVersion } from './previous-version.js';
 import { createPreviewService } from './preview.js';
 import { createProjectSources } from './project.js';
 import { createExitGuard } from './quit.js';
@@ -90,6 +91,12 @@ let reportCrash = (reason: unknown): void => {
 // the old behaviour and still a running app. `reportCrash` works here: before `ready`,
 // `app.getLocale()` answers with the empty string rather than throwing, and `localeFor` maps
 // that to the default locale.
+//
+// Kept, because `start` needs to know whether this folder was *chosen* or *given*: only a
+// chosen one has sibling versions to offer an import from (TYTO-151). A folder named with
+// `--user-data-dir` is a suite's scratch folder, and a question on its first run would be a
+// native box nobody is there to answer.
+let chosenUserData: string | undefined;
 try {
   const userData = chooseUserDataPath({
     appData: app.getPath('appData'),
@@ -98,7 +105,10 @@ try {
       ? app.commandLine.getSwitchValue('user-data-dir')
       : undefined,
   });
-  if (userData !== undefined) app.setPath('userData', userData);
+  if (userData !== undefined) {
+    app.setPath('userData', userData);
+    chosenUserData = userData;
+  }
 } catch (reason) {
   reportCrash(reason);
 }
@@ -197,6 +207,44 @@ async function start(): Promise<void> {
   installCrashHandlers(process, log, (reason) => {
     reportCrash(reason);
   });
+
+  // **The previous version's settings, offered before anything reads its own** (TYTO-151,
+  // ADR 0036). Before `settings.read()` below, because the templates folder that read returns
+  // decides which templates the registry is built from; after the log and the crash box,
+  // because `offerPreviousVersion` logs what it could not bring and never throws.
+  //
+  // A native box and not a page in the window, for the same reason: the answer has to exist
+  // before the window's first question does. The two buttons and the checkbox are the whole
+  // decision, and the checkbox is unticked — secrets travel only when somebody says so.
+  //
+  // **Not under `TYTO_HEADLESS`, and that was measured.** Four end-to-end suites launch
+  // without `--user-data-dir`, so they run in the real `<appData>/Tyto/<version>`; on a
+  // machine that has an older version beside it, the box opened with no window and no person,
+  // and all four timed out waiting for `firstWindow`. A question nobody is there to answer is
+  // not asked, and nothing is recorded, so the next real launch still asks.
+  if (chosenUserData !== undefined && process.env['TYTO_HEADLESS'] !== '1') {
+    await offerPreviousVersion({
+      userData: chosenUserData,
+      productRoot: dirname(chosenUserData),
+      version: app.getVersion(),
+      log,
+      ask: async (offer) => {
+        const fill = (text: string): string => text.replaceAll('{version}', offer.version);
+        const answer = await dialog.showMessageBox({
+          type: 'question',
+          message: fill(translate(uiLocale, 'import.message')),
+          detail: fill(translate(uiLocale, 'import.detail')),
+          buttons: [translate(uiLocale, 'import.confirm'), translate(uiLocale, 'import.decline')],
+          defaultId: 0,
+          cancelId: 1,
+          ...(offer.hasCredentials
+            ? { checkboxLabel: translate(uiLocale, 'import.credentials'), checkboxChecked: false }
+            : {}),
+        });
+        return { accept: answer.response === 0, includeCredentials: answer.checkboxChecked };
+      },
+    });
+  }
 
   // The registry is read before the window opens, not after: the renderer's first question
   // is which templates exist, and answering it with "not yet" would put a loading state in
