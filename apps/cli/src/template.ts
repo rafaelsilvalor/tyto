@@ -1,9 +1,9 @@
 import { access, mkdir, readFile, writeFile } from 'node:fs/promises';
-import { basename, join, resolve } from 'node:path';
+import { basename, dirname, join, resolve } from 'node:path';
 
 import { type Diagnostic, diagnostic, parseManifest } from '@tyto/core';
 import { fileTemplateAssets } from '@tyto/io';
-import { compileTemplate } from '@tyto/template-lang';
+import { TEMPLATE_NAME, compileTemplate, scaffoldTemplate } from '@tyto/template-lang';
 import { TEMPLATE_FILE, type BundledTemplates } from '@tyto/pipeline';
 import { BUILT_IN_TEMPLATE_BUILDS } from '@tyto/templates';
 
@@ -40,6 +40,9 @@ import { diagnosticsDocument, formatDiagnostics, json, registerOrigin } from './
 
 const MANIFEST_FILE = 'manifest.yaml';
 const CODE_FILE = 'template.ts';
+
+/** Where a template keeps the briefs it is previewed and checked against. */
+const EXAMPLES_DIRECTORY = 'examples';
 
 export interface TemplateCheckOptions {
   readonly json: boolean;
@@ -189,71 +192,6 @@ export interface TemplateNewOptions {
   readonly formats: readonly string[];
 }
 
-/**
- * The scaffold, written from `docs/template-authoring.md` and nothing else.
- *
- * Deliberately small and deliberately complete: a manifest with one slot of each kind an
- * author will reach for, and a body that draws them. An author's first edit should be
- * changing something, not adding the first thing.
- */
-function manifestFor(name: string, formats: readonly string[]): string {
-  return `name: ${name}
-version: 0.1.0
-description: TODO — one line on what this template is for.
-formats: [${formats.join(', ')}]
-slots:
-  titulo: { type: rich-text, required: true, max: 60 }
-  imagem: { type: image }
-  cor: { type: enum, values: [azul, laranja], default: azul }
-`;
-}
-
-function templateFor(formats: readonly string[]): string {
-  const [first = 'feed', ...rest] = formats;
-  const extended = rest
-    .map((format) => `<frame format="${format}" extends="${first}" />\n`)
-    .join('');
-
-  return `<!-- Scaffolded by \`tyto template new\`. The vocabulary is in
-     docs/template-authoring.md; \`tyto template check\` reports on this file. -->
-
-<frame format="${first}" bg="var(--bg)">
-  <image slot="imagem" class="photo" />
-  <text slot="titulo" class="title" />
-</frame>
-${extended}
-<style>
-  :root {
-    --bg: #0c2340;
-  }
-  /* An enum reaches a value only through @if: --slot-cor holds the word, not the colour. */
-  @if slot(cor) is laranja {
-    :root {
-      --bg: #ff5900;
-    }
-  }
-
-  .photo {
-    x: 0;
-    y: 0;
-    w: 100%;
-    h: 60%;
-  }
-  .title {
-    x: 64;
-    y: 70%;
-    w: 80%;
-    font: 700 72px/1.05 "Inter";
-    color: white;
-    overflow: shrink;
-  }
-</style>
-`;
-}
-
-/** The grammar's identifier, which is what a manifest name and a `--template` flag allow. */
-const TEMPLATE_NAME = /^[a-zA-Z_][a-zA-Z0-9_-]*$/u;
-
 export async function templateNewCommand(
   name: string,
   options: TemplateNewOptions,
@@ -275,15 +213,20 @@ export async function templateNewCommand(
   const directory = resolve(cwd, options.out, name);
   await mkdir(directory, { recursive: true });
 
+  // The same text the desktop's New template writes (`@tyto/template-lang`, TYTO-44).
+  const scaffold = scaffoldTemplate(name, options.formats);
+
   // `wx` — never overwrite. A person who ran this twice by accident should not lose the
   // template they spent the afternoon on.
   const written: string[] = [];
   for (const [file, contents] of [
-    [MANIFEST_FILE, manifestFor(name, options.formats)],
-    [TEMPLATE_FILE, templateFor(options.formats)],
+    [MANIFEST_FILE, scaffold.manifest],
+    [TEMPLATE_FILE, scaffold.markup],
+    [join(EXAMPLES_DIRECTORY, `${name}.brief`), scaffold.example],
   ] as const) {
     const path = join(directory, file);
     try {
+      await mkdir(dirname(path), { recursive: true });
       await writeFile(path, contents, { flag: 'wx' });
     } catch (cause) {
       environment.console.err(

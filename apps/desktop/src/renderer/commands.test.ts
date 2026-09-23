@@ -22,6 +22,8 @@ import {
   PREVIEW_ZOOM_OUT,
   TEMPLATES_CHOOSE_FOLDER,
   TEMPLATES_CLEAR_FOLDER,
+  TEMPLATE_EDIT,
+  TEMPLATE_NEW,
   SHELL_TOGGLE_LOCALE,
   bindingsOf,
   createDesktopRegistry,
@@ -54,6 +56,8 @@ const actions = () =>
     openExport: vi.fn<() => void>(),
     chooseTemplateFolder: vi.fn<() => void>(),
     clearTemplateFolder: vi.fn<() => void>(),
+    editTemplate: vi.fn<() => void>(),
+    newTemplate: vi.fn<() => void>(),
   }) satisfies DesktopActions;
 
 /**
@@ -115,6 +119,18 @@ describe('the ids the window registers', () => {
     // in and the bar lists a verb (TYTO-122).
     expect(spies.chooseTemplateFolder).toHaveBeenCalledOnce();
     expect(spies.clearTemplateFolder).toHaveBeenCalledOnce();
+  });
+
+  it('runs the two template mode commands, each to its own action (TYTO-44)', () => {
+    const spies = actions();
+    const registry = createDesktopRegistry(spies);
+
+    expect(registry.run(TEMPLATE_EDIT, NO_VIEW)).toBe(true);
+    expect(spies.editTemplate).toHaveBeenCalledOnce();
+    expect(spies.newTemplate).not.toHaveBeenCalled();
+
+    expect(registry.run(TEMPLATE_NEW, NO_VIEW)).toBe(true);
+    expect(spies.newTemplate).toHaveBeenCalledOnce();
   });
 
   it('gives the template folder commands no keystroke', () => {

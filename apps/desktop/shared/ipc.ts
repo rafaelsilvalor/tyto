@@ -93,6 +93,11 @@ const openDocument = z.object({
  */
 const documentId = z.string().min(1).max(100);
 
+/** A diagnostic from the template mode, which says which of its three buffers it is about. */
+const templateDiagnostic = diagnostic.extend({
+  file: z.enum(['manifest', 'markup', 'brief', 'render']),
+});
+
 /**
  * Every channel the app has, and the only place a channel name is written.
  *
@@ -632,6 +637,105 @@ export const IPC_CHANNELS = {
    * effect in the browser process and there is nothing for the window to do with the outcome.
    */
   'app:locale': channel(z.object({ locale: z.string().min(1) }), z.object({})),
+
+  /**
+   * The template mode opening a folder (TYTO-44): `directory: null` asks main for a picker,
+   * a path opens that folder — which is what _New template_ does with the folder it made.
+   *
+   * `template: null` is a dismissed picker, not an error. **`code` is a folder whose layout is
+   * a `template.ts`**, answered without reading it: running code from a folder is the plugin
+   * host's job (ADR 0007), so the window says it cannot be edited here rather than opening a
+   * buffer it could never preview. `refused` names the file that was not there.
+   */
+  'template:open': channel(
+    z.object({ directory: z.string().min(1).nullable() }),
+    z.object({
+      template: z
+        .discriminatedUnion('kind', [
+          z.object({
+            kind: z.literal('markup'),
+            directory: z.string(),
+            manifest: z.string(),
+            markup: z.string(),
+            examples: z.array(z.object({ name: z.string(), path: z.string(), text: z.string() })),
+          }),
+          z.object({ kind: z.literal('code'), directory: z.string() }),
+          z.object({
+            kind: z.literal('refused'),
+            directory: z.string(),
+            missing: z.enum(['manifest.yaml', 'template.html']),
+          }),
+        ])
+        .nullable(),
+    }),
+  ),
+
+  /**
+   * Every format of the template being edited, drawn from its **unsaved** buffers and one
+   * sample brief (TYTO-44).
+   *
+   * `brief:preview`'s shape and its `requestId` for its reason — typing answers out of order —
+   * with one field more on each diagnostic: which buffer it is about, since this mode has three
+   * and a `range` means nothing without its file.
+   */
+  'template:preview': channel(
+    z.object({
+      requestId: z.number().int().nonnegative(),
+      directory: z.string().min(1),
+      manifest: z.string(),
+      markup: z.string(),
+      brief: z.string(),
+      briefPath: z.string().min(1).optional(),
+    }),
+    z.object({
+      requestId: z.number().int().nonnegative(),
+      frames: z.array(
+        z.object({
+          artwork: z.string(),
+          format: z.string(),
+          width: z.number().int().positive(),
+          height: z.number().int().positive(),
+          html: z.string(),
+        }),
+      ),
+      diagnostics: z.array(templateDiagnostic),
+    }),
+  ),
+
+  /**
+   * Writes both buffers and reads the template folders again (TYTO-44).
+   *
+   * **`saved: false` is a manifest that does not parse**, and its diagnostics come back instead:
+   * every brief naming the template is resolved against that file, so writing it broken would
+   * break all of them. `registered` is whether the registry now holds *this folder* under the
+   * manifest's name — false for a folder outside the chosen template folder — because a save
+   * that changes nothing any brief can render has to say so.
+   */
+  'template:save': channel(
+    z.object({ directory: z.string().min(1), manifest: z.string(), markup: z.string() }),
+    z.object({
+      saved: z.boolean(),
+      registered: z.boolean(),
+      name: z.string().optional(),
+      diagnostics: z.array(templateDiagnostic),
+    }),
+  ),
+
+  /**
+   * `tyto template new`'s scaffold, into the chosen template folder (TYTO-44).
+   *
+   * With no folder chosen main asks where, and `directory: null` with no `problem` is that
+   * picker dismissed. The name is checked on both sides — here as the grammar's identifier, the
+   * same pattern the CLI refuses — so a name no brief could write never becomes a folder.
+   */
+  'template:new': channel(
+    z.object({ name: z.string().min(1).max(100) }),
+    z.object({
+      directory: z.string().nullable(),
+      problem: z.enum(['name', 'exists', 'write']).optional(),
+      detail: z.string().optional(),
+    }),
+  ),
 } as const;
 
 export type IpcChannels = typeof IPC_CHANNELS;
