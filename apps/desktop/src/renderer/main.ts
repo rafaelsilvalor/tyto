@@ -19,7 +19,8 @@ import {
 } from './panel.js';
 import { type CommandEntry, type CommandBar, COMMAND_BAR_TAG } from './command-bar.js';
 import { type ExportDialog, type ExportProgressView, EXPORT_DIALOG_TAG } from './export-dialog.js';
-import { type TemplateMode, TEMPLATE_MODE_TAG } from './template-mode.js';
+import type { TemplateMode } from './template-mode.js';
+import { TEMPLATE_MODE_TAG } from './template-mode-tag.js';
 import {
   COMMAND_LABELS,
   DOCUMENT_SLOTS,
@@ -631,14 +632,14 @@ const registry: CommandRegistry = createDesktopRegistry({
   },
 
   editTemplate: () => {
-    void elements.templateMode?.openFolder(null);
+    void loadTemplateMode().then((mode) => mode?.openFolder(null));
   },
   newTemplate: () => {
-    const mode = elements.templateMode;
-    if (mode === null || mode === undefined) return;
-    mode.open = true;
-    // Straight to the name, which is the only thing a New needs from the person.
-    void mode.updateComplete.then(() => {
+    void loadTemplateMode().then(async (mode) => {
+      if (mode === undefined) return;
+      mode.open = true;
+      // Straight to the name, which is the only thing a New needs from the person.
+      await mode.updateComplete;
       mode.querySelector<HTMLInputElement>('.template-mode__new-name')?.focus();
     });
   },
@@ -1305,7 +1306,9 @@ async function changeLayout(next: Layout): Promise<void> {
  */
 function applyLocale(next: Locale): void {
   state.locale = next;
-  if (elements.templateMode !== null && elements.templateMode !== undefined) {
+  // Only once it is loaded: before that there is no element to tell, and `loadTemplateMode`
+  // hands it the locale in force when it arrives.
+  if (customElements.get(TEMPLATE_MODE_TAG) !== undefined && elements.templateMode) {
     elements.templateMode.locale = next;
   }
   if (elements.locale !== null) fillLocalePicker(elements.locale, state.locale);
@@ -1587,13 +1590,35 @@ function wirePanelControls(): void {
 const TEMPLATE_MODE_ID = 'template-mode';
 
 /**
- * Hands the template mode its ports (TYTO-44). Every one is a round trip to main except the
- * last, which is what saving means to the rest of the window.
+ * The template mode, loaded on first use (TYTO-44), with its ports in.
+ *
+ * **Loaded by `import()` and not imported, and the reason is measured.** Statically, the mode
+ * took the window's bundle from 1,433,883 bytes to 2,327,834 — the manifest parser, the
+ * template compiler and the linter — and every one of those bytes is evaluated before `load()`
+ * registers the `app:exit-requested` listener. The same launch-and-close took 545-628 ms to
+ * answer two `app:info` calls on main and 1447-1750 ms here, and `packaged.package.test.ts`,
+ * which closes the app at exactly that moment, hung its 600 s `afterAll` on CI and locally: the
+ * push reached a window with nobody listening and ADR 0031 keeps the app open. A window that
+ * never opens the mode now never pays for it.
+ *
+ * `undefined` without a bridge, which is the unit test's window, and without the element.
  */
-function wireTemplateMode(bridge: TytoBridge): void {
+async function loadTemplateMode(): Promise<TemplateMode | undefined> {
+  const bridge = window.tyto;
   const mode = elements.templateMode;
-  if (mode === null || mode === undefined) return;
+  if (bridge === undefined || mode === null || mode === undefined) return undefined;
+  await import('./template-mode.js');
+  await customElements.whenDefined(TEMPLATE_MODE_TAG);
+  if (mode.ports === undefined) wireTemplateMode(mode, bridge);
   mode.locale = state.locale;
+  return mode;
+}
+
+/**
+ * Hands the template mode its ports. Every one is a round trip to main except the last, which
+ * is what saving means to the rest of the window.
+ */
+function wireTemplateMode(mode: TemplateMode, bridge: TytoBridge): void {
   mode.ports = {
     open: async (directory) => (await bridge['template:open']({ directory })).template,
     preview: (request) => bridge['template:preview'](request),
@@ -1719,8 +1744,6 @@ async function load(): Promise<void> {
     // Asked once here, and again only when the folder changes. A picker that re-asked per
     // click would be re-reading manifests that cannot have changed in between.
     await refreshTemplates(bridge);
-
-    wireTemplateMode(bridge);
   }
 
   if (elements.editor !== null) {

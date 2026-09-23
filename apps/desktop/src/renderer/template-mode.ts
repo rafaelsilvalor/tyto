@@ -23,6 +23,7 @@ import {
   translate,
 } from '../../shared/i18n/index.js';
 import { type RequestGate, createRequestGate } from './preview.js';
+import { TEMPLATE_MODE_TAG } from './template-mode-tag.js';
 
 /**
  * The template mode (TYTO-44, E9.5): a template folder open beside every format it draws.
@@ -47,7 +48,7 @@ import { type RequestGate, createRequestGate } from './preview.js';
  * two buffers: each is dirty when its text differs from what was last read or written.
  */
 
-export const TEMPLATE_MODE_TAG = 'tyto-template-mode';
+export { TEMPLATE_MODE_TAG };
 
 /** How long typing has to pause before the grid is asked for, the same as the brief's preview. */
 export const TEMPLATE_PREVIEW_DELAY = 200;
@@ -78,12 +79,19 @@ const FILE_OF: Readonly<Record<BufferName, string>> = {
   markup: 'template.html',
 };
 
-/** The slots a template with no manifest yet can offer: none. Parsed, not cast. */
-const NO_SLOTS: TemplateManifest = (() => {
+/**
+ * The slots a template with no manifest yet can offer: none. Parsed, not cast — and parsed on
+ * first use rather than at import, because nothing this module does may run before the window
+ * has registered its quit listener (see `TemplateMode.ensureEditors`).
+ */
+let noSlots: TemplateManifest | undefined;
+const NO_SLOTS = (): TemplateManifest => {
+  if (noSlots !== undefined) return noSlots;
   const parsed = parseManifest('name: none\nversion: 0.0.0\nformats: [feed]\nslots: {}\n', '');
   if (!parsed.ok) throw new Error('the empty manifest must parse');
-  return parsed.value;
-})();
+  noSlots = parsed.value;
+  return noSlots;
+};
 
 /**
  * A diagnostic that crossed the bridge, handed back to the editor as the type it left main as.
@@ -170,7 +178,7 @@ export class TemplateMode extends LitElement {
   private savedText: Record<BufferName, string> = { manifest: '', markup: '' };
   private gate: RequestGate = createRequestGate();
   private pending: ReturnType<typeof setTimeout> | undefined;
-  private lastManifest: TemplateManifest = NO_SLOTS;
+  private lastManifest: TemplateManifest | undefined;
 
   constructor() {
     super();
@@ -312,7 +320,8 @@ export class TemplateMode extends LitElement {
     this.example = 0;
     if (opened.kind !== 'markup') return;
 
-    this.lastManifest = this.manifestOf(opened.manifest) ?? NO_SLOTS;
+    this.ensureEditors();
+    this.lastManifest = this.manifestOf(opened.manifest) ?? NO_SLOTS();
     for (const buffer of ['manifest', 'markup'] as const) {
       const editor = this.editors[buffer];
       if (editor !== undefined) editor.restore(editor.blank(opened[buffer]));
@@ -396,19 +405,32 @@ export class TemplateMode extends LitElement {
         const request = this.requestFor('');
         const ports = this.ports;
         if (request === undefined || ports === undefined) {
-          return { source, diagnostics: [], manifest: this.lastManifest };
+          return { source, diagnostics: [], manifest: this.lastManifest ?? NO_SLOTS() };
         }
         const answer = await ports.preview({ ...request, markup: source });
         return {
           source,
           diagnostics: answer.diagnostics.filter((item) => item.file === 'markup').map(asCore),
-          manifest: this.lastManifest,
+          manifest: this.lastManifest ?? NO_SLOTS(),
         };
       },
     };
   }
 
-  protected override firstUpdated(): void {
+  /**
+   * The two views, made the first time a template is opened and kept from then on.
+   *
+   * **Not at the first paint, and that is a measured fix rather than tidiness.** The element is
+   * in `index.html`, so its first update runs while the window is still starting — before
+   * `load()` in `main.ts` has registered the `app:exit-requested` listener. Two CodeMirror views
+   * with a linter made that gap wide enough that a close arriving right after the bridge
+   * appeared found no listener: main's push was lost, its acknowledgement deadline ran out and
+   * the app stayed open by design (ADR 0031). `packaged.package.test.ts` closes at exactly that
+   * moment, and hung 600 s on CI and 3 of 3 times locally. Made on demand, the mode costs a
+   * window that never opens it nothing.
+   */
+  private ensureEditors(): void {
+    if (this.editors.manifest !== undefined) return;
     const registry = createCommandRegistry();
     // `Mod-s` in either tab saves the template and never the brief behind it: this registry is
     // the mode's own, so the window's `editor.save` cannot be reached from here.
@@ -423,7 +445,7 @@ export class TemplateMode extends LitElement {
       const host = this.querySelector<HTMLElement>(`[data-buffer="${buffer}"]`);
       if (host === null) continue;
       const editor = createEditor(host, {
-        doc: this.markup?.[buffer] ?? '',
+        doc: '',
         language: buffer === 'markup' ? 'template' : 'plain',
         commands: registry,
         keymap: defaultKeymapSet,
@@ -437,7 +459,6 @@ export class TemplateMode extends LitElement {
         this.schedule();
       });
       this.editors[buffer] = editor;
-      this.savedText[buffer] = this.markup === undefined ? '' : editor.getValue();
     }
   }
 
