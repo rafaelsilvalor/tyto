@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 
 import { build } from './template.js';
 import { fields, lines, plain } from './rich-text.js';
-import { ARROW, OWL } from './tokens.js';
+import { ARROW, INK, OWL } from './tokens.js';
 
 import type { Inline, RichText, SceneNode, TemplateContext } from '@tyto/core';
 
@@ -46,34 +46,38 @@ function bold(value: string): Inline {
 }
 
 interface ContextOptions {
-  readonly disciplina: RichText;
+  readonly slide: RichText;
   readonly index?: number;
   readonly count?: number;
   readonly titulo?: RichText;
-  readonly format?: string;
 }
 
 function contextOf(options: ContextOptions): TemplateContext {
   const index = options.index ?? 0;
-  const format = options.format ?? 'feed';
-  const titulo = options.titulo ?? rich('Agenda da semana');
+  const titulo = options.titulo ?? rich('AGENDA DA SEMANA');
 
   return {
-    format,
-    size: format === 'story' ? { w: 1080, h: 1920 } : { w: 1080, h: 1080 },
-    idPrefix: `artwork-${index}-${format}`,
+    format: 'retrato',
+    size: { w: 1080, h: 1350 },
+    idPrefix: `artwork-${index}-retrato`,
     artwork: { id: `artwork-${index}`, index, count: options.count ?? 1 },
     slots: {
       titulo: { name: 'titulo', value: { kind: 'rich-text', text: titulo }, adjustments: [] },
-      disciplina: {
-        name: 'disciplina',
-        value: { kind: 'rich-text', text: options.disciplina },
-        adjustments: [],
-      },
+      slide: { name: 'slide', value: { kind: 'rich-text', text: options.slide }, adjustments: [] },
     },
     adjustments: {},
   };
 }
+
+/** The reference slide of 2026-09-22: two disciplines of two sessions each. */
+const REFERENCE = [
+  'FARMÁCIA',
+  '16/09 - 14:00 | Farmacologia Geral | Profª. Rafaela Gomes',
+  '17/09 - 14:00 | Maratonando com questões sobre Ensaios Farmacopeicos | Profª. Sonia Dourado',
+  'SERVIÇO SOCIAL',
+  '15/09 - 19:00 | Serviço Social no âmbito hospitalar | Profª. Nilza Ciciliati',
+  '16/09 - 19:00 | Sistema de Garantia dos Direitos da Criança e do Adolescente | Profª. Coimbra Almeida',
+].join('\n');
 
 /* ----------------------------------------------------------------------- the walker -- */
 
@@ -96,15 +100,13 @@ function words(node: SceneNode | undefined): string {
 /* ------------------------------------------------------------------------- the slot -- */
 
 describe('one slot read as a small table', () => {
-  it('takes the first line as the discipline and the rest as sessions', () => {
-    const value = rich(
-      'Clínica Médica\n22/09 | Arritmias | Dra. Helena\n24/09 | Choque | Dr. Vitor',
+  it('keeps a line with no separator whole, which is how a heading is told apart', () => {
+    const [heading, session] = lines(
+      rich('FARMÁCIA\n16/09 - 14:00 | Farmacologia | Profª. Rafaela'),
     );
 
-    const [heading, ...sessions] = lines(value);
-
-    expect(plain(heading ?? [])).toBe('Clínica Médica');
-    expect(sessions).toHaveLength(2);
+    expect(fields(heading ?? [])).toHaveLength(1);
+    expect(fields(session ?? []).length).toBeGreaterThan(1);
   });
 
   it('drops a blank line rather than reading it as a session with no fields', () => {
@@ -140,73 +142,112 @@ describe('one slot read as a small table', () => {
 
 /* ------------------------------------------------------------------- what it draws -- */
 
+describe('several disciplines on one slide (TYTO-173)', () => {
+  it('draws both of the reference slide’s disciplines in one frame, in order', () => {
+    const frame = build(contextOf({ slide: rich(REFERENCE) }));
+
+    expect(named(frame.children, 'discipline').map(words)).toEqual(['FARMÁCIA', 'SERVIÇO SOCIAL']);
+  });
+
+  it('gives each discipline the sessions written under it, and no one else’s', () => {
+    const frame = build(
+      contextOf({
+        slide: rich('A\n01/01 | um | x\nB\n02/01 | dois | y\n03/01 | três | z\n04/01 | quatro | w'),
+      }),
+    );
+
+    expect(named(frame.children, 'eventos').map((node) => named([node], 'session').length)).toEqual(
+      [1, 3],
+    );
+  });
+
+  it('counts the disciplines from the brief, one to as many as it wrote', () => {
+    for (const count of [1, 2, 3]) {
+      const source = Array.from({ length: count }, (_, i) => `D${i}\n01/01 | t | p`).join('\n');
+      const frame = build(contextOf({ slide: rich(source) }));
+
+      expect(named(frame.children, 'discipline-block'), source).toHaveLength(count);
+    }
+  });
+
+  it('draws sessions written before any heading, under no heading, rather than dropping them', () => {
+    const frame = build(contextOf({ slide: rich('01/01 | Aula solta | Prof. X') }));
+
+    expect(named(frame.children, 'session')).toHaveLength(1);
+    expect(named(frame.children, 'discipline')).toEqual([]);
+  });
+
+  it('asks for the long title to shrink rather than to be reported', () => {
+    const frame = build(contextOf({ slide: rich(REFERENCE) }));
+    const titles = named(frame.children, 'session-title');
+
+    const longest = titles.find((node) => words(node).startsWith('Sistema de Garantia'));
+    expect(longest?.kind === 'text' ? longest.overflow : undefined).toBe('shrink');
+  });
+});
+
 describe('the cover', () => {
-  const disciplina = rich('Clínica Médica\n22/09 | Arritmias | Dra. Helena');
+  const slide = rich('FARMÁCIA\n16/09 - 14:00 | Farmacologia | Profª. Rafaela');
 
   it('is drawn on the first slide', () => {
-    const frame = build(contextOf({ disciplina, index: 0, count: 3 }));
+    const frame = build(contextOf({ slide, index: 0, count: 3 }));
 
-    expect(words(named(frame.children, 'cover-title')[0])).toBe('Agenda da semana');
+    expect(words(named(frame.children, 'cover-title')[0])).toBe('AGENDA DA SEMANA');
   });
 
   it('is drawn on no other slide, and the brief never said so', () => {
     for (const index of [1, 2]) {
-      const frame = build(contextOf({ disciplina, index, count: 3 }));
+      const frame = build(contextOf({ slide, index, count: 3 }));
 
       expect(named(frame.children, 'cover-title'), `slide ${index}`).toEqual([]);
     }
   });
 
-  it('takes the space with it, so the slide below is not a slide with a hole in it', () => {
-    const first = build(contextOf({ disciplina, index: 0, count: 2 }));
-    const second = build(contextOf({ disciplina, index: 1, count: 2 }));
+  it('keeps the disciplines a fixed gap under the cover, centred together as one block', () => {
+    const frame = build(contextOf({ slide, index: 0, count: 2 }));
+    const [middle] = named(frame.children, 'middle');
 
-    // The body group's own y, which is the one coordinate this template writes by hand —
-    // and it writes it from the block's measured height, not from a number per format.
-    const bodyY = (frame: typeof first) => named(frame.children, 'body')[0]?.transform.y ?? 0;
+    if (middle?.kind !== 'group') throw new Error('the first slide centres a middle block');
+    // Cover first, disciplines second, and nothing else: the gap between them is the
+    // stack's, not whatever room the centring happened to leave.
+    expect(middle.children.map((node) => node.name)).toEqual(['cover', 'disciplinas']);
+  });
 
-    // Both are centred between the owl and the handle, so the shorter second slide sits
-    // *lower* than the first rather than leaving a hole where the cover used to be.
-    expect(bodyY(second)).toBeGreaterThan(bodyY(first));
+  it('takes the space with it: without a cover the disciplines alone are the middle', () => {
+    const frame = build(contextOf({ slide, index: 1, count: 2 }));
+
+    expect(named(frame.children, 'middle')).toEqual([]);
+    expect(frame.children.map((node) => node.name)).toContain('disciplinas');
   });
 
   it('draws no illustration when the brief supplied none', () => {
-    const frame = build(contextOf({ disciplina }));
+    const frame = build(contextOf({ slide }));
 
     expect(named(frame.children, 'calendar')).toEqual([]);
   });
 });
 
 describe('the sessions', () => {
-  it('counts what the brief wrote, and nothing else counts them', () => {
-    for (const [count, source] of [
-      [1, 'Pediatria\n27/09 | Febre | Dra. Lúcia'],
-      [
-        3,
-        'Cirurgia\n23/09 | Abdome | Dr. Caio\n25/09 | Trauma | Dra. Marina\n26/09 | Pré | Dr. Caio',
-      ],
-    ] as const) {
-      const frame = build(contextOf({ disciplina: rich(source) }));
-
-      expect(named(frame.children, 'session'), source).toHaveLength(count);
-      expect(named(frame.children, 'session-pill')).toHaveLength(count);
-    }
-  });
-
   it('stacks them, so the second row sits a whole row below the first', () => {
-    const frame = build(
-      contextOf({
-        disciplina: rich('Cirurgia\n23/09 | Abdome | Dr. Caio\n25/09 | Trauma | Dra. Marina'),
-      }),
-    );
+    const frame = build(contextOf({ slide: rich(REFERENCE) }));
 
     const [first, second] = named(frame.children, 'session');
 
     expect(second?.transform.y).toBeGreaterThan(first?.transform.y ?? 0);
   });
 
+  it('draws the date on top of the grey pill, which runs under it from the left edge', () => {
+    const frame = build(contextOf({ slide: rich(REFERENCE) }));
+    const [row] = named(frame.children, 'session');
+
+    if (row?.kind !== 'group') throw new Error('a session is a group');
+    // Painted last, so it covers the grey pill's rounded left end — the two read as one.
+    expect(row.children.map((node) => node.name)).toEqual(['session-pill', 'date-pill']);
+    expect(row.children.every((node) => node.transform.x === 0)).toBe(true);
+  });
+
   it('draws a session with no professor without drawing an empty text node', () => {
-    const frame = build(contextOf({ disciplina: rich('Pediatria\n27/09 | Febre sem foco') }));
+    const frame = build(contextOf({ slide: rich('Pediatria\n27/09 | Febre sem foco') }));
 
     expect(named(frame.children, 'session-title').map(words)).toEqual(['Febre sem foco']);
     expect(named(frame.children, 'professor')).toEqual([]);
@@ -216,7 +257,7 @@ describe('the sessions', () => {
 });
 
 describe('the marks the template holds the geometry of', () => {
-  const frame = build(contextOf({ disciplina: rich('Pediatria\n27/09 | Febre | Dra. Lúcia') }));
+  const frame = build(contextOf({ slide: rich('Pediatria\n27/09 | Febre | Dra. Lúcia') }));
 
   it.each([
     ['owl', OWL],
@@ -229,12 +270,12 @@ describe('the marks the template holds the geometry of', () => {
 
     expect(node.geometry).toEqual({ kind: 'path', d: token.d, fillRule: token.fillRule });
     // The colour is the template's, not the file's: neither token carries one.
-    expect(node.fill).toEqual({ kind: 'solid', color: { r: 18, g: 48, b: 107, a: 1 } });
+    expect(node.fill).toEqual({ kind: 'solid', color: hexToColor(INK) });
   });
 
   it.each([
-    ['owl', OWL, 96],
-    ['arrow', ARROW, 30],
+    ['owl', OWL, 64],
+    ['arrow', ARROW, 26],
   ])(
     "sizes %s as the box its 'd' was drawn in, and scales with a transform",
     (name, token, drawn) => {
@@ -253,18 +294,18 @@ describe('the marks the template holds the geometry of', () => {
 });
 
 describe('the frame itself', () => {
-  const disciplina = rich('Pediatria\n27/09 | Febre | Dra. Lúcia');
+  const slide = rich('Pediatria\n27/09 | Febre | Dra. Lúcia');
 
-  it.each(['feed', 'story'])('draws %s at the size the context gave it', (format) => {
-    const context = contextOf({ disciplina, format });
+  it('draws the portrait format at the size the context gave it', () => {
+    const context = contextOf({ slide });
     const frame = build(context);
 
     expect(frame.size).toEqual(context.size);
-    expect(frame.format).toBe(format);
+    expect(frame.format).toBe('retrato');
   });
 
   it('namespaces its ids with the prefix the context supplied', () => {
-    const context = contextOf({ disciplina, index: 2, format: 'story' });
+    const context = contextOf({ slide, index: 2 });
 
     expect(build(context).children.every((node) => node.id.startsWith(context.idPrefix))).toBe(
       true,
@@ -273,10 +314,16 @@ describe('the frame itself', () => {
 
   it('signs every slide, cover or no cover', () => {
     for (const index of [0, 1, 2]) {
-      const frame = build(contextOf({ disciplina, index, count: 3 }));
+      const frame = build(contextOf({ slide, index, count: 3 }));
 
       expect(words(named(frame.children, 'handle')[0]), `slide ${index}`).toBe('@estrategia.saude');
       expect(named(frame.children, 'owl'), `slide ${index}`).toHaveLength(1);
     }
   });
 });
+
+/** `#rrggbb` as the colour a solid paint holds, so the test states the token and not RGB. */
+function hexToColor(hex: string): { r: number; g: number; b: number; a: number } {
+  const value = Number.parseInt(hex.slice(1), 16);
+  return { r: (value >> 16) & 255, g: (value >> 8) & 255, b: value & 255, a: 1 };
+}

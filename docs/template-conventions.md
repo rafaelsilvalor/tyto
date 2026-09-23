@@ -197,9 +197,25 @@ cannot do that at all — a group there has no size to read back.
 **Repetition inside one slide costs the brief a separator.** A manifest may declare one
 repeatable slot and its occurrences become artworks, so a carousel that repeats _slides_ has
 nothing left to repeat _rows_ with. The template reads them out of the occurrence's own lines
-instead — first line the heading, each line after it `a | b | c`. It works, it needs no card,
-and it asks the brief's author to learn a convention the language does not enforce. TYTO-163 is
-the version where nobody learns one.
+instead. It works, it needs no card, and it asks the brief's author to learn a convention the
+language does not enforce. TYTO-163 is the version where nobody learns one.
+
+**A heading is the line that is not a row — so one separator carries two levels.** TYTO-173 moved
+the agenda's repeat from the discipline up to the slide, because the published carousel puts
+several disciplines on one slide. Inside one `::slide`, a line with no `|` starts a group and every
+`a | b | c` line under it is one of that group's rows:
+
+```
+::slide
+  FARMÁCIA
+  16/09 - 14:00 | Farmacologia Geral | Profª. Rafaela Gomes
+  SERVIÇO SOCIAL
+  15/09 - 19:00 | Serviço Social no âmbito hospitalar | Profª. Nilza Ciciliati
+```
+
+The rule the brief's author learns is still one character. Rows written before any heading belong
+to a group with no heading and are drawn, not dropped: a brief being written has that slide even
+if the published carousel never does. Reach for this before a second separator.
 
 **Split a rich-text line at top level only.** A separator inside `**bold**` or a mark is the
 author doing something else, and cutting there silently reflows their words into a different
@@ -211,7 +227,7 @@ that turns "no runs" into "no node" while keeping the block's stated size, so a 
 professor leaves the row exactly as tall as its neighbours.
 
 **What should change before the second template.** Nothing moves into a shared module yet —
-that is this document's own rule and the evidence is not in. Two things are worth fixing first:
-`tyto template check` reads `manifest.yaml` and `template.html`, so it reports a read failure
-for a folder whose body is a `template.ts` (TYTO-170), and the wrong-`size` clip above deserves
-a diagnostic rather than a paragraph.
+that is this document's own rule and the evidence is not in. One thing is worth fixing first:
+the wrong-`size` clip above deserves a diagnostic rather than a paragraph. (`tyto template check`
+on a code template, the other one named here, was fixed by TYTO-170: it checks the manifest and
+says the body was not checked — `docs/template-authoring.md`.)

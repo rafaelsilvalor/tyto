@@ -1,29 +1,33 @@
 ---
 template: agenda-semana
-formats: [feed, story]
+formats: [retrato]
+ilustracao: ./calendario.png
 ---
-// Three disciplines, so `compile` produces three artworks of two frames each. The first
-// one carries the cover; the other two do not, and nothing in this file says so — the
-// template reads `context.artwork.index`.
+// The two reference slides the maintainer supplied (2026-09-22 and 2026-09-23), so `compile`
+// produces two artworks of one portrait frame each. The first carries the cover; the second
+// does not, and nothing in this file says so — the template reads `context.artwork.index`.
 //
-// The session count is different on every slide on purpose: two, three, then one. That is
-// the whole claim of this template, and a brief that used the same count everywhere would
-// not check it.
+// Inside a `::slide`, a line with no `|` starts a discipline and every
+// `date | title | professor` line under it is one of its sessions. The counts differ on
+// purpose: two disciplines of two sessions, then three of one, two and one. A brief that used
+// the same count everywhere would not check that the template reads them.
 
 ::titulo
-  Agenda da semana
+  AGENDA DA SEMANA
 
-::disciplina
-  Clínica Médica
-  22/09 | Insuficiência cardíaca | Dra. Helena Prado
-  24/09 | Arritmias na emergência | Dr. Vitor Salles
+::slide
+  FARMÁCIA
+  16/09 - 14:00 | Farmacologia Geral | Profª. Rafaela Gomes
+  17/09 - 14:00 | Maratonando com questões sobre Ensaios Farmacopeicos | Profª. Sonia Dourado
+  SERVIÇO SOCIAL
+  15/09 - 19:00 | Serviço Social no âmbito hospitalar | Profª. Nilza Ciciliati
+  16/09 - 19:00 | Sistema de Garantia dos Direitos da Criança e do Adolescente | Profª. Coimbra Almeida
 
-::disciplina
-  Cirurgia Geral
-  23/09 | Abdome agudo | Dr. Caio Nunes
-  25/09 | Trauma torácico | Dra. Marina Reis
-  26/09 | Pré-operatório | Dr. Caio Nunes
-
-::disciplina
-  Pediatria
-  27/09 | Febre sem foco | Dra. Lúcia Amaral
+::slide
+  ODONTOLOGIA
+  23/08 - 20:00 | Maratonando a FGV | Profª. Cássia Reginato
+  SERVIÇO SOCIAL
+  18/08 - 19:00 | Política Nacional da Pessoa Idosa | Profª. Nilza Ciciliati
+  19/08 - 19:00 | Orientações Técnicas: Serviços de Acolhimento | Profª. Coimbra Almeida
+  NUTRIÇÃO
+  23/08 - 19:00 | Portaria CVS 3/2026: Regulamento de Boas Práticas para Serviços de Alimentação | Profª. Amanda Menon

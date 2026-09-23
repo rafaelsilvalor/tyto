@@ -59,12 +59,25 @@ interface Example {
    * from the table the command itself consults would test the table against itself.
    */
   readonly body: 'markup' | 'code';
+  /** The formats its manifest declares, written out for the same reason as `body`. */
+  readonly formats: readonly string[];
 }
 
 const EXAMPLES: readonly Example[] = [
-  { template: 'promo-curso', brief: 'examples/promo.brief', body: 'markup' },
-  { template: 'carrossel-lista', brief: 'examples/lista.brief', body: 'markup' },
-  { template: 'agenda-semana', brief: 'examples/agenda.brief', body: 'code' },
+  {
+    template: 'promo-curso',
+    brief: 'examples/promo.brief',
+    body: 'markup',
+    formats: ['feed', 'story'],
+  },
+  {
+    template: 'carrossel-lista',
+    brief: 'examples/lista.brief',
+    body: 'markup',
+    formats: ['feed', 'story'],
+  },
+  // 4:5 only, since TYTO-173: the published carousel is cut to Instagram's portrait post.
+  { template: 'agenda-semana', brief: 'examples/agenda.brief', body: 'code', formats: ['retrato'] },
 ];
 
 let formats: Awaited<ReturnType<typeof loadFormats>>;
@@ -153,7 +166,7 @@ describe.each(EXAMPLES.map((example) => [example.template, example] as const))(
         expect(
           artwork.frames.map((frame) => frame.format),
           `${name}: artwork '${artwork.id}' is missing a format`,
-        ).toEqual(['feed', 'story']);
+        ).toEqual(example.formats);
       }
     }, 60_000);
 
@@ -261,55 +274,75 @@ describe('a mark the template never declared', () => {
 });
 
 /**
- * The wall TYTO-167 exists to hit, measured rather than described.
+ * The pill that cannot grow, and what the template does about it (TYTO-173).
  *
  * `agenda-semana` draws a session title into a pill whose height is fixed, because a
- * template cannot measure text: `build` decides every coordinate before `layoutText` runs.
- * The template's answer is to state the text box's height as well, so that a title too long
- * for the pill is a `W_TEXT_OVERFLOW` naming the directive the author wrote — rather than a
- * silent wrap out of the pill and onto the paper.
+ * template cannot measure text: `build` decides every coordinate before `layoutText` runs
+ * (TYTO-162). Until TYTO-173 a title too long for the pill was a `W_TEXT_OVERFLOW`. The
+ * published pills are all one height and the type inside them varies, so the title now asks
+ * for `shrink`, which `compile` resolves against the faces: the long title comes out smaller
+ * and nothing is reported.
  *
  * Two briefs with the same shape and different title lengths is what says that. A single
  * brief could only show a number.
  */
-describe('the pill that cannot grow (TYTO-162)', () => {
+describe('the pill that cannot grow, and shrinks its title instead', () => {
   const AGENDA = join(PACK, 'agenda-semana');
 
   const briefWith = (titulo: string) =>
     `---
 template: agenda-semana
-formats: [feed]
+formats: [retrato]
 ---
 ` +
     `::titulo
-  Agenda da semana
+  AGENDA DA SEMANA
 
 ` +
-    `::disciplina
-  Clínica Médica
-  22/09 | ${titulo} | Dra. Helena Prado
+    `::slide
+  SERVIÇO SOCIAL
+  16/09 - 19:00 | ${titulo} | Profª. Coimbra Almeida
 `;
 
-  const overflowIn = async (titulo: string) => {
-    const { warnings } = await buildSource(briefWith(titulo), 'agenda-semana', AGENDA);
-    return warnings.filter((item) => item.code === 'W_TEXT_OVERFLOW');
+  const titleOf = async (titulo: string) => {
+    const { scene, warnings } = await buildSource(briefWith(titulo), 'agenda-semana', AGENDA);
+    const [node] = scene.artworks
+      .flatMap((artwork) => artwork.frames)
+      .flatMap((frame) => named(frame.children, 'session-title'));
+    const sizes =
+      node?.kind === 'text'
+        ? node.runs.flatMap((run) => (run.kind === 'text' ? [run.size] : []))
+        : [];
+    return { sizes, overflow: warnings.filter((item) => item.code === 'W_TEXT_OVERFLOW') };
   };
 
-  it('says nothing about a title that fits', async () => {
-    expect((await overflowIn('Insuficiência cardíaca')).map((item) => item.message)).toEqual([]);
+  const SHORT = 'Farmacologia Geral';
+  const LONG =
+    'Sistema de Garantia dos Direitos da Criança e do Adolescente no âmbito do atendimento hospitalar';
+
+  it('says nothing about a title that fits, and draws it at its declared size', async () => {
+    const { sizes, overflow } = await titleOf(SHORT);
+
+    expect(overflow.map((item) => item.message)).toEqual([]);
+    expect(new Set(sizes).size).toBe(1);
   }, 60_000);
 
-  it('warns about a title that does not, and names the directive that wrote it', async () => {
-    const warnings = await overflowIn(
-      'Insuficiência cardíaca descompensada com congestão pulmonar e indicação de suporte ventilatório',
-    );
+  it('draws a title that does not fit smaller, and still says nothing', async () => {
+    const short = await titleOf(SHORT);
+    const long = await titleOf(LONG);
 
-    expect(warnings).not.toEqual([]);
-    // The slot, not the node id: the author's answer is what has to change, and the only
-    // fix available until TYTO-162 lands is writing a shorter one.
-    expect(warnings.map((item) => item.message).join(' ')).toContain('disciplina');
+    expect(long.overflow.map((item) => item.message)).toEqual([]);
+    expect(Math.max(...long.sizes)).toBeLessThan(Math.min(...short.sizes));
   }, 60_000);
 });
+
+/** Every node below `nodes` with this name, groups included. */
+function named(nodes: readonly SceneNode[], name: string): SceneNode[] {
+  return nodes.flatMap((node) => [
+    ...(node.name === name ? [node] : []),
+    ...(node.kind === 'group' ? named(node.children, name) : []),
+  ]);
+}
 
 describe('tyto template check', () => {
   /**
