@@ -40,9 +40,17 @@ export interface DiagnosticOrigin {
  */
 const origins = new WeakMap<Diagnostic, DiagnosticOrigin>();
 
-/** Records where these diagnostics' ranges point, for whoever prints them later. */
+/**
+ * Records where these diagnostics' ranges point, for whoever prints them later.
+ *
+ * **The first claim wins.** A source registers what it produced as it produces it, and
+ * the caller that later registers everything a stage handed back — `renderTask` naming the
+ * brief — is the fallback for whatever nobody claimed. Overwriting was the bug: a markup
+ * error at `template.html` line 15 printed as `promo.brief:15:1`, a real line of the wrong
+ * file (TYTO-174).
+ */
 export function registerOrigin(items: Diagnostics, origin: DiagnosticOrigin): void {
-  for (const item of items) origins.set(item, origin);
+  for (const item of items) if (!origins.has(item)) origins.set(item, origin);
 }
 
 export interface ReportOptions {

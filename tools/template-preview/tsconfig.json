@@ -1,0 +1,12 @@
+{
+  "extends": "../../tsconfig.node.json",
+  "compilerOptions": {
+    // `pnpm start` runs src/main.ts straight through Node's type stripping, which requires
+    // the real file extension on relative imports.
+    "allowImportingTsExtensions": true,
+    // …and refuses anything that is not erasable, such as a parameter property. Checked
+    // here so the refusal is a type error and not a crash on `pnpm start`.
+    "erasableSyntaxOnly": true
+  },
+  "include": ["src/**/*.ts", "*.config.ts"]
+}

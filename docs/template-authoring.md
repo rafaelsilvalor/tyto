@@ -638,10 +638,60 @@ frame({
   `E_TEMPLATE_CRASH`. A broken template produces diagnostics, never a crash (ADR 0014).
 - **Builders do not validate.** Zod is the validator and `parseScene` is where it runs.
 
+## Previewing a template while you write it
+
+```bash
+pnpm template:preview agenda-semana
+```
+
+**Each image on the page is the file `tyto render` wrote, byte for byte — Playwright's
+Chromium with the determinism flags. It is not byte-identical to the desktop app's export
+for text, whose Chromium draws glyphs differently (ADR 0028).**
+
+`tools/template-preview` serves `http://127.0.0.1:4174/` and draws the template again every
+time a file in its folder is saved. The argument is a name in the built-in pack or the path to
+a template folder of your own; `--brief <file>` picks the brief (default: the first
+`examples/*.brief`), `--types png,svg` the outputs, `--port <n>` the port. It listens on the
+loopback address and on nothing else, because it serves unreleased artwork.
+
+**It is not a renderer, and that is the whole design.** A preview that is close to the output
+is a second renderer, and the day the two disagree the preview is the one that lied. So the
+tool draws nothing: every render is `node apps/cli/dist/index.js render <brief> --out … --json`
+in a child process, and the page is an `<img>` per file that command wrote, served as the
+bytes on disk. `no-renderer-of-its-own.test.ts` holds it to that by its imports — no `@tyto/*`
+package at all — and `preview.visual.test.ts` compares the sha256 of every image the server
+sends with a separate `tyto render` of the same brief, for `agenda-semana` and `promo-curso`.
+Breaking the CLI's render path breaks the page with it, which is the point.
+
+What a save does depends on the file:
+
+- **Markup, a manifest, an asset, the brief** — one `tyto render`. About 1.3 s from save to
+  image on the maintainer's win32 machine.
+- **A `.ts` in a template compiled into the build** — `@tyto/templates` is rebuilt first,
+  because the CLI imports `BUILT_IN_TEMPLATE_BUILDS` from its `dist/` (TYTO-166). The rebuild
+  is tsup with the package's own config minus declarations, which writes the same
+  `dist/index.js` a full `pnpm build` does and takes under a second instead of eleven. About
+  2.5 s from save to image. A `template.ts` in a folder of your own stays inert, exactly as
+  `tyto render` leaves it (ADR 0007), and the page shows the diagnostic `tyto render` gives.
+
+**A failure shows its diagnostics and no image.** A build error is esbuild's message at its
+file, line and column; a markup or template error is what `tyto render --json` printed. The
+picture from before the failure is removed from the page and its URL answers 404, so a stale
+image cannot pass for the current one. While a build is broken every save rebuilds, even a
+save that would not need to, because the `dist/` on disk is still the code from before.
+
+`/api/state` is the same state as JSON — generation, status, every image's format, path, URL,
+byte count and sha256, the diagnostics, the command that ran and how long the build and the
+render took — for an agent driving the page, or anything else.
+
+The page shows the formats the brief renders. The example briefs list every format their
+manifest declares; a brief that names fewer gets fewer.
+
 ## Agent workflow
 
 1. Read `manifest.yaml` and this document.
 2. Write `template.html`.
 3. Run `tyto template check templates/<name>` — returns diagnostics with line numbers.
-4. Run `tyto render examples/<name>.brief --template <name> --out /tmp/x` and inspect the PNG.
+4. Run `tyto render examples/<name>.brief --template <name> --out /tmp/x` and inspect the PNG —
+   or keep `pnpm template:preview <folder>` open and read `/api/state` after each save.
 5. Iterate until `check` is clean and there is no `W_TEXT_OVERFLOW`.

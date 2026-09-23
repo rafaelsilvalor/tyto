@@ -10,6 +10,10 @@ on:
       # code that reads it, changes the pixels as surely as changing an exporter does. Both
       # are in one package since ADR 0021.
       - 'packages/fonts/**'
+      # The template preview's PNG suite compares what it serves against `tyto render`, so
+      # a change to either side of that comparison is a change this job has to see.
+      - 'apps/cli/**'
+      - 'tools/template-preview/**'
 jobs:
   visual:
     runs-on: ubuntu-latest
