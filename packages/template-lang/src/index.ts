@@ -49,3 +49,10 @@ export {
   propertyAlias,
   tagAlias,
 } from './vocabulary.js';
+
+export {
+  TEMPLATE_NAME,
+  type TemplateScaffold,
+  isTemplateName,
+  scaffoldTemplate,
+} from './scaffold.js';

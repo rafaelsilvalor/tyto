@@ -60,6 +60,8 @@ describe('the catalogue', () => {
       // name something else.
       'panel.editor',
       'shell.about.templates',
+      // TYTO-44's slide picker, for `preview.slide.label`'s reason.
+      'templateMode.slide',
     ]);
   });
 });
