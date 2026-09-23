@@ -132,9 +132,6 @@ importers:
       '@tyto/plugin-api':
         specifier: workspace:*
         version: link:../../packages/plugin-api
-      '@tyto/template-lang':
-        specifier: workspace:*
-        version: link:../../packages/template-lang
       '@tyto/templates':
         specifier: workspace:*
         version: link:../../packages/templates

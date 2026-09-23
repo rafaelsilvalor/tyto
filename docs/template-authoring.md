@@ -715,47 +715,6 @@ render took — for an agent driving the page, or anything else.
 The page shows the formats the brief renders. The example briefs list every format their
 manifest declares; a brief that names fewer gets fewer.
 
-## Editing one in the desktop app
-
-_File ▸ Edit template…_ (the command bar lists it as _Editar template…_) opens a template
-folder in the **template mode**, which covers the window: `manifest.yaml` and `template.html` in
-two tabs, one of the folder's `examples/*.brief` as the sample, and **every format the manifest
-declares drawn side by side**. _File ▸ New template…_ writes the same scaffold `tyto template new`
-writes and opens it.
-
-**The grid is drawn from the buffers, not from the files.** Every edit in either tab — CSS in
-`<style>`, a slot added to the manifest — redraws every format after 200 ms, before anything is
-saved. The sample brief is resolved against the manifest being edited and nothing else, so a
-sample that names another template gets `E_UNKNOWN_TEMPLATE`. The frontmatter's `formats:` is
-ignored here on purpose: the grid is a view of the template, and a format added to the manifest
-appears without anybody editing a brief. The template's own files (`assets/…`) are read from its
-folder the way `tyto render` reads them. The HTML the grid shows is the HTML the brief preview
-shows for the same brief — `e2e/template-mode.desktop.test.ts` compares the two byte for byte.
-
-**Saving writes both files and re-registers the template**, by reading the template folders
-again — the same reload choosing a folder does. Every open brief is then compiled again, in
-every tab, because a save can rename a template and a brief naming the old name needs the answer
-too. Two rules decide what a save may write:
-
-- **A manifest that does not parse blocks the save.** Nothing is written, not even the markup,
-  and the diagnostic that stopped it is listed under the grid. Every brief naming this template
-  is resolved against that file, so writing it broken would break all of them.
-- **A markup error does not.** A half-finished layout breaks only the template being written,
-  and saving is how a person keeps it.
-
-**Where the folder is decides whether briefs see it.** New templates go into the template folder
-in force (_Escolher pasta de templates…_), or wherever the person says when there is none. A
-folder outside it can still be edited and saved, and the mode says that no brief uses it — the
-registry holds folders it searches, and a save that silently changed nothing anybody can render
-is the question ADR 0020 exists to prevent.
-
-**Markup only.** A folder whose layout is a `template.ts` opens as one sentence saying it cannot
-be edited here: running code that arrived in a folder is the plugin host's job (ADR 0007).
-`pnpm template:preview` is where a code template is watched while it is written.
-
-Unsaved template work counts for the quit question as one more unsaved document, and closing the
-mode over it asks first.
-
 ## Agent workflow
 
 1. Read `manifest.yaml` and this document.
@@ -766,8 +725,3 @@ mode over it asks first.
 4. Run `tyto render examples/<name>.brief --template <name> --out /tmp/x` and inspect the PNG —
    or keep `pnpm template:preview <folder>` open and read `/api/state` after each save.
 5. Iterate until `check` is clean and there is no `W_TEXT_OVERFLOW`.
-
-`tyto template new <name>` is step 0: a `manifest.yaml`, a `template.html` and an
-`examples/<name>.brief` that `check` has nothing to say about and that renders with the faces
-Tyto ships. The text is `scaffoldTemplate` in `@tyto/template-lang`, which the desktop's _New
-template_ writes too.

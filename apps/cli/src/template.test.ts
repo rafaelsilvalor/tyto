@@ -241,43 +241,11 @@ describe('tyto template new', () => {
 
     expect(code, stderr()).toBe(EXIT_OK);
     expect([...(await readdir(join(workspace, 'templates', 'promo')))].sort()).toEqual([
-      'examples',
       'manifest.yaml',
       'template.html',
     ]);
-    expect(await readdir(join(workspace, 'templates', 'promo', 'examples'))).toEqual([
-      'promo.brief',
-    ]);
     expect(stdout()).toContain('manifest.yaml');
     expect(stdout()).toContain('template.html');
-    expect(stdout()).toContain('promo.brief');
-  });
-
-  it('scaffolds an example that renders with the faces Tyto ships', async () => {
-    // `check` cannot see this one: it reads markup, and a font family is only resolved when
-    // a frame is exported. The scaffold named "Inter" until TYTO-44, which no install of
-    // Tyto has, so every template it made failed its first render with
-    // E_EXPORT_FONT_UNRESOLVED — and the desktop's New template, which previews at once,
-    // would have opened on an empty grid.
-    await run(['template', 'new', 'promo', '--formats', 'feed,story'], environment());
-    await writeFile(
-      join(workspace, 'formats.yaml'),
-      'feed: { w: 1080, h: 1080 }\nstory: { w: 1080, h: 1920 }\n',
-    );
-    out = [];
-    errors = [];
-
-    const code = await run(
-      ['render', 'templates/promo/examples/promo.brief', '--out', 'out', '--types', 'svg'],
-      environment(),
-    );
-
-    expect(code, stderr()).toBe(EXIT_OK);
-    expect([...(await readdir(join(workspace, 'out')))].sort()).toEqual([
-      'artwork-1-feed.svg',
-      'artwork-1-story.svg',
-      'result.json',
-    ]);
   });
 
   it('produces a folder that check has nothing to say about', async () => {
