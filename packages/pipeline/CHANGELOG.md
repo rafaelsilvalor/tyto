@@ -1,5 +1,34 @@
 # @tyto/pipeline
 
+## 0.9.0
+
+### Minor Changes
+
+- b587f0d: TYTO-182: a face can come from the machine that renders, and a missing one is drawn and reported
+  (ADR 0037).
+
+  `FontRef.source` gains `'system'`, asked for with `systemFont(family)`. `@tyto/fonts`'
+  `createFontLibrary({ describe: describeFace })` reads the platform's font folders, matches a file
+  on its own tables, and answers the exporters and measurement from the same file. Where the machine
+  lacks the face it draws the bundled Source Sans 3 at the nearest weight and raises
+  `W_FONT_SUBSTITUTED`, in `result.json` and in the desktop preview.
+
+  `agenda-semana` now draws in CircularXX: Black for the cover, Medium for the discipline, date and
+  session title, Light for the professor and the handle.
+
+  `JobPorts.loadResources` may answer with diagnostics. `sceneResources` no longer lists a declared
+  font at 400 when its runs already draw it. The desktop export now measures text, as the CLI and
+  the preview do.
+
+### Patch Changes
+
+- Updated dependencies [b587f0d]
+  - @tyto/core@0.25.0
+  - @tyto/brief-lang@0.6.5
+  - @tyto/plugin-api@0.3.8
+  - @tyto/raster@0.2.1
+  - @tyto/template-lang@0.6.5
+
 ## 0.8.2
 
 ### Patch Changes
