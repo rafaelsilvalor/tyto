@@ -188,3 +188,26 @@ describe('the built-in sets', () => {
     expect(idsOf(vimKeymapSet)).toContain(EDITOR_SAVE);
   });
 });
+
+describe('Tab (TYTO-183)', () => {
+  // Through the binding table, as a real keydown runs it: the claim is that the key reaches
+  // the indent, not that the indent command works, which CodeMirror already tests.
+  it('indents the line by the two spaces a brief block uses, and Shift+Tab takes them back', () => {
+    const editor = open(createCommandRegistry(), '::slide\nFARMÁCIA');
+    editor.view.dispatch({ selection: { anchor: editor.view.state.doc.length } });
+
+    expect(press(editor.view, 'Tab')).toBe(true);
+    expect(editor.view.state.doc.toString()).toBe('::slide\n  FARMÁCIA');
+
+    expect(press(editor.view, 'Tab', { shiftKey: true })).toBe(true);
+    expect(editor.view.state.doc.toString()).toBe('::slide\nFARMÁCIA');
+  });
+
+  it('indents every selected line, not only the one the cursor is on', () => {
+    const editor = open(createCommandRegistry(), 'a\nb');
+    editor.view.dispatch({ selection: { anchor: 0, head: editor.view.state.doc.length } });
+
+    press(editor.view, 'Tab');
+    expect(editor.view.state.doc.toString()).toBe('  a\n  b');
+  });
+});

@@ -1,5 +1,5 @@
-import { defaultKeymap, history, historyKeymap } from '@codemirror/commands';
-import { foldGutter, foldKeymap, indentOnInput } from '@codemirror/language';
+import { defaultKeymap, history, historyKeymap, indentWithTab } from '@codemirror/commands';
+import { foldGutter, foldKeymap, indentOnInput, indentUnit } from '@codemirror/language';
 import {
   type Extension,
   type StateEffect,
@@ -239,7 +239,13 @@ const baseExtensions = (): Extension[] => [
   // whole of it. Where the line actually breaks in the artwork is the IR's answer, not
   // this one (ADR 0016).
   EditorView.lineWrapping,
-  keymap.of([...defaultKeymap, ...historyKeymap, ...foldKeymap]),
+  // Two spaces, stated rather than left to CodeMirror's default, because it is what a brief's
+  // block content is indented by (`::slide` and the lines under it).
+  indentUnit.of('  '),
+  // Tab indents and Shift+Tab outdents (TYTO-183). CodeMirror binds nothing to Tab on
+  // purpose, so a keyboard user can leave the editor with it; binding it takes that away,
+  // and CodeMirror's own way back is Escape then Tab, which moves focus on.
+  keymap.of([...defaultKeymap, ...historyKeymap, ...foldKeymap, indentWithTab]),
 ];
 
 export function createEditor(parent: HTMLElement, options: EditorOptions = {}): EditorHandle {
