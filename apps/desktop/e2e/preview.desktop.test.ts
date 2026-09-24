@@ -303,7 +303,7 @@ describe('a template whose body is code', () => {
     // a debounce, an IPC hop and a compile, and a fixed pause would be a flake with a
     // number on it.
     const deadline = Date.now() + 20_000;
-    while (Date.now() < deadline && !(await shown()).includes('Clínica')) {
+    while (Date.now() < deadline && !(await shown()).includes('Farmacologia Geral')) {
       await page.waitForTimeout(200);
     }
   }, 60_000);
@@ -313,7 +313,10 @@ describe('a template whose body is code', () => {
 
     // The brief's own words, and the handle the *template* supplies — the second is what
     // says a build function ran, since no directive in the brief writes it.
-    expect(html).toContain('Clínica');
+    // A session title from the example's first slide, which TYTO-173 rewrote to the
+    // published carousel: the brief it replaced said `Clínica`, and this suite, which runs
+    // only when a PR touches the desktop, kept asking for it after the merge.
+    expect(html).toContain('Farmacologia Geral');
     expect(html).toContain('@estrategia.saude');
   });
 
@@ -328,7 +331,10 @@ describe('a template whose body is code', () => {
     expect(
       await frame
         .locator('.tyto-frame')
-        .evaluate(() => document.fonts.check('700 48px "Source Sans 3"')),
+        // The face the template declares, CircularXX (ADR 0037) — drawn from the machine's
+        // file where it is installed and from the bundled substitute on CI, under the same
+        // family name either way.
+        .evaluate(() => document.fonts.check('500 48px "CircularXX"')),
     ).toBe(true);
   });
 });

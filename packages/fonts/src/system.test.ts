@@ -77,7 +77,11 @@ describe('a face the machine lacks', () => {
       weight: 900,
       style: 'normal',
     });
-    expect(measured).toEqual(bundledFontSource.outlines(BOLD));
+    // `equals` on the bytes rather than `toEqual`: a deep compare of two megabyte arrays is
+    // element by element, and it took six seconds on CI and timed the test out.
+    expect(
+      Buffer.from(measured ?? []).equals(Buffer.from(bundledFontSource.outlines(BOLD) ?? [])),
+    ).toBe(true);
   });
 
   it('is reported once per face, naming what was drawn instead', () => {
@@ -155,6 +159,8 @@ describe.skipIf(!hasCircular)('CircularXX, where it is installed', () => {
       style: 'normal',
     });
     expect(measured).toBeDefined();
-    expect(measured).not.toEqual(bundledFontSource.outlines(REGULAR));
+    expect(
+      Buffer.from(measured ?? []).equals(Buffer.from(bundledFontSource.outlines(REGULAR) ?? [])),
+    ).toBe(false);
   });
 });
