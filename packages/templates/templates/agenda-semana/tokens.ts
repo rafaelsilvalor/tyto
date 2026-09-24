@@ -17,7 +17,7 @@
  * coordinate.
  */
 
-import { font } from '@tyto/core/template';
+import { systemFont } from '@tyto/core/template';
 
 import type { FontRef } from '@tyto/core';
 
@@ -47,15 +47,21 @@ export const ON_INK = '#ffffff';
 /* --------------------------------------------------------------------------- type -- */
 
 /**
- * One face, two weights.
+ * The brand's face, CircularXX, in the three weights the maintainer named (TYTO-182).
  *
- * `@tyto/fonts` ships Source Sans 3 in Regular and Bold only, so nothing here asks for an
- * italic or for a third weight: a face that is not on disk is an export that refuses.
+ * A commercial face: Estratégia holds the licence and the repository is public, so it is
+ * read from the rendering machine (ADR 0037) and never committed. A machine without it
+ * draws the bundled Source Sans 3 at the nearest weight and says so with
+ * `W_FONT_SUBSTITUTED` — which is what CI, having no CircularXX, always does.
  */
-export const FACE: FontRef = font('Source Sans 3');
+export const FACE: FontRef = systemFont('CircularXX');
 
-export const REGULAR = 400;
-export const BOLD = 700;
+/** The professor and the handle. */
+export const LIGHT = 300;
+/** The discipline heading, the date and the session title. */
+export const MEDIUM = 500;
+/** The cover words. */
+export const BLACK = 900;
 
 /** Sizes, named by what they are rather than by how big they are. */
 export const TYPE = {

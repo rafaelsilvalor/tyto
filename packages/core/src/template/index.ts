@@ -55,6 +55,7 @@ export {
   run,
   solid,
   stop,
+  systemFont,
 } from './values.js';
 
 export { TemplateError } from './errors.js';

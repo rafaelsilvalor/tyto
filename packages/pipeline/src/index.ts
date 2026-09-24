@@ -20,6 +20,8 @@ export {
 
 export { type FrameTarget, type JobEvent, type JobListener, type JobStage } from './events.js';
 
+export { fontSubstitutionWarnings } from './font-substitution.js';
+
 export {
   type JobPorts,
   type JobReport,

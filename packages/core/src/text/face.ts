@@ -121,3 +121,48 @@ function build(bytes: Uint8Array | undefined): Face | undefined {
     contentHeight: (font.ascent - font.descent) / unitsPerEm,
   };
 }
+
+interface DescriptiveTables {
+  readonly familyName?: unknown;
+  readonly italicAngle?: unknown;
+  readonly name?: { readonly records?: { readonly preferredFamily?: Record<string, string> } };
+  readonly 'OS/2'?: {
+    readonly usWeightClass?: unknown;
+    readonly fsSelection?: { readonly italic?: boolean };
+  };
+}
+
+/**
+ * The face a font file holds, read from its own tables rather than from its file name.
+ *
+ * Here and not in `@tyto/fonts`, which reads installed files (ADR 0037) and is the one
+ * package the desktop ships outside its bundle: a `fontkit` import there would be a module
+ * the packaged app does not contain. `core` already bundles fontkit, and naming a face from
+ * its bytes opens no file, so the adapter is handed this function instead of importing it.
+ *
+ * The preferred family (name ID 16) where there is one, because that is the family a type
+ * designer groups weights under: CircularXX's Medium says `CircularXX Medium` in the legacy
+ * family field and `CircularXX` in the preferred one. Italic is the slant *or* the flag,
+ * because CircularStd sets the angle to -12 and leaves `fsSelection.italic` false. Both
+ * measured on the maintainer's installed files for TYTO-182.
+ */
+export function describeFace(bytes: Uint8Array): FontFace | undefined {
+  let parsed: unknown;
+  try {
+    parsed = createFont(bytes);
+  } catch {
+    return undefined;
+  }
+  if (!isFont(parsed)) return undefined;
+
+  const tables = parsed as DescriptiveTables;
+  const os2 = tables['OS/2'];
+  const weight = os2?.usWeightClass;
+  if (typeof tables.familyName !== 'string' || typeof weight !== 'number') return undefined;
+
+  const preferred = tables.name?.records?.preferredFamily;
+  const family = preferred?.en ?? Object.values(preferred ?? {})[0] ?? tables.familyName;
+  const slanted = typeof tables.italicAngle === 'number' && tables.italicAngle !== 0;
+  const italic = slanted || os2?.fsSelection?.italic === true;
+  return { family, weight, style: italic ? 'italic' : 'normal' };
+}
