@@ -16,19 +16,20 @@ import { type Block, at, block, stack } from '@tyto/template-kit';
 import {
   ARROW,
   BAND,
-  BOLD,
+  BLACK,
   COVER_INK,
   FACE,
   GAP,
   HANDLE,
   INK,
+  LIGHT,
+  MEDIUM,
   type Mark,
   ON_INK,
   OWL,
   PILL,
   PILL_INK,
   RADIUS,
-  REGULAR,
   TYPE,
 } from './tokens.js';
 
@@ -125,7 +126,7 @@ export function footer(width: number): Block {
   const glyph = mark(ARROW, 26, INK, 'arrow');
   const handle = text({
     name: 'handle',
-    runs: [run(HANDLE, { font: FACE, size: TYPE.handle, weight: REGULAR, color: INK })],
+    runs: [run(HANDLE, { font: FACE, size: TYPE.handle, weight: LIGHT, color: INK })],
     box: { w: width, h: FOOTER_H },
     align: 'center',
     valign: 'middle',
@@ -165,7 +166,7 @@ export function cover(options: CoverOptions): Block {
   const words = label(
     options.titulo,
     { w: options.width, h: height },
-    { size: options.size, weight: BOLD, color: COVER_INK },
+    { size: options.size, weight: BLACK, color: COVER_INK },
     { name: 'cover-title', lineHeight: 1.05, align: 'center' },
   );
 
@@ -215,7 +216,7 @@ function datePill(data: RichText): Block {
   const inner = label(
     data,
     { w: DATE.w, h: DATE.h },
-    { size: TYPE.date, weight: BOLD, color: ON_INK },
+    { size: TYPE.date, weight: MEDIUM, color: ON_INK },
     { name: 'date', align: 'center', valign: 'middle' },
   );
 
@@ -253,13 +254,13 @@ function sessionPill(session: Session, width: number): Block {
       label(
         session.titulo,
         { w: inner, h: 30 },
-        { size: TYPE.sessionTitle, weight: BOLD, color: PILL_INK },
+        { size: TYPE.sessionTitle, weight: MEDIUM, color: PILL_INK },
         { name: 'session-title', overflow: 'shrink' },
       ),
       label(
         session.professor,
         { w: inner, h: 28 },
-        { size: TYPE.professor, weight: REGULAR, color: PILL_INK },
+        { size: TYPE.professor, weight: LIGHT, color: PILL_INK },
         { name: 'professor', overflow: 'shrink' },
       ),
     ],
@@ -308,7 +309,7 @@ export function discipline(name: RichText, sessions: readonly Session[], width: 
   const heading = label(
     name,
     { w: width, h: 78 },
-    { size: TYPE.discipline, weight: BOLD, color: INK },
+    { size: TYPE.discipline, weight: MEDIUM, color: INK },
     { name: 'discipline', align: 'center', overflow: 'shrink' },
   );
 

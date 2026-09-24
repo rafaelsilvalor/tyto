@@ -96,6 +96,17 @@ export function font(family: string, path?: string): FontRef {
   return path === undefined ? { family, source: 'bundled' } : { family, source: 'file', path };
 }
 
+/**
+ * A family the rendering machine has installed rather than one Tyto ships (ADR 0037).
+ *
+ * For a face whose licence keeps it out of a public repository. Where the machine lacks it
+ * the host draws a bundled face instead and says so with `W_FONT_SUBSTITUTED`, so an
+ * artwork is neither refused over a typeface nor silently drawn in the wrong one.
+ */
+export function systemFont(family: string): FontRef {
+  return { family, source: 'system' };
+}
+
 export interface RunOptions {
   readonly font: FontRef;
   readonly size: number;

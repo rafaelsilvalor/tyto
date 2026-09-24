@@ -67,8 +67,12 @@ export type BlendMode = z.infer<typeof blendModeSchema>;
 
 export const fontRefSchema = z.strictObject({
   family: z.string().min(1),
-  /** `bundled` fonts ship with Tyto; `file` ones come from the brief's folder. */
-  source: z.enum(['bundled', 'file']),
+  /**
+   * `bundled` fonts ship with Tyto; `file` ones come from the brief's folder; `system` ones
+   * are installed on the machine that renders, and a host draws a bundled face in their
+   * place, with a warning, where they are not (ADR 0037).
+   */
+  source: z.enum(['bundled', 'file', 'system']),
   path: z.string().min(1).optional(),
 });
 export type FontRef = z.infer<typeof fontRefSchema>;

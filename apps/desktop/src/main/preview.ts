@@ -4,16 +4,19 @@ import {
   type Diagnostics,
   type FileSystem,
   compile,
-  createFaceCache,
   resolve,
   sceneResources,
 } from '@tyto/core';
 import { exportHtml } from '@tyto/export-html';
-import { bundledFont, bundledFontSource } from '@tyto/fonts';
-import { bundledTemplateSource, markupTemplateSource } from '@tyto/pipeline';
+import {
+  bundledTemplateSource,
+  fontSubstitutionWarnings,
+  markupTemplateSource,
+} from '@tyto/pipeline';
 import { BUILT_IN_TEMPLATE_BUILDS } from '@tyto/templates';
 import { fileAssetResolver, fileResources } from '@tyto/io';
 
+import { faces, fonts } from './fonts.js';
 import { type ProjectSources } from './project.js';
 
 /**
@@ -125,10 +128,9 @@ export async function createPreviewService(
 ): Promise<PreviewService> {
   const { fileSystem, sources } = options;
 
-  // One cache for the life of the service: parsing a font to measure a string is the
-  // expensive part of `compile`, the faces are the bundled ones, and neither is a function
-  // of which template folder is in force. This is the one thing here that is still held.
-  const faces = createFaceCache(bundledFontSource);
+  // `faces` is one cache for the life of the process (`fonts.ts`): parsing a font to
+  // measure a string is the expensive part of `compile`, and neither the bundled faces nor
+  // the installed ones are a function of which template folder is in force.
 
   return {
     async preview(brief: string, baseDirectory?: string): Promise<PreviewResult> {
@@ -202,13 +204,14 @@ export async function createPreviewService(
       // by opening a file and looking at the preview, not by a unit test.
       const images =
         baseDirectory === undefined ? undefined : fileResources({ base: baseDirectory });
-      if (images !== undefined) await images.load(sceneResources(scene.value));
+      const needed = sceneResources(scene.value);
+      if (images !== undefined) await images.load(needed);
 
       const exported = exportHtml(scene.value, {
-        // The bundled faces, embedded in the document. Never a family name the host might
-        // not have: determinism is the rule (`docs/architecture.md`), and a preview drawn in
-        // a substituted font is a preview of a different artwork.
-        resources: { font: bundledFont, ...(images?.html ?? {}) },
+        // The faces embedded in the document, never a family name left for the host to
+        // find. A `system` face this machine lacks is embedded as its bundled substitute and
+        // reported below (ADR 0037), so the preview is the export and says where it differs.
+        resources: { font: fonts.font, ...(images?.html ?? {}) },
       });
 
       const before = [
@@ -217,6 +220,7 @@ export async function createPreviewService(
         ...resolved.diagnostics,
         ...template.diagnostics,
         ...scene.diagnostics,
+        ...fontSubstitutionWarnings(fonts.substitutions(needed.faces)),
       ];
 
       // Zipped by position, which is exact rather than close enough: `planArtworks` maps

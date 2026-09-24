@@ -58,6 +58,7 @@ non-zero.
 | `E_EXPORT_FONT_UNRESOLVED` | error | yes | An exporter was given no bytes for a font the scene draws text in. |
 | `E_EXPORT_UNSUPPORTED` | error | no | A scene uses something the chosen exporter cannot express at all. |
 | `W_EXPORT_APPROXIMATED` | warning | no | An exporter rendered something close to, but not exactly, what the IR asked for. |
+| `W_FONT_SUBSTITUTED` | warning | no | A face the scene asks this machine for is not installed, so a bundled one drew it. |
 | `E_RENDER_FAILED` | error | no | A frame could not be turned into bytes by the exporter or the rasterizer. |
 | `E_OUTPUT_WRITE` | error | no | An artifact was rendered but could not be written to the output. |
 | `W_TEXT_OVERFLOW` | warning | no | Compiled text does not fit its frame in one of the requested formats. |
@@ -744,6 +745,20 @@ A warning never replaces a value (ADR 0013).
 ```
 
 Parameters: `node`, `feature`, `exporter`, `detail`
+
+### `W_FONT_SUBSTITUTED`
+
+**Severity:** warning · **Fatal:** no · **Spec:** `docs/adr/0037-a-face-can-come-from-the-machine.md`
+
+A face the scene asks this machine for is not installed, so a bundled one drew it.
+
+The artwork is complete and measured against the face that was drawn, so the line breaks match the pixels; only the typeface differs, and this is what says so.
+
+```
+Font '{font}' is not installed on this machine; drawn in '{substitute}' instead. Install the face to render it as designed.
+```
+
+Parameters: `font`, `substitute`
 
 ### `W_TEXT_OVERFLOW`
 

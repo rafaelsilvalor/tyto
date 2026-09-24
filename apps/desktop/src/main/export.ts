@@ -1,7 +1,6 @@
 import { type Diagnostics, type FileSystem } from '@tyto/core';
 import { htmlExporterPlugin } from '@tyto/export-html';
 import { svgExporterPlugin } from '@tyto/export-svg';
-import { bundledFont } from '@tyto/fonts';
 import {
   type RenderResult,
   fileAssetResolver,
@@ -14,12 +13,14 @@ import {
   type JobEvent,
   type OutputRequest,
   bundledTemplateSource,
+  fontSubstitutionWarnings,
   markupTemplateSource,
   runJob,
 } from '@tyto/pipeline';
 import { BUILT_IN_TEMPLATE_BUILDS } from '@tyto/templates';
 import type { Rasterizer } from '@tyto/raster';
 
+import { faces, fonts } from './fonts.js';
 import { type ProjectSources } from './project.js';
 
 /**
@@ -156,13 +157,13 @@ function exporterHost(
 
   host.activate(
     htmlExporterPlugin({
-      resources: { font: bundledFont, ...(resources?.html ?? {}) },
+      resources: { font: fonts.font, ...(resources?.html ?? {}) },
       // The bytes feed a browser, not a reader. Indentation would change the hash of a
       // render for nothing.
       pretty: false,
     }),
   );
-  host.activate(svgExporterPlugin({ resources: { font: bundledFont, ...(resources?.svg ?? {}) } }));
+  host.activate(svgExporterPlugin({ resources: { font: fonts.font, ...(resources?.svg ?? {}) } }));
 
   if (rasterizer !== undefined) {
     host.activate({
@@ -231,7 +232,13 @@ export async function createExportService(options: ExportServiceOptions): Promis
         exporters: host.registry.exporters,
         formats: catalogue,
         ...(options.rasterizer === undefined ? {} : { rasterizer: options.rasterizer }),
-        ...(images === undefined ? {} : { loadResources: images.load }),
+        // Measured, as the CLI and the preview are: without faces a `shrink` is clipped and
+        // no line is broken, so the export would differ from the preview it was made from.
+        faces,
+        loadResources: async (needed) => {
+          if (images !== undefined) await images.load(needed);
+          return fontSubstitutionWarnings(fonts.substitutions(needed.faces));
+        },
         sink,
         onEvent: (event: JobEvent) => {
           // The whole of the progress transport. A listener that threw would otherwise take

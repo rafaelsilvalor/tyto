@@ -25,7 +25,7 @@ Stroke    { paint: Paint; width; align: 'inside'|'center'|'outside' }
 Effect    = Shadow{x,y,blur,spread,color} | Blur{radius} | BackgroundBlur{radius}
 MaskRef   { nodeId: string; mode: 'alpha'|'luminance' }     // a mask references another node
 BlendMode = 'normal'|'multiply'|'screen'|'overlay'|'darken'|'lighten'|'color-dodge'|'color-burn'|'soft-light'|'hard-light'|'difference'|'exclusion'|'hue'|'saturation'|'color'|'luminosity'
-FontRef   { family; source: 'bundled'|'file'; path? }
+FontRef   { family; source: 'bundled'|'file'|'system'; path? }   // 'system': ADR 0037
 AssetRef  { id; source: 'file'|'url'|'inline'; path?; hash }
 ```
 
