@@ -11,11 +11,15 @@ import {
   type Diagnostic,
   type Scene,
   type SceneNode,
+  type Template,
+  type TextMeasurement,
+  type TextNode,
   compile,
   createFaceCache,
   describeFace,
   loadFormats,
   loadTemplateRegistry,
+  measureText,
   resolve,
 } from '@tyto/core';
 import {
@@ -133,6 +137,8 @@ async function buildSource(
   source: string,
   templateName: string,
   directory: string,
+  /** Stands between `compile` and the template, for a test that watches what it was told. */
+  wrap: (template: Template) => Template = (template) => template,
 ): Promise<{ scene: Scene; warnings: readonly Diagnostic[] }> {
   if (!formats.ok) throw new Error('formats.yaml did not load.');
 
@@ -162,7 +168,7 @@ async function buildSource(
   const template = await templates.load(templateName);
   if (!template.ok) throw new Error(template.error.map((item) => item.message).join('; '));
 
-  const scene = compile(resolved.value, template.value, { formats: formats.value, faces });
+  const scene = compile(resolved.value, wrap(template.value), { formats: formats.value, faces });
   if (!scene.ok) throw new Error(scene.error.map((item) => item.message).join('; '));
 
   return { scene: scene.value, warnings: [...resolved.diagnostics, ...scene.diagnostics] };
@@ -231,6 +237,62 @@ describe.each(EXAMPLES.map((example) => [example.template, example] as const))(
  * and a snapshot of a new one would only show a number. Two briefs with the same words,
  * one of them split, is the shape that says what the split costs.
  */
+/** Every text node in a subtree, groups included — ids are unique across the scene. */
+function textNodes(nodes: readonly SceneNode[]): TextNode[] {
+  return nodes.flatMap((node) =>
+    node.kind === 'group' ? textNodes(node.children) : node.kind === 'text' ? [node] : [],
+  );
+}
+
+/**
+ * TYTO-162's agreement, on both routes to a template: what `context.measure` answers for a
+ * text node before the frame is returned is what the laid-out node measures afterwards.
+ *
+ * The template itself is not asked to call `measure` — neither built-in does yet. The wrap
+ * asks on its behalf, for every text node the frame holds, with the context `compile`
+ * handed it, which is exactly the question a template sizing a box around its text would
+ * ask. Measured against the substitute CI draws, like the rest of this file.
+ */
+describe.each(['agenda-semana', 'promo-curso'])(
+  '%s: the height a template is told is the height that is laid out',
+  (name) => {
+    it('agrees on lines and height for every text node, in every format', async () => {
+      const example = EXAMPLES.find((entry) => entry.template === name);
+      if (example === undefined) throw new Error(`${name} has no example`);
+
+      const told = new Map<string, TextMeasurement | undefined>();
+      const watching = (template: Template): Template => ({
+        manifest: template.manifest,
+        build: (context) => {
+          const built = template.build(context);
+          for (const node of textNodes(built.children)) told.set(node.id, context.measure(node));
+          return built;
+        },
+      });
+
+      const directory = join(PACK, example.template);
+      const source = await readFile(join(directory, example.brief), 'utf8');
+      const { scene } = await buildSource(source, example.template, directory, watching);
+
+      const laid = scene.artworks.flatMap((artwork) =>
+        artwork.frames.flatMap((frame) => textNodes(frame.children)),
+      );
+      expect(laid.length).toBeGreaterThan(0);
+
+      for (const node of laid) {
+        const before = told.get(node.id);
+        const after = measureText(node, faces);
+        expect(before, `${node.id} was measurable before and not after`).toBeDefined();
+        expect({ id: node.id, lines: after?.lines, height: after?.height }).toEqual({
+          id: node.id,
+          lines: before?.lines,
+          height: before?.height,
+        });
+      }
+    }, 60_000);
+  },
+);
+
 describe('a mark the template never declared', () => {
   const PROMO = join(PACK, 'promo-curso');
 

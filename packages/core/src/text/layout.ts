@@ -28,6 +28,14 @@ import type { TextNode, TextRun, TextSpan } from '../scene/nodes.js';
  * sit on a line but not where the line ends, so it does not affect the break decisions.
  */
 
+/**
+ * A text node as measurement sees it: everything but the id, which positions nothing.
+ *
+ * So a template can measure the draft it is about to place (ADR 0038) — `text()` returns a
+ * node without an id, and `frame()` assigns one only once the frame is built.
+ */
+export type MeasurableText = Omit<TextNode, 'id'>;
+
 /** The smallest `overflow: 'shrink'` is allowed to go, as a fraction of the declared size. */
 export const MINIMUM_SHRINK = 0.5;
 
@@ -46,7 +54,7 @@ export interface TextMeasurement {
 }
 
 /** The largest run in a node, whose size the strut — and so the leading — comes from. */
-export function referenceRun(node: TextNode): TextSpan | undefined {
+export function referenceRun(node: MeasurableText): TextSpan | undefined {
   let largest: TextSpan | undefined;
   for (const run of node.runs) {
     if (run.kind !== 'text') continue;
@@ -111,7 +119,7 @@ export interface LayoutOptions {
  * node measured against a fallback would move text for a reason nobody could see.
  */
 export function measureText(
-  node: TextNode,
+  node: MeasurableText,
   faces: FaceCache,
   options: LayoutOptions = {},
 ): TextMeasurement | undefined {
@@ -152,7 +160,7 @@ export function measureText(
 }
 
 function layoutAt(
-  node: TextNode,
+  node: MeasurableText,
   faces: FaceCache,
   reference: TextSpan,
   scale: number,
