@@ -41,7 +41,9 @@ export const build: TemplateBuild = (context: TemplateContext) => {
   const disciplinas = stack({
     name: 'disciplinas',
     gap: GAP.disciplines,
-    items: disciplinesOf(context).map((item) => discipline(item.name, item.sessions, width)),
+    items: disciplinesOf(context).map((item) =>
+      discipline(item.name, item.sessions, width, context.measure),
+    ),
   });
 
   // The slide is three bands. The owl is pinned to the top and the handle to the bottom,
