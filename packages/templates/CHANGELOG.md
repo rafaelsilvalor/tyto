@@ -1,5 +1,31 @@
 # @tyto/templates
 
+## 0.6.0
+
+### Minor Changes
+
+- b749c43: TYTO-184: in `agenda-semana`, a session title or professor too long for one line wraps onto the next
+  and the pill grows to hold it, as the published artwork does, instead of shrinking. The date pill
+  grows with it, and the sessions below move down. A title that fits keeps the published 86 px pill.
+  Where nothing can measure the text, the pill keeps its single-line height and a long line shrinks,
+  as before.
+
+### Patch Changes
+
+- 17ad960: TYTO-162: a template can ask how big a text node will be before it places it (ADR 0038).
+
+  `TemplateContext.measure(node)` returns the `TextMeasurement` — lines, width, height — that
+  `compile` will lay the node out at, from the same `measureText` over the same faces, or
+  `undefined` when nothing can measure. `measureNothing` is the answer for a context with no faces.
+  `measureText` accepts a node without an id (`MeasurableText`), so a template measures the draft it
+  is about to place.
+
+  **Breaking for anyone who builds a `TemplateContext` by hand**: `measure` is now required.
+
+- Updated dependencies [17ad960]
+  - @tyto/core@0.26.0
+  - @tyto/template-kit@0.1.4
+
 ## 0.5.0
 
 ### Minor Changes
