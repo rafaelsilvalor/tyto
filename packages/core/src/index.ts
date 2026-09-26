@@ -88,6 +88,7 @@ export {
   type TemplateBuild,
   type TemplateContext,
   defineTemplate,
+  measureNothing,
 } from './template/define.js';
 
 export { type RunStyle, type RunsOptions, runsOf } from './template/runs.js';
@@ -111,6 +112,7 @@ export { type Face, type FaceCache, createFaceCache, describeFace } from './text
 export {
   MINIMUM_SHRINK,
   type LayoutOptions,
+  type MeasurableText,
   type TextMeasurement,
   measureText,
   referenceRun,
