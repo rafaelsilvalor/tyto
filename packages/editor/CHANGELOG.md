@@ -1,5 +1,11 @@
 # @tyto/editor
 
+## 0.6.7
+
+### Patch Changes
+
+- 1116f2d: Bump `@codemirror/state` to 6.7.6 and `@codemirror/view` to 6.43.13.
+
 ## 0.6.6
 
 ### Patch Changes
