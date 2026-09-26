@@ -354,19 +354,19 @@ describe('a mark the template never declared', () => {
 });
 
 /**
- * The pill that cannot grow, and what the template does about it (TYTO-173).
+ * The pill that grows with its copy (TYTO-184, ADR 0038).
  *
- * `agenda-semana` draws a session title into a pill whose height is fixed, because a
- * template cannot measure text: `build` decides every coordinate before `layoutText` runs
- * (TYTO-162). Until TYTO-173 a title too long for the pill was a `W_TEXT_OVERFLOW`. The
- * published pills are all one height and the type inside them varies, so the title now asks
- * for `shrink`, which `compile` resolves against the faces: the long title comes out smaller
- * and nothing is reported.
+ * `agenda-semana` measures a session's title and professor before it places them, so a
+ * title too long for one line wraps onto a second and the grey pill — and the date pill on
+ * its end — grows to hold it. Until TYTO-184 the title shrank into a fixed pill instead,
+ * because a template could not measure (TYTO-173).
  *
- * Two briefs with the same shape and different title lengths is what says that. A single
- * brief could only show a number.
+ * The long title is the reference's own `Portaria CVS 3/2026…`, which is two lines in the
+ * substitute this file measures against and in CircularXX alike. The card named `Sistema de
+ * Garantia dos Direitos da Criança e do Adolescente`, measured one line in both — so it is
+ * not the one that says anything about wrapping.
  */
-describe('the pill that cannot grow, and shrinks its title instead', () => {
+describe('the pill that grows with its copy', () => {
   const AGENDA = join(PACK, 'agenda-semana');
 
   const briefWith = (titulo: string) =>
@@ -380,39 +380,58 @@ formats: [retrato]
 
 ` +
     `::slide
-  SERVIÇO SOCIAL
-  16/09 - 19:00 | ${titulo} | Profª. Coimbra Almeida
+  NUTRIÇÃO
+  23/08 - 19:00 | ${titulo} | Profª. Amanda Menon
 `;
 
-  const titleOf = async (titulo: string) => {
+  /** The session's title node, its pill and its date pill, as the scene came out. */
+  const sessionOf = async (titulo: string) => {
     const { scene, warnings } = await buildSource(briefWith(titulo), 'agenda-semana', AGENDA);
-    const [node] = scene.artworks
-      .flatMap((artwork) => artwork.frames)
-      .flatMap((frame) => named(frame.children, 'session-title'));
+    const children = scene.artworks.flatMap((artwork) => artwork.frames)[0]?.children ?? [];
+    const title = named(children, 'session-title')[0];
+    const heightOf = (name: string) => {
+      const shape = named(children, name)[0];
+      const rect = shape?.kind === 'group' ? shape.children[0] : undefined;
+      return rect?.kind === 'rect' ? rect.size.h : undefined;
+    };
     const sizes =
-      node?.kind === 'text'
-        ? node.runs.flatMap((run) => (run.kind === 'text' ? [run.size] : []))
+      title?.kind === 'text'
+        ? title.runs.flatMap((run) => (run.kind === 'text' ? [run.size] : []))
         : [];
-    return { sizes, overflow: warnings.filter((item) => item.code === 'W_TEXT_OVERFLOW') };
+    const lines =
+      title?.kind === 'text' ? title.runs.filter((run) => run.kind === 'break').length + 1 : 0;
+    return {
+      sizes,
+      lines,
+      pill: heightOf('session-pill'),
+      date: heightOf('date-pill'),
+      overflow: warnings.filter((item) => item.code === 'W_TEXT_OVERFLOW'),
+    };
   };
 
-  const SHORT = 'Farmacologia Geral';
-  const LONG =
-    'Sistema de Garantia dos Direitos da Criança e do Adolescente no âmbito do atendimento hospitalar';
+  const SHORT = 'Fundamentos da Nutrição';
+  const LONG = 'Portaria CVS 3/2026: Regulamento de Boas Práticas para Serviços de Alimentação';
 
-  it('says nothing about a title that fits, and draws it at its declared size', async () => {
-    const { sizes, overflow } = await titleOf(SHORT);
+  it('keeps a title that fits on one line, in the published 86px pill', async () => {
+    const short = await sessionOf(SHORT);
 
-    expect(overflow.map((item) => item.message)).toEqual([]);
-    expect(new Set(sizes).size).toBe(1);
+    expect(short.overflow.map((item) => item.message)).toEqual([]);
+    expect(short.lines).toBe(1);
+    expect(short.pill).toBe(86);
+    expect(short.date).toBe(86);
   }, 60_000);
 
-  it('draws a title that does not fit smaller, and still says nothing', async () => {
-    const short = await titleOf(SHORT);
-    const long = await titleOf(LONG);
+  it('wraps a long title onto two lines at its declared size, and grows both pills', async () => {
+    const short = await sessionOf(SHORT);
+    const long = await sessionOf(LONG);
 
     expect(long.overflow.map((item) => item.message)).toEqual([]);
-    expect(Math.max(...long.sizes)).toBeLessThan(Math.min(...short.sizes));
+    expect(long.lines).toBe(2);
+    // Not shrunk: the long title is drawn at the size the short one is.
+    expect(new Set([...long.sizes, ...short.sizes]).size).toBe(1);
+    expect(long.pill).toBeGreaterThan(86);
+    // One shape: the date pill is as tall as the grey pill it sits on.
+    expect(long.date).toBe(long.pill);
   }, 60_000);
 });
 
