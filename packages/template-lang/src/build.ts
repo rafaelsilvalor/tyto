@@ -14,7 +14,7 @@ import type {
   TextOverflow,
   TextVerticalAlign,
 } from '@tyto/core';
-import { blendModes } from '@tyto/core';
+import { blendModes, measureNothing } from '@tyto/core';
 import {
   TemplateError,
   font,
@@ -898,5 +898,7 @@ function staticContext(format: string): TemplateContext {
     artwork: { id: format, index: 0, count: 1 },
     slots: {},
     adjustments: {},
+    // The static check reads the markup's layout, never a measured one.
+    measure: measureNothing,
   };
 }

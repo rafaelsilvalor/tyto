@@ -4,6 +4,8 @@ import { build } from './template.js';
 import { fields, lines, plain } from './rich-text.js';
 import { ARROW, INK, OWL } from './tokens.js';
 
+import { measureNothing } from '@tyto/core';
+
 import type { Inline, RichText, SceneNode, TemplateContext } from '@tyto/core';
 
 /**
@@ -66,6 +68,8 @@ function contextOf(options: ContextOptions): TemplateContext {
       slide: { name: 'slide', value: { kind: 'rich-text', text: options.slide }, adjustments: [] },
     },
     adjustments: {},
+    // A pure function of its context, called directly: no faces, so nothing measures.
+    measure: measureNothing,
   };
 }
 

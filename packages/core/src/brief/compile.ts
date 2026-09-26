@@ -11,7 +11,7 @@ import type { AssetRef, FontRef, Paint } from '../scene/primitives.js';
 import { gapStampNode } from '../scene/gap.js';
 import { type Artwork, type Frame, type Scene, parseScene } from '../scene/scene.js';
 import { TemplateError } from '../template/errors.js';
-import type { Template, TemplateContext } from '../template/define.js';
+import { type Template, type TemplateContext, measureNothing } from '../template/define.js';
 
 /**
  * `ResolvedBrief` × template → `Scene` (`docs/architecture.md`, compile stage).
@@ -248,6 +248,10 @@ export function compile(
   if (missing.length > 0) return err(missing);
 
   const faces = options.faces;
+  // One function for the whole compile, and the same `measureText` `layoutText` runs below:
+  // what a template is told a node will measure is what it then measures (ADR 0038).
+  const measure: TemplateContext['measure'] =
+    faces === undefined ? measureNothing : (node) => measureText(node, faces);
 
   const plans = planArtworks(resolved, template);
   const problems: Diagnostic[] = [];
@@ -267,6 +271,7 @@ export function compile(
         artwork: { id: plan.id, index: plan.index, count: plans.length },
         slots: plan.slots,
         adjustments: plan.adjustments,
+        measure,
       };
 
       let frame: Frame;

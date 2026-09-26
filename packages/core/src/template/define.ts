@@ -2,6 +2,7 @@ import type { TemplateManifest } from './manifest.js';
 import type { ResolvedSlot } from '../brief/resolve.js';
 import type { Size } from '../scene/primitives.js';
 import type { Frame } from '../scene/scene.js';
+import type { MeasurableText, TextMeasurement } from '../text/layout.js';
 
 /**
  * `defineTemplate` — what a `template.ts` exports (`docs/template-authoring.md`).
@@ -57,7 +58,30 @@ export interface TemplateContext {
    * Adjustments on any other slot are on that slot, in `slots`.
    */
   readonly adjustments: Readonly<Record<string, string | true>>;
+
+  /**
+   * How big `node` will come out once it is laid out — asked before it is placed (ADR 0038).
+   *
+   * The same `measureText` that `compile` runs on the frame afterwards, against the same
+   * faces, so a box sized from this answer holds exactly the lines that are then drawn in
+   * it. Measure the node as it will be placed: its `box.w` decides where the lines break,
+   * its `overflow` whether it shrinks.
+   *
+   * **`undefined` means unmeasurable, never zero** — no font cache was wired into this
+   * compile, or a run's face is not one anybody supplied. A measurement of an empty node is
+   * a real answer with `height: 0`. A template that falls back to a guess on `undefined`
+   * does so knowingly, and should expect the exporter's own layout to differ from it.
+   */
+  readonly measure: (node: MeasurableText) => TextMeasurement | undefined;
 }
+
+/**
+ * The `measure` of a context that has no faces to measure against.
+ *
+ * For a compile with no font cache and for a context built by hand in a test: it answers
+ * `undefined` for every node, which is the honest answer rather than a guessed height.
+ */
+export const measureNothing: TemplateContext['measure'] = () => undefined;
 
 export type TemplateBuild = (context: TemplateContext) => Frame;
 

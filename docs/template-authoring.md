@@ -512,6 +512,15 @@ build: (context: TemplateContext) => Frame;
 | `artwork`     | `{ id, index, count }`, so a slide can number itself `2/3`                                                                               |
 | `slots`       | every slot the brief gave a value, with the repeatable one already resolved to _this_ artwork's occurrence — `slots.slide` is this slide |
 | `adjustments` | this artwork's, flattened: `true` for a flag, the value for an enum                                                                      |
+| `measure`     | `measure(textDraft)` — the lines, width and height a text node will be laid out at, or `undefined` when nothing can measure (ADR 0038)   |
+
+**`measure` is how a box grows with its text.** Build the text node first, ask, then size
+what surrounds it: `const m = context.measure(title)` and a pill `m.height + padding` tall.
+The answer comes from the same function `compile` lays the frame out with afterwards, so the
+box holds exactly the lines that are drawn. **`undefined` is "cannot measure", never zero** —
+no font cache in this compile, or a face nobody supplied — and a template that falls back
+to a fixed height there is guessing, and should say so in a comment. A markup template has
+no way to call it yet.
 
 **Pass `idPrefix` or the scene will not validate.** Node ids are derived from position, so
 two artworks with a `feed` frame each would both generate `feed.0`, and so would the two
