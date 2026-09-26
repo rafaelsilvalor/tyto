@@ -1,5 +1,44 @@
 # @tyto/desktop
 
+## 0.5.0
+
+### Minor Changes
+
+- b587f0d: TYTO-182: a face can come from the machine that renders, and a missing one is drawn and reported
+  (ADR 0037).
+
+  `FontRef.source` gains `'system'`, asked for with `systemFont(family)`. `@tyto/fonts`'
+  `createFontLibrary({ describe: describeFace })` reads the platform's font folders, matches a file
+  on its own tables, and answers the exporters and measurement from the same file. Where the machine
+  lacks the face it draws the bundled Source Sans 3 at the nearest weight and raises
+  `W_FONT_SUBSTITUTED`, in `result.json` and in the desktop preview.
+
+  `agenda-semana` now draws in CircularXX: Black for the cover, Medium for the discipline, date and
+  session title, Light for the professor and the handle.
+
+  `JobPorts.loadResources` may answer with diagnostics. `sceneResources` no longer lists a declared
+  font at 400 when its runs already draw it. The desktop export now measures text, as the CLI and
+  the preview do.
+
+### Patch Changes
+
+- 56e1b6f: TYTO-183: Tab indents the line (or every selected line) by two spaces in the brief editor, and
+  Shift+Tab takes them back. To move focus out of the editor with the keyboard, press Escape and then
+  Tab.
+- Updated dependencies [8092940]
+- Updated dependencies [b587f0d]
+- Updated dependencies [56e1b6f]
+  - @tyto/templates@0.5.0
+  - @tyto/core@0.25.0
+  - @tyto/fonts@0.2.0
+  - @tyto/pipeline@0.9.0
+  - @tyto/editor@0.6.5
+  - @tyto/brief-lang@0.6.5
+  - @tyto/export-html@0.6.2
+  - @tyto/export-svg@1.3.2
+  - @tyto/io@1.3.6
+  - @tyto/plugin-api@0.3.8
+
 ## 0.4.0
 
 ### Minor Changes

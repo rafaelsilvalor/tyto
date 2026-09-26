@@ -1,6 +1,6 @@
 {
   "name": "@tyto/core",
-  "version": "0.24.0",
+  "version": "0.25.0",
   "type": "module",
   "description": "Scene IR, Result/Diagnostic, ports, template SDK, resolve and compile.",
   "license": "UNLICENSED",

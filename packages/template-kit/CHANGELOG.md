@@ -1,5 +1,12 @@
 # @tyto/template-kit
 
+## 0.1.3
+
+### Patch Changes
+
+- Updated dependencies [b587f0d]
+  - @tyto/core@0.25.0
+
 ## 0.1.2
 
 ### Patch Changes
