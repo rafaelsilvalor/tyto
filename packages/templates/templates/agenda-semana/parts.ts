@@ -33,7 +33,7 @@ import {
   TYPE,
 } from './tokens.js';
 
-import type { AssetRef, RichText, TextRun } from '@tyto/core';
+import type { AssetRef, RichText, TemplateContext, TextRun } from '@tyto/core';
 import type { NonEmpty, TextOptions } from '@tyto/core/template';
 
 /* ---------------------------------------------------------------------------- type -- */
@@ -205,27 +205,71 @@ export interface Session {
   readonly professor: RichText;
 }
 
-/** The pill sizes. Both rows are one height, which is the wall `sessionPill` describes. */
+/** The pills' height for a session whose copy fits one line each — the published row. */
 const DATE = { w: 220, h: 86 } as const;
 
 /** Room between the grey pill's edge and the words inside it. */
-const PAD = { top: 14, right: 32, left: 32 } as const;
+const PAD = { vertical: 12, right: 32, left: 32 } as const;
 
-/** The blue pill on the left of a row, holding the date. */
-function datePill(data: RichText): Block {
+/** What a template is handed to ask how tall its text will be (ADR 0038). */
+type Measure = TemplateContext['measure'];
+
+/**
+ * One line of the grey pill's copy — the title or the professor — as tall as its lines.
+ *
+ * **It wraps and grows rather than shrinking** (TYTO-184): the published pill breaks a
+ * long title onto a second line and grows to hold it. The text is built with the column's
+ * width and no height, asked how tall it comes out, and given that height — never less than
+ * `oneLine`, which is today's single-line box, so a short title is drawn exactly as before.
+ *
+ * Where nothing can measure (`measure` answers `undefined`: no faces in this compile), the
+ * box is `oneLine` and a long line shrinks into it, which is TYTO-173's behaviour. That
+ * height is a guess, and the exporter's own wrap can differ from it.
+ */
+function copyLine(
+  value: RichText,
+  width: number,
+  oneLine: number,
+  style: { readonly size: number; readonly weight: number; readonly color: string },
+  name: string,
+  measure: Measure,
+): Block {
+  const runs = atLeastOne(
+    runsOf(value, { font: FACE, size: style.size, weight: style.weight, color: style.color }),
+  );
+  if (runs === undefined) return block(width, oneLine, group({ children: [] }));
+
+  const measured = measure(text({ name, runs, box: { w: width } }));
+  if (measured === undefined) {
+    return block(
+      width,
+      oneLine,
+      text({ name, runs, box: { w: width, h: oneLine }, overflow: 'shrink' }),
+    );
+  }
+
+  const height = Math.max(oneLine, measured.height);
+  return block(width, height, text({ name, runs, box: { w: width, h: height } }));
+}
+
+/** The blue pill on the left of a row, holding the date, as tall as the row it sits on. */
+function datePill(data: RichText, height: number): Block {
   const inner = label(
     data,
-    { w: DATE.w, h: DATE.h },
+    { w: DATE.w, h: height },
     { size: TYPE.date, weight: MEDIUM, color: ON_INK },
     { name: 'date', align: 'center', valign: 'middle' },
   );
 
   return block(
     DATE.w,
-    DATE.h,
+    height,
     group({
       name: 'date-pill',
-      children: [rect({ size: DATE, radius: RADIUS, fill: solid(INK) }), inner.draft],
+      children: [
+        rect({ size: { w: DATE.w, h: height }, radius: RADIUS, fill: solid(INK) }),
+        inner.draft,
+      ],
     }),
   );
 }
@@ -238,58 +282,62 @@ function datePill(data: RichText): Block {
  * end, so there is no gap and no second rounded edge between them. The words therefore
  * start after the date pill, not after the grey pill's own edge.
  *
- * Both text boxes state a height, and so does the pill, because a template cannot measure
- * text: `build` decides every coordinate before `layoutText` runs
- * (`packages/core/src/brief/compile.ts`). What keeps a long title inside is `shrink`: the
- * published pills are all one height and what varies is the type inside them, which
- * `compile` resolves against the faces (docs/ir-schema.md). A box that grows with its text
- * instead is TYTO-162.
+ * **It is as tall as its copy** plus the padding, and never shorter than the published
+ * single-line row: `copyLine` measures each line before it is placed (ADR 0038), so a title
+ * that wraps makes the pill — and the row, and everything `stack` puts under it — taller.
  */
-function sessionPill(session: Session, width: number): Block {
+function sessionPill(session: Session, width: number, measure: Measure): Block {
   const inner = width - DATE.w - PAD.left - PAD.right;
 
   const copy = stack({
     gap: 4,
     items: [
-      label(
+      copyLine(
         session.titulo,
-        { w: inner, h: 30 },
+        inner,
+        30,
         { size: TYPE.sessionTitle, weight: MEDIUM, color: PILL_INK },
-        { name: 'session-title', overflow: 'shrink' },
+        'session-title',
+        measure,
       ),
-      label(
+      copyLine(
         session.professor,
-        { w: inner, h: 28 },
+        inner,
+        28,
         { size: TYPE.professor, weight: LIGHT, color: PILL_INK },
-        { name: 'professor', overflow: 'shrink' },
+        'professor',
+        measure,
       ),
     ],
   });
 
+  const height = Math.max(DATE.h, copy.height + PAD.vertical * 2);
+
   return block(
     width,
-    DATE.h,
+    height,
     group({
       name: 'session-pill',
       children: [
-        rect({ size: { w: width, h: DATE.h }, radius: RADIUS, fill: solid(PILL) }),
-        at(DATE.w + PAD.left, (DATE.h - copy.height) / 2, copy),
+        rect({ size: { w: width, h: height }, radius: RADIUS, fill: solid(PILL) }),
+        at(DATE.w + PAD.left, (height - copy.height) / 2, copy),
       ],
     }),
   );
 }
 
 /** One session, drawn: the grey pill across the row, and the date pill on top of its end. */
-export function sessionRow(session: Session, width: number): Block {
-  const date = datePill(session.data);
+export function sessionRow(session: Session, width: number, measure: Measure): Block {
+  const pill = sessionPill(session, width, measure);
+  const date = datePill(session.data, pill.height);
 
   return block(
     width,
-    DATE.h,
+    pill.height,
     group({
       name: 'session',
       // Painted in order, so the date is last: it covers the grey pill's rounded left end.
-      children: [sessionPill(session, width).draft, date.draft],
+      children: [pill.draft, date.draft],
     }),
   );
 }
@@ -305,7 +353,12 @@ export function sessionRow(session: Session, width: number): Block {
  * it counts anything, and the `y` of the second session is the height of the first — a
  * number `stack` adds up rather than one somebody typed.
  */
-export function discipline(name: RichText, sessions: readonly Session[], width: number): Block {
+export function discipline(
+  name: RichText,
+  sessions: readonly Session[],
+  width: number,
+  measure: Measure,
+): Block {
   const heading = label(
     name,
     { w: width, h: 78 },
@@ -316,7 +369,7 @@ export function discipline(name: RichText, sessions: readonly Session[], width: 
   const rows = stack({
     name: 'eventos',
     gap: GAP.sessions,
-    items: sessions.map((session) => sessionRow(session, width)),
+    items: sessions.map((session) => sessionRow(session, width, measure)),
   });
 
   return stack({ name: 'discipline-block', gap: GAP.heading, items: [heading, rows] });
