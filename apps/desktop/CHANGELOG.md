@@ -1,5 +1,13 @@
 # @tyto/desktop
 
+## 0.5.2
+
+### Patch Changes
+
+- fc8814f: Bump Electron to 44.4.5.
+- Updated dependencies [1116f2d]
+  - @tyto/editor@0.6.7
+
 ## 0.5.1
 
 ### Patch Changes
