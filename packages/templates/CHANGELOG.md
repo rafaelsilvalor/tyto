@@ -1,5 +1,49 @@
 # @tyto/templates
 
+## 0.5.0
+
+### Minor Changes
+
+- 8092940: TYTO-173: `agenda-semana` puts several disciplines on one slide, as the published carousel does.
+
+  **Breaking for a brief written against 1.0.0 of the template.** The repeatable slot is now `slide`,
+  not `disciplina`: one occurrence is one slide, and inside it a line with no `|` starts a discipline
+  and every `date | title | professor` line under it is one of its sessions. The template renders in
+  a new `retrato` format (1080×1350, Instagram's 4:5 post), added to the pack's `formats.yaml`; it
+  no longer declares `feed` or `story`.
+
+  The slide is three bands: the owl pinned to the top, the handle and arrow to the bottom, the cover
+  under the owl on the first slide only, and the disciplines centred in what is left. The date pill
+  sits on the left end of the grey pill instead of beside it, sessions are 4 px apart, and a title
+  too long for its pill is drawn smaller (`overflow: 'shrink'`) instead of reported. The owl and the
+  arrow are the brand files' geometry, with the colour still the template's.
+
+  **`tyto render` now measures text.** The CLI hands `compile` the bundled faces, as the desktop
+  preview already did. Before this, a `shrink` reached `export-html` as `W_EXPORT_APPROXIMATED`
+  and was clipped, line breaks were left to the exporter, and `W_TEXT_OVERFLOW` was never raised.
+
+- b587f0d: TYTO-182: a face can come from the machine that renders, and a missing one is drawn and reported
+  (ADR 0037).
+
+  `FontRef.source` gains `'system'`, asked for with `systemFont(family)`. `@tyto/fonts`'
+  `createFontLibrary({ describe: describeFace })` reads the platform's font folders, matches a file
+  on its own tables, and answers the exporters and measurement from the same file. Where the machine
+  lacks the face it draws the bundled Source Sans 3 at the nearest weight and raises
+  `W_FONT_SUBSTITUTED`, in `result.json` and in the desktop preview.
+
+  `agenda-semana` now draws in CircularXX: Black for the cover, Medium for the discipline, date and
+  session title, Light for the professor and the handle.
+
+  `JobPorts.loadResources` may answer with diagnostics. `sceneResources` no longer lists a declared
+  font at 400 when its runs already draw it. The desktop export now measures text, as the CLI and
+  the preview do.
+
+### Patch Changes
+
+- Updated dependencies [b587f0d]
+  - @tyto/core@0.25.0
+  - @tyto/template-kit@0.1.3
+
 ## 0.4.1
 
 ### Patch Changes

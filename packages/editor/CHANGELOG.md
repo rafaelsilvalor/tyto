@@ -1,5 +1,17 @@
 # @tyto/editor
 
+## 0.6.5
+
+### Patch Changes
+
+- 56e1b6f: TYTO-183: Tab indents the line (or every selected line) by two spaces in the brief editor, and
+  Shift+Tab takes them back. To move focus out of the editor with the keyboard, press Escape and then
+  Tab.
+- Updated dependencies [b587f0d]
+  - @tyto/core@0.25.0
+  - @tyto/brief-lang@0.6.5
+  - @tyto/template-lang@0.6.5
+
 ## 0.6.4
 
 ### Patch Changes
