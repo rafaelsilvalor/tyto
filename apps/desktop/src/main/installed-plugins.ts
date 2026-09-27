@@ -82,8 +82,8 @@ export function desktopCapabilities(
       return (await credentials.get(credentialAccount(plugin, key))) ?? undefined;
     },
     describeCredential: (plugin, key) =>
-      `the keychain entry '${credentialAccount(plugin, key)}', and this version of the app has ` +
-      'no screen to store one yet',
+      `the keychain entry '${credentialAccount(plugin, key)}' (this version of the app has ` +
+      'no screen to store one yet)',
   };
 }
 
