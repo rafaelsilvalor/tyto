@@ -8,7 +8,7 @@ import type {
   TemplateRegistry,
 } from '@tyto/core';
 import type { TemplateBuild } from '@tyto/core';
-import { fontFaceKey, formatCatalogue, isError, loadTemplateRegistry } from '@tyto/core';
+import { fontFaceKey, formatCatalogue, isError, loadTemplateRegistry, ok } from '@tyto/core';
 import { frame, rect, solid } from '@tyto/core/template';
 import { type HtmlResources, htmlExporterPlugin } from '@tyto/export-html';
 import { type SvgResources, svgExporterPlugin } from '@tyto/export-svg';
@@ -597,6 +597,59 @@ describe('what the job refuses before it starts', () => {
     );
 
     expect(result.ok && result.value.rendered).toBe(6);
+  });
+
+  it('refuses a rasterized exporter declaring a kind no rasterizer encodes', async () => {
+    const host = createPluginHost();
+    host.hostFor('gifs').registerExporter({
+      id: 'gifs',
+      mime: 'text/html',
+      extension: 'html',
+      kinds: ['gif'],
+      rasterized: true,
+      exportFrame: () => ok('<p/>'),
+    });
+
+    await expect(
+      runJob(
+        { brief: briefSource, outputs: [{ kind: 'gif' }] },
+        await portsOf({ exporters: host.registry.exporters }),
+      ),
+    ).rejects.toThrow(/'gifs' declares 'gif' and is rasterized/);
+  });
+});
+
+describe('a kind Tyto never shipped (TYTO-47)', () => {
+  it('is named and typed by the exporter that declares it', async () => {
+    // The vocabulary half of the loader card: an installed exporter that declares `pdf`
+    // can be asked for, and the file is called and described what that exporter says —
+    // not `.svg`, and not whatever the raster port would have guessed.
+    const host = createPluginHost();
+    host.hostFor('pdf').registerExporter({
+      id: 'pdf',
+      mime: 'application/pdf',
+      extension: 'pdf',
+      kinds: ['pdf'],
+      rasterized: false,
+      exportFrame: (_scene, artwork, frame) => ok(`%PDF ${artwork.id} ${frame.format}`),
+    });
+
+    const sink = recordingSink();
+    const { rasterizer: _ignored, ...withoutRasterizer } = await portsOf({
+      exporters: host.registry.exporters,
+      sink,
+    });
+    const result = await runJob(
+      { brief: briefSource, outputs: [{ kind: 'pdf' }] },
+      withoutRasterizer,
+    );
+
+    expect(result.ok && result.value.rendered).toBe(6);
+    expect(sink.written[0]).toMatchObject({
+      name: 'slide-1-feed.pdf',
+      kind: 'pdf',
+      mime: 'application/pdf',
+    });
   });
 });
 
