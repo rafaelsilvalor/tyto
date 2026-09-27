@@ -236,6 +236,20 @@ export default tseslint.config(
   },
 
   {
+    /**
+     * The one file where the CLI reaches the network with `fetch`: `host.fetch`'s adapter
+     * (ADR 0042). Node's own `fetch` is what `DOM_GLOBALS` catches here, and it is the right
+     * tool — redirects can be refused with one option, which `node:https` would leave to
+     * hand-written code. Scoped to the file, so no other Node module learns it may open a
+     * connection; that module only runs after `@tyto/plugin-api` has checked the
+     * plugin's `net:` permissions.
+     */
+    name: 'boundary/cli-plugin-fetch',
+    files: ['apps/cli/src/plugins/capabilities.ts'],
+    rules: { 'no-restricted-globals': 'off' },
+  },
+
+  {
     name: 'boundary/pipeline-has-no-exporters',
     // Tests are exempt: `job.test.ts` activates the real built-ins through the real host,
     // which is the only way to assert that a job renders through whatever was registered.

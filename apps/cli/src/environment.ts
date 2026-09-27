@@ -59,6 +59,14 @@ export interface CliEnvironment {
    * pipe, a CI job — and then `install` needs `--yes` rather than guessing.
    */
   readonly confirm?: (question: string) => Promise<boolean>;
+  /**
+   * The environment an installed plugin's `host.credentials` reads, as
+   * `TYTO_PLUGIN_<NAME>_<KEY>` (ADR 0042).
+   *
+   * Optional, and absent means **no credentials at all**, for the reason `home` is: a test
+   * must never hand a plugin a secret from the machine it runs on.
+   */
+  readonly variables?: Readonly<Record<string, string | undefined>>;
 }
 
 /**
@@ -109,6 +117,7 @@ async function askOnTerminal(question: string): Promise<boolean> {
 export function defaultEnvironment(): CliEnvironment {
   return {
     home: tytoHome(),
+    variables: process.env,
     ...(process.stdin.isTTY ? { confirm: askOnTerminal } : {}),
     console: {
       out: (text) => {

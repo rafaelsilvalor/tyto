@@ -8,6 +8,7 @@ import {
   type InProcessHost,
   type IsolatedPlugin,
   PLUGIN_API_VERSION,
+  type HostCapabilities,
   type Plugin,
   type PluginCrash,
   type PluginManifest,
@@ -119,7 +120,7 @@ export async function writeCrash(
 async function startPlugin(
   store: PluginStore,
   entry: InstalledEntry & { readonly manifest: PluginManifest },
-  launch: PluginProcessLauncher,
+  options: { readonly launch: PluginProcessLauncher; readonly capabilities?: HostCapabilities },
   crashes: Promise<void>[],
 ): Promise<IsolatedPlugin | Diagnostics> {
   const path = join(store.directoryOf(entry.folder), PLUGIN_ENTRY);
@@ -134,7 +135,8 @@ async function startPlugin(
     // The validated manifest, handed over as the document it was: the host validates it
     // again at `tryActivate`, which is the one check a plugin cannot skip (ADR 0007).
     manifest: entry.manifest as unknown,
-    channel: launch({ name: entry.folder, entry: path }),
+    channel: options.launch({ name: entry.folder, entry: path }),
+    ...(options.capabilities === undefined ? {} : { capabilities: options.capabilities }),
     onCrash: (reason) => {
       // Kept, so `close` can wait for it: a CLI that exits mid-write loses the record.
       const crash = { at: new Date().toISOString(), reason };
@@ -161,6 +163,8 @@ export const NO_PLUGINS: LoadedPlugins = {
 export interface LoadOptions {
   /** How a plugin's process is started. A worker thread, unless a test says otherwise. */
   readonly launch?: PluginProcessLauncher;
+  /** What `host.fetch` and `host.credentials` reach, once a plugin's permissions allow it. */
+  readonly capabilities?: HostCapabilities;
 }
 
 /**
@@ -191,7 +195,10 @@ export async function loadInstalledPlugins(
     const plugin = await startPlugin(
       installed.store,
       { ...entry, manifest: entry.manifest },
-      launch,
+      {
+        launch,
+        ...(options.capabilities === undefined ? {} : { capabilities: options.capabilities }),
+      },
       crashes,
     );
     if ('plugin' in plugin) {

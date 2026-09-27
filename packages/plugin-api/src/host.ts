@@ -11,6 +11,13 @@ import type {
   Provided,
   TemplatePack,
 } from './contributions.js';
+import {
+  type HostCapabilities,
+  type HostFetchInit,
+  type HostFetchResponse,
+  checkedCapabilities,
+  responseOf,
+} from './capabilities.js';
 import { type ContributionPoint, type PluginManifest, validatePluginManifest } from './manifest.js';
 
 /**
@@ -79,6 +86,20 @@ export interface PluginHost {
    */
   config<T>(schema: ZodType<T>): T;
 
+  /**
+   * The network, for the hosts the manifest declares (`net:<host>`, `net:*.<domain>`,
+   * `net:*`). Anything else rejects with a `PluginCapabilityError` whose `code` is
+   * `E_PERMISSION`. Redirects are not followed: the 3xx comes back, and the next request is
+   * checked like the first (ADR 0042).
+   */
+  fetch(url: string, init?: HostFetchInit): Promise<HostFetchResponse>;
+  /**
+   * A secret, for a key the manifest declares as `credentials:<key>`. An undeclared key
+   * rejects with `E_PERMISSION`, and a declared one this host holds no value for with
+   * `E_CREDENTIAL_MISSING`.
+   */
+  credentials(key: string): Promise<string>;
+
   readonly log: Logger;
   readonly events: TypedEmitter;
 }
@@ -119,6 +140,11 @@ export interface PluginHostOptions {
   readonly log?: Logger;
   /** Raw configuration, by plugin id. `config()` validates a slice of it. */
   readonly config?: Readonly<Record<string, unknown>>;
+  /**
+   * The network and the secrets `fetch` and `credentials` reach, behind the permission
+   * check. Absent for every built-in today: none declares a permission.
+   */
+  readonly capabilities?: HostCapabilities;
 }
 
 /** A host bound to one plugin, plus the registry the composition root reads. */
@@ -322,7 +348,13 @@ export function createPluginHost(options: PluginHostOptions = {}): InProcessHost
     panels: () => panels.list(),
   };
 
-  function hostWith(pluginId: string, onConflict?: ConflictListener): PluginHost {
+  function hostWith(
+    pluginId: string,
+    onConflict?: ConflictListener,
+    permissions: readonly string[] = [],
+  ): PluginHost {
+    // The permissions of the manifest the host validated, never what the plugin says.
+    const checked = checkedCapabilities(pluginId, permissions, options.capabilities);
     return {
       registerExporter: (exporter) => exporters.add(pluginId, exporter, onConflict),
       registerSource: (contribution) => sources.add(pluginId, contribution, onConflict),
@@ -346,6 +378,9 @@ export function createPluginHost(options: PluginHostOptions = {}): InProcessHost
         }
         return parsed.data;
       },
+
+      fetch: async (url, init) => responseOf(await checked.fetch(url, init)),
+      credentials: (key) => checked.credentials(key),
 
       log,
       events: emitter,
@@ -375,7 +410,7 @@ export function createPluginHost(options: PluginHostOptions = {}): InProcessHost
         );
       }
 
-      const result = plugin.activate(this.hostFor(plugin.id));
+      const result = plugin.activate(hostWith(plugin.id, undefined, manifest.permissions));
 
       // Checked *after* activation, against what was actually registered. `contributes` is
       // the manifest's promise about which points this plugin touches, and a promise
@@ -426,7 +461,9 @@ export function createPluginHost(options: PluginHostOptions = {}): InProcessHost
 
       const conflicts: Conflict[] = [];
       try {
-        plugin.activate(hostWith(plugin.id, (conflict) => conflicts.push(conflict)));
+        plugin.activate(
+          hostWith(plugin.id, (conflict) => conflicts.push(conflict), manifest.permissions),
+        );
       } catch (cause) {
         // Any throw, whatever its class: this is foreign code, and the question is only
         // whether it finished.
