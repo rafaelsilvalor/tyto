@@ -239,6 +239,9 @@ describe('the bridge', () => {
       'dialog:save-changes',
       'export:cancel',
       'export:choose-directory',
+      // TYTO-48, ADR 0044: which kinds an export can produce, installed exporters' included.
+      // Exercised by `e2e/installed-plugins.desktop.test.ts`.
+      'export:kinds',
       'export:progress',
       'export:reveal',
       'export:start',

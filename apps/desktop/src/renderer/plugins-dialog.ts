@@ -35,6 +35,7 @@ const STATUS_KEYS: Record<PluginRow['status'], CatalogueKey> = {
   enabled: 'plugins.status.enabled',
   disabled: 'plugins.status.disabled',
   refused: 'plugins.status.refused',
+  crashed: 'plugins.status.crashed',
 };
 
 export class PluginsDialog extends LitElement {

@@ -165,9 +165,9 @@ export const ptBR: Catalogue = {
   'command.plugins.show': 'Mostrar plugins',
   'plugins.heading': 'Plugins do Tyto',
   'plugins.notice':
-    'As permissões ficam registradas quando um plugin é instalado e ainda não são aplicadas. A linha de comando tyto roda cada plugin numa thread própria, que impede um travamento de derrubar o Tyto mas não é uma caixa de areia: um plugin tem o mesmo acesso a este computador que o próprio Tyto.',
+    'Cada plugin instalado roda num processo próprio, que impede um travamento de derrubar o Tyto mas não é uma caixa de areia: um plugin tem o mesmo acesso a este computador que o próprio Tyto. As permissões net: e credentials: filtram só o que o plugin pede ao Tyto — host.fetch e host.credentials — e um plugin que passa por fora delas não é impedido.',
   'plugins.inactive':
-    'Esta janela ainda não executa plugins instalados. A linha de comando tyto executa.',
+    'Os plugins ativos são iniciados quando a janela abre; um instalado com ela aberta é iniciado na próxima vez.',
   'plugins.folder': 'Os plugins instalados ficam em',
   'plugins.install': 'Instale, remova ou desative um com tyto plugin install, remove ou disable.',
   'plugins.column.name': 'Nome',
@@ -181,6 +181,7 @@ export const ptBR: Catalogue = {
   'plugins.status.enabled': 'ativo',
   'plugins.status.disabled': 'desativado',
   'plugins.status.refused': 'recusado',
+  'plugins.status.crashed': 'travou',
   'plugins.permissions.none': 'nenhuma',
   'plugins.close': 'Fechar',
   'plugins.unavailable': 'Não foi possível ler a lista de plugins.',
