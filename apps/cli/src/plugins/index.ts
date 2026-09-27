@@ -1,5 +1,6 @@
 import { htmlExporterManifest, htmlExporterPlugin } from '@tyto/export-html';
 import { svgExporterManifest, svgExporterPlugin } from '@tyto/export-svg';
+import type { Diagnostics } from '@tyto/core';
 import type { ExportResources } from '@tyto/io';
 import {
   type ExporterRegistry,
@@ -101,10 +102,14 @@ export function activateBuiltIns(options: BuiltInOptions = {}): InProcessHost {
  * A host of its own, because the real ones are per task and bind a task's resources; what
  * this one is asked is only which kinds exist and which of them raster.
  */
-export function reachableExporters(plugins: LoadedPlugins): ExporterRegistry {
+export function reachableExporters(plugins: LoadedPlugins): {
+  readonly exporters: ExporterRegistry;
+  /** Why an installed plugin is not among them — printed when a `--types` is refused. */
+  readonly warnings: Diagnostics;
+} {
   const host = activateBuiltIns();
-  activateInstalled(host, plugins);
-  return host.registry.exporters;
+  const warnings = activateInstalled(host, plugins);
+  return { exporters: host.registry.exporters, warnings };
 }
 
 export {

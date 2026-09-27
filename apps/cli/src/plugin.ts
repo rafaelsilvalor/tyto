@@ -190,7 +190,7 @@ function fail(problems: Diagnostics, environment: CliEnvironment): ExitCode {
 
 /**
  * The text the person approves. It names every permission, and it says plainly that the
- * approval is a record and not a sandbox yet — ADR 0039, until TYTO-48 isolates plugins.
+ * approval is a record and not a sandbox yet — ADR 0040, until TYTO-48 isolates plugins.
  */
 function permissionPrompt(manifest: PluginManifest, source: string): string {
   const permissions =

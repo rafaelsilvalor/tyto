@@ -216,13 +216,13 @@ export const diagnosticCodes = {
   // The loader's codes (TYTO-47). Errors, because each one refuses a plugin somebody asked
   // for by name — at install, at enable, or when the host activates it. A render that meets
   // one does not report it as itself: it reports W_PLUGIN_SKIPPED, because the brief is not
-  // what is wrong and the run goes on without that plugin (ADR 0039).
+  // what is wrong and the run goes on without that plugin (ADR 0040).
   E_PLUGIN_ENGINE: {
     severity: 'error',
     summary: "A plugin's engine range is not satisfied by this host's plugin API.",
     template:
       "Plugin '{plugin}' needs plugin API {range}, and this Tyto provides plugin API {version}.",
-    spec: 'docs/adr/0039-the-engine-is-the-plugin-api-version.md',
+    spec: 'docs/adr/0040-the-engine-is-the-plugin-api-version.md',
     fatal: true,
     fatality: 'A plugin that did not load contributed no slot to skip.',
   },
@@ -272,6 +272,15 @@ export const diagnosticCodes = {
     severity: 'error',
     summary: 'The file recording which plugins were installed and approved cannot be read.',
     template: "Plugin state '{path}' cannot be read: {problem}.",
+    spec: 'docs/plugin-api.md',
+    fatal: true,
+    fatality: 'A plugin that did not load contributed no slot to skip.',
+  },
+  E_PLUGIN_EXPORTER_KIND: {
+    severity: 'error',
+    summary: 'A plugin registered a rasterized exporter declaring a kind no rasterizer encodes.',
+    template:
+      "Plugin '{plugin}' registers exporter '{exporter}' as rasterized for '{kind}', and a rasterizer encodes only {encodable}.",
     spec: 'docs/plugin-api.md',
     fatal: true,
     fatality: 'A plugin that did not load contributed no slot to skip.',
@@ -567,12 +576,12 @@ export const diagnosticCodes = {
   },
   // A warning and not an error, because the brief is not what is wrong: the plugin belongs
   // to the machine, the run goes on without it, and a delivery that failed over somebody
-  // else's plugin would be retried by Jacurutu forever (ADR 0011, ADR 0039).
+  // else's plugin would be retried by Jacurutu forever (ADR 0011, ADR 0040).
   W_PLUGIN_SKIPPED: {
     severity: 'warning',
     summary: 'An installed plugin was not activated for this run, and the run went on without it.',
     template: "Plugin '{plugin}' was skipped: {reason}",
-    spec: 'docs/adr/0039-the-engine-is-the-plugin-api-version.md',
+    spec: 'docs/adr/0040-the-engine-is-the-plugin-api-version.md',
     fatal: false,
     fatality: 'A warning never replaces a value (ADR 0013).',
   },

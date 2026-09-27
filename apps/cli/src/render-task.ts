@@ -155,7 +155,7 @@ export async function renderTask(
     ...(options.rasterizer === undefined ? {} : { rasterizer: options.rasterizer }),
   });
   // After the built-ins, so a built-in keeps every id it has. A plugin refused here is a
-  // warning in this task's `result.json`, and the task renders without it (ADR 0039).
+  // warning in this task's `result.json`, and the task renders without it (ADR 0040).
   const pluginWarnings = activateInstalled(host, options.plugins ?? NO_PLUGINS);
 
   const registered = host.registry.rasterizers<Rasterizer>()[0]?.value;

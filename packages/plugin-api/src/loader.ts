@@ -141,7 +141,7 @@ export function checkStoredPlugin(
  *
  * Each refusal is an error where somebody asked for the plugin by name — `install`,
  * `enable` — and a warning on a render, because the brief is not what is wrong and the run
- * goes on without it (ADR 0039). The original message rides along whole, so the warning
+ * goes on without it (ADR 0040). The original message rides along whole, so the warning
  * still says *which* id collided and with whom.
  */
 export function skippedPluginWarnings(plugin: string, reasons: Diagnostics): Diagnostic[] {

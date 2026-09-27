@@ -13,7 +13,7 @@ import { z } from 'zod';
  * activated until it is installed again.
  *
  * Until TYTO-48 the permissions recorded here are shown and remembered, **not enforced**:
- * a plugin's code runs in the same process as Tyto's, with Tyto's reach (ADR 0039).
+ * a plugin's code runs in the same process as Tyto's, with Tyto's reach (ADR 0040).
  */
 
 export interface PluginStateEntry {

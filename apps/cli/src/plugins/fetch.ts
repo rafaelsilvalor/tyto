@@ -49,6 +49,14 @@ async function isDirectory(path: string): Promise<boolean> {
   }
 }
 
+async function isFile(path: string): Promise<boolean> {
+  try {
+    return (await stat(path)).isFile();
+  } catch {
+    return false;
+  }
+}
+
 function problemOf(cause: unknown): string {
   const stderr = (cause as { readonly stderr?: unknown } | undefined)?.stderr;
   if (typeof stderr === 'string' && stderr.trim() !== '') return stderr.trim().split('\n')[0] ?? '';
@@ -121,8 +129,14 @@ export async function fetchPlugin(
   const gitUrl = gitUrlOf(spec);
 
   try {
+    // A file on this disk is handed to npm as `file:<absolute path>`, never as typed: npm reads
+    // a bare `packed/x.tgz` as GitHub shorthand for the repository `packed` of user
+    // `x.tgz` and tries to clone it — measured, on Linux in CI and on Windows alike.
+    const npmSpec = (await isFile(local)) ? `file:${local}` : spec;
     const directory =
-      gitUrl === undefined ? await fetchNpm(spec, cwd, scratch) : await fetchGit(gitUrl, scratch);
+      gitUrl === undefined
+        ? await fetchNpm(npmSpec, cwd, scratch)
+        : await fetchGit(gitUrl, scratch);
     return ok({ kind: gitUrl === undefined ? 'npm' : 'git', directory, cleanup });
   } catch (cause) {
     await cleanup();

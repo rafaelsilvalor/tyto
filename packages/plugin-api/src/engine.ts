@@ -1,7 +1,7 @@
 import { version } from '../package.json';
 
 /**
- * The version a plugin's `engine` range is checked against (ADR 0039).
+ * The version a plugin's `engine` range is checked against (ADR 0040).
  *
  * **This package's version, not the app's.** `apps/cli` and `apps/desktop` are versioned
  * separately — 0.3.1 and 0.5.2 when this was written — so a range checked against the

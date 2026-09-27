@@ -4,7 +4,7 @@ import packageManifest from '../package.json';
 import { PLUGIN_API_VERSION, satisfiesEngine } from './engine.js';
 
 /**
- * The engine check (ADR 0039). Every row is a range the manifest schema accepts, because
+ * The engine check (ADR 0040). Every row is a range the manifest schema accepts, because
  * those are the only ones a loader will ever be handed.
  */
 

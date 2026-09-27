@@ -1,4 +1,4 @@
-# 0039 — A plugin's engine is the plugin API's version, and a refused plugin does not fail a render
+# 0040 — A plugin's engine is the plugin API's version, and a refused plugin does not fail a render
 
 Status: accepted · 2026-09-27 · TYTO-47 · extends ADR 0007
 

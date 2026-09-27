@@ -4,6 +4,7 @@ import { pathToFileURL } from 'node:url';
 
 import { type Diagnostic, type Diagnostics, diagnostic } from '@tyto/core';
 import { fsPluginStore } from '@tyto/io';
+import { isRasterFormat } from '@tyto/pipeline';
 import {
   type InProcessHost,
   PLUGIN_API_VERSION,
@@ -26,7 +27,7 @@ import {
  * **In process, and with Tyto's reach.** The code is imported with `import()` into this
  * process; a permission the person approved is recorded and shown and not enforced. That
  * is E11.2 (TYTO-48), and until it lands an installed plugin is trusted the way an npm
- * dependency is (ADR 0039).
+ * dependency is (ADR 0040).
  */
 
 /** Where the code of an installed plugin is, relative to its folder (`docs/plugin-api.md`). */
@@ -169,8 +170,49 @@ export async function loadInstalledPlugins(home: string | undefined): Promise<Lo
 export function activateInstalled(host: InProcessHost, loaded: LoadedPlugins): Diagnostics {
   const warnings: Diagnostic[] = [...loaded.warnings];
   for (const plugin of loaded.plugins) {
+    const before = new Set(host.registry.exporters.list().map((exporter) => exporter.id));
     const activated = host.tryActivate(plugin, 'external');
-    if (!activated.ok) warnings.push(...skippedPluginWarnings(plugin.id, activated.error));
+    if (!activated.ok) {
+      warnings.push(...skippedPluginWarnings(plugin.id, activated.error));
+      continue;
+    }
+
+    const unencodable = unencodableKinds(plugin.id, host, before);
+    if (unencodable.length > 0) {
+      host.disposePlugin(plugin.id);
+      warnings.push(...skippedPluginWarnings(plugin.id, unencodable));
+    }
   }
   return warnings;
+}
+
+/**
+ * A rasterized exporter promising a kind no rasterizer encodes (`gif`), as data.
+ *
+ * Checked here rather than in `@tyto/plugin-api`, because which kinds a rasterizer encodes is
+ * `@tyto/raster`'s knowledge and that package is Node. Refusing the plugin at activation is
+ * what keeps a third party's promise from reaching `runJob`, whose `TypeError` for the same
+ * case is a wiring check for this repository and would be exit 2 — an internal failure — for
+ * somebody else's mistake.
+ */
+function unencodableKinds(
+  pluginId: string,
+  host: InProcessHost,
+  before: ReadonlySet<string>,
+): Diagnostic[] {
+  return host.registry.exporters
+    .list()
+    .filter((exporter) => exporter.rasterized && !before.has(exporter.id))
+    .flatMap((exporter) =>
+      exporter.kinds
+        .filter((kind) => !isRasterFormat(kind))
+        .map((kind) =>
+          diagnostic('E_PLUGIN_EXPORTER_KIND', {
+            plugin: pluginId,
+            exporter: exporter.id,
+            kind,
+            encodable: 'png, jpeg and webp',
+          }),
+        ),
+    );
 }

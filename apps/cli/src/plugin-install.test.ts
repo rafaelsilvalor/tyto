@@ -67,14 +67,14 @@ const stdout = (): string => out.join('');
 const stderr = (): string => errors.join('');
 
 /** The exporter `activate` of a fixture plugin: every frame becomes one line of text. */
-function exporterSource(id: string, kinds: readonly string[]): string {
+function exporterSource(id: string, kinds: readonly string[], rasterized = false): string {
   return `export function activate(host) {
   host.registerExporter({
     id: ${JSON.stringify(id)},
     mime: 'text/plain',
     extension: 'txt',
     kinds: ${JSON.stringify(kinds)},
-    rasterized: false,
+    rasterized: ${String(rasterized)},
     exportFrame: (scene, artwork, frame) => ({
       ok: true,
       value: artwork.id + ' ' + frame.format,
@@ -91,6 +91,7 @@ interface FixtureOptions {
   readonly exporterId?: string;
   readonly kinds?: readonly string[];
   readonly permissions?: readonly string[];
+  readonly rasterized?: boolean;
 }
 
 /** A plugin folder on disk: manifest, code, and a package.json so npm can pack it. */
@@ -110,7 +111,7 @@ async function pluginFolder(options: FixtureOptions = {}): Promise<string> {
   );
   await writeFile(
     join(folder, 'dist', 'index.js'),
-    exporterSource(options.exporterId ?? name, options.kinds ?? ['txt']),
+    exporterSource(options.exporterId ?? name, options.kinds ?? ['txt'], options.rasterized),
   );
   await writeFile(
     join(folder, 'package.json'),
@@ -191,8 +192,10 @@ describe('installing from each of the three sources', () => {
     await execInShell(`npm pack "${folder}" --pack-destination "${packed}" --silent`);
     const [tarball] = await readdir(packed);
 
+    // Relative, with a forward slash and no `./`: what a person types, and what npm on its
+    // own reads as a GitHub `user/repo` shorthand rather than as a file.
     const code = await run(
-      ['plugin', 'install', join('packed', tarball ?? 'missing.tgz'), '--yes'],
+      ['plugin', 'install', `packed/${tarball ?? 'missing.tgz'}`, '--yes'],
       environment(),
     );
 
@@ -333,6 +336,29 @@ describe('an installed exporter at render', () => {
     expect(stderr()).toContain(
       "'txt' is not an output type any installed exporter produces. Available: png, jpeg, webp, svg.",
     );
+  });
+
+  it('refuses a rasterized exporter for a kind no rasterizer encodes, naming the plugin', async () => {
+    // The third party's mistake used to reach `runJob` and come out as exit 2, an internal
+    // failure. It is refused at activation instead, and the refused `--types` says why.
+    await run(
+      [
+        'plugin',
+        'install',
+        await pluginFolder({ name: 'gifs', kinds: ['gif'], rasterized: true }),
+        '--yes',
+      ],
+      environment(),
+    );
+
+    const code = await run(renderArguments('gif'), environment());
+
+    expect(code).toBe(EXIT_DIAGNOSTICS);
+    expect(stderr()).toContain(
+      "Plugin 'gifs' registers exporter 'gifs' as rasterized for 'gif', and a rasterizer " +
+        'encodes only png, jpeg and webp.',
+    );
+    expect(stderr()).toContain("'gif' is not an output type any installed exporter produces.");
   });
 
   it('refuses a plugin whose id collides, by name, and the run renders without it', async () => {

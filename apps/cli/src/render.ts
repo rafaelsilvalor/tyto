@@ -129,9 +129,11 @@ export async function renderCommand(
   }
 
   const plugins = await loadInstalledPlugins(environment.home);
-  const exporters = reachableExporters(plugins);
+  const { exporters, warnings: skipped } = reachableExporters(plugins);
   const unavailable = unavailableTypes(options.types, exporters);
   if (unavailable !== undefined) {
+    // The skipped plugins first: when a kind is missing, the reason is usually one of them.
+    if (skipped.length > 0) environment.console.err(formatDiagnostics(skipped));
     environment.console.err(`error: ${unavailable}
 `);
     return EXIT_DIAGNOSTICS;

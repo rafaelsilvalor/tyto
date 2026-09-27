@@ -27,7 +27,7 @@ my-plugin/
 | ------------- | -------------------------------------------------------------------------------------------- |
 | `name`        | lowercase letters, digits and hyphens. **It is the plugin's id** — see below                 |
 | `version`     | semver, with an optional prerelease tag                                                      |
-| `engine`      | a version range (`>=0.1`, `^1.2.3`, `>=0.1 \|\| ^1`) against `PLUGIN_API_VERSION` (ADR 0039) |
+| `engine`      | a version range (`>=0.1`, `^1.2.3`, `>=0.1 \|\| ^1`) against `PLUGIN_API_VERSION` (ADR 0040) |
 | `contributes` | at least one extension point from the table below, no repeats                                |
 | `permissions` | non-empty strings, no repeats; recorded at install, **not enforced until E11.2**             |
 | `config`      | optional `{ "$schema": "…" }`, never dereferenced by the host                                |
@@ -36,7 +36,7 @@ Unknown keys are refused, one complaint per stray key rather than one for the ob
 
 **`name` is the id, and there is only one of them.** VS Code splits `publisher` from `name` and joins them back; nothing here needs that yet, and two names for one plugin is two things to keep in step. The host throws when a `Plugin.id` and its manifest's `name` disagree, because the id is what every extension point keys on and what a loader would name a folder under `~/.tyto/plugins/` — a listing printing one name while an error prints another is the failure that foreclosed.
 
-**`engine` is checked twice: for shape by the schema, for meaning by the loader.** The schema sees that `lates` is a typo; `satisfiesEngine` sees that `>=99` is not this host. The version it compares with is `PLUGIN_API_VERSION` — `@tyto/plugin-api`'s own, **not the app's**, because the CLI and the desktop are versioned separately and a range must mean one thing on one machine (ADR 0039). A plugin writes `"engine": ">=0.3.9"` against the API package it imports types from.
+**`engine` is checked twice: for shape by the schema, for meaning by the loader.** The schema sees that `lates` is a typo; `satisfiesEngine` sees that `>=99` is not this host. The version it compares with is `PLUGIN_API_VERSION` — `@tyto/plugin-api`'s own, **not the app's**, because the CLI and the desktop are versioned separately and a range must mean one thing on one machine (ADR 0040). A plugin writes `"engine": ">=0.3.9"` against the API package it imports types from.
 
 ### The manifest is a document, not a shape
 
@@ -194,13 +194,13 @@ interface PluginHost {
   plugins/<name>/       tyto-plugin.json, dist/index.js, whatever else it ships
 ```
 
-**Three sources, fetched by the programs the person already has.** A folder is used where it is. A git URL — `git+https://…`, `git@host:…`, `git://…`, anything ending `.git` — is `git clone --depth 1`. Anything else is an npm spec — a name, `name@range`, a tarball — and is `npm pack` followed by `tar`. Tyto opens no connection of its own, so git's and npm's credentials, proxy and registry configuration apply unchanged, and nothing about who fetched what reaches Tyto (ADR 0011). It is also what makes the three testable offline: `apps/cli/src/plugin-install.test.ts` clones a `file://` repository and packs a local tarball through exactly the commands a real URL and a real name take.
+**Three sources, fetched by the programs the person already has.** A folder is used where it is. A git URL — `git+https://…`, `git@host:…`, `git://…`, anything ending `.git` — is `git clone --depth 1`. Anything else is an npm spec — a name, `name@range`, a tarball — and is `npm pack` followed by `tar`; a spec that names a file on this disk is handed to npm as `file:<absolute path>`, because npm reads a bare `packed/x.tgz` as the GitHub shorthand `user/repo` and tries to clone it. Tyto opens no connection of its own, so git's and npm's credentials, proxy and registry configuration apply unchanged, and nothing about who fetched what reaches Tyto (ADR 0011). It is also what makes the three testable offline: `apps/cli/src/plugin-install.test.ts` clones a `file://` repository and packs a local tarball through exactly the commands a real URL and a real name take.
 
 **The approval is recorded apart from the files.** A folder under `plugins/` says a plugin's files are here; it does not say anybody agreed to run them. So `plugins.json` holds what `install` asked and was told, and the loader reads both: **a folder with no entry is not installed** — one copied in by hand has had no question asked — and an entry whose plugin now declares a permission nobody approved is refused (`E_PLUGIN_PERMISSIONS_CHANGED`) until it is installed again. Installing a name that is already installed replaces it; that is how an update lands. A built-in's name is never available.
 
 **Approved is not enforced, and the prompt says so.** Until E11.2 (TYTO-48) an installed plugin's code is imported into Tyto's own process and has Tyto's access to the computer; the permissions are shown, recorded and compared, not sandboxed. `install` prints that sentence beside the list, so nobody reads a granted permission as a boundary. Without a terminal to answer, `install` needs `--yes`.
 
-**A plugin that cannot load does not stop a render** (ADR 0039). Installed plugins are read and imported once per process, and activated into each task's host **after** the built-ins through `InProcessHost.tryActivate`, which answers with diagnostics instead of throwing. A contribution id another plugin already holds is `E_PLUGIN_DUPLICATE`, naming both plugins; everything the loser registered is withdrawn, and the task renders without it. On a render every refusal is carried as `W_PLUGIN_SKIPPED` in `result.json` — a warning, because the brief is not what is wrong.
+**A plugin that cannot load does not stop a render** (ADR 0040). Installed plugins are read and imported once per process, and activated into each task's host **after** the built-ins through `InProcessHost.tryActivate`, which answers with diagnostics instead of throwing. A contribution id another plugin already holds is `E_PLUGIN_DUPLICATE`, naming both plugins; everything the loser registered is withdrawn, and the task renders without it. On a render every refusal is carried as `W_PLUGIN_SKIPPED` in `result.json` — a warning, because the brief is not what is wrong.
 
 **`plugin list` shows built-ins and installed plugins alike**, with a status column:
 
@@ -223,7 +223,7 @@ pdf                 1.0.0  external  disabled  exporter
 
 ### The output kinds are open
 
-`--types` takes the four built-in kinds or any kind an installed exporter declares. `ArtifactKind` is `BuiltInKind | (string & Record<never, never>)` — open, and still autocompleting the four — and whether a kind can be produced is the exporter registry's answer, asked once before a task starts: a kind nothing produces is refused with exit 1 and the list of kinds that are available. **A document exporter names its own file**: the artifact's extension and `mime` in `result.json` are the exporter's `extension` and `mime`; only a `rasterized` exporter's come from the raster port, and a rasterized exporter declaring a kind no rasterizer encodes is refused before any frame is built. Whether a browser is launched is asked of the exporters too, so `--types pdf` from a document exporter launches none.
+`--types` takes the four built-in kinds or any kind an installed exporter declares. `ArtifactKind` is `BuiltInKind | (string & Record<never, never>)` — open, and still autocompleting the four — and whether a kind can be produced is the exporter registry's answer, asked once before a task starts: a kind nothing produces is refused with exit 1 and the list of kinds that are available. **A document exporter names its own file**: the artifact's extension and `mime` in `result.json` are the exporter's `extension` and `mime`; only a `rasterized` exporter's come from the raster port. **An installed plugin whose rasterized exporter declares a kind no rasterizer encodes** — `gif` — is refused at activation (`E_PLUGIN_EXPORTER_KIND`, naming the plugin), so asking for that kind is the ordinary exit 1 with the reason printed above it; `runJob`'s own `TypeError` for the same case stays as a wiring check for built-ins. Whether a browser is launched is asked of the exporters too, so `--types pdf` from a document exporter launches none.
 
 ## Phase 1 vs later
 
@@ -236,4 +236,4 @@ are declared in Node packages (`@tyto/io`, `@tyto/raster`) and this one is pure 
 the host stores the value and only ever reads its id. A duplicate id **throws** through `activate`, because in
 Phase 1 every plugin is a built-in this repository wired itself and that is a wiring bug.
 The loader (E11.1) does not catch that throw: it activates through `tryActivate`, which
-answers the same question as data (ADR 0039).
+answers the same question as data (ADR 0040).

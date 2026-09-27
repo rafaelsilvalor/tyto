@@ -42,6 +42,7 @@ non-zero.
 | `E_PLUGIN_ACTIVATE` | error | yes | A plugin's code could not be loaded, or its activate function failed. |
 | `E_PLUGIN_PERMISSIONS_CHANGED` | error | yes | An installed plugin now asks for permissions nobody approved when it was installed. |
 | `E_PLUGIN_STATE` | error | yes | The file recording which plugins were installed and approved cannot be read. |
+| `E_PLUGIN_EXPORTER_KIND` | error | yes | A plugin registered a rasterized exporter declaring a kind no rasterizer encodes. |
 | `E_PLUGIN_FETCH` | error | yes | A plugin could not be copied or fetched from where tyto plugin install was told. |
 | `E_SCENE_SHAPE` | error | yes | A scene does not match the IR schema. |
 | `E_SCENE_DUPLICATE_ID` | error | yes | The same id is used more than once in one scene. |
@@ -117,6 +118,7 @@ incomplete brief, and a crossed box where a picture the exporter could not load 
 | `E_PLUGIN_ACTIVATE` | yes | A plugin that did not load contributed no slot to skip. |
 | `E_PLUGIN_PERMISSIONS_CHANGED` | yes | A plugin that did not load contributed no slot to skip. |
 | `E_PLUGIN_STATE` | yes | A plugin that did not load contributed no slot to skip. |
+| `E_PLUGIN_EXPORTER_KIND` | yes | A plugin that did not load contributed no slot to skip. |
 | `E_PLUGIN_FETCH` | yes | A plugin that did not load contributed no slot to skip. |
 | `E_SCENE_SHAPE` | yes | The IR is malformed, so the exporter has nothing it can draw. |
 | `E_SCENE_DUPLICATE_ID` | yes | The IR is malformed, so the exporter has nothing it can draw. |
@@ -413,7 +415,7 @@ Parameters: `path`, `problem`
 
 ### `E_PLUGIN_ENGINE`
 
-**Severity:** error · **Fatal:** yes · **Spec:** `docs/adr/0039-the-engine-is-the-plugin-api-version.md`
+**Severity:** error · **Fatal:** yes · **Spec:** `docs/adr/0040-the-engine-is-the-plugin-api-version.md`
 
 A plugin's engine range is not satisfied by this host's plugin API.
 
@@ -508,6 +510,20 @@ Plugin state '{path}' cannot be read: {problem}.
 ```
 
 Parameters: `path`, `problem`
+
+### `E_PLUGIN_EXPORTER_KIND`
+
+**Severity:** error · **Fatal:** yes · **Spec:** `docs/plugin-api.md`
+
+A plugin registered a rasterized exporter declaring a kind no rasterizer encodes.
+
+A plugin that did not load contributed no slot to skip.
+
+```
+Plugin '{plugin}' registers exporter '{exporter}' as rasterized for '{kind}', and a rasterizer encodes only {encodable}.
+```
+
+Parameters: `plugin`, `exporter`, `kind`, `encodable`
 
 ### `E_PLUGIN_FETCH`
 
@@ -947,7 +963,7 @@ Parameters: `name`, `shadowed`, `used`
 
 ### `W_PLUGIN_SKIPPED`
 
-**Severity:** warning · **Fatal:** no · **Spec:** `docs/adr/0039-the-engine-is-the-plugin-api-version.md`
+**Severity:** warning · **Fatal:** no · **Spec:** `docs/adr/0040-the-engine-is-the-plugin-api-version.md`
 
 An installed plugin was not activated for this run, and the run went on without it.
 
