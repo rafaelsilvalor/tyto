@@ -68,8 +68,22 @@ export interface DocumentService {
    * is the local queue's `queue:open-brief`, which sends a task id and gets the path main
    * listed for it. `reopen` checks its path against the recent list for the same reason.
    * A file that cannot be read answers with nothing, as a vanished recent entry does.
+   *
+   * `label` is what the tab and the title show in place of the file's own name. Every task's
+   * brief is called `brief.brief`, so two of them open at once would be two identical tabs;
+   * the queue passes `<id> · brief.brief`. It stays with the file across a save and a
+   * `retarget`, and a save-as to another path drops it.
    */
-  openPath(documentId: string, path: string): Promise<AdoptedDocument>;
+  openPath(documentId: string, path: string, label?: string): Promise<AdoptedDocument>;
+  /**
+   * The file at `from` now lives at `to`; any tab holding it follows (TYTO-45).
+   *
+   * Main moved it — the local queue acknowledging a task renames `inbox/<id>/` to
+   * `done/<id>/` — so main is the side that knows both paths. Without this, the tab a person
+   * fixed a brief in would still point into a folder that no longer exists, and their next
+   * save would fail. A path no tab holds is not an error.
+   */
+  retarget(from: string, to: string): void;
   save(documentId: string, text: string, saveAs: boolean): Promise<SavedDocument>;
   /** Forgets a tab's path. A tab main never heard of is not an error. */
   close(documentId: string): void;
@@ -109,6 +123,10 @@ export function createDocumentService(options: DocumentServiceOptions): Document
   /** Where each open tab's brief lives, which is the whole of this service's state. */
   const paths = new Map<string, string>();
 
+  /** A display name some files carry instead of their own (see `openPath`), keyed by path. */
+  const labels = new Map<string, string>();
+  const nameFor = (path: string): string => labels.get(path) ?? basename(path);
+
   /** The tab already holding `path`, if any. See `file:open` in `shared/ipc.ts`. */
   const holderOf = (path: string): string | undefined => {
     for (const [id, held] of paths) if (held === path) return id;
@@ -125,7 +143,7 @@ export function createDocumentService(options: DocumentServiceOptions): Document
     const holder = holderOf(path) ?? documentId;
     paths.set(holder, path);
 
-    const entry: RecentEntry = { path, name: basename(path) };
+    const entry: RecentEntry = { path, name: nameFor(path) };
     await recent.remember(entry);
     return { document: { path, name: entry.name, text }, documentId: holder };
   };
@@ -141,9 +159,10 @@ export function createDocumentService(options: DocumentServiceOptions): Document
       return adopt(documentId, path, await disk.read(path));
     },
 
-    async openPath(documentId, path) {
+    async openPath(documentId, path, label) {
       try {
         const text = await disk.read(path);
+        if (label !== undefined) labels.set(path, label);
         return await adopt(documentId, path, text);
       } catch {
         // Gone between the listing and the click — a task somebody else moved to done/.
@@ -195,9 +214,18 @@ export function createDocumentService(options: DocumentServiceOptions): Document
       const released = previous !== undefined && previous !== documentId ? previous : null;
       if (released !== null) paths.delete(released);
 
-      const entry: RecentEntry = { path, name: basename(path) };
+      const entry: RecentEntry = { path, name: nameFor(path) };
       await recent.remember(entry);
       return { document: { path, name: entry.name, text }, released };
+    },
+
+    retarget(from, to) {
+      for (const [id, held] of paths) if (held === from) paths.set(id, to);
+      const label = labels.get(from);
+      if (label !== undefined) {
+        labels.delete(from);
+        labels.set(to, label);
+      }
     },
 
     close(documentId) {

@@ -97,8 +97,12 @@ const documents = () => {
         document: { path: '/briefs/promo.brief', name: 'promo.brief', text: '::a' },
         documentId,
       }),
-    openPath: (documentId: string, path: string) =>
-      Promise.resolve({ document: { path, name: 'brief.brief', text: '::t' }, documentId }),
+    openPath: (documentId: string, path: string, label?: string) =>
+      Promise.resolve({
+        document: { path, name: label ?? 'brief.brief', text: '::t' },
+        documentId,
+      }),
+    retarget: () => undefined,
     reopen: (documentId: string, path: string) =>
       Promise.resolve(
         path === '/briefs/promo.brief'
@@ -788,6 +792,8 @@ describe('the local queue (TYTO-45)', () => {
     });
 
     expect(known.document?.path).toBe('/fila/inbox/tarefa-2/brief.brief');
+    // Named after the task, so two task briefs open at once are two tabs a person can tell apart.
+    expect(known.document?.name).toBe('tarefa-2 · brief.brief');
     expect(known.documentId).toBe('document-3');
     expect(unknown).toEqual({ document: null, documentId: null });
   });

@@ -195,7 +195,8 @@ describe('the local queue panel', () => {
 
   it('opens the failed brief in the editor, where it is fixed and saved', async () => {
     await task('quebrada').locator('.queue__open-brief').click();
-    await page.waitForSelector('.tabs__tab:has-text("brief.brief")');
+    // Named after the task, so it can be told apart from any other task's `brief.brief`.
+    await page.waitForSelector('.tabs__tab:has-text("quebrada · brief.brief")');
 
     await page.click('#editor .cm-content');
     await page.keyboard.press('Control+a');
@@ -216,5 +217,21 @@ describe('the local queue panel', () => {
     // The picture a person would see, kept for looking at: the suite writes it and the card
     // was not called done until somebody had.
     await page.screenshot({ path: join(tmpdir(), 'tyto-queue-panel.png') });
+  });
+
+  it('keeps saving the fixed brief after it has moved to done/', async () => {
+    // The card's flow one step later: the tab the brief was fixed in followed it out of
+    // `inbox/`, so a further edit is saved where the task now lives, not into a folder that is
+    // gone.
+    const moved = join(queueFolder, 'done', 'quebrada', 'brief.brief');
+    await page.click('#editor .cm-content');
+    await page.keyboard.press('Control+End');
+    await page.keyboard.insertText(' depois');
+    await run('editor.save');
+
+    await expect.poll(() => readFileSync(moved, 'utf8')).toBe(`${GOOD} depois`);
+    // Nothing was put back in the inbox, which would have queued the task a second time.
+    expect(existsSync(join(queueFolder, 'inbox', 'quebrada'))).toBe(false);
+    expect(await page.locator('.tabs__tab', { hasText: 'quebrada · brief.brief' }).count()).toBe(1);
   });
 });

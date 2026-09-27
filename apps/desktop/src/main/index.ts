@@ -359,6 +359,11 @@ async function start(): Promise<void> {
       if (contents === undefined || contents.isDestroyed()) return;
       sendIpcEvent(contents, 'queue:changed', {});
     },
+    // Main moved the file, so main tells the document service: a tab holding the brief a
+    // person just fixed follows it to `done/`, and their next save lands there.
+    onMoved: (from, to) => {
+      documents.retarget(from, to);
+    },
     onError: (message, cause) => {
       log.error(message, cause);
     },

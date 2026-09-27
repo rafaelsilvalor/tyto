@@ -5,6 +5,7 @@ import type { Diagnostics } from '@tyto/core';
 import {
   type BriefSource,
   type BriefTask,
+  BRIEF_FILE,
   OUT_DIR,
   RESULT_FILE,
   type RenderResult,
@@ -77,6 +78,11 @@ export interface QueueOptions {
   readonly onChange: () => void;
   /** Between sweeps. Defaults to `pollSource`'s one second. */
   readonly intervalMs?: number;
+  /**
+   * A task's brief moved from `inbox/` to `done/`. The composition root points any tab that
+   * holds it at the new path, so a brief fixed in the editor can still be saved afterwards.
+   */
+  readonly onMoved?: (from: string, to: string) => void;
   /** A failure that is not the task's, written to the app's log. */
   readonly onError?: (message: string, cause: unknown) => void;
   /** Reads `result.json`; replaceable so a test need not write one. */
@@ -174,6 +180,8 @@ export function createQueueService(options: QueueOptions): QueueService {
     try {
       // Only now, and never after an error (ADR 0008).
       await inbox.ack(task.id);
+      // The layout `tyto watch` uses, and the one the composition root's `done` source reads.
+      options.onMoved?.(task.briefPath, join(root, 'done', task.id, BRIEF_FILE));
       record.set(task.id, { status: 'done', diagnostics });
     } catch (cause) {
       // Measured for TYTO-45: this is where a second consumer on the same folder lands — it

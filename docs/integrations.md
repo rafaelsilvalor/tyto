@@ -125,7 +125,10 @@ one `fsInbox`, and `done/` is a second one, because a finished task has an inbox
   sweep finds and has not tried yet. **A failed task is never re-run on its own**: it waits
   in `inbox/` for a person (ADR 0008). The panel's _Try again_ reads the brief afresh, which
   is the point of it: the usual step before it is _Open brief_, a fix in the editor and a save
-  over the task's own file.
+  over the task's own file. The tab is labelled `<id> · brief.brief`, because every task's
+  brief has the same file name. When the task then moves to `done/`, main points the tab at
+  the new path (`DocumentService.retarget`), so a later save lands where the task now is
+  instead of failing on a folder that is gone.
 - **Pushed, not polled**: main already sweeps the inbox once a second, and it sends
   `queue:changed` when something the panel shows has changed; the panel then asks
   `queue:list`. The window runs no timer of its own.

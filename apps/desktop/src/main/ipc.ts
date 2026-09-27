@@ -1,6 +1,8 @@
 // `import type` and not an inline `{ type IpcMain }`: under `verbatimModuleSyntax` the
 // inline form still emits `import {} from 'electron'`, which outside a running Electron
 // resolves to a path string and would make this module unloadable in a test.
+import { basename } from 'node:path';
+
 import type { IpcMain, WebContents } from 'electron';
 
 import {
@@ -366,7 +368,9 @@ export function createHandlers(dependencies: IpcDependencies): Handlers {
     'queue:open-brief': async ({ documentId, taskId }) => {
       const path = queue.service.briefPath(taskId);
       if (path === undefined) return { document: null, documentId: null };
-      return documents.openPath(documentId, path);
+      // Named after the task: every task's brief is `brief.brief`, and two of them open at
+      // once would otherwise be two tabs nobody could tell apart.
+      return documents.openPath(documentId, path, `${taskId} · ${basename(path)}`);
     },
 
     'log:reveal': async () => {

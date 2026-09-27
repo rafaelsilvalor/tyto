@@ -151,6 +151,34 @@ describe('with auto-run off', () => {
 });
 
 describe('with auto-run on', () => {
+  it('says where a brief went when it moves a task to done/', async () => {
+    const { render } = fakeRender();
+    const moved: [string, string][] = [];
+    service = createQueueService({
+      sources: (folder) => ({
+        inbox: fsInbox({ root: join(folder, 'inbox'), done: join(folder, 'done') }),
+        done: fsInbox({ root: join(folder, 'done') }),
+      }),
+      render,
+      folder: root,
+      autoRun: false,
+      onChange: () => undefined,
+      onMoved: (from, to) => {
+        moved.push([from, to]);
+      },
+      intervalMs: 20,
+    });
+    drop('tarefa-1', '::titulo Olá');
+    await until(service, (current) => statusOf(current, 'tarefa-1') === 'pending');
+
+    await service.run('tarefa-1');
+
+    const to = join(root, 'done', 'tarefa-1', 'brief.brief');
+    expect(moved).toEqual([[join(root, 'inbox', 'tarefa-1', 'brief.brief'), to]]);
+    // The path it names is the one the file is actually at, not a guess about the layout.
+    expect(existsSync(to)).toBe(true);
+  });
+
   it('renders a folder dropped while the app is open, and moves it to done/', async () => {
     const { calls, render } = fakeRender();
     const { service: queue } = start(render, { autoRun: true });
