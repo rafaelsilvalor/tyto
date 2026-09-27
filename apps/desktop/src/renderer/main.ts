@@ -1688,10 +1688,6 @@ async function load(): Promise<void> {
       (askId) => answerExitRequest(bridge, askId),
     );
 
-    // TYTO-175 PERTURBATION, never to merge: the renderer slowed by 2.5 s after the exit
-    // listener exists and before the editor mounts. Reverted in the last commit of the PR.
-    await new Promise((resolve) => setTimeout(resolve, 2500));
-
     const info = await bridge['app:info']({});
     state.version = info.version;
     state.platform = info.platform;
