@@ -164,8 +164,9 @@ export const en: Catalogue = {
   'command.plugins.show': 'Show plugins',
   'plugins.heading': 'Plugins',
   'plugins.notice':
-    'Permissions are recorded when a plugin is installed and are not enforced yet. The tyto command line runs each plugin in a worker thread of its own, which keeps a crash from taking Tyto down but is not a sandbox: a plugin has the same access to this computer as Tyto itself.',
-  'plugins.inactive': 'This window does not run installed plugins yet. The tyto command line does.',
+    'Each installed plugin runs in a process of its own, which keeps a crash from taking Tyto down but is not a sandbox: a plugin has the same access to this computer as Tyto itself. The net: and credentials: permissions filter only what a plugin asks of Tyto — host.fetch and host.credentials — and a plugin that goes around them is not stopped.',
+  'plugins.inactive':
+    'Enabled plugins are started when the window opens; one installed while it is open is started the next time.',
   'plugins.folder': 'Installed plugins live in',
   'plugins.install': 'Install, remove or disable one with tyto plugin install, remove or disable.',
   'plugins.column.name': 'Name',
@@ -179,6 +180,7 @@ export const en: Catalogue = {
   'plugins.status.enabled': 'enabled',
   'plugins.status.disabled': 'disabled',
   'plugins.status.refused': 'refused',
+  'plugins.status.crashed': 'crashed',
   'plugins.permissions.none': 'none',
   'plugins.close': 'Close',
   'plugins.unavailable': 'The plugin list could not be read.',

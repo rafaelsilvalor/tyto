@@ -113,3 +113,17 @@ export {
   allowsHost,
   checkedCapabilities,
 } from './capabilities.js';
+
+export {
+  type ActivateOptions,
+  type InstalledEntry,
+  type InstalledPlugins,
+  type LoadedPlugins,
+  type StartOptions,
+  NO_PLUGINS,
+  PLUGIN_ENTRY_PATH,
+  activateInstalled,
+  readInstalledPlugins,
+  startInstalledPlugins,
+  writeCrash,
+} from './installed.js';

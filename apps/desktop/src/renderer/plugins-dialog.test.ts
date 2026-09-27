@@ -65,11 +65,12 @@ describe('the plugins screen', () => {
     expect(element.querySelector('.plugins__panel')).toBeNull();
   });
 
-  it('says that permissions are recorded and not enforced, before the list', async () => {
+  it('says how far permissions reach, and that the process is not a sandbox', async () => {
     const element = await dialog();
 
     expect(text(element, '.plugins__notice')).toBe(translate('en', 'plugins.notice'));
-    expect(text(element, '.plugins__notice')).toMatch(/not enforced/u);
+    expect(text(element, '.plugins__notice')).toMatch(/not a sandbox/u);
+    expect(text(element, '.plugins__notice')).toMatch(/filter only what a plugin asks of Tyto/u);
   });
 
   it('lists every plugin with its origin and status in the window language', async () => {

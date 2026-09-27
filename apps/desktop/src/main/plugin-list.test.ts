@@ -3,7 +3,13 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
 import { fsPluginStore } from '@tyto/io';
-import { EMPTY_PLUGIN_STATE, PLUGIN_API_VERSION, withPluginEntry } from '@tyto/plugin-api';
+import {
+  EMPTY_PLUGIN_CRASHES,
+  EMPTY_PLUGIN_STATE,
+  PLUGIN_API_VERSION,
+  withPluginCrash,
+  withPluginEntry,
+} from '@tyto/plugin-api';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
 import { exporterBuiltIns, listPlugins, tytoHome } from './plugin-list.js';
@@ -121,6 +127,36 @@ describe('listPlugins', () => {
     const rows = await listPlugins([svg], fsPluginStore(home));
 
     expect(rows.at(-1)).toMatchObject({ name: 'pdf', status: 'refused' });
+  });
+
+  it('shows a crash as history, with when and why, and only while it is enabled', async () => {
+    const store = fsPluginStore(home);
+    await installed('pdf');
+    const approved = { enabled: true, permissions: ['net:api.example.com'], source: './pdf' };
+    await store.writeState(withPluginEntry(EMPTY_PLUGIN_STATE, 'pdf', approved));
+    await store.writeCrashes(
+      withPluginCrash(EMPTY_PLUGIN_CRASHES, 'pdf', {
+        at: '2026-09-27T12:00:00.000Z',
+        reason: 'its process exited with code 7',
+      }),
+    );
+
+    expect((await listPlugins([svg], store)).at(-1)).toMatchObject({
+      name: 'pdf',
+      status: 'crashed',
+      problems: [
+        "Plugin 'pdf' crashed at 2026-09-27T12:00:00.000Z: its process exited with code 7. It is " +
+          'still activated; installing or enabling it again clears this.',
+      ],
+    });
+
+    await store.writeState(
+      withPluginEntry(EMPTY_PLUGIN_STATE, 'pdf', { ...approved, enabled: false }),
+    );
+    expect((await listPlugins([svg], store)).at(-1)).toMatchObject({
+      status: 'disabled',
+      problems: [],
+    });
   });
 });
 

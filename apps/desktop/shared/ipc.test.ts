@@ -29,6 +29,7 @@ describe('the IPC contract', () => {
       'dialog:save-changes',
       'export:cancel',
       'export:choose-directory',
+      'export:kinds',
       'export:progress',
       'export:reveal',
       'export:start',
@@ -219,6 +220,9 @@ describe('what the contract does not promise', () => {
       // in a native dialog, and the question has no subject. Every other export channel
       // names either a document or a run, so this is the only one of the five here.
       'export:choose-directory',
+      // TYTO-48, ADR 0044. "Which kinds can a run produce" has no subject either: the answer
+      // is the built-ins' and the installed plugins', which are main's to know.
+      'export:kinds',
       // TYTO-132. "Open the log folder" has no subject either: there is one log, and where it
       // is, is main's — a renderer that named the folder would be naming a path it has no
       // business holding.

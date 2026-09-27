@@ -314,6 +314,8 @@ export function createHandlers(dependencies: IpcDependencies): Handlers {
       return Promise.resolve({});
     },
 
+    'export:kinds': async () => ({ kinds: [...(await exports.kinds())] }),
+
     'export:reveal': async ({ directory }) => {
       await folders.reveal(directory);
       return {};
