@@ -1,6 +1,8 @@
 // `import type` and not an inline `{ type IpcMain }`: under `verbatimModuleSyntax` the
 // inline form still emits `import {} from 'electron'`, which outside a running Electron
 // resolves to a path string and would make this module unloadable in a test.
+import { basename } from 'node:path';
+
 import type { IpcMain, WebContents } from 'electron';
 
 import {
@@ -19,6 +21,7 @@ import { type DocumentService } from './documents.js';
 import { type ExportService } from './export.js';
 import { type LayoutStore } from './layout-store.js';
 import { type PreviewService } from './preview.js';
+import { type QueueService, type QueueView } from './queue.js';
 import { type TemplateDiagnostic, type TemplateEditorService } from './template-editor.js';
 import { type TemplateCatalogue } from './templates.js';
 
@@ -126,6 +129,16 @@ export interface IpcDependencies {
    * picker is an Electron dialog, and the service below it names none.
    */
   readonly templateEditor: TemplateEditorService;
+  /**
+   * The local queue panel (TYTO-45). `chooseFolder` is the native picker, wrapped by the
+   * composition root like every other dialog here; `remember` writes the choice to
+   * `settings.json`.
+   */
+  readonly queue: {
+    readonly service: QueueService;
+    chooseFolder: () => Promise<string | undefined>;
+    remember: (changes: { queueFolder?: string | null; queueAutoRun?: boolean }) => Promise<void>;
+  };
   /** The plugins screen (TYTO-47): built-ins and installed plugins, read and never run. */
   readonly plugins: {
     readonly folder: string;
@@ -169,6 +182,7 @@ export function createHandlers(dependencies: IpcDependencies): Handlers {
     plugins,
     preview,
     project,
+    queue,
     templateDialogs,
     templateEditor,
     templates,
@@ -317,6 +331,48 @@ export function createHandlers(dependencies: IpcDependencies): Handlers {
 
     'plugins:list': async () => ({ folder: plugins.folder, plugins: [...(await plugins.list())] }),
 
+    'queue:list': async () => wireQueueView(await queue.service.view()),
+
+    'queue:set-folder': async ({ choose }) => {
+      let chosen: string | null = null;
+      if (choose) {
+        const picked = await queue.chooseFolder();
+        // A dismissed picker is not a clear, which is `templates:set-folder`'s rule.
+        if (picked === undefined) return wireQueueView(await queue.service.view());
+        chosen = picked;
+      }
+      await queue.service.setFolder(chosen);
+      await queue.remember({ queueFolder: chosen });
+      return wireQueueView(await queue.service.view());
+    },
+
+    'queue:set-auto-run': async ({ on }) => {
+      queue.service.setAutoRun(on);
+      await queue.remember({ queueAutoRun: on });
+      return wireQueueView(await queue.service.view());
+    },
+
+    'queue:run': ({ taskId }) => {
+      // Not awaited: a render is seconds and the answer is a push. `run` never rejects for a
+      // bad brief; anything else it could reject with is already the task's failure.
+      void queue.service.run(taskId).catch(() => undefined);
+      return Promise.resolve({});
+    },
+
+    'queue:reveal-output': async ({ taskId }) => {
+      const directory = queue.service.outDirectory(taskId);
+      if (directory !== undefined) await folders.reveal(directory);
+      return {};
+    },
+
+    'queue:open-brief': async ({ documentId, taskId }) => {
+      const path = queue.service.briefPath(taskId);
+      if (path === undefined) return { document: null, documentId: null };
+      // Named after the task: every task's brief is `brief.brief`, and two of them open at
+      // once would otherwise be two tabs nobody could tell apart.
+      return documents.openPath(documentId, path, `${taskId} · ${basename(path)}`);
+    },
+
     'log:reveal': async () => {
       await folders.reveal(log.directory);
       return {};
@@ -374,6 +430,31 @@ export function createHandlers(dependencies: IpcDependencies): Handlers {
         ? { directory: result.directory }
         : { directory: null, problem: result.problem, detail: result.detail };
     },
+  };
+}
+
+/**
+ * The queue as the wire carries it: diagnostics flattened the way `export:progress` flattens
+ * them, because `exactOptionalPropertyTypes` tells an absent `range` from an undefined one.
+ */
+function wireQueueView(view: QueueView): IpcResponse<'queue:list'> {
+  return {
+    folder: view.folder,
+    inbox: view.inbox,
+    autoRun: view.autoRun,
+    tasks: view.tasks.slice(0, 500).map((task) => ({
+      id: task.id,
+      status: task.status,
+      diagnostics: task.diagnostics.map((item) => ({
+        severity: item.severity,
+        code: item.code,
+        message: item.message,
+        ...(item.range === undefined ? {} : { range: item.range }),
+        ...(item.hint === undefined ? {} : { hint: item.hint }),
+      })),
+      ...(task.failure === undefined ? {} : { failure: task.failure }),
+      hasOutput: task.hasOutput,
+    })),
   };
 }
 

@@ -253,6 +253,13 @@ describe('the bridge', () => {
       'log:write',
       'on',
       'plugins:list',
+      // TYTO-45: the local queue panel's six. Each is exercised by `e2e/queue.desktop.test.ts`.
+      'queue:list',
+      'queue:open-brief',
+      'queue:reveal-output',
+      'queue:run',
+      'queue:set-auto-run',
+      'queue:set-folder',
       'template:new',
       'template:open',
       'template:preview',
@@ -355,6 +362,8 @@ describe('the language picker', () => {
     'panel.editor',
     'panel.preview',
     'panel.problems',
+    // TYTO-45: a panel name, like the three above, read by the bar's toggle entry.
+    'panel.queue',
     // E9.11: the tab strip is an element and translates inside its own `render`, so the word
     // on a tab's close button is never in this pass; the four `document.discard.*` are read
     // out by the OS in a message box, which is not the document at all; and the rest are
@@ -474,6 +483,13 @@ describe('the language picker', () => {
     // `e2e/plugins.desktop.test.ts` opens the real screen and measures it is drawn.
     'command.plugins.show',
     ...CATALOGUE_KEYS.filter((key) => key.startsWith('plugins.')),
+    // TYTO-45: the queue panel is closed in the default layout, and a closed panel's element is
+    // never created — so none of its strings is in the document on load. Excluded because they
+    // are not on screen yet, not to loosen the count: `src/renderer/queue-panel.test.ts`
+    // renders every state, and `e2e/queue.desktop.test.ts` opens the real panel and measures
+    // it is drawn inside the window.
+    'command.queue.show',
+    ...CATALOGUE_KEYS.filter((key) => key.startsWith('queue.')),
   ];
 
   it('paints every catalogue string on load, with none left blank', async () => {

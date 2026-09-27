@@ -18,6 +18,7 @@ import {
   parseVersion,
 } from './previous-version.js';
 import { fileRecentFiles } from './recent-files.js';
+import { DEFAULT_SETTINGS } from '../../shared/settings.js';
 import { fileSettingsStore } from './settings-store.js';
 
 /**
@@ -203,6 +204,7 @@ describe('saying yes', () => {
     );
     // Neither record is the default, so the comparisons above are not two defaults agreeing.
     expect(await fileSettingsStore(join(newer, 'settings.json')).read()).toEqual({
+      ...DEFAULT_SETTINGS,
       templatesFolder: join('D:', 'work', 'templates'),
     });
     expect(await fileLayoutStore(join(newer, 'layout.json')).read()).not.toEqual(
@@ -335,6 +337,7 @@ describe('a broken older folder', () => {
     expect(recorded.warnings).toEqual(outcome.diagnostics.map((item) => item.message));
     // And the new version still reads its defaults for what did not come across.
     expect(await fileSettingsStore(join(root, '0.3.4', 'settings.json')).read()).toEqual({
+      ...DEFAULT_SETTINGS,
       templatesFolder: null,
     });
   });

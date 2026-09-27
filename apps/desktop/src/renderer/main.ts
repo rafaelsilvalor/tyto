@@ -20,6 +20,7 @@ import {
 import { type CommandEntry, type CommandBar, COMMAND_BAR_TAG } from './command-bar.js';
 import { type ExportDialog, type ExportProgressView, EXPORT_DIALOG_TAG } from './export-dialog.js';
 import { type PluginsDialog, PLUGINS_DIALOG_TAG } from './plugins-dialog.js';
+import { type QueuePanel, QUEUE_PANEL_TAG } from './queue-panel.js';
 import type { TemplateMode } from './template-mode.js';
 import { TEMPLATE_MODE_TAG } from './template-mode-tag.js';
 import {
@@ -65,6 +66,7 @@ import './panels.js';
 import {
   type Layout,
   DEFAULT_LAYOUT,
+  QUEUE_PANEL,
   panelOf,
   withPanelOpen,
   withPanelSize,
@@ -268,6 +270,8 @@ function resolveElements() {
     exportDialog: document.querySelector<ExportDialog>(EXPORT_DIALOG_TAG),
     // TYTO-47. By tag, for the problems panel's reason: naming it keeps the import a runtime one.
     pluginsDialog: document.querySelector<PluginsDialog>(PLUGINS_DIALOG_TAG),
+    // TYTO-45. A dock panel, so `null` whenever it is closed — which is how it starts.
+    queuePanel: document.querySelector<QueuePanel>(QUEUE_PANEL_TAG),
     // TYTO-44. Outside `.shell` for the export dialog's reason: it covers the window.
     templateMode: document.querySelector<TemplateMode>(TEMPLATE_MODE_TAG),
     // Outside the docks, like the command bar: the strip lists what the *window* has open,
@@ -503,6 +507,84 @@ function stopWatchingExport(): void {
 }
 
 /**
+ * The panels `wireQueuePanel` has handed its callbacks to.
+ *
+ * Weak, and keyed by element, because the dock makes a *new* element each time the panel is
+ * reopened (`main.ts`'s `resolveElements` says why) — and a new one has neither the callbacks
+ * nor a view, while one that survived a rearrange has both and must not be asked again.
+ */
+const wiredQueuePanels = new WeakSet<QueuePanel>();
+
+/**
+ * The local queue panel (TYTO-45): its buttons, and its first answer.
+ *
+ * Asked once when the element is born and then only on `queue:changed`, never on a timer —
+ * main already sweeps the inbox, and one push per change is what keeps a panel docked all day
+ * current without the window polling behind it.
+ */
+function wireQueuePanel(): void {
+  const panel = elements.queuePanel;
+  if (panel === null || wiredQueuePanels.has(panel)) return;
+  wiredQueuePanels.add(panel);
+
+  const answer = (ask: (bridge: TytoBridge) => Promise<QueuePanel['view']>): void => {
+    void withBridge(async (bridge) => {
+      try {
+        panel.view = await ask(bridge);
+      } catch {
+        panel.view = 'failed';
+      }
+    });
+  };
+
+  panel.actions = {
+    chooseFolder: () => {
+      answer((bridge) => bridge['queue:set-folder']({ choose: true }));
+    },
+    clearFolder: () => {
+      answer((bridge) => bridge['queue:set-folder']({ choose: false }));
+    },
+    setAutoRun: (on) => {
+      answer((bridge) => bridge['queue:set-auto-run']({ on }));
+    },
+    run: (taskId) => {
+      void withBridge(async (bridge) => {
+        await bridge['queue:run']({ taskId });
+      });
+    },
+    // The same `adopt` a picked file goes through, so a brief already open in a tab is that
+    // tab, and the fixed brief is saved over the task's own file by the ordinary Save.
+    openBrief: (taskId) => {
+      void withBridge(async (bridge) => {
+        const wanted = nextDocumentId();
+        const opened = await bridge['queue:open-brief']({ documentId: wanted, taskId });
+        adopt(opened.document, opened.documentId, wanted);
+      });
+    },
+    openOutput: (taskId) => {
+      void withBridge(async (bridge) => {
+        await bridge['queue:reveal-output']({ taskId });
+      });
+    },
+  };
+
+  void refreshQueue();
+}
+
+/** Asks main for the queue and hands it to the panel, if the panel is open. */
+async function refreshQueue(): Promise<void> {
+  await withBridge(async (bridge) => {
+    const panel = elements.queuePanel;
+    if (panel === null) return;
+    try {
+      panel.view = await bridge['queue:list']({});
+    } catch {
+      panel.view = 'failed';
+    }
+  });
+}
+
+/**
  * The plugins screen (TYTO-47): opened empty and filled when main answers, so a slow disk
  * shows the notice at once rather than nothing. Asked on every open, never cached — a plugin
  * installed from a terminal beside the window is the ordinary way one arrives.
@@ -656,6 +738,12 @@ const registry: CommandRegistry = createDesktopRegistry({
   },
   showPlugins: () => {
     openPluginsDialog();
+  },
+  showQueue: () => {
+    void changeLayout(withPanelOpen(layout, QUEUE_PANEL, true)).then(() => {
+      // Brought forward: the panel may have been open all along, behind the editor's focus.
+      elements.queuePanel?.querySelector<HTMLButtonElement>('button')?.focus();
+    });
   },
 
   editTemplate: () => {
@@ -1225,6 +1313,7 @@ const PANEL_NAMES: Readonly<Record<string, CatalogueKey>> = {
   editor: 'panel.editor',
   preview: 'panel.preview',
   problems: 'panel.problems',
+  queue: 'panel.queue',
 };
 
 /** Every command the registry holds, translated and with the key that runs it. */
@@ -1305,6 +1394,7 @@ async function applyLayout(persist: boolean): Promise<void> {
   pane = previewElements();
   wirePreviewControls(window.tyto === undefined);
   wirePanelControls();
+  wireQueuePanel();
   wireCommandBar();
   wireTabs();
   repaint();
@@ -1762,6 +1852,12 @@ async function load(): Promise<void> {
     // window a stale menu could crash.
     bridge.on('command:run', ({ id }) => {
       runCommand(id);
+    });
+
+    // The queue changed (TYTO-45). Heard whether or not the panel is open, and ignored while
+    // it is closed: the panel asks once when it opens, so nothing is lost by not listening.
+    bridge.on('queue:changed', () => {
+      if (elements.queuePanel !== null) void refreshQueue();
     });
   }
 

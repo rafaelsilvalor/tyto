@@ -19,29 +19,48 @@ import { type Settings, settingsFrom } from '../../shared/settings.js';
 
 export interface SettingsStore {
   read(): Promise<Settings>;
-  write(settings: Settings): Promise<void>;
+  /**
+   * Changes the keys named and keeps the rest (TYTO-45).
+   *
+   * A patch rather than the whole record since the file holds more than one preference: the
+   * templates folder and the queue folder are set from two different places, and a writer
+   * that replaced the record would forget whatever the other one had chosen.
+   */
+  write(changes: Partial<Settings>): Promise<void>;
 }
 
 export function fileSettingsStore(file: string): SettingsStore {
-  return {
-    read: async () => {
-      try {
-        return settingsFrom(JSON.parse(await readFile(file, 'utf8')));
-      } catch {
-        // No file on a first run, unparseable JSON on a hand-edited one. Both mean the same
-        // thing here, and `settingsFrom(undefined)` is the built-in pack alone.
-        return settingsFrom(undefined);
-      }
-    },
+  // One write at a time: two patches racing through read-then-write would each keep the
+  // other's old value.
+  let chain: Promise<void> = Promise.resolve();
 
-    write: async (settings) => {
-      try {
-        await mkdir(dirname(file), { recursive: true });
-        await writeFile(file, JSON.stringify(settings, null, 2), 'utf8');
-      } catch {
-        // The folder is still searched for this session — `reload` has already happened by
-        // the time this is called. What is lost is the memory of it, not the choice.
-      }
+  const read = async (): Promise<Settings> => {
+    try {
+      return settingsFrom(JSON.parse(await readFile(file, 'utf8')));
+    } catch {
+      // No file on a first run, unparseable JSON on a hand-edited one. Both mean the same
+      // thing here, and `settingsFrom(undefined)` is the built-in pack alone.
+      return settingsFrom(undefined);
+    }
+  };
+
+  const write = async (changes: Partial<Settings>): Promise<void> => {
+    try {
+      const next: Settings = { ...(await read()), ...changes };
+      await mkdir(dirname(file), { recursive: true });
+      await writeFile(file, JSON.stringify(next, null, 2), 'utf8');
+    } catch {
+      // The folder is still searched for this session — `reload` has already happened by
+      // the time this is called. What is lost is the memory of it, not the choice.
+    }
+  };
+
+  return {
+    read,
+    write: (changes) => {
+      const next = chain.then(() => write(changes));
+      chain = next;
+      return next;
     },
   };
 }
