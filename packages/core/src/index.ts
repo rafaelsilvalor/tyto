@@ -146,6 +146,8 @@ export {
   templateManifestSchema,
 } from './template/manifest.js';
 
+export { checkSlotVocabulary } from './template/slot-vocabulary.js';
+
 export {
   type TemplateFailure,
   type TemplateRegistry,
