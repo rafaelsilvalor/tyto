@@ -69,7 +69,7 @@ export type {
   Text,
 } from './brief/ast.js';
 
-export { type CompileOptions, compile } from './brief/compile.js';
+export { type CompileOptions, compile, compileDeferred } from './brief/compile.js';
 
 export type {
   DirectiveExpander,
@@ -92,10 +92,13 @@ export {
 } from './config/formats.js';
 
 export {
+  type DeferredTemplate,
   type Template,
   type TemplateBuild,
+  type TemplateCall,
   type TemplateContext,
   defineTemplate,
+  isDeferredTemplate,
   measureNothing,
 } from './template/define.js';
 
@@ -136,6 +139,7 @@ export {
   type TemplateManifest,
   adjustmentSchema,
   adjustmentTypeSchema,
+  manifestFaceSchema,
   parseManifest,
   slotSchema,
   slotTypeSchema,

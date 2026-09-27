@@ -43,6 +43,12 @@ export interface FontLibrary {
   readonly source: { outlines(face: BundledFontFace): Uint8Array | undefined };
   /** The faces among `faces` that this machine lacks, with what was drawn instead. */
   substitutions(faces: readonly BundledFontQuery[]): readonly FontSubstitution[];
+  /**
+   * Whether `source.outlines(face)` answers with a file installed on this machine, rather
+   * than one this package ships. Such a file can be a licence the person holds, and it
+   * reaches a plugin's process only under `font:<family>` (ADR 0048).
+   */
+  fromMachine(face: BundledFontFace): boolean;
 }
 
 export interface FontLibraryOptions {
@@ -225,6 +231,9 @@ export function createFontLibrary(options: FontLibraryOptions): FontLibrary {
         return onMachine(face)?.bytes ?? bundledFontSource.outlines(substituteFor(face));
       },
     },
+
+    fromMachine: (face: BundledFontFace): boolean =>
+      !isBundledFamily(face.family) && onMachine(face) !== undefined,
 
     substitutions(faces: readonly BundledFontQuery[]): readonly FontSubstitution[] {
       const seen = new Set<string>();

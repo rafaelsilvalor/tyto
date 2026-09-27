@@ -2,6 +2,7 @@ import {
   type Artwork,
   type AssetResolver,
   type BriefAst,
+  type DeferredTemplate,
   type Diagnostic,
   type Diagnostics,
   type DirectiveResolver,
@@ -15,9 +16,11 @@ import {
   type TemplateManifest,
   type TemplateRegistry,
   compile,
+  compileDeferred,
   diagnostic,
   err,
   fromPartial,
+  isDeferredTemplate,
   ok,
   resolve,
   sceneResources,
@@ -360,7 +363,7 @@ export async function runJob(
   // `template` is filled in as soon as the template stage loads one, so the three early
   // returns below carry it too: a cancelled run still produced a `result.json`, and "which
   // template was this going to be" is as true then as it is at the end.
-  let loaded: Template | undefined;
+  let loaded: Template | DeferredTemplate | undefined;
 
   const empty = (cancelled: boolean): JobReport => ({
     artifacts: [],
@@ -392,7 +395,7 @@ export async function runJob(
   // the frontmatter range and the "did you mean" the job has no business rewriting.
   notify(onEvent, { kind: 'stage-started', stage: 'template' });
   const name = templateNameOf(parsed.value, request.template);
-  let template: Template | undefined;
+  let template: Template | DeferredTemplate | undefined;
 
   if (name !== undefined && ports.registry.get(name) !== undefined) {
     const load = await ports.templates.load(name);
@@ -445,10 +448,15 @@ export async function runJob(
   /* ---------------------------------------------------------------------- compile -- */
 
   notify(onEvent, { kind: 'stage-started', stage: 'compile' });
-  const compiled = compile(resolved.value, template, {
+  const compileOptions = {
     formats: ports.formats,
     ...(ports.faces === undefined ? {} : { faces: ports.faces }),
-  });
+  };
+  // Only an installed code template answers later (ADR 0048); every other one is compiled
+  // by the same synchronous `compile` as before.
+  const compiled = isDeferredTemplate(template)
+    ? await compileDeferred(resolved.value, template, compileOptions)
+    : compile(resolved.value, template, compileOptions);
   if (!compiled.ok) return err([...problems, ...compiled.error]);
   problems.push(...compiled.diagnostics);
   notify(onEvent, { kind: 'stage-finished', stage: 'compile' });

@@ -2,7 +2,14 @@ import { access, readdir, realpath } from 'node:fs/promises';
 import { isAbsolute, join, relative, resolve, sep } from 'node:path';
 
 import { type Diagnostic, diagnostic } from '@tyto/core';
-import { type InProcessHost, type LoadedPlugins, skippedPluginWarnings } from '@tyto/plugin-api';
+import {
+  type InProcessHost,
+  type IsolatedPackBuild,
+  type LoadedPlugins,
+  type TemplatePack,
+  skippedPluginWarnings,
+  validatePluginManifest,
+} from '@tyto/plugin-api';
 
 /**
  * The template packs installed plugins contribute, as folders the registry can search
@@ -15,11 +22,12 @@ import { type InProcessHost, type LoadedPlugins, skippedPluginWarnings } from '@
  *   path, a `..` that climbs out, and a symbolic link that points out are refused alike; the
  *   last is why both ends are compared after `realpath`. Nothing is decoded, so `%2e%2e` is
  *   a folder name and not a way up — one that does not exist is refused as missing.
- * - **Every template in it is markup.** A folder holding a `template.ts`, or no
- *   `template.html`, is refused by name. Nothing loads code from a folder today (ADR 0007),
- *   so this rule states a boundary rather than closing an open door: the day a code template
- *   can come from a folder, one shipped by a plugin would run in Tyto's own process and not
- *   behind the plugin's thread (ADR 0041).
+ * - **Every template in it runs as markup or in the plugin's process.** A folder with a
+ *   `template.html` is markup. One without it is a code template, and only a pack that
+ *   registered `build` can draw one: its code is bundled into the plugin's `dist/` and runs
+ *   in the plugin's process (ADR 0048). A `template.ts` in the folder is refused by name,
+ *   because Tyto imports nothing from a folder (ADR 0007), and a source file there would
+ *   read as a template that runs when none of it does.
  *
  * Here and not in `@tyto/plugin-api`, because the check reads a disk and that package is pure
  * (ADR 0010); the CLI and the desktop both call it, so the rule has one text.
@@ -32,9 +40,22 @@ const MANIFEST_FILE = 'manifest.yaml';
 const MARKUP_FILE = 'template.html';
 const CODE_FILE = 'template.ts';
 
+/** A checked pack whose code templates are built in its plugin's process (ADR 0048). */
+export interface InstalledCodePack {
+  readonly plugin: string;
+  /** The pack's folder, a real path; each code template is a folder directly inside it. */
+  readonly directory: string;
+  /** The host's proxy of the plugin's `build`. */
+  readonly build: IsolatedPackBuild;
+  /** The manifest's permissions, which the loader already held to what was approved. */
+  readonly permissions: readonly string[];
+}
+
 export interface InstalledPacks {
   /** Searched after the built-in pack, in the order the plugins were loaded. */
   readonly directories: readonly string[];
+  /** The packs among them that registered `build`. */
+  readonly code: readonly InstalledCodePack[];
   /** One `W_PLUGIN_SKIPPED` per reason a plugin's pack was refused. */
   readonly warnings: readonly Diagnostic[];
   /** The plugins whose pack was refused, which no task may activate either. */
@@ -43,6 +64,7 @@ export interface InstalledPacks {
 
 export const NO_INSTALLED_PACKS: InstalledPacks = {
   directories: [],
+  code: [],
   warnings: [],
   refused: new Set(),
 };
@@ -61,6 +83,7 @@ export async function installedPacks(
   folderOf: (plugin: string) => string,
 ): Promise<InstalledPacks> {
   const directories: string[] = [];
+  const code: InstalledCodePack[] = [];
   const warnings: Diagnostic[] = [];
   const refused = new Set<string>();
 
@@ -70,7 +93,10 @@ export async function installedPacks(
 
     const packs = host.registry.templatePacks().filter((pack) => !before.has(pack.id));
     const checked: string[] = [];
+    const built: InstalledCodePack[] = [];
     const problems: Diagnostic[] = [];
+    const validated = validatePluginManifest(plugin.manifest);
+    const permissions = validated.ok ? validated.value.permissions : [];
     for (const pack of packs) {
       if (pack.directory === undefined) continue;
       const inside = await directoryInside(folderOf(plugin.id), pack.directory, plugin.id);
@@ -78,12 +104,18 @@ export async function installedPacks(
         problems.push(inside);
         continue;
       }
-      const code = await codeTemplates(inside, plugin.id);
-      if (code.length > 0) {
-        problems.push(...code);
+      const refusals = await unrunnableTemplates(inside, pack, plugin.id);
+      if (refusals.length > 0) {
+        problems.push(...refusals);
         continue;
       }
       checked.push(inside);
+      if (pack.build !== undefined) {
+        // The proxy `connectIsolatedPlugin` put there, whose calling convention is the
+        // wire's and not the plugin's (`IsolatedPackBuild`).
+        const build = pack.build as unknown as IsolatedPackBuild;
+        built.push({ plugin: plugin.id, directory: inside, build, permissions });
+      }
     }
 
     if (problems.length > 0) {
@@ -92,10 +124,11 @@ export async function installedPacks(
       warnings.push(...skippedPluginWarnings(plugin.id, problems));
     } else {
       directories.push(...checked);
+      code.push(...built);
     }
   }
 
-  return { directories, warnings, refused };
+  return { directories, code, warnings, refused };
 }
 
 /** The loaded plugins minus the refused ones, closing all of them as before. */
@@ -143,8 +176,15 @@ async function directoryInside(
   return real;
 }
 
-/** A `template-pack` from a plugin carries markup templates only (ADR 0046). */
-async function codeTemplates(directory: string, plugin: string): Promise<Diagnostic[]> {
+/**
+ * The templates of a pack that nothing could run the way ADR 0048 allows: a `template.ts`,
+ * which Tyto never imports, and a folder with no `template.html` in a pack with no `build`.
+ */
+async function unrunnableTemplates(
+  directory: string,
+  pack: TemplatePack,
+  plugin: string,
+): Promise<Diagnostic[]> {
   const exists = (path: string): Promise<boolean> =>
     access(path).then(
       () => true,
@@ -163,8 +203,16 @@ async function codeTemplates(directory: string, plugin: string): Promise<Diagnos
     if (!entry.isDirectory()) continue;
     const folder = join(directory, entry.name);
     if (!(await exists(join(folder, MANIFEST_FILE)))) continue;
-    if ((await exists(join(folder, CODE_FILE))) || !(await exists(join(folder, MARKUP_FILE)))) {
-      problems.push(diagnostic('E_PLUGIN_PACK_CODE', { plugin, template: entry.name }));
+    const refuse = (problem: string): void => {
+      problems.push(diagnostic('E_PLUGIN_PACK_CODE', { plugin, template: entry.name, problem }));
+    };
+    if (await exists(join(folder, CODE_FILE))) {
+      refuse(
+        `its folder holds a ${CODE_FILE}, which Tyto never imports: a code template ships ` +
+          "built into the plugin's dist/ and is drawn by the pack's build function",
+      );
+    } else if (!(await exists(join(folder, MARKUP_FILE))) && pack.build === undefined) {
+      refuse(`it has no ${MARKUP_FILE}, and the pack registers no build function to draw it`);
     }
   }
   return problems;

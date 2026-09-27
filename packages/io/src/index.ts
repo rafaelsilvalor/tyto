@@ -58,11 +58,17 @@ export {
   fsPluginStore,
 } from './fs-plugin-store.js';
 export {
+  type InstalledCodePack,
   type InstalledPacks,
   NO_INSTALLED_PACKS,
   installedPacks,
   withoutRefused,
 } from './installed-packs.js';
+export {
+  type InstalledTemplateFonts,
+  type InstalledTemplateSourceOptions,
+  installedTemplateSource,
+} from './installed-templates.js';
 
 export { type NodeFileSystemOptions, nodeFileSystem } from './node-file-system.js';
 

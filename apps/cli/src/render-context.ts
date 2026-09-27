@@ -13,9 +13,12 @@ import {
 } from '@tyto/core';
 import {
   type ExportResources,
+  type InstalledCodePack,
+  type InstalledTemplateFonts,
   NO_INSTALLED_PACKS,
   fileTemplateAssets,
   installedPacks,
+  installedTemplateSource,
   nodeFileSystem,
 } from '@tyto/io';
 import { BUILT_IN_TEMPLATE_BUILDS } from '@tyto/templates';
@@ -23,6 +26,7 @@ import { type LoadedPlugins, createPluginHost } from '@tyto/plugin-api';
 import {
   TEMPLATE_FILE,
   type BundledTemplates,
+  type LocalTemplateSource,
   type TemplateSource,
   bundledTemplateSource,
   markupTemplateSource,
@@ -87,6 +91,8 @@ export interface RenderContext {
    * `W_PLUGIN_SKIPPED` says the plugin was skipped, not only its templates.
    */
   readonly refusedPlugins: ReadonlySet<string>;
+  /** Installed packs whose code templates are built in their plugin's thread (ADR 0048). */
+  readonly codePacks: readonly InstalledCodePack[];
 }
 
 /**
@@ -174,6 +180,7 @@ export async function loadRenderContext(
         .list()
         .map((entry) => ({ name: entry.name, version: entry.version })),
       refusedPlugins: installed.refused,
+      codePacks: installed.code,
     },
     problems,
   );
@@ -206,6 +213,8 @@ export interface TemplateWiring {
  */
 export function templateWiring(
   context: RenderContext,
+  /** Where an installed code template's declared faces come from (ADR 0048). */
+  fonts: InstalledTemplateFonts,
   bundled: BundledTemplates = BUILT_IN_TEMPLATE_BUILDS,
 ): TemplateWiring {
   const loaded: ExportResources[] = [];
@@ -218,7 +227,7 @@ export function templateWiring(
     return undefined;
   };
 
-  const markup: TemplateSource = {
+  const markup: LocalTemplateSource = {
     async load(name) {
       const directory = context.registry.directoryOf(name);
       if (directory === undefined) {
@@ -250,12 +259,23 @@ export function templateWiring(
 
   // Bundled in front of markup, delegating rather than deciding: a name this build does
   // not ship reaches the markup route with its wording and its asset resolution intact.
-  const source = bundledTemplateSource({
+  const builtIn = bundledTemplateSource({
     registry: context.registry,
     fileSystem: context.fileSystem,
     bundled,
     markup,
   });
+  // In front of both, and only for a name the registry found in an installed code pack: the
+  // one way such a template runs is in its plugin's thread (ADR 0048).
+  const source =
+    context.codePacks.length === 0
+      ? builtIn
+      : installedTemplateSource({
+          registry: context.registry,
+          packs: context.codePacks,
+          fonts,
+          next: builtIn,
+        });
 
   return { source, resources: { html: { asset }, svg: { asset } } };
 }

@@ -1,4 +1,5 @@
 import {
+  type DeferredTemplate,
   type Diagnostics,
   type FileSystem,
   type Result,
@@ -23,6 +24,19 @@ import { type TemplateAssets, compileTemplate } from '@tyto/template-lang';
  * three are not enough to reach `compile`.
  */
 export interface TemplateSource {
+  /**
+   * A `DeferredTemplate` is an installed code template, answered from its plugin's process
+   * (ADR 0048); the job compiles it with `compileDeferred`, and every other one as before.
+   */
+  load(name: string): Promise<Result<Template | DeferredTemplate, Diagnostics>>;
+}
+
+/**
+ * A `TemplateSource` that answers only templates `compile` can call in its own loop: the
+ * markup route and the built-in one. It is what the preview and the tests compose, and it
+ * is still a `TemplateSource`, so a job takes it as one.
+ */
+export interface LocalTemplateSource extends TemplateSource {
   load(name: string): Promise<Result<Template, Diagnostics>>;
 }
 
@@ -34,7 +48,9 @@ export interface TemplateSource {
  * hands them to `resolve` as `renderedSlots` when they exist and passes nothing when they
  * do not, which is the difference between W_UNUSED_SLOT being accurate and being guessed.
  */
-export function renderedSlotsOf(template: Template): readonly string[] | undefined {
+export function renderedSlotsOf(
+  template: Template | DeferredTemplate,
+): readonly string[] | undefined {
   const candidate = template as Partial<{ readonly renderedSlots: readonly string[] }>;
   return Array.isArray(candidate.renderedSlots) ? candidate.renderedSlots : undefined;
 }
@@ -66,7 +82,7 @@ export function markupTemplateSource(
   fileSystem: FileSystem,
   registry: TemplateRegistry,
   options: MarkupTemplateSourceOptions = {},
-): TemplateSource {
+): LocalTemplateSource {
   return {
     async load(name: string): Promise<Result<Template, Diagnostics>> {
       const manifest = registry.get(name);

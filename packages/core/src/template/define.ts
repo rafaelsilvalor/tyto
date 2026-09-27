@@ -1,6 +1,7 @@
 import type { TemplateManifest } from './manifest.js';
 import type { ResolvedSlot } from '../brief/resolve.js';
 import type { Size } from '../scene/primitives.js';
+import type { Diagnostics, Result } from '../result/result.js';
 import type { Frame } from '../scene/scene.js';
 import type { MeasurableText, TextMeasurement } from '../text/layout.js';
 
@@ -92,4 +93,36 @@ export interface Template {
 
 export function defineTemplate(manifest: TemplateManifest, build: TemplateBuild): Template {
   return { manifest, build };
+}
+
+/**
+ * What crosses to a template that runs in another process: its context without `measure`,
+ * which is a function and cannot be cloned (ADR 0048). The other end rebuilds `measure`
+ * over the faces that crossed with the call, with the same `measureText`.
+ */
+export type TemplateCall = Omit<TemplateContext, 'measure'>;
+
+/**
+ * A template whose frame is answered later — an installed code template, running in its
+ * plugin's process (ADR 0048).
+ *
+ * Not a `Template` with a wider return type. A `Template` is called by `compile` inside its
+ * loop, and every template in this repository answers there and then; widening `build`
+ * would make every caller await what none of them waits for. A different field name keeps
+ * the two apart in the types, so a deferred template cannot reach `compile` by mistake,
+ * and `compileDeferred` is the one path that awaits.
+ *
+ * It answers with diagnostics rather than a throw, because what goes wrong on the far side
+ * of a process boundary — a timeout, a crash, an answer the IR schema refuses — is already
+ * a value by the time it arrives here.
+ */
+export interface DeferredTemplate {
+  readonly manifest: TemplateManifest;
+  readonly buildLater: (context: TemplateContext) => Promise<Result<Frame, Diagnostics>>;
+}
+
+export function isDeferredTemplate(
+  template: Template | DeferredTemplate,
+): template is DeferredTemplate {
+  return 'buildLater' in template;
 }

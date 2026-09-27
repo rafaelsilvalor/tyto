@@ -94,7 +94,8 @@ export const pluginManifestSchema = z.strictObject({
    *
    * Validated as shape only: non-empty strings, no duplicates. The *vocabulary* stays open
    * because the vocabulary is still growing — `net:<host>` gates `host.fetch` and
-   * `credentials:<key>` gates `host.credentials` (ADR 0042) — and closing an enum now would
+   * `credentials:<key>` gates `host.credentials` (ADR 0042), `font:<family>` sends a code template
+   * a face installed on this machine (ADR 0048) — and closing an enum now would
    * reject the next scope before it is written. E11 closes it; until then a typo in a
    * permission is caught by the grant prompt, which a person reads.
    */

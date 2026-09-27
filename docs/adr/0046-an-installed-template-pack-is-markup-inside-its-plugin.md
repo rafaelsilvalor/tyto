@@ -1,6 +1,14 @@
 # 0046 — An installed template pack is markup, inside its plugin
 
-Status: accepted · 2026-09-27 · TYTO-50 · extends ADR 0020 and ADR 0041 to installed packs
+Status: accepted · 2026-09-27 · TYTO-50 · extends ADR 0020 and ADR 0041 to installed packs ·
+amended by ADR 0048, which lets a code template run in its plugin's process
+
+## Amended by ADR 0048
+
+"An installed pack holds markup templates only" no longer holds. A folder with no
+`template.html` is a code template, drawn by the pack's `build` in the plugin's process
+(TYTO-189). What is still refused, as `E_PLUGIN_PACK_CODE`, is a `template.ts` in the folder
+and a code template in a pack with no `build`. The rest of this ADR stands.
 
 ## Context
 
