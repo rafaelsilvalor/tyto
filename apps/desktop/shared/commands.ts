@@ -55,6 +55,8 @@ export const FILE_MENU_GROUPS: readonly (readonly MenuCommand[])[] = [
     { id: 'template.new', label: 'command.template.new' },
     { id: 'template.edit', label: 'command.template.edit' },
   ],
+  // TYTO-47. Its own group, above Close: a screen about the app rather than a verb on a file.
+  [{ id: 'plugins.show', label: 'command.plugins.show' }],
   [{ id: 'document.close', label: 'command.document.close' }],
 ];
 

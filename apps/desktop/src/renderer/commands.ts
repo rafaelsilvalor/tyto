@@ -54,6 +54,8 @@ export const EDITOR_OPEN = 'editor.open';
 export const EDITOR_SAVE_AS = 'editor.saveAs';
 /** E9.4. Opens the export dialog; the exporting itself is main's. */
 export const FILE_EXPORT = 'file.export';
+/** TYTO-47. Shows the plugins screen; installing one is the CLI's (`tyto plugin install`). */
+export const PLUGINS_SHOW = 'plugins.show';
 /**
  * TYTO-122. Points the app at a folder of templates, or goes back to the built-in pack.
  *
@@ -150,6 +152,7 @@ export const COMMAND_LABELS: Readonly<Record<string, CatalogueKey>> = {
   [EDITOR_SAVE]: 'command.file.save',
   [EDITOR_SAVE_AS]: 'command.file.saveAs',
   [FILE_EXPORT]: 'command.file.export',
+  [PLUGINS_SHOW]: 'command.plugins.show',
   [TEMPLATES_CHOOSE_FOLDER]: 'command.templates.chooseFolder',
   [TEMPLATES_CLEAR_FOLDER]: 'command.templates.clearFolder',
   [TEMPLATE_EDIT]: 'command.template.edit',
@@ -195,6 +198,8 @@ export interface DesktopActions {
   stepDocument(direction: 1 | -1): void;
   /** E9.4. Shows the export dialog. Everything it then does is a round trip to main. */
   openExport(): void;
+  /** TYTO-47. Shows the plugins screen; the list is a round trip to main. */
+  showPlugins(): void;
   /**
    * TYTO-122. Points the app at a folder of templates, or clears the choice.
    *
@@ -275,6 +280,9 @@ export function createDesktopRegistry(actions: DesktopActions): CommandRegistry 
 
   add(FILE_EXPORT, () => {
     actions.openExport();
+  });
+  add(PLUGINS_SHOW, () => {
+    actions.showPlugins();
   });
 
   // Registration order is display order, so these land next to Export rather than at the

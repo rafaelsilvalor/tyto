@@ -1,7 +1,7 @@
 import { type Layout, DEFAULT_LAYOUT } from '../../shared/layout.js';
 import { describe, expect, it, vi } from 'vitest';
 
-import { IPC_CHANNEL_NAMES, IpcContractError } from '../../shared/ipc.js';
+import { IPC_CHANNELS, IPC_CHANNEL_NAMES, IpcContractError } from '../../shared/ipc.js';
 import { type Credentials } from './credentials.js';
 import { createHandlers, guard, registerIpcHandlers } from './ipc.js';
 
@@ -293,6 +293,21 @@ const dependencies = () => ({
   folders: folderDialogs(),
   layout: layoutStore(),
   menu: menuRebuilds(),
+  plugins: {
+    folder: '/home/ana/.tyto/plugins',
+    list: () =>
+      Promise.resolve([
+        {
+          name: 'pdf',
+          version: '1.0.0',
+          origin: 'external' as const,
+          status: 'disabled' as const,
+          contributes: ['exporter'],
+          permissions: ['net:api.example.com'],
+          problems: [],
+        },
+      ]),
+  },
   info: () => ({ version: '0.1.0', platform: 'linux', locale: 'pt-BR', templates: ['promo'] }),
   preview: preview(),
   project: projectFolder(),
@@ -600,6 +615,21 @@ describe('app:exit-answer', () => {
  * *mechanism*, and the mechanism is the contract's length caps, not the discipline of the four
  * call sites. So the test drives `guard` rather than the handler.
  */
+describe('plugins:list', () => {
+  it('answers with the folder and the rows main built, and nothing else', async () => {
+    const handlers = createHandlers(dependencies());
+
+    const answer = await handlers['plugins:list']({});
+
+    expect(answer.folder).toBe('/home/ana/.tyto/plugins');
+    expect(answer.plugins.map((plugin) => [plugin.name, plugin.status])).toEqual([
+      ['pdf', 'disabled'],
+    ]);
+    // What main sends must satisfy the contract the preload validates it against.
+    expect(IPC_CHANNELS['plugins:list'].response.safeParse(answer).success).toBe(true);
+  });
+});
+
 describe('log:write', () => {
   it('files the failure at the level the window asked for', async () => {
     const log = recordingLog();

@@ -2,7 +2,7 @@ import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
 
 import { type BrowserWindow, Menu, app, dialog, ipcMain, safeStorage, shell } from 'electron';
-import { nodeFileSystem } from '@tyto/io';
+import { PLUGINS_DIR, fsPluginStore, nodeFileSystem } from '@tyto/io';
 import type { Rasterizer } from '@tyto/raster';
 
 import { type Locale, localeFor, translate } from '../../shared/i18n/index.js';
@@ -15,6 +15,7 @@ import { crashSummary, fileLog, installCrashHandlers } from './log.js';
 import { menuTemplate } from './menu.js';
 import { fileRecentFiles } from './recent-files.js';
 import { registerIpcHandlers, sendIpcEvent } from './ipc.js';
+import { exporterBuiltIns, listPlugins, tytoHome } from './plugin-list.js';
 import { activateBuiltIns, builtInTemplatesDirectory } from './plugins.js';
 import { offerPreviousVersion } from './previous-version.js';
 import { createPreviewService } from './preview.js';
@@ -252,6 +253,10 @@ async function start(): Promise<void> {
   // front of every panel for the lifetime of a decision made at startup.
   const fileSystem = nodeFileSystem();
   const host = await activateBuiltIns({ fileSystem, log });
+  // Composed here and nowhere else (ADR 0010): the store is `@tyto/io`'s adapter and the
+  // renderer reaches it only through `plugins:list`.
+  const pluginsHome = tytoHome();
+  const pluginStore = fsPluginStore(pluginsHome);
 
   // Which folders this app searches for templates, and the only thing below that is rebuilt
   // when a person picks one (TYTO-122). The built-in pack is always the last root, so
@@ -444,6 +449,12 @@ async function start(): Promise<void> {
         await sources.reload(chosen);
         return inForce();
       },
+    },
+    // Read on every ask, not held: `tyto plugin install` in a terminal beside the window is
+    // the ordinary way a plugin arrives, and a list cached at startup would never show it.
+    plugins: {
+      folder: join(pluginsHome, PLUGINS_DIR),
+      list: () => listPlugins([...exporterBuiltIns(), ...host.registry.plugins()], pluginStore),
     },
     preview,
     templates,
