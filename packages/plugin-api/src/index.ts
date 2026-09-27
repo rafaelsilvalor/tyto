@@ -96,5 +96,18 @@ export { runGuest } from './isolation/guest.js';
 export {
   type IsolatedPlugin,
   type IsolatedPluginOptions,
+  PLUGIN_CALL_DEADLINE_MS,
   connectIsolatedPlugin,
 } from './isolation/isolated-plugin.js';
+
+export {
+  type FetchedResponse,
+  type HostCapabilities,
+  type HostFetchInit,
+  type HostFetchResponse,
+  type PluginCapabilities,
+  PluginCapabilityError,
+  allowsCredential,
+  allowsHost,
+  checkedCapabilities,
+} from './capabilities.js';

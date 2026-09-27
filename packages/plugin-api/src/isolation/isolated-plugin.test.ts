@@ -3,6 +3,7 @@ import { describe, expect, it } from 'vitest';
 
 import type { Exporter } from '../contributions.js';
 import { type Disposable, type Plugin, type PluginHost, createPluginHost } from '../host.js';
+import type { HostCapabilities } from '../capabilities.js';
 import type { GuestChannel, PluginChannel } from './channel.js';
 import { runGuest } from './guest.js';
 import { type IsolatedPlugin, connectIsolatedPlugin } from './isolated-plugin.js';
@@ -19,10 +20,11 @@ import { type IsolatedPlugin, connectIsolatedPlugin } from './isolated-plugin.js
 
 /**
  * The runtime's own, read off `globalThis`: this package compiles against no platform's
- * types (ADR 0010), and every runtime it targets has these three.
+ * types (ADR 0010), and every runtime it targets has these.
  */
-const { structuredClone, queueMicrotask, setTimeout } = globalThis as unknown as {
+const { structuredClone, queueMicrotask, setTimeout, TextEncoder } = globalThis as unknown as {
   structuredClone<T>(value: T): T;
+  TextEncoder: new () => { encode(text: string): Uint8Array };
   queueMicrotask(callback: () => void): void;
   setTimeout(callback: (value?: unknown) => void, delay: number): unknown;
 };
@@ -33,6 +35,8 @@ interface Pair {
   crash(reason: string): void;
   /** Delivered to the host as though the guest had sent it — for a guest that lies. */
   inject(message: unknown): void;
+  /** Whether the host ended the channel with `close`. */
+  closed(): boolean;
 }
 
 function channelPair(start: (guest: GuestChannel) => void): Pair {
@@ -40,6 +44,7 @@ function channelPair(start: (guest: GuestChannel) => void): Pair {
   const toGuest = new Set<(message: unknown) => void>();
   const exits = new Set<(reason: string) => void>();
   let ended = false;
+  let closedByHost = false;
 
   const deliver = (listeners: Set<(message: unknown) => void>, message: unknown): void => {
     // Cloned now, as `postMessage` does: a value that cannot cross throws at the sender.
@@ -57,6 +62,7 @@ function channelPair(start: (guest: GuestChannel) => void): Pair {
     keepAlive: () => undefined,
     close: () => {
       ended = true;
+      closedByHost = true;
       return Promise.resolve();
     },
   };
@@ -72,6 +78,7 @@ function channelPair(start: (guest: GuestChannel) => void): Pair {
       ended = true;
       for (const listener of exits) listener(reason);
     },
+    closed: () => closedByHost,
     inject: (message) => {
       for (const listener of toHost) listener(message);
     },
@@ -110,14 +117,22 @@ const textExporter: Exporter = {
 /** Starts `activate` behind a channel and connects the host to it. */
 async function isolate(
   activate: (host: PluginHost) => Disposable | void,
-  options: { readonly onCrash?: (reason: string) => void; readonly log?: string[] } = {},
+  options: {
+    readonly onCrash?: (reason: string) => void;
+    readonly log?: string[];
+    readonly permissions?: readonly string[];
+    readonly capabilities?: HostCapabilities;
+    readonly deadlineMs?: number;
+  } = {},
 ): Promise<{ readonly pair: Pair; readonly connected: Result<IsolatedPlugin, Diagnostics> }> {
   const pair = channelPair((guest) => runGuest(guest, () => Promise.resolve({ activate })));
   const lines = options.log;
   const connected = await connectIsolatedPlugin({
     name: 'texto',
-    manifest: MANIFEST,
+    manifest: { ...MANIFEST, permissions: options.permissions ?? [] },
     channel: pair.host,
+    ...(options.capabilities === undefined ? {} : { capabilities: options.capabilities }),
+    ...(options.deadlineMs === undefined ? {} : { deadlineMs: options.deadlineMs }),
     ...(options.onCrash === undefined ? {} : { onCrash: options.onCrash }),
     ...(lines === undefined
       ? {}
@@ -407,5 +422,127 @@ describe('what crosses besides contributions', () => {
     });
     await new Promise((resolve) => setTimeout(resolve, 0));
     expect(seen).toEqual(['exporter/svg']);
+  });
+});
+
+describe('host.fetch and host.credentials across the boundary', () => {
+  function network(values: Readonly<Record<string, string>> = {}) {
+    const fetched: string[] = [];
+    const capabilities: HostCapabilities = {
+      fetch: (url) => {
+        fetched.push(url);
+        return Promise.resolve({
+          url,
+          status: 200,
+          statusText: 'OK',
+          headers: { 'content-type': 'application/json' },
+          body: new TextEncoder().encode('{"title":"olá"}'),
+        });
+      },
+      credential: (_plugin, key) => Promise.resolve(values[key]),
+      describeCredential: (_plugin, key) => `TYTO_PLUGIN_TEXTO_${key.toUpperCase()}`,
+    };
+    return { fetched, capabilities };
+  }
+
+  /** An exporter whose frame is whatever `ask` answers, or the code of what it threw. */
+  const asking = (ask: (host: PluginHost) => Promise<string>) => (host: PluginHost) =>
+    host.registerExporter({
+      ...textExporter,
+      exportFrame: async () => {
+        try {
+          return ok(await ask(host));
+        } catch (cause) {
+          return ok(
+            `${(cause as { code?: string }).code ?? 'no code'}: ${(cause as Error).message}`,
+          );
+        }
+      },
+    });
+
+  it('rejects fetch on an undeclared host with E_PERMISSION, and nothing is sent', async () => {
+    const { fetched, capabilities } = network();
+    const { connected } = await isolate(
+      asking(async (host) => (await host.fetch('https://evil.example.org/')).text()),
+      { permissions: ['net:api.example.com'], capabilities },
+    );
+    if (!connected.ok) throw new Error(connected.error[0]?.message);
+
+    const answer = await exporterIn(connected.value.plugin).exportFrame(SCENE, ARTWORK, FRAME);
+    expect(answer.ok && answer.value).toBe(
+      "E_PERMISSION: Plugin 'texto' called 'host.fetch to evil.example.org (net:evil.example.org)' " +
+        'without that permission being granted at install time.',
+    );
+    expect(fetched).toEqual([]);
+  });
+
+  it('reaches a declared host, and the plugin reads the body', async () => {
+    const { fetched, capabilities } = network();
+    const { connected } = await isolate(
+      asking(async (host) => {
+        const response = await host.fetch('https://api.example.com/v1', { method: 'GET' });
+        return `${String(response.ok)} ${String(((await response.json()) as { title: string }).title)}`;
+      }),
+      { permissions: ['net:api.example.com'], capabilities },
+    );
+    if (!connected.ok) throw new Error(connected.error[0]?.message);
+
+    const answer = await exporterIn(connected.value.plugin).exportFrame(SCENE, ARTWORK, FRAME);
+    expect(answer.ok && answer.value).toBe('true olá');
+    expect(fetched).toEqual(['https://api.example.com/v1']);
+  });
+
+  it('resolves only a declared credential', async () => {
+    const { capabilities } = network({ 'api-token': 's3cret', other: 'x' });
+    const { connected } = await isolate(
+      asking(async (host) => {
+        const token = await host.credentials('api-token');
+        const other = await host
+          .credentials('other')
+          .catch((cause: { code: string }) => cause.code);
+        return `${token} ${other}`;
+      }),
+      { permissions: ['credentials:api-token'], capabilities },
+    );
+    if (!connected.ok) throw new Error(connected.error[0]?.message);
+
+    const answer = await exporterIn(connected.value.plugin).exportFrame(SCENE, ARTWORK, FRAME);
+    expect(answer.ok && answer.value).toBe('s3cret E_PERMISSION');
+  });
+});
+
+describe('a plugin that does not answer', () => {
+  it('has its call ended at the deadline, is closed, and is reported once', async () => {
+    const crashes: string[] = [];
+    const { pair, connected } = await isolate(
+      (host) =>
+        host.registerExporter({ ...textExporter, exportFrame: () => new Promise(() => {}) }),
+      { deadlineMs: 100, onCrash: (reason) => crashes.push(reason) },
+    );
+    if (!connected.ok) throw new Error(connected.error[0]?.message);
+    const exporter = exporterIn(connected.value.plugin);
+
+    const answer = await exporter.exportFrame(SCENE, ARTWORK, FRAME);
+    expect(answer.ok ? '' : answer.error[0]?.message).toBe(
+      "Plugin 'texto' did not answer within 0.1 s, so its process was ended.",
+    );
+    expect(pair.closed()).toBe(true);
+    expect(crashes).toEqual(['it did not answer within 0.1 s']);
+    const after = await exporter.exportFrame(SCENE, ARTWORK, FRAME);
+    expect(after.ok ? '' : after.error[0]?.code).toBe('E_PLUGIN_CRASHED');
+  });
+
+  it('is refused when its activation does not finish in time', async () => {
+    const pair = channelPair((guest) => runGuest(guest, () => new Promise(() => {})));
+    const connected = await connectIsolatedPlugin({
+      name: 'texto',
+      manifest: MANIFEST,
+      channel: pair.host,
+      activationDeadlineMs: 100,
+    });
+    expect(connected.ok ? '' : connected.error[0]?.message).toBe(
+      "Plugin 'texto' failed to activate: it did not finish activating within 0.1 s.",
+    );
+    expect(pair.closed()).toBe(true);
   });
 });

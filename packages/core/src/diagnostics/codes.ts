@@ -190,8 +190,10 @@ export const diagnosticCodes = {
     template:
       "Plugin '{plugin}' called '{capability}' without that permission being granted at install time.",
     spec: 'docs/plugin-api.md',
-    fatal: true,
-    fatality: 'A plugin that did not load contributed no slot to skip.',
+    // Not fatal since TYTO-48 enforces it: the refusal is one call's, and a plugin that
+    // hands it back from `exportFrame` costs that frame and not the whole render (ADR 0025).
+    fatal: false,
+    fatality: "One call is refused; what the plugin does with the refusal is the plugin's.",
   },
   // Two codes and not one, the way the template manifest already splits them: "this file
   // is not JSON" and "this JSON is not a manifest" are different problems for whoever has
@@ -309,6 +311,22 @@ export const diagnosticCodes = {
     spec: 'docs/plugin-api.md',
     fatal: false,
     fatality: 'It costs the one frame the call was for; the others are drawn (ADR 0025).',
+  },
+  E_PLUGIN_TIMEOUT: {
+    severity: 'error',
+    summary: 'An isolated plugin did not answer within its deadline, and its process was ended.',
+    template: "Plugin '{plugin}' did not answer within {seconds} s, so its process was ended.",
+    spec: 'docs/plugin-api.md',
+    fatal: false,
+    fatality: 'It costs the one frame the call was for; the others are drawn (ADR 0025).',
+  },
+  E_CREDENTIAL_MISSING: {
+    severity: 'error',
+    summary: 'A plugin asked for a credential it declared, and this host has no value for it.',
+    template: "Plugin '{plugin}' asked for credential '{key}', and {source} holds none.",
+    spec: 'docs/plugin-api.md',
+    fatal: false,
+    fatality: "It is the plugin's call that is refused; what the plugin does with that is its own.",
   },
   W_PLUGIN_CRASHED: {
     severity: 'warning',

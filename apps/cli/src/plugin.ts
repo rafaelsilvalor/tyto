@@ -215,7 +215,8 @@ function fail(problems: Diagnostics, environment: CliEnvironment): ExitCode {
 
 /**
  * The text the person approves. It names every permission, and it says plainly what the
- * worker thread is and is not (ADR 0041): a crash and API boundary, not a sandbox.
+ * worker thread is and is not (ADR 0041): a crash and API boundary, not a sandbox, whose
+ * permissions reach only what crosses it (ADR 0042).
  */
 function permissionPrompt(manifest: PluginManifest, source: string): string {
   const permissions =
@@ -228,7 +229,8 @@ function permissionPrompt(manifest: PluginManifest, source: string): string {
     `permissions:\n${permissions}` +
     'Each plugin runs in a worker thread of its own, so a crash stops the plugin and not\n' +
     'Tyto. That thread is not a sandbox: the plugin has the same access to this computer\n' +
-    'as Tyto itself. The permissions above are recorded and shown, and not yet enforced.\n'
+    'as Tyto itself. net: permissions filter host.fetch only, and credentials: ones\n' +
+    'host.credentials only; code that goes around them is not stopped.\n'
   );
 }
 

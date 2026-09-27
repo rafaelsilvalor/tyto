@@ -18,6 +18,12 @@ import { runGuest } from '@tyto/plugin-api';
  */
 
 const { entry } = workerData as { readonly entry: string };
+
+// Gone before the plugin's module is imported, so the obvious way to reach the network is
+// the one that is checked: `host.fetch`. A plugin can still import `node:http` itself —
+// this is a thread and not a sandbox (TYTO-186) — and removing the global only stops the
+// plugin that meant well from bypassing its own declaration by accident.
+delete (globalThis as { fetch?: unknown }).fetch;
 const port = parentPort;
 if (port === null) {
   throw new TypeError('plugin-worker is a worker thread entry and was started as a script.');
