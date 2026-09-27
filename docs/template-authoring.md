@@ -49,14 +49,18 @@ slots:
   titulo: { type: rich-text, required: true, max: 60 }
   subtitulo: { type: rich-text }
   imagem: { type: image }
-  cor: { type: enum, values: [azul-escuro, laranja, verde], default: azul-escuro }
-  slide: { type: rich-text, repeat: true, min: 1, max: 10 }
+  tom: { type: enum, values: [azul-escuro, laranja, verde], default: azul-escuro }
+  lamina: { type: rich-text, repeat: true, min: 1, max: 10 }
 adjustments:
-  destaque: { type: flag, applies: [slide] }
-  cor: { type: enum, values: [azul-escuro, laranja, verde], applies: [slide] }
+  destaque: { type: flag, applies: [lamina] }
+  tom: { type: enum, values: [azul-escuro, laranja, verde], applies: [lamina] }
 ```
 
 Slot names are chosen by the template author and may be in Portuguese — they are the vocabulary the brief writer sees. Keys of the manifest itself are English.
+
+**Before naming a slot, read `docs/slot-vocabulary.md`.** It reserves six names — `titulo`,
+`subtitulo`, `chamada`, `imagem`, `lamina`, `tom` — with the role and type each carries, and
+says when a domain name is the better choice. The example above follows it.
 
 `templateManifestSchema` in `packages/core/src/template/manifest.ts` is the schema, and
 `parseManifest(source, path)` is the only way in. It reports every problem in one pass,
@@ -64,7 +68,7 @@ each carrying the YAML path of the offending key and the range of the value unde
 These are the rules it enforces beyond the shape:
 
 - **`min` and `max` count occurrences on a repeatable slot and characters on every other
-  one** — `titulo` above is capped at 60 characters, `slide` at 10 slides. Two meanings for
+  one** — `titulo` above is capped at 60 characters, `lamina` at 10 laminas. Two meanings for
   two keys is a footgun, and it is the one the example above already writes; renaming them
   is a change to this document, not to the schema alone.
 - **Both ends are errors, on both kinds of slot.** Too short, too long, too few and too many
