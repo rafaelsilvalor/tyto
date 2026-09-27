@@ -1123,6 +1123,7 @@ async function answerExitRequest(bridge: TytoBridge, askId: number): Promise<voi
       },
     });
   } finally {
+    console.warn(`[quit-probe] renderer answering askId=${askId} allow=${allow}`);
     await bridge['app:exit-answer']({ askId, allow });
   }
 }
@@ -1705,7 +1706,10 @@ async function load(): Promise<void> {
     // The one thing this window listens for rather than asks (ADR 0029). No unsubscribe is
     // kept: the subscription and the window have the same lifetime by construction, and a
     // handle nobody can call is a handle that only looks like cleanup.
+    // TEMPORARY (TYTO-44): quit-path probe.
+    console.warn(`[quit-probe] renderer listener registered at ${Math.round(performance.now())}ms`);
     bridge.on('app:exit-requested', ({ askId }) => {
+      console.warn(`[quit-probe] renderer push received askId=${askId}`);
       // **The acknowledgement goes first, and it is first on purpose** (TYTO-147, ADR 0031).
       // Main's deadline covers this line and nothing after it, so nothing may be computed
       // before it — `answerExitRequest` opens by filtering the whole workspace, and beyond that

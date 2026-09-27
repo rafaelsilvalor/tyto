@@ -102,13 +102,27 @@ beforeAll(async () => {
     // about the app it is testing.
     env: { ...process.env, TYTO_HEADLESS: '1' },
   });
+  // TEMPORARY (TYTO-44): the quit-path probe's lines, from main's stdout and the page console.
+  const forward = (chunk: Buffer): void => {
+    for (const line of chunk.toString().split('\n')) {
+      if (line.includes('[quit-probe]')) process.stdout.write(`${line}\n`);
+    }
+  };
+  app.process().stdout?.on('data', forward);
+  app.process().stderr?.on('data', forward);
   page = await app.firstWindow();
+  page.on('console', (message) => {
+    if (message.text().includes('[quit-probe]')) process.stdout.write(`${message.text()}\n`);
+  });
   await page.waitForFunction(() => (globalThis as Record<string, unknown>)['tyto'] !== undefined);
 });
 
+// TEMPORARY (TYTO-44): 90 s instead of the config's 600 s while the hang is instrumented.
 afterAll(async () => {
+  process.stdout.write('[quit-probe] test: closeApp start\n');
   await closeApp(app);
-});
+  process.stdout.write('[quit-probe] test: closeApp returned\n');
+}, 90_000);
 
 describe('the packaged app', () => {
   it('opens a window at all', () => {
