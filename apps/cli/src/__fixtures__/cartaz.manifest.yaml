@@ -1,3 +1,7 @@
+# Predates docs/slot-vocabulary.md and keeps `cor` and `slide` on purpose: a CLI fixture is
+# an arbitrary template, and every render test here names its output after `slide`.
+# `tyto template check` warns on both (W_SLOT_VOCABULARY); template.test.ts derives a
+# standard-named copy for the tests where a clean folder is the subject.
 name: cartaz
 version: 2.1.0
 description: A template with no text in it, so the CLI can be tested without a bundled font.
