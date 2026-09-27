@@ -66,8 +66,9 @@ const candidatesFor = (code: DiagnosticCode, analysis: BriefAnalysis): readonly 
       return manifest === undefined ? [] : Object.keys(manifest.slots);
     // `E_UNKNOWN_DIRECTIVE` is deliberately absent: `resolve` raises it only for a
     // namespaced `::ai/caption`, whose name is a plugin's to provide and not a slot's to
-    // be confused with. The `NAME` guard would refuse the slash anyway; leaving the case
-    // out says why rather than letting the guard say it silently.
+    // be confused with. Plugin directives are offered by completion since TYTO-49, and a
+    // fix could draw on the same list; it would need a guard that accepts the slash,
+    // because `NAME` refuses it, and that is not built. Leaving the case out says why.
     case 'E_BAD_ADJUSTMENT':
       return manifest === undefined ? [] : Object.keys(manifest.adjustments);
     case 'E_UNKNOWN_FORMAT':

@@ -32,7 +32,36 @@ imagem: ./prof-ana.png
 - **Assets**: paths relative to the `.brief` file; `resolve` confirms existence and computes a hash.
 - **Comments**: `//` at line start.
 - **Escape**: `\::` for text starting with `::`.
-- **Plugin directives**: plugins register namespaced directives, `::ai/caption`. Without the plugin ⇒ `E_UNKNOWN_DIRECTIVE`.
+- **Plugin directives**: plugins register namespaced directives, `::ai/caption`. Without the plugin ⇒ `E_UNKNOWN_DIRECTIVE`. See _Plugin directives_ below.
+
+## Plugin directives
+
+`::demo/shout {slot: titulo} Direito` is a directive the plugin whose `directive` contribution has
+id `demo` answers (ADR 0043). The grammar gives it no node of its own. It is a `Directive` with a
+`Namespace`, and the plugin is handed the parts the parser already marks:
+
+| Part                 | From the AST            | In the example                         |
+| -------------------- | ----------------------- | -------------------------------------- |
+| `namespace`          | `Namespace`, no slash   | `demo`                                 |
+| `name`               | `Name`                  | `shout`                                |
+| `adjustments`        | `Adjustments`           | `[{ name: 'slot', value: 'titulo' }]`  |
+| `body`               | `InlineBody`/`BodyLine` | `[{ kind: 'text', value: 'Direito' }]` |
+| `range`, `nameRange` | the directive           | all of it, and `demo/shout`            |
+
+Every part carries its own `range`.
+
+- **The adjustments are the plugin's arguments.** They are not checked against the manifest's
+  `adjustments`, and they do not reach what the directive expands to unless the plugin puts them
+  there.
+- **An argument value is an `AdjustmentValue`, `[a-zA-Z0-9_-]+`, and that is a known limit.**
+  `{slot: sub.titulo}` parses as far as `sub`, then gives two `E_SYNTAX`, and the plugin still runs
+  with `sub`. A grammar node for arguments is an E3 change and not built.
+- **What it expands to is ordinary slot directives**, and `resolve` checks each one against the
+  manifest. `::demo/shout {slot: rodape} x` on a template with no `rodape` is `E_UNKNOWN_SLOT` on
+  `demo/shout`. Every range in a replacement is the plugin directive's.
+- A plugin that refuses its arguments says so with `E_DIRECTIVE_ARGUMENT`. One that times out or
+  crashes is `E_PLUGIN_TIMEOUT` or `E_PLUGIN_CRASHED`, on the directive. All three are non-fatal,
+  so the rest of the brief resolves.
 
 ## What the grammar settles
 

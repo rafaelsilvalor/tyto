@@ -59,16 +59,16 @@ The last four are named `<id>.tyto-plugin.json` and that is the one place a buil
 
 ## Extension points
 
-| `contributes`     | Registers                                                              | Built-in                                              |
-| ----------------- | ---------------------------------------------------------------------- | ----------------------------------------------------- |
-| `source` / `sink` | `BriefSource` — `pull()`, `ack()`; `OutputSink` — `push()`             | fs-inbox, fs-outbox (remote ones deferred — ADR 0011) |
-| `exporter`        | one **frame** to a document + mime + extension + the kinds it produces | html, svg                                             |
-| `rasterizer`      | `Rasterizer` — `raster(html, opts): Promise<Uint8Array>`               | chromium                                              |
-| `template-pack`   | folder of templates                                                    | built-in templates                                    |
-| `directive`       | `::ns/name` in the brief → transforms AST/ResolvedBrief                | —                                                     |
-| `editor.command`  | `{ id, run(ctx), undo? }`                                              | core-commands                                         |
-| `editor.keymap`   | binding → command id (normal and vim)                                  | default-keymap, vim                                   |
-| `panel`           | UI component in the desktop renderer (sandboxed iframe)                | queue, jobs, diagnostics                              |
+| `contributes`     | Registers                                                               | Built-in                                              |
+| ----------------- | ----------------------------------------------------------------------- | ----------------------------------------------------- |
+| `source` / `sink` | `BriefSource` — `pull()`, `ack()`; `OutputSink` — `push()`              | fs-inbox, fs-outbox (remote ones deferred — ADR 0011) |
+| `exporter`        | one **frame** to a document + mime + extension + the kinds it produces  | html, svg                                             |
+| `rasterizer`      | `Rasterizer` — `raster(html, opts): Promise<Uint8Array>`                | chromium                                              |
+| `template-pack`   | folder of templates                                                     | built-in templates                                    |
+| `directive`       | `::ns/name` in the brief → the slot directives it stands for (ADR 0043) | —                                                     |
+| `editor.command`  | `{ id, run(ctx), undo? }`                                               | core-commands                                         |
+| `editor.keymap`   | binding → command id (normal and vim)                                   | default-keymap, vim                                   |
+| `panel`           | UI component in the desktop renderer (sandboxed iframe)                 | queue, jobs, diagnostics                              |
 
 ### `exporter`, in full
 
@@ -99,6 +99,36 @@ font or an image has a shape only that exporter knows — `HtmlResources.font` t
 `HtmlFontFace` where `SvgResources.font` takes an `SvgFontFace` — so `htmlExporterPlugin`
 and `svgExporterPlugin` close over theirs. Reconciling the two shapes is a separate question
 (TYTO-62) and the extension point stays out of it.
+
+### `directive`, in full
+
+```ts
+interface DirectiveContribution {
+  id: string; // the namespace: `::demo/shout` routes to id 'demo'
+  names: readonly string[]; // what `::demo/` offers, for autocomplete and resolution
+  transform(directive: Directive): ExpansionResult | Promise<ExpansionResult>;
+}
+// ExpansionResult = Result<ExpandedDirective[], Diagnostics>
+// ExpandedDirective = { name, adjustments?, body } — a slot directive, with no ranges
+```
+
+**The documented "transforms AST/ResolvedBrief" is narrower now, on purpose** (ADR 0043). A
+transform is handed the directive as parsed and answers with ordinary slot directives, which
+`resolve` checks against the manifest as if the author had typed them. A plugin cannot put a
+value in a slot the template does not declare, skip a `min`, or reach a `ResolvedBrief`.
+
+**Its arguments are its adjustments.** `::demo/shout {slot: titulo} Direito` hands `transform`
+the `slot` adjustment parsed and ranged, and on a plugin directive the adjustments are not checked
+against the manifest. They do not reach the replacement unless the plugin puts them there.
+
+**Every position is the host's.** A replacement carries no ranges. `resolve` stamps it with the
+plugin directive's range and gives the same range to any plugin diagnostic that has none, so a
+timeout is underlined where the directive is. A replacement names no namespace, so expansion
+never recurses.
+
+`directiveResolverOf(() => host.registry.directives())` is the port `resolve` asks.
+`directiveNamesOf` lists `ns/name` for an editor. The CLI wires the first into every task, and
+the desktop wires neither yet.
 
 ### `template-pack`, and the host it belongs to
 
@@ -211,7 +241,7 @@ host (CLI thread)                                guest (plugin's worker)
                         ◀── result {value} ──      answer checked by the host
 ```
 
-**Each side validates what it receives**, with the Zod schemas in `isolation/protocol.ts` and `isolation/points.ts`: the host every guest message and every answer, the guest every host message and a call's arguments, before the plugin's code sees them. **A contribution crosses as data, and its functions stay behind as handles**; a function is callable only if its point names it, with a schema for its arguments and one for its answer. Today that is `exporter.exportFrame`, which may therefore return a `Promise` — the job awaits it. `template-pack`, `editor.command` and `editor.keymap` cross as data; `source`, `sink`, `rasterizer`, `directive` and `panel` are refused by name — _not available to an isolated plugin yet_ — and TYTO-49 lifts that for `directive` and `panel`.
+**Each side validates what it receives**, with the Zod schemas in `isolation/protocol.ts` and `isolation/points.ts`: the host every guest message and every answer, the guest every host message and a call's arguments, before the plugin's code sees them. **A contribution crosses as data, and its functions stay behind as handles**; a function is callable only if its point names it, with a schema for its arguments and one for its answer. Today that is `exporter.exportFrame` and `directive.transform` (TYTO-49), which may therefore return a `Promise`; the job and `resolve` await them. `template-pack`, `editor.command` and `editor.keymap` cross as data. `source`, `sink`, `rasterizer` and `panel` are refused by name — _not available to an isolated plugin yet_ — and the second half of TYTO-49 lifts that for `panel`. A directive's answer schema is strict: a replacement that carries a `namespace` or a `range` is `E_PLUGIN_PROTOCOL`.
 
 **The proxy goes through `tryActivate`**, so an isolated plugin meets every check an in-process one does. `protocol` is its own number, compared at the `hello` handshake and nowhere else; it is not the engine (ADR 0040), because a plugin never sees these messages.
 

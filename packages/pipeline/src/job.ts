@@ -4,6 +4,7 @@ import {
   type BriefAst,
   type Diagnostic,
   type Diagnostics,
+  type DirectiveResolver,
   type FaceCache,
   type FormatCatalogue,
   type Frame,
@@ -169,6 +170,11 @@ export interface JobPorts {
    * registered, so this stage no longer carries resources it never reads.
    */
   readonly exporters: ExporterRegistry;
+  /**
+   * What answers a `::namespace/name` directive — the host's `directive` point, through
+   * `directiveResolverOf` (ADR 0043). Absent, every one is `E_UNKNOWN_DIRECTIVE`.
+   */
+  readonly directives?: DirectiveResolver;
   /** Required as soon as one requested kind comes from a `rasterized` exporter. */
   readonly rasterizer?: Rasterizer;
   /** Absent means the artifacts come back in memory and nothing is written. */
@@ -408,6 +414,7 @@ export async function runJob(
     ...(request.template === undefined ? {} : { template: request.template }),
     ...(request.formats === undefined ? {} : { formats: request.formats }),
     ...(renderedSlots === undefined ? {} : { renderedSlots }),
+    ...(ports.directives === undefined ? {} : { directives: ports.directives }),
   });
   if (!resolved.ok) return err([...problems, ...resolved.error]);
   problems.push(...resolved.diagnostics);

@@ -1,4 +1,13 @@
-import type { Artwork, Diagnostics, Frame, Result, Scene, TemplateManifest } from '@tyto/core';
+import type {
+  Artwork,
+  Diagnostics,
+  Directive,
+  ExpansionResult,
+  Frame,
+  Result,
+  Scene,
+  TemplateManifest,
+} from '@tyto/core';
 
 /**
  * The nine extension points of `docs/plugin-api.md`, as types.
@@ -141,10 +150,26 @@ export interface TemplatePack extends Contribution {
 
 /* ------------------------------------------------------------------------ directive -- */
 
-/** `directive` — `::ns/name` in a brief. The transform runs before `resolve` (E11.3). */
+/**
+ * `directive` — the `::namespace/name` directives of one namespace (E11.3, ADR 0043).
+ *
+ * **`id` is the namespace.** `::demo/shout` routes to the contribution whose id is
+ * `demo`, and two plugins claiming one namespace is `E_PLUGIN_DUPLICATE` through the same
+ * check every other point uses. A separate `namespace` field would be a second name for
+ * the one thing the host keys on.
+ *
+ * **`transform` answers with slot directives, never with a `ResolvedBrief`.** It is
+ * handed the directive as parsed — its name, its adjustments and its body, each with its
+ * range — and returns ordinary `::slot` directives that `resolve` checks against the
+ * manifest like typed ones. The adjustments are the plugin's own arguments and are not
+ * checked against the manifest; they do not reach the replacement unless the plugin puts
+ * them there.
+ */
 export interface DirectiveContribution extends Contribution {
-  /** The namespace this plugin owns; `::<namespace>/<name>` routes to it. */
-  readonly namespace: string;
+  /** What `::<id>/` offers — the names autocomplete lists, and the only ones that resolve. */
+  readonly names: readonly string[];
+  /** Synchronous or not: an isolated plugin's answer crosses a thread (ADR 0041). */
+  transform(directive: Directive): ExpansionResult | Promise<ExpansionResult>;
 }
 
 /* --------------------------------------------------------------------------- editor -- */
