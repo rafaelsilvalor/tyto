@@ -20,6 +20,8 @@ const PURE_PACKAGES = [
   'packages/export-html',
   'packages/export-svg',
   'packages/templates',
+  // Everything a template imports runs wherever the compiler runs (TYTO-185).
+  'packages/template-kit',
   'packages/plugin-api',
 ];
 
@@ -287,6 +289,22 @@ export default tseslint.config(
         allowTypeImports: false,
       },
     ]),
+  },
+
+  {
+    /**
+     * A template's numbers live in its brand's `tokens.ts` (ADR 0047). Parts and the
+     * composition may halve, double and centre; any other literal there is a size somebody
+     * will have to hunt for, so it is refused where it is written.
+     */
+    name: 'templates/numbers-are-tokens',
+    files: [
+      'packages/templates/templates/**/parts.ts',
+      'packages/templates/templates/**/template.ts',
+    ],
+    rules: {
+      'no-magic-numbers': ['error', { ignore: [-1, 0, 1, 2], ignoreArrayIndexes: true }],
+    },
   },
 
   {

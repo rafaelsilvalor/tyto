@@ -1,4 +1,5 @@
 import { build as agendaSemana } from '../templates/agenda-semana/template.js';
+import { build as aprovados } from '../templates/aprovados/template.js';
 
 import type { TemplateBuild } from '@tyto/core';
 
@@ -42,6 +43,7 @@ export const BUILT_IN_TEMPLATES_DIRECTORY = 'templates';
 /** The names this pack ships, for a caller that wants them without reading a disk. */
 export const BUILT_IN_TEMPLATE_NAMES: readonly string[] = [
   'agenda-semana',
+  'aprovados',
   'carrossel-lista',
   'promo-curso',
 ];
@@ -63,4 +65,5 @@ export const BUILT_IN_TEMPLATE_NAMES: readonly string[] = [
  */
 export const BUILT_IN_TEMPLATE_BUILDS: Readonly<Record<string, TemplateBuild>> = {
   'agenda-semana': agendaSemana,
+  aprovados,
 };

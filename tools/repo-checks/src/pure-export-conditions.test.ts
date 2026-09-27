@@ -319,13 +319,14 @@ const pure = await purePackages();
 const dependencies = externalDependencies(pure);
 
 describe('the pure packages', () => {
-  it('are the seven ADR 0010 names, so the sweep below covers what it claims', () => {
+  it('are the ADR 0010 names, so the sweep below covers what it claims', () => {
     expect(pure.map((directory) => directory.replace('packages/', '')).sort()).toEqual([
       'brief-lang',
       'core',
       'export-html',
       'export-svg',
       'plugin-api',
+      'template-kit',
       'template-lang',
       'templates',
     ]);

@@ -15,7 +15,7 @@ Compiler: brief → Scene IR → exporters (HTML→raster, SVG), plus an Electro
 
 ## Hard rules
 
-- `packages/core`, `brief-lang`, `template-lang`, `export-*`, `templates`: **no Node or DOM imports**. Pure TS, any runtime. This is what makes the cloud possible later. Enforced by lint.
+- `packages/core`, `brief-lang`, `template-lang`, `export-*`, `templates`, `template-kit`: **no Node or DOM imports**. Pure TS, any runtime. This is what makes the cloud possible later. Enforced by lint.
 - No exceptions for expected errors. Stages return `Result<T, Diagnostic[]>`. Diagnostics carry a source `range`.
 - Exporters never receive an AST or a brief — only `Scene`. If something must appear in the output, it enters the IR first.
 - Every adapter (fs, chromium, http…) implements a port from `core` or `plugin-api`. No package imports another package's adapter; composition happens in `apps/*` only.
