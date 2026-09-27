@@ -3,6 +3,7 @@ import { Command, CommanderError } from 'commander';
 import type { CliEnvironment } from './environment.js';
 import { EXIT_DIAGNOSTICS, EXIT_INTERNAL, EXIT_OK, type ExitCode } from './exit.js';
 import { parseFormatList, parsePositiveInteger, parseQuality, parseTypes } from './options.js';
+import { pluginNewCommand } from './plugin-new.js';
 import { pluginInstallCommand, pluginListCommand, pluginStateCommand } from './plugin.js';
 import { renderCommand } from './render.js';
 import { templateCheckCommand, templateNewCommand } from './template.js';
@@ -199,6 +200,15 @@ export function createProgram(environment: CliEnvironment, captured: Captured): 
     .option('-y, --yes', 'approve its permissions without asking', false)
     .action(async (source: string) => {
       captured.code = await pluginInstallCommand(source, pluginInstall.opts(), environment);
+    });
+
+  const pluginNew = plugin
+    .command('new')
+    .description('scaffold a template-pack plugin from docs/plugin-authoring.md')
+    .argument('<name>', "the plugin's name, also its folder's and its template's")
+    .option('--out <dir>', 'where the plugin folder is created', '.')
+    .action(async (name: string) => {
+      captured.code = await pluginNewCommand(name, pluginNew.opts(), environment);
     });
 
   for (const [change, description] of [

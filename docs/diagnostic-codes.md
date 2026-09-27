@@ -44,6 +44,8 @@ non-zero.
 | `E_PLUGIN_PERMISSIONS_CHANGED` | error | yes | An installed plugin now asks for permissions nobody approved when it was installed. |
 | `E_PLUGIN_STATE` | error | yes | The file recording which plugins were installed and approved cannot be read. |
 | `E_PLUGIN_EXPORTER_KIND` | error | yes | A plugin registered a rasterized exporter declaring a kind no rasterizer encodes. |
+| `E_PLUGIN_PACK_DIRECTORY` | error | yes | A plugin's template pack names a folder outside the plugin's installed folder. |
+| `E_PLUGIN_PACK_CODE` | error | yes | A plugin's template pack holds a template that is not markup. |
 | `E_PLUGIN_CRASHED` | error | no | An isolated plugin's process stopped while the host was waiting for it. |
 | `E_PLUGIN_PROTOCOL` | error | no | An isolated plugin sent the host a message that does not match the RPC protocol. |
 | `E_PLUGIN_CALL` | error | no | A function an isolated plugin registered threw when the host called it. |
@@ -127,6 +129,8 @@ incomplete brief, and a crossed box where a picture the exporter could not load 
 | `E_PLUGIN_PERMISSIONS_CHANGED` | yes | A plugin that did not load contributed no slot to skip. |
 | `E_PLUGIN_STATE` | yes | A plugin that did not load contributed no slot to skip. |
 | `E_PLUGIN_EXPORTER_KIND` | yes | A plugin that did not load contributed no slot to skip. |
+| `E_PLUGIN_PACK_DIRECTORY` | yes | A plugin that did not load contributed no slot to skip. |
+| `E_PLUGIN_PACK_CODE` | yes | A plugin that did not load contributed no slot to skip. |
 | `E_PLUGIN_CRASHED` | no | One frame was waiting on the process; the frames other exporters draw survive (ADR 0025). |
 | `E_PLUGIN_PROTOCOL` | no | It costs the one frame whose answer it was; the others are drawn (ADR 0025). |
 | `E_PLUGIN_CALL` | no | It costs the one frame the call was for; the others are drawn (ADR 0025). |
@@ -551,6 +555,34 @@ Plugin '{plugin}' registers exporter '{exporter}' as rasterized for '{kind}', an
 ```
 
 Parameters: `plugin`, `exporter`, `kind`, `encodable`
+
+### `E_PLUGIN_PACK_DIRECTORY`
+
+**Severity:** error · **Fatal:** yes · **Spec:** `docs/adr/0046-an-installed-template-pack-is-markup-inside-its-plugin.md`
+
+A plugin's template pack names a folder outside the plugin's installed folder.
+
+A plugin that did not load contributed no slot to skip.
+
+```
+Plugin '{plugin}' contributes template pack folder '{directory}', and {problem}.
+```
+
+Parameters: `plugin`, `directory`, `problem`
+
+### `E_PLUGIN_PACK_CODE`
+
+**Severity:** error · **Fatal:** yes · **Spec:** `docs/adr/0046-an-installed-template-pack-is-markup-inside-its-plugin.md`
+
+A plugin's template pack holds a template that is not markup.
+
+A plugin that did not load contributed no slot to skip.
+
+```
+Plugin '{plugin}' contributes template '{template}', which is not a markup template: an installed pack may hold only folders with a template.html and no template.ts.
+```
+
+Parameters: `plugin`, `template`
 
 ### `E_PLUGIN_CRASHED`
 

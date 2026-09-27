@@ -1,0 +1,50 @@
+<!-- aviso — the example pack's one template (docs/plugin-authoring.md).
+
+     A markup template like any other: `tyto template check templates/aviso` reports on it
+     from this folder, before it is installed. An installed pack may hold markup templates
+     only (ADR 0046). -->
+
+<frame format="feed" bg="var(--bg)">
+  <rect class="band" />
+  <text slot="titulo" class="title" />
+  <text slot="detalhe" class="detail" />
+</frame>
+
+<frame format="story" extends="feed" />
+
+<style>
+  :root {
+    --bg: #0c2340;
+    --accent: #ff5900;
+  }
+  /* An enum reaches a value only through @if: --slot-cor holds the word, not the colour. */
+  @if slot(cor) is laranja {
+    :root {
+      --bg: #ff5900;
+      --accent: #0c2340;
+    }
+  }
+
+  .band {
+    x: 80;
+    y: 120;
+    w: 160;
+    h: 16;
+    fill: var(--accent);
+  }
+  /* The family is one `@tyto/fonts` ships: a face nobody bundles is a render that fails. */
+  .title {
+    x: 80;
+    y: 200;
+    w: 920;
+    font: 700 88px/1.05 "Source Sans 3";
+    color: white;
+  }
+  .detail {
+    x: 80;
+    y: 780;
+    w: 920;
+    font: 400 44px/1.2 "Source Sans 3";
+    color: white;
+  }
+</style>
