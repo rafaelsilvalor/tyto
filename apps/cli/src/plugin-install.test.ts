@@ -259,7 +259,7 @@ describe('what install refuses', () => {
     expect(questions).toEqual(['Install it? [y/N] ']);
     expect(stderr()).toContain('  - net:api.example.com\n');
     expect(stderr()).toContain('That thread is not a sandbox');
-    expect(stderr()).toContain('recorded and shown, and not yet enforced');
+    expect(stderr()).toContain('net: permissions filter host.fetch only');
     expect(stderr()).toContain('Not installed.');
   });
 

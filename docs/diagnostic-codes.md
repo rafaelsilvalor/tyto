@@ -32,7 +32,7 @@ non-zero.
 | `E_UNSUPPORTED_ATTRIBUTE` | error | yes | A template uses an attribute the tag it sits on does not accept. |
 | `E_TEMPLATE_SYNTAX` | error | yes | A template.html does not match the template grammar. |
 | `E_TEMPLATE_MARKUP` | error | yes | A template.html parses but does not describe a scene the compiler can build. |
-| `E_PERMISSION` | error | yes | A plugin called a capability it was not granted at install time. |
+| `E_PERMISSION` | error | no | A plugin called a capability it was not granted at install time. |
 | `E_PLUGIN_MANIFEST_SYNTAX` | error | yes | A tyto-plugin.json is not valid JSON. |
 | `E_PLUGIN_MANIFEST_SHAPE` | error | yes | A tyto-plugin.json parses as JSON but does not match the plugin manifest schema. |
 | `E_PLUGIN_ENGINE` | error | yes | A plugin's engine range is not satisfied by this host's plugin API. |
@@ -46,6 +46,8 @@ non-zero.
 | `E_PLUGIN_CRASHED` | error | no | An isolated plugin's process stopped while the host was waiting for it. |
 | `E_PLUGIN_PROTOCOL` | error | no | An isolated plugin sent the host a message that does not match the RPC protocol. |
 | `E_PLUGIN_CALL` | error | no | A function an isolated plugin registered threw when the host called it. |
+| `E_PLUGIN_TIMEOUT` | error | no | An isolated plugin did not answer within its deadline, and its process was ended. |
+| `E_CREDENTIAL_MISSING` | error | no | A plugin asked for a credential it declared, and this host has no value for it. |
 | `W_PLUGIN_CRASHED` | warning | no | An installed plugin's process crashed on an earlier run. History, not a refusal. |
 | `E_PLUGIN_FETCH` | error | yes | A plugin could not be copied or fetched from where tyto plugin install was told. |
 | `E_SCENE_SHAPE` | error | yes | A scene does not match the IR schema. |
@@ -112,7 +114,7 @@ incomplete brief, and a crossed box where a picture the exporter could not load 
 | `E_UNSUPPORTED_ATTRIBUTE` | yes | The template is what every artwork is drawn through, so a broken one breaks all of them rather than one slot. |
 | `E_TEMPLATE_SYNTAX` | yes | The template is what every artwork is drawn through, so a broken one breaks all of them rather than one slot. |
 | `E_TEMPLATE_MARKUP` | yes | The template is what every artwork is drawn through, so a broken one breaks all of them rather than one slot. |
-| `E_PERMISSION` | yes | A plugin that did not load contributed no slot to skip. |
+| `E_PERMISSION` | no | One call is refused; what the plugin does with the refusal is the plugin's. |
 | `E_PLUGIN_MANIFEST_SYNTAX` | yes | A plugin that did not load contributed no slot to skip. |
 | `E_PLUGIN_MANIFEST_SHAPE` | yes | A plugin that did not load contributed no slot to skip. |
 | `E_PLUGIN_ENGINE` | yes | A plugin that did not load contributed no slot to skip. |
@@ -126,6 +128,8 @@ incomplete brief, and a crossed box where a picture the exporter could not load 
 | `E_PLUGIN_CRASHED` | no | One frame was waiting on the process; the frames other exporters draw survive (ADR 0025). |
 | `E_PLUGIN_PROTOCOL` | no | It costs the one frame whose answer it was; the others are drawn (ADR 0025). |
 | `E_PLUGIN_CALL` | no | It costs the one frame the call was for; the others are drawn (ADR 0025). |
+| `E_PLUGIN_TIMEOUT` | no | It costs the one frame the call was for; the others are drawn (ADR 0025). |
+| `E_CREDENTIAL_MISSING` | no | It is the plugin's call that is refused; what the plugin does with that is its own. |
 | `E_PLUGIN_FETCH` | yes | A plugin that did not load contributed no slot to skip. |
 | `E_SCENE_SHAPE` | yes | The IR is malformed, so the exporter has nothing it can draw. |
 | `E_SCENE_DUPLICATE_ID` | yes | The IR is malformed, so the exporter has nothing it can draw. |
@@ -380,11 +384,11 @@ Parameters: `problem`
 
 ### `E_PERMISSION`
 
-**Severity:** error · **Fatal:** yes · **Spec:** `docs/plugin-api.md`
+**Severity:** error · **Fatal:** no · **Spec:** `docs/plugin-api.md`
 
 A plugin called a capability it was not granted at install time.
 
-A plugin that did not load contributed no slot to skip.
+One call is refused; what the plugin does with the refusal is the plugin's.
 
 ```
 Plugin '{plugin}' called '{capability}' without that permission being granted at install time.
@@ -573,6 +577,34 @@ Plugin '{plugin}' threw while the host was calling it: {problem}.
 ```
 
 Parameters: `plugin`, `problem`
+
+### `E_PLUGIN_TIMEOUT`
+
+**Severity:** error · **Fatal:** no · **Spec:** `docs/plugin-api.md`
+
+An isolated plugin did not answer within its deadline, and its process was ended.
+
+It costs the one frame the call was for; the others are drawn (ADR 0025).
+
+```
+Plugin '{plugin}' did not answer within {seconds} s, so its process was ended.
+```
+
+Parameters: `plugin`, `seconds`
+
+### `E_CREDENTIAL_MISSING`
+
+**Severity:** error · **Fatal:** no · **Spec:** `docs/plugin-api.md`
+
+A plugin asked for a credential it declared, and this host has no value for it.
+
+It is the plugin's call that is refused; what the plugin does with that is its own.
+
+```
+Plugin '{plugin}' asked for credential '{key}', and {source} holds none.
+```
+
+Parameters: `plugin`, `key`, `source`
 
 ### `E_PLUGIN_FETCH`
 

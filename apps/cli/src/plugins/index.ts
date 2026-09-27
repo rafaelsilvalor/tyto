@@ -120,6 +120,7 @@ export {
   loadInstalledPlugins,
   readInstalledPlugins,
 } from './external.js';
+export { credentialVariable, pluginCapabilities } from './capabilities.js';
 export { type CloseableRasterizer, defaultRasterizer, rasterizerPlugin } from './rasterizer.js';
 export {
   type TemplatePackOptions,

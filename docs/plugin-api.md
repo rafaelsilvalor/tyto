@@ -23,14 +23,14 @@ my-plugin/
 
 `pluginManifestSchema` in `@tyto/plugin-api` is that document, and it is the only reader of it. Every field is checked and every rejection carries a **field path** — `contributes.1`, `config.$schema`, `(root)` — because "the manifest is invalid" is not a sentence anybody can act on in a file they typed by hand. Every problem is reported at once, the same promise the compiler makes about a brief.
 
-| Field         | Rule                                                                                         |
-| ------------- | -------------------------------------------------------------------------------------------- |
-| `name`        | lowercase letters, digits and hyphens. **It is the plugin's id** — see below                 |
-| `version`     | semver, with an optional prerelease tag                                                      |
-| `engine`      | a version range (`>=0.1`, `^1.2.3`, `>=0.1 \|\| ^1`) against `PLUGIN_API_VERSION` (ADR 0040) |
-| `contributes` | at least one extension point from the table below, no repeats                                |
-| `permissions` | non-empty strings, no repeats; recorded at install, **not enforced yet** (ADR 0041)          |
-| `config`      | optional `{ "$schema": "…" }`, never dereferenced by the host                                |
+| Field         | Rule                                                                                                                    |
+| ------------- | ----------------------------------------------------------------------------------------------------------------------- |
+| `name`        | lowercase letters, digits and hyphens. **It is the plugin's id** — see below                                            |
+| `version`     | semver, with an optional prerelease tag                                                                                 |
+| `engine`      | a version range (`>=0.1`, `^1.2.3`, `>=0.1 \|\| ^1`) against `PLUGIN_API_VERSION` (ADR 0040)                            |
+| `contributes` | at least one extension point from the table below, no repeats                                                           |
+| `permissions` | non-empty strings, no repeats; `net:<host>` gates `host.fetch`, `credentials:<key>` gates `host.credentials` (ADR 0042) |
+| `config`      | optional `{ "$schema": "…" }`, never dereferenced by the host                                                           |
 
 Unknown keys are refused, one complaint per stray key rather than one for the object holding them.
 
@@ -172,13 +172,26 @@ get their own commands.
 interface PluginHost {
   registerSource(s: BriefSource): Disposable;  registerSink(...); registerExporter(...); …
   config<T>(schema: ZodType<T>): T;             // validated user config
-  credentials(key: string): Promise<string>;    // only with declared permission; backed by safeStorage
-  fetch: typeof fetch;                          // filtered by net:* permissions
+  credentials(key: string): Promise<string>;    // credentials:<key> only; env in the CLI, safeStorage on desktop
+  fetch(url, init?): Promise<HostFetchResponse>; // net:<host> only; redirects not followed
   log: Logger; events: TypedEmitter<HostEvents>;
 }
 ```
 
-**For an installed plugin every member is a message** (ADR 0041). `config` validates, in the plugin's thread, the slice of configuration the host sent at activation. `log` lines cross to the host, with a `detail` that cannot be cloned sent as its text. `events` hears the `registered` and `disposed` events of each host the plugin is activated in; `emit` stays in the plugin's thread, because a plugin announcing a registration would be speaking for the registry. `credentials` and `fetch` are not built yet: they are the second half of TYTO-48.
+**For an installed plugin every member is a message** (ADR 0041). `config` validates, in the plugin's thread, the slice of configuration the host sent at activation. `log` lines cross to the host, with a `detail` that cannot be cloned sent as its text. `events` hears the `registered` and `disposed` events of each host the plugin is activated in; `emit` stays in the plugin's thread, because a plugin announcing a registration would be speaking for the registry. `fetch` and `credentials` are requests the host answers — below.
+
+### `host.fetch` and `host.credentials` (ADR 0042)
+
+| Permission            | Allows                                                       |
+| --------------------- | ------------------------------------------------------------ |
+| `net:api.example.com` | `host.fetch` to that host, any port, `http` or `https`       |
+| `net:*.example.com`   | every host below `example.com`, and not `example.com` itself |
+| `net:*`               | any host                                                     |
+| `credentials:<key>`   | `host.credentials('<key>')`                                  |
+
+**Checked on the host's side, against the manifest the host validated** — never in the plugin's process — by one function, `checkedCapabilities`, which the in-process host uses too. A refusal **rejects** with a `PluginCapabilityError` whose `code` is `E_PERMISSION`, the way the platform's `fetch` rejects; a declared key with no value is `E_CREDENTIAL_MISSING`, naming where the host looked. **Redirects are not followed**: the 3xx comes back with its `location`, and the next request is checked like the first, so a declared host cannot hand the request to an undeclared one. The response crosses whole — status, headers, body as bytes — with `text()` and `json()` built on the plugin's side.
+
+The network and the secrets are a port, `HostCapabilities`. **In the CLI a credential is an environment variable**, `TYTO_PLUGIN_<NAME>_<KEY>`, both halves upper-cased with every character that is not a letter or a digit turned into `_` — plugin `meu-pdf`'s `api.token` is `TYTO_PLUGIN_MEU_PDF_API_TOKEN` — and an empty variable is unset. The desktop's are `safeStorage`, in its half of the card.
 
 ## Isolation
 
@@ -202,9 +215,11 @@ host (CLI thread)                                guest (plugin's worker)
 
 **The proxy goes through `tryActivate`**, so an isolated plugin meets every check an in-process one does. `protocol` is its own number, compared at the `hello` handshake and nowhere else; it is not the engine (ADR 0040), because a plugin never sees these messages.
 
+**A call has a deadline** (ADR 0042). `PLUGIN_CALL_DEADLINE_MS`, 30 s — ADR 0030's capture deadline, because the frame is the unit in both. A call past it answers `E_PLUGIN_TIMEOUT`, non-fatal; the worker is ended and the timeout is recorded as a crash. An activation that does not finish in the same time is refused. A plugin in `while (true) {}` costs one frame's 30 s and nothing after it.
+
 **A crash is data.** When a plugin's thread ends unasked, every call waiting on it and every call after answers `E_PLUGIN_CRASHED`, non-fatal (ADR 0025): the frames other exporters draw are still delivered. A throw from the plugin's function is `E_PLUGIN_CALL`; an answer its schema refuses is `E_PLUGIN_PROTOCOL`. The crash is written to `crashes.json`, beside `plugins.json` and never inside it, **as history and not as a refusal**: the plugin is activated again on the next run, `plugin list` shows it as `crashed` with its time, and `install`, `enable` or `remove` clears it. A separate file, because the CLIs already shipped read `plugins.json` strictly, and one new key there would make an older CLI on the same machine drop every installed plugin (ADR 0041).
 
-**The worker is a crash and API boundary, not a security sandbox.** The plugin's code runs on the same Node as Tyto's and can import `node:fs` or open a socket without asking; `net:*` filters `host.fetch` only. A real boundary — a child process with Node's permission model — is TYTO-186.
+**The worker is a crash and API boundary, not a security sandbox.** The plugin's code runs on the same Node as Tyto's and can import `node:fs` or open a socket without asking; `net:*` filters `host.fetch` only. The bootstrap deletes the global `fetch` before the plugin loads, so the obvious path is the checked one — which stops a plugin that meant well, and no other. A real boundary — a child process with Node's permission model — is TYTO-186.
 
 ## Lifecycle
 
@@ -225,7 +240,7 @@ host (CLI thread)                                guest (plugin's worker)
 
 **Both files drop the keys they do not know rather than refusing** (ADR 0041), so a newer CLI or desktop can add a field without costing the older one its plugins. **The approval is recorded apart from the files.** A folder under `plugins/` says a plugin's files are here; it does not say anybody agreed to run them. So `plugins.json` holds what `install` asked and was told, and the loader reads both: **a folder with no entry is not installed** — one copied in by hand has had no question asked — and an entry whose plugin now declares a permission nobody approved is refused (`E_PLUGIN_PERMISSIONS_CHANGED`) until it is installed again. Installing a name that is already installed replaces it; that is how an update lands. A built-in's name is never available.
 
-**Approved is not enforced, and the prompt says so.** An installed plugin runs in a worker thread of its own (see Isolation), and the prompt says that thread is not a sandbox: the plugin has Tyto's access to the computer, and the permissions are shown, recorded and compared. `host.fetch` and `host.credentials`, which enforce `net:*` and `credentials:*`, are the second half of TYTO-48. `install` prints that sentence beside the list, so nobody reads a granted permission as a boundary. Without a terminal to answer, `install` needs `--yes`.
+**Approved is enforced where it crosses, and the prompt says how far.** An installed plugin runs in a worker thread of its own (see Isolation), and the prompt says that thread is not a sandbox: the plugin has Tyto's access to the computer, and `net:` and `credentials:` permissions filter `host.fetch` and `host.credentials` only. `install` prints that sentence beside the list, so nobody reads a granted permission as more of a boundary than it is. Without a terminal to answer, `install` needs `--yes`.
 
 **A plugin that cannot load does not stop a render** (ADR 0040). Installed plugins are read and imported once per process, and activated into each task's host **after** the built-ins through `InProcessHost.tryActivate`, which answers with diagnostics instead of throwing. A contribution id another plugin already holds is `E_PLUGIN_DUPLICATE`, naming both plugins; everything the loser registered is withdrawn, and the task renders without it. On a render every refusal is carried as `W_PLUGIN_SKIPPED` in `result.json` — a warning, because the brief is not what is wrong.
 

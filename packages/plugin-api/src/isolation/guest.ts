@@ -1,4 +1,6 @@
-import type { ZodType } from 'zod';
+import { type ZodType, z } from 'zod';
+
+import { PluginCapabilityError, responseOf } from '../capabilities.js';
 
 import type { Disposable, HostEventListener, HostEvents, Logger, PluginHost } from '../host.js';
 import type { GuestChannel } from './channel.js';
@@ -14,6 +16,7 @@ import {
   RPC_PROTOCOL_VERSION,
   type Registration,
   describeIssues,
+  fetchedResponseSchema,
   hostMessageSchema,
 } from './protocol.js';
 
@@ -35,6 +38,8 @@ interface Kept {
   readonly fn: (...args: readonly unknown[]) => unknown;
 }
 
+const stringSchema = z.string();
+
 function messageOf(cause: unknown): string {
   return cause instanceof Error ? cause.message : String(cause);
 }
@@ -45,6 +50,50 @@ export function runGuest(channel: GuestChannel, load: () => Promise<unknown>): v
   let pending: (Registration & { readonly key: object })[] | undefined = [];
   let config: unknown;
   let nextHandle = 0;
+  let nextRequest = 0;
+  const requests = new Map<
+    number,
+    { readonly accept: ZodType; resolve(value: unknown): void; reject(cause: Error): void }
+  >();
+
+  /** One of the host's capabilities, asked across the boundary and checked on the way back. */
+  function request(
+    capability: 'fetch' | 'credentials',
+    args: readonly unknown[],
+    accept: ZodType,
+  ): Promise<unknown> {
+    const id = nextRequest++;
+    return new Promise((resolve, reject) => {
+      requests.set(id, { accept, resolve, reject });
+      try {
+        send({ protocol: RPC_PROTOCOL_VERSION, type: 'request', id, capability, args: [...args] });
+      } catch (cause) {
+        // A body that cannot be cloned is the plugin's argument, refused where it made it.
+        requests.delete(id);
+        reject(cause instanceof Error ? cause : new Error(String(cause)));
+      }
+    });
+  }
+
+  function answer(message: Extract<HostMessage, { type: 'response' }>): void {
+    const pending = requests.get(message.id);
+    if (pending === undefined) return;
+    requests.delete(message.id);
+    if (!message.ok) {
+      pending.reject(
+        message.diagnostic === undefined
+          ? new Error(message.message)
+          : new PluginCapabilityError(message.diagnostic),
+      );
+      return;
+    }
+    const checked = pending.accept.safeParse(message.value);
+    if (checked.success) pending.resolve(checked.data);
+    else
+      pending.reject(
+        new Error(`the host answered something unexpected: ${describeIssues(checked.error)}`),
+      );
+  }
 
   function send(message: GuestMessage): void {
     channel.send(message);
@@ -138,6 +187,15 @@ export function runGuest(channel: GuestChannel, load: () => Promise<unknown>): v
       }
       return parsed.data;
     },
+    fetch: async (url, init) =>
+      responseOf(
+        (await request(
+          'fetch',
+          init === undefined ? [url] : [url, init],
+          fetchedResponseSchema,
+        )) as Parameters<typeof responseOf>[0],
+      ),
+    credentials: async (key) => (await request('credentials', [key], stringSchema)) as string,
     log,
     events: {
       on<Event extends keyof HostEvents>(event: Event, listener: HostEventListener<Event>) {
@@ -221,6 +279,7 @@ export function runGuest(channel: GuestChannel, load: () => Promise<unknown>): v
     const message = parsed.data;
     if (message.type === 'activate') void activate(message);
     else if (message.type === 'call') void call(message);
+    else if (message.type === 'response') answer(message);
     else host.events.emit(message.event, message.payload);
   });
 

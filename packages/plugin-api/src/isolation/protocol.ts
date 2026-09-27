@@ -77,10 +77,33 @@ export const eventMessageSchema = z.strictObject({
   payload: z.strictObject({ point: z.string(), id: z.string() }),
 });
 
-export const hostMessageSchema = z.discriminatedUnion('type', [
+/**
+ * The host's answer to a guest's `request`. A refusal carries the diagnostic, so the guest
+ * can reject with the same code the host decided on.
+ */
+export const responseMessageSchema = z.discriminatedUnion('ok', [
+  z.strictObject({
+    protocol,
+    type: z.literal('response'),
+    id: z.number().int().nonnegative(),
+    ok: z.literal(true),
+    value: z.unknown(),
+  }),
+  z.strictObject({
+    protocol,
+    type: z.literal('response'),
+    id: z.number().int().nonnegative(),
+    ok: z.literal(false),
+    message: z.string(),
+    diagnostic: diagnosticSchema.optional(),
+  }),
+]);
+
+export const hostMessageSchema = z.union([
   activateMessageSchema,
   callMessageSchema,
   eventMessageSchema,
+  responseMessageSchema,
 ]);
 export type HostMessage = z.infer<typeof hostMessageSchema>;
 
@@ -125,6 +148,14 @@ export const guestMessageSchema = z.discriminatedUnion('type', [
     message: z.string(),
     detail: z.unknown().optional(),
   }),
+  /** The plugin asking the host for one of its capabilities: `host.fetch`, `host.credentials`. */
+  z.strictObject({
+    protocol,
+    type: z.literal('request'),
+    id: z.number().int().nonnegative(),
+    capability: z.enum(['fetch', 'credentials']),
+    args: z.array(z.unknown()),
+  }),
   /** A contribution the plugin disposed of itself, after activation. */
   z.strictObject({
     protocol,
@@ -134,6 +165,29 @@ export const guestMessageSchema = z.discriminatedUnion('type', [
   }),
 ]);
 export type GuestMessage = z.infer<typeof guestMessageSchema>;
+
+/** What `host.fetch` sends, checked by the host before the permission check reads it. */
+export const fetchArgsSchema = z.tuple([
+  z.string(),
+  z
+    .strictObject({
+      method: z.string().min(1).optional(),
+      headers: z.record(z.string(), z.string()).optional(),
+      body: z.union([z.string(), z.instanceof(Uint8Array)]).optional(),
+    })
+    .optional(),
+]);
+
+export const credentialsArgsSchema = z.tuple([z.string().min(1)]);
+
+/** What `host.fetch` answers, checked by the guest before the plugin sees it. */
+export const fetchedResponseSchema = z.strictObject({
+  url: z.string(),
+  status: z.number().int(),
+  statusText: z.string(),
+  headers: z.record(z.string(), z.string()),
+  body: z.instanceof(Uint8Array),
+});
 
 /** `contributes.1 must be…` — the path Zod reports, for a message about a message. */
 export function describeIssues(error: z.ZodError): string {

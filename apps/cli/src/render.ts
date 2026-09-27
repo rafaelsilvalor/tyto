@@ -7,7 +7,7 @@ import { ASSETS_DIR } from '@tyto/io';
 import type { CliEnvironment } from './environment.js';
 import { EXIT_DIAGNOSTICS, EXIT_OK, type ExitCode } from './exit.js';
 import { type OutputKind, needsRasterizer, outputRequests, unavailableTypes } from './options.js';
-import { loadInstalledPlugins, reachableExporters } from './plugins/index.js';
+import { loadInstalledPlugins, pluginCapabilities, reachableExporters } from './plugins/index.js';
 import { loadRenderContext, readFailure } from './render-context.js';
 import { renderTask } from './render-task.js';
 import { diagnosticsDocument, formatDiagnostics, json } from './report.js';
@@ -128,7 +128,9 @@ export async function renderCommand(
     });
   }
 
-  const plugins = await loadInstalledPlugins(environment.home);
+  const plugins = await loadInstalledPlugins(environment.home, {
+    capabilities: pluginCapabilities(environment.variables),
+  });
   const { exporters, warnings: skipped } = reachableExporters(plugins);
   const unavailable = unavailableTypes(options.types, exporters);
   if (unavailable !== undefined) {
