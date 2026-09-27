@@ -51,12 +51,12 @@ describe('tyto plugin list', () => {
 
     expect(code).toBe(EXIT_OK);
     expect(out.join('')).toMatchInlineSnapshot(`
-      "html                0.4.2  built-in  exporter
-      svg                 1.0.2  built-in  exporter
-      built-in-templates  0.1.0  built-in  template-pack
-      chromium            0.1.0  built-in  rasterizer
-      fs-inbox            1.0.3  built-in  source
-      fs-outbox           1.0.3  built-in  sink
+      "html                0.4.2  built-in  enabled  exporter
+      svg                 1.0.2  built-in  enabled  exporter
+      built-in-templates  0.1.0  built-in  enabled  template-pack
+      chromium            0.1.0  built-in  enabled  rasterizer
+      fs-inbox            1.0.3  built-in  enabled  source
+      fs-outbox           1.0.3  built-in  enabled  sink
       "
     `);
   });

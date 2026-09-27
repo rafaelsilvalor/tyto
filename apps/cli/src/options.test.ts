@@ -1,3 +1,5 @@
+import { ok } from '@tyto/core';
+import { type Exporter, createPluginHost } from '@tyto/plugin-api';
 import { InvalidArgumentError } from 'commander';
 import { describe, expect, it } from 'vitest';
 
@@ -7,7 +9,21 @@ import {
   parseFormatList,
   parseQuality,
   parseTypes,
+  unavailableTypes,
 } from './options.js';
+
+function exporter(id: string, kinds: readonly string[], rasterized: boolean): Exporter {
+  return { id, mime: `x/${id}`, extension: id, kinds, rasterized, exportFrame: () => ok('') };
+}
+
+/** Tyto's two, shaped as they register, and an installed `pdf` beside them. */
+function registry() {
+  const host = createPluginHost();
+  host.hostFor('html').registerExporter(exporter('html', ['png', 'jpeg', 'webp'], true));
+  host.hostFor('svg').registerExporter(exporter('svg', ['svg'], false));
+  host.hostFor('pdf').registerExporter(exporter('pdf', ['pdf'], false));
+  return host.registry.exporters;
+}
 
 describe('--types', () => {
   it('takes a comma-separated list in the order it was written', () => {
@@ -22,9 +38,14 @@ describe('--types', () => {
     expect(parseTypes('png,png')).toEqual(['png']);
   });
 
-  it('refuses a type nothing can produce, and names the ones it can', () => {
-    expect(() => parseTypes('pdf')).toThrow(InvalidArgumentError);
-    expect(() => parseTypes('pdf')).toThrow(/png, jpeg, webp, svg/u);
+  it('accepts a kind it has never heard of, because an installed exporter may produce it', () => {
+    // Which kinds exist is the registry's answer, known only once plugins are activated.
+    expect(parseTypes('pdf')).toEqual(['pdf']);
+  });
+
+  it('still refuses a word no exporter could declare', () => {
+    expect(() => parseTypes('PDF')).toThrow(InvalidArgumentError);
+    expect(() => parseTypes('p/f')).toThrow(/lowercase letters, digits and hyphens/u);
   });
 
   it('refuses an empty list rather than rendering nothing successfully', () => {
@@ -63,7 +84,23 @@ describe('the requests a run is planned from', () => {
 
 describe('whether a browser is needed at all', () => {
   it('is false for svg alone, so --types svg never launches one', () => {
-    expect(needsRasterizer(['svg'])).toBe(false);
-    expect(needsRasterizer(['svg', 'png'])).toBe(true);
+    expect(needsRasterizer(['svg'], registry())).toBe(false);
+    expect(needsRasterizer(['svg', 'png'], registry())).toBe(true);
+  });
+
+  it('asks the exporter rather than the kind, so an installed pdf launches nothing', () => {
+    expect(needsRasterizer(['pdf'], registry())).toBe(false);
+  });
+});
+
+describe('a type nothing produces', () => {
+  it('is refused after the registry is known, naming every kind that is available', () => {
+    expect(unavailableTypes(['png', 'gif'], registry())).toBe(
+      "'gif' is not an output type any installed exporter produces. Available: png, jpeg, webp, svg, pdf.",
+    );
+  });
+
+  it('is nothing to say when every kind has an exporter', () => {
+    expect(unavailableTypes(['pdf', 'svg'], registry())).toBeUndefined();
   });
 });

@@ -1,6 +1,7 @@
 import { InvalidArgumentError } from 'commander';
 
-import type { OutputRequest } from '@tyto/pipeline';
+import type { ArtifactKind, OutputRequest } from '@tyto/pipeline';
+import type { ExporterRegistry } from '@tyto/plugin-api';
 
 /**
  * Turning what a shell can carry — strings — into what the pipeline takes.
@@ -11,13 +12,18 @@ import type { OutputRequest } from '@tyto/pipeline';
  * typo on the command line into a document about the artwork.
  */
 
-/** The encodings `--types` accepts. `svg` is not a raster format; the other three are. */
-export const OUTPUT_KINDS = ['png', 'jpeg', 'webp', 'svg'] as const;
-export type OutputKind = (typeof OUTPUT_KINDS)[number];
+/**
+ * What `--types` holds: the built-in four, or a kind an installed exporter declares.
+ *
+ * Which kinds exist is not known when the command line is parsed — it is whatever the
+ * registry holds once the installed plugins are activated (TYTO-47) — so {@link parseTypes}
+ * checks only that a word is shaped like a kind, and {@link unavailableTypes} asks the
+ * registry afterwards.
+ */
+export type OutputKind = ArtifactKind;
 
-function isOutputKind(value: string): value is OutputKind {
-  return (OUTPUT_KINDS as readonly string[]).includes(value);
-}
+/** Lowercase letters, digits and hyphens: a kind becomes a file extension's neighbour. */
+const KIND = /^[a-z0-9][a-z0-9-]*$/u;
 
 /** `a, b ,c` → `['a','b','c']`, with the blanks a trailing comma leaves dropped. */
 export function commaSeparated(value: string): readonly string[] {
@@ -30,14 +36,14 @@ export function commaSeparated(value: string): readonly string[] {
 export function parseTypes(value: string): readonly OutputKind[] {
   const listed = commaSeparated(value);
   if (listed.length === 0) {
-    throw new InvalidArgumentError(`--types needs at least one of ${OUTPUT_KINDS.join(', ')}.`);
+    throw new InvalidArgumentError('--types needs at least one output type, such as png or svg.');
   }
 
   const kinds: OutputKind[] = [];
   for (const entry of listed) {
-    if (!isOutputKind(entry)) {
+    if (!KIND.test(entry)) {
       throw new InvalidArgumentError(
-        `'${entry}' is not an output type. Available: ${OUTPUT_KINDS.join(', ')}.`,
+        `'${entry}' is not an output type: a type is lowercase letters, digits and hyphens.`,
       );
     }
     // Deduplicated: asking for `png,png` would write the same file twice and count it
@@ -102,7 +108,30 @@ export function outputRequests(options: OutputOptions): readonly OutputRequest[]
   });
 }
 
-/** True when any requested encoding needs a browser. */
-export function needsRasterizer(types: readonly OutputKind[]): boolean {
-  return types.some((kind) => kind !== 'svg');
+/**
+ * The sentence to refuse a run with when a requested type has no exporter, or nothing.
+ *
+ * Exit 1 and not a diagnostic, exactly as when the list was hard-coded: `--types pdf` on a
+ * machine with no pdf exporter is a command line to fix, not something the brief caused.
+ */
+export function unavailableTypes(
+  types: readonly OutputKind[],
+  exporters: ExporterRegistry,
+): string | undefined {
+  const missing = types.filter((kind) => exporters.forKind(kind) === undefined);
+  if (missing.length === 0) return undefined;
+
+  const available = exporters.list().flatMap((exporter) => exporter.kinds);
+  return (
+    `${missing.map((kind) => `'${kind}'`).join(', ')} ${missing.length === 1 ? 'is' : 'are'} ` +
+    `not an output type any installed exporter produces. Available: ${available.join(', ')}.`
+  );
+}
+
+/** True when any requested encoding comes from an exporter whose document needs a browser. */
+export function needsRasterizer(
+  types: readonly OutputKind[],
+  exporters: ExporterRegistry,
+): boolean {
+  return types.some((kind) => exporters.forKind(kind)?.rasterized === true);
 }

@@ -1,3 +1,4 @@
+import type { Exporter } from '@tyto/plugin-api';
 import { type RasterFormat, rasterExtension, rasterMimeType } from '@tyto/raster';
 
 /**
@@ -9,8 +10,32 @@ import { type RasterFormat, rasterExtension, rasterMimeType } from '@tyto/raster
  * with the machine or the order of a loop would break that without ever failing a test.
  */
 
-/** The encodings a job can ask for. Three raster, one vector. */
-export type ArtifactKind = RasterFormat | 'svg';
+/** The encodings Tyto ships an exporter for. Three raster, one vector. */
+export type BuiltInKind = RasterFormat | 'svg';
+
+/**
+ * The encodings a job can ask for: the built-in four, or whatever an installed exporter
+ * declares in its `kinds` (TYTO-47).
+ *
+ * Open, because a plugin can register `kinds: ['pdf']` and a closed union would leave
+ * nothing able to ask for it. Written as the built-in union widened by a branded string
+ * rather than as `string`, so the four still autocomplete and a `switch` over them still
+ * narrows. Whether a kind *can* be produced is the exporter registry's question, asked once
+ * at the top of `runJob` — not this type's.
+ */
+export type ArtifactKind = BuiltInKind | (string & Record<never, never>);
+
+const RASTER_FORMATS: readonly string[] = ['png', 'jpeg', 'webp'] satisfies RasterFormat[];
+
+export function isRasterFormat(kind: string): kind is RasterFormat {
+  return RASTER_FORMATS.includes(kind);
+}
+
+/** What a finished file is called after its dot, and what `result.json` says it is. */
+export interface ArtifactEncoding {
+  readonly extension: string;
+  readonly mime: string;
+}
 
 export interface Artifact {
   /** `<artwork>-<format>.<ext>`, the file name the sink writes. */
@@ -54,12 +79,26 @@ export interface ArtifactSink {
   write(artifact: Artifact): Promise<void>;
 }
 
-export function artifactExtension(kind: ArtifactKind): string {
-  return kind === 'svg' ? 'svg' : rasterExtension(kind);
-}
-
-export function artifactMimeType(kind: ArtifactKind): string {
-  return kind === 'svg' ? 'image/svg+xml' : rasterMimeType(kind);
+/**
+ * The extension and media type of the file one kind produces, through one exporter.
+ *
+ * **The exporter says, unless its document is not the file.** An SVG, or an installed
+ * exporter's PDF, *is* the artifact, so its `extension` and `mime` are the artifact's. An
+ * HTML document is not a file anybody asked for: it becomes the kind a rasterizer encodes,
+ * and then only the raster port knows that `jpeg` is written `.jpg`. This used to branch on
+ * `kind === 'svg'` and ask `@tyto/raster` about everything else, which is the branch that
+ * made a kind nobody shipped impossible to name.
+ *
+ * `undefined` for a rasterized exporter declaring a kind no rasterizer encodes: there is no
+ * file that request could produce, and `runJob` refuses it before any frame is built.
+ */
+export function artifactEncoding(
+  kind: ArtifactKind,
+  exporter: Pick<Exporter, 'extension' | 'mime' | 'rasterized'>,
+): ArtifactEncoding | undefined {
+  if (!exporter.rasterized) return { extension: exporter.extension, mime: exporter.mime };
+  if (!isRasterFormat(kind)) return undefined;
+  return { extension: rasterExtension(kind), mime: rasterMimeType(kind) };
 }
 
 /**
@@ -70,8 +109,8 @@ export function artifactMimeType(kind: ArtifactKind): string {
  * once, rather than in each sink: two sinks that sanitized differently would answer
  * "which file is slide 2?" two ways.
  */
-export function artifactName(artwork: string, format: string, kind: ArtifactKind): string {
-  return `${fileSafe(artwork)}-${fileSafe(format)}.${artifactExtension(kind)}`;
+export function artifactName(artwork: string, format: string, extension: string): string {
+  return `${fileSafe(artwork)}-${fileSafe(format)}.${extension}`;
 }
 
 const UNSAFE = /[^a-zA-Z0-9._-]+/gu;

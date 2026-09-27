@@ -3,7 +3,7 @@ import { Command, CommanderError } from 'commander';
 import type { CliEnvironment } from './environment.js';
 import { EXIT_DIAGNOSTICS, EXIT_INTERNAL, EXIT_OK, type ExitCode } from './exit.js';
 import { parseFormatList, parsePositiveInteger, parseQuality, parseTypes } from './options.js';
-import { pluginListCommand } from './plugin.js';
+import { pluginInstallCommand, pluginListCommand, pluginStateCommand } from './plugin.js';
 import { renderCommand } from './render.js';
 import { templateCheckCommand, templateNewCommand } from './template.js';
 import { watchCommand } from './watch.js';
@@ -47,7 +47,12 @@ function withProjectOptions(command: Command): Command {
 
 function withOutputOptions(command: Command): Command {
   return command
-    .option('--types <kinds>', 'comma-separated: png, jpeg, webp, svg', parseTypes, ['png'])
+    .option(
+      '--types <kinds>',
+      'comma-separated: png, jpeg, webp, svg, or a kind an installed exporter adds',
+      parseTypes,
+      ['png'],
+    )
     .option(
       '--scale <n>',
       'device pixels per CSS pixel; 2 is the retina export',
@@ -174,15 +179,41 @@ export function createProgram(environment: CliEnvironment, captured: Captured): 
 
   /* --------------------------------------------------------------------------- plugin -- */
 
-  const plugin = program.command('plugin').description('inspect what extends this Tyto');
+  const plugin = program
+    .command('plugin')
+    .description('install, list and switch off what extends this Tyto (~/.tyto/plugins)');
 
   const pluginList = plugin
     .command('list')
-    .description('list every installed plugin: name, version, origin and what it contributes')
+    .description('list every plugin: name, version, origin, status and what it contributes')
+    .option('--active', 'only the plugins a render would activate', false)
     .option('--json', 'print a machine-readable document instead of prose', false)
-    .action(() => {
-      captured.code = pluginListCommand(pluginList.opts(), environment);
+    .action(async () => {
+      captured.code = await pluginListCommand(pluginList.opts(), environment);
     });
+
+  const pluginInstall = plugin
+    .command('install')
+    .description('install a plugin from a folder, a git URL or an npm package name')
+    .argument('<source>', 'a folder, a git URL (git+https://…, …/repo.git) or an npm spec')
+    .option('-y, --yes', 'approve its permissions without asking', false)
+    .action(async (source: string) => {
+      captured.code = await pluginInstallCommand(source, pluginInstall.opts(), environment);
+    });
+
+  for (const [change, description] of [
+    ['remove', 'delete an installed plugin and what was approved for it'],
+    ['disable', 'keep a plugin installed and stop activating it'],
+    ['enable', 'activate a disabled plugin again'],
+  ] as const) {
+    plugin
+      .command(change)
+      .description(description)
+      .argument('<name>', "the plugin's name, as tyto plugin list prints it")
+      .action(async (name: string) => {
+        captured.code = await pluginStateCommand(change, name, environment);
+      });
+  }
 
   // Applied after the tree is built and to every node of it. Commander copies
   // `_exitCallback` to a subcommand when the subcommand is *created*, so an

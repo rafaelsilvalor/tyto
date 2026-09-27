@@ -27,12 +27,12 @@
     "@tyto/export-html": "workspace:*",
     "@tyto/export-svg": "workspace:*",
     "@tyto/pipeline": "workspace:*",
+    "@tyto/plugin-api": "workspace:*",
     "@tyto/template-lang": "workspace:*",
     "zod": "^4.6.5"
   },
   "devDependencies": {
     "@tyto/brief-lang": "workspace:*",
-    "@tyto/plugin-api": "workspace:*",
     "@tyto/raster": "workspace:*",
     "vitest": "^5.0.1"
   }
