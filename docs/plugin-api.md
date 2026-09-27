@@ -127,8 +127,7 @@ timeout is underlined where the directive is. A replacement names no namespace, 
 never recurses.
 
 `directiveResolverOf(() => host.registry.directives())` is the port `resolve` asks.
-`directiveNamesOf` lists `ns/name` for an editor. The CLI wires the first into every task, and
-the desktop wires neither yet.
+`directiveNamesOf` lists `ns/name` for an editor. The CLI wires the first into every task. The desktop wires both since TYTO-49: an export resolves through the run's own host, and the preview through one host holding the installed plugins, whose `directiveNamesOf` rides on `brief:preview` for the editor's list after `::`.
 
 ### `template-pack`, and the host it belongs to
 

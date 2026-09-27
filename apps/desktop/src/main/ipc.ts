@@ -204,6 +204,12 @@ export function createHandlers(dependencies: IpcDependencies): Handlers {
         frames: [...result.frames],
         artworks: [...result.artworks],
         diagnostics: [...result.diagnostics],
+        completion: {
+          ...(result.completion.manifest === undefined
+            ? {}
+            : { manifest: result.completion.manifest }),
+          directives: [...result.completion.directives],
+        },
       };
     },
 

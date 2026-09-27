@@ -14,6 +14,7 @@ import {
   type Logger,
   NO_PLUGINS,
   activateInstalled,
+  directiveResolverOf,
   createPluginHost,
 } from '@tyto/plugin-api';
 import {
@@ -278,6 +279,9 @@ export async function createExportService(options: ExportServiceOptions): Promis
           base: request.assetBase ?? request.directory,
         }),
         exporters: host.registry.exporters,
+        // The run's own host, which the installed plugins were activated into above: a
+        // directive resolves through the same activation that the run reports refusals of.
+        directives: directiveResolverOf(() => host.registry.directives()),
         formats: catalogue,
         ...(options.rasterizer === undefined ? {} : { rasterizer: options.rasterizer }),
         // Measured, as the CLI and the preview are: without faces a `shrink` is clipped and
