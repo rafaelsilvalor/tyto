@@ -42,7 +42,9 @@ describe('the IPC contract', () => {
       'layout:set',
       'log:reveal',
       'log:write',
+      'panel:request',
       'plugins:list',
+      'plugins:panels',
       'queue:list',
       'queue:open-brief',
       'queue:reveal-output',
@@ -235,6 +237,8 @@ describe('what the contract does not promise', () => {
       'app:exit-listening',
       // TYTO-47. "Which plugins are there" has no subject: there is one plugins folder.
       'plugins:list',
+      // TYTO-49. "Which panels do the plugins offer" has none either, for the same reason.
+      'plugins:panels',
       // TYTO-45. "What is in the queue" has no subject: there is one queue folder, and where
       // it is, is main's.
       'queue:list',

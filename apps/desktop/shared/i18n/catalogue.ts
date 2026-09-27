@@ -353,6 +353,8 @@ export interface Catalogue {
   readonly 'plugins.status.refused': string;
   readonly 'plugins.status.crashed': string;
   readonly 'plugins.permissions.none': string;
+  /** On the row of a plugin that contributes a panel: the document text reaches its page. */
+  readonly 'plugins.panel.readsDocument': string;
   readonly 'plugins.close': string;
   readonly 'plugins.unavailable': string;
 
@@ -555,6 +557,7 @@ export const CATALOGUE_KEYS = [
   'plugins.status.refused',
   'plugins.status.crashed',
   'plugins.permissions.none',
+  'plugins.panel.readsDocument',
   'plugins.close',
   'plugins.unavailable',
   'command.queue.show',

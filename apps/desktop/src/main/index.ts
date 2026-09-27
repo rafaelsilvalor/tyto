@@ -1,3 +1,4 @@
+import { readFile } from 'node:fs/promises';
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
 
@@ -9,6 +10,7 @@ import {
   ipcMain,
   net,
   safeStorage,
+  protocol,
   shell,
   utilityProcess,
 } from 'electron';
@@ -32,7 +34,9 @@ import { activateBuiltIns, builtInTemplatesDirectory } from './plugins.js';
 import { utilityProcessLauncher } from './plugin-process.js';
 import { offerPreviousVersion } from './previous-version.js';
 import { createQueueService } from './queue.js';
-import { windowDirectives } from './directives.js';
+import { createPanelService } from './panels.js';
+import { PLUGIN_SCHEME, confinedPath, contentTypeOf, panelPolicy } from './plugin-protocol.js';
+import { type WindowPlugins, windowPlugins } from './window-plugins.js';
 import { createPreviewService } from './preview.js';
 import { createProjectSources } from './project.js';
 import { createTemplateEditor } from './template-editor.js';
@@ -128,6 +132,42 @@ try {
   }
 } catch (reason) {
   reportCrash(reason);
+}
+
+// Before ready, which is the only time Electron accepts it. `standard` so a panel's relative
+// `<script src="panel.js">` resolves against its own folder, and `secure` so the page is not
+// treated as mixed content. The page still has an opaque origin: the iframe's sandbox has no
+// `allow-same-origin` (ADR 0045).
+protocol.registerSchemesAsPrivileged([
+  { scheme: PLUGIN_SCHEME, privileges: { standard: true, secure: true } },
+]);
+
+/**
+ * Serves `tyto-plugin://<plugin>/<path>` out of that plugin's folder, and nothing else.
+ *
+ * Only for a plugin that is active and contributes a panel, and only a file `confinedPath`
+ * places inside its folder once links are resolved. Every page carries `panelPolicy`, which
+ * gives it no network of its own.
+ */
+function servePluginPages(
+  contributed: WindowPlugins,
+  directoryOf: (plugin: string) => string,
+): void {
+  const missing = (): Response => new Response('Not found', { status: 404 });
+  protocol.handle(PLUGIN_SCHEME, async (request) => {
+    const url = new URL(request.url);
+    const plugin = url.hostname;
+    if (!contributed.panels().some((offered) => offered.plugin === plugin)) return missing();
+    const file = await confinedPath(directoryOf(plugin), url.pathname);
+    if (file === undefined) return missing();
+    return new Response(await readFile(file), {
+      headers: {
+        'content-type': contentTypeOf(file),
+        'content-security-policy': panelPolicy(plugin),
+        'x-content-type-options': 'nosniff',
+      },
+    });
+  });
 }
 
 async function start(): Promise<void> {
@@ -319,16 +359,15 @@ async function start(): Promise<void> {
   // reasons for one object to change, and `src/main/templates.ts` says why that matters.
   const templates = await createTemplateCatalogue({ sources });
 
-  // The template mode (TYTO-44). The same `sources` as the three above, so a save that reads
-  // the folders again is seen by the preview, the export and the picker with nothing rebuilt.
-  const templateEditor = createTemplateEditor({ sources });
-
   // The one place `safeStorage` is named. Everything below takes it as an argument, which
   // is what lets the credential module be tested without a keychain and without Electron.
   const credentials = createCredentials({
     encryption: safeStorage,
     store: fileCredentialStore(join(app.getPath('userData'), 'credentials')),
   });
+  // One composition of what a plugin may reach, shared by its process and its panel, so the
+  // two can never be granted different things (ADR 0042, ADR 0045).
+  const capabilities = desktopCapabilities(credentials, (url, init) => net.fetch(url, init));
 
   // The export, composed here for the reason everything else is (ADR 0010): it needs a
   // `Rasterizer`, and the only place allowed to know which adapter exists is this file. It
@@ -346,7 +385,7 @@ async function start(): Promise<void> {
         utilityProcess.fork(modulePath, args, { ...options, stdio: options.stdio }),
       join(dirname(fileURLToPath(import.meta.url)), 'plugin-guest.js'),
     ),
-    capabilities: desktopCapabilities(credentials, (url, init) => net.fetch(url, init)),
+    capabilities,
   }).catch((cause: unknown) => {
     // A disk that refused the folder: the app opens without installed plugins, and says so.
     log.error('The installed plugins could not be started.', cause);
@@ -367,11 +406,17 @@ async function start(): Promise<void> {
   // It is told no folder here. Which folder a compile resolves against is a property of the
   // tab the brief is in, and `ipc.ts` looks it up per request from the id that came with
   // it (E9.11) — a service holding one folder assumed one open document.
-  const preview = await createPreviewService({
-    fileSystem,
-    sources,
-    directives: windowDirectives(plugins),
-  });
+  // What the installed plugins contribute to the window itself: the directives the preview
+  // and the template mode resolve, and the panels (ADR 0043, ADR 0045).
+  const contributed = windowPlugins(plugins);
+  const preview = await createPreviewService({ fileSystem, sources, directives: contributed });
+
+  // The template mode (TYTO-44). The same `sources` as the preview, so a save that reads the
+  // folders again is seen by the preview, the export and the picker with nothing rebuilt.
+  const templateEditor = createTemplateEditor({ sources, directives: contributed.resolver });
+
+  const panels = createPanelService(contributed, capabilities);
+  servePluginPages(contributed, (name) => pluginStore.directoryOf(name));
 
   const exports_ = await createExportService({
     fileSystem,
@@ -546,6 +591,7 @@ async function start(): Promise<void> {
       folder: join(pluginsHome, PLUGINS_DIR),
       list: () => listPlugins([...exporterBuiltIns(), ...host.registry.plugins()], pluginStore),
     },
+    panels,
     preview,
     templates,
     templateEditor,

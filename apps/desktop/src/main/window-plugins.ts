@@ -1,0 +1,79 @@
+import type { DirectiveResolver } from '@tyto/core';
+import {
+  type LoadedPlugins,
+  type PanelContribution,
+  createPluginHost,
+  directiveNamesOf,
+  directiveResolverOf,
+  validatePluginManifest,
+} from '@tyto/plugin-api';
+
+/**
+ * What the installed plugins contribute to the window itself (TYTO-49, ADR 0043, ADR 0045).
+ *
+ * An export builds a host per run and activates the installed plugins into it, so a run
+ * resolves through that host. The preview and the panels have no such host — the preview
+ * compiles on every keystroke and binds no exporter, and a panel lives as long as the window
+ * — so they read this one: activated once, when the plugins have started, and holding only
+ * what they registered. An installed exporter's refusals are the export's to report, and
+ * this host is never asked for one.
+ *
+ * Until the plugins have started it offers nothing, so a `::demo/shout` typed in the first
+ * second is `E_UNKNOWN_DIRECTIVE` and the next preview after start-up clears it; the window
+ * opening is not made to wait on a plugin's activation (ADR 0044). `ready` is for the one
+ * question that has to wait, which panels exist.
+ */
+export interface WindowPlugins {
+  readonly resolver: DirectiveResolver;
+  /** `namespace/name`, for completion after `::`. */
+  names(): readonly string[];
+  /** Settles when the plugins have started and been activated here. Never rejects. */
+  readonly ready: Promise<void>;
+  /** Every panel, with the plugin that registered it. Empty until `ready`. */
+  panels(): readonly WindowPanel[];
+  /** The permissions the host validated for a plugin, or `undefined` for one it has not. */
+  permissionsOf(plugin: string): readonly string[] | undefined;
+}
+
+export interface WindowPanel {
+  readonly plugin: string;
+  readonly panel: PanelContribution;
+}
+
+export function windowPlugins(plugins: Promise<LoadedPlugins>): WindowPlugins {
+  const host = createPluginHost();
+  const owned: WindowPanel[] = [];
+  const permissions = new Map<string, readonly string[]>();
+  let started = false;
+
+  const ready = plugins.then(
+    (loaded) => {
+      for (const plugin of loaded.plugins) {
+        const before = new Set(host.registry.panels());
+        // A plugin this host refuses is refused by the export too, where the run reports it;
+        // saying it twice on every keystroke would bury the one that matters.
+        const activated = host.tryActivate(plugin, 'external');
+        if (!activated.ok) continue;
+        const manifest = validatePluginManifest(plugin.manifest);
+        permissions.set(plugin.id, manifest.ok ? manifest.value.permissions : []);
+        for (const panel of host.registry.panels()) {
+          if (!before.has(panel)) owned.push({ plugin: plugin.id, panel });
+        }
+      }
+      started = true;
+    },
+    () => {
+      started = true;
+    },
+  );
+
+  const directives = () => (started ? host.registry.directives() : []);
+  return {
+    resolver: directiveResolverOf(directives),
+    names: () => directiveNamesOf(directives()),
+    ready,
+    // Filtered against the registry, so a panel its plugin withdrew is not offered again.
+    panels: () => owned.filter(({ panel }) => host.registry.panels().includes(panel)),
+    permissionsOf: (plugin) => permissions.get(plugin),
+  };
+}

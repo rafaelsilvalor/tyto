@@ -27,6 +27,12 @@ import { type CommandEntry, type CommandBar, COMMAND_BAR_TAG } from './command-b
 import { type ExportDialog, type ExportProgressView, EXPORT_DIALOG_TAG } from './export-dialog.js';
 import { type PluginsDialog, PLUGINS_DIALOG_TAG } from './plugins-dialog.js';
 import { previewAnalysis } from './brief-analysis.js';
+import {
+  type OfferedPanel,
+  PluginPanel,
+  announceDocument,
+  servePanelBridge,
+} from './plugin-panel.js';
 import { type QueuePanel, QUEUE_PANEL_TAG } from './queue-panel.js';
 import type { TemplateMode } from './template-mode.js';
 import { TEMPLATE_MODE_TAG } from './template-mode-tag.js';
@@ -73,10 +79,12 @@ import './panels.js';
 import {
   type Layout,
   DEFAULT_LAYOUT,
+  PLUGIN_PANEL_ELEMENT,
   QUEUE_PANEL,
   panelOf,
   withPanelOpen,
   withPanelSize,
+  withPluginPanels,
 } from '../../shared/layout.js';
 import { type SaveOutcome, listenForExit, resolveExit } from './exit.js';
 import { installErrorReporting, reportToLog } from './report-errors.js';
@@ -143,6 +151,9 @@ const PREVIEW_DELAY = 200;
  * the picker's list, which is the same registry the preview resolves against.
  */
 const analysis = previewAnalysis(() => state.templates);
+
+/** The installed plugins' panels by layout id, once main has said which there are (ADR 0045). */
+const offeredPanels = new Map<string, OfferedPanel>();
 
 const state = {
   locale: DEFAULT_LOCALE as Locale,
@@ -1309,6 +1320,39 @@ function registerPanelCommands(): void {
 }
 
 /**
+ * The installed plugins' panels, once main has started the plugins (TYTO-49, ADR 0045).
+ *
+ * Not awaited by `load`: the window opens while the plugins start, and a panel arrives as
+ * a command — closed, until somebody opens it — when they have. Its toggle is labelled with
+ * the plugin's own title, since the catalogue has no word for a panel it did not ship.
+ */
+async function loadPluginPanels(bridge: TytoBridge): Promise<void> {
+  servePanelBridge(window, document, {
+    request: (panelId, capability, args) =>
+      bridge['panel:request']({ panelId, capability, args: [...args] }),
+  });
+  document.addEventListener('plugin-panel-load', () => {
+    announceDocument(document, contentOf(active()));
+  });
+
+  const { panels } = await bridge['plugins:panels']({});
+  for (const panel of panels) {
+    offeredPanels.set(panel.id, panel);
+    registry.register({
+      id: togglePanelCommandId(panel.id),
+      label: panel.title,
+      run: () => {
+        const current = panelOf(layout, panel.id);
+        if (current === undefined) return;
+        void changeLayout(withPanelOpen(layout, panel.id, !current.open));
+      },
+    });
+  }
+  layout = withPluginPanels(layout, panels);
+  await applyLayout(false);
+}
+
+/**
  * `Mod-1`…`Mod-9`, registered once and never again.
  *
  * Nine commands for a window that usually has two tabs, and that is deliberate: the id is
@@ -1412,6 +1456,11 @@ async function applyLayout(persist: boolean): Promise<void> {
     },
   });
 
+  // A plugin panel's element exists once the dock has made it; what it shows is ours to say.
+  for (const panel of document.querySelectorAll(PLUGIN_PANEL_ELEMENT)) {
+    if (panel instanceof PluginPanel) panel.offered = offeredPanels.get(panel.panelId);
+  }
+
   elements = resolveElements();
   pane = previewElements();
   wirePreviewControls(window.tyto === undefined);
@@ -1500,7 +1549,11 @@ async function request(bridge: TytoBridge, documentId: string, brief: string): P
   if (!gate.accept(answer.requestId)) return;
   // The editor shows the active document, so only its answers reach the gutter. A tab
   // compiled in the background is published when it is compiled again in front.
-  if (documentId === workspace.activeId) analysis.publish({ ...answer, brief });
+  if (documentId === workspace.activeId) {
+    analysis.publish({ ...answer, brief });
+    // The plugins' panels hear the document on the same pause the preview compiles on.
+    announceDocument(document, brief);
+  }
 
   const errors = errorCount(answer.diagnostics);
 
@@ -1847,6 +1900,7 @@ async function load(): Promise<void> {
   // Arranged **before** anything is looked up: there are no panels in the document until
   // the dock has made them, so every `getElementById` before this line would answer null.
   await applyLayout(false);
+  if (bridge !== undefined) void loadPluginPanels(bridge);
   wireCommandBarShortcut();
   wireSplitters(document, () => layout, {
     locale: state.locale,

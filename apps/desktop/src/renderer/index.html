@@ -15,10 +15,14 @@
       preview shows carries its faces as `@font-face { src: url("data:font/woff2;...") }` —
       deliberately, because embedding them is what makes a render deterministic. Without this
       the frame would draw in a fallback face and look like a bug in the template.
+
+      `frame-src 'self' tyto-plugin:` is TYTO-49's: a plugin's panel is a page main serves on
+      that scheme, into an iframe sandboxed to `allow-scripts` alone (ADR 0045). Nothing else
+      may be framed.
     -->
     <meta
       http-equiv="Content-Security-Policy"
-      content="default-src 'self'; img-src 'self' data:; font-src 'self' data:; style-src 'self' 'unsafe-inline'; connect-src 'none'; object-src 'none'; base-uri 'none'"
+      content="default-src 'self'; img-src 'self' data:; font-src 'self' data:; style-src 'self' 'unsafe-inline'; connect-src 'none'; frame-src 'self' tyto-plugin:; object-src 'none'; base-uri 'none'"
     />
     <!-- Painted from the catalogue on load; the literal is only what shows before scripts run. -->
     <title>Tyto</title>

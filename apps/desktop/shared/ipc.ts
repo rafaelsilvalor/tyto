@@ -688,6 +688,50 @@ export const IPC_CHANNELS = {
   ),
 
   /**
+   * The installed plugins' panels (TYTO-49, ADR 0045), answered once the plugins have started.
+   *
+   * `src` is a `tyto-plugin:` URL main serves out of that plugin's folder; the renderer puts
+   * it in an iframe whose sandbox is `allow-scripts` alone. `id` is the layout's key for it,
+   * prefixed `plugin:` so it cannot collide with a built-in panel.
+   */
+  'plugins:panels': channel(
+    z.object({}),
+    z.object({
+      panels: z
+        .array(
+          z.object({
+            id: z.string().min(1).max(300),
+            plugin: z.string().min(1),
+            title: z.string().min(1).max(200),
+            location: z.enum(['left', 'right', 'bottom']).optional(),
+            src: z.string().startsWith('tyto-plugin://'),
+          }),
+        )
+        .max(100),
+    }),
+  ),
+
+  /**
+   * What a plugin's panel asked of the host through its bridge, relayed by the renderer.
+   *
+   * Checked in main against that plugin's permissions — `net:<host>` for `fetch`,
+   * `credentials:<key>` for `credentials` (ADR 0042) — and answered as data: a refusal is
+   * `{ ok: false, code: 'E_PERMISSION' }`, never a rejection, so the renderer relays one
+   * shape back to the page.
+   */
+  'panel:request': channel(
+    z.object({
+      panelId: z.string().min(1).max(300),
+      capability: z.enum(['fetch', 'credentials']),
+      args: z.array(z.unknown()).max(2),
+    }),
+    z.union([
+      z.object({ ok: z.literal(true), value: z.unknown() }),
+      z.object({ ok: z.literal(false), code: z.string(), message: z.string() }),
+    ]),
+  ),
+
+  /**
    * The local queue panel (TYTO-45): the queue folder, whether auto-run is on, and every task
    * in `inbox/` and `done/` with how it stands.
    *

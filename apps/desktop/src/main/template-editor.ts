@@ -5,6 +5,7 @@ import { parseBrief } from '@tyto/brief-lang';
 import {
   type Diagnostic,
   type Diagnostics,
+  type DirectiveResolver,
   type FaceCache,
   type TemplateManifest,
   type TemplateRegistry,
@@ -129,6 +130,11 @@ export interface TemplateEditorService {
 
 export interface TemplateEditorOptions {
   readonly sources: ProjectSources;
+  /**
+   * The installed plugins' directives, so a sample brief using `::demo/shout` resolves here
+   * the way it does in the brief's own preview (TYTO-49). Absent, it is `E_UNKNOWN_DIRECTIVE`.
+   */
+  readonly directives?: DirectiveResolver;
   /** Injected for the tests; the app's own is the bundled faces. */
   readonly faces?: FaceCache;
 }
@@ -248,6 +254,7 @@ export function createTemplateEditor(options: TemplateEditorOptions): TemplateEd
         registry: registryOf(manifest.value, directory),
         assets: fileAssetResolver({ base: briefBase }),
         ...(rendered === undefined ? {} : { renderedSlots: rendered }),
+        ...(options.directives === undefined ? {} : { directives: options.directives }),
       });
       const briefProblems = [
         ...ast.diagnostics,

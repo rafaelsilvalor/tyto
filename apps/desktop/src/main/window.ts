@@ -2,6 +2,8 @@ import { join } from 'node:path';
 
 import { BrowserWindow, shell } from 'electron';
 
+import { frameNavigationAllowed } from './plugin-protocol.js';
+
 /**
  * The window, and the three flags that make the renderer a browser rather than a shell.
  *
@@ -45,6 +47,9 @@ export function createMainWindow(options: WindowOptions): BrowserWindow {
       preload: options.preload,
       contextIsolation: true,
       nodeIntegration: false,
+      // Written out although it is the default: a plugin's panel is a subframe, and this is
+      // the switch that would hand it the preload and `window.tyto` (ADR 0045).
+      nodeIntegrationInSubFrames: false,
       sandbox: true,
       // The renderer has no business reading `file://` URLs it was not served, and the
       // editor's own assets come through the bundler.
@@ -55,6 +60,14 @@ export function createMainWindow(options: WindowOptions): BrowserWindow {
   // A link to the outside opens in the user's browser, never in the app. A window that
   // navigated away from the bundle would keep this preload and this `contextIsolation`
   // while showing somebody else's page, which is the one navigation that must not happen.
+  // A plugin's panel may navigate only within its own plugin's pages. The sandbox already
+  // takes `window.top` away from it; this is its own frame, which it could otherwise send to
+  // any site on the internet (ADR 0045).
+  window.webContents.on('will-frame-navigate', (details) => {
+    if (details.isMainFrame) return;
+    if (!frameNavigationAllowed(details.frame?.url ?? '', details.url)) details.preventDefault();
+  });
+
   window.webContents.setWindowOpenHandler(({ url }) => {
     void shell.openExternal(url);
     return { action: 'deny' };

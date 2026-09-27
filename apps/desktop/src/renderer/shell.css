@@ -169,6 +169,12 @@ body {
 .dock--bottom {
   flex: 0 0 auto;
   min-height: 0;
+  /*
+   * Side by side, not stacked (TYTO-49). The bottom dock is one short strip — the problems
+   * panel's 140px — and two panels stacked in it left each a line of height; a plugin panel
+   * that asked for the bottom is the first thing that ever shared it.
+   */
+  flex-direction: row;
 }
 
 /*
@@ -1350,4 +1356,22 @@ tyto-plugins-dialog[open] {
 
 .queue__message {
   overflow-wrap: anywhere;
+}
+
+/*
+ * A plugin's panel (TYTO-49): its page fills the panel under the bar. White behind it, since
+ * the page is somebody else's and may assume a background it does not paint.
+ */
+.plugin-panel__frame {
+  flex: 1;
+  min-height: 0;
+  width: 100%;
+  border: 0;
+  background: #fff;
+}
+
+/* A plugin whose panel reads the open brief says so on its own row (ADR 0045). */
+.plugins__disclosure {
+  margin: 4px 0 0;
+  color: var(--muted, #555);
 }
