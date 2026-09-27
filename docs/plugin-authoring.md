@@ -128,7 +128,9 @@ Installed meu-pack 0.1.0.
 ```
 
 Without `--yes`, `install` asks `Install it? [y/N]` at a terminal and refuses when there is no
-terminal to ask. It **copies** the folder into `~/.tyto/plugins/meu-pack/` (or `$TYTO_HOME`), so
+terminal to ask. A link inside the folder (a symbolic link, or a junction on Windows) is copied
+as what it points to when that is inside the folder too; one that leads out, or nowhere, is
+refused with `E_PLUGIN_LINK`, naming it, and nothing is installed. It **copies** the folder into `~/.tyto/plugins/meu-pack/` (or `$TYTO_HOME`), so
 an edit to your folder reaches Tyto only when you install again. Installing a name that is
 already installed replaces it, and that is how an update lands.
 
@@ -171,9 +173,11 @@ Enabled meu-pack.
 `tyto plugin remove meu-pack` deletes the installed copy and what was approved for it. It prints
 `Removed meu-pack.`.
 
-**The desktop app does not show installed templates yet.** Its template picker reads the
-built-in pack and a folder you choose, and installed packs reach it in the second TYTO-50 pull
-request. Until then this guide's render is the CLI's.
+**The desktop app lists installed templates too**, in the same order: a chosen templates
+folder, then the built-in pack, then installed packs. Its plugins start after the window opens,
+so an installed template joins the Template picker a moment after the built-in ones, and a brief
+already open that names it is previewed again when it does. A skipped plugin is a row in the
+problems panel. The app reads what is installed when it starts, so restart it after an install.
 
 ## Share it
 
@@ -248,6 +252,7 @@ the desktop's plugins screen says so on that plugin's row (ADR 0045).
 | `E_PLUGIN_ACTIVATE … exports no activate` | `dist/index.js` is missing or has no `activate` export       |
 | `E_PLUGIN_PACK_DIRECTORY`                 | `directory` is absolute, leaves the plugin, or is missing    |
 | `E_PLUGIN_PACK_CODE`                      | a template in the pack is not markup                         |
+| `E_PLUGIN_LINK`                           | at install: a link in the folder leads out of it, or nowhere |
 | `E_PLUGIN_DUPLICATE`                      | another plugin already registered that contribution id       |
 | `W_TEMPLATE_SHADOWED`                     | the project or the built-in pack has a template of that name |
 

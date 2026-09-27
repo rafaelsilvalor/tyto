@@ -45,9 +45,10 @@ plugin is kept out of every task's host as well. Its exporter or directive is no
 because a warning that says a plugin was skipped would be false if the same plugin then drew the
 frames.
 
-The check reads the disk, so it lives in `apps/cli/src/plugins/installed-packs.ts` and not in
-`@tyto/plugin-api`, which is pure (ADR 0010). The desktop applies the same rule in the second
-TYTO-50 pull request, which wires installed packs into its template sources and picker.
+The check reads the disk, so it lives in `packages/io/src/installed-packs.ts` and not in
+`@tyto/plugin-api`, which is pure (ADR 0010). The CLI and the desktop both call it, so the rule
+has one text. (It lived in `apps/cli` until the second TYTO-50 pull request wired installed
+packs into the desktop's template sources and picker; the decision is unchanged.)
 
 ## Consequences
 

@@ -57,6 +57,12 @@ export {
   PLUGINS_DIR,
   fsPluginStore,
 } from './fs-plugin-store.js';
+export {
+  type InstalledPacks,
+  NO_INSTALLED_PACKS,
+  installedPacks,
+  withoutRefused,
+} from './installed-packs.js';
 
 export { type NodeFileSystemOptions, nodeFileSystem } from './node-file-system.js';
 
