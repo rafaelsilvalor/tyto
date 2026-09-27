@@ -7,7 +7,7 @@
  * | ------ | --------------------------------------------- | ------------------------------- |
  * | header | the owl                                       | `header()` — `_estrategia-saude` |
  * | middle | the cover (first slide only), then the table  | `cover()`, `pillTable(sessionTable)` |
- * | footer | the handle and the arrow                      | `footer()` — `_estrategia-saude` |
+ * | footer | the handle, and the arrow unless last slide   | `footer()` — `_estrategia-saude` |
  *
  * The middle is centred between the header and the footer, whatever the brief put in it.
  *
@@ -19,7 +19,7 @@
 import { frame, solid } from '@tyto/core/template';
 import { type Block, at, pillTable, stack } from '@tyto/template-kit';
 
-import { cover, footer, header } from '../_estrategia-saude/parts.js';
+import { cover, footer, hasNextSlide, header } from '../_estrategia-saude/parts.js';
 import { sessionTable } from '../_estrategia-saude/presets.js';
 import { BAND, EDGE, GAP, MARGIN, PAPER, TYPE } from '../_estrategia-saude/tokens.js';
 
@@ -29,7 +29,7 @@ export const build: TemplateBuild = (context: TemplateContext) => {
   const width = context.size.w - MARGIN * 2;
 
   const owl = header();
-  const sign = footer(width);
+  const sign = footer(width, { next: hasNextSlide(context.artwork) });
 
   const sessions = pillTable(sessionTable, {
     text: richTextOf(context, 'slide') ?? [],

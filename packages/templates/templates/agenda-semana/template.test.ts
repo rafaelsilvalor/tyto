@@ -213,7 +213,10 @@ describe('the sessions', () => {
 });
 
 describe('the marks the template holds the geometry of', () => {
-  const frame = build(contextOf({ slide: rich('Pediatria\n27/09 | Febre | Dra. Lúcia') }));
+  // The first of two slides, so the arrow is drawn: the last slide has none.
+  const frame = build(
+    contextOf({ slide: rich('Pediatria\n27/09 | Febre | Dra. Lúcia'), index: 0, count: 2 }),
+  );
 
   it.each([
     ['owl', OWL],
@@ -275,6 +278,18 @@ describe('the frame itself', () => {
       expect(words(named(frame.children, 'handle')[0]), `slide ${index}`).toBe('@estrategia.saude');
       expect(named(frame.children, 'owl'), `slide ${index}`).toHaveLength(1);
     }
+  });
+
+  it('points on to the next slide from every slide but the last', () => {
+    const arrows = [0, 1, 2].map(
+      (index) => named(build(contextOf({ slide, index, count: 3 })).children, 'arrow').length,
+    );
+
+    expect(arrows).toEqual([1, 1, 0]);
+  });
+
+  it('draws no arrow on a carousel of one slide, which is its own last', () => {
+    expect(named(build(contextOf({ slide, index: 0, count: 1 })).children, 'arrow')).toEqual([]);
   });
 });
 
