@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
-import { createExitGuard } from './quit.js';
+import { type ExitGuard, type ExitGuardOptions, createExitGuard } from './quit.js';
 
 /**
  * What this suite is for, and what it deliberately cannot reach.
@@ -16,10 +16,20 @@ afterEach(() => {
   vi.useRealTimers();
 });
 
+/**
+ * A guard whose page has already said it is listening — the state every quit after startup is
+ * in, and the one the tests written before ADR 0039 describe.
+ */
+const listeningGuard = (options: ExitGuardOptions): ExitGuard => {
+  const guard = createExitGuard(options);
+  guard.listening();
+  return guard;
+};
+
 describe('createExitGuard', () => {
   it('prevents the exit and asks the window, exactly once', () => {
     const send = vi.fn(() => true);
-    const guard = createExitGuard({ send });
+    const guard = listeningGuard({ send });
     const resume = vi.fn();
 
     expect(guard.mayExit(resume)).toBe(false);
@@ -30,7 +40,7 @@ describe('createExitGuard', () => {
 
   it('does not ask a second time while an answer is outstanding', () => {
     const send = vi.fn(() => true);
-    const guard = createExitGuard({ send });
+    const guard = listeningGuard({ send });
 
     expect(guard.mayExit(vi.fn())).toBe(false);
     // The X button fires `close` and then, through `window-all-closed`, `before-quit`. Two
@@ -42,7 +52,7 @@ describe('createExitGuard', () => {
 
   it('resumes the exit on a yes, and never asks again', () => {
     const send = vi.fn(() => true);
-    const guard = createExitGuard({ send });
+    const guard = listeningGuard({ send });
     const resume = vi.fn();
 
     guard.mayExit(resume);
@@ -57,7 +67,7 @@ describe('createExitGuard', () => {
 
   it('leaves the app running on a no, and asks again on the next attempt', () => {
     const send = vi.fn(() => true);
-    const guard = createExitGuard({ send });
+    const guard = listeningGuard({ send });
     const resume = vi.fn();
 
     guard.mayExit(resume);
@@ -72,7 +82,7 @@ describe('createExitGuard', () => {
   });
 
   it('ignores an answer to a question that is no longer outstanding', () => {
-    const guard = createExitGuard({ send: () => true });
+    const guard = listeningGuard({ send: () => true });
     const resume = vi.fn();
 
     guard.mayExit(vi.fn());
@@ -88,7 +98,7 @@ describe('createExitGuard', () => {
 
   it('lets the exit through when there is no window to ask', () => {
     const send = vi.fn(() => false);
-    const guard = createExitGuard({ send });
+    const guard = listeningGuard({ send });
 
     // A renderer that is already gone cannot report a loss. An app that cannot be closed is
     // worse than the one it would have reported.
@@ -100,7 +110,7 @@ describe('createExitGuard', () => {
 
   it('drops the question when nothing acknowledged, and does not quit on its way past', () => {
     vi.useFakeTimers();
-    const guard = createExitGuard({ send: () => true, ackTimeoutMs: 2000 });
+    const guard = listeningGuard({ send: () => true, ackTimeoutMs: 2000 });
     const resume = vi.fn();
 
     guard.mayExit(resume);
@@ -118,7 +128,7 @@ describe('createExitGuard', () => {
   it('asks again on the next attempt after a question was dropped', () => {
     vi.useFakeTimers();
     const send = vi.fn(() => true);
-    const guard = createExitGuard({ send, ackTimeoutMs: 2000 });
+    const guard = listeningGuard({ send, ackTimeoutMs: 2000 });
 
     guard.mayExit(vi.fn());
     vi.advanceTimersByTime(2000);
@@ -137,7 +147,7 @@ describe('createExitGuard', () => {
     // default drifts back to a guess on a green suite, which is how two seconds got there.
     vi.useFakeTimers();
     const send = vi.fn(() => true);
-    const guard = createExitGuard({ send });
+    const guard = listeningGuard({ send });
 
     guard.mayExit(vi.fn());
 
@@ -152,7 +162,7 @@ describe('createExitGuard', () => {
 
   it('does not fire the timeout after an answer has already arrived', () => {
     vi.useFakeTimers();
-    const guard = createExitGuard({ send: () => true, ackTimeoutMs: 2000 });
+    const guard = listeningGuard({ send: () => true, ackTimeoutMs: 2000 });
     const resume = vi.fn();
 
     guard.mayExit(resume);
@@ -165,7 +175,7 @@ describe('createExitGuard', () => {
 
   it('does not quit later because of a timer left over from a refusal', () => {
     vi.useFakeTimers();
-    const guard = createExitGuard({ send: () => true, ackTimeoutMs: 2000 });
+    const guard = listeningGuard({ send: () => true, ackTimeoutMs: 2000 });
     const resume = vi.fn();
 
     guard.mayExit(resume);
@@ -189,7 +199,7 @@ describe('createExitGuard', () => {
 describe('the deadline is over the acknowledgement, not over the person', () => {
   it('waits with no deadline at all once the window has acknowledged', () => {
     vi.useFakeTimers();
-    const guard = createExitGuard({ send: () => true, ackTimeoutMs: 2000 });
+    const guard = listeningGuard({ send: () => true, ackTimeoutMs: 2000 });
     const resume = vi.fn();
 
     guard.mayExit(resume);
@@ -207,7 +217,7 @@ describe('the deadline is over the acknowledgement, not over the person', () => 
   it('ignores an acknowledgement for a question that is not the outstanding one', () => {
     vi.useFakeTimers();
     const send = vi.fn(() => true);
-    const guard = createExitGuard({ send, ackTimeoutMs: 2000 });
+    const guard = listeningGuard({ send, ackTimeoutMs: 2000 });
     const resume = vi.fn();
 
     guard.mayExit(resume);
@@ -226,7 +236,7 @@ describe('the deadline is over the acknowledgement, not over the person', () => 
   it('keeps the question alive past the deadline once the right window acknowledged', () => {
     vi.useFakeTimers();
     const send = vi.fn(() => true);
-    const guard = createExitGuard({ send, ackTimeoutMs: 2000 });
+    const guard = listeningGuard({ send, ackTimeoutMs: 2000 });
 
     guard.mayExit(vi.fn());
     // The contrast that gives the case above its force: the *outstanding* id disarms the clock,
@@ -241,7 +251,7 @@ describe('the deadline is over the acknowledgement, not over the person', () => 
 
   it('releases the exit when a window that acknowledged then dies', () => {
     vi.useFakeTimers();
-    const guard = createExitGuard({ send: () => true, ackTimeoutMs: 2000 });
+    const guard = listeningGuard({ send: () => true, ackTimeoutMs: 2000 });
     const resume = vi.fn();
 
     guard.mayExit(resume);
@@ -259,14 +269,57 @@ describe('the deadline is over the acknowledgement, not over the person', () => 
 
   it('does not latch when the window goes with no question outstanding', () => {
     const send = vi.fn(() => true);
-    const guard = createExitGuard({ send });
+    const guard = listeningGuard({ send });
 
     // Every ordinary quit reaches `closed` too, after `release` already cleared the question.
     // A `windowGone` that set the latch directly instead of delegating to `release` would make
     // the next quit skip the question entirely — TYTO-123's bug, restored, with a green suite.
     guard.windowGone();
+    // The page that replaces it registers its listener, as every page does first (ADR 0039).
+    guard.listening();
 
     expect(guard.mayExit(vi.fn())).toBe(false);
     expect(send).toHaveBeenCalledTimes(1);
+  });
+});
+
+/**
+ * A push into a page with no listener is lost, and a lost push is an app that does not quit
+ * (TYTO-44, ADR 0039). Measured on CI: the quit arrived 303 ms after launch, the page was still
+ * loading, no acknowledgement ever came, and the app stayed open until the job was killed.
+ */
+describe('a page that cannot hear the question yet', () => {
+  it('is not asked, and the exit goes through', () => {
+    const send = vi.fn(() => true);
+    const guard = createExitGuard({ send });
+
+    expect(guard.mayExit(vi.fn())).toBe(true);
+    expect(send).not.toHaveBeenCalled();
+    // Latched like any other "nobody to ask", so the second hook of the same click agrees.
+    expect(guard.mayExit(vi.fn())).toBe(true);
+  });
+
+  it('is asked once it has said it is listening', () => {
+    const send = vi.fn(() => true);
+    const guard = createExitGuard({ send });
+
+    guard.listening();
+
+    expect(guard.mayExit(vi.fn())).toBe(false);
+    expect(send).toHaveBeenCalledWith(0);
+  });
+
+  it('stops being heard when the page goes, so a reload has to say so again', () => {
+    // A reload is a main-frame navigation, which `index.ts` wires to `windowGone`. The page
+    // that follows has not registered yet, and a push sent into it would be lost exactly like
+    // the first one: the flag belongs to the page, not to the window.
+    const send = vi.fn(() => true);
+    const guard = createExitGuard({ send });
+    guard.listening();
+
+    guard.windowGone();
+
+    expect(guard.mayExit(vi.fn())).toBe(true);
+    expect(send).not.toHaveBeenCalled();
   });
 });
