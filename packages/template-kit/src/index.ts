@@ -6,19 +6,21 @@
  * `@tyto/core/template` supplies the six node builders; this package supplies the layer
  * above them, which the SDK deliberately does not — arrangement.
  *
- * ## The three layers, and where each one lives
+ * ## The four layers, and where each one lives
  *
- * `docs/template-conventions.md` is the long form. In short:
+ * `docs/template-conventions.md` is the long form, ADR 0047 the decision. In short:
  *
- * 1. **Tokens** — colours, type scale, spacing, flat geometry. Exported constants with no
- *    logic. **They do not live here**, because they belong to a brand rather than to a
- *    mechanism: a palette shared by two Estratégia templates is a module beside those
- *    templates, and a kit that shipped one would be deciding somebody else's brand.
- * 2. **Parts** — functions returning a `NodeDraft`: a pill, a row of a listing. Also not
- *    here, for the same reason, and shared between templates by import.
- * 3. **Arrangement** — {@link stack}, {@link row}, {@link inset}, {@link at}. This is the
- *    only layer that is the same whatever is being drawn, so it is the only one this
- *    package owns.
+ * 1. **Configurable components and arrangement — here.** {@link stack}, {@link row},
+ *    {@link inset}, {@link at}; {@link pillTable}; {@link mark}, {@link textBlock}; the
+ *    brief-row readers. Everything here is the same whatever brand draws it: a component
+ *    takes every colour, face and size as configuration.
+ * 2. **Brand tokens** — colours, type scale, spacing, flat geometry. **Not here**, because
+ *    they belong to a brand rather than to a mechanism, and a kit that shipped one would be
+ *    deciding somebody else's brand. They live in `packages/templates/templates/_<brand>/`.
+ * 3. **Brand presets and parts** — a component's configuration in one brand's look (the
+ *    Saúde session table), and pieces only that brand draws (its owl header). Beside the
+ *    tokens, shared between that brand's templates by import.
+ * 4. **The template** — composition only: which presets, in what order, where.
  *
  * ## Why this is a package and not a folder in the template pack
  *
@@ -45,3 +47,40 @@ export {
   sized,
   stack,
 } from './blocks.js';
+
+export { type Mark, mark } from './mark.js';
+
+export { type BandedPageOptions, bandedPage } from './page.js';
+
+export {
+  type TitleBlockContent,
+  type TitleBlockStyle,
+  type TitleImagePart,
+  type TitlePart,
+  type TitleRulePart,
+  type TitleTextPart,
+  titleBlock,
+} from './title-block.js';
+
+export {
+  type Measure,
+  type TextBlockOptions,
+  type TextStyle,
+  atLeastOne,
+  grownTextBlock,
+  naturalWidth,
+  textBlock,
+} from './text.js';
+
+export { FIELD_SEPARATOR, type RowGroup, fields, lines, plain, rowGroups } from './rows.js';
+
+export {
+  type CellShape,
+  type LabelColumn,
+  type LinesColumn,
+  type PillTableColumn,
+  type PillTableContent,
+  type PillTableStyle,
+  type Rewrite,
+  pillTable,
+} from './pill-table.js';
