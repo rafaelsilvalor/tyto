@@ -43,6 +43,10 @@ non-zero.
 | `E_PLUGIN_PERMISSIONS_CHANGED` | error | yes | An installed plugin now asks for permissions nobody approved when it was installed. |
 | `E_PLUGIN_STATE` | error | yes | The file recording which plugins were installed and approved cannot be read. |
 | `E_PLUGIN_EXPORTER_KIND` | error | yes | A plugin registered a rasterized exporter declaring a kind no rasterizer encodes. |
+| `E_PLUGIN_CRASHED` | error | no | An isolated plugin's process stopped while the host was waiting for it. |
+| `E_PLUGIN_PROTOCOL` | error | no | An isolated plugin sent the host a message that does not match the RPC protocol. |
+| `E_PLUGIN_CALL` | error | no | A function an isolated plugin registered threw when the host called it. |
+| `W_PLUGIN_CRASHED` | warning | no | An installed plugin's process crashed on an earlier run. History, not a refusal. |
 | `E_PLUGIN_FETCH` | error | yes | A plugin could not be copied or fetched from where tyto plugin install was told. |
 | `E_SCENE_SHAPE` | error | yes | A scene does not match the IR schema. |
 | `E_SCENE_DUPLICATE_ID` | error | yes | The same id is used more than once in one scene. |
@@ -119,6 +123,9 @@ incomplete brief, and a crossed box where a picture the exporter could not load 
 | `E_PLUGIN_PERMISSIONS_CHANGED` | yes | A plugin that did not load contributed no slot to skip. |
 | `E_PLUGIN_STATE` | yes | A plugin that did not load contributed no slot to skip. |
 | `E_PLUGIN_EXPORTER_KIND` | yes | A plugin that did not load contributed no slot to skip. |
+| `E_PLUGIN_CRASHED` | no | One frame was waiting on the process; the frames other exporters draw survive (ADR 0025). |
+| `E_PLUGIN_PROTOCOL` | no | It costs the one frame whose answer it was; the others are drawn (ADR 0025). |
+| `E_PLUGIN_CALL` | no | It costs the one frame the call was for; the others are drawn (ADR 0025). |
 | `E_PLUGIN_FETCH` | yes | A plugin that did not load contributed no slot to skip. |
 | `E_SCENE_SHAPE` | yes | The IR is malformed, so the exporter has nothing it can draw. |
 | `E_SCENE_DUPLICATE_ID` | yes | The IR is malformed, so the exporter has nothing it can draw. |
@@ -525,6 +532,48 @@ Plugin '{plugin}' registers exporter '{exporter}' as rasterized for '{kind}', an
 
 Parameters: `plugin`, `exporter`, `kind`, `encodable`
 
+### `E_PLUGIN_CRASHED`
+
+**Severity:** error · **Fatal:** no · **Spec:** `docs/plugin-api.md`
+
+An isolated plugin's process stopped while the host was waiting for it.
+
+One frame was waiting on the process; the frames other exporters draw survive (ADR 0025).
+
+```
+Plugin '{plugin}' stopped running: {reason}.
+```
+
+Parameters: `plugin`, `reason`
+
+### `E_PLUGIN_PROTOCOL`
+
+**Severity:** error · **Fatal:** no · **Spec:** `docs/plugin-api.md`
+
+An isolated plugin sent the host a message that does not match the RPC protocol.
+
+It costs the one frame whose answer it was; the others are drawn (ADR 0025).
+
+```
+Plugin '{plugin}' sent a message the host cannot read: {problem}.
+```
+
+Parameters: `plugin`, `problem`
+
+### `E_PLUGIN_CALL`
+
+**Severity:** error · **Fatal:** no · **Spec:** `docs/plugin-api.md`
+
+A function an isolated plugin registered threw when the host called it.
+
+It costs the one frame the call was for; the others are drawn (ADR 0025).
+
+```
+Plugin '{plugin}' threw while the host was calling it: {problem}.
+```
+
+Parameters: `plugin`, `problem`
+
 ### `E_PLUGIN_FETCH`
 
 **Severity:** error · **Fatal:** yes · **Spec:** `docs/plugin-api.md`
@@ -876,6 +925,20 @@ Could not write '{artifact}': {problem}.
 Parameters: `artifact`, `problem`
 
 ## Warnings
+
+### `W_PLUGIN_CRASHED`
+
+**Severity:** warning · **Fatal:** no · **Spec:** `docs/plugin-api.md`
+
+An installed plugin's process crashed on an earlier run. History, not a refusal.
+
+A note about an earlier run; nothing in this one is missing because of it.
+
+```
+Plugin '{plugin}' crashed at {at}: {reason}. It is still activated; installing or enabling it again clears this.
+```
+
+Parameters: `plugin`, `at`, `reason`
 
 ### `W_EXPORT_APPROXIMATED`
 

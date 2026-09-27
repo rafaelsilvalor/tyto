@@ -12,8 +12,13 @@ import { z } from 'zod';
  * not installed**, and an entry whose plugin now asks for more than it was granted is not
  * activated until it is installed again.
  *
- * Until TYTO-48 the permissions recorded here are shown and remembered, **not enforced**:
- * a plugin's code runs in the same process as Tyto's, with Tyto's reach (ADR 0040).
+ * The permissions recorded here are shown and remembered, **not enforced** yet: a plugin
+ * runs in a worker thread of its own, and that thread is not a sandbox (ADR 0041).
+ *
+ * **A key this version does not know is dropped, not refused** (ADR 0041). The CLI and the
+ * desktop are versioned separately and share this file, so the older of the two must still
+ * read what the newer wrote; a strict schema here would make one new field cost the older
+ * app every installed plugin. What it drops, it does not write back either.
  */
 
 export interface PluginStateEntry {
@@ -31,10 +36,10 @@ export interface PluginState {
 
 export const EMPTY_PLUGIN_STATE: PluginState = { plugins: {} };
 
-const pluginStateSchema = z.strictObject({
+const pluginStateSchema = z.object({
   plugins: z.record(
     z.string().regex(/^[a-z0-9][a-z0-9-]*$/, 'must be a plugin name'),
-    z.strictObject({
+    z.object({
       enabled: z.boolean(),
       permissions: z.array(z.string().min(1)),
       source: z.string().min(1),

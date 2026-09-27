@@ -164,7 +164,7 @@ export const ptBR: Catalogue = {
   'command.plugins.show': 'Mostrar plugins',
   'plugins.heading': 'Plugins do Tyto',
   'plugins.notice':
-    'As permissões ficam registradas quando um plugin é instalado e ainda não são aplicadas: um plugin roda com o mesmo acesso a este computador que o próprio Tyto.',
+    'As permissões ficam registradas quando um plugin é instalado e ainda não são aplicadas. A linha de comando tyto roda cada plugin numa thread própria, que impede um travamento de derrubar o Tyto mas não é uma caixa de areia: um plugin tem o mesmo acesso a este computador que o próprio Tyto.',
   'plugins.inactive':
     'Esta janela ainda não executa plugins instalados. A linha de comando tyto executa.',
   'plugins.folder': 'Os plugins instalados ficam em',

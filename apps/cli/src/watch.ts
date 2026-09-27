@@ -84,6 +84,7 @@ export async function watchCommand(
     if (skipped.length > 0) environment.console.err(formatDiagnostics(skipped));
     environment.console.err(`error: ${unavailable}
 `);
+    await plugins.close();
     return EXIT_DIAGNOSTICS;
   }
 
@@ -170,6 +171,8 @@ export async function watchCommand(
     }
   } finally {
     await rasterizer?.close?.();
+    // Every plugin's worker thread, and any crash still being written to plugins.json.
+    await plugins.close();
   }
 
   return failed ? EXIT_DIAGNOSTICS : EXIT_OK;

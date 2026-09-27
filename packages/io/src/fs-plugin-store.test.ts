@@ -2,7 +2,12 @@ import { mkdir, mkdtemp, readFile, readdir, rm, writeFile } from 'node:fs/promis
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
-import { EMPTY_PLUGIN_STATE, withPluginEntry } from '@tyto/plugin-api';
+import {
+  EMPTY_PLUGIN_CRASHES,
+  EMPTY_PLUGIN_STATE,
+  withPluginCrash,
+  withPluginEntry,
+} from '@tyto/plugin-api';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
 import { fsPluginStore } from './fs-plugin-store.js';
@@ -93,5 +98,21 @@ describe('fsPluginStore', () => {
     const state = await fsPluginStore(home).readState();
 
     expect(!state.ok && state.error[0]?.code).toBe('E_PLUGIN_STATE');
+  });
+
+  it('keeps crash history in a file of its own, beside the state and apart from it', async () => {
+    const store = fsPluginStore(home);
+    expect(await store.readCrashes()).toEqual({
+      ok: true,
+      value: EMPTY_PLUGIN_CRASHES,
+      diagnostics: [],
+    });
+
+    const crash = { at: '2026-09-27T12:00:00.000Z', reason: 'its thread exited with code 7' };
+    await store.writeCrashes(withPluginCrash(EMPTY_PLUGIN_CRASHES, 'pdf', crash));
+
+    expect((await readdir(home)).sort()).toEqual(['crashes.json']);
+    const read = await store.readCrashes();
+    expect(read.ok && read.value.crashes).toEqual({ pdf: crash });
   });
 });
