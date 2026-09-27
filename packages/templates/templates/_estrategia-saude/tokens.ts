@@ -1,9 +1,11 @@
 /**
- * Layer 1 of `docs/template-conventions.md`: values, no logic.
+ * Estratégia Saúde's tokens: values, no logic.
  *
- * Everything here is a constant a designer changes without reading the rest of the
- * template. Colours, the type scale, the two marks' geometry, and the margins the
- * composition measures from.
+ * Everything here is a constant a designer changes without reading the rest of a template.
+ * Colours, the type scale, the slide's frame, the chrome's sizes and the two marks' geometry.
+ * Shared by every Saúde template through `presets.ts` and `parts.ts`, which is why it sits
+ * beside them in `_estrategia-saude/` rather than inside one template (ADR 0039). The folder
+ * has no `manifest.yaml`, so the template registry skips it.
  *
  * ## Geometry in, colour out
  *
@@ -20,6 +22,7 @@
 import { systemFont } from '@tyto/core/template';
 
 import type { FontRef } from '@tyto/core';
+import type { Mark } from '@tyto/template-kit';
 
 /* ------------------------------------------------------------------------- colour -- */
 
@@ -71,6 +74,11 @@ export const TYPE = {
   professor: 22,
   date: 26,
   handle: 26,
+  // The approved list's two, provisional until checked against a published slide: the rank
+  // is set as the date is, and the name one step up from a session title, being its row's
+  // only line.
+  rank: 26,
+  name: 26,
 } as const;
 
 /* ------------------------------------------------------------------------- spacing -- */
@@ -108,20 +116,42 @@ export const GAP = {
 /** Corner radius shared by both pills: half their height, so their ends are round. */
 export const RADIUS = 43;
 
-/* ------------------------------------------------------------------------ geometry -- */
+/** The rows of a pill table (`presets.ts`): the badge, the grey pill's padding and lines. */
+export const TABLE = {
+  /** The blue badge on the left of a row — a date or a rank. Its height is the row minimum. */
+  badge: { w: 220, h: 86 },
+  /** Room between the grey pill's edge and the words inside it. */
+  padding: { vertical: 12, left: 32, right: 32 },
+  /** Between two stacked lines inside the grey pill. */
+  lineGap: 4,
+  /** A line's height when its words fit on one line — the published single-line row. */
+  line: { title: 30, professor: 28, name: 30 },
+  /** A group heading's box — a discipline's name. Taller than its letters. */
+  heading: 78,
+} as const;
 
-/** A mark: the box its `d` was drawn in, and the `d` itself. No colour (see above). */
-export interface Mark {
-  readonly box: { readonly w: number; readonly h: number };
-  readonly d: string;
-  /**
-   * `evenodd` when the shape has holes punched by inner subpaths.
-   *
-   * Winding order would do it under `nonzero`, but a hole that depends on the direction a
-   * subpath happens to run is a hole that closes the first time somebody redraws it.
-   */
-  readonly fillRule: 'nonzero' | 'evenodd';
-}
+/** The chrome every slide carries: the owl on top, the handle and the arrow at the foot. */
+export const CHROME = {
+  /** How tall the owl is drawn. */
+  owl: 64,
+  /** How tall the footer arrow is drawn. */
+  arrow: 26,
+  /** The handle is tracked out, so the signature reads quieter than the agenda above it. */
+  handleTracking: 4,
+} as const;
+
+/** The block on a carousel's first slide: an optional illustration over the cover words. */
+export const COVER = {
+  /** The cover words' box, as a multiple of their size: one line and its leading. */
+  boxRatio: 1.3,
+  lineHeight: 1.05,
+  /** The illustration's square side. */
+  illustration: 180,
+  /** Between the illustration and the words under it. */
+  illustrationGap: 16,
+} as const;
+
+/* ------------------------------------------------------------------------ geometry -- */
 
 /**
  * The owl, from the brand file `Corujas/SVG/White.svg` (supplied 2026-09-23).

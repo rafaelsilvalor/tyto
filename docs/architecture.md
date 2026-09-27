@@ -30,6 +30,7 @@ packages/
   export-svg     Scene → SVG (SceneVisitor)
   raster         Rasterizer port + chromium adapter (Electron offscreen or Playwright)
   templates      built-in templates (template-pack plugin)
+  template-kit   what a TypeScript template composes with: arrangement and configurable components (pillTable)
   fonts          the faces Tyto ships, and the reader that hands them to the exporters and to measurement
   pipeline       Job: brief → artworks×formats → artifacts; local queue, cancellation, progress
   plugin-api     extension-point types, PluginHost, plugin manifest, permissions
@@ -41,7 +42,7 @@ apps/
   desktop        electron-vite: main (pipeline, plugins, credentials) / preload / renderer (editor, preview, panels)
 ```
 
-Runtime boundary — **pure** (no Node/DOM): core, brief-lang, template-lang, export-*, templates, plugin-api (types). **Node**: raster, pipeline, io, fonts, sources, cli. **DOM**: editor, desktop/renderer.
+Runtime boundary — **pure** (no Node/DOM): core, brief-lang, template-lang, export-*, templates, template-kit, plugin-api (types). **Node**: raster, pipeline, io, fonts, sources, cli. **DOM**: editor, desktop/renderer.
 
 Path to the cloud: same pure code; `raster` swaps to Playwright in a container, `io` swaps to HTTP + bucket, `pipeline` runs as a worker consuming a queue. No pure package changes.
 

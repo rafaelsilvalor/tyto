@@ -1,13 +1,10 @@
 /**
- * Reading one slot as a small table.
+ * Reading one slot as a small table: one line is one row, `|` separates its fields, and a
+ * line with no `|` can start a group.
  *
  * A manifest may declare **at most one** repeatable slot, and its occurrences become
- * artworks (`packages/core/src/template/manifest.ts`). This carousel spends that repeat on
- * the slide, as the published one is cut (TYTO-173), which leaves the disciplines on a slide
- * and the sessions under each with nothing to repeat with — and both have to vary.
- *
- * So the occurrence carries both. A line with no `|` starts a discipline, and every line
- * under it is one session written as `date | title | professor`:
+ * artworks (`packages/core/src/template/manifest.ts`). A carousel that spends that repeat on
+ * the slide has nothing left to repeat rows with, so the occurrence carries them as lines:
  *
  * ```
  * ::slide
@@ -24,12 +21,51 @@
  * **This is the cost of doing repetition in the template rather than in the language.** It
  * works, it needs no card, and it asks the brief's author to learn a separator. TYTO-163 is
  * the version where the language repeats and nobody learns one.
+ *
+ * Moved here from `agenda-semana` by TYTO-185, because nothing in it knows what the rows
+ * mean: the agenda's sessions and an approved list's `rank | name` are read the same way.
  */
 
 import type { Inline, RichText } from '@tyto/core';
 
-/** What separates a session's three fields on one line. */
+/** What separates the fields of one row. */
 export const FIELD_SEPARATOR = '|';
+
+/** A heading and the rows written under it. */
+export interface RowGroup {
+  /** The heading line, or empty for rows written before any heading. */
+  readonly heading: RichText;
+  /** Each row as its fields, already split and trimmed. */
+  readonly rows: readonly (readonly RichText[])[];
+}
+
+/**
+ * A slot's lines as groups of rows.
+ *
+ * With `grouped`, a line with no separator starts a group and every line with one is a row
+ * of the group above it; rows written before any heading belong to a group with an empty
+ * heading, which is drawn rather than dropped — a brief being written has that slide even
+ * if the published artwork never does. Without `grouped`, every line is a row of one group
+ * with no heading, separator or not.
+ *
+ * `fieldCount` caps the split, so the last field keeps any further separators.
+ */
+export function rowGroups(text: RichText, fieldCount: number, grouped: boolean): RowGroup[] {
+  const result: { heading: RichText; rows: RichText[][] }[] = [];
+
+  for (const line of lines(text)) {
+    // The heading test reads the uncapped split, so a one-field table still tells a
+    // heading from a row by the separator rather than by the cap.
+    if (grouped && fields(line).length === 1) {
+      result.push({ heading: line, rows: [] });
+      continue;
+    }
+    if (result.length === 0) result.push({ heading: [], rows: [] });
+    result[result.length - 1]!.rows.push(fields(line, fieldCount));
+  }
+
+  return result;
+}
 
 /**
  * The lines of a rich-text value, in order, with the breaks removed.

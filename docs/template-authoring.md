@@ -491,10 +491,11 @@ Same nodes, same output. Use it when you need computation (text auto-fit, dynami
 
 **`docs/template-conventions.md` is how to organise one.** It settles the parts this section
 leaves open: how the YAML manifest reaches the module — it is not imported, and the sketch
-above is the shape a _test_ uses — where tokens and reusable parts live, and what
-arrangement a template composes with (`@tyto/template-kit`). Read it before writing a
-second template, because the conventions are what make the second one cheaper than the
-first.
+above is the shape a _test_ uses — where a brand's tokens, presets and parts live
+(`templates/_<brand>/`), and what a template composes with: `@tyto/template-kit`'s
+arrangement and configurable components such as `pillTable` (ADR 0039). Read it before
+writing a template, because the conventions are what make the next one cheaper than the
+last.
 
 `defineTemplate(manifest, build)` pairs a manifest with the function `compile` calls **once
 per (artwork, format)**. It does nothing else — no registration, no lifecycle, no state. A

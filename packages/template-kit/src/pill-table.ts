@@ -1,0 +1,309 @@
+import { group, rect, solid } from '@tyto/core/template';
+
+import { type Block, at, block, stack } from './blocks.js';
+import { type RowGroup, rowGroups } from './rows.js';
+import { type Measure, type TextStyle, grownTextBlock, textBlock } from './text.js';
+
+import type { RichText } from '@tyto/core';
+import type { NodeDraft, TextOptions } from '@tyto/core/template';
+
+/**
+ * A table whose rows are read from one slot and whose cells can be pills.
+ *
+ * The first configurable component (TYTO-185, ADR 0039). One structure — one line of the
+ * brief is one row, `|` separates its cells, an optional line with no `|` heads a group —
+ * drawn by a {@link PillTableStyle} that says everything about the look: the Saúde agenda's
+ * sessions (`date | title | professor`, a blue pill laid over a grey one), the Saúde approved
+ * list (`rank | name`), or a plain table with no shapes at all.
+ *
+ * **The style holds no brand.** Colours, faces and sizes arrive in it; a preset beside the
+ * templates of one brand is where they are chosen (`packages/templates/templates/_<brand>/`).
+ */
+
+/** A pill behind a cell. Absent on a column means the cell draws its words alone. */
+export interface CellShape {
+  readonly fill: string;
+  readonly radius: number;
+}
+
+/**
+ * A column that holds one field in a box as tall as the row, like a date or a rank badge.
+ *
+ * The words are laid out in the whole cell, so `valign: 'middle'` centres them on the row
+ * whatever its height — which is how a badge stays centred beside a cell that grew.
+ */
+export interface LabelColumn {
+  readonly kind: 'label';
+  /** The cell's group. */
+  readonly name: string;
+  readonly width: number;
+  readonly shape?: CellShape;
+  readonly text: {
+    /** The text node's name. */
+    readonly name: string;
+    readonly style: TextStyle;
+    readonly align?: TextOptions['align'];
+    readonly valign?: TextOptions['valign'];
+  };
+}
+
+/**
+ * A column that holds one or more fields stacked, each as tall as its words.
+ *
+ * The agenda's grey pill is one: the session title over the professor. Each line grows with
+ * measured text and never drops below its `minHeight`, and the cell grows with its lines.
+ */
+export interface LinesColumn {
+  readonly kind: 'lines';
+  readonly name: string;
+  /** `fill` takes whatever the fixed columns leave. At most one column should fill. */
+  readonly width: number | 'fill';
+  readonly shape?: CellShape;
+  readonly lines: readonly {
+    readonly name: string;
+    readonly style: TextStyle;
+    readonly minHeight: number;
+  }[];
+  readonly lineGap: number;
+  /** Room between the cell's edge and its lines. */
+  readonly padding: { readonly vertical: number; readonly left: number; readonly right: number };
+}
+
+export type PillTableColumn = LabelColumn | LinesColumn;
+
+export interface PillTableStyle {
+  readonly columns: readonly PillTableColumn[];
+  /**
+   * `side-by-side`: each cell sits in its own slot, `columnGap` apart.
+   *
+   * `overlap`: each cell's shape runs from the row's left edge to its own right edge, and
+   * earlier cells are painted over later ones. With two columns that is the agenda's row — a
+   * grey pill the width of the row with a blue pill laid over its left end, reading as one
+   * shape with no gap and no second rounded edge between them. The cells' words still start
+   * where the cell starts.
+   */
+  readonly layering: 'side-by-side' | 'overlap';
+  /** Space between cells; used by `side-by-side` only. */
+  readonly columnGap?: number;
+  readonly rowGap: number;
+  /** A row is never shorter than this, however short its words. */
+  readonly minRowHeight: number;
+  /**
+   * With `groups`, a line with no `|` heads the rows under it; without, every line is a row.
+   */
+  readonly groups?: {
+    readonly heading: {
+      readonly name: string;
+      readonly height: number;
+      readonly style: TextStyle;
+      readonly align?: TextOptions['align'];
+      readonly overflow?: TextOptions['overflow'];
+    };
+    /** Between a heading and its first row. */
+    readonly headingGap: number;
+    /** Between one group's last row and the next group's heading. */
+    readonly gap: number;
+  };
+  /** The groups the table draws, so a scene reads back in the preset's words. */
+  readonly names: {
+    readonly table: string;
+    /** A heading and its rows; used with `groups` only. */
+    readonly group?: string;
+    /** A group's rows under its heading; used with `groups` only. */
+    readonly rows?: string;
+    readonly row: string;
+  };
+}
+
+export interface PillTableContent {
+  /** The slot's value: one line per row. */
+  readonly text: RichText;
+  readonly width: number;
+  readonly measure: Measure;
+}
+
+/** A column resolved against the table's width: where it starts and how wide it is. */
+interface Placed {
+  readonly column: PillTableColumn;
+  readonly x: number;
+  readonly width: number;
+}
+
+/** The table, drawn. As wide as `width`, as tall as its rows and headings. */
+export function pillTable(style: PillTableStyle, content: PillTableContent): Block {
+  const placed = placeColumns(style, content.width);
+  const fieldCount = style.columns.reduce((sum, column) => sum + fieldsOf(column), 0);
+  const groups = rowGroups(content.text, fieldCount, style.groups !== undefined);
+
+  const drawRows = (rows: RowGroup['rows']) =>
+    stack({
+      ...(style.names.rows === undefined ? {} : { name: style.names.rows }),
+      gap: style.rowGap,
+      items: rows.map((fields) => drawRow(style, placed, fields, content)),
+    });
+
+  const grouping = style.groups;
+  if (grouping === undefined) {
+    return stack({
+      name: style.names.table,
+      gap: style.rowGap,
+      items: groups
+        .flatMap((each) => each.rows)
+        .map((fields) => drawRow(style, placed, fields, content)),
+    });
+  }
+
+  return stack({
+    name: style.names.table,
+    gap: grouping.gap,
+    items: groups.map((each) => {
+      const heading = textBlock(
+        each.heading,
+        { w: content.width, h: grouping.heading.height },
+        grouping.heading.style,
+        {
+          name: grouping.heading.name,
+          ...(grouping.heading.align === undefined ? {} : { align: grouping.heading.align }),
+          ...(grouping.heading.overflow === undefined
+            ? {}
+            : { overflow: grouping.heading.overflow }),
+        },
+      );
+      return stack({
+        ...(style.names.group === undefined ? {} : { name: style.names.group }),
+        gap: grouping.headingGap,
+        items: [heading, drawRows(each.rows)],
+      });
+    }),
+  });
+}
+
+function fieldsOf(column: PillTableColumn): number {
+  return column.kind === 'label' ? 1 : column.lines.length;
+}
+
+function placeColumns(style: PillTableStyle, width: number): Placed[] {
+  const gap = style.layering === 'side-by-side' ? (style.columnGap ?? 0) : 0;
+  const fixed = style.columns.reduce(
+    (sum, column) => sum + (column.width === 'fill' ? 0 : column.width),
+    0,
+  );
+  const fill = width - fixed - gap * Math.max(0, style.columns.length - 1);
+
+  let x = 0;
+  return style.columns.map((column) => {
+    const columnWidth = column.width === 'fill' ? fill : column.width;
+    const result = { column, x, width: columnWidth };
+    x += columnWidth + gap;
+    return result;
+  });
+}
+
+/** One row: every cell as tall as the tallest one needs, and never below the minimum. */
+function drawRow(
+  style: PillTableStyle,
+  placed: readonly Placed[],
+  fields: readonly RichText[],
+  content: PillTableContent,
+): Block {
+  // Each column takes its fields in order; a field the brief did not write is empty.
+  let next = 0;
+  const cells = placed.map((each) => {
+    const count = fieldsOf(each.column);
+    const own = Array.from({ length: count }, (_, index) => fields[next + index] ?? []);
+    next += count;
+    return { ...each, fields: own };
+  });
+
+  const stacks = cells.map((cell) =>
+    cell.column.kind === 'lines'
+      ? linesOf(cell.column, cell.width, cell.fields, content.measure)
+      : undefined,
+  );
+
+  const height = cells.reduce((tallest, cell, index) => {
+    const lines = stacks[index];
+    if (lines === undefined || cell.column.kind !== 'lines') return tallest;
+    return Math.max(tallest, lines.height + cell.column.padding.vertical * 2);
+  }, style.minRowHeight);
+
+  const drawn = cells.map((cell, index) =>
+    drawCell(style, cell, cell.fields, stacks[index], height),
+  );
+
+  return block(
+    content.width,
+    height,
+    group({
+      name: style.names.row,
+      // Painted in order, so under `overlap` the earlier cells go last and cover the
+      // rounded left ends of the later ones.
+      children: style.layering === 'overlap' ? drawn.reverse() : drawn,
+    }),
+  );
+}
+
+/** A lines column's words, stacked, before the row's height is known. */
+function linesOf(
+  column: LinesColumn,
+  width: number,
+  fields: readonly RichText[],
+  measure: Measure,
+): Block {
+  const inner = width - column.padding.left - column.padding.right;
+  return stack({
+    gap: column.lineGap,
+    items: column.lines.map((line, index) =>
+      grownTextBlock(fields[index] ?? [], inner, line.minHeight, line.style, measure, {
+        name: line.name,
+      }),
+    ),
+  });
+}
+
+function drawCell(
+  style: PillTableStyle,
+  cell: Placed,
+  fields: readonly RichText[],
+  lines: Block | undefined,
+  height: number,
+): NodeDraft {
+  const overlap = style.layering === 'overlap';
+  // Under `overlap` the cell's group sits at the row's left edge and its shape reaches from
+  // there to the cell's right edge; the words are offset to where the cell starts.
+  const origin = overlap ? 0 : cell.x;
+  const start = overlap ? cell.x : 0;
+  const shapeWidth = overlap ? cell.x + cell.width : cell.width;
+
+  const children: NodeDraft[] = [];
+  if (cell.column.shape !== undefined) {
+    children.push(
+      rect({
+        size: { w: shapeWidth, h: height },
+        radius: cell.column.shape.radius,
+        fill: solid(cell.column.shape.fill),
+      }),
+    );
+  }
+
+  if (cell.column.kind === 'label') {
+    const words = textBlock(fields[0] ?? [], { w: cell.width, h: height }, cell.column.text.style, {
+      name: cell.column.text.name,
+      ...(cell.column.text.align === undefined ? {} : { align: cell.column.text.align }),
+      ...(cell.column.text.valign === undefined ? {} : { valign: cell.column.text.valign }),
+    });
+    children.push(shift(words.draft, start, 0));
+  } else if (lines !== undefined) {
+    children.push(
+      shift(lines.draft, start + cell.column.padding.left, (height - lines.height) / 2),
+    );
+  }
+
+  return shift(group({ name: cell.column.name, children }), origin, 0);
+}
+
+/** A draft moved by an offset, added to the coordinate it already carries. */
+function shift(draft: NodeDraft, dx: number, dy: number): NodeDraft {
+  if (dx === 0 && dy === 0) return draft;
+  return at(dx, dy, block(0, 0, draft));
+}
