@@ -8,7 +8,7 @@
  *
  * ## The four layers, and where each one lives
  *
- * `docs/template-conventions.md` is the long form, ADR 0039 the decision. In short:
+ * `docs/template-conventions.md` is the long form, ADR 0047 the decision. In short:
  *
  * 1. **Configurable components and arrangement — here.** {@link stack}, {@link row},
  *    {@link inset}, {@link at}; {@link pillTable}; {@link mark}, {@link textBlock}; the

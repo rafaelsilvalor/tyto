@@ -10,7 +10,7 @@ import type { NodeDraft, TextOptions } from '@tyto/core/template';
 /**
  * A table whose rows are read from one slot and whose cells can be pills.
  *
- * The first configurable component (TYTO-185, ADR 0039). One structure — one line of the
+ * The first configurable component (TYTO-185, ADR 0047). One structure — one line of the
  * brief is one row, `|` separates its cells, an optional line with no `|` heads a group —
  * drawn by a {@link PillTableStyle} that says everything about the look: the Saúde agenda's
  * sessions (`date | title | professor`, a blue pill laid over a grey one), the Saúde approved

@@ -10,7 +10,7 @@ import type { TextOptions } from '@tyto/core/template';
  * A title block: a column of optional pieces, each centred on the block — a picture, lines of
  * words, a rule.
  *
- * The second configurable component (TYTO-185, ADR 0039). The Saúde agenda's cover is a
+ * The second configurable component (TYTO-185, ADR 0047). The Saúde agenda's cover is a
  * picture over the cover words; the Saúde approved list's is an emblem, a kicker, a subtitle,
  * a rule and the exam's name. Both are one {@link TitleBlockStyle} each.
  *

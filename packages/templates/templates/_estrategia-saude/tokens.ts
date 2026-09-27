@@ -4,7 +4,7 @@
  * Everything here is a constant a designer changes without reading the rest of a template.
  * Colours, the type scale, the slide's frame, the chrome's sizes and the two marks' geometry.
  * Shared by every Saúde template through `presets.ts` and `parts.ts`, which is why it sits
- * beside them in `_estrategia-saude/` rather than inside one template (ADR 0039). The folder
+ * beside them in `_estrategia-saude/` rather than inside one template (ADR 0047). The folder
  * has no `manifest.yaml`, so the template registry skips it.
  *
  * ## Geometry in, colour out

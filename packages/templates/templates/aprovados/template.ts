@@ -11,7 +11,7 @@
  * | footer | the handle; no arrow, since no slide follows           | `footer()` — `_estrategia-saude` |
  *
  * The second Saúde template (TYTO-185), and the first written after the four layers of
- * ADR 0039: it draws nothing of its own. Every piece is the brand's or the kit's, and every
+ * ADR 0047: it draws nothing of its own. Every piece is the brand's or the kit's, and every
  * number the brand's tokens.
  */
 

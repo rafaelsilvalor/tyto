@@ -12,7 +12,7 @@ yours, and without a convention each template invents its own and shares nothing
 ## The folder
 
 ```
-_estrategia-saude/  a brand: no manifest, so the registry skips it (ADR 0039)
+_estrategia-saude/  a brand: no manifest, so the registry skips it (ADR 0047)
   tokens.ts         colours, type scale, spacing, marks — the brand's spec sheet
   presets.ts        the kit's components in this brand's look
   parts.ts          pieces only this brand draws (its header, its footer)
@@ -63,7 +63,7 @@ manifest and a build together by hand.
 
 ## The four layers
 
-Keep them apart. The boundary is what makes work travel. ADR 0039 is the decision; the
+Keep them apart. The boundary is what makes work travel. ADR 0047 is the decision; the
 three-layer version this replaces kept tokens and parts inside the template, and nothing in
 them could be reused without copying.
 
@@ -218,7 +218,7 @@ different look from the same preset spreads it and overrides the field
 (`{ ...sessionTable, rowGap: 8 }`).
 
 **A component is extracted when the maintainer names the templates that will use it**, which
-is what ADR 0039 put in place of "on the second consumer". A part nobody has named a second
+is what ADR 0047 put in place of "on the second consumer". A part nobody has named a second
 use for stays in its template. What stops the kit from becoming a second language is the same
 discipline in the other direction: a component takes what its named consumers need, and an
 option no consumer uses is not added.
@@ -270,7 +270,7 @@ that turns "no runs" into "no node" while keeping the block's stated size, so a 
 professor leaves the row exactly as tall as its neighbours.
 
 **What changed before the second template.** TYTO-185 moved the agenda onto the four layers
-(ADR 0039): the rows became `pillTable` with the Saúde `sessionTable` preset, the tokens and
+(ADR 0047): the rows became `pillTable` with the Saúde `sessionTable` preset, the tokens and
 parts moved to `_estrategia-saude/`, and the rendered pixels did not change. The "every number
 is in `tokens.ts`" above was not true at the time — about fifteen sizes were literals inside
 `parts.ts` — which is why the rule is now a lint rather than a sentence. The wrong-`size` clip

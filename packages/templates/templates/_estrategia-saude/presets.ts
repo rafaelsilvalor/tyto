@@ -1,5 +1,5 @@
 /**
- * Estratégia Saúde's configurations of the kit's components (ADR 0039).
+ * Estratégia Saúde's configurations of the kit's components (ADR 0047).
  *
  * A preset is a component in this brand's look: which columns, which pills, which colours.
  * It holds no number of its own — every size is a token — so changing the look of every

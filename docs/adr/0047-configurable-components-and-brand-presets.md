@@ -1,4 +1,4 @@
-# 0039 — A component is configured, a brand is a preset, and a template only composes
+# 0047 — A component is configured, a brand is a preset, and a template only composes
 
 Status: accepted · 2026-09-27 · TYTO-185 · amends `docs/template-conventions.md`, leaves ADR 0022 alone
 

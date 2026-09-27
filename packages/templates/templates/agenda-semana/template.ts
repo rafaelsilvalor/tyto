@@ -11,7 +11,7 @@
  *
  * `bandedPage` centres the middle between the header and the footer, whatever the brief put
  * in it. Composition only: every piece comes from the Saúde brand module or from
- * `@tyto/template-kit`, and every number from the brand's tokens (ADR 0039,
+ * `@tyto/template-kit`, and every number from the brand's tokens (ADR 0047,
  * `docs/template-conventions.md`).
  */
 

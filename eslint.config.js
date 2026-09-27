@@ -293,7 +293,7 @@ export default tseslint.config(
 
   {
     /**
-     * A template's numbers live in its brand's `tokens.ts` (ADR 0039). Parts and the
+     * A template's numbers live in its brand's `tokens.ts` (ADR 0047). Parts and the
      * composition may halve, double and centre; any other literal there is a size somebody
      * will have to hunt for, so it is refused where it is written.
      */

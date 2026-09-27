@@ -493,7 +493,7 @@ Same nodes, same output. Use it when you need computation (text auto-fit, dynami
 leaves open: how the YAML manifest reaches the module — it is not imported, and the sketch
 above is the shape a _test_ uses — where a brand's tokens, presets and parts live
 (`templates/_<brand>/`), and what a template composes with: `@tyto/template-kit`'s
-arrangement and configurable components such as `pillTable` (ADR 0039). Read it before
+arrangement and configurable components such as `pillTable` (ADR 0047). Read it before
 writing a template, because the conventions are what make the next one cheaper than the
 last.
 
