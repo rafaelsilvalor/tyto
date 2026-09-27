@@ -103,7 +103,13 @@ beforeAll(async () => {
     env: { ...process.env, TYTO_HEADLESS: '1' },
   });
   page = await app.firstWindow();
-  await page.waitForFunction(() => (globalThis as Record<string, unknown>)['tyto'] !== undefined);
+  // The editor and not the bridge (TYTO-175, TYTO-154's rule). `window.tyto` is put on the page
+  // by the preload, before a line of the renderer has run, so waiting for it answered _is the
+  // preload there_ and then handed a half-loaded window to `afterAll`, which quits it. That
+  // quit reaching a page with no listener is a product question and ADR 0039 settled it; this
+  // wait is what keeps the suite from asking it by accident. Measured on CI with the renderer
+  // slowed by 2.5 s between the exit listener and the editor mount: see the PR for TYTO-175.
+  await page.waitForSelector('#editor .cm-content');
 });
 
 afterAll(async () => {
