@@ -58,6 +58,13 @@ adjustments:
 
 Slot names are chosen by the template author and may be in Portuguese — they are the vocabulary the brief writer sees. Keys of the manifest itself are English.
 
+**Before naming a slot, read `docs/slot-vocabulary.md`.** It reserves six names — `titulo`,
+`subtitulo`, `chamada`, `imagem`, `lamina`, `tom` — with the role and type each carries, and
+says when a domain name is the better choice. The example above predates it: it still spells
+the look-variant `cor` and the repeatable slot `slide`, and
+`packages/core/src/template/manifest.test.ts` parses it verbatim, so it changes with the
+built-in renames rather than ahead of them.
+
 `templateManifestSchema` in `packages/core/src/template/manifest.ts` is the schema, and
 `parseManifest(source, path)` is the only way in. It reports every problem in one pass,
 each carrying the YAML path of the offending key and the range of the value under it.
