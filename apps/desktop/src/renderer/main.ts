@@ -1,4 +1,10 @@
-import { type CommandRegistry, type EditorHandle, createEditor } from '@tyto/editor';
+import {
+  type CommandRegistry,
+  type EditorHandle,
+  briefCompletion,
+  briefLint,
+  createEditor,
+} from '@tyto/editor';
 
 import { type IpcResponse, type TytoBridge } from '../../shared/ipc.js';
 import {
@@ -20,6 +26,7 @@ import {
 import { type CommandEntry, type CommandBar, COMMAND_BAR_TAG } from './command-bar.js';
 import { type ExportDialog, type ExportProgressView, EXPORT_DIALOG_TAG } from './export-dialog.js';
 import { type PluginsDialog, PLUGINS_DIALOG_TAG } from './plugins-dialog.js';
+import { previewAnalysis } from './brief-analysis.js';
 import { type QueuePanel, QUEUE_PANEL_TAG } from './queue-panel.js';
 import type { TemplateMode } from './template-mode.js';
 import { TEMPLATE_MODE_TAG } from './template-mode-tag.js';
@@ -128,6 +135,14 @@ declare global {
  * milliseconds — the delay is about not doing it mid-word, not about cost.
  */
 const PREVIEW_DELAY = 200;
+
+/**
+ * The gutter's and the completion list's analysis, answered by the preview (TYTO-49).
+ *
+ * `brief-analysis.ts` says why there is no second analyzer. The template names come from
+ * the picker's list, which is the same registry the preview resolves against.
+ */
+const analysis = previewAnalysis(() => state.templates);
 
 const state = {
   locale: DEFAULT_LOCALE as Locale,
@@ -1483,6 +1498,9 @@ async function request(bridge: TytoBridge, documentId: string, brief: string): P
   const requestId = gate.next();
   const answer = await bridge['brief:preview']({ requestId, documentId, brief });
   if (!gate.accept(answer.requestId)) return;
+  // The editor shows the active document, so only its answers reach the gutter. A tab
+  // compiled in the background is published when it is compiled again in front.
+  if (documentId === workspace.activeId) analysis.publish({ ...answer, brief });
 
   const errors = errorCount(answer.diagnostics);
 
@@ -1899,6 +1917,10 @@ async function load(): Promise<void> {
       // The search panel's words, which are the catalogue's even though the panel is
       // CodeMirror's. `applyLocale` is what keeps them current afterwards.
       searchPhrases: searchPhrasesFor(state.locale),
+      // Slots, adjustments, enum values and plugin directives after `::`, and the
+      // underline, both fed from the preview's answer. No delay of the linter's own: the
+      // preview's debounce is the pause, and a second one would only add to it.
+      extensions: [briefLint(analysis.analyzer, { delay: 0 }), briefCompletion()],
     });
     // Narrowed once, because `editor` is a module-level `let` and TypeScript widens it
     // again inside every callback below.

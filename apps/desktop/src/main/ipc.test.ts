@@ -43,6 +43,7 @@ const preview = () => ({
           : [{ artwork: 'a1', format: 'feed', width: 1080, height: 1080, html: '<!doctype html>' }],
       artworks: brief.trim() === '' ? [] : [{ id: 'a1', index: 0, range: { start: 4, end: 9 } }],
       diagnostics: [],
+      completion: { directives: ['demo/shout'] },
     });
   },
 });

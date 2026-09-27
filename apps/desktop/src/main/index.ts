@@ -32,6 +32,7 @@ import { activateBuiltIns, builtInTemplatesDirectory } from './plugins.js';
 import { utilityProcessLauncher } from './plugin-process.js';
 import { offerPreviousVersion } from './previous-version.js';
 import { createQueueService } from './queue.js';
+import { windowDirectives } from './directives.js';
 import { createPreviewService } from './preview.js';
 import { createProjectSources } from './project.js';
 import { createTemplateEditor } from './template-editor.js';
@@ -313,15 +314,6 @@ async function start(): Promise<void> {
     },
   });
 
-  // Built before the window, for the same reason the registry is: the preview's first
-  // answer should not wait on a folder read that could have happened during startup. It
-  // reads the same pack the host registered, through the same resolver.
-  //
-  // It is told no folder here. Which folder a compile resolves against is a property of the
-  // tab the brief is in, and `ipc.ts` looks it up per request from the id that came with
-  // it (E9.11) — a service holding one folder assumed one open document.
-  const preview = await createPreviewService({ fileSystem, sources });
-
   // The picker's list, read once alongside the other two. Its own read rather than the
   // preview service's registry: compiling a brief and listing what is installed are two
   // reasons for one object to change, and `src/main/templates.ts` says why that matters.
@@ -365,6 +357,20 @@ async function start(): Promise<void> {
   });
   app.on('will-quit', () => {
     void plugins.then((loaded) => loaded.close());
+  });
+
+  // Built before the window, for the same reason the registry is: the preview's first
+  // answer should not wait on a folder read that could have happened during startup. It
+  // reads the same pack the host registered, through the same resolver, and the installed
+  // plugins' directives once they have started (TYTO-49).
+  //
+  // It is told no folder here. Which folder a compile resolves against is a property of the
+  // tab the brief is in, and `ipc.ts` looks it up per request from the id that came with
+  // it (E9.11) — a service holding one folder assumed one open document.
+  const preview = await createPreviewService({
+    fileSystem,
+    sources,
+    directives: windowDirectives(plugins),
   });
 
   const exports_ = await createExportService({
