@@ -1,6 +1,10 @@
 /**
  * Pieces only Estratégia Saúde draws: the owl header and the signed footer.
  *
+ * **One position for every Saúde template** — the agenda's (the maintainer, 2026-09-27). The
+ * approved list's reference set the owl and the handle a few pixels elsewhere; they are drawn
+ * where the agenda draws them, so the chrome does not move between two slides of one feed.
+ *
  * Each answers with a `Block` — a draft plus the width and height the IR cannot supply — so
  * that a template places it without restating a number. Every number is a token; a table is
  * not here, nor a title block: those are the kit's components in `presets.ts`'s looks.
