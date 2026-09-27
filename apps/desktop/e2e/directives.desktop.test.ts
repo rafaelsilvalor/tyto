@@ -230,7 +230,10 @@ describe('with the demo plugin installed', () => {
           (node) => node.textContent === 'rodape',
         ),
       undefined,
-      { timeout: 5_000 },
+      // A fixed interval, never Playwright's default `requestAnimationFrame` polling: this
+      // window is headless, its frames are throttled, and rAF polling added 900 ms of its
+      // own to this number (1,149 ms against 246 ms for the same keystroke).
+      { timeout: 5_000, polling: 25 },
     );
     const elapsed = Date.now() - typed;
     // Reported rather than bounded hard: the pause is the preview's 200 ms debounce plus one
