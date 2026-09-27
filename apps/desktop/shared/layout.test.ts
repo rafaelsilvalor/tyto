@@ -8,6 +8,7 @@ import {
   ELASTIC_DOCK,
   PREVIEW_PANEL,
   PROBLEMS_PANEL,
+  QUEUE_PANEL,
   clampSize,
   dockIsOpen,
   layoutFrom,
@@ -135,11 +136,33 @@ describe('reading what was on the disk', () => {
     const layout = layoutFrom({
       panels: [
         ...DEFAULT_LAYOUT.panels,
-        { id: 'queue', element: 'tyto-queue', dock: 'left', open: true, size: 200, fixed: false },
+        // `logs` and not `queue`, which this test used until TYTO-45 made the queue a panel
+        // this build does have.
+        { id: 'logs', element: 'tyto-logs', dock: 'left', open: true, size: 200, fixed: false },
       ],
     });
 
-    expect(panelOf(layout, 'queue')).toBeUndefined();
+    expect(panelOf(layout, 'logs')).toBeUndefined();
+  });
+
+  it('adds the queue, closed, to a layout saved before the queue existed', () => {
+    // TYTO-45. Every `layout.json` on a machine today was written by a build with three
+    // panels. It must still parse, and it must not open a column nobody asked for.
+    const beforeTheQueue = {
+      panels: DEFAULT_LAYOUT.panels
+        .filter((panel) => panel.id !== QUEUE_PANEL)
+        .map((panel) => ({ ...panel, size: panel.size + 3 })),
+    };
+
+    const layout = layoutFrom(beforeTheQueue);
+
+    expect(panelOf(layout, QUEUE_PANEL)).toMatchObject({
+      element: 'tyto-queue-panel',
+      dock: 'left',
+      open: false,
+    });
+    // And what the file did say is kept: the other three are where they were left.
+    expect(panelOf(layout, PROBLEMS_PANEL)?.size).toBe(143);
   });
 
   it('takes the element name from this build and never from the file', () => {

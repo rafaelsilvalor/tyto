@@ -97,6 +97,12 @@ const documents = () => {
         document: { path: '/briefs/promo.brief', name: 'promo.brief', text: '::a' },
         documentId,
       }),
+    openPath: (documentId: string, path: string, label?: string) =>
+      Promise.resolve({
+        document: { path, name: label ?? 'brief.brief', text: '::t' },
+        documentId,
+      }),
+    retarget: () => undefined,
     reopen: (documentId: string, path: string) =>
       Promise.resolve(
         path === '/briefs/promo.brief'
@@ -149,6 +155,15 @@ const exportService = () => {
             diagnostics: [],
           }
         : undefined,
+    run: () =>
+      Promise.resolve({
+        status: 'finished' as const,
+        directory: '/out',
+        total: 0,
+        done: 0,
+        failed: 0,
+        diagnostics: [],
+      }),
     cancel: (exportId: string) => {
       cancelled.push(exportId);
     },
@@ -156,6 +171,70 @@ const exportService = () => {
 };
 
 /** The native picker and the file manager, which main owns because Electron owns them. */
+/** The local queue, as the handlers see it: one pending task and one that failed (TYTO-45). */
+const queueDependency = () => {
+  const ran: string[] = [];
+  const remembered: unknown[] = [];
+  const folders: (string | null)[] = [];
+  let autoRun = false;
+  let folder: string | null = '/fila';
+  const service = {
+    view: () =>
+      Promise.resolve({
+        folder,
+        inbox: folder === null ? null : `${folder}/inbox`,
+        autoRun,
+        tasks: [
+          { id: 'tarefa-1', status: 'pending' as const, diagnostics: [], hasOutput: false },
+          {
+            id: 'tarefa-2',
+            status: 'error' as const,
+            diagnostics: [
+              {
+                severity: 'error' as const,
+                code: 'E_UNKNOWN_TEMPLATE',
+                message: 'no template',
+                range: { start: 0, end: 4 },
+              },
+            ],
+            failure: 'boom',
+            hasOutput: true,
+          },
+        ],
+      }),
+    setFolder: (next: string | null) => {
+      folder = next;
+      folders.push(next);
+      return Promise.resolve();
+    },
+    setAutoRun: (on: boolean) => {
+      autoRun = on;
+    },
+    run: (id: string) => {
+      ran.push(id);
+      return Promise.resolve();
+    },
+    briefPath: (id: string) => (id === 'tarefa-2' ? '/fila/inbox/tarefa-2/brief.brief' : undefined),
+    outDirectory: (id: string) => (id === 'tarefa-2' ? '/fila/outbox/tarefa-2/out' : undefined),
+    close: () => undefined,
+  };
+  let picked: string | undefined = '/escolhida';
+  return {
+    ran,
+    remembered,
+    folders,
+    dismissPicker: () => {
+      picked = undefined;
+    },
+    service,
+    chooseFolder: () => Promise.resolve(picked),
+    remember: (changes: unknown) => {
+      remembered.push(changes);
+      return Promise.resolve();
+    },
+  };
+};
+
 const folderDialogs = () => {
   const revealed: string[] = [];
   return {
@@ -311,6 +390,7 @@ const dependencies = () => ({
   info: () => ({ version: '0.1.0', platform: 'linux', locale: 'pt-BR', templates: ['promo'] }),
   preview: preview(),
   project: projectFolder(),
+  queue: queueDependency(),
   templates: catalogue(),
   templateEditor: templateEditor(),
   templateDialogs: templateDialogs(),
@@ -627,6 +707,105 @@ describe('plugins:list', () => {
     ]);
     // What main sends must satisfy the contract the preload validates it against.
     expect(IPC_CHANNELS['plugins:list'].response.safeParse(answer).success).toBe(true);
+  });
+});
+
+describe('the local queue (TYTO-45)', () => {
+  it('answers the view in the shape the preload validates', async () => {
+    const handlers = createHandlers(dependencies());
+
+    const answer = await handlers['queue:list']({});
+
+    expect(answer.tasks.map((task) => [task.id, task.status])).toEqual([
+      ['tarefa-1', 'pending'],
+      ['tarefa-2', 'error'],
+    ]);
+    expect(answer.tasks[1]?.diagnostics[0]?.code).toBe('E_UNKNOWN_TEMPLATE');
+    expect(IPC_CHANNELS['queue:list'].response.safeParse(answer).success).toBe(true);
+  });
+
+  it('points the queue at the folder picked, and writes it down', async () => {
+    const queue = queueDependency();
+    const handlers = createHandlers({ ...dependencies(), queue });
+
+    const answer = await handlers['queue:set-folder']({ choose: true });
+
+    expect(queue.folders).toEqual(['/escolhida']);
+    expect(queue.remembered).toEqual([{ queueFolder: '/escolhida' }]);
+    expect(answer.folder).toBe('/escolhida');
+  });
+
+  it('changes nothing when the picker is dismissed', async () => {
+    const queue = queueDependency();
+    queue.dismissPicker();
+    const handlers = createHandlers({ ...dependencies(), queue });
+
+    const answer = await handlers['queue:set-folder']({ choose: true });
+
+    // A dismissed picker is not a clear: the folder in force stays, and nothing is written.
+    expect(queue.folders).toEqual([]);
+    expect(queue.remembered).toEqual([]);
+    expect(answer.folder).toBe('/fila');
+  });
+
+  it('clears the folder when asked to, and remembers the clearing', async () => {
+    const queue = queueDependency();
+    const handlers = createHandlers({ ...dependencies(), queue });
+
+    await handlers['queue:set-folder']({ choose: false });
+
+    expect(queue.folders).toEqual([null]);
+    expect(queue.remembered).toEqual([{ queueFolder: null }]);
+  });
+
+  it('turns auto-run on and remembers it', async () => {
+    const queue = queueDependency();
+    const handlers = createHandlers({ ...dependencies(), queue });
+
+    const answer = await handlers['queue:set-auto-run']({ on: true });
+
+    expect(answer.autoRun).toBe(true);
+    expect(queue.remembered).toEqual([{ queueAutoRun: true }]);
+  });
+
+  it('runs the task named', async () => {
+    const queue = queueDependency();
+    const handlers = createHandlers({ ...dependencies(), queue });
+
+    await handlers['queue:run']({ taskId: 'tarefa-2' });
+
+    expect(queue.ran).toEqual(['tarefa-2']);
+  });
+
+  it('opens only the brief main listed under that id', async () => {
+    const handlers = createHandlers(dependencies());
+
+    const known = await handlers['queue:open-brief']({
+      documentId: 'document-3',
+      taskId: 'tarefa-2',
+    });
+    // An id the queue never listed opens nothing, the way `file:reopen` refuses a path it
+    // never offered. The renderer cannot turn a task id into a read of anything else.
+    const unknown = await handlers['queue:open-brief']({
+      documentId: 'document-4',
+      taskId: '../../etc/passwd',
+    });
+
+    expect(known.document?.path).toBe('/fila/inbox/tarefa-2/brief.brief');
+    // Named after the task, so two task briefs open at once are two tabs a person can tell apart.
+    expect(known.document?.name).toBe('tarefa-2 · brief.brief');
+    expect(known.documentId).toBe('document-3');
+    expect(unknown).toEqual({ document: null, documentId: null });
+  });
+
+  it('reveals the task output folder, and nothing for a task it does not know', async () => {
+    const folders = folderDialogs();
+    const handlers = createHandlers({ ...dependencies(), folders });
+
+    await handlers['queue:reveal-output']({ taskId: 'tarefa-2' });
+    await handlers['queue:reveal-output']({ taskId: 'tarefa-9' });
+
+    expect(folders.revealed).toEqual(['/fila/outbox/tarefa-2/out']);
   });
 });
 

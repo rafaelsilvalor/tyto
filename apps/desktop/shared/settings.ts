@@ -26,11 +26,29 @@ export const settingsSchema = z.object({
    * can show it in the footer, and the only thing it can do with it is display it.
    */
   templatesFolder: z.string().min(1).nullable(),
+  /**
+   * The local queue's folder (TYTO-45): the parent of `inbox/`, `outbox/` and `done/`, the
+   * same folder `tyto watch <folder>` is given. `null` until a person picks one.
+   *
+   * Defaulted in the schema, as is the one below, so a `settings.json` written before the
+   * queue existed still parses — without it, the missing key would fail the whole object and
+   * `settingsFrom` would throw the templates folder away with it.
+   */
+  queueFolder: z.string().min(1).nullable().default(null),
+  /**
+   * Whether a task dropped into the inbox is rendered without being asked. Off until a person
+   * turns it on, so opening the app never renders a folder by surprise.
+   */
+  queueAutoRun: z.boolean().default(false),
 });
 
 export type Settings = z.infer<typeof settingsSchema>;
 
-export const DEFAULT_SETTINGS: Settings = { templatesFolder: null };
+export const DEFAULT_SETTINGS: Settings = {
+  templatesFolder: null,
+  queueFolder: null,
+  queueAutoRun: false,
+};
 
 /**
  * Whatever was on disk, as settings this build understands.

@@ -93,6 +93,33 @@ const openDocument = z.object({
  */
 const documentId = z.string().min(1).max(100);
 
+/**
+ * A task folder's name, which is the task's id (`@tyto/io`'s `fsInbox`). One path segment in
+ * practice; bounded here so a hostile renderer cannot send a megabyte of one.
+ */
+const taskId = z.string().min(1).max(255);
+
+/** What the local queue panel draws (TYTO-45). */
+const queueView = z.object({
+  /** The folder holding `inbox/`, `outbox/` and `done/`, or `null` before one is chosen. */
+  folder: z.string().nullable(),
+  /** Where a task folder is dropped, so the panel can say so. */
+  inbox: z.string().nullable(),
+  autoRun: z.boolean(),
+  tasks: z
+    .array(
+      z.object({
+        id: taskId,
+        status: z.enum(['pending', 'rendering', 'done', 'error']),
+        diagnostics: z.array(diagnostic),
+        failure: z.string().optional(),
+        /** `out/` has a `result.json`, so "open output folder" has something to open. */
+        hasOutput: z.boolean(),
+      }),
+    )
+    .max(500),
+});
+
 /** A diagnostic from the template mode, which says which of its three buffers it is about. */
 const templateDiagnostic = diagnostic.extend({
   file: z.enum(['manifest', 'markup', 'brief', 'render']),
@@ -637,6 +664,47 @@ export const IPC_CHANNELS = {
   ),
 
   /**
+   * The local queue panel (TYTO-45): the queue folder, whether auto-run is on, and every task
+   * in `inbox/` and `done/` with how it stands.
+   *
+   * **Asked once when the panel opens and again on each `queue:changed`**, never on a timer.
+   * Main already sweeps the inbox every second; the renderer hearing about it is one push.
+   * `failure` is a sentence and not a diagnostic, for `export:progress`'s reason: a render that
+   * died or a task that could not be moved is not something `docs/diagnostic-codes.md` names.
+   */
+  'queue:list': channel(z.object({}), queueView),
+
+  /**
+   * Picks the queue folder through the native picker, or clears it. Answers with the queue as
+   * it now stands; a dismissed picker changes nothing and answers the same.
+   */
+  'queue:set-folder': channel(z.object({ choose: z.boolean() }), queueView),
+
+  /** Turns auto-run on or off, and remembers it. */
+  'queue:set-auto-run': channel(z.object({ on: z.boolean() }), queueView),
+
+  /**
+   * Renders one task now, whatever auto-run says — Run for a pending task, Retry for a failed
+   * one. Answers when it has been queued, not when it is done: the verdict is a push.
+   */
+  'queue:run': channel(z.object({ taskId }), z.object({})),
+
+  /** Opens the task's `out/` folder in the OS file manager. */
+  'queue:reveal-output': channel(z.object({ taskId }), z.object({})),
+
+  /**
+   * Opens the task's brief in a tab, so it can be fixed and run again.
+   *
+   * **A task id, never a path**, and that is the containment `file:reopen` has: main opens
+   * only the brief it listed under that id, so a renderer cannot use this to read anything
+   * else. The answer is `file:open`'s.
+   */
+  'queue:open-brief': channel(
+    z.object({ documentId, taskId }),
+    z.object({ document: openDocument.nullable(), documentId: documentId.nullable() }),
+  ),
+
+  /**
    * Something went wrong in the window, written down where a report can reach it (TYTO-132).
    *
    * An ordinary question and deliberately not a push: the renderer is the side that *has* the
@@ -826,6 +894,15 @@ export const IPC_EVENTS = {
    * what it does when the bar runs it — which for a save is now a row in the problems panel.
    */
   'command:run': z.object({ id: z.string().min(1) }),
+
+  /**
+   * The local queue changed: a task arrived, started, finished or failed (TYTO-45).
+   *
+   * Empty, because the panel asks `queue:list` for the whole of it anyway — a push that
+   * carried the list would have to carry it all, and a panel opened later would still ask
+   * once. The third push, and the second that is a notice rather than a question (ADR 0029).
+   */
+  'queue:changed': z.object({}),
 } as const;
 
 export type IpcEvents = typeof IPC_EVENTS;
