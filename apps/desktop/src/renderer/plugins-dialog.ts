@@ -80,6 +80,11 @@ export class PluginsDialog extends LitElement {
             : plugin.permissions.join(', ')
         }
         ${
+          plugin.contributes.includes('panel')
+            ? html`<p class="plugins__disclosure">${say('plugins.panel.readsDocument')}</p>`
+            : nothing
+        }
+        ${
           plugin.problems.length === 0
             ? nothing
             : html`<ul class="plugins__problems">

@@ -2,6 +2,7 @@ import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
+import { ok } from '@tyto/core';
 import { nodeFileSystem } from '@tyto/io';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
@@ -154,6 +155,47 @@ describe('preview', () => {
       'markup',
       'E_UNSUPPORTED_CSS',
     ]);
+  });
+});
+
+describe('a sample brief with a plugin directive (TYTO-49)', () => {
+  const SHOUTED = [
+    '---',
+    'template: cartaz',
+    'formats: [feed]',
+    '---',
+    '::demo/shout {slot: titulo} Olá',
+    '',
+  ].join('\n');
+  const previewWith = (service: TemplateEditorService) =>
+    service.preview({
+      directory: folder,
+      manifest: MANIFEST,
+      markup: markupWith('#ffffff'),
+      brief: SHOUTED,
+      briefPath: join(folder, 'examples', 'cartaz.brief'),
+    });
+
+  it('resolves it through the directives the window was given', async () => {
+    const shouting = createTemplateEditor({
+      sources,
+      directives: {
+        find: (namespace, name) =>
+          namespace === 'demo' && name === 'shout'
+            ? () => ok([{ name: 'titulo', body: [{ kind: 'text', value: 'OLÁ' }] }])
+            : undefined,
+      },
+    });
+    const codes = (await previewWith(shouting)).diagnostics.map((item) => item.code);
+    expect(codes).not.toContain('E_UNKNOWN_DIRECTIVE');
+    expect(codes).not.toContain('E_MISSING_REQUIRED_SLOT');
+  });
+
+  it('is E_UNKNOWN_DIRECTIVE, on the brief, without them', async () => {
+    const found = (await previewWith(editor)).diagnostics.find(
+      (item) => item.code === 'E_UNKNOWN_DIRECTIVE',
+    );
+    expect(found).toMatchObject({ file: 'brief' });
   });
 });
 

@@ -185,9 +185,21 @@ export interface EditorKeymap extends Contribution {
   readonly mode?: 'normal' | 'vim';
 }
 
-/** `panel` — a UI surface in the desktop renderer, sandboxed in an iframe (E11.3). */
+/**
+ * `panel` — a page in the desktop's window, sandboxed in an iframe (E11.3, ADR 0045).
+ *
+ * Data only: the page is a file the plugin ships, and the host serves it from the plugin's
+ * folder into an iframe with `sandbox="allow-scripts"` and nothing else. What it can ask of
+ * the host goes through a `postMessage` bridge, checked against the same permissions as the
+ * plugin's own `host.fetch` and `host.credentials` (ADR 0042).
+ */
 export interface PanelContribution extends Contribution {
   readonly title: string;
   /** Where the panel docks. The renderer decides what it does with an unknown one. */
   readonly location?: 'left' | 'right' | 'bottom';
+  /**
+   * The page, as a path inside the plugin's folder with `/` between segments —
+   * `panel/index.html`. A path that leaves the folder is never served.
+   */
+  readonly entry: string;
 }

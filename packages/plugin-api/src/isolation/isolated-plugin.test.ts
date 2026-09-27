@@ -346,7 +346,6 @@ describe('what an isolated plugin cannot do', () => {
     ['source', (host: PluginHost) => host.registerSource({ id: 'inbox', value: {} })],
     ['sink', (host: PluginHost) => host.registerSink({ id: 'outbox', value: {} })],
     ['rasterizer', (host: PluginHost) => host.registerRasterizer({ id: 'r', value: {} })],
-    ['panel', (host: PluginHost) => host.registerPanel({ id: 'p', title: 'P' })],
   ])('registers into %s, which is refused by name', async (point, activate) => {
     const { connected } = await isolate(activate);
     expect(connected.ok ? '' : connected.error[0]?.message).toBe(
@@ -668,5 +667,37 @@ describe('an isolated directive (TYTO-49)', () => {
       ['E_PLUGIN_TIMEOUT', DIRECTIVE.range],
     ]);
     expect(connected.value.crashed()).toBe('it did not answer within 0 s');
+  });
+});
+
+describe('an isolated panel (TYTO-49)', () => {
+  it('crosses as data the host can serve', async () => {
+    const { connected } = await isolate(
+      (host) =>
+        host.registerPanel({
+          id: 'contagem',
+          title: 'Contagem',
+          location: 'right',
+          entry: 'panel/index.html',
+        }),
+      { contributes: ['panel'] },
+    );
+    if (!connected.ok) throw new Error(connected.error[0]?.message);
+
+    const host = createPluginHost();
+    host.tryActivate(connected.value.plugin);
+    expect(host.registry.panels()).toEqual([
+      { id: 'contagem', title: 'Contagem', location: 'right', entry: 'panel/index.html' },
+    ]);
+  });
+
+  it('is refused without an entry, since there would be nothing to show', async () => {
+    const { connected } = await isolate(
+      (host) => host.registerPanel({ id: 'p', title: 'P' } as never),
+      { contributes: ['panel'] },
+    );
+    expect(connected.ok ? '' : connected.error[0]?.message).toContain(
+      "its 'panel' contribution does not match",
+    );
   });
 });

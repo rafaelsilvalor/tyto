@@ -68,7 +68,7 @@ The last four are named `<id>.tyto-plugin.json` and that is the one place a buil
 | `directive`       | `::ns/name` in the brief → the slot directives it stands for (ADR 0043) | —                                                     |
 | `editor.command`  | `{ id, run(ctx), undo? }`                                               | core-commands                                         |
 | `editor.keymap`   | binding → command id (normal and vim)                                   | default-keymap, vim                                   |
-| `panel`           | UI component in the desktop renderer (sandboxed iframe)                 | queue, jobs, diagnostics                              |
+| `panel`           | a page in the desktop window, `sandbox="allow-scripts"` (ADR 0045)      | —                                                     |
 
 ### `exporter`, in full
 
@@ -128,6 +128,38 @@ never recurses.
 
 `directiveResolverOf(() => host.registry.directives())` is the port `resolve` asks.
 `directiveNamesOf` lists `ns/name` for an editor. The CLI wires the first into every task. The desktop wires both since TYTO-49: an export resolves through the run's own host, and the preview through one host holding the installed plugins, whose `directiveNamesOf` rides on `brief:preview` for the editor's list after `::`.
+
+### `panel`, in full
+
+```ts
+interface PanelContribution {
+  id: string;
+  title: string;
+  location?: 'left' | 'right' | 'bottom';
+  entry: string; // a page inside the plugin's folder: 'panel/index.html'
+}
+```
+
+The desktop serves `entry` as `tyto-plugin://<plugin>/<entry>`, confined to the plugin's folder
+once links are resolved, with a CSP of its own that gives it no network (ADR 0045). The page
+runs in an iframe with `sandbox="allow-scripts"` and nothing else, so it cannot read the
+window's DOM, the app's `localStorage` or `window.tyto`. It opens closed, and the command bar
+has a toggle for it named after its `title`.
+
+The page talks to the host through `postMessage` alone:
+
+```js
+// ask: the same permissions as the plugin's host.fetch and host.credentials (ADR 0042)
+parent.postMessage(
+  { tyto: 'panel', type: 'request', id: 1, capability: 'fetch', args: [url] },
+  '*',
+);
+// answer: { tyto: 'panel', type: 'response', id: 1, ok: true, value } | { ok: false, code, message }
+// hear: { tyto: 'panel', type: 'event', event: 'document', text } on every pause in typing
+```
+
+**A panel receives the open brief's text**, with no permission asked, and the plugins screen
+says so on that plugin's row. A panel's `fetch` answers with the body as text.
 
 ### `template-pack`, and the host it belongs to
 
@@ -225,7 +257,7 @@ The network and the secrets are a port, `HostCapabilities`. **In the CLI a crede
 ## Isolation
 
 - Main: each plugin in a `utilityProcess` (Electron) / `worker_threads` (CLI). Typed RPC; the host is a proxy.
-- Renderer: `panel` runs in a sandboxed iframe; talks to the host via typed `postMessage`.
+- Renderer: `panel` runs in an iframe with `sandbox="allow-scripts"` alone; talks to the host via a `postMessage` bridge the renderer validates and main checks (ADR 0045). The window's CSP and main's `will-frame-navigate` guard keep its frame on its own plugin's pages.
 - Permissions are approved at install time; denied ⇒ the call rejects with `E_PERMISSION`.
 
 **Built in the CLI (TYTO-48, ADR 0041).** Each installed plugin's module is imported by a `worker_threads` worker of its own — `dist/plugin-worker.js`, one per plugin for the life of the command — and what reaches a task's host is a proxy. Built-ins stay in process.
@@ -242,7 +274,7 @@ host (CLI thread)                                guest (plugin's worker)
                         ◀── result {value} ──      answer checked by the host
 ```
 
-**Each side validates what it receives**, with the Zod schemas in `isolation/protocol.ts` and `isolation/points.ts`: the host every guest message and every answer, the guest every host message and a call's arguments, before the plugin's code sees them. **A contribution crosses as data, and its functions stay behind as handles**; a function is callable only if its point names it, with a schema for its arguments and one for its answer. Today that is `exporter.exportFrame` and `directive.transform` (TYTO-49), which may therefore return a `Promise`; the job and `resolve` await them. `template-pack`, `editor.command` and `editor.keymap` cross as data. `source`, `sink`, `rasterizer` and `panel` are refused by name — _not available to an isolated plugin yet_ — and the second half of TYTO-49 lifts that for `panel`. A directive's answer schema is strict: a replacement that carries a `namespace` or a `range` is `E_PLUGIN_PROTOCOL`.
+**Each side validates what it receives**, with the Zod schemas in `isolation/protocol.ts` and `isolation/points.ts`: the host every guest message and every answer, the guest every host message and a call's arguments, before the plugin's code sees them. **A contribution crosses as data, and its functions stay behind as handles**; a function is callable only if its point names it, with a schema for its arguments and one for its answer. Today that is `exporter.exportFrame` and `directive.transform` (TYTO-49), which may therefore return a `Promise`; the job and `resolve` await them. `template-pack`, `editor.command`, `editor.keymap` and `panel` cross as data. `source`, `sink` and `rasterizer` are refused by name — _not available to an isolated plugin yet_. A directive's answer schema is strict: a replacement that carries a `namespace` or a `range` is `E_PLUGIN_PROTOCOL`.
 
 **The proxy goes through `tryActivate`**, so an isolated plugin meets every check an in-process one does. `protocol` is its own number, compared at the `hello` handshake and nowhere else; it is not the engine (ADR 0040), because a plugin never sees these messages.
 

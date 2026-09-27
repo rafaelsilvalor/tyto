@@ -394,6 +394,18 @@ const dependencies = () => ({
       ]),
   },
   info: () => ({ version: '0.1.0', platform: 'linux', locale: 'pt-BR', templates: ['promo'] }),
+  panels: {
+    list: () =>
+      Promise.resolve([
+        {
+          id: 'plugin:demo/contagem',
+          plugin: 'demo',
+          title: 'Contagem',
+          src: 'tyto-plugin://demo/panel.html',
+        },
+      ]),
+    request: () => Promise.resolve({ ok: false as const, code: 'E_PERMISSION', message: 'no' }),
+  },
   preview: preview(),
   project: projectFolder(),
   queue: queueDependency(),
