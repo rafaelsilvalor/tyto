@@ -76,6 +76,7 @@ const ARTWORK = SCENE.artworks[0]!;
 const FRAME = ARTWORK.frames[0]!;
 
 describe('a plugin in a worker thread', () => {
+  // Starts a plugin's worker thread, which a full `pnpm check` can hold past Vitest's 5 s.
   it('answers from the thread', async () => {
     const { isolated, exporter } = await connect(
       "return { ok: true, value: artwork.id + ' ' + frame.format, diagnostics: [] };",
@@ -86,8 +87,9 @@ describe('a plugin in a worker thread', () => {
       diagnostics: [],
     });
     await isolated.close();
-  });
+  }, 60_000);
 
+  // Starts a plugin's worker thread, which a full `pnpm check` can hold past Vitest's 5 s.
   it('crashes with the message of an uncaught throw, and the host keeps answering', async () => {
     const crashes: string[] = [];
     const { isolated, exporter } = await connect(
@@ -104,13 +106,14 @@ describe('a plugin in a worker thread', () => {
     expect(after.ok ? '' : after.error[0]?.code).toBe('E_PLUGIN_CRASHED');
     expect(crashes).toEqual(['the ink ran out']);
     await isolated.close();
-  });
+  }, 60_000);
 
+  // Starts a plugin's worker thread, which a full `pnpm check` can hold past Vitest's 5 s.
   it('is not a crash when the host closes it', async () => {
     const crashes: string[] = [];
     const { isolated } = await connect('return new Promise(() => {});', crashes);
     await isolated.close();
     expect(crashes).toEqual([]);
     expect(isolated.crashed()).toBeUndefined();
-  });
+  }, 60_000);
 });

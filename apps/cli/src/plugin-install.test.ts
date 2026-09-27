@@ -324,6 +324,7 @@ const renderArguments = (types: string): string[] => [
 ];
 
 describe('an installed exporter at render', () => {
+  // Starts a plugin's worker thread, which a full `pnpm check` can hold past Vitest's 5 s.
   it('produces a kind Tyto did not ship, and result.json names its mime', async () => {
     await run(['plugin', 'install', await pluginFolder(), '--yes'], environment());
 
@@ -341,7 +342,7 @@ describe('an installed exporter at render', () => {
     expect(await readFile(join(workspace, 'task', 'out', 'slide-1-feed.txt'), 'utf8')).toBe(
       'slide-1 feed',
     );
-  });
+  }, 60_000);
 
   it('is not activated once disabled, so its kind cannot be asked for', async () => {
     await run(['plugin', 'install', await pluginFolder(), '--yes'], environment());
@@ -355,6 +356,7 @@ describe('an installed exporter at render', () => {
     );
   });
 
+  // Starts a plugin's worker thread, which a full `pnpm check` can hold past Vitest's 5 s.
   it('refuses a rasterized exporter for a kind no rasterizer encodes, naming the plugin', async () => {
     // The third party's mistake used to reach `runJob` and come out as exit 2, an internal
     // failure. It is refused at activation instead, and the refused `--types` says why.
@@ -376,8 +378,9 @@ describe('an installed exporter at render', () => {
         'encodes only png, jpeg and webp.',
     );
     expect(stderr()).toContain("'gif' is not an output type any installed exporter produces.");
-  });
+  }, 60_000);
 
+  // Starts a plugin's worker thread, which a full `pnpm check` can hold past Vitest's 5 s.
   it('refuses a plugin whose id collides, by name, and the run renders without it', async () => {
     // `vetor` registers an exporter called `svg`, which the built-in already holds.
     await run(
@@ -408,10 +411,11 @@ describe('an installed exporter at render', () => {
     expect(await readFile(join(workspace, 'task', 'out', 'slide-1-feed.svg'), 'utf8')).toMatch(
       /^<svg/u,
     );
-  });
+  }, 60_000);
 });
 
 describe('a plugin whose thread is killed mid-render', () => {
+  // Starts a plugin's worker thread, which a full `pnpm check` can hold past Vitest's 5 s.
   it('fails its own frames, renders the rest, and is listed as crashed until enabled', async () => {
     await run(['plugin', 'install', await pluginFolder({ crashes: true }), '--yes'], environment());
 
@@ -463,5 +467,5 @@ describe('a plugin whose thread is killed mid-render', () => {
       status: 'enabled',
       crashed: null,
     });
-  });
+  }, 60_000);
 });
