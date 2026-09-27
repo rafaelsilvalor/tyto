@@ -72,6 +72,11 @@ beforeAll(async () => {
     ([attribute]) => document.querySelector(`[${attribute}]`)?.textContent !== '',
     [I18N_ATTRIBUTE],
   );
+  // The first translated string is not the window (TYTO-175). The static elements are painted
+  // before `applyLayout` has made a single panel, so a count taken then sees the shell's
+  // strings and none of the panels': 7 of 15, measured on CI with the renderer slowed by 2.5 s.
+  // The editor mounts after the layout, which makes it the wait TYTO-154 asks for.
+  await page.waitForSelector('#editor .cm-content');
 });
 
 afterAll(async () => {
