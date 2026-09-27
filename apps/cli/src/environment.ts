@@ -1,4 +1,7 @@
 import { createRequire } from 'node:module';
+import { homedir } from 'node:os';
+import { join } from 'node:path';
+import { createInterface } from 'node:readline/promises';
 
 import { type CloseableRasterizer, defaultRasterizer } from './plugins/rasterizer.js';
 
@@ -43,6 +46,19 @@ export interface CliEnvironment {
    * failure (exit 2) rather than a diagnostic about anybody's brief.
    */
   rasterizer(): CliRasterizer;
+  /**
+   * `~/.tyto`, where `tyto plugin install` puts plugins and records what it approved.
+   *
+   * Optional, and absent means **no installed plugins at all**: a test that does not name a
+   * folder of its own must never read the real one, and a missing field is the one default
+   * that cannot leak somebody's machine into a snapshot.
+   */
+  readonly home?: string;
+  /**
+   * Asks a yes-or-no question on the terminal. Absent when nobody is there to answer — a
+   * pipe, a CI job — and then `install` needs `--yes` rather than guessing.
+   */
+  readonly confirm?: (question: string) => Promise<boolean>;
 }
 
 /**
@@ -66,8 +82,21 @@ export function cliVersion(): string {
   return manifest.version ?? '0.0.0';
 }
 
+/** `y` or `yes`, any case. Anything else — an empty line included — is a no. */
+async function askOnTerminal(question: string): Promise<boolean> {
+  const terminal = createInterface({ input: process.stdin, output: process.stderr });
+  try {
+    const answer = await terminal.question(question);
+    return /^y(es)?$/iu.test(answer.trim());
+  } finally {
+    terminal.close();
+  }
+}
+
 export function defaultEnvironment(): CliEnvironment {
   return {
+    home: join(homedir(), '.tyto'),
+    ...(process.stdin.isTTY ? { confirm: askOnTerminal } : {}),
     console: {
       out: (text) => {
         process.stdout.write(text);

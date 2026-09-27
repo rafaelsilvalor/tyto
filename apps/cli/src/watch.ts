@@ -4,7 +4,8 @@ import { type BriefTask, OUT_DIR, fsInbox, pollSource } from '@tyto/io';
 
 import type { CliEnvironment } from './environment.js';
 import { EXIT_DIAGNOSTICS, EXIT_OK, type ExitCode } from './exit.js';
-import { type OutputKind, needsRasterizer, outputRequests } from './options.js';
+import { type OutputKind, needsRasterizer, outputRequests, unavailableTypes } from './options.js';
+import { loadInstalledPlugins, reachableExporters } from './plugins/index.js';
 import { loadRenderContext } from './render-context.js';
 import { renderTask } from './render-task.js';
 import { displayPath } from './render.js';
@@ -73,8 +74,21 @@ export async function watchCommand(
   // not a `Result` it would have to re-narrow on every task.
   const { value: project, diagnostics: projectProblems } = context;
 
+  // Read once for the life of the watcher: a plugin installed while it runs is seen on
+  // restart, the same rule the machine's fonts follow.
+  const plugins = await loadInstalledPlugins(environment.home);
+  const exporters = reachableExporters(plugins);
+  const unavailable = unavailableTypes(options.types, exporters);
+  if (unavailable !== undefined) {
+    environment.console.err(`error: ${unavailable}
+`);
+    return EXIT_DIAGNOSTICS;
+  }
+
   const inbox = fsInbox({ root: join(root, 'inbox'), done: join(root, 'done') });
-  const rasterizer = needsRasterizer(options.types) ? environment.rasterizer() : undefined;
+  const rasterizer = needsRasterizer(options.types, exporters)
+    ? environment.rasterizer()
+    : undefined;
 
   // The watcher's own exit code is about the run, not about any one task: a queue that
   // handled ten tasks and failed on one has still done its job, and a person reading the
@@ -95,6 +109,7 @@ export async function watchCommand(
       {
         outputs: outputRequests(options),
         version: environment.version,
+        plugins,
         ...(options.template === undefined ? {} : { template: options.template }),
         ...(options.formats === undefined ? {} : { formats: options.formats }),
         ...(rasterizer === undefined ? {} : { rasterizer }),

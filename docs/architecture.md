@@ -37,7 +37,7 @@ packages/
   sources        (deferred, ADR 0011) jira/trello/notion/sheets/drive plugins
   editor         CodeMirror 6: brief and template languages, vim, diagnostics, manifest-driven autocomplete, find/replace
 apps/
-  cli            commander: render, watch, template new|check, plugin install|list
+  cli            commander: render, watch, template new|check, plugin install|list|remove|disable|enable
   desktop        electron-vite: main (pipeline, plugins, credentials) / preload / renderer (editor, preview, panels)
 ```
 

@@ -18,7 +18,12 @@ import {
 import { type OutputRequest, fontSubstitutionWarnings, runJob } from '@tyto/pipeline';
 import type { Rasterizer } from '@tyto/raster';
 
-import { activateBuiltIns } from './plugins/index.js';
+import {
+  type LoadedPlugins,
+  NO_PLUGINS,
+  activateBuiltIns,
+  activateInstalled,
+} from './plugins/index.js';
 import { type RenderContext, templateWiring } from './render-context.js';
 import { registerOrigin } from './report.js';
 
@@ -62,6 +67,8 @@ export interface RenderTaskOptions {
   readonly signal?: AbortSignal;
   /** `tyto`'s own version, for `result.json`'s `tyto.version`. */
   readonly version: string;
+  /** Installed plugins, imported once per process and activated into every task's host. */
+  readonly plugins?: LoadedPlugins;
 }
 
 export interface RenderTaskReport {
@@ -147,6 +154,9 @@ export async function renderTask(
     resources: combine(briefResources, wiring.resources),
     ...(options.rasterizer === undefined ? {} : { rasterizer: options.rasterizer }),
   });
+  // After the built-ins, so a built-in keeps every id it has. A plugin refused here is a
+  // warning in this task's `result.json`, and the task renders without it (ADR 0039).
+  const pluginWarnings = activateInstalled(host, options.plugins ?? NO_PLUGINS);
 
   const registered = host.registry.rasterizers<Rasterizer>()[0]?.value;
 
@@ -186,7 +196,7 @@ export async function renderTask(
   // `templateWiring` already did for the template's own diagnostics.
   registerOrigin(produced, { path: task.briefPath, source: task.brief });
 
-  const diagnostics = [...inherited, ...produced];
+  const diagnostics = [...inherited, ...pluginWarnings, ...produced];
   const result = renderResult({
     cancelled: job.ok ? job.value.cancelled : false,
     planned: job.ok ? job.value.planned : 0,

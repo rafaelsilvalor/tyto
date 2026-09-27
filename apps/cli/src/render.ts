@@ -6,7 +6,8 @@ import { ASSETS_DIR } from '@tyto/io';
 
 import type { CliEnvironment } from './environment.js';
 import { EXIT_DIAGNOSTICS, EXIT_OK, type ExitCode } from './exit.js';
-import { type OutputKind, needsRasterizer, outputRequests } from './options.js';
+import { type OutputKind, needsRasterizer, outputRequests, unavailableTypes } from './options.js';
+import { loadInstalledPlugins, reachableExporters } from './plugins/index.js';
 import { loadRenderContext, readFailure } from './render-context.js';
 import { renderTask } from './render-task.js';
 import { diagnosticsDocument, formatDiagnostics, json } from './report.js';
@@ -127,7 +128,18 @@ export async function renderCommand(
     });
   }
 
-  const rasterizer = needsRasterizer(options.types) ? environment.rasterizer() : undefined;
+  const plugins = await loadInstalledPlugins(environment.home);
+  const exporters = reachableExporters(plugins);
+  const unavailable = unavailableTypes(options.types, exporters);
+  if (unavailable !== undefined) {
+    environment.console.err(`error: ${unavailable}
+`);
+    return EXIT_DIAGNOSTICS;
+  }
+
+  const rasterizer = needsRasterizer(options.types, exporters)
+    ? environment.rasterizer()
+    : undefined;
 
   try {
     const report = await renderTask(
@@ -147,6 +159,7 @@ export async function renderCommand(
       {
         outputs: outputRequests(options),
         version: environment.version,
+        plugins,
         ...(options.template === undefined ? {} : { template: options.template }),
         ...(options.formats === undefined ? {} : { formats: options.formats }),
         ...(rasterizer === undefined ? {} : { rasterizer }),

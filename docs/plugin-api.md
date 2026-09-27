@@ -23,20 +23,20 @@ my-plugin/
 
 `pluginManifestSchema` in `@tyto/plugin-api` is that document, and it is the only reader of it. Every field is checked and every rejection carries a **field path** — `contributes.1`, `config.$schema`, `(root)` — because "the manifest is invalid" is not a sentence anybody can act on in a file they typed by hand. Every problem is reported at once, the same promise the compiler makes about a brief.
 
-| Field         | Rule                                                                                             |
-| ------------- | ------------------------------------------------------------------------------------------------ |
-| `name`        | lowercase letters, digits and hyphens. **It is the plugin's id** — see below                     |
-| `version`     | semver, with an optional prerelease tag                                                          |
-| `engine`      | a version range (`>=0.1`, `^1.2.3`, `>=0.1 \|\| ^1`), checked for shape and not for satisfaction |
-| `contributes` | at least one extension point from the table below, no repeats                                    |
-| `permissions` | non-empty strings, no repeats; the vocabulary stays open until the loader (E11.1)                |
-| `config`      | optional `{ "$schema": "…" }`, never dereferenced by the host                                    |
+| Field         | Rule                                                                                         |
+| ------------- | -------------------------------------------------------------------------------------------- |
+| `name`        | lowercase letters, digits and hyphens. **It is the plugin's id** — see below                 |
+| `version`     | semver, with an optional prerelease tag                                                      |
+| `engine`      | a version range (`>=0.1`, `^1.2.3`, `>=0.1 \|\| ^1`) against `PLUGIN_API_VERSION` (ADR 0039) |
+| `contributes` | at least one extension point from the table below, no repeats                                |
+| `permissions` | non-empty strings, no repeats; recorded at install, **not enforced until E11.2**             |
+| `config`      | optional `{ "$schema": "…" }`, never dereferenced by the host                                |
 
 Unknown keys are refused, one complaint per stray key rather than one for the object holding them.
 
 **`name` is the id, and there is only one of them.** VS Code splits `publisher` from `name` and joins them back; nothing here needs that yet, and two names for one plugin is two things to keep in step. The host throws when a `Plugin.id` and its manifest's `name` disagree, because the id is what every extension point keys on and what a loader would name a folder under `~/.tyto/plugins/` — a listing printing one name while an error prints another is the failure that foreclosed.
 
-**`engine` is checked for shape, not for meaning.** This package can see that `lates` is a typo; it cannot see whether the host satisfies `>=99`, because that is a semver comparison against a version only the loader knows. Rejecting the first and deferring the second is the honest split.
+**`engine` is checked twice: for shape by the schema, for meaning by the loader.** The schema sees that `lates` is a typo; `satisfiesEngine` sees that `>=99` is not this host. The version it compares with is `PLUGIN_API_VERSION` — `@tyto/plugin-api`'s own, **not the app's**, because the CLI and the desktop are versioned separately and a range must mean one thing on one machine (ADR 0039). A plugin writes `"engine": ">=0.3.9"` against the API package it imports types from.
 
 ### The manifest is a document, not a shape
 
@@ -186,39 +186,54 @@ interface PluginHost {
 
 ## Lifecycle
 
-`tyto plugin install <folder|git|npm>` → validates `tyto-plugin.json` → shows permissions → copies to `~/.tyto/plugins/` → `activate` on next start. `plugin list`, `plugin disable`, `plugin remove`.
+`tyto plugin install <folder|git|npm>` → fetches → validates `tyto-plugin.json` and its `engine` → shows permissions and asks → copies to `~/.tyto/plugins/<name>/` → activated on the next run. `plugin list`, `plugin disable`, `plugin enable`, `plugin remove`.
 
-**`plugin list` is the half that exists (TYTO-35).** It prints name, version, origin and contributes, in prose or under `--json`:
+```
+~/.tyto/
+  plugins.json          what install approved, per plugin: enabled, permissions, source
+  plugins/<name>/       tyto-plugin.json, dist/index.js, whatever else it ships
+```
+
+**Three sources, fetched by the programs the person already has.** A folder is used where it is. A git URL — `git+https://…`, `git@host:…`, `git://…`, anything ending `.git` — is `git clone --depth 1`. Anything else is an npm spec — a name, `name@range`, a tarball — and is `npm pack` followed by `tar`. Tyto opens no connection of its own, so git's and npm's credentials, proxy and registry configuration apply unchanged, and nothing about who fetched what reaches Tyto (ADR 0011). It is also what makes the three testable offline: `apps/cli/src/plugin-install.test.ts` clones a `file://` repository and packs a local tarball through exactly the commands a real URL and a real name take.
+
+**The approval is recorded apart from the files.** A folder under `plugins/` says a plugin's files are here; it does not say anybody agreed to run them. So `plugins.json` holds what `install` asked and was told, and the loader reads both: **a folder with no entry is not installed** — one copied in by hand has had no question asked — and an entry whose plugin now declares a permission nobody approved is refused (`E_PLUGIN_PERMISSIONS_CHANGED`) until it is installed again. Installing a name that is already installed replaces it; that is how an update lands. A built-in's name is never available.
+
+**Approved is not enforced, and the prompt says so.** Until E11.2 (TYTO-48) an installed plugin's code is imported into Tyto's own process and has Tyto's access to the computer; the permissions are shown, recorded and compared, not sandboxed. `install` prints that sentence beside the list, so nobody reads a granted permission as a boundary. Without a terminal to answer, `install` needs `--yes`.
+
+**A plugin that cannot load does not stop a render** (ADR 0039). Installed plugins are read and imported once per process, and activated into each task's host **after** the built-ins through `InProcessHost.tryActivate`, which answers with diagnostics instead of throwing. A contribution id another plugin already holds is `E_PLUGIN_DUPLICATE`, naming both plugins; everything the loser registered is withdrawn, and the task renders without it. On a render every refusal is carried as `W_PLUGIN_SKIPPED` in `result.json` — a warning, because the brief is not what is wrong.
+
+**`plugin list` shows built-ins and installed plugins alike**, with a status column:
 
 ```
 $ tyto plugin list
-html                0.4.2  built-in  exporter
-svg                 1.0.2  built-in  exporter
-built-in-templates  0.1.0  built-in  template-pack
-chromium            0.1.0  built-in  rasterizer
-fs-inbox            1.0.3  built-in  source
-fs-outbox           1.0.3  built-in  sink
+html                0.4.2  built-in  enabled   exporter
+svg                 1.0.2  built-in  enabled   exporter
+built-in-templates  0.1.0  built-in  enabled   template-pack
+chromium            0.1.0  built-in  enabled   rasterizer
+fs-inbox            1.0.3  built-in  enabled   source
+fs-outbox           1.0.3  built-in  enabled   sink
+pdf                 1.0.0  external  disabled  exporter
 ```
 
-`install`, `disable` and `remove` are the loader's and are not there: a command that could only ever answer "nothing" is a promise rather than a feature.
+`refused` is the third status — a folder that failed a check that reads no code, with the reason on stderr. `--active` shows only what a render would activate, and `--json` prints the same rows with `engine`, `permissions` and `status`.
 
-**Listing reads manifests; it does not activate.** `activateBuiltIns` wires one render — it leaves the rasterizer out when there is nothing to raster, and never wires the queue at all — so a listing built from it would be shorter on some runs than on others, and listing would have to launch a browser to tell you a browser is installed. The command reads `BUILT_IN_MANIFESTS` and validates each through the same schema a loaded plugin's file will go through; a built-in whose manifest stopped matching is reported there rather than surfacing as a `TypeError` on the next render. It exits **2** in that case, not 1: a manifest this repository ships is its own bug, and ADR 0011 reserves the retryable code for what a caller can fix.
+**Listing reads manifests; it does not activate.** `activateBuiltIns` wires one render — it leaves the rasterizer out when there is nothing to raster, and never wires the queue at all — so a listing built from it would be shorter on some runs than on others, and listing would have to launch a browser to tell you a browser is installed. The command reads `BUILT_IN_MANIFESTS` and validates each through the same schema a loaded plugin's file will go through; a built-in whose manifest stopped matching is reported there rather than surfacing as a `TypeError` on the next render. It exits **2** in that case, not 1: a manifest this repository ships is its own bug, and ADR 0011 reserves the retryable code for what a caller can fix. The same rule covers installed plugins: `list` imports none of their code, so `--active` means _enabled and passing every check that reads no code_, and an id collision — found only by activating — is named by the render that meets it.
 
-`origin` is the one column a manifest cannot fill in for itself — an author has no way to know whether their plugin ended up bundled or installed — so it is the host's, and `external` has no producer until the loader lands.
+`origin` is the one column a manifest cannot fill in for itself — an author has no way to know whether their plugin ended up bundled or installed — so it is the host's: `built-in` for this repository's, `external` for what the loader found under `plugins/`.
+
+### The output kinds are open
+
+`--types` takes the four built-in kinds or any kind an installed exporter declares. `ArtifactKind` is `BuiltInKind | (string & Record<never, never>)` — open, and still autocompleting the four — and whether a kind can be produced is the exporter registry's answer, asked once before a task starts: a kind nothing produces is refused with exit 1 and the list of kinds that are available. **A document exporter names its own file**: the artifact's extension and `mime` in `result.json` are the exporter's `extension` and `mime`; only a `rasterized` exporter's come from the raster port, and a rasterized exporter declaring a kind no rasterizer encodes is refused before any frame is built. Whether a browser is launched is asked of the exporters too, so `--types pdf` from a document exporter launches none.
 
 ## Phase 1 vs later
 
-Phase 1 implements `PluginHost` and routes **every built-in through it**, with no external loader. External loading, permissions and isolation come in the plugins epic. The API is validated by real use before it opens.
+Phase 1 implements `PluginHost` and routes **every built-in through it**, with no external loader. External loading (E11.1) and isolation (E11.2) come in the plugins epic. The API is validated by real use before it opens.
 
 What Phase 1 shipped (TYTO-34): the nine contribution types, `createPluginHost`, and the two
 exporters, the Chromium rasterizer and the template pack activated through it by `apps/cli`.
 Three points are typed generically — `source`, `sink` and `rasterizer` — because their ports
 are declared in Node packages (`@tyto/io`, `@tyto/raster`) and this one is pure (ADR 0010);
-the host stores the value and only ever reads its id. A duplicate id **throws**, because in
-Phase 1 every plugin is a built-in this repository wired itself and that is a wiring bug;
-when a loader arrives it catches the throw and reports the plugin that lost.
-
-Not yet: the output kinds a caller may ask for are still the four built-in ones, so a
-third-party exporter can register and nothing can request its kind. Widening that vocabulary
-belongs with the loader (E11.1) rather than before it — until a plugin can be installed at
-all, opening the list would only let a caller ask for a kind nothing can provide.
+the host stores the value and only ever reads its id. A duplicate id **throws** through `activate`, because in
+Phase 1 every plugin is a built-in this repository wired itself and that is a wiring bug.
+The loader (E11.1) does not catch that throw: it activates through `tryActivate`, which
+answers the same question as data (ADR 0039).

@@ -304,6 +304,9 @@ importers:
       '@tyto/pipeline':
         specifier: workspace:*
         version: link:../pipeline
+      '@tyto/plugin-api':
+        specifier: workspace:*
+        version: link:../plugin-api
       '@tyto/template-lang':
         specifier: workspace:*
         version: link:../template-lang
@@ -314,9 +317,6 @@ importers:
       '@tyto/brief-lang':
         specifier: workspace:*
         version: link:../brief-lang
-      '@tyto/plugin-api':
-        specifier: workspace:*
-        version: link:../plugin-api
       '@tyto/raster':
         specifier: workspace:*
         version: link:../raster

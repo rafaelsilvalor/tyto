@@ -2,9 +2,10 @@
  * @tyto/plugin-api — extension points and the host contract (ADR 0007).
  *
  * Types and one in-process host, so it stays pure: nothing here reaches for a disk, a
- * browser or a process. Phase 1 of `docs/plugin-api.md` — no loader, no permissions, no
- * isolation, and **every built-in registered through the same door a third party will
- * use**, which is the only way to find out whether that door works before opening it.
+ * browser or a process. Every built-in is registered through the same door a third party
+ * uses, and since E11.1 the loader's rules live here too — the engine check, the approval
+ * state, and an activation that answers with diagnostics — while the app that composes
+ * them reads the folders. Isolation is E11.2.
  */
 
 export type {
@@ -31,6 +32,25 @@ export {
   pluginManifestSchema,
   validatePluginManifest,
 } from './manifest.js';
+
+export { PLUGIN_API_VERSION, satisfiesEngine } from './engine.js';
+
+export {
+  type PluginStore,
+  type StoredPlugin,
+  checkInstallable,
+  checkStoredPlugin,
+  skippedPluginWarnings,
+} from './loader.js';
+
+export {
+  type PluginState,
+  type PluginStateEntry,
+  EMPTY_PLUGIN_STATE,
+  parsePluginState,
+  serializePluginState,
+  withPluginEntry,
+} from './state.js';
 
 export {
   type Disposable,
