@@ -118,8 +118,10 @@ export {
   NO_PLUGINS,
   activateInstalled,
   loadInstalledPlugins,
+  pluginFolders,
   readInstalledPlugins,
 } from './external.js';
+export { withoutRefused } from './installed-packs.js';
 export { credentialVariable, pluginCapabilities } from './capabilities.js';
 export { type CloseableRasterizer, defaultRasterizer, rasterizerPlugin } from './rasterizer.js';
 export {

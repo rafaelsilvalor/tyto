@@ -5,10 +5,15 @@ import { type BriefTask, OUT_DIR, fsInbox, pollSource } from '@tyto/io';
 import type { CliEnvironment } from './environment.js';
 import { EXIT_DIAGNOSTICS, EXIT_OK, type ExitCode } from './exit.js';
 import { type OutputKind, needsRasterizer, outputRequests, unavailableTypes } from './options.js';
-import { loadInstalledPlugins, pluginCapabilities, reachableExporters } from './plugins/index.js';
+import {
+  loadInstalledPlugins,
+  pluginCapabilities,
+  reachableExporters,
+  withoutRefused,
+} from './plugins/index.js';
 import { loadRenderContext } from './render-context.js';
 import { renderTask } from './render-task.js';
-import { displayPath } from './render.js';
+import { displayPath, installedOption } from './render.js';
 import { diagnosticsDocument, formatDiagnostics, json } from './report.js';
 
 /**
@@ -56,12 +61,20 @@ export async function watchCommand(
   const { cwd } = environment;
   const root = resolve(cwd, folder);
 
+  // Read once for the life of the watcher: a plugin installed while it runs is seen on
+  // restart, the same rule the machine's fonts follow. Before the project, because an
+  // installed template pack is part of it (ADR 0046).
+  const loaded = await loadInstalledPlugins(environment.home, {
+    capabilities: pluginCapabilities(environment.variables),
+  });
   const context = await loadRenderContext({
     templatesDirectory: resolve(cwd, options.templates),
     formatsFile: resolve(cwd, options.formatsFile),
     templatesDirectoryIsDefault: options.templatesNamed !== true,
+    ...installedOption(environment, loaded),
   });
   if (!context.ok) {
+    await loaded.close();
     if (options.json) {
       environment.console.out(json(diagnosticsDocument(context.error)));
     } else {
@@ -74,11 +87,7 @@ export async function watchCommand(
   // not a `Result` it would have to re-narrow on every task.
   const { value: project, diagnostics: projectProblems } = context;
 
-  // Read once for the life of the watcher: a plugin installed while it runs is seen on
-  // restart, the same rule the machine's fonts follow.
-  const plugins = await loadInstalledPlugins(environment.home, {
-    capabilities: pluginCapabilities(environment.variables),
-  });
+  const plugins = withoutRefused(loaded, project.refusedPlugins);
   const { exporters, warnings: skipped } = reachableExporters(plugins);
   const unavailable = unavailableTypes(options.types, exporters);
   if (unavailable !== undefined) {

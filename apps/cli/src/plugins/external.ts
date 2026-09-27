@@ -65,6 +65,12 @@ export async function loadInstalledPlugins(
   });
 }
 
+/** Where `install` copied each plugin under `home` — what a pack's `directory` is relative to. */
+export function pluginFolders(home: string): (plugin: string) => string {
+  const store = fsPluginStore(home);
+  return (plugin) => store.directoryOf(plugin);
+}
+
 /** Activates started plugins into one host, after the built-ins; raster kinds are `@tyto/raster`'s. */
 export function activateInstalled(host: InProcessHost, loaded: LoadedPlugins): Diagnostics {
   return activateInto(host, loaded, { encodes: isRasterFormat, encodable: 'png, jpeg and webp' });

@@ -1,4 +1,5 @@
 dist/
+!examples/plugins/*/dist/
 node_modules/
 .turbo/
 coverage/
@@ -24,3 +25,4 @@ packages/fonts/fonts/*/LICENSE.md
 # stylesheet and rewrites `"Source Sans 3"` to single quotes, which the grammar refuses
 # (docs/template-authoring.md says so about its own code block).
 packages/templates/templates/**/*.html
+examples/plugins/**/templates/**/*.html

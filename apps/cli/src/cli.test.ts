@@ -121,6 +121,7 @@ describe('--help', () => {
       ['watch', '--help'],
       ['template', 'check', '--help'],
       ['template', 'new', '--help'],
+      ['plugin', 'new', '--help'],
     ]) {
       out = [];
       expect(await run(argv, environment()), argv.join(' ')).toBe(EXIT_OK);

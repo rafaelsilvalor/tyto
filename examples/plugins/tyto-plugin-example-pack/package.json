@@ -1,0 +1,12 @@
+{
+  "name": "tyto-plugin-example-pack",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "A Tyto template pack with one template, installed from this folder.",
+  "files": [
+    "tyto-plugin.json",
+    "dist",
+    "templates"
+  ]
+}

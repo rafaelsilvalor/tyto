@@ -17,6 +17,7 @@ docs/
   brief-language.md      brief syntax (directives + frontmatter)
   template-authoring.md  how to write templates (human or AI agent)
   plugin-api.md          extension points and host API
+  plugin-authoring.md    how to write, install and share a plugin (human or AI agent)
   integrations.md        Jacurutu boundary, local inbox/outbox, deferred remote sources
   render-contract.md     what a program outside Tyto can rely on (generated)
   conventions.md         stack, tooling, tests
