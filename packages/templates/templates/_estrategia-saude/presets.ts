@@ -121,7 +121,7 @@ export const coverTitle: TitleBlockStyle = {
   parts: [
     {
       kind: 'image',
-      field: 'ilustracao',
+      field: 'imagem',
       name: 'illustration',
       size: { w: COVER.illustration, h: COVER.illustration },
     },
@@ -225,7 +225,7 @@ export const approvedTable: PillTableStyle = {
 export const resultTitle: TitleBlockStyle = {
   name: 'result-title',
   parts: [
-    { kind: 'image', field: 'emblema', name: 'emblem', size: APPROVED.emblem },
+    { kind: 'image', field: 'imagem', name: 'emblem', size: APPROVED.emblem },
     {
       kind: 'text',
       field: 'chamada',

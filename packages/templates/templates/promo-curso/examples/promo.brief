@@ -1,7 +1,7 @@
 ---
 template: promo-curso
 formats: [feed, story]
-cor: laranja
+tom: laranja
 ---
 // The example this template is checked against: it has to render in both formats with no
 // text running past its box. `docs/brief-language.md` is the grammar.

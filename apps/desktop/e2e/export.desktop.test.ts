@@ -304,7 +304,7 @@ describe('exporting from the window (E9.4)', () => {
       '::titulo',
       '  Muitos slides',
       ...Array.from({ length: 24 }, (_unused, index) => [
-        '::item',
+        '::lamina',
         `  Item ${String(index + 1)} de vinte e quatro`,
       ]).flat(),
     ].join('\n');

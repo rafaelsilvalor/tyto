@@ -381,7 +381,7 @@ formats: [retrato]
   AGENDA DA SEMANA
 
 ` +
-    `::slide
+    `::lamina
   NUTRIÇÃO
   23/08 - 19:00 | ${titulo} | Profª. Amanda Menon
 `;
@@ -641,7 +641,7 @@ describe('the fonts the pack draws in, as a render embeds them (ADR 0021)', () =
       },
     );
 
-    const svg = await readFile(join(agenda, 'out/slide-1-retrato.svg'), 'utf8');
+    const svg = await readFile(join(agenda, 'out/lamina-1-retrato.svg'), 'utf8');
     const sha = (bytes: Buffer): string => createHash('sha256').update(bytes).digest('hex');
     const embedded = [...svg.matchAll(/url\("data:font\/[a-z0-9]+;base64,([A-Za-z0-9+/=]+)"\)/g)]
       .map((match) => sha(Buffer.from(match[1] ?? '', 'base64')))

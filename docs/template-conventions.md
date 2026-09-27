@@ -76,8 +76,8 @@ slot; `titleBlock` for a centred column of optional pieces — a picture, lines 
 rule; `mark` and `textBlock` for a path icon and a brief's words at a stated size.
 
 ```ts
-const sessions = pillTable(sessionTable, { text: slide, width, measure: context.measure });
-const title = titleBlock(resultTitle, { width, fields: { titulo, chamada, emblema } });
+const sessions = pillTable(sessionTable, { text: lamina, width, measure: context.measure });
+const title = titleBlock(resultTitle, { width, fields: { titulo, chamada, imagem } });
 ```
 
 A title block's `field` is the slot's name, in the brief's Portuguese; its `name` is the
