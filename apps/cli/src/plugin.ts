@@ -6,6 +6,7 @@ import { PLUGIN_MANIFEST_FILE } from '@tyto/io';
 import {
   PLUGIN_API_VERSION,
   type PluginManifest,
+  type PluginCrash,
   type PluginOrigin,
   type PluginState,
   checkInstallable,
@@ -15,7 +16,7 @@ import {
 
 import type { CliEnvironment } from './environment.js';
 import { EXIT_DIAGNOSTICS, EXIT_INTERNAL, EXIT_OK, type ExitCode } from './exit.js';
-import { type InstalledPlugins, readInstalledPlugins } from './plugins/external.js';
+import { type InstalledPlugins, readInstalledPlugins, writeCrash } from './plugins/external.js';
 import { fetchPlugin } from './plugins/fetch.js';
 import { BUILT_IN_MANIFESTS } from './plugins/index.js';
 import { formatDiagnostics, json } from './report.js';
@@ -29,11 +30,14 @@ import { formatDiagnostics, json } from './report.js';
  * the command that executes it. So `--active` means *would be activated* — enabled, and
  * passing every check that reads no code. A plugin whose ids collide is only found out when
  * it is activated, and a render names it then (`W_PLUGIN_SKIPPED`).
+ *
+ * `crashed` is the one status that is history rather than a verdict: a plugin whose worker
+ * ended unasked on an earlier run, which a render still activates (ADR 0041).
  */
 
 export interface PluginListOptions {
   readonly json: boolean;
-  /** Only what a render would activate: no disabled plugin, no refused one. */
+  /** Only what a render would activate: no disabled plugin, no refused one; crashed ones stay. */
   readonly active?: boolean;
 }
 
@@ -42,7 +46,7 @@ export interface PluginInstallOptions {
   readonly yes: boolean;
 }
 
-type PluginStatus = 'enabled' | 'disabled' | 'refused';
+type PluginStatus = 'enabled' | 'disabled' | 'refused' | 'crashed';
 
 /** One row of the listing. A refused folder may have no manifest to show. */
 interface ListedPlugin {
@@ -50,6 +54,7 @@ interface ListedPlugin {
   readonly manifest?: PluginManifest;
   readonly origin: PluginOrigin;
   readonly status: PluginStatus;
+  readonly crashed?: PluginCrash;
 }
 
 /** Left-pads to a common width so the columns line up without a table library. */
@@ -86,6 +91,7 @@ function document(plugins: readonly ListedPlugin[]): unknown {
       permissions: plugin.manifest?.permissions ?? [],
       origin: plugin.origin,
       status: plugin.status,
+      crashed: plugin.crashed ?? null,
     })),
   };
 }
@@ -137,23 +143,42 @@ export async function pluginListCommand(
   if (environment.home !== undefined) {
     const installed = await readInstalledPlugins(environment.home);
     refusals.push(...installed.stateProblems);
-    for (const entry of installed.entries) {
+    // History, read only here: nothing that decides whether a plugin loads reads it.
+    const history = await installed.store.readCrashes();
+    if (!history.ok) refusals.push(...history.error);
+    const crashes = history.ok ? history.value.crashes : {};
+    for (const installedEntry of installed.entries) {
+      const crashed = crashes[installedEntry.folder];
+      const entry = { ...installedEntry, ...(crashed === undefined ? {} : { crashed }) };
       const status: PluginStatus =
-        entry.problems.length > 0 ? 'refused' : entry.enabled ? 'enabled' : 'disabled';
+        entry.problems.length > 0
+          ? 'refused'
+          : !entry.enabled
+            ? 'disabled'
+            : entry.crashed === undefined
+              ? 'enabled'
+              : 'crashed';
       if (status === 'refused') refusals.push(...entry.problems);
+      if (status === 'crashed' && entry.crashed !== undefined) {
+        refusals.push(diagnostic('W_PLUGIN_CRASHED', { plugin: entry.folder, ...entry.crashed }));
+      }
       listed.push({
         name: entry.folder,
         ...(entry.manifest === undefined ? {} : { manifest: entry.manifest }),
+        ...(entry.crashed === undefined ? {} : { crashed: entry.crashed }),
         origin: 'external',
         status,
       });
     }
   }
 
+  // A crashed plugin is still activated, so it is still active.
   const shown =
-    options.active === true ? listed.filter((plugin) => plugin.status === 'enabled') : listed;
+    options.active === true
+      ? listed.filter((plugin) => plugin.status === 'enabled' || plugin.status === 'crashed')
+      : listed;
   environment.console.out(options.json ? json(document(shown)) : formatList(shown));
-  // Said, not hidden: a listing that shows `refused` owes the reason.
+  // Said, not hidden: a listing that shows `refused` or `crashed` owes the reason.
   if (refusals.length > 0 && options.active !== true) {
     environment.console.err(formatDiagnostics(refusals));
   }
@@ -189,8 +214,8 @@ function fail(problems: Diagnostics, environment: CliEnvironment): ExitCode {
 }
 
 /**
- * The text the person approves. It names every permission, and it says plainly that the
- * approval is a record and not a sandbox yet — ADR 0040, until TYTO-48 isolates plugins.
+ * The text the person approves. It names every permission, and it says plainly what the
+ * worker thread is and is not (ADR 0041): a crash and API boundary, not a sandbox.
  */
 function permissionPrompt(manifest: PluginManifest, source: string): string {
   const permissions =
@@ -201,8 +226,9 @@ function permissionPrompt(manifest: PluginManifest, source: string): string {
     `${manifest.name} ${manifest.version} from ${source}\n` +
     `contributes: ${manifest.contributes.join(', ')}\n` +
     `permissions:\n${permissions}` +
-    'Plugins run inside Tyto with the same access to this computer as Tyto itself. The\n' +
-    'permissions above are recorded and shown, and not yet enforced.\n'
+    'Each plugin runs in a worker thread of its own, so a crash stops the plugin and not\n' +
+    'Tyto. That thread is not a sandbox: the plugin has the same access to this computer\n' +
+    'as Tyto itself. The permissions above are recorded and shown, and not yet enforced.\n'
   );
 }
 
@@ -270,6 +296,8 @@ export async function pluginInstallCommand(
         source: spec,
       }),
     );
+    // A new install is new code: the old one's crash is not its history.
+    await writeCrash(installed.store, manifest.name, undefined);
     environment.console.out(`Installed ${manifest.name} ${manifest.version}.\n`);
     return EXIT_OK;
   } finally {
@@ -311,6 +339,8 @@ export async function pluginStateCommand(
       withPluginEntry(state, name, { ...entry, enabled: change === 'enable' }),
     );
   }
+  // Enabling and removing clear a recorded crash: somebody looked, and chose.
+  if (change !== 'disable') await writeCrash(installed.store, name, undefined);
 
   environment.console.out(`${DONE[change]} ${name}.\n`);
   return EXIT_OK;

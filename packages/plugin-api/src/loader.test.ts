@@ -1,6 +1,12 @@
 import { type Diagnostics, type Result, isErr } from '@tyto/core';
 import { describe, expect, it } from 'vitest';
 
+import {
+  EMPTY_PLUGIN_CRASHES,
+  parsePluginCrashes,
+  serializePluginCrashes,
+  withPluginCrash,
+} from './crashes.js';
 import { checkInstallable, checkStoredPlugin, skippedPluginWarnings } from './loader.js';
 import {
   EMPTY_PLUGIN_STATE,
@@ -162,5 +168,44 @@ describe('plugin state', () => {
       'E_PLUGIN_STATE',
     ]);
     expect(codes(parsePluginState('nope', 'p.json'))).toEqual(['E_PLUGIN_STATE']);
+  });
+
+  it('drops a key it does not know rather than refusing the file (ADR 0041)', () => {
+    // What a newer CLI or desktop may write beside this one. Refusing it would cost the
+    // older app every installed plugin; dropping it costs only what it cannot use anyway.
+    const newer = JSON.stringify({
+      plugins: { pdf: { enabled: true, permissions: [], source: 'a', pinned: true } },
+      written: 'by a newer Tyto',
+    });
+
+    expect(parsePluginState(newer, 'plugins.json')).toEqual({
+      ok: true,
+      value: { plugins: { pdf: { enabled: true, permissions: [], source: 'a' } } },
+      diagnostics: [],
+    });
+  });
+});
+
+describe('crash history', () => {
+  const crash = { at: '2026-09-27T12:00:00.000Z', reason: 'its thread exited with code 7' };
+
+  it('round-trips, and clears an entry when handed nothing', () => {
+    const crashes = withPluginCrash(EMPTY_PLUGIN_CRASHES, 'pdf', crash);
+    expect(parsePluginCrashes(serializePluginCrashes(crashes), 'crashes.json')).toEqual({
+      ok: true,
+      value: crashes,
+      diagnostics: [],
+    });
+    expect(withPluginCrash(crashes, 'pdf', undefined)).toEqual(EMPTY_PLUGIN_CRASHES);
+  });
+
+  it('drops a key it does not know, from its first version', () => {
+    const newer = JSON.stringify({ crashes: { pdf: { ...crash, signal: 'SIGKILL' } }, v: 2 });
+    const read = parsePluginCrashes(newer, 'crashes.json');
+    expect(read.ok && read.value).toEqual({ crashes: { pdf: crash } });
+  });
+
+  it('refuses a file it cannot read, naming the file', () => {
+    expect(codes(parsePluginCrashes('nope', 'crashes.json'))).toEqual(['E_PLUGIN_STATE']);
   });
 });

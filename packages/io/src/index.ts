@@ -51,6 +51,7 @@ export {
 } from './fs-outbox.js';
 
 export {
+  PLUGIN_CRASHES_FILE,
   PLUGIN_MANIFEST_FILE,
   PLUGIN_STATE_FILE,
   PLUGINS_DIR,

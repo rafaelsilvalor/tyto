@@ -1,33 +1,41 @@
 import { access } from 'node:fs/promises';
 import { join } from 'node:path';
-import { pathToFileURL } from 'node:url';
 
 import { type Diagnostic, type Diagnostics, diagnostic } from '@tyto/core';
 import { fsPluginStore } from '@tyto/io';
 import { isRasterFormat } from '@tyto/pipeline';
 import {
   type InProcessHost,
+  type IsolatedPlugin,
   PLUGIN_API_VERSION,
   type Plugin,
+  type PluginCrash,
   type PluginManifest,
+  type PluginProcessLauncher,
   type PluginState,
   type PluginStore,
+  EMPTY_PLUGIN_CRASHES,
   checkStoredPlugin,
+  connectIsolatedPlugin,
   skippedPluginWarnings,
+  withPluginCrash,
 } from '@tyto/plugin-api';
+
+import { launchPluginWorker } from './worker-channel.js';
 
 /**
  * Installed plugins, from `~/.tyto` into a host (E11.1, `docs/plugin-api.md` Lifecycle).
  *
  * Two steps with two lifetimes, for the reason `activateBuiltIns` is per render: reading
- * the folders and importing the code happens **once per process**, and activating happens
- * **once per host**. `tyto watch` builds a host per task, and importing a plugin's module
- * per task would load the same code again for every folder in the inbox.
+ * the folders and starting the code happens **once per process**, and activating happens
+ * **once per host**. `tyto watch` builds a host per task, and starting a plugin per task
+ * would load the same code again for every folder in the inbox.
  *
- * **In process, and with Tyto's reach.** The code is imported with `import()` into this
- * process; a permission the person approved is recorded and shown and not enforced. That
- * is E11.2 (TYTO-48), and until it lands an installed plugin is trusted the way an npm
- * dependency is (ADR 0040).
+ * **In a worker thread of its own** (ADR 0041). Each plugin's module is imported by a
+ * worker, and what reaches a task's host is a proxy that calls it there, so a plugin that
+ * crashes costs the frames waiting on it and not the command. A thread is a crash and API
+ * boundary, **not a sandbox**: the plugin's code runs on the same Node with the same
+ * access to this computer (TYTO-186).
  */
 
 /** Where the code of an installed plugin is, relative to its folder (`docs/plugin-api.md`). */
@@ -90,58 +98,88 @@ function importFailure(plugin: string, problem: string): Diagnostic {
   return diagnostic('E_PLUGIN_ACTIVATE', { plugin, problem });
 }
 
-async function importPlugin(
+/**
+ * Writes a plugin's crash into `crashes.json`, or clears it when handed nothing.
+ *
+ * Read again first rather than written from what this process started with, because
+ * another command may have written the file since. An unreadable file is replaced: it is
+ * history, and a record nobody can read is not one worth keeping over a new one.
+ */
+export async function writeCrash(
+  store: PluginStore,
+  name: string,
+  crash: PluginCrash | undefined,
+): Promise<void> {
+  const read = await store.readCrashes();
+  const crashes = read.ok ? read.value : EMPTY_PLUGIN_CRASHES;
+  if (crash === undefined && crashes.crashes[name] === undefined) return;
+  await store.writeCrashes(withPluginCrash(crashes, name, crash));
+}
+
+async function startPlugin(
   store: PluginStore,
   entry: InstalledEntry & { readonly manifest: PluginManifest },
-): Promise<Plugin | Diagnostic> {
+  launch: PluginProcessLauncher,
+  crashes: Promise<void>[],
+): Promise<IsolatedPlugin | Diagnostics> {
   const path = join(store.directoryOf(entry.folder), PLUGIN_ENTRY);
   try {
     await access(path);
   } catch {
-    return importFailure(entry.folder, `it has no ${PLUGIN_ENTRY.replaceAll('\\', '/')}`);
+    return [importFailure(entry.folder, `it has no ${PLUGIN_ENTRY.replaceAll('\\', '/')}`)];
   }
 
-  let module: { readonly activate?: unknown };
-  try {
-    module = (await import(pathToFileURL(path).href)) as { readonly activate?: unknown };
-  } catch (cause) {
-    return importFailure(entry.folder, cause instanceof Error ? cause.message : String(cause));
-  }
-
-  const { activate } = module;
-  if (typeof activate !== 'function') {
-    return importFailure(entry.folder, `${PLUGIN_ENTRY} exports no activate function`);
-  }
-
-  return {
-    id: entry.folder,
+  const connected = await connectIsolatedPlugin({
+    name: entry.folder,
     // The validated manifest, handed over as the document it was: the host validates it
     // again at `tryActivate`, which is the one check a plugin cannot skip (ADR 0007).
     manifest: entry.manifest as unknown,
-    activate: activate as Plugin['activate'],
-  };
+    channel: launch({ name: entry.folder, entry: path }),
+    onCrash: (reason) => {
+      // Kept, so `close` can wait for it: a CLI that exits mid-write loses the record.
+      const crash = { at: new Date().toISOString(), reason };
+      crashes.push(writeCrash(store, entry.folder, crash).catch(() => undefined));
+    },
+  });
+  return connected.ok ? connected.value : connected.error;
 }
 
-/** What a render activates: the code that imported, and warnings for what did not. */
+/** What a render activates: the plugins that started, and warnings for what did not. */
 export interface LoadedPlugins {
   readonly plugins: readonly Plugin[];
   readonly warnings: Diagnostics;
+  /** Ends every plugin's process, and waits for any crash still being written down. */
+  close(): Promise<void>;
 }
 
-export const NO_PLUGINS: LoadedPlugins = { plugins: [], warnings: [] };
+export const NO_PLUGINS: LoadedPlugins = {
+  plugins: [],
+  warnings: [],
+  close: () => Promise.resolve(),
+};
+
+export interface LoadOptions {
+  /** How a plugin's process is started. A worker thread, unless a test says otherwise. */
+  readonly launch?: PluginProcessLauncher;
+}
 
 /**
- * Imports every enabled plugin that passed its checks, once.
+ * Starts every enabled plugin that passed its checks, once.
  *
- * A disabled plugin is neither imported nor mentioned: disabling is somebody's decision,
+ * A disabled plugin is neither started nor mentioned: disabling is somebody's decision,
  * and a warning on every render about it would be the app arguing with them.
  */
-export async function loadInstalledPlugins(home: string | undefined): Promise<LoadedPlugins> {
+export async function loadInstalledPlugins(
+  home: string | undefined,
+  options: LoadOptions = {},
+): Promise<LoadedPlugins> {
   if (home === undefined) return NO_PLUGINS;
 
   const installed = await readInstalledPlugins(home);
+  const launch = options.launch ?? launchPluginWorker;
   const warnings: Diagnostic[] = [];
-  const plugins: Plugin[] = [];
+  const started: IsolatedPlugin[] = [];
+  const crashes: Promise<void>[] = [];
 
   for (const entry of installed.entries) {
     if (entry.recorded && !entry.enabled) continue;
@@ -150,15 +188,27 @@ export async function loadInstalledPlugins(home: string | undefined): Promise<Lo
       continue;
     }
 
-    const imported = await importPlugin(installed.store, { ...entry, manifest: entry.manifest });
-    if ('code' in imported) {
-      warnings.push(...skippedPluginWarnings(entry.folder, [imported]));
+    const plugin = await startPlugin(
+      installed.store,
+      { ...entry, manifest: entry.manifest },
+      launch,
+      crashes,
+    );
+    if ('plugin' in plugin) {
+      started.push(plugin);
     } else {
-      plugins.push(imported);
+      warnings.push(...skippedPluginWarnings(entry.folder, plugin));
     }
   }
 
-  return { plugins, warnings };
+  return {
+    plugins: started.map((plugin) => plugin.plugin),
+    warnings,
+    async close() {
+      await Promise.all(started.map((plugin) => plugin.close()));
+      await Promise.all(crashes);
+    },
+  };
 }
 
 /**

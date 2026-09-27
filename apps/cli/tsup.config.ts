@@ -1,7 +1,9 @@
 import { defineConfig } from 'tsup';
 
 export default defineConfig({
-  entry: ['src/index.ts'],
+  // Two bundles: the CLI, and the file each installed plugin's worker thread starts from,
+  // which a worker can only be given as a file of its own (ADR 0041).
+  entry: { index: 'src/index.ts', 'plugin-worker': 'src/plugins/plugin-worker.ts' },
   format: ['esm'],
   dts: false,
   sourcemap: true,

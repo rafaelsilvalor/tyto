@@ -66,8 +66,21 @@ function environment(overrides: Partial<CliEnvironment> = {}): CliEnvironment {
 const stdout = (): string => out.join('');
 const stderr = (): string => errors.join('');
 
-/** The exporter `activate` of a fixture plugin: every frame becomes one line of text. */
-function exporterSource(id: string, kinds: readonly string[], rasterized = false): string {
+/**
+ * The exporter `activate` of a fixture plugin: every frame becomes one line of text.
+ *
+ * `crashes` makes every frame end the plugin's thread instead — `process.exit` inside a
+ * worker ends the worker and nothing else, which is the kill the acceptance test needs.
+ */
+function exporterSource(
+  id: string,
+  kinds: readonly string[],
+  rasterized = false,
+  crashes = false,
+): string {
+  const body = crashes
+    ? 'process.exit(7)'
+    : `({ ok: true, value: artwork.id + ' ' + frame.format, diagnostics: [] })`;
   return `export function activate(host) {
   host.registerExporter({
     id: ${JSON.stringify(id)},
@@ -75,11 +88,7 @@ function exporterSource(id: string, kinds: readonly string[], rasterized = false
     extension: 'txt',
     kinds: ${JSON.stringify(kinds)},
     rasterized: ${String(rasterized)},
-    exportFrame: (scene, artwork, frame) => ({
-      ok: true,
-      value: artwork.id + ' ' + frame.format,
-      diagnostics: [],
-    }),
+    exportFrame: (scene, artwork, frame) => ${body},
   });
 }
 `;
@@ -92,6 +101,7 @@ interface FixtureOptions {
   readonly kinds?: readonly string[];
   readonly permissions?: readonly string[];
   readonly rasterized?: boolean;
+  readonly crashes?: boolean;
 }
 
 /** A plugin folder on disk: manifest, code, and a package.json so npm can pack it. */
@@ -111,7 +121,12 @@ async function pluginFolder(options: FixtureOptions = {}): Promise<string> {
   );
   await writeFile(
     join(folder, 'dist', 'index.js'),
-    exporterSource(options.exporterId ?? name, options.kinds ?? ['txt'], options.rasterized),
+    exporterSource(
+      options.exporterId ?? name,
+      options.kinds ?? ['txt'],
+      options.rasterized,
+      options.crashes,
+    ),
   );
   await writeFile(
     join(folder, 'package.json'),
@@ -228,7 +243,7 @@ describe('what install refuses', () => {
     expect(stderr()).toContain("A plugin named 'svg' is already here (built-in).");
   });
 
-  it('shows the permissions, says they are not enforced, and asks', async () => {
+  it('shows the permissions, says the thread is no sandbox, and asks', async () => {
     const questions: string[] = [];
     const code = await run(
       ['plugin', 'install', await pluginFolder({ permissions: ['net:api.example.com'] })],
@@ -243,6 +258,7 @@ describe('what install refuses', () => {
     expect(code).toBe(EXIT_DIAGNOSTICS);
     expect(questions).toEqual(['Install it? [y/N] ']);
     expect(stderr()).toContain('  - net:api.example.com\n');
+    expect(stderr()).toContain('That thread is not a sandbox');
     expect(stderr()).toContain('recorded and shown, and not yet enforced');
     expect(stderr()).toContain('Not installed.');
   });
@@ -392,5 +408,60 @@ describe('an installed exporter at render', () => {
     expect(await readFile(join(workspace, 'task', 'out', 'slide-1-feed.svg'), 'utf8')).toMatch(
       /^<svg/u,
     );
+  });
+});
+
+describe('a plugin whose thread is killed mid-render', () => {
+  it('fails its own frames, renders the rest, and is listed as crashed until enabled', async () => {
+    await run(['plugin', 'install', await pluginFolder({ crashes: true }), '--yes'], environment());
+
+    const code = await run(renderArguments('txt,svg'), environment());
+
+    // Exit 1: the txt frames failed, as data. The command itself finished, and Tyto's own
+    // exporter drew every svg frame after the plugin's thread was gone.
+    expect(code, stderr()).toBe(EXIT_DIAGNOSTICS);
+    const result = JSON.parse(
+      await readFile(join(workspace, 'task', 'out', 'result.json'), 'utf8'),
+    ) as { artifacts: { name: string }[]; diagnostics: { code: string; message: string }[] };
+    expect(result.artifacts.map((artifact) => artifact.name)).toEqual([
+      'slide-1-feed.svg',
+      'slide-2-feed.svg',
+    ]);
+    expect(new Set(result.diagnostics.map((item) => item.message))).toEqual(
+      new Set(["Plugin 'texto' stopped running: its thread exited with code 7."]),
+    );
+
+    // Written beside plugins.json and not into it: an older CLI or desktop reading
+    // plugins.json must see exactly what it would have written itself (ADR 0041).
+    const state = await readFile(join(home, 'plugins.json'), 'utf8');
+    expect(state).not.toContain('crash');
+    const history = JSON.parse(await readFile(join(home, 'crashes.json'), 'utf8')) as {
+      crashes: Record<string, { reason: string }>;
+    };
+    expect(history.crashes['texto']?.reason).toBe('its thread exited with code 7');
+
+    errors = [];
+    const plugins = await listed();
+    expect(plugins.at(-1)).toMatchObject({
+      name: 'texto',
+      status: 'crashed',
+      crashed: { reason: 'its thread exited with code 7' },
+    });
+    expect(stderr()).toMatch(
+      /Plugin 'texto' crashed at \d{4}-\d\d-\d\dT[^:]+:\d\d:\d\d\.\d+Z: its thread exited with code 7\. It is still activated/u,
+    );
+    // History, not a refusal: it is still what a render would activate.
+    expect((await listed('--active')).map((plugin) => plugin.name)).toContain('texto');
+
+    // And it is started afresh on the next run, which is what "responsive" means for a
+    // command: the crash cost one render's frames and nothing after it.
+    expect(await run(renderArguments('svg'), environment())).toBe(EXIT_OK);
+
+    expect(await run(['plugin', 'enable', 'texto'], environment())).toBe(EXIT_OK);
+    expect((await listed()).at(-1)).toMatchObject({
+      name: 'texto',
+      status: 'enabled',
+      crashed: null,
+    });
   });
 });

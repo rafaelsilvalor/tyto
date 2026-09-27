@@ -653,6 +653,36 @@ describe('a kind Tyto never shipped (TYTO-47)', () => {
   });
 });
 
+describe('an exporter that answers later (TYTO-48)', () => {
+  it('is awaited, because an isolated plugin answers from another thread', async () => {
+    const host = createPluginHost();
+    host.hostFor('later').registerExporter({
+      id: 'later',
+      mime: 'text/plain',
+      extension: 'txt',
+      kinds: ['txt'],
+      rasterized: false,
+      exportFrame: async (_scene, artwork, frame) => {
+        await new Promise((resolve) => setTimeout(resolve, 1));
+        return ok(`${artwork.id} ${frame.format}`);
+      },
+    });
+
+    const sink = recordingSink();
+    const { rasterizer: _ignored, ...withoutRasterizer } = await portsOf({
+      exporters: host.registry.exporters,
+      sink,
+    });
+    const result = await runJob(
+      { brief: briefSource, outputs: [{ kind: 'txt' }] },
+      withoutRasterizer,
+    );
+
+    expect(result.ok && result.value.rendered).toBe(6);
+    expect(new TextDecoder().decode(sink.written[0]?.bytes)).toBe('slide-1 feed');
+  });
+});
+
 describe('the resources stage', () => {
   /**
    * A folder of many files, of which the brief draws one.

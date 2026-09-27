@@ -2,6 +2,7 @@ import { type Diagnostic, type Diagnostics, type Result, diagnostic, err, ok } f
 
 import { satisfiesEngine } from './engine.js';
 import { type PluginManifest, parsePluginManifest } from './manifest.js';
+import type { PluginCrashes } from './crashes.js';
 import type { PluginState } from './state.js';
 
 /**
@@ -38,6 +39,14 @@ export interface PluginStore {
   /** The approval state; an absent file is {@link EMPTY_PLUGIN_STATE}, not an error. */
   readState(): Promise<Result<PluginState, Diagnostics>>;
   writeState(state: PluginState): Promise<void>;
+  /**
+   * The crash history; an absent file is {@link EMPTY_PLUGIN_CRASHES}, not an error.
+   *
+   * Apart from the state on purpose (ADR 0041): only `plugin list` reads it, and nothing
+   * that decides whether a plugin loads.
+   */
+  readCrashes(): Promise<Result<PluginCrashes, Diagnostics>>;
+  writeCrashes(crashes: PluginCrashes): Promise<void>;
   /**
    * Copies a folder in as `plugins/<name>/`, replacing whatever was there.
    *

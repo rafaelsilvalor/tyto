@@ -495,10 +495,11 @@ export async function runJob(
     return encoding;
   }
 
-  function bytesOf(task: Task): Result<string, Diagnostics> {
+  async function bytesOf(task: Task): Promise<Result<string, Diagnostics>> {
     // An exporter that does not understand `textAsPaths` ignores it, which is why this is
     // the same call for every kind. The resources were bound when it was registered.
-    const exported = exporterOf(task).exportFrame(scene, task.artwork, task.frame, {
+    // Awaited, because an isolated plugin's exporter answers from another thread (ADR 0041).
+    const exported = await exporterOf(task).exportFrame(scene, task.artwork, task.frame, {
       ...(task.output.textAsPaths === undefined ? {} : { textAsPaths: task.output.textAsPaths }),
     });
 
@@ -560,7 +561,7 @@ export async function runJob(
 
     notify(onEvent, { kind: 'frame-started', target: task.target });
 
-    const document = bytesOf(task);
+    const document = await bytesOf(task);
     const encoded = document.ok ? await encode(task, document.value) : err(document.error);
     const carried = document.ok ? document.diagnostics : [];
 

@@ -285,6 +285,40 @@ export const diagnosticCodes = {
     fatal: true,
     fatality: 'A plugin that did not load contributed no slot to skip.',
   },
+  E_PLUGIN_CRASHED: {
+    severity: 'error',
+    summary: "An isolated plugin's process stopped while the host was waiting for it.",
+    template: "Plugin '{plugin}' stopped running: {reason}.",
+    spec: 'docs/plugin-api.md',
+    fatal: false,
+    fatality:
+      'One frame was waiting on the process; the frames other exporters draw survive (ADR 0025).',
+  },
+  E_PLUGIN_PROTOCOL: {
+    severity: 'error',
+    summary: 'An isolated plugin sent the host a message that does not match the RPC protocol.',
+    template: "Plugin '{plugin}' sent a message the host cannot read: {problem}.",
+    spec: 'docs/plugin-api.md',
+    fatal: false,
+    fatality: 'It costs the one frame whose answer it was; the others are drawn (ADR 0025).',
+  },
+  E_PLUGIN_CALL: {
+    severity: 'error',
+    summary: 'A function an isolated plugin registered threw when the host called it.',
+    template: "Plugin '{plugin}' threw while the host was calling it: {problem}.",
+    spec: 'docs/plugin-api.md',
+    fatal: false,
+    fatality: 'It costs the one frame the call was for; the others are drawn (ADR 0025).',
+  },
+  W_PLUGIN_CRASHED: {
+    severity: 'warning',
+    summary: "An installed plugin's process crashed on an earlier run. History, not a refusal.",
+    template:
+      "Plugin '{plugin}' crashed at {at}: {reason}. It is still activated; installing or enabling it again clears this.",
+    spec: 'docs/plugin-api.md',
+    fatal: false,
+    fatality: 'A note about an earlier run; nothing in this one is missing because of it.',
+  },
   E_PLUGIN_FETCH: {
     severity: 'error',
     summary: 'A plugin could not be copied or fetched from where tyto plugin install was told.',
