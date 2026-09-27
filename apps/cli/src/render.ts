@@ -7,8 +7,15 @@ import { ASSETS_DIR } from '@tyto/io';
 import type { CliEnvironment } from './environment.js';
 import { EXIT_DIAGNOSTICS, EXIT_OK, type ExitCode } from './exit.js';
 import { type OutputKind, needsRasterizer, outputRequests, unavailableTypes } from './options.js';
-import { loadInstalledPlugins, pluginCapabilities, reachableExporters } from './plugins/index.js';
-import { loadRenderContext, readFailure } from './render-context.js';
+import {
+  type LoadedPlugins,
+  loadInstalledPlugins,
+  pluginCapabilities,
+  pluginFolders,
+  reachableExporters,
+  withoutRefused,
+} from './plugins/index.js';
+import { type RenderContextOptions, loadRenderContext, readFailure } from './render-context.js';
 import { renderTask } from './render-task.js';
 import { diagnosticsDocument, formatDiagnostics, json } from './report.js';
 
@@ -56,6 +63,16 @@ export interface RenderCommandOptions {
  * the honest answer: `basename` removes a suffix only when it is there.
  */
 const BRIEF_SUFFIX = '.brief';
+
+/** What `loadRenderContext` needs to search installed packs, when there is a home to read. */
+export function installedOption(
+  environment: CliEnvironment,
+  plugins: LoadedPlugins,
+): Pick<RenderContextOptions, 'installed'> {
+  return environment.home === undefined
+    ? {}
+    : { installed: { plugins, folderOf: pluginFolders(environment.home) } };
+}
 
 /** Paths are printed as the user would type them, not as this machine stores them. */
 export function displayPath(cwd: string, path: string): string {
@@ -116,21 +133,26 @@ export async function renderCommand(
     return reportFailure(readFailure(shownBrief, cause), options, environment);
   }
 
+  // Before the project, because an installed plugin's template pack is part of it: the
+  // registry a brief is resolved against has to be able to find its templates (ADR 0046).
+  const loaded = await loadInstalledPlugins(environment.home, {
+    capabilities: pluginCapabilities(environment.variables),
+  });
   const context = await loadRenderContext({
     templatesDirectory: resolve(cwd, options.templates),
     formatsFile: resolve(cwd, options.formatsFile),
     templatesDirectoryIsDefault: options.templatesNamed !== true,
+    ...installedOption(environment, loaded),
   });
   if (!context.ok) {
+    await loaded.close();
     return reportFailure(context.error, options, environment, {
       path: shownBrief,
       source,
     });
   }
 
-  const plugins = await loadInstalledPlugins(environment.home, {
-    capabilities: pluginCapabilities(environment.variables),
-  });
+  const plugins = withoutRefused(loaded, context.value.refusedPlugins);
   const { exporters, warnings: skipped } = reachableExporters(plugins);
   const unavailable = unavailableTypes(options.types, exporters);
   if (unavailable !== undefined) {

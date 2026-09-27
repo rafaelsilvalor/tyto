@@ -180,6 +180,20 @@ The registry is built from the host's packs and not from a path passed around it
 the difference between an extension point and a decoration: a pack that were registered and
 never read would be one nobody could tell was broken.
 
+**An installed pack is searched after the built-in one, and is checked first** (ADR 0046).
+Until TYTO-50 an installed pack was exactly that decoration: `loadRenderContext` held the
+built-in pack alone, and every brief naming an installed template was `E_UNKNOWN_TEMPLATE`.
+Now the CLI activates each installed plugin into the project's host too, and searches the
+packs it registered after the built-in one, so `W_TEMPLATE_SHADOWED` names an installed
+template the project or the built-in hides. `directory` is relative to the plugin's
+installed folder and may not lead out of it, links included, or it is
+`E_PLUGIN_PACK_DIRECTORY`. Every template in it must be markup (`template.html`, no
+`template.ts`), or it is `E_PLUGIN_PACK_CODE`. Either one refuses the whole plugin, so a
+render reports it as `W_PLUGIN_SKIPPED` and no task activates its other contributions. The
+host reads the manifests from the folder and not from the contribution's `templates`, which a
+plugin may leave empty. The desktop does not search installed packs yet; that is the second
+TYTO-50 pull request. `docs/plugin-authoring.md` walks one from `tyto plugin new` to a render.
+
 ### `editor.command` and `editor.keymap`, in full
 
 ```ts
@@ -286,7 +300,7 @@ host (CLI thread)                                guest (plugin's worker)
 
 ## Lifecycle
 
-`tyto plugin install <folder|git|npm>` → fetches → validates `tyto-plugin.json` and its `engine` → shows permissions and asks → copies to `~/.tyto/plugins/<name>/` → activated on the next run. `plugin list`, `plugin disable`, `plugin enable`, `plugin remove`.
+`tyto plugin install <folder|git|npm>` → fetches → validates `tyto-plugin.json` and its `engine` → shows permissions and asks → copies to `~/.tyto/plugins/<name>/` → activated on the next run. `plugin list`, `plugin disable`, `plugin enable`, `plugin remove`. `plugin new <name>` scaffolds a template pack that installs and renders unedited (`docs/plugin-authoring.md`).
 
 ```
 ~/.tyto/

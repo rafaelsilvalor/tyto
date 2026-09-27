@@ -296,6 +296,25 @@ export const diagnosticCodes = {
     fatal: true,
     fatality: 'A plugin that did not load contributed no slot to skip.',
   },
+  // A pack's folder is a string the plugin's own thread wrote, so where it points is checked
+  // on the host's side before anything is searched there (ADR 0046).
+  E_PLUGIN_PACK_DIRECTORY: {
+    severity: 'error',
+    summary: "A plugin's template pack names a folder outside the plugin's installed folder.",
+    template: "Plugin '{plugin}' contributes template pack folder '{directory}', and {problem}.",
+    spec: 'docs/adr/0046-an-installed-template-pack-is-markup-inside-its-plugin.md',
+    fatal: true,
+    fatality: 'A plugin that did not load contributed no slot to skip.',
+  },
+  E_PLUGIN_PACK_CODE: {
+    severity: 'error',
+    summary: "A plugin's template pack holds a template that is not markup.",
+    template:
+      "Plugin '{plugin}' contributes template '{template}', which is not a markup template: an installed pack may hold only folders with a template.html and no template.ts.",
+    spec: 'docs/adr/0046-an-installed-template-pack-is-markup-inside-its-plugin.md',
+    fatal: true,
+    fatality: 'A plugin that did not load contributed no slot to skip.',
+  },
   E_PLUGIN_CRASHED: {
     severity: 'error',
     summary: "An isolated plugin's process stopped while the host was waiting for it.",

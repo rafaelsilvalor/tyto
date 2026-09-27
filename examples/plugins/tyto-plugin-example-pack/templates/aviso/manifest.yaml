@@ -1,0 +1,8 @@
+name: aviso
+version: 0.1.0
+description: A notice with a headline, a line of detail and a colour.
+formats: [feed, story]
+slots:
+  titulo: { type: rich-text, required: true, max: 60 }
+  detalhe: { type: rich-text, max: 120 }
+  cor: { type: enum, values: [azul, laranja], default: azul }
