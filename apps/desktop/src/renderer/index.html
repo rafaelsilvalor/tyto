@@ -108,6 +108,13 @@
       window rather than living in a dock, and it renders nothing while closed.
     -->
     <tyto-export-dialog></tyto-export-dialog>
+
+    <!--
+      The template mode (TYTO-44), outside `.shell` because it covers the window. Unlike the
+      two above it renders while closed: its two CodeMirror views are made once and kept, so
+      closing the mode does not throw away either undo history.
+    -->
+    <tyto-template-mode></tyto-template-mode>
     <script type="module" src="./main.ts"></script>
   </body>
 </html>

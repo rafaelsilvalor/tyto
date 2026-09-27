@@ -188,7 +188,7 @@ describe('the File submenu', () => {
     const items = fileSubmenu(template('linux'));
     const shape = items.map((item) => (item.type === 'separator' ? '—' : (item.id ?? item.role)));
 
-    // Four groups, so three separators between them — plus the fourth before Quit, which is
+    // Five groups, so four separators between them — plus the fifth before Quit, which is
     // appended on this platform rather than coming from the table.
     expect(shape).toEqual([
       'document.new',
@@ -198,6 +198,9 @@ describe('the File submenu', () => {
       'editor.saveAs',
       '—',
       'file.export',
+      '—',
+      'template.new',
+      'template.edit',
       '—',
       'document.close',
       '—',
