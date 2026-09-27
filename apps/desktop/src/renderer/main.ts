@@ -19,6 +19,7 @@ import {
 } from './panel.js';
 import { type CommandEntry, type CommandBar, COMMAND_BAR_TAG } from './command-bar.js';
 import { type ExportDialog, type ExportProgressView, EXPORT_DIALOG_TAG } from './export-dialog.js';
+import { type PluginsDialog, PLUGINS_DIALOG_TAG } from './plugins-dialog.js';
 import type { TemplateMode } from './template-mode.js';
 import { TEMPLATE_MODE_TAG } from './template-mode-tag.js';
 import {
@@ -265,6 +266,8 @@ function resolveElements() {
     problemsCount: byId('problems-count'),
     commandBar: document.querySelector<CommandBar>(COMMAND_BAR_TAG),
     exportDialog: document.querySelector<ExportDialog>(EXPORT_DIALOG_TAG),
+    // TYTO-47. By tag, for the problems panel's reason: naming it keeps the import a runtime one.
+    pluginsDialog: document.querySelector<PluginsDialog>(PLUGINS_DIALOG_TAG),
     // TYTO-44. Outside `.shell` for the export dialog's reason: it covers the window.
     templateMode: document.querySelector<TemplateMode>(TEMPLATE_MODE_TAG),
     // Outside the docks, like the command bar: the strip lists what the *window* has open,
@@ -499,6 +502,27 @@ function stopWatchingExport(): void {
   exportPoll = undefined;
 }
 
+/**
+ * The plugins screen (TYTO-47): opened empty and filled when main answers, so a slow disk
+ * shows the notice at once rather than nothing. Asked on every open, never cached — a plugin
+ * installed from a terminal beside the window is the ordinary way one arrives.
+ */
+function openPluginsDialog(): void {
+  const dialog = elements.pluginsDialog;
+  if (dialog === null || dialog === undefined) return;
+
+  dialog.locale = state.locale;
+  dialog.view = undefined;
+  dialog.open = true;
+  void withBridge(async (bridge) => {
+    try {
+      dialog.view = await bridge['plugins:list']({});
+    } catch {
+      dialog.view = 'failed';
+    }
+  });
+}
+
 function openExportDialog(): void {
   const dialog = elements.exportDialog;
   if (dialog === null || dialog === undefined) return;
@@ -629,6 +653,9 @@ const registry: CommandRegistry = createDesktopRegistry({
   },
   openExport: () => {
     openExportDialog();
+  },
+  showPlugins: () => {
+    openPluginsDialog();
   },
 
   editTemplate: () => {
@@ -1311,6 +1338,7 @@ function applyLocale(next: Locale): void {
   if (customElements.get(TEMPLATE_MODE_TAG) !== undefined && elements.templateMode) {
     elements.templateMode.locale = next;
   }
+  if (elements.pluginsDialog) elements.pluginsDialog.locale = next;
   if (elements.locale !== null) fillLocalePicker(elements.locale, state.locale);
   editor?.setSearchPhrases(searchPhrasesFor(state.locale));
   repaint();

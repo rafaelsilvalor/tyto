@@ -608,6 +608,35 @@ export const IPC_CHANNELS = {
   'export:choose-directory': channel(z.object({}), z.object({ directory: z.string().optional() })),
 
   /**
+   * The plugins screen (TYTO-47): the built-ins this app activated and what `tyto plugin
+   * install` put under `~/.tyto`, with the reason when one would be refused.
+   *
+   * Read-only on purpose. Installing, removing and disabling are the CLI's, and the window
+   * activates no installed plugin yet — that is the desktop half of TYTO-48. `folder` is where
+   * the plugins live, so the screen can say where to look; `problems` are already-rendered
+   * sentences, because the renderer shows them and has no catalogue of diagnostic codes.
+   */
+  'plugins:list': channel(
+    z.object({}),
+    z.object({
+      folder: z.string().min(1),
+      plugins: z
+        .array(
+          z.object({
+            name: z.string().min(1),
+            version: z.string().nullable(),
+            origin: z.enum(['built-in', 'external']),
+            status: z.enum(['enabled', 'disabled', 'refused']),
+            contributes: z.array(z.string()),
+            permissions: z.array(z.string()),
+            problems: z.array(z.string()),
+          }),
+        )
+        .max(500),
+    }),
+  ),
+
+  /**
    * Something went wrong in the window, written down where a report can reach it (TYTO-132).
    *
    * An ordinary question and deliberately not a push: the renderer is the side that *has* the

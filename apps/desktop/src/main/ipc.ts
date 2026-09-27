@@ -126,6 +126,11 @@ export interface IpcDependencies {
    * picker is an Electron dialog, and the service below it names none.
    */
   readonly templateEditor: TemplateEditorService;
+  /** The plugins screen (TYTO-47): built-ins and installed plugins, read and never run. */
+  readonly plugins: {
+    readonly folder: string;
+    list: () => Promise<readonly IpcResponse<'plugins:list'>['plugins'][number][]>;
+  };
   readonly templateDialogs: {
     /** A template folder to edit, or nothing when the picker is dismissed. */
     chooseTemplate: () => Promise<string | undefined>;
@@ -161,6 +166,7 @@ export function createHandlers(dependencies: IpcDependencies): Handlers {
     layout,
     log,
     menu,
+    plugins,
     preview,
     project,
     templateDialogs,
@@ -308,6 +314,8 @@ export function createHandlers(dependencies: IpcDependencies): Handlers {
       log[level](message, detail);
       return Promise.resolve({});
     },
+
+    'plugins:list': async () => ({ folder: plugins.folder, plugins: [...(await plugins.list())] }),
 
     'log:reveal': async () => {
       await folders.reveal(log.directory);

@@ -82,6 +82,19 @@ export function cliVersion(): string {
   return manifest.version ?? '0.0.0';
 }
 
+/**
+ * `~/.tyto`, or wherever `TYTO_HOME` points (`docs/plugin-api.md`, Lifecycle).
+ *
+ * The desktop reads the same variable (`apps/desktop/src/main/plugin-list.ts`), so the two
+ * apps always agree about which plugins are installed. An empty value counts as unset: a
+ * shell that exported `TYTO_HOME=` meant nothing by it, and a relative empty path would be
+ * the current folder.
+ */
+export function tytoHome(environment: NodeJS.ProcessEnv = process.env): string {
+  const named = environment['TYTO_HOME'];
+  return named !== undefined && named !== '' ? named : join(homedir(), '.tyto');
+}
+
 /** `y` or `yes`, any case. Anything else — an empty line included — is a no. */
 async function askOnTerminal(question: string): Promise<boolean> {
   const terminal = createInterface({ input: process.stdin, output: process.stderr });
@@ -95,7 +108,7 @@ async function askOnTerminal(question: string): Promise<boolean> {
 
 export function defaultEnvironment(): CliEnvironment {
   return {
-    home: join(homedir(), '.tyto'),
+    home: tytoHome(),
     ...(process.stdin.isTTY ? { confirm: askOnTerminal } : {}),
     console: {
       out: (text) => {

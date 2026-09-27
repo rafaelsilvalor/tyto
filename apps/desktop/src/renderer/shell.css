@@ -1093,3 +1093,95 @@ tyto-template-mode [hidden] {
   color: var(--muted);
   font-family: ui-monospace, monospace;
 }
+
+/* The plugins screen (TYTO-47). The export dialog's arrangement — it covers the window and the
+   host is `display: contents` until it opens — and wider, because it is a table. */
+tyto-plugins-dialog {
+  display: contents;
+}
+
+tyto-plugins-dialog[open] {
+  position: fixed;
+  inset: 0;
+  z-index: 10;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgb(0 0 0 / 25%);
+}
+
+.plugins__panel {
+  display: flex;
+  overflow: auto;
+  width: min(820px, calc(100vw - 32px));
+  max-height: calc(100vh - 32px);
+  flex-direction: column;
+  padding: 16px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  margin: 16px;
+  background: var(--ground);
+  box-shadow: 0 16px 48px rgb(0 0 0 / 18%);
+  gap: 10px;
+}
+
+.plugins__title {
+  margin: 0;
+  font-size: 16px;
+}
+
+.plugins__notice {
+  padding: 8px 10px;
+  border-left: 3px solid var(--warning, #b7791f);
+  margin: 0;
+  background: rgb(183 121 31 / 10%);
+  font-size: 13px;
+}
+
+.plugins__inactive,
+.plugins__install,
+.plugins__folder,
+.plugins__failure {
+  margin: 0;
+  font-size: 13px;
+}
+
+.plugins__folder code {
+  word-break: break-all;
+}
+
+.plugins__table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+}
+
+.plugins__table th,
+.plugins__table td {
+  padding: 4px 8px;
+  border-bottom: 1px solid var(--line);
+  text-align: left;
+  vertical-align: top;
+}
+
+/* A name or a point is one word to a reader; breaking `built-in-templates` at its hyphens
+   made it look like three. */
+.plugins__name,
+.plugins__table td:nth-child(5) {
+  white-space: nowrap;
+}
+
+.plugins__row[data-status='refused'] .plugins__status {
+  color: var(--error, #c53030);
+}
+
+.plugins__problems {
+  padding-left: 16px;
+  margin: 4px 0 0;
+  color: var(--error, #c53030);
+}
+
+.plugins__actions {
+  display: flex;
+  justify-content: flex-end;
+}

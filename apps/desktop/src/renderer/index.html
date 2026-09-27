@@ -110,6 +110,12 @@
     <tyto-export-dialog></tyto-export-dialog>
 
     <!--
+      The plugins screen (TYTO-47), outside `.shell` for the export dialog's reason: it covers
+      the window, and it renders nothing while closed.
+    -->
+    <tyto-plugins-dialog></tyto-plugins-dialog>
+
+    <!--
       The template mode (TYTO-44), outside `.shell` because it covers the window. Unlike the
       two above it renders while closed: its two CodeMirror views are made once and kept, so
       closing the mode does not throw away either undo history.

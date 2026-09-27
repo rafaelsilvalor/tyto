@@ -252,6 +252,7 @@ describe('the bridge', () => {
       'log:reveal',
       'log:write',
       'on',
+      'plugins:list',
       'template:new',
       'template:open',
       'template:preview',
@@ -467,6 +468,12 @@ describe('the language picker', () => {
     'command.template.edit',
     'command.template.new',
     ...CATALOGUE_KEYS.filter((key) => key.startsWith('templateMode.')),
+    // TYTO-47: the plugins screen is closed on load and renders nothing while closed — the
+    // export dialog's case. Excluded because they are not on screen yet, not to loosen the
+    // count: `src/renderer/plugins-dialog.test.ts` renders every one of them, and
+    // `e2e/plugins.desktop.test.ts` opens the real screen and measures it is drawn.
+    'command.plugins.show',
+    ...CATALOGUE_KEYS.filter((key) => key.startsWith('plugins.')),
   ];
 
   it('paints every catalogue string on load, with none left blank', async () => {

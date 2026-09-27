@@ -159,6 +159,7 @@ describe('installing from each of the three sources', () => {
     expect(await readdir(join(home, 'plugins', 'texto'))).toContain('tyto-plugin.json');
   });
 
+  // Four git processes: measured at 5.3 s under a full `pnpm check`, past Vitest's 5 s default.
   it('installs from a git URL, cloning it with git', async () => {
     const folder = await pluginFolder();
     const git = ['-c', 'user.name=Tyto', '-c', 'user.email=tyto@example.invalid'];
@@ -181,7 +182,7 @@ describe('installing from each of the three sources', () => {
       'package.json',
       'tyto-plugin.json',
     ]);
-  });
+  }, 60_000);
 
   it('installs an npm spec, fetching it with npm pack', async () => {
     // A tarball is an npm spec like a name is; `npm pack` resolves both the same way, and
