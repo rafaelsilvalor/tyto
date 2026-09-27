@@ -19,6 +19,7 @@ import { type DocumentService } from './documents.js';
 import { type ExportService } from './export.js';
 import { type LayoutStore } from './layout-store.js';
 import { type PreviewService } from './preview.js';
+import { type TemplateDiagnostic, type TemplateEditorService } from './template-editor.js';
 import { type TemplateCatalogue } from './templates.js';
 
 /**
@@ -119,7 +120,27 @@ export interface IpcDependencies {
   readonly menu: {
     setLocale: (locale: string) => void;
   };
+  /**
+   * The template mode (TYTO-44), and the two pickers it needs. Wrapped like `folders`: a
+   * picker is an Electron dialog, and the service below it names none.
+   */
+  readonly templateEditor: TemplateEditorService;
+  readonly templateDialogs: {
+    /** A template folder to edit, or nothing when the picker is dismissed. */
+    chooseTemplate: () => Promise<string | undefined>;
+    /** Where a new template goes when no template folder is chosen. */
+    chooseParent: () => Promise<string | undefined>;
+  };
 }
+
+/** What crosses the bridge of a diagnostic: the fields the contract names, and no others. */
+const wireDiagnostic = (item: TemplateDiagnostic) => ({
+  severity: item.severity,
+  code: item.code,
+  message: item.message,
+  file: item.file,
+  ...(item.range === undefined ? {} : { range: item.range }),
+});
 
 /** One handler per channel, typed against the contract in both directions. */
 type Handlers = {
@@ -141,6 +162,8 @@ export function createHandlers(dependencies: IpcDependencies): Handlers {
     menu,
     preview,
     project,
+    templateDialogs,
+    templateEditor,
     templates,
   } = dependencies;
 
@@ -288,6 +311,54 @@ export function createHandlers(dependencies: IpcDependencies): Handlers {
     'app:locale': ({ locale }) => {
       menu.setLocale(locale);
       return Promise.resolve({});
+    },
+
+    'template:open': async ({ directory }) => {
+      const chosen = directory ?? (await templateDialogs.chooseTemplate());
+      if (chosen === undefined) return { template: null };
+      const opened = await templateEditor.open(chosen);
+      return {
+        template:
+          opened.kind === 'markup'
+            ? { ...opened, examples: opened.examples.map((example) => ({ ...example })) }
+            : opened,
+      };
+    },
+
+    'template:preview': async ({ requestId, directory, manifest, markup, brief, briefPath }) => {
+      const result = await templateEditor.preview({
+        directory,
+        manifest,
+        markup,
+        brief,
+        ...(briefPath === undefined ? {} : { briefPath }),
+      });
+      return {
+        requestId,
+        frames: [...result.frames],
+        diagnostics: result.diagnostics.map(wireDiagnostic),
+      };
+    },
+
+    'template:save': async ({ directory, manifest, markup }) => {
+      const result = await templateEditor.save({ directory, manifest, markup });
+      return {
+        saved: result.saved,
+        registered: result.registered,
+        ...(result.name === undefined ? {} : { name: result.name }),
+        diagnostics: result.diagnostics.map(wireDiagnostic),
+      };
+    },
+
+    'template:new': async ({ name }) => {
+      // Into the template folder in force, so the new template is one briefs can name at once;
+      // with none chosen, wherever the person says.
+      const parent = project.folder().folder ?? (await templateDialogs.chooseParent());
+      if (parent === undefined) return { directory: null };
+      const result = await templateEditor.scaffold(parent, name);
+      return result.ok
+        ? { directory: result.directory }
+        : { directory: null, problem: result.problem, detail: result.detail };
     },
   };
 }

@@ -162,6 +162,18 @@ describe('createEditor', () => {
     expect(painted).toContain('**Constitucional**');
   });
 
+  it('paints nothing in the plain language, which is what a manifest tab opens in', () => {
+    const { parent } = open();
+    handle = createEditor(parent, {
+      doc: '::titulo Direito **Constitucional**\n',
+      language: 'plain',
+    });
+
+    // The same text the test above colours, left as one run: no grammar reached it.
+    expect(parent.querySelectorAll('.cm-line span')).toHaveLength(0);
+    expect(handle.getValue()).toBe('::titulo Direito **Constitucional**\n');
+  });
+
   it('takes the editor off the page on destroy', () => {
     const { parent } = open();
     handle = createEditor(parent, { doc: 'x' });

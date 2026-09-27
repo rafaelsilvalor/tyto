@@ -19,6 +19,7 @@ import { activateBuiltIns, builtInTemplatesDirectory } from './plugins.js';
 import { offerPreviousVersion } from './previous-version.js';
 import { createPreviewService } from './preview.js';
 import { createProjectSources } from './project.js';
+import { createTemplateEditor } from './template-editor.js';
 import { createExitGuard } from './quit.js';
 import { fileSettingsStore } from './settings-store.js';
 import { createTemplateCatalogue } from './templates.js';
@@ -307,6 +308,10 @@ async function start(): Promise<void> {
   // reasons for one object to change, and `src/main/templates.ts` says why that matters.
   const templates = await createTemplateCatalogue({ sources });
 
+  // The template mode (TYTO-44). The same `sources` as the three above, so a save that reads
+  // the folders again is seen by the preview, the export and the picker with nothing rebuilt.
+  const templateEditor = createTemplateEditor({ sources });
+
   // The one place `safeStorage` is named. Everything below takes it as an argument, which
   // is what lets the credential module be tested without a keychain and without Electron.
   const credentials = createCredentials({
@@ -442,6 +447,21 @@ async function start(): Promise<void> {
     },
     preview,
     templates,
+    templateEditor,
+    templateDialogs: {
+      // No `createDirectory`: a template to edit is a folder that already has one in it.
+      chooseTemplate: async () => {
+        const answer = await dialog.showOpenDialog({ properties: ['openDirectory'] });
+        return answer.canceled ? undefined : answer.filePaths[0];
+      },
+      // `createDirectory`, for the export's reason: this is a destination.
+      chooseParent: async () => {
+        const answer = await dialog.showOpenDialog({
+          properties: ['openDirectory', 'createDirectory'],
+        });
+        return answer.canceled ? undefined : answer.filePaths[0];
+      },
+    },
     info: () => ({
       version: app.getVersion(),
       platform: process.platform,
