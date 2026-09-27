@@ -508,5 +508,5 @@ describe('quitting a page that cannot hear the question yet', () => {
 /** Ends an app that would not quit, so a red case above does not also hang the teardown. */
 const closeAppHard = async (app: ElectronApplication): Promise<void> => {
   app.process().kill('SIGKILL');
-  await app.waitForEvent('close').catch(() => undefined);
+  await app.waitForEvent('close', { timeout: 5_000 }).catch(() => undefined);
 };

@@ -19,3 +19,7 @@ write one text. It now also writes `examples/<name>.brief`, and its title uses "
 instead of "Inter": no install of Tyto has Inter, so every scaffolded template failed its first
 render with `E_EXPORT_FONT_UNRESOLVED`. `@tyto/editor` takes `language: 'plain'` for a buffer
 with no grammar.
+
+A quit that arrives while the window is still starting now quits (ADR 0039). The page tells main
+it can hear the quit question (`app:exit-listening`) before main asks it anything; before that,
+the push was dropped and the app stayed open with nobody left to ask.

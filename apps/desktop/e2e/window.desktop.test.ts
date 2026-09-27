@@ -223,6 +223,7 @@ describe('the bridge', () => {
     expect(channels).toEqual([
       'app:exit-ack',
       'app:exit-answer',
+      'app:exit-listening',
       'app:info',
       'app:locale',
       'brief:preview',

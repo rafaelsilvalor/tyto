@@ -1,5 +1,7 @@
 # 0031 — A quit question waits for the person, and only the delivery has a deadline
 
+Amended by ADR 0039: main asks only a page that has said it is listening.
+
 Status: accepted · 2026-09-19 · TYTO-147 · amends the exit bullet of ADR 0029 · the box it describes has three buttons since ADR 0034, which changes none of the staging below
 
 ## Context
