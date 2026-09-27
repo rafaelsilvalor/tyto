@@ -108,6 +108,38 @@ that is exactly what separates 1 from 2 for a reader deciding whether to retry.
 - **fs-inbox/fs-outbox** adapter: `inbox/<id>/brief.brief` → `outbox/<id>/…`. Same shape as the contract above, so it doubles as a Jacurutu simulator and as the integration-test harness.
 - Desktop queue panel reads the `inbox/` folder — works with or without Jacurutu.
 
+### The desktop queue panel
+
+`apps/desktop/src/main/queue.ts` (TYTO-45). **File ▸ Show the local queue** opens a panel in
+the left dock over a folder a person picks, laid out exactly as `tyto watch <folder>` lays it
+out: `<folder>/inbox/<id>/brief.brief` in, `<folder>/outbox/<id>/out/` out, and a task that
+rendered cleanly moved to `<folder>/done/<id>/`. The window and the CLI can therefore be
+pointed at the same folder, one after the other. Both paths go through `@tyto/io`'s
+`BriefSource` port, composed in `apps/desktop/src/main/index.ts` and nowhere else: `inbox/` is
+one `fsInbox`, and `done/` is a second one, because a finished task has an inbox's shape.
+
+- **Status** is `pending`, `rendering`, `done` or `error`. An error comes from this session's
+  run, or from a `result.json` with `status: error` already in `out/`, so a failure seen
+  before a restart is still a failure after it.
+- **Auto-run** (off by default, remembered in `settings.json` with the folder) renders what a
+  sweep finds and has not tried yet. **A failed task is never re-run on its own**: it waits
+  in `inbox/` for a person (ADR 0008). The panel's _Try again_ reads the brief afresh, which
+  is the point of it: the usual step before it is _Open brief_, a fix in the editor and a save
+  over the task's own file.
+- **Pushed, not polled**: main already sweeps the inbox once a second, and it sends
+  `queue:changed` when something the panel shows has changed; the panel then asks
+  `queue:list`. The window runs no timer of its own.
+- The render is the export service's, PNG at the template's formats, so a task rendered here
+  and the same brief rendered by `tyto render` produce the same files.
+
+**One consumer per folder.** `fsInbox` has no claim step (`ack` is a rename), so the window's
+auto-run and a `tyto watch` running over the same folder would both render a task, and the
+slower one's rename would fail. Nothing locks against that. When the rename fails, the
+failure is reported on the task, as _rendered, but could not be moved to done/_, with the
+operating system's reason. It is not a crash and not an unhandled rejection in main
+(`queue.test.ts`, "one consumer per folder"). The same path catches Windows refusing the
+rename of a folder that is open in Explorer. Point one consumer at a folder at a time.
+
 ## Deferred (E10) — only if Jacurutu does not cover it
 
 Jira/Trello/Notion/Sheets sources and a Drive sink as Tyto plugins, with per-connection field mapping and a polling scheduler. Contract preserved:

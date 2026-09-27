@@ -94,6 +94,15 @@ export interface ExportService {
   progress(exportId: string): ExportProgress | undefined;
   /** Fires the run's signal. Idempotent, and a no-op on a run that already finished. */
   cancel(exportId: string): void;
+  /**
+   * Runs one export to the end and answers with how it ended (TYTO-45).
+   *
+   * The local queue's door: it renders one task at a time and needs the verdict before it
+   * decides whether to acknowledge, so it has nothing to poll and no dialog to feed. The same
+   * `execute` as `start`, so a task rendered from the queue and the same brief exported from
+   * the dialog produce the same files. Never rejects; a run that died answers with `failure`.
+   */
+  run(request: ExportRequest): Promise<ExportProgress>;
 }
 
 export interface ExportServiceOptions {
@@ -281,50 +290,68 @@ export async function createExportService(options: ExportServiceOptions): Promis
     run.status = cancelled ? 'cancelled' : 'finished';
   }
 
+  function snapshot(run: Run): ExportProgress {
+    return {
+      status: run.status,
+      directory: run.directory,
+      total: run.total,
+      done: run.done,
+      failed: run.failed,
+      ...(run.result === undefined ? {} : { result: run.result }),
+      ...(run.failure === undefined ? {} : { failure: run.failure }),
+      diagnostics: run.diagnostics,
+    };
+  }
+
+  /** A run registered under a fresh id, and the promise that settles when it is over. */
+  function launch(request: ExportRequest): { exportId: string; run: Run; over: Promise<void> } {
+    counter += 1;
+    const exportId = `export-${String(counter)}`;
+    const run: Run = {
+      controller: new AbortController(),
+      directory: request.directory,
+      status: 'running',
+      total: 0,
+      done: 0,
+      failed: 0,
+      diagnostics: [],
+    };
+    runs.set(exportId, run);
+
+    // Caught here rather than by each caller, because `start` does not wait and would
+    // otherwise leave a rejection nobody listens to. An export that died is a finished export
+    // with a failure, not a silent one.
+    const over = execute(request, run).catch((error: unknown) => {
+      // Written down before it is turned into state, because `run.failure` is only ever read
+      // by a dialog that is still open: close it, or export from a window that then quits,
+      // and the only record of a dead render was gone (TYTO-132).
+      options.log?.error('export failed', error);
+      run.status = 'finished';
+      run.failure = error instanceof Error ? error.message : String(error);
+    });
+
+    return { exportId, run, over };
+  }
+
   return {
-    async start(request: ExportRequest): Promise<{ readonly exportId: string }> {
-      counter += 1;
-      const exportId = `export-${String(counter)}`;
-      const run: Run = {
-        controller: new AbortController(),
-        directory: request.directory,
-        status: 'running',
-        total: 0,
-        done: 0,
-        failed: 0,
-        diagnostics: [],
-      };
-      runs.set(exportId, run);
+    // Deliberately not awaited: `start` answers with an id so the dialog can show a progress
+    // bar, and the run reports through `progress`.
+    start(request: ExportRequest): Promise<{ readonly exportId: string }> {
+      return Promise.resolve({ exportId: launch(request).exportId });
+    },
 
-      // Deliberately not awaited: `start` answers with an id so the dialog can show a
-      // progress bar, and the run reports through `progress`. A rejection here would
-      // otherwise have nobody listening, so it is caught and turned into the run's own
-      // state — an export that died is a finished export with a diagnostic, not a silent one.
-      void execute(request, run).catch((error: unknown) => {
-        // Written down before it is turned into state, because `run.failure` is only ever read
-        // by a dialog that is still open: close it, or export from a window that then quits,
-        // and the only record of a dead render was gone (TYTO-132).
-        options.log?.error('export failed', error);
-        run.status = 'finished';
-        run.failure = error instanceof Error ? error.message : String(error);
-      });
-
-      return { exportId };
+    async run(request: ExportRequest): Promise<ExportProgress> {
+      const { exportId, run, over } = launch(request);
+      await over;
+      // Forgotten once answered: nobody polls a run that was awaited, and the local queue
+      // renders one of these per task for as long as the window is open.
+      runs.delete(exportId);
+      return snapshot(run);
     },
 
     progress(exportId: string): ExportProgress | undefined {
       const run = runs.get(exportId);
-      if (run === undefined) return undefined;
-      return {
-        status: run.status,
-        directory: run.directory,
-        total: run.total,
-        done: run.done,
-        failed: run.failed,
-        ...(run.result === undefined ? {} : { result: run.result }),
-        ...(run.failure === undefined ? {} : { failure: run.failure }),
-        diagnostics: run.diagnostics,
-      };
+      return run === undefined ? undefined : snapshot(run);
     },
 
     cancel(exportId: string): void {

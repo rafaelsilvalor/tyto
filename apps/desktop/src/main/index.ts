@@ -2,7 +2,7 @@ import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
 
 import { type BrowserWindow, Menu, app, dialog, ipcMain, safeStorage, shell } from 'electron';
-import { PLUGINS_DIR, fsPluginStore, nodeFileSystem } from '@tyto/io';
+import { PLUGINS_DIR, fsInbox, fsPluginStore, nodeFileSystem } from '@tyto/io';
 import type { Rasterizer } from '@tyto/raster';
 
 import { type Locale, localeFor, translate } from '../../shared/i18n/index.js';
@@ -18,6 +18,7 @@ import { registerIpcHandlers, sendIpcEvent } from './ipc.js';
 import { exporterBuiltIns, listPlugins, tytoHome } from './plugin-list.js';
 import { activateBuiltIns, builtInTemplatesDirectory } from './plugins.js';
 import { offerPreviousVersion } from './previous-version.js';
+import { createQueueService } from './queue.js';
 import { createPreviewService } from './preview.js';
 import { createProjectSources } from './project.js';
 import { createTemplateEditor } from './template-editor.js';
@@ -338,6 +339,34 @@ async function start(): Promise<void> {
       : { rasterizer: host.registry.rasterizers<Rasterizer>()[0]!.value }),
   });
 
+  // The local queue (TYTO-45), composed here for the reason the export is: the inbox is
+  // `@tyto/io`'s `fsInbox` adapter, reached through its `BriefSource` port, and this file is
+  // the only one allowed to name it (ADR 0010). `done/` is read through a second one, because
+  // `done/<id>/brief.brief` is an inbox's shape. The same layout `tyto watch <folder>` uses.
+  const queue = createQueueService({
+    sources: (folder) => ({
+      inbox: fsInbox({ root: join(folder, 'inbox'), done: join(folder, 'done') }),
+      done: fsInbox({ root: join(folder, 'done') }),
+    }),
+    render: (request) => exports_.run(request),
+    folder: saved.queueFolder,
+    autoRun: saved.queueAutoRun,
+    // A notice and not a question (ADR 0029): the panel asks `queue:list` when it hears it.
+    // Dropped while there is no window, which costs nothing — a window that opens later asks
+    // once on its own.
+    onChange: () => {
+      const contents = mainWindow?.webContents;
+      if (contents === undefined || contents.isDestroyed()) return;
+      sendIpcEvent(contents, 'queue:changed', {});
+    },
+    onError: (message, cause) => {
+      log.error(message, cause);
+    },
+  });
+  app.on('will-quit', () => {
+    queue.close();
+  });
+
   // The one question main asks. `send` is deliberately the whole of what this file lends it:
   // `quit.ts` holds the latch and the ids and knows nothing about Electron, which is what
   // lets the decision be tested without launching one (ADR 0010).
@@ -449,6 +478,17 @@ async function start(): Promise<void> {
         await sources.reload(chosen);
         return inForce();
       },
+    },
+    queue: {
+      service: queue,
+      // `createDirectory`, for the export's reason: a queue folder may not exist yet.
+      chooseFolder: async () => {
+        const answer = await dialog.showOpenDialog({
+          properties: ['openDirectory', 'createDirectory'],
+        });
+        return answer.canceled ? undefined : answer.filePaths[0];
+      },
+      remember: (changes) => settings.write(changes),
     },
     // Read on every ask, not held: `tyto plugin install` in a terminal beside the window is
     // the ordinary way a plugin arrives, and a list cached at startup would never show it.

@@ -61,6 +61,15 @@ export interface DocumentService {
   open(documentId: string): Promise<AdoptedDocument>;
   /** Reopens a path the recent list handed out. `missing` when the entry is gone. */
   reopen(documentId: string, path: string): Promise<AdoptedDocument & { missing: boolean }>;
+  /**
+   * Opens a file main itself chose, with no picker and no recent-list check (TYTO-45).
+   *
+   * Not reachable by a path from the renderer, and that is the containment: the only caller
+   * is the local queue's `queue:open-brief`, which sends a task id and gets the path main
+   * listed for it. `reopen` checks its path against the recent list for the same reason.
+   * A file that cannot be read answers with nothing, as a vanished recent entry does.
+   */
+  openPath(documentId: string, path: string): Promise<AdoptedDocument>;
   save(documentId: string, text: string, saveAs: boolean): Promise<SavedDocument>;
   /** Forgets a tab's path. A tab main never heard of is not an error. */
   close(documentId: string): void;
@@ -130,6 +139,16 @@ export function createDocumentService(options: DocumentServiceOptions): Document
       // back and the renderer leaves the buffer exactly as it was.
       if (path === undefined) return nothing;
       return adopt(documentId, path, await disk.read(path));
+    },
+
+    async openPath(documentId, path) {
+      try {
+        const text = await disk.read(path);
+        return await adopt(documentId, path, text);
+      } catch {
+        // Gone between the listing and the click — a task somebody else moved to done/.
+        return nothing;
+      }
     },
 
     async reopen(documentId, path) {

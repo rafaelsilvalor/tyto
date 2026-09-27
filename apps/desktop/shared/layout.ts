@@ -69,12 +69,13 @@ export type Layout = z.infer<typeof layoutSchema>;
 export const EDITOR_PANEL = 'editor';
 export const PREVIEW_PANEL = 'preview';
 export const PROBLEMS_PANEL = 'problems';
+export const QUEUE_PANEL = 'queue';
 
 /**
  * The arrangement ADR 0024 settled, as the record the app starts from.
  *
- * Three panels and not the seven the ADR draws: the templates list, the file tree, the
- * queue and the logs do not exist yet. They join by being added here, which is the claim
+ * Four panels and not the seven the ADR draws: the templates list, the file tree and the
+ * logs do not exist yet. They join by being added here, which is the claim
  * this card is making — a new panel should be one entry and an element, with no change to
  * the dock, the CSS or the window.
  */
@@ -106,6 +107,19 @@ export const DEFAULT_LAYOUT: Layout = {
       // "nothing to report". A dock that a person can drag and that remembers where they
       // left it cannot also size itself, so the fix is a smaller default and a handle.
       size: 140,
+      fixed: false,
+    },
+    {
+      // TYTO-45. Closed until somebody asks for it: most people never point the window at a
+      // queue folder, and a panel that opened empty on every launch would be a column of
+      // "no folder chosen". In the left dock, which is otherwise empty, so opening it takes
+      // room from nothing a person was already looking at. `layoutFrom` adds it, closed, to
+      // a saved layout that predates it.
+      id: QUEUE_PANEL,
+      element: 'tyto-queue-panel',
+      dock: 'left',
+      open: false,
+      size: 340,
       fixed: false,
     },
   ],

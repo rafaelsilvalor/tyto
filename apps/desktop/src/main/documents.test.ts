@@ -343,3 +343,54 @@ describe('one path per tab', () => {
     }).not.toThrow();
   });
 });
+
+describe('opening a path main chose (TYTO-45)', () => {
+  const TASK = at('fila', 'inbox', 'tarefa-1', 'brief.brief');
+
+  it('opens it with no picker and remembers it like any other open', async () => {
+    const recent = recentFiles();
+    const service = createDocumentService({
+      // A dialog that would fail the test if asked: this door has none.
+      dialogs: {
+        openBrief: () => Promise.reject(new Error('asked')),
+        saveBrief: () => Promise.reject(new Error('asked')),
+      },
+      recent,
+      disk: disk({ [TASK]: '::titulo Tarefa' }),
+    });
+
+    const answer = await service.openPath(TAB, TASK);
+
+    expect(answer).toEqual({
+      document: { path: TASK, name: 'brief.brief', text: '::titulo Tarefa' },
+      documentId: TAB,
+    });
+    // The folder is what a save and the preview's assets resolve against, like any tab.
+    expect(service.folderOf(TAB)).toBe(at('fila', 'inbox', 'tarefa-1'));
+    expect(await recent.knows(TASK)).toBe(true);
+  });
+
+  it('answers nothing for a file that is gone, instead of throwing', async () => {
+    const service = createDocumentService({
+      dialogs: dialogs({}),
+      recent: recentFiles(),
+      disk: disk({}),
+    });
+
+    await expect(service.openPath(TAB, TASK)).resolves.toEqual({
+      document: null,
+      documentId: null,
+    });
+  });
+
+  it('hands back the tab that already holds the file', async () => {
+    const service = createDocumentService({
+      dialogs: dialogs({}),
+      recent: recentFiles(),
+      disk: disk({ [TASK]: 'x' }),
+    });
+    await service.openPath(TAB, TASK);
+
+    expect((await service.openPath(OTHER_TAB, TASK)).documentId).toBe(TAB);
+  });
+});

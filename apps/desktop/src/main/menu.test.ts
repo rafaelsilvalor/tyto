@@ -203,6 +203,7 @@ describe('the File submenu', () => {
       'template.edit',
       '—',
       'plugins.show',
+      'queue.show',
       '—',
       'document.close',
       '—',
