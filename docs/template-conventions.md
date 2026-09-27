@@ -12,15 +12,21 @@ yours, and without a convention each template invents its own and shares nothing
 ## The folder
 
 ```
+_azul/  a brand: no manifest, so the registry skips it (ADR 0047)
+  tokens.ts         colours, type scale, spacing, marks — the brand's spec sheet
+  presets.ts        the kit's components in this brand's look
+  parts.ts          pieces only this brand draws (its header, its footer)
 agenda-semana/
   manifest.yaml     slots, adjustments, formats — the contract, read without running code
-  template.ts       the build function
+  template.ts       the build function: composition only
+  template.test.ts
   assets/           images the template draws
   examples/*.brief  what the template is checked against
 ```
 
 Same folder as the markup route, with `template.ts` where `template.html` would be. A
-folder holds one or the other, never both.
+folder holds one or the other, never both. A template folder holds a `tokens.ts` or a
+`parts.ts` of its own only for what no other template of its brand draws.
 
 **A template that ships _with the application_ keeps that folder and adds one import.** Nothing
 resolves a path at runtime — running code that arrived in a folder is the plugin host's job
@@ -55,61 +61,94 @@ matters more than it looks: a build step inside a template folder would change w
 `defineTemplate` is still the pairing function, and it is what a **test** calls to put a
 manifest and a build together by hand.
 
-## The three layers
+## The four layers
 
-Keep them apart. The boundary is what makes work travel.
+Keep them apart. The boundary is what makes work travel. ADR 0047 is the decision; the
+three-layer version this replaces kept tokens and parts inside the template, and nothing in
+them could be reused without copying.
 
-### 1. Tokens — values, no logic
+### 1. Configurable components and arrangement — `@tyto/template-kit`
 
-Colours, type scale, spacing, and flat geometry. Exported constants.
-
-```ts
-export const INK = { r: 77, g: 77, b: 77, a: 1 } as const;
-export const OWL = { viewBox: { w: 186.09, h: 376.79 }, d: 'M0,0h1v1h-1Z…' } as const;
-```
-
-**A `d` string is a token.** Flat single-colour geometry belongs in code rather than in a
-file beside the template — see "Geometry in, colour out" below.
-
-Tokens belong to a brand, not to a mechanism, so they live beside the templates that share
-them and never in `@tyto/template-kit`.
-
-### 2. Parts — functions that return a draft
+The layer that is the same whatever brand draws it: `stack`, `row`, `inset`, `at` for
+arrangement, and `bandedPage` for the page every Azul slide is (a header band, a footer on
+the bottom edge, the middle centred between them); `pillTable` for a table read out of one
+slot; `titleBlock` for a centred column of optional pieces — a picture, lines of words, a
+rule; `mark` and `textBlock` for a path icon and a brief's words at a stated size.
 
 ```ts
-export function pill(label: RichText, tone: Tone): Block { … }
+const sessions = pillTable(sessionTable, { text: slide, width, measure: context.measure });
+const title = titleBlock(resultTitle, { width, fields: { titulo, chamada, emblema } });
 ```
 
-This is the component the markup route could not deliver. ADR 0022 refused a component
-library across templates because a component's classes land in one flat namespace and
-sharing would force CSS scoping. **In TypeScript there is no stylesheet and no class
-namespace**, so that objection does not apply here: a part is a function, and sharing it is
-an import. The decision ADR 0022 took stands for markup and is untouched.
+A title block's `field` is the slot's name, in the brief's Portuguese; its `name` is the
+node's, in English. The two are separate on purpose: the brief's vocabulary and the scene's
+can change independently.
 
-A part returns a `Block` rather than a bare draft whenever anything will be placed around
-it — see the next layer for why.
-
-### 3. Arrangement — `@tyto/template-kit`
-
-`stack`, `row`, `inset`, `at`. The only layer that is the same whatever is being drawn, so
-the only one that ships as a package.
-
-```ts
-const body = stack({
-  gap: 24,
-  items: [heading, ...sessions.map(sessionRow)],
-});
-return frame({ …, children: [at(80, 420, body)] });
-```
+**A component holds no brand.** Every colour, face and size arrives in its configuration. A
+component that needed to know whose template it is drawing is a part, and belongs to layer 3.
 
 **A `Block` states its own width and height, and that is the point.** Nothing downstream can
 work one out: a `group` in the IR has no box at all, and a text node's `box` leaves both
 dimensions optional because an absent one means "as large as the content needs" — a size
 only `layoutText` learns, and it runs _after_ the template has already returned. So a stack
-cannot read the height it needs to place the next child; somebody has to state it.
+cannot read the height it needs to place the next child; somebody has to state it, or measure
+it first through `context.measure` (ADR 0038).
 
 Placement **adds** to the coordinate a node already carries rather than replacing it, so a
 node nudged by hand keeps its nudge wherever it is put.
+
+### 2. Brand tokens — values, no logic
+
+Colours, type scale, spacing, and flat geometry, in `_<brand>/tokens.ts`. Exported constants.
+
+```ts
+export const INK = '#009fe3';
+export const TABLE = {
+  badge: { w: 220, h: 86 },
+  padding: { vertical: 12, left: 32, right: 32 },
+} as const;
+export const OWL: Mark = {
+  box: { w: 186.09, h: 376.79 },
+  d: 'M0,0h1v1h-1Z…',
+  fillRule: 'nonzero',
+};
+```
+
+**Every number is here.** `parts.ts` and `template.ts` may halve, double and centre; ESLint
+refuses any other literal in them (`templates/numbers-are-tokens`). **A `d` string is a
+token** — see "Geometry in, colour out" below.
+
+### 3. Brand presets and parts
+
+A **preset** is a component in the brand's look — a constant, not a function:
+
+```ts
+export const sessionTable: PillTableStyle = { layering: 'overlap', columns: [badge(…), { kind: 'lines', … }], … };
+```
+
+A **part** is a function returning a `Block` for something only this brand draws: the Azul
+owl header, the signed footer, the cover block. Both live in `_<brand>/` and are shared
+between the brand's templates by import.
+
+This is the component the markup route could not deliver. ADR 0022 refused a component
+library across templates because a component's classes land in one flat namespace and sharing
+would force CSS scoping. **In TypeScript there is no stylesheet and no class namespace**, so
+that objection does not apply: a part is a function, and sharing it is an import. The
+decision ADR 0022 took stands for markup and is untouched.
+
+### 4. The template — composition only
+
+`template.ts` says what goes where, in what order, and nothing else. It opens with a map of the
+artwork, top to bottom, naming the piece that draws each band, so a reviewer reads the map and
+the `frame({ children })` line and knows the slide.
+
+## Names
+
+- **Slots are Portuguese** — they are the brief's vocabulary (`titulo`, `slide`).
+- **Everything else is English**: identifiers, and the `name` of every drawn node.
+- **A node's name says what drew it**, in kebab-case: `sessionPill` would draw `session-pill`,
+  the owl header draws `owl`. Names reach the SVG and HTML output as ids, so an element in a
+  render maps back to one function or one preset.
 
 ## Geometry in, colour out
 
@@ -148,12 +187,13 @@ look at one.
 - **No throwing for an expected problem.** `TemplateError` carries a diagnostic; anything
   else becomes `E_TEMPLATE_CRASH` (ADR 0014).
 
-## The limit this route does not remove
+## The limit that is left
 
-A box still cannot grow with the text inside it. A template cannot measure text — the font
-cache is not in its context, and measurement happens after `build` has returned — so every
-height a `Block` states is a height somebody chose. TYTO-162 is that gap; until it closes,
-a long title is handled by choosing a size that fits the longest one you accept.
+A box can grow with the text inside it since ADR 0038: `context.measure` answers how tall a
+text node will be, and `grownTextBlock` in the kit (what `pillTable`'s cells use) builds on it.
+**Where nothing can measure** — no faces in that compile — `measure` answers `undefined`, the
+box falls back to the height somebody chose, and a long line shrinks into it. So the chosen
+heights still matter: they are the floor, and the whole answer when nothing measures.
 
 **`max` is not always the guard it looks like.** On a non-repeatable `rich-text` slot it caps
 characters, and that does keep a brief inside a box somebody sized. On a **repeatable** slot it
@@ -170,15 +210,18 @@ What it has instead is a choice about `box.h`, and the choice matters:
 
 **State the height.** The wall is the same either way; only one of the two says so.
 
-## How the second template reuses the first
+## How the next template reuses the others
 
-Put tokens and parts in modules, not in the template file. A template file should read as
-composition: what goes where, in what order. When template two wants a part, it imports it;
-when it wants a different look from the same part, the part takes a parameter.
+Look in the kit first, then in the brand's folder. A template that wants a table uses
+`pillTable` with the brand's preset, or adds a preset beside it; a template that wants a
+different look from the same preset spreads it and overrides the field
+(`{ ...sessionTable, rowGap: 8 }`).
 
-Move a part into a shared module when the **second** template needs it, not in advance.
-ADR 0022 shipped a reuse mechanism ahead of its evidence and measured zero consumers five
-days later; the lesson was written down there and applies here unchanged.
+**A component is extracted when the maintainer names the templates that will use it**, which
+is what ADR 0047 put in place of "on the second consumer". A part nobody has named a second
+use for stays in its template. What stops the kit from becoming a second language is the same
+discipline in the other direction: a component takes what its named consumers need, and an
+option no consumer uses is not added.
 
 ## What the first template taught
 
@@ -226,8 +269,11 @@ column. Nested inlines are atomic and join whichever field is open.
 that turns "no runs" into "no node" while keeping the block's stated size, so a missing
 professor leaves the row exactly as tall as its neighbours.
 
-**What should change before the second template.** Nothing moves into a shared module yet —
-that is this document's own rule and the evidence is not in. One thing is worth fixing first:
-the wrong-`size` clip above deserves a diagnostic rather than a paragraph. (`tyto template check`
+**What changed before the second template.** TYTO-185 moved the agenda onto the four layers
+(ADR 0047): the rows became `pillTable` with the Azul `sessionTable` preset, the tokens and
+parts moved to `_azul/`, and the rendered pixels did not change. The "every number
+is in `tokens.ts`" above was not true at the time — about fifteen sizes were literals inside
+`parts.ts` — which is why the rule is now a lint rather than a sentence. The wrong-`size` clip
+above still deserves a diagnostic rather than a paragraph. (`tyto template check`
 on a code template, the other one named here, was fixed by TYTO-170: it checks the manifest and
 says the body was not checked — `docs/template-authoring.md`.)

@@ -95,6 +95,8 @@ const EXAMPLES: readonly Example[] = [
   },
   // 4:5 only, since TYTO-173: the published carousel is cut to Instagram's portrait post.
   { template: 'agenda-semana', brief: 'examples/agenda.brief', body: 'code', formats: ['retrato'] },
+  // The second Azul template, and the first built only from the kit and the brand (TYTO-185).
+  { template: 'aprovados', brief: 'examples/aprovados.brief', body: 'code', formats: ['retrato'] },
 ];
 
 let formats: Awaited<ReturnType<typeof loadFormats>>;
@@ -212,7 +214,7 @@ describe.each(EXAMPLES.map((example) => [example.template, example] as const))(
       // Never a file beside the template. Bundled — the repository ships one copy in
       // `fonts/` — except the agenda, whose brand face is read from the machine (ADR 0037).
       const expected =
-        name === 'agenda-semana'
+        name === 'agenda-semana' || name === 'aprovados'
           ? { family: 'CircularXX', source: 'system' }
           : { family: 'Source Sans 3', source: 'bundled' };
       expect(scene.fonts).toContainEqual(expected);
@@ -485,7 +487,7 @@ describe('the pack as a whole', () => {
         .list()
         .map((entry) => entry.name)
         .sort(),
-    ).toEqual(['agenda-semana', 'carrossel-lista', 'promo-curso']);
+    ).toEqual(['agenda-semana', 'aprovados', 'carrossel-lista', 'promo-curso']);
     // A manifest that does not parse becomes a failure rather than an exception, so an
     // empty list and a broken pack look alike unless this is checked.
     expect(registry.value.failures).toEqual([]);

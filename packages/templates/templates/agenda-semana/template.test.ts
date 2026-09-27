@@ -1,8 +1,7 @@
 import { describe, expect, it } from 'vitest';
 
 import { build } from './template.js';
-import { fields, lines, plain } from './rich-text.js';
-import { ARROW, INK, OWL } from './tokens.js';
+import { ARROW, CHROME, INK, OWL } from '../_azul/tokens.js';
 
 import { measureNothing } from '@tyto/core';
 
@@ -40,11 +39,6 @@ function rich(source: string): RichText {
     parts.push(span(line));
   }
   return parts;
-}
-
-function bold(value: string): Inline {
-  const children = [span(value)];
-  return { kind: 'bold', children, range: children[0]!.range };
 }
 
 interface ContextOptions {
@@ -101,49 +95,6 @@ function words(node: SceneNode | undefined): string {
     .trim();
 }
 
-/* ------------------------------------------------------------------------- the slot -- */
-
-describe('one slot read as a small table', () => {
-  it('keeps a line with no separator whole, which is how a heading is told apart', () => {
-    const [heading, session] = lines(
-      rich('FARMÁCIA\n16/09 - 14:00 | Farmacologia | Profª. Marcela'),
-    );
-
-    expect(fields(heading ?? [])).toHaveLength(1);
-    expect(fields(session ?? []).length).toBeGreaterThan(1);
-  });
-
-  it('drops a blank line rather than reading it as a session with no fields', () => {
-    expect(lines(rich('Pediatria\n\n27/09 | Febre | Dra. Lúcia'))).toHaveLength(2);
-  });
-
-  it('splits a line into date, title and professor, without the spaces around the bars', () => {
-    const [line] = lines(rich('22/09 | Insuficiência cardíaca | Dra. Helena Prado'));
-
-    expect(fields(line ?? [], 3).map(plain)).toEqual([
-      '22/09',
-      'Insuficiência cardíaca',
-      'Dra. Helena Prado',
-    ]);
-  });
-
-  it('leaves a bar in the last field, because the limit stops the split and not the text', () => {
-    const [line] = lines(rich('22/09 | Revisão | Dra. Helena | Dr. Vitor'));
-
-    expect(fields(line ?? [], 3).map(plain)).toEqual([
-      '22/09',
-      'Revisão',
-      'Dra. Helena | Dr. Vitor',
-    ]);
-  });
-
-  it('never splits inside emphasis, where a bar is the author doing something else', () => {
-    const line: RichText = [span('22/09 | '), bold('Revisão | final'), span(' | Dra. Helena')];
-
-    expect(fields(line, 3).map(plain)).toEqual(['22/09', 'Revisão | final', 'Dra. Helena']);
-  });
-});
-
 /* ------------------------------------------------------------------- what it draws -- */
 
 describe('several disciplines on one slide (TYTO-173)', () => {
@@ -160,9 +111,9 @@ describe('several disciplines on one slide (TYTO-173)', () => {
       }),
     );
 
-    expect(named(frame.children, 'eventos').map((node) => named([node], 'session').length)).toEqual(
-      [1, 3],
-    );
+    expect(
+      named(frame.children, 'sessions').map((node) => named([node], 'session').length),
+    ).toEqual([1, 3]);
   });
 
   it('counts the disciplines from the brief, one to as many as it wrote', () => {
@@ -170,7 +121,7 @@ describe('several disciplines on one slide (TYTO-173)', () => {
       const source = Array.from({ length: count }, (_, i) => `D${i}\n01/01 | t | p`).join('\n');
       const frame = build(contextOf({ slide: rich(source) }));
 
-      expect(named(frame.children, 'discipline-block'), source).toHaveLength(count);
+      expect(named(frame.children, 'discipline-group'), source).toHaveLength(count);
     }
   });
 
@@ -214,20 +165,21 @@ describe('the cover', () => {
     if (middle?.kind !== 'group') throw new Error('the first slide centres a middle block');
     // Cover first, disciplines second, and nothing else: the gap between them is the
     // stack's, not whatever room the centring happened to leave.
-    expect(middle.children.map((node) => node.name)).toEqual(['cover', 'disciplinas']);
+    expect(middle.children.map((node) => node.name)).toEqual(['cover', 'session-table']);
   });
 
-  it('takes the space with it: without a cover the disciplines alone are the middle', () => {
+  it('takes the space with it: without a cover the table alone is the middle', () => {
     const frame = build(contextOf({ slide, index: 1, count: 2 }));
+    const [middle] = named(frame.children, 'middle');
 
-    expect(named(frame.children, 'middle')).toEqual([]);
-    expect(frame.children.map((node) => node.name)).toContain('disciplinas');
+    if (middle?.kind !== 'group') throw new Error('every slide centres a middle block');
+    expect(middle.children.map((node) => node.name)).toEqual(['session-table']);
   });
 
   it('draws no illustration when the brief supplied none', () => {
     const frame = build(contextOf({ slide }));
 
-    expect(named(frame.children, 'calendar')).toEqual([]);
+    expect(named(frame.children, 'illustration')).toEqual([]);
   });
 });
 
@@ -261,7 +213,10 @@ describe('the sessions', () => {
 });
 
 describe('the marks the template holds the geometry of', () => {
-  const frame = build(contextOf({ slide: rich('Pediatria\n27/09 | Febre | Dra. Lúcia') }));
+  // The first of two slides, so the arrow is drawn: the last slide has none.
+  const frame = build(
+    contextOf({ slide: rich('Pediatria\n27/09 | Febre | Dra. Lúcia'), index: 0, count: 2 }),
+  );
 
   it.each([
     ['owl', OWL],
@@ -278,8 +233,8 @@ describe('the marks the template holds the geometry of', () => {
   });
 
   it.each([
-    ['owl', OWL, 64],
-    ['arrow', ARROW, 26],
+    ['owl', OWL, CHROME.owl],
+    ['arrow', ARROW, CHROME.arrow],
   ])(
     "sizes %s as the box its 'd' was drawn in, and scales with a transform",
     (name, token, drawn) => {
@@ -323,6 +278,18 @@ describe('the frame itself', () => {
       expect(words(named(frame.children, 'handle')[0]), `slide ${index}`).toBe('@assinatura');
       expect(named(frame.children, 'owl'), `slide ${index}`).toHaveLength(1);
     }
+  });
+
+  it('points on to the next slide from every slide but the last', () => {
+    const arrows = [0, 1, 2].map(
+      (index) => named(build(contextOf({ slide, index, count: 3 })).children, 'arrow').length,
+    );
+
+    expect(arrows).toEqual([1, 1, 0]);
+  });
+
+  it('draws no arrow on a carousel of one slide, which is its own last', () => {
+    expect(named(build(contextOf({ slide, index: 0, count: 1 })).children, 'arrow')).toEqual([]);
   });
 });
 

@@ -1,0 +1,31 @@
+---
+template: aprovados
+formats: [retrato]
+---
+// The maintainer's reference of 2026-09-27, with the names replaced: the published list
+// names real people, and a fixture in a public repository does not need to. The counts are
+// the reference's — four, two and one approved — so the slide is as full as the published one.
+//
+// No emblem here: the exam board's emblem is not this repository's to ship, and the slot is
+// optional. `emblema: ./emblema.png` in the frontmatter draws one.
+
+::chamada
+  Resultado provisório
+
+::subtitulo
+  Mais um dia difícil para quem não é Falcão
+
+::titulo
+  CADAR
+
+::lista
+  ENDODONTIA
+  1º | Carla Mendes Araújo
+  2º | Ana Clara Lemos Pinto
+  3º | Tatiane Cristina Guerra Gomes
+  5º | Marina Monte Rocha
+  PERIODONTIA
+  1º | Manuela Dias Barros
+  3º | Micaela Maria Lopes Costa
+  PRÓTESE DENTAL
+  3º | Leonardo Moura Zanetti
