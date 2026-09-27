@@ -68,7 +68,7 @@ import {
   withPanelOpen,
   withPanelSize,
 } from '../../shared/layout.js';
-import { type SaveOutcome, resolveExit } from './exit.js';
+import { type SaveOutcome, listenForExit, resolveExit } from './exit.js';
 import { installErrorReporting, reportToLog } from './report-errors.js';
 import { searchPhrasesFor } from './search-phrases.js';
 import { type ShellState, fillLocalePicker, localeFromPicker, paint, paintTitle } from './shell.js';
@@ -1123,7 +1123,6 @@ async function answerExitRequest(bridge: TytoBridge, askId: number): Promise<voi
       },
     });
   } finally {
-    console.warn(`[quit-probe] renderer answering askId=${askId} allow=${allow}`);
     await bridge['app:exit-answer']({ askId, allow });
   }
 }
@@ -1666,6 +1665,29 @@ async function load(): Promise<void> {
   const bridge = window.tyto;
 
   if (bridge !== undefined) {
+    // **First, before anything is awaited** (TYTO-44, ADR 0039). Main does not ask a page that
+    // has not said it is listening, and lets the quit through instead — safe only while nothing
+    // here can hold unsaved text, which is why this comes before every other line of `load()`.
+    // A push that arrived during the three awaits that used to precede it reached a page with no
+    // listener, and the app never quit. No unsubscribe is kept: the subscription and the page
+    // have the same lifetime by construction.
+    listenForExit(
+      {
+        onRequest: (handler) => {
+          bridge.on('app:exit-requested', ({ askId }) => {
+            handler(askId);
+          });
+        },
+        acknowledge: (askId) => {
+          void bridge['app:exit-ack']({ askId });
+        },
+        listening: () => {
+          void bridge['app:exit-listening']({});
+        },
+      },
+      (askId) => answerExitRequest(bridge, askId),
+    );
+
     const info = await bridge['app:info']({});
     state.version = info.version;
     state.platform = info.platform;
@@ -1703,28 +1725,6 @@ async function load(): Promise<void> {
   }
 
   if (bridge !== undefined) {
-    // The one thing this window listens for rather than asks (ADR 0029). No unsubscribe is
-    // kept: the subscription and the window have the same lifetime by construction, and a
-    // handle nobody can call is a handle that only looks like cleanup.
-    // TEMPORARY (TYTO-44): quit-path probe.
-    console.warn(`[quit-probe] renderer listener registered at ${Math.round(performance.now())}ms`);
-    bridge.on('app:exit-requested', ({ askId }) => {
-      console.warn(`[quit-probe] renderer push received askId=${askId}`);
-      // **The acknowledgement goes first, and it is first on purpose** (TYTO-147, ADR 0031).
-      // Main's deadline covers this line and nothing after it, so nothing may be computed
-      // before it — `answerExitRequest` opens by filtering the whole workspace, and beyond that
-      // is a box a person has to read. Putting the ack inside that function would put the count
-      // inside the deadline again, which is the shape this card exists to undo.
-      //
-      // Here in the listener and not in the preload, which could speak a beat earlier: a preload
-      // ack proves only that the renderer *process* is alive, and a page whose script has thrown
-      // would still send it, leaving main waiting forever for an answer nobody will write. This
-      // line proves the thing main actually needs — JS in this window is running and has the
-      // question.
-      void bridge['app:exit-ack']({ askId });
-      void answerExitRequest(bridge, askId);
-    });
-
     // A File menu item was picked (TYTO-124). Straight into `runCommand`, which is the same
     // door the command bar knocks on — the id crossed the bridge precisely so that nothing
     // else had to.

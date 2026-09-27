@@ -78,6 +78,7 @@ export interface IpcDependencies {
   readonly exit: {
     readonly acknowledge: (askId: number) => void;
     readonly answer: (askId: number, allow: boolean) => void;
+    readonly listening: () => void;
   };
   /** Brief text to files on disk (E9.4). Injected for the reason `preview` is. */
   readonly exports: ExportService;
@@ -216,6 +217,11 @@ export function createHandlers(dependencies: IpcDependencies): Handlers {
 
     'app:exit-answer': ({ askId, allow }) => {
       exit.answer(askId, allow);
+      return Promise.resolve({});
+    },
+
+    'app:exit-listening': () => {
+      exit.listening();
       return Promise.resolve({});
     },
 

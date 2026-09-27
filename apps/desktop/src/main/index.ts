@@ -21,7 +21,6 @@ import { createPreviewService } from './preview.js';
 import { createProjectSources } from './project.js';
 import { createTemplateEditor } from './template-editor.js';
 import { createExitGuard } from './quit.js';
-import { attachProbeLog, describeHandles, probe, startTicker } from './quit-probe.js';
 import { fileSettingsStore } from './settings-store.js';
 import { createTemplateCatalogue } from './templates.js';
 import { chooseUserDataPath } from './user-data.js';
@@ -142,28 +141,6 @@ async function start(): Promise<void> {
   // exists — the version and the platform are already on every line, so what it adds is a
   // timestamp, which dates the session a report is about.
   log.info('app started');
-  // TEMPORARY (TYTO-44): quit-path probe.
-  attachProbeLog(log);
-  for (const method of [
-    'showMessageBox',
-    'showMessageBoxSync',
-    'showErrorBox',
-    'showOpenDialog',
-    'showOpenDialogSync',
-    'showSaveDialog',
-    'showSaveDialogSync',
-    'showCertificateTrustDialog',
-  ] as const) {
-    const original = (dialog as unknown as Record<string, (...args: unknown[]) => unknown>)[method];
-    if (typeof original !== 'function') continue;
-    (dialog as unknown as Record<string, unknown>)[method] = (...args: unknown[]): unknown => {
-      probe(`dialog.${method} called`);
-      return original.apply(dialog, args);
-    };
-  }
-  process.on('exit', (code) => {
-    probe(`process exit code=${code}`);
-  });
 
   // The window, held rather than discarded, because main now has something to say to it
   // (ADR 0029). A `let` and not a `const`: the handler table is registered before the window
@@ -359,50 +336,14 @@ async function start(): Promise<void> {
   // The one question main asks. `send` is deliberately the whole of what this file lends it:
   // `quit.ts` holds the latch and the ids and knows nothing about Electron, which is what
   // lets the decision be tested without launching one (ADR 0010).
-  const exitGuard = createExitGuard({
+  const exit = createExitGuard({
     send: (askId) => {
       const contents = mainWindow?.webContents;
-      if (contents === undefined || contents.isDestroyed()) {
-        probe(`push not sent askId=${askId}: no live webContents`);
-        return false;
-      }
+      if (contents === undefined || contents.isDestroyed()) return false;
       sendIpcEvent(contents, 'app:exit-requested', { askId });
-      probe(
-        `push sent askId=${askId} url=${contents.getURL().slice(-40)} loading=${contents.isLoading()}`,
-      );
       return true;
     },
   });
-  // TEMPORARY (TYTO-44): the same guard, with every entry point probed.
-  const exit: typeof exitGuard = {
-    mayExit: (resume) => {
-      const may = exitGuard.mayExit(() => {
-        probe('resume called');
-        resume();
-      });
-      probe(`mayExit -> ${may}`);
-      return may;
-    },
-    acknowledge: (askId) => {
-      probe(`ack received askId=${askId}`);
-      exitGuard.acknowledge(askId);
-    },
-    answer: (askId, allow) => {
-      probe(`answer received askId=${askId} allow=${allow}`);
-      exitGuard.answer(askId, allow);
-    },
-    windowGone: () => {
-      probe('windowGone');
-      exitGuard.windowGone();
-    },
-  };
-  const describeProcesses = (): string =>
-    `metrics=[${app
-      .getAppMetrics()
-      .map((metric) => `${metric.type}:${metric.pid}`)
-      .join(
-        ',',
-      )}] windows=${mainWindow === undefined ? 'none' : mainWindow.isDestroyed() ? 'destroyed' : 'alive'}`;
 
   registerIpcHandlers(ipcMain, {
     // The only question this app asks a person that is not a file picker: closing a tab
@@ -410,7 +351,6 @@ async function start(): Promise<void> {
     // Escape and Enter each leave the text alone (E9.11). The quit question reuses this
     // untouched, which is how it inherits the safe default rather than copying it.
     confirm: async ({ message, detail, confirm: yes, cancel: no }) => {
-      probe('dialog:confirm handler');
       const answer = await dialog.showMessageBox({
         type: 'warning',
         message,
@@ -431,7 +371,6 @@ async function start(): Promise<void> {
     // and *keep it*. Here Enter saves and Escape stays, so neither key can cost anybody a
     // word — which is the property that lets the default be the one that acts.
     askToSave: async ({ message, detail, save, discard, cancel }) => {
-      probe('dialog:save-changes handler');
       const answer = await dialog.showMessageBox({
         type: 'warning',
         message,
@@ -562,26 +501,16 @@ async function start(): Promise<void> {
   // The guard is shared, so whichever fires second finds the permission the first one already
   // got instead of putting a second dialog in front of one click.
   mainWindow.on('close', (event) => {
-    probe('window close');
     if (!exit.mayExit(() => mainWindow?.close())) event.preventDefault();
   });
 
   app.on('before-quit', (event) => {
-    probe(`before-quit ${describeHandles()} ${describeProcesses()}`);
-    startTicker(describeProcesses);
     if (
       !exit.mayExit(() => {
-        probe('app.quit called (resume)');
         app.quit();
       })
     )
       event.preventDefault();
-  });
-  app.on('will-quit', () => {
-    probe(`will-quit ${describeHandles()} ${describeProcesses()}`);
-  });
-  app.on('quit', (_event, code) => {
-    probe(`quit code=${code} ${describeHandles()} ${describeProcesses()}`);
   });
 
   // **The other end of the no-deadline wait** (TYTO-147, ADR 0031). Once the window has
@@ -600,7 +529,6 @@ async function start(): Promise<void> {
   });
 
   mainWindow.on('closed', () => {
-    probe('window closed');
     exit.windowGone();
   });
 
@@ -621,7 +549,6 @@ async function start(): Promise<void> {
   });
 
   app.on('window-all-closed', () => {
-    probe('window-all-closed');
     // macOS keeps an app alive with no windows; every other platform does not.
     // Nothing is disposed on the way out: the host's registrations are in-process and the
     // process is ending. `disposePlugin` is for a plugin being uninstalled while the app

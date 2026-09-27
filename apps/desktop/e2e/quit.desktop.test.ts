@@ -440,3 +440,73 @@ describe('quitting with nothing unsaved', () => {
     expect(existsSync(marker)).toBe(false);
   });
 });
+
+/**
+ * A page that cannot hear the question yet (TYTO-44, ADR 0039).
+ *
+ * **The hang #223 shipped and #225 reverted, made deterministic.** On CI the packaged app was
+ * quit 303 ms after launch, while its page was still loading: main pushed `app:exit-requested`
+ * into a page with no listener, the push was dropped, no acknowledgement came, and the app
+ * stayed open for good. Timing a quit into that gap is a race, so this suite builds the gap
+ * instead: `about:blank` is a page that never registers the listener at all, reached by a
+ * main-frame navigation — the same event a reload is, and the one `index.ts` wires to
+ * `windowGone`.
+ *
+ * The second case is the other half of the flag: after a reload the new page says it is
+ * listening again, so a quit with unsaved text in it is still asked about.
+ */
+describe('quitting a page that cannot hear the question yet', () => {
+  it('goes, instead of waiting for an answer nobody can give', async () => {
+    const { app } = await launch('not-listening');
+    await app.evaluate(async ({ BrowserWindow }) => {
+      await BrowserWindow.getAllWindows()[0]?.loadURL('about:blank');
+    });
+
+    const gone = app.waitForEvent('close');
+    await app.evaluate(({ app: electronApp }) => {
+      electronApp.quit();
+    });
+    // Well inside the 30 s acknowledgement deadline, which is what a lost push used to wait
+    // out before dropping the question and leaving the app open.
+    const outcome = await Promise.race([
+      gone.then(() => 'gone' as const),
+      new Promise<'still running'>((resolve) => {
+        setTimeout(() => {
+          resolve('still running');
+        }, 10_000);
+      }),
+    ]);
+    if (outcome !== 'gone') await closeAppHard(app);
+
+    expect(outcome).toBe('gone');
+  });
+
+  it('asks again once a reloaded page has said it is listening', async () => {
+    const { app, page } = await launch('reloaded');
+    await page.reload();
+    await page.waitForSelector('#editor .cm-content');
+    await page.waitForSelector('.tabs__tab');
+    await page.click('#editor .cm-content');
+    await page.keyboard.type('::titulo Campanha');
+    await page.waitForSelector('.tabs__dirty');
+
+    await captureBoxes(app, 'cancel');
+    await app.evaluate(({ app: electronApp }) => {
+      electronApp.quit();
+    });
+    await expect.poll(async () => (await boxes(app)).length, { timeout: 5_000 }).toBe(1);
+
+    await captureBoxes(app, 'discard');
+    const gone = app.waitForEvent('close');
+    await app.evaluate(({ app: electronApp }) => {
+      electronApp.quit();
+    });
+    await gone;
+  });
+});
+
+/** Ends an app that would not quit, so a red case above does not also hang the teardown. */
+const closeAppHard = async (app: ElectronApplication): Promise<void> => {
+  app.process().kill('SIGKILL');
+  await app.waitForEvent('close').catch(() => undefined);
+};

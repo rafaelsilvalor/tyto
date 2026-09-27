@@ -446,6 +446,16 @@ export const IPC_CHANNELS = {
   'app:exit-ack': channel(z.object({ askId: z.number().int().nonnegative() }), z.object({})),
 
   /**
+   * Stage zero: "this page can hear the question" (TYTO-44, ADR 0039).
+   *
+   * Sent once per page, right after the `app:exit-requested` listener is registered and before
+   * anything else the page does. Until main has it, `src/main/quit.ts` treats the window as
+   * having nobody to ask — because a push into a page with no listener is dropped without a
+   * trace, and an app waiting for its acknowledgement is an app that does not quit.
+   */
+  'app:exit-listening': channel(z.object({}), z.object({})),
+
+  /**
    * Stage two: the renderer's half of the one question main asks (TYTO-123, ADR 0029).
    *
    * Main pushes `app:exit-requested` and the answer comes back **here**, on an ordinary

@@ -110,12 +110,7 @@ jobs:
       # the package is also broken. They answer different questions and one run should
       # answer both.
       - if: ${{ !cancelled() }}
-        # TEMPORARY (TYTO-44): a step deadline while the quit hang is instrumented.
-        timeout-minutes: 8
         run: xvfb-run -a pnpm --filter @tyto/desktop test:package
-      # TEMPORARY (TYTO-44): the packaged app's log, which holds the [quit-probe] lines.
-      - if: ${{ always() }}
-        run: find ~/.config/Tyto -name '*.log' -print -exec cat {} \; || true
 
       # **One artifact, and only since there is finally something in it.** The note this
       # replaces was right when it was written: these suites wrote nothing to disk, and a

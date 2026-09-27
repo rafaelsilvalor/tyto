@@ -39,6 +39,19 @@ const pack = join(
   'templates',
 );
 
+/**
+ * Every format the pack's catalogue declares, in its order: what a scaffolded template lists.
+ *
+ * Read rather than written out, because the catalogue grows on its own schedule — `retrato`
+ * arrived with TYTO-173 while this suite was out of main, and a literal list went red on it.
+ * One `name: { ... }` entry per line is the file's shape; comments start with `#`.
+ */
+const catalogueFormats = (): readonly string[] =>
+  readFileSync(join(pack, 'formats.yaml'), 'utf8')
+    .split('\n')
+    .map((line) => /^([a-z][\w-]*):/i.exec(line)?.[1])
+    .filter((format): format is string => format !== undefined);
+
 let scratch: string;
 let mine: string;
 let folder: string;
@@ -260,7 +273,7 @@ describe('the template mode', () => {
     await page.fill('[data-testid="template-new-name"]', 'novo');
     await page.press('[data-testid="template-new-name"]', 'Enter');
 
-    await expect.poll(gridFormats, { timeout: 15_000 }).toEqual(['feed', 'story']);
+    await expect.poll(gridFormats, { timeout: 15_000 }).toEqual(catalogueFormats());
     expect(existsSync(join(mine, 'novo', 'manifest.yaml'))).toBe(true);
     expect(existsSync(join(mine, 'novo', 'examples', 'novo.brief'))).toBe(true);
     expect(

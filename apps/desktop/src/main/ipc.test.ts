@@ -184,11 +184,16 @@ const layoutStore = () => {
 const exitAnswers = () => {
   const given: { askId: number; allow: boolean }[] = [];
   const acknowledged: number[] = [];
+  const heard = { count: 0 };
   return {
     given,
     acknowledged,
+    heard,
     acknowledge: (askId: number) => acknowledged.push(askId),
     answer: (askId: number, allow: boolean) => given.push({ askId, allow }),
+    listening: () => {
+      heard.count += 1;
+    },
   };
 };
 
@@ -514,6 +519,20 @@ describe('the export handlers (E9.4)', () => {
  * Same division of labour as the channel below — the table carries the id, and what stopping
  * the clock means lives in `quit.ts`.
  */
+/** Stage zero: the page can hear the question (TYTO-44, ADR 0039). */
+describe('app:exit-listening', () => {
+  it('tells the guard, and nothing else', async () => {
+    const exit = exitAnswers();
+    const handlers = createHandlers({ ...dependencies(), exit });
+
+    await handlers['app:exit-listening']({});
+
+    expect(exit.heard.count).toBe(1);
+    expect(exit.acknowledged).toEqual([]);
+    expect(exit.given).toEqual([]);
+  });
+});
+
 describe('app:exit-ack', () => {
   it('hands the id to the guard, verbatim', async () => {
     const exit = exitAnswers();

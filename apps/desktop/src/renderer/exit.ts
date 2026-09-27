@@ -82,3 +82,37 @@ export async function resolveExit(question: ExitQuestion): Promise<boolean> {
 
   return true;
 }
+
+/** The three messages of the quit question that the window sends or receives, as ports. */
+export interface ExitChannel {
+  /** Subscribes to `app:exit-requested`. */
+  readonly onRequest: (handler: (askId: number) => void) => void;
+  /** `app:exit-ack`: this page has the question (ADR 0031). */
+  readonly acknowledge: (askId: number) => void;
+  /** `app:exit-listening`: this page can hear the question (ADR 0039). */
+  readonly listening: () => void;
+}
+
+/**
+ * Registers the quit listener and then tells main it exists (TYTO-44, ADR 0039).
+ *
+ * **In that order, and first in `load()`, before anything is awaited.** Main does not ask a page
+ * that has not said it is listening; it lets the quit through instead, which is only safe while
+ * nothing in the page can hold unsaved text. The listener is therefore the first thing the page
+ * registers, and `listening` is sent after `onRequest`, so main can never be told it may ask
+ * before a push would actually be heard.
+ *
+ * **The acknowledgement goes before the answer is even started** (TYTO-147, ADR 0031). Main's
+ * deadline covers the ack and nothing after it, and `answer` opens by counting the workspace
+ * and may end in a box a person has to read.
+ */
+export function listenForExit(
+  channel: ExitChannel,
+  answer: (askId: number) => Promise<void>,
+): void {
+  channel.onRequest((askId) => {
+    channel.acknowledge(askId);
+    void answer(askId);
+  });
+  channel.listening();
+}
