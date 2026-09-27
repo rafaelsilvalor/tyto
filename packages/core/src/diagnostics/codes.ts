@@ -315,6 +315,17 @@ export const diagnosticCodes = {
     fatal: true,
     fatality: 'A plugin that did not load contributed no slot to skip.',
   },
+  // A link is copied as its target when it lands inside the plugin folder; any other is
+  // refused before anything is written, rather than failing the copy halfway (TYTO-50).
+  E_PLUGIN_LINK: {
+    severity: 'error',
+    summary: 'A plugin folder being installed holds a link that leads outside it, or nowhere.',
+    template:
+      "Plugin folder '{source}' holds '{file}', a link that {problem}. Install copies a plugin's own files only: replace the link with the file it points to.",
+    spec: 'docs/plugin-authoring.md',
+    fatal: true,
+    fatality: 'A plugin that did not load contributed no slot to skip.',
+  },
   E_PLUGIN_CRASHED: {
     severity: 'error',
     summary: "An isolated plugin's process stopped while the host was waiting for it.",

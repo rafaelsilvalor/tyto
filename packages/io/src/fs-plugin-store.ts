@@ -1,8 +1,18 @@
-import { cp, mkdir, readFile, readdir, rename, rm, writeFile } from 'node:fs/promises';
-import { dirname, join, relative } from 'node:path';
+import {
+  cp,
+  lstat,
+  mkdir,
+  readFile,
+  readdir,
+  realpath,
+  rename,
+  rm,
+  writeFile,
+} from 'node:fs/promises';
+import { dirname, isAbsolute, join, relative, sep } from 'node:path';
 
-import type { Diagnostics, Result } from '@tyto/core';
-import { ok } from '@tyto/core';
+import type { Diagnostic, Diagnostics, Result } from '@tyto/core';
+import { diagnostic, err, ok } from '@tyto/core';
 import {
   EMPTY_PLUGIN_CRASHES,
   EMPTY_PLUGIN_STATE,
@@ -57,6 +67,56 @@ async function writeAtomically(path: string, text: string): Promise<void> {
   await rename(staging, path);
 }
 
+/** A fetched git checkout carries its history; nothing loads it and it is most of the bytes. */
+function isGitHistory(root: string, path: string): boolean {
+  return relative(root, path).split(/[\\/]/u).includes('.git');
+}
+
+function isWithin(root: string, path: string): boolean {
+  const between = relative(root, path);
+  return (
+    between === '' || (!isAbsolute(between) && between !== '..' && !between.startsWith(`..${sep}`))
+  );
+}
+
+/**
+ * Every link in a plugin folder that does not land inside it, as a diagnostic naming it.
+ *
+ * A link that does land inside is copied as what it points to. One that leads out would
+ * copy somebody else's files into Tyto's plugin folder, and one that leads nowhere copies
+ * nothing, so both are refused before anything is written. Copying a link as a link was the
+ * old behaviour, and on Windows it is an `EPERM` without an administrator — an internal
+ * failure for a folder a person made (TYTO-50). A junction counts as a link here, which is
+ * what `lstat` reports it as.
+ */
+async function linksOutside(from: string): Promise<Diagnostic[]> {
+  const root = await realpath(from);
+  const problems: Diagnostic[] = [];
+  const walk = async (directory: string): Promise<void> => {
+    for (const entry of await readdir(directory, { withFileTypes: true })) {
+      const path = join(directory, entry.name);
+      if (isGitHistory(from, path)) continue;
+      const stats = await lstat(path);
+      if (stats.isSymbolicLink()) {
+        const target = await realpath(path).catch(() => undefined);
+        if (target === undefined || !isWithin(root, target)) {
+          problems.push(
+            diagnostic('E_PLUGIN_LINK', {
+              source: from,
+              file: relative(from, path),
+              problem: target === undefined ? 'leads nowhere' : 'leads out of the folder',
+            }),
+          );
+        }
+      } else if (stats.isDirectory()) {
+        await walk(path);
+      }
+    }
+  };
+  await walk(from);
+  return problems;
+}
+
 export function fsPluginStore(home: string): PluginStore {
   const pluginsDirectory = join(home, PLUGINS_DIR);
   const statePath = join(home, PLUGIN_STATE_FILE);
@@ -108,7 +168,10 @@ export function fsPluginStore(home: string): PluginStore {
       await writeAtomically(crashesPath, serializePluginCrashes(crashes));
     },
 
-    async add(name: string, from: string): Promise<void> {
+    async add(name: string, from: string): Promise<Result<void, Diagnostics>> {
+      const outside = await linksOutside(from);
+      if (outside.length > 0) return err(outside);
+
       const target = join(pluginsDirectory, name);
       // Copied beside the target and swapped in, so an install that dies halfway leaves the
       // previous version whole rather than half of each.
@@ -117,12 +180,13 @@ export function fsPluginStore(home: string): PluginStore {
       await mkdir(pluginsDirectory, { recursive: true });
       await cp(from, staging, {
         recursive: true,
-        // A fetched git checkout carries its history; nothing loads it and it is most of
-        // the bytes.
-        filter: (source) => !relative(from, source).split(/[\\/]/u).includes('.git'),
+        // Every link left is inside the folder (above), so it is copied as its target.
+        dereference: true,
+        filter: (source) => !isGitHistory(from, source),
       });
       await rm(target, { recursive: true, force: true });
       await rename(staging, target);
+      return ok(undefined);
     },
 
     async remove(name: string): Promise<void> {

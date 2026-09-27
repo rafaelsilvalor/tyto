@@ -191,8 +191,12 @@ installed folder and may not lead out of it, links included, or it is
 `template.ts`), or it is `E_PLUGIN_PACK_CODE`. Either one refuses the whole plugin, so a
 render reports it as `W_PLUGIN_SKIPPED` and no task activates its other contributions. The
 host reads the manifests from the folder and not from the contribution's `templates`, which a
-plugin may leave empty. The desktop does not search installed packs yet; that is the second
-TYTO-50 pull request. `docs/plugin-authoring.md` walks one from `tyto plugin new` to a render.
+plugin may leave empty. The desktop searches them in the same order through the same check
+(`installedPacks` in `@tyto/io`), once its plugins have started: `ProjectSources.setInstalled`
+reads the folders again, and the window asks `templates:list` again when `plugins:panels`
+answers, which is after that. A plugin refused over its pack is kept out of the preview, the
+panels and the export, and its `W_PLUGIN_SKIPPED` rides every preview's diagnostics.
+`docs/plugin-authoring.md` walks one from `tyto plugin new` to a render.
 
 ### `editor.command` and `editor.keymap`, in full
 
@@ -315,7 +319,7 @@ host (CLI thread)                                guest (plugin's worker)
 
 **Three sources, fetched by the programs the person already has.** A folder is used where it is. A git URL — `git+https://…`, `git@host:…`, `git://…`, anything ending `.git` — is `git clone --depth 1`. Anything else is an npm spec — a name, `name@range`, a tarball — and is `npm pack` followed by `tar`; a spec that names a file on this disk is handed to npm as `file:<absolute path>`, because npm reads a bare `packed/x.tgz` as the GitHub shorthand `user/repo` and tries to clone it. Tyto opens no connection of its own, so git's and npm's credentials, proxy and registry configuration apply unchanged, and nothing about who fetched what reaches Tyto (ADR 0011). It is also what makes the three testable offline: `apps/cli/src/plugin-install.test.ts` clones a `file://` repository and packs a local tarball through exactly the commands a real URL and a real name take.
 
-**Both files drop the keys they do not know rather than refusing** (ADR 0041), so a newer CLI or desktop can add a field without costing the older one its plugins. **The approval is recorded apart from the files.** A folder under `plugins/` says a plugin's files are here; it does not say anybody agreed to run them. So `plugins.json` holds what `install` asked and was told, and the loader reads both: **a folder with no entry is not installed** — one copied in by hand has had no question asked — and an entry whose plugin now declares a permission nobody approved is refused (`E_PLUGIN_PERMISSIONS_CHANGED`) until it is installed again. Installing a name that is already installed replaces it; that is how an update lands. A built-in's name is never available.
+**Both files drop the keys they do not know rather than refusing** (ADR 0041), so a newer CLI or desktop can add a field without costing the older one its plugins. **The approval is recorded apart from the files.** A folder under `plugins/` says a plugin's files are here; it does not say anybody agreed to run them. So `plugins.json` holds what `install` asked and was told, and the loader reads both: **a folder with no entry is not installed** — one copied in by hand has had no question asked — and an entry whose plugin now declares a permission nobody approved is refused (`E_PLUGIN_PERMISSIONS_CHANGED`) until it is installed again. Installing a name that is already installed replaces it; that is how an update lands. A built-in's name is never available. **A link in the folder is copied as its target when the target is inside the folder, and refused otherwise** (`E_PLUGIN_LINK`, exit 1, naming the file): `PluginStore.add` answers a `Result`, because copying a link as a link was an `EPERM` on Windows without an administrator and reached the person as an internal failure.
 
 **Approved is enforced where it crosses, and the prompt says how far.** An installed plugin runs in a worker thread of its own (see Isolation), and the prompt says that thread is not a sandbox: the plugin has Tyto's access to the computer, and `net:` and `credentials:` permissions filter `host.fetch` and `host.credentials` only. `install` prints that sentence beside the list, so nobody reads a granted permission as more of a boundary than it is. Without a terminal to answer, `install` needs `--yes`.
 

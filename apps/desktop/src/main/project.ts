@@ -34,7 +34,10 @@ import {
 
 /** Everything one read of the folders produced, as one value nothing can change under you. */
 export interface ProjectSnapshot {
-  /** In search order, earlier wins. The chosen folder first, the built-in pack last. */
+  /**
+   * In search order, earlier wins: the chosen folder, the built-in pack, then the packs of
+   * installed plugins (ADR 0046) — the CLI's order.
+   */
   readonly roots: readonly string[];
   /** Absent when every root was unreadable, which is a window that opens and says so. */
   readonly registry: TemplateRegistry | undefined;
@@ -60,6 +63,18 @@ export interface ProjectSources {
   current(): ProjectSnapshot;
   /** Reads the folders again. `undefined` goes back to the built-in pack alone. */
   reload(folder: string | undefined): Promise<ProjectSnapshot>;
+  /**
+   * The installed packs' folders, already checked, searched after the built-in pack.
+   *
+   * Handed over once the plugins have started, which is after the window opened (ADR 0044),
+   * so it reads the folders again with the chosen one kept. `warnings` are the packs that
+   * were refused, carried with every snapshot so the problems panel says which plugin was
+   * skipped and why, the way a render's `result.json` does.
+   */
+  setInstalled(packs: {
+    readonly directories: readonly string[];
+    readonly warnings: readonly Diagnostic[];
+  }): Promise<ProjectSnapshot>;
 }
 
 export interface ProjectSourcesOptions {
@@ -92,8 +107,11 @@ export async function createProjectSources({
     return { found: alone.value.list().length, diagnostics: [] };
   };
 
+  let installed: readonly string[] = [];
+  let installedWarnings: readonly Diagnostic[] = [];
+
   const read = async (chosen: string | undefined): Promise<ProjectSnapshot> => {
-    const roots = chosen === undefined ? [builtIn] : [chosen, builtIn];
+    const roots = [...(chosen === undefined ? [] : [chosen]), builtIn, ...installed];
 
     const probe = chosen === undefined ? undefined : await countIn(chosen);
 
@@ -139,6 +157,7 @@ export async function createProjectSources({
       registry: registry.ok ? registry.value : undefined,
       formats: formats.ok ? formats.value : undefined,
       diagnostics: [
+        ...installedWarnings,
         ...(registry.ok ? registry.diagnostics : registry.error),
         ...formatsDiagnostics,
         ...(probe?.diagnostics ?? []),
@@ -149,11 +168,19 @@ export async function createProjectSources({
   };
 
   let snapshot = await read(folder);
+  let chosenFolder = folder;
 
   return {
     current: () => snapshot,
     reload: async (next) => {
+      chosenFolder = next;
       snapshot = await read(next);
+      return snapshot;
+    },
+    setInstalled: async (packs) => {
+      installed = [...packs.directories];
+      installedWarnings = [...packs.warnings];
+      snapshot = await read(chosenFolder);
       return snapshot;
     },
   };
