@@ -1,3 +1,4 @@
+import { templateManifestSchema } from '@tyto/core';
 import { z } from 'zod';
 
 import { layoutSchema } from './layout.js';
@@ -217,6 +218,15 @@ export const IPC_CHANNELS = {
         }),
       ),
       diagnostics: z.array(diagnostic),
+      /**
+       * What the editor offers after `::` (TYTO-49): the manifest the frontmatter named, and
+       * every installed plugin's `namespace/name`. On this answer rather than on a channel
+       * of its own, so the completion list and the underline come from one pass in main.
+       */
+      completion: z.object({
+        manifest: templateManifestSchema.optional(),
+        directives: z.array(z.string().min(1).max(200)).max(500),
+      }),
     }),
   ),
 
