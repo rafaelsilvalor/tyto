@@ -26,6 +26,7 @@ export { briefDarkTheme, briefLightTheme, type ThemeName, themes } from './theme
 
 export {
   type BriefAnalysis,
+  type EditorDirectives,
   type BriefAnalyzer,
   type BriefAnalyzerOptions,
   briefAnalysisField,

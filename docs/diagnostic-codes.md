@@ -24,6 +24,7 @@ non-zero.
 | `E_BAD_SLOT_VALUE` | error | no | A slot is set to something the manifest does not allow for it. |
 | `E_UNKNOWN_SLOT` | error | no | A directive names a slot the template manifest does not declare. |
 | `E_UNKNOWN_DIRECTIVE` | error | no | A directive matches no template slot and no installed plugin. |
+| `E_DIRECTIVE_ARGUMENT` | error | no | A plugin directive was written without an argument it needs, or with one it cannot use. |
 | `E_MISSING_REQUIRED_SLOT` | error | no | The manifest marks a slot as required and the brief leaves it unset. |
 | `E_BAD_ADJUSTMENT` | error | no | An adjustment is not declared for the slot it is applied to. |
 | `E_ASSET_NOT_FOUND` | error | no | An asset path in the brief does not resolve to a file. |
@@ -106,6 +107,7 @@ incomplete brief, and a crossed box where a picture the exporter could not load 
 | `E_BAD_SLOT_VALUE` | no | The value of one slot; it stays unset and the rest of the artwork is drawn anyway. |
 | `E_UNKNOWN_SLOT` | no | The slot does not exist, and the ones that do are unaffected. |
 | `E_UNKNOWN_DIRECTIVE` | no | The same: a directive nothing claims contributes nothing to skip. |
+| `E_DIRECTIVE_ARGUMENT` | no | The directive contributes nothing; every other directive is resolved. |
 | `E_MISSING_REQUIRED_SLOT` | no | The artwork renders with a hole, and since ADR 0035 the hole is drawn: `compile` stamps every frame built from a brief that left a required slot unset, so the gap is in the exported bytes and not only in the problems panel. |
 | `E_BAD_ADJUSTMENT` | no | One adjustment on one slot; the slot keeps the adjustments that are declared. |
 | `E_ASSET_NOT_FOUND` | no | One image the brief named. The slot stays unset, so the scene never references bytes nobody can supply. |
@@ -269,6 +271,20 @@ Unknown directive '::{directive}'. No template slot or installed plugin provides
 ```
 
 Parameters: `directive`
+
+### `E_DIRECTIVE_ARGUMENT`
+
+**Severity:** error · **Fatal:** no · **Spec:** `docs/brief-language.md`
+
+A plugin directive was written without an argument it needs, or with one it cannot use.
+
+The directive contributes nothing; every other directive is resolved.
+
+```
+Directive '::{directive}' {problem}.
+```
+
+Parameters: `directive`, `problem`
 
 ### `E_MISSING_REQUIRED_SLOT`
 

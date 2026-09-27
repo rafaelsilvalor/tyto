@@ -202,6 +202,38 @@ describe('completeBrief', () => {
     expect(labelsOf(result)).toEqual(['destaque', 'tom']);
   });
 
+  it('offers a plugin directive beside the slots, after ::', () => {
+    const result = completeAt(`${frontmatter()}::|`, {
+      ...analysisOf(CARROSSEL),
+      directives: ['demo/shout'],
+    });
+
+    expect(labelsOf(result)).toEqual(['demo/shout', 'item', 'titulo', 'tom']);
+    expect(result?.options.find((option) => option.label === 'demo/shout')?.detail).toBe('plugin');
+  });
+
+  it('offers only plugin directives once a namespace is written, replacing it whole', () => {
+    const analysis = { ...analysisOf(CARROSSEL), directives: ['demo/shout', 'ai/caption'] };
+    const typed = `${frontmatter()}::demo/sh|`;
+    const afterSlash = `${frontmatter()}::demo/|`;
+
+    for (const doc of [typed, afterSlash]) {
+      const result = completeAt(doc, analysis);
+      expect(labelsOf(result)).toEqual(['ai/caption', 'demo/shout']);
+      expect(result?.from).toBe(doc.indexOf('demo/'));
+      expect(result?.validFor).toEqual(/^[a-zA-Z0-9_/-]*$/u);
+    }
+  });
+
+  it('offers plugin directives before any template is resolved', () => {
+    const result = completeAt(`${frontmatter()}::|`, {
+      ...analysisOf(),
+      directives: ['demo/shout'],
+    });
+
+    expect(labelsOf(result)).toEqual(['demo/shout']);
+  });
+
   it('offers nothing on a comment line', () => {
     const result = completeAt(`${frontmatter()}// ::|`, analysisOf(CARROSSEL));
 

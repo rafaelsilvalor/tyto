@@ -71,6 +71,14 @@ export type {
 
 export { type CompileOptions, compile } from './brief/compile.js';
 
+export type {
+  DirectiveExpander,
+  DirectiveResolver,
+  ExpandedDirective,
+  ExpandedInline,
+  ExpansionResult,
+} from './brief/directives.js';
+
 export {
   type FormatCatalogue,
   type FormatDefinition,

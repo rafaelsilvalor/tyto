@@ -3,6 +3,7 @@ import {
   type AssetRef,
   type AssetResolver,
   type Diagnostics,
+  type DirectiveResolver,
   type TemplateManifest,
   type TemplateRegistry,
   resolve,
@@ -33,6 +34,24 @@ export interface BriefAnalysis {
   readonly manifest?: TemplateManifest;
   /** Every template name the registry knows, for completing `template:` in the frontmatter. */
   readonly templates: readonly string[];
+  /**
+   * Every plugin directive the host offers, as `namespace/name`, for completing after `::`
+   * (TYTO-49). Absent when the host activated none.
+   */
+  readonly directives?: readonly string[];
+}
+
+/**
+ * The plugin directives a host hands the editor: what to offer, and what answers one.
+ *
+ * Two fields and not one, because a list of names is data a worker can be sent and a
+ * resolver is behaviour it cannot. A host with only the names gets the completion list and
+ * keeps `E_UNKNOWN_DIRECTIVE` in the gutter, which is what the CLI would say too.
+ */
+export interface EditorDirectives {
+  /** `namespace/name`, as `directiveNamesOf` in `@tyto/plugin-api` lists them. */
+  readonly names: readonly string[];
+  readonly resolver?: DirectiveResolver;
 }
 
 /**
@@ -70,6 +89,8 @@ export interface BriefAnalyzerOptions {
    * passes a resolver here and gets the diagnostic back.
    */
   readonly assets?: AssetResolver;
+  /** The plugin directives the host activated; absent, none are offered or resolved. */
+  readonly directives?: EditorDirectives;
 }
 
 /**
@@ -137,17 +158,23 @@ export function createBriefAnalyzer(options: BriefAnalyzerOptions): BriefAnalyze
   const registry = registryOf(options.manifests);
   const assets = options.assets ?? acceptEveryAsset;
   const templates = registry.list().map((manifest) => manifest.name);
+  const directives = options.directives;
+  const offered = directives === undefined ? {} : { directives: directives.names };
 
   return {
     analyze: async (source: string): Promise<BriefAnalysis> => {
       const parsed = parseBrief(source);
       if (!parsed.ok) {
-        return { source, diagnostics: parsed.error, templates };
+        return { source, diagnostics: parsed.error, templates, ...offered };
       }
 
       const named = templateNameOf(parsed.value.frontmatter.data);
       const manifest = named === undefined ? undefined : registry.get(named);
-      const resolved = await resolve(parsed.value, { registry, assets });
+      const resolved = await resolve(parsed.value, {
+        registry,
+        assets,
+        ...(directives?.resolver === undefined ? {} : { directives: directives.resolver }),
+      });
 
       // Both branches carry diagnostics: `resolve` succeeds with warnings (ADR 0013), and
       // a brief with a `W_UNUSED_SLOT` in it is one the gutter should still mark.
@@ -159,6 +186,7 @@ export function createBriefAnalyzer(options: BriefAnalyzerOptions): BriefAnalyze
         source,
         diagnostics,
         templates,
+        ...offered,
         ...(manifest === undefined ? {} : { manifest }),
       };
     },

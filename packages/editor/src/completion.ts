@@ -74,16 +74,23 @@ const adjustmentOption = (name: string, manifest: TemplateManifest): Completion 
 
 const valueOption = (value: string): Completion => ({ label: value, type: 'enum' });
 
-const result = (written: Written, options: readonly Completion[]): CompletionResult | null => {
+const result = (
+  written: Written,
+  options: readonly Completion[],
+  // Every name the brief language can write is this shape, so CodeMirror keeps filtering
+  // the list as the author types instead of asking for it again on each keystroke. A
+  // directive name may carry its namespace's slash, which is the one wider list.
+  validFor: RegExp = /^[a-zA-Z0-9_-]*$/u,
+): CompletionResult | null => {
   if (options.length === 0) return null;
-  return {
-    from: written.from,
-    options: [...options],
-    // Every name the brief language can write is this shape, so CodeMirror keeps filtering
-    // the list as the author types instead of asking for it again on each keystroke.
-    validFor: /^[a-zA-Z0-9_-]*$/u,
-  };
+  return { from: written.from, options: [...options], validFor };
 };
+
+const directiveOption = (name: string): Completion => ({
+  label: name,
+  type: 'function',
+  detail: 'plugin',
+});
 
 /* ------------------------------------------------------------------ frontmatter -- */
 
@@ -178,16 +185,25 @@ const slotOfList = (context: CompletionContext, node: SyntaxNode): string | unde
   return name == null ? undefined : context.state.sliceDoc(name.from, name.to);
 };
 
-const slotNames = (
+/**
+ * What may follow `::`: the template's slots, and the plugins' directives beside them.
+ *
+ * Plugin directives are offered with no manifest at all — `::ai/caption` belongs to a
+ * plugin, not to a template — so a brief that names no template yet still lists them.
+ */
+const directiveNames = (
   written: Written,
-  manifest: TemplateManifest | undefined,
-): CompletionResult | null =>
-  manifest === undefined
-    ? null
-    : result(
-        written,
-        Object.keys(manifest.slots).map((name) => slotOption(name, manifest)),
-      );
+  analysis: BriefAnalysis,
+  namespaced: boolean,
+): CompletionResult | null => {
+  const manifest = analysis.manifest;
+  const slots =
+    namespaced || manifest === undefined
+      ? []
+      : Object.keys(manifest.slots).map((name) => slotOption(name, manifest));
+  const plugins = (analysis.directives ?? []).map(directiveOption);
+  return result(written, [...slots, ...plugins], /^[a-zA-Z0-9_/-]*$/u);
+};
 
 const adjustmentNames = (
   context: CompletionContext,
@@ -242,13 +258,24 @@ const completeBody = (
   switch (node.name) {
     // `::|` — the mark is there and the name is not, so the name goes at the cursor.
     case 'Directive':
-      return slotNames(nothingWritten(context), manifest);
+      return directiveNames(nothingWritten(context), analysis, false);
 
     // `::ti|`. The parent guard matters: a `Name` whose parent is an error node is the
-    // `template` key of a frontmatter nobody closed, not a directive.
-    case 'Name':
+    // `template` key of a frontmatter nobody closed, not a directive. After a namespace —
+    // `::demo/sh|` — what is being written starts at the namespace, and only a plugin's
+    // directive can be meant.
+    case 'Name': {
+      if (node.parent?.name !== 'Directive') return null;
+      const namespace = node.prevSibling?.name === 'Namespace' ? node.prevSibling : null;
+      return namespace === null
+        ? directiveNames(writtenAt(context, node), analysis, false)
+        : directiveNames(writtenAt(context, namespace), analysis, true);
+    }
+
+    // `::demo/|` — the namespace is written and its name is not.
+    case 'Namespace':
       return node.parent?.name === 'Directive'
-        ? slotNames(writtenAt(context, node), manifest)
+        ? directiveNames(writtenAt(context, node), analysis, true)
         : null;
 
     // `::item {|` and `::item {destaque, |` — inside the list but not inside an item.

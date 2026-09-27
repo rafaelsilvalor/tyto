@@ -24,6 +24,8 @@ export type {
   TemplatePack,
 } from './contributions.js';
 
+export { directiveNamesOf, directiveResolverOf } from './directives.js';
+
 export {
   type ContributionPoint,
   type PluginManifest,

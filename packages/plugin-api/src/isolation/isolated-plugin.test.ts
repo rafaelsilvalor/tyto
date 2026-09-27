@@ -1,7 +1,18 @@
-import { type Diagnostics, type Result, type Scene, ok } from '@tyto/core';
+import {
+  type Diagnostics,
+  type Directive,
+  type Result,
+  type Scene,
+  type TemplateRegistry,
+  ok,
+  parseManifest,
+  resolve,
+  sourceRange,
+} from '@tyto/core';
 import { describe, expect, it } from 'vitest';
 
-import type { Exporter } from '../contributions.js';
+import type { DirectiveContribution, Exporter } from '../contributions.js';
+import { directiveResolverOf } from '../directives.js';
 import { type Disposable, type Plugin, type PluginHost, createPluginHost } from '../host.js';
 import type { HostCapabilities } from '../capabilities.js';
 import type { GuestChannel, PluginChannel } from './channel.js';
@@ -123,13 +134,18 @@ async function isolate(
     readonly permissions?: readonly string[];
     readonly capabilities?: HostCapabilities;
     readonly deadlineMs?: number;
+    readonly contributes?: readonly string[];
   } = {},
 ): Promise<{ readonly pair: Pair; readonly connected: Result<IsolatedPlugin, Diagnostics> }> {
   const pair = channelPair((guest) => runGuest(guest, () => Promise.resolve({ activate })));
   const lines = options.log;
   const connected = await connectIsolatedPlugin({
     name: 'texto',
-    manifest: { ...MANIFEST, permissions: options.permissions ?? [] },
+    manifest: {
+      ...MANIFEST,
+      permissions: options.permissions ?? [],
+      contributes: options.contributes ?? MANIFEST.contributes,
+    },
     channel: pair.host,
     ...(options.capabilities === undefined ? {} : { capabilities: options.capabilities }),
     ...(options.deadlineMs === undefined ? {} : { deadlineMs: options.deadlineMs }),
@@ -330,7 +346,6 @@ describe('what an isolated plugin cannot do', () => {
     ['source', (host: PluginHost) => host.registerSource({ id: 'inbox', value: {} })],
     ['sink', (host: PluginHost) => host.registerSink({ id: 'outbox', value: {} })],
     ['rasterizer', (host: PluginHost) => host.registerRasterizer({ id: 'r', value: {} })],
-    ['directive', (host: PluginHost) => host.registerDirective({ id: 'd', namespace: 'd' })],
     ['panel', (host: PluginHost) => host.registerPanel({ id: 'p', title: 'P' })],
   ])('registers into %s, which is refused by name', async (point, activate) => {
     const { connected } = await isolate(activate);
@@ -544,5 +559,114 @@ describe('a plugin that does not answer', () => {
       "Plugin 'texto' failed to activate: it did not finish activating within 0.1 s.",
     );
     expect(pair.closed()).toBe(true);
+  });
+});
+
+describe('an isolated directive (TYTO-49)', () => {
+  const DIRECTIVE: Directive = {
+    name: 'shout',
+    namespace: 'demo',
+    adjustments: [{ name: 'slot', value: 'titulo', range: sourceRange(10, 24) }],
+    body: [{ kind: 'text', value: 'Direito', range: sourceRange(25, 32) }],
+    range: sourceRange(0, 32),
+    nameRange: sourceRange(2, 12),
+  };
+
+  const shout: DirectiveContribution = {
+    id: 'demo',
+    names: ['shout'],
+    transform: (directive) =>
+      ok([
+        {
+          name: directive.adjustments[0]?.value ?? '',
+          body: directive.body.map((inline) =>
+            inline.kind === 'text'
+              ? { kind: 'text' as const, value: inline.value.toUpperCase() }
+              : { kind: 'break' as const },
+          ),
+        },
+      ]),
+  };
+
+  function directiveIn(plugin: Plugin): DirectiveContribution {
+    const host = createPluginHost();
+    const activated = host.tryActivate(plugin);
+    if (!activated.ok) throw new Error(activated.error.map((item) => item.message).join('\n'));
+    const [directive] = host.registry.directives();
+    if (directive === undefined) throw new Error('no directive');
+    return directive;
+  }
+
+  it('answers the same as the same directive in process', async () => {
+    const { connected } = await isolate((host) => host.registerDirective(shout), {
+      contributes: ['directive'],
+    });
+    if (!connected.ok) throw new Error(connected.error[0]?.message);
+
+    const isolated = directiveIn(connected.value.plugin);
+    expect(isolated.id).toBe('demo');
+    expect(isolated.names).toEqual(['shout']);
+    expect(await isolated.transform(DIRECTIVE)).toEqual(shout.transform(DIRECTIVE));
+  });
+
+  it('refuses a replacement that is itself a plugin directive', async () => {
+    const { connected } = await isolate(
+      (host) =>
+        host.registerDirective({
+          ...shout,
+          transform: () => ok([{ name: 'titulo', namespace: 'demo', body: [] }] as never),
+        }),
+      { contributes: ['directive'] },
+    );
+    if (!connected.ok) throw new Error(connected.error[0]?.message);
+
+    const answer = await directiveIn(connected.value.plugin).transform(DIRECTIVE);
+    expect(answer.ok ? [] : answer.error.map((item) => item.code)).toEqual(['E_PLUGIN_PROTOCOL']);
+  });
+
+  it('past its deadline is E_PLUGIN_TIMEOUT on the directive’s range, and the brief still resolves', async () => {
+    const { connected } = await isolate(
+      (host) =>
+        host.registerDirective({
+          ...shout,
+          transform: () => new Promise(() => undefined),
+        }),
+      { contributes: ['directive'], deadlineMs: 20 },
+    );
+    if (!connected.ok) throw new Error(connected.error[0]?.message);
+
+    const host = createPluginHost();
+    host.tryActivate(connected.value.plugin);
+    const manifest = parseManifest(
+      'name: promo-curso\nversion: 1.0.0\nformats: [feed]\nslots:\n  titulo: { type: rich-text }\n',
+      'manifest.yaml',
+    );
+    if (!manifest.ok) throw new Error('manifest');
+    const registry: TemplateRegistry = {
+      list: () => [manifest.value],
+      get: () => manifest.value,
+      formatsOf: () => manifest.value.formats,
+      directoryOf: () => undefined,
+      failures: [],
+    };
+    const resolved = await resolve(
+      {
+        frontmatter: { data: { template: 'promo-curso' }, ranges: {} },
+        directives: [DIRECTIVE],
+        range: sourceRange(0, 32),
+      },
+      {
+        registry,
+        assets: { base: '', resolve: () => Promise.resolve(undefined) },
+        directives: directiveResolverOf(() => host.registry.directives()),
+      },
+    );
+
+    expect(resolved.ok).toBe(true);
+    const problems = resolved.ok ? resolved.diagnostics : resolved.error;
+    expect(problems.map((item) => [item.code, item.range])).toEqual([
+      ['E_PLUGIN_TIMEOUT', DIRECTIVE.range],
+    ]);
+    expect(connected.value.crashed()).toBe('it did not answer within 0 s');
   });
 });

@@ -1,8 +1,10 @@
 import { describe, expect, it } from 'vitest';
 
 import type { BriefAst, Directive, Frontmatter, RichText } from './ast.js';
+import type { DirectiveResolver } from './directives.js';
 import { type ResolveOptions, type ResolvedBrief, resolve } from './resolve.js';
-import type { Diagnostic } from '../diagnostics/diagnostic.js';
+import { type Diagnostic, diagnostic } from '../diagnostics/diagnostic.js';
+import { err, ok } from '../result/result.js';
 import type { AssetResolver } from '../ports/asset-resolver.js';
 import type { AssetRef } from '../scene/primitives.js';
 import { sourceRange } from '../source/range.js';
@@ -660,5 +662,105 @@ describe('how the problems arrive', () => {
       expect(result.diagnostics.map((item) => item.code)).toEqual(['W_UNUSED_SLOT']);
       expect(result.value.slots.cor).toBeDefined();
     }
+  });
+});
+
+describe('a plugin directive (ADR 0043)', () => {
+  const at = sourceRange(30, 60);
+  const nameRange = sourceRange(32, 42);
+
+  /** `::demo/shout {slot: titulo} Direito` — the slot named by an adjustment, the body uppercased. */
+  const shout: DirectiveResolver = {
+    find: (namespace, name) =>
+      namespace === 'demo' && name === 'shout'
+        ? (input) => {
+            const slot = input.adjustments.find((item) => item.name === 'slot')?.value;
+            if (slot === undefined) {
+              return err([
+                diagnostic('E_DIRECTIVE_ARGUMENT', {
+                  directive: 'demo/shout',
+                  problem: 'needs {slot: name}',
+                }),
+              ]);
+            }
+            const body = input.body.map((inline) =>
+              inline.kind === 'text'
+                ? { kind: 'text' as const, value: inline.value.toUpperCase() }
+                : { kind: 'break' as const },
+            );
+            return ok([{ name: slot, body }]);
+          }
+        : undefined,
+  };
+
+  function shoutOf(slot: string | undefined, body = 'Direito'): Directive {
+    return directive(
+      'shout',
+      body,
+      {
+        namespace: 'demo',
+        nameRange,
+        adjustments:
+          slot === undefined ? [] : [{ name: 'slot', value: slot, range: sourceRange(43, 55) }],
+      },
+      at,
+    );
+  }
+
+  function withShout(shouted: Directive): BriefAst {
+    return brief(frontmatter({ template: 'promo-curso' }), [shouted, directive('slide', 'Um')]);
+  }
+
+  it('puts what the plugin returned in the slot, stamped with the directive’s range', async () => {
+    const resolved = await accepted(withShout(shoutOf('titulo')), { directives: shout });
+    expect(resolved.slots.titulo?.value).toEqual({
+      kind: 'rich-text',
+      text: [{ kind: 'text', value: 'DIREITO', range: at }],
+    });
+    expect(resolved.slots.titulo?.range).toEqual(at);
+  });
+
+  it('does not check the plugin’s own adjustments against the manifest', async () => {
+    // `slot` is no adjustment promo-curso declares, and it is the plugin's to read.
+    expect(await codes(withShout(shoutOf('titulo')), { directives: shout })).toEqual([]);
+  });
+
+  it('checks the replacement like a typed directive: an unknown slot is E_UNKNOWN_SLOT on the name', async () => {
+    const found = await problems(withShout(shoutOf('rodape')), { directives: shout });
+    const unknown = found.find((item) => item.code === 'E_UNKNOWN_SLOT');
+    expect(unknown?.message).toContain("Unknown slot 'rodape'");
+    expect(unknown?.range).toEqual(nameRange);
+  });
+
+  it('gives a plugin diagnostic with no position the range of the directive', async () => {
+    const found = await problems(withShout(shoutOf(undefined)), { directives: shout });
+    const refused = found.find((item) => item.code === 'E_DIRECTIVE_ARGUMENT');
+    expect(refused?.message).toBe("Directive '::demo/shout' needs {slot: name}.");
+    expect(refused?.range).toEqual(at);
+  });
+
+  it('is E_UNKNOWN_DIRECTIVE when the plugin owns the namespace and not the name', async () => {
+    const other = directive('whisper', 'x', { namespace: 'demo', nameRange }, at);
+    const found = await problems(withShout(other), { directives: shout });
+    const unknown = found.find((item) => item.code === 'E_UNKNOWN_DIRECTIVE');
+    expect(unknown?.message).toContain("'::demo/whisper'");
+    expect(unknown?.range).toEqual(nameRange);
+  });
+
+  it('is E_UNKNOWN_DIRECTIVE, ranged on the name, with no resolver at all', async () => {
+    const found = await problems(withShout(shoutOf('titulo')));
+    const unknown = found.find((item) => item.code === 'E_UNKNOWN_DIRECTIVE');
+    expect(unknown?.message).toContain("'::demo/shout'");
+    expect(unknown?.range).toEqual(nameRange);
+    expect(found.map((item) => item.code)).toContain('E_MISSING_REQUIRED_SLOT');
+  });
+
+  it('awaits an expander that answers later', async () => {
+    const later: DirectiveResolver = {
+      find: () => () =>
+        Promise.resolve(ok([{ name: 'titulo', body: [{ kind: 'text', value: 'Tarde demais' }] }])),
+    };
+    const resolved = await accepted(withShout(shoutOf('titulo')), { directives: later });
+    expect(resolved.slots.titulo?.value).toMatchObject({ text: [{ value: 'Tarde demais' }] });
   });
 });
