@@ -17,7 +17,7 @@ import {
 import { BUILT_IN_TEMPLATE_BUILDS } from '@tyto/templates';
 import { fileAssetResolver, fileResources } from '@tyto/io';
 
-import type { WindowDirectives } from './directives.js';
+import type { WindowPlugins } from './window-plugins.js';
 import { faces, fonts } from './fonts.js';
 import { type ProjectSources } from './project.js';
 
@@ -109,7 +109,7 @@ export interface PreviewServiceOptions {
    */
   readonly sources: ProjectSources;
   /** The installed plugins' directives; absent, every `::ns/name` is `E_UNKNOWN_DIRECTIVE`. */
-  readonly directives?: WindowDirectives;
+  readonly directives?: Pick<WindowPlugins, 'resolver' | 'names'>;
 }
 
 export interface PreviewService {

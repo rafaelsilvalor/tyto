@@ -182,6 +182,8 @@ export const en: Catalogue = {
   'plugins.status.refused': 'refused',
   'plugins.status.crashed': 'crashed',
   'plugins.permissions.none': 'none',
+  'plugins.panel.readsDocument':
+    'Its panel receives the text of the open brief whenever it changes, with no permission asked.',
   'plugins.close': 'Close',
   'plugins.unavailable': 'The plugin list could not be read.',
   'command.queue.show': 'Show the local queue',

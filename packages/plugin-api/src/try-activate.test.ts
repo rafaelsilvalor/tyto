@@ -137,7 +137,7 @@ describe('tryActivate', () => {
     const liar: Plugin = {
       id: 'liar',
       manifest: manifestOf('liar', ['exporter']),
-      activate: (h) => h.registerPanel({ id: 'painel', title: 'Painel' }),
+      activate: (h) => h.registerPanel({ id: 'painel', title: 'Painel', entry: 'panel.html' }),
     };
 
     const result = host.tryActivate(liar);

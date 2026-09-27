@@ -186,21 +186,31 @@ export const ISOLATED_POINTS: Readonly<Partial<Record<ContributionPoint, PointSp
     }),
     callables: {},
   },
+  // Data: the page is a file the host serves, and the page talks to the host through the
+  // window's bridge, never to the plugin's process (ADR 0045).
+  panel: {
+    method: 'registerPanel',
+    data: z.strictObject({
+      id: z.string().min(1),
+      title: z.string().min(1),
+      location: z.enum(['left', 'right', 'bottom']).optional(),
+      entry: z.string().min(1).max(500),
+    }),
+    callables: {},
+  },
 };
 
 /**
  * Points an isolated plugin cannot register into yet, and the method that reaches each.
  *
  * `source`, `sink` and `rasterizer` carry a value whose type lives in a Node package and
- * whose methods nothing here names; `panel` is a page in the desktop's renderer, which is
- * the second half of TYTO-49. Refused by name, so a plugin learns which one, rather than
- * registering something that could never be called.
+ * whose methods nothing here names. Refused by name, so a plugin learns which one, rather
+ * than registering something that could never be called.
  */
 export const NOT_YET_ISOLATED: Readonly<Record<string, ContributionPoint>> = {
   registerSource: 'source',
   registerSink: 'sink',
   registerRasterizer: 'rasterizer',
-  registerPanel: 'panel',
 };
 
 export function pointSpecOf(point: string): PointSpec | undefined {

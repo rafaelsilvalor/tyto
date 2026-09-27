@@ -183,6 +183,8 @@ export const ptBR: Catalogue = {
   'plugins.status.refused': 'recusado',
   'plugins.status.crashed': 'travou',
   'plugins.permissions.none': 'nenhuma',
+  'plugins.panel.readsDocument':
+    'O painel dele recebe o texto do brief aberto sempre que ele muda, sem pedir permissão.',
   'plugins.close': 'Fechar',
   'plugins.unavailable': 'Não foi possível ler a lista de plugins.',
   'command.queue.show': 'Mostrar a fila local',

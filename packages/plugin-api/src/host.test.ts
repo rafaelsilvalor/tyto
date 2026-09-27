@@ -278,7 +278,7 @@ describe('activating a plugin', () => {
       manifest: manifestOf({ contributes: ['exporter'] }),
       activate: (plugin) => {
         plugin.registerExporter(exporterOf('promo'));
-        plugin.registerPanel({ id: 'promo-panel', title: 'Promo' });
+        plugin.registerPanel({ id: 'promo-panel', title: 'Promo', entry: 'panel.html' });
       },
     });
 
@@ -321,7 +321,7 @@ describe('activating a plugin', () => {
           plugin.registerDirective({ id: 'e', names: [], transform: () => ok([]) });
           plugin.registerCommand({ id: 'f', title: 'Do' });
           plugin.registerKeymap({ id: 'g', bindings: {} });
-          plugin.registerPanel({ id: 'h', title: 'Promo' });
+          plugin.registerPanel({ id: 'h', title: 'Promo', entry: 'panel.html' });
         },
       }),
     );

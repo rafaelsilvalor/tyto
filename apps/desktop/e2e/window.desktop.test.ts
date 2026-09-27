@@ -255,7 +255,10 @@ describe('the bridge', () => {
       'log:reveal',
       'log:write',
       'on',
+      // TYTO-49: a plugin panel's list and its bridge. Exercised by `e2e/panel-plugin.desktop.test.ts`.
+      'panel:request',
       'plugins:list',
+      'plugins:panels',
       // TYTO-45: the local queue panel's six. Each is exercised by `e2e/queue.desktop.test.ts`.
       'queue:list',
       'queue:open-brief',

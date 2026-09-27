@@ -7,6 +7,7 @@ import {
   EDITOR_PANEL,
   ELASTIC_DOCK,
   PREVIEW_PANEL,
+  PLUGIN_PANEL_ELEMENT,
   PROBLEMS_PANEL,
   QUEUE_PANEL,
   clampSize,
@@ -16,6 +17,7 @@ import {
   panelOf,
   withPanelOpen,
   withPanelSize,
+  withPluginPanels,
 } from './layout.js';
 
 /**
@@ -184,5 +186,74 @@ describe('reading what was on the disk', () => {
 
   it('clamps a size a person hand-edited past the end of the world', () => {
     expect(panelOf(layoutFrom(saved({ size: 99_999 })), PREVIEW_PANEL)?.size).toBe(4000);
+  });
+});
+
+describe('a plugin’s panels (TYTO-49)', () => {
+  const offered = [{ id: 'plugin:demo/contagem', location: 'bottom' as const }];
+
+  it('adds an offered panel closed, in the dock it asked for', () => {
+    const next = withPluginPanels(DEFAULT_LAYOUT, offered);
+    expect(panelOf(next, 'plugin:demo/contagem')).toEqual({
+      id: 'plugin:demo/contagem',
+      element: PLUGIN_PANEL_ELEMENT,
+      dock: 'bottom',
+      open: false,
+      size: 200,
+      fixed: false,
+    });
+    // The built-ins are untouched.
+    expect(next.panels.slice(0, DEFAULT_LAYOUT.panels.length)).toEqual(DEFAULT_LAYOUT.panels);
+  });
+
+  it('keeps a remembered plugin panel through a restart, element taken from this build', () => {
+    const saved = {
+      panels: [
+        ...DEFAULT_LAYOUT.panels,
+        {
+          id: 'plugin:demo/contagem',
+          element: 'script-kiddie',
+          dock: 'left',
+          open: true,
+          size: 9_000,
+          fixed: true,
+        },
+      ],
+    };
+    const read = layoutFrom(saved);
+    expect(panelOf(read, 'plugin:demo/contagem')).toMatchObject({
+      element: PLUGIN_PANEL_ELEMENT,
+      dock: 'left',
+      open: true,
+      size: 4000,
+      fixed: false,
+    });
+    // Still offered, so kept as remembered rather than reset to closed.
+    expect(panelOf(withPluginPanels(read, offered), 'plugin:demo/contagem')?.open).toBe(true);
+  });
+
+  it('drops a plugin panel nobody offers any more', () => {
+    const withPanel = withPluginPanels(DEFAULT_LAYOUT, offered);
+    expect(panelOf(withPluginPanels(withPanel, []), 'plugin:demo/contagem')).toBeUndefined();
+  });
+
+  it('still reads a layout.json written before plugin panels existed', () => {
+    const old = {
+      panels: DEFAULT_LAYOUT.panels.map(({ id, element, dock, open, size, fixed }) => ({
+        id,
+        element,
+        dock,
+        open,
+        size,
+        fixed,
+      })),
+    };
+    expect(layoutFrom(old)).toEqual(DEFAULT_LAYOUT);
+  });
+
+  it('never lets a plugin take a built-in’s record', () => {
+    const next = withPluginPanels(DEFAULT_LAYOUT, [{ id: 'editor' }]);
+    expect(next.panels.filter((panel) => panel.id === 'editor')).toHaveLength(1);
+    expect(panelOf(next, 'editor')?.element).toBe('tyto-editor-panel');
   });
 });

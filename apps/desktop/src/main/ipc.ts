@@ -20,6 +20,7 @@ import { type DesktopLog } from './log.js';
 import { type DocumentService } from './documents.js';
 import { type ExportService } from './export.js';
 import { type LayoutStore } from './layout-store.js';
+import { type PanelService } from './panels.js';
 import { type PreviewService } from './preview.js';
 import { type QueueService, type QueueView } from './queue.js';
 import { type TemplateDiagnostic, type TemplateEditorService } from './template-editor.js';
@@ -144,6 +145,8 @@ export interface IpcDependencies {
     readonly folder: string;
     list: () => Promise<readonly IpcResponse<'plugins:list'>['plugins'][number][]>;
   };
+  /** The installed plugins' panels and their bridge (ADR 0045). */
+  readonly panels: PanelService;
   readonly templateDialogs: {
     /** A template folder to edit, or nothing when the picker is dismissed. */
     chooseTemplate: () => Promise<string | undefined>;
@@ -338,6 +341,11 @@ export function createHandlers(dependencies: IpcDependencies): Handlers {
     },
 
     'plugins:list': async () => ({ folder: plugins.folder, plugins: [...(await plugins.list())] }),
+
+    'plugins:panels': async () => ({ panels: [...(await dependencies.panels.list())] }),
+
+    'panel:request': ({ panelId, capability, args }) =>
+      dependencies.panels.request(panelId, capability, args),
 
     'queue:list': async () => wireQueueView(await queue.service.view()),
 

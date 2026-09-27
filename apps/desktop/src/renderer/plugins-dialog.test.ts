@@ -121,6 +121,21 @@ describe('the plugins screen', () => {
     expect(text(element, '[data-plugin="pdf"] .plugins__status')).toBe('desativado');
   });
 
+  it('says, on its own row, that a plugin with a panel receives the open brief', async () => {
+    const element = await dialog({
+      folder: VIEW.folder,
+      plugins: [
+        { ...VIEW.plugins[0]!, name: 'painel', origin: 'external', contributes: ['panel'] },
+        { ...VIEW.plugins[0]!, name: 'svg', contributes: ['exporter'] },
+      ],
+    });
+
+    expect(text(element, '[data-plugin="painel"] .plugins__disclosure')).toBe(
+      translate('en', 'plugins.panel.readsDocument'),
+    );
+    expect(element.querySelector('[data-plugin="svg"] .plugins__disclosure')).toBeNull();
+  });
+
   it('closes on Escape', async () => {
     const element = await dialog();
     element

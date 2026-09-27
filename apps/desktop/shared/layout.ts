@@ -72,6 +72,18 @@ export const PROBLEMS_PANEL = 'problems';
 export const QUEUE_PANEL = 'queue';
 
 /**
+ * A plugin's panel (TYTO-49, ADR 0045): an id under this prefix, drawn by one element.
+ *
+ * The prefix is what lets a saved layout keep a plugin panel's place while the plugin is not
+ * running yet — the build does not know it, but it knows the shape — and what keeps a plugin
+ * from naming a panel `editor` and taking a built-in's record.
+ */
+export const PLUGIN_PANEL_PREFIX = 'plugin:';
+export const PLUGIN_PANEL_ELEMENT = 'tyto-plugin-panel';
+
+const isPluginPanel = (id: string): boolean => id.startsWith(PLUGIN_PANEL_PREFIX);
+
+/**
  * The arrangement ADR 0024 settled, as the record the app starts from.
  *
  * Four panels and not the seven the ADR draws: the templates list, the file tree and the
@@ -192,19 +204,66 @@ export function layoutFrom(value: unknown): Layout {
   const parsed = layoutSchema.safeParse(value);
   const saved = parsed.success ? parsed.data.panels : [];
 
+  // A plugin panel the file remembers is kept, element and all taken from this build, so its
+  // place survives the seconds before the plugins have started. Whether its plugin still
+  // offers it is `withPluginPanels`'s question, asked once they have.
+  const plugins = saved
+    .filter((panel) => isPluginPanel(panel.id))
+    .map((panel) => ({
+      ...panel,
+      element: PLUGIN_PANEL_ELEMENT,
+      fixed: false,
+      size: clampSize(panel.size),
+    }));
+
   return {
-    panels: DEFAULT_LAYOUT.panels.map((fallback) => {
-      const remembered = saved.find((panel) => panel.id === fallback.id);
-      if (remembered === undefined) return fallback;
-      // `element` and `fixed` come from this build and not from the file. They are code,
-      // not preference: a saved layout naming an element that no longer exists would be a
-      // dock creating an unknown tag and a panel that silently renders nothing.
-      return {
-        ...fallback,
-        open: fallback.fixed ? true : remembered.open,
-        size: clampSize(remembered.size),
-        dock: remembered.dock,
-      };
-    }),
+    panels: [...builtIns(saved), ...plugins],
   };
+}
+
+function builtIns(saved: readonly PanelRecord[]): PanelRecord[] {
+  return DEFAULT_LAYOUT.panels.map((fallback) => {
+    const remembered = saved.find((panel) => panel.id === fallback.id);
+    if (remembered === undefined) return fallback;
+    // `element` and `fixed` come from this build and not from the file. They are code,
+    // not preference: a saved layout naming an element that no longer exists would be a
+    // dock creating an unknown tag and a panel that silently renders nothing.
+    return {
+      ...fallback,
+      open: fallback.fixed ? true : remembered.open,
+      size: clampSize(remembered.size),
+      dock: remembered.dock,
+    };
+  });
+}
+
+/** A plugin's panel as the layout needs to know it: its id, and where it asked to dock. */
+export interface OfferedPluginPanel {
+  readonly id: string;
+  readonly location?: 'left' | 'right' | 'bottom' | undefined;
+}
+
+/**
+ * The layout, reconciled against the panels the installed plugins offer this session.
+ *
+ * **Closed by default**: a panel appears the first time as a command, not as a column that
+ * opened itself — the person decides whether a third party's page gets room in the window.
+ * A plugin panel nobody offers any more is dropped, so a removed plugin leaves no empty
+ * record behind; one still offered keeps whatever the file remembered.
+ */
+export function withPluginPanels(layout: Layout, offered: readonly OfferedPluginPanel[]): Layout {
+  const wanted = new Map(offered.map((panel) => [panel.id, panel]));
+  const kept = layout.panels.filter((panel) => !isPluginPanel(panel.id) || wanted.has(panel.id));
+  const known = new Set(kept.map((panel) => panel.id));
+  const added = offered
+    .filter((panel) => !known.has(panel.id))
+    .map((panel): PanelRecord => ({
+      id: panel.id,
+      element: PLUGIN_PANEL_ELEMENT,
+      dock: panel.location ?? 'right',
+      open: false,
+      size: panel.location === 'bottom' ? 200 : 320,
+      fixed: false,
+    }));
+  return { panels: [...kept, ...added].slice(0, 50) };
 }
