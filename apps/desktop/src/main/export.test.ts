@@ -3,7 +3,9 @@ import { createRequire } from 'node:module';
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 
+import { ok } from '@tyto/core';
 import { nodeFileSystem } from '@tyto/io';
+import type { LoadedPlugins, Plugin } from '@tyto/plugin-api';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
 import { type ExportProgress, type ExportService, createExportService } from './export.js';
@@ -181,4 +183,102 @@ describe('the export service', () => {
       service.cancel('export-nope');
     }).not.toThrow();
   });
+});
+
+describe('installed plugins in the export (TYTO-48)', () => {
+  const manifestOf = (name: string): unknown => ({
+    name,
+    version: '1.0.0',
+    engine: '>=0.1',
+    contributes: ['exporter'],
+    permissions: [],
+  });
+
+  /**
+   * What `startDesktopPlugins` hands over, with the plugins in process: the export's half is
+   * how they are activated, and the process they live in is `plugin-process.test.ts`'s.
+   */
+  const installed = (...plugins: Plugin[]): LoadedPlugins => ({
+    plugins,
+    warnings: [],
+    close: () => Promise.resolve(),
+  });
+
+  const texto: Plugin = {
+    id: 'texto',
+    manifest: manifestOf('texto'),
+    activate: (host) =>
+      host.registerExporter({
+        id: 'texto',
+        mime: 'text/plain',
+        extension: 'txt',
+        kinds: ['txt'],
+        rasterized: false,
+        exportFrame: (_scene, artwork, frame) => ok(`${artwork.id} ${frame.format}`),
+      }),
+  };
+
+  // A second `svg`: activated after the built-ins, so it is the one refused.
+  const impostor: Plugin = {
+    id: 'vetor',
+    manifest: manifestOf('vetor'),
+    activate: (host) =>
+      host.registerExporter({
+        id: 'svg',
+        mime: 'image/svg+xml',
+        extension: 'svg',
+        kinds: ['svg'],
+        rasterized: false,
+        exportFrame: () => ok('<svg/>'),
+      }),
+  };
+
+  async function serviceWith(plugins: LoadedPlugins): Promise<ExportService> {
+    return createExportService({
+      fileSystem: nodeFileSystem(),
+      sources: await createProjectSources({ fileSystem: nodeFileSystem(), builtIn: packDirectory }),
+      version: '0.0.0-test',
+      plugins: Promise.resolve(plugins),
+    });
+  }
+
+  it("offers an installed exporter's kind beside the built-ins", async () => {
+    const kinds = await (await serviceWith(installed(texto))).kinds();
+    expect(kinds.map((item) => item.kind)).toEqual(['png', 'jpeg', 'webp', 'svg', 'txt']);
+  });
+
+  it('renders that kind through run, the door the queue uses', async () => {
+    const progress = await (
+      await serviceWith(installed(texto))
+    ).run({
+      brief: exampleBrief('promo-curso', 'promo.brief'),
+      directory: out,
+      label: 'promo',
+      outputs: [{ kind: 'txt' }],
+    });
+
+    expect(progress.failure).toBeUndefined();
+    const texts = readdirSync(out).filter((name) => name.endsWith('.txt'));
+    expect(texts.length).toBeGreaterThan(0);
+    expect(readFileSync(join(out, texts[0]!), 'utf8')).toMatch(/^\S+ \S+$/u);
+  }, 60_000);
+
+  it("names a refused plugin in the run's diagnostics, and renders with Tyto's own", async () => {
+    const progress = await (
+      await serviceWith(installed(impostor))
+    ).run({
+      brief: exampleBrief('promo-curso', 'promo.brief'),
+      directory: out,
+      label: 'promo',
+      outputs: [{ kind: 'svg' }],
+    });
+
+    expect(progress.diagnostics.filter((item) => item.code === 'W_PLUGIN_SKIPPED')).toEqual([
+      expect.objectContaining({
+        message: expect.stringContaining("Plugin 'vetor' was refused") as unknown,
+      }),
+    ]);
+    const svg = readdirSync(out).find((name) => name.endsWith('.svg'));
+    expect(readFileSync(join(out, svg!), 'utf8')).not.toBe('<svg/>');
+  }, 60_000);
 });

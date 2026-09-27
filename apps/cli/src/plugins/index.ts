@@ -1,13 +1,20 @@
 import { htmlExporterManifest, htmlExporterPlugin } from '@tyto/export-html';
 import { svgExporterManifest, svgExporterPlugin } from '@tyto/export-svg';
+import type { Diagnostics } from '@tyto/core';
 import type { ExportResources } from '@tyto/io';
-import { type InProcessHost, type Plugin, createPluginHost } from '@tyto/plugin-api';
+import {
+  type ExporterRegistry,
+  type InProcessHost,
+  type Plugin,
+  createPluginHost,
+} from '@tyto/plugin-api';
 import type { Rasterizer } from '@tyto/raster';
 
 import builtInTemplatesManifest from './built-in-templates.tyto-plugin.json';
 import chromiumManifest from './chromium.tyto-plugin.json';
 import fsInboxManifest from './fs-inbox.tyto-plugin.json';
 import fsOutboxManifest from './fs-outbox.tyto-plugin.json';
+import { type LoadedPlugins, activateInstalled } from './external.js';
 import { rasterizerPlugin } from './rasterizer.js';
 
 /**
@@ -88,6 +95,34 @@ export function activateBuiltIns(options: BuiltInOptions = {}): InProcessHost {
   return host;
 }
 
+/**
+ * Every exporter a run could reach, built-in and installed, before any task exists.
+ *
+ * What `--types` is checked against, and what decides whether a browser is launched at all.
+ * A host of its own, because the real ones are per task and bind a task's resources; what
+ * this one is asked is only which kinds exist and which of them raster.
+ */
+export function reachableExporters(plugins: LoadedPlugins): {
+  readonly exporters: ExporterRegistry;
+  /** Why an installed plugin is not among them — printed when a `--types` is refused. */
+  readonly warnings: Diagnostics;
+} {
+  const host = activateBuiltIns();
+  const warnings = activateInstalled(host, plugins);
+  return { exporters: host.registry.exporters, warnings };
+}
+
+export {
+  type InstalledEntry,
+  type LoadedPlugins,
+  NO_PLUGINS,
+  activateInstalled,
+  loadInstalledPlugins,
+  pluginFolders,
+  readInstalledPlugins,
+} from './external.js';
+export { withoutRefused } from './installed-packs.js';
+export { credentialVariable, pluginCapabilities } from './capabilities.js';
 export { type CloseableRasterizer, defaultRasterizer, rasterizerPlugin } from './rasterizer.js';
 export {
   type TemplatePackOptions,

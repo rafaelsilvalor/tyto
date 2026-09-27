@@ -8,12 +8,21 @@ import {
   fsTaskOutput,
   renderResult,
 } from '@tyto/io';
-import { type InProcessHost, type Logger, createPluginHost } from '@tyto/plugin-api';
+import {
+  type InProcessHost,
+  type LoadedPlugins,
+  type Logger,
+  NO_PLUGINS,
+  activateInstalled,
+  directiveResolverOf,
+  createPluginHost,
+} from '@tyto/plugin-api';
 import {
   type JobEvent,
   type OutputRequest,
   bundledTemplateSource,
   fontSubstitutionWarnings,
+  isRasterFormat,
   markupTemplateSource,
   runJob,
 } from '@tyto/pipeline';
@@ -94,6 +103,28 @@ export interface ExportService {
   progress(exportId: string): ExportProgress | undefined;
   /** Fires the run's signal. Idempotent, and a no-op on a run that already finished. */
   cancel(exportId: string): void;
+  /**
+   * Runs one export to the end and answers with how it ended (TYTO-45).
+   *
+   * The local queue's door: it renders one task at a time and needs the verdict before it
+   * decides whether to acknowledge, so it has nothing to poll and no dialog to feed. The same
+   * `execute` as `start`, so a task rendered from the queue and the same brief exported from
+   * the dialog produce the same files. Never rejects; a run that died answers with `failure`.
+   */
+  run(request: ExportRequest): Promise<ExportProgress>;
+  /**
+   * Every kind a run can produce: the built-ins' and every installed exporter's (ADR 0044).
+   *
+   * What the export dialog offers, asked of the same host shape a run builds, so a kind is
+   * offered exactly when a run could produce it.
+   */
+  kinds(): Promise<readonly ExportableKind[]>;
+}
+
+/** One kind a run can produce, and whether it goes through the rasterizer. */
+export interface ExportableKind {
+  readonly kind: string;
+  readonly rasterized: boolean;
 }
 
 export interface ExportServiceOptions {
@@ -125,6 +156,16 @@ export interface ExportServiceOptions {
    * memory that the dialog may or may not still be polling for.
    */
   readonly log?: Logger;
+  /**
+   * The installed plugins, started once for the app's life, each in a `utilityProcess` of
+   * its own (ADR 0044). Activated into every run's host **after** the built-ins, so the
+   * export dialog and the queue — which renders through {@link ExportService.run} — both
+   * reach them. Absent: no installed plugins.
+   *
+   * A promise, so the window does not wait for them to open: a plugin whose activation hangs
+   * costs its own deadline (ADR 0042) to the first export, not to the app's start.
+   */
+  readonly plugins?: LoadedPlugins | Promise<LoadedPlugins>;
 }
 
 /** A run in flight, and what the poller reads. */
@@ -152,7 +193,8 @@ interface Run {
 function exporterHost(
   resources: ReturnType<typeof fileResources> | undefined,
   rasterizer: Rasterizer | undefined,
-): InProcessHost {
+  plugins: LoadedPlugins,
+): { readonly host: InProcessHost; readonly warnings: Diagnostics } {
   const host = createPluginHost();
 
   host.activate(
@@ -180,11 +222,18 @@ function exporterHost(
     });
   }
 
-  return host;
+  // After the built-ins, so a built-in keeps its ids; a plugin refused here is a
+  // `W_PLUGIN_SKIPPED` in the run's diagnostics, the CLI's rule (ADR 0040).
+  const warnings = activateInstalled(host, plugins, {
+    encodes: isRasterFormat,
+    encodable: 'png, jpeg and webp',
+  });
+  return { host, warnings };
 }
 
 export async function createExportService(options: ExportServiceOptions): Promise<ExportService> {
   const { fileSystem, sources } = options;
+  const plugins = Promise.resolve(options.plugins ?? NO_PLUGINS);
 
   const runs = new Map<string, Run>();
   let counter = 0;
@@ -203,7 +252,7 @@ export async function createExportService(options: ExportServiceOptions): Promis
 
     const images =
       request.assetBase === undefined ? undefined : fileResources({ base: request.assetBase });
-    const host = exporterHost(images, options.rasterizer);
+    const { host, warnings: skipped } = exporterHost(images, options.rasterizer, await plugins);
     const sink = await fsTaskOutput(request.directory, { label: request.label });
 
     const job = await runJob(
@@ -230,6 +279,9 @@ export async function createExportService(options: ExportServiceOptions): Promis
           base: request.assetBase ?? request.directory,
         }),
         exporters: host.registry.exporters,
+        // The run's own host, which the installed plugins were activated into above: a
+        // directive resolves through the same activation that the run reports refusals of.
+        directives: directiveResolverOf(() => host.registry.directives()),
         formats: catalogue,
         ...(options.rasterizer === undefined ? {} : { rasterizer: options.rasterizer }),
         // Measured, as the CLI and the preview are: without faces a `shrink` is clipped and
@@ -257,7 +309,7 @@ export async function createExportService(options: ExportServiceOptions): Promis
     );
 
     const produced = job.ok ? job.diagnostics : job.error;
-    run.diagnostics = [...startup, ...produced];
+    run.diagnostics = [...startup, ...skipped, ...produced];
 
     const cancelled = job.ok ? job.value.cancelled : false;
     run.result = renderResult({
@@ -281,50 +333,78 @@ export async function createExportService(options: ExportServiceOptions): Promis
     run.status = cancelled ? 'cancelled' : 'finished';
   }
 
+  function snapshot(run: Run): ExportProgress {
+    return {
+      status: run.status,
+      directory: run.directory,
+      total: run.total,
+      done: run.done,
+      failed: run.failed,
+      ...(run.result === undefined ? {} : { result: run.result }),
+      ...(run.failure === undefined ? {} : { failure: run.failure }),
+      diagnostics: run.diagnostics,
+    };
+  }
+
+  /** A run registered under a fresh id, and the promise that settles when it is over. */
+  function launch(request: ExportRequest): { exportId: string; run: Run; over: Promise<void> } {
+    counter += 1;
+    const exportId = `export-${String(counter)}`;
+    const run: Run = {
+      controller: new AbortController(),
+      directory: request.directory,
+      status: 'running',
+      total: 0,
+      done: 0,
+      failed: 0,
+      diagnostics: [],
+    };
+    runs.set(exportId, run);
+
+    // Caught here rather than by each caller, because `start` does not wait and would
+    // otherwise leave a rejection nobody listens to. An export that died is a finished export
+    // with a failure, not a silent one.
+    const over = execute(request, run).catch((error: unknown) => {
+      // Written down before it is turned into state, because `run.failure` is only ever read
+      // by a dialog that is still open: close it, or export from a window that then quits,
+      // and the only record of a dead render was gone (TYTO-132).
+      options.log?.error('export failed', error);
+      run.status = 'finished';
+      run.failure = error instanceof Error ? error.message : String(error);
+    });
+
+    return { exportId, run, over };
+  }
+
   return {
-    async start(request: ExportRequest): Promise<{ readonly exportId: string }> {
-      counter += 1;
-      const exportId = `export-${String(counter)}`;
-      const run: Run = {
-        controller: new AbortController(),
-        directory: request.directory,
-        status: 'running',
-        total: 0,
-        done: 0,
-        failed: 0,
-        diagnostics: [],
-      };
-      runs.set(exportId, run);
+    // Deliberately not awaited: `start` answers with an id so the dialog can show a progress
+    // bar, and the run reports through `progress`.
+    start(request: ExportRequest): Promise<{ readonly exportId: string }> {
+      return Promise.resolve({ exportId: launch(request).exportId });
+    },
 
-      // Deliberately not awaited: `start` answers with an id so the dialog can show a
-      // progress bar, and the run reports through `progress`. A rejection here would
-      // otherwise have nobody listening, so it is caught and turned into the run's own
-      // state — an export that died is a finished export with a diagnostic, not a silent one.
-      void execute(request, run).catch((error: unknown) => {
-        // Written down before it is turned into state, because `run.failure` is only ever read
-        // by a dialog that is still open: close it, or export from a window that then quits,
-        // and the only record of a dead render was gone (TYTO-132).
-        options.log?.error('export failed', error);
-        run.status = 'finished';
-        run.failure = error instanceof Error ? error.message : String(error);
-      });
+    async run(request: ExportRequest): Promise<ExportProgress> {
+      const { exportId, run, over } = launch(request);
+      await over;
+      // Forgotten once answered: nobody polls a run that was awaited, and the local queue
+      // renders one of these per task for as long as the window is open.
+      runs.delete(exportId);
+      return snapshot(run);
+    },
 
-      return { exportId };
+    async kinds(): Promise<readonly ExportableKind[]> {
+      // A host with no folder's bytes bound: what is asked is only which kinds exist.
+      const { host } = exporterHost(undefined, options.rasterizer, await plugins);
+      return host.registry.exporters
+        .list()
+        .flatMap((exporter) =>
+          exporter.kinds.map((kind) => ({ kind, rasterized: exporter.rasterized })),
+        );
     },
 
     progress(exportId: string): ExportProgress | undefined {
       const run = runs.get(exportId);
-      if (run === undefined) return undefined;
-      return {
-        status: run.status,
-        directory: run.directory,
-        total: run.total,
-        done: run.done,
-        failed: run.failed,
-        ...(run.result === undefined ? {} : { result: run.result }),
-        ...(run.failure === undefined ? {} : { failure: run.failure }),
-        diagnostics: run.diagnostics,
-      };
+      return run === undefined ? undefined : snapshot(run);
     },
 
     cancel(exportId: string): void {

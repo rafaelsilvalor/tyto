@@ -72,6 +72,11 @@ beforeAll(async () => {
     ([attribute]) => document.querySelector(`[${attribute}]`)?.textContent !== '',
     [I18N_ATTRIBUTE],
   );
+  // The first translated string is not the window (TYTO-175). The static elements are painted
+  // before `applyLayout` has made a single panel, so a count taken then sees the shell's
+  // strings and none of the panels': 7 of 15, measured on CI with the renderer slowed by 2.5 s.
+  // The editor mounts after the layout, which makes it the wait TYTO-154 asks for.
+  await page.waitForSelector('#editor .cm-content');
 });
 
 afterAll(async () => {
@@ -223,6 +228,7 @@ describe('the bridge', () => {
     expect(channels).toEqual([
       'app:exit-ack',
       'app:exit-answer',
+      'app:exit-listening',
       'app:info',
       'app:locale',
       'brief:preview',
@@ -233,6 +239,9 @@ describe('the bridge', () => {
       'dialog:save-changes',
       'export:cancel',
       'export:choose-directory',
+      // TYTO-48, ADR 0044: which kinds an export can produce, installed exporters' included.
+      // Exercised by `e2e/installed-plugins.desktop.test.ts`.
+      'export:kinds',
       'export:progress',
       'export:reveal',
       'export:start',
@@ -246,6 +255,21 @@ describe('the bridge', () => {
       'log:reveal',
       'log:write',
       'on',
+      // TYTO-49: a plugin panel's list and its bridge. Exercised by `e2e/panel-plugin.desktop.test.ts`.
+      'panel:request',
+      'plugins:list',
+      'plugins:panels',
+      // TYTO-45: the local queue panel's six. Each is exercised by `e2e/queue.desktop.test.ts`.
+      'queue:list',
+      'queue:open-brief',
+      'queue:reveal-output',
+      'queue:run',
+      'queue:set-auto-run',
+      'queue:set-folder',
+      'template:new',
+      'template:open',
+      'template:preview',
+      'template:save',
       'templates:folder',
       'templates:list',
       'templates:set-folder',
@@ -344,6 +368,8 @@ describe('the language picker', () => {
     'panel.editor',
     'panel.preview',
     'panel.problems',
+    // TYTO-45: a panel name, like the three above, read by the bar's toggle entry.
+    'panel.queue',
     // E9.11: the tab strip is an element and translates inside its own `render`, so the word
     // on a tab's close button is never in this pass; the four `document.discard.*` are read
     // out by the OS in a message box, which is not the document at all; and the rest are
@@ -451,6 +477,25 @@ describe('the language picker', () => {
     'export.failed',
     'export.problems',
     'command.file.export',
+    // TYTO-44: the template mode renders its own strings, the export dialog's way, and the two
+    // commands that open it are the bar's and the menu's. `template-mode.test.ts` renders the
+    // element; `i18n.test.ts` holds every key to both locales.
+    'command.template.edit',
+    'command.template.new',
+    ...CATALOGUE_KEYS.filter((key) => key.startsWith('templateMode.')),
+    // TYTO-47: the plugins screen is closed on load and renders nothing while closed — the
+    // export dialog's case. Excluded because they are not on screen yet, not to loosen the
+    // count: `src/renderer/plugins-dialog.test.ts` renders every one of them, and
+    // `e2e/plugins.desktop.test.ts` opens the real screen and measures it is drawn.
+    'command.plugins.show',
+    ...CATALOGUE_KEYS.filter((key) => key.startsWith('plugins.')),
+    // TYTO-45: the queue panel is closed in the default layout, and a closed panel's element is
+    // never created — so none of its strings is in the document on load. Excluded because they
+    // are not on screen yet, not to loosen the count: `src/renderer/queue-panel.test.ts`
+    // renders every state, and `e2e/queue.desktop.test.ts` opens the real panel and measures
+    // it is drawn inside the window.
+    'command.queue.show',
+    ...CATALOGUE_KEYS.filter((key) => key.startsWith('queue.')),
   ];
 
   it('paints every catalogue string on load, with none left blank', async () => {

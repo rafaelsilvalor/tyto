@@ -54,6 +54,10 @@ export const EDITOR_OPEN = 'editor.open';
 export const EDITOR_SAVE_AS = 'editor.saveAs';
 /** E9.4. Opens the export dialog; the exporting itself is main's. */
 export const FILE_EXPORT = 'file.export';
+/** TYTO-47. Shows the plugins screen; installing one is the CLI's (`tyto plugin install`). */
+export const PLUGINS_SHOW = 'plugins.show';
+/** TYTO-45. Opens the local queue panel, or brings it forward when it is already open. */
+export const QUEUE_SHOW = 'queue.show';
 /**
  * TYTO-122. Points the app at a folder of templates, or goes back to the built-in pack.
  *
@@ -63,6 +67,15 @@ export const FILE_EXPORT = 'file.export';
  */
 export const TEMPLATES_CHOOSE_FOLDER = 'templates.chooseFolder';
 export const TEMPLATES_CLEAR_FOLDER = 'templates.clearFolder';
+/**
+ * TYTO-44. The template mode: open a template folder to edit, or scaffold a new one.
+ *
+ * Two verbs for the File menu's reason — the bar lists what a person can do, and "edit" and
+ * "make" are different things to want. `template.new` opens the mode on its name field rather
+ * than asking in a box, because the mode is where the new template is going to be written.
+ */
+export const TEMPLATE_EDIT = 'template.edit';
+export const TEMPLATE_NEW = 'template.new';
 /**
  * A recent file, as a command per entry (E9.8).
  *
@@ -141,8 +154,12 @@ export const COMMAND_LABELS: Readonly<Record<string, CatalogueKey>> = {
   [EDITOR_SAVE]: 'command.file.save',
   [EDITOR_SAVE_AS]: 'command.file.saveAs',
   [FILE_EXPORT]: 'command.file.export',
+  [PLUGINS_SHOW]: 'command.plugins.show',
+  [QUEUE_SHOW]: 'command.queue.show',
   [TEMPLATES_CHOOSE_FOLDER]: 'command.templates.chooseFolder',
   [TEMPLATES_CLEAR_FOLDER]: 'command.templates.clearFolder',
+  [TEMPLATE_EDIT]: 'command.template.edit',
+  [TEMPLATE_NEW]: 'command.template.new',
   [LAYOUT_RESTORE]: 'command.layout.restore',
   [DOCUMENT_CLOSE]: 'command.document.close',
   [DOCUMENT_NEXT]: 'command.document.next',
@@ -184,6 +201,14 @@ export interface DesktopActions {
   stepDocument(direction: 1 | -1): void;
   /** E9.4. Shows the export dialog. Everything it then does is a round trip to main. */
   openExport(): void;
+  /** TYTO-47. Shows the plugins screen; the list is a round trip to main. */
+  showPlugins(): void;
+  /**
+   * TYTO-45. Opens the queue panel. Open and not toggle, unlike the panel's own
+   * `layout.togglePanel:queue`: a menu item called "Show the local queue" that hid it the
+   * second time would be a menu item that lies.
+   */
+  showQueue(): void;
   /**
    * TYTO-122. Points the app at a folder of templates, or clears the choice.
    *
@@ -193,6 +218,9 @@ export interface DesktopActions {
    */
   chooseTemplateFolder(): void;
   clearTemplateFolder(): void;
+  /** TYTO-44. Both open the template mode; what happens in it is a round trip to main. */
+  editTemplate(): void;
+  newTemplate(): void;
 }
 
 /**
@@ -262,6 +290,12 @@ export function createDesktopRegistry(actions: DesktopActions): CommandRegistry 
   add(FILE_EXPORT, () => {
     actions.openExport();
   });
+  add(PLUGINS_SHOW, () => {
+    actions.showPlugins();
+  });
+  add(QUEUE_SHOW, () => {
+    actions.showQueue();
+  });
 
   // Registration order is display order, so these land next to Export rather than at the
   // bottom of a list of zoom levels.
@@ -271,6 +305,13 @@ export function createDesktopRegistry(actions: DesktopActions): CommandRegistry 
 
   add(TEMPLATES_CLEAR_FOLDER, () => {
     actions.clearTemplateFolder();
+  });
+
+  add(TEMPLATE_EDIT, () => {
+    actions.editTemplate();
+  });
+  add(TEMPLATE_NEW, () => {
+    actions.newTemplate();
   });
 
   // Reachable with every panel closed, which is the acceptance criterion and the reason it

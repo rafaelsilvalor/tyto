@@ -169,6 +169,12 @@ body {
 .dock--bottom {
   flex: 0 0 auto;
   min-height: 0;
+  /*
+   * Side by side, not stacked (TYTO-49). The bottom dock is one short strip — the problems
+   * panel's 140px — and two panels stacked in it left each a line of height; a plugin panel
+   * that asked for the bottom is the first thing that ever shared it.
+   */
+  flex-direction: row;
 }
 
 /*
@@ -859,4 +865,513 @@ tyto-export-dialog[open] {
   display: flex;
   justify-content: flex-end;
   gap: 8px;
+}
+
+/*
+ * The template mode (TYTO-44). A fixed layer over the whole window, like the export dialog's,
+ * and not a dialog: it is where the work happens while it is open, so it takes the window
+ * rather than a box in the middle of it.
+ *
+ * `:not([open])` hides it instead of the element rendering nothing, because the two editor
+ * hosts inside must outlive a close (`template-mode.ts`). And every `[hidden]` inside is
+ * restated, because a `display` on a class outranks the attribute's own rule.
+ */
+tyto-template-mode {
+  position: fixed;
+  z-index: 9;
+  display: flex;
+  inset: 0;
+  background: var(--ground);
+}
+
+tyto-template-mode:not([open]),
+tyto-template-mode [hidden] {
+  display: none !important;
+}
+
+.template-mode__panel {
+  display: flex;
+  min-width: 0;
+  min-height: 0;
+  flex: 1;
+  flex-direction: column;
+  padding: 16px 24px;
+  gap: 12px;
+}
+
+.template-mode__head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px 16px;
+}
+
+.template-mode__title {
+  display: flex;
+  min-width: 0;
+  align-items: baseline;
+  gap: 12px;
+}
+
+.template-mode__heading {
+  margin: 0;
+  font-size: 18px;
+  white-space: nowrap;
+}
+
+.template-mode__folder {
+  overflow: hidden;
+  color: var(--muted);
+  font-size: 13px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.template-mode__actions,
+.template-mode__new {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.template-mode__problem {
+  width: 100%;
+  margin: 0;
+  color: #b3261e;
+}
+
+.template-mode__refusal {
+  max-width: 60ch;
+  padding: 16px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  margin: 0;
+}
+
+/* Two columns: the buffers at the left, the formats at the right. `min-height: 0` all the way
+   down, for `.shell`'s reason — without it a grid child refuses to shrink and the editor
+   pushes the problems off the bottom of the window. */
+.template-mode__work {
+  display: grid;
+  min-height: 0;
+  flex: 1;
+  gap: 16px;
+  grid-template-columns: minmax(320px, 1fr) minmax(320px, 1.1fr);
+}
+
+.template-mode__buffers,
+.template-mode__preview {
+  display: flex;
+  min-width: 0;
+  min-height: 0;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.template-mode__tabs {
+  display: flex;
+  gap: 4px;
+}
+
+.template-mode__tab {
+  padding: 4px 12px;
+  border: 1px solid var(--line);
+  border-radius: 6px 6px 0 0;
+  background: transparent;
+  color: var(--muted);
+  font: inherit;
+  font-family: ui-monospace, monospace;
+  font-size: 13px;
+}
+
+.template-mode__tab[aria-selected='true'] {
+  border-bottom-color: transparent;
+  color: var(--ink);
+  font-weight: 600;
+}
+
+.template-mode__dirty {
+  margin-left: 6px;
+  font-size: 10px;
+}
+
+.template-mode__buffer {
+  min-height: 0;
+  flex: 1;
+  border: 1px solid var(--line);
+  border-radius: 0 6px 6px;
+}
+
+.template-mode__buffer .cm-editor {
+  height: 100%;
+}
+
+.template-mode__sample {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 16px;
+}
+
+.template-mode__row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+/* The grid scrolls, and nothing else in the mode does: a manifest with five formats is a grid
+   taller than the window, and the buffers beside it must stay where they are. */
+.template-mode__grid {
+  display: flex;
+  min-height: 0;
+  flex: 1;
+  flex-wrap: wrap;
+  align-content: flex-start;
+  gap: 16px;
+  overflow: auto;
+}
+
+.template-mode__cell {
+  display: flex;
+  flex-direction: column;
+  margin: 0;
+  gap: 4px;
+}
+
+.template-mode__paper {
+  overflow: hidden;
+  box-shadow: 0 1px 4px rgb(0 0 0 / 20%);
+}
+
+.template-mode__frame {
+  display: block;
+  border: 0;
+}
+
+.template-mode__cell figcaption,
+.template-mode__note {
+  margin: 0;
+  color: var(--muted);
+  font-size: 13px;
+}
+
+.template-mode__problems {
+  max-height: 25vh;
+  overflow: auto;
+}
+
+.template-mode__subheading {
+  margin: 0 0 4px;
+  font-size: 14px;
+}
+
+.template-mode__notice {
+  margin: 0 0 4px;
+}
+
+.template-mode__notice--refused {
+  color: #b3261e;
+}
+
+.template-mode__list {
+  padding: 0;
+  margin: 0;
+  list-style: none;
+}
+
+.template-mode__problem-row {
+  display: flex;
+  padding: 2px 4px;
+  cursor: pointer;
+  font-size: 13px;
+  gap: 8px;
+}
+
+.template-mode__problem-row:hover {
+  background: var(--line);
+}
+
+.template-mode__problem-row--error code {
+  color: #b3261e;
+}
+
+.template-mode__file {
+  color: var(--muted);
+  font-family: ui-monospace, monospace;
+}
+
+/* The plugins screen (TYTO-47). The export dialog's arrangement — it covers the window and the
+   host is `display: contents` until it opens — and wider, because it is a table. */
+tyto-plugins-dialog {
+  display: contents;
+}
+
+tyto-plugins-dialog[open] {
+  position: fixed;
+  inset: 0;
+  z-index: 10;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgb(0 0 0 / 25%);
+}
+
+.plugins__panel {
+  display: flex;
+  overflow: auto;
+  width: min(820px, calc(100vw - 32px));
+  max-height: calc(100vh - 32px);
+  flex-direction: column;
+  padding: 16px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  margin: 16px;
+  background: var(--ground);
+  box-shadow: 0 16px 48px rgb(0 0 0 / 18%);
+  gap: 10px;
+}
+
+.plugins__title {
+  margin: 0;
+  font-size: 16px;
+}
+
+.plugins__notice {
+  padding: 8px 10px;
+  border-left: 3px solid var(--warning, #b7791f);
+  margin: 0;
+  background: rgb(183 121 31 / 10%);
+  font-size: 13px;
+}
+
+.plugins__inactive,
+.plugins__install,
+.plugins__folder,
+.plugins__failure {
+  margin: 0;
+  font-size: 13px;
+}
+
+.plugins__folder code {
+  word-break: break-all;
+}
+
+.plugins__table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+}
+
+.plugins__table th,
+.plugins__table td {
+  padding: 4px 8px;
+  border-bottom: 1px solid var(--line);
+  text-align: left;
+  vertical-align: top;
+}
+
+/* A name or a point is one word to a reader; breaking `built-in-templates` at its hyphens
+   made it look like three. */
+.plugins__name,
+.plugins__table td:nth-child(5) {
+  white-space: nowrap;
+}
+
+.plugins__row[data-status='refused'] .plugins__status {
+  color: var(--error, #c53030);
+}
+
+.plugins__problems {
+  padding-left: 16px;
+  margin: 4px 0 0;
+  color: var(--error, #c53030);
+}
+
+.plugins__actions {
+  display: flex;
+  justify-content: flex-end;
+}
+
+/*
+ * The local queue panel (TYTO-45).
+ *
+ * A column in the left dock, read top to bottom: where to drop a task, the two controls, then
+ * one card per task. The list is what scrolls, never the panel, so the folder and the
+ * auto-run switch stay in view however long the queue gets.
+ */
+.queue__body {
+  display: flex;
+  flex: 1;
+  min-height: 0;
+  flex-direction: column;
+  gap: 8px;
+  padding: 10px 12px;
+  font-size: 13px;
+}
+
+.queue__note {
+  margin: 0;
+  color: var(--muted);
+}
+
+.queue__note--bad {
+  color: #b3261e;
+}
+
+.queue__folder {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.queue__label {
+  color: var(--muted);
+}
+
+/* A path is one long word; broken anywhere rather than pushing the panel wider. */
+.queue__path {
+  overflow-wrap: anywhere;
+  font-family: ui-monospace, monospace;
+  font-size: 12px;
+}
+
+.queue__controls,
+.queue__actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+}
+
+.queue__button {
+  padding: 3px 10px;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  background: var(--ground);
+  color: var(--ink);
+  font: inherit;
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.queue__button:hover,
+.queue__button:focus-visible {
+  background: color-mix(in srgb, var(--ink) 6%, var(--ground));
+}
+
+.queue__auto {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.queue__tasks {
+  flex: 1;
+  min-height: 0;
+  margin: 0;
+  padding: 0;
+  overflow: auto;
+  list-style: none;
+  border-top: 1px solid var(--line);
+}
+
+.queue__task {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 8px 0;
+  border-bottom: 1px solid var(--line);
+}
+
+/* `minmax(0, 1fr)` on the id, for the problems row's reason: a long folder name ellipsizes
+   instead of pushing the status word out of the panel. */
+.queue__head {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: baseline;
+  gap: 8px;
+}
+
+.queue__dot {
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  transform: translateY(-1px);
+  background: var(--muted);
+}
+
+.queue__dot--rendering {
+  background: #4a5bb8;
+}
+
+.queue__dot--done {
+  background: #2e7d32;
+}
+
+.queue__dot--error {
+  background: #b3261e;
+}
+
+.queue__id {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-weight: 600;
+}
+
+.queue__status {
+  color: var(--muted);
+}
+
+.queue__failure {
+  margin: 0;
+  color: #b3261e;
+  overflow-wrap: anywhere;
+}
+
+.queue__diagnostics {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.queue__diagnostic {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: 8px;
+  align-items: baseline;
+}
+
+.queue__code {
+  color: var(--muted);
+  font-family: ui-monospace, monospace;
+  font-size: 12px;
+}
+
+.queue__diagnostic--error .queue__code {
+  color: #b3261e;
+}
+
+.queue__message {
+  overflow-wrap: anywhere;
+}
+
+/*
+ * A plugin's panel (TYTO-49): its page fills the panel under the bar. White behind it, since
+ * the page is somebody else's and may assume a background it does not paint.
+ */
+.plugin-panel__frame {
+  flex: 1;
+  min-height: 0;
+  width: 100%;
+  border: 0;
+  background: #fff;
+}
+
+/* A plugin whose panel reads the open brief says so on its own row (ADR 0045). */
+.plugins__disclosure {
+  margin: 4px 0 0;
+  color: var(--muted, #555);
 }

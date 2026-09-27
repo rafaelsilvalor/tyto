@@ -3,6 +3,7 @@ import {
   type AssetResolver,
   type Diagnostics,
   type FileSystem,
+  type TemplateManifest,
   compile,
   resolve,
   sceneResources,
@@ -16,6 +17,7 @@ import {
 import { BUILT_IN_TEMPLATE_BUILDS } from '@tyto/templates';
 import { fileAssetResolver, fileResources } from '@tyto/io';
 
+import type { WindowPlugins } from './window-plugins.js';
 import { faces, fonts } from './fonts.js';
 import { type ProjectSources } from './project.js';
 
@@ -79,6 +81,21 @@ export interface PreviewResult {
    * that is blank while somebody types.
    */
   readonly diagnostics: Diagnostics;
+  /**
+   * What the editor offers after `::` (TYTO-49): the manifest the frontmatter named and the
+   * plugins' `namespace/name` directives.
+   *
+   * Carried on the preview's answer rather than worked out by a second analyzer in the
+   * renderer, so the completion list and the underline come from the same pass and cannot
+   * disagree about which template is active or which plugin answers a directive.
+   */
+  readonly completion: PreviewCompletion;
+}
+
+export interface PreviewCompletion {
+  /** Absent when the brief does not parse or names a template the registry lacks. */
+  readonly manifest?: TemplateManifest;
+  readonly directives: readonly string[];
 }
 
 export interface PreviewServiceOptions {
@@ -91,6 +108,8 @@ export interface PreviewServiceOptions {
    * call is cheaper and safer than rebuilding this service when a person picks a folder.
    */
   readonly sources: ProjectSources;
+  /** The installed plugins' directives; absent, every `::ns/name` is `E_UNKNOWN_DIRECTIVE`. */
+  readonly directives?: Pick<WindowPlugins, 'resolver' | 'names'>;
 }
 
 export interface PreviewService {
@@ -145,16 +164,22 @@ export async function createPreviewService(
         diagnostics: startup,
       } = sources.current();
 
+      let completion: PreviewCompletion = { directives: options.directives?.names() ?? [] };
       const failed = (diagnostics: Diagnostics): PreviewResult => ({
         frames: [],
         artworks: [],
         diagnostics: [...startup, ...diagnostics],
+        completion,
       });
 
       if (templates === undefined || catalogue === undefined) return failed([]);
 
       const ast = parseBrief(brief);
       if (!ast.ok) return failed(ast.error);
+
+      const named = ast.value.frontmatter.data['template'];
+      const manifest = typeof named === 'string' ? templates.get(named.trim()) : undefined;
+      if (manifest !== undefined) completion = { ...completion, manifest };
 
       // Built per preview, because the folder is a property of what is open rather than of
       // the service. `confine` stays on, its default: a brief is often written by something
@@ -166,6 +191,7 @@ export async function createPreviewService(
       const resolved = await resolve(ast.value, {
         registry: templates,
         assets,
+        ...(options.directives === undefined ? {} : { directives: options.directives.resolver }),
       });
       if (!resolved.ok) return failed([...ast.diagnostics, ...resolved.error]);
 
@@ -235,7 +261,7 @@ export async function createPreviewService(
       });
 
       if (!exported.ok) {
-        return { frames: [], artworks, diagnostics: [...before, ...exported.error] };
+        return { frames: [], artworks, diagnostics: [...before, ...exported.error], completion };
       }
 
       return {
@@ -248,6 +274,7 @@ export async function createPreviewService(
         })),
         artworks,
         diagnostics: [...before, ...exported.diagnostics],
+        completion,
       };
     },
   };

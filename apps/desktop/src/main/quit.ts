@@ -104,6 +104,21 @@ export interface ExitGuard {
    * page that is gone is gone with it, so there is nothing left here to protect.
    */
   windowGone: () => void;
+  /**
+   * The page in the window has registered its `app:exit-requested` listener, arriving on
+   * `app:exit-listening` (TYTO-44, ADR 0039).
+   *
+   * **Until this arrives there is nobody to ask, and the exit goes through.** A push sent
+   * earlier reaches a page with no listener and is dropped by `ipcRenderer` without a trace;
+   * measured on CI, a quit 303 ms after launch sent its push while the page was still loading,
+   * no acknowledgement ever came, the deadline dropped the question and the app stayed open
+   * with nobody left to ask again. Letting it through is safe because the listener is the first
+   * thing the page registers: nothing that could hold unsaved text exists before it.
+   *
+   * `windowGone` takes it back, since every one of the three deaths it is wired to — a crash,
+   * the window closing, a main-frame navigation — leaves a page that has not registered yet.
+   */
+  listening: () => void;
 }
 
 export function createExitGuard({ send, ackTimeoutMs = 30_000 }: ExitGuardOptions): ExitGuard {
@@ -116,6 +131,8 @@ export function createExitGuard({ send, ackTimeoutMs = 30_000 }: ExitGuardOption
    * guard that could change its mind mid-teardown would be asking a window that is closing.
    */
   let confirmed = false;
+  /** Whether the page now in the window can hear the question (ADR 0039). */
+  let listening = false;
   let nextAskId = 0;
   /**
    * The one question outstanding, if any. One window, one exit, one question.
@@ -172,7 +189,9 @@ export function createExitGuard({ send, ackTimeoutMs = 30_000 }: ExitGuardOption
       if (pending !== undefined) return false;
 
       const askId = nextAskId++;
-      if (!send(askId)) {
+      // `listening` first, so a page that cannot hear the push is never sent one: a send
+      // that "succeeded" into a page with no listener is the hang ADR 0039 records.
+      if (!listening || !send(askId)) {
         // Nobody to ask. Latch anyway, so the hooks that follow this one do not each retry a
         // window that is not there.
         confirmed = true;
@@ -204,6 +223,12 @@ export function createExitGuard({ send, ackTimeoutMs = 30_000 }: ExitGuardOption
       // returns early and changes nothing. Setting the latch directly here would mean the next
       // quit asked nobody, which is the bug TYTO-123 exists to have closed.
       release();
+      // The next page has to say it is listening before it is asked anything (ADR 0039).
+      listening = false;
+    },
+
+    listening: () => {
+      listening = true;
     },
 
     answer: (askId, allow) => {

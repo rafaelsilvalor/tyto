@@ -18,6 +18,7 @@ describe('the IPC contract', () => {
     expect([...IPC_CHANNEL_NAMES].sort()).toEqual([
       'app:exit-ack',
       'app:exit-answer',
+      'app:exit-listening',
       'app:info',
       'app:locale',
       'brief:preview',
@@ -28,6 +29,7 @@ describe('the IPC contract', () => {
       'dialog:save-changes',
       'export:cancel',
       'export:choose-directory',
+      'export:kinds',
       'export:progress',
       'export:reveal',
       'export:start',
@@ -40,6 +42,19 @@ describe('the IPC contract', () => {
       'layout:set',
       'log:reveal',
       'log:write',
+      'panel:request',
+      'plugins:list',
+      'plugins:panels',
+      'queue:list',
+      'queue:open-brief',
+      'queue:reveal-output',
+      'queue:run',
+      'queue:set-auto-run',
+      'queue:set-folder',
+      'template:new',
+      'template:open',
+      'template:preview',
+      'template:save',
       'templates:folder',
       'templates:list',
       'templates:set-folder',
@@ -73,7 +88,12 @@ describe('the IPC contract', () => {
  */
 describe('the event table', () => {
   it('names every event exactly once, and nothing else', () => {
-    expect([...IPC_EVENT_NAMES].sort()).toEqual(['app:exit-requested', 'command:run']);
+    expect([...IPC_EVENT_NAMES].sort()).toEqual([
+      'app:exit-requested',
+      'command:run',
+      // TYTO-45. The queue changed; the panel asks `queue:list` when it hears it.
+      'queue:changed',
+    ]);
     expect(new Set(IPC_EVENT_NAMES).size).toBe(IPC_EVENT_NAMES.length);
   });
 
@@ -202,6 +222,9 @@ describe('what the contract does not promise', () => {
       // in a native dialog, and the question has no subject. Every other export channel
       // names either a document or a run, so this is the only one of the five here.
       'export:choose-directory',
+      // TYTO-48, ADR 0044. "Which kinds can a run produce" has no subject either: the answer
+      // is the built-ins' and the installed plugins', which are main's to know.
+      'export:kinds',
       // TYTO-132. "Open the log folder" has no subject either: there is one log, and where it
       // is, is main's — a renderer that named the folder would be naming a path it has no
       // business holding.
@@ -209,6 +232,16 @@ describe('what the contract does not promise', () => {
       // TYTO-122. "Which folder is searched" has no subject either: there is one setting, and
       // where it points is main's.
       'templates:folder',
+      // TYTO-44, ADR 0039. "This page can hear the question" names nothing: there is one
+      // window, and the page saying it is the page it is about.
+      'app:exit-listening',
+      // TYTO-47. "Which plugins are there" has no subject: there is one plugins folder.
+      'plugins:list',
+      // TYTO-49. "Which panels do the plugins offer" has none either, for the same reason.
+      'plugins:panels',
+      // TYTO-45. "What is in the queue" has no subject: there is one queue folder, and where
+      // it is, is main's.
+      'queue:list',
     ];
 
     for (const name of IPC_CHANNEL_NAMES) {

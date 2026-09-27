@@ -1,3 +1,4 @@
+import { templateManifestSchema } from '@tyto/core';
 import { z } from 'zod';
 
 import { layoutSchema } from './layout.js';
@@ -94,6 +95,38 @@ const openDocument = z.object({
 const documentId = z.string().min(1).max(100);
 
 /**
+ * A task folder's name, which is the task's id (`@tyto/io`'s `fsInbox`). One path segment in
+ * practice; bounded here so a hostile renderer cannot send a megabyte of one.
+ */
+const taskId = z.string().min(1).max(255);
+
+/** What the local queue panel draws (TYTO-45). */
+const queueView = z.object({
+  /** The folder holding `inbox/`, `outbox/` and `done/`, or `null` before one is chosen. */
+  folder: z.string().nullable(),
+  /** Where a task folder is dropped, so the panel can say so. */
+  inbox: z.string().nullable(),
+  autoRun: z.boolean(),
+  tasks: z
+    .array(
+      z.object({
+        id: taskId,
+        status: z.enum(['pending', 'rendering', 'done', 'error']),
+        diagnostics: z.array(diagnostic),
+        failure: z.string().optional(),
+        /** `out/` has a `result.json`, so "open output folder" has something to open. */
+        hasOutput: z.boolean(),
+      }),
+    )
+    .max(500),
+});
+
+/** A diagnostic from the template mode, which says which of its three buffers it is about. */
+const templateDiagnostic = diagnostic.extend({
+  file: z.enum(['manifest', 'markup', 'brief', 'render']),
+});
+
+/**
  * Every channel the app has, and the only place a channel name is written.
  *
  * Deliberately small. E9.1 opens a window and proves the wiring; the channels a brief, a
@@ -185,6 +218,15 @@ export const IPC_CHANNELS = {
         }),
       ),
       diagnostics: z.array(diagnostic),
+      /**
+       * What the editor offers after `::` (TYTO-49): the manifest the frontmatter named, and
+       * every installed plugin's `namespace/name`. On this answer rather than on a channel
+       * of its own, so the completion list and the underline come from one pass in main.
+       */
+      completion: z.object({
+        manifest: templateManifestSchema.optional(),
+        directives: z.array(z.string().min(1).max(200)).max(500),
+      }),
     }),
   ),
 
@@ -441,6 +483,16 @@ export const IPC_CHANNELS = {
   'app:exit-ack': channel(z.object({ askId: z.number().int().nonnegative() }), z.object({})),
 
   /**
+   * Stage zero: "this page can hear the question" (TYTO-44, ADR 0039).
+   *
+   * Sent once per page, right after the `app:exit-requested` listener is registered and before
+   * anything else the page does. Until main has it, `src/main/quit.ts` treats the window as
+   * having nobody to ask — because a push into a page with no listener is dropped without a
+   * trace, and an app waiting for its acknowledgement is an app that does not quit.
+   */
+  'app:exit-listening': channel(z.object({}), z.object({})),
+
+  /**
    * Stage two: the renderer's half of the one question main asks (TYTO-123, ADR 0029).
    *
    * Main pushes `app:exit-requested` and the answer comes back **here**, on an ordinary
@@ -530,7 +582,9 @@ export const IPC_CHANNELS = {
       outputs: z
         .array(
           z.object({
-            kind: z.enum(['png', 'jpeg', 'webp', 'svg']),
+            // Open since TYTO-48: an installed exporter's kind is exportable too. Main checks
+            // it against the run's registry, the way `tyto render --types` does (ADR 0044).
+            kind: z.string().min(1),
             /** 1–100, and only for `jpeg` and `webp`; the raster port refuses it on `png`. */
             quality: z.number().int().min(1).max(100).optional(),
             scale: z.number().positive().max(8).optional(),
@@ -581,6 +635,18 @@ export const IPC_CHANNELS = {
   /** Fires the run's `AbortSignal`. Answers nothing: the verdict arrives through progress. */
   'export:cancel': channel(z.object({ exportId: z.string().min(1) }), z.object({})),
 
+  /**
+   * Every kind an export can produce: the built-ins' and every installed plugin's exporter
+   * (ADR 0044). Asked each time the export dialog opens, so what it offers is what a run
+   * would find in its registry.
+   */
+  'export:kinds': channel(
+    z.object({}),
+    z.object({
+      kinds: z.array(z.object({ kind: z.string().min(1), rasterized: z.boolean() })),
+    }),
+  ),
+
   /** Shows a folder in the OS file manager, which is what "open folder" means. */
   'export:reveal': channel(z.object({ directory: z.string().min(1) }), z.object({})),
 
@@ -591,6 +657,120 @@ export const IPC_CHANNELS = {
    * `file:open` already has, and for the same reason `index.ts` gives as its rule.
    */
   'export:choose-directory': channel(z.object({}), z.object({ directory: z.string().optional() })),
+
+  /**
+   * The plugins screen (TYTO-47): the built-ins this app activated and what `tyto plugin
+   * install` put under `~/.tyto`, with the reason when one would be refused.
+   *
+   * Read-only on purpose. Installing, removing and disabling are the CLI's, and the window
+   * activates no installed plugin yet — that is the desktop half of TYTO-48. `folder` is where
+   * the plugins live, so the screen can say where to look; `problems` are already-rendered
+   * sentences, because the renderer shows them and has no catalogue of diagnostic codes.
+   */
+  'plugins:list': channel(
+    z.object({}),
+    z.object({
+      folder: z.string().min(1),
+      plugins: z
+        .array(
+          z.object({
+            name: z.string().min(1),
+            version: z.string().nullable(),
+            origin: z.enum(['built-in', 'external']),
+            status: z.enum(['enabled', 'disabled', 'refused', 'crashed']),
+            contributes: z.array(z.string()),
+            permissions: z.array(z.string()),
+            problems: z.array(z.string()),
+          }),
+        )
+        .max(500),
+    }),
+  ),
+
+  /**
+   * The installed plugins' panels (TYTO-49, ADR 0045), answered once the plugins have started.
+   *
+   * `src` is a `tyto-plugin:` URL main serves out of that plugin's folder; the renderer puts
+   * it in an iframe whose sandbox is `allow-scripts` alone. `id` is the layout's key for it,
+   * prefixed `plugin:` so it cannot collide with a built-in panel.
+   */
+  'plugins:panels': channel(
+    z.object({}),
+    z.object({
+      panels: z
+        .array(
+          z.object({
+            id: z.string().min(1).max(300),
+            plugin: z.string().min(1),
+            title: z.string().min(1).max(200),
+            location: z.enum(['left', 'right', 'bottom']).optional(),
+            src: z.string().startsWith('tyto-plugin://'),
+          }),
+        )
+        .max(100),
+    }),
+  ),
+
+  /**
+   * What a plugin's panel asked of the host through its bridge, relayed by the renderer.
+   *
+   * Checked in main against that plugin's permissions — `net:<host>` for `fetch`,
+   * `credentials:<key>` for `credentials` (ADR 0042) — and answered as data: a refusal is
+   * `{ ok: false, code: 'E_PERMISSION' }`, never a rejection, so the renderer relays one
+   * shape back to the page.
+   */
+  'panel:request': channel(
+    z.object({
+      panelId: z.string().min(1).max(300),
+      capability: z.enum(['fetch', 'credentials']),
+      args: z.array(z.unknown()).max(2),
+    }),
+    z.union([
+      z.object({ ok: z.literal(true), value: z.unknown() }),
+      z.object({ ok: z.literal(false), code: z.string(), message: z.string() }),
+    ]),
+  ),
+
+  /**
+   * The local queue panel (TYTO-45): the queue folder, whether auto-run is on, and every task
+   * in `inbox/` and `done/` with how it stands.
+   *
+   * **Asked once when the panel opens and again on each `queue:changed`**, never on a timer.
+   * Main already sweeps the inbox every second; the renderer hearing about it is one push.
+   * `failure` is a sentence and not a diagnostic, for `export:progress`'s reason: a render that
+   * died or a task that could not be moved is not something `docs/diagnostic-codes.md` names.
+   */
+  'queue:list': channel(z.object({}), queueView),
+
+  /**
+   * Picks the queue folder through the native picker, or clears it. Answers with the queue as
+   * it now stands; a dismissed picker changes nothing and answers the same.
+   */
+  'queue:set-folder': channel(z.object({ choose: z.boolean() }), queueView),
+
+  /** Turns auto-run on or off, and remembers it. */
+  'queue:set-auto-run': channel(z.object({ on: z.boolean() }), queueView),
+
+  /**
+   * Renders one task now, whatever auto-run says — Run for a pending task, Retry for a failed
+   * one. Answers when it has been queued, not when it is done: the verdict is a push.
+   */
+  'queue:run': channel(z.object({ taskId }), z.object({})),
+
+  /** Opens the task's `out/` folder in the OS file manager. */
+  'queue:reveal-output': channel(z.object({ taskId }), z.object({})),
+
+  /**
+   * Opens the task's brief in a tab, so it can be fixed and run again.
+   *
+   * **A task id, never a path**, and that is the containment `file:reopen` has: main opens
+   * only the brief it listed under that id, so a renderer cannot use this to read anything
+   * else. The answer is `file:open`'s.
+   */
+  'queue:open-brief': channel(
+    z.object({ documentId, taskId }),
+    z.object({ document: openDocument.nullable(), documentId: documentId.nullable() }),
+  ),
 
   /**
    * Something went wrong in the window, written down where a report can reach it (TYTO-132).
@@ -632,6 +812,105 @@ export const IPC_CHANNELS = {
    * effect in the browser process and there is nothing for the window to do with the outcome.
    */
   'app:locale': channel(z.object({ locale: z.string().min(1) }), z.object({})),
+
+  /**
+   * The template mode opening a folder (TYTO-44): `directory: null` asks main for a picker,
+   * a path opens that folder — which is what _New template_ does with the folder it made.
+   *
+   * `template: null` is a dismissed picker, not an error. **`code` is a folder whose layout is
+   * a `template.ts`**, answered without reading it: running code from a folder is the plugin
+   * host's job (ADR 0007), so the window says it cannot be edited here rather than opening a
+   * buffer it could never preview. `refused` names the file that was not there.
+   */
+  'template:open': channel(
+    z.object({ directory: z.string().min(1).nullable() }),
+    z.object({
+      template: z
+        .discriminatedUnion('kind', [
+          z.object({
+            kind: z.literal('markup'),
+            directory: z.string(),
+            manifest: z.string(),
+            markup: z.string(),
+            examples: z.array(z.object({ name: z.string(), path: z.string(), text: z.string() })),
+          }),
+          z.object({ kind: z.literal('code'), directory: z.string() }),
+          z.object({
+            kind: z.literal('refused'),
+            directory: z.string(),
+            missing: z.enum(['manifest.yaml', 'template.html']),
+          }),
+        ])
+        .nullable(),
+    }),
+  ),
+
+  /**
+   * Every format of the template being edited, drawn from its **unsaved** buffers and one
+   * sample brief (TYTO-44).
+   *
+   * `brief:preview`'s shape and its `requestId` for its reason — typing answers out of order —
+   * with one field more on each diagnostic: which buffer it is about, since this mode has three
+   * and a `range` means nothing without its file.
+   */
+  'template:preview': channel(
+    z.object({
+      requestId: z.number().int().nonnegative(),
+      directory: z.string().min(1),
+      manifest: z.string(),
+      markup: z.string(),
+      brief: z.string(),
+      briefPath: z.string().min(1).optional(),
+    }),
+    z.object({
+      requestId: z.number().int().nonnegative(),
+      frames: z.array(
+        z.object({
+          artwork: z.string(),
+          format: z.string(),
+          width: z.number().int().positive(),
+          height: z.number().int().positive(),
+          html: z.string(),
+        }),
+      ),
+      diagnostics: z.array(templateDiagnostic),
+    }),
+  ),
+
+  /**
+   * Writes both buffers and reads the template folders again (TYTO-44).
+   *
+   * **`saved: false` is a manifest that does not parse**, and its diagnostics come back instead:
+   * every brief naming the template is resolved against that file, so writing it broken would
+   * break all of them. `registered` is whether the registry now holds *this folder* under the
+   * manifest's name — false for a folder outside the chosen template folder — because a save
+   * that changes nothing any brief can render has to say so.
+   */
+  'template:save': channel(
+    z.object({ directory: z.string().min(1), manifest: z.string(), markup: z.string() }),
+    z.object({
+      saved: z.boolean(),
+      registered: z.boolean(),
+      name: z.string().optional(),
+      diagnostics: z.array(templateDiagnostic),
+    }),
+  ),
+
+  /**
+   * `tyto template new`'s scaffold, into the chosen template folder (TYTO-44).
+   *
+   * With no folder chosen main asks where, and `directory: null` with no `problem` is that
+   * picker dismissed. The name is checked on both sides — here as the grammar's identifier, the
+   * same pattern the CLI refuses — so a name no brief could write never becomes a folder.
+   */
+  'template:new': channel(
+    z.object({ name: z.string().min(1).max(100) }),
+    z.object({
+      directory: z.string().nullable(),
+      problem: z.enum(['name', 'exists', 'write']).optional(),
+      detail: z.string().optional(),
+    }),
+  ),
 } as const;
 
 export type IpcChannels = typeof IPC_CHANNELS;
@@ -683,6 +962,15 @@ export const IPC_EVENTS = {
    * what it does when the bar runs it — which for a save is now a row in the problems panel.
    */
   'command:run': z.object({ id: z.string().min(1) }),
+
+  /**
+   * The local queue changed: a task arrived, started, finished or failed (TYTO-45).
+   *
+   * Empty, because the panel asks `queue:list` for the whole of it anyway — a push that
+   * carried the list would have to carry it all, and a panel opened later would still ask
+   * once. The third push, and the second that is a notice rather than a question (ADR 0029).
+   */
+  'queue:changed': z.object({}),
 } as const;
 
 export type IpcEvents = typeof IPC_EVENTS;

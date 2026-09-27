@@ -93,9 +93,9 @@ export const pluginManifestSchema = z.strictObject({
    * Declared at install time and enforced at call time (`docs/plugin-api.md`, Isolation).
    *
    * Validated as shape only: non-empty strings, no duplicates. The *vocabulary* stays open
-   * because the spec names exactly one scope so far — `net:*`, filtering `host.fetch` —
-   * and closing an enum around one known member would reject the second permission the
-   * loader epic invents before it is written. E11 closes it; until then a typo in a
+   * because the vocabulary is still growing — `net:<host>` gates `host.fetch` and
+   * `credentials:<key>` gates `host.credentials` (ADR 0042) — and closing an enum now would
+   * reject the next scope before it is written. E11 closes it; until then a typo in a
    * permission is caught by the grant prompt, which a person reads.
    */
   permissions: z

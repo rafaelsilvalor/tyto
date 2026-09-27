@@ -109,6 +109,15 @@ export const diagnosticCodes = {
     fatal: false,
     fatality: 'The same: a directive nothing claims contributes nothing to skip.',
   },
+  E_DIRECTIVE_ARGUMENT: {
+    severity: 'error',
+    summary:
+      'A plugin directive was written without an argument it needs, or with one it cannot use.',
+    template: "Directive '::{directive}' {problem}.",
+    spec: 'docs/brief-language.md',
+    fatal: false,
+    fatality: 'The directive contributes nothing; every other directive is resolved.',
+  },
   E_MISSING_REQUIRED_SLOT: {
     severity: 'error',
     summary: 'The manifest marks a slot as required and the brief leaves it unset.',
@@ -190,8 +199,10 @@ export const diagnosticCodes = {
     template:
       "Plugin '{plugin}' called '{capability}' without that permission being granted at install time.",
     spec: 'docs/plugin-api.md',
-    fatal: true,
-    fatality: 'A plugin that did not load contributed no slot to skip.',
+    // Not fatal since TYTO-48 enforces it: the refusal is one call's, and a plugin that
+    // hands it back from `exportFrame` costs that frame and not the whole render (ADR 0025).
+    fatal: false,
+    fatality: "One call is refused; what the plugin does with the refusal is the plugin's.",
   },
   // Two codes and not one, the way the template manifest already splits them: "this file
   // is not JSON" and "this JSON is not a manifest" are different problems for whoever has
@@ -209,6 +220,155 @@ export const diagnosticCodes = {
     severity: 'error',
     summary: 'A tyto-plugin.json parses as JSON but does not match the plugin manifest schema.',
     template: "Plugin manifest is invalid at '{path}': {problem}.",
+    spec: 'docs/plugin-api.md',
+    fatal: true,
+    fatality: 'A plugin that did not load contributed no slot to skip.',
+  },
+  // The loader's codes (TYTO-47). Errors, because each one refuses a plugin somebody asked
+  // for by name — at install, at enable, or when the host activates it. A render that meets
+  // one does not report it as itself: it reports W_PLUGIN_SKIPPED, because the brief is not
+  // what is wrong and the run goes on without that plugin (ADR 0040).
+  E_PLUGIN_ENGINE: {
+    severity: 'error',
+    summary: "A plugin's engine range is not satisfied by this host's plugin API.",
+    template:
+      "Plugin '{plugin}' needs plugin API {range}, and this Tyto provides plugin API {version}.",
+    spec: 'docs/adr/0040-the-engine-is-the-plugin-api-version.md',
+    fatal: true,
+    fatality: 'A plugin that did not load contributed no slot to skip.',
+  },
+  E_PLUGIN_DUPLICATE: {
+    severity: 'error',
+    summary: 'A plugin registered a contribution id that another plugin already holds.',
+    template:
+      "Plugin '{plugin}' was refused: extension point '{point}' already has '{id}', registered by plugin '{owner}'.",
+    spec: 'docs/plugin-api.md',
+    fatal: true,
+    fatality: 'A plugin that did not load contributed no slot to skip.',
+  },
+  E_PLUGIN_NAME_TAKEN: {
+    severity: 'error',
+    summary: 'A plugin has the same name as one already installed or built in.',
+    template: "A plugin named '{plugin}' is already here ({origin}).",
+    spec: 'docs/plugin-api.md',
+    fatal: true,
+    fatality: 'A plugin that did not load contributed no slot to skip.',
+  },
+  E_PLUGIN_NOT_INSTALLED: {
+    severity: 'error',
+    summary: 'A plugin command named a plugin that is not installed.',
+    template: "No installed plugin is named '{plugin}'.",
+    spec: 'docs/plugin-api.md',
+    fatal: true,
+    fatality: 'A plugin that did not load contributed no slot to skip.',
+  },
+  E_PLUGIN_ACTIVATE: {
+    severity: 'error',
+    summary: "A plugin's code could not be loaded, or its activate function failed.",
+    template: "Plugin '{plugin}' failed to activate: {problem}.",
+    spec: 'docs/plugin-api.md',
+    fatal: true,
+    fatality: 'A plugin that did not load contributed no slot to skip.',
+  },
+  E_PLUGIN_PERMISSIONS_CHANGED: {
+    severity: 'error',
+    summary: 'An installed plugin now asks for permissions nobody approved when it was installed.',
+    template:
+      "Plugin '{plugin}' asks for {permissions}, which were not approved when it was installed. Install it again to approve them.",
+    spec: 'docs/plugin-api.md',
+    fatal: true,
+    fatality: 'A plugin that did not load contributed no slot to skip.',
+  },
+  E_PLUGIN_STATE: {
+    severity: 'error',
+    summary: 'The file recording which plugins were installed and approved cannot be read.',
+    template: "Plugin state '{path}' cannot be read: {problem}.",
+    spec: 'docs/plugin-api.md',
+    fatal: true,
+    fatality: 'A plugin that did not load contributed no slot to skip.',
+  },
+  E_PLUGIN_EXPORTER_KIND: {
+    severity: 'error',
+    summary: 'A plugin registered a rasterized exporter declaring a kind no rasterizer encodes.',
+    template:
+      "Plugin '{plugin}' registers exporter '{exporter}' as rasterized for '{kind}', and a rasterizer encodes only {encodable}.",
+    spec: 'docs/plugin-api.md',
+    fatal: true,
+    fatality: 'A plugin that did not load contributed no slot to skip.',
+  },
+  // A pack's folder is a string the plugin's own thread wrote, so where it points is checked
+  // on the host's side before anything is searched there (ADR 0046).
+  E_PLUGIN_PACK_DIRECTORY: {
+    severity: 'error',
+    summary: "A plugin's template pack names a folder outside the plugin's installed folder.",
+    template: "Plugin '{plugin}' contributes template pack folder '{directory}', and {problem}.",
+    spec: 'docs/adr/0046-an-installed-template-pack-is-markup-inside-its-plugin.md',
+    fatal: true,
+    fatality: 'A plugin that did not load contributed no slot to skip.',
+  },
+  E_PLUGIN_PACK_CODE: {
+    severity: 'error',
+    summary: "A plugin's template pack holds a template that is not markup.",
+    template:
+      "Plugin '{plugin}' contributes template '{template}', which is not a markup template: an installed pack may hold only folders with a template.html and no template.ts.",
+    spec: 'docs/adr/0046-an-installed-template-pack-is-markup-inside-its-plugin.md',
+    fatal: true,
+    fatality: 'A plugin that did not load contributed no slot to skip.',
+  },
+  E_PLUGIN_CRASHED: {
+    severity: 'error',
+    summary: "An isolated plugin's process stopped while the host was waiting for it.",
+    template: "Plugin '{plugin}' stopped running: {reason}.",
+    spec: 'docs/plugin-api.md',
+    fatal: false,
+    fatality:
+      'One frame was waiting on the process; the frames other exporters draw survive (ADR 0025).',
+  },
+  E_PLUGIN_PROTOCOL: {
+    severity: 'error',
+    summary: 'An isolated plugin sent the host a message that does not match the RPC protocol.',
+    template: "Plugin '{plugin}' sent a message the host cannot read: {problem}.",
+    spec: 'docs/plugin-api.md',
+    fatal: false,
+    fatality: 'It costs the one frame whose answer it was; the others are drawn (ADR 0025).',
+  },
+  E_PLUGIN_CALL: {
+    severity: 'error',
+    summary: 'A function an isolated plugin registered threw when the host called it.',
+    template: "Plugin '{plugin}' threw while the host was calling it: {problem}.",
+    spec: 'docs/plugin-api.md',
+    fatal: false,
+    fatality: 'It costs the one frame the call was for; the others are drawn (ADR 0025).',
+  },
+  E_PLUGIN_TIMEOUT: {
+    severity: 'error',
+    summary: 'An isolated plugin did not answer within its deadline, and its process was ended.',
+    template: "Plugin '{plugin}' did not answer within {seconds} s, so its process was ended.",
+    spec: 'docs/plugin-api.md',
+    fatal: false,
+    fatality: 'It costs the one frame the call was for; the others are drawn (ADR 0025).',
+  },
+  E_CREDENTIAL_MISSING: {
+    severity: 'error',
+    summary: 'A plugin asked for a credential it declared, and this host has no value for it.',
+    template: "Plugin '{plugin}' asked for credential '{key}', and {source} holds none.",
+    spec: 'docs/plugin-api.md',
+    fatal: false,
+    fatality: "It is the plugin's call that is refused; what the plugin does with that is its own.",
+  },
+  W_PLUGIN_CRASHED: {
+    severity: 'warning',
+    summary: "An installed plugin's process crashed on an earlier run. History, not a refusal.",
+    template:
+      "Plugin '{plugin}' crashed at {at}: {reason}. It is still activated; installing or enabling it again clears this.",
+    spec: 'docs/plugin-api.md',
+    fatal: false,
+    fatality: 'A note about an earlier run; nothing in this one is missing because of it.',
+  },
+  E_PLUGIN_FETCH: {
+    severity: 'error',
+    summary: 'A plugin could not be copied or fetched from where tyto plugin install was told.',
+    template: "Could not fetch a plugin from '{source}': {problem}.",
     spec: 'docs/plugin-api.md',
     fatal: true,
     fatality: 'A plugin that did not load contributed no slot to skip.',
@@ -491,6 +651,17 @@ export const diagnosticCodes = {
     template:
       "Template '{name}' in '{shadowed}' is shadowed by the one in '{used}', which is searched first.",
     spec: 'docs/adr/0020-built-in-template-pack.md',
+    fatal: false,
+    fatality: 'A warning never replaces a value (ADR 0013).',
+  },
+  // A warning and not an error, because the brief is not what is wrong: the plugin belongs
+  // to the machine, the run goes on without it, and a delivery that failed over somebody
+  // else's plugin would be retried by Jacurutu forever (ADR 0011, ADR 0040).
+  W_PLUGIN_SKIPPED: {
+    severity: 'warning',
+    summary: 'An installed plugin was not activated for this run, and the run went on without it.',
+    template: "Plugin '{plugin}' was skipped: {reason}",
+    spec: 'docs/adr/0040-the-engine-is-the-plugin-api-version.md',
     fatal: false,
     fatality: 'A warning never replaces a value (ADR 0013).',
   },

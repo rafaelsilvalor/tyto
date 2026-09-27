@@ -49,6 +49,19 @@ export const FILE_MENU_GROUPS: readonly (readonly MenuCommand[])[] = [
     { id: 'editor.saveAs', label: 'command.file.saveAs' },
   ],
   [{ id: 'file.export', label: 'command.file.export' }],
+  // TYTO-44. Beside Export rather than under Open: a template is not a document this window
+  // tabs, and the mode it opens is the one place in the app that writes one.
+  [
+    { id: 'template.new', label: 'command.template.new' },
+    { id: 'template.edit', label: 'command.template.edit' },
+  ],
+  // TYTO-47. Its own group, above Close: a screen about the app rather than a verb on a file.
+  [
+    { id: 'plugins.show', label: 'command.plugins.show' },
+    // TYTO-45. Beside the plugins screen: both are about the app rather than about a file.
+    // It opens the panel, or brings it forward when it is already open.
+    { id: 'queue.show', label: 'command.queue.show' },
+  ],
   [{ id: 'document.close', label: 'command.document.close' }],
 ];
 

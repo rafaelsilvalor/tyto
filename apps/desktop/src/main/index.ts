@@ -1,8 +1,21 @@
+import { readFile } from 'node:fs/promises';
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
 
-import { type BrowserWindow, Menu, app, dialog, ipcMain, safeStorage, shell } from 'electron';
-import { nodeFileSystem } from '@tyto/io';
+import {
+  type BrowserWindow,
+  Menu,
+  app,
+  dialog,
+  ipcMain,
+  net,
+  safeStorage,
+  protocol,
+  shell,
+  utilityProcess,
+} from 'electron';
+import { PLUGINS_DIR, fsInbox, fsPluginStore, nodeFileSystem } from '@tyto/io';
+import { NO_PLUGINS } from '@tyto/plugin-api';
 import type { Rasterizer } from '@tyto/raster';
 
 import { type Locale, localeFor, translate } from '../../shared/i18n/index.js';
@@ -10,15 +23,23 @@ import { fileCredentialStore } from './credential-store.js';
 import { createCredentials } from './credentials.js';
 import { createDocumentService } from './documents.js';
 import { createExportService } from './export.js';
+import { desktopCapabilities, startDesktopPlugins } from './installed-plugins.js';
 import { fileLayoutStore } from './layout-store.js';
 import { crashSummary, fileLog, installCrashHandlers } from './log.js';
 import { menuTemplate } from './menu.js';
 import { fileRecentFiles } from './recent-files.js';
 import { registerIpcHandlers, sendIpcEvent } from './ipc.js';
+import { exporterBuiltIns, listPlugins, tytoHome } from './plugin-list.js';
 import { activateBuiltIns, builtInTemplatesDirectory } from './plugins.js';
+import { utilityProcessLauncher } from './plugin-process.js';
 import { offerPreviousVersion } from './previous-version.js';
+import { createQueueService } from './queue.js';
+import { createPanelService } from './panels.js';
+import { PLUGIN_SCHEME, confinedPath, contentTypeOf, panelPolicy } from './plugin-protocol.js';
+import { type WindowPlugins, windowPlugins } from './window-plugins.js';
 import { createPreviewService } from './preview.js';
 import { createProjectSources } from './project.js';
+import { createTemplateEditor } from './template-editor.js';
 import { createExitGuard } from './quit.js';
 import { fileSettingsStore } from './settings-store.js';
 import { createTemplateCatalogue } from './templates.js';
@@ -111,6 +132,42 @@ try {
   }
 } catch (reason) {
   reportCrash(reason);
+}
+
+// Before ready, which is the only time Electron accepts it. `standard` so a panel's relative
+// `<script src="panel.js">` resolves against its own folder, and `secure` so the page is not
+// treated as mixed content. The page still has an opaque origin: the iframe's sandbox has no
+// `allow-same-origin` (ADR 0045).
+protocol.registerSchemesAsPrivileged([
+  { scheme: PLUGIN_SCHEME, privileges: { standard: true, secure: true } },
+]);
+
+/**
+ * Serves `tyto-plugin://<plugin>/<path>` out of that plugin's folder, and nothing else.
+ *
+ * Only for a plugin that is active and contributes a panel, and only a file `confinedPath`
+ * places inside its folder once links are resolved. Every page carries `panelPolicy`, which
+ * gives it no network of its own.
+ */
+function servePluginPages(
+  contributed: WindowPlugins,
+  directoryOf: (plugin: string) => string,
+): void {
+  const missing = (): Response => new Response('Not found', { status: 404 });
+  protocol.handle(PLUGIN_SCHEME, async (request) => {
+    const url = new URL(request.url);
+    const plugin = url.hostname;
+    if (!contributed.panels().some((offered) => offered.plugin === plugin)) return missing();
+    const file = await confinedPath(directoryOf(plugin), url.pathname);
+    if (file === undefined) return missing();
+    return new Response(await readFile(file), {
+      headers: {
+        'content-type': contentTypeOf(file),
+        'content-security-policy': panelPolicy(plugin),
+        'x-content-type-options': 'nosniff',
+      },
+    });
+  });
 }
 
 async function start(): Promise<void> {
@@ -251,6 +308,10 @@ async function start(): Promise<void> {
   // front of every panel for the lifetime of a decision made at startup.
   const fileSystem = nodeFileSystem();
   const host = await activateBuiltIns({ fileSystem, log });
+  // Composed here and nowhere else (ADR 0010): the store is `@tyto/io`'s adapter and the
+  // renderer reaches it only through `plugins:list`.
+  const pluginsHome = tytoHome();
+  const pluginStore = fsPluginStore(pluginsHome);
 
   // Which folders this app searches for templates, and the only thing below that is rebuilt
   // when a person picks one (TYTO-122). The built-in pack is always the last root, so
@@ -293,15 +354,6 @@ async function start(): Promise<void> {
     },
   });
 
-  // Built before the window, for the same reason the registry is: the preview's first
-  // answer should not wait on a folder read that could have happened during startup. It
-  // reads the same pack the host registered, through the same resolver.
-  //
-  // It is told no folder here. Which folder a compile resolves against is a property of the
-  // tab the brief is in, and `ipc.ts` looks it up per request from the id that came with
-  // it (E9.11) — a service holding one folder assumed one open document.
-  const preview = await createPreviewService({ fileSystem, sources });
-
   // The picker's list, read once alongside the other two. Its own read rather than the
   // preview service's registry: compiling a brief and listing what is installed are two
   // reasons for one object to change, and `src/main/templates.ts` says why that matters.
@@ -313,19 +365,101 @@ async function start(): Promise<void> {
     encryption: safeStorage,
     store: fileCredentialStore(join(app.getPath('userData'), 'credentials')),
   });
+  // One composition of what a plugin may reach, shared by its process and its panel, so the
+  // two can never be granted different things (ADR 0042, ADR 0045).
+  const capabilities = desktopCapabilities(credentials, (url, init) => net.fetch(url, init));
 
   // The export, composed here for the reason everything else is (ADR 0010): it needs a
   // `Rasterizer`, and the only place allowed to know which adapter exists is this file. It
   // is read back out of the plugin registry rather than constructed a second time — what
   // exports is what TYTO-133 registered, which is the claim the extension point makes.
+  // Installed plugins, started once for the app's life, each in a `utilityProcess` of its
+  // own (ADR 0044) — never in main. `plugin-guest.js` is the second bundle beside this one.
+  // What they can reach is behind their declared permissions: `net.fetch` for the network,
+  // and `safeStorage`, through the same `credentials`, for secrets (ADR 0042).
+  // Not awaited: the window opens while they start, and the export waits for them.
+  const plugins = startDesktopPlugins({
+    store: pluginStore,
+    launch: utilityProcessLauncher(
+      (modulePath, args, options) =>
+        utilityProcess.fork(modulePath, args, { ...options, stdio: options.stdio }),
+      join(dirname(fileURLToPath(import.meta.url)), 'plugin-guest.js'),
+    ),
+    capabilities,
+  }).catch((cause: unknown) => {
+    // A disk that refused the folder: the app opens without installed plugins, and says so.
+    log.error('The installed plugins could not be started.', cause);
+    return NO_PLUGINS;
+  });
+  void plugins.then((loaded) => {
+    for (const warning of loaded.warnings) log.warn(warning.message);
+  });
+  app.on('will-quit', () => {
+    void plugins.then((loaded) => loaded.close());
+  });
+
+  // Built before the window, for the same reason the registry is: the preview's first
+  // answer should not wait on a folder read that could have happened during startup. It
+  // reads the same pack the host registered, through the same resolver, and the installed
+  // plugins' directives once they have started (TYTO-49).
+  //
+  // It is told no folder here. Which folder a compile resolves against is a property of the
+  // tab the brief is in, and `ipc.ts` looks it up per request from the id that came with
+  // it (E9.11) — a service holding one folder assumed one open document.
+  // What the installed plugins contribute to the window itself: the directives the preview
+  // and the template mode resolve, and the panels (ADR 0043, ADR 0045).
+  const contributed = windowPlugins(plugins);
+  const preview = await createPreviewService({ fileSystem, sources, directives: contributed });
+
+  // The template mode (TYTO-44). The same `sources` as the preview, so a save that reads the
+  // folders again is seen by the preview, the export and the picker with nothing rebuilt.
+  const templateEditor = createTemplateEditor({ sources, directives: contributed.resolver });
+
+  const panels = createPanelService(contributed, capabilities);
+  servePluginPages(contributed, (name) => pluginStore.directoryOf(name));
+
   const exports_ = await createExportService({
     fileSystem,
     log,
     sources,
+    plugins,
     version: app.getVersion(),
     ...(host.registry.rasterizers<Rasterizer>()[0]?.value === undefined
       ? {}
       : { rasterizer: host.registry.rasterizers<Rasterizer>()[0]!.value }),
+  });
+
+  // The local queue (TYTO-45), composed here for the reason the export is: the inbox is
+  // `@tyto/io`'s `fsInbox` adapter, reached through its `BriefSource` port, and this file is
+  // the only one allowed to name it (ADR 0010). `done/` is read through a second one, because
+  // `done/<id>/brief.brief` is an inbox's shape. The same layout `tyto watch <folder>` uses.
+  const queue = createQueueService({
+    sources: (folder) => ({
+      inbox: fsInbox({ root: join(folder, 'inbox'), done: join(folder, 'done') }),
+      done: fsInbox({ root: join(folder, 'done') }),
+    }),
+    render: (request) => exports_.run(request),
+    folder: saved.queueFolder,
+    autoRun: saved.queueAutoRun,
+    // A notice and not a question (ADR 0029): the panel asks `queue:list` when it hears it.
+    // Dropped while there is no window, which costs nothing — a window that opens later asks
+    // once on its own.
+    onChange: () => {
+      const contents = mainWindow?.webContents;
+      if (contents === undefined || contents.isDestroyed()) return;
+      sendIpcEvent(contents, 'queue:changed', {});
+    },
+    // Main moved the file, so main tells the document service: a tab holding the brief a
+    // person just fixed follows it to `done/`, and their next save lands there.
+    onMoved: (from, to) => {
+      documents.retarget(from, to);
+    },
+    onError: (message, cause) => {
+      log.error(message, cause);
+    },
+  });
+  app.on('will-quit', () => {
+    queue.close();
   });
 
   // The one question main asks. `send` is deliberately the whole of what this file lends it:
@@ -440,8 +574,41 @@ async function start(): Promise<void> {
         return inForce();
       },
     },
+    queue: {
+      service: queue,
+      // `createDirectory`, for the export's reason: a queue folder may not exist yet.
+      chooseFolder: async () => {
+        const answer = await dialog.showOpenDialog({
+          properties: ['openDirectory', 'createDirectory'],
+        });
+        return answer.canceled ? undefined : answer.filePaths[0];
+      },
+      remember: (changes) => settings.write(changes),
+    },
+    // Read on every ask, not held: `tyto plugin install` in a terminal beside the window is
+    // the ordinary way a plugin arrives, and a list cached at startup would never show it.
+    plugins: {
+      folder: join(pluginsHome, PLUGINS_DIR),
+      list: () => listPlugins([...exporterBuiltIns(), ...host.registry.plugins()], pluginStore),
+    },
+    panels,
     preview,
     templates,
+    templateEditor,
+    templateDialogs: {
+      // No `createDirectory`: a template to edit is a folder that already has one in it.
+      chooseTemplate: async () => {
+        const answer = await dialog.showOpenDialog({ properties: ['openDirectory'] });
+        return answer.canceled ? undefined : answer.filePaths[0];
+      },
+      // `createDirectory`, for the export's reason: this is a destination.
+      chooseParent: async () => {
+        const answer = await dialog.showOpenDialog({
+          properties: ['openDirectory', 'createDirectory'],
+        });
+        return answer.canceled ? undefined : answer.filePaths[0];
+      },
+    },
     info: () => ({
       version: app.getVersion(),
       platform: process.platform,

@@ -1,4 +1,7 @@
 import { createRequire } from 'node:module';
+import { homedir } from 'node:os';
+import { join } from 'node:path';
+import { createInterface } from 'node:readline/promises';
 
 import { type CloseableRasterizer, defaultRasterizer } from './plugins/rasterizer.js';
 
@@ -43,6 +46,27 @@ export interface CliEnvironment {
    * failure (exit 2) rather than a diagnostic about anybody's brief.
    */
   rasterizer(): CliRasterizer;
+  /**
+   * `~/.tyto`, where `tyto plugin install` puts plugins and records what it approved.
+   *
+   * Optional, and absent means **no installed plugins at all**: a test that does not name a
+   * folder of its own must never read the real one, and a missing field is the one default
+   * that cannot leak somebody's machine into a snapshot.
+   */
+  readonly home?: string;
+  /**
+   * Asks a yes-or-no question on the terminal. Absent when nobody is there to answer — a
+   * pipe, a CI job — and then `install` needs `--yes` rather than guessing.
+   */
+  readonly confirm?: (question: string) => Promise<boolean>;
+  /**
+   * The environment an installed plugin's `host.credentials` reads, as
+   * `TYTO_PLUGIN_<NAME>_<KEY>` (ADR 0042).
+   *
+   * Optional, and absent means **no credentials at all**, for the reason `home` is: a test
+   * must never hand a plugin a secret from the machine it runs on.
+   */
+  readonly variables?: Readonly<Record<string, string | undefined>>;
 }
 
 /**
@@ -66,8 +90,35 @@ export function cliVersion(): string {
   return manifest.version ?? '0.0.0';
 }
 
+/**
+ * `~/.tyto`, or wherever `TYTO_HOME` points (`docs/plugin-api.md`, Lifecycle).
+ *
+ * The desktop reads the same variable (`apps/desktop/src/main/plugin-list.ts`), so the two
+ * apps always agree about which plugins are installed. An empty value counts as unset: a
+ * shell that exported `TYTO_HOME=` meant nothing by it, and a relative empty path would be
+ * the current folder.
+ */
+export function tytoHome(environment: NodeJS.ProcessEnv = process.env): string {
+  const named = environment['TYTO_HOME'];
+  return named !== undefined && named !== '' ? named : join(homedir(), '.tyto');
+}
+
+/** `y` or `yes`, any case. Anything else — an empty line included — is a no. */
+async function askOnTerminal(question: string): Promise<boolean> {
+  const terminal = createInterface({ input: process.stdin, output: process.stderr });
+  try {
+    const answer = await terminal.question(question);
+    return /^y(es)?$/iu.test(answer.trim());
+  } finally {
+    terminal.close();
+  }
+}
+
 export function defaultEnvironment(): CliEnvironment {
   return {
+    home: tytoHome(),
+    variables: process.env,
+    ...(process.stdin.isTTY ? { confirm: askOnTerminal } : {}),
     console: {
       out: (text) => {
         process.stdout.write(text);

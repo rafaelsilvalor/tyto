@@ -234,6 +234,8 @@ export interface Catalogue {
   readonly 'panel.editor': string;
   readonly 'panel.preview': string;
   readonly 'panel.problems': string;
+  /** TYTO-45. Closed in the default layout, like the panel it names. */
+  readonly 'panel.queue': string;
 
   /**
    * The find-and-replace panel (E8.5), which is CodeMirror's own DOM.
@@ -300,6 +302,83 @@ export interface Catalogue {
   readonly 'export.failed': string;
   readonly 'export.problems': string;
   readonly 'command.file.export': string;
+
+  /** The template mode (TYTO-44). */
+  readonly 'command.template.edit': string;
+  readonly 'command.template.new': string;
+  readonly 'templateMode.heading': string;
+  readonly 'templateMode.save': string;
+  readonly 'templateMode.close': string;
+  readonly 'templateMode.openOther': string;
+  readonly 'templateMode.example': string;
+  readonly 'templateMode.noExample': string;
+  readonly 'templateMode.slide': string;
+  readonly 'templateMode.empty': string;
+  readonly 'templateMode.problems': string;
+  readonly 'templateMode.clean': string;
+  readonly 'templateMode.file.render': string;
+  readonly 'templateMode.unsaved': string;
+  readonly 'templateMode.saved': string;
+  readonly 'templateMode.savedUnregistered': string;
+  readonly 'templateMode.saveRefused': string;
+  readonly 'templateMode.code': string;
+  readonly 'templateMode.refused': string;
+  readonly 'templateMode.new.name': string;
+  readonly 'templateMode.new.create': string;
+  readonly 'templateMode.new.problem.name': string;
+  readonly 'templateMode.new.problem.exists': string;
+  readonly 'templateMode.new.problem.write': string;
+  readonly 'templateMode.discard.message': string;
+  readonly 'templateMode.discard.detail': string;
+  readonly 'templateMode.discard.confirm': string;
+  readonly 'templateMode.discard.cancel': string;
+
+  /** The plugins screen (TYTO-47). Opened by a command, so none of these is on screen at load. */
+  readonly 'command.plugins.show': string;
+  readonly 'plugins.heading': string;
+  readonly 'plugins.notice': string;
+  readonly 'plugins.inactive': string;
+  readonly 'plugins.folder': string;
+  readonly 'plugins.install': string;
+  readonly 'plugins.column.name': string;
+  readonly 'plugins.column.version': string;
+  readonly 'plugins.column.origin': string;
+  readonly 'plugins.column.status': string;
+  readonly 'plugins.column.contributes': string;
+  readonly 'plugins.column.permissions': string;
+  readonly 'plugins.origin.builtIn': string;
+  readonly 'plugins.origin.external': string;
+  readonly 'plugins.status.enabled': string;
+  readonly 'plugins.status.disabled': string;
+  readonly 'plugins.status.refused': string;
+  readonly 'plugins.status.crashed': string;
+  readonly 'plugins.permissions.none': string;
+  /** On the row of a plugin that contributes a panel: the document text reaches its page. */
+  readonly 'plugins.panel.readsDocument': string;
+  readonly 'plugins.close': string;
+  readonly 'plugins.unavailable': string;
+
+  /**
+   * The local queue panel (TYTO-45). Closed in the default layout, so none of these is on
+   * screen at load; `queue.status.*` are the words a row's status is shown in.
+   */
+  readonly 'command.queue.show': string;
+  readonly 'queue.heading': string;
+  readonly 'queue.folder.none': string;
+  readonly 'queue.folder.choose': string;
+  readonly 'queue.folder.clear': string;
+  readonly 'queue.inbox': string;
+  readonly 'queue.autoRun': string;
+  readonly 'queue.empty': string;
+  readonly 'queue.status.pending': string;
+  readonly 'queue.status.rendering': string;
+  readonly 'queue.status.done': string;
+  readonly 'queue.status.error': string;
+  readonly 'queue.run': string;
+  readonly 'queue.retry': string;
+  readonly 'queue.openBrief': string;
+  readonly 'queue.openOutput': string;
+  readonly 'queue.unavailable': string;
 }
 
 export type CatalogueKey = keyof Catalogue;
@@ -384,6 +463,7 @@ export const CATALOGUE_KEYS = [
   'panel.editor',
   'panel.preview',
   'panel.problems',
+  'panel.queue',
   'search.find',
   'search.replace',
   'search.next',
@@ -430,4 +510,71 @@ export const CATALOGUE_KEYS = [
   'export.failed',
   'export.problems',
   'command.file.export',
+  'command.template.edit',
+  'command.template.new',
+  'templateMode.heading',
+  'templateMode.save',
+  'templateMode.close',
+  'templateMode.openOther',
+  'templateMode.example',
+  'templateMode.noExample',
+  'templateMode.slide',
+  'templateMode.empty',
+  'templateMode.problems',
+  'templateMode.clean',
+  'templateMode.file.render',
+  'templateMode.unsaved',
+  'templateMode.saved',
+  'templateMode.savedUnregistered',
+  'templateMode.saveRefused',
+  'templateMode.code',
+  'templateMode.refused',
+  'templateMode.new.name',
+  'templateMode.new.create',
+  'templateMode.new.problem.name',
+  'templateMode.new.problem.exists',
+  'templateMode.new.problem.write',
+  'templateMode.discard.message',
+  'templateMode.discard.detail',
+  'templateMode.discard.confirm',
+  'templateMode.discard.cancel',
+  'command.plugins.show',
+  'plugins.heading',
+  'plugins.notice',
+  'plugins.inactive',
+  'plugins.folder',
+  'plugins.install',
+  'plugins.column.name',
+  'plugins.column.version',
+  'plugins.column.origin',
+  'plugins.column.status',
+  'plugins.column.contributes',
+  'plugins.column.permissions',
+  'plugins.origin.builtIn',
+  'plugins.origin.external',
+  'plugins.status.enabled',
+  'plugins.status.disabled',
+  'plugins.status.refused',
+  'plugins.status.crashed',
+  'plugins.permissions.none',
+  'plugins.panel.readsDocument',
+  'plugins.close',
+  'plugins.unavailable',
+  'command.queue.show',
+  'queue.heading',
+  'queue.folder.none',
+  'queue.folder.choose',
+  'queue.folder.clear',
+  'queue.inbox',
+  'queue.autoRun',
+  'queue.empty',
+  'queue.status.pending',
+  'queue.status.rendering',
+  'queue.status.done',
+  'queue.status.error',
+  'queue.run',
+  'queue.retry',
+  'queue.openBrief',
+  'queue.openOutput',
+  'queue.unavailable',
 ] as const satisfies readonly CatalogueKey[];

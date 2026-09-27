@@ -1,4 +1,5 @@
 import type { BriefAst, Directive, RichText } from './ast.js';
+import { type DirectiveResolver, stampExpansion } from './directives.js';
 import { type Diagnostic, diagnostic } from '../diagnostics/diagnostic.js';
 import { didYouMean } from '../diagnostics/suggest.js';
 import type { AssetResolver } from '../ports/asset-resolver.js';
@@ -100,6 +101,11 @@ export interface ResolveOptions {
    * rather than being guessed at.
    */
   readonly renderedSlots?: readonly string[];
+  /**
+   * What answers a `::namespace/name` directive: the plugins' directives, when the caller
+   * activated any. Absent, every namespaced directive is `E_UNKNOWN_DIRECTIVE`.
+   */
+  readonly directives?: DirectiveResolver;
 }
 
 /** Reserved frontmatter keys: metadata about the brief, not slots of the template. */
@@ -547,6 +553,40 @@ function formatsOf(
   return kept;
 }
 
+/**
+ * A plugin directive, as the slot directives it stands for (ADR 0043).
+ *
+ * Every diagnostic the plugin raises without a position is given the directive's, so a
+ * plugin that timed out or crashed is still underlined where the author wrote it. The
+ * replacements are stamped the same way, and `resolve` checks them as it checks anything
+ * typed: a slot the manifest lacks is `E_UNKNOWN_SLOT` on the plugin directive's name.
+ */
+async function expand(
+  directive: Directive,
+  namespace: string,
+  options: ResolveOptions,
+  resolver: Resolver,
+): Promise<readonly Directive[]> {
+  const expander = options.directives?.find(namespace, directive.name);
+  if (expander === undefined) {
+    resolver.report(
+      diagnostic(
+        'E_UNKNOWN_DIRECTIVE',
+        { directive: `${namespace}/${directive.name}` },
+        { range: directive.nameRange },
+      ),
+    );
+    return [];
+  }
+
+  const answer = await expander(directive);
+  const problems = answer.ok ? answer.diagnostics : answer.error;
+  for (const problem of problems) {
+    resolver.report(problem.range === undefined ? { ...problem, range: directive.range } : problem);
+  }
+  return answer.ok ? answer.value.map((expanded) => stampExpansion(expanded, directive)) : [];
+}
+
 export async function resolve(
   ast: BriefAst,
   options: ResolveOptions,
@@ -592,14 +632,9 @@ export async function resolve(
 
   for (const directive of ast.directives) {
     if (directive.namespace !== undefined) {
-      // Namespaced directives come from plugins, and there is no plugin host yet (E7).
-      resolver.report(
-        diagnostic(
-          'E_UNKNOWN_DIRECTIVE',
-          { directive: `${directive.namespace}/${directive.name}` },
-          { range: directive.nameRange },
-        ),
-      );
+      for (const replacement of await expand(directive, directive.namespace, options, resolver)) {
+        await resolver.take(candidateOf(replacement), false);
+      }
       continue;
     }
     await resolver.take(candidateOf(directive), false);

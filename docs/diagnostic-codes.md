@@ -24,6 +24,7 @@ non-zero.
 | `E_BAD_SLOT_VALUE` | error | no | A slot is set to something the manifest does not allow for it. |
 | `E_UNKNOWN_SLOT` | error | no | A directive names a slot the template manifest does not declare. |
 | `E_UNKNOWN_DIRECTIVE` | error | no | A directive matches no template slot and no installed plugin. |
+| `E_DIRECTIVE_ARGUMENT` | error | no | A plugin directive was written without an argument it needs, or with one it cannot use. |
 | `E_MISSING_REQUIRED_SLOT` | error | no | The manifest marks a slot as required and the brief leaves it unset. |
 | `E_BAD_ADJUSTMENT` | error | no | An adjustment is not declared for the slot it is applied to. |
 | `E_ASSET_NOT_FOUND` | error | no | An asset path in the brief does not resolve to a file. |
@@ -32,9 +33,26 @@ non-zero.
 | `E_UNSUPPORTED_ATTRIBUTE` | error | yes | A template uses an attribute the tag it sits on does not accept. |
 | `E_TEMPLATE_SYNTAX` | error | yes | A template.html does not match the template grammar. |
 | `E_TEMPLATE_MARKUP` | error | yes | A template.html parses but does not describe a scene the compiler can build. |
-| `E_PERMISSION` | error | yes | A plugin called a capability it was not granted at install time. |
+| `E_PERMISSION` | error | no | A plugin called a capability it was not granted at install time. |
 | `E_PLUGIN_MANIFEST_SYNTAX` | error | yes | A tyto-plugin.json is not valid JSON. |
 | `E_PLUGIN_MANIFEST_SHAPE` | error | yes | A tyto-plugin.json parses as JSON but does not match the plugin manifest schema. |
+| `E_PLUGIN_ENGINE` | error | yes | A plugin's engine range is not satisfied by this host's plugin API. |
+| `E_PLUGIN_DUPLICATE` | error | yes | A plugin registered a contribution id that another plugin already holds. |
+| `E_PLUGIN_NAME_TAKEN` | error | yes | A plugin has the same name as one already installed or built in. |
+| `E_PLUGIN_NOT_INSTALLED` | error | yes | A plugin command named a plugin that is not installed. |
+| `E_PLUGIN_ACTIVATE` | error | yes | A plugin's code could not be loaded, or its activate function failed. |
+| `E_PLUGIN_PERMISSIONS_CHANGED` | error | yes | An installed plugin now asks for permissions nobody approved when it was installed. |
+| `E_PLUGIN_STATE` | error | yes | The file recording which plugins were installed and approved cannot be read. |
+| `E_PLUGIN_EXPORTER_KIND` | error | yes | A plugin registered a rasterized exporter declaring a kind no rasterizer encodes. |
+| `E_PLUGIN_PACK_DIRECTORY` | error | yes | A plugin's template pack names a folder outside the plugin's installed folder. |
+| `E_PLUGIN_PACK_CODE` | error | yes | A plugin's template pack holds a template that is not markup. |
+| `E_PLUGIN_CRASHED` | error | no | An isolated plugin's process stopped while the host was waiting for it. |
+| `E_PLUGIN_PROTOCOL` | error | no | An isolated plugin sent the host a message that does not match the RPC protocol. |
+| `E_PLUGIN_CALL` | error | no | A function an isolated plugin registered threw when the host called it. |
+| `E_PLUGIN_TIMEOUT` | error | no | An isolated plugin did not answer within its deadline, and its process was ended. |
+| `E_CREDENTIAL_MISSING` | error | no | A plugin asked for a credential it declared, and this host has no value for it. |
+| `W_PLUGIN_CRASHED` | warning | no | An installed plugin's process crashed on an earlier run. History, not a refusal. |
+| `E_PLUGIN_FETCH` | error | yes | A plugin could not be copied or fetched from where tyto plugin install was told. |
 | `E_SCENE_SHAPE` | error | yes | A scene does not match the IR schema. |
 | `E_SCENE_DUPLICATE_ID` | error | yes | The same id is used more than once in one scene. |
 | `E_SCENE_MASK_NOT_FOUND` | error | yes | A mask references a node the scene does not contain. |
@@ -65,6 +83,7 @@ non-zero.
 | `W_UNUSED_SLOT` | warning | no | The brief sets a slot the chosen template never renders. |
 | `W_MARKUP_IN_FRONTMATTER` | warning | no | A frontmatter scalar on a rich-text slot contains what looks like inline markup. |
 | `W_TEMPLATE_SHADOWED` | warning | no | Two template sources declare the same name; the earlier source is the one used. |
+| `W_PLUGIN_SKIPPED` | warning | no | An installed plugin was not activated for this run, and the run went on without it. |
 | `W_IMPORT_SKIPPED` | warning | no | Something in the previous version's data folder could not be brought across to this one. |
 
 ## What is fatal, and why
@@ -90,6 +109,7 @@ incomplete brief, and a crossed box where a picture the exporter could not load 
 | `E_BAD_SLOT_VALUE` | no | The value of one slot; it stays unset and the rest of the artwork is drawn anyway. |
 | `E_UNKNOWN_SLOT` | no | The slot does not exist, and the ones that do are unaffected. |
 | `E_UNKNOWN_DIRECTIVE` | no | The same: a directive nothing claims contributes nothing to skip. |
+| `E_DIRECTIVE_ARGUMENT` | no | The directive contributes nothing; every other directive is resolved. |
 | `E_MISSING_REQUIRED_SLOT` | no | The artwork renders with a hole, and since ADR 0035 the hole is drawn: `compile` stamps every frame built from a brief that left a required slot unset, so the gap is in the exported bytes and not only in the problems panel. |
 | `E_BAD_ADJUSTMENT` | no | One adjustment on one slot; the slot keeps the adjustments that are declared. |
 | `E_ASSET_NOT_FOUND` | no | One image the brief named. The slot stays unset, so the scene never references bytes nobody can supply. |
@@ -98,9 +118,25 @@ incomplete brief, and a crossed box where a picture the exporter could not load 
 | `E_UNSUPPORTED_ATTRIBUTE` | yes | The template is what every artwork is drawn through, so a broken one breaks all of them rather than one slot. |
 | `E_TEMPLATE_SYNTAX` | yes | The template is what every artwork is drawn through, so a broken one breaks all of them rather than one slot. |
 | `E_TEMPLATE_MARKUP` | yes | The template is what every artwork is drawn through, so a broken one breaks all of them rather than one slot. |
-| `E_PERMISSION` | yes | A plugin that did not load contributed no slot to skip. |
+| `E_PERMISSION` | no | One call is refused; what the plugin does with the refusal is the plugin's. |
 | `E_PLUGIN_MANIFEST_SYNTAX` | yes | A plugin that did not load contributed no slot to skip. |
 | `E_PLUGIN_MANIFEST_SHAPE` | yes | A plugin that did not load contributed no slot to skip. |
+| `E_PLUGIN_ENGINE` | yes | A plugin that did not load contributed no slot to skip. |
+| `E_PLUGIN_DUPLICATE` | yes | A plugin that did not load contributed no slot to skip. |
+| `E_PLUGIN_NAME_TAKEN` | yes | A plugin that did not load contributed no slot to skip. |
+| `E_PLUGIN_NOT_INSTALLED` | yes | A plugin that did not load contributed no slot to skip. |
+| `E_PLUGIN_ACTIVATE` | yes | A plugin that did not load contributed no slot to skip. |
+| `E_PLUGIN_PERMISSIONS_CHANGED` | yes | A plugin that did not load contributed no slot to skip. |
+| `E_PLUGIN_STATE` | yes | A plugin that did not load contributed no slot to skip. |
+| `E_PLUGIN_EXPORTER_KIND` | yes | A plugin that did not load contributed no slot to skip. |
+| `E_PLUGIN_PACK_DIRECTORY` | yes | A plugin that did not load contributed no slot to skip. |
+| `E_PLUGIN_PACK_CODE` | yes | A plugin that did not load contributed no slot to skip. |
+| `E_PLUGIN_CRASHED` | no | One frame was waiting on the process; the frames other exporters draw survive (ADR 0025). |
+| `E_PLUGIN_PROTOCOL` | no | It costs the one frame whose answer it was; the others are drawn (ADR 0025). |
+| `E_PLUGIN_CALL` | no | It costs the one frame the call was for; the others are drawn (ADR 0025). |
+| `E_PLUGIN_TIMEOUT` | no | It costs the one frame the call was for; the others are drawn (ADR 0025). |
+| `E_CREDENTIAL_MISSING` | no | It is the plugin's call that is refused; what the plugin does with that is its own. |
+| `E_PLUGIN_FETCH` | yes | A plugin that did not load contributed no slot to skip. |
 | `E_SCENE_SHAPE` | yes | The IR is malformed, so the exporter has nothing it can draw. |
 | `E_SCENE_DUPLICATE_ID` | yes | The IR is malformed, so the exporter has nothing it can draw. |
 | `E_SCENE_MASK_NOT_FOUND` | yes | The IR is malformed, so the exporter has nothing it can draw. |
@@ -240,6 +276,20 @@ Unknown directive '::{directive}'. No template slot or installed plugin provides
 
 Parameters: `directive`
 
+### `E_DIRECTIVE_ARGUMENT`
+
+**Severity:** error · **Fatal:** no · **Spec:** `docs/brief-language.md`
+
+A plugin directive was written without an argument it needs, or with one it cannot use.
+
+The directive contributes nothing; every other directive is resolved.
+
+```
+Directive '::{directive}' {problem}.
+```
+
+Parameters: `directive`, `problem`
+
 ### `E_MISSING_REQUIRED_SLOT`
 
 **Severity:** error · **Fatal:** no · **Spec:** `docs/brief-language.md`
@@ -354,11 +404,11 @@ Parameters: `problem`
 
 ### `E_PERMISSION`
 
-**Severity:** error · **Fatal:** yes · **Spec:** `docs/plugin-api.md`
+**Severity:** error · **Fatal:** no · **Spec:** `docs/plugin-api.md`
 
 A plugin called a capability it was not granted at install time.
 
-A plugin that did not load contributed no slot to skip.
+One call is refused; what the plugin does with the refusal is the plugin's.
 
 ```
 Plugin '{plugin}' called '{capability}' without that permission being granted at install time.
@@ -393,6 +443,230 @@ Plugin manifest is invalid at '{path}': {problem}.
 ```
 
 Parameters: `path`, `problem`
+
+### `E_PLUGIN_ENGINE`
+
+**Severity:** error · **Fatal:** yes · **Spec:** `docs/adr/0040-the-engine-is-the-plugin-api-version.md`
+
+A plugin's engine range is not satisfied by this host's plugin API.
+
+A plugin that did not load contributed no slot to skip.
+
+```
+Plugin '{plugin}' needs plugin API {range}, and this Tyto provides plugin API {version}.
+```
+
+Parameters: `plugin`, `range`, `version`
+
+### `E_PLUGIN_DUPLICATE`
+
+**Severity:** error · **Fatal:** yes · **Spec:** `docs/plugin-api.md`
+
+A plugin registered a contribution id that another plugin already holds.
+
+A plugin that did not load contributed no slot to skip.
+
+```
+Plugin '{plugin}' was refused: extension point '{point}' already has '{id}', registered by plugin '{owner}'.
+```
+
+Parameters: `plugin`, `point`, `id`, `owner`
+
+### `E_PLUGIN_NAME_TAKEN`
+
+**Severity:** error · **Fatal:** yes · **Spec:** `docs/plugin-api.md`
+
+A plugin has the same name as one already installed or built in.
+
+A plugin that did not load contributed no slot to skip.
+
+```
+A plugin named '{plugin}' is already here ({origin}).
+```
+
+Parameters: `plugin`, `origin`
+
+### `E_PLUGIN_NOT_INSTALLED`
+
+**Severity:** error · **Fatal:** yes · **Spec:** `docs/plugin-api.md`
+
+A plugin command named a plugin that is not installed.
+
+A plugin that did not load contributed no slot to skip.
+
+```
+No installed plugin is named '{plugin}'.
+```
+
+Parameters: `plugin`
+
+### `E_PLUGIN_ACTIVATE`
+
+**Severity:** error · **Fatal:** yes · **Spec:** `docs/plugin-api.md`
+
+A plugin's code could not be loaded, or its activate function failed.
+
+A plugin that did not load contributed no slot to skip.
+
+```
+Plugin '{plugin}' failed to activate: {problem}.
+```
+
+Parameters: `plugin`, `problem`
+
+### `E_PLUGIN_PERMISSIONS_CHANGED`
+
+**Severity:** error · **Fatal:** yes · **Spec:** `docs/plugin-api.md`
+
+An installed plugin now asks for permissions nobody approved when it was installed.
+
+A plugin that did not load contributed no slot to skip.
+
+```
+Plugin '{plugin}' asks for {permissions}, which were not approved when it was installed. Install it again to approve them.
+```
+
+Parameters: `plugin`, `permissions`
+
+### `E_PLUGIN_STATE`
+
+**Severity:** error · **Fatal:** yes · **Spec:** `docs/plugin-api.md`
+
+The file recording which plugins were installed and approved cannot be read.
+
+A plugin that did not load contributed no slot to skip.
+
+```
+Plugin state '{path}' cannot be read: {problem}.
+```
+
+Parameters: `path`, `problem`
+
+### `E_PLUGIN_EXPORTER_KIND`
+
+**Severity:** error · **Fatal:** yes · **Spec:** `docs/plugin-api.md`
+
+A plugin registered a rasterized exporter declaring a kind no rasterizer encodes.
+
+A plugin that did not load contributed no slot to skip.
+
+```
+Plugin '{plugin}' registers exporter '{exporter}' as rasterized for '{kind}', and a rasterizer encodes only {encodable}.
+```
+
+Parameters: `plugin`, `exporter`, `kind`, `encodable`
+
+### `E_PLUGIN_PACK_DIRECTORY`
+
+**Severity:** error · **Fatal:** yes · **Spec:** `docs/adr/0046-an-installed-template-pack-is-markup-inside-its-plugin.md`
+
+A plugin's template pack names a folder outside the plugin's installed folder.
+
+A plugin that did not load contributed no slot to skip.
+
+```
+Plugin '{plugin}' contributes template pack folder '{directory}', and {problem}.
+```
+
+Parameters: `plugin`, `directory`, `problem`
+
+### `E_PLUGIN_PACK_CODE`
+
+**Severity:** error · **Fatal:** yes · **Spec:** `docs/adr/0046-an-installed-template-pack-is-markup-inside-its-plugin.md`
+
+A plugin's template pack holds a template that is not markup.
+
+A plugin that did not load contributed no slot to skip.
+
+```
+Plugin '{plugin}' contributes template '{template}', which is not a markup template: an installed pack may hold only folders with a template.html and no template.ts.
+```
+
+Parameters: `plugin`, `template`
+
+### `E_PLUGIN_CRASHED`
+
+**Severity:** error · **Fatal:** no · **Spec:** `docs/plugin-api.md`
+
+An isolated plugin's process stopped while the host was waiting for it.
+
+One frame was waiting on the process; the frames other exporters draw survive (ADR 0025).
+
+```
+Plugin '{plugin}' stopped running: {reason}.
+```
+
+Parameters: `plugin`, `reason`
+
+### `E_PLUGIN_PROTOCOL`
+
+**Severity:** error · **Fatal:** no · **Spec:** `docs/plugin-api.md`
+
+An isolated plugin sent the host a message that does not match the RPC protocol.
+
+It costs the one frame whose answer it was; the others are drawn (ADR 0025).
+
+```
+Plugin '{plugin}' sent a message the host cannot read: {problem}.
+```
+
+Parameters: `plugin`, `problem`
+
+### `E_PLUGIN_CALL`
+
+**Severity:** error · **Fatal:** no · **Spec:** `docs/plugin-api.md`
+
+A function an isolated plugin registered threw when the host called it.
+
+It costs the one frame the call was for; the others are drawn (ADR 0025).
+
+```
+Plugin '{plugin}' threw while the host was calling it: {problem}.
+```
+
+Parameters: `plugin`, `problem`
+
+### `E_PLUGIN_TIMEOUT`
+
+**Severity:** error · **Fatal:** no · **Spec:** `docs/plugin-api.md`
+
+An isolated plugin did not answer within its deadline, and its process was ended.
+
+It costs the one frame the call was for; the others are drawn (ADR 0025).
+
+```
+Plugin '{plugin}' did not answer within {seconds} s, so its process was ended.
+```
+
+Parameters: `plugin`, `seconds`
+
+### `E_CREDENTIAL_MISSING`
+
+**Severity:** error · **Fatal:** no · **Spec:** `docs/plugin-api.md`
+
+A plugin asked for a credential it declared, and this host has no value for it.
+
+It is the plugin's call that is refused; what the plugin does with that is its own.
+
+```
+Plugin '{plugin}' asked for credential '{key}', and {source} holds none.
+```
+
+Parameters: `plugin`, `key`, `source`
+
+### `E_PLUGIN_FETCH`
+
+**Severity:** error · **Fatal:** yes · **Spec:** `docs/plugin-api.md`
+
+A plugin could not be copied or fetched from where tyto plugin install was told.
+
+A plugin that did not load contributed no slot to skip.
+
+```
+Could not fetch a plugin from '{source}': {problem}.
+```
+
+Parameters: `source`, `problem`
 
 ### `E_SCENE_SHAPE`
 
@@ -732,6 +1006,20 @@ Parameters: `artifact`, `problem`
 
 ## Warnings
 
+### `W_PLUGIN_CRASHED`
+
+**Severity:** warning · **Fatal:** no · **Spec:** `docs/plugin-api.md`
+
+An installed plugin's process crashed on an earlier run. History, not a refusal.
+
+A note about an earlier run; nothing in this one is missing because of it.
+
+```
+Plugin '{plugin}' crashed at {at}: {reason}. It is still activated; installing or enabling it again clears this.
+```
+
+Parameters: `plugin`, `at`, `reason`
+
 ### `W_EXPORT_APPROXIMATED`
 
 **Severity:** warning · **Fatal:** no · **Spec:** `docs/ir-schema.md`
@@ -815,6 +1103,20 @@ Template '{name}' in '{shadowed}' is shadowed by the one in '{used}', which is s
 ```
 
 Parameters: `name`, `shadowed`, `used`
+
+### `W_PLUGIN_SKIPPED`
+
+**Severity:** warning · **Fatal:** no · **Spec:** `docs/adr/0040-the-engine-is-the-plugin-api-version.md`
+
+An installed plugin was not activated for this run, and the run went on without it.
+
+A warning never replaces a value (ADR 0013).
+
+```
+Plugin '{plugin}' was skipped: {reason}
+```
+
+Parameters: `plugin`, `reason`
 
 ### `W_IMPORT_SKIPPED`
 

@@ -1,4 +1,10 @@
-import { type CommandRegistry, type EditorHandle, createEditor } from '@tyto/editor';
+import {
+  type CommandRegistry,
+  type EditorHandle,
+  briefCompletion,
+  briefLint,
+  createEditor,
+} from '@tyto/editor';
 
 import { type IpcResponse, type TytoBridge } from '../../shared/ipc.js';
 import {
@@ -19,6 +25,17 @@ import {
 } from './panel.js';
 import { type CommandEntry, type CommandBar, COMMAND_BAR_TAG } from './command-bar.js';
 import { type ExportDialog, type ExportProgressView, EXPORT_DIALOG_TAG } from './export-dialog.js';
+import { type PluginsDialog, PLUGINS_DIALOG_TAG } from './plugins-dialog.js';
+import { previewAnalysis } from './brief-analysis.js';
+import {
+  type OfferedPanel,
+  PluginPanel,
+  announceDocument,
+  servePanelBridge,
+} from './plugin-panel.js';
+import { type QueuePanel, QUEUE_PANEL_TAG } from './queue-panel.js';
+import type { TemplateMode } from './template-mode.js';
+import { TEMPLATE_MODE_TAG } from './template-mode-tag.js';
 import {
   COMMAND_LABELS,
   DOCUMENT_SLOTS,
@@ -62,11 +79,14 @@ import './panels.js';
 import {
   type Layout,
   DEFAULT_LAYOUT,
+  PLUGIN_PANEL_ELEMENT,
+  QUEUE_PANEL,
   panelOf,
   withPanelOpen,
   withPanelSize,
+  withPluginPanels,
 } from '../../shared/layout.js';
-import { type SaveOutcome, resolveExit } from './exit.js';
+import { type SaveOutcome, listenForExit, resolveExit } from './exit.js';
 import { installErrorReporting, reportToLog } from './report-errors.js';
 import { searchPhrasesFor } from './search-phrases.js';
 import { type ShellState, fillLocalePicker, localeFromPicker, paint, paintTitle } from './shell.js';
@@ -123,6 +143,17 @@ declare global {
  * milliseconds — the delay is about not doing it mid-word, not about cost.
  */
 const PREVIEW_DELAY = 200;
+
+/**
+ * The gutter's and the completion list's analysis, answered by the preview (TYTO-49).
+ *
+ * `brief-analysis.ts` says why there is no second analyzer. The template names come from
+ * the picker's list, which is the same registry the preview resolves against.
+ */
+const analysis = previewAnalysis(() => state.templates);
+
+/** The installed plugins' panels by layout id, once main has said which there are (ADR 0045). */
+const offeredPanels = new Map<string, OfferedPanel>();
 
 const state = {
   locale: DEFAULT_LOCALE as Locale,
@@ -263,6 +294,12 @@ function resolveElements() {
     problemsCount: byId('problems-count'),
     commandBar: document.querySelector<CommandBar>(COMMAND_BAR_TAG),
     exportDialog: document.querySelector<ExportDialog>(EXPORT_DIALOG_TAG),
+    // TYTO-47. By tag, for the problems panel's reason: naming it keeps the import a runtime one.
+    pluginsDialog: document.querySelector<PluginsDialog>(PLUGINS_DIALOG_TAG),
+    // TYTO-45. A dock panel, so `null` whenever it is closed — which is how it starts.
+    queuePanel: document.querySelector<QueuePanel>(QUEUE_PANEL_TAG),
+    // TYTO-44. Outside `.shell` for the export dialog's reason: it covers the window.
+    templateMode: document.querySelector<TemplateMode>(TEMPLATE_MODE_TAG),
     // Outside the docks, like the command bar: the strip lists what the *window* has open,
     // so it must not disappear with a panel.
     tabs: document.querySelector<DocumentTabs>(TABS_TAG),
@@ -495,9 +532,115 @@ function stopWatchingExport(): void {
   exportPoll = undefined;
 }
 
+/**
+ * The panels `wireQueuePanel` has handed its callbacks to.
+ *
+ * Weak, and keyed by element, because the dock makes a *new* element each time the panel is
+ * reopened (`main.ts`'s `resolveElements` says why) — and a new one has neither the callbacks
+ * nor a view, while one that survived a rearrange has both and must not be asked again.
+ */
+const wiredQueuePanels = new WeakSet<QueuePanel>();
+
+/**
+ * The local queue panel (TYTO-45): its buttons, and its first answer.
+ *
+ * Asked once when the element is born and then only on `queue:changed`, never on a timer —
+ * main already sweeps the inbox, and one push per change is what keeps a panel docked all day
+ * current without the window polling behind it.
+ */
+function wireQueuePanel(): void {
+  const panel = elements.queuePanel;
+  if (panel === null || wiredQueuePanels.has(panel)) return;
+  wiredQueuePanels.add(panel);
+
+  const answer = (ask: (bridge: TytoBridge) => Promise<QueuePanel['view']>): void => {
+    void withBridge(async (bridge) => {
+      try {
+        panel.view = await ask(bridge);
+      } catch {
+        panel.view = 'failed';
+      }
+    });
+  };
+
+  panel.actions = {
+    chooseFolder: () => {
+      answer((bridge) => bridge['queue:set-folder']({ choose: true }));
+    },
+    clearFolder: () => {
+      answer((bridge) => bridge['queue:set-folder']({ choose: false }));
+    },
+    setAutoRun: (on) => {
+      answer((bridge) => bridge['queue:set-auto-run']({ on }));
+    },
+    run: (taskId) => {
+      void withBridge(async (bridge) => {
+        await bridge['queue:run']({ taskId });
+      });
+    },
+    // The same `adopt` a picked file goes through, so a brief already open in a tab is that
+    // tab, and the fixed brief is saved over the task's own file by the ordinary Save.
+    openBrief: (taskId) => {
+      void withBridge(async (bridge) => {
+        const wanted = nextDocumentId();
+        const opened = await bridge['queue:open-brief']({ documentId: wanted, taskId });
+        adopt(opened.document, opened.documentId, wanted);
+      });
+    },
+    openOutput: (taskId) => {
+      void withBridge(async (bridge) => {
+        await bridge['queue:reveal-output']({ taskId });
+      });
+    },
+  };
+
+  void refreshQueue();
+}
+
+/** Asks main for the queue and hands it to the panel, if the panel is open. */
+async function refreshQueue(): Promise<void> {
+  await withBridge(async (bridge) => {
+    const panel = elements.queuePanel;
+    if (panel === null) return;
+    try {
+      panel.view = await bridge['queue:list']({});
+    } catch {
+      panel.view = 'failed';
+    }
+  });
+}
+
+/**
+ * The plugins screen (TYTO-47): opened empty and filled when main answers, so a slow disk
+ * shows the notice at once rather than nothing. Asked on every open, never cached — a plugin
+ * installed from a terminal beside the window is the ordinary way one arrives.
+ */
+function openPluginsDialog(): void {
+  const dialog = elements.pluginsDialog;
+  if (dialog === null || dialog === undefined) return;
+
+  dialog.locale = state.locale;
+  dialog.view = undefined;
+  dialog.open = true;
+  void withBridge(async (bridge) => {
+    try {
+      dialog.view = await bridge['plugins:list']({});
+    } catch {
+      dialog.view = 'failed';
+    }
+  });
+}
+
 function openExportDialog(): void {
   const dialog = elements.exportDialog;
   if (dialog === null || dialog === undefined) return;
+
+  // Asked each time, so an installed exporter's kind is offered beside Tyto's (ADR 0044).
+  // Unique and in main's order; the built-in four until the answer lands.
+  void withBridge(async (bridge) => {
+    const answer = await bridge['export:kinds']({});
+    dialog.available = [...new Set(answer.kinds.map((item) => item.kind))];
+  });
 
   dialog.chooseDirectory = () => {
     void withBridge(async (bridge) => {
@@ -625,6 +768,28 @@ const registry: CommandRegistry = createDesktopRegistry({
   },
   openExport: () => {
     openExportDialog();
+  },
+  showPlugins: () => {
+    openPluginsDialog();
+  },
+  showQueue: () => {
+    void changeLayout(withPanelOpen(layout, QUEUE_PANEL, true)).then(() => {
+      // Brought forward: the panel may have been open all along, behind the editor's focus.
+      elements.queuePanel?.querySelector<HTMLButtonElement>('button')?.focus();
+    });
+  },
+
+  editTemplate: () => {
+    void loadTemplateMode().then((mode) => mode?.openFolder(null));
+  },
+  newTemplate: () => {
+    void loadTemplateMode().then(async (mode) => {
+      if (mode === undefined) return;
+      mode.open = true;
+      // Straight to the name, which is the only thing a New needs from the person.
+      await mode.updateComplete;
+      mode.querySelector<HTMLInputElement>('.template-mode__new-name')?.focus();
+    });
   },
 
   newDocument: () => {
@@ -1069,7 +1234,12 @@ async function answerExitRequest(bridge: TytoBridge, askId: number): Promise<voi
   let allow = false;
   try {
     allow = await resolveExit({
-      unsaved: () => workspace.documents.filter(isUnsaved).map((document_) => document_.id),
+      unsaved: () => [
+        ...workspace.documents.filter(isUnsaved).map((document_) => document_.id),
+        // The template mode's two buffers, as one entry: the box counts things a person would
+        // lose, and a template is one thing (TYTO-44).
+        ...(elements.templateMode?.unsaved === true ? [TEMPLATE_MODE_ID] : []),
+      ],
 
       ask: async (count) => {
         const detail = translate(
@@ -1092,7 +1262,13 @@ async function answerExitRequest(bridge: TytoBridge, askId: number): Promise<voi
       // `saveAs: false`, so a tab that already has a file is written where it lives and only
       // a tab with no path gets a picker. `documents.save` is where that fallback is, and it
       // has been there since E9.8 — which is most of why this card is an M.
-      save: (documentId) => saveOneDocument(bridge, documentId, false),
+      save: async (documentId) => {
+        if (documentId !== TEMPLATE_MODE_ID) return saveOneDocument(bridge, documentId, false);
+        // A manifest that does not parse is refused, and a refused save is a failed one: the
+        // quit is cancelled with the reason on screen, which is ADR 0034's rule for any save.
+        const saved = (await elements.templateMode?.save()) ?? false;
+        return saved ? 'saved' : 'failed';
+      },
     });
   } finally {
     await bridge['app:exit-answer']({ askId, allow });
@@ -1144,6 +1320,39 @@ function registerPanelCommands(): void {
 }
 
 /**
+ * The installed plugins' panels, once main has started the plugins (TYTO-49, ADR 0045).
+ *
+ * Not awaited by `load`: the window opens while the plugins start, and a panel arrives as
+ * a command — closed, until somebody opens it — when they have. Its toggle is labelled with
+ * the plugin's own title, since the catalogue has no word for a panel it did not ship.
+ */
+async function loadPluginPanels(bridge: TytoBridge): Promise<void> {
+  servePanelBridge(window, document, {
+    request: (panelId, capability, args) =>
+      bridge['panel:request']({ panelId, capability, args: [...args] }),
+  });
+  document.addEventListener('plugin-panel-load', () => {
+    announceDocument(document, contentOf(active()));
+  });
+
+  const { panels } = await bridge['plugins:panels']({});
+  for (const panel of panels) {
+    offeredPanels.set(panel.id, panel);
+    registry.register({
+      id: togglePanelCommandId(panel.id),
+      label: panel.title,
+      run: () => {
+        const current = panelOf(layout, panel.id);
+        if (current === undefined) return;
+        void changeLayout(withPanelOpen(layout, panel.id, !current.open));
+      },
+    });
+  }
+  layout = withPluginPanels(layout, panels);
+  await applyLayout(false);
+}
+
+/**
  * `Mod-1`…`Mod-9`, registered once and never again.
  *
  * Nine commands for a window that usually has two tabs, and that is deliberate: the id is
@@ -1170,6 +1379,7 @@ const PANEL_NAMES: Readonly<Record<string, CatalogueKey>> = {
   editor: 'panel.editor',
   preview: 'panel.preview',
   problems: 'panel.problems',
+  queue: 'panel.queue',
 };
 
 /** Every command the registry holds, translated and with the key that runs it. */
@@ -1246,10 +1456,16 @@ async function applyLayout(persist: boolean): Promise<void> {
     },
   });
 
+  // A plugin panel's element exists once the dock has made it; what it shows is ours to say.
+  for (const panel of document.querySelectorAll(PLUGIN_PANEL_ELEMENT)) {
+    if (panel instanceof PluginPanel) panel.offered = offeredPanels.get(panel.panelId);
+  }
+
   elements = resolveElements();
   pane = previewElements();
   wirePreviewControls(window.tyto === undefined);
   wirePanelControls();
+  wireQueuePanel();
   wireCommandBar();
   wireTabs();
   repaint();
@@ -1278,6 +1494,12 @@ async function changeLayout(next: Layout): Promise<void> {
  */
 function applyLocale(next: Locale): void {
   state.locale = next;
+  // Only once it is loaded: before that there is no element to tell, and `loadTemplateMode`
+  // hands it the locale in force when it arrives.
+  if (customElements.get(TEMPLATE_MODE_TAG) !== undefined && elements.templateMode) {
+    elements.templateMode.locale = next;
+  }
+  if (elements.pluginsDialog) elements.pluginsDialog.locale = next;
   if (elements.locale !== null) fillLocalePicker(elements.locale, state.locale);
   editor?.setSearchPhrases(searchPhrasesFor(state.locale));
   repaint();
@@ -1325,6 +1547,13 @@ async function request(bridge: TytoBridge, documentId: string, brief: string): P
   const requestId = gate.next();
   const answer = await bridge['brief:preview']({ requestId, documentId, brief });
   if (!gate.accept(answer.requestId)) return;
+  // The editor shows the active document, so only its answers reach the gutter. A tab
+  // compiled in the background is published when it is compiled again in front.
+  if (documentId === workspace.activeId) {
+    analysis.publish({ ...answer, brief });
+    // The plugins' panels hear the document on the same pause the preview compiles on.
+    announceDocument(document, brief);
+  }
 
   const errors = errorCount(answer.diagnostics);
 
@@ -1546,10 +1775,115 @@ function wirePanelControls(): void {
   });
 }
 
+/**
+ * The id the quit question files the template mode under (TYTO-44).
+ *
+ * The mode is not a tab, and the question counts tabs: `resolveExit` asks for ids, then saves
+ * each one. Filing the mode under an id of its own is what lets unsaved template work stop a
+ * quit without a second question or a second box — and it cannot collide with a tab, whose ids
+ * are `doc-<n>`.
+ */
+const TEMPLATE_MODE_ID = 'template-mode';
+
+/**
+ * The template mode, loaded on first use (TYTO-44), with its ports in.
+ *
+ * **Loaded by `import()` and not imported, and the reason is measured.** Statically, the mode
+ * took the window's bundle from 1,433,883 bytes to 2,327,834 — the manifest parser, the
+ * template compiler and the linter — and every one of those bytes is evaluated before `load()`
+ * registers the `app:exit-requested` listener. The same launch-and-close took 545-628 ms to
+ * answer two `app:info` calls on main and 1447-1750 ms here, and `packaged.package.test.ts`,
+ * which closes the app at exactly that moment, hung its 600 s `afterAll` on CI and locally: the
+ * push reached a window with nobody listening and ADR 0031 keeps the app open. A window that
+ * never opens the mode now never pays for it.
+ *
+ * `undefined` without a bridge, which is the unit test's window, and without the element.
+ */
+async function loadTemplateMode(): Promise<TemplateMode | undefined> {
+  const bridge = window.tyto;
+  const mode = elements.templateMode;
+  if (bridge === undefined || mode === null || mode === undefined) return undefined;
+  await import('./template-mode.js');
+  await customElements.whenDefined(TEMPLATE_MODE_TAG);
+  if (mode.ports === undefined) wireTemplateMode(mode, bridge);
+  mode.locale = state.locale;
+  return mode;
+}
+
+/**
+ * Hands the template mode its ports. Every one is a round trip to main except the last, which
+ * is what saving means to the rest of the window.
+ */
+function wireTemplateMode(mode: TemplateMode, bridge: TytoBridge): void {
+  mode.ports = {
+    open: async (directory) => (await bridge['template:open']({ directory })).template,
+    preview: (request) => bridge['template:preview'](request),
+    save: (request) => bridge['template:save'](request),
+    create: (name) => bridge['template:new']({ name }),
+    confirmDiscard: async () =>
+      (
+        await bridge['dialog:confirm']({
+          message: translate(state.locale, 'templateMode.discard.message'),
+          detail: translate(state.locale, 'templateMode.discard.detail'),
+          confirm: translate(state.locale, 'templateMode.discard.confirm'),
+          cancel: translate(state.locale, 'templateMode.discard.cancel'),
+        })
+      ).confirmed,
+    saved: () => {
+      void afterTemplateSaved(bridge);
+    },
+  };
+}
+
+/**
+ * A template was saved and main has read the folders again: every open brief is compiled again
+ * — the third acceptance criterion.
+ *
+ * **Every** open brief and not only the ones naming the template, because a save can rename
+ * it: a brief that named the old name stops resolving and one that named the new name starts,
+ * and both need the answer. It is one compile per tab, and background tabs are updated without
+ * a repaint, exactly as a late answer to their own typing is (`request`).
+ */
+async function afterTemplateSaved(bridge: TytoBridge): Promise<void> {
+  // The folder may now hold one template more, or one fewer — the picker's list and the
+  // footer's count come from the same read.
+  const chosen = await bridge['templates:folder']({});
+  state.templatesFolder = chosen.folder;
+  state.templatesFound = chosen.found;
+  await refreshTemplates(bridge);
+  await Promise.all(
+    workspace.documents.map((document_) => request(bridge, document_.id, contentOf(document_))),
+  );
+  repaint();
+}
+
 async function load(): Promise<void> {
   const bridge = window.tyto;
 
   if (bridge !== undefined) {
+    // **First, before anything is awaited** (TYTO-44, ADR 0039). Main does not ask a page that
+    // has not said it is listening, and lets the quit through instead — safe only while nothing
+    // here can hold unsaved text, which is why this comes before every other line of `load()`.
+    // A push that arrived during the three awaits that used to precede it reached a page with no
+    // listener, and the app never quit. No unsubscribe is kept: the subscription and the page
+    // have the same lifetime by construction.
+    listenForExit(
+      {
+        onRequest: (handler) => {
+          bridge.on('app:exit-requested', ({ askId }) => {
+            handler(askId);
+          });
+        },
+        acknowledge: (askId) => {
+          void bridge['app:exit-ack']({ askId });
+        },
+        listening: () => {
+          void bridge['app:exit-listening']({});
+        },
+      },
+      (askId) => answerExitRequest(bridge, askId),
+    );
+
     const info = await bridge['app:info']({});
     state.version = info.version;
     state.platform = info.platform;
@@ -1566,6 +1900,7 @@ async function load(): Promise<void> {
   // Arranged **before** anything is looked up: there are no panels in the document until
   // the dock has made them, so every `getElementById` before this line would answer null.
   await applyLayout(false);
+  if (bridge !== undefined) void loadPluginPanels(bridge);
   wireCommandBarShortcut();
   wireSplitters(document, () => layout, {
     locale: state.locale,
@@ -1587,25 +1922,6 @@ async function load(): Promise<void> {
   }
 
   if (bridge !== undefined) {
-    // The one thing this window listens for rather than asks (ADR 0029). No unsubscribe is
-    // kept: the subscription and the window have the same lifetime by construction, and a
-    // handle nobody can call is a handle that only looks like cleanup.
-    bridge.on('app:exit-requested', ({ askId }) => {
-      // **The acknowledgement goes first, and it is first on purpose** (TYTO-147, ADR 0031).
-      // Main's deadline covers this line and nothing after it, so nothing may be computed
-      // before it — `answerExitRequest` opens by filtering the whole workspace, and beyond that
-      // is a box a person has to read. Putting the ack inside that function would put the count
-      // inside the deadline again, which is the shape this card exists to undo.
-      //
-      // Here in the listener and not in the preload, which could speak a beat earlier: a preload
-      // ack proves only that the renderer *process* is alive, and a page whose script has thrown
-      // would still send it, leaving main waiting forever for an answer nobody will write. This
-      // line proves the thing main actually needs — JS in this window is running and has the
-      // question.
-      void bridge['app:exit-ack']({ askId });
-      void answerExitRequest(bridge, askId);
-    });
-
     // A File menu item was picked (TYTO-124). Straight into `runCommand`, which is the same
     // door the command bar knocks on — the id crossed the bridge precisely so that nothing
     // else had to.
@@ -1615,6 +1931,12 @@ async function load(): Promise<void> {
     // window a stale menu could crash.
     bridge.on('command:run', ({ id }) => {
       runCommand(id);
+    });
+
+    // The queue changed (TYTO-45). Heard whether or not the panel is open, and ignored while
+    // it is closed: the panel asks once when it opens, so nothing is lost by not listening.
+    bridge.on('queue:changed', () => {
+      if (elements.queuePanel !== null) void refreshQueue();
     });
   }
 
@@ -1649,6 +1971,10 @@ async function load(): Promise<void> {
       // The search panel's words, which are the catalogue's even though the panel is
       // CodeMirror's. `applyLocale` is what keeps them current afterwards.
       searchPhrases: searchPhrasesFor(state.locale),
+      // Slots, adjustments, enum values and plugin directives after `::`, and the
+      // underline, both fed from the preview's answer. No delay of the linter's own: the
+      // preview's debounce is the pause, and a second one would only add to it.
+      extensions: [briefLint(analysis.analyzer, { delay: 0 }), briefCompletion()],
     });
     // Narrowed once, because `editor` is a module-level `let` and TypeScript widens it
     // again inside every callback below.

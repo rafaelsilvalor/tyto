@@ -4,10 +4,16 @@ import { type BriefTask, OUT_DIR, fsInbox, pollSource } from '@tyto/io';
 
 import type { CliEnvironment } from './environment.js';
 import { EXIT_DIAGNOSTICS, EXIT_OK, type ExitCode } from './exit.js';
-import { type OutputKind, needsRasterizer, outputRequests } from './options.js';
+import { type OutputKind, needsRasterizer, outputRequests, unavailableTypes } from './options.js';
+import {
+  loadInstalledPlugins,
+  pluginCapabilities,
+  reachableExporters,
+  withoutRefused,
+} from './plugins/index.js';
 import { loadRenderContext } from './render-context.js';
 import { renderTask } from './render-task.js';
-import { displayPath } from './render.js';
+import { displayPath, installedOption } from './render.js';
 import { diagnosticsDocument, formatDiagnostics, json } from './report.js';
 
 /**
@@ -55,12 +61,20 @@ export async function watchCommand(
   const { cwd } = environment;
   const root = resolve(cwd, folder);
 
+  // Read once for the life of the watcher: a plugin installed while it runs is seen on
+  // restart, the same rule the machine's fonts follow. Before the project, because an
+  // installed template pack is part of it (ADR 0046).
+  const loaded = await loadInstalledPlugins(environment.home, {
+    capabilities: pluginCapabilities(environment.variables),
+  });
   const context = await loadRenderContext({
     templatesDirectory: resolve(cwd, options.templates),
     formatsFile: resolve(cwd, options.formatsFile),
     templatesDirectoryIsDefault: options.templatesNamed !== true,
+    ...installedOption(environment, loaded),
   });
   if (!context.ok) {
+    await loaded.close();
     if (options.json) {
       environment.console.out(json(diagnosticsDocument(context.error)));
     } else {
@@ -73,8 +87,22 @@ export async function watchCommand(
   // not a `Result` it would have to re-narrow on every task.
   const { value: project, diagnostics: projectProblems } = context;
 
+  const plugins = withoutRefused(loaded, project.refusedPlugins);
+  const { exporters, warnings: skipped } = reachableExporters(plugins);
+  const unavailable = unavailableTypes(options.types, exporters);
+  if (unavailable !== undefined) {
+    // The skipped plugins first: when a kind is missing, the reason is usually one of them.
+    if (skipped.length > 0) environment.console.err(formatDiagnostics(skipped));
+    environment.console.err(`error: ${unavailable}
+`);
+    await plugins.close();
+    return EXIT_DIAGNOSTICS;
+  }
+
   const inbox = fsInbox({ root: join(root, 'inbox'), done: join(root, 'done') });
-  const rasterizer = needsRasterizer(options.types) ? environment.rasterizer() : undefined;
+  const rasterizer = needsRasterizer(options.types, exporters)
+    ? environment.rasterizer()
+    : undefined;
 
   // The watcher's own exit code is about the run, not about any one task: a queue that
   // handled ten tasks and failed on one has still done its job, and a person reading the
@@ -95,6 +123,7 @@ export async function watchCommand(
       {
         outputs: outputRequests(options),
         version: environment.version,
+        plugins,
         ...(options.template === undefined ? {} : { template: options.template }),
         ...(options.formats === undefined ? {} : { formats: options.formats }),
         ...(rasterizer === undefined ? {} : { rasterizer }),
@@ -153,6 +182,8 @@ export async function watchCommand(
     }
   } finally {
     await rasterizer?.close?.();
+    // Every plugin's worker thread, and any crash still being written to plugins.json.
+    await plugins.close();
   }
 
   return failed ? EXIT_DIAGNOSTICS : EXIT_OK;

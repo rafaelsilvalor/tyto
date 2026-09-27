@@ -1,4 +1,4 @@
-import { isErr } from '@tyto/core';
+import { type Diagnostics, type Result, diagnostic, err, isErr, ok } from '@tyto/core';
 import type { ZodType } from 'zod';
 
 import type {
@@ -11,6 +11,13 @@ import type {
   Provided,
   TemplatePack,
 } from './contributions.js';
+import {
+  type HostCapabilities,
+  type HostFetchInit,
+  type HostFetchResponse,
+  checkedCapabilities,
+  responseOf,
+} from './capabilities.js';
 import { type ContributionPoint, type PluginManifest, validatePluginManifest } from './manifest.js';
 
 /**
@@ -79,6 +86,20 @@ export interface PluginHost {
    */
   config<T>(schema: ZodType<T>): T;
 
+  /**
+   * The network, for the hosts the manifest declares (`net:<host>`, `net:*.<domain>`,
+   * `net:*`). Anything else rejects with a `PluginCapabilityError` whose `code` is
+   * `E_PERMISSION`. Redirects are not followed: the 3xx comes back, and the next request is
+   * checked like the first (ADR 0042).
+   */
+  fetch(url: string, init?: HostFetchInit): Promise<HostFetchResponse>;
+  /**
+   * A secret, for a key the manifest declares as `credentials:<key>`. An undeclared key
+   * rejects with `E_PERMISSION`, and a declared one this host holds no value for with
+   * `E_CREDENTIAL_MISSING`.
+   */
+  credentials(key: string): Promise<string>;
+
   readonly log: Logger;
   readonly events: TypedEmitter;
 }
@@ -88,8 +109,8 @@ export interface PluginHost {
  * manifest cannot say about itself: a manifest is written by its author, and an author has
  * no way to know whether their plugin ended up bundled or installed.
  *
- * `external` has no producer yet — the loader is E11.1 — and exists because the alternative
- * is a listing that says nothing and has to grow a column later.
+ * `external` is what `tryActivate` records by default: a plugin the loader found under
+ * `plugins/` (E11.1).
  */
 export type PluginOrigin = 'built-in' | 'external';
 
@@ -119,6 +140,11 @@ export interface PluginHostOptions {
   readonly log?: Logger;
   /** Raw configuration, by plugin id. `config()` validates a slice of it. */
   readonly config?: Readonly<Record<string, unknown>>;
+  /**
+   * The network and the secrets `fetch` and `credentials` reach, behind the permission
+   * check. Absent for every built-in today: none declares a permission.
+   */
+  readonly capabilities?: HostCapabilities;
 }
 
 /** A host bound to one plugin, plus the registry the composition root reads. */
@@ -139,6 +165,21 @@ export interface InProcessHost {
    * because then the manifest is somebody else's file.
    */
   activate(plugin: Plugin, origin?: PluginOrigin): Disposable | void;
+  /**
+   * The loader's door (E11.1): the same checks as {@link activate}, answered as data.
+   *
+   * A plugin somebody installed is somebody else's file and somebody else's code, so every
+   * way it can fail to load is an expected error and comes back as diagnostics
+   * (`docs/conventions.md`): a manifest that does not validate, a name another plugin
+   * already has, a contribution id another plugin already holds, an `activate` that throws,
+   * a point it registered into without declaring it. **A plugin that fails is withdrawn
+   * whole** — whatever it registered before the failure is disposed — so the run goes on as
+   * if it had never been installed, and the plugin that already held the id keeps it.
+   *
+   * Built-ins stay on `activate`, which throws, because for them each of these is a wiring
+   * bug in this repository.
+   */
+  tryActivate(plugin: Plugin, origin?: PluginOrigin): Result<InstalledPlugin, Diagnostics>;
   /** What one plugin gets. Its `config()` reads that plugin's slice, and nobody else's. */
   hostFor(pluginId: string): PluginHost;
   readonly registry: PluginRegistry;
@@ -158,6 +199,15 @@ interface Entry<T> {
   readonly value: T;
 }
 
+/** A contribution refused because another plugin already holds its id. */
+interface Conflict {
+  readonly point: ContributionPoint;
+  readonly id: string;
+  readonly owner: string;
+}
+
+type ConflictListener = (conflict: Conflict) => void;
+
 /** One extension point's contributions, keyed by id so a duplicate is a lookup away. */
 class Point<T extends { readonly id: string }> {
   private readonly entries = new Map<string, Entry<T>>();
@@ -169,8 +219,15 @@ class Point<T extends { readonly id: string }> {
     private readonly contributed: Map<string, Set<ContributionPoint>>,
   ) {}
 
-  add(plugin: string, value: T): Disposable {
+  add(plugin: string, value: T, onConflict?: ConflictListener): Disposable {
     const existing = this.entries.get(value.id);
+    if (existing !== undefined && onConflict !== undefined) {
+      // The loader's path (`tryActivate`): the plugin keeps running, the contribution is not
+      // stored, and the conflict is reported as data once `activate` returns. Nothing is
+      // thrown, because a third party's duplicate is an expected error and not ours.
+      onConflict({ point: this.name, id: value.id, owner: existing.plugin });
+      return { dispose: () => undefined };
+    }
     if (existing !== undefined) {
       // Thrown rather than returned. In Phase 1 every plugin is a built-in this repository
       // wired itself, so two `svg` exporters is a wiring bug and not something a brief or
@@ -291,6 +348,45 @@ export function createPluginHost(options: PluginHostOptions = {}): InProcessHost
     panels: () => panels.list(),
   };
 
+  function hostWith(
+    pluginId: string,
+    onConflict?: ConflictListener,
+    permissions: readonly string[] = [],
+  ): PluginHost {
+    // The permissions of the manifest the host validated, never what the plugin says.
+    const checked = checkedCapabilities(pluginId, permissions, options.capabilities);
+    return {
+      registerExporter: (exporter) => exporters.add(pluginId, exporter, onConflict),
+      registerSource: (contribution) => sources.add(pluginId, contribution, onConflict),
+      registerSink: (contribution) => sinks.add(pluginId, contribution, onConflict),
+      registerRasterizer: (contribution) => rasterizers.add(pluginId, contribution, onConflict),
+      registerTemplatePack: (pack) => templatePacks.add(pluginId, pack, onConflict),
+      registerDirective: (directive) => directives.add(pluginId, directive, onConflict),
+      registerCommand: (command) => commands.add(pluginId, command, onConflict),
+      registerKeymap: (keymap) => keymaps.add(pluginId, keymap, onConflict),
+      registerPanel: (panel) => panels.add(pluginId, panel, onConflict),
+
+      config<T>(schema: ZodType<T>): T {
+        const parsed = schema.safeParse(options.config?.[pluginId]);
+        if (!parsed.success) {
+          throw new TypeError(
+            `Configuration for plugin '${pluginId}' does not match the schema it asked ` +
+              `for: ${parsed.error.issues
+                .map((issue) => `${issue.path.map(String).join('.') || '(root)'} ${issue.message}`)
+                .join('; ')}`,
+          );
+        }
+        return parsed.data;
+      },
+
+      fetch: async (url, init) => responseOf(await checked.fetch(url, init)),
+      credentials: (key) => checked.credentials(key),
+
+      log,
+      events: emitter,
+    };
+  }
+
   return {
     registry,
 
@@ -314,7 +410,7 @@ export function createPluginHost(options: PluginHostOptions = {}): InProcessHost
         );
       }
 
-      const result = plugin.activate(this.hostFor(plugin.id));
+      const result = plugin.activate(hostWith(plugin.id, undefined, manifest.permissions));
 
       // Checked *after* activation, against what was actually registered. `contributes` is
       // the manifest's promise about which points this plugin touches, and a promise
@@ -340,36 +436,75 @@ export function createPluginHost(options: PluginHostOptions = {}): InProcessHost
       return result;
     },
 
+    tryActivate(plugin: Plugin, origin: PluginOrigin = 'external') {
+      const validated = validatePluginManifest(plugin.manifest);
+      if (isErr(validated)) return validated;
+
+      const manifest = validated.value;
+      if (manifest.name !== plugin.id) {
+        return err([
+          diagnostic('E_PLUGIN_ACTIVATE', {
+            plugin: plugin.id,
+            problem: `its tyto-plugin.json names '${manifest.name}', and the name is the id`,
+          }),
+        ]);
+      }
+
+      // Before `activate` runs, and never followed by `disposePlugin`: withdrawing by id
+      // here would withdraw the plugin that already has the name.
+      const holder = installed.get(plugin.id);
+      if (holder !== undefined) {
+        return err([
+          diagnostic('E_PLUGIN_NAME_TAKEN', { plugin: plugin.id, origin: holder.origin }),
+        ]);
+      }
+
+      const conflicts: Conflict[] = [];
+      try {
+        plugin.activate(
+          hostWith(plugin.id, (conflict) => conflicts.push(conflict), manifest.permissions),
+        );
+      } catch (cause) {
+        // Any throw, whatever its class: this is foreign code, and the question is only
+        // whether it finished.
+        this.disposePlugin(plugin.id);
+        return err([
+          diagnostic('E_PLUGIN_ACTIVATE', {
+            plugin: plugin.id,
+            problem: cause instanceof Error ? cause.message : String(cause),
+          }),
+        ]);
+      }
+
+      if (conflicts.length > 0) {
+        this.disposePlugin(plugin.id);
+        return err(
+          conflicts.map((conflict) =>
+            diagnostic('E_PLUGIN_DUPLICATE', { plugin: plugin.id, ...conflict }),
+          ),
+        );
+      }
+
+      const undeclared = [...(contributed.get(plugin.id) ?? [])].filter(
+        (point) => !manifest.contributes.includes(point),
+      );
+      if (undeclared.length > 0) {
+        this.disposePlugin(plugin.id);
+        return err([
+          diagnostic('E_PLUGIN_ACTIVATE', {
+            plugin: plugin.id,
+            problem: `it registered into ${undeclared.map((point) => `'${point}'`).join(', ')}, which its tyto-plugin.json does not list under 'contributes'`,
+          }),
+        ]);
+      }
+
+      const record: InstalledPlugin = { manifest, origin };
+      installed.set(plugin.id, record);
+      return ok(record);
+    },
+
     hostFor(pluginId: string): PluginHost {
-      return {
-        registerExporter: (exporter) => exporters.add(pluginId, exporter),
-        registerSource: (contribution) => sources.add(pluginId, contribution),
-        registerSink: (contribution) => sinks.add(pluginId, contribution),
-        registerRasterizer: (contribution) => rasterizers.add(pluginId, contribution),
-        registerTemplatePack: (pack) => templatePacks.add(pluginId, pack),
-        registerDirective: (directive) => directives.add(pluginId, directive),
-        registerCommand: (command) => commands.add(pluginId, command),
-        registerKeymap: (keymap) => keymaps.add(pluginId, keymap),
-        registerPanel: (panel) => panels.add(pluginId, panel),
-
-        config<T>(schema: ZodType<T>): T {
-          const parsed = schema.safeParse(options.config?.[pluginId]);
-          if (!parsed.success) {
-            throw new TypeError(
-              `Configuration for plugin '${pluginId}' does not match the schema it asked ` +
-                `for: ${parsed.error.issues
-                  .map(
-                    (issue) => `${issue.path.map(String).join('.') || '(root)'} ${issue.message}`,
-                  )
-                  .join('; ')}`,
-            );
-          }
-          return parsed.data;
-        },
-
-        log,
-        events: emitter,
-      };
+      return hostWith(pluginId);
     },
 
     disposePlugin(pluginId: string): void {

@@ -20,9 +20,16 @@ import { type Locale, DEFAULT_LOCALE, translate } from '../../shared/i18n/index.
 
 export const EXPORT_DIALOG_TAG = 'tyto-export-dialog';
 
-/** The file types a person can tick. `svg` is the one that needs no rasterizer. */
+/**
+ * The file types Tyto ships, and what the dialog offers until main says otherwise.
+ * `svg` is the one that needs no rasterizer.
+ */
 export const EXPORT_KINDS = ['png', 'jpeg', 'webp', 'svg'] as const;
-export type ExportKind = (typeof EXPORT_KINDS)[number];
+/**
+ * A kind a run can produce: one of {@link EXPORT_KINDS}, or one an installed exporter
+ * declares (ADR 0044). Open, because main is what knows which plugins are installed.
+ */
+export type ExportKind = string;
 
 export interface ExportProgressView {
   readonly status: 'running' | 'finished' | 'cancelled';
@@ -104,6 +111,7 @@ export class ExportDialog extends LitElement {
     reveal: { attribute: false },
     close: { attribute: false },
     formats: { attribute: false },
+    available: { attribute: false },
     kinds: { state: true },
     chosenFormats: { state: true },
     scale: { state: true },
@@ -139,6 +147,12 @@ export class ExportDialog extends LitElement {
   declare kinds: readonly ExportKind[];
 
   /**
+   * Every file type offered, in main's order: the built-ins' and every installed
+   * exporter's (`export:kinds`). {@link EXPORT_KINDS} until that answer arrives.
+   */
+  declare available: readonly ExportKind[];
+
+  /**
    * Which formats are ticked, or `undefined` before {@link formats} has been handed over.
    *
    * `undefined` and not the empty array, for {@link formats}' reason one level down: the
@@ -166,6 +180,7 @@ export class ExportDialog extends LitElement {
     this.close = () => undefined;
     this.formats = [];
     this.kinds = ['svg'];
+    this.available = [...EXPORT_KINDS];
     this.chosenFormats = undefined;
     this.scale = 1;
     this.quality = DEFAULT_QUALITY;
@@ -250,20 +265,22 @@ export class ExportDialog extends LitElement {
     const formats = this.formatsToSend;
     this.start({
       directory: this.directory,
-      // Ordered by `EXPORT_KINDS` rather than by the order they were ticked, so the same
+      // Ordered by what is offered rather than by the order they were ticked, so the same
       // set of checkboxes always produces the same request.
-      outputs: EXPORT_KINDS.filter((kind) => this.kinds.includes(kind)).map((kind) => ({
-        kind,
-        // **Quality never reaches `png`**, which is not a preference: the raster port throws
-        // a `TypeError` for it, because PNG is lossless and a caller who believed it had
-        // asked for a smaller file deserves to be told it had not. SVG has no pixels to
-        // compress either.
-        ...(LOSSY_KINDS.includes(kind) ? { quality: this.quality } : {}),
-        // **Scale never reaches `svg`** for the matching reason: an SVG is instructions and
-        // has no resolution to double. `1` is left off entirely rather than sent, so the
-        // untouched form produces the request this dialog produced before it could choose.
-        ...(RASTER_KINDS.includes(kind) && this.scale !== 1 ? { scale: this.scale } : {}),
-      })),
+      outputs: this.available
+        .filter((kind) => this.kinds.includes(kind))
+        .map((kind) => ({
+          kind,
+          // **Quality never reaches `png`**, which is not a preference: the raster port throws
+          // a `TypeError` for it, because PNG is lossless and a caller who believed it had
+          // asked for a smaller file deserves to be told it had not. SVG has no pixels to
+          // compress either.
+          ...(LOSSY_KINDS.includes(kind) ? { quality: this.quality } : {}),
+          // **Scale never reaches `svg`** for the matching reason: an SVG is instructions and
+          // has no resolution to double. `1` is left off entirely rather than sent, so the
+          // untouched form produces the request this dialog produced before it could choose.
+          ...(RASTER_KINDS.includes(kind) && this.scale !== 1 ? { scale: this.scale } : {}),
+        })),
       ...(formats === undefined ? {} : { formats }),
     });
   }
@@ -467,7 +484,7 @@ export class ExportDialog extends LitElement {
 
       <fieldset class="export__types" ?disabled=${running}>
         <legend class="export__label">${say('export.fileTypes')}</legend>
-        ${EXPORT_KINDS.map(
+        ${this.available.map(
           (kind) =>
             html`<label class="export__type">
               <input

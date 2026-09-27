@@ -1,9 +1,19 @@
 import { execFileSync } from 'node:child_process';
-import { existsSync, readdirSync, rmSync } from 'node:fs';
+import {
+  existsSync,
+  mkdirSync,
+  mkdtempSync,
+  readFileSync,
+  readdirSync,
+  rmSync,
+  writeFileSync,
+} from 'node:fs';
+import { tmpdir } from 'node:os';
 import { createRequire } from 'node:module';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
+import { PLUGIN_API_VERSION } from '@tyto/plugin-api';
 import { type ElectronApplication, type Page, _electron } from 'playwright';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 
@@ -71,6 +81,44 @@ function packagedExecutable(): string {
 
 let app: ElectronApplication;
 let page: Page;
+let scratch: string;
+
+/**
+ * One installed plugin in a `TYTO_HOME` of this suite's own, **outside `app.asar`** (TYTO-48).
+ *
+ * The case only a packaged build can answer: the guest `plugin-guest.js` is inside the asar,
+ * and the plugin's module is a plain file on the disk beside nothing of Tyto's. Both have to
+ * load in one `utilityProcess` for the export to produce a `.txt`.
+ */
+function writeHome(home: string): void {
+  const folder = join(home, 'plugins', 'texto');
+  mkdirSync(join(folder, 'dist'), { recursive: true });
+  writeFileSync(
+    join(folder, 'tyto-plugin.json'),
+    JSON.stringify({
+      name: 'texto',
+      version: '1.0.0',
+      engine: `>=${PLUGIN_API_VERSION}`,
+      contributes: ['exporter'],
+      permissions: [],
+    }),
+  );
+  writeFileSync(join(folder, 'package.json'), JSON.stringify({ name: 'texto', type: 'module' }));
+  writeFileSync(
+    join(folder, 'dist', 'index.js'),
+    `export function activate(host) {
+  host.registerExporter({
+    id: 'texto', mime: 'text/plain', extension: 'txt', kinds: ['txt'], rasterized: false,
+    exportFrame: (scene, artwork, frame) => ({ ok: true, value: artwork.id + ' ' + frame.format, diagnostics: [] }),
+  });
+}
+`,
+  );
+  writeFileSync(
+    join(home, 'plugins.json'),
+    JSON.stringify({ plugins: { texto: { enabled: true, permissions: [], source: '.' } } }),
+  );
+}
 
 beforeAll(async () => {
   if (!existsSync(built)) {
@@ -96,18 +144,30 @@ beforeAll(async () => {
     stdio: 'inherit',
   });
 
+  scratch = mkdtempSync(join(tmpdir(), 'tyto-packaged-'));
+  writeHome(join(scratch, 'tyto-home'));
+
   app = await _electron.launch({
     executablePath: packagedExecutable(),
-    // The same flag `window.desktop.test.ts` uses, and the only thing either suite changes
-    // about the app it is testing.
-    env: { ...process.env, TYTO_HEADLESS: '1' },
+    // Its own data folder and its own `TYTO_HOME`, so the packaged app neither reads nor
+    // writes the machine's (TYTO-150, TYTO-48).
+    args: [`--user-data-dir=${join(scratch, 'user-data')}`],
+    // The same flag `window.desktop.test.ts` uses.
+    env: { ...process.env, TYTO_HEADLESS: '1', TYTO_HOME: join(scratch, 'tyto-home') },
   });
   page = await app.firstWindow();
-  await page.waitForFunction(() => (globalThis as Record<string, unknown>)['tyto'] !== undefined);
+  // The editor and not the bridge (TYTO-175, TYTO-154's rule). `window.tyto` is put on the page
+  // by the preload, before a line of the renderer has run, so waiting for it answered _is the
+  // preload there_ and then handed a half-loaded window to `afterAll`, which quits it. That
+  // quit reaching a page with no listener is a product question and ADR 0039 settled it; this
+  // wait is what keeps the suite from asking it by accident. Measured on CI with the renderer
+  // slowed by 2.5 s between the exit listener and the editor mount: see the PR for TYTO-175.
+  await page.waitForSelector('#editor .cm-content');
 });
 
 afterAll(async () => {
   await closeApp(app);
+  rmSync(scratch, { recursive: true, force: true });
 });
 
 describe('the packaged app', () => {
@@ -157,4 +217,46 @@ describe('the packaged app', () => {
     const packaged = createRequire(import.meta.url)('../package.json') as { version: string };
     expect(info.version).toBe(packaged.version);
   });
+
+  it('runs an installed plugin that lives outside the asar, in a utility process', async () => {
+    type Bridge = Record<string, (request: unknown) => Promise<unknown>>;
+    const call = <T>(channel: string, request: unknown): Promise<T> =>
+      page.evaluate(
+        ([name, body]) => (globalThis as never as { tyto: Bridge }).tyto[name as string]!(body),
+        [channel, request] as const,
+      ) as Promise<T>;
+
+    const { kinds } = await call<{ kinds: { kind: string }[] }>('export:kinds', {});
+    expect(kinds.map((item) => item.kind)).toContain('txt');
+
+    const out = join(scratch, 'out');
+    const { exportId } = await call<{ exportId: string }>('export:start', {
+      documentId: 'packaged',
+      brief: ['---', 'template: promo-curso', '---', '::titulo Empacotado'].join('\n'),
+      directory: out,
+      outputs: [{ kind: 'txt' }],
+    });
+    const started = Date.now();
+    for (;;) {
+      const { progress } = await call<{ progress?: { status: string; failure?: string } }>(
+        'export:progress',
+        { exportId },
+      );
+      if (progress !== undefined && progress.status !== 'running') {
+        expect(progress.failure).toBeUndefined();
+        break;
+      }
+      if (Date.now() - started > 60_000) throw new Error('the packaged export never finished');
+      await new Promise((resolve) => setTimeout(resolve, 100));
+    }
+    const texts = readdirSync(out).filter((name) => name.endsWith('.txt'));
+    expect(texts.length).toBeGreaterThan(0);
+    // Written straight to stdout, because the default reporter hides a passing test's
+    // console, and this line is what a reviewer reads in `desktop`'s test:package step.
+    process.stdout.write(
+      `[TYTO-48] packaged app activated the installed plugin 'texto' from outside app.asar ` +
+        `and exported ${String(texts.length)} .txt file(s)\n`,
+    );
+    expect(readFileSync(join(out, texts[0]!), 'utf8')).toMatch(/^\S+ \S+$/u);
+  }, 120_000);
 });

@@ -1,6 +1,8 @@
 // `import type` and not an inline `{ type IpcMain }`: under `verbatimModuleSyntax` the
 // inline form still emits `import {} from 'electron'`, which outside a running Electron
 // resolves to a path string and would make this module unloadable in a test.
+import { basename } from 'node:path';
+
 import type { IpcMain, WebContents } from 'electron';
 
 import {
@@ -18,7 +20,10 @@ import { type DesktopLog } from './log.js';
 import { type DocumentService } from './documents.js';
 import { type ExportService } from './export.js';
 import { type LayoutStore } from './layout-store.js';
+import { type PanelService } from './panels.js';
 import { type PreviewService } from './preview.js';
+import { type QueueService, type QueueView } from './queue.js';
+import { type TemplateDiagnostic, type TemplateEditorService } from './template-editor.js';
 import { type TemplateCatalogue } from './templates.js';
 
 /**
@@ -77,6 +82,7 @@ export interface IpcDependencies {
   readonly exit: {
     readonly acknowledge: (askId: number) => void;
     readonly answer: (askId: number, allow: boolean) => void;
+    readonly listening: () => void;
   };
   /** Brief text to files on disk (E9.4). Injected for the reason `preview` is. */
   readonly exports: ExportService;
@@ -119,7 +125,44 @@ export interface IpcDependencies {
   readonly menu: {
     setLocale: (locale: string) => void;
   };
+  /**
+   * The template mode (TYTO-44), and the two pickers it needs. Wrapped like `folders`: a
+   * picker is an Electron dialog, and the service below it names none.
+   */
+  readonly templateEditor: TemplateEditorService;
+  /**
+   * The local queue panel (TYTO-45). `chooseFolder` is the native picker, wrapped by the
+   * composition root like every other dialog here; `remember` writes the choice to
+   * `settings.json`.
+   */
+  readonly queue: {
+    readonly service: QueueService;
+    chooseFolder: () => Promise<string | undefined>;
+    remember: (changes: { queueFolder?: string | null; queueAutoRun?: boolean }) => Promise<void>;
+  };
+  /** The plugins screen (TYTO-47): built-ins and installed plugins, read and never run. */
+  readonly plugins: {
+    readonly folder: string;
+    list: () => Promise<readonly IpcResponse<'plugins:list'>['plugins'][number][]>;
+  };
+  /** The installed plugins' panels and their bridge (ADR 0045). */
+  readonly panels: PanelService;
+  readonly templateDialogs: {
+    /** A template folder to edit, or nothing when the picker is dismissed. */
+    chooseTemplate: () => Promise<string | undefined>;
+    /** Where a new template goes when no template folder is chosen. */
+    chooseParent: () => Promise<string | undefined>;
+  };
 }
+
+/** What crosses the bridge of a diagnostic: the fields the contract names, and no others. */
+const wireDiagnostic = (item: TemplateDiagnostic) => ({
+  severity: item.severity,
+  code: item.code,
+  message: item.message,
+  file: item.file,
+  ...(item.range === undefined ? {} : { range: item.range }),
+});
 
 /** One handler per channel, typed against the contract in both directions. */
 type Handlers = {
@@ -139,8 +182,12 @@ export function createHandlers(dependencies: IpcDependencies): Handlers {
     layout,
     log,
     menu,
+    plugins,
     preview,
     project,
+    queue,
+    templateDialogs,
+    templateEditor,
     templates,
   } = dependencies;
 
@@ -160,6 +207,12 @@ export function createHandlers(dependencies: IpcDependencies): Handlers {
         frames: [...result.frames],
         artworks: [...result.artworks],
         diagnostics: [...result.diagnostics],
+        completion: {
+          ...(result.completion.manifest === undefined
+            ? {}
+            : { manifest: result.completion.manifest }),
+          directives: [...result.completion.directives],
+        },
       };
     },
 
@@ -193,6 +246,11 @@ export function createHandlers(dependencies: IpcDependencies): Handlers {
 
     'app:exit-answer': ({ askId, allow }) => {
       exit.answer(askId, allow);
+      return Promise.resolve({});
+    },
+
+    'app:exit-listening': () => {
+      exit.listening();
       return Promise.resolve({});
     },
 
@@ -265,6 +323,8 @@ export function createHandlers(dependencies: IpcDependencies): Handlers {
       return Promise.resolve({});
     },
 
+    'export:kinds': async () => ({ kinds: [...(await exports.kinds())] }),
+
     'export:reveal': async ({ directory }) => {
       await folders.reveal(directory);
       return {};
@@ -280,6 +340,55 @@ export function createHandlers(dependencies: IpcDependencies): Handlers {
       return Promise.resolve({});
     },
 
+    'plugins:list': async () => ({ folder: plugins.folder, plugins: [...(await plugins.list())] }),
+
+    'plugins:panels': async () => ({ panels: [...(await dependencies.panels.list())] }),
+
+    'panel:request': ({ panelId, capability, args }) =>
+      dependencies.panels.request(panelId, capability, args),
+
+    'queue:list': async () => wireQueueView(await queue.service.view()),
+
+    'queue:set-folder': async ({ choose }) => {
+      let chosen: string | null = null;
+      if (choose) {
+        const picked = await queue.chooseFolder();
+        // A dismissed picker is not a clear, which is `templates:set-folder`'s rule.
+        if (picked === undefined) return wireQueueView(await queue.service.view());
+        chosen = picked;
+      }
+      await queue.service.setFolder(chosen);
+      await queue.remember({ queueFolder: chosen });
+      return wireQueueView(await queue.service.view());
+    },
+
+    'queue:set-auto-run': async ({ on }) => {
+      queue.service.setAutoRun(on);
+      await queue.remember({ queueAutoRun: on });
+      return wireQueueView(await queue.service.view());
+    },
+
+    'queue:run': ({ taskId }) => {
+      // Not awaited: a render is seconds and the answer is a push. `run` never rejects for a
+      // bad brief; anything else it could reject with is already the task's failure.
+      void queue.service.run(taskId).catch(() => undefined);
+      return Promise.resolve({});
+    },
+
+    'queue:reveal-output': async ({ taskId }) => {
+      const directory = queue.service.outDirectory(taskId);
+      if (directory !== undefined) await folders.reveal(directory);
+      return {};
+    },
+
+    'queue:open-brief': async ({ documentId, taskId }) => {
+      const path = queue.service.briefPath(taskId);
+      if (path === undefined) return { document: null, documentId: null };
+      // Named after the task: every task's brief is `brief.brief`, and two of them open at
+      // once would otherwise be two tabs nobody could tell apart.
+      return documents.openPath(documentId, path, `${taskId} · ${basename(path)}`);
+    },
+
     'log:reveal': async () => {
       await folders.reveal(log.directory);
       return {};
@@ -289,6 +398,79 @@ export function createHandlers(dependencies: IpcDependencies): Handlers {
       menu.setLocale(locale);
       return Promise.resolve({});
     },
+
+    'template:open': async ({ directory }) => {
+      const chosen = directory ?? (await templateDialogs.chooseTemplate());
+      if (chosen === undefined) return { template: null };
+      const opened = await templateEditor.open(chosen);
+      return {
+        template:
+          opened.kind === 'markup'
+            ? { ...opened, examples: opened.examples.map((example) => ({ ...example })) }
+            : opened,
+      };
+    },
+
+    'template:preview': async ({ requestId, directory, manifest, markup, brief, briefPath }) => {
+      const result = await templateEditor.preview({
+        directory,
+        manifest,
+        markup,
+        brief,
+        ...(briefPath === undefined ? {} : { briefPath }),
+      });
+      return {
+        requestId,
+        frames: [...result.frames],
+        diagnostics: result.diagnostics.map(wireDiagnostic),
+      };
+    },
+
+    'template:save': async ({ directory, manifest, markup }) => {
+      const result = await templateEditor.save({ directory, manifest, markup });
+      return {
+        saved: result.saved,
+        registered: result.registered,
+        ...(result.name === undefined ? {} : { name: result.name }),
+        diagnostics: result.diagnostics.map(wireDiagnostic),
+      };
+    },
+
+    'template:new': async ({ name }) => {
+      // Into the template folder in force, so the new template is one briefs can name at once;
+      // with none chosen, wherever the person says.
+      const parent = project.folder().folder ?? (await templateDialogs.chooseParent());
+      if (parent === undefined) return { directory: null };
+      const result = await templateEditor.scaffold(parent, name);
+      return result.ok
+        ? { directory: result.directory }
+        : { directory: null, problem: result.problem, detail: result.detail };
+    },
+  };
+}
+
+/**
+ * The queue as the wire carries it: diagnostics flattened the way `export:progress` flattens
+ * them, because `exactOptionalPropertyTypes` tells an absent `range` from an undefined one.
+ */
+function wireQueueView(view: QueueView): IpcResponse<'queue:list'> {
+  return {
+    folder: view.folder,
+    inbox: view.inbox,
+    autoRun: view.autoRun,
+    tasks: view.tasks.slice(0, 500).map((task) => ({
+      id: task.id,
+      status: task.status,
+      diagnostics: task.diagnostics.map((item) => ({
+        severity: item.severity,
+        code: item.code,
+        message: item.message,
+        ...(item.range === undefined ? {} : { range: item.range }),
+        ...(item.hint === undefined ? {} : { hint: item.hint }),
+      })),
+      ...(task.failure === undefined ? {} : { failure: task.failure }),
+      hasOutput: task.hasOutput,
+    })),
   };
 }
 

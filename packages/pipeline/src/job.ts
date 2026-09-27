@@ -4,6 +4,7 @@ import {
   type BriefAst,
   type Diagnostic,
   type Diagnostics,
+  type DirectiveResolver,
   type FaceCache,
   type FormatCatalogue,
   type Frame,
@@ -27,10 +28,12 @@ import type { Rasterizer } from '@tyto/raster';
 
 import {
   type Artifact,
+  type ArtifactEncoding,
   type ArtifactKind,
   type ArtifactSink,
-  artifactMimeType,
+  artifactEncoding,
   artifactName,
+  isRasterFormat,
 } from './artifact.js';
 import { type FrameTarget, type JobListener, notify } from './events.js';
 import { limiter } from './limit.js';
@@ -167,6 +170,11 @@ export interface JobPorts {
    * registered, so this stage no longer carries resources it never reads.
    */
   readonly exporters: ExporterRegistry;
+  /**
+   * What answers a `::namespace/name` directive — the host's `directive` point, through
+   * `directiveResolverOf` (ADR 0043). Absent, every one is `E_UNKNOWN_DIRECTIVE`.
+   */
+  readonly directives?: DirectiveResolver;
   /** Required as soon as one requested kind comes from a `rasterized` exporter. */
   readonly rasterizer?: Rasterizer;
   /** Absent means the artifacts come back in memory and nothing is written. */
@@ -296,6 +304,7 @@ export async function runJob(
   // Resolved before anything runs, so a missing exporter is one sentence at the top rather
   // than the same failure repeated once per frame.
   const exporterFor = new Map<string, Exporter>();
+  const encodingFor = new Map<string, ArtifactEncoding>();
   for (const output of request.outputs) {
     const exporter = ports.exporters.forKind(output.kind);
     if (exporter === undefined) {
@@ -308,6 +317,17 @@ export async function runJob(
       );
     }
     exporterFor.set(output.kind, exporter);
+
+    // Refused here for the reason a missing exporter is: one sentence, before any frame.
+    // A rasterized exporter declaring `gif` has promised a kind no rasterizer encodes.
+    const encoding = artifactEncoding(output.kind, exporter);
+    if (encoding === undefined) {
+      throw new TypeError(
+        `Exporter '${exporter.id}' declares '${output.kind}' and is rasterized, but a ` +
+          'rasterizer encodes only png, jpeg and webp — see docs/plugin-api.md.',
+      );
+    }
+    encodingFor.set(output.kind, encoding);
   }
 
   const rastering = [...exporterFor.values()].some((exporter) => exporter.rasterized);
@@ -394,6 +414,7 @@ export async function runJob(
     ...(request.template === undefined ? {} : { template: request.template }),
     ...(request.formats === undefined ? {} : { formats: request.formats }),
     ...(renderedSlots === undefined ? {} : { renderedSlots }),
+    ...(ports.directives === undefined ? {} : { directives: ports.directives }),
   });
   if (!resolved.ok) return err([...problems, ...resolved.error]);
   problems.push(...resolved.diagnostics);
@@ -472,10 +493,20 @@ export async function runJob(
     return exporter;
   }
 
-  function bytesOf(task: Task): Result<string, Diagnostics> {
+  /** Defined for every requested kind, for the same reason as {@link exporterOf}. */
+  function encodingOf(task: Task): ArtifactEncoding {
+    const encoding = encodingFor.get(task.output.kind);
+    if (encoding === undefined) {
+      throw new TypeError(`No encoding for '${task.output.kind}', which was checked earlier.`);
+    }
+    return encoding;
+  }
+
+  async function bytesOf(task: Task): Promise<Result<string, Diagnostics>> {
     // An exporter that does not understand `textAsPaths` ignores it, which is why this is
     // the same call for every kind. The resources were bound when it was registered.
-    const exported = exporterOf(task).exportFrame(scene, task.artwork, task.frame, {
+    // Awaited, because an isolated plugin's exporter answers from another thread (ADR 0041).
+    const exported = await exporterOf(task).exportFrame(scene, task.artwork, task.frame, {
       ...(task.output.textAsPaths === undefined ? {} : { textAsPaths: task.output.textAsPaths }),
     });
 
@@ -508,7 +539,7 @@ export async function runJob(
 
     try {
       // Defined: the guard at the top of `runJob` refused a raster output without one.
-      const format = task.output.kind === 'svg' ? undefined : task.output.kind;
+      const format = isRasterFormat(task.output.kind) ? task.output.kind : undefined;
       const bytes = await ports.rasterizer?.raster(document, {
         width,
         height,
@@ -537,7 +568,7 @@ export async function runJob(
 
     notify(onEvent, { kind: 'frame-started', target: task.target });
 
-    const document = bytesOf(task);
+    const document = await bytesOf(task);
     const encoded = document.ok ? await encode(task, document.value) : err(document.error);
     const carried = document.ok ? document.diagnostics : [];
 
@@ -556,12 +587,13 @@ export async function runJob(
       return;
     }
 
+    const encoding = encodingOf(task);
     const artifact: Artifact = {
-      name: artifactName(task.artwork.id, task.frame.format, task.output.kind),
+      name: artifactName(task.artwork.id, task.frame.format, encoding.extension),
       artwork: task.artwork.id,
       format: task.frame.format,
       kind: task.output.kind,
-      mime: artifactMimeType(task.output.kind),
+      mime: encoding.mime,
       bytes: encoded.value,
     };
 

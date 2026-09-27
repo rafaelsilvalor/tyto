@@ -22,6 +22,8 @@ import {
   markupTemplateSource,
 } from '@tyto/pipeline';
 
+import type { LoadedPlugins } from './plugins/external.js';
+import { NO_INSTALLED_PACKS, installedPacks } from './plugins/installed-packs.js';
 import {
   builtInTemplatesDirectory,
   packDirectories,
@@ -58,6 +60,16 @@ export interface RenderContextOptions {
    * type and do not have is still a mistake worth reading about.
    */
   readonly templatesDirectoryIsDefault?: boolean;
+  /**
+   * Installed plugins, whose template packs are searched after the built-in one (ADR 0046).
+   *
+   * `folderOf` is where install copied a plugin, which is what a pack's `directory` is
+   * relative to. Left out, only the project and the built-in pack are searched.
+   */
+  readonly installed?: {
+    readonly plugins: LoadedPlugins;
+    folderOf(plugin: string): string;
+  };
 }
 
 export interface RenderContext {
@@ -66,6 +78,11 @@ export interface RenderContext {
   readonly formats: FormatCatalogue;
   /** For `result.json`'s `tyto.templates`: which templates, at which versions, were here. */
   readonly templateVersions: readonly { readonly name: string; readonly version: string }[];
+  /**
+   * Installed plugins refused over their pack. A task must not activate them either:
+   * `W_PLUGIN_SKIPPED` says the plugin was skipped, not only its templates.
+   */
+  readonly refusedPlugins: ReadonlySet<string>;
 }
 
 /**
@@ -107,12 +124,25 @@ export async function loadRenderContext(
     }),
   );
 
+  // Read before an installed plugin is activated into the same host: what an installed
+  // pack claims is searched only once it has been checked, below.
+  const builtInDirectories = packDirectories(host.registry.templatePacks());
+
+  // Installed packs after the built-in one, the order installed plugins are activated in
+  // everywhere else (ADR 0040): a built-in keeps every name it has.
+  const installed =
+    options.installed === undefined
+      ? NO_INSTALLED_PACKS
+      : await installedPacks(host, options.installed.plugins, options.installed.folderOf);
+
   // Project first: a folder the user pointed at is a more specific statement of intent
   // than a package that came along with the program, so their `promo-curso` is the one
-  // that renders and the built-in is reported as shadowed (ADR 0020).
+  // that renders and the built-in is reported as shadowed (ADR 0020). The same warning
+  // names an installed template that a built-in or the project hides.
   const registry = await loadTemplateRegistry(fileSystem, [
     options.templatesDirectory,
-    ...packDirectories(host.registry.templatePacks()),
+    ...builtInDirectories,
+    ...installed.directories,
   ]);
   if (!registry.ok) return err(registry.error);
 
@@ -123,6 +153,7 @@ export async function loadRenderContext(
     options.templatesDirectoryIsDefault === true ? options.templatesDirectory : undefined;
 
   const problems = [
+    ...installed.warnings,
     ...formats.diagnostics,
     ...registry.diagnostics,
     ...registry.value.failures
@@ -138,6 +169,7 @@ export async function loadRenderContext(
       templateVersions: registry.value
         .list()
         .map((entry) => ({ name: entry.name, version: entry.version })),
+      refusedPlugins: installed.refused,
     },
     problems,
   );

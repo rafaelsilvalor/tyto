@@ -2,7 +2,7 @@ import { readFileSync } from 'node:fs';
 import { createRequire } from 'node:module';
 import { dirname, join } from 'node:path';
 
-import { GAP_COLOR_CSS } from '@tyto/core';
+import { GAP_COLOR_CSS, ok } from '@tyto/core';
 import { nodeFileSystem } from '@tyto/io';
 import { beforeAll, describe, expect, it } from 'vitest';
 
@@ -178,5 +178,38 @@ describe('the preview service', () => {
   it('answers an empty document without throwing', async () => {
     // The state the window opens in, before anybody types.
     await expect(preview.preview('')).resolves.toMatchObject({ frames: [] });
+  });
+});
+
+describe('the preview service with a plugin directive (TYTO-49)', () => {
+  const SHOUTED = '---\ntemplate: promo-curso\n---\n::demo/shout {slot: titulo} Direito\n';
+
+  it('resolves it through the directives it was given, and offers their names', async () => {
+    const shouting = await createPreviewService({
+      fileSystem: nodeFileSystem(),
+      sources: await createProjectSources({ fileSystem: nodeFileSystem(), builtIn: packDirectory }),
+      directives: {
+        names: () => ['demo/shout'],
+        resolver: {
+          find: (namespace, name) =>
+            namespace === 'demo' && name === 'shout'
+              ? () => ok([{ name: 'titulo', body: [{ kind: 'text', value: 'DIREITO' }] }])
+              : undefined,
+        },
+      },
+    });
+    const result = await shouting.preview(SHOUTED);
+
+    expect(result.diagnostics.filter((item) => item.severity === 'error')).toEqual([]);
+    expect(result.frames.some((frame) => frame.html.includes('DIREITO'))).toBe(true);
+    expect(result.completion.directives).toEqual(['demo/shout']);
+    expect(result.completion.manifest?.name).toBe('promo-curso');
+  });
+
+  it('is E_UNKNOWN_DIRECTIVE without them, and still names the manifest for completion', async () => {
+    const result = await preview.preview(SHOUTED);
+
+    expect(result.diagnostics.map((item) => item.code)).toContain('E_UNKNOWN_DIRECTIVE');
+    expect(result.completion).toMatchObject({ directives: [], manifest: { name: 'promo-curso' } });
   });
 });
