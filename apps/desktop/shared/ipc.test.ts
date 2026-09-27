@@ -41,6 +41,7 @@ describe('the IPC contract', () => {
       'layout:set',
       'log:reveal',
       'log:write',
+      'plugins:list',
       'template:new',
       'template:open',
       'template:preview',
@@ -217,6 +218,8 @@ describe('what the contract does not promise', () => {
       // TYTO-44, ADR 0039. "This page can hear the question" names nothing: there is one
       // window, and the page saying it is the page it is about.
       'app:exit-listening',
+      // TYTO-47. "Which plugins are there" has no subject: there is one plugins folder.
+      'plugins:list',
     ];
 
     for (const name of IPC_CHANNEL_NAMES) {

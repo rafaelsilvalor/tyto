@@ -330,6 +330,28 @@ export interface Catalogue {
   readonly 'templateMode.discard.detail': string;
   readonly 'templateMode.discard.confirm': string;
   readonly 'templateMode.discard.cancel': string;
+
+  /** The plugins screen (TYTO-47). Opened by a command, so none of these is on screen at load. */
+  readonly 'command.plugins.show': string;
+  readonly 'plugins.heading': string;
+  readonly 'plugins.notice': string;
+  readonly 'plugins.inactive': string;
+  readonly 'plugins.folder': string;
+  readonly 'plugins.install': string;
+  readonly 'plugins.column.name': string;
+  readonly 'plugins.column.version': string;
+  readonly 'plugins.column.origin': string;
+  readonly 'plugins.column.status': string;
+  readonly 'plugins.column.contributes': string;
+  readonly 'plugins.column.permissions': string;
+  readonly 'plugins.origin.builtIn': string;
+  readonly 'plugins.origin.external': string;
+  readonly 'plugins.status.enabled': string;
+  readonly 'plugins.status.disabled': string;
+  readonly 'plugins.status.refused': string;
+  readonly 'plugins.permissions.none': string;
+  readonly 'plugins.close': string;
+  readonly 'plugins.unavailable': string;
 }
 
 export type CatalogueKey = keyof Catalogue;
@@ -488,4 +510,24 @@ export const CATALOGUE_KEYS = [
   'templateMode.discard.detail',
   'templateMode.discard.confirm',
   'templateMode.discard.cancel',
+  'command.plugins.show',
+  'plugins.heading',
+  'plugins.notice',
+  'plugins.inactive',
+  'plugins.folder',
+  'plugins.install',
+  'plugins.column.name',
+  'plugins.column.version',
+  'plugins.column.origin',
+  'plugins.column.status',
+  'plugins.column.contributes',
+  'plugins.column.permissions',
+  'plugins.origin.builtIn',
+  'plugins.origin.external',
+  'plugins.status.enabled',
+  'plugins.status.disabled',
+  'plugins.status.refused',
+  'plugins.permissions.none',
+  'plugins.close',
+  'plugins.unavailable',
 ] as const satisfies readonly CatalogueKey[];

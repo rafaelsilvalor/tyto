@@ -202,6 +202,8 @@ describe('the File submenu', () => {
       'template.new',
       'template.edit',
       '—',
+      'plugins.show',
+      '—',
       'document.close',
       '—',
       'quit',
