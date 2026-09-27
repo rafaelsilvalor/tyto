@@ -11,11 +11,13 @@
 
 export {
   type Artifact,
+  type ArtifactEncoding,
   type ArtifactKind,
   type ArtifactSink,
-  artifactExtension,
-  artifactMimeType,
+  type BuiltInKind,
+  artifactEncoding,
   artifactName,
+  isRasterFormat,
 } from './artifact.js';
 
 export { type FrameTarget, type JobEvent, type JobListener, type JobStage } from './events.js';

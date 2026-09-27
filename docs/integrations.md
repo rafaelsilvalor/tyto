@@ -40,7 +40,7 @@ Boundary rules:
 | `tyto template new <name>`     | scaffolds a template folder from `docs/template-authoring.md`                       |
 
 A project is two paths, both overridable: `--templates` (default `templates/`, one subfolder
-per template) and `--formats-file` (default `formats.yaml`). `--types png,jpeg,webp,svg`
+per template) and `--formats-file` (default `formats.yaml`). `--types png,jpeg,webp,svg` (or a kind an installed exporter adds, `docs/plugin-api.md`)
 chooses the encodings and defaults to `png`; `--scale` and `--quality` apply only to the
 raster ones, and `--types svg` never launches a browser at all.
 

@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { artifactExtension, artifactMimeType, artifactName } from './artifact.js';
+import { artifactEncoding, artifactName } from './artifact.js';
 
 /**
  * The output folder is a contract (ADR 0011): Jacurutu reads `out/` and matches files to
@@ -10,10 +10,6 @@ import { artifactExtension, artifactMimeType, artifactName } from './artifact.js
 describe('artifactName', () => {
   it('is <artwork>-<format>.<ext>', () => {
     expect(artifactName('slide-2', 'story', 'png')).toBe('slide-2-story.png');
-  });
-
-  it('writes jpeg as .jpg, agreeing with the raster port', () => {
-    expect(artifactName('artwork-1', 'feed', 'jpeg')).toBe('artwork-1-feed.jpg');
   });
 
   it.each([
@@ -41,14 +37,32 @@ describe('artifactName', () => {
   });
 });
 
-describe('artifact media types and extensions', () => {
+describe('artifactEncoding', () => {
+  const RASTERIZED = { extension: 'html', mime: 'text/html', rasterized: true } as const;
+
   it.each([
     ['png', 'png', 'image/png'],
     ['jpeg', 'jpg', 'image/jpeg'],
     ['webp', 'webp', 'image/webp'],
-    ['svg', 'svg', 'image/svg+xml'],
-  ] as const)('%s is .%s and %s', (kind, extension, mime) => {
-    expect(artifactExtension(kind)).toBe(extension);
-    expect(artifactMimeType(kind)).toBe(mime);
+  ] as const)(
+    'a rasterized %s is .%s and %s, as the raster port writes it',
+    (kind, extension, mime) => {
+      expect(artifactEncoding(kind, RASTERIZED)).toEqual({ extension, mime });
+    },
+  );
+
+  it('takes a document exporter at its word, including for a kind Tyto never shipped', () => {
+    // The whole of TYTO-47's vocabulary change: `pdf` names no raster format and is not
+    // `svg`, and the file is still called what its exporter says.
+    expect(
+      artifactEncoding('pdf', { extension: 'pdf', mime: 'application/pdf', rasterized: false }),
+    ).toEqual({ extension: 'pdf', mime: 'application/pdf' });
+    expect(
+      artifactEncoding('svg', { extension: 'svg', mime: 'image/svg+xml', rasterized: false }),
+    ).toEqual({ extension: 'svg', mime: 'image/svg+xml' });
+  });
+
+  it('has no answer for a rasterized kind no rasterizer encodes', () => {
+    expect(artifactEncoding('gif', RASTERIZED)).toBeUndefined();
   });
 });

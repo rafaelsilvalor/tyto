@@ -50,6 +50,13 @@ export {
   fsTaskOutput,
 } from './fs-outbox.js';
 
+export {
+  PLUGIN_MANIFEST_FILE,
+  PLUGIN_STATE_FILE,
+  PLUGINS_DIR,
+  fsPluginStore,
+} from './fs-plugin-store.js';
+
 export { type NodeFileSystemOptions, nodeFileSystem } from './node-file-system.js';
 
 export { type PollOptions, pollSource } from './poll.js';
