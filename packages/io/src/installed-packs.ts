@@ -2,9 +2,7 @@ import { access, readdir, realpath } from 'node:fs/promises';
 import { isAbsolute, join, relative, resolve, sep } from 'node:path';
 
 import { type Diagnostic, diagnostic } from '@tyto/core';
-import { type InProcessHost, skippedPluginWarnings } from '@tyto/plugin-api';
-
-import type { LoadedPlugins } from './external.js';
+import { type InProcessHost, type LoadedPlugins, skippedPluginWarnings } from '@tyto/plugin-api';
 
 /**
  * The template packs installed plugins contribute, as folders the registry can search
@@ -22,6 +20,9 @@ import type { LoadedPlugins } from './external.js';
  *   so this rule states a boundary rather than closing an open door: the day a code template
  *   can come from a folder, one shipped by a plugin would run in Tyto's own process and not
  *   behind the plugin's thread (ADR 0041).
+ *
+ * Here and not in `@tyto/plugin-api`, because the check reads a disk and that package is pure
+ * (ADR 0010); the CLI and the desktop both call it, so the rule has one text.
  *
  * A refusal refuses the plugin, not only its pack: `W_PLUGIN_SKIPPED` says the plugin was
  * skipped, and it would be false if the same plugin's exporter then drew the frames.

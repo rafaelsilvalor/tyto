@@ -11,9 +11,15 @@ import {
   loadTemplateRegistry,
   ok,
 } from '@tyto/core';
-import { type ExportResources, fileTemplateAssets, nodeFileSystem } from '@tyto/io';
+import {
+  type ExportResources,
+  NO_INSTALLED_PACKS,
+  fileTemplateAssets,
+  installedPacks,
+  nodeFileSystem,
+} from '@tyto/io';
 import { BUILT_IN_TEMPLATE_BUILDS } from '@tyto/templates';
-import { createPluginHost } from '@tyto/plugin-api';
+import { type LoadedPlugins, createPluginHost } from '@tyto/plugin-api';
 import {
   TEMPLATE_FILE,
   type BundledTemplates,
@@ -22,8 +28,6 @@ import {
   markupTemplateSource,
 } from '@tyto/pipeline';
 
-import type { LoadedPlugins } from './plugins/external.js';
-import { NO_INSTALLED_PACKS, installedPacks } from './plugins/installed-packs.js';
 import {
   builtInTemplatesDirectory,
   packDirectories,
