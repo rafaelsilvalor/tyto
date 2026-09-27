@@ -18,6 +18,7 @@ describe('the IPC contract', () => {
     expect([...IPC_CHANNEL_NAMES].sort()).toEqual([
       'app:exit-ack',
       'app:exit-answer',
+      'app:exit-listening',
       'app:info',
       'app:locale',
       'brief:preview',
@@ -40,6 +41,10 @@ describe('the IPC contract', () => {
       'layout:set',
       'log:reveal',
       'log:write',
+      'template:new',
+      'template:open',
+      'template:preview',
+      'template:save',
       'templates:folder',
       'templates:list',
       'templates:set-folder',
@@ -209,6 +214,9 @@ describe('what the contract does not promise', () => {
       // TYTO-122. "Which folder is searched" has no subject either: there is one setting, and
       // where it points is main's.
       'templates:folder',
+      // TYTO-44, ADR 0039. "This page can hear the question" names nothing: there is one
+      // window, and the page saying it is the page it is about.
+      'app:exit-listening',
     ];
 
     for (const name of IPC_CHANNEL_NAMES) {

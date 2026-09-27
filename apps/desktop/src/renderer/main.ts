@@ -19,6 +19,8 @@ import {
 } from './panel.js';
 import { type CommandEntry, type CommandBar, COMMAND_BAR_TAG } from './command-bar.js';
 import { type ExportDialog, type ExportProgressView, EXPORT_DIALOG_TAG } from './export-dialog.js';
+import type { TemplateMode } from './template-mode.js';
+import { TEMPLATE_MODE_TAG } from './template-mode-tag.js';
 import {
   COMMAND_LABELS,
   DOCUMENT_SLOTS,
@@ -66,7 +68,7 @@ import {
   withPanelOpen,
   withPanelSize,
 } from '../../shared/layout.js';
-import { type SaveOutcome, resolveExit } from './exit.js';
+import { type SaveOutcome, listenForExit, resolveExit } from './exit.js';
 import { installErrorReporting, reportToLog } from './report-errors.js';
 import { searchPhrasesFor } from './search-phrases.js';
 import { type ShellState, fillLocalePicker, localeFromPicker, paint, paintTitle } from './shell.js';
@@ -263,6 +265,8 @@ function resolveElements() {
     problemsCount: byId('problems-count'),
     commandBar: document.querySelector<CommandBar>(COMMAND_BAR_TAG),
     exportDialog: document.querySelector<ExportDialog>(EXPORT_DIALOG_TAG),
+    // TYTO-44. Outside `.shell` for the export dialog's reason: it covers the window.
+    templateMode: document.querySelector<TemplateMode>(TEMPLATE_MODE_TAG),
     // Outside the docks, like the command bar: the strip lists what the *window* has open,
     // so it must not disappear with a panel.
     tabs: document.querySelector<DocumentTabs>(TABS_TAG),
@@ -625,6 +629,19 @@ const registry: CommandRegistry = createDesktopRegistry({
   },
   openExport: () => {
     openExportDialog();
+  },
+
+  editTemplate: () => {
+    void loadTemplateMode().then((mode) => mode?.openFolder(null));
+  },
+  newTemplate: () => {
+    void loadTemplateMode().then(async (mode) => {
+      if (mode === undefined) return;
+      mode.open = true;
+      // Straight to the name, which is the only thing a New needs from the person.
+      await mode.updateComplete;
+      mode.querySelector<HTMLInputElement>('.template-mode__new-name')?.focus();
+    });
   },
 
   newDocument: () => {
@@ -1069,7 +1086,12 @@ async function answerExitRequest(bridge: TytoBridge, askId: number): Promise<voi
   let allow = false;
   try {
     allow = await resolveExit({
-      unsaved: () => workspace.documents.filter(isUnsaved).map((document_) => document_.id),
+      unsaved: () => [
+        ...workspace.documents.filter(isUnsaved).map((document_) => document_.id),
+        // The template mode's two buffers, as one entry: the box counts things a person would
+        // lose, and a template is one thing (TYTO-44).
+        ...(elements.templateMode?.unsaved === true ? [TEMPLATE_MODE_ID] : []),
+      ],
 
       ask: async (count) => {
         const detail = translate(
@@ -1092,7 +1114,13 @@ async function answerExitRequest(bridge: TytoBridge, askId: number): Promise<voi
       // `saveAs: false`, so a tab that already has a file is written where it lives and only
       // a tab with no path gets a picker. `documents.save` is where that fallback is, and it
       // has been there since E9.8 — which is most of why this card is an M.
-      save: (documentId) => saveOneDocument(bridge, documentId, false),
+      save: async (documentId) => {
+        if (documentId !== TEMPLATE_MODE_ID) return saveOneDocument(bridge, documentId, false);
+        // A manifest that does not parse is refused, and a refused save is a failed one: the
+        // quit is cancelled with the reason on screen, which is ADR 0034's rule for any save.
+        const saved = (await elements.templateMode?.save()) ?? false;
+        return saved ? 'saved' : 'failed';
+      },
     });
   } finally {
     await bridge['app:exit-answer']({ askId, allow });
@@ -1278,6 +1306,11 @@ async function changeLayout(next: Layout): Promise<void> {
  */
 function applyLocale(next: Locale): void {
   state.locale = next;
+  // Only once it is loaded: before that there is no element to tell, and `loadTemplateMode`
+  // hands it the locale in force when it arrives.
+  if (customElements.get(TEMPLATE_MODE_TAG) !== undefined && elements.templateMode) {
+    elements.templateMode.locale = next;
+  }
   if (elements.locale !== null) fillLocalePicker(elements.locale, state.locale);
   editor?.setSearchPhrases(searchPhrasesFor(state.locale));
   repaint();
@@ -1546,10 +1579,115 @@ function wirePanelControls(): void {
   });
 }
 
+/**
+ * The id the quit question files the template mode under (TYTO-44).
+ *
+ * The mode is not a tab, and the question counts tabs: `resolveExit` asks for ids, then saves
+ * each one. Filing the mode under an id of its own is what lets unsaved template work stop a
+ * quit without a second question or a second box — and it cannot collide with a tab, whose ids
+ * are `doc-<n>`.
+ */
+const TEMPLATE_MODE_ID = 'template-mode';
+
+/**
+ * The template mode, loaded on first use (TYTO-44), with its ports in.
+ *
+ * **Loaded by `import()` and not imported, and the reason is measured.** Statically, the mode
+ * took the window's bundle from 1,433,883 bytes to 2,327,834 — the manifest parser, the
+ * template compiler and the linter — and every one of those bytes is evaluated before `load()`
+ * registers the `app:exit-requested` listener. The same launch-and-close took 545-628 ms to
+ * answer two `app:info` calls on main and 1447-1750 ms here, and `packaged.package.test.ts`,
+ * which closes the app at exactly that moment, hung its 600 s `afterAll` on CI and locally: the
+ * push reached a window with nobody listening and ADR 0031 keeps the app open. A window that
+ * never opens the mode now never pays for it.
+ *
+ * `undefined` without a bridge, which is the unit test's window, and without the element.
+ */
+async function loadTemplateMode(): Promise<TemplateMode | undefined> {
+  const bridge = window.tyto;
+  const mode = elements.templateMode;
+  if (bridge === undefined || mode === null || mode === undefined) return undefined;
+  await import('./template-mode.js');
+  await customElements.whenDefined(TEMPLATE_MODE_TAG);
+  if (mode.ports === undefined) wireTemplateMode(mode, bridge);
+  mode.locale = state.locale;
+  return mode;
+}
+
+/**
+ * Hands the template mode its ports. Every one is a round trip to main except the last, which
+ * is what saving means to the rest of the window.
+ */
+function wireTemplateMode(mode: TemplateMode, bridge: TytoBridge): void {
+  mode.ports = {
+    open: async (directory) => (await bridge['template:open']({ directory })).template,
+    preview: (request) => bridge['template:preview'](request),
+    save: (request) => bridge['template:save'](request),
+    create: (name) => bridge['template:new']({ name }),
+    confirmDiscard: async () =>
+      (
+        await bridge['dialog:confirm']({
+          message: translate(state.locale, 'templateMode.discard.message'),
+          detail: translate(state.locale, 'templateMode.discard.detail'),
+          confirm: translate(state.locale, 'templateMode.discard.confirm'),
+          cancel: translate(state.locale, 'templateMode.discard.cancel'),
+        })
+      ).confirmed,
+    saved: () => {
+      void afterTemplateSaved(bridge);
+    },
+  };
+}
+
+/**
+ * A template was saved and main has read the folders again: every open brief is compiled again
+ * — the third acceptance criterion.
+ *
+ * **Every** open brief and not only the ones naming the template, because a save can rename
+ * it: a brief that named the old name stops resolving and one that named the new name starts,
+ * and both need the answer. It is one compile per tab, and background tabs are updated without
+ * a repaint, exactly as a late answer to their own typing is (`request`).
+ */
+async function afterTemplateSaved(bridge: TytoBridge): Promise<void> {
+  // The folder may now hold one template more, or one fewer — the picker's list and the
+  // footer's count come from the same read.
+  const chosen = await bridge['templates:folder']({});
+  state.templatesFolder = chosen.folder;
+  state.templatesFound = chosen.found;
+  await refreshTemplates(bridge);
+  await Promise.all(
+    workspace.documents.map((document_) => request(bridge, document_.id, contentOf(document_))),
+  );
+  repaint();
+}
+
 async function load(): Promise<void> {
   const bridge = window.tyto;
 
   if (bridge !== undefined) {
+    // **First, before anything is awaited** (TYTO-44, ADR 0039). Main does not ask a page that
+    // has not said it is listening, and lets the quit through instead — safe only while nothing
+    // here can hold unsaved text, which is why this comes before every other line of `load()`.
+    // A push that arrived during the three awaits that used to precede it reached a page with no
+    // listener, and the app never quit. No unsubscribe is kept: the subscription and the page
+    // have the same lifetime by construction.
+    listenForExit(
+      {
+        onRequest: (handler) => {
+          bridge.on('app:exit-requested', ({ askId }) => {
+            handler(askId);
+          });
+        },
+        acknowledge: (askId) => {
+          void bridge['app:exit-ack']({ askId });
+        },
+        listening: () => {
+          void bridge['app:exit-listening']({});
+        },
+      },
+      (askId) => answerExitRequest(bridge, askId),
+    );
+
     const info = await bridge['app:info']({});
     state.version = info.version;
     state.platform = info.platform;
@@ -1587,25 +1725,6 @@ async function load(): Promise<void> {
   }
 
   if (bridge !== undefined) {
-    // The one thing this window listens for rather than asks (ADR 0029). No unsubscribe is
-    // kept: the subscription and the window have the same lifetime by construction, and a
-    // handle nobody can call is a handle that only looks like cleanup.
-    bridge.on('app:exit-requested', ({ askId }) => {
-      // **The acknowledgement goes first, and it is first on purpose** (TYTO-147, ADR 0031).
-      // Main's deadline covers this line and nothing after it, so nothing may be computed
-      // before it — `answerExitRequest` opens by filtering the whole workspace, and beyond that
-      // is a box a person has to read. Putting the ack inside that function would put the count
-      // inside the deadline again, which is the shape this card exists to undo.
-      //
-      // Here in the listener and not in the preload, which could speak a beat earlier: a preload
-      // ack proves only that the renderer *process* is alive, and a page whose script has thrown
-      // would still send it, leaving main waiting forever for an answer nobody will write. This
-      // line proves the thing main actually needs — JS in this window is running and has the
-      // question.
-      void bridge['app:exit-ack']({ askId });
-      void answerExitRequest(bridge, askId);
-    });
-
     // A File menu item was picked (TYTO-124). Straight into `runCommand`, which is the same
     // door the command bar knocks on — the id crossed the bridge precisely so that nothing
     // else had to.
