@@ -166,13 +166,17 @@ export const APPROVED = {
     /** Between two rows. */
     rows: 5,
   },
-  /** The rows: narrower than the page and centred on it. */
-  table: { w: 457 },
+  /**
+   * The rows: as wide as each list's longest name, and no wider than `max` — past it a name
+   * wraps (the maintainer, 2026-09-27). Each list is centred on its own.
+   */
+  table: { max: 800 },
   badge: { w: 92, h: 39, radius: 19.5 },
   /** The name's line inside the grey pill, and the room before it. */
   line: 20,
   // More room above than below: the names are capitals, which sit high in their line box.
-  padding: { top: 8, bottom: 0, left: 15, right: 15 },
+  // 30 after the longest name, measured on the maintainer's mockup of 2026-09-27.
+  padding: { top: 8, bottom: 0, left: 15, right: 30 },
 } as const;
 
 export const COVER = {

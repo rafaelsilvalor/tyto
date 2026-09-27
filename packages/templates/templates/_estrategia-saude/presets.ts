@@ -167,13 +167,15 @@ function capitals(value: RichText): RichText {
  * The approved list: `rank | name`, grouped under specialty headings.
  *
  * Measured on the maintainer's reference of 2026-09-27: the same overlap as
- * {@link sessionTable}, at less than half its size — a 92 × 39 badge on a grey pill 457 wide.
- * The brief writes `1º`; the badge draws `1º Lugar`.
+ * {@link sessionTable}, at less than half its size — a 92 × 39 badge on a grey pill. Each
+ * specialty's rows are as wide as its longest name, up to 800 (`fit`). The brief writes `1º`;
+ * the badge draws `1º Lugar`.
  */
 export const approvedTable: PillTableStyle = {
   layering: 'overlap',
   rowGap: APPROVED.gap.rows,
   minRowHeight: APPROVED.badge.h,
+  fit: { max: APPROVED.table.max },
   columns: [
     badge({
       name: 'rank-pill',

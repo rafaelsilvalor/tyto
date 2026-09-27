@@ -218,3 +218,48 @@ describe('rewrite', () => {
     expect(named(draw(suffixed, ' | Ana').draft, 'key')).toEqual([]);
   });
 });
+
+describe('fit', () => {
+  // 10 px a character, one line: widths are counted rather than rendered.
+  const tenPerCharacter: Measure = (node) =>
+    ({
+      runs: node.runs,
+      lines: 1,
+      width:
+        node.runs.reduce((sum, run) => sum + (run.kind === 'text' ? run.text.length : 0), 0) * 10,
+      height: 20,
+      scale: 1,
+      overflow: 0,
+    }) as ReturnType<Measure>;
+
+  const FIT: PillTableStyle = { ...GROUPED, fit: { max: 400 } };
+
+  it('gives every row of a group the width of its widest row, and each group its own', () => {
+    const table = draw(
+      FIT,
+      'A\na | 1234567890 | x\nb | 12345 | y\nB\nc | 123 | z',
+      tenPerCharacter,
+    );
+    const [first, second] = named(table.draft, 'rows');
+
+    // Badge 100, padding 20 either side, and the widest line: 100 px, then 30 px.
+    expect(
+      childrenOf(first).map((row) => (row.kind === 'group' ? row.children.length : 0)),
+    ).toEqual([2, 2]);
+    expect(first?.transform.x).toBe((WIDTH - 240) / 2);
+    expect(second?.transform.x).toBe((WIDTH - 170) / 2);
+  });
+
+  it('stops at the maximum, where the words wrap instead', () => {
+    const table = draw(FIT, 'A\na | ' + 'x'.repeat(80) + ' | y', tenPerCharacter);
+    const [rows] = named(table.draft, 'rows');
+
+    expect(rows?.transform.x).toBe((WIDTH - 400) / 2);
+  });
+
+  it('draws every row at the maximum when nothing can measure', () => {
+    const [rows] = named(draw(FIT, 'A\na | b | c').draft, 'rows');
+
+    expect(rows?.transform.x).toBe((WIDTH - 400) / 2);
+  });
+});

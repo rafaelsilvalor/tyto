@@ -26,9 +26,21 @@ function rich(source: string): RichText {
   return parts;
 }
 
+/** A measure of 10 px a character, one line, 20 px tall: enough to count widths by. */
+const tenPerCharacter: TemplateContext['measure'] = (node) => {
+  const characters = node.runs.reduce(
+    (sum, run) => sum + (run.kind === 'text' ? run.text.length : 0),
+    0,
+  );
+  return { runs: node.runs, lines: 1, width: characters * 10, height: 20, scale: 1, overflow: 0 };
+};
+
 const LIST = 'ENDODONTIA\n1º | Ana Souza\n2º | Bruno Lima\nPERIODONTIA\n1º | Carla Dias';
 
-function contextOf(slots: Record<string, RichText | AssetRef>): TemplateContext {
+function contextOf(
+  slots: Record<string, RichText | AssetRef>,
+  measure: TemplateContext['measure'] = measureNothing,
+): TemplateContext {
   return {
     format: 'retrato',
     size: { w: 1080, h: 1350 },
@@ -47,7 +59,7 @@ function contextOf(slots: Record<string, RichText | AssetRef>): TemplateContext 
       ]),
     ) as TemplateContext['slots'],
     adjustments: {},
-    measure: measureNothing,
+    measure,
   };
 }
 
@@ -76,7 +88,7 @@ describe('aprovados', () => {
     const [middle] = named(frame.children, 'middle');
 
     if (middle?.kind !== 'group') throw new Error('the slide centres a middle block');
-    expect(middle.children.map((node) => node.name)).toEqual(['result-title', undefined]);
+    expect(middle.children.map((node) => node.name)).toEqual(['result-title', 'approved-table']);
     expect(named(frame.children, 'kicker').map(words)).toEqual(['Resultado provisório']);
     expect(named(frame.children, 'exam').map(words)).toEqual(['CADAR']);
   });
@@ -93,12 +105,25 @@ describe('aprovados', () => {
     ]);
   });
 
-  it('sets the list in a column narrower than the page, centred on it', () => {
-    const frame = build(contextOf(FULL));
-    const [table] = named(frame.children, 'approved-table');
+  it('makes every row of a specialty as wide as its longest name, centred on its own', () => {
+    // A measure that answers 10 px a character, so the widths are countable.
+    const frame = build(contextOf(FULL, tenPerCharacter));
+    const lists = named(frame.children, 'approved');
 
-    // The column is placed by its wrapper: centred in the page's content width.
-    expect(table?.transform.x).toBe((1080 - 70 * 2 - APPROVED.table.w) / 2);
+    // BRUNO LIMA (10) is ENDODONTIA's longest name, CARLA DIAS (10) PERIODONTIA's: badge,
+    // padding either side of the name, and the name.
+    const width = APPROVED.badge.w + APPROVED.padding.left + 100 + APPROVED.padding.right;
+    for (const list of lists) {
+      expect(list.transform.x).toBe((1080 - 70 * 2 - width) / 2);
+    }
+  });
+
+  it('stops a list growing at the maximum, where the name wraps instead', () => {
+    const long = rich(`ENDODONTIA\n1º | ${'NOME '.repeat(40).trim()}`);
+    const frame = build(contextOf({ ...FULL, lista: long }, tenPerCharacter));
+    const [list] = named(frame.children, 'approved');
+
+    expect(list?.transform.x).toBe((1080 - 70 * 2 - APPROVED.table.max) / 2);
   });
 
   it('draws no emblem when the brief supplied none, and one when it did', () => {

@@ -89,5 +89,5 @@ not apply to a function.
 The cost is paid by the kit's interface. A configuration surface that grows by one option
 per template becomes a second language; `pillTable` and `titleBlock` take what the agenda
 and the approved list need and nothing either lacks — the approved list added a `rewrite` for
-`1º` → `1º Lugar` and unequal top and bottom padding, both used — and the next component waits
+`1º` → `1º Lugar`, unequal top and bottom padding, and `fit` — each list as wide as its longest name, up to 800, the first change the maintainer asked for after using the template — all used — and the next component waits
 for the references the maintainer groups by idea.

@@ -68,6 +68,7 @@ export {
   type TextStyle,
   atLeastOne,
   grownTextBlock,
+  naturalWidth,
   textBlock,
 } from './text.js';
 

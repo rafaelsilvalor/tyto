@@ -104,3 +104,21 @@ export function grownTextBlock(
   const height = Math.max(minHeight, measured.height);
   return block(width, height, text({ ...options, runs, box: { w: width, h: height } }));
 }
+
+/**
+ * How wide a brief's words come out on one line, rounded up to a whole pixel: 0 for an empty
+ * field, and nothing when nothing can measure.
+ *
+ * Rounded up so a box made exactly this wide never wraps the line it was measured for over a
+ * fraction of a pixel.
+ */
+export function naturalWidth(
+  value: RichText,
+  style: TextStyle,
+  measure: Measure,
+): number | undefined {
+  const runs = runsIn(value, style);
+  if (runs === undefined) return 0;
+  const measured = measure(text({ runs, box: {} }));
+  return measured === undefined ? undefined : Math.ceil(measured.width);
+}

@@ -7,7 +7,7 @@
  * | ------ | ------------------------------------------------------ | -------------------------------- |
  * | header | the owl                                                | `header()` — `_estrategia-saude` |
  * | middle | emblem, kicker, subtitle, rule, the exam's name        | `titleBlock(resultTitle)`        |
- * |        | the approved, grouped by specialty, centred and narrow | `pillTable(approvedTable)`       |
+ * |        | the approved, each specialty as wide as its longest name | `pillTable(approvedTable)`     |
  * | footer | the handle; no arrow, since no slide follows           | `footer()` — `_estrategia-saude` |
  *
  * The second Saúde template (TYTO-185), and the first written after the four layers of
@@ -15,16 +15,8 @@
  * number the brand's tokens.
  */
 
-import { frame, group, solid } from '@tyto/core/template';
-import {
-  type Block,
-  at,
-  bandedPage,
-  block,
-  pillTable,
-  stack,
-  titleBlock,
-} from '@tyto/template-kit';
+import { frame, solid } from '@tyto/core/template';
+import { bandedPage, pillTable, stack, titleBlock } from '@tyto/template-kit';
 
 import { footer, hasNextSlide, header } from '../_estrategia-saude/parts.js';
 import { approvedTable, resultTitle } from '../_estrategia-saude/presets.js';
@@ -45,14 +37,11 @@ export const build: TemplateBuild = (context: TemplateContext) => {
     },
   });
 
-  const list = centred(
-    pillTable(approvedTable, {
-      text: richTextOf(context, 'lista') ?? [],
-      width: APPROVED.table.w,
-      measure: context.measure,
-    }),
+  const list = pillTable(approvedTable, {
+    text: richTextOf(context, 'lista') ?? [],
     width,
-  );
+    measure: context.measure,
+  });
 
   return frame({
     format: context.format,
@@ -68,11 +57,6 @@ export const build: TemplateBuild = (context: TemplateContext) => {
     }),
   });
 };
-
-/** A block narrower than the page, centred on it: the list is set in a column of its own. */
-function centred(item: Block, width: number): Block {
-  return block(width, item.height, group({ children: [at((width - item.width) / 2, 0, item)] }));
-}
 
 /** A rich-text slot's value, or nothing when the brief left it unset. */
 function richTextOf(context: TemplateContext, name: string): RichText | undefined {

@@ -47,7 +47,7 @@ const WIDTH = 940;
 describe('approvedTable', () => {
   const table = pillTable(approvedTable, {
     text: rich('ENDODONTIA\n1º | Ana Beatriz Souza\n2º | Carlos Menezes\n43º | daniela prado'),
-    width: APPROVED.table.w,
+    width: APPROVED.table.max,
     measure: measureNothing,
   });
 
@@ -75,7 +75,7 @@ describe('approvedTable', () => {
   it('adds nothing to a rank the brief left empty', () => {
     const empty = pillTable(approvedTable, {
       text: rich('ENDODONTIA\n | Sem colocação'),
-      width: APPROVED.table.w,
+      width: APPROVED.table.max,
       measure: measureNothing,
     });
     expect(words(empty.draft, 'rank')).toEqual([]);

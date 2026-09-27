@@ -2,7 +2,7 @@ import { group, rect, solid } from '@tyto/core/template';
 
 import { type Block, at, block, stack } from './blocks.js';
 import { type RowGroup, rowGroups } from './rows.js';
-import { type Measure, type TextStyle, grownTextBlock, textBlock } from './text.js';
+import { type Measure, type TextStyle, grownTextBlock, naturalWidth, textBlock } from './text.js';
 
 import type { RichText } from '@tyto/core';
 import type { NodeDraft, TextOptions } from '@tyto/core/template';
@@ -111,6 +111,17 @@ export interface PillTableStyle {
   /** A row is never shorter than this, however short its words. */
   readonly minRowHeight: number;
   /**
+   * Rows as wide as their words rather than as the table.
+   *
+   * Every row of a group takes the width of that group's widest row — the widest name, plus
+   * the fixed columns and the padding — so one long name widens its whole list, and each list
+   * is centred on its own (the Saúde approved list, 2026-09-27). Past `max` a row stops
+   * growing and its words wrap. Where nothing can measure, every row is `max` wide.
+   *
+   * Absent, every row is the table's width.
+   */
+  readonly fit?: { readonly max: number };
+  /**
    * With `groups`, a line with no `|` heads the rows under it; without, every line is a row.
    */
   readonly groups?: {
@@ -151,28 +162,33 @@ interface Placed {
   readonly width: number;
 }
 
-/** The table, drawn. As wide as `width`, as tall as its rows and headings. */
+/**
+ * The table, drawn. As wide as `width`, as tall as its rows and headings.
+ *
+ * Under `fit` a group's rows can be narrower than `width`; they are centred in it.
+ */
 export function pillTable(style: PillTableStyle, content: PillTableContent): Block {
-  const placed = placeColumns(style, content.width);
   const fieldCount = style.columns.reduce((sum, column) => sum + fieldsOf(column), 0);
   const groups = rowGroups(content.text, fieldCount, style.groups !== undefined);
 
-  const drawRows = (rows: RowGroup['rows']) =>
-    stack({
-      ...(style.names.rows === undefined ? {} : { name: style.names.rows }),
-      gap: style.rowGap,
-      items: rows.map((fields) => drawRow(style, placed, fields, content)),
+  const drawRows = (rows: RowGroup['rows'], name: string | undefined, gap: number) => {
+    const width = rowWidth(style, rows, content);
+    const placed = placeColumns(style, width);
+    const drawn = stack({
+      ...(name === undefined ? {} : { name }),
+      gap,
+      items: rows.map((fields) => drawRow(style, placed, fields, width, content.measure)),
     });
+    return centred(drawn, content.width);
+  };
 
   const grouping = style.groups;
   if (grouping === undefined) {
-    return stack({
-      name: style.names.table,
-      gap: style.rowGap,
-      items: groups
-        .flatMap((each) => each.rows)
-        .map((fields) => drawRow(style, placed, fields, content)),
-    });
+    return drawRows(
+      groups.flatMap((each) => each.rows),
+      style.names.table,
+      style.rowGap,
+    );
   }
 
   return stack({
@@ -194,10 +210,66 @@ export function pillTable(style: PillTableStyle, content: PillTableContent): Blo
       return stack({
         ...(style.names.group === undefined ? {} : { name: style.names.group }),
         gap: grouping.headingGap,
-        items: [heading, drawRows(each.rows)],
+        items: [heading, drawRows(each.rows, style.names.rows, style.rowGap)],
       });
     }),
   });
+}
+
+/** A block narrower than `width`, centred in it; one exactly `width` wide is itself. */
+function centred(item: Block, width: number): Block {
+  if (item.width >= width) return item;
+  return block(width, item.height, group({ children: [at((width - item.width) / 2, 0, item)] }));
+}
+
+/** The width a group's rows are drawn at: the table's, or under `fit` their widest row's. */
+function rowWidth(
+  style: PillTableStyle,
+  rows: RowGroup['rows'],
+  content: PillTableContent,
+): number {
+  if (style.fit === undefined) return content.width;
+  const cap = Math.min(style.fit.max, content.width);
+
+  let widest = 0;
+  for (const fields of rows) {
+    const natural = naturalRowWidth(style, fields, content.measure);
+    if (natural === undefined) return cap;
+    widest = Math.max(widest, natural);
+  }
+  return Math.min(cap, widest);
+}
+
+/** How wide one row is with every line on one line, or nothing when nothing can measure. */
+function naturalRowWidth(
+  style: PillTableStyle,
+  fields: readonly RichText[],
+  measure: Measure,
+): number | undefined {
+  const gap = style.layering === 'side-by-side' ? (style.columnGap ?? 0) : 0;
+  let total = gap * Math.max(0, style.columns.length - 1);
+  let next = 0;
+
+  for (const column of style.columns) {
+    const count = fieldsOf(column);
+    const own = fields.slice(next, next + count);
+    next += count;
+
+    if (column.width !== 'fill') {
+      total += column.width;
+      continue;
+    }
+    if (column.kind === 'label') return undefined;
+
+    let widest = 0;
+    for (const [index, line] of column.lines.entries()) {
+      const width = naturalWidth(rewritten(own[index] ?? [], line.rewrite), line.style, measure);
+      if (width === undefined) return undefined;
+      widest = Math.max(widest, width);
+    }
+    total += column.padding.left + widest + column.padding.right;
+  }
+  return total;
 }
 
 function fieldsOf(column: PillTableColumn): number {
@@ -226,7 +298,8 @@ function drawRow(
   style: PillTableStyle,
   placed: readonly Placed[],
   fields: readonly RichText[],
-  content: PillTableContent,
+  width: number,
+  measure: Measure,
 ): Block {
   // Each column takes its fields in order; a field the brief did not write is empty.
   let next = 0;
@@ -239,7 +312,7 @@ function drawRow(
 
   const stacks = cells.map((cell) =>
     cell.column.kind === 'lines'
-      ? linesOf(cell.column, cell.width, cell.fields, content.measure)
+      ? linesOf(cell.column, cell.width, cell.fields, measure)
       : undefined,
   );
 
@@ -254,7 +327,7 @@ function drawRow(
   );
 
   return block(
-    content.width,
+    width,
     height,
     group({
       name: style.names.row,
