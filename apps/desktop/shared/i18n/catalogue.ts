@@ -234,6 +234,8 @@ export interface Catalogue {
   readonly 'panel.editor': string;
   readonly 'panel.preview': string;
   readonly 'panel.problems': string;
+  /** TYTO-45. Closed in the default layout, like the panel it names. */
+  readonly 'panel.queue': string;
 
   /**
    * The find-and-replace panel (E8.5), which is CodeMirror's own DOM.
@@ -352,6 +354,28 @@ export interface Catalogue {
   readonly 'plugins.permissions.none': string;
   readonly 'plugins.close': string;
   readonly 'plugins.unavailable': string;
+
+  /**
+   * The local queue panel (TYTO-45). Closed in the default layout, so none of these is on
+   * screen at load; `queue.status.*` are the words a row's status is shown in.
+   */
+  readonly 'command.queue.show': string;
+  readonly 'queue.heading': string;
+  readonly 'queue.folder.none': string;
+  readonly 'queue.folder.choose': string;
+  readonly 'queue.folder.clear': string;
+  readonly 'queue.inbox': string;
+  readonly 'queue.autoRun': string;
+  readonly 'queue.empty': string;
+  readonly 'queue.status.pending': string;
+  readonly 'queue.status.rendering': string;
+  readonly 'queue.status.done': string;
+  readonly 'queue.status.error': string;
+  readonly 'queue.run': string;
+  readonly 'queue.retry': string;
+  readonly 'queue.openBrief': string;
+  readonly 'queue.openOutput': string;
+  readonly 'queue.unavailable': string;
 }
 
 export type CatalogueKey = keyof Catalogue;
@@ -436,6 +460,7 @@ export const CATALOGUE_KEYS = [
   'panel.editor',
   'panel.preview',
   'panel.problems',
+  'panel.queue',
   'search.find',
   'search.replace',
   'search.next',
@@ -530,4 +555,21 @@ export const CATALOGUE_KEYS = [
   'plugins.permissions.none',
   'plugins.close',
   'plugins.unavailable',
+  'command.queue.show',
+  'queue.heading',
+  'queue.folder.none',
+  'queue.folder.choose',
+  'queue.folder.clear',
+  'queue.inbox',
+  'queue.autoRun',
+  'queue.empty',
+  'queue.status.pending',
+  'queue.status.rendering',
+  'queue.status.done',
+  'queue.status.error',
+  'queue.run',
+  'queue.retry',
+  'queue.openBrief',
+  'queue.openOutput',
+  'queue.unavailable',
 ] as const satisfies readonly CatalogueKey[];

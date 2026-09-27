@@ -343,3 +343,101 @@ describe('one path per tab', () => {
     }).not.toThrow();
   });
 });
+
+describe('opening a path main chose (TYTO-45)', () => {
+  const TASK = at('fila', 'inbox', 'tarefa-1', 'brief.brief');
+
+  it('opens it with no picker and remembers it like any other open', async () => {
+    const recent = recentFiles();
+    const service = createDocumentService({
+      // A dialog that would fail the test if asked: this door has none.
+      dialogs: {
+        openBrief: () => Promise.reject(new Error('asked')),
+        saveBrief: () => Promise.reject(new Error('asked')),
+      },
+      recent,
+      disk: disk({ [TASK]: '::titulo Tarefa' }),
+    });
+
+    const answer = await service.openPath(TAB, TASK);
+
+    expect(answer).toEqual({
+      document: { path: TASK, name: 'brief.brief', text: '::titulo Tarefa' },
+      documentId: TAB,
+    });
+    // The folder is what a save and the preview's assets resolve against, like any tab.
+    expect(service.folderOf(TAB)).toBe(at('fila', 'inbox', 'tarefa-1'));
+    expect(await recent.knows(TASK)).toBe(true);
+  });
+
+  it('answers nothing for a file that is gone, instead of throwing', async () => {
+    const service = createDocumentService({
+      dialogs: dialogs({}),
+      recent: recentFiles(),
+      disk: disk({}),
+    });
+
+    await expect(service.openPath(TAB, TASK)).resolves.toEqual({
+      document: null,
+      documentId: null,
+    });
+  });
+
+  it('hands back the tab that already holds the file', async () => {
+    const service = createDocumentService({
+      dialogs: dialogs({}),
+      recent: recentFiles(),
+      disk: disk({ [TASK]: 'x' }),
+    });
+    await service.openPath(TAB, TASK);
+
+    expect((await service.openPath(OTHER_TAB, TASK)).documentId).toBe(TAB);
+  });
+
+  it('shows the label given in place of the file name, and keeps it across a save', async () => {
+    const service = createDocumentService({
+      dialogs: dialogs({}),
+      recent: recentFiles(),
+      disk: disk({ [TASK]: 'x' }),
+    });
+
+    const opened = await service.openPath(TAB, TASK, 'tarefa-1 · brief.brief');
+    const saved = await service.save(TAB, 'y', false);
+
+    expect(opened.document?.name).toBe('tarefa-1 · brief.brief');
+    expect(saved.document?.name).toBe('tarefa-1 · brief.brief');
+    // Still the brief's own name for what an export is called: the label is for a person.
+    expect(service.nameOf(TAB)).toBe('brief');
+  });
+
+  it('follows a file main moved, so the next save lands at the new path', async () => {
+    const DONE = at('fila', 'done', 'tarefa-1', 'brief.brief');
+    const files = disk({ [TASK]: 'x' });
+    const service = createDocumentService({
+      dialogs: dialogs({}),
+      recent: recentFiles(),
+      disk: files,
+    });
+    await service.openPath(TAB, TASK, 'tarefa-1 · brief.brief');
+
+    service.retarget(TASK, DONE);
+    const saved = await service.save(TAB, 'depois', false);
+
+    expect(files.written[DONE]).toBe('depois');
+    expect(saved.document).toMatchObject({ path: DONE, name: 'tarefa-1 · brief.brief' });
+    expect(service.folderOf(TAB)).toBe(at('fila', 'done', 'tarefa-1'));
+  });
+
+  it('leaves every tab alone when no tab holds the moved file', async () => {
+    const service = createDocumentService({
+      dialogs: dialogs({}),
+      recent: recentFiles(),
+      disk: disk({ [BRIEF]: 'x' }),
+    });
+    await service.openPath(TAB, BRIEF);
+
+    service.retarget(TASK, at('fila', 'done', 'tarefa-1', 'brief.brief'));
+
+    expect(service.folderOf(TAB)).toBe(at('briefs'));
+  });
+});

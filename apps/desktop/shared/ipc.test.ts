@@ -42,6 +42,12 @@ describe('the IPC contract', () => {
       'log:reveal',
       'log:write',
       'plugins:list',
+      'queue:list',
+      'queue:open-brief',
+      'queue:reveal-output',
+      'queue:run',
+      'queue:set-auto-run',
+      'queue:set-folder',
       'template:new',
       'template:open',
       'template:preview',
@@ -79,7 +85,12 @@ describe('the IPC contract', () => {
  */
 describe('the event table', () => {
   it('names every event exactly once, and nothing else', () => {
-    expect([...IPC_EVENT_NAMES].sort()).toEqual(['app:exit-requested', 'command:run']);
+    expect([...IPC_EVENT_NAMES].sort()).toEqual([
+      'app:exit-requested',
+      'command:run',
+      // TYTO-45. The queue changed; the panel asks `queue:list` when it hears it.
+      'queue:changed',
+    ]);
     expect(new Set(IPC_EVENT_NAMES).size).toBe(IPC_EVENT_NAMES.length);
   });
 
@@ -220,6 +231,9 @@ describe('what the contract does not promise', () => {
       'app:exit-listening',
       // TYTO-47. "Which plugins are there" has no subject: there is one plugins folder.
       'plugins:list',
+      // TYTO-45. "What is in the queue" has no subject: there is one queue folder, and where
+      // it is, is main's.
+      'queue:list',
     ];
 
     for (const name of IPC_CHANNEL_NAMES) {
