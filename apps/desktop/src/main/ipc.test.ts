@@ -167,6 +167,11 @@ const exportService = () => {
     cancel: (exportId: string) => {
       cancelled.push(exportId);
     },
+    kinds: () =>
+      Promise.resolve([
+        { kind: 'svg', rasterized: false },
+        { kind: 'txt', rasterized: false },
+      ]),
   };
 };
 

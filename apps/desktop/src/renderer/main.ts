@@ -609,6 +609,13 @@ function openExportDialog(): void {
   const dialog = elements.exportDialog;
   if (dialog === null || dialog === undefined) return;
 
+  // Asked each time, so an installed exporter's kind is offered beside Tyto's (ADR 0044).
+  // Unique and in main's order; the built-in four until the answer lands.
+  void withBridge(async (bridge) => {
+    const answer = await bridge['export:kinds']({});
+    dialog.available = [...new Set(answer.kinds.map((item) => item.kind))];
+  });
+
   dialog.chooseDirectory = () => {
     void withBridge(async (bridge) => {
       const answer = await bridge['export:choose-directory']({});

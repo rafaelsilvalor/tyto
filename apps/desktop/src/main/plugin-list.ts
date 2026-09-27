@@ -3,11 +3,11 @@ import { join } from 'node:path';
 
 import { htmlExporterManifest } from '@tyto/export-html';
 import { svgExporterManifest } from '@tyto/export-svg';
+import { diagnostic } from '@tyto/core';
 import {
   type InstalledPlugin,
-  PLUGIN_API_VERSION,
   type PluginStore,
-  checkStoredPlugin,
+  readInstalledPlugins,
   validatePluginManifest,
 } from '@tyto/plugin-api';
 
@@ -75,46 +75,43 @@ export async function listPlugins(
     problems: [],
   }));
 
-  const [state, stored] = await Promise.all([store.readState(), store.list()]);
+  // The same reader the CLI's `plugin list` and both apps' loaders use, so the screen and
+  // the command cannot disagree about which folder is refused and why.
+  const [installed, history] = await Promise.all([
+    readInstalledPlugins(store),
+    store.readCrashes(),
+  ]);
+  const crashes = history.ok ? history.value.crashes : {};
 
-  for (const plugin of stored) {
-    if (!state.ok) {
-      // A state file nobody can read approves nothing, so every folder is refused by it.
+  for (const entry of installed.entries) {
+    const manifest = entry.manifest;
+    if (manifest === undefined) {
       rows.push({
-        name: plugin.folder,
+        name: entry.folder,
         version: null,
         origin: 'external',
         status: 'refused',
         contributes: [],
         permissions: [],
-        problems: state.error.map((problem) => problem.message),
+        problems: entry.problems.map((problem) => problem.message),
       });
       continue;
     }
 
-    const checked = checkStoredPlugin(plugin, state.value, PLUGIN_API_VERSION);
-    if (!checked.ok) {
-      rows.push({
-        name: plugin.folder,
-        version: null,
-        origin: 'external',
-        status: 'refused',
-        contributes: [],
-        permissions: [],
-        problems: checked.error.map((problem) => problem.message),
-      });
-      continue;
-    }
-
-    const manifest = checked.value;
+    // History and not a refusal (ADR 0041): a crashed plugin is still started, so it is
+    // shown as crashed, with when and why, until it is enabled or installed again.
+    const crash = crashes[entry.folder];
+    const crashed = entry.enabled && crash !== undefined;
     rows.push({
       name: manifest.name,
       version: manifest.version,
       origin: 'external',
-      status: state.value.plugins[plugin.folder]?.enabled === true ? 'enabled' : 'disabled',
+      status: crashed ? 'crashed' : entry.enabled ? 'enabled' : 'disabled',
       contributes: [...manifest.contributes],
       permissions: [...manifest.permissions],
-      problems: [],
+      problems: crashed
+        ? [diagnostic('W_PLUGIN_CRASHED', { plugin: entry.folder, ...crash }).message]
+        : [],
     });
   }
 

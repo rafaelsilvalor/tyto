@@ -8,12 +8,20 @@ import {
   fsTaskOutput,
   renderResult,
 } from '@tyto/io';
-import { type InProcessHost, type Logger, createPluginHost } from '@tyto/plugin-api';
+import {
+  type InProcessHost,
+  type LoadedPlugins,
+  type Logger,
+  NO_PLUGINS,
+  activateInstalled,
+  createPluginHost,
+} from '@tyto/plugin-api';
 import {
   type JobEvent,
   type OutputRequest,
   bundledTemplateSource,
   fontSubstitutionWarnings,
+  isRasterFormat,
   markupTemplateSource,
   runJob,
 } from '@tyto/pipeline';
@@ -103,6 +111,19 @@ export interface ExportService {
    * the dialog produce the same files. Never rejects; a run that died answers with `failure`.
    */
   run(request: ExportRequest): Promise<ExportProgress>;
+  /**
+   * Every kind a run can produce: the built-ins' and every installed exporter's (ADR 0044).
+   *
+   * What the export dialog offers, asked of the same host shape a run builds, so a kind is
+   * offered exactly when a run could produce it.
+   */
+  kinds(): Promise<readonly ExportableKind[]>;
+}
+
+/** One kind a run can produce, and whether it goes through the rasterizer. */
+export interface ExportableKind {
+  readonly kind: string;
+  readonly rasterized: boolean;
 }
 
 export interface ExportServiceOptions {
@@ -134,6 +155,16 @@ export interface ExportServiceOptions {
    * memory that the dialog may or may not still be polling for.
    */
   readonly log?: Logger;
+  /**
+   * The installed plugins, started once for the app's life, each in a `utilityProcess` of
+   * its own (ADR 0044). Activated into every run's host **after** the built-ins, so the
+   * export dialog and the queue — which renders through {@link ExportService.run} — both
+   * reach them. Absent: no installed plugins.
+   *
+   * A promise, so the window does not wait for them to open: a plugin whose activation hangs
+   * costs its own deadline (ADR 0042) to the first export, not to the app's start.
+   */
+  readonly plugins?: LoadedPlugins | Promise<LoadedPlugins>;
 }
 
 /** A run in flight, and what the poller reads. */
@@ -161,7 +192,8 @@ interface Run {
 function exporterHost(
   resources: ReturnType<typeof fileResources> | undefined,
   rasterizer: Rasterizer | undefined,
-): InProcessHost {
+  plugins: LoadedPlugins,
+): { readonly host: InProcessHost; readonly warnings: Diagnostics } {
   const host = createPluginHost();
 
   host.activate(
@@ -189,11 +221,18 @@ function exporterHost(
     });
   }
 
-  return host;
+  // After the built-ins, so a built-in keeps its ids; a plugin refused here is a
+  // `W_PLUGIN_SKIPPED` in the run's diagnostics, the CLI's rule (ADR 0040).
+  const warnings = activateInstalled(host, plugins, {
+    encodes: isRasterFormat,
+    encodable: 'png, jpeg and webp',
+  });
+  return { host, warnings };
 }
 
 export async function createExportService(options: ExportServiceOptions): Promise<ExportService> {
   const { fileSystem, sources } = options;
+  const plugins = Promise.resolve(options.plugins ?? NO_PLUGINS);
 
   const runs = new Map<string, Run>();
   let counter = 0;
@@ -212,7 +251,7 @@ export async function createExportService(options: ExportServiceOptions): Promis
 
     const images =
       request.assetBase === undefined ? undefined : fileResources({ base: request.assetBase });
-    const host = exporterHost(images, options.rasterizer);
+    const { host, warnings: skipped } = exporterHost(images, options.rasterizer, await plugins);
     const sink = await fsTaskOutput(request.directory, { label: request.label });
 
     const job = await runJob(
@@ -266,7 +305,7 @@ export async function createExportService(options: ExportServiceOptions): Promis
     );
 
     const produced = job.ok ? job.diagnostics : job.error;
-    run.diagnostics = [...startup, ...produced];
+    run.diagnostics = [...startup, ...skipped, ...produced];
 
     const cancelled = job.ok ? job.value.cancelled : false;
     run.result = renderResult({
@@ -347,6 +386,16 @@ export async function createExportService(options: ExportServiceOptions): Promis
       // renders one of these per task for as long as the window is open.
       runs.delete(exportId);
       return snapshot(run);
+    },
+
+    async kinds(): Promise<readonly ExportableKind[]> {
+      // A host with no folder's bytes bound: what is asked is only which kinds exist.
+      const { host } = exporterHost(undefined, options.rasterizer, await plugins);
+      return host.registry.exporters
+        .list()
+        .flatMap((exporter) =>
+          exporter.kinds.map((kind) => ({ kind, rasterized: exporter.rasterized })),
+        );
     },
 
     progress(exportId: string): ExportProgress | undefined {

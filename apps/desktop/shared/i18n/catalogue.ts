@@ -351,6 +351,7 @@ export interface Catalogue {
   readonly 'plugins.status.enabled': string;
   readonly 'plugins.status.disabled': string;
   readonly 'plugins.status.refused': string;
+  readonly 'plugins.status.crashed': string;
   readonly 'plugins.permissions.none': string;
   readonly 'plugins.close': string;
   readonly 'plugins.unavailable': string;
@@ -552,6 +553,7 @@ export const CATALOGUE_KEYS = [
   'plugins.status.enabled',
   'plugins.status.disabled',
   'plugins.status.refused',
+  'plugins.status.crashed',
   'plugins.permissions.none',
   'plugins.close',
   'plugins.unavailable',

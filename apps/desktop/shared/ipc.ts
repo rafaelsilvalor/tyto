@@ -572,7 +572,9 @@ export const IPC_CHANNELS = {
       outputs: z
         .array(
           z.object({
-            kind: z.enum(['png', 'jpeg', 'webp', 'svg']),
+            // Open since TYTO-48: an installed exporter's kind is exportable too. Main checks
+            // it against the run's registry, the way `tyto render --types` does (ADR 0044).
+            kind: z.string().min(1),
             /** 1–100, and only for `jpeg` and `webp`; the raster port refuses it on `png`. */
             quality: z.number().int().min(1).max(100).optional(),
             scale: z.number().positive().max(8).optional(),
@@ -623,6 +625,18 @@ export const IPC_CHANNELS = {
   /** Fires the run's `AbortSignal`. Answers nothing: the verdict arrives through progress. */
   'export:cancel': channel(z.object({ exportId: z.string().min(1) }), z.object({})),
 
+  /**
+   * Every kind an export can produce: the built-ins' and every installed plugin's exporter
+   * (ADR 0044). Asked each time the export dialog opens, so what it offers is what a run
+   * would find in its registry.
+   */
+  'export:kinds': channel(
+    z.object({}),
+    z.object({
+      kinds: z.array(z.object({ kind: z.string().min(1), rasterized: z.boolean() })),
+    }),
+  ),
+
   /** Shows a folder in the OS file manager, which is what "open folder" means. */
   'export:reveal': channel(z.object({ directory: z.string().min(1) }), z.object({})),
 
@@ -653,7 +667,7 @@ export const IPC_CHANNELS = {
             name: z.string().min(1),
             version: z.string().nullable(),
             origin: z.enum(['built-in', 'external']),
-            status: z.enum(['enabled', 'disabled', 'refused']),
+            status: z.enum(['enabled', 'disabled', 'refused', 'crashed']),
             contributes: z.array(z.string()),
             permissions: z.array(z.string()),
             problems: z.array(z.string()),

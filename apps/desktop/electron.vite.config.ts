@@ -65,7 +65,12 @@ export default defineConfig({
           /^playwright(?:-core)?(?:\/|$)/,
           /^chromium-bidi(?:\/|$)/,
         ],
-        input: { index: resolve(import.meta.dirname, 'src/main/index.ts') },
+        // Two bundles: main, and the file each installed plugin's `utilityProcess` starts from,
+        // which Electron can only be given as a file of its own (ADR 0044).
+        input: {
+          index: resolve(import.meta.dirname, 'src/main/index.ts'),
+          'plugin-guest': resolve(import.meta.dirname, 'src/main/plugin-guest.ts'),
+        },
       },
     },
   },

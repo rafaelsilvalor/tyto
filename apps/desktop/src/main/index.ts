@@ -1,8 +1,19 @@
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
 
-import { type BrowserWindow, Menu, app, dialog, ipcMain, safeStorage, shell } from 'electron';
+import {
+  type BrowserWindow,
+  Menu,
+  app,
+  dialog,
+  ipcMain,
+  net,
+  safeStorage,
+  shell,
+  utilityProcess,
+} from 'electron';
 import { PLUGINS_DIR, fsInbox, fsPluginStore, nodeFileSystem } from '@tyto/io';
+import { NO_PLUGINS } from '@tyto/plugin-api';
 import type { Rasterizer } from '@tyto/raster';
 
 import { type Locale, localeFor, translate } from '../../shared/i18n/index.js';
@@ -10,6 +21,7 @@ import { fileCredentialStore } from './credential-store.js';
 import { createCredentials } from './credentials.js';
 import { createDocumentService } from './documents.js';
 import { createExportService } from './export.js';
+import { desktopCapabilities, startDesktopPlugins } from './installed-plugins.js';
 import { fileLayoutStore } from './layout-store.js';
 import { crashSummary, fileLog, installCrashHandlers } from './log.js';
 import { menuTemplate } from './menu.js';
@@ -17,6 +29,7 @@ import { fileRecentFiles } from './recent-files.js';
 import { registerIpcHandlers, sendIpcEvent } from './ipc.js';
 import { exporterBuiltIns, listPlugins, tytoHome } from './plugin-list.js';
 import { activateBuiltIns, builtInTemplatesDirectory } from './plugins.js';
+import { utilityProcessLauncher } from './plugin-process.js';
 import { offerPreviousVersion } from './previous-version.js';
 import { createQueueService } from './queue.js';
 import { createPreviewService } from './preview.js';
@@ -329,10 +342,36 @@ async function start(): Promise<void> {
   // `Rasterizer`, and the only place allowed to know which adapter exists is this file. It
   // is read back out of the plugin registry rather than constructed a second time — what
   // exports is what TYTO-133 registered, which is the claim the extension point makes.
+  // Installed plugins, started once for the app's life, each in a `utilityProcess` of its
+  // own (ADR 0044) — never in main. `plugin-guest.js` is the second bundle beside this one.
+  // What they can reach is behind their declared permissions: `net.fetch` for the network,
+  // and `safeStorage`, through the same `credentials`, for secrets (ADR 0042).
+  // Not awaited: the window opens while they start, and the export waits for them.
+  const plugins = startDesktopPlugins({
+    store: pluginStore,
+    launch: utilityProcessLauncher(
+      (modulePath, args, options) =>
+        utilityProcess.fork(modulePath, args, { ...options, stdio: options.stdio }),
+      join(dirname(fileURLToPath(import.meta.url)), 'plugin-guest.js'),
+    ),
+    capabilities: desktopCapabilities(credentials, (url, init) => net.fetch(url, init)),
+  }).catch((cause: unknown) => {
+    // A disk that refused the folder: the app opens without installed plugins, and says so.
+    log.error('The installed plugins could not be started.', cause);
+    return NO_PLUGINS;
+  });
+  void plugins.then((loaded) => {
+    for (const warning of loaded.warnings) log.warn(warning.message);
+  });
+  app.on('will-quit', () => {
+    void plugins.then((loaded) => loaded.close());
+  });
+
   const exports_ = await createExportService({
     fileSystem,
     log,
     sources,
+    plugins,
     version: app.getVersion(),
     ...(host.registry.rasterizers<Rasterizer>()[0]?.value === undefined
       ? {}
