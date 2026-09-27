@@ -63,6 +63,8 @@ export const FACE: FontRef = systemFont('CircularXX');
 export const LIGHT = 300;
 /** The discipline heading, the date and the session title. */
 export const MEDIUM = 500;
+/** The approved list's kicker, its ranks and its names. */
+export const BOLD = 700;
 /** The cover words. */
 export const BLACK = 900;
 
@@ -74,11 +76,6 @@ export const TYPE = {
   professor: 22,
   date: 26,
   handle: 26,
-  // The approved list's two, provisional until checked against a published slide: the rank
-  // is set as the date is, and the name one step up from a session title, being its row's
-  // only line.
-  rank: 26,
-  name: 26,
 } as const;
 
 /* ------------------------------------------------------------------------- spacing -- */
@@ -121,11 +118,11 @@ export const TABLE = {
   /** The blue badge on the left of a row — a date or a rank. Its height is the row minimum. */
   badge: { w: 220, h: 86 },
   /** Room between the grey pill's edge and the words inside it. */
-  padding: { vertical: 12, left: 32, right: 32 },
+  padding: { top: 12, bottom: 12, left: 32, right: 32 },
   /** Between two stacked lines inside the grey pill. */
   lineGap: 4,
   /** A line's height when its words fit on one line — the published single-line row. */
-  line: { title: 30, professor: 28, name: 30 },
+  line: { title: 30, professor: 28 },
   /** A group heading's box — a discipline's name. Taller than its letters. */
   heading: 78,
 } as const;
@@ -141,6 +138,43 @@ export const CHROME = {
 } as const;
 
 /** The block on a carousel's first slide: an optional illustration over the cover words. */
+/**
+ * The approved list (`aprovados`), measured on the maintainer's reference of 2026-09-27 in
+ * pixels of a 1080 × 1350 export. Font sizes are read from glyph heights, so they are good to
+ * a point or two; the boxes are good to a pixel or two.
+ */
+export const APPROVED = {
+  /** The emblem over the words: 205 × 147 as published; `contain` keeps any other ratio. */
+  emblem: { w: 205, h: 147 },
+  type: { kicker: 23.5, subtitle: 23.5, exam: 76, specialty: 46, rank: 17, name: 16 },
+  /** Boxes: one line of each piece and its leading. */
+  box: { kicker: 30, subtitle: 30, exam: 84, specialty: 58 },
+  /** The rule between the subtitle and the exam's name. */
+  rule: { w: 531, h: 3 },
+  gap: {
+    /** Emblem → kicker, kicker → subtitle, subtitle → rule, rule → exam, to the glyphs. */
+    kicker: 12,
+    subtitle: 17,
+    rule: 15,
+    exam: 19,
+    /** The exam's name → the first specialty heading. */
+    table: 28,
+    /** A specialty heading's box → its first row. */
+    heading: 23,
+    /** One specialty's last row → the next heading's box. */
+    groups: 44,
+    /** Between two rows. */
+    rows: 5,
+  },
+  /** The rows: narrower than the page and centred on it. */
+  table: { w: 457 },
+  badge: { w: 92, h: 39, radius: 19.5 },
+  /** The name's line inside the grey pill, and the room before it. */
+  line: 20,
+  // More room above than below: the names are capitals, which sit high in their line box.
+  padding: { top: 8, bottom: 0, left: 15, right: 15 },
+} as const;
+
 export const COVER = {
   /** The cover words' box, as a multiple of their size: one line and its leading. */
   boxRatio: 1.3,

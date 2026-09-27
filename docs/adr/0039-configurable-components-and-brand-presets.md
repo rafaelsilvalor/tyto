@@ -67,19 +67,27 @@ still stays in its template.
 
 ## Consequences
 
-`agenda-semana` is composition over the Saúde module: `header()`, `cover()`,
-`pillTable(sessionTable)` and `footer()`. Rewritten onto the component it renders **the same
-pixels** as before — 0 of 1,458,000 different on each of the example brief's two slides,
-against `main`, with a one-pixel token change producing 27,367 and 28,885 as the control.
+`agenda-semana` is composition over the Saúde module: `header()`,
+`titleBlock(coverTitle)`, `pillTable(sessionTable)` and `footer()`, placed by `bandedPage`.
+Rewritten onto the components it renders **the same pixels** as before — 0 of 1,458,000
+different on each of the example brief's two slides, against `main`, with a one-pixel token
+change producing 27,367 and 28,885 as the control. The one deliberate change is the footer
+arrow, which announces a next slide and is therefore not drawn on the last one.
 
-The approved list exists as a preset before it exists as a template, and it is
-**provisional**: built from the maintainer's description, not from a published slide.
+**The second template cost no drawing code.** `aprovados`, the Saúde approved list, was built
+in the same PR from the maintainer's annotated reference: `titleBlock(resultTitle)` and
+`pillTable(approvedTable)` on the same `bandedPage`, with a new preset and tokens and nothing
+else. Matched in the live preview, every glyph run inside its slide lands within 2 px of the
+reference. The maintainer's annotation named the pieces — top, title, areas, footer, margins
+and gaps — and each is one call; the margins and gaps, which he saw repeated but did not
+expect to be a component, became `bandedPage` and the brand's tokens.
 
 ADR 0022 is untouched. The markup route keeps its per-template components and its refusal of
 a shared library, for the reason it gave — one flat class namespace per template — which does
 not apply to a function.
 
 The cost is paid by the kit's interface. A configuration surface that grows by one option
-per template becomes a second language; `pillTable` takes what the agenda and the approved
-list need and nothing either lacks, and the next component waits for the references the
-maintainer groups by idea.
+per template becomes a second language; `pillTable` and `titleBlock` take what the agenda
+and the approved list need and nothing either lacks — the approved list added a `rewrite` for
+`1º` → `1º Lugar` and unequal top and bottom padding, both used — and the next component waits
+for the references the maintainer groups by idea.

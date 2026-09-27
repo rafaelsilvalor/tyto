@@ -44,6 +44,8 @@ export interface LabelColumn {
     readonly style: TextStyle;
     readonly align?: TextOptions['align'];
     readonly valign?: TextOptions['valign'];
+    /** What the brief wrote, turned into what is drawn — `1º` into `1º Lugar`, say. */
+    readonly rewrite?: Rewrite;
   };
 }
 
@@ -63,13 +65,33 @@ export interface LinesColumn {
     readonly name: string;
     readonly style: TextStyle;
     readonly minHeight: number;
+    readonly rewrite?: Rewrite;
   }[];
   readonly lineGap: number;
-  /** Room between the cell's edge and its lines. */
-  readonly padding: { readonly vertical: number; readonly left: number; readonly right: number };
+  /**
+   * Room between the cell's edge and its lines. The lines are centred in what `top` and
+   * `bottom` leave, so an unequal pair nudges them optically — capitals sit high in their
+   * line box, and a list of names in capitals reads centred only with more room above.
+   */
+  readonly padding: {
+    readonly top: number;
+    readonly bottom: number;
+    readonly left: number;
+    readonly right: number;
+  };
 }
 
 export type PillTableColumn = LabelColumn | LinesColumn;
+
+/**
+ * A field as the brief wrote it, turned into what a cell draws. Runs on non-empty fields
+ * only, so a rewrite that adds words never makes an empty field draw something.
+ */
+export type Rewrite = (value: RichText) => RichText;
+
+function rewritten(value: RichText, rewrite: Rewrite | undefined): RichText {
+  return rewrite === undefined || value.length === 0 ? value : rewrite(value);
+}
 
 export interface PillTableStyle {
   readonly columns: readonly PillTableColumn[];
@@ -224,7 +246,7 @@ function drawRow(
   const height = cells.reduce((tallest, cell, index) => {
     const lines = stacks[index];
     if (lines === undefined || cell.column.kind !== 'lines') return tallest;
-    return Math.max(tallest, lines.height + cell.column.padding.vertical * 2);
+    return Math.max(tallest, lines.height + cell.column.padding.top + cell.column.padding.bottom);
   }, style.minRowHeight);
 
   const drawn = cells.map((cell, index) =>
@@ -254,9 +276,16 @@ function linesOf(
   return stack({
     gap: column.lineGap,
     items: column.lines.map((line, index) =>
-      grownTextBlock(fields[index] ?? [], inner, line.minHeight, line.style, measure, {
-        name: line.name,
-      }),
+      grownTextBlock(
+        rewritten(fields[index] ?? [], line.rewrite),
+        inner,
+        line.minHeight,
+        line.style,
+        measure,
+        {
+          name: line.name,
+        },
+      ),
     ),
   });
 }
@@ -287,15 +316,25 @@ function drawCell(
   }
 
   if (cell.column.kind === 'label') {
-    const words = textBlock(fields[0] ?? [], { w: cell.width, h: height }, cell.column.text.style, {
-      name: cell.column.text.name,
-      ...(cell.column.text.align === undefined ? {} : { align: cell.column.text.align }),
-      ...(cell.column.text.valign === undefined ? {} : { valign: cell.column.text.valign }),
-    });
+    const words = textBlock(
+      rewritten(fields[0] ?? [], cell.column.text.rewrite),
+      { w: cell.width, h: height },
+      cell.column.text.style,
+      {
+        name: cell.column.text.name,
+        ...(cell.column.text.align === undefined ? {} : { align: cell.column.text.align }),
+        ...(cell.column.text.valign === undefined ? {} : { valign: cell.column.text.valign }),
+      },
+    );
     children.push(shift(words.draft, start, 0));
   } else if (lines !== undefined) {
     children.push(
-      shift(lines.draft, start + cell.column.padding.left, (height - lines.height) / 2),
+      shift(
+        lines.draft,
+        start + cell.column.padding.left,
+        cell.column.padding.top +
+          (height - cell.column.padding.top - cell.column.padding.bottom - lines.height) / 2,
+      ),
     );
   }
 

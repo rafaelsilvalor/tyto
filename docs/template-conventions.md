@@ -70,12 +70,19 @@ them could be reused without copying.
 ### 1. Configurable components and arrangement — `@tyto/template-kit`
 
 The layer that is the same whatever brand draws it: `stack`, `row`, `inset`, `at` for
-arrangement; `pillTable` for a table read out of one slot; `mark` and `textBlock` for a path
-icon and a brief's words at a stated size.
+arrangement, and `bandedPage` for the page every Saúde slide is (a header band, a footer on
+the bottom edge, the middle centred between them); `pillTable` for a table read out of one
+slot; `titleBlock` for a centred column of optional pieces — a picture, lines of words, a
+rule; `mark` and `textBlock` for a path icon and a brief's words at a stated size.
 
 ```ts
 const sessions = pillTable(sessionTable, { text: slide, width, measure: context.measure });
+const title = titleBlock(resultTitle, { width, fields: { titulo, chamada, emblema } });
 ```
+
+A title block's `field` is the slot's name, in the brief's Portuguese; its `name` is the
+node's, in English. The two are separate on purpose: the brief's vocabulary and the scene's
+can change independently.
 
 **A component holds no brand.** Every colour, face and size arrives in its configuration. A
 component that needed to know whose template it is drawing is a part, and belongs to layer 3.

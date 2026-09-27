@@ -50,6 +50,18 @@ export {
 
 export { type Mark, mark } from './mark.js';
 
+export { type BandedPageOptions, bandedPage } from './page.js';
+
+export {
+  type TitleBlockContent,
+  type TitleBlockStyle,
+  type TitleImagePart,
+  type TitlePart,
+  type TitleRulePart,
+  type TitleTextPart,
+  titleBlock,
+} from './title-block.js';
+
 export {
   type Measure,
   type TextBlockOptions,
@@ -68,5 +80,6 @@ export {
   type PillTableColumn,
   type PillTableContent,
   type PillTableStyle,
+  type Rewrite,
   pillTable,
 } from './pill-table.js';

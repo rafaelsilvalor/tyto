@@ -2,7 +2,12 @@ import { measureNothing } from '@tyto/core';
 import { systemFont } from '@tyto/core/template';
 import { describe, expect, it } from 'vitest';
 
-import { type LinesColumn, type PillTableStyle, pillTable } from './pill-table.js';
+import {
+  type LabelColumn,
+  type LinesColumn,
+  type PillTableStyle,
+  pillTable,
+} from './pill-table.js';
 import { rich } from './rich-text.fixture.js';
 
 import type { GroupDraft, NodeDraft } from '@tyto/core/template';
@@ -23,7 +28,7 @@ const lines: LinesColumn = {
   name: 'body',
   width: 'fill',
   shape: { fill: '#dddddd', radius: 10 },
-  padding: { vertical: 10, left: 20, right: 20 },
+  padding: { top: 10, bottom: 10, left: 20, right: 20 },
   lineGap: 4,
   lines: [
     { name: 'title', style: STYLE, minHeight: 30 },
@@ -182,5 +187,34 @@ describe('groups', () => {
 
     expect(named(table.draft, 'row')).toHaveLength(2);
     expect(named(table.draft, 'heading')).toEqual([]);
+  });
+});
+
+describe('rewrite', () => {
+  const suffixed: PillTableStyle = {
+    ...BASE,
+    columns: [
+      {
+        ...(BASE.columns[0] as LabelColumn),
+        text: {
+          ...(BASE.columns[0] as LabelColumn).text,
+          rewrite: (value) => [...value, { kind: 'text', value: '!', range: { start: 0, end: 0 } }],
+        },
+      },
+      lines,
+    ],
+  };
+
+  it('turns what the brief wrote into what the cell draws', () => {
+    const [key] = named(draw(suffixed, '1º | Ana').draft, 'key');
+    expect(
+      key?.kind === 'text'
+        ? key.runs.map((run) => (run.kind === 'text' ? run.text : '')).join('')
+        : '',
+    ).toBe('1º!');
+  });
+
+  it('is not asked about an empty field, so it cannot make one draw', () => {
+    expect(named(draw(suffixed, ' | Ana').draft, 'key')).toEqual([]);
   });
 });

@@ -3,15 +3,16 @@ import { pillTable } from '@tyto/template-kit';
 import { describe, expect, it } from 'vitest';
 
 import { approvedTable, sessionTable } from './presets.js';
-import { TABLE } from './tokens.js';
+import { APPROVED } from './tokens.js';
 
 import type { Inline, RichText } from '@tyto/core';
 import type { NodeDraft } from '@tyto/core/template';
 
 /**
- * The Saúde presets, drawn. `sessionTable` is proven pixel for pixel by `agenda-semana`
- * (TYTO-185 rendered it against `main`); `approvedTable` has no published slide yet, so what
- * is pinned here is its structure — the words go where the description says they do.
+ * The Saúde presets, drawn. The pixels are proven by rendering: `sessionTable` through
+ * `agenda-semana` against `main`, `approvedTable` through `aprovados` against the
+ * maintainer's reference of 2026-09-27 (TYTO-185). What is pinned here is structure — the
+ * words go where the brief put them, and the rewrites happen.
  */
 
 let cursor = 0;
@@ -43,24 +44,41 @@ function words(draft: NodeDraft, name: string): string[] {
 
 const WIDTH = 940;
 
-describe('approvedTable (provisional)', () => {
+describe('approvedTable', () => {
   const table = pillTable(approvedTable, {
-    text: rich('1º | Ana Beatriz Souza\n2º | Carlos Menezes\n43º | Daniela Prado'),
-    width: WIDTH,
+    text: rich('ENDODONTIA\n1º | Ana Beatriz Souza\n2º | Carlos Menezes\n43º | daniela prado'),
+    width: APPROVED.table.w,
     measure: measureNothing,
   });
 
-  it('draws one row per line, the rank in the badge and the name in the grey pill', () => {
-    expect(words(table.draft, 'rank')).toEqual(['1º', '2º', '43º']);
+  it('draws each rank as a place, the way the published badge reads', () => {
+    expect(words(table.draft, 'rank')).toEqual(['1º Lugar', '2º Lugar', '43º Lugar']);
+  });
+
+  it('sets every name in capitals, whatever the brief typed', () => {
     expect(words(table.draft, 'name')).toEqual([
-      'Ana Beatriz Souza',
-      'Carlos Menezes',
-      'Daniela Prado',
+      'ANA BEATRIZ SOUZA',
+      'CARLOS MENEZES',
+      'DANIELA PRADO',
     ]);
   });
 
-  it('keeps the published row height for a one-line name', () => {
-    expect(table.height).toBe(TABLE.badge.h * 3 + approvedTable.rowGap * 2);
+  it('heads the rows with their specialty', () => {
+    expect(words(table.draft, 'specialty')).toEqual(['ENDODONTIA']);
+  });
+
+  it('is the heading, its gap and three published rows tall', () => {
+    const rows = APPROVED.badge.h * 3 + APPROVED.gap.rows * 2;
+    expect(table.height).toBe(APPROVED.box.specialty + APPROVED.gap.heading + rows);
+  });
+
+  it('adds nothing to a rank the brief left empty', () => {
+    const empty = pillTable(approvedTable, {
+      text: rich('ENDODONTIA\n | Sem colocação'),
+      width: APPROVED.table.w,
+      measure: measureNothing,
+    });
+    expect(words(empty.draft, 'rank')).toEqual([]);
   });
 });
 
