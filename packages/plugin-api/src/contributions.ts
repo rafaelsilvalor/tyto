@@ -73,12 +73,19 @@ export interface Exporter extends Contribution {
    * point exists to remove.
    */
   readonly rasterized: boolean;
+  /**
+   * Synchronous or not, as the exporter pleases (ADR 0041).
+   *
+   * The built-ins answer on the spot. An exporter registered by an isolated plugin is a
+   * proxy whose answer comes back across a thread or a process, and no such answer can be
+   * synchronous; the job awaits either.
+   */
   exportFrame(
     scene: Scene,
     artwork: Artwork,
     frame: Frame,
     options?: ExportFrameOptions,
-  ): Result<string, Diagnostics>;
+  ): Result<string, Diagnostics> | Promise<Result<string, Diagnostics>>;
 }
 
 /**

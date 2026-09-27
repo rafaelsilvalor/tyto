@@ -4,11 +4,15 @@ import { dirname, join, relative } from 'node:path';
 import type { Diagnostics, Result } from '@tyto/core';
 import { ok } from '@tyto/core';
 import {
+  EMPTY_PLUGIN_CRASHES,
   EMPTY_PLUGIN_STATE,
+  type PluginCrashes,
   type PluginState,
   type PluginStore,
   type StoredPlugin,
+  parsePluginCrashes,
   parsePluginState,
+  serializePluginCrashes,
   serializePluginState,
 } from '@tyto/plugin-api';
 
@@ -18,6 +22,7 @@ import {
  * ```
  * <home>/
  *   plugins.json          what install approved, per plugin
+ *   crashes.json          when a plugin's process last ended unasked (ADR 0041)
  *   plugins/<name>/       tyto-plugin.json, dist/index.js, whatever else it ships
  * ```
  *
@@ -28,6 +33,7 @@ import {
 
 export const PLUGINS_DIR = 'plugins';
 export const PLUGIN_STATE_FILE = 'plugins.json';
+export const PLUGIN_CRASHES_FILE = 'crashes.json';
 export const PLUGIN_MANIFEST_FILE = 'tyto-plugin.json';
 
 function isMissing(cause: unknown): boolean {
@@ -54,6 +60,7 @@ async function writeAtomically(path: string, text: string): Promise<void> {
 export function fsPluginStore(home: string): PluginStore {
   const pluginsDirectory = join(home, PLUGINS_DIR);
   const statePath = join(home, PLUGIN_STATE_FILE);
+  const crashesPath = join(home, PLUGIN_CRASHES_FILE);
 
   return {
     async list(): Promise<readonly StoredPlugin[]> {
@@ -88,6 +95,17 @@ export function fsPluginStore(home: string): PluginStore {
 
     async writeState(state: PluginState): Promise<void> {
       await writeAtomically(statePath, serializePluginState(state));
+    },
+
+    async readCrashes(): Promise<Result<PluginCrashes, Diagnostics>> {
+      const source = await readIfPresent(crashesPath);
+      return source === undefined
+        ? ok(EMPTY_PLUGIN_CRASHES)
+        : parsePluginCrashes(source, crashesPath);
+    },
+
+    async writeCrashes(crashes: PluginCrashes): Promise<void> {
+      await writeAtomically(crashesPath, serializePluginCrashes(crashes));
     },
 
     async add(name: string, from: string): Promise<void> {

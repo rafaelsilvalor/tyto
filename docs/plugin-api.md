@@ -29,7 +29,7 @@ my-plugin/
 | `version`     | semver, with an optional prerelease tag                                                      |
 | `engine`      | a version range (`>=0.1`, `^1.2.3`, `>=0.1 \|\| ^1`) against `PLUGIN_API_VERSION` (ADR 0040) |
 | `contributes` | at least one extension point from the table below, no repeats                                |
-| `permissions` | non-empty strings, no repeats; recorded at install, **not enforced until E11.2**             |
+| `permissions` | non-empty strings, no repeats; recorded at install, **not enforced yet** (ADR 0041)          |
 | `config`      | optional `{ "$schema": "…" }`, never dereferenced by the host                                |
 
 Unknown keys are refused, one complaint per stray key rather than one for the object holding them.
@@ -178,11 +178,33 @@ interface PluginHost {
 }
 ```
 
+**For an installed plugin every member is a message** (ADR 0041). `config` validates, in the plugin's thread, the slice of configuration the host sent at activation. `log` lines cross to the host, with a `detail` that cannot be cloned sent as its text. `events` hears the `registered` and `disposed` events of each host the plugin is activated in; `emit` stays in the plugin's thread, because a plugin announcing a registration would be speaking for the registry. `credentials` and `fetch` are not built yet: they are the second half of TYTO-48.
+
 ## Isolation
 
 - Main: each plugin in a `utilityProcess` (Electron) / `worker_threads` (CLI). Typed RPC; the host is a proxy.
 - Renderer: `panel` runs in a sandboxed iframe; talks to the host via typed `postMessage`.
 - Permissions are approved at install time; denied ⇒ the call rejects with `E_PERMISSION`.
+
+**Built in the CLI (TYTO-48, ADR 0041).** Each installed plugin's module is imported by a `worker_threads` worker of its own — `dist/plugin-worker.js`, one per plugin for the life of the command — and what reaches a task's host is a proxy. Built-ins stay in process. The desktop's `utilityProcess` is the same port with a second adapter, and is not built yet.
+
+```
+host (CLI thread)                                guest (plugin's worker)
+  connectIsolatedPlugin ◀── hello {protocol: 1} ── runGuest
+                        ── activate {config} ──▶   plugin.activate(guestHost)
+                        ◀── activated {registrations: data + {$call: n}}
+  tryActivate(proxy)       per task host, replayed
+  exportFrame(...)      ── call {handle, args} ──▶ args checked, function run
+                        ◀── result {value} ──      answer checked by the host
+```
+
+**Each side validates what it receives**, with the Zod schemas in `isolation/protocol.ts` and `isolation/points.ts`: the host every guest message and every answer, the guest every host message and a call's arguments, before the plugin's code sees them. **A contribution crosses as data, and its functions stay behind as handles**; a function is callable only if its point names it, with a schema for its arguments and one for its answer. Today that is `exporter.exportFrame`, which may therefore return a `Promise` — the job awaits it. `template-pack`, `editor.command` and `editor.keymap` cross as data; `source`, `sink`, `rasterizer`, `directive` and `panel` are refused by name — _not available to an isolated plugin yet_ — and TYTO-49 lifts that for `directive` and `panel`.
+
+**The proxy goes through `tryActivate`**, so an isolated plugin meets every check an in-process one does. `protocol` is its own number, compared at the `hello` handshake and nowhere else; it is not the engine (ADR 0040), because a plugin never sees these messages.
+
+**A crash is data.** When a plugin's thread ends unasked, every call waiting on it and every call after answers `E_PLUGIN_CRASHED`, non-fatal (ADR 0025): the frames other exporters draw are still delivered. A throw from the plugin's function is `E_PLUGIN_CALL`; an answer its schema refuses is `E_PLUGIN_PROTOCOL`. The crash is written to `crashes.json`, beside `plugins.json` and never inside it, **as history and not as a refusal**: the plugin is activated again on the next run, `plugin list` shows it as `crashed` with its time, and `install`, `enable` or `remove` clears it. A separate file, because the CLIs already shipped read `plugins.json` strictly, and one new key there would make an older CLI on the same machine drop every installed plugin (ADR 0041).
+
+**The worker is a crash and API boundary, not a security sandbox.** The plugin's code runs on the same Node as Tyto's and can import `node:fs` or open a socket without asking; `net:*` filters `host.fetch` only. A real boundary — a child process with Node's permission model — is TYTO-186.
 
 ## Lifecycle
 
@@ -191,18 +213,19 @@ interface PluginHost {
 ```
 ~/.tyto/
   plugins.json          what install approved, per plugin: enabled, permissions, source
+  crashes.json          when a plugin's worker last ended unasked — history, read by plugin list
   plugins/<name>/       tyto-plugin.json, dist/index.js, whatever else it ships
 ```
 
 **`TYTO_HOME` moves the folder.** Both apps read it — the CLI in `apps/cli/src/environment.ts`, the desktop in `apps/desktop/src/main/plugin-list.ts` — and fall back to `~/.tyto` when it is unset or empty, so the two always list the same plugins. It is also how a test points either app at a folder of its own instead of at somebody's real one.
 
-**The desktop shows the same list** (File ▸ _Show plugins_), read through one channel, `plugins:list`: main composes `fsPluginStore` and runs every installed folder through `checkStoredPlugin`, the renderer only draws the rows. It is read-only — install, remove and disable are the CLI's — and it opens with the sentence that the permissions are recorded and not enforced. The window does not activate installed plugins yet; that is the desktop half of E11.2 (TYTO-48), where activation happens in a `utilityProcess` and never in main.
+**The desktop shows the same list** (File ▸ _Show plugins_), read through one channel, `plugins:list`: main composes `fsPluginStore` and runs every installed folder through `checkStoredPlugin`, the renderer only draws the rows. It is read-only — install, remove and disable are the CLI's — and it opens with the same notice `install` prints: the permissions are recorded and not enforced, and the CLI's worker thread contains a crash but is not a sandbox (ADR 0041). The window does not activate installed plugins yet; that is the desktop half of E11.2 (TYTO-48), where activation happens in a `utilityProcess` and never in main.
 
 **Three sources, fetched by the programs the person already has.** A folder is used where it is. A git URL — `git+https://…`, `git@host:…`, `git://…`, anything ending `.git` — is `git clone --depth 1`. Anything else is an npm spec — a name, `name@range`, a tarball — and is `npm pack` followed by `tar`; a spec that names a file on this disk is handed to npm as `file:<absolute path>`, because npm reads a bare `packed/x.tgz` as the GitHub shorthand `user/repo` and tries to clone it. Tyto opens no connection of its own, so git's and npm's credentials, proxy and registry configuration apply unchanged, and nothing about who fetched what reaches Tyto (ADR 0011). It is also what makes the three testable offline: `apps/cli/src/plugin-install.test.ts` clones a `file://` repository and packs a local tarball through exactly the commands a real URL and a real name take.
 
-**The approval is recorded apart from the files.** A folder under `plugins/` says a plugin's files are here; it does not say anybody agreed to run them. So `plugins.json` holds what `install` asked and was told, and the loader reads both: **a folder with no entry is not installed** — one copied in by hand has had no question asked — and an entry whose plugin now declares a permission nobody approved is refused (`E_PLUGIN_PERMISSIONS_CHANGED`) until it is installed again. Installing a name that is already installed replaces it; that is how an update lands. A built-in's name is never available.
+**Both files drop the keys they do not know rather than refusing** (ADR 0041), so a newer CLI or desktop can add a field without costing the older one its plugins. **The approval is recorded apart from the files.** A folder under `plugins/` says a plugin's files are here; it does not say anybody agreed to run them. So `plugins.json` holds what `install` asked and was told, and the loader reads both: **a folder with no entry is not installed** — one copied in by hand has had no question asked — and an entry whose plugin now declares a permission nobody approved is refused (`E_PLUGIN_PERMISSIONS_CHANGED`) until it is installed again. Installing a name that is already installed replaces it; that is how an update lands. A built-in's name is never available.
 
-**Approved is not enforced, and the prompt says so.** Until E11.2 (TYTO-48) an installed plugin's code is imported into Tyto's own process and has Tyto's access to the computer; the permissions are shown, recorded and compared, not sandboxed. `install` prints that sentence beside the list, so nobody reads a granted permission as a boundary. Without a terminal to answer, `install` needs `--yes`.
+**Approved is not enforced, and the prompt says so.** An installed plugin runs in a worker thread of its own (see Isolation), and the prompt says that thread is not a sandbox: the plugin has Tyto's access to the computer, and the permissions are shown, recorded and compared. `host.fetch` and `host.credentials`, which enforce `net:*` and `credentials:*`, are the second half of TYTO-48. `install` prints that sentence beside the list, so nobody reads a granted permission as a boundary. Without a terminal to answer, `install` needs `--yes`.
 
 **A plugin that cannot load does not stop a render** (ADR 0040). Installed plugins are read and imported once per process, and activated into each task's host **after** the built-ins through `InProcessHost.tryActivate`, which answers with diagnostics instead of throwing. A contribution id another plugin already holds is `E_PLUGIN_DUPLICATE`, naming both plugins; everything the loser registered is withdrawn, and the task renders without it. On a render every refusal is carried as `W_PLUGIN_SKIPPED` in `result.json` — a warning, because the brief is not what is wrong.
 
@@ -219,7 +242,7 @@ fs-outbox           1.0.3  built-in  enabled   sink
 pdf                 1.0.0  external  disabled  exporter
 ```
 
-`refused` is the third status — a folder that failed a check that reads no code, with the reason on stderr. `--active` shows only what a render would activate, and `--json` prints the same rows with `engine`, `permissions` and `status`.
+`refused` is the third status — a folder that failed a check that reads no code, with the reason on stderr. `crashed` is the fourth, and the only one that is history: the plugin's thread ended unasked on an earlier run, stderr names when and why (`W_PLUGIN_CRASHED`), and the plugin still activates. `--active` shows only what a render would activate — so `crashed` is in it — and `--json` prints the same rows with `engine`, `permissions`, `status` and `crashed`.
 
 **Listing reads manifests; it does not activate.** `activateBuiltIns` wires one render — it leaves the rasterizer out when there is nothing to raster, and never wires the queue at all — so a listing built from it would be shorter on some runs than on others, and listing would have to launch a browser to tell you a browser is installed. The command reads `BUILT_IN_MANIFESTS` and validates each through the same schema a loaded plugin's file will go through; a built-in whose manifest stopped matching is reported there rather than surfacing as a `TypeError` on the next render. It exits **2** in that case, not 1: a manifest this repository ships is its own bug, and ADR 0011 reserves the retryable code for what a caller can fix. The same rule covers installed plugins: `list` imports none of their code, so `--active` means _enabled and passing every check that reads no code_, and an id collision — found only by activating — is named by the render that meets it.
 

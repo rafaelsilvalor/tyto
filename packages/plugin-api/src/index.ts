@@ -44,6 +44,15 @@ export {
 } from './loader.js';
 
 export {
+  type PluginCrash,
+  type PluginCrashes,
+  EMPTY_PLUGIN_CRASHES,
+  parsePluginCrashes,
+  serializePluginCrashes,
+  withPluginCrash,
+} from './crashes.js';
+
+export {
   type PluginState,
   type PluginStateEntry,
   EMPTY_PLUGIN_STATE,
@@ -67,3 +76,25 @@ export {
   type TypedEmitter,
   createPluginHost,
 } from './host.js';
+
+export type {
+  GuestChannel,
+  PluginChannel,
+  PluginProcessLauncher,
+  PluginProcessRequest,
+} from './isolation/channel.js';
+
+export {
+  type GuestMessage,
+  type HelloMessage,
+  type HostMessage,
+  RPC_PROTOCOL_VERSION,
+} from './isolation/protocol.js';
+
+export { runGuest } from './isolation/guest.js';
+
+export {
+  type IsolatedPlugin,
+  type IsolatedPluginOptions,
+  connectIsolatedPlugin,
+} from './isolation/isolated-plugin.js';
