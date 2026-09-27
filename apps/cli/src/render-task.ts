@@ -16,6 +16,7 @@ import {
   renderResult,
 } from '@tyto/io';
 import { type OutputRequest, fontSubstitutionWarnings, runJob } from '@tyto/pipeline';
+import { directiveResolverOf } from '@tyto/plugin-api';
 import type { Rasterizer } from '@tyto/raster';
 
 import {
@@ -173,6 +174,7 @@ export async function renderTask(
       templates: wiring.source,
       assets: fileAssetResolver({ base: task.assetBase }),
       exporters: host.registry.exporters,
+      directives: directiveResolverOf(() => host.registry.directives()),
       formats: context.formats,
       faces,
       // Read back out of the registry rather than passed through: what renders is what was

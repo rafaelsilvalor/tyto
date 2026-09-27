@@ -1,5 +1,11 @@
 import { EditorState } from '@codemirror/state';
-import { type AssetResolver, type TemplateManifest, parseManifest } from '@tyto/core';
+import {
+  type AssetResolver,
+  type DirectiveResolver,
+  type TemplateManifest,
+  ok,
+  parseManifest,
+} from '@tyto/core';
 import { describe, expect, it } from 'vitest';
 
 import { briefAnalysisField, createBriefAnalyzer, setBriefAnalysis } from './analysis.js';
@@ -147,6 +153,52 @@ slots:
 
     expect(analysis.manifest?.version).toBe('2.0.0');
     expect(analysis.diagnostics).toEqual([]);
+  });
+});
+
+describe('createBriefAnalyzer with a plugin directive (TYTO-49)', () => {
+  const SHOUTED = [
+    '---',
+    'template: carrossel-lista',
+    '---',
+    '::demo/shout {slot: titulo} Lista',
+    '::item Um',
+    '',
+  ].join('\n');
+
+  const shout: DirectiveResolver = {
+    find: (namespace, name) =>
+      namespace === 'demo' && name === 'shout'
+        ? (directive) =>
+            ok([
+              {
+                name: directive.adjustments[0]?.value ?? '',
+                body: [{ kind: 'text', value: 'LISTA' }],
+              },
+            ])
+        : undefined,
+  };
+
+  it('resolves it through the host’s resolver, so the gutter stays clean', async () => {
+    const withPlugin = createBriefAnalyzer({
+      manifests: [CARROSSEL],
+      directives: { names: ['demo/shout'], resolver: shout },
+    });
+    const analysis = await withPlugin.analyze(SHOUTED);
+
+    expect(analysis.diagnostics).toEqual([]);
+    expect(analysis.directives).toEqual(['demo/shout']);
+  });
+
+  it('marks it E_UNKNOWN_DIRECTIVE on the name without the plugin', async () => {
+    const analysis = await analyzer.analyze(SHOUTED);
+    const unknown = analysis.diagnostics.find((item) => item.code === 'E_UNKNOWN_DIRECTIVE');
+
+    expect(unknown?.range).toEqual({
+      start: SHOUTED.indexOf('demo/shout'),
+      end: SHOUTED.indexOf('demo/shout') + 'demo/shout'.length,
+    });
+    expect(analysis.directives).toBeUndefined();
   });
 });
 

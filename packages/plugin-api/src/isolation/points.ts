@@ -1,5 +1,8 @@
 import {
   type Diagnostics,
+  type Directive,
+  type ExpandedInline,
+  type Inline,
   artworkSchema,
   err,
   frameSchema,
@@ -19,7 +22,7 @@ import { resultSchema } from './protocol.js';
  * handle the host calls back. **A function is callable only if it is named here**, with
  * the schema its arguments are checked against in the guest and the schema its answer is
  * checked against in the host — so adding a callable to a point is one entry, which is how
- * TYTO-49 gives a directive its transform.
+ * a directive got its `transform` (TYTO-49).
  *
  * `failed` is what the caller receives when the call cannot be answered at all — the
  * process died, or answered something the schema refused — shaped like a real answer, so
@@ -53,6 +56,78 @@ export type RegisterMethod =
   | 'registerKeymap'
   | 'registerPanel';
 
+const rangeSchema = z.strictObject({
+  start: z.number().int().nonnegative(),
+  end: z.number().int().nonnegative(),
+});
+
+type RangedInline = Inline;
+
+/** An AST inline, positions included: what the guest checks a directive's body against. */
+const rangedInlineSchema: z.ZodType<RangedInline> = z.lazy(() =>
+  z.discriminatedUnion('kind', [
+    z.strictObject({ kind: z.literal('text'), value: z.string(), range: rangeSchema }),
+    z.strictObject({
+      kind: z.literal('bold'),
+      children: z.array(rangedInlineSchema),
+      range: rangeSchema,
+    }),
+    z.strictObject({
+      kind: z.literal('italic'),
+      children: z.array(rangedInlineSchema),
+      range: rangeSchema,
+    }),
+    z.strictObject({ kind: z.literal('break'), range: rangeSchema }),
+    z.strictObject({
+      kind: z.literal('mark'),
+      key: z.string(),
+      value: z.string(),
+      children: z.array(rangedInlineSchema),
+      range: rangeSchema,
+    }),
+  ]),
+) as z.ZodType<RangedInline>;
+
+/** A plugin directive as parsed, which is what `transform` is handed (ADR 0043). */
+const directiveSchema = z.strictObject({
+  name: z.string().min(1),
+  namespace: z.string().min(1),
+  adjustments: z.array(
+    z.strictObject({ name: z.string(), value: z.string().optional(), range: rangeSchema }),
+  ),
+  body: z.array(rangedInlineSchema),
+  range: rangeSchema,
+  nameRange: rangeSchema,
+}) as unknown as z.ZodType<Directive>;
+
+/** An inline as a plugin answers it: the AST's shapes, and no positions to lie with. */
+const expandedInlineSchema: z.ZodType<ExpandedInline> = z.lazy(() =>
+  z.discriminatedUnion('kind', [
+    z.strictObject({ kind: z.literal('text'), value: z.string() }),
+    z.strictObject({ kind: z.literal('bold'), children: z.array(expandedInlineSchema) }),
+    z.strictObject({ kind: z.literal('italic'), children: z.array(expandedInlineSchema) }),
+    z.strictObject({ kind: z.literal('break') }),
+    z.strictObject({
+      kind: z.literal('mark'),
+      key: z.string(),
+      value: z.string(),
+      children: z.array(expandedInlineSchema),
+    }),
+  ]),
+) as z.ZodType<ExpandedInline>;
+
+/**
+ * A replacement slot directive. Strict, so a `namespace` — which would make it another
+ * plugin directive — or a `range` is refused as `E_PLUGIN_PROTOCOL` rather than dropped.
+ */
+const expandedDirectiveSchema = z.strictObject({
+  name: z.string().min(1),
+  adjustments: z
+    .array(z.strictObject({ name: z.string().min(1), value: z.string().optional() }))
+    .optional(),
+  body: z.array(expandedInlineSchema),
+});
+
 const exportFrameOptionsSchema = z.strictObject({ textAsPaths: z.boolean().optional() });
 
 export const ISOLATED_POINTS: Readonly<Partial<Record<ContributionPoint, PointSpec>>> = {
@@ -85,6 +160,18 @@ export const ISOLATED_POINTS: Readonly<Partial<Record<ContributionPoint, PointSp
     }),
     callables: {},
   },
+  directive: {
+    method: 'registerDirective',
+    data: z.strictObject({ id: z.string().min(1), names: z.array(z.string().min(1)) }),
+    callables: {
+      transform: {
+        args: z.tuple([directiveSchema]),
+        send: ([directive]) => [directive],
+        result: resultSchema(z.array(expandedDirectiveSchema)),
+        failed: (problems) => err(problems),
+      },
+    },
+  },
   'editor.command': {
     method: 'registerCommand',
     data: z.strictObject({ id: z.string().min(1), title: z.string() }),
@@ -105,15 +192,14 @@ export const ISOLATED_POINTS: Readonly<Partial<Record<ContributionPoint, PointSp
  * Points an isolated plugin cannot register into yet, and the method that reaches each.
  *
  * `source`, `sink` and `rasterizer` carry a value whose type lives in a Node package and
- * whose methods nothing here names; `directive` and `panel` are behaviour whose shape is
- * TYTO-49's to decide. Refused by name, so a plugin learns which one, rather than
+ * whose methods nothing here names; `panel` is a page in the desktop's renderer, which is
+ * the second half of TYTO-49. Refused by name, so a plugin learns which one, rather than
  * registering something that could never be called.
  */
 export const NOT_YET_ISOLATED: Readonly<Record<string, ContributionPoint>> = {
   registerSource: 'source',
   registerSink: 'sink',
   registerRasterizer: 'rasterizer',
-  registerDirective: 'directive',
   registerPanel: 'panel',
 };
 

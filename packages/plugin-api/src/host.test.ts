@@ -318,7 +318,7 @@ describe('activating a plugin', () => {
           plugin.registerExporter(exporterOf('promo'));
           plugin.registerRasterizer({ id: 'c', value: 1 });
           plugin.registerTemplatePack({ id: 'd', templates: [] });
-          plugin.registerDirective({ id: 'e', namespace: 'promo' });
+          plugin.registerDirective({ id: 'e', names: [], transform: () => ok([]) });
           plugin.registerCommand({ id: 'f', title: 'Do' });
           plugin.registerKeymap({ id: 'g', bindings: {} });
           plugin.registerPanel({ id: 'h', title: 'Promo' });

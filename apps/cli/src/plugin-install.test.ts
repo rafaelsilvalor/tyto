@@ -469,3 +469,143 @@ describe('a plugin whose thread is killed mid-render', () => {
     });
   }, 60_000);
 });
+
+/* ------------------------------------------------------------- a plugin directive -- */
+
+/**
+ * `::demo/shout {slot: name} text` — the card's test plugin (TYTO-49, ADR 0043), as a
+ * third party would ship it: plain ESM, run in its own worker thread. The slot is named by
+ * a parsed adjustment and the body comes back uppercased.
+ */
+const SHOUT_SOURCE = `const loud = (inline) =>
+  inline.kind === 'text'
+    ? { kind: 'text', value: inline.value.toUpperCase() }
+    : inline.kind === 'break'
+      ? { kind: 'break' }
+      : { ...inline, range: undefined, children: inline.children.map(loud) };
+
+export function activate(host) {
+  host.registerDirective({
+    id: 'demo',
+    names: ['shout'],
+    transform: (directive) => {
+      const slot = directive.adjustments.find((item) => item.name === 'slot');
+      if (slot === undefined || slot.value === undefined) {
+        return {
+          ok: false,
+          error: [{
+            severity: 'error',
+            code: 'E_DIRECTIVE_ARGUMENT',
+            message: "Directive '::demo/shout' needs {slot: name}.",
+          }],
+        };
+      }
+      return { ok: true, value: [{ name: slot.value, body: directive.body.map(loud) }], diagnostics: [] };
+    },
+  });
+}
+`;
+
+async function shoutFolder(): Promise<string> {
+  const folder = join(workspace, 'sources', 'demo');
+  await mkdir(join(folder, 'dist'), { recursive: true });
+  await writeFile(
+    join(folder, 'tyto-plugin.json'),
+    JSON.stringify({
+      name: 'demo',
+      version: '1.0.0',
+      engine: `>=${PLUGIN_API_VERSION}`,
+      contributes: ['directive'],
+      permissions: [],
+    }),
+  );
+  await writeFile(join(folder, 'dist', 'index.js'), SHOUT_SOURCE);
+  return folder;
+}
+
+interface ReportedDiagnostic {
+  readonly code: string;
+  readonly message: string;
+  readonly range?: { readonly start: number; readonly end: number };
+}
+
+async function renderedWith(brief: string): Promise<{
+  readonly code: number;
+  readonly artifacts: readonly string[];
+  readonly diagnostics: readonly ReportedDiagnostic[];
+}> {
+  await writeFile(join(workspace, 'task', 'brief.brief'), brief);
+  const code = await run(renderArguments('svg'), environment());
+  const result = JSON.parse(
+    await readFile(join(workspace, 'task', 'out', 'result.json'), 'utf8'),
+  ) as { artifacts: { name: string }[]; diagnostics: ReportedDiagnostic[] };
+  return {
+    code,
+    artifacts: result.artifacts.map((artifact) => artifact.name),
+    diagnostics: result.diagnostics,
+  };
+}
+
+const HEAD = '---\ntemplate: cartaz\nformats: [feed]\nimagem: ./logo.png\n---\n';
+/** Every brief below is `HEAD`, `::slide Um`, then the plugin directive, which starts here. */
+const DIRECTIVE_AT = HEAD.length + '::slide Um\n'.length;
+
+describe('an installed directive at render', () => {
+  // Starts a plugin's worker thread, which a full `pnpm check` can hold past Vitest's 5 s.
+  it('expands ::demo/shout into the slot it names, through the worker', async () => {
+    await run(['plugin', 'install', await shoutFolder(), '--yes'], environment());
+
+    const rendered = await renderedWith(`${HEAD}::slide Um\n::demo/shout {slot: slide} dois\n`);
+
+    expect(rendered.code, stderr()).toBe(EXIT_OK);
+    expect(rendered.diagnostics).toEqual([]);
+    expect(rendered.artifacts).toEqual(['slide-1-feed.svg', 'slide-2-feed.svg']);
+  }, 60_000);
+
+  // Starts a plugin's worker thread, which a full `pnpm check` can hold past Vitest's 5 s.
+  it('uppercases the text, and the manifest checks the replacement on the directive', async () => {
+    // `cor` is an enum of lowercase values, so the uppercased one is refused by name — which
+    // is the text having crossed the thread both ways, and resolve checking what came back.
+    await run(['plugin', 'install', await shoutFolder(), '--yes'], environment());
+
+    const rendered = await renderedWith(`${HEAD}::slide Um\n::demo/shout {slot: cor} laranja\n`);
+
+    expect(rendered.diagnostics.map((item) => [item.code, item.range?.start])).toEqual([
+      ['E_BAD_SLOT_VALUE', DIRECTIVE_AT],
+    ]);
+    expect(rendered.diagnostics[0]?.message).toContain('LARANJA');
+  }, 60_000);
+
+  it('is E_UNKNOWN_DIRECTIVE without the plugin, on the name', async () => {
+    const rendered = await renderedWith(`${HEAD}::slide Um\n::demo/shout {slot: slide} dois\n`);
+
+    expect(rendered.code).toBe(EXIT_DIAGNOSTICS);
+    expect(rendered.diagnostics.map((item) => [item.code, item.range?.start])).toEqual([
+      ['E_UNKNOWN_DIRECTIVE', DIRECTIVE_AT + 2],
+    ]);
+    expect(rendered.artifacts).toEqual(['slide-1-feed.svg']);
+  });
+
+  // Starts a plugin's worker thread, which a full `pnpm check` can hold past Vitest's 5 s.
+  it('cannot take an argument value outside [a-zA-Z0-9_-] — the known limit', async () => {
+    // Adjustment values are the grammar's `value` token; a plugin argument is one of them
+    // until the grammar has an argument node of its own (ADR 0043).
+    await run(['plugin', 'install', await shoutFolder(), '--yes'], environment());
+
+    const rendered = await renderedWith(
+      `${HEAD}::slide Um\n::demo/shout {slot: sub.titulo} dois\n`,
+    );
+
+    // Measured, not designed: the value stops at `sub`, the rest of the list is two syntax
+    // errors, and the plugin still runs with the part that parsed.
+    expect(rendered.diagnostics.map((item) => item.code)).toEqual([
+      'E_SYNTAX',
+      'E_SYNTAX',
+      'E_UNKNOWN_SLOT',
+    ]);
+    expect(rendered.diagnostics[0]?.message).toBe(
+      'Syntax error: an adjustment list is missing its closing }.',
+    );
+    expect(rendered.diagnostics[2]?.message).toContain("Unknown slot 'sub'.");
+  }, 60_000);
+});

@@ -109,6 +109,15 @@ export const diagnosticCodes = {
     fatal: false,
     fatality: 'The same: a directive nothing claims contributes nothing to skip.',
   },
+  E_DIRECTIVE_ARGUMENT: {
+    severity: 'error',
+    summary:
+      'A plugin directive was written without an argument it needs, or with one it cannot use.',
+    template: "Directive '::{directive}' {problem}.",
+    spec: 'docs/brief-language.md',
+    fatal: false,
+    fatality: 'The directive contributes nothing; every other directive is resolved.',
+  },
   E_MISSING_REQUIRED_SLOT: {
     severity: 'error',
     summary: 'The manifest marks a slot as required and the brief leaves it unset.',
