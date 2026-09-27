@@ -53,8 +53,12 @@ export interface PluginStore {
    * Replacing, because the caller has already decided — `install` refuses a name that is
    * taken before it gets this far, and reinstalling to approve new permissions is the one
    * case where somebody asked for the old files to go.
+   *
+   * A folder it will not copy — a link in it that leads outside it — is an `Err` naming the
+   * file, and nothing is replaced (TYTO-50). That is a person's folder being refused, which
+   * ADR 0011 makes exit 1, not a failure of the program.
    */
-  add(name: string, from: string): Promise<void>;
+  add(name: string, from: string): Promise<Result<void, Diagnostics>>;
   remove(name: string): Promise<void>;
   /** The folder a plugin's files are in, for the host that imports its code. */
   directoryOf(name: string): string;

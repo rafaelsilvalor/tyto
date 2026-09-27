@@ -1,4 +1,4 @@
-import { mkdir, mkdtemp, readFile, readdir, rm, writeFile } from 'node:fs/promises';
+import { lstat, mkdir, mkdtemp, readFile, readdir, rm, symlink, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
@@ -50,6 +50,54 @@ describe('fsPluginStore', () => {
 
     expect(await store.list()).toEqual([{ folder: 'pdf', manifestSource: '{"name":"pdf"}' }]);
     expect((await readdir(store.directoryOf('pdf'))).sort()).toEqual(['dist', 'tyto-plugin.json']);
+  });
+
+  // A junction on Windows, which needs no administrator; a symbolic link elsewhere. Both are
+  // what a person's folder holds, and copying one as a link was an EPERM on Windows (TYTO-50).
+  it('copies a link that lands inside the folder as what it points to', async () => {
+    await mkdir(join(source, 'templates'), { recursive: true });
+    await writeFile(join(source, 'templates', 'a.txt'), 'inside');
+    await symlink(join(source, 'templates'), join(source, 'linked'), 'junction');
+    const store = fsPluginStore(home);
+
+    expect(await store.add('pdf', source)).toEqual({ ok: true, value: undefined, diagnostics: [] });
+
+    const copied = join(store.directoryOf('pdf'), 'linked');
+    expect((await lstat(copied)).isSymbolicLink()).toBe(false);
+    expect(await readFile(join(copied, 'a.txt'), 'utf8')).toBe('inside');
+  });
+
+  it('refuses a link that leads out of the folder, naming it, and writes nothing', async () => {
+    const outside = join(home, '..', 'outside');
+    await mkdir(outside, { recursive: true });
+    await symlink(outside, join(source, 'dist', 'elsewhere'), 'junction');
+    const store = fsPluginStore(home);
+
+    const added = await store.add('pdf', source);
+
+    expect(added.ok).toBe(false);
+    if (added.ok) return;
+    expect(added.error.map((problem) => [problem.code, problem.message])).toEqual([
+      [
+        'E_PLUGIN_LINK',
+        `Plugin folder '${source}' holds '${join('dist', 'elsewhere')}', a link that leads out of the folder. Install copies a plugin's own files only: replace the link with the file it points to.`,
+      ],
+    ]);
+    expect(await store.list()).toEqual([]);
+  });
+
+  it('refuses a link that leads nowhere', async () => {
+    const gone = join(home, '..', 'gone');
+    await mkdir(gone, { recursive: true });
+    await symlink(gone, join(source, 'dangling'), 'junction');
+    await rm(gone, { recursive: true });
+    const store = fsPluginStore(home);
+
+    const added = await store.add('pdf', source);
+
+    expect(added.ok ? [] : added.error.map((problem) => problem.message)).toEqual([
+      expect.stringContaining("holds 'dangling', a link that leads nowhere."),
+    ]);
   });
 
   it('replaces the previous files on a second add, rather than merging them', async () => {

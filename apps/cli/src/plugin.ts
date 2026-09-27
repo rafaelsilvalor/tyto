@@ -290,7 +290,8 @@ export async function pluginInstallCommand(
       }
     }
 
-    await installed.store.add(manifest.name, fetched.value.directory);
+    const added = await installed.store.add(manifest.name, fetched.value.directory);
+    if (!added.ok) return fail(added.error, environment);
     await installed.store.writeState(
       withPluginEntry(state, manifest.name, {
         enabled: true,

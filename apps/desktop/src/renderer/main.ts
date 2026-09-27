@@ -1335,7 +1335,10 @@ async function loadPluginPanels(bridge: TytoBridge): Promise<void> {
     announceDocument(document, contentOf(active()));
   });
 
+  // Answered once the plugins have started, and main has put their template packs into the
+  // search before answering (`index.ts`), so this is also the moment the picker can list them.
   const { panels } = await bridge['plugins:panels']({});
+  void afterTemplatesReread(bridge);
   for (const panel of panels) {
     offeredPanels.set(panel.id, panel);
     registry.register({
@@ -1830,21 +1833,23 @@ function wireTemplateMode(mode: TemplateMode, bridge: TytoBridge): void {
         })
       ).confirmed,
     saved: () => {
-      void afterTemplateSaved(bridge);
+      void afterTemplatesReread(bridge);
     },
   };
 }
 
 /**
- * A template was saved and main has read the folders again: every open brief is compiled again
- * — the third acceptance criterion.
+ * Main has read the folders again — a template was saved, or the installed plugins started and
+ * their packs joined the search (ADR 0046) — so every open brief is compiled again. The first is
+ * TYTO-44's third acceptance criterion; the second is why a brief that names an installed
+ * template, open before the plugins had started, stops being `E_UNKNOWN_TEMPLATE` untouched.
  *
  * **Every** open brief and not only the ones naming the template, because a save can rename
  * it: a brief that named the old name stops resolving and one that named the new name starts,
  * and both need the answer. It is one compile per tab, and background tabs are updated without
  * a repaint, exactly as a late answer to their own typing is (`request`).
  */
-async function afterTemplateSaved(bridge: TytoBridge): Promise<void> {
+async function afterTemplatesReread(bridge: TytoBridge): Promise<void> {
   // The folder may now hold one template more, or one fewer — the picker's list and the
   // footer's count come from the same read.
   const chosen = await bridge['templates:folder']({});
