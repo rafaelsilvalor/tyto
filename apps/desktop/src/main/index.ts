@@ -14,8 +14,15 @@ import {
   shell,
   utilityProcess,
 } from 'electron';
-import { PLUGINS_DIR, fsInbox, fsPluginStore, nodeFileSystem } from '@tyto/io';
-import { NO_PLUGINS } from '@tyto/plugin-api';
+import {
+  PLUGINS_DIR,
+  fsInbox,
+  fsPluginStore,
+  installedPacks,
+  nodeFileSystem,
+  withoutRefused,
+} from '@tyto/io';
+import { NO_PLUGINS, createPluginHost } from '@tyto/plugin-api';
 import type { Rasterizer } from '@tyto/raster';
 
 import { type Locale, localeFor, translate } from '../../shared/i18n/index.js';
@@ -398,6 +405,25 @@ async function start(): Promise<void> {
     void plugins.then((loaded) => loaded.close());
   });
 
+  // The installed plugins' template packs, checked by the CLI's own rule (ADR 0046) and
+  // searched after the built-in pack once they are. A plugin refused over its pack is
+  // refused everywhere below — preview, panels and export — because the problems panel
+  // says it was skipped. `windowPlugins` settles after this, which is what tells the
+  // renderer to ask for the template list again.
+  const checked = plugins.then(async (loaded) => {
+    try {
+      const packs = await installedPacks(createPluginHost(), loaded, (name) =>
+        pluginStore.directoryOf(name),
+      );
+      for (const warning of packs.warnings) log.warn(warning.message);
+      await sources.setInstalled(packs);
+      return withoutRefused(loaded, packs.refused);
+    } catch (cause) {
+      log.error("The installed plugins' templates could not be read.", cause);
+      return loaded;
+    }
+  });
+
   // Built before the window, for the same reason the registry is: the preview's first
   // answer should not wait on a folder read that could have happened during startup. It
   // reads the same pack the host registered, through the same resolver, and the installed
@@ -408,7 +434,7 @@ async function start(): Promise<void> {
   // it (E9.11) — a service holding one folder assumed one open document.
   // What the installed plugins contribute to the window itself: the directives the preview
   // and the template mode resolve, and the panels (ADR 0043, ADR 0045).
-  const contributed = windowPlugins(plugins);
+  const contributed = windowPlugins(checked);
   const preview = await createPreviewService({ fileSystem, sources, directives: contributed });
 
   // The template mode (TYTO-44). The same `sources` as the preview, so a save that reads the
@@ -422,7 +448,7 @@ async function start(): Promise<void> {
     fileSystem,
     log,
     sources,
-    plugins,
+    plugins: checked,
     version: app.getVersion(),
     ...(host.registry.rasterizers<Rasterizer>()[0]?.value === undefined
       ? {}

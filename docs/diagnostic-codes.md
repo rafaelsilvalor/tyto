@@ -46,6 +46,7 @@ non-zero.
 | `E_PLUGIN_EXPORTER_KIND` | error | yes | A plugin registered a rasterized exporter declaring a kind no rasterizer encodes. |
 | `E_PLUGIN_PACK_DIRECTORY` | error | yes | A plugin's template pack names a folder outside the plugin's installed folder. |
 | `E_PLUGIN_PACK_CODE` | error | yes | A plugin's template pack holds a template that is not markup. |
+| `E_PLUGIN_LINK` | error | yes | A plugin folder being installed holds a link that leads outside it, or nowhere. |
 | `E_PLUGIN_CRASHED` | error | no | An isolated plugin's process stopped while the host was waiting for it. |
 | `E_PLUGIN_PROTOCOL` | error | no | An isolated plugin sent the host a message that does not match the RPC protocol. |
 | `E_PLUGIN_CALL` | error | no | A function an isolated plugin registered threw when the host called it. |
@@ -131,6 +132,7 @@ incomplete brief, and a crossed box where a picture the exporter could not load 
 | `E_PLUGIN_EXPORTER_KIND` | yes | A plugin that did not load contributed no slot to skip. |
 | `E_PLUGIN_PACK_DIRECTORY` | yes | A plugin that did not load contributed no slot to skip. |
 | `E_PLUGIN_PACK_CODE` | yes | A plugin that did not load contributed no slot to skip. |
+| `E_PLUGIN_LINK` | yes | A plugin that did not load contributed no slot to skip. |
 | `E_PLUGIN_CRASHED` | no | One frame was waiting on the process; the frames other exporters draw survive (ADR 0025). |
 | `E_PLUGIN_PROTOCOL` | no | It costs the one frame whose answer it was; the others are drawn (ADR 0025). |
 | `E_PLUGIN_CALL` | no | It costs the one frame the call was for; the others are drawn (ADR 0025). |
@@ -583,6 +585,20 @@ Plugin '{plugin}' contributes template '{template}', which is not a markup templ
 ```
 
 Parameters: `plugin`, `template`
+
+### `E_PLUGIN_LINK`
+
+**Severity:** error · **Fatal:** yes · **Spec:** `docs/plugin-authoring.md`
+
+A plugin folder being installed holds a link that leads outside it, or nowhere.
+
+A plugin that did not load contributed no slot to skip.
+
+```
+Plugin folder '{source}' holds '{file}', a link that {problem}. Install copies a plugin's own files only: replace the link with the file it points to.
+```
+
+Parameters: `source`, `file`, `problem`
 
 ### `E_PLUGIN_CRASHED`
 

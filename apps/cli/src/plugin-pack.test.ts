@@ -360,6 +360,23 @@ describe('a pack folder outside its plugin', () => {
     ]);
   }, 60_000);
 
+  it('is refused at install when the plugin folder itself holds a link out: exit 1, no stack', async () => {
+    // What used to be `tyto: internal failure — Error: EPERM … symlink` on Windows, exit 2.
+    const outside = join(workspace, 'outside');
+    await mkdir(outside, { recursive: true });
+    const folder = await packPlugin('templates');
+    await symlink(outside, join(folder, 'linked'), 'junction');
+
+    const code = await run(['plugin', 'install', folder, '--yes'], environment());
+
+    expect(code).toBe(EXIT_DIAGNOSTICS);
+    expect(stderr()).toContain("holds 'linked', a link that leads out of the folder.");
+    expect(stderr()).not.toContain('internal failure');
+    expect(stderr()).not.toMatch(/\n\s+at /u);
+    expect(await run(['plugin', 'list', '--json'], environment())).toBe(EXIT_OK);
+    expect(out.join('')).not.toContain('"pacote"');
+  });
+
   // Starts a plugin's worker thread, which a full `pnpm check` can hold past Vitest's 5 s.
   it('refuses the whole plugin, so its exporter is not offered either', async () => {
     await run(

@@ -2,6 +2,7 @@ import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
+import { diagnostic } from '@tyto/core';
 import { nodeFileSystem } from '@tyto/io';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 
@@ -214,5 +215,56 @@ describe('the folders this app searches', () => {
     // which is the case above. Both keep the app rendering.
     expect(snapshot.formats).toBeDefined();
     expect(snapshot.diagnostics.some((item) => item.code.startsWith('E_FORMATS'))).toBe(true);
+  });
+});
+
+describe("installed plugins' packs (ADR 0046)", () => {
+  let installed: string;
+
+  beforeAll(() => {
+    installed = join(scratch, 'installed');
+    pack(installed, [
+      ['promo-curso', 'an installed one, hidden'],
+      ['cartaz', 'only in the installed pack'],
+    ]);
+  });
+
+  const skipped = diagnostic('W_PLUGIN_SKIPPED', { plugin: 'fora', reason: 'its pack leads out.' });
+
+  it('searches them after the built-in pack, which keeps the names it has', async () => {
+    const sources = await sourcesOver(mine);
+
+    const snapshot = await sources.setInstalled({ directories: [installed], warnings: [] });
+
+    // The CLI's order: the chosen folder, the built-in pack, then installed packs.
+    expect(snapshot.roots).toEqual([mine, builtIn, installed]);
+    expect(snapshot.registry?.get('cartaz')?.description).toBe('only in the installed pack');
+    expect(snapshot.registry?.get('promo-curso')?.description).toBe('mine, and it wins');
+    expect(
+      snapshot.diagnostics
+        .filter((item) => item.code === 'W_TEMPLATE_SHADOWED')
+        .map((item) => item.message)
+        .some((message) => message.includes(join(installed, 'promo-curso'))),
+    ).toBe(true);
+  });
+
+  it('keeps them, and the refusals, across a change of the chosen folder', async () => {
+    const sources = await sourcesOver(mine);
+    await sources.setInstalled({ directories: [installed], warnings: [skipped] });
+
+    const snapshot = await sources.reload(undefined);
+
+    expect(snapshot.roots).toEqual([builtIn, installed]);
+    expect(snapshot.diagnostics).toContainEqual(skipped);
+  });
+
+  it('keeps the chosen folder when they arrive after it', async () => {
+    const sources = await sourcesOver(mine);
+    await sources.reload(empty);
+
+    const snapshot = await sources.setInstalled({ directories: [installed], warnings: [] });
+
+    expect(snapshot.roots).toEqual([empty, builtIn, installed]);
+    expect(snapshot.folder).toEqual({ path: empty, found: 0 });
   });
 });
