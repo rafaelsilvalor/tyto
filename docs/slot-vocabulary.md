@@ -77,8 +77,10 @@ changed: `agenda-semana` draws several disciplines to a slide from one occurrenc
 slot** — they are lines inside one `rich-text` value, and the template parses them. So the
 standard covers the repeatable slot (`lamina`) and deliberately says nothing about the rows.
 
-`aprovados`' `lista` is therefore not a `lamina`: it does not repeat, and the approved list is
-one artwork. It keeps its own name under the freedom rule below.
+`aprovados` first kept a `lista` that did not repeat, when the approved list was one artwork.
+TYTO-190 made it a carousel the way the agenda is one: each `::lamina` is a slide and holds its
+specialties and rows, so `lista` left the template (3.0.0) rather than living beside a
+`lamina` that carries the same rows.
 
 ## `cor` and `tom`: one role, and `tom` wins
 
@@ -155,8 +157,10 @@ source.
 | `carrossel-lista` | `item`                | `lamina`           | 1.0.0 → 2.0.0 |
 | `agenda-semana`   | `ilustracao`, `slide` | `imagem`, `lamina` | 2.0.0 → 3.0.0 |
 | `aprovados`       | `emblema`             | `imagem`           | 1.0.0 → 2.0.0 |
+| `aprovados`       | `lista`               | `lamina` (repeats) | 2.0.0 → 3.0.0 |
 
-`aprovados`' `lista` stays, under the freedom rule. Class names and scene node names
+The second `aprovados` row is TYTO-190: `lista` became the repeatable `lamina` when the template
+learned to run across several slides. Class names and scene node names
 (`.item`, `illustration`, `emblem`) were left alone: they are the template's own English
 vocabulary, not the brief's, and keeping them is what kept the pixels still: every example's
 PNG is byte-identical before and after the rename.

@@ -37,15 +37,22 @@ const tenPerCharacter: TemplateContext['measure'] = (node) => {
 
 const LIST = 'ENDODONTIA\n1º | Ana Souza\n2º | Bruno Lima\nPERIODONTIA\n1º | Carla Dias';
 
+/** Which slide of how many; the first of one when a case does not say. */
+interface Slide {
+  readonly index: number;
+  readonly count: number;
+}
+
 function contextOf(
   slots: Record<string, RichText | AssetRef>,
   measure: TemplateContext['measure'] = measureNothing,
+  slide: Slide = { index: 0, count: 1 },
 ): TemplateContext {
   return {
     format: 'retrato',
     size: { w: 1080, h: 1350 },
-    idPrefix: 'artwork-0-retrato',
-    artwork: { id: 'artwork-0', index: 0, count: 1 },
+    idPrefix: `lamina-${slide.index}-retrato`,
+    artwork: { id: `lamina-${slide.index}`, index: slide.index, count: slide.count },
     slots: Object.fromEntries(
       Object.entries(slots).map(([name, value]) => [
         name,
@@ -79,7 +86,7 @@ const FULL = {
   chamada: rich('Resultado provisório'),
   subtitulo: rich('Mais um dia difícil para quem não é Falcão'),
   titulo: rich('CADAR'),
-  lista: rich(LIST),
+  lamina: rich(LIST),
 };
 
 describe('aprovados', () => {
@@ -120,7 +127,7 @@ describe('aprovados', () => {
 
   it('stops a list growing at the maximum, where the name wraps instead', () => {
     const long = rich(`ENDODONTIA\n1º | ${'NOME '.repeat(40).trim()}`);
-    const frame = build(contextOf({ ...FULL, lista: long }, tenPerCharacter));
+    const frame = build(contextOf({ ...FULL, lamina: long }, tenPerCharacter));
     const [list] = named(frame.children, 'approved');
 
     expect(list?.transform.x).toBe((1080 - 70 * 2 - APPROVED.table.max) / 2);
@@ -133,10 +140,47 @@ describe('aprovados', () => {
     expect(named(build(contextOf({ ...FULL, imagem: asset })).children, 'emblem')).toHaveLength(1);
   });
 
-  it('signs the slide without an arrow, since no slide follows it', () => {
+  it('signs a single slide without an arrow, since no slide follows it', () => {
     const frame = build(contextOf(FULL));
 
     expect(named(frame.children, 'handle').map(words)).toEqual(['@assinatura']);
     expect(named(frame.children, 'arrow')).toEqual([]);
+  });
+});
+
+describe('aprovados across several slides (TYTO-190)', () => {
+  const slides = (count: number) =>
+    Array.from({ length: count }, (_, index) =>
+      build(contextOf(FULL, measureNothing, { index, count })),
+    );
+
+  it('draws the title block on the first slide and on no other', () => {
+    expect(slides(3).map((frame) => named(frame.children, 'result-title').length)).toEqual([
+      1, 0, 0,
+    ]);
+  });
+
+  it('draws the list alone as the middle of every later slide', () => {
+    const [, second] = slides(2);
+    const [middle] = named(second?.children ?? [], 'middle');
+
+    if (middle?.kind !== 'group') throw new Error('every slide centres a middle block');
+    expect(middle.children.map((node) => node.name)).toEqual(['approved-table']);
+  });
+
+  it('points on to the next slide from every slide but the last', () => {
+    expect(slides(3).map((frame) => named(frame.children, 'arrow').length)).toEqual([1, 1, 0]);
+  });
+
+  it('draws each slide from its own lamina', () => {
+    const frame = build(
+      contextOf({ ...FULL, lamina: rich('PRÓTESE DENTAL\n3º | Leo Moura') }, measureNothing, {
+        index: 1,
+        count: 2,
+      }),
+    );
+
+    expect(named(frame.children, 'specialty').map(words)).toEqual(['PRÓTESE DENTAL']);
+    expect(named(frame.children, 'name').map(words)).toEqual(['LEO MOURA']);
   });
 });
