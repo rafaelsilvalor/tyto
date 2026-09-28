@@ -1,8 +1,5 @@
 import {
-  type Diagnostics,
   type FileSystem,
-  type Result,
-  type Template,
   type TemplateBuild,
   type TemplateRegistry,
   defineTemplate,
@@ -11,7 +8,7 @@ import {
   ok,
 } from '@tyto/core';
 
-import { TEMPLATE_FILE, type TemplateSource } from './template-source.js';
+import { type LocalTemplateSource, TEMPLATE_FILE } from './template-source.js';
 
 /**
  * The other half of ADR 0005: a template whose body is code rather than markup.
@@ -45,7 +42,7 @@ export interface BundledTemplateSourceOptions {
   readonly fileSystem: FileSystem;
   readonly bundled: BundledTemplates;
   /** Where a name this source does not hold goes, unchanged. */
-  readonly markup: TemplateSource;
+  readonly markup: LocalTemplateSource;
 }
 
 /**
@@ -55,9 +52,9 @@ export interface BundledTemplateSourceOptions {
  * same way whichever route was asked first, with the same "available" list, so only one
  * place words it.
  */
-export function bundledTemplateSource(options: BundledTemplateSourceOptions): TemplateSource {
+export function bundledTemplateSource(options: BundledTemplateSourceOptions): LocalTemplateSource {
   return {
-    async load(name: string): Promise<Result<Template, Diagnostics>> {
+    async load(name: string) {
       const build = options.bundled[name];
       if (build === undefined) return options.markup.load(name);
 

@@ -45,7 +45,8 @@ non-zero.
 | `E_PLUGIN_STATE` | error | yes | The file recording which plugins were installed and approved cannot be read. |
 | `E_PLUGIN_EXPORTER_KIND` | error | yes | A plugin registered a rasterized exporter declaring a kind no rasterizer encodes. |
 | `E_PLUGIN_PACK_DIRECTORY` | error | yes | A plugin's template pack names a folder outside the plugin's installed folder. |
-| `E_PLUGIN_PACK_CODE` | error | yes | A plugin's template pack holds a template that is not markup. |
+| `E_PLUGIN_PACK_CODE` | error | yes | A plugin's template pack holds a template that could not run in the plugin's process. |
+| `E_PLUGIN_TEMPLATE` | error | no | An installed code template did not answer a frame from its plugin's process. |
 | `E_PLUGIN_LINK` | error | yes | A plugin folder being installed holds a link that leads outside it, or nowhere. |
 | `E_PLUGIN_CRASHED` | error | no | An isolated plugin's process stopped while the host was waiting for it. |
 | `E_PLUGIN_PROTOCOL` | error | no | An isolated plugin sent the host a message that does not match the RPC protocol. |
@@ -77,6 +78,7 @@ non-zero.
 | `E_EXPORT_FONT_UNRESOLVED` | error | yes | An exporter was given no bytes for a font the scene draws text in. |
 | `E_EXPORT_UNSUPPORTED` | error | no | A scene uses something the chosen exporter cannot express at all. |
 | `W_EXPORT_APPROXIMATED` | warning | no | An exporter rendered something close to, but not exactly, what the IR asked for. |
+| `W_PLUGIN_FONT_WITHHELD` | warning | no | A face installed on this machine was not sent to a plugin's template, which did not ask for it. |
 | `W_FONT_SUBSTITUTED` | warning | no | A face the scene asks this machine for is not installed, so a bundled one drew it. |
 | `E_RENDER_FAILED` | error | no | A frame could not be turned into bytes by the exporter or the rasterizer. |
 | `E_OUTPUT_WRITE` | error | no | An artifact was rendered but could not be written to the output. |
@@ -132,6 +134,7 @@ incomplete brief, and a crossed box where a picture the exporter could not load 
 | `E_PLUGIN_EXPORTER_KIND` | yes | A plugin that did not load contributed no slot to skip. |
 | `E_PLUGIN_PACK_DIRECTORY` | yes | A plugin that did not load contributed no slot to skip. |
 | `E_PLUGIN_PACK_CODE` | yes | A plugin that did not load contributed no slot to skip. |
+| `E_PLUGIN_TEMPLATE` | no | It costs the frame the call was for; the frames that did arrive are drawn (ADR 0025). |
 | `E_PLUGIN_LINK` | yes | A plugin that did not load contributed no slot to skip. |
 | `E_PLUGIN_CRASHED` | no | One frame was waiting on the process; the frames other exporters draw survive (ADR 0025). |
 | `E_PLUGIN_PROTOCOL` | no | It costs the one frame whose answer it was; the others are drawn (ADR 0025). |
@@ -574,17 +577,31 @@ Parameters: `plugin`, `directory`, `problem`
 
 ### `E_PLUGIN_PACK_CODE`
 
-**Severity:** error · **Fatal:** yes · **Spec:** `docs/adr/0046-an-installed-template-pack-is-markup-inside-its-plugin.md`
+**Severity:** error · **Fatal:** yes · **Spec:** `docs/adr/0048-an-installed-code-template-runs-in-its-plugin.md`
 
-A plugin's template pack holds a template that is not markup.
+A plugin's template pack holds a template that could not run in the plugin's process.
 
 A plugin that did not load contributed no slot to skip.
 
 ```
-Plugin '{plugin}' contributes template '{template}', which is not a markup template: an installed pack may hold only folders with a template.html and no template.ts.
+Plugin '{plugin}' contributes template '{template}', and {problem}.
 ```
 
-Parameters: `plugin`, `template`
+Parameters: `plugin`, `template`, `problem`
+
+### `E_PLUGIN_TEMPLATE`
+
+**Severity:** error · **Fatal:** no · **Spec:** `docs/adr/0048-an-installed-code-template-runs-in-its-plugin.md`
+
+An installed code template did not answer a frame from its plugin's process.
+
+It costs the frame the call was for; the frames that did arrive are drawn (ADR 0025).
+
+```
+Plugin '{plugin}' did not build a frame of template '{template}': {problem}
+```
+
+Parameters: `plugin`, `template`, `problem`
 
 ### `E_PLUGIN_LINK`
 
@@ -1049,6 +1066,20 @@ A warning never replaces a value (ADR 0013).
 ```
 
 Parameters: `node`, `feature`, `exporter`, `detail`
+
+### `W_PLUGIN_FONT_WITHHELD`
+
+**Severity:** warning · **Fatal:** no · **Spec:** `docs/adr/0048-an-installed-code-template-runs-in-its-plugin.md`
+
+A face installed on this machine was not sent to a plugin's template, which did not ask for it.
+
+The frame is drawn and laid out against the face; only the measurements the template took itself before it placed the text, were missing.
+
+```
+Plugin '{plugin}' measures '{family}' in template '{template}', and that face is installed on this machine: it is sent only to a plugin whose manifest declares 'font:{family}'. The template measured it as unmeasurable.
+```
+
+Parameters: `plugin`, `family`, `template`
 
 ### `W_FONT_SUBSTITUTED`
 

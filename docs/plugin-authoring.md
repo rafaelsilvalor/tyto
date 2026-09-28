@@ -87,7 +87,7 @@ Three things about this function that no type will tell you:
   scaffold uses neither, so a first install needs no `npm install`.
 - **What crosses is data.** A contribution is copied to Tyto's thread. Its functions stay behind
   as handles, and only the ones an extension point names are callable: today
-  `exporter.exportFrame` and `directive.transform`.
+  `exporter.exportFrame`, `directive.transform` and `template-pack.build`.
 
 ### A template pack's `directory`
 
@@ -96,8 +96,10 @@ path, a `..` that climbs out, a link that points out and a folder that is not th
 (ADR 0046). The folder holds one subfolder per template, exactly like a project's `templates/`,
 and `docs/template-authoring.md` is how to write one. Two rules are specific to a pack:
 
-- **Markup only.** Each template folder must have a `template.html` and no `template.ts`. A pack
-  with a code template is refused as a whole.
+- **Markup, or code built into `dist/`.** A template folder with a `template.html` is markup. One
+  without it is a code template, and the pack must register `build` to draw it (below). A
+  `template.ts` in the folder is refused, because Tyto never imports anything from it, and a pack
+  with a refused template is refused as a whole.
 - **`templates` can stay empty.** Tyto reads the manifests from `directory` itself, with the
   parser a project's templates go through. It does not read the list the plugin sends.
 
@@ -111,6 +113,48 @@ Check a template before installing it. This reads the folder in place, without t
 $ tyto template check meu-pack/templates/meu-pack
 meu-pack/templates/meu-pack: no problems found
 ```
+
+### A code template
+
+A code template's code lives in the plugin's module, not in its folder. The pack registers a
+`build`, and Tyto calls it in the plugin's own thread, once per artwork and format, with the
+template's manifest name and a `TemplateContext` (ADR 0048):
+
+```js
+export function activate(host) {
+  host.registerTemplatePack({ id: 'meu-codigo', templates: [], directory: 'templates', build });
+}
+```
+
+`tyto plugin new meu-codigo --code` writes one in plain JavaScript that installs and renders on
+the first try. A real one is usually TypeScript that imports `@tyto/core/template` and
+`@tyto/template-kit` from a checkout of this repository, **bundled with every import inlined**
+into `dist/index.js`. The installed folder has no `node_modules`, and a `@tyto` package left
+external is a plugin that does not activate.
+
+- **The answer is checked.** A frame the Scene IR refuses, a throw and a call that takes more
+  than 30 s are each `E_PLUGIN_TEMPLATE`, naming your plugin and the template. They cost that
+  frame, and the render goes on.
+- **`context.measure` answers from the faces your manifest declares.** It is synchronous, as it
+  is in Tyto, so the faces have to reach your thread before the call. List every face the
+  template measures in its `manifest.yaml`:
+
+  ```yaml
+  faces:
+    - { family: Source Sans 3, weight: 700 }
+  ```
+
+  A face left out measures as `undefined`, and your template falls back to its own guess.
+
+- **A face installed on the person's machine needs `font:<family>`.** Faces Tyto ships are sent
+  freely. A face installed on the machine, such as a licensed CircularXX, is sent only if your
+  manifest's `permissions` has `font:CircularXX` and the person approved it at install. Without
+  it the render warns `W_PLUGIN_FONT_WITHHELD` and your template measures that face as `undefined`.
+  On a machine without the face, Tyto measures and draws the bundled substitute, which needs no
+  permission.
+
+`tyto template check` reads markup, so it has nothing to check in a code template's folder but
+the manifest. Render the example brief instead.
 
 ## Install it from its folder
 
@@ -221,10 +265,11 @@ into, or activation is refused. The shapes are in `docs/plugin-api.md`:
 
 ## Permissions, and what they do not do
 
-| Permission          | Allows                      |
-| ------------------- | --------------------------- |
-| `net:<host>`        | `host.fetch` to that host   |
-| `credentials:<key>` | `host.credentials('<key>')` |
+| Permission          | Allows                                                     |
+| ------------------- | ---------------------------------------------------------- |
+| `net:<host>`        | `host.fetch` to that host                                  |
+| `credentials:<key>` | `host.credentials('<key>')`                                |
+| `font:<family>`     | a code template is sent that face's file from this machine |
 
 `install` shows the list and asks. A permission added in a later version is refused until the
 plugin is installed again (`E_PLUGIN_PERMISSIONS_CHANGED`). Wildcards and redirects are in
@@ -245,16 +290,18 @@ the desktop's plugins screen says so on that plugin's row (ADR 0045).
 
 ## When it does not load
 
-| What you see                              | What it means                                                |
-| ----------------------------------------- | ------------------------------------------------------------ |
-| `Plugin manifest is invalid at '<path>'`  | `tyto-plugin.json` breaks a rule; the path names the field   |
-| `E_PLUGIN_ENGINE`                         | `engine` does not include this Tyto's plugin API             |
-| `E_PLUGIN_ACTIVATE … exports no activate` | `dist/index.js` is missing or has no `activate` export       |
-| `E_PLUGIN_PACK_DIRECTORY`                 | `directory` is absolute, leaves the plugin, or is missing    |
-| `E_PLUGIN_PACK_CODE`                      | a template in the pack is not markup                         |
-| `E_PLUGIN_LINK`                           | at install: a link in the folder leads out of it, or nowhere |
-| `E_PLUGIN_DUPLICATE`                      | another plugin already registered that contribution id       |
-| `W_TEMPLATE_SHADOWED`                     | the project or the built-in pack has a template of that name |
+| What you see                              | What it means                                                                            |
+| ----------------------------------------- | ---------------------------------------------------------------------------------------- |
+| `Plugin manifest is invalid at '<path>'`  | `tyto-plugin.json` breaks a rule; the path names the field                               |
+| `E_PLUGIN_ENGINE`                         | `engine` does not include this Tyto's plugin API                                         |
+| `E_PLUGIN_ACTIVATE … exports no activate` | `dist/index.js` is missing or has no `activate` export                                   |
+| `E_PLUGIN_PACK_DIRECTORY`                 | `directory` is absolute, leaves the plugin, or is missing                                |
+| `E_PLUGIN_PACK_CODE`                      | a `template.ts` in the pack, or a code template without `build`                          |
+| `E_PLUGIN_TEMPLATE`                       | at render: a code template's `build` timed out, threw or answered a frame the IR refuses |
+| `W_PLUGIN_FONT_WITHHELD`                  | a code template measures a face from this machine without `font:<family>`                |
+| `E_PLUGIN_LINK`                           | at install: a link in the folder leads out of it, or nowhere                             |
+| `E_PLUGIN_DUPLICATE`                      | another plugin already registered that contribution id                                   |
+| `W_TEMPLATE_SHADOWED`                     | the project or the built-in pack has a template of that name                             |
 
 At render time the `E_` codes arrive inside `W_PLUGIN_SKIPPED`, because your plugin is not what
 is wrong with the brief. `docs/diagnostic-codes.md` has every code.

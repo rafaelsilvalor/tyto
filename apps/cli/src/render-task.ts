@@ -127,7 +127,10 @@ export async function renderTask(
   /** Diagnostics the context itself produced — a broken template folder, say. */
   inherited: Diagnostics = [],
 ): Promise<RenderTaskReport> {
-  const wiring = templateWiring(context);
+  const wiring = templateWiring(context, {
+    outlines: (face) => fonts.source.outlines(face),
+    fromMachine: (face) => fonts.fromMachine(face),
+  });
   // Typed as the wider one where there is one, because the template it used is only known
   // once the job has run and `TaskOutput` has nowhere to put that.
   const delivery =

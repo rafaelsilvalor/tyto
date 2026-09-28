@@ -6,12 +6,15 @@ import {
   artworkSchema,
   err,
   frameSchema,
+  ok,
   sceneSchema,
+  sizeSchema,
   templateManifestSchema,
 } from '@tyto/core';
 import { z } from 'zod';
 
 import type { ContributionPoint } from '../manifest.js';
+import type { GuestFaces, ShippedFace } from './faces.js';
 import { resultSchema } from './protocol.js';
 
 /**
@@ -35,6 +38,21 @@ export interface CallableSpec {
   send(args: readonly unknown[]): readonly unknown[];
   readonly result: z.ZodType;
   failed(problems: Diagnostics): unknown;
+  /** A contribution may leave it out: a pack of markup templates registers no `build`. */
+  readonly optional?: boolean;
+  /**
+   * In the guest, after `args` accepted them: what the plugin's function is handed. Absent,
+   * it is handed the arguments as they crossed. A template's `build` is handed a context
+   * whose `measure` is rebuilt here, because a function does not cross (ADR 0048).
+   */
+  receive?(args: readonly unknown[], guest: GuestState): readonly unknown[];
+  /** In the guest: what the plugin's answer becomes on the wire. Absent, it crosses as it is. */
+  reply?(value: unknown): unknown;
+}
+
+/** What a guest keeps between calls, for the callables that need more than their arguments. */
+export interface GuestState {
+  readonly faces: GuestFaces;
 }
 
 export interface PointSpec {
@@ -130,6 +148,33 @@ const expandedDirectiveSchema = z.strictObject({
 
 const exportFrameOptionsSchema = z.strictObject({ textAsPaths: z.boolean().optional() });
 
+/**
+ * A `TemplateCall`: the context a template is built with, less `measure`, which the guest
+ * rebuilds (ADR 0048). `slots` is Tyto's own `ResolvedSlot` record, checked for being one;
+ * its shape is the host's to guarantee, and nothing a plugin wrote produced it.
+ */
+const templateCallSchema = z.strictObject({
+  format: z.string().min(1),
+  size: sizeSchema,
+  idPrefix: z.string().min(1),
+  artwork: z.strictObject({
+    id: z.string().min(1),
+    index: z.number().int().nonnegative(),
+    count: z.number().int().positive(),
+  }),
+  slots: z.record(z.string(), z.unknown()),
+  adjustments: z.record(z.string(), z.union([z.string(), z.literal(true)])),
+});
+
+const shippedFaceSchema = z.strictObject({
+  face: z.strictObject({
+    family: z.string().min(1),
+    weight: z.number(),
+    style: z.enum(['normal', 'italic']),
+  }),
+  bytes: z.instanceof(Uint8Array),
+});
+
 export const ISOLATED_POINTS: Readonly<Partial<Record<ContributionPoint, PointSpec>>> = {
   exporter: {
     method: 'registerExporter',
@@ -158,7 +203,23 @@ export const ISOLATED_POINTS: Readonly<Partial<Record<ContributionPoint, PointSp
       templates: z.array(templateManifestSchema),
       directory: z.string().min(1).optional(),
     }),
-    callables: {},
+    callables: {
+      // `build(template, call, faces)` on the host's side; the plugin's own function is
+      // `build(template, context)` and returns a frame, which crosses as a result so a
+      // throw and an answer arrive in one shape (ADR 0048).
+      build: {
+        args: z.tuple([z.string().min(1), templateCallSchema, z.array(shippedFaceSchema)]),
+        send: ([template, call, faces]) => [template, call, faces ?? []],
+        result: resultSchema(frameSchema),
+        failed: (problems) => err(problems),
+        optional: true,
+        receive: ([template, call, faces], guest) => {
+          guest.faces.add(faces as readonly ShippedFace[]);
+          return [template, { ...(call as object), measure: guest.faces.measure }];
+        },
+        reply: (frame) => ok(frame),
+      },
+    },
   },
   directive: {
     method: 'registerDirective',

@@ -6,8 +6,12 @@ import type {
   Frame,
   Result,
   Scene,
+  TemplateCall,
+  TemplateContext,
   TemplateManifest,
 } from '@tyto/core';
+
+import type { ShippedFace } from './isolation/faces.js';
 
 /**
  * The nine extension points of `docs/plugin-api.md`, as types.
@@ -146,7 +150,29 @@ export interface TemplatePack extends Contribution {
   readonly templates: readonly TemplateManifest[];
   /** Where the folder is, when it is on a disk — what an asset path inside it is relative to. */
   readonly directory?: string;
+  /**
+   * The code templates of the pack, by manifest name: a folder with a `manifest.yaml` and
+   * no `template.html` is built by this (ADR 0048). The plugin bundles the code into its
+   * `dist/`; nothing is imported from the folder.
+   *
+   * Only an installed plugin's pack is built this way, and only in the plugin's own
+   * process: the host holds a proxy, which it calls with a {@link TemplateCall} and the
+   * faces that cross with it ({@link IsolatedPackBuild}), and the plugin's function is
+   * handed a real context whose `measure` answers from those faces.
+   */
+  readonly build?: (template: string, context: TemplateContext) => Frame | Promise<Frame>;
 }
+
+/**
+ * `TemplatePack.build` as the host's proxy of it is called (ADR 0048): the context crosses
+ * without `measure`, the faces it measures cross beside it, and the answer is a result,
+ * because a timeout, a crash and a frame the IR schema refuses arrive as values.
+ */
+export type IsolatedPackBuild = (
+  template: string,
+  call: TemplateCall,
+  faces: readonly ShippedFace[],
+) => Promise<Result<Frame, Diagnostics>>;
 
 /* ------------------------------------------------------------------------ directive -- */
 

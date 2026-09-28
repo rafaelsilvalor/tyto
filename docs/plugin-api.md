@@ -187,8 +187,9 @@ Now the CLI activates each installed plugin into the project's host too, and sea
 packs it registered after the built-in one, so `W_TEMPLATE_SHADOWED` names an installed
 template the project or the built-in hides. `directory` is relative to the plugin's
 installed folder and may not lead out of it, links included, or it is
-`E_PLUGIN_PACK_DIRECTORY`. Every template in it must be markup (`template.html`, no
-`template.ts`), or it is `E_PLUGIN_PACK_CODE`. Either one refuses the whole plugin, so a
+`E_PLUGIN_PACK_DIRECTORY`. A template in it is markup (`template.html`) or a code template
+drawn by the pack's `build` in the plugin's process (below); a `template.ts` in the folder, or a
+code template in a pack with no `build`, is `E_PLUGIN_PACK_CODE`. Either one refuses the whole plugin, so a
 render reports it as `W_PLUGIN_SKIPPED` and no task activates its other contributions. The
 host reads the manifests from the folder and not from the contribution's `templates`, which a
 plugin may leave empty. The desktop searches them in the same order through the same check
@@ -197,6 +198,22 @@ reads the folders again, and the window asks `templates:list` again when `plugin
 answers, which is after that. A plugin refused over its pack is kept out of the preview, the
 panels and the export, and its `W_PLUGIN_SKIPPED` rides every preview's diagnostics.
 `docs/plugin-authoring.md` walks one from `tyto plugin new` to a render.
+
+**An installed code template runs in its plugin's process** (ADR 0048). `TemplatePack.build(template,
+context)` is the `template-pack` point's one callable, and it is optional: a folder with a
+`manifest.yaml` and no `template.html` is built by it, by manifest name, through the same
+call-by-id mechanism and deadline as `exportFrame`. The host checks the frame against
+`frameSchema`, and a timeout, crash, throw or refused answer is `E_PLUGIN_TEMPLATE`, naming
+the plugin and the template, which costs that frame and is not fatal. The context crosses without
+`measure`; the faces the manifest declares under `faces:` cross beside it, once per process,
+and the guest rebuilds `measure` over them with core's `measureText`, so it stays synchronous
+(ADR 0038). A face installed on the machine is sent only under a `font:<family>` permission;
+without it the template measures it as `undefined` and the load says `W_PLUGIN_FONT_WITHHELD`.
+The only loader is `installedTemplateSource` in `@tyto/io`, and it only calls the proxy:
+nothing imports a plugin's template in Tyto's own process. The job compiles such a template with
+`compileDeferred`, and every other one with `compile`. `installedPacks` refuses them with `E_PLUGIN_PACK_CODE` unless its caller passes
+`allowCode: true`, which the CLI does. The desktop does not until TYTO-189's second pull
+request.
 
 ### `editor.command` and `editor.keymap`, in full
 

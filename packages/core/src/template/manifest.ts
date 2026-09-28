@@ -148,6 +148,13 @@ export const adjustmentSchema = z
   });
 export type Adjustment = z.infer<typeof adjustmentSchema>;
 
+/** A face as `FontSource` is asked for it: family, CSS weight, style. */
+export const manifestFaceSchema = z.strictObject({
+  family: z.string().min(1),
+  weight: z.number().int().min(100).max(900),
+  style: z.enum(['normal', 'italic']).default('normal'),
+});
+
 export const templateManifestSchema = z
   .strictObject({
     name: z.string().regex(TEMPLATE_NAME, 'must not be blank or contain a space or a slash'),
@@ -157,6 +164,15 @@ export const templateManifestSchema = z
     formats: z.array(z.string().min(1)).min(1),
     slots: z.record(z.string(), slotSchema),
     adjustments: z.record(z.string(), adjustmentSchema).default({}),
+    /**
+     * The faces a code template measures, for an installed one that runs in its plugin's
+     * process (ADR 0048). Measurement there is synchronous, so the faces have to cross
+     * with the call rather than be asked for mid-build; a face left out of this list
+     * measures as `undefined` in the plugin. Read as data, like the rest of the manifest:
+     * nothing runs to find out what a template measures. A built-in, measured in Tyto's own
+     * process, needs none.
+     */
+    faces: z.array(manifestFaceSchema).optional(),
   })
   .superRefine((manifest, context) => {
     // Checked here rather than as a key schema on the records: Zod reports a failing
