@@ -34,7 +34,7 @@ formats: [${formats.join(', ')}]
 slots:
   titulo: { type: rich-text, required: true, max: 60 }
   imagem: { type: image }
-  cor: { type: enum, values: [azul, laranja], default: azul }
+  tom: { type: enum, values: [azul, laranja], default: azul }
 `;
 }
 
@@ -56,8 +56,8 @@ ${extended}
   :root {
     --bg: #0c2340;
   }
-  /* An enum reaches a value only through @if: --slot-cor holds the word, not the colour. */
-  @if slot(cor) is laranja {
+  /* An enum reaches a value only through @if: --slot-tom holds the word, not the colour. */
+  @if slot(tom) is laranja {
     :root {
       --bg: #ff5900;
     }
@@ -88,7 +88,7 @@ function exampleFor(name: string): string {
   // grammar.
   return `---
 template: ${name}
-cor: laranja
+tom: laranja
 ---
 ::titulo
   Primeiro **título**

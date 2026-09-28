@@ -1,7 +1,7 @@
 import { access, mkdir, readFile, writeFile } from 'node:fs/promises';
 import { basename, dirname, join, resolve } from 'node:path';
 
-import { type Diagnostic, diagnostic, parseManifest } from '@tyto/core';
+import { type Diagnostic, checkSlotVocabulary, diagnostic, parseManifest } from '@tyto/core';
 import { fileTemplateAssets } from '@tyto/io';
 import { TEMPLATE_NAME, compileTemplate, scaffoldTemplate } from '@tyto/template-lang';
 import { TEMPLATE_FILE, type BundledTemplates } from '@tyto/pipeline';
@@ -111,6 +111,12 @@ export async function templateCheckCommand(
   }
   registerOrigin(manifest.diagnostics, { path: manifestPath, source: manifestSource });
   problems.push(...manifest.diagnostics);
+
+  // Before the body branches, so a code template (manifest-only) and a markup one are both
+  // held to docs/slot-vocabulary.md. Warnings only: they never change the exit code.
+  const vocabulary = checkSlotVocabulary(manifest.value, manifestSource);
+  registerOrigin(vocabulary, { path: manifestPath, source: manifestSource });
+  problems.push(...vocabulary);
 
   const name = manifest.value.name;
   const shipped = bundled[name] !== undefined;
