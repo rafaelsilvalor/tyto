@@ -1,5 +1,6 @@
 name: agenda-semana
-version: 4.0.0
+version: 4.1.0
+brand: azul
 description: The week's agenda as a carousel — a cover on the first slide, several disciplines to a slide.
 formats: [grid]
 slots:
