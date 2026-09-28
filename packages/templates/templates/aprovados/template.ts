@@ -1,14 +1,14 @@
 /**
- * `aprovados` — an exam's approved list on one slide.
+ * `aprovados` — an exam's approved list, on one slide or several (TYTO-190).
  *
- * ## The slide, top to bottom
+ * ## A slide, top to bottom
  *
- * | band   | what                                                   | drawn by                         |
- * | ------ | ------------------------------------------------------ | -------------------------------- |
- * | header | the owl                                                | `header()` — `_estrategia-saude` |
- * | middle | emblem, kicker, subtitle, rule, the exam's name        | `titleBlock(resultTitle)`        |
- * |        | the approved, each specialty as wide as its longest name | `pillTable(approvedTable)`     |
- * | footer | the handle; no arrow, since no slide follows           | `footer()` — `_estrategia-saude` |
+ * | band   | what                                                     | drawn by                         |
+ * | ------ | -------------------------------------------------------- | -------------------------------- |
+ * | header | the owl                                                  | `header()` — `_estrategia-saude` |
+ * | middle | first slide only: emblem, kicker, subtitle, rule, exam    | `titleBlock(resultTitle)`        |
+ * |        | this `::lamina`'s specialties, each as wide as its names | `pillTable(approvedTable)`       |
+ * | footer | the handle, and the arrow unless this is the last slide  | `footer()` — `_estrategia-saude` |
  *
  * The second Saúde template (TYTO-185), and the first written after the four layers of
  * ADR 0047: it draws nothing of its own. Every piece is the brand's or the kit's, and every
@@ -16,7 +16,7 @@
  */
 
 import { frame, solid } from '@tyto/core/template';
-import { bandedPage, pillTable, stack, titleBlock } from '@tyto/template-kit';
+import { type Block, bandedPage, pillTable, stack, titleBlock } from '@tyto/template-kit';
 
 import { footer, hasNextSlide, header } from '../_estrategia-saude/parts.js';
 import { approvedTable, resultTitle } from '../_estrategia-saude/presets.js';
@@ -27,18 +27,8 @@ import type { RichText, TemplateBuild, TemplateContext } from '@tyto/core';
 export const build: TemplateBuild = (context: TemplateContext) => {
   const width = context.size.w - MARGIN * 2;
 
-  const title = titleBlock(resultTitle, {
-    width,
-    fields: {
-      imagem: imageOf(context, 'imagem'),
-      chamada: richTextOf(context, 'chamada'),
-      subtitulo: richTextOf(context, 'subtitulo'),
-      titulo: richTextOf(context, 'titulo'),
-    },
-  });
-
   const list = pillTable(approvedTable, {
-    text: richTextOf(context, 'lista') ?? [],
+    text: richTextOf(context, 'lamina') ?? [],
     width,
     measure: context.measure,
   });
@@ -53,10 +43,36 @@ export const build: TemplateBuild = (context: TemplateContext) => {
       edges: { top: EDGE.top, bottom: EDGE.bottom, side: MARGIN },
       header: { item: header(), band: BAND.header },
       footer: footer(width, { next: hasNextSlide(context.artwork) }),
-      middle: stack({ name: 'middle', gap: APPROVED.gap.table, items: [title, list] }),
+      middle: stack({
+        name: 'middle',
+        gap: APPROVED.gap.table,
+        items: [...titleOf(context, width), list],
+      }),
     }),
   });
 };
+
+/**
+ * The title block, on the first slide and on no other (TYTO-190).
+ *
+ * A list of none or one, spread into the middle stack, so the gap below it disappears with
+ * it — the same shape as the agenda's cover. Every later slide is its list alone, centred.
+ */
+function titleOf(context: TemplateContext, width: number): Block[] {
+  if (context.artwork.index !== 0) return [];
+
+  return [
+    titleBlock(resultTitle, {
+      width,
+      fields: {
+        imagem: imageOf(context, 'imagem'),
+        chamada: richTextOf(context, 'chamada'),
+        subtitulo: richTextOf(context, 'subtitulo'),
+        titulo: richTextOf(context, 'titulo'),
+      },
+    }),
+  ];
+}
 
 /** A rich-text slot's value, or nothing when the brief left it unset. */
 function richTextOf(context: TemplateContext, name: string): RichText | undefined {
