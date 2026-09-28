@@ -4,7 +4,9 @@ formats: [retrato]
 ---
 // The maintainer's reference of 2026-09-27, with the names replaced: the published list
 // names real people, and a fixture in a public repository does not need to. The counts are
-// the reference's — four, two and one approved — so the slide is as full as the published one.
+// the reference's — four, two and one approved — split over two slides, so the example
+// checks what TYTO-190 added: the title on the first slide only, the arrow on every slide
+// but the last.
 //
 // No emblem here: the exam board's emblem is not this repository's to ship, and the slot is
 // optional. `imagem: ./emblema.png` in the frontmatter draws one.
@@ -18,7 +20,7 @@ formats: [retrato]
 ::titulo
   CADAR
 
-::lista
+::lamina
   ENDODONTIA
   1º | Carla Mendes Araújo
   2º | Ana Clara Lemos Pinto
@@ -27,5 +29,7 @@ formats: [retrato]
   PERIODONTIA
   1º | Manuela Dias Barros
   3º | Micaela Maria Lopes Costa
+
+::lamina
   PRÓTESE DENTAL
   3º | Leonardo Moura Zanetti

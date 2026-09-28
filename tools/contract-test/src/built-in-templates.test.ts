@@ -295,6 +295,24 @@ describe.each(['agenda-semana', 'promo-curso'])(
   },
 );
 
+/**
+ * `aprovados` across several slides (TYTO-190), through the whole pipeline: the example brief
+ * writes two `::lamina`, and the scene has to come out as two artworks with the title on the
+ * first alone and the arrow on every one but the last.
+ */
+describe('aprovados across its example’s two laminas', () => {
+  const example = EXAMPLES.find((each) => each.template === 'aprovados')!;
+
+  it('draws one artwork per lamina, the title on the first only, the arrow on all but the last', async () => {
+    const { scene } = await build(example);
+    const frames = scene.artworks.map((artwork) => artwork.frames[0]?.children ?? []);
+
+    expect(frames).toHaveLength(2);
+    expect(frames.map((children) => named(children, 'result-title').length)).toEqual([1, 0]);
+    expect(frames.map((children) => named(children, 'arrow').length)).toEqual([1, 0]);
+  }, 60_000);
+});
+
 describe('a mark the template never declared', () => {
   const PROMO = join(PACK, 'promo-curso');
 
