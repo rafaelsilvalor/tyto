@@ -30,7 +30,7 @@ export const build: TemplateBuild = (context: TemplateContext) => {
   const title = titleBlock(resultTitle, {
     width,
     fields: {
-      emblema: imageOf(context, 'emblema'),
+      imagem: imageOf(context, 'imagem'),
       chamada: richTextOf(context, 'chamada'),
       subtitulo: richTextOf(context, 'subtitulo'),
       titulo: richTextOf(context, 'titulo'),

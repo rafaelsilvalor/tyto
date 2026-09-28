@@ -76,8 +76,8 @@ slot; `titleBlock` for a centred column of optional pieces — a picture, lines 
 rule; `mark` and `textBlock` for a path icon and a brief's words at a stated size.
 
 ```ts
-const sessions = pillTable(sessionTable, { text: slide, width, measure: context.measure });
-const title = titleBlock(resultTitle, { width, fields: { titulo, chamada, emblema } });
+const sessions = pillTable(sessionTable, { text: lamina, width, measure: context.measure });
+const title = titleBlock(resultTitle, { width, fields: { titulo, chamada, imagem } });
 ```
 
 A title block's `field` is the slot's name, in the brief's Portuguese; its `name` is the
@@ -245,11 +245,11 @@ language does not enforce. TYTO-163 is the version where nobody learns one.
 
 **A heading is the line that is not a row — so one separator carries two levels.** TYTO-173 moved
 the agenda's repeat from the discipline up to the slide, because the published carousel puts
-several disciplines on one slide. Inside one `::slide`, a line with no `|` starts a group and every
+several disciplines on one slide. Inside one `::lamina`, a line with no `|` starts a group and every
 `a | b | c` line under it is one of that group's rows:
 
 ```
-::slide
+::lamina
   FARMÁCIA
   16/09 - 14:00 | Farmacologia Geral | Profª. Marcela Rocha
   SERVIÇO SOCIAL

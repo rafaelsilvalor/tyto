@@ -59,7 +59,11 @@ function contextOf(options: ContextOptions): TemplateContext {
     artwork: { id: `artwork-${index}`, index, count: options.count ?? 1 },
     slots: {
       titulo: { name: 'titulo', value: { kind: 'rich-text', text: titulo }, adjustments: [] },
-      slide: { name: 'slide', value: { kind: 'rich-text', text: options.slide }, adjustments: [] },
+      lamina: {
+        name: 'lamina',
+        value: { kind: 'rich-text', text: options.slide },
+        adjustments: [],
+      },
     },
     adjustments: {},
     // A pure function of its context, called directly: no faces, so nothing measures.

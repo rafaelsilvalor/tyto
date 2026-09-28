@@ -1,5 +1,5 @@
 name: agenda-semana
-version: 2.0.0
+version: 3.0.0
 description: The week's agenda as a carousel — a cover on the first slide, several disciplines to a slide.
 formats: [retrato]
 slots:
@@ -10,9 +10,9 @@ slots:
   # rather than as geometry (docs/template-conventions.md, "Geometry in, colour out").
   # Optional: it does not change from week to week, and a cover with words and no picture
   # is still a cover.
-  ilustracao: { type: image }
+  imagem: { type: image }
   # The one slot that may repeat, and therefore the one that decides how many slides there
   # are: one occurrence is one slide, as the published carousel is cut. Inside it, a line
   # with no `|` starts a discipline and every `date | title | professor` line below it is
   # one of that discipline's sessions. `max` counts occurrences here, not characters.
-  slide: { type: rich-text, repeat: true, min: 1, max: 12 }
+  lamina: { type: rich-text, repeat: true, min: 1, max: 12 }

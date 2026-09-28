@@ -22,11 +22,11 @@ slots:
   titulo: { type: rich-text, required: true, max: 60 }
   subtitulo: { type: rich-text }
   imagem: { type: image }
-  cor: { type: enum, values: [azul-escuro, laranja, verde], default: azul-escuro }
-  slide: { type: rich-text, repeat: true, min: 1, max: 10 }
+  tom: { type: enum, values: [azul-escuro, laranja, verde], default: azul-escuro }
+  lamina: { type: rich-text, repeat: true, min: 1, max: 10 }
 adjustments:
-  destaque: { type: flag, applies: [slide] }
-  cor: { type: enum, values: [azul-escuro, laranja, verde], applies: [slide] }
+  destaque: { type: flag, applies: [lamina] }
+  tom: { type: enum, values: [azul-escuro, laranja, verde], applies: [lamina] }
 `;
 
 const MINIMAL = `name: bare
@@ -60,22 +60,22 @@ describe('the manifest the doc prints', () => {
     const manifest = accepted(DOC_EXAMPLE);
     expect(manifest.name).toBe('promo-curso');
     expect(manifest.formats).toEqual(['feed', 'story', 'banner-wide']);
-    expect(Object.keys(manifest.slots)).toEqual(['titulo', 'subtitulo', 'imagem', 'cor', 'slide']);
-    expect(Object.keys(manifest.adjustments)).toEqual(['destaque', 'cor']);
+    expect(Object.keys(manifest.slots)).toEqual(['titulo', 'subtitulo', 'imagem', 'tom', 'lamina']);
+    expect(Object.keys(manifest.adjustments)).toEqual(['destaque', 'tom']);
   });
 
   it('fills the flags a slot leaves out, so no consumer writes ?? false', () => {
     const manifest = accepted(DOC_EXAMPLE);
     expect(manifest.slots.subtitulo).toEqual({ type: 'rich-text', required: false, repeat: false });
     expect(manifest.slots.titulo?.required).toBe(true);
-    expect(manifest.slots.slide?.repeat).toBe(true);
+    expect(manifest.slots.lamina?.repeat).toBe(true);
   });
 
   it('reads min and max as occurrences on a repeatable slot and characters elsewhere', () => {
     // The same two keys, two meanings — the overload the doc writes and the schema keeps.
     const manifest = accepted(DOC_EXAMPLE);
     expect(manifest.slots.titulo?.max).toBe(60);
-    expect(manifest.slots.slide).toMatchObject({ repeat: true, min: 1, max: 10 });
+    expect(manifest.slots.lamina).toMatchObject({ repeat: true, min: 1, max: 10 });
   });
 
   it('defaults adjustments to an empty object when a manifest declares none', () => {

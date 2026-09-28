@@ -130,7 +130,7 @@ describe('aprovados', () => {
     expect(named(build(contextOf(FULL)).children, 'emblem')).toEqual([]);
 
     const asset = { kind: 'file', path: 'emblema.png' } as unknown as AssetRef;
-    expect(named(build(contextOf({ ...FULL, emblema: asset })).children, 'emblem')).toHaveLength(1);
+    expect(named(build(contextOf({ ...FULL, imagem: asset })).children, 'emblem')).toHaveLength(1);
   });
 
   it('signs the slide without an arrow, since no slide follows it', () => {

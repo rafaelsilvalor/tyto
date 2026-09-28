@@ -7,7 +7,7 @@ formats: [retrato]
 // the reference's — four, two and one approved — so the slide is as full as the published one.
 //
 // No emblem here: the exam board's emblem is not this repository's to ship, and the slot is
-// optional. `emblema: ./emblema.png` in the frontmatter draws one.
+// optional. `imagem: ./emblema.png` in the frontmatter draws one.
 
 ::chamada
   Resultado provisório
