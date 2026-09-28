@@ -84,6 +84,7 @@ export class PluginsDialog extends LitElement {
             ? html`<p class="plugins__disclosure">${say('plugins.panel.readsDocument')}</p>`
             : nothing
         }
+        ${this.fonts(say, plugin)}
         ${
           plugin.problems.length === 0
             ? nothing
@@ -93,6 +94,20 @@ export class PluginsDialog extends LitElement {
         }
       </td>
     </tr>`;
+  }
+
+  /**
+   * `font:<family>` said in words (ADR 0048): the permission sends a file from this machine
+   * to the plugin's process, and the row says whose faces those are.
+   */
+  private fonts(say: (key: CatalogueKey) => string, plugin: PluginRow): unknown {
+    const families = plugin.permissions
+      .filter((permission) => permission.startsWith('font:'))
+      .map((permission) => permission.slice('font:'.length));
+    if (families.length === 0) return nothing;
+    return html`<p class="plugins__disclosure plugins__fonts">
+      ${say('plugins.font.sendsMachineFaces')} ${families.join(', ')}
+    </p>`;
   }
 
   private body(say: (key: CatalogueKey) => string): unknown {

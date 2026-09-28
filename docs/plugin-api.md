@@ -212,8 +212,9 @@ without it the template measures it as `undefined` and the load says `W_PLUGIN_F
 The only loader is `installedTemplateSource` in `@tyto/io`, and it only calls the proxy:
 nothing imports a plugin's template in Tyto's own process. The job compiles such a template with
 `compileDeferred`, and every other one with `compile`. `installedPacks` refuses them with `E_PLUGIN_PACK_CODE` unless its caller passes
-`allowCode: true`, which the CLI does. The desktop does not until TYTO-189's second pull
-request.
+`allowCode: true`, which both apps do. The desktop draws them from the plugin's utility process
+for the preview, the export and the queue (`template-source.ts`), and its plugins screen says
+what a `font:<family>` permission sends.
 
 ### `editor.command` and `editor.keymap`, in full
 

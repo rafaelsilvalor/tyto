@@ -136,6 +136,27 @@ describe('the plugins screen', () => {
     expect(element.querySelector('[data-plugin="svg"] .plugins__disclosure')).toBeNull();
   });
 
+  it('says, on its own row, which faces from this machine a font: permission sends', async () => {
+    const element = await dialog({
+      folder: VIEW.folder,
+      plugins: [
+        {
+          ...VIEW.plugins[0]!,
+          name: 'agenda',
+          origin: 'external',
+          contributes: ['template-pack'],
+          permissions: ['font:CircularXX', 'net:api.example.com'],
+        },
+        { ...VIEW.plugins[0]!, name: 'svg', contributes: ['exporter'] },
+      ],
+    });
+
+    expect(text(element, '[data-plugin="agenda"] .plugins__fonts')).toBe(
+      `${translate('en', 'plugins.font.sendsMachineFaces')} CircularXX`,
+    );
+    expect(element.querySelector('[data-plugin="svg"] .plugins__fonts')).toBeNull();
+  });
+
   it('closes on Escape', async () => {
     const element = await dialog();
     element

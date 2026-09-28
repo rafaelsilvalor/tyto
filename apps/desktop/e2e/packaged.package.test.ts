@@ -114,9 +114,57 @@ function writeHome(home: string): void {
 }
 `,
   );
+  writeCodeTemplate(home);
+  const entry = { enabled: true, permissions: [], source: '.' };
   writeFileSync(
     join(home, 'plugins.json'),
-    JSON.stringify({ plugins: { texto: { enabled: true, permissions: [], source: '.' } } }),
+    JSON.stringify({ plugins: { texto: entry, cartaz: entry } }),
+  );
+}
+
+/**
+ * An installed code template, outside `app.asar` too (TYTO-189, ADR 0048): its rect is 777
+ * wide when it is built in a utility process and 111 anywhere else, so the preview says
+ * where the packaged app ran it.
+ */
+function writeCodeTemplate(home: string): void {
+  const folder = join(home, 'plugins', 'cartaz');
+  mkdirSync(join(folder, 'dist'), { recursive: true });
+  mkdirSync(join(folder, 'templates', 'cartaz'), { recursive: true });
+  writeFileSync(
+    join(folder, 'tyto-plugin.json'),
+    JSON.stringify({
+      name: 'cartaz',
+      version: '1.0.0',
+      engine: `>=${PLUGIN_API_VERSION}`,
+      contributes: ['template-pack'],
+      permissions: [],
+    }),
+  );
+  writeFileSync(join(folder, 'package.json'), JSON.stringify({ name: 'cartaz', type: 'module' }));
+  writeFileSync(
+    join(folder, 'templates', 'cartaz', 'manifest.yaml'),
+    'name: cartaz\nversion: 1.0.0\nformats: [feed]\nslots: {}\n',
+  );
+  writeFileSync(
+    join(folder, 'dist', 'index.js'),
+    `export function activate(host) {
+  host.registerTemplatePack({
+    id: 'cartaz', templates: [], directory: 'templates',
+    build: (template, context) => ({
+      format: context.format,
+      size: context.size,
+      children: [{
+        id: context.idPrefix + '.onde', kind: 'rect',
+        size: { w: process.type === 'utility' ? 777 : 111, h: 10 }, radius: [0, 0, 0, 0],
+        fill: { kind: 'solid', color: { r: 255, g: 89, b: 0, a: 1 } },
+        transform: { x: 0, y: 0, rotation: 0, scaleX: 1, scaleY: 1, anchor: { x: 0, y: 0 } },
+        opacity: 1, blend: 'normal', visible: true, clip: false, effects: [],
+      }],
+    }),
+  });
+}
+`,
   );
 }
 
@@ -258,5 +306,39 @@ describe('the packaged app', () => {
         `and exported ${String(texts.length)} .txt file(s)\n`,
     );
     expect(readFileSync(join(out, texts[0]!), 'utf8')).toMatch(/^\S+ \S+$/u);
+  }, 120_000);
+
+  it("renders an installed code template in its plugin's utility process", async () => {
+    type Bridge = Record<string, (request: unknown) => Promise<unknown>>;
+    const preview = (): Promise<{ frames: { html: string }[]; diagnostics: unknown[] }> =>
+      page.evaluate(
+        (brief) =>
+          (globalThis as never as { tyto: Bridge }).tyto['brief:preview']!({
+            requestId: 1,
+            documentId: 'packaged',
+            brief,
+          }) as Promise<{ frames: { html: string }[]; diagnostics: unknown[] }>,
+        ['---', 'template: cartaz', 'formats: [feed]', '---', ''].join('\n'),
+      );
+
+    // The plugins start after the window opens (ADR 0044); until they have, `cartaz` is a
+    // name nobody knows, so the preview is asked again until it draws.
+    const started = Date.now();
+    let answer = await preview();
+    while (answer.frames.length === 0) {
+      if (Date.now() - started > 60_000) {
+        throw new Error(`cartaz never previewed: ${JSON.stringify(answer.diagnostics)}`);
+      }
+      await new Promise((resolve) => setTimeout(resolve, 250));
+      answer = await preview();
+    }
+
+    const html = answer.frames[0]?.html ?? '';
+    const width = html.includes('777') ? '777' : html.includes('111') ? '111' : 'neither';
+    process.stdout.write(
+      `[TYTO-189] packaged app rendered code template 'cartaz' through its plugin: ${width}\n`,
+    );
+    expect(answer.diagnostics).toEqual([]);
+    expect(width).toBe('777');
   }, 120_000);
 });
