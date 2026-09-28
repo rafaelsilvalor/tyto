@@ -145,6 +145,7 @@ describe('exporting from the window into a folder used before (ADR 0054)', () =>
     const box = await list.boundingBox();
     expect(box).not.toBeNull();
     expect(box!.height).toBeGreaterThan(20);
+    expect(await list.textContent()).toContain('In the folder, from the previous export:');
     expect(await list.textContent()).toContain("Removed 'grid-1x1-03.svg'");
 
     // For a person to look at the real window; off in CI, where nobody would.

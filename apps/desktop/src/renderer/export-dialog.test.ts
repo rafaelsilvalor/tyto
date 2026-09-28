@@ -200,6 +200,7 @@ describe('the export dialog', () => {
     await element.updateComplete;
 
     const listed = element.querySelector('[data-testid="export-leftovers"]')?.textContent ?? '';
+    expect(listed).toContain('Na pasta, da exportação anterior:');
     expect(listed).toContain("Removed 'grid-03.png'");
     expect(listed).not.toContain('substituted');
     expect(element.querySelector('.export__problems')).toBeNull();
