@@ -20,6 +20,7 @@ import {
   loadFormats,
   loadTemplateRegistry,
   measureText,
+  pieceKinds,
   resolve,
 } from '@tyto/core';
 import {
@@ -85,18 +86,18 @@ const EXAMPLES: readonly Example[] = [
     template: 'promo-curso',
     brief: 'examples/promo.brief',
     body: 'markup',
-    formats: ['feed', 'story'],
+    formats: ['grid-1x1', 'story'],
   },
   {
     template: 'carrossel-lista',
     brief: 'examples/lista.brief',
     body: 'markup',
-    formats: ['feed', 'story'],
+    formats: ['grid-1x1', 'story'],
   },
   // 4:5 only, since TYTO-173: the published carousel is cut to Instagram's portrait post.
-  { template: 'agenda-semana', brief: 'examples/agenda.brief', body: 'code', formats: ['retrato'] },
+  { template: 'agenda-semana', brief: 'examples/agenda.brief', body: 'code', formats: ['grid'] },
   // The second Azul template, and the first built only from the kit and the brand (TYTO-185).
-  { template: 'aprovados', brief: 'examples/aprovados.brief', body: 'code', formats: ['retrato'] },
+  { template: 'aprovados', brief: 'examples/aprovados.brief', body: 'code', formats: ['grid'] },
 ];
 
 let formats: Awaited<ReturnType<typeof loadFormats>>;
@@ -317,7 +318,7 @@ describe('a mark the template never declared', () => {
   const PROMO = join(PACK, 'promo-curso');
 
   const briefWith = (titulo: string) =>
-    `---\ntemplate: promo-curso\nformats: [feed]\n---\n::titulo\n  ${titulo}\n`;
+    `---\ntemplate: promo-curso\nformats: [grid-1x1]\n---\n::titulo\n  ${titulo}\n`;
 
   // `roxo` is not among the manifest's [azul, laranja, verde], so no `.cor-roxo` exists.
   const SPLIT = briefWith('Turma {cor:roxo}nova{/} de setembro');
@@ -392,7 +393,7 @@ describe('the pill that grows with its copy', () => {
   const briefWith = (titulo: string) =>
     `---
 template: agenda-semana
-formats: [retrato]
+formats: [grid]
 ---
 ` +
     `::titulo
@@ -496,6 +497,41 @@ describe('tyto template check', () => {
 });
 
 describe('the pack as a whole', () => {
+  // TYTO-194: every format the pack defines says which kind of piece it is the canvas of, and
+  // the piece a template makes is derived from that and its manifest — never written twice.
+  it('names a kind on every format it defines', () => {
+    if (!formats.ok) throw new Error('formats.yaml did not load.');
+    const catalogue = formats.value;
+
+    expect(catalogue.list().map((format) => [format.id, catalogue.kindOf(format.id)])).toEqual([
+      ['grid', 'grid'],
+      ['grid-1x1', 'grid'],
+      ['story', 'story'],
+    ]);
+  });
+
+  it('derives each template’s piece kinds from its formats and whether it repeats', async () => {
+    if (!formats.ok) throw new Error('formats.yaml did not load.');
+    const catalogue = formats.value;
+    const registry = await loadTemplateRegistry(fileSystem, PACK);
+    if (!registry.ok) throw new Error(registry.error.map((item) => item.message).join('; '));
+
+    const kinds = Object.fromEntries(
+      registry.value
+        .list()
+        .map((manifest) => [
+          manifest.name,
+          pieceKinds(manifest, catalogue).map((piece) => piece.kind),
+        ]),
+    );
+    expect(kinds).toEqual({
+      'agenda-semana': ['carrossel'],
+      aprovados: ['carrossel'],
+      'carrossel-lista': ['carrossel', 'stories'],
+      'promo-curso': ['grid', 'story'],
+    });
+  });
+
   it('loads as a registry with both templates and no failures', async () => {
     const registry = await loadTemplateRegistry(fileSystem, PACK);
     if (!registry.ok) throw new Error(registry.error.map((item) => item.message).join('; '));
@@ -615,7 +651,7 @@ describe('the fonts the pack draws in, as a render embeds them (ADR 0021)', () =
     // refuse. This is the wording that used to be here four times.
     expect(stderr).not.toContain('E_EXPORT_FONT_UNRESOLVED');
 
-    const svg = await readFile(join(project, 'out/artwork-1-feed.svg'), 'utf8');
+    const svg = await readFile(join(project, 'out/artwork-1-grid-1x1.svg'), 'utf8');
     const embedded = [...svg.matchAll(/url\("data:font\/woff2;base64,([A-Za-z0-9+/=]+)"\)/g)]
       .map((match) => Buffer.from(match[1] ?? '', 'base64'))
       .map((bytes) => createHash('sha256').update(bytes).digest('hex'));
@@ -659,7 +695,7 @@ describe('the fonts the pack draws in, as a render embeds them (ADR 0021)', () =
       },
     );
 
-    const svg = await readFile(join(agenda, 'out/lamina-1-retrato.svg'), 'utf8');
+    const svg = await readFile(join(agenda, 'out/lamina-1-grid.svg'), 'utf8');
     const sha = (bytes: Buffer): string => createHash('sha256').update(bytes).digest('hex');
     const embedded = [...svg.matchAll(/url\("data:font\/[a-z0-9]+;base64,([A-Za-z0-9+/=]+)"\)/g)]
       .map((match) => sha(Buffer.from(match[1] ?? '', 'base64')))

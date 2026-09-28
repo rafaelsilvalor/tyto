@@ -1,7 +1,7 @@
 name: aprovados
-version: 3.0.0
+version: 4.0.0
 description: An exam's approved list as a carousel — an emblem and the exam's name on the first slide, and the approved grouped by specialty on every slide.
-formats: [retrato]
+formats: [grid]
 slots:
   # The exam board's emblem over the words. Optional: a result with no emblem is still a
   # result, and the gap it would have taken closes up.

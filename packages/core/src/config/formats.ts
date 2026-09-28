@@ -25,11 +25,26 @@ import type { Size } from '../scene/primitives.js';
  */
 const FORMAT_ID = /^[^\s/\\]+$/u;
 
+/**
+ * The kinds of piece a format can be the canvas of (TYTO-194, `docs/format-kinds.md`).
+ *
+ * A closed list, so a picker's filter values cannot drift the way slot names once did. A
+ * sequence of `grid` is a carousel and a sequence of `story` is stories: that half is not a
+ * kind, it is whether the template repeats, which its manifest already says.
+ */
+export const FORMAT_KINDS = ['grid', 'story', 'banner', 'capa-ebook', 'thumbnail'] as const;
+export type FormatKind = (typeof FORMAT_KINDS)[number];
+
 export const formatSchema = z.strictObject({
   w: z.number().finite().positive(),
   h: z.number().finite().positive(),
   /** What a picker shows a human. The id is what everything else uses. */
   label: z.string().min(1).optional(),
+  /**
+   * Which kind of piece this canvas is. Optional, so a project's `formats.yaml` written before
+   * TYTO-194 still loads; the built-in pack declares one on every format.
+   */
+  kind: z.enum(FORMAT_KINDS).optional(),
 });
 export type FormatDefinition = z.infer<typeof formatSchema>;
 
@@ -67,6 +82,7 @@ export interface FormatCatalogue {
   has(id: string): boolean;
   sizeOf(id: string): Size | undefined;
   labelOf(id: string): string | undefined;
+  kindOf(id: string): FormatKind | undefined;
 }
 
 export function formatCatalogue(formats: Formats): FormatCatalogue {
@@ -78,6 +94,7 @@ export function formatCatalogue(formats: Formats): FormatCatalogue {
       return definition === undefined ? undefined : { w: definition.w, h: definition.h };
     },
     labelOf: (id) => formats[id]?.label,
+    kindOf: (id) => formats[id]?.kind,
   };
 }
 

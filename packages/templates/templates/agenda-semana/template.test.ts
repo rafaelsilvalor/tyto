@@ -53,9 +53,9 @@ function contextOf(options: ContextOptions): TemplateContext {
   const titulo = options.titulo ?? rich('AGENDA DA SEMANA');
 
   return {
-    format: 'retrato',
+    format: 'grid',
     size: { w: 1080, h: 1350 },
-    idPrefix: `artwork-${index}-retrato`,
+    idPrefix: `artwork-${index}-grid`,
     artwork: { id: `artwork-${index}`, index, count: options.count ?? 1 },
     slots: {
       titulo: { name: 'titulo', value: { kind: 'rich-text', text: titulo }, adjustments: [] },
@@ -264,7 +264,7 @@ describe('the frame itself', () => {
     const frame = build(context);
 
     expect(frame.size).toEqual(context.size);
-    expect(frame.format).toBe('retrato');
+    expect(frame.format).toBe('grid');
   });
 
   it('namespaces its ids with the prefix the context supplied', () => {

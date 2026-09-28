@@ -299,7 +299,7 @@ describe('exporting from the window (E9.4)', () => {
     const many = [
       '---',
       'template: carrossel-lista',
-      'formats: [feed, story]',
+      'formats: [grid-1x1, story]',
       '---',
       '::titulo',
       '  Muitos slides',
@@ -375,7 +375,7 @@ describe('exporting from the window (E9.4)', () => {
  * red run cannot be ambiguous between the rasterizer and the plumbing — both sides of the
  * comparison went through the same rasterizer.
  *
- * `promo-curso` declares `feed` and `story`, which is what makes it the fixture for this: one
+ * `promo-curso` declares `grid-1x1` and `story`, which is what makes it the fixture for this: one
  * of the two can be unticked, and the frame that lands says which one stayed by its size.
  */
 describe('choosing formats and scale (TYTO-137)', () => {
@@ -444,8 +444,8 @@ describe('choosing formats and scale (TYTO-137)', () => {
   }, 60_000);
 
   it('renders only the formats that stayed ticked', async () => {
-    const out = join(scratch, 'feed-only');
-    await exportInto(out, { formats: ['feed'] });
+    const out = join(scratch, 'grid-1x1-only');
+    await exportInto(out, { formats: ['grid-1x1'] });
 
     const frames = framesIn(out);
 
@@ -457,8 +457,8 @@ describe('choosing formats and scale (TYTO-137)', () => {
   }, 180_000);
 
   it('doubles the pixels at 2x, and not the room the design gets', async () => {
-    const out = join(scratch, 'feed-retina');
-    await exportInto(out, { formats: ['feed'], scale: 2 });
+    const out = join(scratch, 'grid-1x1-retina');
+    await exportInto(out, { formats: ['grid-1x1'], scale: 2 });
 
     const frames = framesIn(out);
 

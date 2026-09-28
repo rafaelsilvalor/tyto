@@ -1,6 +1,6 @@
 ---
 template: agenda-semana
-formats: [retrato]
+formats: [grid]
 imagem: ./calendario.png
 ---
 // The two reference slides the maintainer supplied (2026-09-22 and 2026-09-23), so `compile`

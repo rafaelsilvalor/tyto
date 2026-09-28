@@ -1,4 +1,4 @@
-<!-- promo-curso — a course promotion, in feed and story.
+<!-- promo-curso — a course promotion, in grid-1x1 and story.
 
      The type is "Source Sans 3" with no path, which is a `bundled` font: one Tyto ships
      (`@tyto/fonts`), not a file beside this template. Two templates carrying their own
@@ -10,7 +10,7 @@
      that asked for one would behave differently depending on who rendered it. The sizes
      below are chosen so the example brief fits at the size it declares. -->
 
-<frame format="feed" bg="var(--bg)">
+<frame format="grid-1x1" bg="var(--bg)">
   <image slot="imagem" class="photo" />
   <rect id="veil" class="veil" />
   <group class="copy">
@@ -20,7 +20,7 @@
   <rect class="rule" />
 </frame>
 
-<frame format="story" extends="feed" />
+<frame format="story" extends="grid-1x1" />
 
 <style>
   /* The template's own palette. `azul` is a word in the brief; only this file knows it is

@@ -87,7 +87,7 @@ const FILE_OF: Readonly<Record<BufferName, string>> = {
 let noSlots: TemplateManifest | undefined;
 const NO_SLOTS = (): TemplateManifest => {
   if (noSlots !== undefined) return noSlots;
-  const parsed = parseManifest('name: none\nversion: 0.0.0\nformats: [feed]\nslots: {}\n', '');
+  const parsed = parseManifest('name: none\nversion: 0.0.0\nformats: [grid]\nslots: {}\n', '');
   if (!parsed.ok) throw new Error('the empty manifest must parse');
   noSlots = parsed.value;
   return noSlots;

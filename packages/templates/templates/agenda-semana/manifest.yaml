@@ -1,7 +1,7 @@
 name: agenda-semana
-version: 3.0.0
+version: 4.0.0
 description: The week's agenda as a carousel — a cover on the first slide, several disciplines to a slide.
-formats: [retrato]
+formats: [grid]
 slots:
   # The cover words, drawn on the first slide only. The template decides that, not the
   # brief: `context.artwork.index === 0` is what a markup body has no guard for.
