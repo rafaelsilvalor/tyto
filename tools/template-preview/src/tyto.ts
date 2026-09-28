@@ -1,7 +1,13 @@
 import { execFile } from 'node:child_process';
 import { join, relative } from 'node:path';
 
-import { REBUILD_SCRIPT, REPOSITORY_ROOT, TEMPLATES_PACKAGE, TYTO_BINARY } from './paths.ts';
+import {
+  KIT_PACKAGE,
+  REBUILD_SCRIPT,
+  REPOSITORY_ROOT,
+  TEMPLATES_PACKAGE,
+  TYTO_BINARY,
+} from './paths.ts';
 
 /**
  * The two programs this tool runs, and what it reads back from them.
@@ -143,9 +149,32 @@ export interface RebuildOutcome {
   readonly diagnostics: readonly PreviewDiagnostic[];
 }
 
-/** Rebuilds `@tyto/templates`, so the next `tyto render` imports the code just saved. */
-export async function rebuildTemplates(): Promise<RebuildOutcome> {
-  const exited = await spawnNode(['--experimental-strip-types', REBUILD_SCRIPT], TEMPLATES_PACKAGE);
+/** Which packages a save asks to be rebuilt before the render. */
+export interface RebuildPackages {
+  /** `@tyto/template-kit`, whose `dist/` the templates package imports. */
+  readonly kit: boolean;
+  /** `@tyto/templates`, whose `dist/` is where `BUILT_IN_TEMPLATE_BUILDS` is read from. */
+  readonly templates: boolean;
+}
+
+/**
+ * Rebuilds what the save touched, the kit before the templates, so the next `tyto render`
+ * imports the code just saved (TYTO-181).
+ *
+ * The kit goes first because the templates import it; a kit that failed to build stops here,
+ * and the page says which package is stale rather than drawing with the one from before.
+ */
+export async function rebuildPackages(packages: RebuildPackages): Promise<RebuildOutcome> {
+  if (packages.kit) {
+    const kit = await rebuildPackage(KIT_PACKAGE, '@tyto/template-kit');
+    if (!kit.ok) return kit;
+  }
+  if (packages.templates) return rebuildPackage(TEMPLATES_PACKAGE, '@tyto/templates');
+  return { ok: true, diagnostics: [] };
+}
+
+async function rebuildPackage(folder: string, name: string): Promise<RebuildOutcome> {
+  const exited = await spawnNode(['--experimental-strip-types', REBUILD_SCRIPT], folder);
 
   let document: {
     ok?: boolean;
@@ -163,8 +192,9 @@ export async function rebuildTemplates(): Promise<RebuildOutcome> {
     diagnostics: (document.errors ?? []).map((error) => ({
       severity: 'error',
       code: 'PREVIEW_BUILD_FAILED',
-      message: error.text,
-      ...(error.file === undefined ? {} : { path: shown(join(TEMPLATES_PACKAGE, error.file)) }),
+      // The package in the words, because the picture is withheld for it: this one is stale.
+      message: `${name} did not rebuild, so its dist/ is stale: ${error.text}`,
+      ...(error.file === undefined ? {} : { path: shown(join(folder, error.file)) }),
       ...(error.line === undefined ? {} : { line: error.line }),
       // esbuild counts columns from 0 and `tyto render` from 1; the page shows one convention.
       ...(error.column === undefined ? {} : { column: error.column + 1 }),

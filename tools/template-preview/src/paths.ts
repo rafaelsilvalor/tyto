@@ -29,5 +29,14 @@ export const TEMPLATES_PACKAGE = dirname(require.resolve('@tyto/templates/packag
 export const BUILT_IN_PACK = join(TEMPLATES_PACKAGE, 'templates');
 export const BUILT_IN_FORMATS = join(BUILT_IN_PACK, 'formats.yaml');
 
-/** The script that rebuilds `@tyto/templates`, run with that package as its working folder. */
+/**
+ * `@tyto/template-kit`'s package folder, and the source a TypeScript template's parts call.
+ *
+ * `@tyto/templates`' `dist/` imports the kit rather than bundling it, so a saved kit function
+ * reaches `tyto render` only once the kit's own `dist/` is rewritten (TYTO-181).
+ */
+export const KIT_PACKAGE = join(REPOSITORY_ROOT, 'packages', 'template-kit');
+export const KIT_SOURCE = join(KIT_PACKAGE, 'src');
+
+/** The script that rebuilds a package, run with that package as its working folder. */
 export const REBUILD_SCRIPT = fileURLToPath(new URL('./rebuild-templates.ts', import.meta.url));
