@@ -263,6 +263,24 @@ describe('what install refuses', () => {
     expect(stderr()).toContain('Not installed.');
   });
 
+  it('says what a font: permission sends, and only for a plugin that asks for one', async () => {
+    const answer = (): Partial<CliEnvironment> => ({ confirm: () => Promise.resolve(false) });
+
+    await run(
+      ['plugin', 'install', await pluginFolder({ permissions: ['font:CircularXX'] })],
+      environment(answer()),
+    );
+    expect(stderr()).toContain('  - font:CircularXX\n');
+    expect(stderr()).toContain(
+      'font: permissions send its code templates the files of CircularXX as\n' +
+        'installed on this computer, which may be licensed to you and not to its author.\n',
+    );
+
+    errors.length = 0;
+    await run(['plugin', 'install', await pluginFolder()], environment(answer()));
+    expect(stderr()).not.toContain('font: permissions');
+  });
+
   it('refuses to guess when nobody can answer and --yes was not given', async () => {
     const code = await run(['plugin', 'install', await pluginFolder()], environment());
 

@@ -185,6 +185,8 @@ export const ptBR: Catalogue = {
   'plugins.permissions.none': 'nenhuma',
   'plugins.panel.readsDocument':
     'O painel dele recebe o texto do brief aberto sempre que ele muda, sem pedir permissão.',
+  'plugins.font.sendsMachineFaces':
+    'Os templates em código dele recebem os arquivos destas fontes instaladas neste computador, que podem ser licenciadas para você e não para o autor do plugin:',
   'plugins.close': 'Fechar',
   'plugins.unavailable': 'Não foi possível ler a lista de plugins.',
   'command.queue.show': 'Mostrar a fila local',

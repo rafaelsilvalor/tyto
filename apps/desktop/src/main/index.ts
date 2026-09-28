@@ -412,8 +412,14 @@ async function start(): Promise<void> {
   // renderer to ask for the template list again.
   const checked = plugins.then(async (loaded) => {
     try {
-      const packs = await installedPacks(createPluginHost(), loaded, (name) =>
-        pluginStore.directoryOf(name),
+      // Code templates too: each runs in its plugin's utility process, reached through the
+      // proxy the loader registered, and the preview and the export draw it from there
+      // (ADR 0048, `template-source.ts`).
+      const packs = await installedPacks(
+        createPluginHost(),
+        loaded,
+        (name) => pluginStore.directoryOf(name),
+        { allowCode: true },
       );
       for (const warning of packs.warnings) log.warn(warning.message);
       await sources.setInstalled(packs);

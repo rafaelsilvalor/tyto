@@ -355,6 +355,11 @@ export interface Catalogue {
   readonly 'plugins.permissions.none': string;
   /** On the row of a plugin that contributes a panel: the document text reaches its page. */
   readonly 'plugins.panel.readsDocument': string;
+  /**
+   * On the row of a plugin that declares `font:<family>`: that face's file, installed on this
+   * machine, is sent to the plugin's process (ADR 0048). The families follow it.
+   */
+  readonly 'plugins.font.sendsMachineFaces': string;
   readonly 'plugins.close': string;
   readonly 'plugins.unavailable': string;
 
@@ -558,6 +563,7 @@ export const CATALOGUE_KEYS = [
   'plugins.status.crashed',
   'plugins.permissions.none',
   'plugins.panel.readsDocument',
+  'plugins.font.sendsMachineFaces',
   'plugins.close',
   'plugins.unavailable',
   'command.queue.show',
