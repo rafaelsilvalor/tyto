@@ -1,7 +1,8 @@
 import { build } from 'tsup';
 
 /**
- * Rebuilds `@tyto/templates`' JavaScript with the package's own `tsup.config.ts`.
+ * Rebuilds a package's JavaScript with its own `tsup.config.ts` — `@tyto/templates`, and
+ * since TYTO-181 `@tyto/template-kit` first when the kit changed.
  *
  * Run as a child process with that package as its working folder, because tsup reads its
  * config and resolves its entries against `process.cwd()` and nothing else.

@@ -127,10 +127,10 @@ describe('the preview of a markup template', () => {
     const broken = join(project, 'broken-tyto.mjs');
     await writeFile(broken, "process.stderr.write('render path broken\\n'); process.exit(2);\n");
 
-    const { renderWithTyto, rebuildTemplates } = await import('./tyto.ts');
+    const { renderWithTyto, rebuildPackages } = await import('./tyto.ts');
     preview = await startPreview(target(), {
       now: () => performance.now(),
-      rebuild: rebuildTemplates,
+      rebuild: rebuildPackages,
       render: (request) => renderWithTyto({ ...request, binary: broken }),
     });
     await preview.session.request({ rebuild: false });

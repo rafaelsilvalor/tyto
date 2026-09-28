@@ -732,12 +732,25 @@ What a save does depends on the file:
   `dist/index.js` a full `pnpm build` does and takes under a second instead of eleven. About
   2.5 s from save to image. A `template.ts` in a folder of your own stays inert, exactly as
   `tyto render` leaves it (ADR 0007), and the page shows the diagnostic `tyto render` gives.
+- **A brand module beside a compiled template** (`templates/_estrategia-saude/`, ADR 0047) —
+  the same rebuild of `@tyto/templates`, because the template imports it (TYTO-181). The
+  whole pack folder is watched for that reason; a save to _another_ template of it is ignored.
+- **A `.ts` in `packages/template-kit/src`** — `@tyto/template-kit` is rebuilt first, the same
+  fast way, because `@tyto/templates` imports the kit's `dist/` rather than bundling it
+  (TYTO-181). Measured on `aprovados`: 3.4 s from a kit save to the image (0.7 s of it the kit
+  build), and 2.2 s back to the original bytes when the change was reverted. A kit save does
+  nothing for a markup template, which does not import the kit.
+- **The brief, wherever it is** — one render. A brief on another drive than the pack is
+  watched too; it used not to be, because a relative path between two drives is absolute and
+  was read as "inside the template folder" (TYTO-181).
 
 **A failure shows its diagnostics and no image.** A build error is esbuild's message at its
 file, line and column; a markup or template error is what `tyto render --json` printed. The
 picture from before the failure is removed from the page and its URL answers 404, so a stale
 image cannot pass for the current one. While a build is broken every save rebuilds, even a
-save that would not need to, because the `dist/` on disk is still the code from before.
+save that would not need to, because the `dist/` on disk is still the code from before. The
+diagnostic names the package that did not rebuild — `@tyto/template-kit did not rebuild, so
+its dist/ is stale: …` — and a broken kit is rebuilt on every save until it builds.
 
 `/api/state` is the same state as JSON — generation, status, every image's format, path, URL,
 byte count and sha256, the diagnostics, the command that ran and how long the build and the
