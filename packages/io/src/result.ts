@@ -15,7 +15,7 @@ import { z } from 'zod';
  */
 
 export const resultArtifactSchema = z.strictObject({
-  /** `<artwork>-<format>.<ext>`, relative to the folder `result.json` sits in. */
+  /** `<format>-<NN>.<ext>` (ADR 0053), relative to the folder `result.json` sits in. */
   name: z.string().min(1),
   artwork: z.string().min(1),
   format: z.string().min(1),

@@ -38,7 +38,7 @@ export interface ArtifactEncoding {
 }
 
 export interface Artifact {
-  /** `<artwork>-<format>.<ext>`, the file name the sink writes. */
+  /** `<format>-<NN>.<ext>` (ADR 0053), the file name the sink writes. */
   readonly name: string;
   readonly artwork: string;
   readonly format: string;
@@ -102,15 +102,29 @@ export function artifactEncoding(
 }
 
 /**
- * `<artwork>-<format>.<ext>` — the naming the card and ADR 0011 specify.
+ * `<format>-<NN>.<ext>` — `grid-01.png`, `story-02.svg` (TYTO-197, ADR 0053).
  *
- * Ids in a brief come from a repeatable slot and can hold anything the author typed, so
- * anything a filesystem or a URL would argue about is collapsed to `-`. It is done here,
- * once, rather than in each sink: two sinks that sanitized differently would answer
+ * The maintainer's words for a delivery are the format and the slide's place in it, so the
+ * file carries exactly those: the artwork's id (`lamina-1`) stays in `result.json`, where a
+ * program maps a file back to its slide, and leaves the name a person reads in a folder.
+ *
+ * Format ids are the project's, and a project's `formats.yaml` can hold anything its id rule
+ * allows, so anything a filesystem or a URL would argue about is collapsed to `-`. It is done
+ * here, once, rather than in each sink: two sinks that sanitized differently would answer
  * "which file is slide 2?" two ways.
  */
-export function artifactName(artwork: string, format: string, extension: string): string {
-  return `${fileSafe(artwork)}-${fileSafe(format)}.${extension}`;
+export function artifactName(format: string, number: string, extension: string): string {
+  return `${fileSafe(format)}-${number}.${extension}`;
+}
+
+/**
+ * An artwork's place in its delivery, 1-based, padded so every file of one delivery has the
+ * same width: `01` … `12`, and `001` … `120` only once a delivery passes 99 artworks. A fixed
+ * width is what keeps a folder sorted by name in slide order.
+ */
+export function artworkNumber(index: number, count: number): string {
+  const width = Math.max(2, String(count).length);
+  return String(index + 1).padStart(width, '0');
 }
 
 const UNSAFE = /[^a-zA-Z0-9._-]+/gu;

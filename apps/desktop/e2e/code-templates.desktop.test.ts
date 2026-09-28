@@ -328,7 +328,7 @@ describe('an installed code template in the window', () => {
       diagnostics: { code: string }[];
     };
     expect(document.diagnostics).toEqual([]);
-    expect(document.artifacts.map((artifact) => artifact.name)).toEqual(['artwork-1-grid-1x1.png']);
+    expect(document.artifacts.map((artifact) => artifact.name)).toEqual(['grid-1x1-01.png']);
   }, 120_000);
 
   it('lists the font: permission on the plugins screen', async () => {

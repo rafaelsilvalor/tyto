@@ -248,18 +248,18 @@ describe('a three-slide brief in two formats', () => {
     expect(result.value.cancelled).toBe(false);
 
     expect(result.value.artifacts.map((artifact) => artifact.name)).toEqual([
-      'slide-1-feed.png',
-      'slide-1-feed.svg',
-      'slide-1-story.png',
-      'slide-1-story.svg',
-      'slide-2-feed.png',
-      'slide-2-feed.svg',
-      'slide-2-story.png',
-      'slide-2-story.svg',
-      'slide-3-feed.png',
-      'slide-3-feed.svg',
-      'slide-3-story.png',
-      'slide-3-story.svg',
+      'feed-01.png',
+      'feed-01.svg',
+      'story-01.png',
+      'story-01.svg',
+      'feed-02.png',
+      'feed-02.svg',
+      'story-02.png',
+      'story-02.svg',
+      'feed-03.png',
+      'feed-03.svg',
+      'story-03.png',
+      'story-03.svg',
     ]);
 
     // Six of each, which is the acceptance criterion stated the other way round.
@@ -303,8 +303,8 @@ describe('a three-slide brief in two formats', () => {
 
     // The delay makes the later frames finish first often enough that a report built by
     // pushing as work completed would be flaky here rather than wrong once.
-    expect(result.value.artifacts[0]?.name).toBe('slide-1-feed.png');
-    expect(result.value.artifacts.at(-1)?.name).toBe('slide-3-story.svg');
+    expect(result.value.artifacts[0]?.name).toBe('feed-01.png');
+    expect(result.value.artifacts.at(-1)?.name).toBe('story-03.svg');
   });
 
   it('gives each frame its own size and format', async () => {
@@ -364,10 +364,7 @@ describe('cancellation', () => {
     expect(result.value.planned).toBe(12);
     expect(result.value.rendered).toBe(2);
     expect(sink.written).toHaveLength(2);
-    expect(sink.written.map((artifact) => artifact.name)).toEqual([
-      'slide-1-feed.png',
-      'slide-1-feed.svg',
-    ]);
+    expect(sink.written.map((artifact) => artifact.name)).toEqual(['feed-01.png', 'feed-01.svg']);
   });
 
   it('renders nothing at all when the signal is already aborted', async () => {
@@ -430,15 +427,15 @@ describe('one broken frame', () => {
       [...sink.written].map((artifact) => artifact.name).sort(),
     );
     expect([...sink.written].map((artifact) => artifact.name).sort()).toEqual([
-      'slide-1-feed.png',
-      'slide-1-feed.svg',
-      'slide-1-story.svg',
-      'slide-2-feed.png',
-      'slide-2-feed.svg',
-      'slide-2-story.svg',
-      'slide-3-feed.png',
-      'slide-3-feed.svg',
-      'slide-3-story.svg',
+      'feed-01.png',
+      'feed-01.svg',
+      'feed-02.png',
+      'feed-02.svg',
+      'feed-03.png',
+      'feed-03.svg',
+      'story-01.svg',
+      'story-02.svg',
+      'story-03.svg',
     ]);
   });
 
@@ -476,7 +473,7 @@ describe('one broken frame', () => {
 
   it('reports a sink that refuses one file without losing the rest', async () => {
     const sink = recordingSink((artifact) =>
-      artifact.name === 'slide-2-feed.svg' ? 'EACCES' : undefined,
+      artifact.name === 'feed-02.svg' ? 'EACCES' : undefined,
     );
 
     const result = await runJob({ brief: briefSource, outputs: BOTH }, await portsOf({ sink }));
@@ -646,7 +643,7 @@ describe('a kind Tyto never shipped (TYTO-47)', () => {
 
     expect(result.ok && result.value.rendered).toBe(6);
     expect(sink.written[0]).toMatchObject({
-      name: 'slide-1-feed.pdf',
+      name: 'feed-01.pdf',
       kind: 'pdf',
       mime: 'application/pdf',
     });
@@ -953,9 +950,9 @@ describe('the stages before the render', () => {
 
     if (!result.ok) throw new Error(result.error.map((item) => item.message).join('; '));
     expect(result.value.artifacts.map((artifact) => artifact.name)).toEqual([
-      'slide-1-story.svg',
-      'slide-2-story.svg',
-      'slide-3-story.svg',
+      'story-01.svg',
+      'story-02.svg',
+      'story-03.svg',
     ]);
   });
 

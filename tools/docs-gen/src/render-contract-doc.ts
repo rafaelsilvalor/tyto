@@ -78,7 +78,7 @@ writes a folder.
   ${BRIEF_FILE}          written by the caller (or by a person)
   ${ASSETS_DIR}/              the issue's attachments; paths in the brief resolve against it
   ${OUT_DIR}/                 written by Tyto
-    <artwork>-<format>.png|jpg|webp|svg
+    <format>-<NN>.png|jpg|webp|svg
     ${RESULT_FILE}
 \`\`\`
 
