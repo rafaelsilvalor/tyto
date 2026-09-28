@@ -80,8 +80,10 @@ export type {
 } from './brief/directives.js';
 
 export {
+  FORMAT_KINDS,
   type FormatCatalogue,
   type FormatDefinition,
+  type FormatKind,
   type Formats,
   formatCatalogue,
   formatSchema,
@@ -90,6 +92,8 @@ export {
   parseFormats,
   undefinedFormats,
 } from './config/formats.js';
+
+export { type PieceKind, type TemplatePiece, pieceKinds } from './template/piece-kind.js';
 
 export {
   type DeferredTemplate,

@@ -177,7 +177,7 @@ describe('tyto plugin new --code', () => {
 
     expect(code, stderr()).toBe(EXIT_OK);
     expect(result.diagnostics).toEqual([]);
-    const svg = await readFile(join(out, 'artwork-1-feed.svg'), 'utf8');
+    const svg = await readFile(join(out, 'artwork-1-grid.svg'), 'utf8');
     // Three lines of 72 px at 1.2, measured in the plugin's process: the band is 259.2 + 80
     // tall. Unmeasured, it would be one line's 86.4 + 80.
     expect(svg.match(/<text /gu)).toHaveLength(3);

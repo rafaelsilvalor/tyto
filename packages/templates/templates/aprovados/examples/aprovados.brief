@@ -1,6 +1,6 @@
 ---
 template: aprovados
-formats: [retrato]
+formats: [grid]
 ---
 // The maintainer's reference of 2026-09-27, with the names replaced: the published list
 // names real people, and a fixture in a public repository does not need to. The counts are

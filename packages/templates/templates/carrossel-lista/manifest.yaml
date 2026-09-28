@@ -1,7 +1,7 @@
 name: carrossel-lista
-version: 2.0.0
+version: 3.0.0
 description: A list carousel — the list's title on every slide, one item to a slide.
-formats: [feed, story]
+formats: [grid-1x1, story]
 slots:
   titulo: { type: rich-text, required: true, max: 60 }
   lamina: { type: rich-text, repeat: true, min: 1, max: 10 }

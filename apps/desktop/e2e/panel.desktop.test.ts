@@ -142,7 +142,7 @@ describe('clicking a diagnostic', () => {
       [
         '---',
         'template: carrossel-lista',
-        'formats: [feed]',
+        'formats: [grid-1x1]',
         '---',
         PADDING,
         '::nao-existe x',
@@ -190,7 +190,9 @@ describe('picking a template', () => {
     // agreeing afterwards. The picker dispatches an edit into the document, so the preview
     // refreshes through the same path typing does — there is no second code path to keep.
     await type(
-      ['---', 'template: carrossel-lista', 'formats: [feed]', '---', '::slide', '  Um'].join('\n'),
+      ['---', 'template: carrossel-lista', 'formats: [grid-1x1]', '---', '::slide', '  Um'].join(
+        '\n',
+      ),
     );
 
     await page.selectOption('#template', 'promo-curso');
@@ -229,7 +231,7 @@ describe('the artwork list', () => {
       [
         '---',
         'template: carrossel-lista',
-        'formats: [feed]',
+        'formats: [grid-1x1]',
         '---',
         '::titulo',
         '  Como estudar',
@@ -284,7 +286,7 @@ describe('the panel takes the room it needs and no more', () => {
     const many = [
       '---',
       'template: promo-curso',
-      'formats: [feed]',
+      'formats: [grid-1x1]',
       '---',
       ...Array.from({ length: 14 }, (_, i) => `::nao-existe-${String(i)} x`),
     ].join('\n');

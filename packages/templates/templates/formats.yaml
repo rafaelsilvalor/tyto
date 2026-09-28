@@ -1,7 +1,13 @@
 # The sizes the example briefs assume, so the built-in pack can be rendered straight out of
 # the repository: `tyto render --templates packages/templates/templates --formats-file …`.
 # A project overrides this with its own; a template states its layout, not its canvas.
-feed: { w: 1080, h: 1080 }
-story: { w: 1080, h: 1920, label: Story }
-# Instagram's portrait post, 4:5. The published Agenda da semana carousel is cut to it.
-retrato: { w: 1080, h: 1350, label: Retrato }
+#
+# Named by piece kind (TYTO-194, docs/format-kinds.md): a kind's standard size is the kind's
+# name alone, and an unusual size carries its proportion. `kind` is from a closed list, and a
+# template that repeats turns a `grid` into a carousel and a `story` into stories.
+#
+# The standard post, 4:5, which the published Saúde carousels are cut to.
+grid: { w: 1080, h: 1350, kind: grid, label: Grid }
+# The square post, which the house uses rarely.
+grid-1x1: { w: 1080, h: 1080, kind: grid, label: Grid 1:1 }
+story: { w: 1080, h: 1920, kind: story, label: Story }

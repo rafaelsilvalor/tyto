@@ -1,4 +1,4 @@
 # The sizes this pack's templates are drawn at. A project renders with its own formats.yaml,
 # so these ids have to be in it: copy the lines it lacks.
-feed: { w: 1080, h: 1080 }
-story: { w: 1080, h: 1920, label: Story }
+grid-1x1: { w: 1080, h: 1080, kind: grid, label: Grid 1:1 }
+story: { w: 1080, h: 1920, kind: story, label: Story }

@@ -231,7 +231,7 @@ function assignIds(drafts: readonly NodeDraft[], prefix: string): SceneNode[] {
 }
 
 export interface FrameOptions {
-  /** A format name from the manifest, such as `feed` or `story`. */
+  /** A format name from the manifest, such as `grid` or `story`. */
   readonly format: string;
   readonly size: Size;
   /** No background means transparent; the rasterizer omits it rather than painting white. */

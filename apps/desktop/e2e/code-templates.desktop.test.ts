@@ -63,7 +63,7 @@ const AGENDA_BRIEF = readFileSync(join(AGENDA, 'examples', 'agenda.brief'), 'utf
 );
 const briefNaming = (template: string): string =>
   AGENDA_BRIEF.replace(/^template: agenda-semana$/mu, `template: ${template}`);
-const CARTAZ_BRIEF = ['---', 'template: cartaz', 'formats: [feed]', '---', ''].join('\n');
+const CARTAZ_BRIEF = ['---', 'template: cartaz', 'formats: [grid-1x1]', '---', ''].join('\n');
 
 let scratch: string;
 let home: string;
@@ -135,7 +135,7 @@ function cartazPlugin(): string {
   mkdirSync(template, { recursive: true });
   writeFileSync(
     join(template, 'manifest.yaml'),
-    'name: cartaz\nversion: 1.0.0\nformats: [feed]\nslots: {}\n',
+    'name: cartaz\nversion: 1.0.0\nformats: [grid-1x1]\nslots: {}\n',
   );
   writeFileSync(
     join(folder, 'dist', 'index.js'),
@@ -328,7 +328,7 @@ describe('an installed code template in the window', () => {
       diagnostics: { code: string }[];
     };
     expect(document.diagnostics).toEqual([]);
-    expect(document.artifacts.map((artifact) => artifact.name)).toEqual(['artwork-1-feed.png']);
+    expect(document.artifacts.map((artifact) => artifact.name)).toEqual(['artwork-1-grid-1x1.png']);
   }, 120_000);
 
   it('lists the font: permission on the plugins screen', async () => {

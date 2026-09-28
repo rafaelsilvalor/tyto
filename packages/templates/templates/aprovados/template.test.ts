@@ -49,9 +49,9 @@ function contextOf(
   slide: Slide = { index: 0, count: 1 },
 ): TemplateContext {
   return {
-    format: 'retrato',
+    format: 'grid',
     size: { w: 1080, h: 1350 },
-    idPrefix: `lamina-${slide.index}-retrato`,
+    idPrefix: `lamina-${slide.index}-grid`,
     artwork: { id: `lamina-${slide.index}`, index: slide.index, count: slide.count },
     slots: Object.fromEntries(
       Object.entries(slots).map(([name, value]) => [

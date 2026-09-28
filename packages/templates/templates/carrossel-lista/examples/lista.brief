@@ -1,6 +1,6 @@
 ---
 template: carrossel-lista
-formats: [feed, story]
+formats: [grid-1x1, story]
 ---
 // Four slides, so `compile` produces four artworks of two frames each. The adjustments on
 // the third one are what a brief writer reaches for when a slide has to stand out.

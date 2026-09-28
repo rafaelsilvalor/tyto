@@ -15,7 +15,7 @@ import { type Diagnostics, type Result, err, fromDiagnostics } from '../result/r
  */
 
 export const frameSchema = z.strictObject({
-  /** Manifest format name, such as `feed` or `story`. */
+  /** Manifest format name, such as `grid` or `story`. */
   format: z.string().min(1),
   size: sizeSchema,
   /** No background means transparent: the rasterizer omits it rather than painting white. */

@@ -179,7 +179,7 @@ function writeCodeTemplate(home: string): void {
   writeFileSync(join(folder, 'package.json'), JSON.stringify({ name: 'cartaz', type: 'module' }));
   writeFileSync(
     join(folder, 'templates', 'cartaz', 'manifest.yaml'),
-    'name: cartaz\nversion: 1.0.0\nformats: [feed]\nslots: {}\n',
+    'name: cartaz\nversion: 1.0.0\nformats: [grid-1x1]\nslots: {}\n',
   );
   writeFileSync(
     join(folder, 'dist', 'index.js'),
@@ -353,7 +353,7 @@ describe('the packaged app', () => {
             documentId: 'packaged',
             brief,
           }) as Promise<{ frames: { html: string }[]; diagnostics: unknown[] }>,
-        ['---', 'template: cartaz', 'formats: [feed]', '---', ''].join('\n'),
+        ['---', 'template: cartaz', 'formats: [grid-1x1]', '---', ''].join('\n'),
       );
 
     // The plugins start after the window opens (ADR 0044); until they have, `cartaz` is a

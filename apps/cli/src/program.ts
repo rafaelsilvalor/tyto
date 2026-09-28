@@ -172,7 +172,7 @@ export function createProgram(environment: CliEnvironment, captured: Captured): 
     .argument('<name>', 'the template name, also its folder name')
     .option('--out <dir>', 'where the folder is created', DEFAULT_TEMPLATES_DIRECTORY)
     .option('--formats <ids>', 'comma-separated format ids the template renders', parseFormatList, [
-      'feed',
+      'grid',
     ])
     .action(async (name: string) => {
       captured.code = await templateNewCommand(name, scaffold.opts(), environment);

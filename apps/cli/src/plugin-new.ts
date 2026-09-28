@@ -45,7 +45,7 @@ export function pluginScaffold(
   name: string,
   options: { readonly code?: boolean } = {},
 ): readonly (readonly [string, string])[] {
-  const template = scaffoldTemplate(name, ['feed']);
+  const template = scaffoldTemplate(name, ['grid']);
   const manifest = {
     name,
     version: '0.1.0',
@@ -66,7 +66,7 @@ export function pluginScaffold(
     join(TEMPLATES_DIRECTORY, FORMATS_FILE),
     "# The sizes this pack's templates are drawn at. A project renders with its own\n" +
       '# formats.yaml, so these ids have to be in it: copy the lines it lacks.\n' +
-      'feed: { w: 1080, h: 1080 }\n',
+      'grid: { w: 1080, h: 1350, kind: grid, label: Grid }\n',
   ];
 
   if (options.code === true) {
@@ -126,7 +126,7 @@ function codeManifestSource(name: string): string {
   return `name: ${name}
 version: 0.1.0
 description: TODO — one line on what this template is for.
-formats: [feed]
+formats: [grid]
 slots:
   titulo: { type: rich-text, required: true, max: 120 }
 # Every face the template measures. One left out measures as unmeasurable in the plugin.
