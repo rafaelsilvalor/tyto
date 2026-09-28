@@ -52,6 +52,7 @@ once before any frame is built rather than once per slide.
 ```yaml
 name: promo-curso
 version: 1.0.0
+brand: tyto-demo # whose look it draws; optional
 description: Course promotion with teacher photo
 formats: [grid-1x1, story, banner-wide] # ids defined in the project's formats.yaml
 slots:
@@ -105,6 +106,12 @@ These are the rules it enforces beyond the shape:
   a misspelled key must reach its author rather than be silently ignored.
 - **`name` may not be blank or contain a space or a slash.** It reaches a shell as
   `--template <name>` and may be joined into a path. Nothing about style is enforced.
+- **`brand` names whose look the template draws** (TYTO-195, ADR 0052): lower case letters,
+  digits and single hyphens, such as `estrategia-saude`, so it works as a filter key. It is
+  optional, so a manifest written before it still loads; every built-in template names one
+  (`estrategia-saude` or `tyto-demo`). It is the one fact about a template's identity nothing
+  else in the manifest answers: the name says what the piece is about, and the formats and the
+  repeatable slot say what kind of piece it is (`docs/format-kinds.md`).
 
 ## Discovery: `TemplateRegistry`
 

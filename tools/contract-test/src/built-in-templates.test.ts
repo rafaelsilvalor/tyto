@@ -510,6 +510,21 @@ describe('the pack as a whole', () => {
     ]);
   });
 
+  // TYTO-195: every built-in names whose look it draws, so a picker can group them.
+  it('names a brand on every template it ships', async () => {
+    const registry = await loadTemplateRegistry(fileSystem, PACK);
+    if (!registry.ok) throw new Error(registry.error.map((item) => item.message).join('; '));
+
+    expect(
+      Object.fromEntries(registry.value.list().map((manifest) => [manifest.name, manifest.brand])),
+    ).toEqual({
+      'agenda-semana': 'estrategia-saude',
+      aprovados: 'estrategia-saude',
+      'carrossel-lista': 'tyto-demo',
+      'promo-curso': 'tyto-demo',
+    });
+  });
+
   it('derives each template’s piece kinds from its formats and whether it repeats', async () => {
     if (!formats.ok) throw new Error('formats.yaml did not load.');
     const catalogue = formats.value;

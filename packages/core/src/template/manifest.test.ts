@@ -83,6 +83,28 @@ describe('the manifest the doc prints', () => {
   });
 });
 
+describe('the brand a manifest names (TYTO-195)', () => {
+  const withBrand = (brand: string) =>
+    `name: cartaz\nversion: 1.0.0\nbrand: ${brand}\nformats: [grid]\nslots: {}\n`;
+
+  it('reads the brand a template names', () => {
+    expect(accepted(withBrand('estrategia-saude')).brand).toBe('estrategia-saude');
+  });
+
+  it('leaves the brand absent on a manifest written before it existed', () => {
+    expect(accepted('name: cartaz\nversion: 1.0.0\nformats: [grid]\nslots: {}\n').brand).toBe(
+      undefined,
+    );
+  });
+
+  it.each(['Estrategia', 'estrategia saude', 'estrategia--saude', '-saude', 'saúde'])(
+    'refuses %s, at the key that holds it',
+    (brand) => {
+      expect(pathsOf(rejected(withBrand(JSON.stringify(brand))))).toEqual(['brand']);
+    },
+  );
+});
+
 describe('where a broken manifest is blamed', () => {
   it('names the YAML path of the offending key', () => {
     const source = MINIMAL.replace('{ type: rich-text }', '{ type: caligrafia }');
