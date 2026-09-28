@@ -1,6 +1,7 @@
 # 0049 — An installed plugin runs under the runtime's permission model, and the network stays advisory
 
-Status: accepted · 2026-09-28 · TYTO-186 · amends ADR 0041, extends ADR 0042, ADR 0044 and ADR 0048
+Status: accepted · 2026-09-28 · TYTO-186 · amends ADR 0041, extends ADR 0042, ADR 0044 and ADR 0048 ·
+extended by ADR 0050, which confines the desktop's plugins on a bundled Node
 
 ## Context
 

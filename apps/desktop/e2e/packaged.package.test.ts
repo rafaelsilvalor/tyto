@@ -88,7 +88,7 @@ let scratch: string;
  *
  * The case only a packaged build can answer: the guest `plugin-guest.js` is inside the asar,
  * and the plugin's module is a plain file on the disk beside nothing of Tyto's. Both have to
- * load in one `utilityProcess` for the export to produce a `.txt`.
+ * load in one process on the bundled Node for the export to produce a `.txt`.
  */
 function writeHome(home: string): void {
   const folder = join(home, 'plugins', 'texto');
@@ -115,17 +115,52 @@ function writeHome(home: string): void {
 `,
   );
   writeCodeTemplate(home);
+  writeSpy(home);
   const entry = { enabled: true, permissions: [], source: '.' };
   writeFileSync(
     join(home, 'plugins.json'),
-    JSON.stringify({ plugins: { texto: entry, cartaz: entry } }),
+    JSON.stringify({ plugins: { texto: entry, cartaz: entry, espia: entry } }),
+  );
+}
+
+/**
+ * A plugin that tries to read a file beside the plugins folder, and says which Node it ran on
+ * and what the read answered (TYTO-186, ADR 0050).
+ */
+function writeSpy(home: string): void {
+  const secret = join(dirname(home), 'secret.txt');
+  writeFileSync(secret, "not the plugin's");
+  const folder = join(home, 'plugins', 'espia');
+  mkdirSync(join(folder, 'dist'), { recursive: true });
+  writeFileSync(
+    join(folder, 'tyto-plugin.json'),
+    JSON.stringify({
+      name: 'espia',
+      version: '1.0.0',
+      engine: `>=${PLUGIN_API_VERSION}`,
+      contributes: ['exporter'],
+      permissions: [],
+    }),
+  );
+  writeFileSync(join(folder, 'package.json'), JSON.stringify({ name: 'espia', type: 'module' }));
+  writeFileSync(
+    join(folder, 'dist', 'index.js'),
+    `export function activate(host) {
+  host.registerExporter({
+    id: 'espia', mime: 'text/plain', extension: 'spy', kinds: ['spy'], rasterized: false,
+    exportFrame: () => import('node:fs').then((fs) => {
+      try { fs.readFileSync(${JSON.stringify(secret)}); return 'read'; } catch (cause) { return cause.code; }
+    }).then((code) => ({ ok: true, value: [process.version, process.execPath, code].join('|'), diagnostics: [] })),
+  });
+}
+`,
   );
 }
 
 /**
  * An installed code template, outside `app.asar` too (TYTO-189, ADR 0048): its rect is 777
- * wide when it is built in a utility process and 111 anywhere else, so the preview says
- * where the packaged app ran it.
+ * wide when it is built off Electron, on the bundled Node (ADR 0050), and 111 in Electron, so
+ * the preview says where the packaged app ran it.
  */
 function writeCodeTemplate(home: string): void {
   const folder = join(home, 'plugins', 'cartaz');
@@ -156,7 +191,7 @@ function writeCodeTemplate(home: string): void {
       size: context.size,
       children: [{
         id: context.idPrefix + '.onde', kind: 'rect',
-        size: { w: process.type === 'utility' ? 777 : 111, h: 10 }, radius: [0, 0, 0, 0],
+        size: { w: process.versions.electron === undefined ? 777 : 111, h: 10 }, radius: [0, 0, 0, 0],
         fill: { kind: 'solid', color: { r: 255, g: 89, b: 0, a: 1 } },
         transform: { x: 0, y: 0, rotation: 0, scaleX: 1, scaleY: 1, anchor: { x: 0, y: 0 } },
         opacity: 1, blend: 'normal', visible: true, clip: false, effects: [],
@@ -266,7 +301,7 @@ describe('the packaged app', () => {
     expect(info.version).toBe(packaged.version);
   });
 
-  it('runs an installed plugin that lives outside the asar, in a utility process', async () => {
+  it('runs an installed plugin that lives outside the asar, on the bundled Node', async () => {
     type Bridge = Record<string, (request: unknown) => Promise<unknown>>;
     const call = <T>(channel: string, request: unknown): Promise<T> =>
       page.evaluate(
@@ -308,7 +343,7 @@ describe('the packaged app', () => {
     expect(readFileSync(join(out, texts[0]!), 'utf8')).toMatch(/^\S+ \S+$/u);
   }, 120_000);
 
-  it("renders an installed code template in its plugin's utility process", async () => {
+  it("renders an installed code template in its plugin's process on the bundled Node", async () => {
     type Bridge = Record<string, (request: unknown) => Promise<unknown>>;
     const preview = (): Promise<{ frames: { html: string }[]; diagnostics: unknown[] }> =>
       page.evaluate(
@@ -340,5 +375,44 @@ describe('the packaged app', () => {
     );
     expect(answer.diagnostics).toEqual([]);
     expect(width).toBe('777');
+  }, 120_000);
+
+  it('confines a plugin to its folder, on the Node the package carries (ADR 0050)', async () => {
+    type Bridge = Record<string, (request: unknown) => Promise<unknown>>;
+    const call = <T>(channel: string, request: unknown): Promise<T> =>
+      page.evaluate(
+        ([name, body]) => (globalThis as never as { tyto: Bridge }).tyto[name as string]!(body),
+        [channel, request] as const,
+      ) as Promise<T>;
+
+    const out = join(scratch, 'spy');
+    const { exportId } = await call<{ exportId: string }>('export:start', {
+      documentId: 'packaged',
+      brief: ['---', 'template: promo-curso', '---', '::titulo Espia'].join('\n'),
+      directory: out,
+      outputs: [{ kind: 'spy' }],
+    });
+    const started = Date.now();
+    for (;;) {
+      const { progress } = await call<{ progress?: { status: string; failure?: string } }>(
+        'export:progress',
+        { exportId },
+      );
+      if (progress !== undefined && progress.status !== 'running') {
+        expect(progress.failure).toBeUndefined();
+        break;
+      }
+      if (Date.now() - started > 60_000) throw new Error('the spy export never finished');
+      await new Promise((resolve) => setTimeout(resolve, 100));
+    }
+    const [file] = readdirSync(out).filter((name) => name.endsWith('.spy'));
+    const [version, execPath, code] = readFileSync(join(out, file!), 'utf8').split('|');
+    const binary = process.platform === 'win32' ? 'node.exe' : 'node';
+    process.stdout.write(
+      `[TYTO-186] packaged guest on bundled node ${String(version)} at ${String(execPath)}: ` +
+        `read outside grant → ${String(code)}\n`,
+    );
+    expect(code).toBe('ERR_ACCESS_DENIED');
+    expect(execPath?.endsWith(join('resources', 'node', binary))).toBe(true);
   }, 120_000);
 });
