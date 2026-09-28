@@ -20,17 +20,15 @@ import {
 import {
   type JobEvent,
   type OutputRequest,
-  bundledTemplateSource,
   fontSubstitutionWarnings,
   isRasterFormat,
-  markupTemplateSource,
   runJob,
 } from '@tyto/pipeline';
-import { BUILT_IN_TEMPLATE_BUILDS } from '@tyto/templates';
 import type { Rasterizer } from '@tyto/raster';
 
 import { faces, fonts } from './fonts.js';
 import { type ProjectSources } from './project.js';
+import { templateSourceOf } from './template-source.js';
 
 /**
  * Brief text in, files on disk out — the export's whole job (E9.4, TYTO-43).
@@ -242,7 +240,12 @@ export async function createExportService(options: ExportServiceOptions): Promis
     // The snapshot this run is exporting under, taken once at the top. Startup problems are
     // replayed into the run's diagnostics rather than thrown, for `preview.ts`'s reason: an
     // app whose template folder is unreadable should open and say so.
-    const { registry: templates, formats: catalogue, diagnostics: startup } = sources.current();
+    const {
+      registry: templates,
+      formats: catalogue,
+      diagnostics: startup,
+      codePacks,
+    } = sources.current();
 
     if (templates === undefined || catalogue === undefined) {
       run.status = 'finished';
@@ -266,12 +269,8 @@ export async function createExportService(options: ExportServiceOptions): Promis
         registry: templates,
         // Bundled in front of markup, so a template whose body is code draws here the
         // same way it draws through the CLI. Nothing is loaded from a folder either way.
-        templates: bundledTemplateSource({
-          registry: templates,
-          fileSystem,
-          bundled: BUILT_IN_TEMPLATE_BUILDS,
-          markup: markupTemplateSource(fileSystem, templates),
-        }),
+        // An installed code template in front of both, drawn in its plugin's process.
+        templates: templateSourceOf(fileSystem, templates, codePacks),
         assets: fileAssetResolver({
           // `confine` stays on, its default: a brief is often written by something else
           // (ADR 0011), and `../../../.ssh/id_rsa` embedded in an exported PNG is a real way

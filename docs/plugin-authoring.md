@@ -222,6 +222,8 @@ folder, then the built-in pack, then installed packs. Its plugins start after th
 so an installed template joins the Template picker a moment after the built-in ones, and a brief
 already open that names it is previewed again when it does. A skipped plugin is a row in the
 problems panel. The app reads what is installed when it starts, so restart it after an install.
+A code template previews and exports there from the plugin's utility process, as it renders
+from the CLI, and the plugins screen shows which faces a `font:` permission sends.
 
 ## Share it
 

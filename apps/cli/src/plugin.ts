@@ -230,7 +230,24 @@ function permissionPrompt(manifest: PluginManifest, source: string): string {
     'Each plugin runs in a worker thread of its own, so a crash stops the plugin and not\n' +
     'Tyto. That thread is not a sandbox: the plugin has the same access to this computer\n' +
     'as Tyto itself. net: permissions filter host.fetch only, and credentials: ones\n' +
-    'host.credentials only; code that goes around them is not stopped.\n'
+    'host.credentials only; code that goes around them is not stopped.\n' +
+    fontNotice(manifest.permissions)
+  );
+}
+
+/**
+ * `font:<family>` in words, only for a plugin that asks for one (ADR 0048): approving it sends
+ * the file of a face installed on this computer, which can be licensed to the person and not
+ * to the plugin's author, into the plugin's thread.
+ */
+function fontNotice(permissions: readonly string[]): string {
+  const families = permissions
+    .filter((permission) => permission.startsWith('font:'))
+    .map((permission) => permission.slice('font:'.length));
+  if (families.length === 0) return '';
+  return (
+    `font: permissions send its code templates the files of ${families.join(', ')} as\n` +
+    'installed on this computer, which may be licensed to you and not to its author.\n'
   );
 }
 

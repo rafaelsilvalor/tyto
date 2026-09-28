@@ -7,6 +7,7 @@ import {
   loadFormats,
   loadTemplateRegistry,
 } from '@tyto/core';
+import type { InstalledCodePack } from '@tyto/io';
 
 /**
  * Which folders this app searches for templates, and the one thing in main that is rebuilt
@@ -56,6 +57,8 @@ export interface ProjectSnapshot {
    * second arrives as an `E_TEMPLATE_READ` in `diagnostics`.
    */
   readonly folder: { readonly path: string; readonly found: number } | undefined;
+  /** Installed packs whose code templates are built in their plugin's process (ADR 0048). */
+  readonly codePacks: readonly InstalledCodePack[];
 }
 
 export interface ProjectSources {
@@ -74,6 +77,7 @@ export interface ProjectSources {
   setInstalled(packs: {
     readonly directories: readonly string[];
     readonly warnings: readonly Diagnostic[];
+    readonly code?: readonly InstalledCodePack[];
   }): Promise<ProjectSnapshot>;
 }
 
@@ -109,6 +113,7 @@ export async function createProjectSources({
 
   let installed: readonly string[] = [];
   let installedWarnings: readonly Diagnostic[] = [];
+  let codePacks: readonly InstalledCodePack[] = [];
 
   const read = async (chosen: string | undefined): Promise<ProjectSnapshot> => {
     const roots = [...(chosen === undefined ? [] : [chosen]), builtIn, ...installed];
@@ -164,6 +169,7 @@ export async function createProjectSources({
       ],
       failures: registry.ok ? registry.value.failures : [],
       folder: chosen === undefined ? undefined : { path: chosen, found: probe?.found ?? 0 },
+      codePacks,
     };
   };
 
@@ -180,6 +186,7 @@ export async function createProjectSources({
     setInstalled: async (packs) => {
       installed = [...packs.directories];
       installedWarnings = [...packs.warnings];
+      codePacks = [...(packs.code ?? [])];
       snapshot = await read(chosenFolder);
       return snapshot;
     },

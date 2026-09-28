@@ -108,7 +108,7 @@ Faces fall into three groups:
   reports `W_PLUGIN_FONT_WITHHELD`, naming the plugin, the template and the family.
 - **Faces inside the plugin's own folder** would be sent freely. Nothing supplies them yet: no
   mechanism lets a template name a face in its plugin's folder, and a `FontRef` with
-  `source: 'file'` comes from the brief's folder.
+  `source: 'file'` comes from the brief's folder. That mechanism is TYTO-192.
 
 `FontLibrary.fromMachine(face)` tells the first group from the second. A `system` face the
 machine lacks is answered with the bundled substitute (ADR 0037), which is bundled and crosses
@@ -148,6 +148,21 @@ build, and `cmp` found every file identical: `slide-1-retrato.svg` (500 721 B),
   `allowCode`, which is off by default, and the CLI passes `true`. Any caller without an
   isolated runner, or one that forgets the option, gets `E_PLUGIN_PACK_CODE` ("a code template,
   which this app cannot run from a plugin yet"), never a template it would have to draw some
-  other way. The desktop passes nothing until TYTO-189's second pull request turns it on beside
-  its `utilityProcess` runner. That is also where the round trip and the first-render cost are
-  measured.
+  other way. The desktop turned it on in TYTO-189's second pull request, beside its
+  `utilityProcess` runner, for the preview, the export and the queue (which stays PNG-only,
+  ADR 0044).
+- **Measured on the desktop**, through the preload, on the maintainer's machine, where
+  CircularXX is installed and so crosses under `font:CircularXX`. `agenda-semana`'s example has
+  2 frames and 16 measurements. `cartaz` is one frame with no measurement, so its whole preview
+  is an upper bound on one `utilityProcess` round trip. Three runs of
+  `code-templates.desktop.test.ts`:
+
+  ```
+  MEASURE … first in-repo 181.0 ms, then first through the plugin 108.1 ms; warm median n=20: plugin 59.2 ms, in-repo 57.3 ms; cartaz (1 frame, 1 round trip, no measurement) 3.2 ms
+  MEASURE … first in-repo 166.3 ms, then first through the plugin 109.8 ms; warm median n=20: plugin 68.9 ms, in-repo 61.6 ms; cartaz (1 frame, 1 round trip, no measurement) 3.8 ms
+  MEASURE … first in-repo 159.6 ms, then first through the plugin 104.1 ms; warm median n=20: plugin 60.2 ms, in-repo 55.5 ms; cartaz (1 frame, 1 round trip, no measurement) 3.6 ms
+  ```
+
+  The first plugin preview costs 40 to 49 ms more than its warm ones. That is the faces crossing
+  and being parsed in the guest, against the 58 ms estimated on `worker_threads`. Warm, the
+  boundary adds 2 to 7 ms to a preview of 55 to 62 ms.
