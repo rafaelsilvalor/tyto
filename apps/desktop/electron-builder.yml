@@ -36,6 +36,9 @@ directories:
 # window. `e2e/packaged.package.test.ts` is that measurement, kept.
 files:
   - out/**
+  # The bundled Node goes beside the asar as an extra resource (below), never inside it: an
+  # executable in an asar cannot be run (ADR 0050).
+  - '!out/node/**'
   - package.json
   - '!node_modules/**'
   - node_modules/@tyto/templates/package.json
@@ -50,6 +53,17 @@ files:
   - node_modules/@tyto/fonts/package.json
   - node_modules/@tyto/fonts/dist/**
   - node_modules/@tyto/fonts/fonts/**
+
+# **Installed plugins run on a Node of their own, which the package carries** (TYTO-186,
+# ADR 0050). `pnpm build` puts Node's official binary for this platform, checked against the
+# sha256 `bundled-node.json` pins, at `out/node/`; it lands at `resources/node/`, outside the
+# asar, and its LICENSE with it. The plugin bootstrap is unpacked for the same reason: that
+# Node is not Electron, and it cannot read a file inside an asar.
+extraResources:
+  - from: out/node
+    to: node
+asarUnpack:
+  - out/guest/**
 
 # Named rather than inferred. electron-builder can read the repository out of a
 # `package.json`, but `apps/desktop/package.json` has no `repository` field and the one it

@@ -292,8 +292,8 @@ it needs has to be inside its folder, bundled into `dist/` or beside it: a depen
 `node_modules` outside the folder is a read the runtime refuses. If it crashes, Tyto records the
 crash and carries on. **The network is not confined** on the Node versions Tyto supports: `net:`
 filters `host.fetch`, and code that opens its own socket is not stopped. On Node 25 and later,
-that socket is refused too. On the desktop the plugin's process is still a crash boundary only,
-until the app ships its own Node. **A panel receives the text of the brief that is open**, with no permission asked, and
+that socket is refused too. The desktop runs your plugin the same way, on the Node 24 it
+carries (ADR 0050). **A panel receives the text of the brief that is open**, with no permission asked, and
 the desktop's plugins screen says so on that plugin's row (ADR 0045).
 
 ## When it does not load

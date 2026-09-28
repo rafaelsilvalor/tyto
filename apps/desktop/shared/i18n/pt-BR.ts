@@ -165,7 +165,7 @@ export const ptBR: Catalogue = {
   'command.plugins.show': 'Mostrar plugins',
   'plugins.heading': 'Plugins do Tyto',
   'plugins.notice':
-    'Cada plugin instalado roda num processo próprio, que impede um travamento de derrubar o Tyto mas não é uma caixa de areia: um plugin tem o mesmo acesso a este computador que o próprio Tyto. As permissões net: e credentials: filtram só o que o plugin pede ao Tyto — host.fetch e host.credentials — e um plugin que passa por fora delas não é impedido.',
+    'Cada plugin instalado roda num processo próprio, então um travamento para o plugin e não o Tyto. O modelo de permissões do Node prende esse processo à pasta do próprio plugin: ele não lê seus outros arquivos, não grava em lugar nenhum e não abre programas. A rede não fica presa: as permissões net: filtram só o que o plugin pede ao Tyto por host.fetch, e um plugin que abre a própria conexão não é impedido. As permissões credentials: filtram host.credentials.',
   'plugins.inactive':
     'Os plugins ativos são iniciados quando a janela abre; um instalado com ela aberta é iniciado na próxima vez.',
   'plugins.folder': 'Os plugins instalados ficam em',

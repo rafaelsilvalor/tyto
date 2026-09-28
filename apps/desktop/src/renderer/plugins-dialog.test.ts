@@ -65,12 +65,14 @@ describe('the plugins screen', () => {
     expect(element.querySelector('.plugins__panel')).toBeNull();
   });
 
-  it('says how far permissions reach, and that the process is not a sandbox', async () => {
+  it('says what the process is confined to, and that the network is not', async () => {
     const element = await dialog();
 
     expect(text(element, '.plugins__notice')).toBe(translate('en', 'plugins.notice'));
-    expect(text(element, '.plugins__notice')).toMatch(/not a sandbox/u);
-    expect(text(element, '.plugins__notice')).toMatch(/filter only what a plugin asks of Tyto/u);
+    expect(text(element, '.plugins__notice')).toMatch(
+      /confines that process to the plugin’s own folder/u,
+    );
+    expect(text(element, '.plugins__notice')).toMatch(/It is not confined on the network/u);
   });
 
   it('lists every plugin with its origin and status in the window language', async () => {

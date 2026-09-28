@@ -18,7 +18,7 @@ import type { Credentials } from './credentials.js';
  *
  * The rules — what is enabled, what passed its checks, how a crash is recorded — are
  * `@tyto/plugin-api`'s `startInstalledPlugins`, the same the CLI runs. What this module
- * composes is the desktop's half: a `utilityProcess` per plugin, Electron's `net.fetch` for
+ * composes is the desktop's half: a process per plugin on the bundled Node, Electron's `net.fetch` for
  * `host.fetch`, and `safeStorage` for `host.credentials`. **Never activated in main**: what
  * reaches an export's host is a proxy of a plugin living in its own process.
  */
@@ -99,10 +99,9 @@ export function startDesktopPlugins(options: DesktopPluginsOptions): Promise<Loa
   return startInstalledPlugins(store, {
     launch: options.launch,
     capabilities: options.capabilities,
-    // Not yet: a `utilityProcess` accepts `--permission` and does not enforce it, measured, so
-    // the desktop is a crash boundary only until it starts plugins on a bundled Node
-    // (ADR 0049, the second TYTO-186 pull request).
-    requireSandbox: false,
+    // Each plugin's process runs on the bundled Node and must prove it is confined before its
+    // code is imported (ADR 0049, ADR 0050).
+    requireSandbox: true,
     entryOf: async (folder) => {
       const path = join(store.directoryOf(folder), PLUGIN_ENTRY);
       try {

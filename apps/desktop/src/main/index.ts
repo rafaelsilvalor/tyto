@@ -1,3 +1,5 @@
+import { fork } from 'node:child_process';
+import { realpathSync } from 'node:fs';
 import { readFile } from 'node:fs/promises';
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
@@ -12,7 +14,6 @@ import {
   safeStorage,
   protocol,
   shell,
-  utilityProcess,
 } from 'electron';
 import {
   PLUGINS_DIR,
@@ -38,7 +39,7 @@ import { fileRecentFiles } from './recent-files.js';
 import { registerIpcHandlers, sendIpcEvent } from './ipc.js';
 import { exporterBuiltIns, listPlugins, tytoHome } from './plugin-list.js';
 import { activateBuiltIns, builtInTemplatesDirectory } from './plugins.js';
-import { utilityProcessLauncher } from './plugin-process.js';
+import { bundledNodeLauncher, bundledNodePaths } from './plugin-process.js';
 import { offerPreviousVersion } from './previous-version.js';
 import { createQueueService } from './queue.js';
 import { createPanelService } from './panels.js';
@@ -380,18 +381,25 @@ async function start(): Promise<void> {
   // `Rasterizer`, and the only place allowed to know which adapter exists is this file. It
   // is read back out of the plugin registry rather than constructed a second time — what
   // exports is what TYTO-133 registered, which is the claim the extension point makes.
-  // Installed plugins, started once for the app's life, each in a `utilityProcess` of its
-  // own (ADR 0044) — never in main. `plugin-guest.js` is the second bundle beside this one.
+  // Installed plugins, started once for the app's life, each in a process of its own on the
+  // Node bundled with the app, under its permission model (ADR 0049, ADR 0050) — never in main.
   // What they can reach is behind their declared permissions: `net.fetch` for the network,
   // and `safeStorage`, through the same `credentials`, for secrets (ADR 0042).
   // Not awaited: the window opens while they start, and the export waits for them.
   const plugins = startDesktopPlugins({
     store: pluginStore,
-    launch: utilityProcessLauncher(
-      (modulePath, args, options) =>
-        utilityProcess.fork(modulePath, args, { ...options, stdio: options.stdio }),
-      join(dirname(fileURLToPath(import.meta.url)), 'plugin-guest.js'),
-    ),
+    launch: bundledNodeLauncher({
+      fork: (modulePath, args, options) => fork(modulePath, args, options),
+      realpath: (path) => realpathSync(path),
+      ...bundledNodePaths({
+        packaged: app.isPackaged,
+        mainDirectory: dirname(fileURLToPath(import.meta.url)),
+        mainFile: fileURLToPath(import.meta.url),
+        resourcesPath: process.resourcesPath,
+        platform: process.platform,
+        join,
+      }),
+    }),
     capabilities,
   }).catch((cause: unknown) => {
     // A disk that refused the folder: the app opens without installed plugins, and says so.
@@ -412,7 +420,7 @@ async function start(): Promise<void> {
   // renderer to ask for the template list again.
   const checked = plugins.then(async (loaded) => {
     try {
-      // Code templates too: each runs in its plugin's utility process, reached through the
+      // Code templates too: each runs in its plugin's process, reached through the
       // proxy the loader registered, and the preview and the export draw it from there
       // (ADR 0048, `template-source.ts`).
       const packs = await installedPacks(
