@@ -1,6 +1,18 @@
 # 0041 — An installed plugin runs behind a message boundary, and the boundary is not a sandbox
 
-Status: accepted · 2026-09-27 · TYTO-48 · extends ADR 0007 and ADR 0040
+Status: accepted · 2026-09-27 · TYTO-48 · extends ADR 0007 and ADR 0040 · amended by ADR 0049,
+which runs the CLI's plugins in a child process under Node's permission model
+
+## Amended by ADR 0049
+
+"The boundary is not a sandbox" is no longer true of the CLI, since 2026-09-28. An installed
+plugin runs in a child process started with `--permission` and read access to its own folder and
+its bootstrap only, not in a worker thread, which was measured not to be narrower than the
+thread that starts it. Its process proves it is confined before its code is imported, and the
+host refuses it with `E_PLUGIN_SANDBOX` otherwise. `RPC_PROTOCOL_VERSION` is 2. The network
+stays advisory on the Node versions the project pins: `net:` still filters `host.fetch` and
+nothing else. The message boundary, the proxy, the crash handling and `crashes.json` below all
+stand.
 
 ## Context
 

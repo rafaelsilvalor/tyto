@@ -31,4 +31,12 @@ runGuest(
     onMessage: (listener) => port.on('message', (event) => listener(event.data)),
   },
   () => import(pathToFileURL(entry).href),
+  // Said as it is. A `utilityProcess` accepts `--permission` and ignores it (measured), so this
+  // process is not confined and makes no attempt to prove otherwise; the desktop's host does
+  // not require the sandbox until plugins run on a bundled Node (ADR 0049).
+  {
+    runtime: `Electron ${process.versions.electron ?? 'unknown'} utilityProcess`,
+    canary: 'failed',
+    detail: 'a utilityProcess does not enforce the permission model',
+  },
 );

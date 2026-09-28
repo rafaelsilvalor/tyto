@@ -16,7 +16,7 @@ import { z } from 'zod';
  * compared, before any other message is read.
  */
 
-export const RPC_PROTOCOL_VERSION = 1;
+export const RPC_PROTOCOL_VERSION = 2;
 
 const protocol = z.literal(RPC_PROTOCOL_VERSION);
 
@@ -109,10 +109,33 @@ export type HostMessage = z.infer<typeof hostMessageSchema>;
 
 /* --------------------------------------------------------------- guest → host -- */
 
-/** The first message, and the only one read before its `protocol` is compared. */
+/**
+ * What the plugin's process found when it tried to read a file outside its grant, before the
+ * plugin's module was imported (ADR 0049).
+ *
+ * `denied` is the only answer that proves the permission model is enforcing: the file is
+ * known to exist, so a refusal cannot be a missing file. `readable` is a process that is not
+ * confined, and `failed` is any other outcome, `ENOENT` included, named in `detail`.
+ */
+export const sandboxReportSchema = z.strictObject({
+  /** The runtime the process runs on, as the diagnostic names it: `Node v24.21.0`. */
+  runtime: z.string().min(1),
+  canary: z.enum(['denied', 'readable', 'failed']),
+  detail: z.string(),
+});
+export type SandboxReport = z.infer<typeof sandboxReportSchema>;
+
+/**
+ * The first message, and the only one read before its `protocol` is compared.
+ *
+ * `sandbox` is optional in the schema so that a guest that sends none is told so by name
+ * rather than as a malformed message; a host that requires the sandbox refuses it all the
+ * same (ADR 0049).
+ */
 export const helloMessageSchema = z.object({
   type: z.literal('hello'),
   protocol: z.number(),
+  sandbox: sandboxReportSchema.optional(),
 });
 export type HelloMessage = z.infer<typeof helloMessageSchema>;
 

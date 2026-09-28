@@ -80,7 +80,7 @@ describe('fsPluginStore', () => {
     expect(added.error.map((problem) => [problem.code, problem.message])).toEqual([
       [
         'E_PLUGIN_LINK',
-        `Plugin folder '${source}' holds '${join('dist', 'elsewhere')}', a link that leads out of the folder. Install copies a plugin's own files only: replace the link with the file it points to.`,
+        `Plugin folder '${source}' holds '${join('dist', 'elsewhere')}', a link that leads out of the folder. A plugin may hold its own files only: replace the link with the file it points to.`,
       ],
     ]);
     expect(await store.list()).toEqual([]);
@@ -97,6 +97,20 @@ describe('fsPluginStore', () => {
 
     expect(added.ok ? [] : added.error.map((problem) => problem.message)).toEqual([
       expect.stringContaining("holds 'dangling', a link that leads nowhere."),
+    ]);
+  });
+
+  it('names a link made in an installed folder after install, which a load refuses (ADR 0049)', async () => {
+    const store = fsPluginStore(home);
+    await store.add('pdf', source);
+    expect(await store.linksLeaving('pdf')).toEqual([]);
+
+    const outside = join(home, '..', 'outside');
+    await mkdir(outside, { recursive: true });
+    await symlink(outside, join(store.directoryOf('pdf'), 'dist', 'later'), 'junction');
+
+    expect((await store.linksLeaving('pdf')).map((problem) => problem.code)).toEqual([
+      'E_PLUGIN_LINK',
     ]);
   });
 

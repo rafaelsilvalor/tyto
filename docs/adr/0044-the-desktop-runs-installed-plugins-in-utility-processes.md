@@ -1,6 +1,15 @@
 # 0044 — The desktop runs installed plugins in utility processes, and the queue stays PNG-only
 
-Status: accepted · 2026-09-27 · TYTO-48 · extends ADR 0041 and ADR 0042
+Status: accepted · 2026-09-27 · TYTO-48 · extends ADR 0041 and ADR 0042 · amended by ADR 0049,
+which measured that a `utilityProcess` does not enforce Node's permission model
+
+## Amended by ADR 0049
+
+A `utilityProcess` accepts `--permission` in `execArgv` and does not enforce it: the process
+reads any file, opens sockets and spawns children, measured on Electron 44.4.1. So the desktop
+host does not require the sandbox yet (`requireSandbox: false`) and is a crash boundary only.
+The second TYTO-186 pull request moves each plugin off `utilityProcess` onto a Node 24 binary
+bundled with the app, under the same model as the CLI.
 
 ## Context
 

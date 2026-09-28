@@ -20,10 +20,11 @@ import type { PluginState } from './state.js';
  * starting a plugin per run would load the same code again every time.
  *
  * **Ports only** (ADR 0010). The store reads the disk, `launch` starts the plugin's process
- * — a worker thread in the CLI, a `utilityProcess` in the desktop — and `entryOf` says
+ * — a confined child process in the CLI, a `utilityProcess` in the desktop — and `entryOf` says
  * where a plugin's code is and whether it is there. So the rules, and the order they are
  * applied in, are one copy for both apps; what differs between them is only what they
- * compose. A plugin's process is a crash and API boundary, **not a sandbox** (TYTO-186).
+ * compose. A plugin's process is a crash and API boundary, and where the app's runtime can
+ * confine it, a sandbox too: `requireSandbox` says which (ADR 0049).
  */
 
 /** Where the code of an installed plugin is, relative to its folder, as messages spell it. */
@@ -123,6 +124,8 @@ export interface StartOptions {
   entryOf(folder: string): Promise<string | undefined>;
   /** What `host.fetch` and `host.credentials` reach, once a plugin's permissions allow it. */
   readonly capabilities?: HostCapabilities;
+  /** Whether each plugin's process must prove it is confined to its folder (ADR 0049). */
+  readonly requireSandbox: boolean;
 }
 
 function importFailure(plugin: string, problem: string): Diagnostic {
@@ -140,12 +143,22 @@ async function startPlugin(
     return [importFailure(entry.folder, `it has no ${PLUGIN_ENTRY_PATH}`)];
   }
 
+  // Checked on every load, not only at install: the permission model follows a link out of
+  // the folder it granted (ADR 0049), and a folder can change after it was installed.
+  const links = await store.linksLeaving(entry.folder);
+  if (links.length > 0) return links;
+
   const connected = await connectIsolatedPlugin({
     name: entry.folder,
     // The validated manifest, handed over as the document it was: the host validates it
     // again at `tryActivate`, which is the one check a plugin cannot skip (ADR 0007).
     manifest: entry.manifest as unknown,
-    channel: options.launch({ name: entry.folder, entry: path }),
+    channel: options.launch({
+      name: entry.folder,
+      entry: path,
+      directory: store.directoryOf(entry.folder),
+    }),
+    requireSandbox: options.requireSandbox,
     ...(options.capabilities === undefined ? {} : { capabilities: options.capabilities }),
     onCrash: (reason) => {
       // Kept, so `close` can wait for it: an app that exits mid-write loses the record.

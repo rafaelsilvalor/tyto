@@ -89,7 +89,7 @@ describe('the example pack', () => {
   const brief = join(EXAMPLE_PACK, 'templates', 'aviso', 'examples', 'aviso.brief');
   const formats = join(EXAMPLE_PACK, 'templates', 'formats.yaml');
 
-  // Starts a plugin's worker thread, which a full `pnpm check` can hold past Vitest's 5 s.
+  // Starts a plugin's process, which a full `pnpm check` can hold past Vitest's 5 s.
   it('installs from its folder and renders its template', async () => {
     expect(await run(['plugin', 'install', EXAMPLE_PACK, '--yes'], environment()), stderr()).toBe(
       EXIT_OK,
@@ -113,7 +113,7 @@ describe('the example pack', () => {
     expect(rendered.diagnostics.map((item) => item.code)).toContain('E_UNKNOWN_TEMPLATE');
   });
 
-  // Starts a plugin's worker thread, which a full `pnpm check` can hold past Vitest's 5 s.
+  // Starts a plugin's process, which a full `pnpm check` can hold past Vitest's 5 s.
   it('stops being one once disabled', async () => {
     await run(['plugin', 'install', EXAMPLE_PACK, '--yes'], environment());
     await run(['plugin', 'disable', 'example-pack'], environment());
@@ -125,7 +125,7 @@ describe('the example pack', () => {
 });
 
 describe('the example pack in tyto watch', () => {
-  // Starts a plugin's worker thread, which a full `pnpm check` can hold past Vitest's 5 s.
+  // Starts a plugin's process, which a full `pnpm check` can hold past Vitest's 5 s.
   it('renders a task that names its template', async () => {
     await run(['plugin', 'install', EXAMPLE_PACK, '--yes'], environment());
     const task = join(workspace, 'queue', 'inbox', 'aviso-1');
@@ -158,7 +158,7 @@ describe('the example pack in tyto watch', () => {
 });
 
 describe('tyto plugin new', () => {
-  // Starts a plugin's worker thread, which a full `pnpm check` can hold past Vitest's 5 s.
+  // Starts a plugin's process, which a full `pnpm check` can hold past Vitest's 5 s.
   it('scaffolds a pack that installs, checks and renders with nothing edited', async () => {
     expect(await run(['plugin', 'new', 'meu-pack', '--out', 'sources'], environment())).toBe(
       EXIT_OK,
@@ -339,7 +339,7 @@ describe('a pack folder outside its plugin', () => {
     60_000,
   );
 
-  // Starts a plugin's worker thread, which a full `pnpm check` can hold past Vitest's 5 s.
+  // Starts a plugin's process, which a full `pnpm check` can hold past Vitest's 5 s.
   it('refuses a link that leads out, which only the real path shows', async () => {
     const outside = join(workspace, 'outside');
     await cp(join(EXAMPLE_PACK, 'templates'), outside, { recursive: true });
@@ -355,8 +355,10 @@ describe('a pack folder outside its plugin', () => {
       join(EXAMPLE_PACK, 'templates', 'formats.yaml'),
     );
 
+    // Refused before the pack's folder is read at all: every load asks the store for links out
+    // of the plugin's folder first, because the permission model would follow one (ADR 0049).
     expect(skipped(rendered)).toEqual([
-      "Plugin 'pacote' was skipped: Plugin 'pacote' contributes template pack folder 'linked', and a link in it leads out of the plugin folder.",
+      `Plugin 'pacote' was skipped: Plugin folder '${join(home, 'plugins', 'pacote')}' holds 'linked', a link that leads out of the folder. A plugin may hold its own files only: replace the link with the file it points to.`,
     ]);
   }, 60_000);
 
@@ -377,7 +379,7 @@ describe('a pack folder outside its plugin', () => {
     expect(out.join('')).not.toContain('"pacote"');
   });
 
-  // Starts a plugin's worker thread, which a full `pnpm check` can hold past Vitest's 5 s.
+  // Starts a plugin's process, which a full `pnpm check` can hold past Vitest's 5 s.
   it('refuses the whole plugin, so its exporter is not offered either', async () => {
     await run(
       ['plugin', 'install', await packPlugin('../outside', { exporter: true }), '--yes'],
@@ -403,7 +405,7 @@ describe('a pack folder outside its plugin', () => {
   }, 60_000);
 });
 
-// A code template runs in the plugin's thread through the pack's `build` (ADR 0048); these
+// A code template runs in the plugin's process through the pack's `build` (ADR 0048); these
 // are the two folders nothing could run that way. `plugin-code-template.test.ts` has the
 // ones that run.
 describe('a code template in an installed pack', () => {
@@ -441,7 +443,7 @@ describe('a code template in an installed pack', () => {
 });
 
 describe('an installed template with a built-in name', () => {
-  // Starts a plugin's worker thread, which a full `pnpm check` can hold past Vitest's 5 s.
+  // Starts a plugin's process, which a full `pnpm check` can hold past Vitest's 5 s.
   it('is shadowed by the built-in, and the run says so', async () => {
     const folder = await packPlugin('templates');
     const manifest = join(folder, 'templates', 'aviso', 'manifest.yaml');
