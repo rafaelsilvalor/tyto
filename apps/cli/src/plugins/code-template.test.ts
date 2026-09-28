@@ -124,6 +124,7 @@ export function activate(host) {
     createPluginHost(),
     { plugins: [connected.value.plugin], warnings: [], close: async () => undefined },
     () => plugin,
+    { allowCode: true },
   );
   expect(packs.warnings).toEqual([]);
   const registry = await loadTemplateRegistry(nodeFileSystem(), [...packs.directories]);

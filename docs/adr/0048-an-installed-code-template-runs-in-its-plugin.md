@@ -144,6 +144,10 @@ build, and `cmp` found every file identical: `slide-1-retrato.svg` (500 721 B),
 - A text node the plugin returns carries no source ranges, because `text/origin.ts` keeps them
   in the host's memory. So a `W_TEXT_OVERFLOW` about an installed code template names the node,
   not the slot.
-- The desktop still does not route installed code templates. Its preview and picker take them in
-  TYTO-189's second pull request, where the `utilityProcess` round trip and the first-render
-  cost are measured.
+- **An app runs installed code templates only when it says so.** `installedPacks` takes
+  `allowCode`, which is off by default, and the CLI passes `true`. Any caller without an
+  isolated runner, or one that forgets the option, gets `E_PLUGIN_PACK_CODE` ("a code template,
+  which this app cannot run from a plugin yet"), never a template it would have to draw some
+  other way. The desktop passes nothing until TYTO-189's second pull request turns it on beside
+  its `utilityProcess` runner. That is also where the round trip and the first-render cost are
+  measured.

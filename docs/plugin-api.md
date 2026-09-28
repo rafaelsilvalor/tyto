@@ -211,8 +211,9 @@ and the guest rebuilds `measure` over them with core's `measureText`, so it stay
 without it the template measures it as `undefined` and the load says `W_PLUGIN_FONT_WITHHELD`.
 The only loader is `installedTemplateSource` in `@tyto/io`, and it only calls the proxy:
 nothing imports a plugin's template in Tyto's own process. The job compiles such a template with
-`compileDeferred`, and every other one with `compile`. In this pull request only the CLI routes them; the
-desktop follows in TYTO-189's second.
+`compileDeferred`, and every other one with `compile`. `installedPacks` refuses them with `E_PLUGIN_PACK_CODE` unless its caller passes
+`allowCode: true`, which the CLI does. The desktop does not until TYTO-189's second pull
+request.
 
 ### `editor.command` and `editor.keymap`, in full
 

@@ -6,7 +6,6 @@ import {
   type InProcessHost,
   type IsolatedPackBuild,
   type LoadedPlugins,
-  type TemplatePack,
   skippedPluginWarnings,
   validatePluginManifest,
 } from '@tyto/plugin-api';
@@ -62,6 +61,16 @@ export interface InstalledPacks {
   readonly refused: ReadonlySet<string>;
 }
 
+export interface InstalledPacksOptions {
+  /**
+   * Whether this app can run a code template in its plugin's process (ADR 0048). **Off unless
+   * asked for**: a caller that has no isolated runner for them, or forgets to say it has one,
+   * gets `E_PLUGIN_PACK_CODE` for every code template, never a template it cannot draw. The
+   * CLI turns it on; the desktop does in TYTO-189's second pull request, beside its runner.
+   */
+  readonly allowCode?: boolean;
+}
+
 export const NO_INSTALLED_PACKS: InstalledPacks = {
   directories: [],
   code: [],
@@ -81,7 +90,9 @@ export async function installedPacks(
   host: InProcessHost,
   loaded: LoadedPlugins,
   folderOf: (plugin: string) => string,
+  options: InstalledPacksOptions = {},
 ): Promise<InstalledPacks> {
+  const allowCode = options.allowCode === true;
   const directories: string[] = [];
   const code: InstalledCodePack[] = [];
   const warnings: Diagnostic[] = [];
@@ -104,13 +115,14 @@ export async function installedPacks(
         problems.push(inside);
         continue;
       }
-      const refusals = await unrunnableTemplates(inside, pack, plugin.id);
+      const drawsCode = allowCode && pack.build !== undefined;
+      const refusals = await unrunnableTemplates(inside, drawsCode, allowCode, plugin.id);
       if (refusals.length > 0) {
         problems.push(...refusals);
         continue;
       }
       checked.push(inside);
-      if (pack.build !== undefined) {
+      if (drawsCode && pack.build !== undefined) {
         // The proxy `connectIsolatedPlugin` put there, whose calling convention is the
         // wire's and not the plugin's (`IsolatedPackBuild`).
         const build = pack.build as unknown as IsolatedPackBuild;
@@ -178,11 +190,13 @@ async function directoryInside(
 
 /**
  * The templates of a pack that nothing could run the way ADR 0048 allows: a `template.ts`,
- * which Tyto never imports, and a folder with no `template.html` in a pack with no `build`.
+ * which Tyto never imports, and a folder with no `template.html` that nothing here draws —
+ * because the pack has no `build`, or because this app runs no code templates.
  */
 async function unrunnableTemplates(
   directory: string,
-  pack: TemplatePack,
+  drawsCode: boolean,
+  allowCode: boolean,
   plugin: string,
 ): Promise<Diagnostic[]> {
   const exists = (path: string): Promise<boolean> =>
@@ -211,8 +225,12 @@ async function unrunnableTemplates(
         `its folder holds a ${CODE_FILE}, which Tyto never imports: a code template ships ` +
           "built into the plugin's dist/ and is drawn by the pack's build function",
       );
-    } else if (!(await exists(join(folder, MARKUP_FILE))) && pack.build === undefined) {
-      refuse(`it has no ${MARKUP_FILE}, and the pack registers no build function to draw it`);
+    } else if (!(await exists(join(folder, MARKUP_FILE))) && !drawsCode) {
+      refuse(
+        allowCode
+          ? `it has no ${MARKUP_FILE}, and the pack registers no build function to draw it`
+          : `it is a code template, which this app cannot run from a plugin yet`,
+      );
     }
   }
   return problems;

@@ -60,6 +60,7 @@ export {
 export {
   type InstalledCodePack,
   type InstalledPacks,
+  type InstalledPacksOptions,
   NO_INSTALLED_PACKS,
   installedPacks,
   withoutRefused,

@@ -143,7 +143,10 @@ export async function loadRenderContext(
   const installed =
     options.installed === undefined
       ? NO_INSTALLED_PACKS
-      : await installedPacks(host, options.installed.plugins, options.installed.folderOf);
+      : // The CLI runs code templates in their plugin's thread (ADR 0048).
+        await installedPacks(host, options.installed.plugins, options.installed.folderOf, {
+          allowCode: true,
+        });
 
   // Project first: a folder the user pointed at is a more specific statement of intent
   // than a package that came along with the program, so their `promo-curso` is the one
