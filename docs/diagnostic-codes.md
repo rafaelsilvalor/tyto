@@ -90,6 +90,9 @@ non-zero.
 | `W_SLOT_VOCABULARY` | warning | no | A manifest names a slot against the standard slot vocabulary: a known synonym, a reserved name with the wrong shape, or a repeatable slot not named lamina. |
 | `W_PLUGIN_SKIPPED` | warning | no | An installed plugin was not activated for this run, and the run went on without it. |
 | `W_IMPORT_SKIPPED` | warning | no | Something in the previous version's data folder could not be brought across to this one. |
+| `W_LEFTOVER_REMOVED` | warning | no | A file the previous export wrote into this folder, and this one did not produce, was removed. |
+| `W_LEFTOVER_KEPT` | warning | no | A file the previous export listed, and this one did not produce, was left in the folder. |
+| `W_PREVIOUS_RESULT_UNREADABLE` | warning | no | The folder's previous result.json could not be read, so nothing in the folder was removed. |
 
 ## What is fatal, and why
 
@@ -1209,3 +1212,45 @@ Could not bring '{item}' across from version {version}: {problem}.
 ```
 
 Parameters: `item`, `version`, `problem`
+
+### `W_LEFTOVER_REMOVED`
+
+**Severity:** warning · **Fatal:** no · **Spec:** `docs/adr/0054-a-delivery-removes-what-tyto-wrote-there-last-time.md`
+
+A file the previous export wrote into this folder, and this one did not produce, was removed.
+
+A warning never replaces a value (ADR 0013).
+
+```
+Removed '{file}', which the previous export wrote and this one did not produce.
+```
+
+Parameters: `file`
+
+### `W_LEFTOVER_KEPT`
+
+**Severity:** warning · **Fatal:** no · **Spec:** `docs/adr/0054-a-delivery-removes-what-tyto-wrote-there-last-time.md`
+
+A file the previous export listed, and this one did not produce, was left in the folder.
+
+A warning never replaces a value (ADR 0013).
+
+```
+Kept '{file}', which the previous export listed and this one did not produce: {reason}.
+```
+
+Parameters: `file`, `reason`
+
+### `W_PREVIOUS_RESULT_UNREADABLE`
+
+**Severity:** warning · **Fatal:** no · **Spec:** `docs/adr/0054-a-delivery-removes-what-tyto-wrote-there-last-time.md`
+
+The folder's previous result.json could not be read, so nothing in the folder was removed.
+
+A warning never replaces a value (ADR 0013).
+
+```
+Removed nothing: the previous result.json could not be read ({reason}), so this export cannot tell which files it wrote.
+```
+
+Parameters: `reason`

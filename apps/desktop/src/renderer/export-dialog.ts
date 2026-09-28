@@ -37,7 +37,12 @@ export interface ExportProgressView {
   readonly done: number;
   readonly failed: number;
   readonly directory: string;
-  readonly diagnostics: readonly { readonly severity: string; readonly message: string }[];
+  readonly diagnostics: readonly {
+    readonly severity: string;
+    /** Optional here because only the leftover codes are read by it (ADR 0054). */
+    readonly code?: string;
+    readonly message: string;
+  }[];
   /**
    * `| undefined` and not just `?`, because this shape comes off the wire.
    *
@@ -47,6 +52,13 @@ export interface ExportProgressView {
    */
   readonly failure?: string | undefined;
 }
+
+/** What a re-export into a used folder reports about the files it found there (ADR 0054). */
+const LEFTOVER_CODES: ReadonlySet<string> = new Set([
+  'W_LEFTOVER_REMOVED',
+  'W_LEFTOVER_KEPT',
+  'W_PREVIOUS_RESULT_UNREADABLE',
+]);
 
 /** The file types that lose something when compressed, and the only ones quality reaches. */
 export const LOSSY_KINDS: readonly ExportKind[] = ['jpeg', 'webp'];
@@ -413,6 +425,9 @@ export class ExportDialog extends LitElement {
     const say = translate.bind(null, this.locale);
     const fraction = completion(progress);
     const errors = progress.diagnostics.filter((item) => item.severity === 'error');
+    // Shown although they are warnings, and the only warnings shown here: a file removed from
+    // the folder the person is about to send is the one thing they have to be told (ADR 0054).
+    const leftovers = progress.diagnostics.filter((item) => LEFTOVER_CODES.has(item.code ?? ''));
 
     const heading =
       progress.failure !== undefined
@@ -457,6 +472,16 @@ export class ExportDialog extends LitElement {
           : html`<ul class="export__problems">
               ${errors.map((item) => html`<li>${item.message}</li>`)}
             </ul>`
+      }
+      ${
+        leftovers.length === 0
+          ? nothing
+          : html`<div class="export__leftovers" data-testid="export-leftovers">
+              <p>${say('export.leftovers')}</p>
+              <ul>
+                ${leftovers.map((item) => html`<li>${item.message}</li>`)}
+              </ul>
+            </div>`
       }
     </div>`;
   }

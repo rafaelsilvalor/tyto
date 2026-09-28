@@ -65,9 +65,22 @@ somebody would otherwise have to delete first.
 
 **A flag rather than a second command**, because `render` carries ten options a delivery needs
 every one of, and a sibling would be a second copy of that surface, its help and its tests.
-**An existing folder is written into and not cleared**, the same rule `--out` has — so a brief
-edited from three slides down to two leaves the third one in the delivery, and `result.json`
-does not mention it, because it lists what that run wrote.
+**An existing folder is reused, and only what Tyto wrote there last time leaves it**
+(TYTO-127, ADR 0054). The export reads the previous `editaveis/result.json` before it writes
+anything, and once the artwork is written it removes each file that report listed and this
+export did not produce: the third slide of a brief edited down to two, or `lamina-1-grid.png`
+after ADR 0053 renamed it. A file the report did not list is never touched, so a note or a
+logo somebody dropped beside the artwork stays. Each removal is a `W_LEFTOVER_REMOVED` warning
+on stderr and in the new `result.json`. A listed file is kept, with a `W_LEFTOVER_KEPT` naming
+why, when its size is no longer the one recorded (somebody replaced it by hand), when its name
+is not one file in the folder (refused), when this export failed, was cancelled or wrote
+fewer files than planned, or when the operating system refuses the removal. A report that
+cannot be read removes nothing (`W_PREVIOUS_RESULT_UNREADABLE`), and a folder with no report
+yet removes nothing and says nothing. `--out` removes nothing, ever: see below.
+
+The desktop's export box follows the same rule over the folder a person picks, with
+`result.json` beside the artwork. The queue panel and `tyto watch` do not: their `out/` is the
+contract above.
 
 **`template.txt` names the template and does not carry it.** One line — `promo-curso 1.0.0`
 — plus the template's own description and a sentence saying where the template actually

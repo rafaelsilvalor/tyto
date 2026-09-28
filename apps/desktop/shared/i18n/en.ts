@@ -129,6 +129,7 @@ export const en: Catalogue = {
   'export.cancelled': 'Export cancelled',
   'export.failed': 'Export failed',
   'export.problems': 'Finished with problems',
+  'export.leftovers': 'In the folder, from the previous export:',
   'command.file.export': 'Export…',
   'command.template.edit': 'Edit template…',
   'command.template.new': 'New template…',

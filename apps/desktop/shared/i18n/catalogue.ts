@@ -301,6 +301,8 @@ export interface Catalogue {
   readonly 'export.cancelled': string;
   readonly 'export.failed': string;
   readonly 'export.problems': string;
+  /** Heads the list of files an earlier export left and this one removed or kept (ADR 0054). */
+  readonly 'export.leftovers': string;
   readonly 'command.file.export': string;
 
   /** The template mode (TYTO-44). */
@@ -514,6 +516,7 @@ export const CATALOGUE_KEYS = [
   'export.cancelled',
   'export.failed',
   'export.problems',
+  'export.leftovers',
   'command.file.export',
   'command.template.edit',
   'command.template.new',

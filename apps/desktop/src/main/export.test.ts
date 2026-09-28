@@ -139,6 +139,39 @@ describe('the export service', () => {
     expect(onDisk).toEqual(named);
   }, 60_000);
 
+  it('removes what its previous export wrote only when asked, which the queue never does', async () => {
+    // ADR 0054. Four artworks, then three, into one folder: the export box asks for leftovers
+    // to go and the queue does not, and the two must stay different.
+    const four = exampleBrief('carrossel-lista', 'lista.brief');
+    const three = four.slice(0, four.lastIndexOf('::lamina'));
+    const exportInto = async (brief: string, removeLeftovers: boolean) =>
+      settled(
+        (
+          await service.start({
+            brief,
+            directory: out,
+            label: 'lista',
+            outputs: [{ kind: 'svg' }],
+            removeLeftovers,
+          })
+        ).exportId,
+      );
+
+    await exportInto(four, false);
+    const kept = await exportInto(three, false);
+    expect(readdirSync(out)).toContain('story-04.svg');
+    expect(kept.diagnostics.map((item) => item.code)).not.toContain('W_LEFTOVER_REMOVED');
+
+    await exportInto(four, true);
+    const removed = await exportInto(three, true);
+    expect(readdirSync(out)).not.toContain('story-04.svg');
+    expect(removed.diagnostics.filter((item) => item.code === 'W_LEFTOVER_REMOVED')).toHaveLength(
+      2,
+    );
+    // In the report on disk too, which is what somebody opening the folder later reads.
+    expect(removed.result?.diagnostics.map((item) => item.code)).toContain('W_LEFTOVER_REMOVED');
+  }, 60_000);
+
   it('reports a brief that does not compile instead of throwing', async () => {
     const { exportId } = await service.start({
       brief: 'this is not a brief',

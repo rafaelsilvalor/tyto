@@ -201,11 +201,24 @@ export async function renderTask(
   // `templateWiring` already did for the template's own diagnostics.
   registerOrigin(produced, { path: task.briefPath, source: task.brief });
 
-  const diagnostics = [...inherited, ...pluginWarnings, ...produced];
+  const artifacts = job.ok ? job.value.artifacts : [];
+  // Only a `--folder` delivery removes anything; `--out` is the ADR 0011 contract and its
+  // reader reconciles against `result.json` itself (ADR 0054).
+  const leftovers =
+    delivery === undefined
+      ? []
+      : await delivery.removeLeftovers({
+          artifacts,
+          planned: job.ok ? job.value.planned : 0,
+          cancelled: job.ok ? job.value.cancelled : false,
+          failed: hasErrors([...inherited, ...produced]),
+        });
+
+  const diagnostics = [...inherited, ...pluginWarnings, ...produced, ...leftovers];
   const result = renderResult({
     cancelled: job.ok ? job.value.cancelled : false,
     planned: job.ok ? job.value.planned : 0,
-    artifacts: job.ok ? job.value.artifacts : [],
+    artifacts,
     diagnostics,
     version: options.version,
     templates: context.templateVersions,
