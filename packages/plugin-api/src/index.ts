@@ -21,6 +21,7 @@ export type {
   RasterizerContribution,
   SinkContribution,
   SourceContribution,
+  IsolatedPackBuild,
   TemplatePack,
 } from './contributions.js';
 
@@ -93,6 +94,7 @@ export {
   RPC_PROTOCOL_VERSION,
 } from './isolation/protocol.js';
 
+export { type GuestFaces, type ShippedFace, guestFaces } from './isolation/faces.js';
 export { runGuest } from './isolation/guest.js';
 
 export {

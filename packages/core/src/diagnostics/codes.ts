@@ -306,14 +306,27 @@ export const diagnosticCodes = {
     fatal: true,
     fatality: 'A plugin that did not load contributed no slot to skip.',
   },
+  // Narrowed by ADR 0048: a code template may come from a plugin, built into its dist/ and
+  // run in its process. What is still refused is a folder that would be run any other way.
   E_PLUGIN_PACK_CODE: {
     severity: 'error',
-    summary: "A plugin's template pack holds a template that is not markup.",
-    template:
-      "Plugin '{plugin}' contributes template '{template}', which is not a markup template: an installed pack may hold only folders with a template.html and no template.ts.",
-    spec: 'docs/adr/0046-an-installed-template-pack-is-markup-inside-its-plugin.md',
+    summary:
+      "A plugin's template pack holds a template that could not run in the plugin's process.",
+    template: "Plugin '{plugin}' contributes template '{template}', and {problem}.",
+    spec: 'docs/adr/0048-an-installed-code-template-runs-in-its-plugin.md',
     fatal: true,
     fatality: 'A plugin that did not load contributed no slot to skip.',
+  },
+  // Every failure an installed code template can have arrives as a value from the plugin's
+  // process, and this names which template it cost (ADR 0048).
+  E_PLUGIN_TEMPLATE: {
+    severity: 'error',
+    summary: "An installed code template did not answer a frame from its plugin's process.",
+    template: "Plugin '{plugin}' did not build a frame of template '{template}': {problem}",
+    spec: 'docs/adr/0048-an-installed-code-template-runs-in-its-plugin.md',
+    fatal: false,
+    fatality:
+      'It costs the frame the call was for; the frames that did arrive are drawn (ADR 0025).',
   },
   // A link is copied as its target when it lands inside the plugin folder; any other is
   // refused before anything is written, rather than failing the copy halfway (TYTO-50).
@@ -598,6 +611,19 @@ export const diagnosticCodes = {
     spec: 'docs/ir-schema.md',
     fatal: false,
     fatality: 'A warning never replaces a value (ADR 0013).',
+  },
+  // A face installed on this machine can be a licence the person holds and a plugin does
+  // not; it crosses only under `font:<family>`, approved at install (ADR 0048).
+  W_PLUGIN_FONT_WITHHELD: {
+    severity: 'warning',
+    summary:
+      "A face installed on this machine was not sent to a plugin's template, which did not ask for it.",
+    template:
+      "Plugin '{plugin}' measures '{family}' in template '{template}', and that face is installed on this machine: it is sent only to a plugin whose manifest declares 'font:{family}'. The template measured it as unmeasurable.",
+    spec: 'docs/adr/0048-an-installed-code-template-runs-in-its-plugin.md',
+    fatal: false,
+    fatality:
+      'The frame is drawn and laid out against the face; only the measurements the template took itself before it placed the text, were missing.',
   },
   W_FONT_SUBSTITUTED: {
     severity: 'warning',

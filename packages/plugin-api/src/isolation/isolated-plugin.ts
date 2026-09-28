@@ -201,7 +201,12 @@ export function connectIsolatedPlugin(
         return `it registered into '${registration.point}', which an isolated plugin cannot reach`;
       }
       const handles = z.strictObject(
-        Object.fromEntries(Object.keys(spec.callables).map((key) => [key, callHandleSchema])),
+        Object.fromEntries(
+          Object.entries(spec.callables).map(([key, callable]) => [
+            key,
+            callable.optional === true ? callHandleSchema.optional() : callHandleSchema,
+          ]),
+        ),
       );
       const shape = spec.data.extend(handles.shape);
       const parsed = shape.safeParse(registration.contribution);
@@ -211,7 +216,10 @@ export function connectIsolatedPlugin(
 
       const contribution: Record<string, unknown> = { ...parsed.data };
       for (const [key, callable] of Object.entries(spec.callables)) {
-        const { $call } = parsed.data[key] as { $call: number };
+        const handle = parsed.data[key] as { $call: number } | undefined;
+        // An optional function the plugin did not register stays absent, as it is in-process.
+        if (handle === undefined) continue;
+        const { $call } = handle;
         contribution[key] = (...args: unknown[]): Promise<unknown> =>
           call(callable, $call, callable.send(args));
       }
