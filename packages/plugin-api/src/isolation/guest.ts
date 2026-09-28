@@ -17,6 +17,7 @@ import {
   type HostMessage,
   RPC_PROTOCOL_VERSION,
   type Registration,
+  type SandboxReport,
   describeIssues,
   fetchedResponseSchema,
   hostMessageSchema,
@@ -25,13 +26,15 @@ import {
 /**
  * The plugin's side of isolation: a `PluginHost` whose every call is a message (ADR 0041).
  *
- * This runs inside the plugin's process — a worker thread in the CLI — and is the only
+ * This runs inside the plugin's process — a child process in the CLI — and is the only
  * `PluginHost` an installed plugin ever holds. Registering keeps the functions here and
  * sends the rest; the host calls a function back by handle, and the arguments are checked
  * against the point's schema **here**, before the plugin's code sees them.
  *
  * `load` is the app's: it imports the plugin's module, which is the one thing this package
- * cannot do without naming a disk (ADR 0010).
+ * cannot do without naming a disk (ADR 0010). So is `sandbox`: the app's bootstrap tries to
+ * read a file outside the process's grant **before** calling this, and the answer crosses in
+ * `hello`, before the host has asked for the plugin's module to be imported (ADR 0049).
  */
 
 interface Kept {
@@ -46,7 +49,11 @@ function messageOf(cause: unknown): string {
   return cause instanceof Error ? cause.message : String(cause);
 }
 
-export function runGuest(channel: GuestChannel, load: () => Promise<unknown>): void {
+export function runGuest(
+  channel: GuestChannel,
+  load: () => Promise<unknown>,
+  sandbox: SandboxReport,
+): void {
   const kept = new Map<number, Kept>();
   const state: GuestState = { faces: guestFaces() };
   const listeners = new Map<string, Set<(payload: never) => void>>();
@@ -289,5 +296,5 @@ export function runGuest(channel: GuestChannel, load: () => Promise<unknown>): v
     else host.events.emit(message.event, message.payload);
   });
 
-  channel.send({ type: 'hello', protocol: RPC_PROTOCOL_VERSION });
+  channel.send({ type: 'hello', protocol: RPC_PROTOCOL_VERSION, sandbox });
 }

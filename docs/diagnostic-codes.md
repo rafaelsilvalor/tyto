@@ -47,7 +47,8 @@ non-zero.
 | `E_PLUGIN_PACK_DIRECTORY` | error | yes | A plugin's template pack names a folder outside the plugin's installed folder. |
 | `E_PLUGIN_PACK_CODE` | error | yes | A plugin's template pack holds a template that could not run in the plugin's process. |
 | `E_PLUGIN_TEMPLATE` | error | no | An installed code template did not answer a frame from its plugin's process. |
-| `E_PLUGIN_LINK` | error | yes | A plugin folder being installed holds a link that leads outside it, or nowhere. |
+| `E_PLUGIN_LINK` | error | yes | A plugin folder holds a link that leads outside it, or nowhere. |
+| `E_PLUGIN_SANDBOX` | error | yes | An installed plugin's process is not confined to its own folder, so it was not run. |
 | `E_PLUGIN_CRASHED` | error | no | An isolated plugin's process stopped while the host was waiting for it. |
 | `E_PLUGIN_PROTOCOL` | error | no | An isolated plugin sent the host a message that does not match the RPC protocol. |
 | `E_PLUGIN_CALL` | error | no | A function an isolated plugin registered threw when the host called it. |
@@ -137,6 +138,7 @@ incomplete brief, and a crossed box where a picture the exporter could not load 
 | `E_PLUGIN_PACK_CODE` | yes | A plugin that did not load contributed no slot to skip. |
 | `E_PLUGIN_TEMPLATE` | no | It costs the frame the call was for; the frames that did arrive are drawn (ADR 0025). |
 | `E_PLUGIN_LINK` | yes | A plugin that did not load contributed no slot to skip. |
+| `E_PLUGIN_SANDBOX` | yes | A plugin that did not load contributed no slot to skip. |
 | `E_PLUGIN_CRASHED` | no | One frame was waiting on the process; the frames other exporters draw survive (ADR 0025). |
 | `E_PLUGIN_PROTOCOL` | no | It costs the one frame whose answer it was; the others are drawn (ADR 0025). |
 | `E_PLUGIN_CALL` | no | It costs the one frame the call was for; the others are drawn (ADR 0025). |
@@ -608,15 +610,29 @@ Parameters: `plugin`, `template`, `problem`
 
 **Severity:** error · **Fatal:** yes · **Spec:** `docs/plugin-authoring.md`
 
-A plugin folder being installed holds a link that leads outside it, or nowhere.
+A plugin folder holds a link that leads outside it, or nowhere.
 
 A plugin that did not load contributed no slot to skip.
 
 ```
-Plugin folder '{source}' holds '{file}', a link that {problem}. Install copies a plugin's own files only: replace the link with the file it points to.
+Plugin folder '{source}' holds '{file}', a link that {problem}. A plugin may hold its own files only: replace the link with the file it points to.
 ```
 
 Parameters: `source`, `file`, `problem`
+
+### `E_PLUGIN_SANDBOX`
+
+**Severity:** error · **Fatal:** yes · **Spec:** `docs/adr/0049-an-installed-plugin-runs-under-the-runtime-permission-model.md`
+
+An installed plugin's process is not confined to its own folder, so it was not run.
+
+A plugin that did not load contributed no slot to skip.
+
+```
+Plugin '{plugin}' was not run: its process on {runtime} is not confined to its folder ({problem}).
+```
+
+Parameters: `plugin`, `runtime`, `problem`
 
 ### `E_PLUGIN_CRASHED`
 

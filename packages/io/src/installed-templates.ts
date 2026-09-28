@@ -31,7 +31,8 @@ import type { InstalledCodePack } from './installed-packs.js';
  * face crosses once per plugin process. A face this machine has installed crosses only to a
  * plugin whose manifest declares `font:<family>`, which the person approved at install:
  * such a file can be a licence the person holds and the plugin's author does not, and the
- * plugin's process is not a sandbox (ADR 0041, TYTO-186). One it may not have measures as
+ * file is handed to the plugin's process by the host, so the process's confinement to its
+ * own folder does not stop it (ADR 0049). One it may not have measures as
  * `undefined` there, and the load says so with `W_PLUGIN_FONT_WITHHELD`.
  */
 

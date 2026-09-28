@@ -207,7 +207,7 @@ export function createProgram(environment: CliEnvironment, captured: Captured): 
     .description('scaffold a template-pack plugin from docs/plugin-authoring.md')
     .argument('<name>', "the plugin's name, also its folder's and its template's")
     .option('--out <dir>', 'where the plugin folder is created', '.')
-    .option('--code', "a code template, built in the plugin's thread, instead of markup")
+    .option('--code', "a code template, built in the plugin's process, instead of markup")
     .action(async (name: string) => {
       captured.code = await pluginNewCommand(name, pluginNew.opts(), environment);
     });

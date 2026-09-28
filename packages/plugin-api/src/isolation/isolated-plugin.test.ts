@@ -18,6 +18,13 @@ import type { HostCapabilities } from '../capabilities.js';
 import type { GuestChannel, PluginChannel } from './channel.js';
 import { runGuest } from './guest.js';
 import { type IsolatedPlugin, connectIsolatedPlugin } from './isolated-plugin.js';
+import type { SandboxReport } from './protocol.js';
+
+/** What a confined process reports: its canary was refused (ADR 0049). */
+const CONFINED: SandboxReport = { runtime: 'Node v24.21.0', canary: 'denied', detail: '' };
+
+const runConfined = (guest: GuestChannel, load: () => Promise<unknown>): void =>
+  runGuest(guest, load, CONFINED);
 
 /**
  * Isolation's protocol, end to end, with both ends in this process (TYTO-48).
@@ -137,9 +144,10 @@ async function isolate(
     readonly contributes?: readonly string[];
   } = {},
 ): Promise<{ readonly pair: Pair; readonly connected: Result<IsolatedPlugin, Diagnostics> }> {
-  const pair = channelPair((guest) => runGuest(guest, () => Promise.resolve({ activate })));
+  const pair = channelPair((guest) => runConfined(guest, () => Promise.resolve({ activate })));
   const lines = options.log;
   const connected = await connectIsolatedPlugin({
+    requireSandbox: true,
     name: 'texto',
     manifest: {
       ...MANIFEST,
@@ -329,6 +337,7 @@ describe('a crashed plugin', () => {
   it('is refused when it dies during activation', async () => {
     const pair = channelPair(() => undefined);
     const connecting = connectIsolatedPlugin({
+      requireSandbox: true,
       name: 'texto',
       manifest: MANIFEST,
       channel: pair.host,
@@ -365,14 +374,15 @@ describe('what an isolated plugin cannot do', () => {
   it('speaks another protocol', async () => {
     const pair = channelPair(() => undefined);
     const connecting = connectIsolatedPlugin({
+      requireSandbox: true,
       name: 'texto',
       manifest: MANIFEST,
       channel: pair.host,
     });
-    pair.inject({ type: 'hello', protocol: 2 });
+    pair.inject({ type: 'hello', protocol: 3, sandbox: CONFINED });
     const connected = await connecting;
     expect(connected.ok ? '' : connected.error[0]?.message).toBe(
-      "Plugin 'texto' failed to activate: its process speaks protocol 2 and this host speaks 1.",
+      "Plugin 'texto' failed to activate: its process speaks protocol 3 and this host speaks 2.",
     );
   });
 
@@ -390,7 +400,7 @@ describe('what crosses besides contributions', () => {
   it('sends the plugin its configuration and its log lines to the host', async () => {
     const lines: string[] = [];
     const pair = channelPair((guest) =>
-      runGuest(guest, () =>
+      runConfined(guest, () =>
         Promise.resolve({
           activate: (host: PluginHost) => {
             const { greeting } = host.config(
@@ -403,6 +413,7 @@ describe('what crosses besides contributions', () => {
       ),
     );
     const connected = await connectIsolatedPlugin({
+      requireSandbox: true,
       name: 'texto',
       manifest: { ...MANIFEST, contributes: ['editor.command'] },
       channel: pair.host,
@@ -547,8 +558,9 @@ describe('a plugin that does not answer', () => {
   });
 
   it('is refused when its activation does not finish in time', async () => {
-    const pair = channelPair((guest) => runGuest(guest, () => new Promise(() => {})));
+    const pair = channelPair((guest) => runConfined(guest, () => new Promise(() => {})));
     const connected = await connectIsolatedPlugin({
+      requireSandbox: true,
       name: 'texto',
       manifest: MANIFEST,
       channel: pair.host,
@@ -699,5 +711,85 @@ describe('an isolated panel (TYTO-49)', () => {
     expect(connected.ok ? '' : connected.error[0]?.message).toContain(
       "its 'panel' contribution does not match",
     );
+  });
+});
+
+describe('the confinement a host requires (ADR 0049)', () => {
+  /** Connects to a guest whose bootstrap reported `sandbox`, and says whether it was imported. */
+  async function reporting(sandbox: SandboxReport | undefined, requireSandbox: boolean) {
+    let imported = false;
+    const load = (): Promise<unknown> => {
+      imported = true;
+      return Promise.resolve({
+        activate: (host: PluginHost) => host.registerExporter(textExporter),
+      });
+    };
+    const pair = channelPair((guest) =>
+      sandbox === undefined
+        ? // A guest built before the field existed: its hello carries none.
+          runGuest(
+            {
+              send: (message) => guest.send({ ...message, sandbox: undefined } as never),
+              onMessage: guest.onMessage,
+            },
+            load,
+            CONFINED,
+          )
+        : runGuest(guest, load, sandbox),
+    );
+    const connected = await connectIsolatedPlugin({
+      name: 'texto',
+      manifest: MANIFEST,
+      channel: pair.host,
+      requireSandbox,
+    });
+    return { connected, imported: () => imported, closed: pair.closed };
+  }
+
+  it.each<[string, SandboxReport | undefined, string]>([
+    [
+      'reports nothing',
+      undefined,
+      "Plugin 'texto' was not run: its process on an unknown runtime is not confined to its folder (it did not report whether it is confined).",
+    ],
+    [
+      'could read the canary',
+      {
+        runtime: 'Electron 44.4.1 utilityProcess',
+        canary: 'readable',
+        detail: 'it read /app/out/main/index.js',
+      },
+      "Plugin 'texto' was not run: its process on Electron 44.4.1 utilityProcess is not confined to its folder (it could read a file outside its folder: it read /app/out/main/index.js).",
+    ],
+    [
+      'was refused the canary for another reason',
+      {
+        runtime: 'Node v24.21.0',
+        canary: 'failed',
+        detail: 'reading /cli/index.js failed with ENOENT',
+      },
+      "Plugin 'texto' was not run: its process on Node v24.21.0 is not confined to its folder (its check of the confinement did not complete: reading /cli/index.js failed with ENOENT).",
+    ],
+  ])('refuses a guest that %s, and never imports its module', async (_, sandbox, message) => {
+    const { connected, imported, closed } = await reporting(sandbox, true);
+    expect(
+      connected.ok ? [] : connected.error.map((problem) => [problem.code, problem.message]),
+    ).toEqual([['E_PLUGIN_SANDBOX', message]]);
+    expect(imported()).toBe(false);
+    expect(closed()).toBe(true);
+  });
+
+  it('activates a guest whose canary was denied', async () => {
+    const { connected, imported } = await reporting(CONFINED, true);
+    expect(connected.ok).toBe(true);
+    expect(imported()).toBe(true);
+  });
+
+  it('does not ask a host that does not require it, which is a crash boundary only', async () => {
+    const { connected } = await reporting(
+      { runtime: 'Electron 44.4.1 utilityProcess', canary: 'failed', detail: 'not confined' },
+      false,
+    );
+    expect(connected.ok).toBe(true);
   });
 });

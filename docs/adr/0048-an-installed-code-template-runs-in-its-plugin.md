@@ -1,6 +1,7 @@
 # 0048 — An installed code template runs in its plugin's process, and its faces cross with the call
 
-Status: accepted · 2026-09-27 · TYTO-189 · amends ADR 0046, extends ADR 0038, ADR 0041 and ADR 0042
+Status: accepted · 2026-09-27 · TYTO-189 · amends ADR 0046, extends ADR 0038, ADR 0041 and ADR 0042 · extended by ADR 0049, which
+confines the plugin's process a code template runs in
 
 ## Context
 

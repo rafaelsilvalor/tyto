@@ -21,13 +21,14 @@ import {
   nodeFileSystem,
 } from '@tyto/io';
 import { connectIsolatedPlugin, createPluginHost } from '@tyto/plugin-api';
-import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, inject, it } from 'vitest';
 
-import { launchPluginWorker } from './worker-channel.js';
+import { pluginProcessLauncher } from './plugin-process.js';
 
 /**
- * An installed code template in a real worker thread (TYTO-189, ADR 0048): what reaches a
- * render when the template answers, and when it does not.
+ * An installed code template in a real, confined child process (TYTO-189, ADR 0048, ADR
+ * 0049): what reaches a render when the template answers, when it does not, and what the
+ * runtime refuses it.
  *
  * Each case is a plugin whose `build` body is the case, behind the same checks the CLI
  * composes — `installedPacks`, then `installedTemplateSource`, then `compileDeferred` —
@@ -94,8 +95,7 @@ async function templateOf(options: Case) {
   const entry = join(plugin, 'index.js');
   await writeFile(
     entry,
-    `import { threadId } from 'node:worker_threads';
-const rect = ${RECT};
+    `const rect = ${RECT};
 export function activate(host) {
   host.registerTemplatePack({
     id: 'cartaz', templates: [], directory: 'templates',
@@ -114,7 +114,12 @@ export function activate(host) {
   const connected = await connectIsolatedPlugin({
     name: 'cartaz',
     manifest,
-    channel: launchPluginWorker({ name: 'cartaz', entry }),
+    channel: pluginProcessLauncher({ guest: inject('pluginGuest') })({
+      name: 'cartaz',
+      entry,
+      directory: plugin,
+    }),
+    requireSandbox: true,
     deadlineMs: 1_000,
   });
   if (!connected.ok) throw new Error(connected.error[0]?.message);
@@ -161,18 +166,34 @@ function sceneOf(result: { ok: boolean }): Scene {
 }
 
 describe('an installed code template', () => {
-  // Starts a plugin's worker thread, which a full `pnpm check` can hold past Vitest's 5 s.
-  it("is built in the plugin's worker thread, never in Tyto's", async () => {
+  // Starts a plugin's process, which a full `pnpm check` can hold past Vitest's 5 s.
+  it("is built in the plugin's process, never in Tyto's", async () => {
     const { scene } = await compiled({
-      body: "return { format: context.format, size: context.size, children: [rect(context.idPrefix + '.t', threadId)] };",
+      body: "return { format: context.format, size: context.size, children: [rect(context.idPrefix + '.t', process.pid)] };",
     });
 
     const [node] = sceneOf(scene).artworks[0]?.frames[0]?.children ?? [];
-    // `threadId` is 0 on the thread that started Node, which is the CLI's.
-    expect(node?.kind === 'rect' ? node.size.w : 0).toBeGreaterThan(0);
+    const pid = node?.kind === 'rect' ? node.size.w : 0;
+    expect(pid).toBeGreaterThan(0);
+    expect(pid).not.toBe(process.pid);
   }, 60_000);
 
-  // Starts a plugin's worker thread, which a full `pnpm check` can hold past Vitest's 5 s.
+  // Starts a plugin's process, which a full `pnpm check` can hold past Vitest's 5 s.
+  it("that reads a file outside its plugin's folder is refused by the runtime (ADR 0049)", async () => {
+    const outside = join(folder, 'outside.txt');
+    await writeFile(outside, "not the template's");
+    const { scene } = await compiled({
+      body: `return import('node:fs').then((fs) => { fs.readFileSync(${JSON.stringify(outside)}); return { format: context.format, size: context.size, children: [] }; });`,
+    });
+
+    expect(problemsOf(scene).map((problem) => problem.message)).toEqual([
+      expect.stringMatching(
+        /^Plugin 'cartaz' did not build a frame of template 'cartaz': .*Access to this API has been restricted/u,
+      ),
+    ]);
+  }, 60_000);
+
+  // Starts a plugin's process, which a full `pnpm check` can hold past Vitest's 5 s.
   it('in while (true) costs one deadline, and the render goes on with a diagnostic', async () => {
     const started = Date.now();
     const { scene } = await compiled({ body: 'while (true) {}' });
@@ -187,7 +208,7 @@ describe('an installed code template', () => {
     ]);
   }, 60_000);
 
-  // Starts a plugin's worker thread, which a full `pnpm check` can hold past Vitest's 5 s.
+  // Starts a plugin's process, which a full `pnpm check` can hold past Vitest's 5 s.
   it('that returns a frame the IR refuses gets a diagnostic, not a crash', async () => {
     const { scene } = await compiled({
       body: "return { format: context.format, size: context.size, children: [{ kind: 'blob' }] };",
@@ -199,7 +220,7 @@ describe('an installed code template', () => {
     expect(problem?.message).toContain('its answer does not match');
   }, 60_000);
 
-  // Starts a plugin's worker thread, which a full `pnpm check` can hold past Vitest's 5 s.
+  // Starts a plugin's process, which a full `pnpm check` can hold past Vitest's 5 s.
   it('that throws costs the frame it threw for, and the other formats are drawn', async () => {
     const { scene } = await compiled({
       formats: ['feed', 'story'],
@@ -253,7 +274,7 @@ describe("a face installed on this machine, and a plugin's template", () => {
     return node?.kind === 'rect' ? node.size.w : 0;
   };
 
-  // Starts a plugin's worker thread, which a full `pnpm check` can hold past Vitest's 5 s.
+  // Starts a plugin's process, which a full `pnpm check` can hold past Vitest's 5 s.
   it('is withheld without font:<family>, and the load says so', async () => {
     const fonts = await machineFonts();
     expect(fonts.fromMachine({ family: 'CircularXX', weight: 500, style: 'normal' })).toBe(true);
@@ -265,7 +286,7 @@ describe("a face installed on this machine, and a plugin's template", () => {
     expect(measuredWidth(scene)).toBe(1);
   }, 60_000);
 
-  // Starts a plugin's worker thread, which a full `pnpm check` can hold past Vitest's 5 s.
+  // Starts a plugin's process, which a full `pnpm check` can hold past Vitest's 5 s.
   it('is sent to a plugin that declares font:<family>', async () => {
     const fonts = await machineFonts();
 
@@ -280,7 +301,7 @@ describe("a face installed on this machine, and a plugin's template", () => {
     expect(measuredWidth(scene)).toBe(2);
   }, 60_000);
 
-  // Starts a plugin's worker thread, which a full `pnpm check` can hold past Vitest's 5 s.
+  // Starts a plugin's process, which a full `pnpm check` can hold past Vitest's 5 s.
   it('is not sent when the manifest does not declare it, permission or not', async () => {
     const fonts = await machineFonts();
 
