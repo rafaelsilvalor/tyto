@@ -101,7 +101,7 @@ describe('the example pack', () => {
     expect(rendered.diagnostics).toEqual([]);
     expect(rendered.artifacts).toEqual(['artwork-1-feed.svg', 'artwork-1-story.svg']);
     const svg = await readFile(join(workspace, 'out', 'artwork-1-feed.svg'), 'utf8');
-    // The brief's text, drawn by the pack's template: `cor: laranja` is its orange.
+    // The brief's text, drawn by the pack's template: `tom: laranja` is its orange.
     expect(svg).toMatch(/^<svg/u);
     expect(svg).toContain('#ff5900');
   }, 60_000);
