@@ -7,7 +7,7 @@
  * the slide has nothing left to repeat rows with, so the occurrence carries them as lines:
  *
  * ```
- * ::slide
+ * ::lamina
  *   FARMÁCIA
  *   16/09 - 14:00 | Farmacologia Geral | Profª. Rafaela Gomes
  *   SERVIÇO SOCIAL
