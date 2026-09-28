@@ -1,0 +1,7 @@
+# TYTO-186 measurement. DO NOT MERGE.
+# The repository's config plus one extra resource: the Node binary fetch-node.mjs left in
+# apps/desktop/bundled-node. Paths are relative to apps/desktop, the project directory.
+extends: electron-builder.yml
+extraResources:
+  - from: bundled-node
+    to: node

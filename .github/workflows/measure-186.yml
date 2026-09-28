@@ -1,0 +1,71 @@
+# TYTO-186 measurement. DO NOT MERGE: this workflow lives on a throwaway branch and its PR
+# is closed once the numbers are read.
+name: measure-186
+on:
+  pull_request:
+    paths: ['.github/measure-186/**', '.github/workflows/measure-186.yml']
+jobs:
+  # Does the CLI's sandbox behave the same on the Node CI runs (22) as on 24?
+  node-permission:
+    strategy:
+      fail-fast: false
+      matrix: { os: [ubuntu-latest, windows-latest, macos-latest], node: ['22', '24'] }
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with: { node-version: '${{ matrix.node }}' }
+      - run: node .github/measure-186/probe.mjs
+
+  # What bundling Node 24 costs the desktop, and whether it runs from where it lands.
+  bundled-node:
+    strategy:
+      fail-fast: false
+      matrix: { os: [ubuntu-latest, windows-latest, macos-latest] }
+    runs-on: ${{ matrix.os }}
+    defaults: { run: { shell: bash } }
+    steps:
+      - uses: actions/checkout@v7
+      - uses: pnpm/action-setup@v6
+      - uses: actions/setup-node@v7
+        with: { node-version: 22, cache: pnpm }
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm build
+      - name: Installers as the repository builds them
+        working-directory: apps/desktop
+        run: pnpm exec electron-builder --publish never && mv release ../../release-base
+      - name: Fetch Node 24.21.0, the version Electron 44 embeds
+        run: node .github/measure-186/fetch-node.mjs 24.21.0 apps/desktop/bundled-node
+      - name: Installers with the bundled Node
+        working-directory: apps/desktop
+        run: pnpm exec electron-builder --publish never --config ../../.github/measure-186/electron-builder.measure.yml && mv release ../../release-node
+      - name: Installer sizes, before and after
+        run: node .github/measure-186/sizes.mjs release-base release-node
+      - name: Run the bundled Node from inside the unpacked app
+        run: node .github/measure-186/run-bundled.mjs release-node
+      - name: Run it from inside the AppImage too
+        if: runner.os == 'Linux'
+        run: |
+          cd release-node
+          chmod +x ./*.AppImage
+          ./*.AppImage --appimage-extract > /dev/null
+          ls -la squashfs-root/resources/node
+          squashfs-root/resources/node/node ../.github/measure-186/probe.mjs | head -4
+      - name: Signatures on Windows
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          foreach ($file in @('release-node/win-unpacked/resources/node/node.exe', 'release-node/win-unpacked/Tyto.exe') + (Get-ChildItem release-node/*.exe).FullName) {
+            $signature = Get-AuthenticodeSignature $file
+            "{0}: {1} signer={2}" -f $file, $signature.Status, $signature.SignerCertificate.Subject
+          }
+          Get-CimInstance -Namespace root/Microsoft/Windows/CI -ClassName Win32_DeviceGuard -ErrorAction SilentlyContinue | Format-List CodeIntegrityPolicyEnforcementStatus, UsermodeCodeIntegrityPolicyEnforcementStatus
+          Get-CimInstance -Namespace root/Microsoft/Windows/DeviceGuard -ClassName Win32_DeviceGuard -ErrorAction SilentlyContinue | Format-List CodeIntegrityPolicyEnforcementStatus, UsermodeCodeIntegrityPolicyEnforcementStatus
+      - name: Signatures on macOS
+        if: runner.os == 'macOS'
+        run: |
+          app=$(ls -d release-node/mac*/Tyto.app)
+          echo "--- codesign of the bundled node"; codesign -dv --verbose=2 "$app/Contents/Resources/node/node" 2>&1 || true
+          echo "--- codesign of the app"; codesign -dv --verbose=2 "$app" 2>&1 || true
+          echo "--- deep verify of the app"; codesign --verify --deep --strict --verbose=2 "$app" 2>&1 || true
+          echo "--- Gatekeeper assessment"; spctl --assess --type execute --verbose=4 "$app" 2>&1 || true
