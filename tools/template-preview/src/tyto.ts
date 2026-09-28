@@ -187,17 +187,35 @@ async function rebuildPackage(folder: string, name: string): Promise<RebuildOutc
   }
   if (document.ok === true) return { ok: true, diagnostics: [] };
 
-  return {
-    ok: false,
-    diagnostics: (document.errors ?? []).map((error) => ({
-      severity: 'error',
-      code: 'PREVIEW_BUILD_FAILED',
-      // The package in the words, because the picture is withheld for it: this one is stale.
-      message: `${name} did not rebuild, so its dist/ is stale: ${error.text}`,
-      ...(error.file === undefined ? {} : { path: shown(join(folder, error.file)) }),
-      ...(error.line === undefined ? {} : { line: error.line }),
-      // esbuild counts columns from 0 and `tyto render` from 1; the page shows one convention.
-      ...(error.column === undefined ? {} : { column: error.column + 1 }),
-    })),
-  };
+  return { ok: false, diagnostics: staleDiagnostics(name, folder, document.errors ?? []) };
+}
+
+/** One error of a package build, as `rebuild-templates.ts` prints it. */
+export interface BuildError {
+  readonly text: string;
+  readonly file?: string;
+  readonly line?: number;
+  readonly column?: number;
+}
+
+/**
+ * A failed package build, as the page shows it in place of a picture.
+ *
+ * **The package is named in the words**, because the picture is withheld for it: what the
+ * person reads is which `dist/` is stale, not only esbuild's complaint (TYTO-181).
+ */
+export function staleDiagnostics(
+  name: string,
+  folder: string,
+  errors: readonly BuildError[],
+): PreviewDiagnostic[] {
+  return errors.map((error) => ({
+    severity: 'error',
+    code: 'PREVIEW_BUILD_FAILED',
+    message: `${name} did not rebuild, so its dist/ is stale: ${error.text}`,
+    ...(error.file === undefined ? {} : { path: shown(join(folder, error.file)) }),
+    ...(error.line === undefined ? {} : { line: error.line }),
+    // esbuild counts columns from 0 and `tyto render` from 1; the page shows one convention.
+    ...(error.column === undefined ? {} : { column: error.column + 1 }),
+  }));
 }
