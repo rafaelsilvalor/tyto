@@ -1,4 +1,4 @@
-<!-- carrossel-lista — a list carousel, in feed and story.
+<!-- carrossel-lista — a list carousel, in grid-1x1 and story.
 
      One artwork per `::lamina` in the brief, each carrying the list's title and its own
      item. `@each lamina` is a scope and not a loop (ADR 0017): `compile` has already called
@@ -18,14 +18,14 @@
      Type is "Source Sans 3" with no path — a `bundled` font Tyto ships, not a
      copy beside this template. No `overflow: shrink`; see promo-curso for why. -->
 
-<frame format="feed" bg="var(--bg)">
+<frame format="grid-1x1" bg="var(--bg)">
   <rect class="chip" />
   <text slot="titulo" class="kicker" />
   <text slot="lamina" class="item" />
   <rect class="rule" />
 </frame>
 
-<frame format="story" extends="feed" />
+<frame format="story" extends="grid-1x1" />
 
 <style>
   :root {

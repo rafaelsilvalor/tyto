@@ -18,13 +18,22 @@ promo-curso/
 The sizes a project renders at, one file for the whole project:
 
 ```yaml
-feed: { w: 1080, h: 1080 }
-story: { w: 1080, h: 1920, label: Story }
-banner-wide: { w: 1600, h: 400 }
+grid: { w: 1080, h: 1350, kind: grid, label: Grid }
+grid-1x1: { w: 1080, h: 1080, kind: grid, label: Grid 1:1 }
+story: { w: 1080, h: 1920, kind: story, label: Story }
+banner-wide: { w: 1600, h: 400, kind: banner }
 ```
 
 An id is what a manifest's `formats` list names, what reaches a shell as `--format <id>`,
-and what becomes `Frame.format`; `label` is only what a picker shows a human. Blanks,
+and what becomes `Frame.format`; `label` is only what a picker shows a human.
+
+**`kind` says which piece the canvas is for** (TYTO-194): one of `grid`, `story`, `banner`,
+`capa-ebook`, `thumbnail`. It is optional, so a project's file written before it still loads,
+and the built-in pack declares one on every format. A template's piece kind is never written:
+`pieceKinds` in `packages/core/src/template/piece-kind.ts` derives it from the format's `kind`
+and whether the manifest repeats — a `grid` that repeats is a `carrossel`, a `story` that
+repeats is `stories`. **`docs/format-kinds.md` has the naming rule** the built-in ids follow:
+a kind's standard size is the kind's name alone, and an unusual one carries its proportion. Blanks,
 whitespace and separators in an id are refused for the same reason a template name refuses
 them, and nothing about style is.
 
@@ -44,7 +53,7 @@ once before any frame is built rather than once per slide.
 name: promo-curso
 version: 1.0.0
 description: Course promotion with teacher photo
-formats: [feed, story, banner-wide] # ids defined in the project's formats.yaml
+formats: [grid-1x1, story, banner-wide] # ids defined in the project's formats.yaml
 slots:
   titulo: { type: rich-text, required: true, max: 60 }
   subtitulo: { type: rich-text }
@@ -171,7 +180,7 @@ paths apart.
 
 <!-- prettier-ignore -->
 ```html
-<frame format="feed" bg="none">
+<frame format="grid-1x1" bg="none">
   <image src="{imagem}" fit="cover" class="bg" />
   <rect id="grad" class="grad" />
   <group class="content" opacity="0.95" blend="normal" mask="#grad">
@@ -181,7 +190,7 @@ paths apart.
   <vector src="assets/logo.svg" class="logo" />
 </frame>
 
-<frame format="story" extends="feed" />
+<frame format="story" extends="grid-1x1" />
 
 <style>
   :root { --color: var(--slot-cor); }
@@ -250,7 +259,7 @@ frame writes its own. A frame either extends another or has children of its own,
 
 **`mask="#grad"`** names an `id` in the same frame. Ids are unique across a whole scene, so an
 explicit `id` is namespaced with `context.idPrefix` on the way into the IR: `grad` in the
-markup is `slide-1.feed.grad` in the scene. It also means a mask may not name one of the
+markup is `lamina-1.grid-1x1.grad` in the scene. It also means a mask may not name one of the
 masked node's own descendants (`E_SCENE_MASK_DESCENDANT`), which is why the `<rect id="grad">`
 above is a sibling of the group it masks rather than a child of it.
 
@@ -267,7 +276,7 @@ including inside another `<define>`.
 
 <!-- prettier-ignore -->
 ```html
-<frame format="feed" bg="#0c2340">
+<frame format="grid-1x1" bg="#0c2340">
   <use component="chip" class="first" />
   <use component="chip" class="second" />
 </frame>
@@ -310,7 +319,7 @@ and `class` is a binding.
 
 <!-- prettier-ignore -->
 ```html
-<frame format="feed">
+<frame format="grid-1x1">
   <use component="linha" class="topo" texto="titulo" />
   <use component="linha" class="base" texto="subtitulo" />
 </frame>
@@ -529,8 +538,8 @@ to a fixed height there is guessing, and should say so in a comment. A markup te
 no way to call it yet.
 
 **Pass `idPrefix` or the scene will not validate.** Node ids are derived from position, so
-two artworks with a `feed` frame each would both generate `feed.0`, and so would the two
-formats of one artwork. The prefix carries both — `slide-1.feed` — and a template that
+two artworks with a `grid-1x1` frame each would both generate `grid-1x1.0`, and so would the two
+formats of one artwork. The prefix carries both — `lamina-1.grid-1x1` — and a template that
 ignores it produces duplicate ids that `parseScene` reports as `E_SCENE_DUPLICATE_ID`.
 
 ### `runsOf` — rich text into runs
@@ -557,7 +566,7 @@ produces IR is exactly the code whose output is validated rather than trusted.
 Nothing a template throws escapes (ADR 0014): a `TemplateError` carries the diagnostic it
 built, and anything else becomes `E_TEMPLATE_CRASH`. Returning a frame for a format it was
 not asked for is caught too — that is a template that mixed up its own branches, and the
-scene would otherwise render the story layout under the feed's name.
+scene would otherwise render the story layout under the grid's name.
 
 **Frame size comes from `context.size`**, which `compile` reads from `formats.yaml`. A
 template that hardcodes one is writing down a number the project already knows.
@@ -661,12 +670,12 @@ frame({
 });
 ```
 
-- **Ids are optional and derived from position.** The example produces `feed.0`, `copy`
+- **Ids are optional and derived from position.** The example produces `grid-1x1.0`, `copy`
   and `copy.0`: the path segment is the node's own id when it has one, so reordering a
   sibling above a named group does not rewrite its children. A generated id is stable
   across runs — it is derived, not counted — which is what determinism requires.
 - **Ids must be unique across the whole scene, and a frame only sees its own subtree.**
-  Two artworks with a `feed` frame each would both generate `feed.0`. Pass `idPrefix` (the
+  Two artworks with a `grid-1x1` frame each would both generate `grid-1x1.0`. Pass `idPrefix` (the
   compile stage passes the artwork id) or `parseScene` reports `E_SCENE_DUPLICATE_ID`.
 - **Colour is written as CSS and stored as channels.** `color()` reads `#rgb`, `#rgba`,
   `#rrggbb` and `#rrggbbaa`; `solid`, `stop` and `run` take a hex string directly. There

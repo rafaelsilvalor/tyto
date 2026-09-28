@@ -42,7 +42,7 @@ opções que ela aceita. Não é editor de imagem: você não arrasta caixa, nã
 não mexe em tamanho. Quem sabe onde cada coisa fica é o _template_, que alguém de design
 escreve uma vez e todo mundo reusa.
 
-**O que sai.** As artes prontas, em todos os tamanhos que a campanha pede — feed, story,
+**O que sai.** As artes prontas, em todos os tamanhos que a campanha pede — grid, story,
 banner — do mesmo briefing e de uma vez só. Um carrossel de cinco slides vira cinco artes em
 cada tamanho. Saem em PNG, JPEG e WebP, e também em SVG.
 

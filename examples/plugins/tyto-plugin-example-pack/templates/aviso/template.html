@@ -4,13 +4,13 @@
      from this folder, before it is installed. An installed pack may hold markup templates
      only (ADR 0046). -->
 
-<frame format="feed" bg="var(--bg)">
+<frame format="grid-1x1" bg="var(--bg)">
   <rect class="band" />
   <text slot="titulo" class="title" />
   <text slot="detalhe" class="detail" />
 </frame>
 
-<frame format="story" extends="feed" />
+<frame format="story" extends="grid-1x1" />
 
 <style>
   :root {

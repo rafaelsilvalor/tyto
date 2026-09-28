@@ -26,10 +26,10 @@ afterEach(async () => {
 });
 
 // Each template's own manifest decides its formats: the agenda is cut to the 4:5 portrait
-// the published carousel uses (TYTO-173), the promo to the square feed and the story.
+// the published carousel uses (TYTO-173), the promo to the square grid and the story.
 describe.each([
-  { template: 'agenda-semana', formats: ['retrato'] },
-  { template: 'promo-curso', formats: ['feed', 'story'] },
+  { template: 'agenda-semana', formats: ['grid'] },
+  { template: 'promo-curso', formats: ['grid-1x1', 'story'] },
 ])('the $template preview', ({ template, formats }) => {
   it('serves every image with the sha256 of the file `tyto render` writes', async () => {
     const target = resolveTarget({ template }, REPOSITORY_ROOT);

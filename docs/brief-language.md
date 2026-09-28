@@ -7,7 +7,7 @@ Slot names and enum values are defined by each template's manifest, so they may 
 ```brief
 ---
 template: promo-curso
-formats: [feed, story]
+formats: [grid-1x1, story]
 tom: azul-escuro
 imagem: ./prof-ana.png
 ---

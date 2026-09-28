@@ -39,7 +39,7 @@ slots:
 }
 
 function markupFor(formats: readonly string[]): string {
-  const [first = 'feed', ...rest] = formats;
+  const [first = 'grid', ...rest] = formats;
   const extended = rest
     .map((format) => `<frame format="${format}" extends="${first}" />\n`)
     .join('');

@@ -160,7 +160,7 @@ describe('the template mode', () => {
     await runCommand('template.edit');
 
     await page.waitForSelector('tyto-template-mode[open]');
-    await expect.poll(gridFormats, { timeout: 15_000 }).toEqual(['feed', 'story']);
+    await expect.poll(gridFormats, { timeout: 15_000 }).toEqual(['grid-1x1', 'story']);
     expect(await page.textContent('[data-testid="template-folder"]')).toBe(folder);
     // Both tabs, and the sample the folder carries.
     const tabs = await page.locator('[data-buffer-tab]').allTextContents();
@@ -175,7 +175,7 @@ describe('the template mode', () => {
     // mode would be a second renderer and the one that lied. The brief behind asks for both
     // formats, so its preview can be pointed at each in turn.
     const grid = await gridHtml();
-    for (const [index, format] of ['feed', 'story'].entries()) {
+    for (const [index, format] of ['grid-1x1', 'story'].entries()) {
       await page.evaluate((wanted) => {
         document.querySelector<HTMLElement>(`.preview__tab[data-format="${wanted}"]`)?.click();
       }, format);

@@ -1,6 +1,6 @@
 ---
 template: promo-curso
-formats: [feed, story]
+formats: [grid-1x1, story]
 tom: laranja
 ---
 // The example this template is checked against: it has to render in both formats with no

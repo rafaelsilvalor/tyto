@@ -57,6 +57,27 @@ describe('what the catalogue answers', () => {
   });
 });
 
+describe('the kind of piece a format is the canvas of (TYTO-194)', () => {
+  const KINDS = `grid: { w: 1080, h: 1350, kind: grid, label: Grid }
+story: { w: 1080, h: 1920, kind: story }
+legacy: { w: 800, h: 600 }
+`;
+
+  it('answers the kind a format declares', () => {
+    const catalogue = accepted(KINDS);
+    expect(catalogue.kindOf('grid')).toBe('grid');
+    expect(catalogue.kindOf('story')).toBe('story');
+  });
+
+  it('still loads a format written before kinds existed, and answers no kind for it', () => {
+    expect(accepted(KINDS).kindOf('legacy')).toBeUndefined();
+  });
+
+  it('refuses a kind outside the closed list, at the key that holds it', () => {
+    expect(pathsOf(rejected('poster: { w: 1, h: 1, kind: poster }\n'))).toEqual(['poster.kind']);
+  });
+});
+
 describe('where a broken formats file is blamed', () => {
   it('names the YAML path of the offending key', () => {
     expect(pathsOf(rejected('feed: { w: 1080, h: alto }\n'))).toEqual(['feed.h']);

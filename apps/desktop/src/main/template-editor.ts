@@ -346,14 +346,14 @@ export function createTemplateEditor(options: TemplateEditorOptions): TemplateEd
       if (await exists(directory)) return { ok: false, problem: 'exists', detail: directory };
 
       // Every format the project defines, which is the one default the desktop can do better
-      // than the CLI's `feed`: the window knows the catalogue, and a new template is most useful
+      // than the CLI's `grid`: the window knows the catalogue, and a new template is most useful
       // drawn at every size it will be asked for.
       const formats =
         sources
           .current()
           .formats?.list()
           .map((format) => format.id) ?? [];
-      const scaffold = scaffoldTemplate(name, formats.length === 0 ? ['feed'] : formats);
+      const scaffold = scaffoldTemplate(name, formats.length === 0 ? ['grid'] : formats);
 
       try {
         await mkdir(join(directory, EXAMPLES_DIRECTORY), { recursive: true });
