@@ -5,15 +5,31 @@ import { join } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
 import type { BundledTemplates } from '@tyto/pipeline';
+import { BUILT_IN_TEMPLATE_NAMES } from '@tyto/templates';
 
 import type { CliEnvironment } from './environment.js';
 import { EXIT_DIAGNOSTICS, EXIT_OK } from './exit.js';
+import { builtInTemplatesDirectory } from './plugins/templates.js';
 import { run } from './program.js';
 import { templateCheckCommand } from './template.js';
 
-import manifestSource from './__fixtures__/cartaz.manifest.yaml?raw';
+import cartazManifest from './__fixtures__/cartaz.manifest.yaml?raw';
 import markSource from './__fixtures__/mark.svg?raw';
-import templateMarkup from './__fixtures__/cartaz.html?raw';
+import cartazMarkup from './__fixtures__/cartaz.html?raw';
+
+/**
+ * The shared `cartaz` fixture, spoken in the standard slot vocabulary (docs/slot-vocabulary.md).
+ *
+ * The fixture predates the vocabulary and still says `cor` and `slide`, and every render test
+ * in this package names its output after the repeatable slot (`slide-1-feed.svg`), so renaming
+ * it at the source is a change to all of them. Here, where `check` is the subject, a clean
+ * folder has to be clean of `W_SLOT_VOCABULARY` too.
+ */
+const manifestSource = cartazManifest
+  .replace(/^ {2}cor:/mu, '  tom:')
+  .replace(/^ {2}slide:/mu, '  lamina:')
+  .concat('adjustments:\n  tom: { type: enum, values: [azul, laranja], applies: [lamina] }\n');
+const templateMarkup = cartazMarkup.replace('slot(cor)', 'slot(tom)');
 
 /**
  * Step 2 and step 3 of the agent workflow in `docs/template-authoring.md`: scaffold a
@@ -230,6 +246,108 @@ describe('tyto template check on a code template (TYTO-170)', () => {
     expect(code).toBe(EXIT_DIAGNOSTICS);
     expect(stderr()).toContain('E_INPUT_READ');
     expect(stderr()).toContain('ships no code template named');
+  });
+});
+
+describe('tyto template check against the slot vocabulary (TYTO-158)', () => {
+  interface Reported {
+    status: string;
+    diagnostics: { code: string; severity: string; message: string }[];
+  }
+
+  /** The clean fixture with its picture slot named `emblema`, in manifest and markup both. */
+  async function installWithEmblema(): Promise<void> {
+    await installTemplate('cartaz', templateMarkup.replace('slot="imagem"', 'slot="emblema"'));
+    const manifestPath = join(workspace, 'templates', 'cartaz', 'manifest.yaml');
+    const manifest = await readFile(manifestPath, 'utf8');
+    await writeFile(manifestPath, manifest.replace(/^ {2}imagem:/mu, '  emblema:'));
+  }
+
+  it('warns on a known synonym, naming the word used and the standard one, and exits 0', async () => {
+    await installWithEmblema();
+
+    const code = await run(['template', 'check', 'templates/cartaz'], environment());
+
+    expect(code, stderr()).toBe(EXIT_OK);
+    expect(stderr()).toMatch(
+      /manifest\.yaml:\d+:\d+: warning W_SLOT_VOCABULARY Slot 'emblema' .*'imagem'/u,
+    );
+  });
+
+  it('reports it as a warning, not an error, in the --json document', async () => {
+    await installWithEmblema();
+
+    const code = await run(['template', 'check', 'templates/cartaz', '--json'], environment());
+
+    expect(code).toBe(EXIT_OK);
+    const document = JSON.parse(stdout()) as Reported;
+    expect(document.status).toBe('ok');
+    expect(document.diagnostics.map((item) => [item.code, item.severity])).toEqual([
+      ['W_SLOT_VOCABULARY', 'warning'],
+    ]);
+  });
+
+  it('holds a code template to it too, on the manifest-only route', async () => {
+    const directory = join(workspace, 'templates', 'agenda');
+    await mkdir(directory, { recursive: true });
+    await writeFile(
+      join(directory, 'manifest.yaml'),
+      'name: agenda\nversion: 1.0.0\nformats: [feed]\nslots:\n' +
+        '  titulo: { type: rich-text, required: true }\n' +
+        '  slide: { type: rich-text, repeat: true }\n',
+    );
+
+    const code = await templateCheckCommand('templates/agenda', { json: false }, environment(), {
+      agenda: () => {
+        throw new Error('template check must never run a template body');
+      },
+    });
+
+    expect(code).toBe(EXIT_OK);
+    expect(stderr()).toMatch(/W_SLOT_VOCABULARY Slot 'slide' .*'lamina'/u);
+    expect(stderr()).toContain('not checked: the template body');
+  });
+
+  it('leaves a domain name alone, and a near-miss the closed list does not name', async () => {
+    const directory = join(workspace, 'templates', 'agenda');
+    await mkdir(directory, { recursive: true });
+    await writeFile(
+      join(directory, 'manifest.yaml'),
+      'name: agenda\nversion: 1.0.0\nformats: [feed]\nslots:\n' +
+        '  titulo: { type: rich-text, required: true }\n' +
+        '  disciplina: { type: rich-text }\n' +
+        '  titulos: { type: rich-text }\n',
+    );
+
+    const code = await templateCheckCommand('templates/agenda', { json: true }, environment(), {
+      agenda: () => {
+        throw new Error('template check must never run a template body');
+      },
+    });
+
+    expect(code).toBe(EXIT_OK);
+    expect((JSON.parse(stdout()) as Reported).diagnostics).toEqual([]);
+  });
+
+  it('passes what `tyto template new` scaffolds, so no template starts with a warning', async () => {
+    expect(await run(['template', 'new', 'promo'], environment())).toBe(EXIT_OK);
+    out = [];
+
+    const code = await run(['template', 'check', 'templates/promo', '--json'], environment());
+
+    expect(code).toBe(EXIT_OK);
+    expect(JSON.parse(stdout())).toEqual({ status: 'ok', diagnostics: [] });
+  });
+
+  it.each(BUILT_IN_TEMPLATE_NAMES)('passes the built-in %s clean', async (name) => {
+    const code = await templateCheckCommand(
+      join(builtInTemplatesDirectory(), name),
+      { json: true },
+      environment(),
+    );
+
+    expect(code).toBe(EXIT_OK);
+    expect((JSON.parse(stdout()) as Reported).diagnostics.map((item) => item.message)).toEqual([]);
   });
 });
 

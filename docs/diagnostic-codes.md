@@ -86,6 +86,7 @@ non-zero.
 | `W_UNUSED_SLOT` | warning | no | The brief sets a slot the chosen template never renders. |
 | `W_MARKUP_IN_FRONTMATTER` | warning | no | A frontmatter scalar on a rich-text slot contains what looks like inline markup. |
 | `W_TEMPLATE_SHADOWED` | warning | no | Two template sources declare the same name; the earlier source is the one used. |
+| `W_SLOT_VOCABULARY` | warning | no | A manifest names a slot against the standard slot vocabulary: a known synonym, a reserved name with the wrong shape, or a repeatable slot not named lamina. |
 | `W_PLUGIN_SKIPPED` | warning | no | An installed plugin was not activated for this run, and the run went on without it. |
 | `W_IMPORT_SKIPPED` | warning | no | Something in the previous version's data folder could not be brought across to this one. |
 
@@ -1150,6 +1151,20 @@ Template '{name}' in '{shadowed}' is shadowed by the one in '{used}', which is s
 ```
 
 Parameters: `name`, `shadowed`, `used`
+
+### `W_SLOT_VOCABULARY`
+
+**Severity:** warning · **Fatal:** no · **Spec:** `docs/slot-vocabulary.md`
+
+A manifest names a slot against the standard slot vocabulary: a known synonym, a reserved name with the wrong shape, or a repeatable slot not named lamina.
+
+A warning never replaces a value (ADR 0013).
+
+```
+Slot '{slot}' {problem}; {suggestion}.
+```
+
+Parameters: `slot`, `problem`, `suggestion`
 
 ### `W_PLUGIN_SKIPPED`
 

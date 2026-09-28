@@ -36,14 +36,14 @@ A standard name is **reserved**: if a template has a slot playing that role, it 
 name, and if it uses that name, the slot plays that role with that type. Both directions
 matter — a `titulo` that is an image is worse than a template with no `titulo` at all.
 
-| Name        | Type                                   | Role, in one sentence                                                                                           |
-| ----------- | -------------------------------------- | --------------------------------------------------------------------------------------------------------------- |
-| `titulo`    | `rich-text`, `required: true`          | The words the artwork is about, drawn largest; the one slot a brief can never leave out.                        |
-| `subtitulo` | `rich-text`                            | The line that qualifies `titulo` — what, when or for whom — drawn smaller and next to it.                       |
-| `chamada`   | `rich-text`                            | The short label that sets up the title block and says what kind of artwork this is: "Resultado final".          |
-| `imagem`    | `image`                                | The one picture the brief supplies, wherever the template places it: behind the words, above them, beside them. |
-| `lamina`    | any type, `repeat: true`               | The block that becomes one artwork: one `::lamina` is one slide of the carousel.                                |
-| `tom`       | `enum`, also declared as an adjustment | The closed list that picks how the artwork looks; the adjustment of the same name overrides it on one lamina.   |
+| Name        | Type                                          | Role, in one sentence                                                                                           |
+| ----------- | --------------------------------------------- | --------------------------------------------------------------------------------------------------------------- |
+| `titulo`    | `rich-text`, `required: true`                 | The words the artwork is about, drawn largest; the one slot a brief can never leave out.                        |
+| `subtitulo` | `rich-text`                                   | The line that qualifies `titulo` — what, when or for whom — drawn smaller and next to it.                       |
+| `chamada`   | `rich-text`                                   | The short label that sets up the title block and says what kind of artwork this is: "Resultado final".          |
+| `imagem`    | `image`                                       | The one picture the brief supplies, wherever the template places it: behind the words, above them, beside them. |
+| `lamina`    | any type, `repeat: true`                      | The block that becomes one artwork: one `::lamina` is one slide of the carousel.                                |
+| `tom`       | `enum`, and an adjustment when a slot repeats | The closed list that picks how the artwork looks; the adjustment of the same name overrides it on one lamina.   |
 
 `lamina` is spelled without the circumflex because a slot name has to be the grammar's
 identifier, `[a-zA-Z_][a-zA-Z0-9_-]*` (`docs/template-authoring.md`, "manifest.yaml").
@@ -118,8 +118,11 @@ TYTO-158 turns this into a warning. The boundary is written so a manifest alone 
 without reading template code and without judging a name nobody listed:
 
 1. **A reserved name with the wrong shape** — `titulo` not `rich-text` or not required,
-   `subtitulo` or `chamada` not `rich-text`, `imagem` not `image`, `tom` not `enum` or not
-   also an adjustment, `lamina` without `repeat: true`.
+   `subtitulo` or `chamada` not `rich-text`, `imagem` not `image`, `tom` not `enum`, `tom`
+   not also an adjustment in a manifest that declares a repeatable slot, `lamina` without
+   `repeat: true`. The adjustment is owed only beside a `lamina` because what it does is
+   override `tom` on one lamina: a one-artwork template such as `promo-curso` has nothing to
+   override it on, and a plain `tom` enum is its whole look.
 2. **A repeatable slot not named `lamina`.**
 3. **A known synonym**, from this closed list only:
 
@@ -133,6 +136,16 @@ without reading template code and without judging a name nobody listed:
 A name on neither list is never flagged. That is what keeps domain names free: the check
 only knows the words this document names, so `disciplina`, `professor` and `lista` pass by
 construction. Growing the synonym table is a change to this document first.
+
+**Where it fires: `tyto template check`, and only there.** Each finding is `W_SLOT_VOCABULARY`
+at the slot's entry in `manifest.yaml`, a warning that never changes the exit code (ADR 0025).
+Both routes get it — a markup template and a code template, whose manifest is all `check`
+reads — and so does a plugin's template pack, whose author runs the same command on
+`<pack>/templates/<name>` (`docs/plugin-authoring.md`). A render, the desktop and installing
+a pack never report it: the template's author is the only person who can act on it, and a
+brief writer warned about a template's naming can do nothing but read the warning. The rules
+live in `packages/core/src/template/slot-vocabulary.ts`, which names this section as its
+source.
 
 ## The built-in templates, checked
 

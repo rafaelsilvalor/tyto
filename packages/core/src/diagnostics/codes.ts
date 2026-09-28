@@ -691,6 +691,18 @@ export const diagnosticCodes = {
     fatal: false,
     fatality: 'A warning never replaces a value (ADR 0013).',
   },
+  // A warning and not an error, because a manifest that ignores the convention is still a
+  // valid manifest: the vocabulary is a layer on top of ADR 0005. Only `tyto template check`
+  // asks for it, since the template's author is the only person who can act on it.
+  W_SLOT_VOCABULARY: {
+    severity: 'warning',
+    summary:
+      'A manifest names a slot against the standard slot vocabulary: a known synonym, a reserved name with the wrong shape, or a repeatable slot not named lamina.',
+    template: "Slot '{slot}' {problem}; {suggestion}.",
+    spec: 'docs/slot-vocabulary.md',
+    fatal: false,
+    fatality: 'A warning never replaces a value (ADR 0013).',
+  },
   // A warning and not an error, because the brief is not what is wrong: the plugin belongs
   // to the machine, the run goes on without it, and a delivery that failed over somebody
   // else's plugin would be retried by Jacurutu forever (ADR 0011, ADR 0040).
