@@ -5,9 +5,10 @@ import { join } from 'node:path';
 import {
   type PreviewDiagnostic,
   type RebuildOutcome,
+  type RebuildPackages,
   type RenderOutcome,
   type RenderRequest,
-  rebuildTemplates,
+  rebuildPackages,
   renderWithTyto,
 } from './tyto.ts';
 
@@ -67,18 +68,21 @@ export interface PreviewState {
 
 export interface PreviewPorts {
   readonly render: (request: RenderRequest) => Promise<RenderOutcome>;
-  readonly rebuild: () => Promise<RebuildOutcome>;
+  readonly rebuild: (packages: RebuildPackages) => Promise<RebuildOutcome>;
   readonly now: () => number;
 }
 
 const DEFAULT_PORTS: PreviewPorts = {
   render: renderWithTyto,
-  rebuild: rebuildTemplates,
+  rebuild: rebuildPackages,
   now: () => performance.now(),
 };
 
 interface Pending {
+  /** `@tyto/templates` — a template's or a brand module's code was saved. */
   rebuild: boolean;
+  /** `@tyto/template-kit` — a kit function was saved (TYTO-181). */
+  kit: boolean;
   since: number;
 }
 
@@ -92,9 +96,10 @@ export class PreviewSession {
    *
    * The failed build left the previous `dist/` in place, so rendering on the next save of
    * a `manifest.yaml` would draw the code from before the broken one — a stale picture
-   * arrived at by a different road.
+   * arrived at by a different road. Kept per package, because a broken kit has to be rebuilt
+   * on every request until it builds, whichever file the next save touched.
    */
-  private buildBroken = false;
+  private broken: RebuildPackages = { kit: false, templates: false };
   private previousFolder: string | undefined;
 
   private readonly target: PreviewTarget;
@@ -130,12 +135,17 @@ export class PreviewSession {
    * Asks for a redraw. Calls that arrive while one is running collapse into one more, so
    * a burst of saves costs two renders and not one per save.
    */
-  request(options: { readonly rebuild: boolean }): Promise<void> {
+  request(options: { readonly rebuild: boolean; readonly kit?: boolean }): Promise<void> {
     const rebuild = options.rebuild && this.target.compiled;
+    const kit = (options.kit ?? false) && this.target.compiled;
     this.pending =
       this.pending === undefined
-        ? { rebuild, since: this.ports.now() }
-        : { rebuild: this.pending.rebuild || rebuild, since: this.pending.since };
+        ? { rebuild, kit, since: this.ports.now() }
+        : {
+            rebuild: this.pending.rebuild || rebuild,
+            kit: this.pending.kit || kit,
+            since: this.pending.since,
+          };
     this.running ??= this.drain().finally(() => {
       this.running = undefined;
     });
@@ -164,12 +174,18 @@ export class PreviewSession {
     const generation = this.state.generation + 1;
     let buildMs: number | undefined;
 
-    if (this.target.compiled && (job.rebuild || this.buildBroken)) {
+    const packages: RebuildPackages = {
+      kit: job.kit || this.broken.kit,
+      templates: job.rebuild || this.broken.templates,
+    };
+    if (this.target.compiled && (packages.kit || packages.templates)) {
       this.publish({ ...this.state, status: 'building' });
       const started = this.ports.now();
-      const built = await this.ports.rebuild();
+      const built = await this.ports.rebuild(packages);
       buildMs = Math.round(this.ports.now() - started);
-      this.buildBroken = !built.ok;
+      // A failure keeps every package this job asked for marked, since which one broke is
+      // in the diagnostic and the next request has to try them all again.
+      this.broken = built.ok ? { kit: false, templates: false } : packages;
       if (!built.ok) {
         await this.replaceFolder(undefined);
         this.publish({

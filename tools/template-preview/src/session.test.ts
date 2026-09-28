@@ -6,7 +6,7 @@ import { join } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
 import { type PreviewPorts, type PreviewTarget, PreviewSession } from './session.ts';
-import type { RebuildOutcome, RenderOutcome, RenderRequest } from './tyto.ts';
+import type { RebuildOutcome, RebuildPackages, RenderOutcome, RenderRequest } from './tyto.ts';
 
 /**
  * The queue and the generations, with the two programs replaced by stand-ins that write a
@@ -35,6 +35,8 @@ afterEach(async () => {
 interface Script {
   renders: RenderRequest[];
   rebuilds: number;
+  /** Which packages each rebuild was asked for, in order (TYTO-181). */
+  rebuilt: RebuildPackages[];
   renderFails: boolean;
   buildFails: boolean;
 }
@@ -42,8 +44,9 @@ interface Script {
 function ports(script: Script): PreviewPorts {
   return {
     now: () => performance.now(),
-    rebuild: (): Promise<RebuildOutcome> => {
+    rebuild: (packages): Promise<RebuildOutcome> => {
       script.rebuilds += 1;
+      script.rebuilt.push(packages);
       return Promise.resolve(
         script.buildFails
           ? {
@@ -87,7 +90,13 @@ function ports(script: Script): PreviewPorts {
   };
 }
 
-const fresh = (): Script => ({ renders: [], rebuilds: 0, renderFails: false, buildFails: false });
+const fresh = (): Script => ({
+  renders: [],
+  rebuilds: 0,
+  rebuilt: [],
+  renderFails: false,
+  buildFails: false,
+});
 
 describe('PreviewSession', () => {
   it('shows no image after a failed render, and deletes the folder of the one before', async () => {
@@ -137,6 +146,38 @@ describe('PreviewSession', () => {
     await session.request({ rebuild: true });
     expect(script.rebuilds).toBe(0);
     expect(script.renders).toHaveLength(1);
+  });
+
+  it('rebuilds the kit alone when only a kit function was saved (TYTO-181)', async () => {
+    const script = fresh();
+    const session = new PreviewSession(TARGET, root, ports(script));
+
+    await session.request({ rebuild: false, kit: true });
+    expect(script.rebuilt).toEqual([{ kit: true, templates: false }]);
+    expect(session.current().generation).toBe(1);
+  });
+
+  it('asks for both packages when a burst saved the kit and a template', async () => {
+    const script = fresh();
+    const session = new PreviewSession(TARGET, root, ports(script));
+
+    await session.request({ rebuild: true, kit: true });
+    expect(script.rebuilt).toEqual([{ kit: true, templates: true }]);
+  });
+
+  it('keeps rebuilding a broken kit until it builds, whatever the next save touched', async () => {
+    const script = { ...fresh(), buildFails: true };
+    const session = new PreviewSession(TARGET, root, ports(script));
+
+    await session.request({ rebuild: false, kit: true });
+    script.buildFails = false;
+    await session.request({ rebuild: false });
+
+    expect(script.rebuilt).toEqual([
+      { kit: true, templates: false },
+      { kit: true, templates: false },
+    ]);
+    expect(session.current().status).toBe('ok');
   });
 
   it('collapses a burst of requests into the one running and one more', async () => {
