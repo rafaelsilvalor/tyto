@@ -1,5 +1,6 @@
 name: promo-curso
-version: 3.0.0
+version: 3.1.0
+brand: tyto-demo
 description: Course promotion with a teacher photo, a headline and a colour variant.
 formats: [grid-1x1, story]
 slots:

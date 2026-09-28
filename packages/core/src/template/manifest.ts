@@ -39,6 +39,12 @@ const VERSION = /^\d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?$/u;
  */
 const TEMPLATE_NAME = /^[^\s/\\]+$/u;
 
+/**
+ * A brand is a filter key — a picker lists one brand's templates, a pack groups them — so it
+ * is kept to the characters every such key survives: lower case, digits and single hyphens.
+ */
+const BRAND = /^[a-z0-9]+(?:-[a-z0-9]+)*$/u;
+
 export const slotTypeSchema = z.enum(['rich-text', 'image', 'enum']);
 export type SlotType = z.infer<typeof slotTypeSchema>;
 
@@ -160,6 +166,17 @@ export const templateManifestSchema = z
     name: z.string().regex(TEMPLATE_NAME, 'must not be blank or contain a space or a slash'),
     version: z.string().regex(VERSION, 'must be major.minor.patch'),
     description: z.string().optional(),
+    /**
+     * Whose look the template draws, such as `estrategia-saude` (TYTO-195, ADR 0052). Optional,
+     * so a manifest written before it still loads; the built-in pack names one on every
+     * template. The template's own name says what the piece is about, and its formats and
+     * repeatable slot say what kind of piece it is (ADR 0051), so this is the one fact about a
+     * template's identity the rest of the manifest cannot answer.
+     */
+    brand: z
+      .string()
+      .regex(BRAND, 'must be lower case letters, digits and single hyphens, like estrategia-saude')
+      .optional(),
     /** Format ids defined in the project's `formats.yaml`; a template renders at least one. */
     formats: z.array(z.string().min(1)).min(1),
     slots: z.record(z.string(), slotSchema),

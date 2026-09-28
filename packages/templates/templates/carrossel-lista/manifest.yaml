@@ -1,5 +1,6 @@
 name: carrossel-lista
-version: 3.0.0
+version: 3.1.0
+brand: tyto-demo
 description: A list carousel — the list's title on every slide, one item to a slide.
 formats: [grid-1x1, story]
 slots:

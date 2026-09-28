@@ -1,5 +1,6 @@
 name: aprovados
-version: 4.0.0
+version: 4.1.0
+brand: estrategia-saude
 description: An exam's approved list as a carousel — an emblem and the exam's name on the first slide, and the approved grouped by specialty on every slide.
 formats: [grid]
 slots:
