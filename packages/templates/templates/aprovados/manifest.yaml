@@ -1,11 +1,11 @@
 name: aprovados
-version: 1.0.0
+version: 2.0.0
 description: An exam's approved list on one slide — an emblem, the exam's name, and the approved grouped by specialty.
 formats: [retrato]
 slots:
   # The exam board's emblem over the words. Optional: a result with no emblem is still a
   # result, and the gap it would have taken closes up.
-  emblema: { type: image }
+  imagem: { type: image }
   # The small words over the subtitle: "Resultado provisório", "Resultado final".
   chamada: { type: rich-text, max: 40 }
   subtitulo: { type: rich-text, max: 60 }

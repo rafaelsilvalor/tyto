@@ -101,10 +101,10 @@ describe('the example briefs', () => {
 
     expect(foldedHeads).toEqual([
       '::titulo',
-      '::item',
-      '::item',
-      '::item {destaque, tom: escuro}',
-      '::item',
+      '::lamina',
+      '::lamina',
+      '::lamina {destaque, tom: escuro}',
+      '::lamina',
     ]);
   });
 });

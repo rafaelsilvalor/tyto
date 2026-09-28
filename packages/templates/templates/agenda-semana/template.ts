@@ -28,7 +28,7 @@ export const build: TemplateBuild = (context: TemplateContext) => {
   const width = context.size.w - MARGIN * 2;
 
   const sessions = pillTable(sessionTable, {
-    text: richTextOf(context, 'slide') ?? [],
+    text: richTextOf(context, 'lamina') ?? [],
     width,
     measure: context.measure,
   });
@@ -65,12 +65,12 @@ function coverOf(context: TemplateContext, width: number): Block[] {
   const titulo = richTextOf(context, 'titulo');
   if (titulo === undefined) return [];
 
-  const ilustracao = context.slots['ilustracao']?.value;
+  const imagem = context.slots['imagem']?.value;
 
   return [
     titleBlock(coverTitle, {
       width,
-      fields: { titulo, ilustracao: ilustracao?.kind === 'image' ? ilustracao.asset : undefined },
+      fields: { titulo, imagem: imagem?.kind === 'image' ? imagem.asset : undefined },
     }),
   ];
 }

@@ -136,15 +136,25 @@ construction. Growing the synonym table is a change to this document first.
 
 ## The built-in templates, checked
 
-| Template          | Mismatch                      | Resolution                                        |
-| ----------------- | ----------------------------- | ------------------------------------------------- |
-| `promo-curso`     | `cor` is the look-variant     | Rename to `tom` (slot and any adjustment).        |
-| `carrossel-lista` | `item` is the repeatable slot | Rename to `lamina`.                               |
-| `agenda-semana`   | `ilustracao`, `slide`         | Rename to `imagem`, `lamina`.                     |
-| `aprovados`       | `emblema`                     | Rename to `imagem`. `lista` stays (freedom rule). |
+| Template          | Was                   | Now                | Version       |
+| ----------------- | --------------------- | ------------------ | ------------- |
+| `promo-curso`     | `cor`                 | `tom`              | 1.0.0 → 2.0.0 |
+| `carrossel-lista` | `item`                | `lamina`           | 1.0.0 → 2.0.0 |
+| `agenda-semana`   | `ilustracao`, `slide` | `imagem`, `lamina` | 2.0.0 → 3.0.0 |
+| `aprovados`       | `emblema`             | `imagem`           | 1.0.0 → 2.0.0 |
 
-The renames are a separate change, made after PR #237 merges — it touches the same
-templates, and renaming in parallel would conflict.
+`aprovados`' `lista` stays, under the freedom rule. Class names and scene node names
+(`.item`, `illustration`, `emblem`) were left alone: they are the template's own English
+vocabulary, not the brief's, and keeping them is what kept the pixels still: every example's
+PNG is byte-identical before and after the rename.
+
+**The artwork's id is the one thing besides the brief that changed.** An artwork is named
+after the repeatable slot, and that name reaches two places:
+
+- the file name: `item-1-feed.png` is now `lamina-1-feed.png`, `slide-1-retrato.png` is now
+  `lamina-1-retrato.png`;
+- the SVG's element ids, which start with the artwork's: `id="slide-1.retrato.…"` is now
+  `id="lamina-1.retrato.…"`. With that prefix renamed, every SVG is otherwise identical.
 
 ## Migrating briefs already written
 
@@ -159,8 +169,13 @@ become `E_UNKNOWN_SLOT`, and the brief no longer sets its required repeatable sl
   transition — both names for `imagem`, one for `lamina` — would leave the agenda brief broken
   anyway and teach two rules.
 - **The failure is loud and points at the line.** `E_UNKNOWN_SLOT` is an error carrying the
-  range of the directive that used the old name. Nobody exports a silently wrong artwork; the
-  brief writer sees exactly which word to change.
+  range of the directive that used the old name, so the brief writer sees exactly which word
+  to change. An old agenda brief rendered against 3.0.0 gets three of them — the frontmatter
+  key and both `::slide` — plus `E_BAD_SLOT_VALUE` for the `lamina` it no longer sets, and
+  `tyto render` exits `1` with `status: "error"`. It still writes the one artwork it could
+  draw, a cover with no picture and no table; that is the render contract's "rendered, with
+  errors" (`docs/render-contract.md`), and `status` is what says the folder is not
+  publishable.
 - **The bump is the honest label, not a mechanism.** A brief names a template, not a version
   (`template: agenda-semana`), so no version is ever selected; `version` only reaches
   `result.json`, as the record of which template produced a run (`docs/render-contract.md`).

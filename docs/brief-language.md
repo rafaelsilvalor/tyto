@@ -8,17 +8,17 @@ Slot names and enum values are defined by each template's manifest, so they may 
 ---
 template: promo-curso
 formats: [feed, story]
-cor: azul-escuro
+tom: azul-escuro
 imagem: ./prof-ana.png
 ---
 ::titulo Direito **Constitucional**
 ::subtitulo Aulas ao vivo toda semana
 
-::slide
+::lamina
   O que cai na prova
-::slide {destaque}
+::lamina {destaque}
   Como estudar
-::slide {destaque, cor: laranja}
+::lamina {destaque, tom: laranja}
   Garanta sua vaga
 ```
 
@@ -26,7 +26,7 @@ imagem: ./prof-ana.png
 
 - **Frontmatter**: metadata and scalar slots. `template` is required (or `--template` on the CLI). `formats` defaults come from the manifest. A scalar on a rich-text slot is one run of plain text, and inline markup in it is `W_MARKUP_IN_FRONTMATTER` — see below.
 - **Slot directive** `::name value` — inline value to end of line, or an indented block on the following lines. The name must exist in the template manifest (`E_UNKNOWN_SLOT`).
-- **Repeatable directive** (`::slide`) — each occurrence becomes an `Artwork`. The manifest declares which slot is `repeat`.
+- **Repeatable directive** (`::lamina`) — each occurrence becomes an `Artwork`. The manifest declares which slot is `repeat`.
 - **Adjustments** `{a, b: value}` — only those declared in `manifest.adjustments`. They apply to the slot; on a repeatable slot, to that slide.
 - **Text**: inline Markdown only — `**bold**`, `*italic*`, `\` line break, `{cor:x}text{/}` mark. No headings, lists or links.
 - **Assets**: paths relative to the `.brief` file; `resolve` confirms existence and computes a hash.
