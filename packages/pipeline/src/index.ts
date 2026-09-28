@@ -36,6 +36,7 @@ export { type Limiter, limiter } from './limit.js';
 
 export {
   TEMPLATE_FILE,
+  type LocalTemplateSource,
   type MarkupTemplateSourceOptions,
   type TemplateSource,
   markupTemplateSource,

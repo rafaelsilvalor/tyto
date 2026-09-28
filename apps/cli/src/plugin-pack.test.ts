@@ -403,13 +403,24 @@ describe('a pack folder outside its plugin', () => {
   }, 60_000);
 });
 
+// A code template runs in the plugin's thread through the pack's `build` (ADR 0048); these
+// are the two folders nothing could run that way. `plugin-code-template.test.ts` has the
+// ones that run.
 describe('a code template in an installed pack', () => {
   it.each([
-    ['a template.ts beside the markup', 'template.ts'],
-    ['no template.html at all', undefined],
+    [
+      'a template.ts beside the markup',
+      'template.ts',
+      "its folder holds a template.ts, which Tyto never imports: a code template ships built into the plugin's dist/ and is drawn by the pack's build function",
+    ],
+    [
+      'no template.html at all',
+      undefined,
+      'it has no template.html, and the pack registers no build function to draw it',
+    ],
   ])(
     'refuses %s, naming the plugin and the template',
-    async (_case, extra) => {
+    async (_case, extra, problem) => {
       const folder = await packPlugin('templates');
       const template = join(folder, 'templates', 'aviso');
       if (extra === undefined) {
@@ -421,7 +432,7 @@ describe('a code template in an installed pack', () => {
       const rendered = await renderThrough(folder);
 
       expect(skipped(rendered)).toEqual([
-        "Plugin 'pacote' was skipped: Plugin 'pacote' contributes template 'aviso', which is not a markup template: an installed pack may hold only folders with a template.html and no template.ts.",
+        `Plugin 'pacote' was skipped: Plugin 'pacote' contributes template 'aviso', and ${problem}.`,
       ]);
       expect(rendered.diagnostics.map((item) => item.code)).toContain('E_UNKNOWN_TEMPLATE');
     },

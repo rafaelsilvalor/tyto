@@ -4,7 +4,9 @@ import { PluginCapabilityError, responseOf } from '../capabilities.js';
 
 import type { Disposable, HostEventListener, HostEvents, Logger, PluginHost } from '../host.js';
 import type { GuestChannel } from './channel.js';
+import { guestFaces } from './faces.js';
 import {
+  type GuestState,
   NOT_YET_ISOLATED,
   type PointSpec,
   type RegisterMethod,
@@ -46,6 +48,7 @@ function messageOf(cause: unknown): string {
 
 export function runGuest(channel: GuestChannel, load: () => Promise<unknown>): void {
   const kept = new Map<number, Kept>();
+  const state: GuestState = { faces: guestFaces() };
   const listeners = new Map<string, Set<(payload: never) => void>>();
   let pending: (Registration & { readonly key: object })[] | undefined = [];
   let config: unknown;
@@ -251,20 +254,23 @@ export function runGuest(channel: GuestChannel, load: () => Promise<unknown>): v
       return;
     }
 
-    const args = target.spec.callables[target.name]?.args.safeParse(message.args);
-    if (args === undefined || !args.success) {
+    const callable = target.spec.callables[target.name];
+    const args = callable?.args.safeParse(message.args);
+    if (callable === undefined || args === undefined || !args.success) {
       send({
         protocol: RPC_PROTOCOL_VERSION,
         type: 'thrown',
         id,
-        problem: `the host called ${target.name} with arguments its schema refuses: ${args === undefined ? 'no schema' : describeIssues(args.error)}`,
+        problem: `the host called ${target.name} with arguments its schema refuses: ${args === undefined || args.success ? 'no schema' : describeIssues(args.error)}`,
       });
       return;
     }
 
     try {
-      const value = await target.fn(...args.data);
-      send({ protocol: RPC_PROTOCOL_VERSION, type: 'result', id, value });
+      const handed = callable.receive?.(args.data, state) ?? args.data;
+      const value = await target.fn(...handed);
+      const answer = callable.reply === undefined ? value : callable.reply(value);
+      send({ protocol: RPC_PROTOCOL_VERSION, type: 'result', id, value: answer });
     } catch (cause) {
       send({ protocol: RPC_PROTOCOL_VERSION, type: 'thrown', id, problem: messageOf(cause) });
     }

@@ -11,7 +11,13 @@ import type { AssetRef, FontRef, Paint } from '../scene/primitives.js';
 import { gapStampNode } from '../scene/gap.js';
 import { type Artwork, type Frame, type Scene, parseScene } from '../scene/scene.js';
 import { TemplateError } from '../template/errors.js';
-import { type Template, type TemplateContext, measureNothing } from '../template/define.js';
+import {
+  type DeferredTemplate,
+  type Template,
+  type TemplateContext,
+  measureNothing,
+} from '../template/define.js';
+import type { TemplateManifest } from '../template/manifest.js';
 
 /**
  * `ResolvedBrief` × template → `Scene` (`docs/architecture.md`, compile stage).
@@ -199,8 +205,8 @@ interface Plan {
  * slide. A manifest without one gives a single artwork, because a brief still produces
  * an artwork even when nothing repeats.
  */
-function planArtworks(resolved: ResolvedBrief, template: Template): readonly Plan[] {
-  const repeatable = Object.entries(template.manifest.slots).find(([, slot]) => slot.repeat)?.[0];
+function planArtworks(resolved: ResolvedBrief, manifest: TemplateManifest): readonly Plan[] {
+  const repeatable = Object.entries(manifest.slots).find(([, slot]) => slot.repeat)?.[0];
 
   if (repeatable === undefined || resolved.artworks.length === 0) {
     return [{ id: 'artwork-1', index: 0, slots: resolved.slots, adjustments: {} }];
@@ -242,18 +248,102 @@ export function compile(
   template: Template,
   options: CompileOptions,
 ): Result<Scene, Diagnostics> {
+  return compileWith(resolved, template.manifest, options, (context) => {
+    try {
+      return { frame: template.build(context), problems: [] };
+    } catch (cause) {
+      return { problems: [crash(template.manifest.name, cause)] };
+    }
+  });
+}
+
+/**
+ * `compile`, for a template whose frames are answered later (ADR 0048).
+ *
+ * Every frame is asked for first, one call at a time and in `compile`'s own order, and the
+ * answers are then handed to the same loop `compile` runs — so layout, the gap stamp and
+ * `parseScene` are one code for both, and a built-in template, which never comes here, is
+ * compiled exactly as it was. A frame the template could not answer is its diagnostics and
+ * no frame: whether that stops the scene is the diagnostics' fatality, not this function's.
+ */
+export async function compileDeferred(
+  resolved: ResolvedBrief,
+  template: DeferredTemplate,
+  options: CompileOptions,
+): Promise<Result<Scene, Diagnostics>> {
+  const { manifest } = template;
+  // Before the first call, for `compile`'s reason, and because a call here costs a message.
+  const missing = undefinedFormats(options.formats, resolved.formats, manifest.name);
+  if (missing.length > 0) return err(missing);
+
+  const plans = planArtworks(resolved, manifest);
+  const measure = measureOf(options.faces);
+  const answers = new Map<string, Result<Frame, Diagnostics>>();
+  for (const plan of plans) {
+    for (const format of resolved.formats) {
+      const context = contextOf(plan, format, plans.length, options, measure);
+      answers.set(context.idPrefix, await template.buildLater(context));
+    }
+  }
+
+  return compileWith(resolved, manifest, options, (context) => {
+    const answer = answers.get(context.idPrefix);
+    // Unreachable: both loops walk the same plans and formats.
+    if (answer === undefined) {
+      return { problems: [crash(manifest.name, new Error(`no answer for ${context.idPrefix}`))] };
+    }
+    return answer.ok
+      ? { frame: answer.value, problems: answer.diagnostics }
+      : { problems: answer.error };
+  });
+}
+
+/** What one call of a template came to: its frame, or why there is none. */
+interface Built {
+  readonly frame?: Frame;
+  readonly problems: readonly Diagnostic[];
+}
+
+/** One function for the whole compile (ADR 0038): the same `measureText` `layoutText` runs. */
+function measureOf(faces: FaceCache | undefined): TemplateContext['measure'] {
+  return faces === undefined ? measureNothing : (node) => measureText(node, faces);
+}
+
+function contextOf(
+  plan: Plan,
+  format: string,
+  count: number,
+  options: CompileOptions,
+  measure: TemplateContext['measure'],
+): TemplateContext {
+  return {
+    format,
+    // Defined: `undefinedFormats` refused every format the catalogue lacks.
+    size: options.formats.sizeOf(format) ?? { w: 0, h: 0 },
+    idPrefix: idPrefixOf(plan.id, format),
+    artwork: { id: plan.id, index: plan.index, count },
+    slots: plan.slots,
+    adjustments: plan.adjustments,
+    measure,
+  };
+}
+
+function compileWith(
+  resolved: ResolvedBrief,
+  manifest: TemplateManifest,
+  options: CompileOptions,
+  build: (context: TemplateContext) => Built,
+): Result<Scene, Diagnostics> {
   // Before anything is built: a format with no size cannot produce a frame, and finding
   // that out per artwork would report the same thing once per slide.
-  const missing = undefinedFormats(options.formats, resolved.formats, template.manifest.name);
+  const missing = undefinedFormats(options.formats, resolved.formats, manifest.name);
   if (missing.length > 0) return err(missing);
 
   const faces = options.faces;
-  // One function for the whole compile, and the same `measureText` `layoutText` runs below:
-  // what a template is told a node will measure is what it then measures (ADR 0038).
-  const measure: TemplateContext['measure'] =
-    faces === undefined ? measureNothing : (node) => measureText(node, faces);
+  // What a template is told a node will measure is what it then measures (ADR 0038).
+  const measure = measureOf(faces);
 
-  const plans = planArtworks(resolved, template);
+  const plans = planArtworks(resolved, manifest);
   const problems: Diagnostic[] = [];
   const artworks: Artwork[] = [];
   const fonts = new Map<string, FontRef>();
@@ -263,31 +353,19 @@ export function compile(
     const frames: Frame[] = [];
 
     for (const format of resolved.formats) {
-      const context: TemplateContext = {
-        format,
-        // Defined: `undefinedFormats` above refused every format the catalogue lacks.
-        size: options.formats.sizeOf(format) ?? { w: 0, h: 0 },
-        idPrefix: idPrefixOf(plan.id, format),
-        artwork: { id: plan.id, index: plan.index, count: plans.length },
-        slots: plan.slots,
-        adjustments: plan.adjustments,
-        measure,
-      };
+      const context = contextOf(plan, format, plans.length, options, measure);
 
-      let frame: Frame;
-      try {
-        frame = template.build(context);
-      } catch (cause) {
-        problems.push(crash(template.manifest.name, cause));
-        continue;
-      }
+      const built = build(context);
+      problems.push(...built.problems);
+      if (built.frame === undefined) continue;
+      let frame: Frame = built.frame;
 
       // A template that returns the wrong frame has mixed up its own branches, and the
       // scene would render the story layout under the feed's name.
       if (frame.format !== format) {
         problems.push(
           diagnostic('E_TEMPLATE_CRASH', {
-            template: template.manifest.name,
+            template: manifest.name,
             problem: `asked for format '${format}' and returned '${frame.format}'`,
           }),
         );
@@ -323,10 +401,9 @@ export function compile(
   // warning, so `problems.length > 0` was the same test — `W_TEXT_OVERFLOW` is the first
   // diagnostic a compile can emit and still have something to hand back.
   //
-  // Every error this stage can emit is fatal today: a template that throws or returns the
-  // wrong frame has broken every artwork, not one slot. The test is written in terms of
-  // fatality anyway, so a later non-fatal compile error needs no second reading of this
-  // line.
+  // A template that throws or returns the wrong frame has broken every artwork, not one
+  // slot, and that is fatal. An installed code template's failure is not (ADR 0048): it
+  // arrives as `E_PLUGIN_TEMPLATE`, costs its frame, and the scene keeps the others.
   if (hasFatal(problems)) return err(problems);
 
   // Straight to `parseScene`: a template is code, and code that produces IR is exactly the
