@@ -108,7 +108,7 @@ Faces fall into three groups:
   reports `W_PLUGIN_FONT_WITHHELD`, naming the plugin, the template and the family.
 - **Faces inside the plugin's own folder** would be sent freely. Nothing supplies them yet: no
   mechanism lets a template name a face in its plugin's folder, and a `FontRef` with
-  `source: 'file'` comes from the brief's folder.
+  `source: 'file'` comes from the brief's folder. That mechanism is TYTO-192.
 
 `FontLibrary.fromMachine(face)` tells the first group from the second. A `system` face the
 machine lacks is answered with the bundled substitute (ADR 0037), which is bundled and crosses
