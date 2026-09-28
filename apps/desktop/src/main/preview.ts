@@ -5,21 +5,19 @@ import {
   type FileSystem,
   type TemplateManifest,
   compile,
+  compileDeferred,
+  isDeferredTemplate,
   resolve,
   sceneResources,
 } from '@tyto/core';
 import { exportHtml } from '@tyto/export-html';
-import {
-  bundledTemplateSource,
-  fontSubstitutionWarnings,
-  markupTemplateSource,
-} from '@tyto/pipeline';
-import { BUILT_IN_TEMPLATE_BUILDS } from '@tyto/templates';
+import { fontSubstitutionWarnings } from '@tyto/pipeline';
 import { fileAssetResolver, fileResources } from '@tyto/io';
 
 import type { WindowPlugins } from './window-plugins.js';
 import { faces, fonts } from './fonts.js';
 import { type ProjectSources } from './project.js';
+import { templateSourceOf } from './template-source.js';
 
 /**
  * Brief text in, one HTML document per frame out — the preview's whole job (E9.2).
@@ -162,6 +160,7 @@ export async function createPreviewService(
         // Startup problems, replayed on every preview rather than thrown. A desktop app whose
         // template folder is unreadable should open, show the editor, and say what is wrong.
         diagnostics: startup,
+        codePacks,
       } = sources.current();
 
       let completion: PreviewCompletion = { directives: options.directives?.names() ?? [] };
@@ -197,17 +196,18 @@ export async function createPreviewService(
 
       // The same pairing the export path uses: a preview that could not draw a code
       // template would send somebody to the CLI to find out whether their work rendered.
-      const template = await bundledTemplateSource({
-        registry: templates,
-        fileSystem,
-        bundled: BUILT_IN_TEMPLATE_BUILDS,
-        markup: markupTemplateSource(fileSystem, templates),
-      }).load(resolved.value.template);
+      const template = await templateSourceOf(fileSystem, templates, codePacks).load(
+        resolved.value.template,
+      );
       if (!template.ok) {
         return failed([...ast.diagnostics, ...resolved.diagnostics, ...template.error]);
       }
 
-      const scene = compile(resolved.value, template.value, { formats: catalogue, faces });
+      // An installed code template answers from its plugin's process (ADR 0048); every other
+      // one is compiled in the loop as before.
+      const scene = isDeferredTemplate(template.value)
+        ? await compileDeferred(resolved.value, template.value, { formats: catalogue, faces })
+        : compile(resolved.value, template.value, { formats: catalogue, faces });
       if (!scene.ok) {
         return failed([
           ...ast.diagnostics,

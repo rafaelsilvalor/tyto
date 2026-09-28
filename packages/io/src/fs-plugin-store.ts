@@ -196,5 +196,9 @@ export function fsPluginStore(home: string): PluginStore {
     directoryOf(name: string): string {
       return join(pluginsDirectory, name);
     },
+
+    linksLeaving(name: string): Promise<Diagnostics> {
+      return linksOutside(join(pluginsDirectory, name));
+    },
   };
 }

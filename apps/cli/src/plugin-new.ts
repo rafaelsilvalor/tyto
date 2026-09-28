@@ -16,7 +16,7 @@ import { formatDiagnostics } from './report.js';
  * (TYTO-50, `docs/plugin-authoring.md`).
  *
  * **Plain JavaScript, no dependencies, nothing to build.** `dist/index.js` is written as the
- * file the plugin's thread imports, so `tyto plugin install <folder>` works offline straight
+ * file the plugin's process imports, so `tyto plugin install <folder>` works offline straight
  * after this command. A TypeScript source and a bundler are a choice an author can make
  * later, and a scaffold that needed `npm install` before its first install would fail the
  * first try on every machine without a network — the lesson `tyto template new` learned
@@ -35,7 +35,7 @@ export interface PluginNewOptions {
   readonly out: string;
   /**
    * A code template instead of a markup one: `dist/index.js` builds the frame in the
-   * plugin's thread, and the template's folder holds only its manifest (ADR 0048).
+   * plugin's process, and the template's folder holds only its manifest (ADR 0048).
    */
   readonly code?: boolean;
 }
@@ -120,7 +120,7 @@ export function activate(host) {
 
 /**
  * A code template's manifest: no `template.html` beside it, and `faces` naming what it
- * measures, because the faces cross to the plugin's thread with each call (ADR 0048).
+ * measures, because the faces cross to the plugin's process with each call (ADR 0048).
  */
 function codeManifestSource(name: string): string {
   return `name: ${name}

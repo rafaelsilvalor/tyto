@@ -329,13 +329,26 @@ export const diagnosticCodes = {
       'It costs the frame the call was for; the frames that did arrive are drawn (ADR 0025).',
   },
   // A link is copied as its target when it lands inside the plugin folder; any other is
-  // refused before anything is written, rather than failing the copy halfway (TYTO-50).
+  // refused before anything is written, rather than failing the copy halfway (TYTO-50). The
+  // same check runs again at load, because the permission model follows a link out of the
+  // folder it granted (ADR 0049).
   E_PLUGIN_LINK: {
     severity: 'error',
-    summary: 'A plugin folder being installed holds a link that leads outside it, or nowhere.',
+    summary: 'A plugin folder holds a link that leads outside it, or nowhere.',
     template:
-      "Plugin folder '{source}' holds '{file}', a link that {problem}. Install copies a plugin's own files only: replace the link with the file it points to.",
+      "Plugin folder '{source}' holds '{file}', a link that {problem}. A plugin may hold its own files only: replace the link with the file it points to.",
     spec: 'docs/plugin-authoring.md',
+    fatal: true,
+    fatality: 'A plugin that did not load contributed no slot to skip.',
+  },
+  // The canary a plugin's process runs before the plugin's code is imported read a file it
+  // should not have been able to read, or never said what it found (ADR 0049).
+  E_PLUGIN_SANDBOX: {
+    severity: 'error',
+    summary: "An installed plugin's process is not confined to its own folder, so it was not run.",
+    template:
+      "Plugin '{plugin}' was not run: its process on {runtime} is not confined to its folder ({problem}).",
+    spec: 'docs/adr/0049-an-installed-plugin-runs-under-the-runtime-permission-model.md',
     fatal: true,
     fatality: 'A plugin that did not load contributed no slot to skip.',
   },

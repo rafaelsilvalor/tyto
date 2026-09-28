@@ -69,8 +69,8 @@ const stderr = (): string => errors.join('');
 /**
  * The exporter `activate` of a fixture plugin: every frame becomes one line of text.
  *
- * `crashes` makes every frame end the plugin's thread instead — `process.exit` inside a
- * worker ends the worker and nothing else, which is the kill the acceptance test needs.
+ * `crashes` makes every frame end the plugin's process instead — `process.exit` inside it
+ * ends that process and nothing else, which is the kill the acceptance test needs.
  */
 function exporterSource(
   id: string,
@@ -243,7 +243,7 @@ describe('what install refuses', () => {
     expect(stderr()).toContain("A plugin named 'svg' is already here (built-in).");
   });
 
-  it('shows the permissions, says the thread is no sandbox, and asks', async () => {
+  it('shows the permissions, says what the process is confined to, and asks', async () => {
     const questions: string[] = [];
     const code = await run(
       ['plugin', 'install', await pluginFolder({ permissions: ['net:api.example.com'] })],
@@ -258,9 +258,28 @@ describe('what install refuses', () => {
     expect(code).toBe(EXIT_DIAGNOSTICS);
     expect(questions).toEqual(['Install it? [y/N] ']);
     expect(stderr()).toContain('  - net:api.example.com\n');
-    expect(stderr()).toContain('That thread is not a sandbox');
+    expect(stderr()).toContain("confines that process to the plugin's own folder");
+    expect(stderr()).toContain('It is not confined on the\nnetwork');
     expect(stderr()).toContain('net: permissions filter host.fetch only');
     expect(stderr()).toContain('Not installed.');
+  });
+
+  it('says what a font: permission sends, and only for a plugin that asks for one', async () => {
+    const answer = (): Partial<CliEnvironment> => ({ confirm: () => Promise.resolve(false) });
+
+    await run(
+      ['plugin', 'install', await pluginFolder({ permissions: ['font:CircularXX'] })],
+      environment(answer()),
+    );
+    expect(stderr()).toContain('  - font:CircularXX\n');
+    expect(stderr()).toContain(
+      'font: permissions send its code templates the files of CircularXX as\n' +
+        'installed on this computer, which may be licensed to you and not to its author.\n',
+    );
+
+    errors.length = 0;
+    await run(['plugin', 'install', await pluginFolder()], environment(answer()));
+    expect(stderr()).not.toContain('font: permissions');
   });
 
   it('refuses to guess when nobody can answer and --yes was not given', async () => {
@@ -324,7 +343,7 @@ const renderArguments = (types: string): string[] => [
 ];
 
 describe('an installed exporter at render', () => {
-  // Starts a plugin's worker thread, which a full `pnpm check` can hold past Vitest's 5 s.
+  // Starts a plugin's process, which a full `pnpm check` can hold past Vitest's 5 s.
   it('produces a kind Tyto did not ship, and result.json names its mime', async () => {
     await run(['plugin', 'install', await pluginFolder(), '--yes'], environment());
 
@@ -356,7 +375,7 @@ describe('an installed exporter at render', () => {
     );
   });
 
-  // Starts a plugin's worker thread, which a full `pnpm check` can hold past Vitest's 5 s.
+  // Starts a plugin's process, which a full `pnpm check` can hold past Vitest's 5 s.
   it('refuses a rasterized exporter for a kind no rasterizer encodes, naming the plugin', async () => {
     // The third party's mistake used to reach `runJob` and come out as exit 2, an internal
     // failure. It is refused at activation instead, and the refused `--types` says why.
@@ -380,7 +399,7 @@ describe('an installed exporter at render', () => {
     expect(stderr()).toContain("'gif' is not an output type any installed exporter produces.");
   }, 60_000);
 
-  // Starts a plugin's worker thread, which a full `pnpm check` can hold past Vitest's 5 s.
+  // Starts a plugin's process, which a full `pnpm check` can hold past Vitest's 5 s.
   it('refuses a plugin whose id collides, by name, and the run renders without it', async () => {
     // `vetor` registers an exporter called `svg`, which the built-in already holds.
     await run(
@@ -414,15 +433,15 @@ describe('an installed exporter at render', () => {
   }, 60_000);
 });
 
-describe('a plugin whose thread is killed mid-render', () => {
-  // Starts a plugin's worker thread, which a full `pnpm check` can hold past Vitest's 5 s.
+describe('a plugin whose process is killed mid-render', () => {
+  // Starts a plugin's process, which a full `pnpm check` can hold past Vitest's 5 s.
   it('fails its own frames, renders the rest, and is listed as crashed until enabled', async () => {
     await run(['plugin', 'install', await pluginFolder({ crashes: true }), '--yes'], environment());
 
     const code = await run(renderArguments('txt,svg'), environment());
 
     // Exit 1: the txt frames failed, as data. The command itself finished, and Tyto's own
-    // exporter drew every svg frame after the plugin's thread was gone.
+    // exporter drew every svg frame after the plugin's process was gone.
     expect(code, stderr()).toBe(EXIT_DIAGNOSTICS);
     const result = JSON.parse(
       await readFile(join(workspace, 'task', 'out', 'result.json'), 'utf8'),
@@ -432,7 +451,7 @@ describe('a plugin whose thread is killed mid-render', () => {
       'slide-2-feed.svg',
     ]);
     expect(new Set(result.diagnostics.map((item) => item.message))).toEqual(
-      new Set(["Plugin 'texto' stopped running: its thread exited with code 7."]),
+      new Set(["Plugin 'texto' stopped running: its process exited with code 7."]),
     );
 
     // Written beside plugins.json and not into it: an older CLI or desktop reading
@@ -442,17 +461,17 @@ describe('a plugin whose thread is killed mid-render', () => {
     const history = JSON.parse(await readFile(join(home, 'crashes.json'), 'utf8')) as {
       crashes: Record<string, { reason: string }>;
     };
-    expect(history.crashes['texto']?.reason).toBe('its thread exited with code 7');
+    expect(history.crashes['texto']?.reason).toBe('its process exited with code 7');
 
     errors = [];
     const plugins = await listed();
     expect(plugins.at(-1)).toMatchObject({
       name: 'texto',
       status: 'crashed',
-      crashed: { reason: 'its thread exited with code 7' },
+      crashed: { reason: 'its process exited with code 7' },
     });
     expect(stderr()).toMatch(
-      /Plugin 'texto' crashed at \d{4}-\d\d-\d\dT[^:]+:\d\d:\d\d\.\d+Z: its thread exited with code 7\. It is still activated/u,
+      /Plugin 'texto' crashed at \d{4}-\d\d-\d\dT[^:]+:\d\d:\d\d\.\d+Z: its process exited with code 7\. It is still activated/u,
     );
     // History, not a refusal: it is still what a render would activate.
     expect((await listed('--active')).map((plugin) => plugin.name)).toContain('texto');
@@ -551,7 +570,7 @@ const HEAD = '---\ntemplate: cartaz\nformats: [feed]\nimagem: ./logo.png\n---\n'
 const DIRECTIVE_AT = HEAD.length + '::slide Um\n'.length;
 
 describe('an installed directive at render', () => {
-  // Starts a plugin's worker thread, which a full `pnpm check` can hold past Vitest's 5 s.
+  // Starts a plugin's process, which a full `pnpm check` can hold past Vitest's 5 s.
   it('expands ::demo/shout into the slot it names, through the worker', async () => {
     await run(['plugin', 'install', await shoutFolder(), '--yes'], environment());
 
@@ -562,7 +581,7 @@ describe('an installed directive at render', () => {
     expect(rendered.artifacts).toEqual(['slide-1-feed.svg', 'slide-2-feed.svg']);
   }, 60_000);
 
-  // Starts a plugin's worker thread, which a full `pnpm check` can hold past Vitest's 5 s.
+  // Starts a plugin's process, which a full `pnpm check` can hold past Vitest's 5 s.
   it('uppercases the text, and the manifest checks the replacement on the directive', async () => {
     // `cor` is an enum of lowercase values, so the uppercased one is refused by name — which
     // is the text having crossed the thread both ways, and resolve checking what came back.
@@ -586,7 +605,7 @@ describe('an installed directive at render', () => {
     expect(rendered.artifacts).toEqual(['slide-1-feed.svg']);
   });
 
-  // Starts a plugin's worker thread, which a full `pnpm check` can hold past Vitest's 5 s.
+  // Starts a plugin's process, which a full `pnpm check` can hold past Vitest's 5 s.
   it('cannot take an argument value outside [a-zA-Z0-9_-] — the known limit', async () => {
     // Adjustment values are the grammar's `value` token; a plugin argument is one of them
     // until the grammar has an argument node of its own (ADR 0043).

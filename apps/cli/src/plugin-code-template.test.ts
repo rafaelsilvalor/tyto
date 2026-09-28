@@ -13,7 +13,7 @@ import { run } from './program.js';
 
 /**
  * An installed code template, from `tyto plugin install` to `tyto render` (TYTO-189,
- * ADR 0048) — against a real temp disk and the real worker thread.
+ * ADR 0048) — against a real temp disk and the real, confined plugin process.
  *
  * The template is `agenda-semana`, the first production template written in TypeScript,
  * bundled the way a plugin author bundles one: every import inlined into `dist/index.js`,
@@ -144,7 +144,7 @@ async function render(brief: string, out: string): Promise<Rendered> {
 }
 
 describe('tyto plugin new --code', () => {
-  // Starts a plugin's worker thread, which a full `pnpm check` can hold past Vitest's 5 s.
+  // Starts a plugin's process, which a full `pnpm check` can hold past Vitest's 5 s.
   it('scaffolds a code template that installs and renders with nothing edited', async () => {
     expect(
       await run(['plugin', 'new', 'meu-codigo', '--code', '--out', 'sources'], environment()),
@@ -178,7 +178,7 @@ describe('tyto plugin new --code', () => {
     expect(code, stderr()).toBe(EXIT_OK);
     expect(result.diagnostics).toEqual([]);
     const svg = await readFile(join(out, 'artwork-1-feed.svg'), 'utf8');
-    // Three lines of 72 px at 1.2, measured in the plugin's thread: the band is 259.2 + 80
+    // Three lines of 72 px at 1.2, measured in the plugin's process: the band is 259.2 + 80
     // tall. Unmeasured, it would be one line's 86.4 + 80.
     expect(svg.match(/<text /gu)).toHaveLength(3);
     expect(svg).toContain('V339.2 H0');

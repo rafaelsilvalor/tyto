@@ -164,10 +164,11 @@ meu-pack 0.1.0 from ./meu-pack
 contributes: template-pack
 permissions:
   (none)
-Each plugin runs in a worker thread of its own, so a crash stops the plugin and not
-Tyto. That thread is not a sandbox: the plugin has the same access to this computer
-as Tyto itself. net: permissions filter host.fetch only, and credentials: ones
-host.credentials only; code that goes around them is not stopped.
+Each plugin runs in a process of its own, so a crash stops the plugin and not Tyto.
+Node's permission model confines that process to the plugin's own folder: it cannot
+read your other files, write anywhere, or start programs. It is not confined on the
+network: net: permissions filter host.fetch only, and a plugin that opens its own
+connection is not stopped. credentials: permissions filter host.credentials.
 Installed meu-pack 0.1.0.
 ```
 
@@ -222,6 +223,8 @@ folder, then the built-in pack, then installed packs. Its plugins start after th
 so an installed template joins the Template picker a moment after the built-in ones, and a brief
 already open that names it is previewed again when it does. A skipped plugin is a row in the
 problems panel. The app reads what is installed when it starts, so restart it after an install.
+A code template previews and exports there from the plugin's utility process, as it renders
+from the CLI, and the plugins screen shows which faces a `font:` permission sends.
 
 ## Share it
 
@@ -281,11 +284,16 @@ with every character that is not a letter or a digit turned into `_`. For `meu-p
 system keychain only, and this version has no screen to store one** (TYTO-187). A declared
 credential therefore answers `E_CREDENTIAL_MISSING` there.
 
-**The boundary is a crash boundary, not a sandbox.** Your code runs on the same Node as Tyto's, in
-a worker thread (CLI) or a utility process (desktop). If it crashes, Tyto records the crash and
-carries on. But it can import `node:fs` or open a socket without asking anybody. `net:` and
-`credentials:` filter `host.fetch` and `host.credentials` and nothing else. A real sandbox is
-TYTO-186. **A panel receives the text of the brief that is open**, with no permission asked, and
+**In the CLI your code runs confined to its own folder** (ADR 0049). It runs in a process of its
+own under Node's permission model, which can read the plugin's installed folder and nothing else.
+It cannot read another file on the computer, write anywhere (its own folder included), start a
+program or a worker thread, or load a native addon, and its environment is empty. So everything
+it needs has to be inside its folder, bundled into `dist/` or beside it: a dependency left in a
+`node_modules` outside the folder is a read the runtime refuses. If it crashes, Tyto records the
+crash and carries on. **The network is not confined** on the Node versions Tyto supports: `net:`
+filters `host.fetch`, and code that opens its own socket is not stopped. On Node 25 and later,
+that socket is refused too. On the desktop the plugin's process is still a crash boundary only,
+until the app ships its own Node. **A panel receives the text of the brief that is open**, with no permission asked, and
 the desktop's plugins screen says so on that plugin's row (ADR 0045).
 
 ## When it does not load
@@ -299,7 +307,8 @@ the desktop's plugins screen says so on that plugin's row (ADR 0045).
 | `E_PLUGIN_PACK_CODE`                      | a `template.ts` in the pack, or a code template without `build`                          |
 | `E_PLUGIN_TEMPLATE`                       | at render: a code template's `build` timed out, threw or answered a frame the IR refuses |
 | `W_PLUGIN_FONT_WITHHELD`                  | a code template measures a face from this machine without `font:<family>`                |
-| `E_PLUGIN_LINK`                           | at install: a link in the folder leads out of it, or nowhere                             |
+| `E_PLUGIN_LINK`                           | at install or load: a link in the folder leads out of it, or nowhere                     |
+| `E_PLUGIN_SANDBOX`                        | the plugin's process could not prove it is confined to its folder, so it was not run     |
 | `E_PLUGIN_DUPLICATE`                      | another plugin already registered that contribution id                                   |
 | `W_TEMPLATE_SHADOWED`                     | the project or the built-in pack has a template of that name                             |
 

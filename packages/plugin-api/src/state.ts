@@ -12,8 +12,9 @@ import { z } from 'zod';
  * not installed**, and an entry whose plugin now asks for more than it was granted is not
  * activated until it is installed again.
  *
- * The permissions recorded here are shown and remembered, **not enforced** yet: a plugin
- * runs in a worker thread of its own, and that thread is not a sandbox (ADR 0041).
+ * The permissions recorded here are what the person approved. `net:` and `credentials:` are
+ * enforced where the plugin asks the host (ADR 0042); the runtime confines the rest of what
+ * the plugin's process can do to its own folder, and not its network (ADR 0049).
  *
  * **A key this version does not know is dropped, not refused** (ADR 0041). The CLI and the
  * desktop are versioned separately and share this file, so the older of the two must still
