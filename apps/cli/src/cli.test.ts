@@ -170,11 +170,7 @@ describe('tyto render', () => {
 
     expect(code, stderr()).toBe(EXIT_OK);
     // Two slides × one format × one encoding, plus the manifest.
-    expect(await outFiles('task', 'out')).toEqual([
-      'result.json',
-      'slide-1-feed.svg',
-      'slide-2-feed.svg',
-    ]);
+    expect(await outFiles('task', 'out')).toEqual(['feed-01.svg', 'feed-02.svg', 'result.json']);
   });
 
   it('writes a result.json its own schema accepts', async () => {
@@ -218,19 +214,15 @@ describe('tyto render', () => {
     );
 
     expect(code, stderr()).toBe(EXIT_DIAGNOSTICS);
-    expect(await outFiles('task', 'out')).toEqual([
-      'result.json',
-      'slide-1-feed.svg',
-      'slide-2-feed.svg',
-    ]);
+    expect(await outFiles('task', 'out')).toEqual(['feed-01.svg', 'feed-02.svg', 'result.json']);
 
     const parsed = parseRenderResult(await resultAt('task', 'out'));
     if (!parsed.ok) throw new Error(parsed.error.join('; '));
     expect(parsed.value.status).toBe('error');
     expect(parsed.value.planned).toBe(2);
     expect(parsed.value.artifacts.map((artifact) => artifact.name)).toEqual([
-      'slide-1-feed.svg',
-      'slide-2-feed.svg',
+      'feed-01.svg',
+      'feed-02.svg',
     ]);
     expect(parsed.value.diagnostics.some((item) => item.code === 'E_UNKNOWN_SLOT')).toBe(true);
   });
@@ -257,13 +249,9 @@ describe('tyto render', () => {
 
     // Still non-zero: fatality decides what is drawn, severity decides what fails.
     expect(code, stderr()).toBe(EXIT_DIAGNOSTICS);
-    expect(await outFiles('task', 'out')).toEqual([
-      'result.json',
-      'slide-1-feed.svg',
-      'slide-2-feed.svg',
-    ]);
+    expect(await outFiles('task', 'out')).toEqual(['feed-01.svg', 'feed-02.svg', 'result.json']);
 
-    const svg = await readFile(join(workspace, 'task', 'out', 'slide-1-feed.svg'), 'utf8');
+    const svg = await readFile(join(workspace, 'task', 'out', 'feed-01.svg'), 'utf8');
     expect(svg).toContain(GAP_COLOR_CSS);
 
     const parsed = parseRenderResult(await resultAt('task', 'out'));
@@ -277,7 +265,7 @@ describe('tyto render', () => {
   it('leaves the mark out of an artwork with nothing missing, which is the control', async () => {
     await run(['render', 'task/brief.brief', '--out', 'task/out', '--types', 'svg'], environment());
 
-    const svg = await readFile(join(workspace, 'task', 'out', 'slide-1-feed.svg'), 'utf8');
+    const svg = await readFile(join(workspace, 'task', 'out', 'feed-01.svg'), 'utf8');
     expect(svg).not.toContain(GAP_COLOR_CSS);
   });
 
@@ -307,7 +295,7 @@ describe('tyto render', () => {
   it("embeds the template's own <vector src>, which nothing but the CLI resolves", async () => {
     await run(['render', 'task/brief.brief', '--out', 'task/out', '--types', 'svg'], environment());
 
-    const svg = await readFile(join(workspace, 'task', 'out', 'slide-1-feed.svg'), 'utf8');
+    const svg = await readFile(join(workspace, 'task', 'out', 'feed-01.svg'), 'utf8');
     // The mark's path data reached the document, so `assets/mark.svg` beside the template
     // was read and handed to `compileTemplate` as a `TemplateAssets`.
     expect(svg).toContain('M2 2h20v20H2z');
@@ -321,17 +309,17 @@ describe('tyto render', () => {
 
     expect(code, stderr()).toBe(EXIT_OK);
     expect(await outFiles('task', 'out')).toEqual([
+      'feed-01.png',
+      'feed-01.svg',
+      'feed-02.png',
+      'feed-02.svg',
       'result.json',
-      'slide-1-feed.png',
-      'slide-1-feed.svg',
-      'slide-2-feed.png',
-      'slide-2-feed.svg',
     ]);
     expect(stdout().trim().split('\n')).toEqual([
-      'slide-1-feed.png',
-      'slide-1-feed.svg',
-      'slide-2-feed.png',
-      'slide-2-feed.svg',
+      'feed-01.png',
+      'feed-01.svg',
+      'feed-02.png',
+      'feed-02.svg',
     ]);
   });
 
@@ -363,7 +351,7 @@ describe('tyto render', () => {
     );
 
     expect(code, stderr()).toBe(EXIT_OK);
-    expect(await outFiles('task', 'plain')).toEqual(['result.json', 'slide-1-story.svg']);
+    expect(await outFiles('task', 'plain')).toEqual(['result.json', 'story-01.svg']);
   });
 
   it('reports a format the template does not render, rather than rendering nothing', async () => {
@@ -418,11 +406,7 @@ describe('tyto render --folder', () => {
     expect(code, stderr()).toBe(EXIT_OK);
     // Nothing but artwork at this level — the whole point of the layout. A `result.json`
     // here would be the one file somebody has to delete before sending the folder on.
-    expect(await outFiles('entregas', NAME)).toEqual([
-      'editaveis',
-      'slide-1-feed.svg',
-      'slide-2-feed.svg',
-    ]);
+    expect(await outFiles('entregas', NAME)).toEqual(['editaveis', 'feed-01.svg', 'feed-02.svg']);
     expect(await outFiles('entregas', NAME, 'editaveis')).toEqual([
       `${NAME}.brief`,
       'result.json',
@@ -508,8 +492,8 @@ describe('tyto render --folder', () => {
     // The names are the same names `--out` produces. Only the folder around them moved, and
     // an artifact list that suddenly carried a path would be a change to the ADR 0011 schema.
     expect(parsed.value.artifacts.map((artifact) => artifact.name)).toEqual([
-      'slide-1-feed.svg',
-      'slide-2-feed.svg',
+      'feed-01.svg',
+      'feed-02.svg',
     ]);
   });
 
@@ -522,17 +506,13 @@ describe('tyto render --folder', () => {
       environment(),
     );
 
-    expect(await outFiles('entregas')).toEqual([
-      'result.json',
-      'slide-1-feed.svg',
-      'slide-2-feed.svg',
-    ]);
+    expect(await outFiles('entregas')).toEqual(['feed-01.svg', 'feed-02.svg', 'result.json']);
   });
 
   it('reuses an existing folder and overwrites by name, leaving what it did not produce', async () => {
     const delivery = join(workspace, 'entregas', NAME);
     await mkdir(delivery, { recursive: true });
-    await writeFile(join(delivery, 'slide-3-feed.svg'), 'from a run that made three slides');
+    await writeFile(join(delivery, 'feed-03.svg'), 'from a run that made three slides');
 
     await run(
       ['render', `task/${NAME}.brief`, '--out', 'entregas', '--folder', '--types', 'svg'],
@@ -542,7 +522,7 @@ describe('tyto render --folder', () => {
     // The documented rule, and the hazard it carries, pinned rather than left to be
     // discovered: a brief edited from three slides down to two leaves the third in the
     // delivery, and `result.json` does not mention it because it lists what this run wrote.
-    expect(await outFiles('entregas', NAME)).toContain('slide-3-feed.svg');
+    expect(await outFiles('entregas', NAME)).toContain('feed-03.svg');
   });
 });
 
@@ -666,9 +646,9 @@ describe('tyto watch --once', () => {
 
     expect(code, stderr()).toBe(EXIT_OK);
     expect(await outFiles('queue', 'outbox', 'issue-42', 'out')).toEqual([
+      'feed-01.svg',
+      'feed-02.svg',
       'result.json',
-      'slide-1-feed.svg',
-      'slide-2-feed.svg',
     ]);
   });
 

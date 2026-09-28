@@ -99,8 +99,8 @@ describe('the example pack', () => {
 
     expect(rendered.code, stderr()).toBe(EXIT_OK);
     expect(rendered.diagnostics).toEqual([]);
-    expect(rendered.artifacts).toEqual(['artwork-1-grid-1x1.svg', 'artwork-1-story.svg']);
-    const svg = await readFile(join(workspace, 'out', 'artwork-1-grid-1x1.svg'), 'utf8');
+    expect(rendered.artifacts).toEqual(['grid-1x1-01.svg', 'story-01.svg']);
+    const svg = await readFile(join(workspace, 'out', 'grid-1x1-01.svg'), 'utf8');
     // The brief's text, drawn by the pack's template: `tom: laranja` is its orange.
     expect(svg).toMatch(/^<svg/u);
     expect(svg).toContain('#ff5900');
@@ -150,9 +150,9 @@ describe('the example pack in tyto watch', () => {
 
     expect(code, stderr()).toBe(EXIT_OK);
     expect((await readdir(join(workspace, 'queue', 'outbox', 'aviso-1', 'out'))).sort()).toEqual([
-      'artwork-1-grid-1x1.svg',
-      'artwork-1-story.svg',
+      'grid-1x1-01.svg',
       'result.json',
+      'story-01.svg',
     ]);
   }, 60_000);
 });
@@ -177,7 +177,7 @@ describe('tyto plugin new', () => {
 
     expect(rendered.code, stderr()).toBe(EXIT_OK);
     expect(rendered.diagnostics).toEqual([]);
-    expect(rendered.artifacts).toEqual(['artwork-1-grid.svg']);
+    expect(rendered.artifacts).toEqual(['grid-01.svg']);
   }, 60_000);
 
   it('writes the layout the example pack has', async () => {

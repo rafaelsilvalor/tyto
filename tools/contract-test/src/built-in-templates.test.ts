@@ -1,6 +1,6 @@
 import { execFile } from 'node:child_process';
 import { createHash } from 'node:crypto';
-import { mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
+import { mkdir, mkdtemp, readFile, readdir, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -666,7 +666,13 @@ describe('the fonts the pack draws in, as a render embeds them (ADR 0021)', () =
     // refuse. This is the wording that used to be here four times.
     expect(stderr).not.toContain('E_EXPORT_FONT_UNRESOLVED');
 
-    const svg = await readFile(join(project, 'out/artwork-1-grid-1x1.svg'), 'utf8');
+    // TYTO-197: files are named by format and number, one of each per format.
+    expect((await readdir(join(project, 'out'))).sort()).toEqual([
+      'grid-1x1-01.svg',
+      'result.json',
+      'story-01.svg',
+    ]);
+    const svg = await readFile(join(project, 'out/grid-1x1-01.svg'), 'utf8');
     const embedded = [...svg.matchAll(/url\("data:font\/woff2;base64,([A-Za-z0-9+/=]+)"\)/g)]
       .map((match) => Buffer.from(match[1] ?? '', 'base64'))
       .map((bytes) => createHash('sha256').update(bytes).digest('hex'));
@@ -710,7 +716,13 @@ describe('the fonts the pack draws in, as a render embeds them (ADR 0021)', () =
       },
     );
 
-    const svg = await readFile(join(agenda, 'out/lamina-1-grid.svg'), 'utf8');
+    // TYTO-197: two laminas in one format are grid-01 and grid-02, in slide order.
+    expect((await readdir(join(agenda, 'out'))).sort()).toEqual([
+      'grid-01.svg',
+      'grid-02.svg',
+      'result.json',
+    ]);
+    const svg = await readFile(join(agenda, 'out/grid-01.svg'), 'utf8');
     const sha = (bytes: Buffer): string => createHash('sha256').update(bytes).digest('hex');
     const embedded = [...svg.matchAll(/url\("data:font\/[a-z0-9]+;base64,([A-Za-z0-9+/=]+)"\)/g)]
       .map((match) => sha(Buffer.from(match[1] ?? '', 'base64')))

@@ -188,7 +188,7 @@ function taskOutput(directories: TaskOutputDirectories): TaskOutput {
  *
  * ```
  * <destination>/<name>/
- *   <artwork>-<format>.png        nothing but artwork at this level
+ *   <format>-<NN>.png             nothing but artwork at this level
  *   editaveis/
  *     <name>.brief                the brief that produced the files above
  *     template.txt                which template made it — a pointer, never a copy
@@ -217,7 +217,7 @@ function taskOutput(directories: TaskOutputDirectories): TaskOutput {
  * Exporting the same brief twice reuses the folder and overwrites by name — the same rule
  * `--out` has today, chosen for that reason rather than invented here. **What it costs is
  * worth naming: a file from a previous run that this one does not produce survives.** A
- * brief edited from three slides down to two leaves `slide-3-feed.png` in the delivery, and
+ * brief edited from three slides down to two leaves `grid-03.png` in the delivery, and
  * nothing in `result.json` mentions it, because `result.json` lists what this run wrote.
  * Cleaning the folder, or refusing a non-empty one, is a decision with a blast radius —
  * deleting somebody's files — and it is not this card's to take.
