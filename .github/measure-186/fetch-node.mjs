@@ -31,7 +31,10 @@ const work = mkdtempSync(path.join(tmpdir(), 'node-'));
 const file = path.join(work, `${stem}.${extension}`);
 writeFileSync(file, archive);
 // bsdtar on the Windows runner reads zip as well as tar.
-execFileSync('tar', ['-xf', file, '-C', work], { stdio: 'inherit' });
+// Windows' own bsdtar reads zip; the GNU tar Git Bash puts first on PATH does not.
+const tar =
+  process.platform === 'win32' ? path.join(process.env.SystemRoot, 'System32', 'tar.exe') : 'tar';
+execFileSync(tar, ['-xf', file, '-C', work], { stdio: 'inherit' });
 
 const binary =
   platform === 'win' ? path.join(work, stem, 'node.exe') : path.join(work, stem, 'bin', 'node');

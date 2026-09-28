@@ -50,7 +50,8 @@ jobs:
           chmod +x ./*.AppImage
           ./*.AppImage --appimage-extract > /dev/null
           ls -la squashfs-root/resources/node
-          squashfs-root/resources/node/node ../.github/measure-186/probe.mjs | head -4
+          squashfs-root/resources/node/node ../.github/measure-186/probe.mjs > appimage-probe.txt
+          head -12 appimage-probe.txt
       - name: Signatures on Windows
         if: runner.os == 'Windows'
         shell: pwsh
@@ -67,5 +68,7 @@ jobs:
           app=$(ls -d release-node/mac*/Tyto.app)
           echo "--- codesign of the bundled node"; codesign -dv --verbose=2 "$app/Contents/Resources/node/node" 2>&1 || true
           echo "--- codesign of the app"; codesign -dv --verbose=2 "$app" 2>&1 || true
+          base=$(ls -d release-base/mac*/Tyto.app)
+          echo "--- baseline: deep verify of the app built without Node"; codesign --verify --deep --strict --verbose=2 "$base" 2>&1 || true
           echo "--- deep verify of the app"; codesign --verify --deep --strict --verbose=2 "$app" 2>&1 || true
           echo "--- Gatekeeper assessment"; spctl --assess --type execute --verbose=4 "$app" 2>&1 || true

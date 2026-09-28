@@ -6,7 +6,7 @@
 // child in three ways: spawn, fork with IPC, and a worker whose execArgv asks for the
 // permission model. Each child prints one line per capability it tried.
 import { fork, spawnSync } from 'node:child_process';
-import { copyFileSync, mkdtempSync, mkdirSync, writeFileSync } from 'node:fs';
+import { copyFileSync, mkdtempSync, mkdirSync, realpathSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -83,7 +83,9 @@ if (role === 'child') {
 } else if (role === 'worker') {
   await tryAll((line) => console.log(line));
 } else {
-  const root = mkdtempSync(path.join(tmpdir(), 'tyto-186-'));
+  // The real path: on macOS the temporary folder is under /var, a link to /private/var, and a
+  // grant on the linked path refuses the child its own entry (measured on the first run).
+  const root = realpathSync(mkdtempSync(path.join(tmpdir(), 'tyto-186-')));
   const plugin = path.join(root, 'plugin');
   mkdirSync(plugin);
   mkdirSync(path.join(root, 'outside'));
