@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { artifactEncoding, artifactName } from './artifact.js';
+import { artifactEncoding, artifactName, artworkNumber } from './artifact.js';
 
 /**
  * The output folder is a contract (ADR 0011): Jacurutu reads `out/` and matches files to
@@ -8,32 +8,47 @@ import { artifactEncoding, artifactName } from './artifact.js';
  */
 
 describe('artifactName', () => {
-  it('is <artwork>-<format>.<ext>', () => {
-    expect(artifactName('slide-2', 'story', 'png')).toBe('slide-2-story.png');
+  it('is <format>-<NN>.<ext> (TYTO-197)', () => {
+    expect(artifactName('story', '02', 'png')).toBe('story-02.png');
+    expect(artifactName('grid-1x1', '01', 'svg')).toBe('grid-1x1-01.svg');
   });
 
   it.each([
-    ['a space', 'promo curso', 'promo-curso-feed.png'],
-    ['a slash', 'a/b', 'a-b-feed.png'],
-    ['a backslash', 'a\\b', 'a-b-feed.png'],
-    ['an accent', 'matrícula', 'matr-cula-feed.png'],
-    ['a colon', 'slide:1', 'slide-1-feed.png'],
-  ])('collapses %s, because an artwork id is whatever the author typed', (_label, id, expected) => {
-    expect(artifactName(id, 'feed', 'png')).toBe(expected);
+    ['a space', 'grid quadrado', 'grid-quadrado-01.png'],
+    ['a slash', 'a/b', 'a-b-01.png'],
+    ['a backslash', 'a\\b', 'a-b-01.png'],
+    ['an accent', 'miniatura-vídeo', 'miniatura-v-deo-01.png'],
+    ['a colon', 'grid:4x5', 'grid-4x5-01.png'],
+  ])('collapses %s, because a project names its formats', (_label, format, expected) => {
+    expect(artifactName(format, '01', 'png')).toBe(expected);
   });
 
   it('refuses to produce a hidden file', () => {
-    // `.slide-feed.png` would not show in a folder listing, and an artifact nobody can
+    // `.grid-01.png` would not show in a folder listing, and an artifact nobody can
     // see is an artifact nobody knows was produced.
-    expect(artifactName('.slide', 'feed', 'png')).toBe('slide-feed.png');
+    expect(artifactName('.grid', '01', 'png')).toBe('grid-01.png');
   });
 
-  it('names an id that sanitises away rather than producing "-feed.png"', () => {
-    expect(artifactName('///', 'feed', 'svg')).toBe('untitled-feed.svg');
+  it('names a format that sanitises away rather than producing "-01.png"', () => {
+    expect(artifactName('///', '01', 'svg')).toBe('untitled-01.svg');
   });
 
   it('is stable, because result.json must not change between identical runs', () => {
-    expect(artifactName('slide-1', 'feed', 'png')).toBe(artifactName('slide-1', 'feed', 'png'));
+    expect(artifactName('grid', '01', 'png')).toBe(artifactName('grid', '01', 'png'));
+  });
+});
+
+describe('artworkNumber', () => {
+  it('counts from one, in two digits', () => {
+    expect([0, 1, 11].map((index) => artworkNumber(index, 12))).toEqual(['01', '02', '12']);
+  });
+
+  it('widens every number of a delivery together, once it passes 99', () => {
+    expect([0, 99].map((index) => artworkNumber(index, 100))).toEqual(['001', '100']);
+  });
+
+  it('keeps two digits for a single artwork', () => {
+    expect(artworkNumber(0, 1)).toBe('01');
   });
 });
 

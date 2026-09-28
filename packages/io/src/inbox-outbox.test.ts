@@ -185,11 +185,11 @@ describe('a task folder dropped into the inbox', () => {
 
     // Two slides × one format × two encodings, plus the manifest.
     expect(await outFiles('issue-42')).toEqual([
+      'feed-01.png',
+      'feed-01.svg',
+      'feed-02.png',
+      'feed-02.svg',
       'result.json',
-      'slide-1-feed.png',
-      'slide-1-feed.svg',
-      'slide-2-feed.png',
-      'slide-2-feed.svg',
     ]);
   });
 
@@ -279,14 +279,10 @@ describe('a task that failed', () => {
     // And the two frames that did work are still on disk beside the failure — and now
     // named by the document that is supposed to describe the folder. `artifacts` used to
     // be empty here, which is the state ADR 0025 calls "rendered, with errors".
-    expect(await outFiles('issue-99')).toEqual([
-      'result.json',
-      'slide-1-feed.svg',
-      'slide-2-feed.svg',
-    ]);
+    expect(await outFiles('issue-99')).toEqual(['feed-01.svg', 'feed-02.svg', 'result.json']);
     expect(parsed.value.artifacts.map((artifact) => artifact.name)).toEqual([
-      'slide-1-feed.svg',
-      'slide-2-feed.svg',
+      'feed-01.svg',
+      'feed-02.svg',
     ]);
   });
 });

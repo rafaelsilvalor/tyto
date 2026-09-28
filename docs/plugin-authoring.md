@@ -195,8 +195,8 @@ meu-pack            0.1.0  external  enabled  template-pack
 ```
 $ cp meu-pack/templates/formats.yaml .
 $ tyto render meu-pack/templates/meu-pack/examples/meu-pack.brief --types png,svg --out out
-artwork-1-grid-1x1.png
-artwork-1-grid-1x1.svg
+grid-1x1-01.png
+grid-1x1-01.svg
 ```
 
 The CLI searches the project's `templates/`, then the built-in pack, then installed packs. A name

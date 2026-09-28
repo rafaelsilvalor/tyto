@@ -36,6 +36,7 @@ import {
   type ArtifactSink,
   artifactEncoding,
   artifactName,
+  artworkNumber,
   isRasterFormat,
 } from './artifact.js';
 import { type FrameTarget, type JobListener, notify } from './events.js';
@@ -271,6 +272,8 @@ function messageOf(cause: unknown): string {
 /** Every frame of every artwork, once per requested output, in a deterministic order. */
 interface Task {
   readonly artwork: Artwork;
+  /** The artwork's place in the delivery, as its file names carry it (`01`). */
+  readonly number: string;
   readonly frame: Frame;
   readonly output: OutputRequest;
   readonly target: FrameTarget;
@@ -278,11 +281,13 @@ interface Task {
 
 function plan(scene: Scene, outputs: readonly OutputRequest[]): readonly Task[] {
   const tasks: Task[] = [];
-  for (const artwork of scene.artworks) {
+  for (const [index, artwork] of scene.artworks.entries()) {
+    const number = artworkNumber(index, scene.artworks.length);
     for (const frame of artwork.frames) {
       for (const output of outputs) {
         tasks.push({
           artwork,
+          number,
           frame,
           output,
           target: { artwork: artwork.id, format: frame.format, kind: output.kind },
@@ -597,7 +602,7 @@ export async function runJob(
 
     const encoding = encodingOf(task);
     const artifact: Artifact = {
-      name: artifactName(task.artwork.id, task.frame.format, encoding.extension),
+      name: artifactName(task.frame.format, task.number, encoding.extension),
       artwork: task.artwork.id,
       format: task.frame.format,
       kind: task.output.kind,

@@ -62,7 +62,7 @@ describe('the preview of a markup template', () => {
     const served = await preview.servedHashes();
     const byHand = await renderByHand(target());
 
-    expect([...served.keys()].sort()).toEqual(['artwork-1-grid-1x1.svg', 'artwork-1-story.svg']);
+    expect([...served.keys()].sort()).toEqual(['grid-1x1-01.svg', 'story-01.svg']);
     expect(served).toEqual(byHand);
   });
 

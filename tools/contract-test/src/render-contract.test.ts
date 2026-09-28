@@ -105,9 +105,9 @@ describe('a task folder rendered by the binary', () => {
 
     expect(code, stderr).toBe(EXIT_OK);
     expect([...(await readdir(join(workspace, 'task', 'out')))].sort()).toEqual([
+      'feed-01.svg',
+      'feed-02.svg',
       'result.json',
-      'slide-1-feed.svg',
-      'slide-2-feed.svg',
     ]);
   });
 

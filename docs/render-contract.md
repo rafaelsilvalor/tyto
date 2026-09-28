@@ -16,7 +16,7 @@ writes a folder.
   brief.brief          written by the caller (or by a person)
   assets/              the issue's attachments; paths in the brief resolve against it
   out/                 written by Tyto
-    <artwork>-<format>.png|jpg|webp|svg
+    <format>-<NN>.png|jpg|webp|svg
     result.json
 ```
 

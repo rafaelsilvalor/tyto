@@ -9,7 +9,7 @@ In the Breu suite, **Jacurutu** orchestrates (remote queue → local task → de
   brief.brief          written by Jacurutu (or by a person)
   assets/              issue attachments
   out/                 written by Tyto
-    <artwork>-<format>.png|jpg|webp|svg
+    <format>-<NN>.png|jpg|webp|svg
     result.json        { status: ok|error, artifacts[], diagnostics[], tyto: {version, templates} }
 ```
 
@@ -50,7 +50,7 @@ reads and which nothing here may move. With it, `--out` becomes the parent and T
 
 ```
 <out>/<brief-name>/
-  <artwork>-<format>.png        artwork and nothing else at this level
+  <format>-<NN>.png             artwork and nothing else at this level
   editaveis/
     <brief-name>.brief          the brief that produced the files above
     template.txt                which template made it — a pointer, never a copy

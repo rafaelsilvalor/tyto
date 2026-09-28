@@ -355,10 +355,10 @@ describe('an installed exporter at render', () => {
     );
     if (!result.ok) throw new Error(result.error.join('; '));
     expect(result.value.artifacts.map((artifact) => [artifact.name, artifact.mime])).toEqual([
-      ['slide-1-feed.txt', 'text/plain'],
-      ['slide-2-feed.txt', 'text/plain'],
+      ['feed-01.txt', 'text/plain'],
+      ['feed-02.txt', 'text/plain'],
     ]);
-    expect(await readFile(join(workspace, 'task', 'out', 'slide-1-feed.txt'), 'utf8')).toBe(
+    expect(await readFile(join(workspace, 'task', 'out', 'feed-01.txt'), 'utf8')).toBe(
       'slide-1 feed',
     );
   }, 60_000);
@@ -427,9 +427,7 @@ describe('an installed exporter at render', () => {
       }),
     ]);
     // Tyto's own exporter drew these; the impostor's would have written text.
-    expect(await readFile(join(workspace, 'task', 'out', 'slide-1-feed.svg'), 'utf8')).toMatch(
-      /^<svg/u,
-    );
+    expect(await readFile(join(workspace, 'task', 'out', 'feed-01.svg'), 'utf8')).toMatch(/^<svg/u);
   }, 60_000);
 });
 
@@ -447,8 +445,8 @@ describe('a plugin whose process is killed mid-render', () => {
       await readFile(join(workspace, 'task', 'out', 'result.json'), 'utf8'),
     ) as { artifacts: { name: string }[]; diagnostics: { code: string; message: string }[] };
     expect(result.artifacts.map((artifact) => artifact.name)).toEqual([
-      'slide-1-feed.svg',
-      'slide-2-feed.svg',
+      'feed-01.svg',
+      'feed-02.svg',
     ]);
     expect(new Set(result.diagnostics.map((item) => item.message))).toEqual(
       new Set(["Plugin 'texto' stopped running: its process exited with code 7."]),
@@ -578,7 +576,7 @@ describe('an installed directive at render', () => {
 
     expect(rendered.code, stderr()).toBe(EXIT_OK);
     expect(rendered.diagnostics).toEqual([]);
-    expect(rendered.artifacts).toEqual(['slide-1-feed.svg', 'slide-2-feed.svg']);
+    expect(rendered.artifacts).toEqual(['feed-01.svg', 'feed-02.svg']);
   }, 60_000);
 
   // Starts a plugin's process, which a full `pnpm check` can hold past Vitest's 5 s.
@@ -602,7 +600,7 @@ describe('an installed directive at render', () => {
     expect(rendered.diagnostics.map((item) => [item.code, item.range?.start])).toEqual([
       ['E_UNKNOWN_DIRECTIVE', DIRECTIVE_AT + 2],
     ]);
-    expect(rendered.artifacts).toEqual(['slide-1-feed.svg']);
+    expect(rendered.artifacts).toEqual(['feed-01.svg']);
   });
 
   // Starts a plugin's process, which a full `pnpm check` can hold past Vitest's 5 s.

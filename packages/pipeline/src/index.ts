@@ -17,6 +17,7 @@ export {
   type BuiltInKind,
   artifactEncoding,
   artifactName,
+  artworkNumber,
   isRasterFormat,
 } from './artifact.js';
 

@@ -21,7 +21,7 @@ import cartazMarkup from './__fixtures__/cartaz.html?raw';
  * The shared `cartaz` fixture, spoken in the standard slot vocabulary (docs/slot-vocabulary.md).
  *
  * The fixture predates the vocabulary and still says `cor` and `slide`, and every render test
- * in this package names its output after the repeatable slot (`slide-1-feed.svg`), so renaming
+ * in this package names its output after the repeatable slot (`feed-01.svg`), so renaming
  * it at the source is a change to all of them. Here, where `check` is the subject, a clean
  * folder has to be clean of `W_SLOT_VOCABULARY` too.
  */
@@ -392,9 +392,9 @@ describe('tyto template new', () => {
 
     expect(code, stderr()).toBe(EXIT_OK);
     expect([...(await readdir(join(workspace, 'out')))].sort()).toEqual([
-      'artwork-1-feed.svg',
-      'artwork-1-story.svg',
+      'feed-01.svg',
       'result.json',
+      'story-01.svg',
     ]);
   });
 
