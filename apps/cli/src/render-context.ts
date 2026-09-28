@@ -91,7 +91,7 @@ export interface RenderContext {
    * `W_PLUGIN_SKIPPED` says the plugin was skipped, not only its templates.
    */
   readonly refusedPlugins: ReadonlySet<string>;
-  /** Installed packs whose code templates are built in their plugin's thread (ADR 0048). */
+  /** Installed packs whose code templates are built in their plugin's process (ADR 0048). */
   readonly codePacks: readonly InstalledCodePack[];
 }
 
@@ -143,7 +143,7 @@ export async function loadRenderContext(
   const installed =
     options.installed === undefined
       ? NO_INSTALLED_PACKS
-      : // The CLI runs code templates in their plugin's thread (ADR 0048).
+      : // The CLI runs code templates in their plugin's process (ADR 0048).
         await installedPacks(host, options.installed.plugins, options.installed.folderOf, {
           allowCode: true,
         });
@@ -269,7 +269,7 @@ export function templateWiring(
     markup,
   });
   // In front of both, and only for a name the registry found in an installed code pack: the
-  // one way such a template runs is in its plugin's thread (ADR 0048).
+  // one way such a template runs is in its plugin's process (ADR 0048).
   const source =
     context.codePacks.length === 0
       ? builtIn

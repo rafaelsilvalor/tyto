@@ -3,7 +3,7 @@ import type { GuestMessage, HelloMessage, HostMessage } from './protocol.js';
 /**
  * The ports an isolated plugin's process is reached through (E11.2, ADR 0041).
  *
- * Declared here and implemented in the apps: `worker_threads` in `apps/cli`, and
+ * Declared here and implemented in the apps: a child process in `apps/cli`, and
  * `utilityProcess` in `apps/desktop`. Neither is a type this package may name (ADR 0010),
  * and neither needs to be — the whole protocol is "send a message, hear a message, hear
  * that the other end is gone", which is these few methods.
@@ -44,6 +44,11 @@ export interface PluginProcessRequest {
   readonly name: string;
   /** The absolute path of the module whose `activate` the guest calls. */
   readonly entry: string;
+  /**
+   * The plugin's installed folder: the one place its process may read, where the app
+   * confines it (ADR 0049).
+   */
+  readonly directory: string;
 }
 
 /** What each app implements: a process per plugin, and its end of the channel. */

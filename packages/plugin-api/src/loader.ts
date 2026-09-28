@@ -62,6 +62,12 @@ export interface PluginStore {
   remove(name: string): Promise<void>;
   /** The folder a plugin's files are in, for the host that imports its code. */
   directoryOf(name: string): string;
+  /**
+   * Every link in an installed plugin's folder that leads outside it, or nowhere, as
+   * `E_PLUGIN_LINK`; empty when there is none. Asked before the plugin's process starts,
+   * because the permission model follows a link out of the folder it granted (ADR 0049).
+   */
+  linksLeaving(name: string): Promise<Diagnostics>;
 }
 
 function refused(plugin: string, problem: string): Result<never, Diagnostics> {

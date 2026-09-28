@@ -41,6 +41,7 @@ function launched() {
   )({
     name: 'texto',
     entry: '/home/.tyto/plugins/texto/dist/index.js',
+    directory: '/home/.tyto/plugins/texto',
   });
   return { forks, child, channel };
 }
@@ -62,11 +63,11 @@ describe('a plugin in a utility process', () => {
     const heard: unknown[] = [];
     channel.onMessage((message) => heard.push(message));
 
-    channel.send({ protocol: 1, type: 'activate', plugin: 'texto', config: undefined });
+    channel.send({ protocol: 2, type: 'activate', plugin: 'texto', config: undefined });
     child.emit('message', { type: 'hello', protocol: 1 });
 
     expect(child.sent).toEqual([
-      { protocol: 1, type: 'activate', plugin: 'texto', config: undefined },
+      { protocol: 2, type: 'activate', plugin: 'texto', config: undefined },
     ]);
     expect(heard).toEqual([{ type: 'hello', protocol: 1 }]);
   });

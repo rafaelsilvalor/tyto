@@ -15,6 +15,7 @@ import {
   type GuestMessage,
   RPC_PROTOCOL_VERSION,
   type Registration,
+  type SandboxReport,
   callHandleSchema,
   credentialsArgsSchema,
   describeIssues,
@@ -72,6 +73,13 @@ export interface IsolatedPluginOptions {
   readonly onCrash?: (reason: string) => void;
   /** The network and secrets behind `host.fetch` and `host.credentials`, if this host has any. */
   readonly capabilities?: HostCapabilities;
+  /**
+   * Whether the plugin's process must prove it is confined before its code is imported
+   * (ADR 0049). `true` refuses a guest whose `hello` reports anything but a denied canary,
+   * or none. An app says it explicitly: an app whose runtime cannot confine a process yet
+   * passes `false` and is a crash boundary only, as ADR 0041 describes.
+   */
+  readonly requireSandbox: boolean;
   /** One call's deadline: {@link PLUGIN_CALL_DEADLINE_MS} unless a test needs to wait less. */
   readonly deadlineMs?: number;
   /**
@@ -110,6 +118,30 @@ const NO_LOG: Logger = {
 
 function failure(name: string, problem: string): Diagnostics {
   return [diagnostic('E_PLUGIN_ACTIVATE', { plugin: name, problem })];
+}
+
+/**
+ * Why a guest's report does not prove it is confined, or `undefined` when it does.
+ *
+ * Only `denied` passes. A runtime that accepts the permission flags without enforcing them
+ * is the case this exists for: a worker thread and Electron's `utilityProcess` both did,
+ * measured, and a guest on either reports `readable` (ADR 0049).
+ */
+function unconfined(name: string, sandbox: SandboxReport | undefined): Diagnostics | undefined {
+  if (sandbox?.canary === 'denied') return undefined;
+  const problem =
+    sandbox === undefined
+      ? 'it did not report whether it is confined'
+      : sandbox.canary === 'readable'
+        ? `it could read a file outside its folder: ${sandbox.detail}`
+        : `its check of the confinement did not complete: ${sandbox.detail}`;
+  return [
+    diagnostic('E_PLUGIN_SANDBOX', {
+      plugin: name,
+      runtime: sandbox?.runtime ?? 'an unknown runtime',
+      problem,
+    }),
+  ];
 }
 
 export function connectIsolatedPlugin(
@@ -351,6 +383,14 @@ export function connectIsolatedPlugin(
                 `${String(RPC_PROTOCOL_VERSION)}`,
             ),
           );
+          return;
+        }
+        // Before `activate`, so nothing of the plugin's has been imported when it is refused.
+        const confinement = options.requireSandbox
+          ? unconfined(name, hello.data.sandbox)
+          : undefined;
+        if (confinement !== undefined) {
+          refuse(confinement);
           return;
         }
         greeted = true;

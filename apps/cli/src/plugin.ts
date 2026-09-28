@@ -215,8 +215,9 @@ function fail(problems: Diagnostics, environment: CliEnvironment): ExitCode {
 
 /**
  * The text the person approves. It names every permission, and it says plainly what the
- * worker thread is and is not (ADR 0041): a crash and API boundary, not a sandbox, whose
- * permissions reach only what crosses it (ADR 0042).
+ * plugin's process is and is not (ADR 0049): confined to its own folder by Node's permission
+ * model, and not confined on the network, where `net:` permissions filter `host.fetch` only
+ * (ADR 0042).
  */
 function permissionPrompt(manifest: PluginManifest, source: string): string {
   const permissions =
@@ -227,10 +228,11 @@ function permissionPrompt(manifest: PluginManifest, source: string): string {
     `${manifest.name} ${manifest.version} from ${source}\n` +
     `contributes: ${manifest.contributes.join(', ')}\n` +
     `permissions:\n${permissions}` +
-    'Each plugin runs in a worker thread of its own, so a crash stops the plugin and not\n' +
-    'Tyto. That thread is not a sandbox: the plugin has the same access to this computer\n' +
-    'as Tyto itself. net: permissions filter host.fetch only, and credentials: ones\n' +
-    'host.credentials only; code that goes around them is not stopped.\n' +
+    'Each plugin runs in a process of its own, so a crash stops the plugin and not Tyto.\n' +
+    "Node's permission model confines that process to the plugin's own folder: it cannot\n" +
+    'read your other files, write anywhere, or start programs. It is not confined on the\n' +
+    'network: net: permissions filter host.fetch only, and a plugin that opens its own\n' +
+    'connection is not stopped. credentials: permissions filter host.credentials.\n' +
     fontNotice(manifest.permissions)
   );
 }
@@ -238,7 +240,7 @@ function permissionPrompt(manifest: PluginManifest, source: string): string {
 /**
  * `font:<family>` in words, only for a plugin that asks for one (ADR 0048): approving it sends
  * the file of a face installed on this computer, which can be licensed to the person and not
- * to the plugin's author, into the plugin's thread.
+ * to the plugin's author, into the plugin's process.
  */
 function fontNotice(permissions: readonly string[]): string {
   const families = permissions

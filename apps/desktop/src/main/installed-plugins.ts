@@ -99,6 +99,10 @@ export function startDesktopPlugins(options: DesktopPluginsOptions): Promise<Loa
   return startInstalledPlugins(store, {
     launch: options.launch,
     capabilities: options.capabilities,
+    // Not yet: a `utilityProcess` accepts `--permission` and does not enforce it, measured, so
+    // the desktop is a crash boundary only until it starts plugins on a bundled Node
+    // (ADR 0049, the second TYTO-186 pull request).
+    requireSandbox: false,
     entryOf: async (folder) => {
       const path = join(store.directoryOf(folder), PLUGIN_ENTRY);
       try {

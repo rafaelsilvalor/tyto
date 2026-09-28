@@ -182,7 +182,7 @@ export async function watchCommand(
     }
   } finally {
     await rasterizer?.close?.();
-    // Every plugin's worker thread, and any crash still being written to plugins.json.
+    // Every plugin's process, and any crash still being written to plugins.json.
     await plugins.close();
   }
 

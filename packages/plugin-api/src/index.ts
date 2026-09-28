@@ -92,6 +92,7 @@ export {
   type HelloMessage,
   type HostMessage,
   RPC_PROTOCOL_VERSION,
+  type SandboxReport,
 } from './isolation/protocol.js';
 
 export { type GuestFaces, type ShippedFace, guestFaces } from './isolation/faces.js';

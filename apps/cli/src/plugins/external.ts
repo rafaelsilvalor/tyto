@@ -16,16 +16,16 @@ import {
   startInstalledPlugins,
 } from '@tyto/plugin-api';
 
-import { launchPluginWorker } from './worker-channel.js';
+import { launchPluginProcess } from './plugin-process.js';
 
 /**
  * Installed plugins, from `~/.tyto` into a host (E11.1, `docs/plugin-api.md` Lifecycle).
  *
  * The rules are `@tyto/plugin-api`'s (`installed.ts`), shared with the desktop; what this
- * module adds is the CLI's composition: the store on `<home>`, a worker thread per plugin
- * (ADR 0041), and a file check for `dist/index.js`. A thread is a crash and API boundary,
- * **not a sandbox**: the plugin's code runs on the same Node with the same access to this
- * computer (TYTO-186).
+ * module adds is the CLI's composition: the store on `<home>`, a child process per plugin
+ * under Node's permission model, and a file check for `dist/index.js`. The CLI requires the
+ * sandbox: a plugin whose process cannot prove it is confined to its folder is refused before
+ * its code is imported (ADR 0049).
  */
 
 /** Where the code of an installed plugin is, relative to its folder (`docs/plugin-api.md`). */
@@ -37,7 +37,7 @@ export function readInstalledPlugins(home: string): Promise<InstalledPlugins> {
 }
 
 export interface LoadOptions {
-  /** How a plugin's process is started. A worker thread, unless a test says otherwise. */
+  /** How a plugin's process is started. A confined child process, unless a test says otherwise. */
   readonly launch?: PluginProcessLauncher;
   /** What `host.fetch` and `host.credentials` reach, once a plugin's permissions allow it. */
   readonly capabilities?: HostCapabilities;
@@ -51,7 +51,8 @@ export async function loadInstalledPlugins(
   if (home === undefined) return NO_PLUGINS;
   const store = fsPluginStore(home);
   return startInstalledPlugins(store, {
-    launch: options.launch ?? launchPluginWorker,
+    launch: options.launch ?? launchPluginProcess,
+    requireSandbox: true,
     entryOf: async (folder) => {
       const path = join(store.directoryOf(folder), PLUGIN_ENTRY);
       try {
