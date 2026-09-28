@@ -9,6 +9,7 @@ import {
 } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { tmpdir } from 'node:os';
+import { execFileSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 
 import { PLUGIN_API_VERSION } from '@tyto/plugin-api';
@@ -18,12 +19,14 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { closeApp } from './close-app.js';
 
 /**
- * Installed plugins in a running app, each in a `utilityProcess` of its own (TYTO-48).
+ * Installed plugins in a running app, each in a process of its own on the bundled Node, under
+ * its permission model (TYTO-48, TYTO-186).
  *
  * **What only a running app can say.** The unit suites activate plugins in process with a fake
- * channel; this one starts real utility processes from the built `plugin-guest.js` and walks
- * the doors a person uses — the kinds the dialog offers, an export, the queue, and the plugins
- * screen after a plugin's process has died.
+ * channel; this one starts real processes from the built `out/guest/plugin-guest.js` on
+ * `out/node/` and walks the doors a person uses — the kinds the dialog offers, an export, the
+ * queue, the plugins screen after a plugin's process has died, and what the runtime refuses a
+ * plugin that reaches outside its folder.
  *
  * `TYTO_HOME` is a folder this suite writes and `--user-data-dir` keeps settings out of the
  * real ones (TYTO-150), so nothing here touches the machine's own `~/.tyto`.
@@ -39,6 +42,18 @@ if (!existsSync(built)) {
 }
 
 const BRIEF = ['---', 'template: promo-curso', '---', '::titulo Do plugin'].join('\n');
+
+/** The pin this app's Node is fetched from (`scripts/fetch-node.ts`, ADR 0050). */
+const PINNED = (
+  JSON.parse(readFileSync(join(here, '..', 'bundled-node.json'), 'utf8')) as { version: string }
+).version;
+const BUNDLED_NODE = join(
+  here,
+  '..',
+  'out',
+  'node',
+  process.platform === 'win32' ? 'node.exe' : 'node',
+);
 
 let scratch: string;
 let home: string;
@@ -86,10 +101,20 @@ function writeHome(): void {
   install('vetor', 'svg', 'svg', `return { ok: true, value: '<svg/>', diagnostics: [] };`);
   // Ends its own process the first time it is asked for a frame.
   install('quebra', 'quebra', 'boom', 'process.exit(3);');
+  // Tries to read a file beside the plugins folder, and says which Node it ran on.
+  const secret = join(scratch, 'secret.txt');
+  writeFileSync(secret, "not the plugin's");
+  install(
+    'espia',
+    'espia',
+    'spy',
+    `return import('node:fs').then((fs) => { try { fs.readFileSync(${JSON.stringify(secret)}); return 'read'; } catch (cause) { return cause.code; } })` +
+      `.then((code) => ({ ok: true, value: [process.version, process.execPath, code].join('|'), diagnostics: [] }));`,
+  );
   const entry = { enabled: true, permissions: [], source: '.' };
   writeFileSync(
     join(home, 'plugins.json'),
-    JSON.stringify({ plugins: { texto: entry, vetor: entry, quebra: entry } }),
+    JSON.stringify({ plugins: { texto: entry, vetor: entry, quebra: entry, espia: entry } }),
   );
 }
 
@@ -213,4 +238,31 @@ describe('installed plugins in the window', () => {
     expect(plugins.find((row) => row.name === 'quebra')?.status).toBe('crashed');
     expect(plugins.find((row) => row.name === 'texto')?.status).toBe('enabled');
   }, 120_000);
+});
+
+describe('the Node installed plugins run on (ADR 0050)', () => {
+  it('is pinned to exactly the Node this Electron embeds, and the binary is that version', async () => {
+    // The drift test. Dependabot bumps Electron and never sees `bundled-node.json`; a bump
+    // whose Node differs from the pin turns this red until the pin is moved with it.
+    const embedded = await app.evaluate(() => process.versions.node);
+    expect(PINNED).toBe(embedded);
+    expect(execFileSync(BUNDLED_NODE, ['--version'], { encoding: 'utf8' }).trim()).toBe(
+      `v${PINNED}`,
+    );
+  });
+
+  it('confines a plugin to its own folder: a read outside it is refused by the runtime', async () => {
+    const out = join(scratch, 'export-spy');
+    const progress = await exported('spy', out);
+    expect(progress.failure).toBeUndefined();
+    const [file] = readdirSync(out).filter((name) => name.endsWith('.spy'));
+    const [version, execPath, code] = readFileSync(join(out, file!), 'utf8').split('|');
+
+    expect(version).toBe(`v${PINNED}`);
+    expect(execPath).toBe(BUNDLED_NODE);
+    expect(code).toBe('ERR_ACCESS_DENIED');
+    process.stdout.write(
+      `[TYTO-186] window guest on bundled node ${String(version)}: read outside grant → ${String(code)}\n`,
+    );
+  }, 90_000);
 });

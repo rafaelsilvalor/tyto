@@ -21,7 +21,7 @@ import type { IpcResponse } from '../../shared/ipc.js';
  * `checkStoredPlugin` — manifest, engine, approval — and none of its code is imported:
  * listing must not be the thing that runs a plugin. The desktop does not activate installed
  * plugins at all yet; that is the desktop half of TYTO-48, where activation happens in a
- * `utilityProcess` and never in main.
+ * process of its own, on the bundled Node since TYTO-186, and never in main.
  */
 
 export type PluginRow = IpcResponse<'plugins:list'>['plugins'][number];

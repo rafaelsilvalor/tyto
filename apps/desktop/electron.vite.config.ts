@@ -69,7 +69,8 @@ export default defineConfig({
         // which Electron can only be given as a file of its own (ADR 0044).
         input: {
           index: resolve(import.meta.dirname, 'src/main/index.ts'),
-          'plugin-guest': resolve(import.meta.dirname, 'src/main/plugin-guest.ts'),
+          // The plugin bootstrap is not here: it has to be one file with nothing shared, and
+          // `vite.guest.config.ts` builds it on its own (ADR 0050).
         },
       },
     },

@@ -38,6 +38,8 @@ const NODE_PACKAGES = [
   // twice is what makes ADR 0001's `nodeIntegration: false` a rule rather than a habit.
   'apps/desktop/src/main',
   'apps/desktop/src/preload',
+  // The build step that fetches the Node bundled with the app (ADR 0050).
+  'apps/desktop/scripts',
   'tools',
 ];
 
@@ -248,6 +250,18 @@ export default tseslint.config(
      */
     name: 'boundary/cli-plugin-fetch',
     files: ['apps/cli/src/plugins/capabilities.ts'],
+    rules: { 'no-restricted-globals': 'off' },
+  },
+
+  {
+    /**
+     * The desktop's build step that downloads Node's official archive from nodejs.org, for the
+     * Node the app carries (ADR 0050). A build tool, not the app: it never ships, it reaches one
+     * host, and it checks the archive against the sha256 `bundled-node.json` pins before
+     * anything is extracted. Scoped to the file for the reason the rule above is.
+     */
+    name: 'boundary/desktop-fetch-node',
+    files: ['apps/desktop/scripts/fetch-node.ts'],
     rules: { 'no-restricted-globals': 'off' },
   },
 

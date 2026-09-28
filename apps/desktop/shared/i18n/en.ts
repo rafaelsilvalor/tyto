@@ -164,7 +164,7 @@ export const en: Catalogue = {
   'command.plugins.show': 'Show plugins',
   'plugins.heading': 'Plugins',
   'plugins.notice':
-    'Each installed plugin runs in a process of its own, which keeps a crash from taking Tyto down but is not a sandbox: a plugin has the same access to this computer as Tyto itself. The net: and credentials: permissions filter only what a plugin asks of Tyto — host.fetch and host.credentials — and a plugin that goes around them is not stopped.',
+    'Each installed plugin runs in a process of its own, so a crash stops the plugin and not Tyto. Node’s permission model confines that process to the plugin’s own folder: it cannot read your other files, write anywhere or start programs. It is not confined on the network: net: permissions filter only what a plugin asks of Tyto through host.fetch, and a plugin that opens its own connection is not stopped. credentials: permissions filter host.credentials.',
   'plugins.inactive':
     'Enabled plugins are started when the window opens; one installed while it is open is started the next time.',
   'plugins.folder': 'Installed plugins live in',

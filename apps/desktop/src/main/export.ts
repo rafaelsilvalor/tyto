@@ -155,7 +155,7 @@ export interface ExportServiceOptions {
    */
   readonly log?: Logger;
   /**
-   * The installed plugins, started once for the app's life, each in a `utilityProcess` of
+   * The installed plugins, started once for the app's life, each in a process of
    * its own (ADR 0044). Activated into every run's host **after** the built-ins, so the
    * export dialog and the queue — which renders through {@link ExportService.run} — both
    * reach them. Absent: no installed plugins.

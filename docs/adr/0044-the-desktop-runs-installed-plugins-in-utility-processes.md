@@ -6,10 +6,9 @@ which measured that a `utilityProcess` does not enforce Node's permission model
 ## Amended by ADR 0049
 
 A `utilityProcess` accepts `--permission` in `execArgv` and does not enforce it: the process
-reads any file, opens sockets and spawns children, measured on Electron 44.4.1. So the desktop
-host does not require the sandbox yet (`requireSandbox: false`) and is a crash boundary only.
-The second TYTO-186 pull request moves each plugin off `utilityProcess` onto a Node 24 binary
-bundled with the app, under the same model as the CLI.
+reads any file, opens sockets and spawns children, measured on Electron 44.4.1. Since ADR 0050,
+each plugin runs on a Node 24 binary the app carries, pinned to the Node its Electron embeds,
+under the same model as the CLI, and the desktop's host requires the sandbox.
 
 ## Context
 

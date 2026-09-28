@@ -20,7 +20,7 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { closeApp } from './close-app.js';
 
 /**
- * Installed code templates in a running app, built in their plugin's `utilityProcess`
+ * Installed code templates in a running app, built in their plugin's own process
  * (TYTO-189, ADR 0048).
  *
  * Two plugins, installed by the built CLI into this suite's own `TYTO_HOME`:
@@ -28,7 +28,7 @@ import { closeApp } from './close-app.js';
  * - `agenda-plugin` is `agenda-semana`, bundled with every import inlined the way an author
  *   bundles one. Its preview and its export are compared with the in-repo template's, byte
  *   for byte, in the same window.
- * - `cartaz` is a template whose frame says where it was built: a rect 777 wide in a utility
+ * - `cartaz` is a template whose frame says where it was built: a rect 777 wide off Electron
  *   process, 111 anywhere else. It is the in-process path made observable.
  *
  * `--user-data-dir` keeps the window's settings out of the real ones, and `closeApp` answers
@@ -147,7 +147,7 @@ function cartazPlugin(): string {
       size: context.size,
       children: [{
         id: context.idPrefix + '.onde', kind: 'rect',
-        size: { w: process.type === 'utility' ? 777 : 111, h: 10 }, radius: [0, 0, 0, 0],
+        size: { w: process.versions.electron === undefined ? 777 : 111, h: 10 }, radius: [0, 0, 0, 0],
         fill: { kind: 'solid', color: { r: 255, g: 89, b: 0, a: 1 } },
         transform: { x: 0, y: 0, rotation: 0, scaleX: 1, scaleY: 1, anchor: { x: 0, y: 0 } },
         opacity: 1, blend: 'normal', visible: true, clip: false, effects: [],
@@ -246,7 +246,7 @@ afterAll(async () => {
 });
 
 describe('an installed code template in the window', () => {
-  it("is built in its plugin's utility process, never in Tyto's", async () => {
+  it("is built in its plugin's process on the bundled Node, never in Tyto's", async () => {
     const answer = await preview(CARTAZ_BRIEF);
 
     expect(answer.diagnostics).toEqual([]);

@@ -13,7 +13,7 @@ import { closeApp } from './close-app.js';
  * A plugin directive in the window (TYTO-49, ADR 0043).
  *
  * `::demo/shout {slot: titulo} Direito` with the plugin installed: the preview resolves it
- * in the plugin's own `utilityProcess`, the gutter stays clean, and `demo/shout` is offered
+ * in the plugin's own process, the gutter stays clean, and `demo/shout` is offered
  * after `::`. Without the plugin the same brief is `E_UNKNOWN_DIRECTIVE`, underlined on
  * `demo/shout`. Two launches, because whether a plugin is installed is read when the window
  * opens (ADR 0044).
