@@ -140,8 +140,7 @@ export const diagnosticCodes = {
   E_ASSET_NOT_FOUND: {
     severity: 'error',
     summary: 'An asset path in the brief does not resolve to a file.',
-    template:
-      "Asset '{path}' was not found relative to the brief at '{base}', nor in its assets/ folder.",
+    template: "Asset '{path}' was not found in {searched}.",
     spec: 'docs/brief-language.md',
     fatal: false,
     fatality:

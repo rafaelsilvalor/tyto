@@ -14,6 +14,7 @@ import {
   fileResources,
   fsDeliveryOutput,
   fsTaskOutput,
+  recordingAssetResolver,
   renderResult,
 } from '@tyto/io';
 import { type OutputRequest, fontSubstitutionWarnings, runJob } from '@tyto/pipeline';
@@ -174,6 +175,14 @@ export async function renderTask(
 
   const registered = host.registry.rasterizers<Rasterizer>()[0]?.value;
 
+  // Recorded as the brief resolves, so a `--folder` delivery copies into `assets/` exactly
+  // the files the artwork was drawn from (ADR 0057). `--out` never reads the record.
+  const assets = recordingAssetResolver(
+    task.assetsOverride === undefined
+      ? briefAssetResolver({ briefDirectory: task.briefDirectory })
+      : fileAssetResolver({ base: task.assetsOverride }),
+  );
+
   const job = await runJob(
     {
       brief: task.brief,
@@ -185,10 +194,7 @@ export async function renderTask(
     {
       registry: context.registry,
       templates: wiring.source,
-      assets:
-        task.assetsOverride === undefined
-          ? briefAssetResolver({ briefDirectory: task.briefDirectory })
-          : fileAssetResolver({ base: task.assetsOverride }),
+      assets: assets.resolver,
       exporters: host.registry.exporters,
       directives: directiveResolverOf(() => host.registry.directives()),
       formats: context.formats,
@@ -227,7 +233,10 @@ export async function renderTask(
           failed: hasErrors([...inherited, ...produced]),
         });
 
-  const diagnostics = [...inherited, ...pluginWarnings, ...produced, ...leftovers];
+  // Before `result.json`, whose warnings include what it removed from `assets/`.
+  const delivered = delivery === undefined ? [] : await delivery.deliverAssets(assets.delivered());
+
+  const diagnostics = [...inherited, ...pluginWarnings, ...produced, ...leftovers, ...delivered];
   const result = renderResult({
     cancelled: job.ok ? job.value.cancelled : false,
     planned: job.ok ? job.value.planned : 0,

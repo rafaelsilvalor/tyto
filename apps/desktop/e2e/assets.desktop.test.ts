@@ -1,4 +1,4 @@
-import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -200,7 +200,7 @@ describe('a brief opened from a delivery-shaped folder (ADR 0056)', () => {
       timeout: 60_000,
     });
 
-    const result = JSON.parse(readFileSync(join(out, 'result.json'), 'utf8')) as {
+    const result = JSON.parse(readFileSync(join(out, 'editaveis', 'result.json'), 'utf8')) as {
       status: string;
       artifacts: { name: string }[];
       diagnostics: { code: string }[];
@@ -209,5 +209,13 @@ describe('a brief opened from a delivery-shaped folder (ADR 0056)', () => {
     expect(result.status).toBe('ok');
     const svg = readFileSync(join(out, result.artifacts[0]!.name), 'utf8');
     expect(svg).toContain(IN_ASSETS.toString('base64'));
+
+    // The folder picked is the delivery (ADR 0057): the image the brief used in assets/, and
+    // the copied brief naming that copy, so it renders again from editaveis/.
+    expect(readdirSync(join(out, 'assets'))).toEqual(['calendario.png']);
+    expect(readFileSync(join(out, 'assets', 'calendario.png')).equals(IN_ASSETS)).toBe(true);
+    expect(readFileSync(join(out, 'editaveis', 'fallback.brief'), 'utf8')).toContain(
+      'imagem: calendario.png',
+    );
   }, 120_000);
 });

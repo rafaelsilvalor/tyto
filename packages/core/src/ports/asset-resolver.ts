@@ -18,6 +18,16 @@ export interface AssetResolver {
   readonly base: string;
 
   /**
+   * Every folder a reference is looked for in, in order, when there is more than `base`.
+   *
+   * `E_ASSET_NOT_FOUND` names these rather than a fixed sentence, so a miss says where it
+   * actually looked: one folder under `tyto render --assets`, the brief's folder and its
+   * `assets/` by default (ADR 0056), and a delivery's `assets/` too for a brief in
+   * `editaveis/` (ADR 0057). Absent, `base` alone was searched.
+   */
+  readonly searched?: readonly string[];
+
+  /**
    * The asset at `reference`, or `undefined` when nothing is there.
    *
    * Absence is a value, not a rejection: a brief pointing at a file that does not exist is

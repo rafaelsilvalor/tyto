@@ -297,6 +297,8 @@ export function createHandlers(dependencies: IpcDependencies): Handlers {
         // The export box writes into a folder the person picked and will send as it is, so
         // what an earlier export left there goes (ADR 0054). The queue does not come here.
         removeLeftovers: true,
+        // And that folder is the delivery: artwork, editaveis/ and assets/ (ADR 0057).
+        delivery: true,
       });
     },
 

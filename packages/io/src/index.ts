@@ -24,9 +24,11 @@ export { isInside } from './contain.js';
 export type { ExportResources } from './export-resources.js';
 
 export {
+  type DeliveredAsset,
   type FileAssetResolverOptions,
   briefAssetResolver,
   fileAssetResolver,
+  recordingAssetResolver,
 } from './file-assets.js';
 
 export { type FileResources, type FileResourcesOptions, fileResources } from './file-resources.js';
