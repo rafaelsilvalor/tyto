@@ -315,6 +315,8 @@ export default tseslint.config(
     files: [
       'packages/templates/templates/**/parts.ts',
       'packages/templates/templates/**/template.ts',
+      // A composition several templates share (TYTO-200), held to the template's rule.
+      'packages/templates/templates/**/compose.ts',
     ],
     rules: {
       'no-magic-numbers': ['error', { ignore: [-1, 0, 1, 2], ignoreArrayIndexes: true }],

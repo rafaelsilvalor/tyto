@@ -98,6 +98,25 @@ const EXAMPLES: readonly Example[] = [
   { template: 'agenda-semana', brief: 'examples/agenda.brief', body: 'code', formats: ['grid'] },
   // The second Saúde template, and the first built only from the kit and the brand (TYTO-185).
   { template: 'aprovados', brief: 'examples/aprovados.brief', body: 'code', formats: ['grid'] },
+  // The weekly mock-exam agenda, one composition in three brands (TYTO-200). EC has no grid.
+  {
+    template: 'simulados-semana-ec',
+    brief: 'examples/simulados.brief',
+    body: 'code',
+    formats: ['story'],
+  },
+  {
+    template: 'simulados-semana-ecj',
+    brief: 'examples/simulados.brief',
+    body: 'code',
+    formats: ['grid', 'story'],
+  },
+  {
+    template: 'simulados-semana-oab',
+    brief: 'examples/simulados.brief',
+    body: 'code',
+    formats: ['grid', 'story'],
+  },
 ];
 
 let formats: Awaited<ReturnType<typeof loadFormats>>;
@@ -215,7 +234,7 @@ describe.each(EXAMPLES.map((example) => [example.template, example] as const))(
       // Never a file beside the template. Bundled — the repository ships one copy in
       // `fonts/` — except the agenda, whose brand face is read from the machine (ADR 0037).
       const expected =
-        name === 'agenda-semana' || name === 'aprovados'
+        name === 'agenda-semana' || name === 'aprovados' || name.startsWith('simulados-semana-')
           ? { family: 'CircularXX', source: 'system' }
           : { family: 'Source Sans 3', source: 'bundled' };
       expect(scene.fonts).toContainEqual(expected);
@@ -522,6 +541,9 @@ describe('the pack as a whole', () => {
       aprovados: 'estrategia-saude',
       'carrossel-lista': 'tyto-demo',
       'promo-curso': 'tyto-demo',
+      'simulados-semana-ec': 'estrategia-concursos',
+      'simulados-semana-ecj': 'estrategia-carreira-juridica',
+      'simulados-semana-oab': 'estrategia-oab',
     });
   });
 
@@ -544,6 +566,9 @@ describe('the pack as a whole', () => {
       aprovados: ['carrossel'],
       'carrossel-lista': ['carrossel', 'stories'],
       'promo-curso': ['grid', 'story'],
+      'simulados-semana-ec': ['stories'],
+      'simulados-semana-ecj': ['carrossel', 'stories'],
+      'simulados-semana-oab': ['carrossel', 'stories'],
     });
   });
 
@@ -556,7 +581,15 @@ describe('the pack as a whole', () => {
         .list()
         .map((entry) => entry.name)
         .sort(),
-    ).toEqual(['agenda-semana', 'aprovados', 'carrossel-lista', 'promo-curso']);
+    ).toEqual([
+      'agenda-semana',
+      'aprovados',
+      'carrossel-lista',
+      'promo-curso',
+      'simulados-semana-ec',
+      'simulados-semana-ecj',
+      'simulados-semana-oab',
+    ]);
     // A manifest that does not parse becomes a failure rather than an exception, so an
     // empty list and a broken pack look alike unless this is checked.
     expect(registry.value.failures).toEqual([]);

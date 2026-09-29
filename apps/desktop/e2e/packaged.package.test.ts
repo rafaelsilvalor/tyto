@@ -282,6 +282,9 @@ describe('the packaged app', () => {
       'aprovados',
       'carrossel-lista',
       'promo-curso',
+      'simulados-semana-ec',
+      'simulados-semana-ecj',
+      'simulados-semana-oab',
     ]);
   });
 

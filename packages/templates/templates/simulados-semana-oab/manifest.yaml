@@ -1,0 +1,16 @@
+name: simulados-semana-oab
+version: 1.0.0
+brand: estrategia-oab
+description: Estratégia OAB's mock exams of the week as a carousel and as stories — the title, then each day's schedule and its exams; the last grid asks for a comment.
+formats: [grid, story]
+slots:
+  # The title, drawn on every slide. A line break in the brief is a line break on the slide.
+  titulo: { type: rich-text, required: true, max: 60 }
+  # One slide each, cut by hand. Inside it, `Domingo 26/10 | Aplicação às 08h30 & correção
+  # às 14h` starts a day — the day, then its schedule on the accent band — and every line
+  # with no `|` under it is one of that day's mock exams. `max` counts slides here.
+  # The words in the last grid's call to comment. Optional: without it the grid says
+  # "Escreva SIMULADO nos comentários para acessar". The default is in the code, since a
+  # manifest default only applies to an enum slot.
+  chamada: { type: rich-text, max: 60 }
+  lamina: { type: rich-text, repeat: true, min: 1, max: 12 }

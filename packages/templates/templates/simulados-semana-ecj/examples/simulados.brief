@@ -1,0 +1,28 @@
+---
+template: simulados-semana-ecj
+formats: [grid, story]
+---
+// The maintainer's ECJ reference of 2026-09-28, as two slides so the carousel has a last
+// grid: the call to comment is drawn on the second grid and on no story.
+//
+// Inside a `::lamina`, a line with one `|` starts a day — the day, then its schedule — and
+// every line with none under it is one of that day's mock exams. The counts differ on
+// purpose: two days of two and one exams, then one of one.
+//
+// One slide feeds both formats, so it has to fit the grid, the shorter of the two: three
+// exams in two days is about what a grid holds. A slide that does not fit runs off the
+// bottom of the grid with no warning — a template cannot report one yet.
+
+::titulo
+  Agenda de Simulados
+
+::lamina
+  Domingo 26/10 | Aplicação às 08h30 & correção às 14h
+  1º Simulado Delegado (Regular) - Matérias Principais
+  1º Simulado TJ SP - Pós-edital (Juiz)
+  Sábado 01/11 | Aplicação às 08h30 & correção às 14h
+  1º Simulado Defensoria SP - Pré-edital
+
+::lamina
+  Domingo 02/11 | Aplicação às 08h30 & correção às 14h
+  1º Simulado Promotor MP RJ - Pós-edital

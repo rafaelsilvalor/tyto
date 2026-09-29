@@ -12,6 +12,10 @@ yours, and without a convention each template invents its own and shares nothing
 ## The folder
 
 ```
+_estrategia/        the house: what several of its brands share (ADR 0055)
+  marks.ts          the owl and the speech balloon, in no colour
+  brands.ts         what sets each brand apart — an accent, a sign-off
+  compose.ts        one piece's composition, for every brand that publishes it
 _estrategia-saude/  a brand: no manifest, so the registry skips it (ADR 0047)
   tokens.ts         colours, type scale, spacing, marks — the brand's spec sheet
   presets.ts        the kit's components in this brand's look
@@ -141,6 +145,14 @@ decision ADR 0022 took stands for markup and is untouched.
 `template.ts` says what goes where, in what order, and nothing else. It opens with a map of the
 artwork, top to bottom, naming the piece that draws each band, so a reviewer reads the map and
 the `frame({ children })` line and knows the slide.
+
+### One piece, several brands
+
+When brands publish the same piece and differ only in colour or sign-off — the weekly mock-exam
+agenda for Concursos, Carreira Jurídica and OAB (TYTO-200) — each brand still gets **its own
+template**, so its manifest says its `brand` and its `formats`. The composition is written once,
+in the house's `compose.ts`, as a function of a `Brand`; each `template.ts` is that function
+applied to its brand, one line. What varies by brand is an argument, never a copy (ADR 0055).
 
 ## Names
 

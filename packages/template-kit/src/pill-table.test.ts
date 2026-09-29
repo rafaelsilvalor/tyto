@@ -190,6 +190,58 @@ describe('groups', () => {
   });
 });
 
+describe('caption', () => {
+  const single: LinesColumn = {
+    ...lines,
+    lines: [{ name: 'title', style: STYLE, minHeight: 30 }],
+  };
+  const CAPTIONED: PillTableStyle = {
+    ...GROUPED,
+    columns: [single],
+    groups: {
+      ...GROUPED.groups!,
+      caption: {
+        name: 'caption',
+        height: 36,
+        shape: { fill: '#c37d2c', radius: [4, 4, 0, 0] },
+        text: { name: 'schedule', style: STYLE },
+        padding: { left: 12, right: 12 },
+        gap: 2,
+      },
+    },
+  };
+
+  it('draws the heading line’s second field on a band between the heading and its rows', () => {
+    const table = draw(CAPTIONED, 'Domingo | às 8h\nSimulado A\nSimulado B');
+
+    expect(named(table.draft, 'heading')).toHaveLength(1);
+    expect(named(table.draft, 'caption')).toHaveLength(1);
+    expect(named(table.draft, 'schedule')).toHaveLength(1);
+    expect(named(table.draft, 'row')).toHaveLength(2);
+  });
+
+  it('adds the band and its gap to the group’s height', () => {
+    const table = draw(CAPTIONED, 'Domingo | às 8h\nSimulado A');
+
+    // 40 heading + 8 + 36 band + 2 + 50 row (the minimum beats 30 + 20 of padding).
+    expect(table.height).toBe(40 + 8 + 36 + 2 + 50);
+  });
+
+  it('shapes the band with the corners the style gives it, as wide as the rows', () => {
+    const table = draw(CAPTIONED, 'Domingo | às 8h\nSimulado A');
+    const band = childrenOf(named(table.draft, 'caption')[0])[0];
+
+    expect(band).toMatchObject({ kind: 'rect', size: { w: WIDTH, h: 36 }, radius: [4, 4, 0, 0] });
+  });
+
+  it('draws no band over rows written before any heading', () => {
+    const table = draw(CAPTIONED, 'Simulado solto');
+
+    expect(named(table.draft, 'caption')).toEqual([]);
+    expect(named(table.draft, 'row')).toHaveLength(1);
+  });
+});
+
 describe('rewrite', () => {
   const suffixed: PillTableStyle = {
     ...BASE,
