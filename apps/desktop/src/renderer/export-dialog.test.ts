@@ -184,6 +184,27 @@ describe('the export dialog', () => {
 
     expect(element.querySelector('.export__failure')?.textContent).toContain('ENOSPC');
   });
+
+  it('lists what it removed from the folder, and no other warning', async () => {
+    // ADR 0054's "with a warning": the person is about to send this folder, so a file taken
+    // out of it is said here even though the run finished cleanly.
+    const element = dialog();
+    element.progress = progress({
+      status: 'finished',
+      done: 4,
+      diagnostics: [
+        { severity: 'warning', code: 'W_LEFTOVER_REMOVED', message: "Removed 'grid-03.png'" },
+        { severity: 'warning', code: 'W_FONT_SUBSTITUTED', message: 'a font was substituted' },
+      ],
+    });
+    await element.updateComplete;
+
+    const listed = element.querySelector('[data-testid="export-leftovers"]')?.textContent ?? '';
+    expect(listed).toContain('Na pasta, da exportação anterior:');
+    expect(listed).toContain("Removed 'grid-03.png'");
+    expect(listed).not.toContain('substituted');
+    expect(element.querySelector('.export__problems')).toBeNull();
+  });
 });
 
 /**

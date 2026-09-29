@@ -129,6 +129,7 @@ export const ptBR: Catalogue = {
   'export.cancelled': 'Exportação cancelada',
   'export.failed': 'A exportação falhou',
   'export.problems': 'Concluída com problemas',
+  'export.leftovers': 'Na pasta, da exportação anterior:',
   'command.file.export': 'Exportar…',
   'command.template.edit': 'Editar template…',
   'command.template.new': 'Novo template…',

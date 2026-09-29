@@ -45,10 +45,13 @@ export {
   type FsDeliveryOutputOptions,
   type FsOutboxOptions,
   type FsTaskOutputOptions,
+  type ReusableTaskOutput,
   fsDeliveryOutput,
   fsOutbox,
   fsTaskOutput,
 } from './fs-outbox.js';
+
+export type { LeftoverRun } from './leftovers.js';
 
 export {
   PLUGIN_CRASHES_FILE,

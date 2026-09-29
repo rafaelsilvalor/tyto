@@ -476,6 +476,9 @@ describe('the language picker', () => {
     'export.cancelled',
     'export.failed',
     'export.problems',
+    // TYTO-127: shown only after an export that found leftovers. `export-dialog.test.ts` reads
+    // it back and `e2e/leftovers.desktop.test.ts` measures the list on screen.
+    'export.leftovers',
     'command.file.export',
     // TYTO-44: the template mode renders its own strings, the export dialog's way, and the two
     // commands that open it are the bar's and the menu's. `template-mode.test.ts` renders the

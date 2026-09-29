@@ -582,6 +582,8 @@ describe('the export handlers (E9.4)', () => {
         label: 'promo',
         assetBase: '/briefs',
         outputs: [{ kind: 'svg' }],
+        // The export box is the one caller that asks for this; the queue does not (ADR 0054).
+        removeLeftovers: true,
       },
     ]);
   });
