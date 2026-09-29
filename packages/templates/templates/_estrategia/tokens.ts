@@ -68,8 +68,11 @@ export const HANDLE_TRACKING = 7;
 
 /* ------------------------------------------------------------------------- spacing -- */
 
-/** The side gutter the chrome stands on, and the least room beside the middle. */
-export const MARGIN = 80;
+/**
+ * The side gutter the chrome stands on, and the least room beside the middle. The owl and the
+ * sign-off stand on it (the maintainer, 2026-09-29: 112).
+ */
+export const MARGIN = 112;
 
 /** Paper above the owl. */
 export const EDGE = { top: 75 } as const;
@@ -94,8 +97,14 @@ export const TITLE = {
 
 /** The table of days and mock exams. */
 export const TABLE = {
-  /** Every row, band and heading is this wide, whatever the words; a long name wraps. */
+  /**
+   * How wide the rows, bands and headings are: `width` at least, and as wide as the slide's
+   * longest exam needs, up to `maxWidth` — past it the name wraps (the maintainer,
+   * 2026-09-29). Every row of a slide shares the one width. `maxWidth` is the room between
+   * the two 112 gutters, a multiple of 8 as he asked.
+   */
   width: 700,
+  maxWidth: 856,
   /** The day heading's box: one line of it and its leading. */
   heading: 66,
   /** Day heading → its band. */

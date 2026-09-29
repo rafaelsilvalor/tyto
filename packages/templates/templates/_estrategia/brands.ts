@@ -32,5 +32,9 @@ export const EC: Brand = {
   signOff: { kind: 'note', text: 'Clique no link para mais informações' },
 };
 
-/** The grid's call to comment, the same words for every brand that has a grid. */
+/**
+ * The grid's call to comment when the brief writes no `chamada` (the maintainer, 2026-09-29:
+ * a field with a default). The default lives here and not in the manifests, because a
+ * manifest `default` is only applied to an `enum` slot.
+ */
 export const CALL_TO_COMMENT = 'Escreva SIMULADO nos comentários para acessar';

@@ -26,13 +26,17 @@ const style = (size: number, weight: number, color: string): TextStyle => ({
   color,
 });
 
+/** A mock exam's name on its grey row. */
+export const EXAM_STYLE: TextStyle = style(TYPE.exam, BOOK, ROW_INK);
+
 /**
  * The week's mock exams: a day, its schedule on an accent band, one grey row per exam.
  *
  * Written in the brief as `Domingo 26/10 | Aplicação às 08h30 & correção às 14h`, then one
  * line per exam — the heading line carries the band's words, so a line with one separator
  * is a day and a line with none is an exam (`pillTable`'s caption). Every row is the table's
- * width, as the references draw them, and a long name wraps and makes its row taller.
+ * width, as the references draw them; the composition picks that width from the longest name
+ * (`tableWidth` in `compose.ts`), and a name past the maximum wraps and makes its row taller.
  */
 export function examTable(accent: string): PillTableStyle {
   return {
@@ -47,9 +51,7 @@ export function examTable(accent: string): PillTableStyle {
         shape: { fill: ROW, radius: 0 },
         padding: { top: 0, bottom: 0, left: TABLE.padding, right: TABLE.padding },
         lineGap: 0,
-        lines: [
-          { name: 'exam', style: style(TYPE.exam, BOOK, ROW_INK), minHeight: TABLE.row.line },
-        ],
+        lines: [{ name: 'exam', style: EXAM_STYLE, minHeight: TABLE.row.line }],
       },
     ],
     groups: {

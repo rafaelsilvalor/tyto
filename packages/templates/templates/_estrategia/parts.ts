@@ -7,7 +7,7 @@
  */
 
 import { group, rect, run, solid, text } from '@tyto/core/template';
-import { type Block, at, block, mark, naturalWidth } from '@tyto/template-kit';
+import { type Block, at, block, mark, naturalWidth, textBlock } from '@tyto/template-kit';
 
 import { BALLOON, OWL } from './marks.js';
 import { BOLD, CHROME, CTA, FACE, HANDLE_TRACKING, LIGHT, SIGN_OFF_BOX, TYPE } from './tokens.js';
@@ -51,19 +51,20 @@ export function signOff(brand: Brand, width: number): Block {
 /**
  * The call to comment: its words in an outlined pill as wide as they are, then the balloon.
  *
+ * The words are the brief's `chamada` when it wrote one, and the house's line otherwise.
+ *
  * The pill hugs its words, so it is measured; where nothing can measure it takes the width
  * it is offered, which is a guess the exporter's own layout may not agree with.
  */
 export function callToComment(
-  words: string,
+  words: RichText,
   accent: string,
   width: number,
   measure: Measure,
 ): Block {
   const style = { font: FACE, size: TYPE.cta, weight: BOLD, color: accent };
-  const value: RichText = [{ kind: 'text', value: words, range: { start: 0, end: 0 } }];
   const balloonRoom = CTA.balloonGap + CTA.balloon;
-  const natural = naturalWidth(value, style, measure);
+  const natural = naturalWidth(words, style, measure);
   const pill =
     natural === undefined
       ? width - balloonRoom
@@ -82,14 +83,12 @@ export function callToComment(
           radius: CTA.height / 2,
           stroke: { paint: solid(accent), width: CTA.stroke, align: 'inside' },
         }),
-        text({
+        textBlock(words, { w: pill, h: CTA.height }, style, {
           name: 'cta',
-          runs: [run(words, style)],
-          box: { w: pill, h: CTA.height },
           align: 'center',
           valign: 'middle',
           overflow: 'shrink',
-        }),
+        }).draft,
         at(pill + CTA.balloonGap, (CTA.height - glyph.height) / 2, glyph),
       ],
     }),

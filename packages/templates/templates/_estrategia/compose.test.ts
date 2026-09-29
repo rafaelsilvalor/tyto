@@ -1,7 +1,7 @@
 import { measureNothing } from '@tyto/core';
 import { describe, expect, it } from 'vitest';
 
-import { EC, ECJ, OAB } from './brands.js';
+import { CALL_TO_COMMENT, EC, ECJ, OAB } from './brands.js';
 import { simuladosDaSemana } from './compose.js';
 import { SAFETY, TABLE } from './tokens.js';
 
@@ -49,11 +49,19 @@ interface Slide {
   readonly format: keyof typeof SIZE;
   readonly index?: number;
   readonly count?: number;
+  /** The slide's `lamina`; the two-day week when a case does not say. */
+  readonly week?: string;
+  /** The brief's call to comment, when a case writes one. */
+  readonly chamada?: string;
 }
 
 function contextOf(slide: Slide, measure: TemplateContext['measure'] = measureNothing) {
   const index = slide.index ?? 0;
-  const slots = { titulo: rich('Agenda de Simulados'), lamina: rich(WEEK) };
+  const slots = {
+    titulo: rich('Agenda de Simulados'),
+    lamina: rich(slide.week ?? WEEK),
+    ...(slide.chamada === undefined ? {} : { chamada: rich(slide.chamada) }),
+  };
   return {
     format: slide.format,
     size: SIZE[slide.format],
@@ -108,6 +116,18 @@ describe('simulados da semana: pieces per format and slide', () => {
     expect(grids.map((nodes) => named(nodes, 'call-to-comment').length)).toEqual([0, 0, 1]);
   });
 
+  it('says the brief’s chamada in the call to comment, and the house’s line without one', () => {
+    const said = (slide: Slide) => {
+      const [cta] = named(draw(ECJ, slide), 'cta');
+      return cta?.kind === 'text'
+        ? cta.runs.map((run) => (run.kind === 'text' ? run.text : '')).join('')
+        : undefined;
+    };
+
+    expect(said({ format: 'grid', chamada: 'Comente PROVA' })).toBe('Comente PROVA');
+    expect(said({ format: 'grid' })).toBe(CALL_TO_COMMENT);
+  });
+
   it('never asks for a comment on a story, not even the last', () => {
     expect(named(draw(ECJ, { format: 'story' }), 'call-to-comment')).toEqual([]);
   });
@@ -138,6 +158,39 @@ describe('simulados da semana: the three brands', () => {
     expect(named(draw(OAB, { format: 'story' }), 'handle')).toHaveLength(1);
     expect(named(draw(EC, { format: 'story' }), 'handle')).toEqual([]);
     expect(named(draw(EC, { format: 'story' }), 'note')).toHaveLength(1);
+  });
+});
+
+describe('simulados da semana: the table’s width', () => {
+  const bandWidth = (week: string) => {
+    const [band] = named(draw(ECJ, { format: 'story', week }), 'schedule-band');
+    const [shape] = band?.kind === 'group' ? band.children : [];
+    return shape !== undefined && 'size' in shape ? shape.size.w : undefined;
+  };
+  const dayWith = (exam: string) => `Domingo | às 8h
+${exam}`;
+
+  it('keeps its least width when every name fits in it', () => {
+    expect(bandWidth(WEEK)).toBe(TABLE.width);
+  });
+
+  it('grows to the longest name and its padding', () => {
+    // 72 characters at 10 px, and the padding on both ends.
+    expect(bandWidth(dayWith('x'.repeat(72)))).toBe(720 + TABLE.padding * 2);
+  });
+
+  it('stops at the maximum, where the name wraps instead', () => {
+    expect(bandWidth(dayWith('x'.repeat(120)))).toBe(TABLE.maxWidth);
+  });
+
+  it('keeps its least width where nothing can measure', () => {
+    const [band] = named(
+      simuladosDaSemana(ECJ)(contextOf({ format: 'story', week: dayWith('x'.repeat(120)) }))
+        .children,
+      'schedule-band',
+    );
+    const [shape] = band?.kind === 'group' ? band.children : [];
+    expect(shape !== undefined && 'size' in shape ? shape.size.w : undefined).toBe(TABLE.width);
   });
 });
 
