@@ -58,6 +58,8 @@ const RESERVED: Readonly<Record<string, ReservedShape>> = {
   subtitulo: { expected: 'type: rich-text', fits: (slot) => slot.type === 'rich-text' },
   chamada: { expected: 'type: rich-text', fits: (slot) => slot.type === 'rich-text' },
   imagem: { expected: 'type: image', fits: (slot) => slot.type === 'image' },
+  // The seal art glued to the foot of a carousel's last grid (TYTO-201).
+  selo: { expected: 'type: image', fits: (slot) => slot.type === 'image' },
   // The adjustment is what overrides `tom` on one lamina, so it is owed only when there is a
   // lamina to override it on: a one-artwork template with a plain `tom` enum is complete.
   tom: {

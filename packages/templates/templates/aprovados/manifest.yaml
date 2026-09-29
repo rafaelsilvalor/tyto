@@ -1,5 +1,5 @@
 name: aprovados
-version: 4.1.0
+version: 4.2.0
 brand: estrategia-saude
 description: An exam's approved list as a carousel — an emblem and the exam's name on the first slide, and the approved grouped by specialty on every slide.
 formats: [grid]
@@ -17,4 +17,8 @@ slots:
   # its `lamina`. A line with no `|` starts a specialty, and every `rank | name` line under it
   # is one of its approved: `1º | Ana Souza`. The badge draws `1º Lugar`, and the name is set
   # in capitals whatever the brief typed. `max` counts slides here, not characters.
+  # The seal art, 1080 × 140, glued to the foot of the last slide (TYTO-201). Optional; with
+  # it the page above shrinks by 140, so nothing is drawn under the seal. In the frontmatter:
+  # `selo: ./selo.png`.
+  selo: { type: image }
   lamina: { type: rich-text, repeat: true, min: 1, max: 12 }
