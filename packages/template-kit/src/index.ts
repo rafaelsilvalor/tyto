@@ -75,6 +75,7 @@ export {
 export { FIELD_SEPARATOR, type RowGroup, fields, lines, plain, rowGroups } from './rows.js';
 
 export {
+  type CaptionStyle,
   type CellShape,
   type LabelColumn,
   type LinesColumn,

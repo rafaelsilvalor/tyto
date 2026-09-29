@@ -132,10 +132,20 @@ export interface PillTableStyle {
       readonly align?: TextOptions['align'];
       readonly overflow?: TextOptions['overflow'];
     };
-    /** Between a heading and its first row. */
+    /** Between a heading and its first row — or its caption, when there is one. */
     readonly headingGap: number;
     /** Between one group's last row and the next group's heading. */
     readonly gap: number;
+    /**
+     * A band between a heading and its rows, as wide as the rows, holding the heading line's
+     * second field: `Domingo 26/10 | Aplicação às 08h30 & correção às 14h` draws the day as
+     * the heading and the schedule on the band (the weekly mock-exam agenda, TYTO-200).
+     *
+     * **With a caption, a heading is the line with one separator**, and a row the line with
+     * none — which is how a table of one-field rows tells the two apart. Rows of more than
+     * one field and a caption cannot share a table.
+     */
+    readonly caption?: CaptionStyle;
   };
   /** The groups the table draws, so a scene reads back in the preset's words. */
   readonly names: {
@@ -146,6 +156,26 @@ export interface PillTableStyle {
     readonly rows?: string;
     readonly row: string;
   };
+}
+
+/** The band under a group heading: {@link PillTableStyle}'s `groups.caption`. */
+export interface CaptionStyle {
+  readonly name: string;
+  readonly height: number;
+  /** Corners as `[top-left, top-right, bottom-right, bottom-left]`, or one for all four. */
+  readonly shape: {
+    readonly fill: string;
+    readonly radius: number | readonly [number, number, number, number];
+  };
+  readonly text: {
+    readonly name: string;
+    readonly style: TextStyle;
+    readonly align?: TextOptions['align'];
+  };
+  /** Room between the band's ends and its words. */
+  readonly padding: { readonly left: number; readonly right: number };
+  /** Between the band and the first row under it. */
+  readonly gap: number;
 }
 
 export interface PillTableContent {
@@ -169,9 +199,20 @@ interface Placed {
  */
 export function pillTable(style: PillTableStyle, content: PillTableContent): Block {
   const fieldCount = style.columns.reduce((sum, column) => sum + fieldsOf(column), 0);
-  const groups = rowGroups(content.text, fieldCount, style.groups !== undefined);
+  const caption = style.groups?.caption;
+  const groups = rowGroups(
+    content.text,
+    fieldCount,
+    style.groups !== undefined,
+    caption === undefined ? 1 : 2,
+  );
 
-  const drawRows = (rows: RowGroup['rows'], name: string | undefined, gap: number) => {
+  const drawRows = (
+    rows: RowGroup['rows'],
+    name: string | undefined,
+    gap: number,
+    band?: RichText,
+  ) => {
     const width = rowWidth(style, rows, content);
     const placed = placeColumns(style, width);
     const drawn = stack({
@@ -179,7 +220,11 @@ export function pillTable(style: PillTableStyle, content: PillTableContent): Blo
       gap,
       items: rows.map((fields) => drawRow(style, placed, fields, width, content.measure)),
     });
-    return centred(drawn, content.width);
+    if (caption === undefined || band === undefined) return centred(drawn, content.width);
+    return centred(
+      stack({ gap: caption.gap, items: [captionBand(caption, band, width), drawn] }),
+      content.width,
+    );
   };
 
   const grouping = style.groups;
@@ -210,10 +255,48 @@ export function pillTable(style: PillTableStyle, content: PillTableContent): Blo
       return stack({
         ...(style.names.group === undefined ? {} : { name: style.names.group }),
         gap: grouping.headingGap,
-        items: [heading, drawRows(each.rows, style.names.rows, style.rowGap)],
+        items: [
+          heading,
+          drawRows(
+            each.rows,
+            style.names.rows,
+            style.rowGap,
+            // Rows written before any heading have no heading line, so no band either.
+            each.headingRest.length === 0 ? undefined : each.headingRest[0],
+          ),
+        ],
       });
     }),
   });
+}
+
+/** The caption band: its shape the rows' width, its words centred on its height. */
+function captionBand(caption: CaptionStyle, value: RichText, width: number): Block {
+  const words = textBlock(
+    value,
+    { w: width - caption.padding.left - caption.padding.right, h: caption.height },
+    caption.text.style,
+    {
+      name: caption.text.name,
+      valign: 'middle',
+      ...(caption.text.align === undefined ? {} : { align: caption.text.align }),
+    },
+  );
+  return block(
+    width,
+    caption.height,
+    group({
+      name: caption.name,
+      children: [
+        rect({
+          size: { w: width, h: caption.height },
+          radius: caption.shape.radius,
+          fill: solid(caption.shape.fill),
+        }),
+        shift(words.draft, caption.padding.left, 0),
+      ],
+    }),
+  );
 }
 
 /** A block narrower than `width`, centred in it; one exactly `width` wide is itself. */

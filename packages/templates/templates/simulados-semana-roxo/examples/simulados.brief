@@ -1,0 +1,14 @@
+---
+template: simulados-semana-roxo
+formats: [story]
+---
+// The maintainer's ROXO reference of 2026-09-28: a story only, a title on two lines, and the
+// note to the story's link where the other brands sign with their handle.
+
+::titulo
+  Programação da
+  Agenda de Simulados
+
+::lamina
+  Sábado 26/09 | Aplicação às 08h & correção às 14h
+  2º Simulado Especial Receita Federal - Auditor Fiscal - Pré-Edital

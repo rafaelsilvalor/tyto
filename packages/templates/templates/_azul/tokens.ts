@@ -192,33 +192,10 @@ export const COVER = {
 /* ------------------------------------------------------------------------ geometry -- */
 
 /**
- * The owl, from the brand file `Marks/SVG/White.svg` (supplied 2026-09-23).
- *
- * Its six distinct subpaths are joined into one `d`, in the file's order. The file draws the
- * body's lower half three times, invisibly, because the fill is opaque over itself; the two
- * repeats are dropped here, before anybody applies opacity and sees them. The file's white
- * fill is dropped too — geometry in, colour out.
- *
- * `nonzero`, as the file is drawn: the pupils are holes by winding direction, and no two of
- * the joined subpaths overlap, so joining them changes nothing a fill rule decides.
+ * The owl, shared with the other Casa brands since TYTO-200: the geometry is the
+ * house's, not Azul's, and each brand fills it with its own colour.
  */
-export const OWL: Mark = {
-  box: { w: 186.09, h: 376.79 },
-  d:
-    // The right eye, its pupil punched out by winding.
-    'M0,0h1v1h-1ZM0,0h1v1h-1Z' +
-    // The beak.
-    'M0,0h1v1h-1Z' +
-    // The left eye.
-    'M0,0h1v1h-1ZM0,0h1v1h-1Z' +
-    // The left wing.
-    'M0,0h1v1h-1Z' +
-    // The body's lower half, once.
-    'M0,0h1v1h-1Z' +
-    // The head and brow.
-    'M0,0h1v1h-1Z',
-  fillRule: 'nonzero',
-};
+export { OWL } from '../_casa/marks.js';
 
 /**
  * The footer arrow, from the brand file `seta.svg` (supplied 2026-09-23), colour dropped.

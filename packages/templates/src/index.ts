@@ -1,5 +1,8 @@
 import { build as agendaSemana } from '../templates/agenda-semana/template.js';
 import { build as aprovados } from '../templates/aprovados/template.js';
+import { build as simuladosSemanaRoxo } from '../templates/simulados-semana-roxo/template.js';
+import { build as simuladosSemanaOcre } from '../templates/simulados-semana-ocre/template.js';
+import { build as simuladosSemanaVinho } from '../templates/simulados-semana-vinho/template.js';
 
 import type { TemplateBuild } from '@tyto/core';
 
@@ -46,6 +49,9 @@ export const BUILT_IN_TEMPLATE_NAMES: readonly string[] = [
   'aprovados',
   'carrossel-lista',
   'promo-curso',
+  'simulados-semana-ocre',
+  'simulados-semana-roxo',
+  'simulados-semana-vinho',
 ];
 
 /**
@@ -66,4 +72,7 @@ export const BUILT_IN_TEMPLATE_NAMES: readonly string[] = [
 export const BUILT_IN_TEMPLATE_BUILDS: Readonly<Record<string, TemplateBuild>> = {
   'agenda-semana': agendaSemana,
   aprovados,
+  'simulados-semana-roxo': simuladosSemanaRoxo,
+  'simulados-semana-ocre': simuladosSemanaOcre,
+  'simulados-semana-vinho': simuladosSemanaVinho,
 };

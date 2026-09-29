@@ -35,6 +35,12 @@ export const FIELD_SEPARATOR = '|';
 export interface RowGroup {
   /** The heading line, or empty for rows written before any heading. */
   readonly heading: RichText;
+  /**
+   * The heading line's fields after its first, when a heading has more than one — the
+   * schedule a day's caption band draws, say. Empty for a one-field heading and for rows
+   * written before any heading.
+   */
+  readonly headingRest: readonly RichText[];
   /** Each row as its fields, already split and trimmed. */
   readonly rows: readonly (readonly RichText[])[];
 }
@@ -49,18 +55,32 @@ export interface RowGroup {
  * with no heading, separator or not.
  *
  * `fieldCount` caps the split, so the last field keeps any further separators.
+ *
+ * `headingFields` is how many fields a heading line has. One by default: a line with no
+ * separator is a heading. Two when a heading carries a second field, like
+ * `Domingo 26/10 | Aplicação às 08h30`: then a line with exactly one separator is a heading
+ * and a table whose rows have one field tells them apart by that separator. The count is
+ * the test, so it must differ from the rows' own count.
  */
-export function rowGroups(text: RichText, fieldCount: number, grouped: boolean): RowGroup[] {
-  const result: { heading: RichText; rows: RichText[][] }[] = [];
+export function rowGroups(
+  text: RichText,
+  fieldCount: number,
+  grouped: boolean,
+  headingFields = 1,
+): RowGroup[] {
+  const result: { heading: RichText; headingRest: RichText[]; rows: RichText[][] }[] = [];
 
   for (const line of lines(text)) {
     // The heading test reads the uncapped split, so a one-field table still tells a
     // heading from a row by the separator rather than by the cap.
-    if (grouped && fields(line).length === 1) {
-      result.push({ heading: line, rows: [] });
+    if (grouped && fields(line).length === headingFields) {
+      // A one-field heading is the line as written, which is what it has always been.
+      const [heading = [], ...headingRest] =
+        headingFields === 1 ? [line] : fields(line, headingFields);
+      result.push({ heading, headingRest, rows: [] });
       continue;
     }
-    if (result.length === 0) result.push({ heading: [], rows: [] });
+    if (result.length === 0) result.push({ heading: [], headingRest: [], rows: [] });
     result[result.length - 1]!.rows.push(fields(line, fieldCount));
   }
 

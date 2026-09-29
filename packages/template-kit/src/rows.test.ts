@@ -85,6 +85,30 @@ describe('rowGroups', () => {
     ]);
   });
 
+  it('reads a two-field heading when told to, and the one-field lines under it as rows', () => {
+    const groups = rowGroups(
+      rich('Domingo | às 8h\nSimulado A\nSimulado B\nSábado | às 9h\nC'),
+      1,
+      true,
+      2,
+    );
+
+    expect(
+      groups.map((group) => ({
+        heading: plain(group.heading),
+        rest: group.headingRest.map(plain),
+        rows: group.rows.map((row) => row.map(plain)),
+      })),
+    ).toEqual([
+      { heading: 'Domingo', rest: ['às 8h'], rows: [['Simulado A'], ['Simulado B']] },
+      { heading: 'Sábado', rest: ['às 9h'], rows: [['C']] },
+    ]);
+  });
+
+  it('leaves a one-field heading with nothing after it', () => {
+    expect(rowGroups(rich('A\n1 | um'), 2, true)[0]?.headingRest).toEqual([]);
+  });
+
   it('answers no groups for an empty slot', () => {
     expect(rowGroups([], 2, true)).toEqual([]);
   });
