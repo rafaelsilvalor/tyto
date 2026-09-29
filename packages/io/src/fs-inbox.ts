@@ -10,9 +10,10 @@ import type { BriefSource, BriefTask } from './ports.js';
  * though Jacurutu is not running yet: the same layout is the integration-test harness and
  * the thing a person drops a folder into by hand. One shape, three users.
  *
- * `assets/` beside the brief is the asset base, because that is where Jacurutu puts an
- * issue's attachments. A task without one still renders — a brief that references no
- * image needs no folder — and paths then resolve against the task folder itself.
+ * Asset paths resolve the way they do everywhere else (ADR 0056): as written, from the task
+ * folder, then from `assets/` beside the brief — which is where Jacurutu puts an issue's
+ * attachments, so `./logo.png` with the file only in `assets/` keeps working. A task
+ * without `assets/` still renders; a brief that references no image needs no folder.
  */
 
 /** The two names the contract fixes. Changing either breaks Jacurutu, not just a test. */
@@ -30,14 +31,6 @@ export interface FsInboxOptions {
    * success has thrown away the only copy of what went in.
    */
   readonly done?: string;
-}
-
-async function isDirectory(path: string): Promise<boolean> {
-  try {
-    return (await stat(path)).isDirectory();
-  } catch {
-    return false;
-  }
 }
 
 async function isFile(path: string): Promise<boolean> {
@@ -77,11 +70,10 @@ export function fsInbox(options: FsInboxOptions): BriefSource {
         // else entirely; either way picking it up would render nothing and ack it.
         if (!(await isFile(briefPath))) continue;
 
-        const assets = join(directory, ASSETS_DIR);
         tasks.push({
           id,
           brief: await readFile(briefPath, 'utf8'),
-          assetBase: (await isDirectory(assets)) ? assets : directory,
+          briefDirectory: directory,
           briefPath,
         });
       }

@@ -13,6 +13,14 @@ In the Breu suite, **Jacurutu** orchestrates (remote queue → local task → de
     result.json        { status: ok|error, artifacts[], diagnostics[], tyto: {version, templates} }
 ```
 
+**Where an asset path resolves (ADR 0056).** As written, from the brief's folder first; when
+nothing is there, the same path from `assets/` beside the brief. The literal one wins when both
+exist, and each folder refuses a path that climbs out of it. The resolved path differs by folder
+and the hash does not, since it is the bytes'. One resolver in `@tyto/io`
+(`briefAssetResolver`) serves every surface — CLI render, `tyto watch`, the desktop queue,
+preview and export box — so one folder renders the same in all of them. `tyto render --assets
+<dir>` is the only exception: that folder alone, no fallback.
+
 Invocation: `tyto render <task>/brief.brief --out <task>/out` (exit 0 = ok, 1 = error diagnostics, 2 = internal failure). Optional later: Jacurutu imports `@tyto/pipeline` as a library — same contract, no process.
 
 **The contract has its own document**, written for somebody on the other side of it:

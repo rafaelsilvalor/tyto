@@ -382,6 +382,75 @@ describe('tyto render', () => {
 /* --------------------------------------------------------------------------- folder -- */
 
 /**
+ * ADR 0056: the path as written, from the brief's folder, then `assets/` beside it.
+ *
+ * The fixture's `task/` is already the Jacurutu shape — `./logo.png` with the file only in
+ * `assets/` — so the fallback is proved by every render above. These pin the other two
+ * cases, and which bytes are drawn when both files exist.
+ */
+describe('tyto render, where an asset is found', () => {
+  /** Different bytes under the same name: trailing data after IEND, still a valid PNG. */
+  const BESIDE_PNG = Buffer.concat([LOGO_PNG, Buffer.from('beside')]);
+
+  async function svgOf(): Promise<string> {
+    const code = await run(
+      ['render', 'task/brief.brief', '--out', 'task/out', '--types', 'svg'],
+      environment(),
+    );
+    expect(code, stderr()).toBe(EXIT_OK);
+    return readFile(join(workspace, 'task', 'out', 'feed-01.svg'), 'utf8');
+  }
+
+  it('draws ./assets/logo.png as written', async () => {
+    await writeFile(
+      join(workspace, 'task', 'brief.brief'),
+      briefSource.replace('imagem: ./logo.png', 'imagem: ./assets/logo.png'),
+    );
+
+    expect(await svgOf()).toContain(LOGO_PNG.toString('base64'));
+  });
+
+  it('draws an image beside the brief, with no assets/ at all', async () => {
+    await rm(join(workspace, 'task', 'assets'), { recursive: true });
+    await writeFile(join(workspace, 'task', 'logo.png'), LOGO_PNG);
+
+    expect(await svgOf()).toContain(LOGO_PNG.toString('base64'));
+  });
+
+  it('draws the literal one when both exist', async () => {
+    await writeFile(join(workspace, 'task', 'logo.png'), BESIDE_PNG);
+
+    const svg = await svgOf();
+    expect(svg).toContain(BESIDE_PNG.toString('base64'));
+    expect(svg).not.toContain(`base64,${LOGO_PNG.toString('base64')}"`);
+  });
+
+  it('searches only the --assets folder when one is named', async () => {
+    // The person said where the files are, so `assets/` beside the brief is not searched.
+    await mkdir(join(workspace, 'elsewhere'));
+
+    const code = await run(
+      [
+        'render',
+        'task/brief.brief',
+        '--out',
+        'task/out',
+        '--types',
+        'svg',
+        '--assets',
+        join(workspace, 'elsewhere'),
+      ],
+      environment(),
+    );
+
+    expect(code).toBe(EXIT_DIAGNOSTICS);
+    const parsed = parseRenderResult(await resultAt('task', 'out'));
+    if (!parsed.ok) throw new Error(parsed.error.join('; '));
+    expect(parsed.value.diagnostics.some((item) => item.code === 'E_ASSET_NOT_FOUND')).toBe(true);
+  });
+});
+
+/**
  * `--folder`: the delivery layout of TYTO-121.
  *
  * The acceptance criterion is a **shape on disk**, so these read the disk rather than the

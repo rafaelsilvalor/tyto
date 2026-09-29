@@ -580,7 +580,7 @@ describe('the export handlers (E9.4)', () => {
         brief: 'title: edited but not saved',
         directory: '/out',
         label: 'promo',
-        assetBase: '/briefs',
+        briefDirectory: '/briefs',
         outputs: [{ kind: 'svg' }],
         // The export box is the one caller that asks for this; the queue does not (ADR 0054).
         removeLeftovers: true,
@@ -599,13 +599,13 @@ describe('the export handlers (E9.4)', () => {
       outputs: [{ kind: 'svg' }],
     });
 
-    const [request] = deps.exports.started as { label: string; assetBase?: string }[];
+    const [request] = deps.exports.started as { label: string; briefDirectory?: string }[];
 
     expect(request?.label).toBe('untitled');
-    // And no `assetBase` at all, rather than one pointing at the output folder: a brief with
+    // And no `briefDirectory` at all, rather than one pointing at the output folder: a brief with
     // no folder beside it resolves no relative asset, which is what `preview.ts` already
     // decided for the same state.
-    expect(request).not.toHaveProperty('assetBase');
+    expect(request).not.toHaveProperty('briefDirectory');
   });
 
   it('answers nothing for a run it never started', async () => {

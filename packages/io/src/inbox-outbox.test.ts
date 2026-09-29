@@ -10,7 +10,7 @@ import type { Rasterizer } from '@tyto/raster';
 import { markupTemplateSource, runJob } from '@tyto/pipeline';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
-import { fileAssetResolver } from './file-assets.js';
+import { briefAssetResolver } from './file-assets.js';
 import type { ExportResources } from './export-resources.js';
 import { fileResources } from './file-resources.js';
 import { fsInbox } from './fs-inbox.js';
@@ -110,14 +110,14 @@ async function render(
   const registry = loaded.value;
 
   const output = await fsOutbox({ root: join(workspace, 'outbox') }).open(task.id);
-  const resources = fileResources({ base: task.assetBase });
+  const resources = fileResources({ base: task.briefDirectory });
 
   const result = await runJob(
     { brief: task.brief, outputs: [{ kind: 'png' }, { kind: 'svg' }] },
     {
       registry,
       templates: markupTemplateSource(fileSystem, registry),
-      assets: fileAssetResolver({ base: task.assetBase }),
+      assets: briefAssetResolver({ briefDirectory: task.briefDirectory }),
       exporters: exportersOf(resources),
       // The whole of TYTO-62 in one line: the exporters above were registered with
       // resolvers over an empty store, and this is what fills it — after `compile`, with
@@ -171,9 +171,9 @@ describe('a task folder dropped into the inbox', () => {
     expect(tasks).toHaveLength(1);
     expect(tasks[0]?.id).toBe('issue-42');
     expect(tasks[0]?.brief).toContain('template: cartaz');
-    // `assets/` beside the brief is the base, because that is where Jacurutu puts an
-    // issue's attachments.
-    expect(tasks[0]?.assetBase.endsWith('assets')).toBe(true);
+    // The task folder, not `assets/`: paths resolve from the brief first and fall back to
+    // `assets/`, where Jacurutu puts an issue's attachments (ADR 0056).
+    expect(tasks[0]?.briefDirectory.endsWith('issue-42')).toBe(true);
   });
 
   it('becomes an out/ folder with the artifacts and a result.json', async () => {
@@ -236,7 +236,7 @@ describe('a task folder dropped into the inbox', () => {
   });
 
   it('resolves the asset against the task folder and hashes its bytes', async () => {
-    const resolver = fileAssetResolver({ base: join(workspace, 'inbox', 'issue-42', 'assets') });
+    const resolver = briefAssetResolver({ briefDirectory: join(workspace, 'inbox', 'issue-42') });
     const asset = await resolver.resolve('./logo.png');
 
     expect(asset?.id).toBe('./logo.png');
@@ -247,7 +247,7 @@ describe('a task folder dropped into the inbox', () => {
 
   it('refuses an asset that climbs out of the task folder', async () => {
     await writeFile(join(workspace, 'secret.txt'), 'not for embedding');
-    const resolver = fileAssetResolver({ base: join(workspace, 'inbox', 'issue-42', 'assets') });
+    const resolver = briefAssetResolver({ briefDirectory: join(workspace, 'inbox', 'issue-42') });
 
     expect(await resolver.resolve('../../../secret.txt')).toBeUndefined();
   });

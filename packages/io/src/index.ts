@@ -23,7 +23,11 @@ export { isInside } from './contain.js';
 
 export type { ExportResources } from './export-resources.js';
 
-export { type FileAssetResolverOptions, fileAssetResolver } from './file-assets.js';
+export {
+  type FileAssetResolverOptions,
+  briefAssetResolver,
+  fileAssetResolver,
+} from './file-assets.js';
 
 export { type FileResources, type FileResourcesOptions, fileResources } from './file-resources.js';
 

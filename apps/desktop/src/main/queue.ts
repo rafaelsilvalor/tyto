@@ -161,7 +161,7 @@ export function createQueueService(options: QueueOptions): QueueService {
     const progress = await options.render({
       brief: task.brief,
       directory: outOf(root, task.id),
-      assetBase: task.assetBase,
+      briefDirectory: task.briefDirectory,
       label: task.id,
       outputs: QUEUE_OUTPUTS,
     });
