@@ -3,6 +3,7 @@ import { htmlExporterPlugin } from '@tyto/export-html';
 import { svgExporterPlugin } from '@tyto/export-svg';
 import {
   type RenderResult,
+  briefAssetResolver,
   fileAssetResolver,
   fileResources,
   fsTaskOutput,
@@ -57,8 +58,11 @@ export interface ExportRequest {
   readonly brief: string;
   /** The folder the artifacts go in. Created if it is not there. */
   readonly directory: string;
-  /** What relative asset paths resolve against; the open file's folder. */
-  readonly assetBase?: string;
+  /**
+   * The open file's folder, or a queued task's. Asset paths resolve from it as written,
+   * then from `assets/` beside it (ADR 0056).
+   */
+  readonly briefDirectory?: string;
   /** Names the artifacts, the way `tyto render` names them after the brief. */
   readonly label: string;
   readonly outputs: readonly OutputRequest[];
@@ -260,7 +264,9 @@ export async function createExportService(options: ExportServiceOptions): Promis
     }
 
     const images =
-      request.assetBase === undefined ? undefined : fileResources({ base: request.assetBase });
+      request.briefDirectory === undefined
+        ? undefined
+        : fileResources({ base: request.briefDirectory });
     const { host, warnings: skipped } = exporterHost(images, options.rasterizer, await plugins);
     const sink = await fsTaskOutput(request.directory, {
       label: request.label,
@@ -280,12 +286,13 @@ export async function createExportService(options: ExportServiceOptions): Promis
         // same way it draws through the CLI. Nothing is loaded from a folder either way.
         // An installed code template in front of both, drawn in its plugin's process.
         templates: templateSourceOf(fileSystem, templates, codePacks),
-        assets: fileAssetResolver({
-          // `confine` stays on, its default: a brief is often written by something else
-          // (ADR 0011), and `../../../.ssh/id_rsa` embedded in an exported PNG is a real way
-          // to leak a file.
-          base: request.assetBase ?? request.directory,
-        }),
+        // `confine` stays on, its default: a brief is often written by something else
+        // (ADR 0011), and `../../../.ssh/id_rsa` embedded in an exported PNG is a real way
+        // to leak a file.
+        assets:
+          request.briefDirectory === undefined
+            ? fileAssetResolver({ base: request.directory })
+            : briefAssetResolver({ briefDirectory: request.briefDirectory }),
         exporters: host.registry.exporters,
         // The run's own host, which the installed plugins were activated into above: a
         // directive resolves through the same activation that the run reports refusals of.

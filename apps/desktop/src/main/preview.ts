@@ -12,7 +12,7 @@ import {
 } from '@tyto/core';
 import { exportHtml } from '@tyto/export-html';
 import { fontSubstitutionWarnings } from '@tyto/pipeline';
-import { fileAssetResolver, fileResources } from '@tyto/io';
+import { briefAssetResolver, fileResources } from '@tyto/io';
 
 import type { WindowPlugins } from './window-plugins.js';
 import { faces, fonts } from './fonts.js';
@@ -130,7 +130,8 @@ export interface PreviewService {
  * `assets/` beside it to read. A brief that references an asset gets the exporter's own
  * diagnostic naming the missing reference — which is what the author needs to see — rather
  * than a preview that fails to open. Opening a `.brief` replaces this with a real resolver
- * rooted at the file's own folder (E9.8), and the images start appearing.
+ * rooted at the file's own folder, with `assets/` beside it as the fallback (E9.8, ADR 0056),
+ * and the images start appearing.
  */
 const noAssets: AssetResolver = {
   // Named, because it is what `E_ASSET_NOT_FOUND` prints as the folder it looked in, and
@@ -185,7 +186,9 @@ export async function createPreviewService(
       // else (ADR 0011), and `../../../.ssh/id_rsa` embedded in an exported PNG is a real
       // way to leak a file. An author previewing their own folder is inside it anyway.
       const assets =
-        baseDirectory === undefined ? noAssets : fileAssetResolver({ base: baseDirectory });
+        baseDirectory === undefined
+          ? noAssets
+          : briefAssetResolver({ briefDirectory: baseDirectory });
 
       const resolved = await resolve(ast.value, {
         registry: templates,

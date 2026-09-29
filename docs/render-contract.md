@@ -14,14 +14,18 @@ writes a folder.
 ```
 <task>/
   brief.brief          written by the caller (or by a person)
-  assets/              the issue's attachments; paths in the brief resolve against it
+  assets/              the issue's attachments; searched when a path is not beside the brief
   out/                 written by Tyto
     <format>-<NN>.png|jpg|webp|svg
     result.json
 ```
 
-`assets/` is optional. When it is absent, relative asset paths in the brief resolve
-against the task folder itself.
+An asset path in the brief is read as written, from the task folder first. When nothing is
+there, the same path is read from `assets/` (ADR 0056). So `./logo.png` finds
+`assets/logo.png`, `./assets/logo.png` finds it too, and a file of the same name
+beside the brief wins over the one in `assets/`. The resolved path differs by folder;
+the asset's hash does not, because it is the bytes'. `assets/` is optional, and a
+path that climbs out of the task folder is read from neither place.
 
 ## Invocation
 

@@ -29,7 +29,7 @@ imagem: ./prof-ana.png
 - **Repeatable directive** (`::lamina`) — each occurrence becomes an `Artwork`. The manifest declares which slot is `repeat`.
 - **Adjustments** `{a, b: value}` — only those declared in `manifest.adjustments`. They apply to the slot; on a repeatable slot, to that slide.
 - **Text**: inline Markdown only — `**bold**`, `*italic*`, `\` line break, `{cor:x}text{/}` mark. No headings, lists or links.
-- **Assets**: paths relative to the `.brief` file; `resolve` confirms existence and computes a hash.
+- **Assets**: a path is read as written, relative to the `.brief` file; when nothing is there, the same path is read from `assets/` beside the brief (ADR 0056). If both exist, the one beside the brief wins, and a path that climbs out of the brief's folder is read from neither. `resolve` confirms existence and computes a hash of the bytes, so the hash is the same whichever folder the file was found in. The CLI, `tyto watch`, the queue, the preview and the export box all follow this rule; only `tyto render --assets <dir>` replaces it, with that one folder and no fallback.
 - **Comments**: `//` at line start.
 - **Escape**: `\::` for text starting with `::`.
 - **Plugin directives**: plugins register namespaced directives, `::ai/caption`. Without the plugin ⇒ `E_UNKNOWN_DIRECTIVE`. See _Plugin directives_ below.

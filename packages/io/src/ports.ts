@@ -19,12 +19,13 @@ export interface BriefTask {
    * source that only a filesystem could implement. */
   readonly brief: string;
   /**
-   * What relative paths in the brief resolve against.
+   * The brief's own folder, which asset paths in it resolve against: the path as written
+   * first, then `assets/` beside it (ADR 0056, `briefAssetResolver`).
    *
    * A location rather than bytes, because a brief may reference any number of assets and
    * reading all of them up front would load a folder of photographs to render one.
    */
-  readonly assetBase: string;
+  readonly briefDirectory: string;
   /** For a diagnostic that wants to name the file the author should open. */
   readonly briefPath: string;
 }

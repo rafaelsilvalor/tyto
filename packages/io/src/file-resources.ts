@@ -33,7 +33,11 @@ import { EMBEDDABLE_MIME, dataUri } from './mime.js';
  */
 
 export interface FileResourcesOptions {
-  /** The folder to read — a task's `assets/`, normally `BriefTask.assetBase`. */
+  /**
+   * The folder a ref without a `path` is read against — normally the brief's, as in
+   * `BriefTask.briefDirectory`. A ref from `briefAssetResolver` carries the path it was
+   * found at, in the brief's folder or in `assets/`, and is read from there (ADR 0056).
+   */
   readonly base: string;
   /**
    * Per-file ceiling, 32 MB by default.

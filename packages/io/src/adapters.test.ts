@@ -71,13 +71,13 @@ describe('fsInbox', () => {
     expect(tasks.map((task) => task.id)).toEqual(['a', 'b', 'c']);
   });
 
-  it('falls back to the task folder when there is no assets/ beside the brief', async () => {
+  it('hands over the task folder as the brief directory, assets/ or not', async () => {
     await mkdir(join(workspace, 'inbox', 'bare'), { recursive: true });
     await writeFile(join(workspace, 'inbox', 'bare', 'brief.brief'), '::titulo Oi\n');
 
     const [task] = await fsInbox({ root: join(workspace, 'inbox') }).pull();
 
-    expect(task?.assetBase.endsWith('bare')).toBe(true);
+    expect(task?.briefDirectory.endsWith('bare')).toBe(true);
   });
 });
 
@@ -544,7 +544,7 @@ describe('pollSource', () => {
   const task = (id: string): BriefTask => ({
     id,
     brief: '::titulo Oi\n',
-    assetBase: '/tmp',
+    briefDirectory: '/tmp',
     briefPath: `/tmp/${id}/brief.brief`,
   });
 

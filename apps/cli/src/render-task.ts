@@ -9,6 +9,7 @@ import { createFontLibrary } from '@tyto/fonts';
 import {
   type ExportResources,
   type RenderResult,
+  briefAssetResolver,
   fileAssetResolver,
   fileResources,
   fsDeliveryOutput,
@@ -43,8 +44,16 @@ export interface RenderTask {
   readonly brief: string;
   /** As the user should read it, for the `file:line:col` of a diagnostic. */
   readonly briefPath: string;
-  /** What relative asset paths in the brief resolve against. */
-  readonly assetBase: string;
+  /**
+   * The brief's folder. Asset paths resolve from it as written, then from `assets/` beside
+   * it (ADR 0056), unless {@link assetsOverride} says otherwise.
+   */
+  readonly briefDirectory: string;
+  /**
+   * `tyto render --assets <dir>`: the one folder asset paths resolve against, with no
+   * fallback. The person named where the files are, so nothing else is searched.
+   */
+  readonly assetsOverride?: string;
   /** Where the artifacts and `result.json` go. Created if it is not there. */
   readonly outDirectory: string;
   /**
@@ -149,7 +158,8 @@ export async function renderTask(
 
   // Handed out empty and filled by `loadResources` below, once the scene says which files
   // it draws. The folder is no longer read to find out (TYTO-62).
-  const briefResources = fileResources({ base: task.assetBase });
+  const assetFolder = task.assetsOverride ?? task.briefDirectory;
+  const briefResources = fileResources({ base: assetFolder });
 
   // Per task, because an exporter binds the bytes of the folder it is rendering: two tasks
   // in a `tyto watch` have different `assets/`, and an exporter bound to the wrong one
@@ -175,7 +185,10 @@ export async function renderTask(
     {
       registry: context.registry,
       templates: wiring.source,
-      assets: fileAssetResolver({ base: task.assetBase }),
+      assets:
+        task.assetsOverride === undefined
+          ? briefAssetResolver({ briefDirectory: task.briefDirectory })
+          : fileAssetResolver({ base: task.assetsOverride }),
       exporters: host.registry.exporters,
       directives: directiveResolverOf(() => host.registry.directives()),
       formats: context.formats,
