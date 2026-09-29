@@ -1,4 +1,4 @@
-import { type Diagnostics, type FileSystem } from '@tyto/core';
+import { type Diagnostics, type FileSystem, hasErrors } from '@tyto/core';
 import { htmlExporterPlugin } from '@tyto/export-html';
 import { svgExporterPlugin } from '@tyto/export-svg';
 import {
@@ -64,6 +64,12 @@ export interface ExportRequest {
   readonly outputs: readonly OutputRequest[];
   /** Absent renders every format the template declares, which is `tyto render`'s default. */
   readonly formats?: readonly string[];
+  /**
+   * Remove what the previous export wrote into {@link directory} and this one did not
+   * (ADR 0054). On for the export box, where a person picked the folder and will send it;
+   * off for the queue, whose `outbox/<id>/out/` is the ADR 0011 contract's shape.
+   */
+  readonly removeLeftovers?: boolean;
 }
 
 export type ExportStatus = 'running' | 'finished' | 'cancelled';
@@ -256,7 +262,10 @@ export async function createExportService(options: ExportServiceOptions): Promis
     const images =
       request.assetBase === undefined ? undefined : fileResources({ base: request.assetBase });
     const { host, warnings: skipped } = exporterHost(images, options.rasterizer, await plugins);
-    const sink = await fsTaskOutput(request.directory, { label: request.label });
+    const sink = await fsTaskOutput(request.directory, {
+      label: request.label,
+      removeLeftovers: request.removeLeftovers ?? false,
+    });
 
     const job = await runJob(
       {
@@ -308,13 +317,22 @@ export async function createExportService(options: ExportServiceOptions): Promis
     );
 
     const produced = job.ok ? job.diagnostics : job.error;
-    run.diagnostics = [...startup, ...skipped, ...produced];
-
     const cancelled = job.ok ? job.value.cancelled : false;
+    const planned = job.ok ? job.value.planned : 0;
+    const artifacts = job.ok ? job.value.artifacts : [];
+    // Before `finish`, which replaces the `result.json` that says which files are Tyto's.
+    const leftovers = await sink.removeLeftovers({
+      artifacts,
+      planned,
+      cancelled,
+      failed: hasErrors([...startup, ...produced]),
+    });
+    run.diagnostics = [...startup, ...skipped, ...produced, ...leftovers];
+
     run.result = renderResult({
       cancelled,
-      planned: job.ok ? job.value.planned : 0,
-      artifacts: job.ok ? job.value.artifacts : [],
+      planned,
+      artifacts,
       diagnostics: run.diagnostics,
       version: options.version,
       // The template the run actually loaded, or none. A run that never got that far names

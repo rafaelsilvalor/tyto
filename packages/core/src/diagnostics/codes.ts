@@ -740,6 +740,38 @@ export const diagnosticCodes = {
     fatal: false,
     fatality: 'A warning never replaces a value (ADR 0013).',
   },
+  // The three leftover codes (TYTO-127). Warnings, because the artwork this run made is
+  // exactly what the brief asked for; they exist so that a file deleted from somebody's
+  // delivery, or one that could have been and was not, is never deleted or kept in silence.
+  W_LEFTOVER_REMOVED: {
+    severity: 'warning',
+    summary:
+      'A file the previous export wrote into this folder, and this one did not produce, was removed.',
+    template: "Removed '{file}', which the previous export wrote and this one did not produce.",
+    spec: 'docs/adr/0054-a-delivery-removes-what-tyto-wrote-there-last-time.md',
+    fatal: false,
+    fatality: 'A warning never replaces a value (ADR 0013).',
+  },
+  W_LEFTOVER_KEPT: {
+    severity: 'warning',
+    summary:
+      'A file the previous export listed, and this one did not produce, was left in the folder.',
+    template:
+      "Kept '{file}', which the previous export listed and this one did not produce: {reason}.",
+    spec: 'docs/adr/0054-a-delivery-removes-what-tyto-wrote-there-last-time.md',
+    fatal: false,
+    fatality: 'A warning never replaces a value (ADR 0013).',
+  },
+  W_PREVIOUS_RESULT_UNREADABLE: {
+    severity: 'warning',
+    summary:
+      "The folder's previous result.json could not be read, so nothing in the folder was removed.",
+    template:
+      'Removed nothing: the previous result.json could not be read ({reason}), so this export cannot tell which files it wrote.',
+    spec: 'docs/adr/0054-a-delivery-removes-what-tyto-wrote-there-last-time.md',
+    fatal: false,
+    fatality: 'A warning never replaces a value (ADR 0013).',
+  },
 } as const satisfies Record<string, DiagnosticCodeDefinition>;
 
 export type DiagnosticCode = keyof typeof diagnosticCodes;

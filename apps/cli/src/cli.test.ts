@@ -509,20 +509,64 @@ describe('tyto render --folder', () => {
     expect(await outFiles('entregas')).toEqual(['feed-01.svg', 'feed-02.svg', 'result.json']);
   });
 
-  it('reuses an existing folder and overwrites by name, leaving what it did not produce', async () => {
+  it('removes the slide a brief no longer has, and says so on stderr (ADR 0054)', async () => {
+    const render = (): Promise<number> =>
+      run(
+        ['render', `task/${NAME}.brief`, '--out', 'entregas', '--folder', '--types', 'svg'],
+        environment(),
+      );
+    await writeFile(
+      join(workspace, 'task', `${NAME}.brief`),
+      `${briefSource}
+::slide
+  Terceiro
+`,
+    );
+    await render();
+    expect(await outFiles('entregas', NAME)).toContain('feed-03.svg');
+
+    // The same brief edited from three slides down to two, exported into the same folder.
+    await writeFile(join(workspace, 'task', `${NAME}.brief`), briefSource);
+    const code = await render();
+
+    expect(code, stderr()).toBe(EXIT_OK);
+    expect(await outFiles('entregas', NAME)).toEqual(['editaveis', 'feed-01.svg', 'feed-02.svg']);
+    expect(stderr()).toContain("warning W_LEFTOVER_REMOVED Removed 'feed-03.svg'");
+    const parsed = parseRenderResult(await resultAt('entregas', NAME, 'editaveis'));
+    if (!parsed.ok) throw new Error(parsed.error.join('; '));
+    expect(parsed.value.diagnostics.map((item) => item.code)).toEqual(['W_LEFTOVER_REMOVED']);
+  });
+
+  it('keeps a file the previous result.json did not list, even one named like artwork', async () => {
+    // A folder Tyto has no report for: nothing in it is known to be Tyto's, so nothing goes.
     const delivery = join(workspace, 'entregas', NAME);
     await mkdir(delivery, { recursive: true });
-    await writeFile(join(delivery, 'feed-03.svg'), 'from a run that made three slides');
+    await writeFile(join(delivery, 'feed-03.svg'), 'put here by a person');
 
     await run(
       ['render', `task/${NAME}.brief`, '--out', 'entregas', '--folder', '--types', 'svg'],
       environment(),
     );
 
-    // The documented rule, and the hazard it carries, pinned rather than left to be
-    // discovered: a brief edited from three slides down to two leaves the third in the
-    // delivery, and `result.json` does not mention it because it lists what this run wrote.
     expect(await outFiles('entregas', NAME)).toContain('feed-03.svg');
+    expect(stderr()).not.toContain('W_LEFTOVER');
+  });
+
+  it('leaves what an earlier --out run wrote, because --out removes nothing', async () => {
+    await writeFile(
+      join(workspace, 'task', `${NAME}.brief`),
+      `${briefSource}
+::slide
+  Terceiro
+`,
+    );
+    await run(['render', `task/${NAME}.brief`, '--out', 'saida', '--types', 'svg'], environment());
+    await writeFile(join(workspace, 'task', `${NAME}.brief`), briefSource);
+    await run(['render', `task/${NAME}.brief`, '--out', 'saida', '--types', 'svg'], environment());
+
+    // The ADR 0011 contract: its reader reconciles against result.json itself.
+    expect(await outFiles('saida')).toContain('feed-03.svg');
+    expect(stderr()).not.toContain('W_LEFTOVER');
   });
 });
 

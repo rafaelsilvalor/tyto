@@ -1,8 +1,10 @@
 import { mkdir, rename, rm, writeFile } from 'node:fs/promises';
 import { basename, join, resolve } from 'node:path';
 
+import type { Diagnostics } from '@tyto/core';
 import type { Artifact } from '@tyto/pipeline';
 
+import { type LeftoverRun, readPreviousDelivery, removeLeftovers } from './leftovers.js';
 import type { OutputSink, TaskOutput } from './ports.js';
 import { type RenderResult, renderResultSchema } from './result.js';
 
@@ -56,7 +58,23 @@ export interface DeliveryTemplate {
  * resolves the template from the brief's frontmatter or the `--template` fallback while it
  * runs, so the delivery learns it between the last artifact and `finish`.
  */
-export interface DeliveryOutput extends TaskOutput {
+/**
+ * A `TaskOutput` over a folder a person reuses, which can tidy what an earlier export left.
+ *
+ * Separate from `finish` for `describeTemplate`'s reason: the warnings it returns belong in
+ * the `result.json` that `finish` writes, so the caller needs them first.
+ */
+export interface ReusableTaskOutput extends TaskOutput {
+  /**
+   * Removes the files the previous export's `result.json` listed and this run did not write
+   * (ADR 0054), and returns one warning per file removed or kept. Call it **before** `finish`
+   * — and before `result.json` is replaced, which `finish` is what does. A no-op returning
+   * nothing unless the output was opened with `removeLeftovers`.
+   */
+  removeLeftovers(run: LeftoverRun): Promise<Diagnostics>;
+}
+
+export interface DeliveryOutput extends ReusableTaskOutput {
   /**
    * Writes {@link TEMPLATE_FILE}. Call it **before** `finish`, so `result.json` stays the
    * last file to appear and keeps meaning "this delivery is complete".
@@ -116,6 +134,13 @@ export interface FsTaskOutputOptions {
   readonly validate?: boolean;
   /** Named in the schema-mismatch message, so a reader knows which task produced it. */
   readonly label?: string;
+  /**
+   * Make {@link ReusableTaskOutput.removeLeftovers} remove what the previous export wrote
+   * here and this one did not (ADR 0054). **Off by default, and off for `--out` and the
+   * outbox**: that folder is the ADR 0011 contract, and its reader reconciles against
+   * `result.json` itself. On for a folder a person picked and will send as it is.
+   */
+  readonly removeLeftovers?: boolean;
 }
 
 /**
@@ -130,10 +155,16 @@ export interface FsTaskOutputOptions {
 export async function fsTaskOutput(
   directory: string,
   options: FsTaskOutputOptions = {},
-): Promise<TaskOutput> {
+): Promise<ReusableTaskOutput> {
   const full = resolve(directory);
   await mkdir(full, { recursive: true });
-  return taskOutput({ artifacts: full, result: full, ...options, label: options.label ?? full });
+  return taskOutput({
+    artifacts: full,
+    result: full,
+    ...(options.validate === undefined ? {} : { validate: options.validate }),
+    label: options.label ?? full,
+    removeLeftovers: options.removeLeftovers ?? false,
+  });
 }
 
 /**
@@ -150,12 +181,28 @@ interface TaskOutputDirectories {
   readonly result: string;
   readonly validate?: boolean;
   readonly label: string;
+  readonly removeLeftovers: boolean;
 }
 
-function taskOutput(directories: TaskOutputDirectories): TaskOutput {
+async function taskOutput(directories: TaskOutputDirectories): Promise<ReusableTaskOutput> {
   const validate = directories.validate ?? true;
+  // Read when the output opens, before this export can write a byte: the previous report is
+  // the one record of which files in the folder are Tyto's, and `finish` replaces it.
+  const previous = directories.removeLeftovers
+    ? await readPreviousDelivery(join(directories.result, RESULT_FILE))
+    : ({ kind: 'none' } as const);
 
   return {
+    async removeLeftovers(run: LeftoverRun): Promise<Diagnostics> {
+      return removeLeftovers({
+        previous,
+        artifacts: directories.artifacts,
+        // Only when the report sits beside the artwork, and then it is never artwork.
+        protectedNames: directories.artifacts === directories.result ? [RESULT_FILE] : [],
+        run,
+      });
+    },
+
     async write(artifact: Artifact): Promise<void> {
       await writeAtomic(join(directories.artifacts, artifact.name), artifact.bytes);
     },
@@ -212,15 +259,14 @@ function taskOutput(directories: TaskOutputDirectories): TaskOutput {
  * sanitiser with its own opinion, and two sanitisers is how one folder ends up named two
  * things.
  *
- * ## An existing folder is written into, not cleared
+ ## An existing folder is reused, and only Tyto's own leftovers leave it
  *
- * Exporting the same brief twice reuses the folder and overwrites by name — the same rule
- * `--out` has today, chosen for that reason rather than invented here. **What it costs is
- * worth naming: a file from a previous run that this one does not produce survives.** A
- * brief edited from three slides down to two leaves `grid-03.png` in the delivery, and
- * nothing in `result.json` mentions it, because `result.json` lists what this run wrote.
- * Cleaning the folder, or refusing a non-empty one, is a decision with a blast radius —
- * deleting somebody's files — and it is not this card's to take.
+ * Exporting the same brief twice reuses the folder and overwrites by name. A file the
+ * previous export wrote and this one does not produce — `grid-03.png` after a brief went
+ * from three slides to two, or `lamina-1-grid.png` after ADR 0053 renamed it — is removed
+ * by `removeLeftovers`, and only if the previous `editaveis/result.json` listed it and its
+ * size is still the one recorded there (ADR 0054). Nothing else in the folder is touched,
+ * and every removal is a warning in the new `result.json`.
  */
 export async function fsDeliveryOutput(
   destination: string,
@@ -247,12 +293,14 @@ export async function fsDeliveryOutput(
   await writeAtomic(join(editable, `${options.name}.${BRIEF_EXTENSION}`), options.brief);
 
   return {
-    ...taskOutput({
+    ...(await taskOutput({
       artifacts: folder,
       result: editable,
       ...(options.validate === undefined ? {} : { validate: options.validate }),
       label: options.label ?? folder,
-    }),
+      // Always, because this layout exists to be sent as it is (ADR 0054).
+      removeLeftovers: true,
+    })),
 
     async describeTemplate(template: DeliveryTemplate): Promise<void> {
       await writeAtomic(join(editable, TEMPLATE_FILE), templateNote(template));

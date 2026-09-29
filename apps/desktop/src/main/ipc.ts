@@ -294,6 +294,9 @@ export function createHandlers(dependencies: IpcDependencies): Handlers {
         })),
         ...(assetBase === undefined ? {} : { assetBase }),
         ...(formats === undefined ? {} : { formats: [...formats] }),
+        // The export box writes into a folder the person picked and will send as it is, so
+        // what an earlier export left there goes (ADR 0054). The queue does not come here.
+        removeLeftovers: true,
       });
     },
 
