@@ -15,6 +15,7 @@ yours, and without a convention each template invents its own and shares nothing
 _estrategia/        the house: what several of its brands share (ADR 0055)
   marks.ts          the owl and the speech balloon, in no colour
   brands.ts         what sets each brand apart — an accent, a sign-off
+  seal.ts           when a slide carries the brief's `selo` (the last grid slide)
   compose.ts        one piece's composition, for every brand that publishes it
 _estrategia-saude/  a brand: no manifest, so the registry skips it (ADR 0047)
   tokens.ts         colours, type scale, spacing, marks — the brand's spec sheet
@@ -153,6 +154,16 @@ agenda for Concursos, Carreira Jurídica and OAB (TYTO-200) — each brand still
 template**, so its manifest says its `brand` and its `formats`. The composition is written once,
 in the house's `compose.ts`, as a function of a `Brand`; each `template.ts` is that function
 applied to its brand, one line. What varies by brand is an argument, never a copy (ADR 0055).
+
+### The seal
+
+A carousel may close with a seal: the brief's optional `selo`, an art the frame's width and
+140 tall, glued to the foot of the **last grid slide** and never drawn on a story (TYTO-201).
+**The page shrinks by the seal's height**: `sealed` in the kit hands the layout the shorter
+size and returns the seal to draw, so a middle centred on the page centres above the seal and
+a footer standing on the bottom edge stands on the seal. When a slide carries it is the
+house's rule, in `_estrategia/seal.ts`; a template only passes `sealOf(context)` to `sealed`
+and spreads the seal into its frame's children.
 
 ## Names
 

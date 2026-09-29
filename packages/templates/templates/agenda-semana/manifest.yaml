@@ -1,5 +1,5 @@
 name: agenda-semana
-version: 4.1.0
+version: 4.2.0
 brand: estrategia-saude
 description: The week's agenda as a carousel — a cover on the first slide, several disciplines to a slide.
 formats: [grid]
@@ -16,4 +16,8 @@ slots:
   # are: one occurrence is one slide, as the published carousel is cut. Inside it, a line
   # with no `|` starts a discipline and every `date | title | professor` line below it is
   # one of that discipline's sessions. `max` counts occurrences here, not characters.
+  # The seal art, 1080 × 140, glued to the foot of the last slide (TYTO-201). Optional; with
+  # it the page above shrinks by 140, so nothing is drawn under the seal. In the frontmatter:
+  # `selo: ./selo.png`.
+  selo: { type: image }
   lamina: { type: rich-text, repeat: true, min: 1, max: 12 }

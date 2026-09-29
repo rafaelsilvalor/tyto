@@ -1,5 +1,5 @@
 name: simulados-semana-ecj
-version: 1.0.0
+version: 1.1.0
 brand: estrategia-carreira-juridica
 description: Estratégia Carreira Jurídica's mock exams of the week as a carousel and as stories — the title, then each day's schedule and its exams; the last grid asks for a comment.
 formats: [grid, story]
@@ -13,4 +13,8 @@ slots:
   # "Escreva SIMULADO nos comentários para acessar". The default is in the code, since a
   # manifest default only applies to an enum slot.
   chamada: { type: rich-text, max: 60 }
+  # The seal art, 1080 × 140, glued to the foot of the last grid slide (TYTO-201), never on a story. Optional; with
+  # it the page above shrinks by 140, so nothing is drawn under the seal. In the frontmatter:
+  # `selo: ./selo.png`.
+  selo: { type: image }
   lamina: { type: rich-text, repeat: true, min: 1, max: 12 }

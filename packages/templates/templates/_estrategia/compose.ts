@@ -22,6 +22,10 @@
  * whole is centred, so a wider title moves everything under it with it.
  *
  * The stories carry no owl, as none of the three references draws one there.
+ *
+ * The last grid may close with the brief's `selo` glued to its foot (TYTO-201). The page then
+ * shrinks by the seal's height before any of the above is placed, so the middle centres
+ * above the seal and the sign-off follows it up (`sealed` in the kit, `sealOf` here).
  */
 
 import { frame, solid } from '@tyto/core/template';
@@ -33,12 +37,14 @@ import {
   naturalWidth,
   pillTable,
   rowGroups,
+  sealed,
   stack,
 } from '@tyto/template-kit';
 
 import { CALL_TO_COMMENT } from './brands.js';
 import { callToComment, owl, signOff } from './parts.js';
 import { EXAM_STYLE, TITLE_LINE, TITLE_STYLE, examTable } from './presets.js';
+import { sealOf } from './seal.js';
 import { CTA, EDGE, MARGIN, PAPER, SAFETY, TABLE, TITLE } from './tokens.js';
 
 import type { Brand } from './brands.js';
@@ -80,10 +86,11 @@ export function simuladosDaSemana(brand: Brand): TemplateBuild {
       items: [...titleOf(context, room), body],
     });
 
+    const page = sealed(context.size, sealOf(context));
     const chrome = story ? undefined : owl(brand.accent);
     const top = chrome === undefined ? EDGE.top : EDGE.top + chrome.height + SAFETY;
-    const middleX = (context.size.w - middle.width) / 2;
-    const middleY = Math.max(top, (context.size.h - middle.height) / 2);
+    const middleX = (page.size.w - middle.width) / 2;
+    const middleY = Math.max(top, (page.size.h - middle.height) / 2);
 
     return frame({
       format: context.format,
@@ -94,6 +101,7 @@ export function simuladosDaSemana(brand: Brand): TemplateBuild {
         ...(chrome === undefined ? [] : [at(MARGIN, EDGE.top, chrome)]),
         at(middleX, middleY, middle),
         at(MARGIN, middleY + middle.height + SAFETY, signOff(brand, room)),
+        ...page.seal,
       ],
     });
   };

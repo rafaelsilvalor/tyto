@@ -2,7 +2,7 @@ import { rect } from '@tyto/core/template';
 import { describe, expect, it } from 'vitest';
 
 import { sized } from './blocks.js';
-import { bandedPage } from './page.js';
+import { bandedPage, sealed } from './page.js';
 
 /** Where the three bands land: arithmetic, as everything else in this package is tested. */
 
@@ -32,5 +32,31 @@ describe('bandedPage', () => {
 
   it('pins a middle taller than the room under the header rather than over it', () => {
     expect(page(900)[1]?.y).toBe(130);
+  });
+});
+
+describe('sealed', () => {
+  const SIZE = { w: 1080, h: 1350 };
+  const asset = { id: 'selo', source: 'file' as const, path: 'selo.png', hash: 'abc' };
+
+  it('hands the layout the whole frame and draws nothing when there is no seal', () => {
+    expect(sealed(SIZE, undefined)).toEqual({ size: SIZE, seal: [] });
+  });
+
+  it('shrinks the page by the seal’s height, so nothing is laid out under it', () => {
+    expect(sealed(SIZE, { asset, height: 140 }).size).toEqual({ w: 1080, h: 1210 });
+  });
+
+  it('glues the seal to the foot of the frame, the frame’s width, covering its band', () => {
+    const [placed] = sealed(SIZE, { asset, height: 140 }).seal;
+
+    expect(placed?.transform).toMatchObject({ x: 0, y: 1210 });
+    expect(placed).toMatchObject({
+      kind: 'image',
+      name: 'seal',
+      size: { w: 1080, h: 140 },
+      fit: 'cover',
+      asset,
+    });
   });
 });
