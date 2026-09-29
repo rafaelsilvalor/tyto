@@ -1,5 +1,5 @@
 name: simulados-semana-roxo
-version: 1.0.0
+version: 1.0.1
 brand: roxo
 description: Roxo's mock exams of the week as stories — the title, then each day's schedule and its exams, one story per slide.
 # Stories only: Roxo publishes this piece in no grid (the maintainer,

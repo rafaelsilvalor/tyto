@@ -1,5 +1,5 @@
 name: simulados-semana-ocre
-version: 1.1.0
+version: 1.1.1
 brand: ocre
 description: Ocre's mock exams of the week as a carousel and as stories — the title, then each day's schedule and its exams; the last grid asks for a comment.
 formats: [grid, story]

@@ -203,13 +203,30 @@ describe('simulados da semana: the areas', () => {
     expect(middle?.transform.y).toBeGreaterThan(0);
   });
 
-  it('stands the sign-off a safety gap below the middle, on the gutter', () => {
+  it('stands the sign-off a safety gap below the middle', () => {
     const nodes = draw(OCRE, { format: 'story' });
     const [middle] = named(nodes, 'middle');
     const [signOff] = named(nodes, 'sign-off');
     const middleBottom = (middle?.transform.y ?? 0) + heightOf(middle);
 
     expect(signOff?.transform.y).toBe(middleBottom + SAFETY);
+  });
+
+  // "Todos devem estar alinhados" (the maintainer, 2026-09-29, on the first real art).
+  it.each([
+    ['a grid with the call to comment', { format: 'grid' } as const, 'owl'],
+    ['an earlier grid', { format: 'grid', index: 0, count: 2 } as const, 'owl'],
+    ['a story, which has no owl', { format: 'story' } as const, undefined],
+  ])('lines the owl and the sign-off up with the middle on %s', (_name, slide, owlName) => {
+    for (const brand of [OCRE, VINHO, ROXO]) {
+      const nodes = draw(brand, slide);
+      const [middle] = named(nodes, 'middle');
+      const x = middle?.transform.x;
+
+      expect(x).toBeGreaterThan(0);
+      expect(named(nodes, 'sign-off')[0]?.transform.x).toBe(x);
+      if (owlName !== undefined) expect(named(nodes, owlName)[0]?.transform.x).toBe(x);
+    }
   });
 });
 

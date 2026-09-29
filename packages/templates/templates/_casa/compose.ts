@@ -11,15 +11,20 @@
  *
  * | area   | what                                            | where                          |
  * | ------ | ----------------------------------------------- | ------------------------------ |
- * | top    | the owl, on the grid only                       | its top-left, on the gutter    |
+ * | top    | the owl, on the grid only                       | its top, on the middle's edge  |
  * | middle | the title, the days and their exams, and on the | centred on the page, both ways |
  * |        | last grid the call to comment                   |                                |
- * | bottom | the handle, or ROXO's note                        | its top-left, `SAFETY` below   |
+ * | bottom | the handle, or ROXO's note                        | its top, on the middle's edge, |
+ * |        |                                                 | `SAFETY` below the middle      |
  *
  * The top and bottom areas are whatever the middle leaves (the maintainer, 2026-09-28): the
  * middle is centred, and what stands in an area hugs it from the area's top. The middle is
  * left-aligned inside itself — title, days and rows share one left edge — and the block as a
  * whole is centred, so a wider title moves everything under it with it.
+ *
+ * **Everything shares the middle's left edge** (the maintainer, 2026-09-29, on the first real
+ * art: "todos devem estar alinhados"): the owl above and the sign-off below start where the
+ * title, the days and the call to comment start, so they move with the middle too.
  *
  * The stories carry no owl, as none of the three references draws one there.
  *
@@ -98,9 +103,9 @@ export function simuladosDaSemana(brand: Brand): TemplateBuild {
       idPrefix: context.idPrefix,
       background: solid(PAPER),
       children: [
-        ...(chrome === undefined ? [] : [at(MARGIN, EDGE.top, chrome)]),
+        ...(chrome === undefined ? [] : [at(middleX, EDGE.top, chrome)]),
         at(middleX, middleY, middle),
-        at(MARGIN, middleY + middle.height + SAFETY, signOff(brand, room)),
+        at(middleX, middleY + middle.height + SAFETY, signOff(brand, middle.width)),
         ...page.seal,
       ],
     });

@@ -69,8 +69,9 @@ export const HANDLE_TRACKING = 7;
 /* ------------------------------------------------------------------------- spacing -- */
 
 /**
- * The side gutter the chrome stands on, and the least room beside the middle. The owl and the
- * sign-off stand on it (the maintainer, 2026-09-29: 112).
+ * The least room beside the middle: the title wraps and the call to comment stops before it
+ * (the maintainer, 2026-09-29: 112). The owl and the sign-off no longer stand on it; they
+ * share the middle's left edge (`compose.ts`).
  */
 export const MARGIN = 112;
 
