@@ -117,7 +117,7 @@ export async function watchCommand(
         id: task.id,
         brief: task.brief,
         briefPath,
-        assetBase: task.assetBase,
+        briefDirectory: task.briefDirectory,
         outDirectory: join(root, 'outbox', task.id, OUT_DIR),
       },
       {

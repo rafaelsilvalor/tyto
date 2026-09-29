@@ -17,7 +17,7 @@ import {
 } from '@tyto/core';
 import { exportHtml } from '@tyto/export-html';
 import { bundledFont, bundledFontSource } from '@tyto/fonts';
-import { fileAssetResolver, fileResources, fileTemplateAssets } from '@tyto/io';
+import { briefAssetResolver, fileResources, fileTemplateAssets } from '@tyto/io';
 import { TEMPLATE_FILE, renderedSlotsOf } from '@tyto/pipeline';
 import { compileTemplate, isTemplateName, scaffoldTemplate } from '@tyto/template-lang';
 
@@ -252,7 +252,7 @@ export function createTemplateEditor(options: TemplateEditorOptions): TemplateEd
       const rendered = renderedSlotsOf(template.value);
       const resolved = await resolve(ast.value, {
         registry: registryOf(manifest.value, directory),
-        assets: fileAssetResolver({ base: briefBase }),
+        assets: briefAssetResolver({ briefDirectory: briefBase }),
         ...(rendered === undefined ? {} : { renderedSlots: rendered }),
         ...(options.directives === undefined ? {} : { directives: options.directives }),
       });

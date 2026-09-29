@@ -313,7 +313,7 @@ describe('one test per diagnostic code', () => {
     const ast = valid({ directives: [directive('imagem', './sumiu.png', {}, at)] });
     const [problem] = (await problems(ast)).filter((item) => item.code === 'E_ASSET_NOT_FOUND');
     expect(problem?.message).toBe(
-      "Asset './sumiu.png' was not found relative to the brief at 'briefs/'.",
+      "Asset './sumiu.png' was not found relative to the brief at 'briefs/', nor in its assets/ folder.",
     );
     expect(problem?.range).toEqual(at);
   });

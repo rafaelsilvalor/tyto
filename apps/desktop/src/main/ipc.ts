@@ -276,7 +276,7 @@ export function createHandlers(dependencies: IpcDependencies): Handlers {
       // The text is the request's and the folder is main's, which is `brief:preview`'s
       // split exactly: the editor's buffer is the only place an unsaved brief exists, and
       // the path is the only thing main keeps about a tab.
-      const assetBase = documents.folderOf(documentId);
+      const briefDirectory = documents.folderOf(documentId);
       return exports.start({
         brief,
         directory,
@@ -292,7 +292,7 @@ export function createHandlers(dependencies: IpcDependencies): Handlers {
           ...(output.quality === undefined ? {} : { quality: output.quality }),
           ...(output.scale === undefined ? {} : { scale: output.scale }),
         })),
-        ...(assetBase === undefined ? {} : { assetBase }),
+        ...(briefDirectory === undefined ? {} : { briefDirectory }),
         ...(formats === undefined ? {} : { formats: [...formats] }),
         // The export box writes into a folder the person picked and will send as it is, so
         // what an earlier export left there goes (ADR 0054). The queue does not come here.

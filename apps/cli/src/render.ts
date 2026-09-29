@@ -1,8 +1,7 @@
-import { readFile, stat } from 'node:fs/promises';
-import { basename, isAbsolute, join, relative, resolve } from 'node:path';
+import { readFile } from 'node:fs/promises';
+import { basename, isAbsolute, relative, resolve } from 'node:path';
 
 import type { Diagnostics } from '@tyto/core';
-import { ASSETS_DIR } from '@tyto/io';
 
 import type { CliEnvironment } from './environment.js';
 import { EXIT_DIAGNOSTICS, EXIT_OK, type ExitCode } from './exit.js';
@@ -80,27 +79,6 @@ export function displayPath(cwd: string, path: string): string {
   return shown === '' || shown.startsWith('..') ? path : shown;
 }
 
-async function isDirectory(path: string): Promise<boolean> {
-  try {
-    return (await stat(path)).isDirectory();
-  } catch {
-    return false;
-  }
-}
-
-/**
- * `assets/` beside the brief when there is one, the brief's own folder otherwise.
- *
- * Exactly `fsInbox`'s rule, because a task rendered by hand and the same task rendered by
- * the watcher have to resolve `./logo.png` to the same file. `--assets` overrides it for
- * an author whose own layout is neither.
- */
-export async function assetBaseFor(briefDirectory: string, override?: string): Promise<string> {
-  if (override !== undefined) return override;
-  const beside = join(briefDirectory, ASSETS_DIR);
-  return (await isDirectory(beside)) ? beside : briefDirectory;
-}
-
 /** Prints a run that never got as far as a job: no artifacts, no `result.json`. */
 function reportFailure(
   diagnostics: Diagnostics,
@@ -175,7 +153,8 @@ export async function renderCommand(
         id: shownBrief,
         brief: source,
         briefPath: shownBrief,
-        assetBase: await assetBaseFor(resolve(briefPath, '..'), options.assets),
+        briefDirectory: resolve(briefPath, '..'),
+        ...(options.assets === undefined ? {} : { assetsOverride: options.assets }),
         outDirectory: resolve(cwd, options.out),
         // `basename` and nothing else. The name comes off a file that exists, so it is
         // already legal here, and a second sanitiser is what `artifact.ts` warns against.
