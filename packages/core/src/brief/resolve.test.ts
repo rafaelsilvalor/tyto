@@ -312,10 +312,23 @@ describe('one test per diagnostic code', () => {
     const at = sourceRange(60, 80);
     const ast = valid({ directives: [directive('imagem', './sumiu.png', {}, at)] });
     const [problem] = (await problems(ast)).filter((item) => item.code === 'E_ASSET_NOT_FOUND');
-    expect(problem?.message).toBe(
-      "Asset './sumiu.png' was not found relative to the brief at 'briefs/', nor in its assets/ folder.",
-    );
+    expect(problem?.message).toBe("Asset './sumiu.png' was not found in 'briefs/'.");
     expect(problem?.range).toEqual(at);
+  });
+
+  it('E_ASSET_NOT_FOUND names every folder the resolver searched, in order', async () => {
+    const ast = valid({ directives: [directive('imagem', './sumiu.png')] });
+    const searched = (folders: readonly string[]) =>
+      problems(ast, { assets: { ...assets, searched: folders } }).then(
+        (found) => found.find((item) => item.code === 'E_ASSET_NOT_FOUND')?.message,
+      );
+
+    expect(await searched(['briefs/', 'briefs/assets'])).toBe(
+      "Asset './sumiu.png' was not found in 'briefs/' or 'briefs/assets'.",
+    );
+    expect(await searched(['e/', 'e/assets', 'assets'])).toBe(
+      "Asset './sumiu.png' was not found in 'e/', 'e/assets' or 'assets'.",
+    );
   });
 
   it('W_UNUSED_SLOT — a slot the brief set that the template does not render', async () => {

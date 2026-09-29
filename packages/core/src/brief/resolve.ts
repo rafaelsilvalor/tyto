@@ -421,7 +421,7 @@ class Resolver {
           this.report(
             diagnostic(
               'E_ASSET_NOT_FOUND',
-              { path: plain, base: this.options.assets.base },
+              { path: plain, searched: searchedIn(this.options.assets) },
               { range: candidate.range },
             ),
           );
@@ -643,4 +643,14 @@ export async function resolve(
   resolver.finish(ast.frontmatter.range ?? ast.range);
 
   return fromPartial(resolver.build(formats), resolver.diagnostics);
+}
+
+/**
+ * The folders a resolver looked in, as `E_ASSET_NOT_FOUND` prints them: `'a'`, `'a' or 'b'`,
+ * `'a', 'b' or 'c'`.
+ */
+function searchedIn(assets: AssetResolver): string {
+  const folders = (assets.searched ?? [assets.base]).map((folder) => `'${folder}'`);
+  if (folders.length <= 1) return folders.join('');
+  return `${folders.slice(0, -1).join(', ')} or ${folders[folders.length - 1]}`;
 }

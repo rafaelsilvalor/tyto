@@ -6,7 +6,9 @@ import {
   briefAssetResolver,
   fileAssetResolver,
   fileResources,
+  fsDeliveryOutput,
   fsTaskOutput,
+  recordingAssetResolver,
   renderResult,
 } from '@tyto/io';
 import {
@@ -74,6 +76,13 @@ export interface ExportRequest {
    * off for the queue, whose `outbox/<id>/out/` is the ADR 0011 contract's shape.
    */
   readonly removeLeftovers?: boolean;
+  /**
+   * Deliver into {@link directory} itself: the artwork at the top, the brief in
+   * `editaveis/` and the images it used in `assets/` (ADR 0057). On for the export box, where
+   * the folder the person picked is the delivery; off for the queue, whose
+   * `outbox/<id>/out/` is the ADR 0011 contract's shape. `label` names the copied brief.
+   */
+  readonly delivery?: boolean;
 }
 
 export type ExportStatus = 'running' | 'finished' | 'cancelled';
@@ -268,10 +277,30 @@ export async function createExportService(options: ExportServiceOptions): Promis
         ? undefined
         : fileResources({ base: request.briefDirectory });
     const { host, warnings: skipped } = exporterHost(images, options.rasterizer, await plugins);
-    const sink = await fsTaskOutput(request.directory, {
-      label: request.label,
-      removeLeftovers: request.removeLeftovers ?? false,
-    });
+    // The export box delivers into the folder the person picked; `tyto render --folder`
+    // adds a level named after the brief, and the two differ on purpose (ADR 0057).
+    const delivery =
+      request.delivery === true
+        ? await fsDeliveryOutput(request.directory, {
+            name: request.label,
+            // The editor's text, the one this run renders, not a second read of the file.
+            brief: new TextEncoder().encode(request.brief),
+            folder: 'destination',
+            label: request.label,
+          })
+        : undefined;
+    const sink =
+      delivery ??
+      (await fsTaskOutput(request.directory, {
+        label: request.label,
+        removeLeftovers: request.removeLeftovers ?? false,
+      }));
+    // Recorded as the brief resolves, so a delivery copies exactly what was drawn.
+    const assets = recordingAssetResolver(
+      request.briefDirectory === undefined
+        ? fileAssetResolver({ base: request.directory })
+        : briefAssetResolver({ briefDirectory: request.briefDirectory }),
+    );
 
     const job = await runJob(
       {
@@ -289,10 +318,7 @@ export async function createExportService(options: ExportServiceOptions): Promis
         // `confine` stays on, its default: a brief is often written by something else
         // (ADR 0011), and `../../../.ssh/id_rsa` embedded in an exported PNG is a real way
         // to leak a file.
-        assets:
-          request.briefDirectory === undefined
-            ? fileAssetResolver({ base: request.directory })
-            : briefAssetResolver({ briefDirectory: request.briefDirectory }),
+        assets: assets.resolver,
         exporters: host.registry.exporters,
         // The run's own host, which the installed plugins were activated into above: a
         // directive resolves through the same activation that the run reports refusals of.
@@ -334,7 +360,18 @@ export async function createExportService(options: ExportServiceOptions): Promis
       cancelled,
       failed: hasErrors([...startup, ...produced]),
     });
-    run.diagnostics = [...startup, ...skipped, ...produced, ...leftovers];
+    // Before `result.json`, whose warnings include what it removed from `assets/`.
+    const delivered =
+      delivery === undefined ? [] : await delivery.deliverAssets(assets.delivered());
+    if (delivery !== undefined && job.ok && job.value.template !== undefined) {
+      const { name, version, description } = job.value.template;
+      await delivery.describeTemplate({
+        name,
+        version,
+        ...(description === undefined ? {} : { description }),
+      });
+    }
+    run.diagnostics = [...startup, ...skipped, ...produced, ...leftovers, ...delivered];
 
     run.result = renderResult({
       cancelled,

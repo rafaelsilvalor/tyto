@@ -44,7 +44,7 @@ describe('diagnostic', () => {
     const range = sourceRange(10, 16);
     const item = diagnostic(
       'E_ASSET_NOT_FOUND',
-      { path: './prof-ana.png', base: '/briefs' },
+      { path: './prof-ana.png', searched: "'/briefs'" },
       { range, hint: 'Check the path relative to the brief.' },
     );
 

@@ -133,10 +133,10 @@ describe('exporting from the window into a folder used before (ADR 0054)', () =>
     await exportInto(out);
 
     expect(readdirSync(out).sort()).toEqual([
+      'editaveis',
       'grid-1x1-01.svg',
       'grid-1x1-02.svg',
       'leia-me.txt',
-      'result.json',
     ]);
 
     // On screen, and big enough to read: jsdom can say the list exists and not that it shows.

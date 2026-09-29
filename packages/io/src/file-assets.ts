@@ -1,10 +1,11 @@
 import { readFile } from 'node:fs/promises';
-import { isAbsolute, join, resolve } from 'node:path';
+import { basename, isAbsolute, join, resolve } from 'node:path';
 
 import type { AssetResolver, AssetRef } from '@tyto/core';
 
 import { isInside } from './contain.js';
 import { ASSETS_DIR } from './fs-inbox.js';
+import { EDITABLE_DIR } from './fs-outbox.js';
 import { hashOf } from './hash.js';
 
 /**
@@ -80,6 +81,7 @@ export function fileAssetResolver(options: FileAssetResolverOptions): AssetResol
 
   return {
     base,
+    searched: [base, ...fallbacks],
 
     async resolve(reference: string): Promise<AssetRef | undefined> {
       // The literal path first, so what the brief says is what it gets when it is there.
@@ -110,6 +112,12 @@ export function fileAssetResolver(options: FileAssetResolverOptions): AssetResol
  * The asset rule every surface uses (ADR 0056): the path as written in the brief, read
  * from the brief's folder first, then from `assets/` beside it.
  *
+ * **A brief in a folder named `editaveis` also reads its delivery's `assets/`** (ADR 0057):
+ * `<brief folder>/../assets`, the images a delivery copied beside its artwork. It is a third
+ * containment root like the other two, so a path climbing out of any of them is still
+ * refused. The folder's name is the only signal, and that is a heuristic: any folder a person
+ * happens to name `editaveis` gains `../assets` as a base.
+ *
  * The CLI, `tyto watch`, the queue, the desktop preview, the export box and the template
  * editor's brief preview all build their resolver here, so one folder renders the same in
  * all of them. Before this, the CLI and the inbox read `assets/` only and the desktop read
@@ -120,9 +128,46 @@ export function briefAssetResolver(options: {
   readonly briefDirectory: string;
   readonly confine?: boolean;
 }): AssetResolver {
+  const delivery = basename(resolve(options.briefDirectory)) === EDITABLE_DIR;
   return fileAssetResolver({
     base: options.briefDirectory,
-    fallbacks: [join(options.briefDirectory, ASSETS_DIR)],
+    fallbacks: [
+      join(options.briefDirectory, ASSETS_DIR),
+      ...(delivery ? [join(options.briefDirectory, '..', ASSETS_DIR)] : []),
+    ],
     ...(options.confine === undefined ? {} : { confine: options.confine }),
   });
+}
+
+/** An image a brief resolved: the path as written, and the file it was read from. */
+export interface DeliveredAsset {
+  readonly reference: string;
+  readonly path: string;
+}
+
+/**
+ * `inner`, and a record of every file it found, for a delivery to copy into `assets/`
+ * (ADR 0057).
+ *
+ * Recorded as the brief resolves rather than re-scanned afterwards, so what a delivery
+ * copies is exactly what the artwork was drawn from — a second read of the frontmatter would
+ * be a second rule for which paths are images, and the two could disagree.
+ */
+export function recordingAssetResolver(inner: AssetResolver): {
+  readonly resolver: AssetResolver;
+  readonly delivered: () => readonly DeliveredAsset[];
+} {
+  const found = new Map<string, DeliveredAsset>();
+  return {
+    resolver: {
+      base: inner.base,
+      ...(inner.searched === undefined ? {} : { searched: inner.searched }),
+      async resolve(reference: string): Promise<AssetRef | undefined> {
+        const asset = await inner.resolve(reference);
+        if (asset?.path !== undefined) found.set(reference, { reference, path: asset.path });
+        return asset;
+      },
+    },
+    delivered: () => [...found.values()],
+  };
 }
