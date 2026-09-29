@@ -1,5 +1,5 @@
 name: simulados-semana-ec
-version: 1.0.0
+version: 1.0.1
 brand: estrategia-concursos
 description: Estratégia Concursos's mock exams of the week as stories — the title, then each day's schedule and its exams, one story per slide.
 # Stories only: Estratégia Concursos publishes this piece in no grid (the maintainer,

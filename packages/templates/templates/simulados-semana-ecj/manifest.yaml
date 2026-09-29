@@ -1,5 +1,5 @@
 name: simulados-semana-ecj
-version: 1.1.0
+version: 1.1.1
 brand: estrategia-carreira-juridica
 description: Estratégia Carreira Jurídica's mock exams of the week as a carousel and as stories — the title, then each day's schedule and its exams; the last grid asks for a comment.
 formats: [grid, story]
