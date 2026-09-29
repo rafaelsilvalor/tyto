@@ -50,7 +50,7 @@ export {
 
 export { type Mark, mark } from './mark.js';
 
-export { type BandedPageOptions, bandedPage } from './page.js';
+export { type BandedPageOptions, type Seal, bandedPage, sealed } from './page.js';
 
 export {
   type TitleBlockContent,

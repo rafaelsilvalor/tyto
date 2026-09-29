@@ -9,6 +9,7 @@
  * | middle | first slide only: emblem, kicker, subtitle, rule, exam    | `titleBlock(resultTitle)`        |
  * |        | this `::lamina`'s specialties, each as wide as its names | `pillTable(approvedTable)`       |
  * | footer | the handle, and the arrow unless this is the last slide  | `footer()` — `_azul` |
+ * | seal   | last slide only, when the brief has a `selo`: the art     | `sealed` — kit; `sealOf` — house |
  *
  * The second Azul template (TYTO-185), and the first written after the four layers of
  * ADR 0047: it draws nothing of its own. Every piece is the brand's or the kit's, and every
@@ -16,8 +17,9 @@
  */
 
 import { frame, solid } from '@tyto/core/template';
-import { type Block, bandedPage, pillTable, stack, titleBlock } from '@tyto/template-kit';
+import { type Block, bandedPage, pillTable, stack, titleBlock, sealed } from '@tyto/template-kit';
 
+import { sealOf } from '../_casa/seal.js';
 import { footer, hasNextSlide, header } from '../_azul/parts.js';
 import { approvedTable, resultTitle } from '../_azul/presets.js';
 import { APPROVED, BAND, EDGE, MARGIN, PAPER } from '../_azul/tokens.js';
@@ -33,22 +35,29 @@ export const build: TemplateBuild = (context: TemplateContext) => {
     measure: context.measure,
   });
 
+  // The last slide may close with the brief's `selo`; the page above it shrinks by its
+  // height, so the bands are laid out on what is left (TYTO-201).
+  const page = sealed(context.size, sealOf(context));
+
   return frame({
     format: context.format,
     size: context.size,
     idPrefix: context.idPrefix,
     background: solid(PAPER),
-    children: bandedPage({
-      size: context.size,
-      edges: { top: EDGE.top, bottom: EDGE.bottom, side: MARGIN },
-      header: { item: header(), band: BAND.header },
-      footer: footer(width, { next: hasNextSlide(context.artwork) }),
-      middle: stack({
-        name: 'middle',
-        gap: APPROVED.gap.table,
-        items: [...titleOf(context, width), list],
+    children: [
+      ...bandedPage({
+        size: page.size,
+        edges: { top: EDGE.top, bottom: EDGE.bottom, side: MARGIN },
+        header: { item: header(), band: BAND.header },
+        footer: footer(width, { next: hasNextSlide(context.artwork) }),
+        middle: stack({
+          name: 'middle',
+          gap: APPROVED.gap.table,
+          items: [...titleOf(context, width), list],
+        }),
       }),
-    }),
+      ...page.seal,
+    ],
   });
 };
 

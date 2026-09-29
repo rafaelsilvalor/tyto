@@ -8,6 +8,7 @@
  * | header | the owl                                       | `header()` — `_azul`       |
  * | middle | the cover (first slide only), then the table  | `titleBlock(coverTitle)`, `pillTable(sessionTable)` |
  * | footer | the handle, and the arrow unless last slide   | `footer()` — `_azul`       |
+ * | seal   | last slide only, when the brief has a `selo`  | `sealed` — kit; `sealOf` — house       |
  *
  * `bandedPage` centres the middle between the header and the footer, whatever the brief put
  * in it. Composition only: every piece comes from the Azul brand module or from
@@ -16,8 +17,9 @@
  */
 
 import { frame, solid } from '@tyto/core/template';
-import { type Block, bandedPage, pillTable, stack, titleBlock } from '@tyto/template-kit';
+import { type Block, bandedPage, pillTable, stack, titleBlock, sealed } from '@tyto/template-kit';
 
+import { sealOf } from '../_casa/seal.js';
 import { footer, hasNextSlide, header } from '../_azul/parts.js';
 import { coverTitle, sessionTable } from '../_azul/presets.js';
 import { BAND, EDGE, GAP, MARGIN, PAPER } from '../_azul/tokens.js';
@@ -38,18 +40,25 @@ export const build: TemplateBuild = (context: TemplateContext) => {
     items: [...coverOf(context, width), sessions],
   });
 
+  // The last slide may close with the brief's `selo`; the page above it shrinks by its
+  // height, so the bands are laid out on what is left (TYTO-201).
+  const page = sealed(context.size, sealOf(context));
+
   return frame({
     format: context.format,
     size: context.size,
     idPrefix: context.idPrefix,
     background: solid(PAPER),
-    children: bandedPage({
-      size: context.size,
-      edges: { top: EDGE.top, bottom: EDGE.bottom, side: MARGIN },
-      header: { item: header(), band: BAND.header },
-      footer: footer(width, { next: hasNextSlide(context.artwork) }),
-      middle,
-    }),
+    children: [
+      ...bandedPage({
+        size: page.size,
+        edges: { top: EDGE.top, bottom: EDGE.bottom, side: MARGIN },
+        header: { item: header(), band: BAND.header },
+        footer: footer(width, { next: hasNextSlide(context.artwork) }),
+        middle,
+      }),
+      ...page.seal,
+    ],
   });
 };
 

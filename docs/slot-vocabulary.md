@@ -42,6 +42,7 @@ matter — a `titulo` that is an image is worse than a template with no `titulo`
 | `subtitulo` | `rich-text`                                   | The line that qualifies `titulo` — what, when or for whom — drawn smaller and next to it.                       |
 | `chamada`   | `rich-text`                                   | The short label that sets up the title block and says what kind of artwork this is: "Resultado final".          |
 | `imagem`    | `image`                                       | The one picture the brief supplies, wherever the template places it: behind the words, above them, beside them. |
+| `selo`      | `image`                                       | The seal art glued to the foot of the last grid slide, full width; the page above it shrinks by its height.     |
 | `lamina`    | any type, `repeat: true`                      | The block that becomes one artwork: one `::lamina` is one slide of the carousel.                                |
 | `tom`       | `enum`, and an adjustment when a slot repeats | The closed list that picks how the artwork looks; the adjustment of the same name overrides it on one lamina.   |
 

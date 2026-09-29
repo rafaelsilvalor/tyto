@@ -80,6 +80,7 @@ describe('checkSlotVocabulary', () => {
     ['subtitulo', `${TITULO}  subtitulo: { type: image }\n`],
     ['chamada', `${TITULO}  chamada: { type: enum, values: [a] }\n`],
     ['imagem', `${TITULO}  imagem: { type: rich-text }\n`],
+    ['selo', `${TITULO}  selo: { type: rich-text }\n`],
     ['lamina', `${TITULO}  lamina: { type: rich-text }\n`],
     ['tom', `${TITULO}  tom: { type: rich-text }\n`],
     // An enum beside a lamina, but the per-lamina override the standard fixes is missing.
@@ -102,6 +103,7 @@ describe('checkSlotVocabulary', () => {
         '  subtitulo: { type: rich-text, max: 60 }\n' +
         '  chamada: { type: rich-text }\n' +
         '  imagem: { type: image }\n' +
+        '  selo: { type: image }\n' +
         '  lamina: { type: rich-text, repeat: true, min: 1 }\n' +
         '  tom: { type: enum, values: [claro, escuro], default: escuro }\n',
       '  tom: { type: enum, values: [claro, escuro], applies: [lamina] }\n',

@@ -1,5 +1,8 @@
-import { type Block, at } from './blocks.js';
+import { image } from '@tyto/core/template';
 
+import { type Block, at, block } from './blocks.js';
+
+import type { AssetRef } from '@tyto/core';
 import type { NodeDraft } from '@tyto/core/template';
 
 /**
@@ -38,4 +41,36 @@ export function bandedPage(options: BandedPageOptions): NodeDraft[] {
     at(edges.side, middleY, middle),
     at(edges.side, bottom, footer),
   ];
+}
+
+/** A seal: an art the width of the frame, glued to its foot (TYTO-201). */
+export interface Seal {
+  readonly asset: AssetRef;
+  readonly height: number;
+}
+
+/**
+ * The page a layout has once a seal is glued to its foot, and the seal drawn there.
+ *
+ * **The page shrinks by the seal's height** (the maintainer, 2026-09-29): whatever lays the
+ * slide out is handed the shorter size, so a middle centred on the page centres above the
+ * seal and a footer standing on the bottom edge stands on the seal instead — nothing is
+ * drawn under it. With no seal, the size is the frame's and there is nothing to draw.
+ *
+ * The seal is drawn with `cover`, so an art a few pixels off 1080 × `height` still fills
+ * the band rather than leaving a sliver of paper beside it.
+ */
+export function sealed(
+  size: { readonly w: number; readonly h: number },
+  seal: Seal | undefined,
+): { readonly size: { readonly w: number; readonly h: number }; readonly seal: NodeDraft[] } {
+  if (seal === undefined) return { size, seal: [] };
+
+  const band = { w: size.w, h: seal.height };
+  const art = block(
+    band.w,
+    band.h,
+    image({ name: 'seal', asset: seal.asset, size: band, fit: 'cover' }),
+  );
+  return { size: { w: size.w, h: size.h - seal.height }, seal: [at(0, size.h - seal.height, art)] };
 }
