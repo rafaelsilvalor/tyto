@@ -584,6 +584,8 @@ describe('the export handlers (E9.4)', () => {
         outputs: [{ kind: 'svg' }],
         // The export box is the one caller that asks for this; the queue does not (ADR 0054).
         removeLeftovers: true,
+        // And the one that delivers: artwork, editaveis/ and assets/ (ADR 0057).
+        delivery: true,
       },
     ]);
   });

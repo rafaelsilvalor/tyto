@@ -231,13 +231,15 @@ describe('exporting from the window (E9.4)', () => {
     });
 
     const files = readdirSync(out).sort();
-    expect(files).toContain('result.json');
+    // A delivery (ADR 0057): artwork at the top, the report under editaveis/.
+    expect(files).toContain('editaveis');
+    expect(readdirSync(join(out, 'editaveis'))).toContain('result.json');
     expect(files.filter((name) => name.endsWith('.svg')).length).toBeGreaterThan(0);
 
     // The count the person read is the count that landed, which is the whole point of
     // showing one.
     const counted = await window.locator('[data-testid="export-count"]').textContent();
-    const written = files.filter((name) => name !== 'result.json').length;
+    const written = files.filter((name) => name.endsWith('.svg')).length;
     expect(counted?.replace(/\s/gu, '')).toBe(`${String(written)}/${String(written)}`);
   }, 120_000);
 
@@ -255,12 +257,13 @@ describe('exporting from the window (E9.4)', () => {
 
     const listing = (directory: string): string[] =>
       readdirSync(directory)
-        .filter((name) => name !== 'result.json')
+        .filter((name) => name.endsWith('.svg'))
         .sort();
 
-    // `result.json` is excluded from the comparison and not from the test: it carries the
-    // running program's version and the run's own diagnostics, so two programs would
-    // legitimately differ there. The artifacts are what the criterion is about.
+    // The artwork only. `result.json` carries the running program's version and the run's
+    // own diagnostics, so two programs would legitimately differ there, and the window's
+    // folder is a delivery with editaveis/ beside the files (ADR 0057) where `--out` is flat.
+    // The artifacts are what the criterion is about.
     expect(listing(fromWindow)).toEqual(listing(fromCli));
 
     for (const name of listing(fromWindow)) {
@@ -453,7 +456,7 @@ describe('choosing formats and scale (TYTO-137)', () => {
     // dropped and the size says **which one**, which a count alone could not.
     expect(frames).toHaveLength(1);
     expect([frames[0]?.width, frames[0]?.height]).toEqual([1080, 1080]);
-    expect(readdirSync(out)).toContain('result.json');
+    expect(readdirSync(join(out, 'editaveis'))).toContain('result.json');
   }, 180_000);
 
   it('doubles the pixels at 2x, and not the room the design gets', async () => {

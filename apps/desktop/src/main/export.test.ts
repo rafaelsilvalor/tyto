@@ -92,6 +92,34 @@ describe('the export service', () => {
     expect(files.filter((name) => name.endsWith('.svg')).length).toBeGreaterThan(0);
   }, 60_000);
 
+  it('delivers into the picked folder: artwork on top, editaveis/ and assets/ (TYTO-205)', async () => {
+    const examples = join(packDirectory, 'agenda-semana', 'examples');
+    const { exportId } = await service.start({
+      brief: exampleBrief('agenda-semana', 'agenda.brief'),
+      directory: out,
+      briefDirectory: examples,
+      label: 'agenda',
+      outputs: [{ kind: 'svg' }],
+      removeLeftovers: true,
+      delivery: true,
+    });
+
+    const progress = await settled(exportId);
+
+    expect(progress.diagnostics.filter((item) => item.severity === 'error')).toEqual([]);
+    // No level named after the brief: the folder the person picked is the delivery.
+    expect(readdirSync(out).sort()).toEqual(['assets', 'editaveis', 'grid-01.svg', 'grid-02.svg']);
+    expect(readdirSync(join(out, 'editaveis')).sort()).toEqual([
+      'agenda.brief',
+      'result.json',
+      'template.txt',
+    ]);
+    expect(readdirSync(join(out, 'assets'))).toEqual(['calendario.png']);
+    expect(readFileSync(join(out, 'editaveis', 'agenda.brief'), 'utf8')).toContain(
+      'imagem: calendario.png\n',
+    );
+  }, 60_000);
+
   it('answers with a plan before it answers with files', async () => {
     // The whole reason progress is pollable. `total` arrives from the job's `planned` event,
     // which fires once the scene exists and before the first frame is written, so a dialog

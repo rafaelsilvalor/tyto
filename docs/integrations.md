@@ -21,6 +21,11 @@ and the hash does not, since it is the bytes'. One resolver in `@tyto/io`
 preview and export box — so one folder renders the same in all of them. `tyto render --assets
 <dir>` is the only exception: that folder alone, no fallback.
 
+**A brief in a folder named `editaveis` also reads `../assets` (ADR 0057)**, the delivery's
+images, as a third folder with its own containment. The folder's name is the only signal: any
+folder somebody happens to call `editaveis` gains it. `E_ASSET_NOT_FOUND` names the folders
+that were actually searched — one under `--assets`, two by default, three in `editaveis/`.
+
 Invocation: `tyto render <task>/brief.brief --out <task>/out` (exit 0 = ok, 1 = error diagnostics, 2 = internal failure). Optional later: Jacurutu imports `@tyto/pipeline` as a library — same contract, no process.
 
 **The contract has its own document**, written for somebody on the other side of it:
@@ -58,12 +63,21 @@ reads and which nothing here may move. With it, `--out` becomes the parent and T
 
 ```
 <out>/<brief-name>/
-  <format>-<NN>.png             artwork and nothing else at this level
+  <format>-<NN>.png             artwork at this level, beside the two folders
   editaveis/
-    <brief-name>.brief          the brief that produced the files above
+    <brief-name>.brief          the brief that produced the files above, its image paths
+                                pointing at assets/
     template.txt                which template made it — a pointer, never a copy
     result.json
+  assets/
+    <image>                     every image the brief used, by its own file name (ADR 0057)
 ```
+
+`assets/` holds what the brief brought — `imagem:`, `selo:` — and nothing else: not the fonts
+(a commercial face is licensed to a machine, not to a folder) and not the marks a template draws
+from its own code (the owl, the speech balloon). The copied brief's frontmatter values that
+named those images now name the copies, so `editaveis/<brief-name>.brief` renders again from
+where it sits, to the same bytes.
 
 `<brief-name>` is the brief's own file name without `.brief`, used as it is: it names a file
 that already exists on this filesystem, so a second sanitiser beside `artifactName`'s would
@@ -86,9 +100,16 @@ fewer files than planned, or when the operating system refuses the removal. A re
 cannot be read removes nothing (`W_PREVIOUS_RESULT_UNREADABLE`), and a folder with no report
 yet removes nothing and says nothing. `--out` removes nothing, ever: see below.
 
-The desktop's export box follows the same rule over the folder a person picks, with
-`result.json` beside the artwork. The queue panel and `tyto watch` do not: their `out/` is the
-contract above.
+The same rule reaches `assets/`: an image the previous delivery's brief pointed at there and
+this one does not is removed, with a `W_LEFTOVER_REMOVED`, and a file the brief never named is
+left alone.
+
+**The desktop's export box delivers the same layout, one level up** (ADR 0057): the folder a
+person picks **is** the delivery — artwork at its top, `editaveis/` and `assets/` beside it —
+because that person already chose where it goes. **`tyto render --folder` keeps its
+`<out>/<brief-name>/` level**, because `--out` there names a parent that many briefs share. The
+two differ on purpose; neither is a bug. The queue panel and `tyto watch` deliver nothing: their
+`out/` is the contract above.
 
 **`template.txt` names the template and does not carry it.** One line — `promo-curso 1.0.0`
 — plus the template's own description and a sentence saying where the template actually

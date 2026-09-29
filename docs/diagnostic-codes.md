@@ -338,10 +338,10 @@ An asset path in the brief does not resolve to a file.
 One image the brief named. The slot stays unset, so the scene never references bytes nobody can supply.
 
 ```
-Asset '{path}' was not found relative to the brief at '{base}', nor in its assets/ folder.
+Asset '{path}' was not found in {searched}.
 ```
 
-Parameters: `path`, `base`
+Parameters: `path`, `searched`
 
 ### `E_UNSUPPORTED_CSS`
 

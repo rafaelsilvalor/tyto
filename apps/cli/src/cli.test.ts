@@ -446,7 +446,11 @@ describe('tyto render, where an asset is found', () => {
     expect(code).toBe(EXIT_DIAGNOSTICS);
     const parsed = parseRenderResult(await resultAt('task', 'out'));
     if (!parsed.ok) throw new Error(parsed.error.join('; '));
-    expect(parsed.value.diagnostics.some((item) => item.code === 'E_ASSET_NOT_FOUND')).toBe(true);
+    const missing = parsed.value.diagnostics.find((item) => item.code === 'E_ASSET_NOT_FOUND');
+    // The one folder it searched, and not the brief's assets/ it never looked in (TYTO-205).
+    expect(missing?.message).toBe(
+      `Asset './logo.png' was not found in '${join(workspace, 'elsewhere')}'.`,
+    );
   });
 });
 
@@ -473,9 +477,16 @@ describe('tyto render --folder', () => {
     );
 
     expect(code, stderr()).toBe(EXIT_OK);
-    // Nothing but artwork at this level — the whole point of the layout. A `result.json`
+    // Artwork, and the two folders beside it — the whole point of the layout. A `result.json`
     // here would be the one file somebody has to delete before sending the folder on.
-    expect(await outFiles('entregas', NAME)).toEqual(['editaveis', 'feed-01.svg', 'feed-02.svg']);
+    expect(await outFiles('entregas', NAME)).toEqual([
+      'assets',
+      'editaveis',
+      'feed-01.svg',
+      'feed-02.svg',
+    ]);
+    // The image the brief used, and nothing it did not (TYTO-205).
+    expect(await outFiles('entregas', NAME, 'assets')).toEqual(['logo.png']);
     expect(await outFiles('entregas', NAME, 'editaveis')).toEqual([
       `${NAME}.brief`,
       'result.json',
@@ -535,7 +546,7 @@ describe('tyto render --folder', () => {
     ).toContain('cartaz 2.1.0');
   });
 
-  it('keeps the brief byte for byte, so the copy is the text that made the artwork', async () => {
+  it('keeps the brief byte for byte but for its image paths, which point at assets/', async () => {
     await run(
       ['render', `task/${NAME}.brief`, '--out', 'entregas', '--folder', '--types', 'svg'],
       environment(),
@@ -543,9 +554,39 @@ describe('tyto render --folder', () => {
 
     // Read as bytes rather than as a string: a copy that normalised CR LF or dropped a BOM
     // would compare equal as text and be a different file, and a CR LF brief is supported
-    // input (TYTO-64).
+    // input (TYTO-64). The one change is the image path (ADR 0057).
     const copied = await readFile(join(workspace, 'entregas', NAME, 'editaveis', `${NAME}.brief`));
-    expect(copied.equals(Buffer.from(briefSource, 'utf8'))).toBe(true);
+    expect(
+      copied.equals(
+        Buffer.from(briefSource.replace('imagem: ./logo.png', 'imagem: logo.png'), 'utf8'),
+      ),
+    ).toBe(true);
+  });
+
+  it('renders the copied brief from editaveis/ to the same bytes (TYTO-205)', async () => {
+    await run(
+      ['render', `task/${NAME}.brief`, '--out', 'entregas', '--folder', '--types', 'svg'],
+      environment(),
+    );
+
+    const code = await run(
+      [
+        'render',
+        join('entregas', NAME, 'editaveis', `${NAME}.brief`),
+        '--out',
+        'de-novo',
+        '--types',
+        'svg',
+      ],
+      environment(),
+    );
+
+    expect(code, stderr()).toBe(EXIT_OK);
+    for (const file of ['feed-01.svg', 'feed-02.svg']) {
+      const delivered = await readFile(join(workspace, 'entregas', NAME, file));
+      const again = await readFile(join(workspace, 'de-novo', file));
+      expect(again.equals(delivered), file).toBe(true);
+    }
   });
 
   it('writes a result.json its own schema accepts, one level down', async () => {
@@ -599,7 +640,12 @@ describe('tyto render --folder', () => {
     const code = await render();
 
     expect(code, stderr()).toBe(EXIT_OK);
-    expect(await outFiles('entregas', NAME)).toEqual(['editaveis', 'feed-01.svg', 'feed-02.svg']);
+    expect(await outFiles('entregas', NAME)).toEqual([
+      'assets',
+      'editaveis',
+      'feed-01.svg',
+      'feed-02.svg',
+    ]);
     expect(stderr()).toContain("warning W_LEFTOVER_REMOVED Removed 'feed-03.svg'");
     const parsed = parseRenderResult(await resultAt('entregas', NAME, 'editaveis'));
     if (!parsed.ok) throw new Error(parsed.error.join('; '));

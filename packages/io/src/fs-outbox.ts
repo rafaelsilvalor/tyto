@@ -1,8 +1,12 @@
-import { mkdir, rename, rm, writeFile } from 'node:fs/promises';
-import { basename, join, resolve } from 'node:path';
+import { copyFile, lstat, mkdir, readFile, rename, rm, writeFile } from 'node:fs/promises';
+import { basename, extname, join, resolve } from 'node:path';
 
-import type { Diagnostics } from '@tyto/core';
+import { type Diagnostic, type Diagnostics, diagnostic } from '@tyto/core';
 import type { Artifact } from '@tyto/pipeline';
+
+import { frontmatterValues, rewriteFrontmatterValues } from './delivery-brief.js';
+import type { DeliveredAsset } from './file-assets.js';
+import { ASSETS_DIR } from './fs-inbox.js';
 
 import { type LeftoverRun, readPreviousDelivery, removeLeftovers } from './leftovers.js';
 import type { OutputSink, TaskOutput } from './ports.js';
@@ -80,6 +84,14 @@ export interface DeliveryOutput extends ReusableTaskOutput {
    * last file to appear and keeps meaning "this delivery is complete".
    */
   describeTemplate(template: DeliveryTemplate): Promise<void>;
+
+  /**
+   * Copies every image the brief resolved into `assets/` beside the artwork, points the
+   * copied brief's frontmatter at them, and removes what the previous delivery's brief
+   * pointed at there and this one does not (ADR 0057). Returns one warning per file
+   * removed or kept. Call it **before** `finish`, for {@link describeTemplate}'s reason.
+   */
+  deliverAssets(assets: readonly DeliveredAsset[]): Promise<Diagnostics>;
 }
 
 export interface FsDeliveryOutputOptions {
@@ -89,8 +101,17 @@ export interface FsDeliveryOutputOptions {
    * One path segment: a `/` in it would silently deliver somewhere else.
    */
   readonly name: string;
-  /** The brief that produced the artwork, copied into {@link EDITABLE_DIR} unchanged. */
+  /**
+   * The brief that produced the artwork, copied into {@link EDITABLE_DIR} as written until
+   * {@link DeliveryOutput.deliverAssets} points its image paths at `assets/`.
+   */
   readonly brief: Uint8Array;
+  /**
+   * `'named'`, the default, delivers into `<destination>/<name>/`: `tyto render --folder`.
+   * `'destination'` delivers into `destination` itself: the desktop export box, where the
+   * person picked the folder that is the delivery (ADR 0057).
+   */
+  readonly folder?: 'named' | 'destination';
   /** See {@link FsOutboxOptions.validate}. On by default. */
   readonly validate?: boolean;
   /** Named in the schema-mismatch message, so a reader knows which task produced it. */
@@ -283,14 +304,22 @@ export async function fsDeliveryOutput(
     );
   }
 
-  const folder = join(resolve(destination), options.name);
+  const folder =
+    options.folder === 'destination'
+      ? resolve(destination)
+      : join(resolve(destination), options.name);
   const editable = join(folder, EDITABLE_DIR);
+  const briefPath = join(editable, `${options.name}.${BRIEF_EXTENSION}`);
   // One `mkdir -p` makes both: `editaveis/` is inside the folder it is created under.
   await mkdir(editable, { recursive: true });
 
+  // Read before it is replaced: the previous delivery's brief is the one record of which
+  // files in `assets/` an earlier export put there (ADR 0057).
+  const previousAssets = await readFile(briefPath, 'utf8').then(frontmatterValues, () => []);
+
   // Before any artifact, so a run that dies half way still shows what it was rendering.
   // `result.json` is the finished signal and is still the last thing written.
-  await writeAtomic(join(editable, `${options.name}.${BRIEF_EXTENSION}`), options.brief);
+  await writeAtomic(briefPath, options.brief);
 
   return {
     ...(await taskOutput({
@@ -305,7 +334,89 @@ export async function fsDeliveryOutput(
     async describeTemplate(template: DeliveryTemplate): Promise<void> {
       await writeAtomic(join(editable, TEMPLATE_FILE), templateNote(template));
     },
+
+    async deliverAssets(assets: readonly DeliveredAsset[]): Promise<Diagnostics> {
+      const directory = join(folder, ASSETS_DIR);
+      const names = deliveredNames(assets);
+      if (names.size > 0) await mkdir(directory, { recursive: true });
+      for (const [path, name] of names) await copyAtomic(path, join(directory, name));
+
+      const renames = new Map<string, string>();
+      for (const asset of assets) {
+        const name = names.get(asset.path);
+        if (name !== undefined) renames.set(asset.reference, name);
+      }
+      const source = new TextDecoder().decode(options.brief);
+      await writeAtomic(briefPath, rewriteFrontmatterValues(source, renames));
+
+      return removeAssetLeftovers(directory, previousAssets, new Set(names.values()));
+    },
   };
+}
+
+/**
+ * Each image's name in `assets/`: its own file name, and `-2`, `-3`… before the extension
+ * when two different files share one. The same file named twice by the brief is copied once.
+ * Compared without case, because a delivery is opened on filesystems that ignore it.
+ */
+function deliveredNames(assets: readonly DeliveredAsset[]): Map<string, string> {
+  const names = new Map<string, string>();
+  const taken = new Set<string>();
+  for (const { path } of assets) {
+    if (names.has(path)) continue;
+    const extension = extname(path);
+    const stem = basename(path, extension);
+    let name = `${stem}${extension}`;
+    for (let count = 2; taken.has(name.toLowerCase()); count += 1) {
+      name = `${stem}-${String(count)}${extension}`;
+    }
+    taken.add(name.toLowerCase());
+    names.set(path, name);
+  }
+  return names;
+}
+
+/** `writeAtomic` for a file that is already on disk: copied to `.part`, then renamed. */
+async function copyAtomic(from: string, to: string): Promise<void> {
+  const temporary = `${to}.part`;
+  try {
+    await copyFile(from, temporary);
+    await rename(temporary, to);
+  } catch (cause) {
+    await rm(temporary, { force: true }).catch(() => undefined);
+    throw cause;
+  }
+}
+
+/**
+ * What the previous delivery's brief pointed at in `assets/` and this one does not: removed,
+ * with a warning each (ADR 0054's rule, carried to `assets/` by ADR 0057).
+ *
+ * Only a bare file name counts, the only shape a delivered brief writes, so nothing outside
+ * `assets/` can be named, and a file somebody else put there is left alone.
+ */
+async function removeAssetLeftovers(
+  directory: string,
+  previous: readonly string[],
+  current: ReadonlySet<string>,
+): Promise<Diagnostics> {
+  const warnings: Diagnostic[] = [];
+  for (const name of new Set(previous)) {
+    const bare = name !== '' && name === basename(name) && !name.startsWith('.');
+    if (!bare || current.has(name)) continue;
+    const path = join(directory, name);
+    const found = await lstat(path).catch(() => undefined);
+    if (found?.isFile() !== true) continue;
+    try {
+      await rm(path);
+      warnings.push(diagnostic('W_LEFTOVER_REMOVED', { file: `${ASSETS_DIR}/${name}` }));
+    } catch (cause) {
+      warnings.push(
+        diagnostic('W_LEFTOVER_KEPT', { file: `${ASSETS_DIR}/${name}`, reason: String(cause) }),
+      );
+    }
+  }
+  return warnings;
 }
 
 /**
