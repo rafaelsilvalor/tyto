@@ -14,7 +14,7 @@ import type {
   TextOverflow,
   TextVerticalAlign,
 } from '@tyto/core';
-import { blendModes, measureNothing } from '@tyto/core';
+import { blendModes, measureNothing, reportNothing } from '@tyto/core';
 import {
   TemplateError,
   font,
@@ -900,5 +900,6 @@ function staticContext(format: string): TemplateContext {
     adjustments: {},
     // The static check reads the markup's layout, never a measured one.
     measure: measureNothing,
+    report: reportNothing,
   };
 }

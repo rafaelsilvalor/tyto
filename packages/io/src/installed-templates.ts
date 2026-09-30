@@ -139,10 +139,15 @@ function deferred(
         sent.add(key);
       }
 
-      // Everything but `measure`, which is a function and is rebuilt in the plugin.
-      const { measure: _measure, ...call } = context;
+      // Everything but the functions, which are rebuilt in the plugin.
+      const { measure: _measure, report, ...call } = context;
       const answer = await pack.build(manifest.name, call, shipped);
-      if (answer.ok) return answer;
+      if (answer.ok) {
+        // The reports crossed as data the wire checked against the closed list; the
+        // diagnostic, its range and its wording are written here, by `compile` (ADR 0058).
+        for (const reported of answer.value.reports) report(reported);
+        return ok(answer.value.frame, answer.diagnostics);
+      }
       return err([
         diagnostic('E_PLUGIN_TEMPLATE', {
           plugin: pack.plugin,

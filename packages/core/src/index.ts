@@ -99,11 +99,15 @@ export {
   type DeferredTemplate,
   type Template,
   type TemplateBuild,
+  type TemplateAnswer,
   type TemplateCall,
   type TemplateContext,
+  type TemplateReport,
   defineTemplate,
   isDeferredTemplate,
   measureNothing,
+  reportNothing,
+  templateReportCodes,
 } from './template/define.js';
 
 export { type RunStyle, type RunsOptions, runsOf } from './template/runs.js';

@@ -1,11 +1,11 @@
-import { measureNothing } from '@tyto/core';
+import { measureNothing, reportNothing } from '@tyto/core';
 import { describe, expect, it } from 'vitest';
 
 import { CALL_TO_COMMENT, ROXO, OCRE, VINHO } from './brands.js';
 import { simuladosDaSemana } from './compose.js';
 import { SAFETY, TABLE } from './tokens.js';
 
-import type { Inline, RichText, SceneNode, TemplateContext } from '@tyto/core';
+import type { Inline, RichText, SceneNode, TemplateContext, TemplateReport } from '@tyto/core';
 
 /**
  * The weekly mock-exam agenda is composition (ADR 0047), so what is checked here is that it
@@ -55,7 +55,11 @@ interface Slide {
   readonly chamada?: string;
 }
 
-function contextOf(slide: Slide, measure: TemplateContext['measure'] = measureNothing) {
+function contextOf(
+  slide: Slide,
+  measure: TemplateContext['measure'] = measureNothing,
+  report: TemplateContext['report'] = reportNothing,
+) {
   const index = slide.index ?? 0;
   const slots = {
     titulo: rich('Agenda de Simulados'),
@@ -75,6 +79,7 @@ function contextOf(slide: Slide, measure: TemplateContext['measure'] = measureNo
     ) as TemplateContext['slots'],
     adjustments: {},
     measure,
+    report,
   } satisfies TemplateContext;
 }
 
@@ -246,3 +251,49 @@ function boxHeightOf(node: SceneNode): number {
       return 'size' in node ? node.size.h : 0;
   }
 }
+
+describe('simulados da semana: a slide that runs off the page (TYTO-202)', () => {
+  /** Two days of four exams: at 10 px a character, more than the grid holds and less than the story. */
+  const LONG = [26, 27]
+    .map(
+      (day) =>
+        `Domingo ${String(day)}/10 | Aplicação às 08h30 & correção às 14h\n` +
+        Array.from({ length: 4 }, (_, exam) => `${String(exam + 1)}º Simulado TX QC`).join('\n'),
+    )
+    .join('\n');
+
+  /** One day of one exam, on a grid that is not the last: nothing near the foot. */
+  const SHORT = 'Domingo 26/10 | Aplicação às 08h30 & correção às 14h\n1º Simulado TX QC';
+
+  function reportsOf(slide: Slide): TemplateReport[] {
+    const reports: TemplateReport[] = [];
+    simuladosDaSemana(OCRE)(
+      contextOf(slide, tenPerCharacter, (report) => {
+        reports.push(report);
+      }),
+    );
+    return reports;
+  }
+
+  it('reports how far the grid runs past its foot', () => {
+    const reports = reportsOf({ format: 'grid', week: LONG });
+
+    expect(reports.map((report) => report.code)).toEqual(['W_TEMPLATE_OVERFLOW']);
+    expect(reports[0]?.overflow).toBeGreaterThan(0);
+  });
+
+  it('says nothing for the same slide on the taller story', () => {
+    expect(reportsOf({ format: 'story', week: LONG })).toEqual([]);
+  });
+
+  it('says nothing for a slide that fits the grid, which is the control', () => {
+    expect(reportsOf({ format: 'grid', index: 0, count: 2, week: SHORT })).toEqual([]);
+  });
+
+  it('measures the overflow to the sign-off’s foot, the lowest thing drawn', () => {
+    const [signOff] = named(draw(OCRE, { format: 'grid', week: LONG }), 'sign-off');
+    const foot = (signOff?.transform.y ?? 0) + (signOff === undefined ? 0 : boxHeightOf(signOff));
+
+    expect(reportsOf({ format: 'grid', week: LONG })[0]?.overflow).toBeCloseTo(foot - SIZE.grid.h);
+  });
+});

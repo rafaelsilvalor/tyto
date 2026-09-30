@@ -84,6 +84,7 @@ non-zero.
 | `E_RENDER_FAILED` | error | no | A frame could not be turned into bytes by the exporter or the rasterizer. |
 | `E_OUTPUT_WRITE` | error | no | An artifact was rendered but could not be written to the output. |
 | `W_TEXT_OVERFLOW` | warning | no | Compiled text does not fit its frame in one of the requested formats. |
+| `W_TEMPLATE_OVERFLOW` | warning | no | An artwork's content runs past the room its template has for it in one format. |
 | `W_UNUSED_SLOT` | warning | no | The brief sets a slot the chosen template never renders. |
 | `W_MARKUP_IN_FRONTMATTER` | warning | no | A frontmatter scalar on a rich-text slot contains what looks like inline markup. |
 | `W_TEMPLATE_SHADOWED` | warning | no | Two template sources declare the same name; the earlier source is the one used. |
@@ -1128,6 +1129,20 @@ Text in slot '{slot}' overflows its frame by {overflow}px in format '{format}'.
 ```
 
 Parameters: `slot`, `overflow`, `format`
+
+### `W_TEMPLATE_OVERFLOW`
+
+**Severity:** warning · **Fatal:** no · **Spec:** `docs/adr/0058-a-template-reports-warnings-beside-its-frame.md`
+
+An artwork's content runs past the room its template has for it in one format.
+
+A warning never replaces a value (ADR 0013).
+
+```
+Artwork '{artwork}' does not fit format '{format}': its content runs {overflow}px past the room the template has, and that part is cut.
+```
+
+Parameters: `artwork`, `format`, `overflow`
 
 ### `W_UNUSED_SLOT`
 

@@ -41,6 +41,7 @@ import {
   grownTextBlock,
   naturalWidth,
   pillTable,
+  reportOverflow,
   rowGroups,
   sealed,
   stack,
@@ -96,6 +97,13 @@ export function simuladosDaSemana(brand: Brand): TemplateBuild {
     const top = chrome === undefined ? EDGE.top : EDGE.top + chrome.height + SAFETY;
     const middleX = (page.size.w - middle.width) / 2;
     const middleY = Math.max(top, (page.size.h - middle.height) / 2);
+    const signature = signOff(brand, middle.width);
+    const signatureY = middleY + middle.height + SAFETY;
+
+    // One lamina feeds the grid and the story, and what fits the taller story can run off
+    // the grid's foot (TYTO-202): the sign-off is the lowest thing drawn, and it must end on
+    // the page — above the seal, when there is one.
+    reportOverflow(context.report, signatureY + signature.height, page.size.h);
 
     return frame({
       format: context.format,
@@ -105,7 +113,7 @@ export function simuladosDaSemana(brand: Brand): TemplateBuild {
       children: [
         ...(chrome === undefined ? [] : [at(middleX, EDGE.top, chrome)]),
         at(middleX, middleY, middle),
-        at(middleX, middleY + middle.height + SAFETY, signOff(brand, middle.width)),
+        at(middleX, signatureY, signature),
         ...page.seal,
       ],
     });
