@@ -55,7 +55,15 @@ const catalogue = () => ({
   list: () =>
     Promise.resolve({
       templates: [
-        { name: 'promo', version: '1.0.0', description: 'A promo', formats: ['feed', 'story'] },
+        {
+          name: 'promo',
+          version: '1.0.0',
+          description: 'A promo',
+          formats: [
+            { id: 'feed', label: 'Feed' },
+            { id: 'story', label: 'Story' },
+          ],
+        },
       ],
       failures: [],
     }),

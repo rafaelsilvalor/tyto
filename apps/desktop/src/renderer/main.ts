@@ -24,7 +24,12 @@ import {
   revealRange,
 } from './panel.js';
 import { type CommandEntry, type CommandBar, COMMAND_BAR_TAG } from './command-bar.js';
-import { type ExportDialog, type ExportProgressView, EXPORT_DIALOG_TAG } from './export-dialog.js';
+import {
+  type ExportDialog,
+  type ExportProgressView,
+  type FormatOption,
+  EXPORT_DIALOG_TAG,
+} from './export-dialog.js';
 import { type PluginsDialog, PLUGINS_DIALOG_TAG } from './plugins-dialog.js';
 import { previewAnalysis } from './brief-analysis.js';
 import {
@@ -482,13 +487,13 @@ const EXPORT_POLL_MS = 150;
  * The formats the brief in front will render, for the dialog's checklist (TYTO-137).
  *
  * **No channel of its own, because the window already has both halves.** `templates:list`
- * answers with each template's format ids and `panel.templates` is holding that answer; the
+ * answers with each template's formats, id and label, and `panel.templates` holds that answer; the
  * brief's frontmatter names which template it is. So this is a lookup rather than a round
  * trip — and an empty array is the honest answer for a brief that names no template, or one
  * whose manifest this window does not have, which the dialog draws as *every format the
  * template has* rather than as an empty list.
  */
-function formatsOfActiveBrief(): readonly string[] {
+function formatsOfActiveBrief(): readonly FormatOption[] {
   const wanted = templateOf(activeText());
   if (wanted === undefined) return [];
   return panel.templates.find((template) => template.name === wanted)?.formats ?? [];
