@@ -890,8 +890,17 @@ ${day('26/10')}${day('27/10')}
       /simulados\.brief:8:1: warning W_TEMPLATE_OVERFLOW Artwork 'lamina-1' does not fit format 'grid': its content runs \d+px past/,
     );
 
+    // Only the overflow is this card's. The simulados draw in CircularXX, a face licensed to a
+    // machine and never shipped (ADR 0037), so a machine without it — CI's runner — also reports
+    // one W_FONT_SUBSTITUTED per weight. Those are about the machine, not the brief.
     const parsed = parseRenderResult(await resultAt('task', 'out'));
     if (!parsed.ok) throw new Error(parsed.error.join('; '));
-    expect(parsed.value.diagnostics.map((item) => item.code)).toEqual(['W_TEMPLATE_OVERFLOW']);
+    const overflows = parsed.value.diagnostics.filter(
+      (item) => item.code === 'W_TEMPLATE_OVERFLOW',
+    );
+    expect(overflows).toHaveLength(1);
+    expect(overflows[0]?.message).toMatch(/^Artwork 'lamina-1' does not fit format 'grid':/);
+    // On the first `::lamina`, the directive the slide came from.
+    expect(overflows[0]?.range?.start).toBe(BRIEF.indexOf('::lamina'));
   });
 });
