@@ -111,8 +111,20 @@ describe('clicking a problem puts the cursor exactly where it said', () => {
 
 describe('the template picker', () => {
   const templates: readonly Template[] = [
-    { name: 'cartaz', version: '1.0.0', description: 'One poster', formats: ['feed'] },
-    { name: 'promo-curso', version: '2.1.0', formats: ['feed', 'story'] },
+    {
+      name: 'cartaz',
+      version: '1.0.0',
+      description: 'One poster',
+      formats: [{ id: 'grid-1x1', label: 'Grid 1:1' }],
+    },
+    {
+      name: 'promo-curso',
+      version: '2.1.0',
+      formats: [
+        { id: 'grid', label: 'Grid' },
+        { id: 'story', label: 'Story' },
+      ],
+    },
   ];
 
   it('lists the manifests and marks the one the brief names', () => {
@@ -127,9 +139,10 @@ describe('the template picker', () => {
     const picker = select();
     paintTemplatePicker(picker, { templates, current: 'cartaz', locale: 'pt-BR' });
 
-    expect(picker.options[0]?.title).toBe('One poster — feed');
+    // The label a person reads, not the id the brief carries (TYTO-196).
+    expect(picker.options[0]?.title).toBe('One poster — Grid 1:1');
     // No description is not an empty one: the formats still answer "what will I get".
-    expect(picker.options[1]?.title).toBe('feed, story');
+    expect(picker.options[1]?.title).toBe('Grid, Story');
   });
 
   it('offers a placeholder while the brief names no template', () => {

@@ -107,9 +107,10 @@ export function paintTemplatePicker(picker: HTMLSelectElement, state: TemplatePi
       const option = document_.createElement('option');
       option.value = template.name;
       option.textContent = template.name;
-      const detail = [template.description, template.formats.join(', ')].filter(
-        (part) => part !== undefined && part !== '',
-      );
+      const detail = [
+        template.description,
+        template.formats.map((format) => format.label).join(', '),
+      ].filter((part) => part !== undefined && part !== '');
       if (detail.length > 0) option.title = detail.join(' — ');
       option.selected = template.name === state.current;
       return option;

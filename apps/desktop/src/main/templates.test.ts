@@ -85,6 +85,54 @@ describe('the template catalogue', () => {
     }
   });
 
+  it('names each format by its label from formats.yaml, keeping the id beside it', async () => {
+    // TYTO-196: the shipped pack's `formats.yaml` labels every format, so the dialog can say
+    // "Grid 1:1" and still send `grid-1x1`.
+    const catalogue = await createTemplateCatalogue({
+      sources: await sourcesOver(packDirectory),
+    });
+
+    const formats = (await catalogue.list()).templates.flatMap((template) => template.formats);
+    expect(formats).toContainEqual({ id: 'grid-1x1', label: 'Grid 1:1' });
+    expect(formats).toContainEqual({ id: 'grid', label: 'Grid' });
+    expect(formats).toContainEqual({ id: 'story', label: 'Story' });
+  });
+
+  it('falls back to the id for a format with no label, or with no catalogue at all', async () => {
+    // `label` is optional in a third-party `formats.yaml`, and a folder with none has no
+    // catalogue; either way the dialog shows what it showed before labels existed.
+    const withoutCatalogue = await createTemplateCatalogue({
+      sources: await sourcesOver(scratch),
+    });
+    const bare = (await withoutCatalogue.list()).templates.find(
+      (item) => item.name === 'with-preview',
+    );
+    expect(bare?.formats).toEqual([{ id: 'feed', label: 'feed' }]);
+
+    // Its own folder, so the broken-folder case below still sees exactly the two it built.
+    const unlabelled = mkdtempSync(join(tmpdir(), 'tyto-unlabelled-'));
+    mkdirSync(join(unlabelled, 'pack'), { recursive: true });
+    writeFileSync(
+      join(unlabelled, 'formats.yaml'),
+      ['feed: { w: 1080, h: 1080, kind: grid }', 'wide: { w: 1920, h: 1080, label: Wide }'].join(
+        '\n',
+      ),
+    );
+    writeFileSync(
+      join(unlabelled, 'pack', 'manifest.yaml'),
+      ['name: pack', 'version: 1.0.0', 'formats: [feed, wide]', 'slots: {}'].join('\n'),
+    );
+    const withCatalogue = await createTemplateCatalogue({
+      sources: await sourcesOver(unlabelled),
+    });
+    const pack = (await withCatalogue.list()).templates.find((item) => item.name === 'pack');
+    expect(pack?.formats).toEqual([
+      { id: 'feed', label: 'feed' },
+      { id: 'wide', label: 'Wide' },
+    ]);
+    rmSync(unlabelled, { recursive: true, force: true });
+  });
+
   it('carries a preview.png across as bytes, not as a path', async () => {
     // A path would be refused by the renderer's `img-src 'self' data:` policy, which is the
     // whole of the reason since ADR 0024 retired the other one — that the renderer would
