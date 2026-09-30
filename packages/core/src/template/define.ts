@@ -74,7 +74,35 @@ export interface TemplateContext {
    * does so knowingly, and should expect the exporter's own layout to differ from it.
    */
   readonly measure: (node: MeasurableText) => TextMeasurement | undefined;
+
+  /**
+   * Tells the author something about this frame without failing it (ADR 0058).
+   *
+   * A template returns a frame and nothing else, so before this there was no way for one
+   * to say "the slide you wrote does not fit the grid" — it drew what fitted and the rest
+   * was cut in silence. A report is a warning from the diagnostic catalog: the template
+   * names the code and its own numbers, and `compile` supplies the artwork, the format and
+   * the source range of the directive the artwork came from. Severity and wording stay in
+   * the catalog, where every other diagnostic keeps them.
+   */
+  readonly report: (report: TemplateReport) => void;
 }
+
+/**
+ * What a template may report, as a closed list (ADR 0058).
+ *
+ * Closed on purpose: an installed template runs in its plugin's process and its reports
+ * cross back as data, and a list the host checks is what keeps a plugin from writing an
+ * arbitrary diagnostic — an error, say, or somebody else's code — into the author's run.
+ */
+export type TemplateReport = {
+  /** The content runs past the room the template has for it; `overflow` is in px. */
+  readonly code: 'W_TEMPLATE_OVERFLOW';
+  readonly overflow: number;
+};
+
+/** Every code a template may report, for the checks that cannot read a type. */
+export const templateReportCodes = ['W_TEMPLATE_OVERFLOW'] as const;
 
 /**
  * The `measure` of a context that has no faces to measure against.
@@ -83,6 +111,9 @@ export interface TemplateContext {
  * `undefined` for every node, which is the honest answer rather than a guessed height.
  */
 export const measureNothing: TemplateContext['measure'] = () => undefined;
+
+/** The `report` of a context built by hand, in a test or a preview: it keeps nothing. */
+export const reportNothing: TemplateContext['report'] = () => undefined;
 
 export type TemplateBuild = (context: TemplateContext) => Frame;
 
@@ -96,11 +127,19 @@ export function defineTemplate(manifest: TemplateManifest, build: TemplateBuild)
 }
 
 /**
- * What crosses to a template that runs in another process: its context without `measure`,
- * which is a function and cannot be cloned (ADR 0048). The other end rebuilds `measure`
- * over the faces that crossed with the call, with the same `measureText`.
+ * What crosses to a template that runs in another process: its context without `measure`
+ * and `report`, which are functions and cannot be cloned (ADR 0048). The other end rebuilds
+ * `measure` over the faces that crossed with the call, with the same `measureText`, and
+ * `report` as a list that crosses back beside the frame (ADR 0058).
  */
-export type TemplateCall = Omit<TemplateContext, 'measure'>;
+export type TemplateCall = Omit<TemplateContext, 'measure' | 'report'>;
+
+/** What an installed template's build answers across the boundary: its frame and reports. */
+export interface TemplateAnswer {
+  readonly frame: Frame;
+  /** Always a list, never absent: an answer crosses as JSON, where `undefined` is lost. */
+  readonly reports: readonly TemplateReport[];
+}
 
 /**
  * A template whose frame is answered later — an installed code template, running in its

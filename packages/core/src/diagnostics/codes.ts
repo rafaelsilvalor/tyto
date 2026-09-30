@@ -674,6 +674,18 @@ export const diagnosticCodes = {
     fatal: false,
     fatality: 'A warning never replaces a value (ADR 0013).',
   },
+  // Raised by a template through `context.report` rather than by a stage (ADR 0058). The
+  // template names only the code and how far it ran over; `compile` fills in the artwork and
+  // the format and points the range at the directive the artwork came from.
+  W_TEMPLATE_OVERFLOW: {
+    severity: 'warning',
+    summary: "An artwork's content runs past the room its template has for it in one format.",
+    template:
+      "Artwork '{artwork}' does not fit format '{format}': its content runs {overflow}px past the room the template has, and that part is cut.",
+    spec: 'docs/adr/0058-a-template-reports-warnings-beside-its-frame.md',
+    fatal: false,
+    fatality: 'A warning never replaces a value (ADR 0013).',
+  },
   W_UNUSED_SLOT: {
     severity: 'warning',
     summary: 'The brief sets a slot the chosen template never renders.',

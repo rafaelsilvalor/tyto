@@ -11,7 +11,7 @@ formats: [grid, story]
 //
 // One slide feeds both formats, so it has to fit the grid, the shorter of the two: three
 // exams in two days is about what a grid holds. A slide that does not fit runs off the
-// bottom of the grid with no warning — a template cannot report one yet.
+// bottom of the grid, and the render says so with W_TEMPLATE_OVERFLOW (TYTO-202).
 
 ::titulo
   Agenda de Simulados

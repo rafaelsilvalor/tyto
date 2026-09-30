@@ -14,8 +14,10 @@ export {
   type Template,
   type TemplateBuild,
   type TemplateContext,
+  type TemplateReport,
   defineTemplate,
   measureNothing,
+  reportNothing,
 } from './define.js';
 
 export { type RunStyle, type RunsOptions, runsOf } from './runs.js';
