@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 
 import type { BriefAst, Directive, Frontmatter, RichText } from './ast.js';
-import { compile } from './compile.js';
+import { compile, compileDeferred } from './compile.js';
 import { type ResolvedBrief, resolve } from './resolve.js';
 import { formatCatalogue } from '../config/formats.js';
 import type { AssetResolver } from '../ports/asset-resolver.js';
@@ -9,7 +9,7 @@ import { GAP_COLOR } from '../scene/gap.js';
 import type { AssetRef } from '../scene/primitives.js';
 import type { Frame, Scene } from '../scene/scene.js';
 import { sourceRange } from '../source/range.js';
-import { type Template, defineTemplate } from '../template/define.js';
+import { type DeferredTemplate, type Template, defineTemplate } from '../template/define.js';
 import { TemplateError } from '../template/errors.js';
 import { type TemplateManifest, parseManifest } from '../template/manifest.js';
 import { frame, group, image, text } from '../template/nodes.js';
@@ -508,5 +508,64 @@ describe('a brief that left a required slot unset is drawn, and stamped', () => 
 
     expect(partialScene.value.fonts).toEqual(whole.fonts);
     expect(partialScene.value.assets).toEqual(whole.assets);
+  });
+});
+
+describe('a template reports beside its frame (ADR 0058)', () => {
+  // Each slide at its own place in the source, so a range proves which one was meant.
+  const SLIDES = [sourceRange(100, 120), sourceRange(130, 150), sourceRange(160, 180)];
+  const PLACED: BriefAst = {
+    ...BRIEF,
+    directives: [
+      ...BRIEF.directives.filter((item) => item.name !== 'slide'),
+      ...SLIDES.map((range, index) => directive('slide', textOf(`slide ${index}`), { range })),
+    ],
+  };
+
+  /** `promo-curso`, reporting that its second slide runs 37.4px past the feed's foot. */
+  const reporting = defineTemplate(MANIFEST, (context) => {
+    if (context.artwork.index === 1 && context.format === 'feed') {
+      context.report({ code: 'W_TEMPLATE_OVERFLOW', overflow: 37.4 });
+    }
+    return promoCurso.build(context);
+  });
+
+  it('turns the report into the catalog warning, on the directive the slide came from', async () => {
+    const result = compile(await resolved(PLACED), reporting, { formats: FORMATS });
+
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect(result.value.artworks).toHaveLength(3);
+    expect(result.diagnostics).toEqual([
+      {
+        severity: 'warning',
+        code: 'W_TEMPLATE_OVERFLOW',
+        message:
+          "Artwork 'slide-2' does not fit format 'feed': its content runs 37px past the room the template has, and that part is cut.",
+        range: SLIDES[1],
+      },
+    ]);
+  });
+
+  it('says nothing for a template that reports nothing, which is the control', async () => {
+    const result = compile(await resolved(PLACED), promoCurso, { formats: FORMATS });
+
+    expect(result.ok && result.diagnostics).toEqual([]);
+  });
+
+  it('carries a deferred template’s reports the same way', async () => {
+    const deferred: DeferredTemplate = {
+      manifest: MANIFEST,
+      buildLater: (context) => {
+        const answer = reporting.build(context);
+        return Promise.resolve({ ok: true, value: answer, diagnostics: [] });
+      },
+    };
+
+    const result = await compileDeferred(await resolved(PLACED), deferred, { formats: FORMATS });
+
+    expect(result.ok && result.diagnostics.map((item) => [item.code, item.range])).toEqual([
+      ['W_TEMPLATE_OVERFLOW', SLIDES[1]],
+    ]);
   });
 });

@@ -276,7 +276,7 @@ export function runGuest(
     try {
       const handed = callable.receive?.(args.data, state) ?? args.data;
       const value = await target.fn(...handed);
-      const answer = callable.reply === undefined ? value : callable.reply(value);
+      const answer = callable.reply === undefined ? value : callable.reply(value, handed);
       send({ protocol: RPC_PROTOCOL_VERSION, type: 'result', id, value: answer });
     } catch (cause) {
       send({ protocol: RPC_PROTOCOL_VERSION, type: 'thrown', id, problem: messageOf(cause) });

@@ -314,3 +314,26 @@ describe("a face installed on this machine, and a plugin's template", () => {
     expect(measuredWidth(scene)).toBe(1);
   }, 60_000);
 });
+
+describe("an installed code template's reports (ADR 0058)", () => {
+  // Starts a plugin's process, which a full `pnpm check` can hold past Vitest's 5 s.
+  it('cross back beside the frame and become the catalog warning', async () => {
+    const { scene } = await compiled({
+      body: "context.report({ code: 'W_TEMPLATE_OVERFLOW', overflow: 12 }); return { format: context.format, size: context.size, children: [] };",
+    });
+
+    expect(scene.ok).toBe(true);
+    expect(problemsOf(scene).map((problem) => problem.message)).toEqual([
+      "Artwork 'artwork-1' does not fit format 'feed': its content runs 12px past the room the template has, and that part is cut.",
+    ]);
+  }, 60_000);
+
+  // Starts a plugin's process, which a full `pnpm check` can hold past Vitest's 5 s.
+  it('outside the closed list cost the frame, and write no diagnostic of the plugin’s', async () => {
+    const { scene } = await compiled({
+      body: "context.report({ code: 'E_ASSET_NOT_FOUND', overflow: 12 }); return { format: context.format, size: context.size, children: [] };",
+    });
+
+    expect(problemsOf(scene).map((problem) => problem.code)).toEqual(['E_PLUGIN_TEMPLATE']);
+  }, 60_000);
+});

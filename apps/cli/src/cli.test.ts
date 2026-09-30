@@ -836,3 +836,71 @@ describe('tyto watch --once', () => {
     expect(parsed.value.status).toBe('error');
   });
 });
+
+describe('tyto render, where a slide runs off the grid (TYTO-202)', () => {
+  const day = (date: string): string =>
+    `  Domingo ${date} | Aplicação às 08h30 & correção às 14h\n` +
+    [1, 2, 3].map((exam) => `  ${String(exam)}º Simulado TJ SP - Pós-edital (Juiz)\n`).join('');
+
+  // The first slide is two days of three exams: more than the grid holds, less than the story
+  // does. The second is the example's own last slide, which fits both.
+  const BRIEF = `---
+template: simulados-semana-ecj
+formats: [grid, story]
+---
+::titulo
+  Agenda de Simulados
+
+::lamina
+${day('26/10')}${day('27/10')}
+::lamina
+  Domingo 02/11 | Aplicação às 08h30 & correção às 14h
+  1º Simulado Promotor MP RJ - Pós-edital
+`;
+
+  beforeEach(async () => {
+    // The built-in pack is sized for `grid`, which the cartaz project does not define.
+    await writeFile(
+      join(workspace, 'formats.yaml'),
+      'grid: { w: 1080, h: 1350, kind: grid }\nstory: { w: 1080, h: 1920, kind: story }\n',
+    );
+    await writeFile(join(workspace, 'task', 'simulados.brief'), BRIEF);
+  });
+
+  it('warns on stderr, naming the slide and the format, on the lamina’s line', async () => {
+    const code = await run(
+      ['render', 'task/simulados.brief', '--out', 'task/out', '--types', 'svg'],
+      environment(),
+    );
+
+    // A warning, not a failure: every frame is still written.
+    expect(code, stderr()).toBe(EXIT_OK);
+    expect(await outFiles('task', 'out')).toEqual([
+      'grid-01.svg',
+      'grid-02.svg',
+      'result.json',
+      'story-01.svg',
+      'story-02.svg',
+    ]);
+    const warnings = stderr()
+      .split('\n')
+      .filter((line) => line.includes('W_TEMPLATE_OVERFLOW'));
+    expect(warnings).toHaveLength(1);
+    expect(warnings[0]).toMatch(
+      /simulados\.brief:8:1: warning W_TEMPLATE_OVERFLOW Artwork 'lamina-1' does not fit format 'grid': its content runs \d+px past/,
+    );
+
+    // Only the overflow is this card's. The simulados draw in CircularXX, a face licensed to a
+    // machine and never shipped (ADR 0037), so a machine without it — CI's runner — also reports
+    // one W_FONT_SUBSTITUTED per weight. Those are about the machine, not the brief.
+    const parsed = parseRenderResult(await resultAt('task', 'out'));
+    if (!parsed.ok) throw new Error(parsed.error.join('; '));
+    const overflows = parsed.value.diagnostics.filter(
+      (item) => item.code === 'W_TEMPLATE_OVERFLOW',
+    );
+    expect(overflows).toHaveLength(1);
+    expect(overflows[0]?.message).toMatch(/^Artwork 'lamina-1' does not fit format 'grid':/);
+    // On the first `::lamina`, the directive the slide came from.
+    expect(overflows[0]?.range?.start).toBe(BRIEF.indexOf('::lamina'));
+  });
+});

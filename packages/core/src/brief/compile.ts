@@ -15,6 +15,7 @@ import {
   type DeferredTemplate,
   type Template,
   type TemplateContext,
+  type TemplateReport,
   measureNothing,
 } from '../template/define.js';
 import type { TemplateManifest } from '../template/manifest.js';
@@ -193,6 +194,8 @@ function flatten(slot: ResolvedSlot | undefined): Readonly<Record<string, string
 interface Plan {
   readonly id: string;
   readonly index: number;
+  /** Where the brief wrote this artwork's occurrence — what a template's report points at. */
+  readonly range?: SourceRange;
   readonly slots: Readonly<Record<string, ResolvedSlot>>;
   readonly adjustments: Readonly<Record<string, string | true>>;
 }
@@ -215,6 +218,7 @@ function planArtworks(resolved: ResolvedBrief, manifest: TemplateManifest): read
   return resolved.artworks.map((artwork) => ({
     id: `${repeatable}-${artwork.index + 1}`,
     index: artwork.index,
+    ...(artwork.slot.range === undefined ? {} : { range: artwork.slot.range }),
     slots: { ...resolved.slots, [repeatable]: artwork.slot },
     adjustments: flatten(artwork.slot),
   }));
@@ -279,10 +283,13 @@ export async function compileDeferred(
   const plans = planArtworks(resolved, manifest);
   const measure = measureOf(options.faces);
   const answers = new Map<string, Result<Frame, Diagnostics>>();
+  const reported = new Map<string, Diagnostic[]>();
   for (const plan of plans) {
     for (const format of resolved.formats) {
-      const context = contextOf(plan, format, plans.length, options, measure);
+      const reports: Diagnostic[] = [];
+      const context = contextOf(plan, format, plans.length, options, measure, reports);
       answers.set(context.idPrefix, await template.buildLater(context));
+      reported.set(context.idPrefix, reports);
     }
   }
 
@@ -292,9 +299,10 @@ export async function compileDeferred(
     if (answer === undefined) {
       return { problems: [crash(manifest.name, new Error(`no answer for ${context.idPrefix}`))] };
     }
+    const reports = reported.get(context.idPrefix) ?? [];
     return answer.ok
-      ? { frame: answer.value, problems: answer.diagnostics }
-      : { problems: answer.error };
+      ? { frame: answer.value, problems: [...reports, ...answer.diagnostics] }
+      : { problems: [...reports, ...answer.error] };
   });
 }
 
@@ -315,6 +323,7 @@ function contextOf(
   count: number,
   options: CompileOptions,
   measure: TemplateContext['measure'],
+  reports: Diagnostic[],
 ): TemplateContext {
   return {
     format,
@@ -325,7 +334,22 @@ function contextOf(
     slots: plan.slots,
     adjustments: plan.adjustments,
     measure,
+    report: (report) => {
+      reports.push(reportDiagnostic(report, plan, format));
+    },
   };
+}
+
+/**
+ * A template's report as the catalog's diagnostic (ADR 0058): the template said what and
+ * how much, and this says where — the artwork, the format and the directive it came from.
+ */
+function reportDiagnostic(report: TemplateReport, plan: Plan, format: string): Diagnostic {
+  return diagnostic(
+    report.code,
+    { artwork: plan.id, format, overflow: Math.round(report.overflow) },
+    plan.range === undefined ? {} : { range: plan.range },
+  );
 }
 
 function compileWith(
@@ -353,10 +377,11 @@ function compileWith(
     const frames: Frame[] = [];
 
     for (const format of resolved.formats) {
-      const context = contextOf(plan, format, plans.length, options, measure);
+      const reports: Diagnostic[] = [];
+      const context = contextOf(plan, format, plans.length, options, measure, reports);
 
       const built = build(context);
-      problems.push(...built.problems);
+      problems.push(...reports, ...built.problems);
       if (built.frame === undefined) continue;
       let frame: Frame = built.frame;
 

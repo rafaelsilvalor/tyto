@@ -3,7 +3,10 @@ import {
   type Directive,
   type Result,
   type Scene,
+  type TemplateAnswer,
+  type TemplateCall,
   type TemplateRegistry,
+  type TemplateReport,
   ok,
   parseManifest,
   resolve,
@@ -11,7 +14,12 @@ import {
 } from '@tyto/core';
 import { describe, expect, it } from 'vitest';
 
-import type { DirectiveContribution, Exporter } from '../contributions.js';
+import type {
+  DirectiveContribution,
+  Exporter,
+  IsolatedPackBuild,
+  TemplatePack,
+} from '../contributions.js';
 import { directiveResolverOf } from '../directives.js';
 import { type Disposable, type Plugin, type PluginHost, createPluginHost } from '../host.js';
 import type { HostCapabilities } from '../capabilities.js';
@@ -791,5 +799,71 @@ describe('the confinement a host requires (ADR 0049)', () => {
       false,
     );
     expect(connected.ok).toBe(true);
+  });
+});
+
+describe('an isolated template’s reports (ADR 0058)', () => {
+  const CALL: TemplateCall = {
+    format: 'feed',
+    size: { w: 10, h: 10 },
+    idPrefix: 'lamina-1.feed',
+    artwork: { id: 'lamina-1', index: 0, count: 1 },
+    slots: {},
+    adjustments: {},
+  };
+
+  /** A pack whose one template reports what `reports` says, and draws an empty frame. */
+  function reportingPack(reports: readonly unknown[]): TemplatePack {
+    return {
+      id: 'demo',
+      templates: [],
+      build: (_template, context) => {
+        for (const report of reports) context.report(report as TemplateReport);
+        return { format: context.format, size: context.size, children: [] };
+      },
+    };
+  }
+
+  async function buildIn(
+    reports: readonly unknown[],
+  ): Promise<Result<TemplateAnswer, Diagnostics>> {
+    const { connected } = await isolate(
+      (host) => host.registerTemplatePack(reportingPack(reports)),
+      {
+        contributes: ['template-pack'],
+      },
+    );
+    if (!connected.ok) throw new Error(connected.error[0]?.message);
+    const host = createPluginHost();
+    const activated = host.tryActivate(connected.value.plugin);
+    if (!activated.ok) throw new Error(activated.error[0]?.message);
+    const [pack] = host.registry.templatePacks();
+    // The proxy's calling convention is the wire's (`IsolatedPackBuild`), as `@tyto/io` reads it.
+    const build = pack?.build as unknown as IsolatedPackBuild;
+    return build('demo', CALL, []);
+  }
+
+  it('crosses back beside the frame, as the list the template made', async () => {
+    const answer = await buildIn([{ code: 'W_TEMPLATE_OVERFLOW', overflow: 37 }]);
+
+    expect(answer.ok && answer.value).toEqual({
+      frame: { format: 'feed', size: { w: 10, h: 10 }, children: [] },
+      reports: [{ code: 'W_TEMPLATE_OVERFLOW', overflow: 37 }],
+    });
+  });
+
+  it('crosses as an empty list when the template reports nothing, never as nothing', async () => {
+    const answer = await buildIn([]);
+
+    expect(answer.ok && answer.value.reports).toEqual([]);
+    // The desktop's wire is JSON (`plugin-wire.ts`), where an absent field and `undefined`
+    // are lost: the answer has to come out of a round trip the same as it went in.
+    expect(JSON.parse(JSON.stringify(answer))).toEqual(answer);
+  });
+
+  it('refuses a report outside the closed list, so a plugin cannot write its own diagnostic', async () => {
+    const answer = await buildIn([{ code: 'E_PLUGIN_CRASHED', overflow: 1 }]);
+
+    expect(answer.ok ? [] : answer.error.map((item) => item.code)).toEqual(['E_PLUGIN_PROTOCOL']);
   });
 });

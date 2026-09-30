@@ -207,7 +207,10 @@ call-by-id mechanism and deadline as `exportFrame`. The host checks the frame ag
 the plugin and the template, which costs that frame and is not fatal. The context crosses without
 `measure`; the faces the manifest declares under `faces:` cross beside it, once per process,
 and the guest rebuilds `measure` over them with core's `measureText`, so it stays synchronous
-(ADR 0038). A face installed on the machine is sent only under a `font:<family>` permission;
+(ADR 0038). `report` is rebuilt there too, and what the template reported crosses back beside
+the frame as `ok({ frame, reports })` — always a list — checked against the closed list of codes a
+template may report, so a plugin reporting any other code is `E_PLUGIN_PROTOCOL` for that frame
+(ADR 0058). A face installed on the machine is sent only under a `font:<family>` permission;
 without it the template measures it as `undefined` and the load says `W_PLUGIN_FONT_WITHHELD`.
 The only loader is `installedTemplateSource` in `@tyto/io`, and it only calls the proxy:
 nothing imports a plugin's template in Tyto's own process. The job compiles such a template with
