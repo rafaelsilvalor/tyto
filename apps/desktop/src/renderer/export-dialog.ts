@@ -1,6 +1,7 @@
 import { LitElement, type TemplateResult, html, nothing } from 'lit';
 
 import { type Locale, DEFAULT_LOCALE, translate } from '../../shared/i18n/index.js';
+import { type IpcResponse } from '../../shared/ipc.js';
 
 /**
  * The export dialog: where the files go, what shapes they take, and how far along it is
@@ -30,6 +31,9 @@ export const EXPORT_KINDS = ['png', 'jpeg', 'webp', 'svg'] as const;
  * declares (ADR 0044). Open, because main is what knows which plugins are installed.
  */
 export type ExportKind = string;
+
+/** A format a template renders, as `templates:list` names it: sent by `id`, shown by `label`. */
+export type FormatOption = IpcResponse<'templates:list'>['templates'][number]['formats'][number];
 
 export interface ExportProgressView {
   readonly status: 'running' | 'finished' | 'cancelled';
@@ -152,8 +156,11 @@ export class ExportDialog extends LitElement {
    * `formats`, which is the behaviour that shipped. The window already holds this: it is
    * `templates:list`'s answer, filtered by the template named in the brief, so the dialog
    * needs no channel of its own.
+   *
+   * Each one carries the `label` a person reads beside the `id` the request sends (TYTO-196);
+   * main has already put the id in the label where the catalogue had none.
    */
-  declare formats: readonly string[];
+  declare formats: readonly FormatOption[];
 
   /** Which file types are ticked. SVG alone by default — it is the one that always works. */
   declare kinds: readonly ExportKind[];
@@ -208,7 +215,8 @@ export class ExportDialog extends LitElement {
    */
   protected override willUpdate(changed: Map<string, unknown>): void {
     if (!changed.has('formats')) return;
-    this.chosenFormats = this.formats.length === 0 ? undefined : [...this.formats];
+    this.chosenFormats =
+      this.formats.length === 0 ? undefined : this.formats.map((format) => format.id);
   }
 
   /** Light DOM, so `shell.css` reaches inside — the arrangement ADR 0024 settled. */
@@ -318,13 +326,13 @@ export class ExportDialog extends LitElement {
           html`<label class="export__format">
             <input
               type="checkbox"
-              value=${format}
-              .checked=${chosen.includes(format)}
+              value=${format.id}
+              .checked=${chosen.includes(format.id)}
               @change=${() => {
-                this.toggleFormat(format);
+                this.toggleFormat(format.id);
               }}
             />
-            ${format}
+            ${format.label}
           </label>`,
       )}
     </fieldset>`;

@@ -254,8 +254,14 @@ export const IPC_CHANNELS = {
           name: z.string(),
           version: z.string(),
           description: z.string().optional(),
-          /** Format ids the template renders, which is what the preview tabs will become. */
-          formats: z.array(z.string()),
+          /**
+           * The formats the template renders: the `id` a request sends and the `label` a
+           * person reads (TYTO-196). `label` is always present because main fills it with the
+           * id when the catalogue has none — a third-party pack may leave it out, and a
+           * project with no readable `formats.yaml` has no catalogue at all — so the renderer
+           * never needs a fallback of its own.
+           */
+          formats: z.array(z.object({ id: z.string(), label: z.string().min(1) })),
           preview: z.string().optional(),
         }),
       ),

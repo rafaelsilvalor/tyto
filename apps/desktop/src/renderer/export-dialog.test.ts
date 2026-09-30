@@ -216,10 +216,11 @@ describe('the export dialog', () => {
  * ticked and `scale` is absent at 1×, rather than being sent as a full list and a 1.
  */
 describe('the export dialog, choosing what to render', () => {
-  const withFormats = async (formats: readonly string[]): Promise<ExportDialog> => {
+  /** Ids in, each labelled by its id upper-cased, so a test can tell the two apart. */
+  const withFormats = async (ids: readonly string[]): Promise<ExportDialog> => {
     const element = dialog();
     element.directory = '/out';
-    element.formats = formats;
+    element.formats = ids.map((id) => ({ id, label: id.toUpperCase() }));
     await element.updateComplete;
     return element;
   };
@@ -256,6 +257,24 @@ describe('the export dialog, choosing what to render', () => {
     expect((await startAndCapture(element))?.formats).toEqual(['feed']);
   });
 
+  it('shows each format by its label and sends it by its id', async () => {
+    // TYTO-196: a person reads "Grid 1:1", the export channel still receives `grid-1x1`.
+    const element = dialog();
+    element.directory = '/out';
+    element.formats = [
+      { id: 'grid-1x1', label: 'Grid 1:1' },
+      { id: 'story', label: 'Story' },
+    ];
+    await element.updateComplete;
+
+    const rows = [...element.querySelectorAll<HTMLLabelElement>('.export__format')];
+    expect(rows.map((row) => row.textContent?.trim())).toEqual(['Grid 1:1', 'Story']);
+
+    element.querySelector<HTMLInputElement>('.export__format input[value="story"]')?.click();
+    await element.updateComplete;
+    expect((await startAndCapture(element))?.formats).toEqual(['grid-1x1']);
+  });
+
   it('will not start with every format unticked', async () => {
     const element = await withFormats(['feed', 'story']);
 
@@ -287,7 +306,7 @@ describe('the export dialog, choosing what to render', () => {
 
     // Another tab, another template. A selection naming formats the new template does not
     // have would be an export of nothing wearing a full checklist.
-    element.formats = ['quadrado'];
+    element.formats = [{ id: 'quadrado', label: 'Quadrado' }];
     await element.updateComplete;
 
     const ticked = [...element.querySelectorAll<HTMLInputElement>('.export__format input')];

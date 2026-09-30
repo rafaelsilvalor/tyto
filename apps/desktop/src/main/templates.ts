@@ -1,7 +1,7 @@
 import { readFile } from 'node:fs/promises';
 import { join } from 'node:path';
 
-import { type TemplateRegistry } from '@tyto/core';
+import { type FormatCatalogue, type TemplateRegistry } from '@tyto/core';
 
 import { type IpcResponse } from '../../shared/ipc.js';
 import { type ProjectSnapshot, type ProjectSources } from './project.js';
@@ -69,12 +69,23 @@ async function previewUri(directory: string): Promise<string | undefined> {
   return `data:image/png;base64,${bytes.toString('base64')}`;
 }
 
-function entriesOf(registry: TemplateRegistry): IpcResponse<'templates:list'>['templates'] {
+/**
+ * Each template with its formats named for a person (TYTO-196).
+ *
+ * The id is the fallback label, decided here and nowhere else: `label` is optional in a
+ * `formats.yaml`, and a project whose catalogue could not be read at all still lists its
+ * templates. Showing the id is what the dialog did before labels existed, so a missing one
+ * degrades to that rather than to a blank checkbox.
+ */
+function entriesOf(
+  registry: TemplateRegistry,
+  formats: FormatCatalogue | undefined,
+): IpcResponse<'templates:list'>['templates'] {
   return registry.list().map((manifest) => ({
     name: manifest.name,
     version: manifest.version,
     ...(manifest.description === undefined ? {} : { description: manifest.description }),
-    formats: [...manifest.formats],
+    formats: manifest.formats.map((id) => ({ id, label: formats?.labelOf(id) ?? id })),
   }));
 }
 
@@ -96,7 +107,7 @@ export async function createTemplateCatalogue(
     // desktop opens and says it has no templates; that is the same call `plugins.ts` makes.
     const registry = snapshot.registry;
 
-    const templates = registry === undefined ? [] : entriesOf(registry);
+    const templates = registry === undefined ? [] : entriesOf(registry, snapshot.formats);
 
     // The preview image is per template and optional, so it is read after the list exists
     // rather than being folded into the map above — a missing file must not cost the entry.
