@@ -72,8 +72,8 @@ export interface ExportRequest {
   readonly formats?: readonly string[];
   /**
    * Remove what the previous export wrote into {@link directory} and this one did not
-   * (ADR 0054). On for the export box, where a person picked the folder and will send it;
-   * off for the queue, whose `outbox/<id>/out/` is the ADR 0011 contract's shape.
+   * (ADR 0054). On for the export box, where a person picked the folder and will send it,
+   * and for the queue, whose `outbox/<id>/out/` a retry reuses (ADR 0059).
    */
   readonly removeLeftovers?: boolean;
   /**

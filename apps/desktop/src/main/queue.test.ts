@@ -148,6 +148,19 @@ describe('with auto-run off', () => {
     expect(statusOf(view, 'tarefa-1')).toBe('done');
     expect(view.tasks.find((task) => task.id === 'tarefa-1')?.hasOutput).toBe(true);
   });
+
+  it('asks the export to remove what the previous run left in out/ (ADR 0059)', async () => {
+    // The removal itself is `@tyto/io`'s and tested there; the queue's part is asking for
+    // it. Without the flag, a retry of a brief that lost slides keeps them (TYTO-199).
+    const { calls, render } = fakeRender();
+    const { service: queue } = start(render, { autoRun: false });
+    drop('tarefa-1', '::titulo Olá');
+    await until(queue, (current) => statusOf(current, 'tarefa-1') === 'pending');
+
+    await queue.run('tarefa-1');
+
+    expect(calls.map((call) => call.removeLeftovers)).toEqual([true]);
+  });
 });
 
 describe('with auto-run on', () => {
