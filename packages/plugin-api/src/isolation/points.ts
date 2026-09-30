@@ -3,6 +3,7 @@ import {
   type Directive,
   type ExpandedInline,
   type Inline,
+  type TemplateReport,
   artworkSchema,
   err,
   frameSchema,
@@ -10,6 +11,7 @@ import {
   sceneSchema,
   sizeSchema,
   templateManifestSchema,
+  templateReportCodes,
 } from '@tyto/core';
 import { z } from 'zod';
 
@@ -46,8 +48,12 @@ export interface CallableSpec {
    * whose `measure` is rebuilt here, because a function does not cross (ADR 0048).
    */
   receive?(args: readonly unknown[], guest: GuestState): readonly unknown[];
-  /** In the guest: what the plugin's answer becomes on the wire. Absent, it crosses as it is. */
-  reply?(value: unknown): unknown;
+  /**
+   * In the guest: what the plugin's answer becomes on the wire, given the arguments
+   * `receive` handed it — which is where a call's own state, such as a template's reports,
+   * is found again. Absent, the answer crosses as it is.
+   */
+  reply?(value: unknown, handed: readonly unknown[]): unknown;
 }
 
 /** What a guest keeps between calls, for the callables that need more than their arguments. */
@@ -166,6 +172,29 @@ const templateCallSchema = z.strictObject({
   adjustments: z.record(z.string(), z.union([z.string(), z.literal(true)])),
 });
 
+/**
+ * A template's report, as a plugin may send it back (ADR 0058): one of the closed list of
+ * codes and its own numbers, nothing else — the host writes the diagnostic, so a plugin
+ * cannot put an error, a message or a range of its choosing into the author's run.
+ */
+const templateReportSchema = z.strictObject({
+  code: z.enum(templateReportCodes),
+  overflow: z.number().nonnegative(),
+});
+
+/** `TemplateAnswer`: the frame, and the reports beside it, as a list that is always there. */
+const templateAnswerSchema = z.strictObject({
+  frame: frameSchema,
+  reports: z.array(templateReportSchema),
+});
+
+/**
+ * The reports of the calls in flight, by the context each was handed. Keyed by the context
+ * rather than kept in `GuestState`, because two builds may be awaiting at once and each
+ * must cross back with its own.
+ */
+const reportsOf = new WeakMap<object, TemplateReport[]>();
+
 const shippedFaceSchema = z.strictObject({
   face: z.strictObject({
     family: z.string().min(1),
@@ -206,18 +235,32 @@ export const ISOLATED_POINTS: Readonly<Partial<Record<ContributionPoint, PointSp
     callables: {
       // `build(template, call, faces)` on the host's side; the plugin's own function is
       // `build(template, context)` and returns a frame, which crosses as a result so a
-      // throw and an answer arrive in one shape (ADR 0048).
+      // throw and an answer arrive in one shape (ADR 0048) — beside the reports the
+      // template made while it built (ADR 0058).
       build: {
         args: z.tuple([z.string().min(1), templateCallSchema, z.array(shippedFaceSchema)]),
         send: ([template, call, faces]) => [template, call, faces ?? []],
-        result: resultSchema(frameSchema),
+        result: resultSchema(templateAnswerSchema),
         failed: (problems) => err(problems),
         optional: true,
         receive: ([template, call, faces], guest) => {
           guest.faces.add(faces as readonly ShippedFace[]);
-          return [template, { ...(call as object), measure: guest.faces.measure }];
+          const reports: TemplateReport[] = [];
+          const context = {
+            ...(call as object),
+            measure: guest.faces.measure,
+            report: (report: TemplateReport) => {
+              reports.push(report);
+            },
+          };
+          reportsOf.set(context, reports);
+          return [template, context];
         },
-        reply: (frame) => ok(frame),
+        reply: (frame, [, context]) => {
+          const reports =
+            typeof context === 'object' && context !== null ? reportsOf.get(context) : undefined;
+          return ok({ frame, reports: reports ?? [] });
+        },
       },
     },
   },

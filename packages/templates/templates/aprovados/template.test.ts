@@ -1,4 +1,4 @@
-import { measureNothing } from '@tyto/core';
+import { measureNothing, reportNothing } from '@tyto/core';
 import { describe, expect, it } from 'vitest';
 
 import { APPROVED } from '../_estrategia-saude/tokens.js';
@@ -67,6 +67,7 @@ function contextOf(
     ) as TemplateContext['slots'],
     adjustments: {},
     measure,
+    report: reportNothing,
   };
 }
 

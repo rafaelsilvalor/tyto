@@ -535,6 +535,7 @@ build: (context: TemplateContext) => Frame;
 | `slots`       | every slot the brief gave a value, with the repeatable one already resolved to _this_ artwork's occurrence — `slots.slide` is this slide |
 | `adjustments` | this artwork's, flattened: `true` for a flag, the value for an enum                                                                      |
 | `measure`     | `measure(textDraft)` — the lines, width and height a text node will be laid out at, or `undefined` when nothing can measure (ADR 0038)   |
+| `report`      | `report({ code: 'W_TEMPLATE_OVERFLOW', overflow })` — a warning about this frame, from a closed list, which `compile` writes (ADR 0058)  |
 
 **`measure` is how a box grows with its text.** Build the text node first, ask, then size
 what surrounds it: `const m = context.measure(title)` and a pill `m.height + padding` tall.
@@ -543,6 +544,14 @@ box holds exactly the lines that are drawn. **`undefined` is "cannot measure", n
 no font cache in this compile, or a face nobody supplied — and a template that falls back
 to a fixed height there is guessing, and should say so in a comment. A markup template has
 no way to call it yet.
+
+**`report` is how a layout says the brief does not fit.** A frame draws what fits in its size
+and the rest is cut, so a template whose content runs past the page says how far:
+`reportOverflow(context.report, bottom, limit)` from `@tyto/template-kit` does it when `bottom`
+lands below `limit`. The template names only the code and its number; `compile` adds the
+artwork, the format and the range of the directive the artwork came from, and the wording is
+the catalog's (`W_TEMPLATE_OVERFLOW`). The list of codes is closed. A context built by hand in a
+test passes `reportNothing`.
 
 **Pass `idPrefix` or the scene will not validate.** Node ids are derived from position, so
 two artworks with a `grid-1x1` frame each would both generate `grid-1x1.0`, and so would the two

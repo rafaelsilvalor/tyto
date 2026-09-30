@@ -2,7 +2,9 @@ import { rect } from '@tyto/core/template';
 import { describe, expect, it } from 'vitest';
 
 import { sized } from './blocks.js';
-import { bandedPage, sealed } from './page.js';
+import { bandedPage, reportOverflow, sealed } from './page.js';
+
+import type { TemplateReport } from '@tyto/core';
 
 /** Where the three bands land: arithmetic, as everything else in this package is tested. */
 
@@ -58,5 +60,28 @@ describe('sealed', () => {
       fit: 'cover',
       asset,
     });
+  });
+});
+
+describe('reportOverflow (TYTO-202)', () => {
+  const reportsFor = (bottom: number, limit: number): TemplateReport[] => {
+    const reports: TemplateReport[] = [];
+    reportOverflow(
+      (report) => {
+        reports.push(report);
+      },
+      bottom,
+      limit,
+    );
+    return reports;
+  };
+
+  it('reports how far the foot lands below the limit', () => {
+    expect(reportsFor(1390, 1350)).toEqual([{ code: 'W_TEMPLATE_OVERFLOW', overflow: 40 }]);
+  });
+
+  it('says nothing for a foot on the limit or above it', () => {
+    expect(reportsFor(1350, 1350)).toEqual([]);
+    expect(reportsFor(900, 1350)).toEqual([]);
   });
 });

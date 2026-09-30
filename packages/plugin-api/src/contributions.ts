@@ -6,6 +6,7 @@ import type {
   Frame,
   Result,
   Scene,
+  TemplateAnswer,
   TemplateCall,
   TemplateContext,
   TemplateManifest,
@@ -165,14 +166,16 @@ export interface TemplatePack extends Contribution {
 
 /**
  * `TemplatePack.build` as the host's proxy of it is called (ADR 0048): the context crosses
- * without `measure`, the faces it measures cross beside it, and the answer is a result,
- * because a timeout, a crash and a frame the IR schema refuses arrive as values.
+ * without `measure` and `report`, the faces it measures cross beside it, and the answer is a
+ * result, because a timeout, a crash and a frame the IR schema refuses arrive as values.
+ * What succeeds is the frame and the reports the template made building it (ADR 0058),
+ * which the host hands to its own `report`.
  */
 export type IsolatedPackBuild = (
   template: string,
   call: TemplateCall,
   faces: readonly ShippedFace[],
-) => Promise<Result<Frame, Diagnostics>>;
+) => Promise<Result<TemplateAnswer, Diagnostics>>;
 
 /* ------------------------------------------------------------------------ directive -- */
 
