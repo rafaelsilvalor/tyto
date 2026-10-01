@@ -269,6 +269,19 @@ describe('tyto render', () => {
     expect(svg).not.toContain(GAP_COLOR_CSS);
   });
 
+  it("crops the brief's own `cover` image in the SVG, as the window does (TYTO-215)", async () => {
+    await run(['render', 'task/brief.brief', '--out', 'task/out', '--types', 'svg'], environment());
+
+    const svg = await readFile(join(workspace, 'task', 'out', 'feed-01.svg'), 'utf8');
+    // The 1×1 logo into the 1080×300 photo box: scaled to the width, centred on the height,
+    // and clipped to the box. Without the picture's size the exporter falls back to
+    // `preserveAspectRatio="… slice"`, which an importer does not read (TYTO-60).
+    expect(svg).toContain('<clipPath');
+    expect(svg).toContain('preserveAspectRatio="none"');
+    expect(svg).toContain('transform="translate(0 -390) scale(1080)"');
+    expect(svg).not.toContain('slice');
+  });
+
   it('writes no artifact at all when the brief names a template that does not exist', async () => {
     // The other side of the same rule: fatal means nothing is drawn, and `result.json` is
     // still written so the caller on the other end of ADR 0011 has something to read.
