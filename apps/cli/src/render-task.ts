@@ -67,6 +67,14 @@ export interface RenderTask {
    * than a change to the one above.
    */
   readonly delivery?: { readonly name: string };
+  /**
+   * Remove what the previous run in {@link outDirectory} listed and this one did not
+   * produce (ADR 0054's rule). `tyto watch` sets it, because its `outbox/<id>/out/` is the
+   * folder the desktop queue already tidies (ADR 0059, ADR 0060); `tyto render --out` does
+   * not, because that folder belongs to the caller and `--out` removes nothing, ever. A
+   * `--folder` delivery always removes, so this is ignored there.
+   */
+  readonly removeLeftovers?: boolean;
 }
 
 export interface RenderTaskOptions {
@@ -155,7 +163,12 @@ export async function renderTask(
           brief: new TextEncoder().encode(task.brief),
           label: task.id,
         });
-  const output = delivery ?? (await fsTaskOutput(task.outDirectory, { label: task.id }));
+  const output =
+    delivery ??
+    (await fsTaskOutput(task.outDirectory, {
+      label: task.id,
+      removeLeftovers: task.removeLeftovers ?? false,
+    }));
 
   // Handed out empty and filled by `loadResources` below, once the scene says which files
   // it draws. The folder is no longer read to find out (TYTO-62).
@@ -221,17 +234,15 @@ export async function renderTask(
   registerOrigin(produced, { path: task.briefPath, source: task.brief });
 
   const artifacts = job.ok ? job.value.artifacts : [];
-  // Only a `--folder` delivery removes anything; `--out` is the ADR 0011 contract and its
-  // reader reconciles against `result.json` itself (ADR 0054).
-  const leftovers =
-    delivery === undefined
-      ? []
-      : await delivery.removeLeftovers({
-          artifacts,
-          planned: job.ok ? job.value.planned : 0,
-          cancelled: job.ok ? job.value.cancelled : false,
-          failed: hasErrors([...inherited, ...produced]),
-        });
+  // A `--folder` delivery and a watched task remove what their last run left; `--out` was
+  // opened without the rule and answers nothing, because its reader reconciles against
+  // `result.json` itself (ADR 0054, ADR 0060).
+  const leftovers = await output.removeLeftovers({
+    artifacts,
+    planned: job.ok ? job.value.planned : 0,
+    cancelled: job.ok ? job.value.cancelled : false,
+    failed: hasErrors([...inherited, ...produced]),
+  });
 
   // Before `result.json`, whose warnings include what it removed from `assets/`.
   const delivered = delivery === undefined ? [] : await delivery.deliverAssets(assets.delivered());
