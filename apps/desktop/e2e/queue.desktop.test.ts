@@ -30,7 +30,8 @@ import { closeApp } from './close-app.js';
  * fixed and saved there, and runs again from the panel.
  *
  * Its own `--user-data-dir`, so the layout, the settings and the recent list are this suite's
- * and not the machine's (TYTO-139 is the four suites that still share the real one).
+ * and not the machine's (TYTO-139 is the four suites that still share the real one), and its
+ * own `TYTO_HOME`, so no plugin or template installed on this machine can decide the outcome.
  */
 
 const here = dirname(fileURLToPath(import.meta.url));
@@ -44,6 +45,22 @@ if (!existsSync(built)) {
 
 const GOOD = ['---', 'template: promo-curso', '---', '::titulo Da fila'].join('\n');
 const BROKEN = ['---', 'template: nenhum-template', '---', '::titulo Quebrada'].join('\n');
+
+/** An official template whose one repeating slot is one slide per occurrence. */
+const agenda = (slides: number): string =>
+  [
+    '---',
+    'template: agenda-semana',
+    'formats: [grid]',
+    '---',
+    '::titulo',
+    '  AGENDA DA SEMANA',
+    ...Array.from({ length: slides }, (_unused, index) => [
+      '::lamina',
+      '  FARMÁCIA',
+      `  0${String(index + 1)}/10 - 14:00 | Aula ${String(index + 1)} | Profª. Teste`,
+    ]).flat(),
+  ].join('\n');
 
 let scratch: string;
 let queueFolder: string;
@@ -100,7 +117,7 @@ beforeAll(async () => {
   app = await _electron.launch({
     args: ['.', `--user-data-dir=${join(scratch, 'user-data')}`],
     cwd: join(here, '..'),
-    env: { ...process.env, TYTO_HEADLESS: '1' },
+    env: { ...process.env, TYTO_HEADLESS: '1', TYTO_HOME: join(scratch, 'tyto-home') },
   });
   page = await app.firstWindow();
   // Something the script builds, never the markup it shipped with (TYTO-154, TYTO-175).
@@ -233,5 +250,51 @@ describe('the local queue panel', () => {
     // Nothing was put back in the inbox, which would have queued the task a second time.
     expect(existsSync(join(queueFolder, 'inbox', 'quebrada'))).toBe(false);
     expect(await page.locator('.tabs__tab', { hasText: 'quebrada · brief.brief' }).count()).toBe(1);
+  });
+
+  it('tries again a task that lost a slide, and out/ keeps only the new ones (TYTO-199)', async () => {
+    // Auto-run off, so the second run is the button and not a sweep.
+    await page.uncheck('tyto-queue-panel .queue__auto-run');
+    const id = 'encolhe';
+    const brief = join(queueFolder, 'inbox', id, 'brief.brief');
+    const out = join(queueFolder, 'outbox', id, 'out');
+    const pngs = () =>
+      readdirSync(out)
+        .filter((name) => name.endsWith('.png'))
+        .sort();
+    const listed = () =>
+      JSON.parse(readFileSync(join(out, 'result.json'), 'utf8')) as {
+        status: string;
+        artifacts: { name: string }[];
+        diagnostics: { code: string }[];
+      };
+
+    // A clean run leaves for done/, and only a failed one offers Try again. A non-empty folder
+    // where the task's done/ folder would go makes the move fail after the render — ENOTEMPTY
+    // on Linux, EPERM on Windows, which replaces a plain file there without complaint — and
+    // that is the failure queue.ts reports as "rendered, but could not be moved". With no
+    // `brief.brief` in it, the done/ listing does not take it for a task.
+    mkdirSync(join(queueFolder, 'done', id), { recursive: true });
+    writeFileSync(join(queueFolder, 'done', id, 'in-the-way.txt'), 'in the way', 'utf8');
+    drop(id, agenda(4));
+    await waitForStatus(id, 'pending', 10_000);
+    await task(id).locator('.queue__run').click();
+    await waitForStatus(id, 'error');
+    expect(pngs()).toHaveLength(4);
+
+    rmSync(join(queueFolder, 'done', id), { recursive: true });
+    writeFileSync(brief, agenda(3), 'utf8');
+    await expect
+      .poll(async () => (await task(id).locator('.queue__run').textContent())?.trim())
+      .toBe('Try again');
+    await task(id).locator('.queue__run').click();
+    await waitForStatus(id, 'done');
+
+    const result = listed();
+    expect(result.status).toBe('ok');
+    expect(result.artifacts).toHaveLength(3);
+    expect(pngs()).toEqual(result.artifacts.map((artifact) => artifact.name).sort());
+    expect(result.diagnostics.map((item) => item.code)).toContain('W_LEFTOVER_REMOVED');
+    await page.screenshot({ path: join(tmpdir(), 'tyto-queue-retry.png') });
   });
 });
