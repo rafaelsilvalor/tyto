@@ -119,6 +119,9 @@ export async function watchCommand(
         briefPath,
         briefDirectory: task.briefDirectory,
         outDirectory: join(root, 'outbox', task.id, OUT_DIR),
+        // The queue's rule on the queue's folder: a task re-dropped with fewer slides ends
+        // with the slides it has now (ADR 0060).
+        removeLeftovers: true,
       },
       {
         outputs: outputRequests(options),
