@@ -2,6 +2,7 @@ import { type Diagnostics, type FileSystem, hasErrors } from '@tyto/core';
 import { htmlExporterPlugin } from '@tyto/export-html';
 import { svgExporterPlugin } from '@tyto/export-svg';
 import {
+  type ExportResources,
   type RenderResult,
   briefAssetResolver,
   fileAssetResolver,
@@ -31,7 +32,7 @@ import type { Rasterizer } from '@tyto/raster';
 
 import { faces, fonts } from './fonts.js';
 import { type ProjectSources } from './project.js';
-import { templateSourceOf } from './template-source.js';
+import { briefThenTemplate, templateSourceOf } from './template-source.js';
 
 /**
  * Brief text in, files on disk out — the export's whole job (E9.4, TYTO-43).
@@ -208,7 +209,7 @@ interface Run {
  * startup and owns the things that are not bound to a folder.
  */
 function exporterHost(
-  resources: ReturnType<typeof fileResources> | undefined,
+  resources: ExportResources,
   rasterizer: Rasterizer | undefined,
   plugins: LoadedPlugins,
 ): { readonly host: InProcessHost; readonly warnings: Diagnostics } {
@@ -216,13 +217,13 @@ function exporterHost(
 
   host.activate(
     htmlExporterPlugin({
-      resources: { font: fonts.font, ...(resources?.html ?? {}) },
+      resources: { font: fonts.font, ...resources.html },
       // The bytes feed a browser, not a reader. Indentation would change the hash of a
       // render for nothing.
       pretty: false,
     }),
   );
-  host.activate(svgExporterPlugin({ resources: { font: fonts.font, ...(resources?.svg ?? {}) } }));
+  host.activate(svgExporterPlugin({ resources: { font: fonts.font, ...resources.svg } }));
 
   if (rasterizer !== undefined) {
     host.activate({
@@ -276,7 +277,14 @@ export async function createExportService(options: ExportServiceOptions): Promis
       request.briefDirectory === undefined
         ? undefined
         : fileResources({ base: request.briefDirectory });
-    const { host, warnings: skipped } = exporterHost(images, options.rasterizer, await plugins);
+    // Built before the exporters so they can be bound to the template's own files as well as
+    // the brief's (TYTO-176); it fills those as the job loads the template.
+    const wiring = templateSourceOf(fileSystem, templates, codePacks);
+    const { host, warnings: skipped } = exporterHost(
+      briefThenTemplate(images, wiring.resources),
+      options.rasterizer,
+      await plugins,
+    );
     // The export box delivers into the folder the person picked; `tyto render --folder`
     // adds a level named after the brief, and the two differ on purpose (ADR 0057).
     const delivery =
@@ -314,7 +322,7 @@ export async function createExportService(options: ExportServiceOptions): Promis
         // Bundled in front of markup, so a template whose body is code draws here the
         // same way it draws through the CLI. Nothing is loaded from a folder either way.
         // An installed code template in front of both, drawn in its plugin's process.
-        templates: templateSourceOf(fileSystem, templates, codePacks),
+        templates: wiring.source,
         // `confine` stays on, its default: a brief is often written by something else
         // (ADR 0011), and `../../../.ssh/id_rsa` embedded in an exported PNG is a real way
         // to leak a file.
@@ -455,7 +463,7 @@ export async function createExportService(options: ExportServiceOptions): Promis
 
     async kinds(): Promise<readonly ExportableKind[]> {
       // A host with no folder's bytes bound: what is asked is only which kinds exist.
-      const { host } = exporterHost(undefined, options.rasterizer, await plugins);
+      const { host } = exporterHost({}, options.rasterizer, await plugins);
       return host.registry.exporters
         .list()
         .flatMap((exporter) =>
