@@ -1,5 +1,5 @@
 import { execFileSync } from 'node:child_process';
-import { mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync } from 'node:fs';
+import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { createRequire } from 'node:module';
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
@@ -18,13 +18,15 @@ import { closeApp } from './close-app.js';
  *
  * Before the fix the window drew nothing for such a template — `E_TEMPLATE_MARKUP` for a
  * `<vector src="assets/…">`, `E_TEMPLATE_VALUE` for an `<image src="assets/…">` — while the CLI
- * drew it whole. So the proof is a PNG from each program over one brief, compared within the
- * tolerance `e2e/raster.desktop.test.ts` defends (0.1% of pixels, pixelmatch threshold 0.1).
+ * drew it whole. So the proof is the window's PNG within the tolerance `e2e/raster.desktop.test.ts`
+ * defends (0.1% of pixels, pixelmatch threshold 0.1), and the CLI's SVG embedding the same two
+ * files the window's does.
  *
- * **No text in the fixture, on purpose.** ADR 0028 measured glyphs at about ten times that
- * tolerance between the window's rasterizer and the CLI's Playwright one, on both platforms. A
- * fixture with a title would be measuring that known gap; without one it measures the
- * template's own files, which is what this card is about.
+ * **The PNG is compared with the artwork, not with the CLI's PNG.** The CLI rasterizes through
+ * Playwright's browser and the desktop job does not install one. Measured on this machine, where
+ * it is installed: the two PNGs differed in 0 of 1,166,400 pixels. **And there is no text in the
+ * fixture**, because ADR 0028 measured glyphs at ten times that tolerance between the two
+ * rasterizers. Without text, the comparison measures the template's own files.
  *
  * The CLI is its built binary, spawned the way `e2e/export.desktop.test.ts` spawns it. Its own
  * `--user-data-dir` and `TYTO_HOME`, so neither this machine's layout nor its plugins decide.
@@ -126,10 +128,24 @@ async function run(commandId: string): Promise<void> {
 const shown = async (): Promise<string> =>
   window.evaluate(() => document.getElementById('preview-frame')?.getAttribute('srcdoc') ?? '');
 
-/** What the pixel at (x, y) of a PNG is, as `[r, g, b]`. */
-function pixelAt(png: PNG, x: number, y: number): number[] {
-  const offset = (png.width * y + x) * 4;
-  return [png.data[offset]!, png.data[offset + 1]!, png.data[offset + 2]!];
+/**
+ * The artwork `MARKUP` describes, pixel for pixel: black, the background over the top half,
+ * the mark's square below it. Every edge falls on a whole pixel, so there is nothing to blend.
+ */
+function expectedArtwork(width: number, height: number): PNG {
+  const png = new PNG({ width, height });
+  for (let y = 0; y < height; y++) {
+    for (let x = 0; x < width; x++) {
+      const inMark = x >= 540 && x < 940 && y >= 600 && y < 1000;
+      const rgb = y < height / 2 ? BACKGROUND_RGB : inMark ? MARK_RGB : ([0, 0, 0] as const);
+      const offset = (width * y + x) * 4;
+      png.data[offset] = rgb[0];
+      png.data[offset + 1] = rgb[1];
+      png.data[offset + 2] = rgb[2];
+      png.data[offset + 3] = 255;
+    }
+  }
+  return png;
 }
 
 beforeAll(async () => {
@@ -194,7 +210,7 @@ describe("a template's own folder, in the window and the CLI (TYTO-176)", () => 
     if (shot !== undefined) await window.screenshot({ path: shot });
   }, 60_000);
 
-  it('exports a PNG that matches `tyto render` within the raster tolerance', async () => {
+  it('exports a PNG within the raster tolerance of the artwork, and the files `tyto render` embeds', async () => {
     const fromWindow = join(scratch, 'from-window');
     await answerPickers({ directory: fromWindow });
     await run('file.export');
@@ -208,7 +224,7 @@ describe("a template's own folder, in the window and the CLI (TYTO-176)", () => 
     );
     for (const kind of ['png', 'jpeg', 'webp', 'svg']) {
       const box = window.locator(`.export__type input[value="${kind}"]`);
-      if ((await box.isChecked()) !== (kind === 'png')) await box.click();
+      if ((await box.isChecked()) !== (kind === 'png' || kind === 'svg')) await box.click();
     }
     await window.locator('.export__start').click();
     await window.waitForSelector('[data-testid="export-status"][data-state="finished"]', {
@@ -221,36 +237,39 @@ describe("a template's own folder, in the window and the CLI (TYTO-176)", () => 
     expect(result.diagnostics.map((item) => item.code)).toEqual([]);
     expect(result.status).toBe('ok');
 
+    // **Against the artwork the markup describes, not against the CLI's PNG.** The CLI
+    // rasterizes through Playwright's browser, which the desktop job does not install (measured
+    // on the first CI run: `Executable doesn't exist`). The fixture is three solid areas, so its
+    // pixels are known exactly and the reference is computed here — no binary, no LFS.
+    const png = PNG.sync.read(readFileSync(join(fromWindow, 'grid-1x1-01.png')));
+    expect([png.width, png.height]).toEqual([1080, 1080]);
+    const reference = expectedArtwork(png.width, png.height);
+    const differing = pixelmatch(png.data, reference.data, undefined, png.width, png.height, {
+      threshold: THRESHOLD,
+    });
+    process.stdout.write(
+      `[TYTO-176] window png vs artwork: ${String(differing)} of ${String(png.width * png.height)} pixels differ
+`,
+    );
+    expect(differing / (png.width * png.height)).toBeLessThanOrEqual(TOLERANCE);
+
+    // And the CLI over the same brief, as SVG, which needs no browser. Not byte for byte: the CLI
+    // hands its SVG exporter no `assetSize`, so it leaves a `cover` picture to the renderer where
+    // the window crops it with a `clipPath` (TYTO-60). Measured on main for a brief's own image,
+    // so that gap predates this card and lives in `apps/cli`. What both must hold is the
+    // template's two files, embedded.
     const fromCli = join(scratch, 'from-cli');
     const cli = require_.resolve('@tyto/cli/dist/index.js');
     execFileSync(
       process.execPath,
-      [cli, 'render', briefPath, '--out', fromCli, '--types', 'png', '--templates', templates],
+      [cli, 'render', briefPath, '--out', fromCli, '--types', 'svg', '--templates', templates],
       { cwd: scratch, stdio: 'pipe' },
     );
-
-    const pngs = (directory: string): string[] =>
-      readdirSync(directory)
-        .filter((name) => name.endsWith('.png'))
-        .sort();
-    expect(pngs(fromWindow)).toEqual(['grid-1x1-01.png']);
-    expect(pngs(fromCli)).toEqual(pngs(fromWindow));
-
-    const a = PNG.sync.read(readFileSync(join(fromWindow, 'grid-1x1-01.png')));
-    const b = PNG.sync.read(readFileSync(join(fromCli, 'grid-1x1-01.png')));
-    expect([a.width, a.height]).toEqual([b.width, b.height]);
-
-    // The files are actually in the artwork — a black canvas from both programs would agree too.
-    expect(pixelAt(a, 540, 270)).toEqual([...BACKGROUND_RGB]);
-    expect(pixelAt(a, 740, 800)).toEqual([...MARK_RGB]);
-
-    const differing = pixelmatch(a.data, b.data, undefined, a.width, a.height, {
-      threshold: THRESHOLD,
-    });
-    const fraction = differing / (a.width * a.height);
-    process.stdout.write(
-      `[TYTO-176] window vs cli: ${String(differing)} of ${String(a.width * a.height)} pixels differ\n`,
-    );
-    expect(fraction).toBeLessThanOrEqual(TOLERANCE);
+    const background = solidPng(16, BACKGROUND_RGB).toString('base64');
+    for (const folder of [fromWindow, fromCli]) {
+      const svg = readFileSync(join(folder, 'grid-1x1-01.svg'), 'utf8');
+      expect(svg, folder).toContain(background);
+      expect(svg, folder).toContain('#30c060');
+    }
   }, 120_000);
 });
