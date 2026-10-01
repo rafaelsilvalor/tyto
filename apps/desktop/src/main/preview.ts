@@ -17,7 +17,7 @@ import { briefAssetResolver, fileResources } from '@tyto/io';
 import type { WindowPlugins } from './window-plugins.js';
 import { faces, fonts } from './fonts.js';
 import { type ProjectSources } from './project.js';
-import { templateSourceOf } from './template-source.js';
+import { briefThenTemplate, templateSourceOf } from './template-source.js';
 
 /**
  * Brief text in, one HTML document per frame out — the preview's whole job (E9.2).
@@ -199,9 +199,8 @@ export async function createPreviewService(
 
       // The same pairing the export path uses: a preview that could not draw a code
       // template would send somebody to the CLI to find out whether their work rendered.
-      const template = await templateSourceOf(fileSystem, templates, codePacks).load(
-        resolved.value.template,
-      );
+      const wiring = templateSourceOf(fileSystem, templates, codePacks);
+      const template = await wiring.source.load(resolved.value.template);
       if (!template.ok) {
         return failed([...ast.diagnostics, ...resolved.diagnostics, ...template.error]);
       }
@@ -240,7 +239,9 @@ export async function createPreviewService(
         // The faces embedded in the document, never a family name left for the host to
         // find. A `system` face this machine lacks is embedded as its bundled substitute and
         // reported below (ADR 0037), so the preview is the export and says where it differs.
-        resources: { font: fonts.font, ...(images?.html ?? {}) },
+        // The template's own `src=` files after the brief's, as the export binds them
+        // (TYTO-176): a template that draws from its folder previews as it exports.
+        resources: { font: fonts.font, ...briefThenTemplate(images, wiring.resources).html },
       });
 
       const before = [
