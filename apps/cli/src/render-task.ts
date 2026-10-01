@@ -1,6 +1,7 @@
 import {
   type AssetRef,
   type Diagnostics,
+  type Size,
   createFaceCache,
   describeFace,
   hasErrors,
@@ -134,8 +135,13 @@ const faces = createFaceCache(fonts.source);
 function combine(brief: ExportResources, template: ExportResources): ExportResources {
   const asset = (ref: AssetRef): string | undefined =>
     brief.html?.asset?.(ref) ?? template.html?.asset?.(ref);
+  // The SVG half only: HTML crops with `object-fit`, and the SVG exporter needs the picture's
+  // own size to write the crop itself (TYTO-60). Without it a `cover` image came out of
+  // `tyto render` uncropped while the window cropped the same brief (TYTO-215).
+  const assetSize = (ref: AssetRef): Size | undefined =>
+    brief.svg?.assetSize?.(ref) ?? template.svg?.assetSize?.(ref);
   const font = fonts.font;
-  return { html: { asset, font }, svg: { asset, font } };
+  return { html: { asset, font }, svg: { asset, assetSize, font } };
 }
 
 export async function renderTask(
