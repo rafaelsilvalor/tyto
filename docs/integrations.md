@@ -171,6 +171,12 @@ one `fsInbox`, and `done/` is a second one, because a finished task has an inbox
   brief has the same file name. When the task then moves to `done/`, main points the tab at
   the new path (`DocumentService.retarget`), so a later save lands where the task now is
   instead of failing on a folder that is gone.
+- **A run removes what the previous run in `out/` listed and did not produce again**
+  (TYTO-199, ADR 0059): ADR 0054's rule, the one the export box uses, so a brief edited from
+  four slides to three and tried again ends with three, and the new `result.json` names the
+  fourth in a `W_LEFTOVER_REMOVED` warning. A retry that fails again, or is cancelled, keeps
+  the older files. **`tyto watch` does not do this yet**: the same task re-rendered there
+  keeps the fourth slide beside a `result.json` that does not list it.
 - **Pushed, not polled**: main already sweeps the inbox once a second, and it sends
   `queue:changed` when something the panel shows has changed; the panel then asks
   `queue:list`. The window runs no timer of its own.

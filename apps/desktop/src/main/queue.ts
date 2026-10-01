@@ -164,6 +164,10 @@ export function createQueueService(options: QueueOptions): QueueService {
       briefDirectory: task.briefDirectory,
       label: task.id,
       outputs: QUEUE_OUTPUTS,
+      // A task is run again after a failure, usually with a brief that changed; without this
+      // a brief that lost slides leaves the old ones in `out/` beside the new `result.json`.
+      // TYTO-127's rule, not a clear: a retry that fails again keeps them (ADR 0059).
+      removeLeftovers: true,
     });
     const diagnostics = progress.diagnostics;
 
