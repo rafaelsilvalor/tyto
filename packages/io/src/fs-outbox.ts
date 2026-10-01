@@ -157,10 +157,10 @@ export interface FsTaskOutputOptions {
   readonly label?: string;
   /**
    * Make {@link ReusableTaskOutput.removeLeftovers} remove what the previous export wrote
-   * here and this one did not (ADR 0054). **Off by default, and off for `--out` and
-   * `tyto watch`**: that folder is the ADR 0011 contract, and its reader reconciles against
-   * `result.json` itself. On for a folder a person picked and will send as it is, and for
-   * the desktop queue's `out/`, which a retry reuses (ADR 0059).
+   * here and this one did not (ADR 0054). **Off by default, and off for `--out`**: that
+   * folder belongs to the ADR 0011 caller, who reconciles against `result.json` itself. On
+   * for a folder a person picked and will send as it is, and for the `outbox/<id>/out/`
+   * that the desktop queue and `tyto watch` reuse (ADR 0059, ADR 0060).
    */
   readonly removeLeftovers?: boolean;
 }

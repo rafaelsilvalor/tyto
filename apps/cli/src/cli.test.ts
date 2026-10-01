@@ -679,7 +679,8 @@ describe('tyto render --folder', () => {
     await writeFile(join(workspace, 'task', `${NAME}.brief`), briefSource);
     await run(['render', `task/${NAME}.brief`, '--out', 'saida', '--types', 'svg'], environment());
 
-    // The ADR 0011 contract: its reader reconciles against result.json itself.
+    // The ADR 0011 contract: its reader reconciles against result.json itself. `tyto watch`
+    // removes here and `--out` does not, which is the cost ADR 0060 declares.
     expect(await outFiles('saida')).toContain('feed-03.svg');
     expect(stderr()).not.toContain('W_LEFTOVER');
   });
@@ -834,6 +835,71 @@ describe('tyto watch --once', () => {
     const parsed = parseRenderResult(await resultAt('queue', 'outbox', 'issue-42', 'out'));
     if (!parsed.ok) throw new Error(parsed.error.join('; '));
     expect(parsed.value.status).toBe('error');
+  });
+
+  /** `issue-42` dropped into the inbox again, as a caller re-sends a task, with `brief`. */
+  async function dropAgain(brief: string): Promise<void> {
+    // The finished run's copy goes first, or the ack would rename onto a folder that exists.
+    await rm(join(workspace, 'queue', 'done'), { recursive: true, force: true });
+    const task = join(workspace, 'queue', 'inbox', 'issue-42');
+    await mkdir(join(task, 'assets'), { recursive: true });
+    await writeFile(join(task, 'brief.brief'), brief);
+    await writeFile(join(task, 'assets', 'logo.png'), LOGO_PNG);
+  }
+
+  const FOUR_SLIDES = `${briefSource}::slide
+  Terceiro
+::slide
+  Quarto
+`;
+  const THREE_SLIDES = `${briefSource}::slide
+  Terceiro
+`;
+
+  it('removes the slide a re-sent task no longer has, as the queue does (ADR 0060)', async () => {
+    await dropAgain(FOUR_SLIDES);
+    await run(['watch', 'queue', '--once', '--types', 'svg'], environment());
+    expect(await outFiles('queue', 'outbox', 'issue-42', 'out')).toContain('feed-04.svg');
+
+    await dropAgain(THREE_SLIDES);
+    const code = await run(['watch', 'queue', '--once', '--types', 'svg'], environment());
+
+    expect(code, stderr()).toBe(EXIT_OK);
+    expect(await outFiles('queue', 'outbox', 'issue-42', 'out')).toEqual([
+      'feed-01.svg',
+      'feed-02.svg',
+      'feed-03.svg',
+      'result.json',
+    ]);
+    // The same warning the desktop queue writes into the same folder (ADR 0059).
+    const parsed = parseRenderResult(await resultAt('queue', 'outbox', 'issue-42', 'out'));
+    if (!parsed.ok) throw new Error(parsed.error.join('; '));
+    expect(parsed.value.diagnostics.map((item) => item.code)).toEqual(['W_LEFTOVER_REMOVED']);
+    expect(parsed.value.status).toBe('ok');
+  });
+
+  it('keeps the previous slides when the re-sent task fails (ADR 0054)', async () => {
+    await dropAgain(FOUR_SLIDES);
+    await run(['watch', 'queue', '--once', '--types', 'png'], environment());
+
+    await dropAgain(THREE_SLIDES);
+    const code = await run(
+      ['watch', 'queue', '--once', '--types', 'png'],
+      environment({ rasterizer: () => fakeRasterizer(() => true) }),
+    );
+
+    expect(code).toBe(EXIT_DIAGNOSTICS);
+    // A run that failed may hold the only copy of an artwork there is: nothing goes.
+    expect(await outFiles('queue', 'outbox', 'issue-42', 'out')).toEqual([
+      'feed-01.png',
+      'feed-02.png',
+      'feed-03.png',
+      'feed-04.png',
+      'result.json',
+    ]);
+    const parsed = parseRenderResult(await resultAt('queue', 'outbox', 'issue-42', 'out'));
+    if (!parsed.ok) throw new Error(parsed.error.join('; '));
+    expect(parsed.value.diagnostics.map((item) => item.code)).not.toContain('W_LEFTOVER_REMOVED');
   });
 });
 

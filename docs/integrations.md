@@ -175,8 +175,8 @@ one `fsInbox`, and `done/` is a second one, because a finished task has an inbox
   (TYTO-199, ADR 0059): ADR 0054's rule, the one the export box uses, so a brief edited from
   four slides to three and tried again ends with three, and the new `result.json` names the
   fourth in a `W_LEFTOVER_REMOVED` warning. A retry that fails again, or is cancelled, keeps
-  the older files. **`tyto watch` does not do this yet**: the same task re-rendered there
-  keeps the fourth slide beside a `result.json` that does not list it.
+  the older files. `tyto watch` applies the same rule to the same folder (TYTO-211, ADR
+  0060), so the window and the watcher agree; `tyto render --out` still removes nothing.
 - **Pushed, not polled**: main already sweeps the inbox once a second, and it sends
   `queue:changed` when something the panel shows has changed; the panel then asks
   `queue:list`. The window runs no timer of its own.
