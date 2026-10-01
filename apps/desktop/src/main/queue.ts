@@ -14,6 +14,8 @@ import {
 } from '@tyto/io';
 import type { OutputRequest } from '@tyto/pipeline';
 
+import { DEFAULT_QUEUE_KINDS } from '../../shared/settings.js';
+
 import type { ExportProgress, ExportRequest } from './export.js';
 
 /**
@@ -58,6 +60,8 @@ export interface QueueView {
   /** Where task folders are dropped, so the panel can say so. `null` with no folder. */
   readonly inbox: string | null;
   readonly autoRun: boolean;
+  /** The file types this folder's tasks produce (ADR 0061). PNG alone until chosen. */
+  readonly kinds: readonly string[];
   readonly tasks: readonly QueueTaskView[];
 }
 
@@ -74,6 +78,11 @@ export interface QueueOptions {
   readonly render: (request: ExportRequest) => Promise<ExportProgress>;
   readonly folder: string | null;
   readonly autoRun: boolean;
+  /**
+   * The file types each folder produces, by absolute path, as `settings.json` keeps them
+   * (ADR 0061). A folder missing from it produces PNG alone.
+   */
+  readonly kinds?: Readonly<Record<string, readonly string[]>>;
   /** Something the panel shows changed. The composition root pushes `queue:changed`. */
   readonly onChange: () => void;
   /** Between sweeps. Defaults to `pollSource`'s one second. */
@@ -93,6 +102,11 @@ export interface QueueService {
   view(): Promise<QueueView>;
   setFolder(folder: string | null): Promise<void>;
   setAutoRun(on: boolean): void;
+  /**
+   * Chooses what the current folder's next tasks produce, and answers with every folder's
+   * choice, which is what `settings.json` keeps. Ignored with no folder or no kind.
+   */
+  setKinds(kinds: readonly string[]): Readonly<Record<string, readonly string[]>>;
   /** Renders the task now, whatever auto-run says. Resolves when the render is over. */
   run(id: string): Promise<void>;
   /** Where the task's brief is, if the queue has listed it. Only a listed task is openable. */
@@ -101,9 +115,6 @@ export interface QueueService {
   outDirectory(id: string): string | undefined;
   close(): void;
 }
-
-/** What a sweep of the queue produced in PNG, which is `tyto watch`'s default. */
-const QUEUE_OUTPUTS: readonly OutputRequest[] = [{ kind: 'png' }];
 
 async function readResultFile(directory: string): Promise<RenderResult | undefined> {
   try {
@@ -132,6 +143,13 @@ export function createQueueService(options: QueueOptions): QueueService {
 
   let folder = options.folder === null ? null : resolve(options.folder);
   let autoRun = options.autoRun;
+  // Keys resolved on the way in, as `folder` is, so `C:\q` and `C:\q\` are one folder's
+  // choice whichever way `settings.json` spelled it.
+  let kindsByFolder: Readonly<Record<string, readonly string[]>> = Object.fromEntries(
+    Object.entries(options.kinds ?? {}).map(([path, kinds]) => [resolve(path), kinds]),
+  );
+  const kindsOf = (root: string): readonly string[] =>
+    kindsByFolder[resolve(root)] ?? DEFAULT_QUEUE_KINDS;
   let sources = folder === null ? undefined : options.sources(folder);
   let controller: AbortController | undefined;
   // Replaced, not cleared, when the folder changes: pointing the window somewhere else must
@@ -163,7 +181,11 @@ export function createQueueService(options: QueueOptions): QueueService {
       directory: outOf(root, task.id),
       briefDirectory: task.briefDirectory,
       label: task.id,
-      outputs: QUEUE_OUTPUTS,
+      // Read per task, so a choice made between two tasks applies to the next one.
+      outputs: kindsOf(root).map((kind): OutputRequest => ({ kind })),
+      // A kind chosen for this folder whose plugin has since been removed is left out with a
+      // warning on the task, never a failed task (ADR 0061).
+      dropUnavailableKinds: true,
       // A task is run again after a failure, usually with a brief that changed; without this
       // a brief that lost slides leaves the old ones in `out/` beside the new `result.json`.
       // TYTO-127's rule, not a clear: a retry that fails again keeps them (ADR 0059).
@@ -257,7 +279,7 @@ export function createQueueService(options: QueueOptions): QueueService {
   return {
     async view(): Promise<QueueView> {
       if (folder === null || sources === undefined) {
-        return { folder: null, inbox: null, autoRun, tasks: [] };
+        return { folder: null, inbox: null, autoRun, kinds: DEFAULT_QUEUE_KINDS, tasks: [] };
       }
       const root = folder;
       const [waiting, finished] = await Promise.all([
@@ -297,7 +319,7 @@ export function createQueueService(options: QueueOptions): QueueService {
         ...waiting.map((task) => describe(task, 'waiting')),
         ...finished.map((task) => describe(task, 'done')),
       ]);
-      return { folder: root, inbox: join(root, 'inbox'), autoRun, tasks };
+      return { folder: root, inbox: join(root, 'inbox'), autoRun, kinds: kindsOf(root), tasks };
     },
 
     async setFolder(next: string | null): Promise<void> {
@@ -318,6 +340,15 @@ export function createQueueService(options: QueueOptions): QueueService {
     setAutoRun(on: boolean): void {
       autoRun = on;
       options.onChange();
+    },
+
+    setKinds(kinds: readonly string[]): Readonly<Record<string, readonly string[]>> {
+      // An empty choice would make a folder that produces nothing; the panel never sends one,
+      // and the schema refuses it, so this is the last guard rather than the only one.
+      if (folder === null || kinds.length === 0) return kindsByFolder;
+      kindsByFolder = { ...kindsByFolder, [folder]: [...new Set(kinds)] };
+      options.onChange();
+      return kindsByFolder;
     },
 
     run(id: string): Promise<void> {

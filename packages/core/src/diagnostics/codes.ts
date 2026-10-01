@@ -774,6 +774,20 @@ export const diagnosticCodes = {
     fatal: false,
     fatality: 'A warning never replaces a value (ADR 0013).',
   },
+  // A warning and not an error, because the brief is not what is wrong: the kind was chosen
+  // for the queue folder, and the plugin that produced it has since left the machine. The
+  // task renders what is still there, as `W_PLUGIN_SKIPPED` does, rather than failing a folder
+  // meant to run unattended (TYTO-188, ADR 0061).
+  W_QUEUE_KIND_UNAVAILABLE: {
+    severity: 'warning',
+    summary:
+      'A file type chosen for the queue folder has no exporter on this machine, so the task was rendered without it.',
+    template:
+      "Did not produce '{kind}': no exporter on this machine produces it any more, so this task produced {produced}.",
+    spec: 'docs/adr/0061-the-queue-folder-chooses-its-file-types.md',
+    fatal: false,
+    fatality: 'A warning never replaces a value (ADR 0013).',
+  },
   W_PREVIOUS_RESULT_UNREADABLE: {
     severity: 'warning',
     summary:

@@ -138,7 +138,11 @@ export interface IpcDependencies {
   readonly queue: {
     readonly service: QueueService;
     chooseFolder: () => Promise<string | undefined>;
-    remember: (changes: { queueFolder?: string | null; queueAutoRun?: boolean }) => Promise<void>;
+    remember: (changes: {
+      queueFolder?: string | null;
+      queueAutoRun?: boolean;
+      queueKinds?: Readonly<Record<string, readonly string[]>>;
+    }) => Promise<void>;
   };
   /** The plugins screen (TYTO-47): built-ins and installed plugins, read and never run. */
   readonly plugins: {
@@ -373,6 +377,13 @@ export function createHandlers(dependencies: IpcDependencies): Handlers {
       return wireQueueView(await queue.service.view());
     },
 
+    'queue:set-kinds': async ({ kinds }) => {
+      // The whole record, because `remember` patches top-level keys and a folder's choice is
+      // one entry of one key: writing only this folder's would forget every other folder's.
+      await queue.remember({ queueKinds: queue.service.setKinds(kinds) });
+      return wireQueueView(await queue.service.view());
+    },
+
     'queue:run': ({ taskId }) => {
       // Not awaited: a render is seconds and the answer is a push. `run` never rejects for a
       // bad brief; anything else it could reject with is already the task's failure.
@@ -463,6 +474,7 @@ function wireQueueView(view: QueueView): IpcResponse<'queue:list'> {
     folder: view.folder,
     inbox: view.inbox,
     autoRun: view.autoRun,
+    kinds: [...view.kinds],
     tasks: view.tasks.slice(0, 500).map((task) => ({
       id: task.id,
       status: task.status,

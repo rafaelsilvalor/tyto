@@ -19,6 +19,7 @@ const VIEW: QueueView = {
   folder: '/fila',
   inbox: '/fila/inbox',
   autoRun: true,
+  kinds: ['png'],
   tasks: [
     { id: 'nova', status: 'pending', diagnostics: [], hasOutput: false },
     { id: 'andando', status: 'rendering', diagnostics: [], hasOutput: false },
@@ -44,6 +45,7 @@ function spies() {
     chooseFolder: vi.fn<() => void>(),
     clearFolder: vi.fn<() => void>(),
     setAutoRun: vi.fn<(on: boolean) => void>(),
+    setKinds: vi.fn<(kinds: readonly string[]) => void>(),
     run: vi.fn<(taskId: string) => void>(),
     openBrief: vi.fn<(taskId: string) => void>(),
     openOutput: vi.fn<(taskId: string) => void>(),
@@ -144,14 +146,59 @@ describe('the queue panel', () => {
     expect(actions.setAutoRun).toHaveBeenCalledWith(false);
   });
 
+  it('offers every kind a run can produce, in capitals, and adds the one ticked (TYTO-188)', async () => {
+    const actions = spies();
+    const element = await panel(VIEW, actions);
+    element.available = ['png', 'jpeg', 'webp', 'svg', 'pdf'];
+    await element.updateComplete;
+    const boxes = [...element.querySelectorAll<HTMLInputElement>('.queue__kind')];
+
+    expect(element.querySelector('.queue__kinds')?.textContent?.replace(/\s+/gu, ' ').trim()).toBe(
+      'Produces: PNG JPEG WEBP SVG PDF',
+    );
+    boxes.find((box) => box.dataset.kind === 'svg')?.click();
+
+    expect(actions.setKinds).toHaveBeenCalledWith(['png', 'svg']);
+  });
+
+  it('never lets the last kind be unticked, so a folder always produces something', async () => {
+    const element = await panel({ ...VIEW, kinds: ['png'] });
+    element.available = ['png', 'svg'];
+    await element.updateComplete;
+    const byKind = (kind: string) =>
+      element.querySelector<HTMLInputElement>(`.queue__kind[data-kind="${kind}"]`);
+
+    expect(byKind('png')?.disabled).toBe(true);
+    expect(byKind('svg')?.disabled).toBe(false);
+
+    element.view = { ...VIEW, kinds: ['png', 'svg'] };
+    await element.updateComplete;
+    expect(byKind('png')?.disabled).toBe(false);
+  });
+
+  it('still lists a chosen kind no exporter produces, so it can be unticked', async () => {
+    const actions = spies();
+    const element = await panel({ ...VIEW, kinds: ['png', 'pdf'] }, actions);
+    element.available = ['png', 'svg'];
+    await element.updateComplete;
+
+    element.querySelector<HTMLInputElement>('.queue__kind[data-kind="pdf"]')?.click();
+
+    expect(actions.setKinds).toHaveBeenCalledWith(['png']);
+  });
+
   it('asks for a folder when there is none, and offers nothing else', async () => {
     const actions = spies();
-    const element = await panel({ folder: null, inbox: null, autoRun: false, tasks: [] }, actions);
+    const element = await panel(
+      { folder: null, inbox: null, autoRun: false, kinds: ['png'], tasks: [] },
+      actions,
+    );
 
     expect(element.querySelector('.queue__note')?.textContent).toBe(
       translate('en', 'queue.folder.none'),
     );
     expect(element.querySelector('.queue__auto-run')).toBeNull();
+    expect(element.querySelector('.queue__kind')).toBeNull();
     element.querySelector<HTMLButtonElement>('.queue__choose')?.click();
     expect(actions.chooseFolder).toHaveBeenCalledTimes(1);
   });

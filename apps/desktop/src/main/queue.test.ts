@@ -79,7 +79,11 @@ function fakeRender(before?: (request: ExportRequest) => void) {
 
 function start(
   render: (request: ExportRequest) => Promise<ExportProgress>,
-  options: { autoRun: boolean; onError?: (message: string, cause: unknown) => void },
+  options: {
+    autoRun: boolean;
+    onError?: (message: string, cause: unknown) => void;
+    kinds?: Record<string, readonly string[]>;
+  },
 ) {
   const onChange = vi.fn();
   service = createQueueService({
@@ -93,6 +97,7 @@ function start(
     onChange,
     intervalMs: 20,
     ...(options.onError === undefined ? {} : { onError: options.onError }),
+    ...(options.kinds === undefined ? {} : { kinds: options.kinds }),
   });
   return { service, onChange };
 }
@@ -160,6 +165,68 @@ describe('with auto-run off', () => {
     await queue.run('tarefa-1');
 
     expect(calls.map((call) => call.removeLeftovers)).toEqual([true]);
+  });
+});
+
+describe('the file types a folder produces (TYTO-188)', () => {
+  const kindsOf = (calls: readonly ExportRequest[]) =>
+    calls.map((call) => call.outputs.map((output) => output.kind));
+
+  it('produces PNG alone in a folder nobody chose for, as the queue always did (ADR 0044)', async () => {
+    const { calls, render } = fakeRender();
+    const { service: queue } = start(render, { autoRun: false });
+    drop('tarefa-1', '::titulo Olá');
+    await until(queue, (current) => statusOf(current, 'tarefa-1') === 'pending');
+
+    await queue.run('tarefa-1');
+
+    expect(kindsOf(calls)).toEqual([['png']]);
+    expect((await queue.view()).kinds).toEqual(['png']);
+  });
+
+  it("renders the next task in the kinds chosen, and answers with every folder's choice", async () => {
+    const { calls, render } = fakeRender();
+    const elsewhere = join(root, '..', 'outra-fila');
+    const { service: queue } = start(render, { autoRun: false, kinds: { [elsewhere]: ['jpeg'] } });
+    drop('tarefa-1', '::titulo Olá');
+    await until(queue, (current) => statusOf(current, 'tarefa-1') === 'pending');
+
+    const saved = queue.setKinds(['png', 'svg', 'png']);
+    await queue.run('tarefa-1');
+
+    expect(kindsOf(calls)).toEqual([['png', 'svg']]);
+    expect((await queue.view()).kinds).toEqual(['png', 'svg']);
+    // The other folder's choice survives, because the whole record is what gets saved.
+    expect(saved).toEqual({ [elsewhere]: ['jpeg'], [root]: ['png', 'svg'] });
+  });
+
+  it('reads a saved choice for the folder, however the path was spelled', async () => {
+    const { calls, render } = fakeRender();
+    const { service: queue } = start(render, { autoRun: false, kinds: { [`${root}/`]: ['svg'] } });
+    drop('tarefa-1', '::titulo Olá');
+    await until(queue, (current) => statusOf(current, 'tarefa-1') === 'pending');
+
+    await queue.run('tarefa-1');
+
+    expect(kindsOf(calls)).toEqual([['svg']]);
+  });
+
+  it('asks the export to drop a kind it cannot produce rather than fail the task (ADR 0061)', async () => {
+    const { calls, render } = fakeRender();
+    const { service: queue } = start(render, { autoRun: false, kinds: { [root]: ['pdf'] } });
+    drop('tarefa-1', '::titulo Olá');
+    await until(queue, (current) => statusOf(current, 'tarefa-1') === 'pending');
+
+    await queue.run('tarefa-1');
+
+    expect(calls.map((call) => call.dropUnavailableKinds)).toEqual([true]);
+  });
+
+  it('refuses an empty choice, which would make a folder that produces nothing', () => {
+    const { render } = fakeRender();
+    const { service: queue } = start(render, { autoRun: false });
+
+    expect(queue.setKinds([])).toEqual({});
   });
 });
 
@@ -349,7 +416,13 @@ describe('the folder', () => {
       onChange: () => undefined,
     });
 
-    expect(await service.view()).toEqual({ folder: null, inbox: null, autoRun: true, tasks: [] });
+    expect(await service.view()).toEqual({
+      folder: null,
+      inbox: null,
+      autoRun: true,
+      kinds: ['png'],
+      tasks: [],
+    });
     await service.run('tarefa-1');
     expect(calls).toHaveLength(0);
   });

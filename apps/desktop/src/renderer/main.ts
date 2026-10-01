@@ -578,6 +578,9 @@ function wireQueuePanel(): void {
     setAutoRun: (on) => {
       answer((bridge) => bridge['queue:set-auto-run']({ on }));
     },
+    setKinds: (kinds) => {
+      answer((bridge) => bridge['queue:set-kinds']({ kinds: [...kinds] }));
+    },
     run: (taskId) => {
       void withBridge(async (bridge) => {
         await bridge['queue:run']({ taskId });
@@ -600,6 +603,17 @@ function wireQueuePanel(): void {
   };
 
   void refreshQueue();
+  void refreshQueueKinds();
+}
+
+/** What a queue folder can be asked to produce, the export dialog's list (ADR 0044). */
+async function refreshQueueKinds(): Promise<void> {
+  await withBridge(async (bridge) => {
+    const panel = elements.queuePanel;
+    if (panel === null) return;
+    const answer = await bridge['export:kinds']({});
+    panel.available = [...new Set(answer.kinds.map((item) => item.kind))];
+  });
 }
 
 /** Asks main for the queue and hands it to the panel, if the panel is open. */

@@ -376,6 +376,8 @@ export interface Catalogue {
   readonly 'queue.folder.clear': string;
   readonly 'queue.inbox': string;
   readonly 'queue.autoRun': string;
+  /** The label before the file types a folder produces (TYTO-188). */
+  readonly 'queue.kinds': string;
   readonly 'queue.empty': string;
   readonly 'queue.status.pending': string;
   readonly 'queue.status.rendering': string;
@@ -576,6 +578,7 @@ export const CATALOGUE_KEYS = [
   'queue.folder.clear',
   'queue.inbox',
   'queue.autoRun',
+  'queue.kinds',
   'queue.empty',
   'queue.status.pending',
   'queue.status.rendering',

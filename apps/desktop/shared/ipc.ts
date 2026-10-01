@@ -107,6 +107,8 @@ const queueView = z.object({
   /** Where a task folder is dropped, so the panel can say so. */
   inbox: z.string().nullable(),
   autoRun: z.boolean(),
+  /** The file types this folder's tasks produce (TYTO-188, ADR 0061). `['png']` until chosen. */
+  kinds: z.array(z.string().min(1)).min(1).max(64),
   tasks: z
     .array(
       z.object({
@@ -756,6 +758,16 @@ export const IPC_CHANNELS = {
 
   /** Turns auto-run on or off, and remembers it. */
   'queue:set-auto-run': channel(z.object({ on: z.boolean() }), queueView),
+
+  /**
+   * Chooses the file types the current folder's next tasks produce, and remembers them for
+   * that folder (TYTO-188, ADR 0061). Never empty: a folder that produced nothing would be a
+   * folder that silently stopped working.
+   */
+  'queue:set-kinds': channel(
+    z.object({ kinds: z.array(z.string().min(1).max(64)).min(1).max(64) }),
+    queueView,
+  ),
 
   /**
    * Renders one task now, whatever auto-run says — Run for a pending task, Retry for a failed
