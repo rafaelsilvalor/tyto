@@ -481,6 +481,7 @@ async function start(): Promise<void> {
     render: (request) => exports_.run(request),
     folder: saved.queueFolder,
     autoRun: saved.queueAutoRun,
+    kinds: saved.queueKinds,
     // A notice and not a question (ADR 0029): the panel asks `queue:list` when it hears it.
     // Dropped while there is no window, which costs nothing — a window that opens later asks
     // once on its own.

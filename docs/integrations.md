@@ -180,8 +180,13 @@ one `fsInbox`, and `done/` is a second one, because a finished task has an inbox
 - **Pushed, not polled**: main already sweeps the inbox once a second, and it sends
   `queue:changed` when something the panel shows has changed; the panel then asks
   `queue:list`. The window runs no timer of its own.
-- The render is the export service's, PNG at the template's formats, so a task rendered here
-  and the same brief rendered by `tyto render` produce the same files.
+- The render is the export service's, at the template's formats, so a task rendered here
+  and the same brief rendered by `tyto render` produce the same files. **Each folder chooses
+  its file types** in the panel's _Produces_ row (TYTO-188, ADR 0061), from every kind a run
+  can produce, installed exporters' included; a folder nobody chose for produces PNG alone.
+  The choice is kept per folder in `settings.json` as `queueKinds`. A chosen kind whose
+  exporter has since been removed is left out of the task with a `W_QUEUE_KIND_UNAVAILABLE`
+  warning, and a task left with nothing produces PNG.
 
 **One consumer per folder.** `fsInbox` has no claim step (`ack` is a rename), so the window's
 auto-run and a `tyto watch` running over the same folder would both render a task, and the

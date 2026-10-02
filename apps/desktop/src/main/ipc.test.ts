@@ -191,6 +191,7 @@ const queueDependency = () => {
   const remembered: unknown[] = [];
   const folders: (string | null)[] = [];
   let autoRun = false;
+  let kinds: readonly string[] = ['png'];
   let folder: string | null = '/fila';
   const service = {
     view: () =>
@@ -198,6 +199,7 @@ const queueDependency = () => {
         folder,
         inbox: folder === null ? null : `${folder}/inbox`,
         autoRun,
+        kinds,
         tasks: [
           { id: 'tarefa-1', status: 'pending' as const, diagnostics: [], hasOutput: false },
           {
@@ -223,6 +225,10 @@ const queueDependency = () => {
     },
     setAutoRun: (on: boolean) => {
       autoRun = on;
+    },
+    setKinds: (next: readonly string[]) => {
+      kinds = next;
+      return { '/outra': ['jpeg'], '/fila': next };
     },
     run: (id: string) => {
       ran.push(id);
@@ -796,6 +802,18 @@ describe('the local queue (TYTO-45)', () => {
 
     expect(answer.autoRun).toBe(true);
     expect(queue.remembered).toEqual([{ queueAutoRun: true }]);
+  });
+
+  it("chooses the folder's file types and remembers every folder's choice (TYTO-188)", async () => {
+    const queue = queueDependency();
+    const handlers = createHandlers({ ...dependencies(), queue });
+
+    const answer = await handlers['queue:set-kinds']({ kinds: ['png', 'svg'] });
+
+    expect(answer.kinds).toEqual(['png', 'svg']);
+    expect(queue.remembered).toEqual([
+      { queueKinds: { '/outra': ['jpeg'], '/fila': ['png', 'svg'] } },
+    ]);
   });
 
   it('runs the task named', async () => {

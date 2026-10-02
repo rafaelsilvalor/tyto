@@ -259,13 +259,15 @@ describe('the bridge', () => {
       'panel:request',
       'plugins:list',
       'plugins:panels',
-      // TYTO-45: the local queue panel's six. Each is exercised by `e2e/queue.desktop.test.ts`.
+      // TYTO-45: the local queue panel's six, and TYTO-188's seventh. Each is exercised by
+      // `e2e/queue.desktop.test.ts`.
       'queue:list',
       'queue:open-brief',
       'queue:reveal-output',
       'queue:run',
       'queue:set-auto-run',
       'queue:set-folder',
+      'queue:set-kinds',
       'template:new',
       'template:open',
       'template:preview',

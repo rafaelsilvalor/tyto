@@ -196,6 +196,7 @@ export const en: Catalogue = {
   'queue.folder.clear': 'Forget folder',
   'queue.inbox': 'Drop task folders into',
   'queue.autoRun': 'Render automatically',
+  'queue.kinds': 'Produces:',
   'queue.empty': 'No tasks in the queue.',
   'queue.status.pending': 'pending',
   'queue.status.rendering': 'rendering',

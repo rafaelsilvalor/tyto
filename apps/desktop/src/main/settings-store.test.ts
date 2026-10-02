@@ -93,6 +93,41 @@ describe('fileSettingsStore', () => {
       templatesFolder: '/old/templates',
       queueFolder: null,
       queueAutoRun: false,
+      queueKinds: {},
+    });
+  });
+
+  it('reads a file written before a folder could choose its file types', async () => {
+    // TYTO-188's key, missing from every file written before it: defaulted, so every folder
+    // keeps producing PNG alone and nothing else in the record is lost.
+    writeFileSync(
+      file,
+      JSON.stringify({ templatesFolder: '/t', queueFolder: '/q', queueAutoRun: true }),
+      'utf8',
+    );
+
+    expect(await fileSettingsStore(file).read()).toEqual({
+      templatesFolder: '/t',
+      queueFolder: '/q',
+      queueAutoRun: true,
+      queueKinds: {},
+    });
+  });
+
+  it('keeps the templates folder when the file types were hand-broken', async () => {
+    // Without `.catch` on the field, one bad value failed the whole object and the person's
+    // templates folder went back to none along with it.
+    writeFileSync(
+      file,
+      JSON.stringify({ templatesFolder: '/t', queueFolder: '/q', queueKinds: { '/q': [] } }),
+      'utf8',
+    );
+
+    expect(await fileSettingsStore(file).read()).toEqual({
+      templatesFolder: '/t',
+      queueFolder: '/q',
+      queueAutoRun: false,
+      queueKinds: {},
     });
   });
 
@@ -108,6 +143,7 @@ describe('fileSettingsStore', () => {
       templatesFolder: '/templates',
       queueFolder: '/queue',
       queueAutoRun: true,
+      queueKinds: {},
     });
   });
 
