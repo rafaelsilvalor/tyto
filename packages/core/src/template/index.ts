@@ -14,9 +14,11 @@ export {
   type Template,
   type TemplateBuild,
   type TemplateContext,
+  type TemplateFiles,
   type TemplateReport,
   defineTemplate,
   measureNothing,
+  noFiles,
   reportNothing,
 } from './define.js';
 

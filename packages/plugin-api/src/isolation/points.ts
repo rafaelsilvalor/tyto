@@ -7,6 +7,7 @@ import {
   artworkSchema,
   err,
   frameSchema,
+  noFiles,
   ok,
   sceneSchema,
   sizeSchema,
@@ -249,6 +250,8 @@ export const ISOLATED_POINTS: Readonly<Partial<Record<ContributionPoint, PointSp
           const context = {
             ...(call as object),
             measure: guest.faces.measure,
+            // The plugin's own folder is not read for its templates yet (ADR 0062).
+            files: noFiles,
             report: (report: TemplateReport) => {
               reports.push(report);
             },

@@ -1,4 +1,4 @@
-import { measureNothing, reportNothing } from '@tyto/core';
+import { measureNothing, noFiles, reportNothing } from '@tyto/core';
 import { describe, expect, it } from 'vitest';
 
 import { CALL_TO_COMMENT, EC, ECJ, OAB } from './brands.js';
@@ -80,6 +80,7 @@ function contextOf(
     adjustments: {},
     measure,
     report,
+    files: noFiles,
   } satisfies TemplateContext;
 }
 

@@ -1,4 +1,4 @@
-import { measureNothing, reportNothing } from '@tyto/core';
+import { measureNothing, noFiles, reportNothing } from '@tyto/core';
 import { describe, expect, it } from 'vitest';
 
 import { APPROVED } from '../_estrategia-saude/tokens.js';
@@ -68,6 +68,7 @@ function contextOf(
     adjustments: {},
     measure,
     report: reportNothing,
+    files: noFiles,
   };
 }
 

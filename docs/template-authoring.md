@@ -536,6 +536,7 @@ build: (context: TemplateContext) => Frame;
 | `adjustments` | this artwork's, flattened: `true` for a flag, the value for an enum                                                                      |
 | `measure`     | `measure(textDraft)` — the lines, width and height a text node will be laid out at, or `undefined` when nothing can measure (ADR 0038)   |
 | `report`      | `report({ code: 'W_TEMPLATE_OVERFLOW', overflow })` — a warning about this frame, from a closed list, which `compile` writes (ADR 0058)  |
+| `files`       | `files.image(path)` and `files.svg(path)` — the files in the template's own folder, by folder-relative path, or `undefined` (ADR 0062)   |
 
 **`measure` is how a box grows with its text.** Build the text node first, ask, then size
 what surrounds it: `const m = context.measure(title)` and a pill `m.height + padding` tall.
@@ -552,6 +553,33 @@ lands below `limit`. The template names only the code and its number; `compile` 
 artwork, the format and the range of the directive the artwork came from, and the wording is
 the catalog's (`W_TEMPLATE_OVERFLOW`). The list of codes is closed. A context built by hand in a
 test passes `reportNothing`.
+
+**`files` is how a template draws what lives beside its manifest.** A fixed background, a
+logo or a badge goes in the template's folder, and the template asks for it by the path it
+has there, as a markup template's `src=` does: `context.files.image('assets/bg.png')` answers
+an `AssetRef` to hand to `image({ asset })`, and `context.files.svg('assets/mark.svg')` the
+SVG markup. A template cannot write that ref itself: it carries the hash of bytes the template
+never sees, so a hand-made one renders as `E_EXPORT_ASSET_UNRESOLVED`. **`undefined` means the
+folder has no such file**: draw without it, or report it. The folder is read once per load, by
+whoever composed the source, so nothing here touches a disk. An installed plugin's code
+template is handed `noFiles` for now, and so is a context built by hand in a test.
+
+**One path per format gives each format its own background.** A banner in three sizes keeps
+three files and lets the format pick:
+
+```ts
+const background = context.files.image(`assets/bg-${context.format}.png`);
+// banner → assets/bg-banner.png, banner-1x1 → assets/bg-banner-1x1.png, …
+return frame({
+  format: context.format,
+  size: context.size,
+  idPrefix: context.idPrefix,
+  children: background === undefined ? [] : [image({ asset: background, size: context.size })],
+});
+```
+
+No `extends` is needed: the format is in the context, and the code chooses. Each size still
+needs its entry in `formats.yaml`.
 
 **Pass `idPrefix` or the scene will not validate.** Node ids are derived from position, so
 two artworks with a `grid-1x1` frame each would both generate `grid-1x1.0`, and so would the two
@@ -598,6 +626,8 @@ What runs is code **compiled into the application**. `BUILT_IN_TEMPLATE_BUILDS` 
 `@tyto/templates` maps a manifest name to its build function, and `bundledTemplateSource`
 pairs each with the manifest the registry already parsed. The CLI and the desktop compose it
 in front of the markup route, so a name the build does not ship reaches markup unchanged.
+Given a `readFiles` reader, it also reads the template's folder for `context.files` (ADR 0062);
+the reader is `fileTemplateAssets` from `@tyto/io`, the one the markup route uses.
 
 A name that is **both** — shipped code and a `template.html` in its folder — is
 `E_TEMPLATE_AMBIGUOUS` rather than a winner picked quietly. A silent winner is a template

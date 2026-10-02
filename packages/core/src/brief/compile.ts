@@ -15,8 +15,10 @@ import {
   type DeferredTemplate,
   type Template,
   type TemplateContext,
+  type TemplateFiles,
   type TemplateReport,
   measureNothing,
+  noFiles,
 } from '../template/define.js';
 import type { TemplateManifest } from '../template/manifest.js';
 
@@ -252,7 +254,7 @@ export function compile(
   template: Template,
   options: CompileOptions,
 ): Result<Scene, Diagnostics> {
-  return compileWith(resolved, template.manifest, options, (context) => {
+  return compileWith(resolved, template.manifest, options, template.files ?? noFiles, (context) => {
     try {
       return { frame: template.build(context), problems: [] };
     } catch (cause) {
@@ -287,13 +289,15 @@ export async function compileDeferred(
   for (const plan of plans) {
     for (const format of resolved.formats) {
       const reports: Diagnostic[] = [];
-      const context = contextOf(plan, format, plans.length, options, measure, reports);
+      // A plugin's own folder is not read for its templates yet (ADR 0062), and `files`
+      // would not cross the boundary anyway: it is functions.
+      const context = contextOf(plan, format, plans.length, options, measure, noFiles, reports);
       answers.set(context.idPrefix, await template.buildLater(context));
       reported.set(context.idPrefix, reports);
     }
   }
 
-  return compileWith(resolved, manifest, options, (context) => {
+  return compileWith(resolved, manifest, options, noFiles, (context) => {
     const answer = answers.get(context.idPrefix);
     // Unreachable: both loops walk the same plans and formats.
     if (answer === undefined) {
@@ -323,6 +327,7 @@ function contextOf(
   count: number,
   options: CompileOptions,
   measure: TemplateContext['measure'],
+  files: TemplateFiles,
   reports: Diagnostic[],
 ): TemplateContext {
   return {
@@ -334,6 +339,7 @@ function contextOf(
     slots: plan.slots,
     adjustments: plan.adjustments,
     measure,
+    files,
     report: (report) => {
       reports.push(reportDiagnostic(report, plan, format));
     },
@@ -356,6 +362,7 @@ function compileWith(
   resolved: ResolvedBrief,
   manifest: TemplateManifest,
   options: CompileOptions,
+  files: TemplateFiles,
   build: (context: TemplateContext) => Built,
 ): Result<Scene, Diagnostics> {
   // Before anything is built: a format with no size cannot produce a frame, and finding
@@ -378,7 +385,7 @@ function compileWith(
 
     for (const format of resolved.formats) {
       const reports: Diagnostic[] = [];
-      const context = contextOf(plan, format, plans.length, options, measure, reports);
+      const context = contextOf(plan, format, plans.length, options, measure, files, reports);
 
       const built = build(context);
       problems.push(...reports, ...built.problems);

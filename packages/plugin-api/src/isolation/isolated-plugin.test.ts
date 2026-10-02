@@ -867,3 +867,43 @@ describe('an isolated template’s reports (ADR 0058)', () => {
     expect(answer.ok ? [] : answer.error.map((item) => item.code)).toEqual(['E_PLUGIN_PROTOCOL']);
   });
 });
+
+describe('an isolated template’s files (ADR 0062)', () => {
+  const CALL: TemplateCall = {
+    format: 'feed',
+    size: { w: 10, h: 10 },
+    idPrefix: 'lamina-1.feed',
+    artwork: { id: 'lamina-1', index: 0, count: 1 },
+    slots: {},
+    adjustments: {},
+  };
+
+  /**
+   * `files` is functions and does not cross, so the guest rebuilds it, as `measure`. A plugin's
+   * own folder is not read for its templates yet, so every path answers nothing — and a
+   * template that asks must get that answer, not a `TypeError` on a field that is not there.
+   */
+  it('hands the template no files, rather than no field', async () => {
+    const pack: TemplatePack = {
+      id: 'demo',
+      templates: [],
+      build: (_template, context) => ({
+        format: context.files.image('assets/bg.png') === undefined ? context.format : 'leaked',
+        size: context.size,
+        children: [],
+      }),
+    };
+    const { connected } = await isolate((host) => host.registerTemplatePack(pack), {
+      contributes: ['template-pack'],
+    });
+    if (!connected.ok) throw new Error(connected.error[0]?.message);
+    const host = createPluginHost();
+    const activated = host.tryActivate(connected.value.plugin);
+    if (!activated.ok) throw new Error(activated.error[0]?.message);
+    const build = host.registry.templatePacks()[0]?.build as unknown as IsolatedPackBuild;
+
+    const answer = await build('demo', CALL, []);
+
+    expect(answer.ok && answer.value.frame.format).toBe('feed');
+  });
+});
