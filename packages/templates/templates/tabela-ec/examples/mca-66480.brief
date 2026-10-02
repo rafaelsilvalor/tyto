@@ -1,0 +1,21 @@
+---
+template: tabela-ec
+formats: [grid]
+---
+// MCA-66480, "10 concursos previstos para SP ainda em 2026!": three columns and a long one.
+
+::titulo
+  10 concursos previstos para SP ainda em 2026!
+
+::tabela
+  Concurso | Situação | Vagas
+  TRF3 | Banca definida (Vunesp) | -
+  Coren SP | Banca definida (Quadrix) | 76 + CR
+  Sefaz SP (Analista) | Banca definida (FCC) | 60
+  SP Águas | Banca definida (FGV) | 190
+  IPA SP | Banca definida (Vunesp) | 98
+  CDHU | Banca definida (Vunesp) | 388
+  SEE SP | Banca definida (FGV) | 5 mil
+  TJ SP | Em estudos | -
+  Cetesb | Comissão formada | 107 + CR
+  SP Regula | Grupo de Trabalho Formado | -

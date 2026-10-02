@@ -3,6 +3,7 @@ import { build as aprovados } from '../templates/aprovados/template.js';
 import { build as simuladosSemanaEc } from '../templates/simulados-semana-ec/template.js';
 import { build as simuladosSemanaEcj } from '../templates/simulados-semana-ecj/template.js';
 import { build as simuladosSemanaOab } from '../templates/simulados-semana-oab/template.js';
+import { build as tabelaEc } from '../templates/tabela-ec/template.js';
 
 import type { TemplateBuild } from '@tyto/core';
 
@@ -52,6 +53,7 @@ export const BUILT_IN_TEMPLATE_NAMES: readonly string[] = [
   'simulados-semana-ec',
   'simulados-semana-ecj',
   'simulados-semana-oab',
+  'tabela-ec',
 ];
 
 /**
@@ -75,4 +77,5 @@ export const BUILT_IN_TEMPLATE_BUILDS: Readonly<Record<string, TemplateBuild>> =
   'simulados-semana-ec': simuladosSemanaEc,
   'simulados-semana-ecj': simuladosSemanaEcj,
   'simulados-semana-oab': simuladosSemanaOab,
+  'tabela-ec': tabelaEc,
 };

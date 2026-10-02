@@ -1,0 +1,15 @@
+name: tabela-ec
+version: 1.0.0
+brand: estrategia-concursos
+description: Estratégia Concursos's table in one image — a title over the whole table, sized by measuring so every row fits one 1080×1350 post.
+# The grid only: the piece is a feed post that people zoom into (MCA-66477, MCA-66480).
+formats: [grid]
+slots:
+  # The words over the table, set in capitals. A line break in the brief is a line break on
+  # the slide; otherwise the title wraps on its own, in at most three lines.
+  titulo: { type: rich-text, required: true, max: 120 }
+  # The table, as the MCA cards write it. The first line is the header and its `|` count
+  # fixes the columns: `Concurso | Banca | Vagas | Salário`. Every later line with a `|` is a
+  # row; a line with no `|` is a band across the whole table. Column widths, line breaks and
+  # sizes are decided by measuring, and a value like `R$ 33.820,39` is never split.
+  tabela: { type: rich-text, required: true }

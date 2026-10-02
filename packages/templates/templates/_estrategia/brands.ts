@@ -38,3 +38,29 @@ export const EC: Brand = {
  * manifest `default` is only applied to an `enum` slot.
  */
 export const CALL_TO_COMMENT = 'Escreva SIMULADO nos comentários para acessar';
+
+/**
+ * What sets one brand's one-image table apart (TYTO-218): its accent and its handle.
+ *
+ * A separate shape from {@link Brand} because the table signs off with the account's handle
+ * on every brand, EC included, where EC's story agenda signs off with a note.
+ */
+export interface TableBrand {
+  /** The owl, the title, the header row and a band. */
+  readonly accent: string;
+  /** The words at the foot. */
+  readonly handle: string;
+}
+
+/**
+ * Estratégia Concursos's table.
+ *
+ * **Provisional accent, declared:** `#5B0DBF` is the purple of the art the maintainer approved
+ * for MCA-66477 (his standalone generator's "roxo"), and not {@link EC}'s `#5900a6`, which the
+ * mock-exam agenda draws. Which one is EC's purple is his call, asked on 2026-10-02; the
+ * answer is a change to this one line.
+ */
+export const EC_TABLE: TableBrand = {
+  accent: '#5B0DBF',
+  handle: '@estrategiaconcursos',
+};

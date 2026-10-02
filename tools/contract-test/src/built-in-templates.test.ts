@@ -117,6 +117,10 @@ const EXAMPLES: readonly Example[] = [
     body: 'code',
     formats: ['grid', 'story'],
   },
+  // The one-image table (TYTO-218): sized by measuring, so these are the cases where the
+  // measured fit and the drawn text have to agree.
+  { template: 'tabela-ec', brief: 'examples/mca-66477.brief', body: 'code', formats: ['grid'] },
+  { template: 'tabela-ec', brief: 'examples/mca-66480.brief', body: 'code', formats: ['grid'] },
 ];
 
 let formats: Awaited<ReturnType<typeof loadFormats>>;
@@ -234,7 +238,10 @@ describe.each(EXAMPLES.map((example) => [example.template, example] as const))(
       // Never a file beside the template. Bundled — the repository ships one copy in
       // `fonts/` — except the agenda, whose brand face is read from the machine (ADR 0037).
       const expected =
-        name === 'agenda-semana' || name === 'aprovados' || name.startsWith('simulados-semana-')
+        name === 'agenda-semana' ||
+        name === 'aprovados' ||
+        name.startsWith('simulados-semana-') ||
+        name === 'tabela-ec'
           ? { family: 'CircularXX', source: 'system' }
           : { family: 'Source Sans 3', source: 'bundled' };
       expect(scene.fonts).toContainEqual(expected);
@@ -544,6 +551,7 @@ describe('the pack as a whole', () => {
       'simulados-semana-ec': 'estrategia-concursos',
       'simulados-semana-ecj': 'estrategia-carreira-juridica',
       'simulados-semana-oab': 'estrategia-oab',
+      'tabela-ec': 'estrategia-concursos',
     });
   });
 
@@ -569,6 +577,7 @@ describe('the pack as a whole', () => {
       'simulados-semana-ec': ['stories'],
       'simulados-semana-ecj': ['carrossel', 'stories'],
       'simulados-semana-oab': ['carrossel', 'stories'],
+      'tabela-ec': ['grid'],
     });
   });
 
@@ -589,6 +598,7 @@ describe('the pack as a whole', () => {
       'simulados-semana-ec',
       'simulados-semana-ecj',
       'simulados-semana-oab',
+      'tabela-ec',
     ]);
     // A manifest that does not parse becomes a failure rather than an exception, so an
     // empty list and a broken pack look alike unless this is checked.
