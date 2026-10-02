@@ -20,6 +20,13 @@ import { closeApp } from './close-app.js';
  * offscreen window and no display clip is involved. This suite is the guard the card asked
  * for, so that a clip, if one ever comes, turns something red.
  *
+ * **It was real, and it was not a clip** (TYTO-219). In a shown window the story stopped at
+ * 1080 px because the iframe was still showing the grid-1x1 document: a fresh iframe keeps the
+ * first of two `srcdoc` assignments when the second lands before the first one's `load`, and a
+ * hidden window loads fast enough that the story click never landed in that gap. So the suite
+ * now runs twice, hidden and shown. The rule that fixes it is `showDocument` in `preview.ts`,
+ * and its deterministic test is in `preview.test.ts`.
+ *
  * **Two claims, because jsdom can check neither and each one alone misses a way to fail.**
  * The layout box is the format's size, which a `max-height` or a stale size would break. The
  * pixels are painted, which is what a person sees. A frame laid out at 1920 and rastered only
@@ -178,85 +185,113 @@ async function setZoom(target: string): Promise<void> {
 /** More than the number of steps in `ZOOM_STEPS`, so a missing step fails instead of looping. */
 const ZOOM_CLICKS = 10;
 
-beforeAll(async () => {
-  if (!existsSync(built)) {
-    throw new Error(
-      `${built} is missing — run \`pnpm build\` before \`pnpm --filter @tyto/desktop test:desktop\``,
-    );
+/**
+ * The suite's environment, shown or hidden.
+ *
+ * **Both, because the two windows load at different speeds** (TYTO-219). A fresh iframe keeps
+ * the first of two `srcdoc` assignments when the second lands before the first one's `load`,
+ * and only a shown window was slow enough for the story click to land in that gap: 2 of 2
+ * runs red shown with the fix reverted, and the hidden half green in both. The hidden run stays because it is what every
+ * other suite does and what TYTO-177 measured. CI shows the window on the `xvfb-run` display
+ * that `desktop-e2e.yml` already wraps `test:desktop` in.
+ */
+function launchEnvironment(shown: boolean): Record<string, string> {
+  const environment: Record<string, string> = {};
+  for (const [name, value] of Object.entries(process.env)) {
+    if (value !== undefined) environment[name] = value;
   }
+  environment['TYTO_HOME'] = join(scratch, 'tyto-home');
+  // Deleted rather than set to something else: `show` is `TYTO_HEADLESS !== '1'`, and a run
+  // started from a shell that exported it must still get a shown window here.
+  if (shown) delete environment['TYTO_HEADLESS'];
+  else environment['TYTO_HEADLESS'] = '1';
+  return environment;
+}
 
-  scratch = mkdtempSync(join(tmpdir(), 'tyto-preview-height-'));
-  const userData = join(scratch, 'userData');
-  mkdirSync(userData, { recursive: true });
-  writeFileSync(join(userData, 'settings.json'), JSON.stringify({ templatesFolder: TEMPLATES }));
-  app = await _electron.launch({
-    args: ['.', `--user-data-dir=${userData}`],
-    cwd: join(here, '..'),
-    env: { ...process.env, TYTO_HEADLESS: '1', TYTO_HOME: join(scratch, 'tyto-home') },
-  });
-  page = await app.firstWindow();
-  await page.waitForFunction(() => document.querySelector('#editor .cm-content') !== null);
-  await page.click('#editor .cm-content');
-  await page.keyboard.insertText(readFileSync(EXAMPLE, 'utf8'));
-  await page.waitForSelector('.preview__tab[data-format="story"]', { timeout: 15_000 });
-});
-
-afterAll(async () => {
-  await closeApp(app);
-  rmSync(scratch, { recursive: true, force: true });
-});
-
-describe('a story in the preview panel', () => {
-  const story = formatSize('story');
-
-  it('is laid out and painted at its full height when fitted', async () => {
-    await selectFormat('story');
-    const result = await waitForDrawn(story);
-
-    expect(result.box).toEqual(story);
-    expect(result.checker).toBe(0);
-  });
-
-  it('is painted to its last row at 50%, scrolled to the bottom', async () => {
-    // At 50% the story is 960 px tall in a stage much shorter than that. The bottom of the
-    // frame is exactly what a 1080 px clip would lose.
-    await setZoom('50%');
-    // The scroll has to come after the paper is 50% tall. Scrolled before that, it lands on a
-    // stage with nothing to scroll, and the check reads the top of the frame. That is how the
-    // first draft of this test stayed green with the bottom 840 px clipped away.
-    await page.waitForFunction(
-      (height) => document.getElementById('preview-paper')?.offsetHeight === height,
-      Math.round(story.height * 0.5),
-    );
-    await page.evaluate(() => {
-      const stage = document.querySelector('.preview__stage')!;
-      stage.scrollTop = stage.scrollHeight;
-    });
-    await page.waitForFunction(() => {
-      const stage = document.querySelector('.preview__stage')!;
-      const outer = stage.getBoundingClientRect();
-      const paper = document.getElementById('preview-paper')!.getBoundingClientRect();
-      return (
-        paper.top < outer.top && paper.bottom <= outer.top + stage.clientTop + stage.clientHeight
+describe.each([
+  { window: 'hidden', shown: false },
+  { window: 'shown', shown: true },
+])('in a $window window', ({ shown }) => {
+  beforeAll(async () => {
+    if (!existsSync(built)) {
+      throw new Error(
+        `${built} is missing — run \`pnpm build\` before \`pnpm --filter @tyto/desktop test:desktop\``,
       );
-    });
-    const result = await waitForDrawn(story);
+    }
 
-    expect(result.box).toEqual(story);
-    expect(result.checker).toBe(0);
+    scratch = mkdtempSync(join(tmpdir(), 'tyto-preview-height-'));
+    const userData = join(scratch, 'userData');
+    mkdirSync(userData, { recursive: true });
+    writeFileSync(join(userData, 'settings.json'), JSON.stringify({ templatesFolder: TEMPLATES }));
+    app = await _electron.launch({
+      args: ['.', `--user-data-dir=${userData}`],
+      cwd: join(here, '..'),
+      env: launchEnvironment(shown),
+    });
+    page = await app.firstWindow();
+    await page.waitForFunction(() => document.querySelector('#editor .cm-content') !== null);
+    await page.click('#editor .cm-content');
+    await page.keyboard.insertText(readFileSync(EXAMPLE, 'utf8'));
+    await page.waitForSelector('.preview__tab[data-format="story"]', { timeout: 15_000 });
   });
 
-  it('keeps its full height after a square frame was on screen', async () => {
-    // One iframe serves every format, and it is resized in place. grid-1x1 first, so the
-    // story arrives in an element that was 1080 px tall a moment ago.
-    await page.click('#zoom-fit');
-    await selectFormat('grid-1x1');
-    await waitForDrawn(formatSize('grid-1x1'));
+  afterAll(async () => {
+    await closeApp(app);
+    rmSync(scratch, { recursive: true, force: true });
+  });
 
-    await selectFormat('story');
-    const result = await waitForDrawn(story);
+  describe('a story in the preview panel', () => {
+    const story = formatSize('story');
 
-    expect(result.box).toEqual(story);
-    expect(result.checker).toBe(0);
+    it('is laid out and painted at its full height when fitted', async () => {
+      await selectFormat('story');
+      const result = await waitForDrawn(story);
+
+      expect(result.box).toEqual(story);
+      expect(result.checker).toBe(0);
+    });
+
+    it('is painted to its last row at 50%, scrolled to the bottom', async () => {
+      // At 50% the story is 960 px tall in a stage much shorter than that. The bottom of the
+      // frame is exactly what a 1080 px clip would lose.
+      await setZoom('50%');
+      // The scroll has to come after the paper is 50% tall. Scrolled before that, it lands on a
+      // stage with nothing to scroll, and the check reads the top of the frame. That is how the
+      // first draft of this test stayed green with the bottom 840 px clipped away.
+      await page.waitForFunction(
+        (height) => document.getElementById('preview-paper')?.offsetHeight === height,
+        Math.round(story.height * 0.5),
+      );
+      await page.evaluate(() => {
+        const stage = document.querySelector('.preview__stage')!;
+        stage.scrollTop = stage.scrollHeight;
+      });
+      await page.waitForFunction(() => {
+        const stage = document.querySelector('.preview__stage')!;
+        const outer = stage.getBoundingClientRect();
+        const paper = document.getElementById('preview-paper')!.getBoundingClientRect();
+        return (
+          paper.top < outer.top && paper.bottom <= outer.top + stage.clientTop + stage.clientHeight
+        );
+      });
+      const result = await waitForDrawn(story);
+
+      expect(result.box).toEqual(story);
+      expect(result.checker).toBe(0);
+    });
+
+    it('keeps its full height after a square frame was on screen', async () => {
+      // One iframe serves every format, and it is resized in place. grid-1x1 first, so the
+      // story arrives in an element that was 1080 px tall a moment ago.
+      await page.click('#zoom-fit');
+      await selectFormat('grid-1x1');
+      await waitForDrawn(formatSize('grid-1x1'));
+
+      await selectFormat('story');
+      const result = await waitForDrawn(story);
+
+      expect(result.box).toEqual(story);
+      expect(result.checker).toBe(0);
+    });
   });
 });
