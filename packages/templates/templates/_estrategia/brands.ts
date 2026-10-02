@@ -42,8 +42,9 @@ export const CALL_TO_COMMENT = 'Escreva SIMULADO nos comentários para acessar';
 /**
  * What sets one brand's one-image table apart (TYTO-218): its accent and its handle.
  *
- * A separate shape from {@link Brand} because the table signs off with the account's handle
- * on every brand, EC included, where EC's story agenda signs off with a note.
+ * A separate shape from {@link Brand} only for the handle: the table signs off with the
+ * account's handle on every brand, EC included, where EC's story agenda signs off with a
+ * note. The accent is the brand's own, read from its {@link Brand}.
  */
 export interface TableBrand {
   /** The owl, the title, the header row and a band. */
@@ -53,14 +54,14 @@ export interface TableBrand {
 }
 
 /**
- * Estratégia Concursos's table.
+ * Estratégia Concursos's table: EC's registered accent, the one the mock-exam agenda draws, and
+ * its handle.
  *
- * **Provisional accent, declared:** `#5B0DBF` is the purple of the art the maintainer approved
- * for MCA-66477 (his standalone generator's "roxo"), and not {@link EC}'s `#5900a6`, which the
- * mock-exam agenda draws. Which one is EC's purple is his call, asked on 2026-10-02; the
- * answer is a change to this one line.
+ * The approved MCA-66477 art was drawn in `#5B0DBF`, the maintainer's standalone generator's
+ * purple; he chose the registered brand colour instead (2026-10-02), so one brand keeps one
+ * accent and a render sits a shade apart from that reference on purpose.
  */
 export const EC_TABLE: TableBrand = {
-  accent: '#5B0DBF',
+  accent: EC.accent,
   handle: '@estrategiaconcursos',
 };

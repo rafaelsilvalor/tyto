@@ -285,6 +285,7 @@ describe('the packaged app', () => {
       'simulados-semana-ec',
       'simulados-semana-ecj',
       'simulados-semana-oab',
+      'tabela-ec',
     ]);
   });
 

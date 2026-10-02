@@ -2,6 +2,7 @@ import { measureNothing, noFiles } from '@tyto/core';
 import { describe, expect, it } from 'vitest';
 
 import { build } from './template.js';
+import { EC } from '../_estrategia/brands.js';
 import { NO_BREAK_SPACE } from '../_estrategia/table-text.js';
 import { BODY, HANDLE, PAGE } from '../_estrategia/table-tokens.js';
 
@@ -285,6 +286,19 @@ describe.each([
         expect(match, `'${match}' can break`).not.toContain(' ');
       }
     }
+  });
+});
+
+describe('the brand', () => {
+  it('draws the header in EC’s registered accent, the one the mock-exam agenda draws', () => {
+    const header = rows(render(MCA_66477).frame).find((row) => row.name === 'header-row')!;
+    for (const cell of header.rects) {
+      expect(cell.node.kind === 'rect' && cell.node.fill).toEqual({
+        kind: 'solid',
+        color: { r: 0x59, g: 0x00, b: 0xa6, a: 1 },
+      });
+    }
+    expect(EC.accent).toBe('#5900a6');
   });
 });
 
