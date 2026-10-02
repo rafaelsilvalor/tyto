@@ -1,11 +1,4 @@
-import {
-  type AssetRef,
-  type Diagnostics,
-  type Size,
-  createFaceCache,
-  describeFace,
-  hasErrors,
-} from '@tyto/core';
+import { type Diagnostics, createFaceCache, describeFace, hasErrors } from '@tyto/core';
 import { createFontLibrary } from '@tyto/fonts';
 import {
   type ExportResources,
@@ -15,6 +8,7 @@ import {
   fileResources,
   fsDeliveryOutput,
   fsTaskOutput,
+  layeredExportResources,
   recordingAssetResolver,
   renderResult,
 } from '@tyto/io';
@@ -132,16 +126,12 @@ const faces = createFaceCache(fonts.source);
  * stage (ADR 0010). `@tyto/fonts` is a Node adapter; `pipeline` and the exporters know only
  * the ports.
  */
-function combine(brief: ExportResources, template: ExportResources): ExportResources {
-  const asset = (ref: AssetRef): string | undefined =>
-    brief.html?.asset?.(ref) ?? template.html?.asset?.(ref);
-  // The SVG half only: HTML crops with `object-fit`, and the SVG exporter needs the picture's
-  // own size to write the crop itself (TYTO-60). Without it a `cover` image came out of
-  // `tyto render` uncropped while the window cropped the same brief (TYTO-215).
-  const assetSize = (ref: AssetRef): Size | undefined =>
-    brief.svg?.assetSize?.(ref) ?? template.svg?.assetSize?.(ref);
+function exportResources(brief: ExportResources, template: ExportResources): ExportResources {
+  // The window binds the same two layers through the same function, so a field one program
+  // forgot could not reach only one of them again (TYTO-215, TYTO-216).
+  const layered = layeredExportResources([brief, template]);
   const font = fonts.font;
-  return { html: { asset, font }, svg: { asset, assetSize, font } };
+  return { html: { ...layered.html, font }, svg: { ...layered.svg, font } };
 }
 
 export async function renderTask(
@@ -185,7 +175,7 @@ export async function renderTask(
   // in a `tyto watch` have different `assets/`, and an exporter bound to the wrong one
   // would embed the wrong logo (ADR 0007 — every built-in through the same door).
   const host = activateBuiltIns({
-    resources: combine(briefResources, wiring.resources),
+    resources: exportResources(briefResources, wiring.resources),
     ...(options.rasterizer === undefined ? {} : { rasterizer: options.rasterizer }),
   });
   // After the built-ins, so a built-in keeps every id it has. A plugin refused here is a
