@@ -1,9 +1,20 @@
-import type { DirectoryEntry, FileSystem, TemplateBuild, TemplateRegistry } from '@tyto/core';
-import { loadTemplateRegistry } from '@tyto/core';
-import { frame } from '@tyto/core/template';
+import type {
+  AssetRef,
+  DirectoryEntry,
+  FileSystem,
+  TemplateBuild,
+  TemplateFiles,
+  TemplateRegistry,
+} from '@tyto/core';
+import { formatCatalogue, loadTemplateRegistry } from '@tyto/core';
+import { frame, image } from '@tyto/core/template';
+import { svgExporterPlugin } from '@tyto/export-svg';
+import { createPluginHost } from '@tyto/plugin-api';
 import { describe, expect, it, vi } from 'vitest';
 
+import type { Artifact } from './artifact.js';
 import { bundledTemplateSource } from './bundled-template-source.js';
+import { runJob } from './job.js';
 import { markupTemplateSource } from './template-source.js';
 
 /**
@@ -202,5 +213,160 @@ describe('a name nothing declares', () => {
     expect(loaded.ok).toBe(false);
     if (loaded.ok) return;
     expect(loaded.error[0]?.code).toBe('E_UNKNOWN_TEMPLATE');
+  });
+});
+
+describe("its own folder's files (ADR 0062)", () => {
+  /**
+   * Two formats, so "one background per format" is a claim about two different files and
+   * not one file drawn twice: TYTO-210's banner has three sizes and three backgrounds.
+   */
+  const BANNER = `name: faixa
+version: 1.0.0
+formats: [feed, story]
+slots:
+  titulo: { type: rich-text, max: 40 }
+`;
+  const FOLDER = { 'templates/faixa/manifest.yaml': BANNER };
+
+  const BACKGROUNDS: Readonly<Record<string, AssetRef>> = {
+    'assets/bg-feed.png': {
+      id: 'assets/bg-feed.png',
+      source: 'file',
+      path: '/abs/templates/faixa/assets/bg-feed.png',
+      hash: 'sha256-feed',
+    },
+    'assets/bg-story.png': {
+      id: 'assets/bg-story.png',
+      source: 'file',
+      path: '/abs/templates/faixa/assets/bg-story.png',
+      hash: 'sha256-story',
+    },
+  };
+
+  /** What `fileTemplateAssets` answers for that folder, without a disk. */
+  const FILES: TemplateFiles = {
+    svg: () => undefined,
+    image: (path) => BACKGROUNDS[path],
+  };
+
+  /** The worked example in `docs/template-authoring.md`: the format picks the file. */
+  const banner: TemplateBuild = (context) => {
+    const background = context.files.image(`assets/bg-${context.format}.png`);
+    return frame({
+      format: context.format,
+      size: context.size,
+      idPrefix: context.idPrefix,
+      children: background === undefined ? [] : [image({ asset: background, size: context.size })],
+    });
+  };
+
+  async function bannerSource(
+    files: Readonly<Record<string, string>>,
+    readFiles?: (directory: string) => Promise<TemplateFiles>,
+  ) {
+    const fileSystem = fileSystemOf(files);
+    const registry = await registryOf(fileSystem);
+    const source = bundledTemplateSource({
+      registry,
+      fileSystem,
+      bundled: { faixa: banner },
+      markup: markupTemplateSource(fileSystem, registry),
+      ...(readFiles === undefined ? {} : { readFiles }),
+    });
+    return { registry, source };
+  }
+
+  it('reads the folder the registry found, once, and hands the answer to the template', async () => {
+    const readFiles = vi.fn(() => Promise.resolve(FILES));
+    const { source } = await bannerSource(FOLDER, readFiles);
+
+    const loaded = await source.load('faixa');
+
+    expect(loaded.ok).toBe(true);
+    if (!loaded.ok) return;
+    expect(readFiles.mock.calls).toEqual([['templates/faixa']]);
+    expect(loaded.value.files).toBe(FILES);
+  });
+
+  it('draws each format its own background, end to end to svg', async () => {
+    const { registry, source } = await bannerSource(FOLDER, () => Promise.resolve(FILES));
+    const host = createPluginHost();
+    // The composition root's half: the bytes behind a ref the reader minted (`resources`).
+    host.activate(
+      svgExporterPlugin({ resources: { asset: (ref) => `data:image/png;base64,${ref.hash}` } }),
+    );
+    const written: Artifact[] = [];
+
+    const result = await runJob(
+      {
+        brief: '---\ntemplate: faixa\nformats: [feed, story]\n---\n\n::titulo Oferta\n',
+        outputs: [{ kind: 'svg' }],
+      },
+      {
+        registry,
+        templates: source,
+        assets: { base: 'briefs/', resolve: () => Promise.resolve(undefined) },
+        formats: formatCatalogue({ feed: { w: 1200, h: 628 }, story: { w: 600, h: 600 } }),
+        exporters: host.registry.exporters,
+        sink: {
+          write: (artifact) => {
+            written.push(artifact);
+            return Promise.resolve();
+          },
+        },
+      },
+    );
+
+    if (!result.ok) throw new Error(result.error.map((item) => item.message).join('; '));
+    expect(result.diagnostics).toEqual([]);
+    const svgOf = (format: string): string =>
+      new TextDecoder().decode(written.find((artifact) => artifact.format === format)?.bytes);
+    expect(svgOf('feed')).toContain('data:image/png;base64,sha256-feed');
+    expect(svgOf('feed')).not.toContain('sha256-story');
+    expect(svgOf('story')).toContain('data:image/png;base64,sha256-story');
+    expect(svgOf('story')).not.toContain('sha256-feed');
+  });
+
+  /** The card's "a code template with no folder behaves exactly as today". */
+  it('hands a template no files when no reader is wired, as before', async () => {
+    const { source } = await bannerSource(FOLDER);
+
+    const loaded = await source.load('faixa');
+
+    expect(loaded.ok).toBe(true);
+    if (!loaded.ok) return;
+    expect(loaded.value.files).toBeUndefined();
+  });
+
+  it('does not read a folder it refuses as ambiguous', async () => {
+    const readFiles = vi.fn(() => Promise.resolve(FILES));
+    const { source } = await bannerSource(
+      { ...FOLDER, 'templates/faixa/template.html': MARKUP },
+      readFiles,
+    );
+
+    const loaded = await source.load('faixa');
+
+    expect(loaded.ok).toBe(false);
+    expect(readFiles).not.toHaveBeenCalled();
+  });
+
+  /** A markup template's folder is the markup route's to read, through `src=`. */
+  it('does not read for a name it hands to the markup route', async () => {
+    const readFiles = vi.fn(() => Promise.resolve(FILES));
+    const { source } = await bannerSource(
+      {
+        ...FOLDER,
+        'templates/promo/manifest.yaml': MANIFEST.replace('name: ficha', 'name: promo'),
+        'templates/promo/template.html': MARKUP,
+      },
+      readFiles,
+    );
+
+    const loaded = await source.load('promo');
+
+    expect(loaded.ok).toBe(true);
+    expect(readFiles).not.toHaveBeenCalled();
   });
 });

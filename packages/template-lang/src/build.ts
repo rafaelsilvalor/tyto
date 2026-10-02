@@ -9,12 +9,13 @@ import type {
   RunStyle,
   Size,
   TemplateContext,
+  TemplateFiles,
   TemplateManifest,
   TextAlign,
   TextOverflow,
   TextVerticalAlign,
 } from '@tyto/core';
-import { blendModes, measureNothing, reportNothing } from '@tyto/core';
+import { blendModes, measureNothing, noFiles, reportNothing } from '@tyto/core';
 import {
   TemplateError,
   font,
@@ -76,13 +77,15 @@ import { badValue, markupProblem } from './vocabulary.js';
  * `grad` would collide with itself in every other artwork and format.
  */
 
-/** What a build needs that the markup cannot carry: the files around the template. */
-export interface TemplateAssets {
-  /** The SVG markup of a `<vector src="…">`, by template-relative path. */
-  svg?: (path: string) => string | undefined;
-  /** The asset behind an `<image src="…">` that names a file rather than a slot. */
-  image?: (path: string) => AssetRef | undefined;
-}
+/**
+ * What a build needs that the markup cannot carry: the files around the template.
+ *
+ * Core's `TemplateFiles` with both answers optional: the one shape for a template's own
+ * folder, whether the template is markup (`<vector src>`, `<image src>`) or code
+ * (`context.files`, ADR 0062). Optional here because a caller that knows a markup template
+ * draws only SVGs has never had to supply the other.
+ */
+export type TemplateAssets = Partial<TemplateFiles>;
 
 export interface Program {
   readonly manifest: TemplateManifest;
@@ -901,5 +904,6 @@ function staticContext(format: string): TemplateContext {
     // The static check reads the markup's layout, never a measured one.
     measure: measureNothing,
     report: reportNothing,
+    files: noFiles,
   };
 }
