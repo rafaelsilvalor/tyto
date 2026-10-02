@@ -21,6 +21,9 @@ import { run } from './program.js';
  * way a code template reaches a render, and its folder is a temp copy beside the brief's.
  * The brief's folder has no `assets/`, so ADR 0056's brief-side lookup cannot reach the
  * pictures: whatever is drawn came through `context.files`.
+ *
+ * Each picture is drawn `cover` into a frame of another shape, so the SVG has to crop it,
+ * which it does itself only when it knows the picture's size (TYTO-60, TYTO-215).
  */
 
 // Inside the factory, because `vi.mock` is hoisted above every import and declaration.
@@ -34,7 +37,10 @@ vi.mock('@tyto/templates', async (original) => {
       format: context.format,
       size: context.size,
       idPrefix: context.idPrefix,
-      children: background === undefined ? [] : [image({ asset: background, size: context.size })],
+      children:
+        background === undefined
+          ? []
+          : [image({ asset: background, size: context.size, fit: 'cover' })],
     });
   };
   return { ...actual, BUILT_IN_TEMPLATE_BUILDS: { ...actual.BUILT_IN_TEMPLATE_BUILDS, faixa } };
@@ -53,24 +59,25 @@ function chunk(type: string, data: Buffer): Buffer {
   return Buffer.concat([length, body, check]);
 }
 
-/** A 2 × 2 PNG of one colour, written here so no binary is checked in. */
-function solidPng(red: number, green: number, blue: number): Buffer {
+/** A PNG of one colour, written here so no binary is checked in. */
+function solidPng(width: number, height: number, [red, green, blue]: readonly number[]): Buffer {
   const header = Buffer.alloc(13);
-  header.writeUInt32BE(2, 0);
-  header.writeUInt32BE(2, 4);
+  header.writeUInt32BE(width, 0);
+  header.writeUInt32BE(height, 4);
   header.set([8, 2, 0, 0, 0], 8);
-  const row = Buffer.from([0, red, green, blue, red, green, blue]);
+  const pixel = [red ?? 0, green ?? 0, blue ?? 0];
+  const row = Buffer.from([0, ...Array.from({ length: width }, () => pixel).flat()]);
   return Buffer.concat([
     Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]),
     chunk('IHDR', header),
-    chunk('IDAT', deflateSync(Buffer.concat([row, row]))),
+    chunk('IDAT', deflateSync(Buffer.concat(Array.from({ length: height }, () => row)))),
     chunk('IEND', Buffer.alloc(0)),
   ]);
 }
 
 /** Two different pictures, so a frame that drew the other format's file is caught. */
-const FEED_PICTURE = solidPng(12, 35, 64);
-const STORY_PICTURE = solidPng(255, 89, 0);
+const FEED_PICTURE = solidPng(2, 2, [12, 35, 64]);
+const STORY_PICTURE = solidPng(4, 2, [255, 89, 0]);
 
 const MANIFEST = `name: faixa
 version: 1.0.0
@@ -153,5 +160,16 @@ describe('tyto render on a bundled code template with files in its folder', () =
     expect((await svgOf('grid')).includes(story)).toBe(false);
     expect((await svgOf('grid-1x1')).includes(story)).toBe(true);
     expect((await svgOf('grid-1x1')).includes(feed)).toBe(false);
+  });
+
+  it('crops a template picture drawn cover in the SVG itself, rather than leaving it to the reader', async () => {
+    expect(await render()).toBe(EXIT_OK);
+
+    for (const name of await readdir(join(workspace, 'out'))) {
+      if (!name.endsWith('.svg')) continue;
+      const svg = await readFile(join(workspace, 'out', name), 'utf8');
+      expect(svg, name).toContain('<clipPath');
+      expect(svg, name).not.toContain('slice');
+    }
   });
 });

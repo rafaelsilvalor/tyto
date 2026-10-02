@@ -275,7 +275,7 @@ export function templateWiring(
     readFiles: async (directory) => {
       const { assets, resources } = await fileTemplateAssets({ base: directory });
       loaded.push(resources);
-      return { svg: assets.svg ?? none, image: assets.image ?? none };
+      return assets;
     },
   });
   // In front of both, and only for a name the registry found in an installed code pack: the
@@ -292,9 +292,6 @@ export function templateWiring(
 
   return { source, resources: { html: { asset }, svg: { asset } } };
 }
-
-/** What a folder answers for a path it does not hold. */
-const none = (): undefined => undefined;
 
 /** Reads a file the user named on the command line, as a diagnostic rather than a throw. */
 export function readFailure(path: string, cause: unknown): Diagnostics {
