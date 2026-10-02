@@ -102,10 +102,12 @@ export {
   type TemplateAnswer,
   type TemplateCall,
   type TemplateContext,
+  type TemplateFiles,
   type TemplateReport,
   defineTemplate,
   isDeferredTemplate,
   measureNothing,
+  noFiles,
   reportNothing,
   templateReportCodes,
 } from './template/define.js';

@@ -140,7 +140,7 @@ function deferred(
       }
 
       // Everything but the functions, which are rebuilt in the plugin.
-      const { measure: _measure, report, ...call } = context;
+      const { measure: _measure, report, files: _files, ...call } = context;
       const answer = await pack.build(manifest.name, call, shipped);
       if (answer.ok) {
         // The reports crossed as data the wire checked against the closed list; the

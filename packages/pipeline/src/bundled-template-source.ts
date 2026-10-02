@@ -1,6 +1,7 @@
 import {
   type FileSystem,
   type TemplateBuild,
+  type TemplateFiles,
   type TemplateRegistry,
   defineTemplate,
   diagnostic,
@@ -31,6 +32,15 @@ import { type LocalTemplateSource, TEMPLATE_FILE } from './template-source.js';
  * written in TypeScript would make opening that picker execute every template on the
  * machine. So the YAML stays the only manifest and the module contributes only its
  * `build`; the two meet here, which is the first place that has both.
+ *
+ * ## Its own folder's files
+ *
+ * A code template reads a fixed background or a logo beside its manifest through
+ * `context.files` (ADR 0062), as a markup template reads them through `src=`. This source
+ * has the folder but cannot read it: reading means a disk, which `pipeline` does not import.
+ * So the reader is injected, and it is the one the markup route already uses
+ * (`fileTemplateAssets` in `@tyto/io`), which also lets the composition root keep the bytes
+ * it read for the exporters.
  */
 
 /** The build functions an application ships, by the manifest name each one draws. */
@@ -43,6 +53,12 @@ export interface BundledTemplateSourceOptions {
   readonly bundled: BundledTemplates;
   /** Where a name this source does not hold goes, unchanged. */
   readonly markup: LocalTemplateSource;
+  /**
+   * Reads a bundled template's folder for `context.files` (ADR 0062), once per load.
+   *
+   * Left out, a bundled template is handed no files, which is what every one had before.
+   */
+  readonly readFiles?: (directory: string) => Promise<TemplateFiles>;
 }
 
 /**
@@ -68,7 +84,11 @@ export function bundledTemplateSource(options: BundledTemplateSourceOptions): Lo
         return err([diagnostic('E_TEMPLATE_AMBIGUOUS', { name, file: TEMPLATE_FILE, directory })]);
       }
 
-      return ok(defineTemplate(manifest, build));
+      // After the ambiguity check, so a folder that is refused is not read for nothing.
+      if (directory === undefined || options.readFiles === undefined) {
+        return ok(defineTemplate(manifest, build));
+      }
+      return ok(defineTemplate(manifest, build, await options.readFiles(directory)));
     },
   };
 }

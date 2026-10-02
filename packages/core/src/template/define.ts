@@ -4,6 +4,7 @@ import type { Size } from '../scene/primitives.js';
 import type { Diagnostics, Result } from '../result/result.js';
 import type { Frame } from '../scene/scene.js';
 import type { MeasurableText, TextMeasurement } from '../text/layout.js';
+import type { AssetRef } from '../scene/primitives.js';
 
 /**
  * `defineTemplate` — what a `template.ts` exports (`docs/template-authoring.md`).
@@ -86,6 +87,35 @@ export interface TemplateContext {
    * the catalog, where every other diagnostic keeps them.
    */
   readonly report: (report: TemplateReport) => void;
+
+  /**
+   * The files in the template's own folder: a fixed background, a logo, a badge (ADR 0062).
+   *
+   * Paths are relative to the folder, as a markup template's `src=` is: `assets/bg.png`.
+   * An image comes back as an `AssetRef` whose bytes whoever loaded the template already
+   * read, so the exporters can embed it; a template cannot mint one itself, because it has
+   * no bytes to hash. **`undefined` means the folder has no such file**, and a template with
+   * no folder, or one running in a plugin's process, is handed {@link noFiles}.
+   *
+   * One path per format is how a template gives each format its own background:
+   * `context.files.image('assets/bg-' + context.format + '.png')`.
+   */
+  readonly files: TemplateFiles;
+}
+
+/**
+ * What a template can read from its own folder, synchronously, because `build` cannot await.
+ *
+ * The same two questions a markup template's `<vector src>` and `<image src>` ask, and the
+ * same shape: `template-lang`'s `TemplateAssets` is this type with both answers optional.
+ * Nothing here reads a disk. The folder is read up front by whoever composes the source,
+ * through the injected reader (`fileTemplateAssets` in `@tyto/io`).
+ */
+export interface TemplateFiles {
+  /** The SVG markup at a folder-relative path. */
+  readonly svg: (path: string) => string | undefined;
+  /** The image at a folder-relative path, as a ref whose bytes were already read. */
+  readonly image: (path: string) => AssetRef | undefined;
 }
 
 /**
@@ -115,24 +145,34 @@ export const measureNothing: TemplateContext['measure'] = () => undefined;
 /** The `report` of a context built by hand, in a test or a preview: it keeps nothing. */
 export const reportNothing: TemplateContext['report'] = () => undefined;
 
+/** The `files` of a template with no folder to read: every path answers `undefined`. */
+export const noFiles: TemplateFiles = { svg: () => undefined, image: () => undefined };
+
 export type TemplateBuild = (context: TemplateContext) => Frame;
 
 export interface Template {
   readonly manifest: TemplateManifest;
   readonly build: TemplateBuild;
+  /** Its folder's files, when whoever loaded it read them; `compile` hands them on. */
+  readonly files?: TemplateFiles;
 }
 
-export function defineTemplate(manifest: TemplateManifest, build: TemplateBuild): Template {
-  return { manifest, build };
+export function defineTemplate(
+  manifest: TemplateManifest,
+  build: TemplateBuild,
+  files?: TemplateFiles,
+): Template {
+  return files === undefined ? { manifest, build } : { manifest, build, files };
 }
 
 /**
- * What crosses to a template that runs in another process: its context without `measure`
- * and `report`, which are functions and cannot be cloned (ADR 0048). The other end rebuilds
- * `measure` over the faces that crossed with the call, with the same `measureText`, and
- * `report` as a list that crosses back beside the frame (ADR 0058).
+ * What crosses to a template that runs in another process: its context without `measure`,
+ * `report` and `files`, which are functions and cannot be cloned (ADR 0048). The other end
+ * rebuilds `measure` over the faces that crossed with the call, with the same `measureText`,
+ * `report` as a list that crosses back beside the frame (ADR 0058), and `files` as
+ * {@link noFiles}: a plugin's own folder is not read for its templates yet (ADR 0062).
  */
-export type TemplateCall = Omit<TemplateContext, 'measure' | 'report'>;
+export type TemplateCall = Omit<TemplateContext, 'measure' | 'report' | 'files'>;
 
 /** What an installed template's build answers across the boundary: its frame and reports. */
 export interface TemplateAnswer {
