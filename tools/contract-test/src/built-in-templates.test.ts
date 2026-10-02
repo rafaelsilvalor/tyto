@@ -117,6 +117,10 @@ const EXAMPLES: readonly Example[] = [
     body: 'code',
     formats: ['grid', 'story'],
   },
+  // The one-image table (TYTO-218): sized by measuring, so these are the cases where the
+  // measured fit and the drawn text have to agree.
+  { template: 'tabela-roxo', brief: 'examples/quatro-colunas.brief', body: 'code', formats: ['grid'] },
+  { template: 'tabela-roxo', brief: 'examples/tres-colunas.brief', body: 'code', formats: ['grid'] },
 ];
 
 let formats: Awaited<ReturnType<typeof loadFormats>>;
@@ -234,7 +238,10 @@ describe.each(EXAMPLES.map((example) => [example.template, example] as const))(
       // Never a file beside the template. Bundled — the repository ships one copy in
       // `fonts/` — except the agenda, whose brand face is read from the machine (ADR 0037).
       const expected =
-        name === 'agenda-semana' || name === 'aprovados' || name.startsWith('simulados-semana-')
+        name === 'agenda-semana' ||
+        name === 'aprovados' ||
+        name.startsWith('simulados-semana-') ||
+        name === 'tabela-roxo'
           ? { family: 'CircularXX', source: 'system' }
           : { family: 'Source Sans 3', source: 'bundled' };
       expect(scene.fonts).toContainEqual(expected);
@@ -544,6 +551,7 @@ describe('the pack as a whole', () => {
       'simulados-semana-roxo': 'roxo',
       'simulados-semana-ocre': 'ocre',
       'simulados-semana-vinho': 'vinho',
+      'tabela-roxo': 'roxo',
     });
   });
 
@@ -569,6 +577,7 @@ describe('the pack as a whole', () => {
       'simulados-semana-roxo': ['stories'],
       'simulados-semana-ocre': ['carrossel', 'stories'],
       'simulados-semana-vinho': ['carrossel', 'stories'],
+      'tabela-roxo': ['grid'],
     });
   });
 
@@ -589,6 +598,7 @@ describe('the pack as a whole', () => {
       'simulados-semana-ocre',
       'simulados-semana-roxo',
       'simulados-semana-vinho',
+      'tabela-roxo',
     ]);
     // A manifest that does not parse becomes a failure rather than an exception, so an
     // empty list and a broken pack look alike unless this is checked.

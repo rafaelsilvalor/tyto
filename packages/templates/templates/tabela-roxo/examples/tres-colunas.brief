@@ -1,0 +1,21 @@
+---
+template: tabela-roxo
+formats: [grid]
+---
+// REF-2, "10 concursos previstos para QC ainda em 2026!": three columns and a long one.
+
+::titulo
+  10 concursos previstos para QC ainda em 2026!
+
+::tabela
+  Concurso | Situação | Vagas
+  TRZ2 | Banca definida (Ômegas) | -
+  Corex QC | Banca definida (Quintex) | 76 + CR
+  Fazex QC (Analista) | Banca definida (BXT) | 60
+  QC Águas | Banca definida (BLM) | 190
+  IPX QC | Banca definida (Ômegas) | 98
+  CDVX | Banca definida (Ômegas) | 388
+  SEQ QC | Banca definida (BLM) | 5 mil
+  TX QC | Em estudos | -
+  Cetrix | Comissão formada | 107 + CR
+  QC Regula | Grupo de Trabalho Formado | -

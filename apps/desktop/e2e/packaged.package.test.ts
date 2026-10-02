@@ -285,6 +285,7 @@ describe('the packaged app', () => {
       'simulados-semana-ocre',
       'simulados-semana-roxo',
       'simulados-semana-vinho',
+      'tabela-roxo',
     ]);
   });
 
