@@ -85,6 +85,11 @@ function pane(document_: Document): PreviewElements {
   return elements;
 }
 
+/** What Chromium does once a `srcdoc` document is in; jsdom never fires it for one. */
+function loaded(iframe: HTMLIFrameElement): void {
+  iframe.dispatchEvent(new Event('load'));
+}
+
 describe('reading a frame list', () => {
   it('lists each format and each artwork once, in the order they appear', () => {
     expect(formatsOf(CAROUSEL)).toEqual(['feed', 'story']);
@@ -157,6 +162,7 @@ describe('switching format', () => {
       zoom: 1,
     });
     expect(elements.frame.getAttribute('srcdoc')).toContain('artwork-1.feed');
+    loaded(elements.frame);
 
     paintPreview(elements, {
       stale: false,
@@ -336,6 +342,112 @@ describe('showing a frame', () => {
 
     paintPreview(elements, { ...state, zoom: 0.5, stale: false });
     expect(writes).toBe(0);
+  });
+});
+
+describe('one srcdoc navigation at a time (TYTO-219)', () => {
+  // A fresh iframe keeps the *first* of two `srcdoc` assignments when the second lands before
+  // the first one's `load`, so a story clicked before the grid-1x1 preview loaded showed the
+  // grid document, 1080 px tall, in a 1920 px frame. These pin the rule that avoids it.
+  const feed = { format: 'feed', artwork: 'artwork-1' };
+  const story = { format: 'story', artwork: 'artwork-1' };
+  const second = { format: 'feed', artwork: 'artwork-2' };
+
+  function show(elements: PreviewElements, selection: Selection): void {
+    paintPreview(elements, {
+      stale: false,
+      frames: CAROUSEL,
+      artworks: SLIDES,
+      selection,
+      zoom: 1,
+    });
+  }
+
+  /** Counts `srcdoc` writes from here on, which is the number of navigations asked for. */
+  function countWrites(iframe: HTMLIFrameElement): { readonly writes: string[] } {
+    const record = { writes: [] as string[] };
+    iframe.setAttribute = new Proxy(iframe.setAttribute, {
+      apply(target, thisArgument, args: [string, string]) {
+        if (args[0] === 'srcdoc') record.writes.push(args[1]);
+        return Reflect.apply(target, thisArgument, args);
+      },
+    });
+    return record;
+  }
+
+  it('does not navigate again while a document is loading, and applies the newer one on load', () => {
+    const elements = pane(globalThis.document);
+    show(elements, feed);
+    show(elements, story);
+
+    expect(elements.frame.getAttribute('srcdoc')).toContain('artwork-1.feed');
+    loaded(elements.frame);
+    expect(elements.frame.getAttribute('srcdoc')).toContain('artwork-1.story');
+  });
+
+  it('applies only the last of three paints made before the first load', () => {
+    const elements = pane(globalThis.document);
+    const record = countWrites(elements.frame);
+    show(elements, feed);
+    show(elements, story);
+    show(elements, second);
+
+    loaded(elements.frame);
+    loaded(elements.frame);
+
+    expect(record.writes.map((html) => /<title>(.*)<\/title>/.exec(html)?.[1])).toEqual([
+      'artwork-1.feed',
+      'artwork-2.feed',
+    ]);
+  });
+
+  it('does not navigate again when the newest document is the one already loading', () => {
+    const elements = pane(globalThis.document);
+    const record = countWrites(elements.frame);
+    show(elements, feed);
+    show(elements, story);
+    show(elements, feed);
+
+    loaded(elements.frame);
+
+    expect(record.writes).toHaveLength(1);
+    // And the frame is free again: the next change is applied at once.
+    show(elements, story);
+    expect(elements.frame.getAttribute('srcdoc')).toContain('artwork-1.story');
+  });
+
+  it('does not write to an iframe that left the page while it loaded', () => {
+    const elements = pane(globalThis.document);
+    const record = countWrites(elements.frame);
+    show(elements, feed);
+    show(elements, story);
+
+    elements.frame.remove();
+    loaded(elements.frame);
+    loaded(elements.frame);
+
+    expect(record.writes).toHaveLength(1);
+    expect(elements.frame.getAttribute('srcdoc')).toContain('artwork-1.feed');
+  });
+
+  it('keeps nothing pending for a removed iframe, and a replacement starts on its own', () => {
+    const elements = pane(globalThis.document);
+    show(elements, feed);
+    elements.frame.remove();
+    loaded(elements.frame);
+
+    // The same element back in the page navigates at once rather than waiting on a load that
+    // already happened.
+    elements.paper.append(elements.frame);
+    show(elements, story);
+    expect(elements.frame.getAttribute('srcdoc')).toContain('artwork-1.story');
+
+    // A new element is not held back by the old one's pending navigation.
+    show(elements, second);
+    const replacement = { ...elements, frame: globalThis.document.createElement('iframe') };
+    elements.frame.replaceWith(replacement.frame);
+    show(replacement, feed);
+    expect(replacement.frame.getAttribute('srcdoc')).toContain('artwork-1.feed');
   });
 });
 
