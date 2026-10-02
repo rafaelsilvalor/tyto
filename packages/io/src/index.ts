@@ -33,6 +33,8 @@ export {
 
 export { type FileResources, type FileResourcesOptions, fileResources } from './file-resources.js';
 
+export { layeredExportResources } from './layered-resources.js';
+
 export {
   type FileTemplateAssets,
   type FileTemplateAssetsOptions,
