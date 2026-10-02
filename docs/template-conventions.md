@@ -198,6 +198,19 @@ Getting this backwards — passing the drawn size — clips the geometry to a fr
 in both exporters, with **no diagnostic anywhere**. It is caught by looking at a render, so
 look at one.
 
+## A value that must not break is glued with a no-break space
+
+Tyto decides every line break before an exporter sees the text, and **a break opportunity is
+a plain space (U+0020) and only that** (`packages/core/src/text/layout.ts`). So a template
+that must keep `R$ 33.820,39` or `5 + CR` on one line writes their inner spaces as U+00A0. A
+no-break space draws and measures as a space and breaks nothing, in the measurement, in
+`export-html` and in `export-svg` alike. No exporter has to agree to anything.
+
+The same move chooses _where_ a phrase breaks. `R$ 5.667,92 a R$ 13.560,00` glues the `a` to
+the value before it, so the only break left falls between the two values. `_estrategia/table-text.ts`
+(TYTO-218) holds the rules the one-image table uses. Its `pieces` are what a column can never
+be narrower than.
+
 ## What a template may not do
 
 - **No Node, no DOM.** A template runs wherever the compiler runs (ADR 0010). It cannot

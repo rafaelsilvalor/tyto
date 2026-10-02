@@ -1,0 +1,21 @@
+---
+template: tabela-ec
+formats: [grid]
+---
+// MCA-66477, "Top 10 editais previstos para outubro!": the art the maintainer approved.
+
+::titulo
+  Top 10 editais previstos para outubro!
+
+::tabela
+  Concurso | Banca | Vagas | Salário
+  Polícia Penal PE | Cebraspe | 700 | R$ 5.100,00
+  PC PE | Cebraspe | 1.315 | R$ 5.667,92 a R$ 13.560,00
+  TRT 8 (AP/PA) | FCC | CR | R$ 9.776,74 a R$ 18.380,18
+  TRF3 (SP/MS) | Vunesp | - | R$ 9.776,74 a R$ 16.041,21
+  DPE AM | FCC | 5 + CR | R$ 4.713,02 a R$ 8.006,38
+  Sefaz BA | Cesgranrio | 200 + CR | R$ 24.102,21 a R$ 33.820,39 (bruto)
+  Sefaz RS | FCC | - | R$ 17.687,12 e R$ 39.877,31
+  Sefaz SP | FCC | 60 | R$ 7.349,47
+  CGU | Cebraspe | 60 | R$ 20.000,00
+  Câmara dos Deputados | Cebraspe | 150 | R$ 32.070,88

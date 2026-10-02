@@ -38,3 +38,30 @@ export const EC: Brand = {
  * manifest `default` is only applied to an `enum` slot.
  */
 export const CALL_TO_COMMENT = 'Escreva SIMULADO nos comentários para acessar';
+
+/**
+ * What sets one brand's one-image table apart (TYTO-218): its accent and its handle.
+ *
+ * A separate shape from {@link Brand} only for the handle: the table signs off with the
+ * account's handle on every brand, EC included, where EC's story agenda signs off with a
+ * note. The accent is the brand's own, read from its {@link Brand}.
+ */
+export interface TableBrand {
+  /** The owl, the title, the header row and a band. */
+  readonly accent: string;
+  /** The words at the foot. */
+  readonly handle: string;
+}
+
+/**
+ * Estratégia Concursos's table: EC's registered accent, the one the mock-exam agenda draws, and
+ * its handle.
+ *
+ * The approved MCA-66477 art was drawn in `#5B0DBF`, the maintainer's standalone generator's
+ * purple; he chose the registered brand colour instead (2026-10-02), so one brand keeps one
+ * accent and a render sits a shade apart from that reference on purpose.
+ */
+export const EC_TABLE: TableBrand = {
+  accent: EC.accent,
+  handle: '@estrategiaconcursos',
+};
