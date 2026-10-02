@@ -253,11 +253,10 @@ describe("a template's own folder, in the window and the CLI (TYTO-176)", () => 
     );
     expect(differing / (png.width * png.height)).toBeLessThanOrEqual(TOLERANCE);
 
-    // And the CLI over the same brief, as SVG, which needs no browser. Not byte for byte: the CLI
-    // hands its SVG exporter no `assetSize`, so it leaves a `cover` picture to the renderer where
-    // the window crops it with a `clipPath` (TYTO-60). Measured on main for a brief's own image,
-    // so that gap predates this card and lives in `apps/cli`. What both must hold is the
-    // template's two files, embedded.
+    // And the CLI over the same brief, as SVG, which needs no browser. Byte for byte: both bind
+    // the brief's files and the template's through `layeredExportResources` (TYTO-216), so the
+    // `cover` background is cropped the same way in both. Before TYTO-215 the CLI's copy of that
+    // binding dropped `assetSize` and left the crop to the reader (TYTO-60).
     const fromCli = join(scratch, 'from-cli');
     const cli = require_.resolve('@tyto/cli/dist/index.js');
     execFileSync(
@@ -270,6 +269,10 @@ describe("a template's own folder, in the window and the CLI (TYTO-176)", () => 
       const svg = readFileSync(join(folder, 'grid-1x1-01.svg'), 'utf8');
       expect(svg, folder).toContain(background);
       expect(svg, folder).toContain('#30c060');
+      expect(svg, folder).toContain('<clipPath');
     }
+    expect(readFileSync(join(fromCli, 'grid-1x1-01.svg'), 'utf8')).toBe(
+      readFileSync(join(fromWindow, 'grid-1x1-01.svg'), 'utf8'),
+    );
   }, 120_000);
 });

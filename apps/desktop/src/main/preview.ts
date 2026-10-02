@@ -12,12 +12,12 @@ import {
 } from '@tyto/core';
 import { exportHtml } from '@tyto/export-html';
 import { fontSubstitutionWarnings } from '@tyto/pipeline';
-import { briefAssetResolver, fileResources } from '@tyto/io';
+import { briefAssetResolver, fileResources, layeredExportResources } from '@tyto/io';
 
 import type { WindowPlugins } from './window-plugins.js';
 import { faces, fonts } from './fonts.js';
 import { type ProjectSources } from './project.js';
-import { briefThenTemplate, templateSourceOf } from './template-source.js';
+import { templateSourceOf } from './template-source.js';
 
 /**
  * Brief text in, one HTML document per frame out — the preview's whole job (E9.2).
@@ -241,7 +241,7 @@ export async function createPreviewService(
         // reported below (ADR 0037), so the preview is the export and says where it differs.
         // The template's own `src=` files after the brief's, as the export binds them
         // (TYTO-176): a template that draws from its folder previews as it exports.
-        resources: { font: fonts.font, ...briefThenTemplate(images, wiring.resources).html },
+        resources: { font: fonts.font, ...layeredExportResources([images, wiring.resources]).html },
       });
 
       const before = [
