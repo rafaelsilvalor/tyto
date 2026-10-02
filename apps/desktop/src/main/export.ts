@@ -1,4 +1,10 @@
-import { type Diagnostics, type FileSystem, hasErrors } from '@tyto/core';
+import {
+  type Diagnostic,
+  type Diagnostics,
+  type FileSystem,
+  diagnostic,
+  hasErrors,
+} from '@tyto/core';
 import { htmlExporterPlugin } from '@tyto/export-html';
 import { svgExporterPlugin } from '@tyto/export-svg';
 import {
@@ -84,6 +90,13 @@ export interface ExportRequest {
    * `outbox/<id>/out/` is the ADR 0011 contract's shape. `label` names the copied brief.
    */
   readonly delivery?: boolean;
+  /**
+   * Leave out an output no exporter in this run's host produces, with a
+   * `W_QUEUE_KIND_UNAVAILABLE` each, instead of failing the run (ADR 0061). On for the queue,
+   * whose kinds were chosen for a folder and outlive the plugin that produced one; off for
+   * the export box, which only offers what `kinds` answered.
+   */
+  readonly dropUnavailableKinds?: boolean;
 }
 
 export type ExportStatus = 'running' | 'finished' | 'cancelled';
@@ -249,6 +262,32 @@ function exporterHost(
   return { host, warnings };
 }
 
+/** What the queue asks of one run, and what it said about the kinds it had to leave out. */
+interface AvailableOutputs {
+  readonly outputs: readonly OutputRequest[];
+  readonly dropped: readonly Diagnostic[];
+}
+
+/**
+ * The requested outputs this host can produce, and a warning for each it cannot (ADR 0061).
+ *
+ * Asked of the run's own host, the one `runJob` will look the kinds up in, so a kind is
+ * dropped exactly when the job would have refused it. **Never empty**: when nothing chosen
+ * is left, the run produces PNG, the queue's default (ADR 0044), rather than nothing.
+ */
+export function availableOutputs(
+  requested: readonly OutputRequest[],
+  exporters: { forKind(kind: string): unknown },
+): AvailableOutputs {
+  const kept = requested.filter((output) => exporters.forKind(output.kind) !== undefined);
+  const outputs: readonly OutputRequest[] = kept.length > 0 ? kept : [{ kind: 'png' }];
+  const produced = outputs.map((output) => output.kind).join(', ');
+  const dropped = requested
+    .filter((output) => exporters.forKind(output.kind) === undefined)
+    .map((output) => diagnostic('W_QUEUE_KIND_UNAVAILABLE', { kind: output.kind, produced }));
+  return { outputs, dropped };
+}
+
 export async function createExportService(options: ExportServiceOptions): Promise<ExportService> {
   const { fileSystem, sources } = options;
   const plugins = Promise.resolve(options.plugins ?? NO_PLUGINS);
@@ -285,6 +324,10 @@ export async function createExportService(options: ExportServiceOptions): Promis
       options.rasterizer,
       await plugins,
     );
+    const { outputs, dropped } =
+      request.dropUnavailableKinds === true
+        ? availableOutputs(request.outputs, host.registry.exporters)
+        : { outputs: request.outputs, dropped: [] };
     // The export box delivers into the folder the person picked; `tyto render --folder`
     // adds a level named after the brief, and the two differ on purpose (ADR 0057).
     const delivery =
@@ -313,7 +356,7 @@ export async function createExportService(options: ExportServiceOptions): Promis
     const job = await runJob(
       {
         brief: request.brief,
-        outputs: request.outputs,
+        outputs,
         ...(request.formats === undefined ? {} : { formats: request.formats }),
         signal: run.controller.signal,
       },
@@ -379,7 +422,7 @@ export async function createExportService(options: ExportServiceOptions): Promis
         ...(description === undefined ? {} : { description }),
       });
     }
-    run.diagnostics = [...startup, ...skipped, ...produced, ...leftovers, ...delivered];
+    run.diagnostics = [...startup, ...skipped, ...dropped, ...produced, ...leftovers, ...delivered];
 
     run.result = renderResult({
       cancelled,

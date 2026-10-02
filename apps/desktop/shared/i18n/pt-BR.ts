@@ -197,6 +197,7 @@ export const ptBR: Catalogue = {
   'queue.folder.clear': 'Esquecer pasta',
   'queue.inbox': 'Coloque as pastas de tarefa em',
   'queue.autoRun': 'Renderizar automaticamente',
+  'queue.kinds': 'Gera:',
   'queue.empty': 'Nenhuma tarefa na fila.',
   'queue.status.pending': 'pendente',
   'queue.status.rendering': 'renderizando',

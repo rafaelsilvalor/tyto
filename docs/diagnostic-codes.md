@@ -93,6 +93,7 @@ non-zero.
 | `W_IMPORT_SKIPPED` | warning | no | Something in the previous version's data folder could not be brought across to this one. |
 | `W_LEFTOVER_REMOVED` | warning | no | A file the previous export wrote into this folder, and this one did not produce, was removed. |
 | `W_LEFTOVER_KEPT` | warning | no | A file the previous export listed, and this one did not produce, was left in the folder. |
+| `W_QUEUE_KIND_UNAVAILABLE` | warning | no | A file type chosen for the queue folder has no exporter on this machine, so the task was rendered without it. |
 | `W_PREVIOUS_RESULT_UNREADABLE` | warning | no | The folder's previous result.json could not be read, so nothing in the folder was removed. |
 
 ## What is fatal, and why
@@ -1255,6 +1256,20 @@ Kept '{file}', which the previous export listed and this one did not produce: {r
 ```
 
 Parameters: `file`, `reason`
+
+### `W_QUEUE_KIND_UNAVAILABLE`
+
+**Severity:** warning · **Fatal:** no · **Spec:** `docs/adr/0061-the-queue-folder-chooses-its-file-types.md`
+
+A file type chosen for the queue folder has no exporter on this machine, so the task was rendered without it.
+
+A warning never replaces a value (ADR 0013).
+
+```
+Did not produce '{kind}': no exporter on this machine produces it any more, so this task produced {produced}.
+```
+
+Parameters: `kind`, `produced`
 
 ### `W_PREVIOUS_RESULT_UNREADABLE`
 

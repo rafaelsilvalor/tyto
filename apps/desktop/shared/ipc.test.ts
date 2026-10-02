@@ -51,6 +51,7 @@ describe('the IPC contract', () => {
       'queue:run',
       'queue:set-auto-run',
       'queue:set-folder',
+      'queue:set-kinds',
       'template:new',
       'template:open',
       'template:preview',

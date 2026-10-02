@@ -8,7 +8,12 @@ import { nodeFileSystem } from '@tyto/io';
 import type { LoadedPlugins, Plugin } from '@tyto/plugin-api';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
-import { type ExportProgress, type ExportService, createExportService } from './export.js';
+import {
+  type ExportProgress,
+  type ExportService,
+  availableOutputs,
+  createExportService,
+} from './export.js';
 import { createProjectSources } from './project.js';
 
 /**
@@ -341,5 +346,68 @@ describe('installed plugins in the export (TYTO-48)', () => {
     ]);
     const svg = readdirSync(out).find((name) => name.endsWith('.svg'));
     expect(readFileSync(join(out, svg!), 'utf8')).not.toBe('<svg/>');
+  }, 60_000);
+});
+
+describe('a queue kind whose exporter is gone (TYTO-188)', () => {
+  const only = (...kinds: string[]) => ({
+    forKind: (kind: string) => (kinds.includes(kind) ? {} : undefined),
+  });
+
+  it('keeps what the host produces and warns once for each kind it does not', () => {
+    const { outputs, dropped } = availableOutputs(
+      [{ kind: 'png' }, { kind: 'pdf' }, { kind: 'svg' }],
+      only('png', 'svg'),
+    );
+
+    expect(outputs).toEqual([{ kind: 'png' }, { kind: 'svg' }]);
+    expect(dropped).toEqual([
+      expect.objectContaining({
+        code: 'W_QUEUE_KIND_UNAVAILABLE',
+        severity: 'warning',
+        message: expect.stringContaining("'pdf'") as unknown,
+      }),
+    ]);
+  });
+
+  it('falls back to PNG when nothing chosen is left, rather than rendering nothing', () => {
+    const { outputs, dropped } = availableOutputs([{ kind: 'pdf' }], only('png'));
+
+    expect(outputs).toEqual([{ kind: 'png' }]);
+    expect(dropped.map((item) => item.message)).toEqual([
+      "Did not produce 'pdf': no exporter on this machine produces it any more, so this task produced png.",
+    ]);
+  });
+
+  it('drops it in a real run, and result.json says so beside the files it lists', async () => {
+    const progress = await service.run({
+      brief: exampleBrief('aprovados', 'aprovados.brief'),
+      directory: out,
+      label: 'aprovados',
+      outputs: [{ kind: 'svg' }, { kind: 'txt' }],
+      dropUnavailableKinds: true,
+    });
+
+    expect(progress.failure).toBeUndefined();
+    const result = JSON.parse(readFileSync(join(out, 'result.json'), 'utf8')) as {
+      artifacts: { kind: string }[];
+      diagnostics: { code: string }[];
+    };
+    expect(result.artifacts.length).toBeGreaterThan(0);
+    expect(new Set(result.artifacts.map((artifact) => artifact.kind))).toEqual(new Set(['svg']));
+    expect(
+      result.diagnostics.filter((item) => item.code === 'W_QUEUE_KIND_UNAVAILABLE'),
+    ).toHaveLength(1);
+  }, 60_000);
+
+  it('still refuses an unknown kind from the export box, which never asks to drop one', async () => {
+    const progress = await service.run({
+      brief: exampleBrief('aprovados', 'aprovados.brief'),
+      directory: out,
+      label: 'aprovados',
+      outputs: [{ kind: 'txt' }],
+    });
+
+    expect(progress.failure).toMatch(/No registered exporter produces 'txt'/u);
   }, 60_000);
 });

@@ -1,7 +1,15 @@
 # 0044 — The desktop runs installed plugins in utility processes, and the queue stays PNG-only
 
 Status: accepted · 2026-09-27 · TYTO-48 · extends ADR 0041 and ADR 0042 · amended by ADR 0049,
-which measured that a `utilityProcess` does not enforce Node's permission model
+which measured that a `utilityProcess` does not enforce Node's permission model · amended by
+ADR 0061, which lets each queue folder choose its file types
+
+## Amended by ADR 0061
+
+The queue is no longer PNG-only: a person chooses, per queue folder, which kinds its tasks
+produce (TYTO-188). What this ADR argued still holds, and is why the default stays PNG: no
+folder changes what it produces because an exporter was installed, only because somebody
+chose it in the panel.
 
 ## Amended by ADR 0049
 

@@ -27,6 +27,7 @@ export interface QueueActions {
   chooseFolder(): void;
   clearFolder(): void;
   setAutoRun(on: boolean): void;
+  setKinds(kinds: readonly string[]): void;
   run(taskId: string): void;
   openBrief(taskId: string): void;
   openOutput(taskId: string): void;
@@ -43,6 +44,7 @@ const idle: QueueActions = {
   chooseFolder: () => undefined,
   clearFolder: () => undefined,
   setAutoRun: () => undefined,
+  setKinds: () => undefined,
   run: () => undefined,
   openBrief: () => undefined,
   openOutput: () => undefined,
@@ -53,16 +55,23 @@ export class QueuePanel extends DockedPanel {
     ...DockedPanel.properties,
     view: { attribute: false },
     actions: { attribute: false },
+    available: { attribute: false },
   };
 
   /** The queue, `'failed'` when the bridge could not answer, or nothing while it is asked. */
   declare view: QueueView | 'failed' | undefined;
   declare actions: QueueActions;
+  /**
+   * Every kind a run can produce, from `export:kinds`, so an installed exporter's kind is
+   * offered beside Tyto's (ADR 0044). PNG alone until the answer lands.
+   */
+  declare available: readonly string[];
 
   constructor() {
     super();
     this.view = undefined;
     this.actions = idle;
+    this.available = ['png'];
   }
 
   protected override render(): unknown {
@@ -108,6 +117,7 @@ export class QueuePanel extends DockedPanel {
           ${this.say('queue.autoRun')}
         </label>
       </div>
+      ${this.kindsRow(view.kinds)}
       ${
         view.tasks.length === 0
           ? html`<p class="queue__note queue__empty">${this.say('queue.empty')}</p>`
@@ -115,6 +125,44 @@ export class QueuePanel extends DockedPanel {
               ${view.tasks.map((task) => this.row(task))}
             </ul>`
       }`;
+  }
+
+  /**
+   * One checkbox per kind (TYTO-188, ADR 0061). A chosen kind no exporter produces any more
+   * is still listed, so a person can see it and untick it; the task's warning says the same.
+   * **The last ticked box is disabled**: a folder that produced nothing would be one that
+   * stopped working without saying so.
+   */
+  private kindsRow(chosen: readonly string[]): TemplateResult {
+    const offered = [...new Set([...this.available, ...chosen])];
+    const toggle = (kind: string, on: boolean): void => {
+      const next = on ? [...chosen, kind] : chosen.filter((item) => item !== kind);
+      // In the order offered, so the saved choice reads the way the row does.
+      this.actions.setKinds(offered.filter((item) => next.includes(item)));
+    };
+    return html`<div
+      class="queue__controls queue__kinds"
+      role="group"
+      aria-label=${this.say('queue.kinds')}
+    >
+      <span class="queue__label">${this.say('queue.kinds')}</span>
+      ${offered.map((kind) => {
+        const on = chosen.includes(kind);
+        return html`<label class="queue__auto">
+          <input
+            type="checkbox"
+            class="queue__kind"
+            data-kind=${kind}
+            .checked=${on}
+            ?disabled=${on && chosen.length === 1}
+            @change=${(event: Event) => {
+              toggle(kind, (event.target as HTMLInputElement).checked);
+            }}
+          />
+          ${kind.toUpperCase()}
+        </label>`;
+      })}
+    </div>`;
   }
 
   private chooseButton(): TemplateResult {
