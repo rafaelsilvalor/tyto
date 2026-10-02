@@ -1,0 +1,9 @@
+---
+template: guarda-teste
+formats: [grid-1x1, story]
+---
+::titulo
+  Uma guarda **de teste**
+
+::lamina
+  Desenhada inteira, do topo ao rodapé.

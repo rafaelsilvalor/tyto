@@ -1,5 +1,13 @@
 import { execFileSync } from 'node:child_process';
-import { existsSync, mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync } from 'node:fs';
+import {
+  existsSync,
+  mkdirSync,
+  mkdtempSync,
+  readFileSync,
+  readdirSync,
+  rmSync,
+  writeFileSync,
+} from 'node:fs';
 import { createRequire } from 'node:module';
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
@@ -34,7 +42,23 @@ import { closeApp } from './close-app.js';
 const here = dirname(fileURLToPath(import.meta.url));
 const require_ = createRequire(import.meta.url);
 
-const BRIEF = ['---', 'template: promo-curso', '---', '::titulo Exportado pela janela'].join('\n');
+/**
+ * **A committed fixture, and not a template of the pack** (TYTO-217). The pack's test templates
+ * are throwaway and will be deleted; this one lives beside the suite. It declares grid-1x1 and
+ * story, which the formats suite below unticks one of, and draws text only in the bundled
+ * Source Sans 3: the CI runner has no system fonts, and a substituted font would make the two
+ * programs agree about the fallback instead of about the template. The window reads it through
+ * this launch's own `settings.json`, the CLI through `--templates`.
+ */
+const TEMPLATES = join(here, '__fixtures__', 'templates');
+
+const BRIEF = [
+  '---',
+  'template: guarda-teste',
+  '---',
+  '::titulo Exportado pela janela',
+  '::lamina Uma lâmina',
+].join('\n');
 
 let app: ElectronApplication;
 let window: Page;
@@ -114,7 +138,7 @@ async function waitForBriefText(expected: string): Promise<void> {
         `  tabs:           ${JSON.stringify(seen.tabs)}\n` +
         `  editor mounted: ${String(seen.editorMounted)}\n` +
         `  viewport:       ${JSON.stringify(seen.viewport)}\n` +
-        `  A tab named promo.brief with an empty viewport means main answered and the draw is\n` +
+        `  A tab named guarda.brief with an empty viewport means main answered and the draw is\n` +
         `  the problem; an untitled tab means the open never came back from main.`,
       { cause },
     );
@@ -123,7 +147,7 @@ async function waitForBriefText(expected: string): Promise<void> {
 
 beforeAll(async () => {
   scratch = mkdtempSync(join(tmpdir(), 'tyto-export-e2e-'));
-  briefPath = join(scratch, 'promo.brief');
+  briefPath = join(scratch, 'guarda.brief');
   writeFileSync(briefPath, BRIEF, 'utf8');
 
   // **The CLI reads `formats.yaml` from the folder it is run in and the app reads the pack's
@@ -134,10 +158,14 @@ beforeAll(async () => {
   const pack = join(dirname(require_.resolve('@tyto/templates/package.json')), 'templates');
   writeFileSync(join(scratch, 'formats.yaml'), readFileSync(join(pack, 'formats.yaml'), 'utf8'));
 
+  const userData = join(scratch, 'userData');
+  mkdirSync(userData, { recursive: true });
+  writeFileSync(join(userData, 'settings.json'), JSON.stringify({ templatesFolder: TEMPLATES }));
+
   app = await _electron.launch({
-    args: ['.', `--user-data-dir=${join(scratch, 'userData')}`],
+    args: ['.', `--user-data-dir=${userData}`],
     cwd: join(here, '..'),
-    env: { ...process.env, TYTO_HEADLESS: '1' },
+    env: { ...process.env, TYTO_HEADLESS: '1', TYTO_HOME: join(scratch, 'tyto-home') },
   });
   window = await app.firstWindow();
   // **`.shell` is in `index.html` and is therefore no signal at all** (TYTO-154): it is there
@@ -250,10 +278,11 @@ describe('exporting from the window (E9.4)', () => {
     const fromCli = join(scratch, 'from-cli');
 
     const cli = require_.resolve('@tyto/cli/dist/index.js');
-    execFileSync(process.execPath, [cli, 'render', briefPath, '--out', fromCli, '--types', 'svg'], {
-      cwd: scratch,
-      stdio: 'pipe',
-    });
+    execFileSync(
+      process.execPath,
+      [cli, 'render', briefPath, '--out', fromCli, '--types', 'svg', '--templates', TEMPLATES],
+      { cwd: scratch, stdio: 'pipe' },
+    );
 
     const listing = (directory: string): string[] =>
       readdirSync(directory)
@@ -294,14 +323,14 @@ describe('exporting from the window (E9.4)', () => {
   }, 60_000);
 
   it('leaves no partial files when it is cancelled', async () => {
-    // **A brief big enough to still be running when the click lands.** The promo brief is
+    // **A brief big enough to still be running when the click lands.** The one-slide brief is
     // two frames and finished before Playwright could reach the button — the first version
     // of this test failed with `element was detached from the DOM`, which is a race and not
     // a defect. Twenty-four slides in two formats is forty-eight frames, and the point is
     // not the number: it is that a cancel test needs something to cancel.
     const many = [
       '---',
-      'template: carrossel-lista',
+      'template: guarda-teste',
       'formats: [grid-1x1, story]',
       '---',
       '::titulo',
@@ -378,7 +407,7 @@ describe('exporting from the window (E9.4)', () => {
  * red run cannot be ambiguous between the rasterizer and the plumbing — both sides of the
  * comparison went through the same rasterizer.
  *
- * `promo-curso` declares `grid-1x1` and `story`, which is what makes it the fixture for this: one
+ * `guarda-teste` declares `grid-1x1` and `story`, which is what makes it the fixture for this: one
  * of the two can be unticked, and the frame that lands says which one stayed by its size.
  */
 describe('choosing formats and scale (TYTO-137)', () => {
@@ -440,7 +469,7 @@ describe('choosing formats and scale (TYTO-137)', () => {
       });
 
   beforeAll(async () => {
-    // The cancel case above opened another brief, and this one is about `promo-curso`'s two
+    // The cancel case above opened another brief, and this one is about the fixture's two
     // formats. Reopening is also what re-reads the checklist: the dialog is handed the list
     // when it opens, so the tab has to be right first.
     await openBrief();
