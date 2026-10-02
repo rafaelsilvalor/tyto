@@ -1,0 +1,9 @@
+name: guarda-teste
+version: 1.0.0
+description: >-
+  A fixture for the desktop e2e guards (TYTO-217), not a template anybody uses. Two formats so
+  the export dialog has one to untick, and a repeat slot so a brief can ask for many slides.
+formats: [grid-1x1, story]
+slots:
+  titulo: { type: rich-text, required: true }
+  lamina: { type: rich-text, repeat: true, min: 1 }

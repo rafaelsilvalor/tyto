@@ -1,4 +1,4 @@
-import { existsSync, mkdtempSync, readFileSync, rmSync } from 'node:fs';
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { createRequire } from 'node:module';
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
@@ -45,7 +45,14 @@ const packDirectory = join(
   'templates',
 );
 
-const EXAMPLE = join(packDirectory, 'promo-curso', 'examples', 'promo.brief');
+/**
+ * **A committed fixture, not a template of the pack** (TYTO-217): the pack's test templates are
+ * throwaway and will be deleted, and this guard has to outlive them. It draws nothing right of
+ * x=1000 on a dark solid fill, which is what the right-edge column read below relies on, and the
+ * window finds it through this launch's own `settings.json`.
+ */
+const TEMPLATES = join(here, '__fixtures__', 'templates');
+const EXAMPLE = join(TEMPLATES, 'guarda-teste', 'examples', 'guarda.brief');
 
 /** A format's size, read from `formats.yaml`, the one place a size is written. */
 function formatSize(format: string): { width: number; height: number } {
@@ -179,8 +186,11 @@ beforeAll(async () => {
   }
 
   scratch = mkdtempSync(join(tmpdir(), 'tyto-preview-height-'));
+  const userData = join(scratch, 'userData');
+  mkdirSync(userData, { recursive: true });
+  writeFileSync(join(userData, 'settings.json'), JSON.stringify({ templatesFolder: TEMPLATES }));
   app = await _electron.launch({
-    args: ['.', `--user-data-dir=${join(scratch, 'userData')}`],
+    args: ['.', `--user-data-dir=${userData}`],
     cwd: join(here, '..'),
     env: { ...process.env, TYTO_HEADLESS: '1', TYTO_HOME: join(scratch, 'tyto-home') },
   });
