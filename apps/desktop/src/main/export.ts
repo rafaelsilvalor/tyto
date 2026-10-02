@@ -15,6 +15,7 @@ import {
   fileResources,
   fsDeliveryOutput,
   fsTaskOutput,
+  layeredExportResources,
   recordingAssetResolver,
   renderResult,
 } from '@tyto/io';
@@ -38,7 +39,7 @@ import type { Rasterizer } from '@tyto/raster';
 
 import { faces, fonts } from './fonts.js';
 import { type ProjectSources } from './project.js';
-import { briefThenTemplate, templateSourceOf } from './template-source.js';
+import { templateSourceOf } from './template-source.js';
 
 /**
  * Brief text in, files on disk out — the export's whole job (E9.4, TYTO-43).
@@ -320,7 +321,7 @@ export async function createExportService(options: ExportServiceOptions): Promis
     // the brief's (TYTO-176); it fills those as the job loads the template.
     const wiring = templateSourceOf(fileSystem, templates, codePacks);
     const { host, warnings: skipped } = exporterHost(
-      briefThenTemplate(images, wiring.resources),
+      layeredExportResources([images, wiring.resources]),
       options.rasterizer,
       await plugins,
     );
