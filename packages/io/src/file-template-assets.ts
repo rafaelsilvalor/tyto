@@ -2,9 +2,8 @@ import type { Dirent } from 'node:fs';
 import { readFile, readdir, stat } from 'node:fs/promises';
 import { extname, join, relative, resolve } from 'node:path';
 
-import type { AssetRef, Size } from '@tyto/core';
+import type { AssetRef, Size, TemplateFiles } from '@tyto/core';
 import type { ExportResources } from './export-resources.js';
-import type { TemplateAssets } from '@tyto/template-lang';
 
 import { hashOf } from './hash.js';
 import { imageSize } from './image-size.js';
@@ -20,7 +19,7 @@ import { EMBEDDABLE_MIME, dataUri } from './mime.js';
  *
  * ## Why this reads the folder up front
  *
- * `TemplateAssets.svg` and `TemplateAssets.image` are **synchronous**: the template
+ * `TemplateFiles.svg` and `TemplateFiles.image` are **synchronous**: the template
  * function runs inside `compile` and cannot await. So does `HtmlResources.asset`, which
  * needs the bytes of any `<image src="…">` the template drew. The folder is a template's
  * own — a logo, a badge, a background — so reading it is reading a handful of files. The
@@ -45,8 +44,11 @@ export interface FileTemplateAssetsOptions {
 }
 
 export interface FileTemplateAssets {
-  /** Hand to `markupTemplateSource({ assets })`. */
-  readonly assets: TemplateAssets;
+  /**
+   * Hand to `markupTemplateSource({ assets })`, or return from a code template's `readFiles`
+   * (ADR 0062). Both answers are always there, which is what `context.files` needs.
+   */
+  readonly assets: TemplateFiles;
   /**
    * Hand to the job so the exporters can embed what the template drew.
    *
@@ -128,7 +130,7 @@ export async function fileTemplateAssets(
   const byAbsolute = new Map<string, Entry>();
   for (const entry of byPath.values()) byAbsolute.set(entry.absolute, entry);
 
-  const assets: TemplateAssets = {
+  const assets: TemplateFiles = {
     svg: (path) => {
       const entry = byPath.get(templatePath(path));
       return entry?.mime === 'image/svg+xml' ? entry.bytes.toString('utf8') : undefined;
