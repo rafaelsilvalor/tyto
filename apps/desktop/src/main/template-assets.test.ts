@@ -12,7 +12,7 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { type ExportProgress, createExportService } from './export.js';
 import { createPreviewService } from './preview.js';
 import { createProjectSources } from './project.js';
-import { briefThenTemplate, templateSourceOf } from './template-source.js';
+import { templateSourceOf } from './template-source.js';
 
 /**
  * A markup template that draws from its own folder, in the window (TYTO-176).
@@ -223,27 +223,5 @@ describe('templateSourceOf', () => {
     expect(reads).toEqual([]);
     const ref: AssetRef = { id: 'assets/x.png', source: 'file', hash: 'sha256-0' };
     expect(wiring.resources.html?.asset?.(ref)).toBeUndefined();
-  });
-});
-
-describe('briefThenTemplate', () => {
-  const ref: AssetRef = { id: 'logo.png', source: 'file', hash: 'sha256-0' };
-  const answering = (uri: string) => ({
-    html: { asset: () => uri },
-    svg: { asset: () => uri, assetSize: () => ({ w: 1, h: 1 }) },
-  });
-
-  it("asks the brief's files first, the CLI's order", () => {
-    const both = briefThenTemplate(answering('brief'), answering('template'));
-
-    expect(both.html?.asset?.(ref)).toBe('brief');
-    expect(both.svg?.asset?.(ref)).toBe('brief');
-  });
-
-  it("falls back to the template's when the brief has none", () => {
-    const fallback = briefThenTemplate(undefined, answering('template'));
-
-    expect(fallback.html?.asset?.(ref)).toBe('template');
-    expect(fallback.svg?.assetSize?.(ref)).toEqual({ w: 1, h: 1 });
   });
 });

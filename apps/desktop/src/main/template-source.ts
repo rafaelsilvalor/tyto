@@ -1,9 +1,10 @@
-import type { AssetRef, FileSystem, Size, TemplateRegistry } from '@tyto/core';
+import type { FileSystem, TemplateRegistry } from '@tyto/core';
 import {
   type ExportResources,
   type InstalledCodePack,
   fileTemplateAssets,
   installedTemplateSource,
+  layeredExportResources,
 } from '@tyto/io';
 import {
   type LocalTemplateSource,
@@ -54,21 +55,6 @@ export function templateSourceOf(
 ): TemplateWiring {
   const loaded: ExportResources[] = [];
 
-  const asset = (ref: AssetRef): string | undefined => {
-    for (const resources of loaded) {
-      const found = resources.html?.asset?.(ref);
-      if (found !== undefined) return found;
-    }
-    return undefined;
-  };
-  const assetSize = (ref: AssetRef): Size | undefined => {
-    for (const resources of loaded) {
-      const found = resources.svg?.assetSize?.(ref);
-      if (found !== undefined) return found;
-    }
-    return undefined;
-  };
-
   const markup: LocalTemplateSource = {
     async load(name) {
       const directory = registry.directoryOf(name);
@@ -96,7 +82,8 @@ export function templateSourceOf(
       return own.assets;
     },
   });
-  const resources: ExportResources = { html: { asset }, svg: { asset, assetSize } };
+  // Read on every call, so the loads above are seen: `loaded` is empty until the job runs.
+  const resources = layeredExportResources(loaded);
   if (codePacks.length === 0) return { source: builtIn, resources };
   return {
     source: installedTemplateSource({
@@ -110,21 +97,4 @@ export function templateSourceOf(
     }),
     resources,
   };
-}
-
-/**
- * The brief's files first and the template's second, the CLI's order (`render-task.ts`).
- *
- * The two rarely answer the same ref — a template's are keyed by its own folder's absolute
- * paths — but when both could, the brief is what the person chose for this artwork.
- */
-export function briefThenTemplate(
-  brief: ExportResources | undefined,
-  template: ExportResources,
-): ExportResources {
-  const asset = (ref: AssetRef): string | undefined =>
-    brief?.html?.asset?.(ref) ?? template.html?.asset?.(ref);
-  const assetSize = (ref: AssetRef): Size | undefined =>
-    brief?.svg?.assetSize?.(ref) ?? template.svg?.assetSize?.(ref);
-  return { html: { asset }, svg: { asset, assetSize } };
 }
