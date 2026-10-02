@@ -40,7 +40,8 @@ export interface TemplateWiring {
  * A markup template is handed its own folder's files (TYTO-176), the way `tyto render` hands
  * them over in `apps/cli/src/render-context.ts`. Without them a `<vector src="assets/…">`
  * or an `<image src="assets/…">` failed to compile in the window and the template drew
- * nothing at all, while the CLI drew it whole.
+ * nothing at all, while the CLI drew it whole. A bundled code template is handed the same
+ * files, through `context.files` (ADR 0062, TYTO-214).
  *
  * One function so that the preview and the export cannot draw one template two ways.
  */
@@ -86,6 +87,14 @@ export function templateSourceOf(
     fileSystem,
     bundled: BUILT_IN_TEMPLATE_BUILDS,
     markup,
+    // The same reader and the same `loaded` list, for a code template's `context.files`
+    // (ADR 0062): a bundled template draws its folder's pictures as a markup one does, and
+    // an unsaved tab, whose brief has no folder to read, still gets their bytes.
+    readFiles: async (directory) => {
+      const own = await readTemplateAssets({ base: directory });
+      loaded.push(own.resources);
+      return own.assets;
+    },
   });
   const resources: ExportResources = { html: { asset }, svg: { asset, assetSize } };
   if (codePacks.length === 0) return { source: builtIn, resources };
