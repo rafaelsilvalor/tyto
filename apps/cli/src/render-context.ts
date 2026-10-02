@@ -1,5 +1,4 @@
 import {
-  type AssetRef,
   type Diagnostics,
   type FileSystem,
   type FormatCatalogue,
@@ -19,6 +18,7 @@ import {
   fileTemplateAssets,
   installedPacks,
   installedTemplateSource,
+  layeredExportResources,
   nodeFileSystem,
 } from '@tyto/io';
 import { BUILT_IN_TEMPLATE_BUILDS } from '@tyto/templates';
@@ -223,14 +223,6 @@ export function templateWiring(
 ): TemplateWiring {
   const loaded: ExportResources[] = [];
 
-  const asset = (ref: AssetRef): string | undefined => {
-    for (const resources of loaded) {
-      const found = resources.html?.asset?.(ref);
-      if (found !== undefined) return found;
-    }
-    return undefined;
-  };
-
   const markup: LocalTemplateSource = {
     async load(name) {
       const directory = context.registry.directoryOf(name);
@@ -290,7 +282,10 @@ export function templateWiring(
           next: builtIn,
         });
 
-  return { source, resources: { html: { asset }, svg: { asset } } };
+  // `loaded` is empty here and read on every call, so the loads above are seen. The SVG
+  // half now carries `assetSize` as the window's does; a template's own picture already
+  // cropped through the brief's layer, which reads an absolute ref (measured for TYTO-216).
+  return { source, resources: layeredExportResources(loaded) };
 }
 
 /** Reads a file the user named on the command line, as a diagnostic rather than a throw. */
