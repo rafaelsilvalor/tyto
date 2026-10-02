@@ -243,9 +243,7 @@ function paintFrame(elements: PreviewElements, frame: Frame, zoom: number): void
   // `srcdoc` and not a blob URL: the document is already a string in this process, and a
   // blob would be a second thing to revoke. `sandbox` is on the element in the HTML — no
   // scripts, unique origin — because a preview document is a picture, not a program.
-  // TEMPORARY perturbation for CI, reverted in the next commit.
-  if (iframe.getAttribute('srcdoc') !== frame.html) iframe.setAttribute('srcdoc', frame.html);
-  void showDocument;
+  showDocument(iframe, frame.html);
 }
 
 /** The document an iframe is loading, and the newest one asked for while it loads. */
