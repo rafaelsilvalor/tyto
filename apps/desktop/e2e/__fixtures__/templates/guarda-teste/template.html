@@ -1,0 +1,64 @@
+<!-- guarda-teste — the fixture two desktop e2e guards render (TYTO-217).
+
+     It replaces promo-curso there, which is a throwaway template that will be deleted.
+
+     Three constraints, each one a guard's:
+     - Text only in "Source Sans 3", the bundled face, Regular and Bold. The CI runner has no
+       system fonts, and a substituted font is a warning that makes "the CLI and the window
+       agree" true of the fallback rather than of the template.
+     - Nothing to the right of x=1000. `e2e/preview-height.desktop.test.ts` reads a one-pixel
+       column at the paper's right edge, and only the frame's own fill may be there.
+     - A dark solid background. That column is compared against the checkerboard's two colours,
+       white and #d9d9e0, so a white frame would read as not drawn. -->
+
+<frame format="grid-1x1" bg="#14213d">
+  <rect class="chip" />
+  <text slot="titulo" class="title" />
+  <text slot="lamina" class="item" />
+  <rect class="rule" />
+</frame>
+
+<frame format="story" extends="grid-1x1" />
+
+<style>
+  .chip {
+    x: 80;
+    y: 96;
+    w: 96;
+    h: 12;
+    fill: #fca311;
+  }
+  .title {
+    x: 80;
+    y: 152;
+    w: 900;
+    font: 700 64px/1.1 "Source Sans 3";
+    color: white;
+  }
+  .item {
+    x: 80;
+    y: 420;
+    w: 900;
+    font: 400 48px/1.2 "Source Sans 3";
+    color: #e5e5e5;
+  }
+  .rule {
+    x: 80;
+    y: 960;
+    w: 160;
+    h: 12;
+    fill: #fca311;
+  }
+
+  @format story {
+    .title {
+      y: 320;
+    }
+    .item {
+      y: 760;
+    }
+    .rule {
+      y: 1780;
+    }
+  }
+</style>
