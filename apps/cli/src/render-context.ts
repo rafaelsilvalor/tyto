@@ -208,7 +208,8 @@ export interface TemplateWiring {
 }
 
 /**
- * A `TemplateSource` that reads the chosen template's own folder for its `src=` files.
+ * A `TemplateSource` that reads the chosen template's own folder: for a markup template's
+ * `src=` files, and for a code template's `context.files` (ADR 0062), with the one reader.
  *
  * `markupTemplateSource` leaves this to whoever composes it, because resolving a
  * template's assets means reading a folder eagerly and deciding what counts as one —
@@ -267,6 +268,15 @@ export function templateWiring(
     fileSystem: context.fileSystem,
     bundled,
     markup,
+    // The markup route's reader and its bytes, for a code template's `context.files`
+    // (ADR 0062). Kept with the rest although the brief's resources also read a ref with an
+    // absolute path, which every ref this mints carries: the template's pictures should not
+    // depend on how far the brief's reader is willing to look.
+    readFiles: async (directory) => {
+      const { assets, resources } = await fileTemplateAssets({ base: directory });
+      loaded.push(resources);
+      return assets;
+    },
   });
   // In front of both, and only for a name the registry found in an installed code pack: the
   // one way such a template runs is in its plugin's process (ADR 0048).

@@ -627,7 +627,8 @@ What runs is code **compiled into the application**. `BUILT_IN_TEMPLATE_BUILDS` 
 pairs each with the manifest the registry already parsed. The CLI and the desktop compose it
 in front of the markup route, so a name the build does not ship reaches markup unchanged.
 Given a `readFiles` reader, it also reads the template's folder for `context.files` (ADR 0062);
-the reader is `fileTemplateAssets` from `@tyto/io`, the one the markup route uses.
+the reader is `fileTemplateAssets` from `@tyto/io`, the one the markup route uses. `tyto render`
+and `tyto watch` pass it; the desktop app does not yet.
 
 A name that is **both** — shipped code and a `template.html` in its folder — is
 `E_TEMPLATE_AMBIGUOUS` rather than a winner picked quietly. A silent winner is a template
