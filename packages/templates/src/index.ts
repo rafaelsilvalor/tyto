@@ -1,5 +1,6 @@
 import { build as agendaSemana } from '../templates/agenda-semana/template.js';
 import { build as aprovados } from '../templates/aprovados/template.js';
+import { build as bannerEc } from '../templates/banner-ec/template.js';
 import { build as simuladosSemanaEc } from '../templates/simulados-semana-ec/template.js';
 import { build as simuladosSemanaEcj } from '../templates/simulados-semana-ecj/template.js';
 import { build as simuladosSemanaOab } from '../templates/simulados-semana-oab/template.js';
@@ -48,6 +49,7 @@ export const BUILT_IN_TEMPLATES_DIRECTORY = 'templates';
 export const BUILT_IN_TEMPLATE_NAMES: readonly string[] = [
   'agenda-semana',
   'aprovados',
+  'banner-ec',
   'carrossel-lista',
   'promo-curso',
   'simulados-semana-ec',
@@ -74,6 +76,7 @@ export const BUILT_IN_TEMPLATE_NAMES: readonly string[] = [
 export const BUILT_IN_TEMPLATE_BUILDS: Readonly<Record<string, TemplateBuild>> = {
   'agenda-semana': agendaSemana,
   aprovados,
+  'banner-ec': bannerEc,
   'simulados-semana-ec': simuladosSemanaEc,
   'simulados-semana-ecj': simuladosSemanaEcj,
   'simulados-semana-oab': simuladosSemanaOab,

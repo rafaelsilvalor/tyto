@@ -11,3 +11,8 @@ grid: { w: 1080, h: 1350, kind: grid, label: Grid }
 # The square post, which the house uses rarely.
 grid-1x1: { w: 1080, h: 1080, kind: grid, label: Grid 1:1 }
 story: { w: 1080, h: 1920, kind: story, label: Story }
+# The product banner (TYTO-210). `banner` is the house's standard banner, and the two others
+# carry their proportion: a square, and the small strip a product page shows.
+banner: { w: 1200, h: 628, kind: banner, label: Banner }
+banner-1x1: { w: 600, h: 600, kind: banner, label: Banner 1:1 }
+banner-345x146: { w: 345, h: 146, kind: banner, label: Banner 345×146 }
