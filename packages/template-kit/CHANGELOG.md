@@ -1,5 +1,36 @@
 # @tyto/template-kit
 
+## 0.2.0
+
+### Minor Changes
+
+- 2232f11: TYTO-185: add the configurable components `pillTable` (a table read out of one slot) and `titleBlock` (a centred column of optional picture, words and rule), the `bandedPage` arrangement, and `mark`, `textBlock`, `grownTextBlock` and the brief-row readers (`lines`, `fields`, `rowGroups`). Add the `aprovados` template, the Saúde approved list, built only from those and the brand module. `agenda-semana` now composes the Saúde brand module (`templates/_estrategia-saude/`) and renders the same pixels, except that the footer arrow is no longer drawn on the last slide: it announces a next slide, and the last one has none.
+- ac09068: TYTO-201: an optional `selo` slot on `agenda-semana` (4.2.0), `aprovados` (4.2.0), `simulados-semana-ecj` and `simulados-semana-oab` (1.1.0) — an art 1080 × 140 glued to the foot of the last grid slide, never on a story. With it the page above shrinks by 140: the middle centres above the seal and the footer stands on it. Write `selo: ./selo.png` in the frontmatter. The kit gains `sealed`, and `selo` joins the standard slot vocabulary as a reserved `image` name.
+- 1208948: TYTO-200: three new templates, `simulados-semana-ec`, `simulados-semana-ecj` and `simulados-semana-oab` — the weekly mock-exam agenda of Estratégia Concursos (stories only), Carreira Jurídica and OAB, one composition in three accents. Each `::lamina` is one slide: `Domingo 26/10 | Aplicação às 08h30 & correção às 14h` starts a day and every line with no `|` under it is one of its exams. The title is on every slide; the call to comment is on the last grid only, in the brief's optional `::chamada` or in the house's line. Rows are 700 px wide, or as wide as the slide's longest exam up to 856; the owl and the sign-off stand on a 112 px gutter. `pillTable` gains a group `caption`, the band under a heading drawn from the heading line's second field.
+- 8e05004: TYTO-202: a template reports warnings beside its frame (ADR 0058). `TemplateContext` gains `report`, which takes one of a closed list of codes — the first is `W_TEMPLATE_OVERFLOW` — and `compile` writes the catalog's diagnostic with the artwork, the format and the range of the directive the artwork came from. An installed code template's reports cross back from its plugin's process beside the frame, as `ok({ frame, reports })`, checked against that list. `reportOverflow` in `@tyto/template-kit` reports content that runs past the page, and the weekly mock-exam agendas use it: a slide that runs off the grid now renders with a warning instead of being cut in silence. A context built by hand passes `reportNothing`.
+
+### Patch Changes
+
+- Updated dependencies [c0eb5b7]
+- Updated dependencies [cae8d1d]
+- Updated dependencies [416345a]
+- Updated dependencies [8b94c6c]
+- Updated dependencies [8196946]
+- Updated dependencies [2aa7d06]
+- Updated dependencies [0c01004]
+- Updated dependencies [8f7ee31]
+- Updated dependencies [11fb507]
+- Updated dependencies [cc4ca1d]
+- Updated dependencies [b7a02ce]
+- Updated dependencies [2983c3e]
+- Updated dependencies [e3b814b]
+- Updated dependencies [0891ff7]
+- Updated dependencies [b32d72e]
+- Updated dependencies [ac09068]
+- Updated dependencies [272a4ce]
+- Updated dependencies [8e05004]
+  - @tyto/core@0.27.0
+
 ## 0.1.4
 
 ### Patch Changes

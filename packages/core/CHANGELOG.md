@@ -1,5 +1,139 @@
 # @tyto/core
 
+## 0.27.0
+
+### Minor Changes
+
+- cae8d1d: TYTO-214: a code template reads the files in its own folder through `context.files.image(path)`
+  and `context.files.svg(path)` (ADR 0062). `TemplateContext` gains the required `files` field, and
+  a context built by hand passes `noFiles`. `bundledTemplateSource` takes an optional
+  `readFiles(directory)`; without it, a bundled template is handed no files, as before. An
+  installed plugin's code template is handed `noFiles`.
+- 416345a: TYTO-205: a delivery carries its brief in `editaveis/` and the images the brief used in `assets/` (ADR 0057). The desktop export box now delivers into the picked folder — artwork at the top, `editaveis/`, `assets/` — and `tyto render --folder` gains `assets/` under its `<out>/<brief-name>/` level. The copied brief's image paths name the copies, and a brief in a folder named `editaveis` also reads `../assets`, so it renders again from where it sits. `E_ASSET_NOT_FOUND` names the folders actually searched.
+- 8b94c6c: TYTO-127: exporting again into a folder used before removes what the previous export wrote there and this one did not produce, and says so (ADR 0054). It applies to `tyto render --folder` and to the desktop's export box. `--out`, `tyto watch` and the queue panel are unchanged.
+
+  A carousel edited from four slides down to three no longer delivers the fourth, and a delivery made before ADR 0053 loses its `lamina-*` files on the first export after the upgrade. Only a file the previous `result.json` listed can go, and only while its size is still the recorded one. A file somebody added or replaced by hand stays. Each removal is a `W_LEFTOVER_REMOVED` warning on stderr, in `result.json` and in the export box. A kept file is a `W_LEFTOVER_KEPT` with the reason, and a previous report that cannot be read is a `W_PREVIOUS_RESULT_UNREADABLE`.
+
+  `@tyto/io`: `fsTaskOutput` takes `removeLeftovers` and, like `fsDeliveryOutput`, returns a `ReusableTaskOutput` whose `removeLeftovers(run)` is called before `finish`.
+
+- 8196946: TYTO-188: each local queue folder chooses which file types its tasks produce, in the queue
+  panel's "Produces" row, installed exporters' kinds included. A folder nobody chose for still
+  produces PNG alone. A chosen kind whose plugin was removed is left out with a new
+  `W_QUEUE_KIND_UNAVAILABLE` warning instead of failing the task (ADR 0061).
+- 2aa7d06: TYTO-194: formats are named by piece kind, and each format says which kind it is (`docs/format-kinds.md`, ADR 0051).
+
+  **Briefs must be edited.** The built-in pack's `retrato` is now `grid`, and `feed` is now `grid-1x1`; `story` is unchanged. All four built-in templates take a major version (`agenda-semana` 4.0.0, `aprovados` 4.0.0, `carrossel-lista` 3.0.0, `promo-curso` 3.0.0). A brief that still writes the old ids is told the format is not defined.
+
+  ```
+  before                          after
+  formats: [retrato]              formats: [grid]
+  formats: [feed, story]          formats: [grid-1x1, story]
+  lamina-1-retrato.png            lamina-1-grid.png
+  artwork-1-feed.png              artwork-1-grid-1x1.png
+  ```
+
+  The pixels are unchanged: every built-in example renders identical to the previous ids, 14 of 14 files, and only the file names change.
+
+  `formats.yaml` entries gain an optional `kind` (`grid`, `story`, `banner`, `capa-ebook`, `thumbnail`), and `@tyto/core` exports `pieceKinds`, which derives what a template makes from its formats and whether it repeats: a repeating grid is a `carrossel`, a repeating story is `stories`. `tyto template new` and `tyto plugin new` scaffold `grid` by default. An installed plugin whose templates declare `feed` needs a project `formats.yaml` that defines it, or its own ids moved to the new names.
+
+- 0c01004: TYTO-189: an installed plugin can ship code templates, and they run in its own thread. A folder
+  in an installed pack with a `manifest.yaml` and no `template.html` is drawn by the pack's new
+  `build(template, context)`, called through the isolation with the 30 s deadline. The frame is
+  checked against the IR, and a timeout, throw or refused answer is `E_PLUGIN_TEMPLATE`, which
+  costs that frame and not the render. `context.measure` still answers synchronously. The manifest
+  lists the faces it measures under `faces:`, and those cross with the call. A face installed on
+  the machine crosses only under the `font:<family>` permission (`W_PLUGIN_FONT_WITHHELD` otherwise).
+  `tyto plugin new --code` scaffolds one that installs and renders on the first try. `compile` is
+  unchanged for every other template, and `compileDeferred` is the new path (ADR 0048).
+- 8f7ee31: TYTO-50: the desktop lists an installed plugin's templates in the Template picker and previews
+  and exports with them, searched after a chosen folder and the built-in pack and checked by the
+  CLI's own rule (ADR 0046), now `installedPacks` in `@tyto/io`. A plugin refused over its pack is
+  a row in the problems panel and is kept out of the preview, the panels and the export. Installing
+  a folder that holds a link no longer fails with an internal error on Windows: a link inside the
+  folder is copied as its target, and one that leads out or nowhere is `E_PLUGIN_LINK`, exit 1.
+  `PluginStore.add` answers a `Result`.
+- 11fb507: TYTO-195: a template's manifest can name its brand (`brand: estrategia-saude`), lower case letters, digits and single hyphens (ADR 0052). It is optional, so existing manifests still load. The built-in templates name theirs: `agenda-semana` and `aprovados` are `estrategia-saude`, `carrossel-lista` and `promo-curso` are `tyto-demo`. No brief changes and no render changes.
+- cc4ca1d: TYTO-50: an installed template pack now reaches a render. `tyto render` and `tyto watch` search
+  the templates an installed plugin registers, after the project's and the built-in pack's, and a
+  name an earlier source holds is reported as `W_TEMPLATE_SHADOWED`. A pack's `directory` must be
+  relative to the plugin's installed folder and stay inside it (`E_PLUGIN_PACK_DIRECTORY`), and every
+  template in it must be markup (`E_PLUGIN_PACK_CODE`). Either refusal skips the whole plugin
+  (ADR 0046). `tyto plugin new <name>` scaffolds a template pack that installs and renders
+  unedited, and `docs/plugin-authoring.md` walks one from scaffold to render.
+- b7a02ce: TYTO-49: plugin directives (ADR 0043). A plugin registers a `directive` contribution whose `id`
+  is its namespace, with the `names` it answers and a `transform` that turns `::ns/name` into
+  ordinary slot directives, which `resolve` checks against the manifest as if they were typed. The
+  directive's adjustments are the plugin's arguments, handed over parsed and ranged, and the host
+  stamps every range in the answer. `ResolveOptions.directives` and `JobPorts.directives` take the
+  host's point through `directiveResolverOf`. The CLI wires it into every render, and an installed
+  plugin's transform runs in its worker under the per-call deadline. The editor offers `ns/name`
+  after `::`. Without the plugin the brief still gives `E_UNKNOWN_DIRECTIVE` on the name, and a
+  plugin's refusal of its arguments is the new `E_DIRECTIVE_ARGUMENT`.
+- 2983c3e: TYTO-48: `PluginHost` gains `fetch` and `credentials` (ADR 0042). `host.fetch` reaches only the
+  hosts a manifest declares as `net:<host>`, `net:*.<domain>` or `net:*`, never follows a redirect,
+  and rejects anything else with `E_PERMISSION`; `host.credentials(key)` resolves only a
+  `credentials:<key>`, and in the CLI reads it from `TYTO_PLUGIN_<NAME>_<KEY>`. The check runs on
+  the host's side, for isolated and in-process plugins alike. Every call to an isolated plugin, and
+  its activation, has a 30 s deadline: past it the frame answers `E_PLUGIN_TIMEOUT`, the worker is
+  ended, and the timeout is recorded as a crash.
+- e3b814b: TYTO-48: an installed plugin runs in a worker thread of its own, and the `PluginHost` it holds is
+  a proxy whose every call is a Zod-checked message (ADR 0041). `@tyto/plugin-api` gains the
+  protocol, the `PluginChannel` port, `runGuest` and `connectIsolatedPlugin`; `Exporter.exportFrame`
+  may return a `Promise`, which the job awaits. A plugin whose thread ends unasked costs the frames
+  waiting on it (`E_PLUGIN_CRASHED`, non-fatal) and is shown as `crashed` in `plugin list` until it
+  is installed or enabled again; the history is `crashes.json`, beside `plugins.json`, and
+  `plugins.json` now drops keys it does not know instead of refusing the file. The thread is a crash and API boundary, not a sandbox, and the
+  install prompt says so.
+- 0891ff7: TYTO-47: plugins can be installed. `tyto plugin install <folder|git-url|npm-spec>` checks the
+  manifest's `engine` against `PLUGIN_API_VERSION` (the plugin API's own version, ADR 0040), shows
+  the permissions — recorded, not yet enforced — and copies the plugin to `~/.tyto/plugins/`;
+  `remove`, `disable` and `enable` change what is activated, and `plugin list` gains a status column
+  and `--active`. `InProcessHost.tryActivate` activates an installed plugin as data rather than
+  throwing, and a plugin whose contribution id is taken is refused by name while the render goes on
+  (`W_PLUGIN_SKIPPED`). `ArtifactKind` is open, so `--types` accepts any kind an installed exporter
+  declares, and a document exporter's `extension` and `mime` name the file; `artifactExtension` and
+  `artifactMimeType` are replaced by `artifactEncoding`, and `artifactName` takes the extension.
+- b32d72e: Run each installed plugin in the CLI confined to its own folder by Node's permission model
+  (TYTO-186, ADR 0049).
+
+  - **CLI**: a plugin's process is a child process started with `--permission` and read access to
+    its installed folder and its bootstrap only, both as real paths. It cannot read other files,
+    write, start a process or a worker, or load an addon, and its environment is empty. The
+    bootstrap (`dist/guest/plugin-guest.js`) inlines everything it imports. Before the plugin's
+    code is imported, the process tries to read a file outside its grant. A plugin whose process
+    could read it, or did not say, is refused with `E_PLUGIN_SANDBOX`, which names the runtime.
+    The network stays advisory on Node 22 and 24: `net:` filters `host.fetch` only. The install
+    prompt says so.
+  - **`@tyto/plugin-api`**: `RPC_PROTOCOL_VERSION` is 2, and `hello` carries a `sandbox` report.
+    `runGuest` takes that report, `connectIsolatedPlugin` and `startInstalledPlugins` take
+    `requireSandbox`, `PluginProcessRequest` gains `directory`, and `PluginStore` gains
+    `linksLeaving`, which every load asks before a plugin starts.
+  - **`@tyto/core`**: `E_PLUGIN_SANDBOX` is new. `E_PLUGIN_LINK` is also reported at load, and its
+    message no longer names install.
+  - **`@tyto/io`**: `fsPluginStore` implements `linksLeaving`.
+  - **Desktop**: unchanged in behaviour. It does not require the sandbox yet, because a
+    `utilityProcess` accepts `--permission` and does not enforce it. The bundled Node that will
+    confine it comes in the second TYTO-186 pull request.
+
+- ac09068: TYTO-201: an optional `selo` slot on `agenda-semana` (4.2.0), `aprovados` (4.2.0), `simulados-semana-ecj` and `simulados-semana-oab` (1.1.0) — an art 1080 × 140 glued to the foot of the last grid slide, never on a story. With it the page above shrinks by 140: the middle centres above the seal and the footer stands on it. Write `selo: ./selo.png` in the frontmatter. The kit gains `sealed`, and `selo` joins the standard slot vocabulary as a reserved `image` name.
+- 272a4ce: `tyto template check` warns with `W_SLOT_VOCABULARY` when a manifest names a slot against the
+  standard vocabulary in `docs/slot-vocabulary.md`: a known synonym (`emblema` for `imagem`,
+  `slide` for `lamina`, `cor` for `tom`…), a reserved name with the wrong shape, or a repeatable
+  slot not named `lamina`. It is a warning and never fatal, and a name the document does not list
+  is never flagged. `checkSlotVocabulary` is exported from `@tyto/core`.
+
+  The template scaffold (`tyto template new`, the desktop's New template, `tyto plugin new`)
+  names its look-variant slot `tom` instead of `cor`, so a new template starts without the
+  warning. A scaffolded brief writes `tom: laranja`.
+
+- 8e05004: TYTO-202: a template reports warnings beside its frame (ADR 0058). `TemplateContext` gains `report`, which takes one of a closed list of codes — the first is `W_TEMPLATE_OVERFLOW` — and `compile` writes the catalog's diagnostic with the artwork, the format and the range of the directive the artwork came from. An installed code template's reports cross back from its plugin's process beside the frame, as `ok({ frame, reports })`, checked against that list. `reportOverflow` in `@tyto/template-kit` reports content that runs past the page, and the weekly mock-exam agendas use it: a slide that runs off the grid now renders with a warning instead of being cut in silence. A context built by hand passes `reportNothing`.
+
+### Patch Changes
+
+- c0eb5b7: TYTO-204: an asset path in a brief is read as written, from the brief's folder first, and from `assets/` beside the brief when nothing is there (ADR 0056). The same rule holds in `tyto render`, `tyto watch`, the desktop queue, preview, export box and the template editor's preview, so a folder with its images in `assets/` renders the same in the CLI and in the app. `./assets/logo.png` now resolves everywhere, and when a file of the same name exists both beside the brief and in `assets/`, the one beside the brief wins. `tyto render --assets <dir>` still names the one folder searched, with no fallback. `E_ASSET_NOT_FOUND` now says it looked in `assets/` too.
+
+  `@tyto/io` migration: `BriefTask.assetBase` is now `briefDirectory` (the brief's folder); resolve assets with `briefAssetResolver`.
+
 ## 0.26.0
 
 ### Minor Changes
