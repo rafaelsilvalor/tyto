@@ -1,5 +1,6 @@
 import { type IpcResponse } from '../../shared/ipc.js';
 import { paintArtworkList } from './panel.js';
+import { showDocument } from './show-document.js';
 
 /**
  * The preview pane: which frame is showing, at what size, and how it gets on screen.
@@ -244,50 +245,6 @@ function paintFrame(elements: PreviewElements, frame: Frame, zoom: number): void
   // blob would be a second thing to revoke. `sandbox` is on the element in the HTML — no
   // scripts, unique origin — because a preview document is a picture, not a program.
   showDocument(iframe, frame.html);
-}
-
-/** The document an iframe is loading, and the newest one asked for while it loads. */
-interface Navigation {
-  loading: string;
-  newest: string;
-}
-
-/** Keyed by element, so a replaced iframe takes its pending navigation with it. */
-const navigations = new WeakMap<HTMLIFrameElement, Navigation>();
-
-/**
- * Puts `html` in `iframe`, **one navigation at a time** (TYTO-219).
- *
- * A fresh iframe keeps the *first* of two `srcdoc` assignments when the second lands before
- * the first one's `load`. Measured on a fresh sandboxed iframe at a fixed 1080×1920, with no
- * resize: a grid-1x1 document then a story document before the first `load` gave one `load`
- * and the grid document, which is 1080 px tall, so the story showed checkerboard below 1080,
- * 23 of 23 runs. With a wait for `load` between them, 0 of 8. It happened with or without the sandbox,
- * hidden or shown, under a transform or CSS `zoom`, at every scale factor tried. A window
- * only hits it when the format tab is clicked before the first preview has loaded, which is
- * slower in a shown window, and nothing heals it until the next change.
- *
- * So while a navigation is pending only the newest document is remembered, and `load` applies
- * it. Writing the attribute again would cost a navigation the user never sees.
- */
-function showDocument(iframe: HTMLIFrameElement, html: string): void {
-  const pending = navigations.get(iframe);
-  if (pending !== undefined) {
-    pending.newest = html;
-    return;
-  }
-  if (iframe.getAttribute('srcdoc') === html) return;
-
-  const navigation: Navigation = { loading: html, newest: html };
-  navigations.set(iframe, navigation);
-  iframe.addEventListener('load', function settle() {
-    iframe.removeEventListener('load', settle);
-    navigations.delete(iframe);
-    // A frame taken out of the page while it loaded is nobody's preview any more.
-    if (!iframe.isConnected) return;
-    if (navigation.newest !== navigation.loading) showDocument(iframe, navigation.newest);
-  });
-  iframe.setAttribute('srcdoc', html);
 }
 
 /**

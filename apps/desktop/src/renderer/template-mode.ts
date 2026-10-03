@@ -23,6 +23,7 @@ import {
   translate,
 } from '../../shared/i18n/index.js';
 import { type RequestGate, createRequestGate } from './preview.js';
+import { frameDocument } from './show-document.js';
 import { TEMPLATE_MODE_TAG } from './template-mode-tag.js';
 
 /**
@@ -650,7 +651,7 @@ export class TemplateMode extends LitElement {
               class="template-mode__frame"
               sandbox=""
               title=${frame.format}
-              .srcdoc=${frame.html}
+              ${frameDocument(frame.html)}
               style=${`width:${frame.width}px;height:${frame.height}px;transform:scale(${scale});transform-origin:top left`}
             ></iframe>
           </div>
