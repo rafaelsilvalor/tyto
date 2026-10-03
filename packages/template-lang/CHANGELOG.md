@@ -1,5 +1,82 @@
 # @tyto/template-lang
 
+## 0.7.0
+
+### Minor Changes
+
+- 272a4ce: `tyto template check` warns with `W_SLOT_VOCABULARY` when a manifest names a slot against the
+  standard vocabulary in `docs/slot-vocabulary.md`: a known synonym (`emblema` for `imagem`,
+  `slide` for `lamina`, `cor` for `tom`…), a reserved name with the wrong shape, or a repeatable
+  slot not named `lamina`. It is a warning and never fatal, and a name the document does not list
+  is never flagged. `checkSlotVocabulary` is exported from `@tyto/core`.
+
+  The template scaffold (`tyto template new`, the desktop's New template, `tyto plugin new`)
+  names its look-variant slot `tom` instead of `cor`, so a new template starts without the
+  warning. A scaffolded brief writes `tom: laranja`.
+
+- b054a34: TYTO-44 — the desktop app has a template mode. _File ▸ Edit template…_ opens a markup template
+  folder with `manifest.yaml` and `template.html` in tabs of their own, one of the folder's
+  `examples/*.brief` as the sample, and every format the manifest declares drawn side by side
+  from the unsaved buffers. Saving writes both files and reads the template folders again, and
+  every open brief is compiled again; a manifest that does not parse is not written, and the
+  diagnostic that stopped it is shown. A folder whose layout is a `template.ts` is refused with a
+  sentence saying why (ADR 0007). _File ▸ New template…_ writes the same scaffold as
+  `tyto template new`, into the template folder in force.
+
+  The scaffold moved to `@tyto/template-lang` (`scaffoldTemplate`, `isTemplateName`) so both hosts
+  write one text. It now also writes `examples/<name>.brief`, and its title uses "Source Sans 3"
+  instead of "Inter": no install of Tyto has Inter, so every scaffolded template failed its first
+  render with `E_EXPORT_FONT_UNRESOLVED`. `@tyto/editor` takes `language: 'plain'` for a buffer
+  with no grammar.
+
+  A quit that arrives while the window is still starting now quits (ADR 0039). The page tells main
+  it can hear the quit question (`app:exit-listening`) before main asks it anything; before that,
+  the push was dropped and the app stayed open with nobody left to ask.
+
+### Patch Changes
+
+- cae8d1d: TYTO-214: a code template reads the files in its own folder through `context.files.image(path)`
+  and `context.files.svg(path)` (ADR 0062). `TemplateContext` gains the required `files` field, and
+  a context built by hand passes `noFiles`. `bundledTemplateSource` takes an optional
+  `readFiles(directory)`; without it, a bundled template is handed no files, as before. An
+  installed plugin's code template is handed `noFiles`.
+- 2aa7d06: TYTO-194: formats are named by piece kind, and each format says which kind it is (`docs/format-kinds.md`, ADR 0051).
+
+  **Briefs must be edited.** The built-in pack's `retrato` is now `grid`, and `feed` is now `grid-1x1`; `story` is unchanged. All four built-in templates take a major version (`agenda-semana` 4.0.0, `aprovados` 4.0.0, `carrossel-lista` 3.0.0, `promo-curso` 3.0.0). A brief that still writes the old ids is told the format is not defined.
+
+  ```
+  before                          after
+  formats: [retrato]              formats: [grid]
+  formats: [feed, story]          formats: [grid-1x1, story]
+  lamina-1-retrato.png            lamina-1-grid.png
+  artwork-1-feed.png              artwork-1-grid-1x1.png
+  ```
+
+  The pixels are unchanged: every built-in example renders identical to the previous ids, 14 of 14 files, and only the file names change.
+
+  `formats.yaml` entries gain an optional `kind` (`grid`, `story`, `banner`, `capa-ebook`, `thumbnail`), and `@tyto/core` exports `pieceKinds`, which derives what a template makes from its formats and whether it repeats: a repeating grid is a `carrossel`, a repeating story is `stories`. `tyto template new` and `tyto plugin new` scaffold `grid` by default. An installed plugin whose templates declare `feed` needs a project `formats.yaml` that defines it, or its own ids moved to the new names.
+
+- 8e05004: TYTO-202: a template reports warnings beside its frame (ADR 0058). `TemplateContext` gains `report`, which takes one of a closed list of codes — the first is `W_TEMPLATE_OVERFLOW` — and `compile` writes the catalog's diagnostic with the artwork, the format and the range of the directive the artwork came from. An installed code template's reports cross back from its plugin's process beside the frame, as `ok({ frame, reports })`, checked against that list. `reportOverflow` in `@tyto/template-kit` reports content that runs past the page, and the weekly mock-exam agendas use it: a slide that runs off the grid now renders with a warning instead of being cut in silence. A context built by hand passes `reportNothing`.
+- Updated dependencies [c0eb5b7]
+- Updated dependencies [cae8d1d]
+- Updated dependencies [416345a]
+- Updated dependencies [8b94c6c]
+- Updated dependencies [8196946]
+- Updated dependencies [2aa7d06]
+- Updated dependencies [0c01004]
+- Updated dependencies [8f7ee31]
+- Updated dependencies [11fb507]
+- Updated dependencies [cc4ca1d]
+- Updated dependencies [b7a02ce]
+- Updated dependencies [2983c3e]
+- Updated dependencies [e3b814b]
+- Updated dependencies [0891ff7]
+- Updated dependencies [b32d72e]
+- Updated dependencies [ac09068]
+- Updated dependencies [272a4ce]
+- Updated dependencies [8e05004]
+  - @tyto/core@0.27.0
+
 ## 0.6.6
 
 ### Patch Changes

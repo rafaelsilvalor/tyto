@@ -1,5 +1,63 @@
 # @tyto/templates
 
+## 1.0.0
+
+### Major Changes
+
+- 59649d4: TYTO-190: `aprovados` 3.0.0 runs across several slides. Each `::lamina` is one slide and holds its specialties and `rank | name` rows; the title block (imagem, chamada, subtitulo, titulo) is drawn on the first slide only, and the arrow on every slide but the last. **Briefs must be edited**: `::lista` becomes `::lamina`, and an old `::lista` is reported as `E_UNKNOWN_SLOT`. One `::lamina` with the old list renders the same pixels as 2.0.0.
+- 2aa7d06: TYTO-194: formats are named by piece kind, and each format says which kind it is (`docs/format-kinds.md`, ADR 0051).
+
+  **Briefs must be edited.** The built-in pack's `retrato` is now `grid`, and `feed` is now `grid-1x1`; `story` is unchanged. All four built-in templates take a major version (`agenda-semana` 4.0.0, `aprovados` 4.0.0, `carrossel-lista` 3.0.0, `promo-curso` 3.0.0). A brief that still writes the old ids is told the format is not defined.
+
+  ```
+  before                          after
+  formats: [retrato]              formats: [grid]
+  formats: [feed, story]          formats: [grid-1x1, story]
+  lamina-1-retrato.png            lamina-1-grid.png
+  artwork-1-feed.png              artwork-1-grid-1x1.png
+  ```
+
+  The pixels are unchanged: every built-in example renders identical to the previous ids, 14 of 14 files, and only the file names change.
+
+  `formats.yaml` entries gain an optional `kind` (`grid`, `story`, `banner`, `capa-ebook`, `thumbnail`), and `@tyto/core` exports `pieceKinds`, which derives what a template makes from its formats and whether it repeats: a repeating grid is a `carrossel`, a repeating story is `stories`. `tyto template new` and `tyto plugin new` scaffold `grid` by default. An installed plugin whose templates declare `feed` needs a project `formats.yaml` that defines it, or its own ids moved to the new names.
+
+### Minor Changes
+
+- 3beefe0: TYTO-210: a new template, `banner-ec`, and three new formats in the built-in pack: `banner` (1200 × 628), `banner-1x1` (600 × 600) and `banner-345x146` (345 × 146), all of kind `banner`. The template draws Estratégia Concursos's product banner: write only `::titulo`, for example `Prefeitura Municipal de São Miguel do Araguaia **(GO)**`, and each format draws its own fixed background from the template's folder with the text centred where the reference draws it. The template chooses the line breaks: the largest size that fits, balanced lines, a group in parentheses never split or alone on a line, and no line ending on `de`, `do` or `e` when a better break exists. A text too long for the smallest size is drawn at that size and reported as `W_TEMPLATE_OVERFLOW`. `tabela-ec` now also keeps a multi-word qualifier in parentheses whole after a number.
+- 11fb507: TYTO-195: a template's manifest can name its brand (`brand: estrategia-saude`), lower case letters, digits and single hyphens (ADR 0052). It is optional, so existing manifests still load. The built-in templates name theirs: `agenda-semana` and `aprovados` are `estrategia-saude`, `carrossel-lista` and `promo-curso` are `tyto-demo`. No brief changes and no render changes.
+- 2232f11: TYTO-185: add the configurable components `pillTable` (a table read out of one slot) and `titleBlock` (a centred column of optional picture, words and rule), the `bandedPage` arrangement, and `mark`, `textBlock`, `grownTextBlock` and the brief-row readers (`lines`, `fields`, `rowGroups`). Add the `aprovados` template, the Saúde approved list, built only from those and the brand module. `agenda-semana` now composes the Saúde brand module (`templates/_estrategia-saude/`) and renders the same pixels, except that the footer arrow is no longer drawn on the last slide: it announces a next slide, and the last one has none.
+- ac09068: TYTO-201: an optional `selo` slot on `agenda-semana` (4.2.0), `aprovados` (4.2.0), `simulados-semana-ecj` and `simulados-semana-oab` (1.1.0) — an art 1080 × 140 glued to the foot of the last grid slide, never on a story. With it the page above shrinks by 140: the middle centres above the seal and the footer stands on it. Write `selo: ./selo.png` in the frontmatter. The kit gains `sealed`, and `selo` joins the standard slot vocabulary as a reserved `image` name.
+- 1208948: TYTO-200: three new templates, `simulados-semana-ec`, `simulados-semana-ecj` and `simulados-semana-oab` — the weekly mock-exam agenda of Estratégia Concursos (stories only), Carreira Jurídica and OAB, one composition in three accents. Each `::lamina` is one slide: `Domingo 26/10 | Aplicação às 08h30 & correção às 14h` starts a day and every line with no `|` under it is one of its exams. The title is on every slide; the call to comment is on the last grid only, in the brief's optional `::chamada` or in the house's line. Rows are 700 px wide, or as wide as the slide's longest exam up to 856; the owl and the sign-off stand on a 112 px gutter. `pillTable` gains a group `caption`, the band under a heading drawn from the heading line's second field.
+- 6602087: TYTO-157: the built-in templates use the standard slot vocabulary (`docs/slot-vocabulary.md`). **Briefs written against the previous versions must be edited**: `promo-curso` 2.0.0 renames `cor` to `tom`; `carrossel-lista` 2.0.0 renames `item` to `lamina`; `agenda-semana` 3.0.0 renames `ilustracao` to `imagem` and `slide` to `lamina`; `aprovados` 2.0.0 renames `emblema` to `imagem`. An old name is reported as `E_UNKNOWN_SLOT` on its line. The pixels are unchanged; exported files and SVG element ids of the two carousel templates are now named `lamina-N` instead of `item-N` and `slide-N`.
+- ae3a6e2: TYTO-218: a new template, `tabela-ec`. It draws Estratégia Concursos's title over a whole table in one 1080 × 1350 image. Write `::titulo`, then `::tabela`: the first line is the header (`Concurso | Banca | Vagas | Salário`) and fixes the column count, each later `a | b | c` line is a row, and a line with no `|` is a band across the table. The template measures to decide column widths, line breaks, the body size and the title size. It never splits a value such as `R$ 33.820,39`, breaks a range `R$ X a R$ Y` between its two values, and reports `W_TEMPLATE_OVERFLOW` when the table does not fit even at its 16 px floor. The accent is EC's registered `#5900a6`, the agenda's.
+- 8e05004: TYTO-202: a template reports warnings beside its frame (ADR 0058). `TemplateContext` gains `report`, which takes one of a closed list of codes — the first is `W_TEMPLATE_OVERFLOW` — and `compile` writes the catalog's diagnostic with the artwork, the format and the range of the directive the artwork came from. An installed code template's reports cross back from its plugin's process beside the frame, as `ok({ frame, reports })`, checked against that list. `reportOverflow` in `@tyto/template-kit` reports content that runs past the page, and the weekly mock-exam agendas use it: a slide that runs off the grid now renders with a warning instead of being cut in silence. A context built by hand passes `reportNothing`.
+
+### Patch Changes
+
+- bf97d28: `simulados-semana-ec` 1.0.1, `-ecj` and `-oab` 1.1.1: the owl and the sign-off now start on the middle's left edge, with the title, the days, the band and the call to comment, instead of on the 112 px gutter. No brief changes.
+- Updated dependencies [c0eb5b7]
+- Updated dependencies [cae8d1d]
+- Updated dependencies [416345a]
+- Updated dependencies [8b94c6c]
+- Updated dependencies [8196946]
+- Updated dependencies [2aa7d06]
+- Updated dependencies [0c01004]
+- Updated dependencies [8f7ee31]
+- Updated dependencies [11fb507]
+- Updated dependencies [2232f11]
+- Updated dependencies [cc4ca1d]
+- Updated dependencies [b7a02ce]
+- Updated dependencies [2983c3e]
+- Updated dependencies [e3b814b]
+- Updated dependencies [0891ff7]
+- Updated dependencies [b32d72e]
+- Updated dependencies [ac09068]
+- Updated dependencies [1208948]
+- Updated dependencies [272a4ce]
+- Updated dependencies [8e05004]
+  - @tyto/core@0.27.0
+  - @tyto/template-kit@0.2.0
+
 ## 0.6.0
 
 ### Minor Changes
