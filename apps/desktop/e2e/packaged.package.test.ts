@@ -280,6 +280,7 @@ describe('the packaged app', () => {
     expect(info.templates).toEqual([
       'agenda-semana',
       'aprovados',
+      'banner-roxo',
       'carrossel-lista',
       'promo-curso',
       'simulados-semana-ocre',

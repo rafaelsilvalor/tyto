@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 
-import { NO_BREAK_SPACE, glue, pieces, readTable } from './table-text.js';
+import { NO_BREAK_SPACE, pieces } from './breaks.js';
+import { glue, readTable } from './table-text.js';
 
 import type { Inline, RichText } from '@tyto/core';
 

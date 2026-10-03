@@ -3,7 +3,7 @@ import { describe, expect, it } from 'vitest';
 
 import { build } from './template.js';
 import { ROXO } from '../_casa/brands.js';
-import { NO_BREAK_SPACE } from '../_casa/table-text.js';
+import { NO_BREAK_SPACE } from '../_casa/breaks.js';
 import { BODY, HANDLE, PAGE } from '../_casa/table-tokens.js';
 
 import type {

@@ -121,6 +121,20 @@ const EXAMPLES: readonly Example[] = [
   // measured fit and the drawn text have to agree.
   { template: 'tabela-roxo', brief: 'examples/quatro-colunas.brief', body: 'code', formats: ['grid'] },
   { template: 'tabela-roxo', brief: 'examples/tres-colunas.brief', body: 'code', formats: ['grid'] },
+  // The product banner (TYTO-210): one text over a background from the template's own folder,
+  // in three sizes, its breaks chosen by measuring.
+  {
+    template: 'banner-roxo',
+    brief: 'examples/agencia.brief',
+    body: 'code',
+    formats: ['banner', 'banner-1x1', 'banner-345x146'],
+  },
+  {
+    template: 'banner-roxo',
+    brief: 'examples/prefeitura.brief',
+    body: 'code',
+    formats: ['banner', 'banner-1x1', 'banner-345x146'],
+  },
 ];
 
 let formats: Awaited<ReturnType<typeof loadFormats>>;
@@ -241,7 +255,8 @@ describe.each(EXAMPLES.map((example) => [example.template, example] as const))(
         name === 'agenda-semana' ||
         name === 'aprovados' ||
         name.startsWith('simulados-semana-') ||
-        name === 'tabela-roxo'
+        name === 'tabela-roxo' ||
+        name === 'banner-roxo'
           ? { family: 'CircularXX', source: 'system' }
           : { family: 'Source Sans 3', source: 'bundled' };
       expect(scene.fonts).toContainEqual(expected);
@@ -533,6 +548,9 @@ describe('the pack as a whole', () => {
       ['grid', 'grid'],
       ['grid-1x1', 'grid'],
       ['story', 'story'],
+      ['banner', 'banner'],
+      ['banner-1x1', 'banner'],
+      ['banner-345x146', 'banner'],
     ]);
   });
 
@@ -546,6 +564,7 @@ describe('the pack as a whole', () => {
     ).toEqual({
       'agenda-semana': 'azul',
       aprovados: 'azul',
+      'banner-roxo': 'roxo',
       'carrossel-lista': 'tyto-demo',
       'promo-curso': 'tyto-demo',
       'simulados-semana-roxo': 'roxo',
@@ -572,6 +591,8 @@ describe('the pack as a whole', () => {
     expect(kinds).toEqual({
       'agenda-semana': ['carrossel'],
       aprovados: ['carrossel'],
+      // One piece per format: three sizes of one banner read as three banners.
+      'banner-roxo': ['banner', 'banner', 'banner'],
       'carrossel-lista': ['carrossel', 'stories'],
       'promo-curso': ['grid', 'story'],
       'simulados-semana-roxo': ['stories'],
@@ -593,6 +614,7 @@ describe('the pack as a whole', () => {
     ).toEqual([
       'agenda-semana',
       'aprovados',
+      'banner-roxo',
       'carrossel-lista',
       'promo-curso',
       'simulados-semana-ocre',

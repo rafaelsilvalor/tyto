@@ -7,18 +7,15 @@
  *
  * ## Where a line may break, and how that is enforced
  *
- * Tyto's own layout decides every line break before an exporter sees the text, and **a break
- * opportunity is a space (U+0020) and only a space** (`packages/core/src/text/layout.ts`). So
- * a value that must never split is made of no such space: its inner spaces become no-break
- * spaces (U+00A0), which draw as a space and measure as one, and break nothing. That is the
- * whole mechanism — no hyphenation, no zero-width tricks, nothing an exporter has to agree to.
+ * A value that must never split has its inner spaces written as no-break spaces; the
+ * mechanism, and the rules the banner shares with this table, are in `breaks.ts`.
  *
  * What is glued:
  *
  * - a currency sign to its amount: `R$ 33.820,39`;
  * - a number to its unit or percent: `5 mil`, `10 %`;
  * - both sides of a `+`: `5 + CR`, `200 + CR`;
- * - a one-word qualifier in parentheses to the value before it: `R$ 33.820,39 (bruto)`;
+ * - a qualifier in parentheses, whole, to the number before it: `R$ 33.820,39 (bruto)`;
  * - the connector of a range to the value **before** it: `R$ 5.667,92 a R$ 13.560,00` can
  *   break only after the `a`, so it comes out as its two values with the `a` closing the
  *   first line — which is what the art the maintainer approved for REF-1 draws.
@@ -28,10 +25,9 @@
 
 import { fields, lines, plain } from '@tyto/template-kit';
 
-import type { RichText } from '@tyto/core';
+import { NO_BREAK_SPACE, glueParenthesised } from './breaks.js';
 
-/** The space that draws and measures as one and is never a line break. */
-export const NO_BREAK_SPACE = ' ';
+import type { RichText } from '@tyto/core';
 
 /** One body line of the table: its cells, or one band across every column. */
 export type TableRow =
@@ -95,16 +91,16 @@ const CONNECTORS = '(?:a|e|até)';
  */
 export function glue(cell: string): string {
   const nbsp = NO_BREAK_SPACE;
+  // R$ 33.820,39 (bruto) — a qualifier stays with the value it qualifies (`breaks.ts`).
+  const qualified = glueParenthesised(cell, /\d/u);
   return (
-    cell
+    qualified
       // R$ 33.820,39 — and US$, € written the same way.
       .replace(/(R\$|US\$|€) (?=\d)/gu, `$1${nbsp}`)
       // 5 mil, 10 %
       .replace(new RegExp(`(${NUMBER}) (?=${UNITS}(?![\\p{L}]))`, 'gu'), `$1${nbsp}`)
       // 5 + CR
       .replace(/ \+ /gu, `${nbsp}+${nbsp}`)
-      // R$ 33.820,39 (bruto) — a one-word qualifier stays with the value it qualifies.
-      .replace(/(\d) (?=\([^\s()]+\))/gu, `$1${nbsp}`)
       // R$ 5.667,92 a R$ 13.560,00 — the connector stays with the value before it, and the
       // only break left is after it, before the second value.
       .replace(
@@ -112,13 +108,4 @@ export function glue(cell: string): string {
         `$1${nbsp}$2 `,
       )
   );
-}
-
-/**
- * The pieces a glued cell may break between: what a line of it can never be narrower than.
- *
- * Split on the plain space only, as the layout breaks; an empty cell has no pieces.
- */
-export function pieces(glued: string): string[] {
-  return glued.split(' ').filter((piece) => piece !== '');
 }
