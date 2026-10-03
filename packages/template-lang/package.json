@@ -24,8 +24,8 @@
     "test": "vitest run --passWithNoTests"
   },
   "dependencies": {
-    "@lezer/common": "^1.5.2",
-    "@lezer/highlight": "^1.2.3",
+    "@lezer/common": "^1.5.3",
+    "@lezer/highlight": "^1.2.5",
     "@lezer/lr": "^1.4.10",
     "@tyto/core": "workspace:*"
   },
