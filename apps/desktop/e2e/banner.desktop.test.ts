@@ -193,7 +193,11 @@ describe("banner-ec's backgrounds in the window and the CLI (TYTO-210)", () => {
     const result = JSON.parse(
       readFileSync(join(fromWindow, 'editaveis', 'result.json'), 'utf8'),
     ) as { status: string; diagnostics: { code: string }[] };
-    expect(result.diagnostics.map((item) => item.code)).toEqual([]);
+    // CI has no CircularXX, so there every Estratégia render says it drew the substitute
+    // (W_FONT_SUBSTITUTED); that is the machine, not the template. Anything else is not.
+    expect(
+      result.diagnostics.map((item) => item.code).filter((code) => code !== 'W_FONT_SUBSTITUTED'),
+    ).toEqual([]);
     expect(result.status).toBe('ok');
 
     const fromCli = join(scratch, 'from-cli');
