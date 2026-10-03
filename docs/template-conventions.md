@@ -207,14 +207,29 @@ no-break space draws and measures as a space and breaks nothing, in the measurem
 `export-html` and in `export-svg` alike. No exporter has to agree to anything.
 
 The same move chooses _where_ a phrase breaks. `R$ 5.667,92 a R$ 13.560,00` glues the `a` to
-the value before it, so the only break left falls between the two values. `_estrategia/table-text.ts`
-(TYTO-218) holds the rules the one-image table uses. Its `pieces` are what a column can never
-be narrower than.
+the value before it, so the only break left falls between the two values. `_estrategia/breaks.ts`
+holds the mechanism and the rules Estratégia's templates share: a parenthesised group like
+`(GO)` stays whole and joins the word before it, and `pieces` are what a line can never be
+narrower than. `_estrategia/table-text.ts` (TYTO-218) adds the table's own rules on top.
+
+## A short text in a fixed box sets its own breaks
+
+Tyto's layout breaks greedily, so a title it wraps leaves a long line over a short one and
+ends a line wherever the width runs out. A template that must do better decides the breaks
+itself and draws each line after a `lineBreak()`, leaving the layout nothing to choose.
+`_estrategia/balance.ts` (TYTO-210, the product banner) does it for a text of up to twelve
+pieces: the largest size between a floor and a ceiling at which it fits; then, at that size,
+no line ending on a short function word (`de`, `do`, `e`…) when a break that fits avoids it,
+the fewest lines, and the narrowest widest line. A clean break at a smaller size beats an
+awkward one at a larger size. Above twelve pieces it breaks greedily, so a pasted paragraph
+costs one pass. When even the floor does not fit, it draws the floor and reports
+`W_TEMPLATE_OVERFLOW`.
 
 ## What a template may not do
 
 - **No Node, no DOM.** A template runs wherever the compiler runs (ADR 0010). It cannot
-  read a file; assets reach it as an `AssetRef` from the brief.
+  read a file; assets reach it as an `AssetRef`, from the brief or, for its own folder,
+  through `context.files` (ADR 0062).
 - **No state between calls.** `build` runs once per (artwork, format) and a template that
   remembered would render differently depending on what ran before it.
 - **No hardcoded frame size.** It is `context.size`, from `formats.yaml`.

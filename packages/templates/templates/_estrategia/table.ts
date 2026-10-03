@@ -44,7 +44,8 @@ import { frame, group, lineBreak, rect, run, solid, text } from '@tyto/core/temp
 import { type Block, at, block, lines, mark, plain, reportOverflow } from '@tyto/template-kit';
 
 import { OWL } from './marks.js';
-import { glue, pieces, readTable } from './table-text.js';
+import { pieces } from './breaks.js';
+import { glue, readTable } from './table-text.js';
 import {
   BAND,
   BODY,

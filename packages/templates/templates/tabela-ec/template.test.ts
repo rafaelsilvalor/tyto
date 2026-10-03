@@ -3,7 +3,7 @@ import { describe, expect, it } from 'vitest';
 
 import { build } from './template.js';
 import { EC } from '../_estrategia/brands.js';
-import { NO_BREAK_SPACE } from '../_estrategia/table-text.js';
+import { NO_BREAK_SPACE } from '../_estrategia/breaks.js';
 import { BODY, HANDLE, PAGE } from '../_estrategia/table-tokens.js';
 
 import type {
