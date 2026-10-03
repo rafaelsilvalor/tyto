@@ -6,6 +6,7 @@ import {
   type OpenedTemplate,
   type TemplateMode,
   type TemplateModePorts,
+  type TemplateFrame,
   TEMPLATE_MODE_TAG,
   artworksIn,
   cellScale,
@@ -202,5 +203,135 @@ describe('<tyto-template-mode>', () => {
     );
     expect(element.querySelector('.template-mode__work')?.hasAttribute('hidden')).toBe(true);
     expect(element.unsaved).toBe(false);
+  });
+});
+
+describe('the grid shows one srcdoc navigation at a time (TYTO-220)', () => {
+  // TYTO-219's race, measured on this grid too: a fresh cell whose sample changed before its
+  // first `load` kept the first sample, in 20 of 20 runs. jsdom fires its own `load` for a
+  // fresh iframe's `about:blank` a task after insertion, and never one for a `srcdoc` document,
+  // so its event is stopped before it reaches the rule and each test fires `load` where
+  // Chromium would.
+
+  const ours = new WeakSet<Event>();
+
+  const frame = (format: string, text: string): TemplateFrame => ({
+    artwork: 'slide-1',
+    format,
+    width: 1080,
+    height: 1080,
+    html: `<p>${format} ${text}</p>`,
+  });
+
+  /** A mode whose previews answer with whatever `answer.frames` holds when they are asked. */
+  async function gridMode(): Promise<{
+    element: TemplateMode;
+    answer: { frames: TemplateFrame[] };
+  }> {
+    const answer: { frames: TemplateFrame[] } = { frames: [] };
+    const element = await mode({
+      ...ports(),
+      preview: (request) =>
+        Promise.resolve({ requestId: request.requestId, frames: answer.frames, diagnostics: [] }),
+    });
+    element.addEventListener(
+      'load',
+      (event) => {
+        if (!ours.has(event)) event.stopImmediatePropagation();
+      },
+      true,
+    );
+    // The refresh `openFolder` schedules, out of the way before a test drives its own.
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    await element.updateComplete;
+    return { element, answer };
+  }
+
+  async function show(
+    element: TemplateMode,
+    answer: { frames: TemplateFrame[] },
+    frames: TemplateFrame[],
+  ): Promise<HTMLIFrameElement[]> {
+    answer.frames = frames;
+    await element.refresh();
+    await element.updateComplete;
+    return [...element.querySelectorAll<HTMLIFrameElement>('.template-mode__frame')];
+  }
+
+  /** Counts `srcdoc` writes from here on, which is the number of navigations asked for. */
+  function writesTo(iframe: HTMLIFrameElement): string[] {
+    const writes: string[] = [];
+    const write = iframe.setAttribute.bind(iframe);
+    iframe.setAttribute = (name: string, value: string) => {
+      if (name === 'srcdoc') writes.push(value);
+      write(name, value);
+    };
+    return writes;
+  }
+
+  const loaded = (iframe: HTMLIFrameElement): void => {
+    const event = new Event('load');
+    ours.add(event);
+    iframe.dispatchEvent(event);
+  };
+
+  it('keeps a fresh cell on its first sample until load, then applies the newest', async () => {
+    const { element, answer } = await gridMode();
+    const [cell] = await show(element, answer, [frame('feed', 'first')]);
+    if (cell === undefined) throw new Error('no cell');
+    expect(cell.getAttribute('srcdoc')).toBe('<p>feed first</p>');
+    const writes = writesTo(cell);
+
+    await show(element, answer, [frame('feed', 'second')]);
+    await show(element, answer, [frame('feed', 'third')]);
+    expect(writes).toEqual([]);
+    expect(cell.getAttribute('srcdoc')).toBe('<p>feed first</p>');
+
+    loaded(cell);
+    expect(writes).toEqual(['<p>feed third</p>']);
+    loaded(cell);
+    expect(writes).toEqual(['<p>feed third</p>']);
+  });
+
+  it('writes nothing to a cell the grid dropped while it loaded', async () => {
+    const { element, answer } = await gridMode();
+    const [, story] = await show(element, answer, [
+      frame('feed', 'first'),
+      frame('story', 'first'),
+    ]);
+    if (story === undefined) throw new Error('no story cell');
+    // A newer story is waiting on that cell's load when the grid shrinks under it.
+    await show(element, answer, [frame('feed', 'second'), frame('story', 'second')]);
+    const writes = writesTo(story);
+
+    const left = await show(element, answer, [frame('feed', 'third')]);
+    expect(left).toHaveLength(1);
+    expect(story.isConnected).toBe(false);
+
+    loaded(story);
+    expect(writes).toEqual([]);
+    expect(story.getAttribute('srcdoc')).toBe('<p>story first</p>');
+  });
+
+  it('holds a cell the grid grew by to the same rule as the first', async () => {
+    const { element, answer } = await gridMode();
+    const [feed] = await show(element, answer, [frame('feed', 'first')]);
+    if (feed === undefined) throw new Error('no cell');
+    loaded(feed);
+
+    const [, story] = await show(element, answer, [
+      frame('feed', 'second'),
+      frame('story', 'second'),
+    ]);
+    if (story === undefined) throw new Error('no new cell');
+    expect(story.getAttribute('srcdoc')).toBe('<p>story second</p>');
+    const writes = writesTo(story);
+
+    await show(element, answer, [frame('feed', 'third'), frame('story', 'third')]);
+    expect(writes).toEqual([]);
+    expect(story.getAttribute('srcdoc')).toBe('<p>story second</p>');
+
+    loaded(story);
+    expect(story.getAttribute('srcdoc')).toBe('<p>story third</p>');
   });
 });
