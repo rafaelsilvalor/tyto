@@ -1,4 +1,4 @@
-import { measureNothing, noFiles } from '@tyto/core';
+import { measureNothing, noBrandKit, noFiles } from '@tyto/core';
 import { describe, expect, it } from 'vitest';
 
 import { build } from './template.js';
@@ -161,6 +161,7 @@ function render(
     measure,
     report: (report) => reports.push(report),
     files: noFiles,
+    brand: noBrandKit,
   });
   return { frame, reports };
 }

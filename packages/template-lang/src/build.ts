@@ -15,7 +15,7 @@ import type {
   TextOverflow,
   TextVerticalAlign,
 } from '@tyto/core';
-import { blendModes, measureNothing, noFiles, reportNothing } from '@tyto/core';
+import { blendModes, measureNothing, noBrandKit, noFiles, reportNothing } from '@tyto/core';
 import {
   TemplateError,
   font,
@@ -905,5 +905,6 @@ function staticContext(format: string): TemplateContext {
     measure: measureNothing,
     report: reportNothing,
     files: noFiles,
+    brand: noBrandKit,
   };
 }

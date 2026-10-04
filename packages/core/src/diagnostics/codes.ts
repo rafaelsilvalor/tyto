@@ -707,6 +707,15 @@ export const diagnosticCodes = {
   // user asked for. It exists because "my edit to the built-in did nothing" and "why does
   // mine look different on this machine" are the two questions shadowing will generate, and
   // one line answers both (ADR 0020).
+  W_BRAND_KIT_SHADOWED: {
+    severity: 'warning',
+    summary: 'Two plugins contribute a kit for the same brand; the earlier plugin is the one used.',
+    template:
+      "The brand kit for '{brand}' from plugin '{shadowed}' is shadowed by the one from '{used}', which was registered first.",
+    spec: 'docs/adr/0063-a-plugin-contributes-a-brand-kit.md',
+    fatal: false,
+    fatality: 'A warning never replaces a value (ADR 0013).',
+  },
   W_TEMPLATE_SHADOWED: {
     severity: 'warning',
     summary: 'Two template sources declare the same name; the earlier source is the one used.',

@@ -43,7 +43,7 @@ const TEMPLATE_NAME = /^[^\s/\\]+$/u;
  * A brand is a filter key — a picker lists one brand's templates, a pack groups them — so it
  * is kept to the characters every such key survives: lower case, digits and single hyphens.
  */
-const BRAND = /^[a-z0-9]+(?:-[a-z0-9]+)*$/u;
+export const BRAND_ID = /^[a-z0-9]+(?:-[a-z0-9]+)*$/u;
 
 export const slotTypeSchema = z.enum(['rich-text', 'image', 'enum']);
 export type SlotType = z.infer<typeof slotTypeSchema>;
@@ -175,7 +175,10 @@ export const templateManifestSchema = z
      */
     brand: z
       .string()
-      .regex(BRAND, 'must be lower case letters, digits and single hyphens, like azul')
+      .regex(
+        BRAND_ID,
+        'must be lower case letters, digits and single hyphens, like azul',
+      )
       .optional(),
     /** Format ids defined in the project's `formats.yaml`; a template renders at least one. */
     formats: z.array(z.string().min(1)).min(1),

@@ -9,6 +9,7 @@
  */
 
 export type {
+  BrandKitContribution,
   Contribution,
   DirectiveContribution,
   EditorCommand,
@@ -65,6 +66,7 @@ export {
 } from './state.js';
 
 export {
+  type BrandKits,
   type Disposable,
   type HostEventListener,
   type HostEvents,

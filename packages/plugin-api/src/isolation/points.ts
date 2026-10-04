@@ -5,6 +5,8 @@ import {
   type Inline,
   type TemplateReport,
   artworkSchema,
+  brandIdSchema,
+  brandKitSchema,
   err,
   frameSchema,
   noFiles,
@@ -76,6 +78,7 @@ export type RegisterMethod =
   | 'registerSink'
   | 'registerRasterizer'
   | 'registerTemplatePack'
+  | 'registerBrandKit'
   | 'registerDirective'
   | 'registerCommand'
   | 'registerKeymap'
@@ -156,8 +159,8 @@ const expandedDirectiveSchema = z.strictObject({
 const exportFrameOptionsSchema = z.strictObject({ textAsPaths: z.boolean().optional() });
 
 /**
- * A `TemplateCall`: the context a template is built with, less `measure`, which the guest
- * rebuilds (ADR 0048). `slots` is Tyto's own `ResolvedSlot` record, checked for being one;
+ * A `TemplateCall`: the context a template is built with, less `measure`, `report` and
+ * `files`, which the guest rebuilds (ADR 0048, 0058, 0062). `slots` is Tyto's own `ResolvedSlot` record, checked for being one;
  * its shape is the host's to guarantee, and nothing a plugin wrote produced it.
  */
 const templateCallSchema = z.strictObject({
@@ -171,6 +174,8 @@ const templateCallSchema = z.strictObject({
   }),
   slots: z.record(z.string(), z.unknown()),
   adjustments: z.record(z.string(), z.union([z.string(), z.literal(true)])),
+  // Data, so it crosses as it is (ADR 0063): the kit of the template's own brand.
+  brand: brandKitSchema,
 });
 
 /**
@@ -266,6 +271,17 @@ export const ISOLATED_POINTS: Readonly<Partial<Record<ContributionPoint, PointSp
         },
       },
     },
+  },
+  // Data: a kit is geometry and a string, so the whole contribution crosses and nothing is
+  // called back (ADR 0063). The schema bounds a path's length, because a kit rides every
+  // call an installed code template answers.
+  'brand-kit': {
+    method: 'registerBrandKit',
+    data: z.strictObject({
+      id: z.string().min(1),
+      brands: z.record(brandIdSchema, brandKitSchema),
+    }),
+    callables: {},
   },
   directive: {
     method: 'registerDirective',

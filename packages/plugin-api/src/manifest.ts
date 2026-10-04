@@ -19,15 +19,15 @@ import { z } from 'zod';
  */
 
 /**
- * The nine extension points, spelled the way a manifest spells them.
+ * The ten extension points, spelled the way a manifest spells them.
  *
- * The same nine as `contributions.ts`, which is a duplication with a reason: those are
+ * The same ten as `contributions.ts`, which is a duplication with a reason: those are
  * TypeScript types a plugin's *code* implements, and these are strings a JSON file
  * declares before any code exists.
  *
  * They are held equal from both sides. `Point`'s name is typed `ContributionPoint`, so the
  * host cannot open a point this list does not name; and `host.test.ts` activates one
- * plugin declaring all nine and registering into all nine, which fails if the host knows a
+ * plugin declaring all ten and registering into all ten, which fails if the host knows a
  * point this list has forgotten.
  */
 export const CONTRIBUTION_POINTS = [
@@ -36,6 +36,7 @@ export const CONTRIBUTION_POINTS = [
   'exporter',
   'rasterizer',
   'template-pack',
+  'brand-kit',
   'directive',
   'editor.command',
   'editor.keymap',

@@ -1,7 +1,17 @@
-import { type Diagnostics, type Result, diagnostic, err, isErr, ok } from '@tyto/core';
+import {
+  type BrandKit,
+  type Diagnostic,
+  type Diagnostics,
+  type Result,
+  diagnostic,
+  err,
+  isErr,
+  ok,
+} from '@tyto/core';
 import type { ZodType } from 'zod';
 
 import type {
+  BrandKitContribution,
   DirectiveContribution,
   EditorCommand,
   EditorKeymap,
@@ -71,6 +81,7 @@ export interface PluginHost {
   registerSink<T>(contribution: Provided<T>): Disposable;
   registerRasterizer<T>(contribution: Provided<T>): Disposable;
   registerTemplatePack(pack: TemplatePack): Disposable;
+  registerBrandKit(kit: BrandKitContribution): Disposable;
   registerDirective(directive: DirectiveContribution): Disposable;
   registerCommand(command: EditorCommand): Disposable;
   registerKeymap(keymap: EditorKeymap): Disposable;
@@ -129,10 +140,23 @@ export interface PluginRegistry {
   sinks<T>(): readonly Provided<T>[];
   rasterizers<T>(): readonly Provided<T>[];
   templatePacks(): readonly TemplatePack[];
+  /** Every kit contribution, in registration order. */
+  brandKits(): readonly BrandKitContribution[];
+  /**
+   * The kits merged by brand id (ADR 0063) — what `compile`'s `brandKits` takes. The plugin
+   * registered first keeps a brand, and each kit it hid is a `W_BRAND_KIT_SHADOWED`.
+   */
+  brandKitsByBrand(): BrandKits;
   directives(): readonly DirectiveContribution[];
   commands(): readonly EditorCommand[];
   keymaps(): readonly EditorKeymap[];
   panels(): readonly PanelContribution[];
+}
+
+/** The kits of every plugin merged into one per brand, and the warnings the merge made. */
+export interface BrandKits {
+  readonly kits: ReadonlyMap<string, BrandKit>;
+  readonly diagnostics: readonly Diagnostic[];
 }
 
 export interface PluginHostOptions {
@@ -265,6 +289,11 @@ class Point<T extends { readonly id: string }> {
     return [...this.entries.values()].map((entry) => entry.value);
   }
 
+  /** The same order, with the plugin that registered each: for a warning that names it. */
+  owned(): readonly Entry<T>[] {
+    return [...this.entries.values()];
+  }
+
   removeAllFrom(plugin: string): void {
     for (const [id, entry] of [...this.entries]) {
       if (entry.plugin !== plugin) continue;
@@ -272,6 +301,32 @@ class Point<T extends { readonly id: string }> {
       this.emitter.emit('disposed', { point: this.name, id });
     }
   }
+}
+
+/**
+ * One kit per brand, from every plugin's contributions in registration order (ADR 0063).
+ *
+ * **Earlier wins**, which is ADR 0020's rule for templates: built-ins activate before
+ * installed plugins, and installed plugins in the order they were loaded. A brand two
+ * plugins offer is not an error — nothing is wrong with the run — but it is said once, so
+ * "why is this not my logo" has an answer in `result.json`.
+ */
+function mergeBrandKits(entries: readonly Entry<BrandKitContribution>[]): BrandKits {
+  const kits = new Map<string, BrandKit>();
+  const owners = new Map<string, string>();
+  const diagnostics: Diagnostic[] = [];
+  for (const { plugin, value } of entries) {
+    for (const [brand, kit] of Object.entries(value.brands)) {
+      const used = owners.get(brand);
+      if (used !== undefined) {
+        diagnostics.push(diagnostic('W_BRAND_KIT_SHADOWED', { brand, shadowed: plugin, used }));
+        continue;
+      }
+      owners.set(brand, plugin);
+      kits.set(brand, kit);
+    }
+  }
+  return { kits, diagnostics };
 }
 
 function createEmitter(): TypedEmitter {
@@ -315,6 +370,7 @@ export function createPluginHost(options: PluginHostOptions = {}): InProcessHost
   const sinks = new Point<Provided<unknown>>('sink', emitter, contributed);
   const rasterizers = new Point<Provided<unknown>>('rasterizer', emitter, contributed);
   const templatePacks = new Point<TemplatePack>('template-pack', emitter, contributed);
+  const brandKits = new Point<BrandKitContribution>('brand-kit', emitter, contributed);
   const directives = new Point<DirectiveContribution>('directive', emitter, contributed);
   const commands = new Point<EditorCommand>('editor.command', emitter, contributed);
   const keymaps = new Point<EditorKeymap>('editor.keymap', emitter, contributed);
@@ -326,6 +382,7 @@ export function createPluginHost(options: PluginHostOptions = {}): InProcessHost
     sinks,
     rasterizers,
     templatePacks,
+    brandKits,
     directives,
     commands,
     keymaps,
@@ -342,6 +399,8 @@ export function createPluginHost(options: PluginHostOptions = {}): InProcessHost
     sinks: <T>() => sinks.list() as readonly Provided<T>[],
     rasterizers: <T>() => rasterizers.list() as readonly Provided<T>[],
     templatePacks: () => templatePacks.list(),
+    brandKits: () => brandKits.list(),
+    brandKitsByBrand: () => mergeBrandKits(brandKits.owned()),
     directives: () => directives.list(),
     commands: () => commands.list(),
     keymaps: () => keymaps.list(),
@@ -361,6 +420,7 @@ export function createPluginHost(options: PluginHostOptions = {}): InProcessHost
       registerSink: (contribution) => sinks.add(pluginId, contribution, onConflict),
       registerRasterizer: (contribution) => rasterizers.add(pluginId, contribution, onConflict),
       registerTemplatePack: (pack) => templatePacks.add(pluginId, pack, onConflict),
+      registerBrandKit: (kit) => brandKits.add(pluginId, kit, onConflict),
       registerDirective: (directive) => directives.add(pluginId, directive, onConflict),
       registerCommand: (command) => commands.add(pluginId, command, onConflict),
       registerKeymap: (keymap) => keymaps.add(pluginId, keymap, onConflict),

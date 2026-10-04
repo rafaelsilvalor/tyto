@@ -1,4 +1,4 @@
-import { measureNothing, noFiles, reportNothing } from '@tyto/core';
+import { measureNothing, noBrandKit, noFiles, reportNothing } from '@tyto/core';
 import { describe, expect, it } from 'vitest';
 
 import { CALL_TO_COMMENT, ROXO, OCRE, VINHO } from './brands.js';
@@ -81,6 +81,7 @@ function contextOf(
     measure,
     report,
     files: noFiles,
+    brand: noBrandKit,
   } satisfies TemplateContext;
 }
 

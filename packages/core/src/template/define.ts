@@ -5,6 +5,7 @@ import type { Diagnostics, Result } from '../result/result.js';
 import type { Frame } from '../scene/scene.js';
 import type { MeasurableText, TextMeasurement } from '../text/layout.js';
 import type { AssetRef } from '../scene/primitives.js';
+import type { BrandKit } from './brand.js';
 
 /**
  * `defineTemplate` — what a `template.ts` exports (`docs/template-authoring.md`).
@@ -101,6 +102,17 @@ export interface TemplateContext {
    * `context.files.image('assets/bg-' + context.format + '.png')`.
    */
   readonly files: TemplateFiles;
+
+  /**
+   * The kit of the template's own brand — the manifest's `brand` (ADR 0052) — as a plugin
+   * contributed it (ADR 0063): a logo `Mark` and a signature.
+   *
+   * Always an object. **A field that is `undefined` means nobody supplied it**, for this
+   * brand or because the manifest names none, and the template decides what stands in its
+   * place. A template never sees another brand's kit. Unlike `files`, the kit is data, so it
+   * crosses to a template running in its plugin's process with the call.
+   */
+  readonly brand: BrandKit;
 }
 
 /**
@@ -171,6 +183,7 @@ export function defineTemplate(
  * rebuilds `measure` over the faces that crossed with the call, with the same `measureText`,
  * `report` as a list that crosses back beside the frame (ADR 0058), and `files` as
  * {@link noFiles}: a plugin's own folder is not read for its templates yet (ADR 0062).
+ * `brand` is data and crosses as it is (ADR 0063).
  */
 export type TemplateCall = Omit<TemplateContext, 'measure' | 'report' | 'files'>;
 

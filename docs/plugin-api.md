@@ -65,6 +65,7 @@ The last four are named `<id>.tyto-plugin.json` and that is the one place a buil
 | `exporter`        | one **frame** to a document + mime + extension + the kinds it produces  | html, svg                                             |
 | `rasterizer`      | `Rasterizer` — `raster(html, opts): Promise<Uint8Array>`                | chromium                                              |
 | `template-pack`   | folder of templates                                                     | built-in templates                                    |
+| `brand-kit`       | a logo mark and a signature per brand id (ADR 0063)                     | —                                                     |
 | `directive`       | `::ns/name` in the brief → the slot directives it stands for (ADR 0043) | —                                                     |
 | `editor.command`  | `{ id, run(ctx), undo? }`                                               | core-commands                                         |
 | `editor.keymap`   | binding → command id (normal and vim)                                   | default-keymap, vim                                   |
@@ -219,6 +220,29 @@ nothing imports a plugin's template in Tyto's own process. The job compiles such
 for the preview, the export and the queue (`template-source.ts`), and its plugins screen says
 what a `font:<family>` permission sends.
 
+### `brand-kit`, in full
+
+A kit is what a template draws as its brand's logo and signature, supplied by a plugin rather
+than written into the template (ADR 0063). The contribution is `{ id, brands }`: `id` names the
+kit, and `brands` maps a brand id — spelled as a manifest's `brand` (ADR 0052) — to
+`{ logo?, signature? }`. A logo is a `MarkShape`, `{ box, d, fillRule }`, with no colour: the
+template fills it where it places it. A path is at most 65 536 characters and a signature at
+most 500.
+
+A template reads the kit of **its own** brand from `context.brand`, and never another's. A
+template that names no brand, or whose brand nobody supplied, gets both fields `undefined`, and
+draws its own stand-in. The composition root merges every plugin's kits with
+`registry.brandKitsByBrand()` and hands the map to the job as `brandKits`. **Earlier wins**, in
+registration order, as templates do across sources (ADR 0020): a brand two plugins offer is
+kept by the first, and `W_BRAND_KIT_SHADOWED` names the one it hid. The brand is inside the kit
+and not its id on purpose — with the brand as the id, the second plugin would be refused as
+`E_PLUGIN_DUPLICATE` and withdrawn whole.
+
+A kit is data, so an installed plugin's crosses its boundary as it is, checked against a
+strict schema at activation, and it reaches an installed code template with the call, beside
+its context (ADR 0048), whether or not the plugin's folder is readable (ADR 0062). Neither app
+passes kits yet; each gets its own pull request.
+
 ### `editor.command` and `editor.keymap`, in full
 
 ```ts
@@ -305,7 +329,7 @@ The network and the secrets are a port, `HostCapabilities`. **In the CLI a crede
 
 ```
 host (CLI process)                               guest (plugin's process)
-  connectIsolatedPlugin ◀── hello {protocol: 2, sandbox} ── runGuest
+  connectIsolatedPlugin ◀── hello {protocol: 3, sandbox} ── runGuest
                            canary denied? else E_PLUGIN_SANDBOX
                         ── activate {config} ──▶   plugin.activate(guestHost)
                         ◀── activated {registrations: data + {$call: n}}
@@ -314,7 +338,7 @@ host (CLI process)                               guest (plugin's process)
                         ◀── result {value} ──      answer checked by the host
 ```
 
-**Each side validates what it receives**, with the Zod schemas in `isolation/protocol.ts` and `isolation/points.ts`: the host every guest message and every answer, the guest every host message and a call's arguments, before the plugin's code sees them. **A contribution crosses as data, and its functions stay behind as handles**; a function is callable only if its point names it, with a schema for its arguments and one for its answer. Today that is `exporter.exportFrame` and `directive.transform` (TYTO-49), which may therefore return a `Promise`; the job and `resolve` await them. `template-pack`, `editor.command`, `editor.keymap` and `panel` cross as data. `source`, `sink` and `rasterizer` are refused by name — _not available to an isolated plugin yet_. A directive's answer schema is strict: a replacement that carries a `namespace` or a `range` is `E_PLUGIN_PROTOCOL`.
+**Each side validates what it receives**, with the Zod schemas in `isolation/protocol.ts` and `isolation/points.ts`: the host every guest message and every answer, the guest every host message and a call's arguments, before the plugin's code sees them. **A contribution crosses as data, and its functions stay behind as handles**; a function is callable only if its point names it, with a schema for its arguments and one for its answer. Today that is `exporter.exportFrame` and `directive.transform` (TYTO-49), which may therefore return a `Promise`; the job and `resolve` await them. `template-pack`, `brand-kit`, `editor.command`, `editor.keymap` and `panel` cross as data. `source`, `sink` and `rasterizer` are refused by name — _not available to an isolated plugin yet_. A directive's answer schema is strict: a replacement that carries a `namespace` or a `range` is `E_PLUGIN_PROTOCOL`.
 
 **The proxy goes through `tryActivate`**, so an isolated plugin meets every check an in-process one does. `protocol` is its own number, compared at the `hello` handshake and nowhere else; it is not the engine (ADR 0040), because a plugin never sees these messages.
 

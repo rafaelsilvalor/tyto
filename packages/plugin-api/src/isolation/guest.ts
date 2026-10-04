@@ -184,6 +184,7 @@ export function runGuest(
     registerSink: (value) => register('registerSink', value),
     registerRasterizer: (value) => register('registerRasterizer', value),
     registerTemplatePack: (value) => register('registerTemplatePack', value),
+    registerBrandKit: (value) => register('registerBrandKit', value),
     registerDirective: (value) => register('registerDirective', value),
     registerCommand: (value) => register('registerCommand', value),
     registerKeymap: (value) => register('registerKeymap', value),

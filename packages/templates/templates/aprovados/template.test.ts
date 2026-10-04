@@ -1,4 +1,4 @@
-import { measureNothing, noFiles, reportNothing } from '@tyto/core';
+import { measureNothing, noBrandKit, noFiles, reportNothing } from '@tyto/core';
 import { describe, expect, it } from 'vitest';
 
 import { APPROVED } from '../_azul/tokens.js';
@@ -69,6 +69,7 @@ function contextOf(
     measure,
     report: reportNothing,
     files: noFiles,
+    brand: noBrandKit,
   };
 }
 

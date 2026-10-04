@@ -1,27 +1,18 @@
-import { solid, vector } from '@tyto/core/template';
+import { type MarkShape, solid, vector } from '@tyto/core/template';
 
 import { type Block, block } from './blocks.js';
 
 /**
  * A mark: a flat, single-colour icon held as geometry — the box its `d` was drawn in, and
- * the `d` itself. **No colour**: the fill is decided where the mark is placed, which is what
- * lets the same owl be blue on paper and white on a dark panel without a second copy
+ * the `d` itself. **No colour**: the fill is decided where the mark is placed
  * (`docs/template-conventions.md`, "Geometry in, colour out").
  *
- * Moved here from `agenda-semana/parts.ts` by TYTO-185: the geometry belongs to a brand,
- * drawing it at a height does not.
+ * Moved here from `agenda-semana/parts.ts` by TYTO-185, and declared in `@tyto/core` since
+ * TYTO-223, because a brand kit carries one and a template's context carries the kit (ADR
+ * 0063). A local alias rather than a re-export, because tsup's declaration build
+ * drops the `type` modifier of a re-export and the `.d.ts` would promise a value.
  */
-export interface Mark {
-  readonly box: { readonly w: number; readonly h: number };
-  readonly d: string;
-  /**
-   * `evenodd` when the shape has holes punched by inner subpaths.
-   *
-   * Winding order would do it under `nonzero`, but a hole that depends on the direction a
-   * subpath happens to run is a hole that closes the first time somebody redraws it.
-   */
-  readonly fillRule: 'nonzero' | 'evenodd';
-}
+export type Mark = MarkShape;
 
 /**
  * A mark drawn at a chosen height, in a chosen colour.

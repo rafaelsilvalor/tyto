@@ -1,5 +1,6 @@
 import type {
   Artwork,
+  BrandKit,
   Diagnostics,
   Directive,
   ExpansionResult,
@@ -15,7 +16,7 @@ import type {
 import type { ShippedFace } from './isolation/faces.js';
 
 /**
- * The nine extension points of `docs/plugin-api.md`, as types.
+ * The ten extension points of `docs/plugin-api.md`, as types.
  *
  * Every one of them is a thing a plugin contributes and the host hands back; built-ins use
  * the same shapes, because a built-in that had a shortcut would be a shortcut nobody could
@@ -176,6 +177,26 @@ export type IsolatedPackBuild = (
   call: TemplateCall,
   faces: readonly ShippedFace[],
 ) => Promise<Result<TemplateAnswer, Diagnostics>>;
+
+/* ------------------------------------------------------------------------ brand-kit -- */
+
+/**
+ * `brand-kit` — the logo and the signature of one or more brands (ADR 0063).
+ *
+ * Shaped like a template pack: `id` names the contribution and is free, and `brands` holds
+ * one kit per brand id, spelled as a manifest's `brand` (ADR 0052). Not one contribution per
+ * brand keyed by the brand: two plugins offering one brand would then be the host's
+ * `E_PLUGIN_DUPLICATE`, and the second plugin would be withdrawn whole. Brands merge
+ * instead, as template names do across sources (ADR 0020) — the plugin registered first
+ * keeps the brand, and `W_BRAND_KIT_SHADOWED` names the one it hid.
+ *
+ * **Data only.** A kit has no function in it, so it crosses an isolated plugin's boundary as
+ * it is, and it reaches a code template in a plugin's process with the call, beside its
+ * context, whether or not that plugin's folder is readable (ADR 0062).
+ */
+export interface BrandKitContribution extends Contribution {
+  readonly brands: Readonly<Record<string, BrandKit>>;
+}
 
 /* ------------------------------------------------------------------------ directive -- */
 

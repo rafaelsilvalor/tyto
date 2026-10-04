@@ -16,7 +16,11 @@ import { z } from 'zod';
  * compared, before any other message is read.
  */
 
-export const RPC_PROTOCOL_VERSION = 2;
+/**
+ * 2 since `hello` carried the sandbox report (ADR 0049); 3 since a template call carries
+ * the brand kit, which a strict schema on an older guest would refuse (ADR 0063).
+ */
+export const RPC_PROTOCOL_VERSION = 3;
 
 const protocol = z.literal(RPC_PROTOCOL_VERSION);
 

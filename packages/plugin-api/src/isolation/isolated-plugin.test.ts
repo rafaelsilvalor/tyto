@@ -1,6 +1,7 @@
 import {
   type Diagnostics,
   type Directive,
+  MARK_PATH_LIMIT,
   type Result,
   type Scene,
   type TemplateAnswer,
@@ -15,13 +16,21 @@ import {
 import { describe, expect, it } from 'vitest';
 
 import type {
+  BrandKitContribution,
   DirectiveContribution,
   Exporter,
   IsolatedPackBuild,
   TemplatePack,
 } from '../contributions.js';
 import { directiveResolverOf } from '../directives.js';
-import { type Disposable, type Plugin, type PluginHost, createPluginHost } from '../host.js';
+import {
+  type Disposable,
+  type InProcessHost,
+  type InstalledPlugin,
+  type Plugin,
+  type PluginHost,
+  createPluginHost,
+} from '../host.js';
 import type { HostCapabilities } from '../capabilities.js';
 import type { GuestChannel, PluginChannel } from './channel.js';
 import { runGuest } from './guest.js';
@@ -379,6 +388,8 @@ describe('what an isolated plugin cannot do', () => {
     );
   });
 
+  // A bootstrap left behind by an upgrade: 2 is the number before the brand kit joined the
+  // template call (ADR 0063), and it is refused by name rather than by a schema complaint.
   it('speaks another protocol', async () => {
     const pair = channelPair(() => undefined);
     const connecting = connectIsolatedPlugin({
@@ -387,10 +398,10 @@ describe('what an isolated plugin cannot do', () => {
       manifest: MANIFEST,
       channel: pair.host,
     });
-    pair.inject({ type: 'hello', protocol: 3, sandbox: CONFINED });
+    pair.inject({ type: 'hello', protocol: 2, sandbox: CONFINED });
     const connected = await connecting;
     expect(connected.ok ? '' : connected.error[0]?.message).toBe(
-      "Plugin 'texto' failed to activate: its process speaks protocol 3 and this host speaks 2.",
+      "Plugin 'texto' failed to activate: its process speaks protocol 2 and this host speaks 3.",
     );
   });
 
@@ -810,6 +821,7 @@ describe('an isolated template’s reports (ADR 0058)', () => {
     artwork: { id: 'lamina-1', index: 0, count: 1 },
     slots: {},
     adjustments: {},
+    brand: {},
   };
 
   /** A pack whose one template reports what `reports` says, and draws an empty frame. */
@@ -876,6 +888,7 @@ describe('an isolated template’s files (ADR 0062)', () => {
     artwork: { id: 'lamina-1', index: 0, count: 1 },
     slots: {},
     adjustments: {},
+    brand: {},
   };
 
   /**
@@ -905,5 +918,95 @@ describe('an isolated template’s files (ADR 0062)', () => {
     const answer = await build('demo', CALL, []);
 
     expect(answer.ok && answer.value.frame.format).toBe('feed');
+  });
+});
+
+describe('an isolated plugin’s brand kit (ADR 0063)', () => {
+  // Invented: a brand nobody has and a triangle.
+  const TRIANGLE = {
+    box: { w: 10, h: 10 },
+    d: 'M0 10 L5 0 L10 10 Z',
+    fillRule: 'nonzero',
+  } as const;
+  const KIT = { logo: TRIANGLE, signature: '@test-brand' };
+
+  async function registered(
+    kit: BrandKitContribution,
+  ): Promise<Result<InstalledPlugin, Diagnostics> & { readonly host: InProcessHost }> {
+    const { connected } = await isolate((host) => host.registerBrandKit(kit), {
+      contributes: ['brand-kit'],
+    });
+    if (!connected.ok) throw new Error(connected.error[0]?.message);
+    const host = createPluginHost();
+    return Object.assign(host.tryActivate(connected.value.plugin), { host });
+  }
+
+  it('crosses as data, and the host holds it under its brand', async () => {
+    const activated = await registered({ id: 'kit', brands: { 'test-brand': KIT } });
+
+    expect(activated.ok).toBe(true);
+    expect(activated.host.registry.brandKits()).toEqual([
+      { id: 'kit', brands: { 'test-brand': KIT } },
+    ]);
+    expect(activated.host.registry.brandKitsByBrand().kits.get('test-brand')).toEqual(KIT);
+  });
+
+  it.each([
+    ['a brand id a manifest could not name', { 'Test Brand': KIT }],
+    [
+      'a logo with a colour, which a mark never carries',
+      { 'test-brand': { logo: { ...TRIANGLE, fill: '#f00' } } },
+    ],
+    [
+      'a path longer than the limit',
+      { 'test-brand': { logo: { ...TRIANGLE, d: 'M0 0'.padEnd(MARK_PATH_LIMIT + 1, ' ') } } },
+    ],
+    ['a box of no size', { 'test-brand': { logo: { ...TRIANGLE, box: { w: 0, h: 10 } } } }],
+  ])('refuses %s, at activation, before the host holds anything', async (_, brands) => {
+    const { connected } = await isolate(
+      (host) => host.registerBrandKit({ id: 'kit', brands } as unknown as BrandKitContribution),
+      { contributes: ['brand-kit'] },
+    );
+
+    expect(connected.ok ? [] : connected.error.map((item) => [item.code, item.message])).toEqual([
+      ['E_PLUGIN_ACTIVATE', expect.stringContaining("its 'brand-kit' contribution does not match")],
+    ]);
+  });
+
+  it('reaches a code template in the plugin’s process with the call', async () => {
+    const pack: TemplatePack = {
+      id: 'demo',
+      templates: [],
+      // The template writes what it was handed into the frame's format, which is the one
+      // string that crosses back unchecked against a vocabulary.
+      build: (_template, context) => ({
+        format: `${context.brand.signature ?? 'none'}|${context.brand.logo?.d ?? 'none'}`,
+        size: context.size,
+        children: [],
+      }),
+    };
+    const { connected } = await isolate((host) => host.registerTemplatePack(pack), {
+      contributes: ['template-pack'],
+    });
+    if (!connected.ok) throw new Error(connected.error[0]?.message);
+    const host = createPluginHost();
+    const activated = host.tryActivate(connected.value.plugin);
+    if (!activated.ok) throw new Error(activated.error[0]?.message);
+    const build = host.registry.templatePacks()[0]?.build as unknown as IsolatedPackBuild;
+    const call: TemplateCall = {
+      format: 'feed',
+      size: { w: 10, h: 10 },
+      idPrefix: 'lamina-1.feed',
+      artwork: { id: 'lamina-1', index: 0, count: 1 },
+      slots: {},
+      adjustments: {},
+      brand: KIT,
+    };
+
+    const withKit = await build('demo', call, []);
+    const withoutKit = await build('demo', { ...call, brand: {} }, []);
+
+    expect(withKit.ok && withKit.value.frame.format).toBe('@test-brand|M0 10 L5 0 L10 10 Z');
+    expect(withoutKit.ok && withoutKit.value.frame.format).toBe('none|none');
   });
 });

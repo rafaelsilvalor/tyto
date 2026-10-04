@@ -3,7 +3,7 @@ import { describe, expect, it } from 'vitest';
 import { build } from './template.js';
 import { ARROW, CHROME, INK, OWL } from '../_azul/tokens.js';
 
-import { measureNothing, noFiles, reportNothing } from '@tyto/core';
+import { measureNothing, noBrandKit, noFiles, reportNothing } from '@tyto/core';
 
 import type { Inline, RichText, SceneNode, TemplateContext } from '@tyto/core';
 
@@ -70,6 +70,7 @@ function contextOf(options: ContextOptions): TemplateContext {
     measure: measureNothing,
     report: reportNothing,
     files: noFiles,
+    brand: noBrandKit,
   };
 }
 

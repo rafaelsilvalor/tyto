@@ -55,6 +55,7 @@ import templateMarkup from './__fixtures__/template.html?raw';
  */
 const FICHA_MANIFEST = `name: ficha
 version: 1.0.0
+brand: test-brand
 formats: [feed]
 slots:
   titulo: { type: rich-text, max: 40 }
@@ -1019,6 +1020,41 @@ describe('a template whose body is code', () => {
    * no body to read. So `W_UNUSED_SLOT` cannot fire for a code template — a silence worth
    * asserting, because the alternative reading is "this template uses every slot".
    */
+  // The ports' kits reach the template under its manifest's brand (ADR 0063). Invented brand
+  // and shape.
+  it.each([
+    [
+      'the kit of its own brand',
+      new Map([['test-brand', { signature: '@test-brand' }]]),
+      '@test-brand',
+    ],
+    ['no kit for another brand', new Map([['other-brand', { signature: '@other' }]]), undefined],
+    ['no kit when the ports carry none', undefined, undefined],
+  ])('hands the template %s', async (_, brandKits, signature) => {
+    const registry = await registryOf();
+    const handed: (string | undefined)[] = [];
+    const build: TemplateBuild = (context) => {
+      handed.push(context.brand.signature);
+      return frame({ format: context.format, size: context.size, idPrefix: context.idPrefix });
+    };
+
+    const result = await runJob(
+      { brief: '---\ntemplate: ficha\nformats: [feed]\n---\n\n::titulo Agenda\n', outputs: BOTH },
+      await portsOf({
+        templates: bundledTemplateSource({
+          registry,
+          fileSystem,
+          bundled: { ficha: build },
+          markup: markupTemplateSource(fileSystem, registry),
+        }),
+        ...(brandKits === undefined ? {} : { brandKits }),
+      }),
+    );
+
+    expect(result.ok).toBe(true);
+    expect(handed).toEqual([signature]);
+  });
+
   it('reports no unused slot, because nobody can tell', async () => {
     const registry = await registryOf();
     const build: TemplateBuild = (context) =>

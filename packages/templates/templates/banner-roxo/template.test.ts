@@ -1,4 +1,4 @@
-import { measureNothing } from '@tyto/core';
+import { measureNothing, noBrandKit } from '@tyto/core';
 import { describe, expect, it } from 'vitest';
 
 import { LAYOUTS, build } from './template.js';
@@ -163,6 +163,7 @@ function render(
     measure,
     report: (report) => reports.push(report),
     files: folder,
+    brand: noBrandKit,
   });
   return { frame, reports };
 }
@@ -276,6 +277,7 @@ describe('banner-roxo given italic', () => {
       measure: proportional,
       report: () => undefined,
       files: folder,
+      brand: noBrandKit,
     });
     const spans = titleOf(frame).runs.flatMap((run) => (run.kind === 'text' ? [run] : []));
 

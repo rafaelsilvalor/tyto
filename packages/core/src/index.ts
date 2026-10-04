@@ -112,6 +112,15 @@ export {
   templateReportCodes,
 } from './template/define.js';
 
+export { type BrandKit, type MarkShape, noBrandKit } from './template/brand.js';
+export {
+  MARK_PATH_LIMIT,
+  SIGNATURE_LIMIT,
+  brandIdSchema,
+  brandKitSchema,
+  markSchema,
+} from './template/brand-schema.js';
+
 export { type RunStyle, type RunsOptions, runsOf } from './template/runs.js';
 
 export {

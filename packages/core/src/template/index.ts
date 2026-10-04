@@ -22,6 +22,8 @@ export {
   reportNothing,
 } from './define.js';
 
+export { type BrandKit, type MarkShape, noBrandKit } from './brand.js';
+
 export { type RunStyle, type RunsOptions, runsOf } from './runs.js';
 
 export {

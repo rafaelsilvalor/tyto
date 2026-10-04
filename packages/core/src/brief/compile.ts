@@ -21,6 +21,7 @@ import {
   noFiles,
 } from '../template/define.js';
 import type { TemplateManifest } from '../template/manifest.js';
+import { type BrandKit, noBrandKit } from '../template/brand.js';
 
 /**
  * `ResolvedBrief` × template → `Scene` (`docs/architecture.md`, compile stage).
@@ -247,6 +248,14 @@ export interface CompileOptions {
    * same lines instead of each guessing.
    */
   readonly faces?: FaceCache;
+  /**
+   * Every brand kit the composition root collected, by brand id (ADR 0063).
+   *
+   * The whole map rather than one kit, because which brand a template draws is its
+   * manifest's to say; `compile` hands the template the kit under its own `brand` and no
+   * other. Absent, or without that brand, the template is handed {@link noBrandKit}.
+   */
+  readonly brandKits?: ReadonlyMap<string, BrandKit>;
 }
 
 export function compile(
@@ -284,6 +293,7 @@ export async function compileDeferred(
 
   const plans = planArtworks(resolved, manifest);
   const measure = measureOf(options.faces);
+  const brand = brandKitOf(manifest, options);
   const answers = new Map<string, Result<Frame, Diagnostics>>();
   const reported = new Map<string, Diagnostic[]>();
   for (const plan of plans) {
@@ -291,7 +301,16 @@ export async function compileDeferred(
       const reports: Diagnostic[] = [];
       // A plugin's own folder is not read for its templates yet (ADR 0062), and `files`
       // would not cross the boundary anyway: it is functions.
-      const context = contextOf(plan, format, plans.length, options, measure, noFiles, reports);
+      const context = contextOf(
+        plan,
+        format,
+        plans.length,
+        options,
+        measure,
+        noFiles,
+        brand,
+        reports,
+      );
       answers.set(context.idPrefix, await template.buildLater(context));
       reported.set(context.idPrefix, reports);
     }
@@ -321,6 +340,15 @@ function measureOf(faces: FaceCache | undefined): TemplateContext['measure'] {
   return faces === undefined ? measureNothing : (node) => measureText(node, faces);
 }
 
+/**
+ * The kit under the template's own brand (ADR 0063): a template is never handed another
+ * brand's, and one that names no brand, or whose brand nobody supplied, gets the empty kit.
+ */
+function brandKitOf(manifest: TemplateManifest, options: CompileOptions): BrandKit {
+  if (manifest.brand === undefined) return noBrandKit;
+  return options.brandKits?.get(manifest.brand) ?? noBrandKit;
+}
+
 function contextOf(
   plan: Plan,
   format: string,
@@ -328,6 +356,7 @@ function contextOf(
   options: CompileOptions,
   measure: TemplateContext['measure'],
   files: TemplateFiles,
+  brand: BrandKit,
   reports: Diagnostic[],
 ): TemplateContext {
   return {
@@ -340,6 +369,7 @@ function contextOf(
     adjustments: plan.adjustments,
     measure,
     files,
+    brand,
     report: (report) => {
       reports.push(reportDiagnostic(report, plan, format));
     },
@@ -373,6 +403,7 @@ function compileWith(
   const faces = options.faces;
   // What a template is told a node will measure is what it then measures (ADR 0038).
   const measure = measureOf(faces);
+  const brand = brandKitOf(manifest, options);
 
   const plans = planArtworks(resolved, manifest);
   const problems: Diagnostic[] = [];
@@ -385,7 +416,16 @@ function compileWith(
 
     for (const format of resolved.formats) {
       const reports: Diagnostic[] = [];
-      const context = contextOf(plan, format, plans.length, options, measure, files, reports);
+      const context = contextOf(
+        plan,
+        format,
+        plans.length,
+        options,
+        measure,
+        files,
+        brand,
+        reports,
+      );
 
       const built = build(context);
       problems.push(...reports, ...built.problems);

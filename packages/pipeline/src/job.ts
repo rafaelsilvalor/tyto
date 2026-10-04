@@ -2,6 +2,7 @@ import {
   type Artwork,
   type AssetResolver,
   type BriefAst,
+  type BrandKit,
   type DeferredTemplate,
   type Diagnostic,
   type Diagnostics,
@@ -192,6 +193,12 @@ export interface JobPorts {
    * an adapter's job — `core` is pure and reads no files.
    */
   readonly faces?: FaceCache;
+  /**
+   * Every brand kit the plugins contributed, merged by brand id (ADR 0063) — the `kits` of
+   * `PluginRegistry.brandKitsByBrand()`. A template is handed the one under its own
+   * manifest's `brand`; absent, every template is handed the empty kit.
+   */
+  readonly brandKits?: ReadonlyMap<string, BrandKit>;
   /**
    * Loads the bytes the compiled scene turned out to need, before anything is exported.
    *
@@ -456,6 +463,7 @@ export async function runJob(
   const compileOptions = {
     formats: ports.formats,
     ...(ports.faces === undefined ? {} : { faces: ports.faces }),
+    ...(ports.brandKits === undefined ? {} : { brandKits: ports.brandKits }),
   };
   // Only an installed code template answers later (ADR 0048); every other one is compiled
   // by the same synchronous `compile` as before.

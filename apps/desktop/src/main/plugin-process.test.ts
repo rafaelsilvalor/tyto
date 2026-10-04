@@ -1,6 +1,7 @@
 import { EventEmitter } from 'node:events';
 import { posix, win32 } from 'node:path';
 
+import { RPC_PROTOCOL_VERSION } from '@tyto/plugin-api';
 import { describe, expect, it } from 'vitest';
 
 import {
@@ -93,16 +94,26 @@ describe('a plugin on the bundled Node', () => {
     channel.onMessage((message) => heard.push(message));
     channel.onExit((reason) => reasons.push(reason));
 
-    channel.send({ protocol: 2, type: 'activate', plugin: 'texto', config: undefined });
-    child.emit('message', { type: 'hello', protocol: 2 });
+    channel.send({
+      protocol: RPC_PROTOCOL_VERSION,
+      type: 'activate',
+      plugin: 'texto',
+      config: undefined,
+    });
+    child.emit('message', { type: 'hello', protocol: RPC_PROTOCOL_VERSION });
     child.emit('message', { fatal: 'the ink ran out' });
     child.emit('exit', 1, null);
 
     // `config` survives JSON as a marker; a dropped key is what the guest's schema refused.
     expect(child.sent).toEqual([
-      { protocol: 2, type: 'activate', plugin: 'texto', config: { $tytoUndefined: true } },
+      {
+        protocol: RPC_PROTOCOL_VERSION,
+        type: 'activate',
+        plugin: 'texto',
+        config: { $tytoUndefined: true },
+      },
     ]);
-    expect(heard).toEqual([{ type: 'hello', protocol: 2 }]);
+    expect(heard).toEqual([{ type: 'hello', protocol: RPC_PROTOCOL_VERSION }]);
     expect(reasons).toEqual(['the ink ran out']);
   });
 
@@ -113,7 +124,7 @@ describe('a plugin on the bundled Node', () => {
 
     const body = new Uint8Array([0, 1, 254, 255]);
     channel.send({
-      protocol: 2,
+      protocol: RPC_PROTOCOL_VERSION,
       type: 'response',
       id: 1,
       ok: true,
@@ -123,7 +134,7 @@ describe('a plugin on the bundled Node', () => {
 
     expect(child.sent).toEqual([
       {
-        protocol: 2,
+        protocol: RPC_PROTOCOL_VERSION,
         type: 'response',
         id: 1,
         ok: true,
@@ -131,7 +142,13 @@ describe('a plugin on the bundled Node', () => {
       },
     ]);
     expect(heard).toEqual([
-      { protocol: 2, type: 'response', id: 1, ok: true, value: { body, config: undefined } },
+      {
+        protocol: RPC_PROTOCOL_VERSION,
+        type: 'response',
+        id: 1,
+        ok: true,
+        value: { body, config: undefined },
+      },
     ]);
   });
 

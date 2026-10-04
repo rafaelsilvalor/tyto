@@ -2,7 +2,7 @@ import { ok } from '@tyto/core';
 import { describe, expect, it, vi } from 'vitest';
 import { z } from 'zod';
 
-import type { Exporter } from './contributions.js';
+import type { BrandKitContribution, Exporter } from './contributions.js';
 import { type Disposable, type Logger, type Plugin, createPluginHost } from './host.js';
 import { CONTRIBUTION_POINTS } from './manifest.js';
 
@@ -304,10 +304,10 @@ describe('activating a plugin', () => {
     expect(host.registry.exporters.list()).toEqual([]);
   });
 
-  it('knows the same nine points the manifest vocabulary names', () => {
+  it('knows the same ten points the manifest vocabulary names', () => {
     // Two declarations of one vocabulary: `CONTRIBUTION_POINTS` is what a JSON file may
     // say, and the host's points are what code may register into. This activates one
-    // plugin into all nine and compares what was recorded against the list.
+    // plugin into all ten and compares what was recorded against the list.
     const host = createPluginHost();
     host.activate(
       pluginOf({
@@ -318,6 +318,7 @@ describe('activating a plugin', () => {
           plugin.registerExporter(exporterOf('promo'));
           plugin.registerRasterizer({ id: 'c', value: 1 });
           plugin.registerTemplatePack({ id: 'd', templates: [] });
+          plugin.registerBrandKit({ id: 'i', brands: {} });
           plugin.registerDirective({ id: 'e', names: [], transform: () => ok([]) });
           plugin.registerCommand({ id: 'f', title: 'Do' });
           plugin.registerKeymap({ id: 'g', bindings: {} });
@@ -328,9 +329,9 @@ describe('activating a plugin', () => {
 
     // The real assertion is that this did not throw: a point the host knows and
     // `CONTRIBUTION_POINTS` does not would have been registered without being declared,
-    // which `activate` refuses. The counts below say the nine arrived rather than that
+    // which `activate` refuses. The counts below say the ten arrived rather than that
     // nothing was attempted.
-    expect(CONTRIBUTION_POINTS).toHaveLength(9);
+    expect(CONTRIBUTION_POINTS).toHaveLength(10);
     expect(
       [
         host.registry.sources(),
@@ -338,11 +339,87 @@ describe('activating a plugin', () => {
         host.registry.exporters.list(),
         host.registry.rasterizers(),
         host.registry.templatePacks(),
+        host.registry.brandKits(),
         host.registry.directives(),
         host.registry.commands(),
         host.registry.keymaps(),
         host.registry.panels(),
       ].map((point) => point.length),
-    ).toEqual([1, 1, 1, 1, 1, 1, 1, 1, 1]);
+    ).toEqual([1, 1, 1, 1, 1, 1, 1, 1, 1, 1]);
+  });
+});
+
+describe('brand kits merge by brand (ADR 0063)', () => {
+  // Invented: two brands nobody has, and a triangle and a square.
+  const TRIANGLE = {
+    box: { w: 10, h: 10 },
+    d: 'M0 10 L5 0 L10 10 Z',
+    fillRule: 'nonzero',
+  } as const;
+  const SQUARE = { box: { w: 10, h: 10 }, d: 'M0 0 H10 V10 H0 Z', fillRule: 'evenodd' } as const;
+
+  const kitPlugin = (name: string, brands: BrandKitContribution['brands']): Plugin => ({
+    id: name,
+    manifest: {
+      name,
+      version: '0.1.0',
+      engine: '>=0.1',
+      contributes: ['brand-kit'],
+      permissions: [],
+    },
+    activate: (host) => host.registerBrandKit({ id: `${name}-kit`, brands }),
+  });
+
+  it('keeps every brand any plugin offers, each from the plugin that offered it', () => {
+    const host = createPluginHost();
+    host.activate(kitPlugin('first', { 'test-brand': { logo: TRIANGLE } }));
+    expect(
+      host.tryActivate(kitPlugin('second', { 'other-brand': { signature: '@other' } })).ok,
+    ).toBe(true);
+
+    const merged = host.registry.brandKitsByBrand();
+
+    expect(Object.fromEntries(merged.kits)).toEqual({
+      'test-brand': { logo: TRIANGLE },
+      'other-brand': { signature: '@other' },
+    });
+    expect(merged.diagnostics).toEqual([]);
+  });
+
+  it('does not withdraw a plugin for offering a brand another already has', () => {
+    const host = createPluginHost();
+    host.activate(kitPlugin('first', { 'test-brand': { logo: TRIANGLE } }));
+
+    // Unlike two template packs with one id: the brand is inside the kit, not its id.
+    expect(host.tryActivate(kitPlugin('second', { 'test-brand': { logo: SQUARE } })).ok).toBe(true);
+    expect(host.registry.brandKits().map((kit) => kit.id)).toEqual(['first-kit', 'second-kit']);
+  });
+
+  it('lets the plugin registered first keep a brand, and names the one it hid', () => {
+    const host = createPluginHost();
+    host.activate(kitPlugin('first', { 'test-brand': { logo: TRIANGLE, signature: '@first' } }));
+    host.hostFor('second').registerBrandKit({
+      id: 'second-kit',
+      brands: { 'test-brand': { logo: SQUARE }, 'other-brand': { signature: '@other' } },
+    });
+
+    const merged = host.registry.brandKitsByBrand();
+
+    expect(merged.kits.get('test-brand')).toEqual({ logo: TRIANGLE, signature: '@first' });
+    expect(merged.kits.get('other-brand')).toEqual({ signature: '@other' });
+    expect(merged.diagnostics.map((item) => [item.code, item.severity, item.message])).toEqual([
+      [
+        'W_BRAND_KIT_SHADOWED',
+        'warning',
+        "The brand kit for 'test-brand' from plugin 'second' is shadowed by the one from 'first', which was registered first.",
+      ],
+    ]);
+  });
+
+  it('merges to nothing, and says nothing, when no plugin offers a kit', () => {
+    const merged = createPluginHost().registry.brandKitsByBrand();
+
+    expect([...merged.kits]).toEqual([]);
+    expect(merged.diagnostics).toEqual([]);
   });
 });
