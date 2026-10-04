@@ -1,6 +1,6 @@
 import { type Diagnostic as LintDiagnostic, forEachDiagnostic } from '@codemirror/lint';
 import { type DiagnosticCode, type TemplateManifest, diagnostic, parseManifest } from '@tyto/core';
-import { afterEach, describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import { type BriefAnalysis, type BriefAnalyzer, createBriefAnalyzer } from './analysis.js';
 import { createEditor, type EditorHandle } from './editor.js';
@@ -33,6 +33,7 @@ const brief = (...lines: readonly string[]): string =>
 let handle: EditorHandle | undefined;
 
 afterEach(() => {
+  vi.useRealTimers();
   handle?.destroy();
   handle = undefined;
   document.body.replaceChildren();
@@ -207,16 +208,41 @@ describe('briefLint', () => {
    * analysis, and the debounce is the half that can regress — CodeMirror's own default is
    * 750, which this extension has to override and could stop overriding.
    *
-   * So the constant is asserted directly and the wall clock is given a loose ceiling. A
-   * 200 ms assertion here would be measuring how loaded the CI runner is: the analysis
-   * itself is sub-millisecond over a brief this size, and nothing in it grows with the
-   * machine.
+   * So the constant is asserted directly, and the debounce is driven on a fake clock
+   * rather than measured on the real one: a wall-clock bound here measured how loaded the
+   * CI runner was (TYTO-191). `@codemirror/lint` schedules with `setTimeout` and compares
+   * against `Date.now()`, so those are the three things faked; promises stay real, and
+   * `advanceTimersByTimeAsync` drains them after each timer it fires.
+   *
+   * The editor is built without a `delay`, so what runs is the default `briefLint` passes
+   * to `linter`, not a number this test hands in. The analyzer is counted so the negative
+   * half proves the source was not called yet, not merely that a marker had not rendered.
    */
   it('keeps the debounce well inside the budget the card sets', async () => {
     expect(BRIEF_LINT_DELAY).toBeLessThan(200);
 
-    const editor = open(brief('::titlo Lista', '::item Um'), { delay: BRIEF_LINT_DELAY });
-    await waitForMarker(editor, 'E_UNKNOWN_SLOT', 400);
+    vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout', 'Date'] });
+    let analyses = 0;
+    const counting: BriefAnalyzer = {
+      analyze: (source) => {
+        analyses += 1;
+        return analyzer.analyze(source);
+      },
+    };
+    const parent = document.createElement('div');
+    document.body.append(parent);
+    handle = createEditor(parent, {
+      doc: brief('::titlo Lista', '::item Um'),
+      extensions: [briefLint(counting)],
+    });
+
+    await vi.advanceTimersByTimeAsync(BRIEF_LINT_DELAY - 1);
+    expect(analyses).toBe(0);
+    expect(markerFor(handle, 'E_UNKNOWN_SLOT')).toBeUndefined();
+
+    await vi.advanceTimersByTimeAsync(1);
+    expect(analyses).toBe(1);
+    expect(markerFor(handle, 'E_UNKNOWN_SLOT')).toBeDefined();
   });
 });
 
