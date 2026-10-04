@@ -78,22 +78,45 @@ const accelerators = async (): Promise<string[]> =>
 const editorText = async (): Promise<string> =>
   page.evaluate(() => document.querySelector('#editor .cm-content')?.textContent ?? '');
 
-const scrollTop = async (): Promise<number> =>
-  page.evaluate(() => document.querySelector('#editor .cm-scroller')?.scrollTop ?? -1);
+/** Turns the wheel over the middle of the editor, which is where a person's pointer is. */
+const wheelOverEditor = async (deltaY: number): Promise<void> => {
+  const box = await page.locator('#editor .cm-scroller').boundingBox();
+  if (box === null) throw new Error('the editor has no box to scroll');
+  await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
+  await page.mouse.wheel(0, deltaY);
+};
+
+/** How far down the buffer is, in screens of the editor's own height. */
+const screensDown = async (): Promise<number> =>
+  page.evaluate(() => {
+    const scroller = document.querySelector('#editor .cm-scroller');
+    return scroller === null ? -1 : scroller.scrollTop / scroller.clientHeight;
+  });
 
 /**
- * Waits for the buffer to be scrolled away from the top, rather than sleeping and hoping.
+ * Waits for the buffer to be more than a screen down, rather than sleeping and hoping.
  *
  * CodeMirror scrolls on a measure pass and not on the dispatch, so a fixed timeout after a
  * tab switch races the restore: the scroll effect can land *after* the next keystroke and put
  * the view back where the snapshot said it was. Waiting on the condition is the only stable
  * form of this assertion.
+ *
+ * A screen and not a pixel, because the top of the document can read as a fraction above 0
+ * (TYTO-119 measured 0.8): `> 0` passed on a buffer that was showing line 1.
  */
-const waitForScroll = async (): Promise<void> => {
+const waitForScroll = async (timeout?: number): Promise<void> => {
   await page.waitForFunction(
-    () => (document.querySelector('#editor .cm-scroller')?.scrollTop ?? 0) > 0,
+    () => {
+      const scroller = document.querySelector('#editor .cm-scroller');
+      return scroller !== null && scroller.scrollTop > scroller.clientHeight;
+    },
+    undefined,
+    timeout === undefined ? {} : { timeout },
   );
 };
+
+/** How long a restored scroll is given to land before the assertion looks for it. */
+const SCROLL_SETTLES = 3000;
 
 const tabNames = async (): Promise<string[]> =>
   page.evaluate(() =>
@@ -324,16 +347,26 @@ describe('opening two briefs', () => {
 
 describe('switching between them', () => {
   it('puts the buffer, the cursor and the scroll back where they were', async () => {
-    // Cursor at the very top of the first, at the very bottom of the second. Where a typed
-    // character lands afterwards is the assertion — a caret is not a thing a headless window
-    // will show you, and where the next keystroke goes is what a cursor *is*.
+    // Cursor at the very top of the first. Where a typed character lands afterwards is the
+    // assertion — a caret is not a thing a headless window will show you, and where the next
+    // keystroke goes is what a cursor *is*.
     await clickTab('campanha.brief');
     await page.click('#editor .cm-content');
     await page.keyboard.press('Control+Home');
 
+    // In the second, the caret at the top and the viewport more than a screen below it, so
+    // the two disagree (TYTO-119). With the caret at the bottom, restoring the selection
+    // scrolls the view on its own, and a dropped scroll used to read as scrolled; this way
+    // only the scroll can bring the view back down.
+    //
+    // Scrolled with the wheel, the way a person scrolls, and not by setting `scrollTop`.
+    // Measured on the same build: a wheel scroll left at 3992.8 came back at 3992.8, while a
+    // `scrollTop` set from here left at 4246.4 came back at 0.8. CodeMirror never saw the
+    // second as a scroll, so it tests something no person does.
     await clickTab('promo.brief');
     await page.click('#editor .cm-content');
-    await page.keyboard.press('Control+End');
+    await page.keyboard.press('Control+Home');
+    await wheelOverEditor(4000);
     await waitForScroll();
 
     await clickTab('campanha.brief');
@@ -350,13 +383,19 @@ describe('switching between them', () => {
     await clickTab('promo.brief');
     // Scrolled, and deliberately not "scrolled to the same pixel": `scrollSnapshot` puts the
     // line back in view rather than restoring an offset, and an offset is not what a person
-    // remembers about where they were.
-    await waitForScroll();
-    expect(await scrollTop()).toBeGreaterThan(0);
+    // remembers about where they were — so "more than a screen down", the place the caret's
+    // line cannot account for. A dropped scroll leaves the top, so the wait is bounded and
+    // its timeout swallowed: the assertion below is what reports it.
+    await waitForScroll(SCROLL_SETTLES).catch(() => undefined);
+    expect(await screensDown()).toBeGreaterThan(1);
     // Read from the top, because `.cm-content` holds the *viewport*: four hundred lines down
-    // a blank-padded brief there is nothing in the DOM to find.
-    await page.keyboard.press('Control+Home');
-    await page.waitForTimeout(300);
+    // a blank-padded brief there is nothing in the DOM to find. Wheeled there rather than
+    // sent with Control+Home: the caret is already at the top, so that key moves nothing and
+    // CodeMirror does not scroll for a selection that did not change.
+    await wheelOverEditor(-10_000);
+    await page.waitForFunction(() =>
+      (document.querySelector('#editor .cm-content')?.textContent ?? '').includes('Promo'),
+    );
     expect(await editorText()).toContain('Promo');
   });
 
