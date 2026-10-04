@@ -4,7 +4,7 @@
  *
  * Tyto's layout breaks greedily — as many words on a line as fit — which leaves a long line
  * over a short one and ends lines wherever the width runs out (`Prefeitura Municipal de / São
- * Miguel`). So this decides the breaks itself and the caller draws each line after a
+ * Bento`). So this decides the breaks itself and the caller draws each line after a
  * `lineBreak()`; the layout is left nothing to choose.
  *
  * ## What is chosen, in order

@@ -2,7 +2,7 @@
 template: simulados-semana-ocre
 formats: [grid, story]
 ---
-// The maintainer's OCRE reference of 2026-09-28, as two slides so the carousel has a last
+// The maintainer's ocre reference of 2026-09-28, as two slides so the carousel has a last
 // grid: the call to comment is drawn on the second grid and on no story.
 //
 // Inside a `::lamina`, a line with one `|` starts a day — the day, then its schedule — and

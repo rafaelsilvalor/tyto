@@ -58,14 +58,14 @@ describe('balancing the lines', () => {
 });
 
 describe('a line never ends on a function word when a better break exists', () => {
-  const text = 'Prefeitura Municipal de São Bento do Altavale';
+  const text = 'Prefeitura Municipal de São Bento do Vale Alto';
 
   it('breaks before `de`, not after it', () => {
     const setting = balance(request(text, { box: { w: 30, h: 2 } }))!;
     const lines = linesOf(text, setting.starts);
 
     for (const line of lines.slice(0, -1)) expect(line).not.toMatch(/ (de|do)$/u);
-    expect(lines).toEqual(['Prefeitura Municipal', 'de São Bento do Altavale']);
+    expect(lines).toEqual(['Prefeitura Municipal', 'de São Bento do Vale Alto']);
   });
 
   it('prefers a clean break at a smaller size to an awkward one at a larger size', () => {

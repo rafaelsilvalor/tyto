@@ -175,10 +175,7 @@ export const templateManifestSchema = z
      */
     brand: z
       .string()
-      .regex(
-        BRAND_ID,
-        'must be lower case letters, digits and single hyphens, like azul',
-      )
+      .regex(BRAND_ID, 'must be lower case letters, digits and single hyphens, like azul')
       .optional(),
     /** Format ids defined in the project's `formats.yaml`; a template renders at least one. */
     formats: z.array(z.string().min(1)).min(1),

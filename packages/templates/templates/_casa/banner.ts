@@ -133,7 +133,7 @@ interface Piece {
 /**
  * The glued text's pieces, and which of them the author started a line with.
  *
- * A piece is what the layout could never break: `Altavale (GO)` is one.
+ * A piece is what the layout could never break: `Alto (VA)` is one.
  */
 function piecesOf(words: StyledText): { pieces: Piece[]; forced: Set<number> } {
   const glued = glueParenthesised(words.characters, JOINS_A_GROUP);

@@ -1,12 +1,12 @@
 name: banner-roxo
 version: 1.0.0
 brand: roxo
-description: Roxo's product banner — one text over a fixed background, in three sizes.
+description: roxo's product banner — one text over a fixed background, in three sizes.
 # One piece in three sizes. Each format draws its own background from `assets/bg-<format>.png`.
 formats: [banner, banner-1x1, banner-345x146]
 slots:
   # The product's name, the same on every format: `Prefeitura Municipal de São Bento do
-  # Altavale **(GO)**`. The lines are broken by the template, balanced, with a group in
+  # Vale Alto **(VA)**`. The lines are broken by the template, balanced, with a group in
   # parentheses kept whole and no line ending on `de` or `e`; a line break in the brief is
   # kept. `**bold**` is the bold face.
   titulo: { type: rich-text, required: true, max: 120 }

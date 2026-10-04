@@ -206,9 +206,9 @@ here inherits that — the three axes are being designed for a template nobody h
 ## A real layout, and what it does to the argument above
 
 Added the same day, after the section above was written. The maintainer supplied a production
-carousel slide — an Casa "Agenda da semana" — annotated by hand into three kinds of region:
+carousel slide — a house "Agenda da semana" — annotated by hand into three kinds of region:
 
-- **blue**: fixed on every slide (the owl header, the `@assinatura` footer and its arrow)
+- **blue**: fixed on every slide (the owl header, the signed footer and its arrow)
 - **green**: fixed on the first slide only, and never changes (the calendar emoji and the title)
 - **red**: varies from slide to slide (a discipline heading, then a list of session rows, each row
   a date pill beside a grey pill holding a session title and a professor's name)

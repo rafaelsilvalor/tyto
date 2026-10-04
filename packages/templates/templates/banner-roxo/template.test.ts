@@ -137,8 +137,8 @@ const SIZES: Record<string, { w: number; h: number }> = {
   'banner-345x146': { w: 345, h: 146 },
 };
 
-const SAO_MIGUEL = 'Prefeitura Municipal de São Bento do Altavale **(GO)**';
-const AFVVA = 'Agência de Fomento e Vigilância Hidroviária do Vale Alto **(AFVVA)**';
+const PREFEITURA = 'Prefeitura Municipal de São Bento do Vale Alto **(VA)**';
+const AGENCIA = 'Agência de Fomento e Vigilância Hidroviária do Vale Alto **(AFVVA)**';
 
 interface Built {
   readonly frame: Frame;
@@ -185,7 +185,7 @@ function linesOf(node: TextNode): string[] {
 
 describe.each(Object.keys(SIZES))('banner-roxo in %s', (format) => {
   it('draws its own background, full-bleed, under the text', () => {
-    const { frame } = render(SAO_MIGUEL, format);
+    const { frame } = render(PREFEITURA, format);
     const [first] = frame.children;
 
     expect(first?.kind).toBe('image');
@@ -195,7 +195,7 @@ describe.each(Object.keys(SIZES))('banner-roxo in %s', (format) => {
     expect(first.transform).toMatchObject({ x: 0, y: 0 });
   });
 
-  it.each([SAO_MIGUEL, AFVVA])('keeps every line of “%s” inside its box', (titulo) => {
+  it.each([PREFEITURA, AGENCIA])('keeps every line of “%s” inside its box', (titulo) => {
     const { frame, reports } = render(titulo, format);
     const node = titleOf(frame);
     const layout = LAYOUTS[format]!;
@@ -208,14 +208,14 @@ describe.each(Object.keys(SIZES))('banner-roxo in %s', (format) => {
     expect(layOut(node)).toHaveLength(breaks + 1);
   });
 
-  it('never splits `(GO)` nor starts a line with it', () => {
-    for (const line of linesOf(titleOf(render(SAO_MIGUEL, format).frame))) {
+  it('never splits `(VA)` nor starts a line with it', () => {
+    for (const line of linesOf(titleOf(render(PREFEITURA, format).frame))) {
       expect(line.startsWith('(')).toBe(false);
       expect(line).not.toMatch(/\([^)]*$/u);
     }
   });
 
-  it.each([SAO_MIGUEL, AFVVA])('ends no line of “%s” on a function word', (titulo) => {
+  it.each([PREFEITURA, AGENCIA])('ends no line of “%s” on a function word', (titulo) => {
     const lines = linesOf(titleOf(render(titulo, format).frame));
     expect(lines.length).toBeGreaterThan(1);
     for (const line of lines.slice(0, -1)) {
@@ -225,7 +225,7 @@ describe.each(Object.keys(SIZES))('banner-roxo in %s', (format) => {
   });
 
   it('draws in ROXO’s accent, the state in bold, and nothing in italic', () => {
-    const spans = titleOf(render(SAO_MIGUEL, format).frame).runs.flatMap((run) =>
+    const spans = titleOf(render(PREFEITURA, format).frame).runs.flatMap((run) =>
       run.kind === 'text' ? [run] : [],
     );
 
@@ -233,15 +233,15 @@ describe.each(Object.keys(SIZES))('banner-roxo in %s', (format) => {
       expect(span.color).toEqual({ kind: 'solid', color: expect.anything() });
       expect(span.style).toBe('normal');
     }
-    expect(spans.find((span) => span.text.includes('(GO)'))?.weight).toBe(700);
+    expect(spans.find((span) => span.text.includes('(VA)'))?.weight).toBe(700);
     expect(spans.find((span) => span.text.includes('Prefeitura'))?.weight).toBe(400);
-    expect(render(SAO_MIGUEL, format).frame.children.length).toBe(2);
+    expect(render(PREFEITURA, format).frame.children.length).toBe(2);
     const ink = spans[0]!.color;
     expect(ink.kind === 'solid' && ink.color).toEqual(solidOf(ROXO.accent));
   });
 
   it('draws a text too long for the floor at the floor, and says by how much it overflows', () => {
-    const long = Array.from({ length: 6 }, () => AFVVA.replaceAll('**', '')).join(' ');
+    const long = Array.from({ length: 6 }, () => AGENCIA.replaceAll('**', '')).join(' ');
     const { frame, reports } = render(long, format);
     const node = titleOf(frame);
     const sizes = node.runs.flatMap((run) => (run.kind === 'text' ? [run.size] : []));
@@ -288,9 +288,9 @@ describe('banner-roxo given italic', () => {
 
 describe('banner-roxo with nothing to measure', () => {
   it('still draws every word, in one block the layout fits into the box', () => {
-    const node = titleOf(render(SAO_MIGUEL, 'banner', measureNothing).frame);
+    const node = titleOf(render(PREFEITURA, 'banner', measureNothing).frame);
     expect(node.overflow).toBe('shrink');
-    expect(linesOf({ ...node, box: {} }).join(' ')).toBe(SAO_MIGUEL.replaceAll('**', ''));
+    expect(linesOf({ ...node, box: {} }).join(' ')).toBe(PREFEITURA.replaceAll('**', ''));
   });
 });
 

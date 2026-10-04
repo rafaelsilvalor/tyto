@@ -1,9 +1,9 @@
 /**
- * The Casa house's marks: geometry every brand of the house draws, in no colour.
+ * The house's marks: geometry every brand of the house draws, in no colour.
  *
  * Each holds a `d` and the box it was drawn in, and the fill is decided where the mark is
  * placed ("Geometry in, colour out", `docs/template-conventions.md`). That is what lets one
- * owl be Azul's blue, Ocre's ochre, VINHO's wine and Roxo' purple without
+ * owl be azul's blue, ocre's ochre, vinho's wine and roxo's purple without
  * four copies of it.
  *
  * The brand files themselves are not in this repository; their geometry is, and swapping a
@@ -13,7 +13,7 @@
 import type { Mark } from '@tyto/template-kit';
 
 /**
- * The owl, from the brand file `Marks/SVG/White.svg` (supplied 2026-09-23).
+ * The owl, from the house's brand file `White.svg` (supplied 2026-09-23).
  *
  * Its six distinct subpaths are joined into one `d`, in the file's order. The file draws the
  * body's lower half three times, invisibly, because the fill is opaque over itself; the two

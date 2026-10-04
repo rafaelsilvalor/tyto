@@ -83,7 +83,7 @@
 ### Minor Changes
 
 - d3587dd: TYTO-167 — the first production template written in TypeScript, and the first entry in
-  `BUILT_IN_TEMPLATE_BUILDS`, which TYTO-166 shipped empty. `agenda-semana` draws the Casa
+  `BUILT_IN_TEMPLATE_BUILDS`, which TYTO-166 shipped empty. `agenda-semana` draws the azul
   week's agenda as a carousel: a cover on the first slide, one discipline per slide, and as many
   session rows as the brief wrote.
 

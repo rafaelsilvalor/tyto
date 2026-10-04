@@ -1,7 +1,7 @@
 /**
- * Pieces only Azul draws: the owl header and the signed footer.
+ * Pieces only the azul brand draws: the owl header and the signed footer.
  *
- * **One position for every Azul template** — the agenda's (the maintainer, 2026-09-27). The
+ * **One position for every azul template** — the agenda's (the maintainer, 2026-09-27). The
  * approved list's reference set the owl and the handle a few pixels elsewhere; they are drawn
  * where the agenda draws them, so the chrome does not move between two slides of one feed.
  *

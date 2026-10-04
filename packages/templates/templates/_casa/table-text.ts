@@ -18,7 +18,7 @@
  * - a qualifier in parentheses, whole, to the number before it: `R$ 33.820,39 (bruto)`;
  * - the connector of a range to the value **before** it: `R$ 5.667,92 a R$ 13.560,00` can
  *   break only after the `a`, so it comes out as its two values with the `a` closing the
- *   first line — which is what the art the maintainer approved for REF-1 draws.
+ *   first line — which is what the table art the maintainer approved draws.
  *
  * A number itself (`1.315`, `33.820,39`) has no space in it and was never breakable.
  */
@@ -41,7 +41,7 @@ export interface TableContent {
 }
 
 /**
- * The brief's `::tabela`, read as the design cards write their table.
+ * The brief's `::tabela`, read as the table requests write it.
  *
  * The first line is the header, `Concurso | Banca | Vagas | Salário`, and its field count is
  * the column count. Every later line with a `|` is a row: a short row is padded with empty

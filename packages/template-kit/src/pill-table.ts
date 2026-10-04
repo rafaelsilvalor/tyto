@@ -12,8 +12,8 @@ import type { NodeDraft, TextOptions } from '@tyto/core/template';
  *
  * The first configurable component (TYTO-185, ADR 0047). One structure — one line of the
  * brief is one row, `|` separates its cells, an optional line with no `|` heads a group —
- * drawn by a {@link PillTableStyle} that says everything about the look: the Azul agenda's
- * sessions (`date | title | professor`, a blue pill laid over a grey one), the Azul approved
+ * drawn by a {@link PillTableStyle} that says everything about the look: the azul agenda's
+ * sessions (`date | title | professor`, a blue pill laid over a grey one), the azul approved
  * list (`rank | name`), or a plain table with no shapes at all.
  *
  * **The style holds no brand.** Colours, faces and sizes arrive in it; a preset beside the
@@ -115,7 +115,7 @@ export interface PillTableStyle {
    *
    * Every row of a group takes the width of that group's widest row — the widest name, plus
    * the fixed columns and the padding — so one long name widens its whole list, and each list
-   * is centred on its own (the Azul approved list, 2026-09-27). Past `max` a row stops
+   * is centred on its own (the azul approved list, 2026-09-27). Past `max` a row stops
    * growing and its words wrap. Where nothing can measure, every row is `max` wide.
    *
    * Absent, every row is the table's width.

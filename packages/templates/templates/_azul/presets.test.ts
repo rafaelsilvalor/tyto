@@ -9,7 +9,7 @@ import type { Inline, RichText } from '@tyto/core';
 import type { NodeDraft } from '@tyto/core/template';
 
 /**
- * The Azul presets, drawn. The pixels are proven by rendering: `sessionTable` through
+ * The azul presets, drawn. The pixels are proven by rendering: `sessionTable` through
  * `agenda-semana` against `main`, `approvedTable` through `aprovados` against the
  * maintainer's reference of 2026-09-27 (TYTO-185). What is pinned here is structure — the
  * words go where the brief put them, and the rewrites happen.

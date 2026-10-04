@@ -11,7 +11,7 @@ purpose: _a face nobody bundles is `E_EXPORT_FONT_UNRESOLVED` naming it, never a
 
 That rule met a face it cannot hold. The brand typeface of `agenda-semana` is **CircularXX** —
 Black for the cover words, Medium for the discipline, the date and the session title, Light for
-the professor and the handle. It is a commercial face. Casa holds the licence and the
+the professor and the handle. It is a commercial face. The house holds the licence and the
 machines that make the artwork have it installed — measured on the maintainer's machine: 40
 CircularXX and CircularStd files, all under `%LOCALAPPDATA%\Microsoft\Windows\Fonts` and none
 in `%WINDIR%\Fonts`. **The repository is public**, so the licence that lets the machine have

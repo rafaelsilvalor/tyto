@@ -1,9 +1,9 @@
 /**
- * Azul's configurations of the kit's components (ADR 0047).
+ * The azul brand's configurations of the kit's components (ADR 0047).
  *
  * A preset is a component in this brand's look: which columns, which pills, which colours.
  * It holds no number of its own — every size is a token — so changing the look of every
- * Azul table is a change to `tokens.ts`, and changing what a table *is* is a change here.
+ * azul table is a change to `tokens.ts`, and changing what a table *is* is a change here.
  */
 
 import {

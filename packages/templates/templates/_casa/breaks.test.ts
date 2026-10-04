@@ -9,10 +9,10 @@ const ANY_WORD = /[\p{L}\p{N})]/u;
 
 describe('a parenthesised group', () => {
   it('joins the word before it, so `(GO)` never starts a line alone', () => {
-    const glued = glueParenthesised('São Bento do Altavale (GO)', ANY_WORD);
+    const glued = glueParenthesised('São Bento do Vale Alto (VA)', ANY_WORD);
 
-    expect(shown(glued)).toBe('São Bento do Altavale~(GO)');
-    expect(pieces(glued).at(-1)).toBe(`Altavale${NO_BREAK_SPACE}(GO)`);
+    expect(shown(glued)).toBe('São Bento do Vale Alto~(VA)');
+    expect(pieces(glued).at(-1)).toBe(`Alto${NO_BREAK_SPACE}(VA)`);
   });
 
   it('never splits inside, however many words it holds', () => {

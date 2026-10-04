@@ -2,7 +2,7 @@
 template: simulados-semana-roxo
 formats: [story]
 ---
-// The maintainer's ROXO reference of 2026-09-28: a story only, a title on two lines, and the
+// The maintainer's roxo reference of 2026-09-28: a story only, a title on two lines, and the
 // note to the story's link where the other brands sign with their handle.
 
 ::titulo

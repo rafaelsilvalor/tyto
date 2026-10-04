@@ -16,16 +16,16 @@ import type { Brand } from './brands.js';
 import type { RichText } from '@tyto/core';
 import type { Measure } from '@tyto/template-kit';
 
-/** The owl, in the brand's accent: the same geometry as Azul's. */
+/** The owl, in the brand's accent: the same geometry as azul's. */
 export function owl(accent: string): Block {
   return mark(OWL, CHROME.owl, accent, 'owl');
 }
 
 /**
  * The bottom area's words, left-aligned on one line: the handle, tracked out and light, or
- * ROXO's note, bold.
+ * roxo's note, bold.
  *
- * A token and not a slot, as Azul's handle is: the account a piece is published from does
+ * A token and not a slot, as azul's handle is: the account a piece is published from does
  * not change from week to week.
  */
 export function signOff(brand: Brand, width: number): Block {

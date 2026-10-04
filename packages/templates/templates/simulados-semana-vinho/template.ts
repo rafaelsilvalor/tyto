@@ -1,8 +1,8 @@
 /**
- * `simulados-semana-vinho` — Vinho's weekly mock-exam agenda.
+ * `simulados-semana-vinho` — vinho's weekly mock-exam agenda.
  *
  * The piece is drawn by `_casa/compose.ts` for three brands; this template is that
- * composition in Vinho's accent and sign-off (TYTO-200).
+ * composition in vinho's accent and sign-off (TYTO-200).
  */
 
 import { VINHO } from '../_casa/brands.js';

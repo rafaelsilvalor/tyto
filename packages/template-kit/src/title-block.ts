@@ -10,8 +10,8 @@ import type { TextOptions } from '@tyto/core/template';
  * A title block: a column of optional pieces, each centred on the block — a picture, lines of
  * words, a rule.
  *
- * The second configurable component (TYTO-185, ADR 0047). The Azul agenda's cover is a
- * picture over the cover words; the Azul approved list's is an emblem, a kicker, a subtitle,
+ * The second configurable component (TYTO-185, ADR 0047). The azul agenda's cover is a
+ * picture over the cover words; the azul approved list's is an emblem, a kicker, a subtitle,
  * a rule and the exam's name. Both are one {@link TitleBlockStyle} each.
  *
  * **A piece the brief left empty is not drawn, and its gap goes with it**, so an agenda with

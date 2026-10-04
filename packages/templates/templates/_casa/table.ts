@@ -2,8 +2,8 @@
  * The one-image table (TYTO-218): a title over a table, the **whole table in one 1080×1350
  * image**, however small it has to get — the social team's brief says people zoom in.
  *
- * Composed once for any Casa brand, as the weekly agenda is (ADR 0055): a template is
- * this function applied to a {@link TableBrand}. Only ROXO draws it today.
+ * Composed once for any brand of the house, as the weekly agenda is (ADR 0055): a template is
+ * this function applied to a {@link TableBrand}. Only roxo draws it today.
  *
  * ## The page, top to bottom
  *

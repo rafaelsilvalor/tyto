@@ -87,7 +87,7 @@ const proportional: TemplateContext['measure'] = (node) => {
   };
 };
 
-const MCA_66477 = {
+const FOUR_COLUMNS = {
   titulo: 'Top 10 editais previstos para novembro!',
   tabela: [
     'Concurso | Banca | Vagas | Salário',
@@ -104,7 +104,7 @@ const MCA_66477 = {
   ].join('\n'),
 };
 
-const MCA_66480 = {
+const THREE_COLUMNS = {
   titulo: '10 concursos previstos para QC ainda em 2026!',
   tabela: [
     'Concurso | Situação | Vagas',
@@ -121,12 +121,12 @@ const MCA_66480 = {
   ].join('\n'),
 };
 
-/** REF-1's table three times over: 30 rows. */
+/** The four-column table three times over: 30 rows. */
 const THIRTY_ROWS = {
-  titulo: MCA_66477.titulo,
+  titulo: FOUR_COLUMNS.titulo,
   tabela: [
     'Concurso | Banca | Vagas | Salário',
-    ...Array.from({ length: 3 }, () => MCA_66477.tabela.split('\n').slice(1)).flat(),
+    ...Array.from({ length: 3 }, () => FOUR_COLUMNS.tabela.split('\n').slice(1)).flat(),
   ].join('\n'),
 };
 
@@ -224,8 +224,8 @@ const bodySize = (frame: Frame): number => {
 /* ------------------------------------------------------------------------ the rules -- */
 
 describe.each([
-  ['REF-1', MCA_66477],
-  ['REF-2', MCA_66480],
+  ['four columns', FOUR_COLUMNS],
+  ['three columns', THREE_COLUMNS],
 ])('%s', (_, brief) => {
   const { frame, reports } = render(brief);
 
@@ -292,7 +292,7 @@ describe.each([
 
 describe('the brand', () => {
   it('draws the header in ROXO’s registered accent, the one the mock-exam agenda draws', () => {
-    const header = rows(render(MCA_66477).frame).find((row) => row.name === 'header-row')!;
+    const header = rows(render(FOUR_COLUMNS).frame).find((row) => row.name === 'header-row')!;
     for (const cell of header.rects) {
       expect(cell.node.kind === 'rect' && cell.node.fill).toEqual({
         kind: 'solid',
@@ -304,15 +304,15 @@ describe('the brand', () => {
 });
 
 describe('column widths come from the content', () => {
-  it('gives REF-1’s Salário more room than its Vagas', () => {
-    const header = rows(render(MCA_66477).frame).find((row) => row.name === 'header-row')!;
+  it('gives the four-column table’s Salário more room than its Vagas', () => {
+    const header = rows(render(FOUR_COLUMNS).frame).find((row) => row.name === 'header-row')!;
     const widths = header.rects.map((item) => (item.node.kind === 'rect' ? item.node.size.w : 0));
 
     expect(widths[3]).toBeGreaterThan(widths[2]!);
   });
 
   it('when a salary range wraps, breaks it into its two values, the connector closing line one', () => {
-    const { frame } = render(MCA_66477);
+    const { frame } = render(FOUR_COLUMNS);
     const cell = placed(frame).find(
       (item) => item.node.name === 'cell-text' && textOf(item.node).startsWith('R$\u00a05.667'),
     )!.node as TextNode;
@@ -334,14 +334,14 @@ describe('a table too long for one image', () => {
     expect(reports[0]!.overflow).toBeGreaterThan(0);
   });
 
-  it('fits REF-1 above the floor, so the floor is a floor and not the answer', () => {
-    expect(bodySize(render(MCA_66477).frame)).toBeGreaterThan(BODY.floor);
+  it('fits the four-column table above the floor, so the floor is a floor and not the answer', () => {
+    expect(bodySize(render(FOUR_COLUMNS).frame)).toBeGreaterThan(BODY.floor);
   });
 });
 
 describe('with nothing to measure', () => {
   it('still draws every cell, in equal columns, shrinking into its box', () => {
-    const { frame } = render(MCA_66477, measureNothing);
+    const { frame } = render(FOUR_COLUMNS, measureNothing);
     const texts = placed(frame).filter((item) => item.node.name === 'cell-text');
 
     expect(texts).toHaveLength(4 + 10 * 4);

@@ -1,8 +1,8 @@
 /**
- * The seal every Casa carousel may close with (TYTO-201): an art 1080 × 140 glued to
+ * The seal every house carousel may close with (TYTO-201): an art 1080 × 140 glued to
  * the foot of the last grid slide, supplied by the brief's optional `selo` slot.
  *
- * The house's, not one brand's, because Azul's agenda and approved list and the three
+ * The house's, not one brand's, because azul's agenda and approved list and the three
  * brands' mock-exam agenda all take it the same way (the maintainer, 2026-09-29). The kit's
  * `sealed` draws it and shrinks the page above it; this file decides **when**.
  */

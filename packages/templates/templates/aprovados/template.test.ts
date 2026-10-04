@@ -10,7 +10,7 @@ import type { AssetRef, Inline, RichText, SceneNode, TemplateContext } from '@ty
  * `aprovados` is composition only (ADR 0047), so what is checked here is that it composes:
  * the right pieces, in the right order, fed from the right slots. The pixels were matched
  * against the maintainer's reference of 2026-09-27 in the live preview (TYTO-185), and the
- * pieces themselves are tested where they live — the kit and the Azul presets.
+ * pieces themselves are tested where they live — the kit and the azul presets.
  */
 
 let cursor = 0;

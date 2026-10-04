@@ -4,7 +4,7 @@
  * ## Where the numbers come from
  *
  * The maintainer's standalone generator (`gerador-tabela-instagram_6.html`, outside the
- * repository) and the art he approved from it for REF-1: its page padding, paper, zebra,
+ * repository) and the table art he approved from it: its page padding, paper, zebra,
  * radius, cell gaps, header and band styles, and handle. What the generator left to a slider
  * — the body size, the title size, the column widths — is not a token here: `table.ts`
  * decides it from the brief by measuring, and only its floors and ceilings live below.
@@ -19,7 +19,7 @@
 export const PAPER = '#fbfbfb';
 
 /**
- * Body text. Black and not the generator's `#1a1a1a`: the design card asks for it outright —
+ * Body text. Black and not the generator's `#1a1a1a`: the table request asks for it outright —
  * the grey "is getting blurry in the post".
  */
 export const INK = '#000000';
@@ -57,7 +57,7 @@ export const TITLE = {
   ceiling: 96,
   /**
    * The title is never more than this many times the body size, so a short table does not
-   * sit under a shouting title. 62 over 22: the approved REF-1 art.
+   * sit under a shouting title. 62 over 22: the approved table art.
    */
   perBody: 62 / 22,
   /** Room on each side of the title, inside the page's. */

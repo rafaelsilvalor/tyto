@@ -7,7 +7,7 @@ Status: accepted · 2026-09-28 · TYTO-195 · extends ADR 0020's manifest
 On 2026-09-27 the maintainer asked for templates to be told apart at a glance, and chose to put
 identity in the manifest rather than in the template's name: "Campo novo no manifesto". About
 150 templates are waiting to be ported, several brands among them; nothing in a manifest said
-that `agenda-semana` is Azul's and `promo-curso` a demonstration.
+that `agenda-semana` is the azul brand's and `promo-curso` a demonstration.
 
 Two of the three facts about a template's identity already had a home by the time this was
 built. **What the piece is about** is the template's name. **What kind of piece it is** is
@@ -22,7 +22,7 @@ before this is not broken by it.
 
 **Every built-in template names one**, and the contract test pins which. `agenda-semana` and
 `aprovados` are `azul`; `carrossel-lista` and `promo-curso` are `tyto-demo`. The
-brand module those two Azul templates draw with, `templates/_azul/` (ADR 0047), is
+brand module those two azul templates draw with, `templates/_azul/` (ADR 0047), is
 named after the same key.
 
 **The brand is not a closed list.** A kind is closed because its values are the house's words

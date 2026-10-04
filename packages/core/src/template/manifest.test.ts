@@ -97,7 +97,7 @@ describe('the brand a manifest names (TYTO-195)', () => {
     );
   });
 
-  it.each(['Casa', 'azul claro', 'azul--claro', '-claro', 'clarão'])(
+  it.each(['Azul', 'azul escuro', 'azul--escuro', '-escuro', 'azulão'])(
     'refuses %s, at the key that holds it',
     (brand) => {
       expect(pathsOf(rejected(withBrand(JSON.stringify(brand))))).toEqual(['brand']);

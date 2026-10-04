@@ -1,8 +1,8 @@
 /**
- * `tabela-roxo` — Roxo's table in one 1080×1350 image (TYTO-218).
+ * `tabela-roxo` — roxo's table in one 1080×1350 image (TYTO-218).
  *
- * The piece is drawn by `_casa/table.ts` for any Casa brand; this template is that
- * composition in ROXO's accent and handle.
+ * The piece is drawn by `_casa/table.ts` for any brand of the house; this template is that
+ * composition in roxo's accent and handle.
  */
 
 import { ROXO_TABLE } from '../_casa/brands.js';

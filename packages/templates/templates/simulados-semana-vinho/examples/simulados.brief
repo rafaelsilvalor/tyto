@@ -2,7 +2,7 @@
 template: simulados-semana-vinho
 formats: [grid, story]
 ---
-// The maintainer's VINHO reference of 2026-09-28: one day, one mock exam, one slide — so the
+// The maintainer's vinho reference of 2026-09-28: one day, one mock exam, one slide — so the
 // only grid is also the last, and it carries the call to comment.
 
 ::titulo
@@ -10,4 +10,4 @@ formats: [grid, story]
 
 ::lamina
   Domingo 20/09 | Aplicação às 08h30 & correção às 14h
-  1º Simulado de 2ª Fase - VINHO 47
+  1º Simulado de 2ª Fase - Exame 47

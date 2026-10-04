@@ -96,9 +96,9 @@ const EXAMPLES: readonly Example[] = [
   },
   // 4:5 only, since TYTO-173: the published carousel is cut to Instagram's portrait post.
   { template: 'agenda-semana', brief: 'examples/agenda.brief', body: 'code', formats: ['grid'] },
-  // The second Azul template, and the first built only from the kit and the brand (TYTO-185).
+  // The second azul template, and the first built only from the kit and the brand (TYTO-185).
   { template: 'aprovados', brief: 'examples/aprovados.brief', body: 'code', formats: ['grid'] },
-  // The weekly mock-exam agenda, one composition in three brands (TYTO-200). ROXO has no grid.
+  // The weekly mock-exam agenda, one composition in three brands (TYTO-200). roxo has no grid.
   {
     template: 'simulados-semana-roxo',
     brief: 'examples/simulados.brief',
@@ -119,8 +119,18 @@ const EXAMPLES: readonly Example[] = [
   },
   // The one-image table (TYTO-218): sized by measuring, so these are the cases where the
   // measured fit and the drawn text have to agree.
-  { template: 'tabela-roxo', brief: 'examples/quatro-colunas.brief', body: 'code', formats: ['grid'] },
-  { template: 'tabela-roxo', brief: 'examples/tres-colunas.brief', body: 'code', formats: ['grid'] },
+  {
+    template: 'tabela-roxo',
+    brief: 'examples/quatro-colunas.brief',
+    body: 'code',
+    formats: ['grid'],
+  },
+  {
+    template: 'tabela-roxo',
+    brief: 'examples/tres-colunas.brief',
+    body: 'code',
+    formats: ['grid'],
+  },
   // The product banner (TYTO-210): one text over a background from the template's own folder,
   // in three sizes, its breaks chosen by measuring.
   {
@@ -567,8 +577,8 @@ describe('the pack as a whole', () => {
       'banner-roxo': 'roxo',
       'carrossel-lista': 'tyto-demo',
       'promo-curso': 'tyto-demo',
-      'simulados-semana-roxo': 'roxo',
       'simulados-semana-ocre': 'ocre',
+      'simulados-semana-roxo': 'roxo',
       'simulados-semana-vinho': 'vinho',
       'tabela-roxo': 'roxo',
     });
@@ -595,8 +605,8 @@ describe('the pack as a whole', () => {
       'banner-roxo': ['banner', 'banner', 'banner'],
       'carrossel-lista': ['carrossel', 'stories'],
       'promo-curso': ['grid', 'story'],
-      'simulados-semana-roxo': ['stories'],
       'simulados-semana-ocre': ['carrossel', 'stories'],
+      'simulados-semana-roxo': ['stories'],
       'simulados-semana-vinho': ['carrossel', 'stories'],
       'tabela-roxo': ['grid'],
     });

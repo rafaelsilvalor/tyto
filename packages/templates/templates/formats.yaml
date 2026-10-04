@@ -6,7 +6,7 @@
 # name alone, and an unusual size carries its proportion. `kind` is from a closed list, and a
 # template that repeats turns a `grid` into a carousel and a `story` into stories.
 #
-# The standard post, 4:5, which the published Azul carousels are cut to.
+# The standard post, 4:5, which the published azul carousels are cut to.
 grid: { w: 1080, h: 1350, kind: grid, label: Grid }
 # The square post, which the house uses rarely.
 grid-1x1: { w: 1080, h: 1080, kind: grid, label: Grid 1:1 }

@@ -5,13 +5,13 @@
  *
  * | band   | what                                          | drawn by                               |
  * | ------ | --------------------------------------------- | -------------------------------------- |
- * | header | the owl                                       | `header()` — `_azul`       |
+ * | header | the owl                                       | `header()` — `_azul`                   |
  * | middle | the cover (first slide only), then the table  | `titleBlock(coverTitle)`, `pillTable(sessionTable)` |
- * | footer | the handle, and the arrow unless last slide   | `footer()` — `_azul`       |
+ * | footer | the handle, and the arrow unless last slide   | `footer()` — `_azul`                   |
  * | seal   | last slide only, when the brief has a `selo`  | `sealed` — kit; `sealOf` — house       |
  *
  * `bandedPage` centres the middle between the header and the footer, whatever the brief put
- * in it. Composition only: every piece comes from the Azul brand module or from
+ * in it. Composition only: every piece comes from the azul brand module or from
  * `@tyto/template-kit`, and every number from the brand's tokens (ADR 0047,
  * `docs/template-conventions.md`).
  */

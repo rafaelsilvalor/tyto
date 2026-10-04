@@ -9,7 +9,7 @@ import type { NodeDraft } from '@tyto/core/template';
  * A page in three bands: a header pinned to the top, a footer pinned to the bottom, and a
  * middle centred in the room left between them.
  *
- * Every Azul slide is laid out this way (TYTO-185), and nothing about it is a brand: the
+ * Every azul slide is laid out this way (TYTO-185), and nothing about it is a brand: the
  * edges and the header band are numbers the brand's tokens supply. Centring is the only
  * position that is right for every brief when the middle's height comes from the brief — a
  * slide with one row and a slide with twelve are both balanced. Only a middle taller than

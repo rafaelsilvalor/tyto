@@ -1,8 +1,8 @@
 /**
- * `simulados-semana-roxo` — Roxo's weekly mock-exam agenda.
+ * `simulados-semana-roxo` — roxo's weekly mock-exam agenda.
  *
  * The piece is drawn by `_casa/compose.ts` for three brands; this template is that
- * composition in Roxo's accent and sign-off (TYTO-200).
+ * composition in roxo's accent and sign-off (TYTO-200).
  */
 
 import { ROXO } from '../_casa/brands.js';

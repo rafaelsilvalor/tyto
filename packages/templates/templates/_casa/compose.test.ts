@@ -10,7 +10,7 @@ import type { Inline, RichText, SceneNode, TemplateContext, TemplateReport } fro
 /**
  * The weekly mock-exam agenda is composition (ADR 0047), so what is checked here is that it
  * composes: which pieces each format and each slide carries, in which brand's colour, and
- * where the areas stand. The pixels were matched against the maintainer's OCRE reference of
+ * where the areas stand. The pixels were matched against the maintainer's ocre reference of
  * 2026-09-28 in the live preview (TYTO-200); the table itself is tested in the kit.
  */
 

@@ -1,5 +1,5 @@
 /**
- * The kit's components in the look Roxo, Ocre and VINHO share
+ * The kit's components in the look roxo, ocre and vinho share
  * (ADR 0047). A preset holds no number of its own; the accent arrives from the brand.
  */
 

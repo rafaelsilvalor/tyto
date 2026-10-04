@@ -14,7 +14,7 @@
  * | top    | the owl, on the grid only                       | its top, on the middle's edge  |
  * | middle | the title, the days and their exams, and on the | centred on the page, both ways |
  * |        | last grid the call to comment                   |                                |
- * | bottom | the handle, or ROXO's note                        | its top, on the middle's edge, |
+ * | bottom | the handle, or roxo's note                      | its top, on the middle's edge, |
  * |        |                                                 | `SAFETY` below the middle      |
  *
  * The top and bottom areas are whatever the middle leaves (the maintainer, 2026-09-28): the

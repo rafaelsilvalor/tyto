@@ -1,5 +1,5 @@
 /**
- * The tokens Roxo, Ocre and VINHO share: values, no logic.
+ * The tokens roxo, ocre and vinho share: values, no logic.
  *
  * The three brands draw the weekly mock-exam agenda (TYTO-200) in one look and differ only in
  * their accent and their sign-off, which live in `brands.ts`. Everything here is the same for
@@ -7,11 +7,11 @@
  *
  * ## Where the numbers come from
  *
- * Measured in the pixels of the maintainer's annotated references of 2026-09-28 — the OCRE
+ * Measured in the pixels of the maintainer's annotated references of 2026-09-28 — the ocre
  * story and grid, scaled from a 738-wide export to 1080, so each is good to a pixel or two —
- * and font sizes solved from those widths against CircularXX itself. The VINHO and ROXO
+ * and font sizes solved from those widths against CircularXX itself. The vinho and roxo
  * references were drawn less strictly (their middle is not centred); where they disagree
- * with OCRE, OCRE wins, as the maintainer named it the reference.
+ * with ocre, ocre wins, as the maintainer named it the reference.
  */
 
 import { systemFont } from '@tyto/core/template';
@@ -38,7 +38,7 @@ export const ON_ACCENT = '#ffffff';
 /* --------------------------------------------------------------------------- type -- */
 
 /**
- * CircularXX, read from the rendering machine (ADR 0037) as Azul's is: a commercial face
+ * CircularXX, read from the rendering machine (ADR 0037) as azul's is: a commercial face
  * the repository cannot carry. CI draws the bundled substitute and says so.
  */
 export const FACE: FontRef = systemFont('CircularXX');
@@ -47,7 +47,7 @@ export const FACE: FontRef = systemFont('CircularXX');
 export const LIGHT = 300;
 /** A mock exam's name. */
 export const BOOK = 400;
-/** The title, the call to comment, ROXO's story note. */
+/** The title, the call to comment, roxo's story note. */
 export const BOLD = 700;
 /** The day and the schedule. */
 export const BLACK = 900;
@@ -63,7 +63,7 @@ export const TYPE = {
   handle: 28,
 } as const;
 
-/** The handle is tracked out, as Azul's is, so the signature reads quieter. */
+/** The handle is tracked out, as azul's is, so the signature reads quieter. */
 export const HANDLE_TRACKING = 7;
 
 /* ------------------------------------------------------------------------- spacing -- */
@@ -82,7 +82,7 @@ export const EDGE = { top: 75 } as const;
 export const CHROME = { owl: 60 } as const;
 
 /**
- * The room between the middle and whatever stands below it — the handle, or ROXO's note.
+ * The room between the middle and whatever stands below it — the handle, or roxo's note.
  * The maintainer's "gap de segurança": the bottom area begins here, and its words sit at
  * its top.
  */

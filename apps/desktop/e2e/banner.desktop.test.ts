@@ -193,7 +193,7 @@ describe("banner-roxo's backgrounds in the window and the CLI (TYTO-210)", () =>
     const result = JSON.parse(
       readFileSync(join(fromWindow, 'editaveis', 'result.json'), 'utf8'),
     ) as { status: string; diagnostics: { code: string }[] };
-    // CI has no CircularXX, so there every Casa render says it drew the substitute
+    // CI has no CircularXX, so there every house render says it drew the substitute
     // (W_FONT_SUBSTITUTED); that is the machine, not the template. Anything else is not.
     expect(
       result.diagnostics.map((item) => item.code).filter((code) => code !== 'W_FONT_SUBSTITUTED'),

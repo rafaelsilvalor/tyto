@@ -18,7 +18,7 @@
  *    they belong to a brand rather than to a mechanism, and a kit that shipped one would be
  *    deciding somebody else's brand. They live in `packages/templates/templates/_<brand>/`.
  * 3. **Brand presets and parts** — a component's configuration in one brand's look (the
- *    Azul session table), and pieces only that brand draws (its owl header). Beside the
+ *    azul session table), and pieces only that brand draws (its owl header). Beside the
  *    tokens, shared between that brand's templates by import.
  * 4. **The template** — composition only: which presets, in what order, where.
  *

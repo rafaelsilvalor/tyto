@@ -1,9 +1,9 @@
 /**
- * Azul's tokens: values, no logic.
+ * The azul brand's tokens: values, no logic.
  *
  * Everything here is a constant a designer changes without reading the rest of a template.
  * Colours, the type scale, the slide's frame, the chrome's sizes and the two marks' geometry.
- * Shared by every Azul template through `presets.ts` and `parts.ts`, which is why it sits
+ * Shared by every azul template through `presets.ts` and `parts.ts`, which is why it sits
  * beside them in `_azul/` rather than inside one template (ADR 0047). The folder
  * has no `manifest.yaml`, so the template registry skips it.
  *
@@ -52,7 +52,7 @@ export const ON_INK = '#ffffff';
 /**
  * The brand's face, CircularXX, in the three weights the maintainer named (TYTO-182).
  *
- * A commercial face: Casa holds the licence and the repository is public, so it is
+ * A commercial face: the house holds the licence and the repository is public, so it is
  * read from the rendering machine (ADR 0037) and never committed. A machine without it
  * draws the bundled Source Sans 3 at the nearest weight and says so with
  * `W_FONT_SUBSTITUTED` — which is what CI, having no CircularXX, always does.
@@ -192,8 +192,8 @@ export const COVER = {
 /* ------------------------------------------------------------------------ geometry -- */
 
 /**
- * The owl, shared with the other Casa brands since TYTO-200: the geometry is the
- * house's, not Azul's, and each brand fills it with its own colour.
+ * The owl, shared with the house's other brands since TYTO-200: the geometry is the
+ * house's, not azul's, and each brand fills it with its own colour.
  */
 export { OWL } from '../_casa/marks.js';
 

@@ -13,7 +13,7 @@ days later.
 
 On 2026-09-27 the maintainer brought the evidence the rule was waiting for, in advance of the
 templates themselves: about **150 templates** are waiting to be ported, and **at least three
-Azul templates share one look**. His example was the Azul approved list — a title, a
+azul templates share one look**. His example was the azul approved list — a title, a
 subtitle and pills of `rank | name` — which is the same structure as the agenda's
 `date | title + professor` rows. He asked for components with some flexibility: one table that
 can be configured into either, or into a plain table for another brand.
@@ -38,8 +38,8 @@ second template could only copy the file.
 separates its cells, an optional line with no `|` heads a group, and a `PillTableStyle` says
 everything about how it looks — columns (a badge holding one field, or a cell of stacked lines
 that grow with measured text), pills or no shapes, overlapping or side by side, gaps and
-minimum heights, group headings. Configuring it is data, not code: the Azul session table and
-the Azul approved list are two constants in one preset file.
+minimum heights, group headings. Configuring it is data, not code: the azul session table and
+the azul approved list are two constants in one preset file.
 
 **The kit hosts components, not only arrangement.** A component is the same whatever brand
 draws it, which is the test the kit's boundary already used for `stack`; a table configured
@@ -67,14 +67,14 @@ still stays in its template.
 
 ## Consequences
 
-`agenda-semana` is composition over the Azul module: `header()`,
+`agenda-semana` is composition over the azul module: `header()`,
 `titleBlock(coverTitle)`, `pillTable(sessionTable)` and `footer()`, placed by `bandedPage`.
 Rewritten onto the components it renders **the same pixels** as before — 0 of 1,458,000
 different on each of the example brief's two slides, against `main`, with a one-pixel token
 change producing 27,367 and 28,885 as the control. The one deliberate change is the footer
 arrow, which announces a next slide and is therefore not drawn on the last one.
 
-**The second template cost no drawing code.** `aprovados`, the Azul approved list, was built
+**The second template cost no drawing code.** `aprovados`, the azul approved list, was built
 in the same PR from the maintainer's annotated reference: `titleBlock(resultTitle)` and
 `pillTable(approvedTable)` on the same `bandedPage`, with a new preset and tokens and nothing
 else. Matched in the live preview, every glyph run inside its slide lands within 2 px of the

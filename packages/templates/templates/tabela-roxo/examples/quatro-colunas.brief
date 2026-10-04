@@ -2,7 +2,7 @@
 template: tabela-roxo
 formats: [grid]
 ---
-// REF-1, "Top 10 editais previstos para novembro!": the art the maintainer approved.
+// The shape of the table art the maintainer approved — ten rows, four columns — in invented copy.
 
 ::titulo
   Top 10 editais previstos para novembro!

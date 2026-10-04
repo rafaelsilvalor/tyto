@@ -5,13 +5,13 @@
  *
  * | band   | what                                                     | drawn by                         |
  * | ------ | -------------------------------------------------------- | -------------------------------- |
- * | header | the owl                                                  | `header()` — `_azul` |
+ * | header | the owl                                                  | `header()` — `_azul`             |
  * | middle | first slide only: emblem, kicker, subtitle, rule, exam    | `titleBlock(resultTitle)`        |
  * |        | this `::lamina`'s specialties, each as wide as its names | `pillTable(approvedTable)`       |
- * | footer | the handle, and the arrow unless this is the last slide  | `footer()` — `_azul` |
+ * | footer | the handle, and the arrow unless this is the last slide  | `footer()` — `_azul`             |
  * | seal   | last slide only, when the brief has a `selo`: the art     | `sealed` — kit; `sealOf` — house |
  *
- * The second Azul template (TYTO-185), and the first written after the four layers of
+ * The second azul template (TYTO-185), and the first written after the four layers of
  * ADR 0047: it draws nothing of its own. Every piece is the brand's or the kit's, and every
  * number the brand's tokens.
  */

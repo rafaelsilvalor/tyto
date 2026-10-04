@@ -1,5 +1,5 @@
 /**
- * Where a line of Casa's text may break: the rules the one-image table (TYTO-218) and the
+ * Where a line of the house's text may break: the rules the one-image table (TYTO-218) and the
  * product banner (TYTO-210) share. Strings only — no measuring and no drawing.
  *
  * ## How a break is prevented

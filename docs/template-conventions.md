@@ -12,12 +12,12 @@ yours, and without a convention each template invents its own and shares nothing
 ## The folder
 
 ```
-_casa/        the house: what several of its brands share (ADR 0055)
+_casa/             the house: what several of its brands share (ADR 0055)
   marks.ts          the owl and the speech balloon, in no colour
   brands.ts         what sets each brand apart — an accent, a sign-off
   seal.ts           when a slide carries the brief's `selo` (the last grid slide)
   compose.ts        one piece's composition, for every brand that publishes it
-_azul/  a brand: no manifest, so the registry skips it (ADR 0047)
+_azul/             a brand: no manifest, so the registry skips it (ADR 0047)
   tokens.ts         colours, type scale, spacing, marks — the brand's spec sheet
   presets.ts        the kit's components in this brand's look
   parts.ts          pieces only this brand draws (its header, its footer)
@@ -75,7 +75,7 @@ them could be reused without copying.
 ### 1. Configurable components and arrangement — `@tyto/template-kit`
 
 The layer that is the same whatever brand draws it: `stack`, `row`, `inset`, `at` for
-arrangement, and `bandedPage` for the page every Azul slide is (a header band, a footer on
+arrangement, and `bandedPage` for the page every azul slide is (a header band, a footer on
 the bottom edge, the middle centred between them); `pillTable` for a table read out of one
 slot; `titleBlock` for a centred column of optional pieces — a picture, lines of words, a
 rule; `mark` and `textBlock` for a path icon and a brief's words at a stated size.
@@ -131,7 +131,7 @@ A **preset** is a component in the brand's look — a constant, not a function:
 export const sessionTable: PillTableStyle = { layering: 'overlap', columns: [badge(…), { kind: 'lines', … }], … };
 ```
 
-A **part** is a function returning a `Block` for something only this brand draws: the Azul
+A **part** is a function returning a `Block` for something only this brand draws: the azul
 owl header, the signed footer, the cover block. Both live in `_<brand>/` and are shared
 between the brand's templates by import.
 
@@ -150,7 +150,7 @@ the `frame({ children })` line and knows the slide.
 ### One piece, several brands
 
 When brands publish the same piece and differ only in colour or sign-off — the weekly mock-exam
-agenda for Roxo, Ocre and VINHO (TYTO-200) — each brand still gets **its own
+agenda for roxo, ocre and vinho (TYTO-200) — each brand still gets **its own
 template**, so its manifest says its `brand` and its `formats`. The composition is written once,
 in the house's `compose.ts`, as a function of a `Brand`; each `template.ts` is that function
 applied to its brand, one line. What varies by brand is an argument, never a copy (ADR 0055).
@@ -208,7 +208,7 @@ no-break space draws and measures as a space and breaks nothing, in the measurem
 
 The same move chooses _where_ a phrase breaks. `R$ 5.667,92 a R$ 13.560,00` glues the `a` to
 the value before it, so the only break left falls between the two values. `_casa/breaks.ts`
-holds the mechanism and the rules Casa's templates share: a parenthesised group like
+holds the mechanism and the rules the house's templates share: a parenthesised group like
 `(GO)` stays whole and joins the word before it, and `pieces` are what a line can never be
 narrower than. `_casa/table-text.ts` (TYTO-218) adds the table's own rules on top.
 
@@ -321,7 +321,7 @@ that turns "no runs" into "no node" while keeping the block's stated size, so a 
 professor leaves the row exactly as tall as its neighbours.
 
 **What changed before the second template.** TYTO-185 moved the agenda onto the four layers
-(ADR 0047): the rows became `pillTable` with the Azul `sessionTable` preset, the tokens and
+(ADR 0047): the rows became `pillTable` with the azul `sessionTable` preset, the tokens and
 parts moved to `_azul/`, and the rendered pixels did not change. The "every number
 is in `tokens.ts`" above was not true at the time — about fifteen sizes were literals inside
 `parts.ts` — which is why the rule is now a lint rather than a sentence. The wrong-`size` clip

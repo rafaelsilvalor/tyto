@@ -1,8 +1,8 @@
 import { build as agendaSemana } from '../templates/agenda-semana/template.js';
 import { build as aprovados } from '../templates/aprovados/template.js';
 import { build as bannerRoxo } from '../templates/banner-roxo/template.js';
-import { build as simuladosSemanaRoxo } from '../templates/simulados-semana-roxo/template.js';
 import { build as simuladosSemanaOcre } from '../templates/simulados-semana-ocre/template.js';
+import { build as simuladosSemanaRoxo } from '../templates/simulados-semana-roxo/template.js';
 import { build as simuladosSemanaVinho } from '../templates/simulados-semana-vinho/template.js';
 import { build as tabelaRoxo } from '../templates/tabela-roxo/template.js';
 
@@ -77,8 +77,8 @@ export const BUILT_IN_TEMPLATE_BUILDS: Readonly<Record<string, TemplateBuild>> =
   'agenda-semana': agendaSemana,
   aprovados,
   'banner-roxo': bannerRoxo,
-  'simulados-semana-roxo': simuladosSemanaRoxo,
   'simulados-semana-ocre': simuladosSemanaOcre,
+  'simulados-semana-roxo': simuladosSemanaRoxo,
   'simulados-semana-vinho': simuladosSemanaVinho,
   'tabela-roxo': tabelaRoxo,
 };

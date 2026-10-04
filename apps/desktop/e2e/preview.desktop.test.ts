@@ -141,7 +141,7 @@ describe('the main screen', () => {
     // The marker is one nonsense **word**, and all three of those properties were learned
     // the hard way rather than chosen:
     //
-    // - *Nonsense*, because the first version polled for "VINHO", which `promo.brief` already
+    // - *Nonsense*, because the first version polled for a word, which `promo.brief` already
     //   contains — the poll passed on the unchanged document and measured nothing.
     // - *One word*, because text is wrapped into lines in the IR (ADR 0019) and the exporter
     //   emits a `<span>` per line. "Matricula Zephyr 4242" set in 96px bold wraps, so the
