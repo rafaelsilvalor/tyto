@@ -108,6 +108,11 @@ export interface PreviewServiceOptions {
   readonly sources: ProjectSources;
   /** The installed plugins' directives; absent, every `::ns/name` is `E_UNKNOWN_DIRECTIVE`. */
   readonly directives?: Pick<WindowPlugins, 'resolver' | 'names'>;
+  /**
+   * The installed plugins' brand kits (ADR 0063); absent, every template is handed the empty
+   * kit. Asked per compile, because the plugins start after the window opens.
+   */
+  readonly brandKits?: Pick<WindowPlugins, 'brandKits'>;
 }
 
 export interface PreviewService {
@@ -205,13 +210,23 @@ export async function createPreviewService(
         return failed([...ast.diagnostics, ...resolved.diagnostics, ...template.error]);
       }
 
+      // A template of a brand some plugin supplied a kit for is handed that kit, as in the
+      // export and the CLI (ADR 0063); a brand two plugins offer says so on every preview.
+      const brandKits = options.brandKits?.brandKits();
+      const compileOptions = {
+        formats: catalogue,
+        faces,
+        ...(brandKits === undefined ? {} : { brandKits: brandKits.kits }),
+      };
+      const kitWarnings = brandKits?.diagnostics ?? [];
       // An installed code template answers from its plugin's process (ADR 0048); every other
       // one is compiled in the loop as before.
       const scene = isDeferredTemplate(template.value)
-        ? await compileDeferred(resolved.value, template.value, { formats: catalogue, faces })
-        : compile(resolved.value, template.value, { formats: catalogue, faces });
+        ? await compileDeferred(resolved.value, template.value, compileOptions)
+        : compile(resolved.value, template.value, compileOptions);
       if (!scene.ok) {
         return failed([
+          ...kitWarnings,
           ...ast.diagnostics,
           ...resolved.diagnostics,
           ...template.diagnostics,
@@ -246,6 +261,7 @@ export async function createPreviewService(
 
       const before = [
         ...startup,
+        ...kitWarnings,
         ...ast.diagnostics,
         ...resolved.diagnostics,
         ...template.diagnostics,

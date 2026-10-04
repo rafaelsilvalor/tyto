@@ -325,6 +325,9 @@ export async function createExportService(options: ExportServiceOptions): Promis
       options.rasterizer,
       await plugins,
     );
+    // The kits of the plugins this run activated, one per brand (ADR 0063): the same host
+    // the run reports refusals of, so a refused plugin offers no kit either.
+    const brandKits = host.registry.brandKitsByBrand();
     const { outputs, dropped } =
       request.dropUnavailableKinds === true
         ? availableOutputs(request.outputs, host.registry.exporters)
@@ -380,6 +383,7 @@ export async function createExportService(options: ExportServiceOptions): Promis
         // Measured, as the CLI and the preview are: without faces a `shrink` is clipped and
         // no line is broken, so the export would differ from the preview it was made from.
         faces,
+        brandKits: brandKits.kits,
         loadResources: async (needed) => {
           if (images !== undefined) await images.load(needed);
           return fontSubstitutionWarnings(fonts.substitutions(needed.faces));
@@ -423,7 +427,15 @@ export async function createExportService(options: ExportServiceOptions): Promis
         ...(description === undefined ? {} : { description }),
       });
     }
-    run.diagnostics = [...startup, ...skipped, ...dropped, ...produced, ...leftovers, ...delivered];
+    run.diagnostics = [
+      ...startup,
+      ...skipped,
+      ...brandKits.diagnostics,
+      ...dropped,
+      ...produced,
+      ...leftovers,
+      ...delivered,
+    ];
 
     run.result = renderResult({
       cancelled,

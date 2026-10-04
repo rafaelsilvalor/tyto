@@ -240,8 +240,10 @@ and not its id on purpose — with the brand as the id, the second plugin would 
 
 A kit is data, so an installed plugin's crosses its boundary as it is, checked against a
 strict schema at activation, and it reaches an installed code template with the call, beside
-its context (ADR 0048), whether or not the plugin's folder is readable (ADR 0062). Neither app
-passes kits yet; each gets its own pull request.
+its context (ADR 0048), whether or not the plugin's folder is readable (ADR 0062). Both apps
+pass them: `tyto render` and `tyto watch` from each task's host, and the desktop's preview from
+the window's plugins and its export and queue from each run's host, each with the merge's
+warnings beside its own diagnostics.
 
 ### `editor.command` and `editor.keymap`, in full
 

@@ -17,6 +17,7 @@ function contributed(permissions: readonly string[]): WindowPlugins {
       },
     ],
     permissionsOf: (plugin) => (plugin === 'demo' ? permissions : undefined),
+    brandKits: () => ({ kits: new Map(), diagnostics: [] }),
   };
 }
 

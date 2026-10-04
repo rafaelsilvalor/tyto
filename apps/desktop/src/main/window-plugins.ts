@@ -1,5 +1,6 @@
 import type { DirectiveResolver } from '@tyto/core';
 import {
+  type BrandKits,
   type LoadedPlugins,
   type PanelContribution,
   createPluginHost,
@@ -33,6 +34,11 @@ export interface WindowPlugins {
   panels(): readonly WindowPanel[];
   /** The permissions the host validated for a plugin, or `undefined` for one it has not. */
   permissionsOf(plugin: string): readonly string[] | undefined;
+  /**
+   * The installed plugins' brand kits, one per brand (ADR 0063), and the warnings the merge
+   * made. Empty until the plugins have started, like the directives.
+   */
+  brandKits(): BrandKits;
 }
 
 export interface WindowPanel {
@@ -68,6 +74,7 @@ export function windowPlugins(plugins: Promise<LoadedPlugins>): WindowPlugins {
   );
 
   const directives = () => (started ? host.registry.directives() : []);
+  const noKits: BrandKits = { kits: new Map(), diagnostics: [] };
   return {
     resolver: directiveResolverOf(directives),
     names: () => directiveNamesOf(directives()),
@@ -75,5 +82,6 @@ export function windowPlugins(plugins: Promise<LoadedPlugins>): WindowPlugins {
     // Filtered against the registry, so a panel its plugin withdrew is not offered again.
     panels: () => owned.filter(({ panel }) => host.registry.panels().includes(panel)),
     permissionsOf: (plugin) => permissions.get(plugin),
+    brandKits: () => (started ? host.registry.brandKitsByBrand() : noKits),
   };
 }

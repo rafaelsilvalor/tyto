@@ -452,7 +452,12 @@ async function start(): Promise<void> {
   // What the installed plugins contribute to the window itself: the directives the preview
   // and the template mode resolve, and the panels (ADR 0043, ADR 0045).
   const contributed = windowPlugins(checked);
-  const preview = await createPreviewService({ fileSystem, sources, directives: contributed });
+  const preview = await createPreviewService({
+    fileSystem,
+    sources,
+    directives: contributed,
+    brandKits: contributed,
+  });
 
   // The template mode (TYTO-44). The same `sources` as the preview, so a save that reads the
   // folders again is seen by the preview, the export and the picker with nothing rebuilt.

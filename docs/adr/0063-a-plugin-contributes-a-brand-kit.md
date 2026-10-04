@@ -98,11 +98,12 @@ disagree. So `RPC_PROTOCOL_VERSION` is **3**, as ADR 0049 made it 2 for a new re
 
 - A plugin can contribute a kit for any brand id. A template of that brand receives its logo
   and signature; a template of another brand receives `undefined` for both.
-- **This change wires no program.** `apps/cli` and `apps/desktop` pass no `brandKits` yet, so
-  every template is handed the empty kit in both, which is what a template that never reads
-  `context.brand` already assumed. Each program gets its own follow-up pull request that reads
-  `brandKitsByBrand()` from the host holding the installed plugins, passes its `kits` to the
-  job and the preview, and carries its `diagnostics` into the run.
+- **Each program was wired in a pull request of its own**, after the packages. `apps/cli` and
+  `apps/desktop` read `brandKitsByBrand()` from the host holding the installed plugins — the
+  CLI's task host; the desktop's window plugins for the preview, and each run's host for the
+  export and the queue — pass its `kits` to the job and the preview, and carry its
+  `diagnostics` into the run. Until then every template was handed the empty kit, which is
+  what a template that never reads `context.brand` already assumed.
 - A context built by hand has one more field; `noBrandKit` is what a test passes, beside
   `noFiles`, `measureNothing` and `reportNothing`.
 - `@tyto/plugin-api` gains a point, a registry method and a protocol number. Below 1.0 that is
