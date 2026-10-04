@@ -183,6 +183,11 @@ export async function renderTask(
   const pluginWarnings = activateInstalled(host, options.plugins ?? NO_PLUGINS);
 
   const registered = host.registry.rasterizers<Rasterizer>()[0]?.value;
+  // Every kit the built-ins and the installed plugins registered, one per brand (ADR 0063).
+  // Read from this task's host, which holds the same plugins the task renders with: a
+  // plugin refused here offers no kit either. A brand two plugins offer is a warning in
+  // this task's `result.json`.
+  const brandKits = host.registry.brandKitsByBrand();
 
   // Recorded as the brief resolves, so a `--folder` delivery copies into `assets/` exactly
   // the files the artwork was drawn from (ADR 0057). `--out` never reads the record.
@@ -208,6 +213,7 @@ export async function renderTask(
       directives: directiveResolverOf(() => host.registry.directives()),
       formats: context.formats,
       faces,
+      brandKits: brandKits.kits,
       // Read back out of the registry rather than passed through: what renders is what was
       // registered, which is the claim the extension point makes.
       ...(registered === undefined ? {} : { rasterizer: registered }),
@@ -243,7 +249,14 @@ export async function renderTask(
   // Before `result.json`, whose warnings include what it removed from `assets/`.
   const delivered = delivery === undefined ? [] : await delivery.deliverAssets(assets.delivered());
 
-  const diagnostics = [...inherited, ...pluginWarnings, ...produced, ...leftovers, ...delivered];
+  const diagnostics = [
+    ...inherited,
+    ...pluginWarnings,
+    ...brandKits.diagnostics,
+    ...produced,
+    ...leftovers,
+    ...delivered,
+  ];
   const result = renderResult({
     cancelled: job.ok ? job.value.cancelled : false,
     planned: job.ok ? job.value.planned : 0,
