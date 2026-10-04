@@ -1,31 +1,41 @@
 name: visual
+# The Playwright pixel suite against the Linux references. **A required status check on
+# `main` since TYTO-138 (ADR 0064), so it carries no `paths:` filter**: a filtered workflow
+# reports on most pull requests never, and a required context that never reports leaves
+# them pending for good. The first step decides instead — `tools/repo-checks/src/ci-scope.mjs`
+# holds the list the filter used to carry (the exporters, raster, templates, core, the
+# fonts, `apps/cli`, the template preview) plus the root files every build reads, and when
+# nothing in it changed every later step is skipped and the job summary says
+# `skipped: no change under …`. When the diff cannot be read, it runs.
+#
+# Why the list and not the dependency graph `desktop-e2e.yml` uses: this suite renders what
+# `tyto render` and the template preview produce, which is a narrower thing than everything
+# those packages import — the list was this workflow's decision before TYTO-138 and the
+# card moved it, it did not widen it.
 on:
   pull_request:
-    paths:
-      - 'packages/export-*/**'
-      - 'packages/raster/**'
-      - 'packages/templates/**'
-      - 'packages/core/**'
-      # A reference render embeds the bundled font's bytes, so changing the font, or the
-      # code that reads it, changes the pixels as surely as changing an exporter does. Both
-      # are in one package since ADR 0021.
-      - 'packages/fonts/**'
-      # The template preview's PNG suite compares what it serves against `tyto render`, so
-      # a change to either side of that comparison is a change this job has to see.
-      - 'apps/cli/**'
-      - 'tools/template-preview/**'
 jobs:
+  # The job name is the required context; `github-config.test.ts` pins it.
   visual:
     runs-on: ubuntu-latest
     steps:
+      # `fetch-depth: 2`: `pull_request` checks out a merge commit, whose first parent is
+      # the base the scope's diff is read against.
       - uses: actions/checkout@v7
-        with: { lfs: true }
-      - uses: pnpm/action-setup@v6
-      - uses: actions/setup-node@v7
+        with: { lfs: true, fetch-depth: 2 }
+      - id: scope
+        run: node tools/repo-checks/src/ci-scope.mjs visual
+      - if: steps.scope.outputs.run == 'true'
+        uses: pnpm/action-setup@v6
+      - if: steps.scope.outputs.run == 'true'
+        uses: actions/setup-node@v7
         with: { node-version: 22, cache: pnpm }
-      - run: pnpm install --frozen-lockfile
-      - run: pnpm exec playwright install --with-deps chromium
-      - run: pnpm test:visual
+      - if: steps.scope.outputs.run == 'true'
+        run: pnpm install --frozen-lockfile
+      - if: steps.scope.outputs.run == 'true'
+        run: pnpm exec playwright install --with-deps chromium
+      - if: steps.scope.outputs.run == 'true'
+        run: pnpm test:visual
       - uses: actions/upload-artifact@v7
-        if: failure()
+        if: ${{ failure() && steps.scope.outputs.run == 'true' }}
         with: { name: visual-diffs, path: '**/__diff__/**' }

@@ -16,31 +16,30 @@ name: desktop-e2e
 # runs on no pull request and that is exactly how the tag-prefix defect landed green
 # (TYTO-97). Running them inside `desktop.yml`, before packaging, is cheapest in minutes
 # and latest in discovery: a tag is pushed to release, not to find out. Running them here,
-# path-filtered on `apps/desktop/**`, is the only shape that reports before the merge, and
-# it costs the Electron download on desktop PRs only — 3 min 13 s a run, whole (see below:
-# caching that download was tried and measured, and bought nothing).
+# on every pull request, is the only shape that reports before the merge — 455–487 s a run,
+# whole, on 6 of 6 runs measured for TYTO-138 (see below: caching the Electron download
+# was tried and measured, and bought nothing).
 #
-# **The `push` trigger is not a duplicate of the `pull_request` one, and the asymmetry is
-# deliberate.** The path filter is what keeps this off unrelated PRs, and it is also this
-# workflow's blind spot: the app bundles nine workspace packages, so a change in
-# `packages/core` can break the window without touching a filtered path. The push side
-# carries no filter for that reason — anything that reaches `main` is checked, whatever it
-# touched.
+# **A required status check on `main` since TYTO-138 (ADR 0064), so there is no `paths:`
+# filter.** A path-filtered workflow reports on most pull requests never, and a required
+# context that never reports leaves them pending for good. Instead the first step reads the
+# pull request's diff and decides: `tools/repo-checks/src/ci-scope.mjs` computes this
+# suite's scope from the dependency graph of `@tyto/desktop` — every workspace package the
+# app bundles, `apps/cli` that three suites compare against, and the root files every
+# build reads. When nothing in it changed, every later step is skipped and the job summary
+# says `skipped: no change under …` with the list, so a green that measured nothing says
+# so. When the diff cannot be read, it runs. The old filter, `apps/desktop/**`, missed 13
+# of the last 40 merged pull requests that changed something the app bundles.
 #
-# **Not a required status check on `main`**, for the reason `docs/git-workflow.md` gives
-# about `visual.yml`: a path-filtered workflow reports on most PRs never, and a required
-# context that never reports leaves them pending for good. What that costs is real and is
-# worth naming — a red run here does not block the merge button; it is visible on the PR
-# and somebody has to look. Making it required means giving it a second, filter-less job
-# that reports green trivially, which is a decision this card did not take.
+# **`push` to `main` always runs the whole suite**: the script scopes pull requests only,
+# and anything that reaches `main` is checked whatever it touched.
 on:
   pull_request:
-    paths:
-      - 'apps/desktop/**'
-      - '.github/workflows/desktop-e2e.yml'
   push: { branches: [main] }
 concurrency: { group: 'desktop-e2e-${{ github.ref }}', cancel-in-progress: true }
 jobs:
+  # The job name is the required context `main`'s protection stores; `github-config.test.ts`
+  # pins it, and holds it unique among the jobs a pull request runs.
   desktop:
     runs-on: ubuntu-latest
     steps:
@@ -48,14 +47,25 @@ jobs:
       # `.gitattributes` routes `**/__fixtures__/**/*.png` through Git LFS. Without it those
       # files arrive as 130-byte pointers, `PNG.sync.read` fails on the first one, and the
       # comparison that was supposed to guard the rasterizer never runs — `ci.yml` has
-      # carried the same flag since the visual suite existed (TYTO-133).
+      # carried the same flag since the visual suite existed (TYTO-133). It is fetched even
+      # on a skip because it is 6 files and 0.15 MB.
+      #
+      # `fetch-depth: 2` is what the scope needs: `pull_request` checks out a merge commit,
+      # and its first parent is the base the diff is read against.
       - uses: actions/checkout@v7
-        with: { lfs: true }
-      - uses: pnpm/action-setup@v6
-      - uses: actions/setup-node@v7
+        with: { lfs: true, fetch-depth: 2 }
+      # Before `setup-node`, on the runner's own Node: the script imports nothing, and the
+      # point of a skip is not paying for the install.
+      - id: scope
+        run: node tools/repo-checks/src/ci-scope.mjs desktop
+      - if: steps.scope.outputs.run == 'true'
+        uses: pnpm/action-setup@v6
+      - if: steps.scope.outputs.run == 'true'
+        uses: actions/setup-node@v7
         with: { node-version: 22, cache: pnpm }
 
-      - run: pnpm install --frozen-lockfile
+      - if: steps.scope.outputs.run == 'true'
+        run: pnpm install --frozen-lockfile
 
       # **There is no Electron cache here, and that is a measurement rather than an
       # omission.** The card asked for one. It was built — `actions/cache` on
@@ -92,24 +102,27 @@ jobs:
       # would be ~170 MB nothing opens. Xvfb on top, because `show: false` is not headless
       # on Linux: Electron still opens a display connection at startup and dies with
       # `Missing X server or $DISPLAY` without one.
-      - run: pnpm exec playwright install-deps chromium
-      - run: sudo apt-get install -y --no-install-recommends xvfb
+      - if: steps.scope.outputs.run == 'true'
+        run: pnpm exec playwright install-deps chromium
+      - if: steps.scope.outputs.run == 'true'
+        run: sudo apt-get install -y --no-install-recommends xvfb
 
       # `pnpm build`, not `pnpm --filter @tyto/desktop build` — the same rule `desktop.yml`
       # carries and for the same reason: on a fresh checkout the workspace packages have no
       # `dist/`, and the filtered form runs the package's script and nothing before it.
-      - run: pnpm build
+      - if: steps.scope.outputs.run == 'true'
+        run: pnpm build
 
-      # **3 min 13 s for the job, and that is the number this card records as acceptable.**
-      # `test:desktop` is 2 min 17 s of it and `test:package` 6.4 s — measured on this
-      # workflow's own runs, not estimated. `test:package` is that cheap because
+      # **3 min 13 s for the job when TYTO-111 measured it; 455–487 s by TYTO-138**, as the
+      # suites grew. `test:package` was 6.4 s of it, measured on this workflow's own runs. `test:package` is that cheap because
       # `electron-builder` repacks the Electron `test:desktop` has already fetched, so the
       # two suites share one download whatever caching is or is not in front of them.
-      - run: xvfb-run -a pnpm --filter @tyto/desktop test:desktop
+      - if: steps.scope.outputs.run == 'true'
+        run: xvfb-run -a pnpm --filter @tyto/desktop test:desktop
       # `!cancelled()` rather than nothing, so a red `test:desktop` does not hide whether
       # the package is also broken. They answer different questions and one run should
       # answer both.
-      - if: ${{ !cancelled() }}
+      - if: ${{ !cancelled() && steps.scope.outputs.run == 'true' }}
         run: xvfb-run -a pnpm --filter @tyto/desktop test:package
 
       # **One artifact, and only since there is finally something in it.** The note this
@@ -128,7 +141,7 @@ jobs:
       #
       # `if-no-files-found: ignore` keeps the green path silent, which is the whole of what
       # the old note was protecting.
-      - if: ${{ !cancelled() }}
+      - if: ${{ !cancelled() && steps.scope.outputs.run == 'true' }}
         uses: actions/upload-artifact@v7
         with:
           name: desktop-raster-diffs

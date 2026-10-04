@@ -32,8 +32,10 @@ interface Workflow {
   jobs?: Record<
     string,
     {
+      name?: string;
       env?: Record<string, string | number>;
       steps?: {
+        id?: string;
         uses?: string;
         run?: string;
         if?: string;
@@ -64,10 +66,23 @@ const workflowFiles = readdirSync(join(repoRoot, WORKFLOWS_DIR)).filter((file) =
  * identifies them by job name. Renaming a job in the workflow therefore silently drops
  * the protection instead of failing, so the names the branch expects are pinned here.
  * Changing one means updating `main`'s protection in the same PR.
+ *
+ * `desktop` and `visual` joined in TYTO-138 (ADR 0064). Unlike the first two they measure
+ * something only some pull requests change, so they decide their own scope in their first
+ * step (`ci-scope.mjs`) instead of through a `paths:` filter — the assertions under
+ * "required checks" below hold that shape.
  */
 const REQUIRED_CHECKS = [
   { context: 'check', workflow: 'ci.yml' },
   { context: 'lint', workflow: 'commitlint.yml' },
+  { context: 'desktop', workflow: 'desktop-e2e.yml' },
+  { context: 'visual', workflow: 'visual.yml' },
+];
+
+/** The required checks that scope themselves, and the suite name each passes the script. */
+const SCOPED_CHECKS = [
+  { context: 'desktop', workflow: 'desktop-e2e.yml', suite: 'desktop' },
+  { context: 'visual', workflow: 'visual.yml', suite: 'visual' },
 ];
 
 interface ChangesetsActionMajor {
@@ -542,6 +557,77 @@ describe('git attributes', () => {
       );
     }
   });
+});
+
+/**
+ * The shape a required check has to keep (ADR 0064). `main`'s protection stores the
+ * context as a bare job name and waits for it, so three things break it without failing
+ * anything: a `paths:` filter (the context never reports and every PR pends), a second job
+ * with the same name on a pull request (two results under one name), and a scoped job
+ * whose later steps forget the scope (a skip that installs and builds anyway, or worse, a
+ * step that runs the suite unconditionally while another is skipped).
+ */
+describe('required checks', () => {
+  /** The context a job reports under: its `name:` when it has one, its key otherwise. */
+  const contextsOnPullRequest = () =>
+    workflowFiles.flatMap((file) => {
+      const workflow = readYaml<Workflow>(`${WORKFLOWS_DIR}/${file}`);
+      if (!triggersOf(workflow).includes('pull_request')) return [];
+      return Object.entries(workflow.jobs ?? {}).map(([key, job]) => ({
+        file,
+        context: job.name ?? key,
+      }));
+    });
+
+  it.each(REQUIRED_CHECKS)(
+    'run "$context" on every pull request, with no path filter to leave it pending',
+    ({ workflow }) => {
+      const parsed = readYaml<Workflow>(`${WORKFLOWS_DIR}/${workflow}`);
+      const on = parsed.on;
+      expect(triggersOf(parsed), `${workflow} does not run on pull_request`).toContain(
+        'pull_request',
+      );
+      const pullRequest =
+        typeof on === 'object' && !Array.isArray(on)
+          ? (on.pull_request as Record<string, unknown> | null)
+          : null;
+      for (const filter of ['paths', 'paths-ignore', 'branches', 'branches-ignore', 'types']) {
+        expect(
+          pullRequest?.[filter],
+          `${workflow} filters pull_request on ${filter}`,
+        ).toBeUndefined();
+      }
+    },
+  );
+
+  it.each(REQUIRED_CHECKS)(
+    'report "$context" from exactly one job a pull request runs',
+    ({ context }) => {
+      // `desktop.yml` has a job too, and runs on tags only; `labeler.yml` runs on
+      // `pull_request_target`, which is a different event. Neither counts, and that is the point
+      // of asking by event rather than by file.
+      const owners = contextsOnPullRequest().filter((entry) => entry.context === context);
+      expect(owners.map((entry) => entry.file)).toHaveLength(1);
+    },
+  );
+
+  it.each(SCOPED_CHECKS)(
+    'decide "$context" in its first step after checkout, and gate every later step on it',
+    ({ context, workflow, suite }) => {
+      const steps = readYaml<Workflow>(`${WORKFLOWS_DIR}/${workflow}`).jobs?.[context]?.steps ?? [];
+      expect(steps[0]?.uses).toMatch(/^actions\/checkout@/u);
+      // Two commits, because the diff is read between the merge commit and its first parent.
+      expect(steps[0]?.with?.['fetch-depth']).toBe(2);
+      expect(steps[1]?.id).toBe('scope');
+      expect(steps[1]?.run).toBe(`node tools/repo-checks/src/ci-scope.mjs ${suite}`);
+      for (const [index, step] of steps.slice(2).entries()) {
+        expect(
+          step.if ?? '(no condition)',
+          `${workflow} step ${index + 2} (${step.run ?? step.uses}) runs even when the scope skipped`,
+        ).toContain("steps.scope.outputs.run == 'true'");
+      }
+    },
+  );
 });
 
 describe('dependabot', () => {

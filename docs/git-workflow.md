@@ -151,25 +151,29 @@ One file is fine again, and the repo-check that enforced the split went with the
 
 ## Workflows (`.github/workflows/`)
 
-| File              | Trigger                                     | Does                                                                                                             |
-| ----------------- | ------------------------------------------- | ---------------------------------------------------------------------------------------------------------------- |
-| `ci.yml`          | PR, push to main                            | install (pnpm cache) → format:check → changeset status → typecheck → lint → test → build. Turborepo remote cache |
-| `visual.yml`      | PR touching export/raster/templates/core    | Playwright + `test:visual`; uploads diffs as artifact on failure                                                 |
-| `desktop-e2e.yml` | PR touching `apps/desktop/**`, push to main | Xvfb + `test:desktop` and `test:package`, 3 min 13 s, no Electron cache                                          |
-| `commitlint.yml`  | PR                                          | validates PR title and commits                                                                                   |
-| `release.yml`     | push to main                                | Changesets → version PR → tags                                                                                   |
-| `desktop.yml`     | tag `desktop-v*`                            | tag/version guard → OS matrix → electron-builder → GitHub Release                                                |
-| `labeler.yml`     | PR (`pull_request_target`)                  | applies `pkg:*`/`app:*`/`docs`/`repo` labels from `.github/labeler.yml`                                          |
+| File              | Trigger                                    | Does                                                                                                             |
+| ----------------- | ------------------------------------------ | ---------------------------------------------------------------------------------------------------------------- |
+| `ci.yml`          | PR, push to main                           | install (pnpm cache) → format:check → changeset status → typecheck → lint → test → build. Turborepo remote cache |
+| `visual.yml`      | PR (scoped in-job, ADR 0064)               | Playwright + `test:visual`; uploads diffs as artifact on failure                                                 |
+| `desktop-e2e.yml` | PR (scoped in-job, ADR 0064), push to main | Xvfb + `test:desktop` and `test:package`, 455–487 s, no Electron cache                                           |
+| `commitlint.yml`  | PR                                         | validates PR title and commits                                                                                   |
+| `release.yml`     | push to main                               | Changesets → version PR → tags                                                                                   |
+| `desktop.yml`     | tag `desktop-v*`                           | tag/version guard → OS matrix → electron-builder → GitHub Release                                                |
+| `labeler.yml`     | PR (`pull_request_target`)                 | applies `pkg:*`/`app:*`/`docs`/`repo` labels from `.github/labeler.yml`                                          |
 
 ## Protections and labels
 
 Branch protection on `main`: require PR, dismiss stale reviews, linear history, no force pushes, no deletions, and the rule applies to administrators too.
 
-Required status checks are stored as job names, not workflow names: `check` (from `ci.yml`) and `lint` (from `commitlint.yml`). `visual.yml` and `desktop-e2e.yml` are deliberately not required — both are path-filtered, and a check that never reports on most PRs would leave them permanently pending. Renaming either required job changes the required context, so `tools/repo-checks/src/github-config.test.ts` fails when the names drift.
+Required status checks are stored as job names, not workflow names: `check` (from `ci.yml`), `lint` (from `commitlint.yml`), and since TYTO-138 `desktop` (from `desktop-e2e.yml`) and `visual` (from `visual.yml`). Renaming any of them changes the required context, so `tools/repo-checks/src/github-config.test.ts` pins all four, asserts each belongs to exactly one job a pull request runs, and fails when a name drifts. `release.yml`, `desktop.yml` and `labeler.yml` are not required: none of them runs on `pull_request`.
+
+**A required check carries no `paths:` filter, because a filtered workflow reports on most PRs never and a required context that never reports leaves them pending for good** (ADR 0064). `desktop` and `visual` measure something only some PRs change, so instead their first step, `tools/repo-checks/src/ci-scope.mjs`, reads the PR's diff and decides. When nothing in scope changed, every later step is skipped, the context goes green, and the job summary says `skipped: no change under …` followed by every path it compared against. When the diff cannot be read, it runs. The desktop scope is the app's own dependency graph plus `apps/cli` and the root config files, computed on every run, which closed the blind spot the old `apps/desktop/**` filter had: it ran on 23 of the last 40 merged PRs, where 36 of the 40 changed something the app bundles. `visual` keeps the list its filter carried.
 
 **The Electron download is not cached, and the cache is what measured that.** TYTO-111 built one — `actions/cache` on `~/.cache/electron`, keyed on the Electron version — and then ran the job cold and warm: `e2e/tabs.desktop.test.ts`, the file that pays for the download, took 57.6 s on the cold run and 58.2 s on the one that restored 116.85 MiB; the jobs were 3 min 34 s and 3 min 31 s. The 58 s is the 17 tests in that file, not the fetch. So the step went out, and reinstating it is two lines whenever somebody has a number that wants it. A companion entry for `~/.cache/electron-builder` never cached a byte at all — electron-builder repacks the zip out of `~/.cache/electron`, which is also why `test:package` costs 6 s in CI against ~70 s on a machine that fetches its own.
 
-**What a non-required check costs, said once rather than implied twice.** `desktop-e2e` reports on every PR that touches `apps/desktop/**` and goes red where the suite goes red, but the merge button does not read it. Somebody has to look. The alternative is a second, filter-less job that reports green trivially so the required context always exists; that is a real option and it is not the one TYTO-111 took, because a green-by-construction context is a check whose name lies about what it measured.
+**What TYTO-111 objected to, and how TYTO-138 answered it.** TYTO-111 left `desktop-e2e` unrequired rather than add a second, filter-less job reporting green trivially, because a green-by-construction context is a check whose name lies about what it measured. The scope step is not that job: a skip happens only after the diff was read, and the summary names what was compared. The twin was priced and rejected in ADR 0064 — it would have kept the hand-written filter, and with it the 13 PRs of 40.
+
+**The version PR's runs already wait for approval** before `check` and `lint` start, because the release bot opens it. `desktop` and `visual` join that same approval and nothing more.
 
 Required approvals are **0** while the project has one maintainer. Requiring one, with administrators included in the rule, would leave nobody able to merge: GitHub does not let an author approve their own PR. It goes to 1 the day a second maintainer joins.
 
