@@ -30,7 +30,7 @@ import { closeApp } from './close-app.js';
  * fixed and saved there, and runs again from the panel.
  *
  * Its own `--user-data-dir`, so the layout, the settings and the recent list are this suite's
- * and not the machine's (TYTO-139 is the four suites that still share the real one), and its
+ * and not the machine's (TYTO-139 made that every suite's rule), and its
  * own `TYTO_HOME`, so no plugin or template installed on this machine can decide the outcome.
  */
 

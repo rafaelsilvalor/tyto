@@ -200,7 +200,6 @@ function launchEnvironment(shown: boolean): Record<string, string> {
   for (const [name, value] of Object.entries(process.env)) {
     if (value !== undefined) environment[name] = value;
   }
-  environment['TYTO_HOME'] = join(scratch, 'tyto-home');
   // Deleted rather than set to something else: `show` is `TYTO_HEADLESS !== '1'`, and a run
   // started from a shell that exported it must still get a shown window here.
   if (shown) delete environment['TYTO_HEADLESS'];
@@ -226,7 +225,7 @@ describe.each([
     app = await _electron.launch({
       args: ['.', `--user-data-dir=${userData}`],
       cwd: join(here, '..'),
-      env: launchEnvironment(shown),
+      env: { ...launchEnvironment(shown), TYTO_HOME: join(scratch, 'tyto-home') },
     });
     page = await app.firstWindow();
     await page.waitForFunction(() => document.querySelector('#editor .cm-content') !== null);

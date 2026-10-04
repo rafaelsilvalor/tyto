@@ -54,7 +54,7 @@ describe('chooseUserDataPath', () => {
   });
 
   it('leaves a folder named on the command line alone', () => {
-    // The fourteen end-to-end suites that pass `--user-data-dir` are this assertion. Electron
+    // Every end-to-end suite passes `--user-data-dir` (TYTO-139) and is this assertion. Electron
     // has already applied the switch, so the only correct answer is to set nothing.
     expect(
       chooseUserDataPath({

@@ -1,4 +1,5 @@
-import { existsSync } from 'node:fs';
+import { existsSync, mkdtempSync, rmSync } from 'node:fs';
+import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -33,6 +34,7 @@ const here = dirname(fileURLToPath(import.meta.url));
 const built = join(here, '..', 'out', 'main', 'index.js');
 
 let app: ElectronApplication;
+let scratch: string;
 let page: Page;
 
 const openBar = async (): Promise<void> => {
@@ -68,10 +70,13 @@ beforeAll(async () => {
     );
   }
 
+  // Its own data folders, never the machine's (TYTO-139): the real `layout.json` and an older
+  // version folder beside the current one both used to reach this suite through them.
+  scratch = mkdtempSync(join(tmpdir(), 'tyto-command-bar-e2e-'));
   app = await _electron.launch({
-    args: ['.'],
+    args: ['.', `--user-data-dir=${join(scratch, 'user-data')}`],
     cwd: join(here, '..'),
-    env: { ...process.env, TYTO_HEADLESS: '1' },
+    env: { ...process.env, TYTO_HEADLESS: '1', TYTO_HOME: join(scratch, 'tyto-home') },
   });
   page = await app.firstWindow();
   await page.waitForSelector('#editor .cm-content');
@@ -79,6 +84,7 @@ beforeAll(async () => {
 
 afterAll(async () => {
   await closeApp(app);
+  rmSync(scratch, { recursive: true, force: true });
 });
 
 describe('opening the bar', () => {

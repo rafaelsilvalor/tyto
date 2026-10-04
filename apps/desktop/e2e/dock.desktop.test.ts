@@ -31,7 +31,7 @@ async function launch(): Promise<{ app: ElectronApplication; page: Page }> {
   const started = await _electron.launch({
     args: ['.', `--user-data-dir=${join(scratch, 'userData')}`],
     cwd: join(here, '..'),
-    env: { ...process.env, TYTO_HEADLESS: '1' },
+    env: { ...process.env, TYTO_HEADLESS: '1', TYTO_HOME: join(scratch, 'tyto-home') },
   });
   const window = await started.firstWindow();
   await window.waitForSelector('[data-panel="editor"]');

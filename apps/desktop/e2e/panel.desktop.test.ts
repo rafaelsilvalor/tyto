@@ -121,7 +121,7 @@ beforeAll(async () => {
   app = await _electron.launch({
     args: ['.', `--user-data-dir=${join(scratch, 'userData')}`],
     cwd: join(here, '..'),
-    env: { ...process.env, TYTO_HEADLESS: '1' },
+    env: { ...process.env, TYTO_HEADLESS: '1', TYTO_HOME: join(scratch, 'tyto-home') },
   });
   page = await app.firstWindow();
   await page.waitForFunction(() => document.querySelector('#editor .cm-content') !== null);

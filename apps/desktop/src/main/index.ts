@@ -282,11 +282,14 @@ async function start(): Promise<void> {
   // before the window's first question does. The two buttons and the checkbox are the whole
   // decision, and the checkbox is unticked — secrets travel only when somebody says so.
   //
-  // **Not under `TYTO_HEADLESS`, and that was measured.** Four end-to-end suites launch
-  // without `--user-data-dir`, so they run in the real `<appData>/Tyto/<version>`; on a
-  // machine that has an older version beside it, the box opened with no window and no person,
-  // and all four timed out waiting for `firstWindow`. A question nobody is there to answer is
-  // not asked, and nothing is recorded, so the next real launch still asks.
+  // **Not under `TYTO_HEADLESS`, and that was measured.** Four end-to-end suites used to launch
+  // without `--user-data-dir` and ran in the real `<appData>/Tyto/<version>`; on a machine
+  // that has an older version beside it, the box opened with no window and no person, and all
+  // four timed out waiting for `firstWindow`. Since TYTO-139 every suite names its own folder,
+  // which already skips the box through `chosenUserData`, and `e2e/launch-isolation.test.ts`
+  // keeps it that way. The `TYTO_HEADLESS` half stays because ADR 0036 decides it by name and
+  // it still covers a hidden launch somebody starts by hand: a question nobody is there to
+  // answer is not asked, and nothing is recorded, so the next real launch still asks.
   if (chosenUserData !== undefined && process.env['TYTO_HEADLESS'] !== '1') {
     await offerPreviousVersion({
       userData: chosenUserData,

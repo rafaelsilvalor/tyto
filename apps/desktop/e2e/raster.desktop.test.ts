@@ -1,4 +1,5 @@
-import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -90,6 +91,7 @@ const THRESHOLD = 0.1;
 const PLATFORM = process.platform;
 
 let app: ElectronApplication;
+let scratch: string;
 
 /**
  * The checkerboard `shapes.json` points its image at.
@@ -296,18 +298,22 @@ beforeAll(async () => {
     );
   }
 
+  // Its own data folders, never the machine's (TYTO-139): the real `layout.json` and an older
+  // version folder beside the current one both used to reach this suite through them.
+  scratch = mkdtempSync(join(tmpdir(), 'tyto-raster-e2e-'));
   app = await _electron.launch({
     // The same five flags the CLI's Chromium is launched with. They are what makes a
     // reference comparable at all; whether the *shipped* app applies them is a separate
     // question this card answers in `src/main/index.ts`.
-    args: ['.'],
+    args: ['.', `--user-data-dir=${join(scratch, 'user-data')}`],
     cwd: join(here, '..'),
-    env: { ...process.env, TYTO_HEADLESS: '1' },
+    env: { ...process.env, TYTO_HEADLESS: '1', TYTO_HOME: join(scratch, 'tyto-home') },
   });
 });
 
 afterAll(async () => {
   await closeApp(app);
+  rmSync(scratch, { recursive: true, force: true });
 });
 
 /**

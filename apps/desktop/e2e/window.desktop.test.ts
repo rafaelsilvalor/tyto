@@ -1,4 +1,5 @@
-import { existsSync, readFileSync } from 'node:fs';
+import { existsSync, mkdtempSync, readFileSync, rmSync } from 'node:fs';
+import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -46,6 +47,7 @@ const manifest = JSON.parse(readFileSync(join(here, '..', 'package.json'), 'utf8
 };
 
 let app: ElectronApplication;
+let scratch: string;
 let page: Page;
 
 beforeAll(async () => {
@@ -55,17 +57,20 @@ beforeAll(async () => {
     );
   }
 
+  // Its own data folders, never the machine's (TYTO-139): the real `layout.json` and an older
+  // version folder beside the current one both used to reach this suite through them.
+  scratch = mkdtempSync(join(tmpdir(), 'tyto-window-e2e-'));
   app = await _electron.launch({
     // The **folder**, not the built file. Electron resolves a directory through its
     // `package.json`, which is how a packaged app starts and what `electron-builder` will
     // do — and it is the only form under which `app.getVersion()` reads *this* app's
     // version. Handed a path to a `.js` it loads the file and reports Electron's own
     // version instead, which is what the window used to show.
-    args: ['.'],
+    args: ['.', `--user-data-dir=${join(scratch, 'user-data')}`],
     cwd: join(here, '..'),
     // `TYTO_HEADLESS` keeps the window off the screen. It is the only thing this suite
     // changes about the app it is testing; every flag it asserts on is the shipped one.
-    env: { ...process.env, TYTO_HEADLESS: '1' },
+    env: { ...process.env, TYTO_HEADLESS: '1', TYTO_HOME: join(scratch, 'tyto-home') },
   });
   page = await app.firstWindow();
   await page.waitForFunction(
@@ -81,6 +86,7 @@ beforeAll(async () => {
 
 afterAll(async () => {
   await closeApp(app);
+  rmSync(scratch, { recursive: true, force: true });
 });
 
 /** *App opens an empty window; `window.require` is undefined in the renderer.* */
@@ -406,7 +412,8 @@ describe('the language picker', () => {
     'crash.detail',
     'crash.noLog',
     // TYTO-151: the first-run question about the previous version's settings, a native box
-    // main shows before the window exists — and never under `TYTO_HEADLESS`, which is here.
+    // main shows before the window exists — and never to a folder named with `--user-data-dir`
+    // or under `TYTO_HEADLESS`, and this suite has both.
     'import.message',
     'import.detail',
     'import.credentials',

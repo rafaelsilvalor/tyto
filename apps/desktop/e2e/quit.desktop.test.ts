@@ -139,7 +139,7 @@ const launch = async (name: string): Promise<{ app: ElectronApplication; page: P
     // the last run rather than the app.
     args: ['.', `--user-data-dir=${join(scratch, name)}`],
     cwd: join(here, '..'),
-    env: { ...process.env, TYTO_HEADLESS: '1' },
+    env: { ...process.env, TYTO_HEADLESS: '1', TYTO_HOME: join(scratch, 'tyto-home') },
   });
   const page = await app.firstWindow();
   await page.waitForSelector('#editor .cm-content');

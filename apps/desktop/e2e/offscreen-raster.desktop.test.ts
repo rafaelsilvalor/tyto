@@ -359,7 +359,7 @@ beforeAll(async () => {
     // folder the other suites share (TYTO-117).
     args: ['.', `--user-data-dir=${join(scratch, 'userData')}`, ...DETERMINISM_ARGS],
     cwd: join(here, '..'),
-    env: { ...process.env, TYTO_HEADLESS: '1' },
+    env: { ...process.env, TYTO_HEADLESS: '1', TYTO_HOME: join(scratch, 'tyto-home') },
   });
 });
 
