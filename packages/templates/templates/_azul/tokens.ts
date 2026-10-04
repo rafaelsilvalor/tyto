@@ -2,21 +2,17 @@
  * The azul brand's tokens: values, no logic.
  *
  * Everything here is a constant a designer changes without reading the rest of a template.
- * Colours, the type scale, the slide's frame, the chrome's sizes and the two marks' geometry.
+ * Colours, the type scale, the slide's frame, the chrome's sizes and the arrow's geometry.
  * Shared by every azul template through `presets.ts` and `parts.ts`, which is why it sits
  * beside them in `_azul/` rather than inside one template (ADR 0047). The folder
  * has no `manifest.yaml`, so the template registry skips it.
  *
  * ## Geometry in, colour out
  *
- * `OWL` and `ARROW` hold a `d` and the box it was drawn in, and neither holds a colour.
- * The fill is decided where the mark is placed, which is what lets the same owl be blue on
- * paper and white on a dark panel without a second copy of the geometry.
- *
- * **Both are lifted from the brand files**, supplied by the maintainer for TYTO-173. The
- * files themselves are not in this repository; the geometry is, and swapping it again is
- * changing `d` and `box` on these two constants and nothing else: no call site names a
- * coordinate.
+ * `ARROW` holds a `d` and the box it was drawn in, and no colour. The fill is decided where
+ * the mark is placed, which is what lets the same mark be blue on paper and white on a dark
+ * panel without a second copy of the geometry. The logo is not here: the brand kit supplies
+ * it (ADR 0063), and `_casa/marks.ts` holds the placeholder drawn without one (ADR 0065).
  */
 
 import { systemFont } from '@tyto/core/template';
@@ -32,7 +28,7 @@ import type { Mark } from '@tyto/template-kit';
 /** The paper. White, as the published slide is. */
 export const PAPER = '#ffffff';
 
-/** The brand blue: the owl, the arrow, the discipline headings, the date pills. */
+/** The brand blue: the logo, the arrow, the discipline headings, the date pills. */
 export const INK = '#009fe3';
 
 /** The cover words. A dark grey, so the blue is kept for what changes week to week. */
@@ -44,7 +40,7 @@ export const PILL = '#dddddd';
 /** Type on the grey pill. */
 export const PILL_INK = '#3c3c3c';
 
-/** Type on a blue field — the date pill, the footer handle. */
+/** Type on a blue field — the date pill, the footer signature. */
 export const ON_INK = '#ffffff';
 
 /* --------------------------------------------------------------------------- type -- */
@@ -59,7 +55,7 @@ export const ON_INK = '#ffffff';
  */
 export const FACE: FontRef = systemFont('CircularXX');
 
-/** The professor and the handle. */
+/** The professor and the signature. */
 export const LIGHT = 300;
 /** The discipline heading, the date and the session title. */
 export const MEDIUM = 500;
@@ -75,7 +71,7 @@ export const TYPE = {
   sessionTitle: 22,
   professor: 22,
   date: 26,
-  handle: 26,
+  signature: 26,
 } as const;
 
 /* ------------------------------------------------------------------------- spacing -- */
@@ -89,7 +85,7 @@ export const MARGIN = 70;
 /** Paper above the header band and below the footer band. */
 export const EDGE = { top: 60, bottom: 26 } as const;
 
-/** The two chrome bands: the owl sits in the header, the handle and arrow in the footer. */
+/** The two chrome bands: the logo sits in the header, the signature and arrow in the footer. */
 export const BAND = { header: 74, footer: 92 } as const;
 
 /** How far apart the pieces of a slide sit. */
@@ -127,14 +123,14 @@ export const TABLE = {
   heading: 78,
 } as const;
 
-/** The chrome every slide carries: the owl on top, the handle and the arrow at the foot. */
+/** The chrome every slide carries: the logo on top, the signature and the arrow at the foot. */
 export const CHROME = {
-  /** How tall the owl is drawn. */
-  owl: 64,
+  /** How tall the logo is drawn. */
+  logo: 64,
   /** How tall the footer arrow is drawn. */
   arrow: 26,
-  /** The handle is tracked out, so the signature reads quieter than the agenda above it. */
-  handleTracking: 4,
+  /** The signature is tracked out, so it reads quieter than the agenda above it. */
+  signatureTracking: 4,
 } as const;
 
 /** The block on a carousel's first slide: an optional illustration over the cover words. */
@@ -192,12 +188,6 @@ export const COVER = {
 /* ------------------------------------------------------------------------ geometry -- */
 
 /**
- * The owl, shared with the house's other brands since TYTO-200: the geometry is the
- * house's, not azul's, and each brand fills it with its own colour.
- */
-export { OWL } from '../_casa/marks.js';
-
-/**
  * The footer arrow, from the brand file `seta.svg` (supplied 2026-09-23), colour dropped.
  *
  * The head is the file's; the shaft is longer. The published slide draws the same head on
@@ -215,6 +205,3 @@ export const ARROW: Mark = {
     `V0l${ARROW_HEAD},189.26-${ARROW_HEAD},188.55Z`,
   fillRule: 'nonzero',
 };
-
-/** The account every slide signs off with. Brand chrome, so the brief never sets it. */
-export const HANDLE = '@assinatura';

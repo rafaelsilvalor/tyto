@@ -139,17 +139,17 @@ describe('simulados da semana: pieces per format and slide', () => {
     expect(named(draw(OCRE, { format: 'story' }), 'call-to-comment')).toEqual([]);
   });
 
-  it('puts the owl on the grid and none on the story', () => {
-    expect(named(draw(OCRE, { format: 'grid' }), 'owl')).toHaveLength(1);
-    expect(named(draw(OCRE, { format: 'story' }), 'owl')).toEqual([]);
+  it('puts the logo on the grid and none on the story', () => {
+    expect(named(draw(OCRE, { format: 'grid' }), 'logo')).toHaveLength(1);
+    expect(named(draw(OCRE, { format: 'story' }), 'logo')).toEqual([]);
   });
 });
 
 describe('simulados da semana: the three brands', () => {
-  it('fills the owl with each brand’s accent', () => {
+  it('fills the logo with each brand’s accent', () => {
     for (const brand of [OCRE, VINHO, ROXO]) {
-      const [owl] = named(draw(brand), 'owl');
-      expect(owl).toMatchObject({ fill: { kind: 'solid', color: rgba(brand.accent) } });
+      const [logo] = named(draw(brand), 'logo');
+      expect(logo).toMatchObject({ fill: { kind: 'solid', color: rgba(brand.accent) } });
     }
   });
 
@@ -160,10 +160,10 @@ describe('simulados da semana: the three brands', () => {
     });
   });
 
-  it('signs with the handle for OCRE and VINHO, and with the note to the link for ROXO', () => {
-    expect(named(draw(OCRE, { format: 'story' }), 'handle')).toHaveLength(1);
-    expect(named(draw(VINHO, { format: 'story' }), 'handle')).toHaveLength(1);
-    expect(named(draw(ROXO, { format: 'story' }), 'handle')).toEqual([]);
+  it('signs with the signature for OCRE and VINHO, and with the note to the link for ROXO', () => {
+    expect(named(draw(OCRE, { format: 'story' }), 'signature')).toHaveLength(1);
+    expect(named(draw(VINHO, { format: 'story' }), 'signature')).toHaveLength(1);
+    expect(named(draw(ROXO, { format: 'story' }), 'signature')).toEqual([]);
     expect(named(draw(ROXO, { format: 'story' }), 'note')).toHaveLength(1);
   });
 });
@@ -221,10 +221,10 @@ describe('simulados da semana: the areas', () => {
 
   // "Todos devem estar alinhados" (the maintainer, 2026-09-29, on the first real art).
   it.each([
-    ['a grid with the call to comment', { format: 'grid' } as const, 'owl'],
-    ['an earlier grid', { format: 'grid', index: 0, count: 2 } as const, 'owl'],
-    ['a story, which has no owl', { format: 'story' } as const, undefined],
-  ])('lines the owl and the sign-off up with the middle on %s', (_name, slide, owlName) => {
+    ['a grid with the call to comment', { format: 'grid' } as const, 'logo'],
+    ['an earlier grid', { format: 'grid', index: 0, count: 2 } as const, 'logo'],
+    ['a story, which has no logo', { format: 'story' } as const, undefined],
+  ])('lines the logo and the sign-off up with the middle on %s', (_name, slide, owlName) => {
     for (const brand of [OCRE, VINHO, ROXO]) {
       const nodes = draw(brand, slide);
       const [middle] = named(nodes, 'middle');

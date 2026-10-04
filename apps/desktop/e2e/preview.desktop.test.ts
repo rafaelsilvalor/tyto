@@ -311,8 +311,9 @@ describe('a template whose body is code', () => {
   it('draws the brief it was given, through the bundled build function', async () => {
     const html = await shown();
 
-    // The brief's own words, and the handle the *template* supplies — the second is what
-    // says a build function ran, since no directive in the brief writes it.
+    // The brief's own words, and the signature the *template* supplies — the placeholder,
+    // since this launch installs no brand kit (ADR 0065). The second is what says a build
+    // function ran, since no directive in the brief writes it.
     // A session title from the example's first slide, which TYTO-173 rewrote to the
     // published carousel: the brief it replaced said `Clínica`, and this suite, which runs
     // only when a PR touches the desktop, kept asking for it after the merge.

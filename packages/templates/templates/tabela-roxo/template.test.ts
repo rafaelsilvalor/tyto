@@ -4,7 +4,7 @@ import { describe, expect, it } from 'vitest';
 import { build } from './template.js';
 import { ROXO } from '../_casa/brands.js';
 import { NO_BREAK_SPACE } from '../_casa/breaks.js';
-import { BODY, HANDLE, PAGE } from '../_casa/table-tokens.js';
+import { BODY, SIGNATURE, PAGE } from '../_casa/table-tokens.js';
 
 import type {
   Frame,
@@ -22,7 +22,7 @@ import type {
  * **Never a pixel size.** CI has no CircularXX and draws a narrower substitute, so the fit
  * loop lands on a different size there than on a designer's machine; what must hold on both
  * is the rules — every cell's words inside its cell, no value split across lines, the
- * salary column wider than the vacancies one, the table above the handle. So the measure
+ * salary column wider than the vacancies one, the table above the signature. So the measure
  * here is a stand-in with proportional advances that **wraps at spaces only**, as Tyto's
  * own layout does, and the same stand-in re-lays every cell of the result to check it.
  */
@@ -229,7 +229,7 @@ describe.each([
 ])('%s', (_, brief) => {
   const { frame, reports } = render(brief);
 
-  it('fits in one image: nothing reported, and the table ends above the handle', () => {
+  it('fits in one image: nothing reported, and the table ends above the signature', () => {
     expect(reports).toEqual([]);
     const table = placed(frame).find((item) => item.node.name === 'table')!;
     const bottom = Math.max(
@@ -238,7 +238,7 @@ describe.each([
         .map((item) => item.y + (item.node.kind === 'text' ? (item.node.box.h ?? 0) : 0)),
     );
     expect(table).toBeDefined();
-    expect(bottom).toBeLessThanOrEqual(1350 - PAGE.bottom - HANDLE.height);
+    expect(bottom).toBeLessThanOrEqual(1350 - PAGE.bottom - SIGNATURE.height);
   });
 
   it('keeps every cell’s words inside the cell, wrapped to fit its box', () => {

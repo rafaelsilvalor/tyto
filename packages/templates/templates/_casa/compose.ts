@@ -11,10 +11,10 @@
  *
  * | area   | what                                            | where                          |
  * | ------ | ----------------------------------------------- | ------------------------------ |
- * | top    | the owl, on the grid only                       | its top, on the middle's edge  |
+ * | top    | the logo, on the grid only                       | its top, on the middle's edge  |
  * | middle | the title, the days and their exams, and on the | centred on the page, both ways |
  * |        | last grid the call to comment                   |                                |
- * | bottom | the handle, or roxo's note                      | its top, on the middle's edge, |
+ * | bottom | the signature, or roxo's note                      | its top, on the middle's edge, |
  * |        |                                                 | `SAFETY` below the middle      |
  *
  * The top and bottom areas are whatever the middle leaves (the maintainer, 2026-09-28): the
@@ -23,10 +23,10 @@
  * whole is centred, so a wider title moves everything under it with it.
  *
  * **Everything shares the middle's left edge** (the maintainer, 2026-09-29, on the first real
- * art: "todos devem estar alinhados"): the owl above and the sign-off below start where the
+ * art: "todos devem estar alinhados"): the logo above and the sign-off below start where the
  * title, the days and the call to comment start, so they move with the middle too.
  *
- * The stories carry no owl, as none of the three references draws one there.
+ * The stories carry no logo, as none of the three references draws one there.
  *
  * The last grid may close with the brief's `selo` glued to its foot (TYTO-201). The page then
  * shrinks by the seal's height before any of the above is placed, so the middle centres
@@ -48,7 +48,7 @@ import {
 } from '@tyto/template-kit';
 
 import { CALL_TO_COMMENT } from './brands.js';
-import { callToComment, owl, signOff } from './parts.js';
+import { callToComment, logo, signOff } from './parts.js';
 import { EXAM_STYLE, TITLE_LINE, TITLE_STYLE, examTable } from './presets.js';
 import { sealOf } from './seal.js';
 import { CTA, EDGE, MARGIN, PAPER, SAFETY, TABLE, TITLE } from './tokens.js';
@@ -93,11 +93,11 @@ export function simuladosDaSemana(brand: Brand): TemplateBuild {
     });
 
     const page = sealed(context.size, sealOf(context));
-    const chrome = story ? undefined : owl(brand.accent);
+    const chrome = story ? undefined : logo(context.brand, brand.accent);
     const top = chrome === undefined ? EDGE.top : EDGE.top + chrome.height + SAFETY;
     const middleX = (page.size.w - middle.width) / 2;
     const middleY = Math.max(top, (page.size.h - middle.height) / 2);
-    const signature = signOff(brand, middle.width);
+    const signature = signOff(brand, context.brand, middle.width);
     const signatureY = middleY + middle.height + SAFETY;
 
     // One lamina feeds the grid and the story, and what fits the taller story can run off

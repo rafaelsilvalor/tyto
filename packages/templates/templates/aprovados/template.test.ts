@@ -2,6 +2,7 @@ import { measureNothing, noBrandKit, noFiles, reportNothing } from '@tyto/core';
 import { describe, expect, it } from 'vitest';
 
 import { APPROVED } from '../_azul/tokens.js';
+import { PLACEHOLDER_SIGNATURE } from '../_casa/marks.js';
 import { build } from './template.js';
 
 import type { AssetRef, Inline, RichText, SceneNode, TemplateContext } from '@tyto/core';
@@ -146,7 +147,7 @@ describe('aprovados', () => {
   it('signs a single slide without an arrow, since no slide follows it', () => {
     const frame = build(contextOf(FULL));
 
-    expect(named(frame.children, 'handle').map(words)).toEqual(['@assinatura']);
+    expect(named(frame.children, 'signature').map(words)).toEqual([PLACEHOLDER_SIGNATURE]);
     expect(named(frame.children, 'arrow')).toEqual([]);
   });
 });

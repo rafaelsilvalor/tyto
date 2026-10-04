@@ -43,7 +43,7 @@ export const ON_ACCENT = '#ffffff';
  */
 export const FACE: FontRef = systemFont('CircularXX');
 
-/** The handle. */
+/** The signature. */
 export const LIGHT = 300;
 /** A mock exam's name. */
 export const BOOK = 400;
@@ -60,29 +60,29 @@ export const TYPE = {
   exam: 25,
   cta: 29,
   note: 32,
-  handle: 28,
+  signature: 28,
 } as const;
 
-/** The handle is tracked out, as azul's is, so the signature reads quieter. */
-export const HANDLE_TRACKING = 7;
+/** The signature is tracked out, as azul's is, so the signature reads quieter. */
+export const SIGNATURE_TRACKING = 7;
 
 /* ------------------------------------------------------------------------- spacing -- */
 
 /**
  * The least room beside the middle: the title wraps and the call to comment stops before it
- * (the maintainer, 2026-09-29: 112). The owl and the sign-off no longer stand on it; they
+ * (the maintainer, 2026-09-29: 112). The logo and the sign-off no longer stand on it; they
  * share the middle's left edge (`compose.ts`).
  */
 export const MARGIN = 112;
 
-/** Paper above the owl. */
+/** Paper above the logo. */
 export const EDGE = { top: 75 } as const;
 
 /** How tall the chrome's marks are drawn. */
-export const CHROME = { owl: 60 } as const;
+export const CHROME = { logo: 60 } as const;
 
 /**
- * The room between the middle and whatever stands below it — the handle, or roxo's note.
+ * The room between the middle and whatever stands below it — the signature, or roxo's note.
  * The maintainer's "gap de segurança": the bottom area begins here, and its words sit at
  * its top.
  */
@@ -131,5 +131,5 @@ export const CTA = {
   balloonGap: 19,
 } as const;
 
-/** The box the handle and the note are laid out in: one line and its leading. */
+/** The box the signature and the note are laid out in: one line and its leading. */
 export const SIGN_OFF_BOX = 40;

@@ -3,8 +3,8 @@
  * format.
  *
  * The background is a PNG per format in the template's own folder, read through
- * `context.files` (ADR 0062): `assets/bg-<format>.png`, drawn full-bleed. It already carries
- * the owl or the logo, so nothing else is drawn but the text.
+ * `context.files` (ADR 0062): `assets/bg-<format>.png`, drawn full-bleed. Over it go the
+ * brand kit's logo, or its placeholder (ADR 0065), in the format's logo box, and the text.
  *
  * The text is set by `balance.ts` in the format's {@link BannerLayout} box: the largest size
  * between the layout's floor and ceiling at which it fits, its lines balanced, a
@@ -18,10 +18,11 @@
  */
 
 import { frame, image, lineBreak, run, runsOf, solid, text } from '@tyto/core/template';
-import { atLeastOne, reportOverflow } from '@tyto/template-kit';
+import { at, atLeastOne, mark, reportOverflow } from '@tyto/template-kit';
 
 import { balance } from './balance.js';
 import { glueParenthesised } from './breaks.js';
+import { logoOf } from './kit.js';
 import { BOLD, BOOK, FACE, PAPER } from './tokens.js';
 
 import type { SizeRange } from './balance.js';
@@ -37,12 +38,24 @@ export interface BannerLayout {
   readonly sizes: SizeRange;
   /** A line's height, as a multiple of the size. */
   readonly lineHeight: number;
+  /**
+   * The box the logo is drawn in, in the format's pixels. It is drawn at the box's height and
+   * centred across its width, so a kit's logo of another shape keeps the same centre line.
+   */
+  readonly logo?: {
+    readonly x: number;
+    readonly y: number;
+    readonly w: number;
+    readonly h: number;
+  };
 }
 
 /** What one brand's banner is drawn with. */
 export interface BannerStyle {
   /** The text's colour. */
   readonly ink: string;
+  /** The logo's colour. */
+  readonly logoInk: string;
   /** Each format's layout, by format id. */
   readonly layouts: Readonly<Record<string, BannerLayout>>;
 }
@@ -63,6 +76,10 @@ export function productBanner(style: BannerStyle): TemplateBuild {
     const children: NodeDraft[] = [];
     if (background !== undefined) {
       children.push(image({ name: 'background', asset: background, size: context.size }));
+    }
+    if (layout.logo !== undefined) {
+      const logo = mark(logoOf(context.brand), layout.logo.h, style.logoInk, 'logo');
+      children.push(at(layout.logo.x + (layout.logo.w - logo.width) / 2, layout.logo.y, logo));
     }
     const titulo = setTitle(words, layout, context.measure);
     if (titulo !== undefined) {

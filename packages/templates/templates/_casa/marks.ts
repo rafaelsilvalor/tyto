@@ -3,43 +3,41 @@
  *
  * Each holds a `d` and the box it was drawn in, and the fill is decided where the mark is
  * placed ("Geometry in, colour out", `docs/template-conventions.md`). That is what lets one
- * owl be azul's blue, ocre's ochre, vinho's wine and roxo's purple without
- * four copies of it.
+ * logo be azul's blue, ocre's ochre, vinho's wine and roxo's purple without four copies of it.
  *
- * The brand files themselves are not in this repository; their geometry is, and swapping a
- * mark is changing its `d` and `box` here and nothing else.
+ * The brand's own logo and signature are not here: a brand kit supplies them (ADR 0063), and
+ * the placeholders below stand in where none is installed (ADR 0065).
  */
 
 import type { Mark } from '@tyto/template-kit';
 
 /**
- * The owl, from the house's brand file `White.svg` (supplied 2026-09-23).
+ * What stands where the brand's logo goes when no brand kit supplies one (ADR 0065).
  *
- * Its six distinct subpaths are joined into one `d`, in the file's order. The file draws the
- * body's lower half three times, invisibly, because the fill is opaque over itself; the two
- * repeats are dropped here, before anybody applies opacity and sees them. The file's white
- * fill is dropped too — geometry in, colour out.
- *
- * `nonzero`, as the file is drawn: the pupils are holes by winding direction, and no two of
- * the joined subpaths overlap, so joining them changes nothing a fill rule decides.
+ * Invented for this repository and traced from nothing: a rounded rectangle with a round
+ * hole near its top, so it reads as "a mark goes here" and not as anybody's mark. Its box is
+ * the box the house's logo was drawn in, so every layout that sizes the logo by height places
+ * the stand-in in exactly the room the logo takes, and a kit's logo of another shape is what
+ * moves a neighbour, never the placeholder.
  */
-export const OWL: Mark = {
+export const PLACEHOLDER_LOGO: Mark = {
   box: { w: 186.09, h: 376.79 },
   d:
-    // The right eye, its pupil punched out by winding.
-    'M0,0h1v1h-1ZM0,0h1v1h-1Z' +
-    // The beak.
-    'M0,0h1v1h-1Z' +
-    // The left eye.
-    'M0,0h1v1h-1ZM0,0h1v1h-1Z' +
-    // The left wing.
-    'M0,0h1v1h-1Z' +
-    // The body's lower half, once.
-    'M0,0h1v1h-1Z' +
-    // The head and brow.
-    'M0,0h1v1h-1Z',
-  fillRule: 'nonzero',
+    // The rectangle, its corners rounded by quarter arcs.
+    'M24,0H162.09A24,24,0,0,1,186.09,24V352.79A24,24,0,0,1,162.09,376.79' +
+    'H24A24,24,0,0,1,0,352.79V24A24,24,0,0,1,24,0Z' +
+    // The hole: a circle as two half arcs, punched out by the even-odd rule.
+    'M51.05,120A42,42,0,1,0,135.05,120A42,42,0,1,0,51.05,120Z',
+  fillRule: 'evenodd',
 };
+
+/**
+ * What stands where the brand's signature goes when no brand kit supplies one (ADR 0065).
+ *
+ * Shaped like an account's handle, an at sign and one word, so a layout measured on one is
+ * exercised by a line of about the same length. Provisional: the maintainer chooses the words.
+ */
+export const PLACEHOLDER_SIGNATURE = '@assinatura';
 
 /**
  * The speech balloon beside the grid's call to comment, from the brand file `balloom.svg`

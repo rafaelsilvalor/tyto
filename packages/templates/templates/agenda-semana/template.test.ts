@@ -1,7 +1,8 @@
 import { describe, expect, it } from 'vitest';
 
 import { build } from './template.js';
-import { ARROW, CHROME, INK, OWL } from '../_azul/tokens.js';
+import { ARROW, CHROME, INK } from '../_azul/tokens.js';
+import { PLACEHOLDER_LOGO, PLACEHOLDER_SIGNATURE } from '../_casa/marks.js';
 
 import { measureNothing, noBrandKit, noFiles, reportNothing } from '@tyto/core';
 
@@ -226,7 +227,7 @@ describe('the marks the template holds the geometry of', () => {
   );
 
   it.each([
-    ['owl', OWL],
+    ['logo', PLACEHOLDER_LOGO],
     ['arrow', ARROW],
   ])('draws %s as a path with a fill the template supplied', (name, token) => {
     const [node] = named(frame.children, name);
@@ -240,7 +241,7 @@ describe('the marks the template holds the geometry of', () => {
   });
 
   it.each([
-    ['owl', OWL, CHROME.owl],
+    ['logo', PLACEHOLDER_LOGO, CHROME.logo],
     ['arrow', ARROW, CHROME.arrow],
   ])(
     "sizes %s as the box its 'd' was drawn in, and scales with a transform",
@@ -282,8 +283,10 @@ describe('the frame itself', () => {
     for (const index of [0, 1, 2]) {
       const frame = build(contextOf({ slide, index, count: 3 }));
 
-      expect(words(named(frame.children, 'handle')[0]), `slide ${index}`).toBe('@assinatura');
-      expect(named(frame.children, 'owl'), `slide ${index}`).toHaveLength(1);
+      expect(words(named(frame.children, 'signature')[0]), `slide ${index}`).toBe(
+        PLACEHOLDER_SIGNATURE,
+      );
+      expect(named(frame.children, 'logo'), `slide ${index}`).toHaveLength(1);
     }
   });
 

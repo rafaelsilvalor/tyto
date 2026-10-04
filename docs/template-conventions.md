@@ -13,7 +13,8 @@ yours, and without a convention each template invents its own and shares nothing
 
 ```
 _casa/             the house: what several of its brands share (ADR 0055)
-  marks.ts          the owl and the speech balloon, in no colour
+  marks.ts          the logo and signature placeholders, the speech balloon
+  kit.ts            the brand kit's logo and signature, or the placeholders
   brands.ts         what sets each brand apart — an accent, a sign-off
   seal.ts           when a slide carries the brief's `selo` (the last grid slide)
   compose.ts        one piece's composition, for every brand that publishes it
@@ -112,9 +113,9 @@ export const TABLE = {
   badge: { w: 220, h: 86 },
   padding: { vertical: 12, left: 32, right: 32 },
 } as const;
-export const OWL: Mark = {
-  box: { w: 186.09, h: 376.79 },
-  d: 'M0,0h1v1h-1Z…',
+export const ARROW: Mark = {
+  box: { w: 2360.92, h: 377.81 },
+  d: 'M2130,377.81v-134.18H0…',
   fillRule: 'nonzero',
 };
 ```
@@ -132,7 +133,7 @@ export const sessionTable: PillTableStyle = { layering: 'overlap', columns: [bad
 ```
 
 A **part** is a function returning a `Block` for something only this brand draws: the azul
-owl header, the signed footer, the cover block. Both live in `_<brand>/` and are shared
+logo header, the signed footer, the cover block. Both live in `_<brand>/` and are shared
 between the brand's templates by import.
 
 This is the component the markup route could not deliver. ADR 0022 refused a component
@@ -170,7 +171,7 @@ and spreads the seal into its frame's children.
 - **Slots are Portuguese** — they are the brief's vocabulary (`titulo`, `slide`).
 - **Everything else is English**: identifiers, and the `name` of every drawn node.
 - **A node's name says what drew it**, in kebab-case: `sessionPill` would draw `session-pill`,
-  the owl header draws `owl`. Names reach the SVG and HTML output as ids, so an element in a
+  the logo header draws `logo`. Names reach the SVG and HTML output as ids, so an element in a
   render maps back to one function or one preset.
 
 ## Geometry in, colour out
@@ -184,8 +185,14 @@ travel.** Exported SVGs name their classes `.cls-1`, `.cls-2` …, always from 1
 them in one artwork repaint each other. TYTO-168 tracks the fact that nothing stops this
 today.
 
-Lifting only the geometry has a second payoff: the same owl is white on a dark frame and
+Lifting only the geometry has a second payoff: the same mark is white on a dark frame and
 blue on a light one without a second file.
+
+**A brand's logo and signature are not tokens of the repository.** A brand kit supplies them
+(ADR 0063) and the template reads them through `logoOf(context.brand)` and
+`signatureOf(context.brand)` in `_casa/kit.ts`, which answer the placeholders when the kit
+leaves a field out (ADR 0065). `tools/repo-checks` fails when a known brand token comes back
+into a tracked text file.
 
 **A path vector's `size` is its viewport, not the size it is drawn at.** `export-html` emits
 `<svg width="size.w" height="size.h" viewBox="0 0 size.w size.h">` around the `d`, so anything

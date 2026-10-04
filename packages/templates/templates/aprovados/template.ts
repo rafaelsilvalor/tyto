@@ -5,10 +5,10 @@
  *
  * | band   | what                                                     | drawn by                         |
  * | ------ | -------------------------------------------------------- | -------------------------------- |
- * | header | the owl                                                  | `header()` — `_azul`             |
+ * | header | the logo                                                  | `header()` — `_azul`             |
  * | middle | first slide only: emblem, kicker, subtitle, rule, exam    | `titleBlock(resultTitle)`        |
  * |        | this `::lamina`'s specialties, each as wide as its names | `pillTable(approvedTable)`       |
- * | footer | the handle, and the arrow unless this is the last slide  | `footer()` — `_azul`             |
+ * | footer | the signature, and the arrow unless this is the last slide  | `footer()` — `_azul`             |
  * | seal   | last slide only, when the brief has a `selo`: the art     | `sealed` — kit; `sealOf` — house |
  *
  * The second azul template (TYTO-185), and the first written after the four layers of
@@ -48,8 +48,8 @@ export const build: TemplateBuild = (context: TemplateContext) => {
       ...bandedPage({
         size: page.size,
         edges: { top: EDGE.top, bottom: EDGE.bottom, side: MARGIN },
-        header: { item: header(), band: BAND.header },
-        footer: footer(width, { next: hasNextSlide(context.artwork) }),
+        header: { item: header(context.brand), band: BAND.header },
+        footer: footer(width, context.brand, { next: hasNextSlide(context.artwork) }),
         middle: stack({
           name: 'middle',
           gap: APPROVED.gap.table,

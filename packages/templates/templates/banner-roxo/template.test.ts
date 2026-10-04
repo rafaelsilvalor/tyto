@@ -4,6 +4,7 @@ import { describe, expect, it } from 'vitest';
 import { LAYOUTS, build } from './template.js';
 import { ROXO } from '../_casa/brands.js';
 import { FUNCTION_WORDS, NO_BREAK_SPACE } from '../_casa/breaks.js';
+import { PLACEHOLDER_LOGO } from '../_casa/marks.js';
 
 import type {
   AssetRef,
@@ -195,6 +196,25 @@ describe.each(Object.keys(SIZES))('banner-roxo in %s', (format) => {
     expect(first.transform).toMatchObject({ x: 0, y: 0 });
   });
 
+  it('draws the placeholder logo in the box the painted-out logo took, over the background', () => {
+    // Without a kit (ADR 0065): the box was measured on the background's pixels before the
+    // logo was painted out of it, so the placeholder stands exactly where the logo stood.
+    const { frame } = render(PREFEITURA, format);
+    const box = LAYOUTS[format]!.logo!;
+    const [, logo] = frame.children;
+
+    expect(logo?.kind).toBe('vector');
+    if (logo?.kind !== 'vector') return;
+    expect(logo.name).toBe('logo');
+    expect(logo.geometry).toMatchObject({ d: PLACEHOLDER_LOGO.d });
+    expect(logo.transform.scaleY * logo.size.h).toBeCloseTo(box.h);
+    expect(logo.transform.y).toBe(box.y);
+    // Centred across the box: the placeholder has the logo's proportions, so it fills it.
+    const drawnWidth = logo.transform.scaleX * logo.size.w;
+    expect(logo.transform.x + drawnWidth / 2).toBeCloseTo(box.x + box.w / 2);
+    expect(Math.abs(drawnWidth - box.w)).toBeLessThan(2);
+  });
+
   it.each([PREFEITURA, AGENCIA])('keeps every line of “%s” inside its box', (titulo) => {
     const { frame, reports } = render(titulo, format);
     const node = titleOf(frame);
@@ -235,7 +255,7 @@ describe.each(Object.keys(SIZES))('banner-roxo in %s', (format) => {
     }
     expect(spans.find((span) => span.text.includes('(VA)'))?.weight).toBe(700);
     expect(spans.find((span) => span.text.includes('Prefeitura'))?.weight).toBe(400);
-    expect(render(PREFEITURA, format).frame.children.length).toBe(2);
+    expect(render(PREFEITURA, format).frame.children.length).toBe(3);
     const ink = spans[0]!.color;
     expect(ink.kind === 'solid' && ink.color).toEqual(solidOf(ROXO.accent));
   });

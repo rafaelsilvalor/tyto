@@ -5,7 +5,7 @@
  *
  * The maintainer's standalone generator (`gerador-tabela-instagram_6.html`, outside the
  * repository) and the table art he approved from it: its page padding, paper, zebra,
- * radius, cell gaps, header and band styles, and handle. What the generator left to a slider
+ * radius, cell gaps, header and band styles, and signature. What the generator left to a slider
  * — the body size, the title size, the column widths — is not a token here: `table.ts`
  * decides it from the brief by measuring, and only its floors and ceilings live below.
  *
@@ -30,19 +30,19 @@ export const ZEBRA = '#f2f2f4';
 /** Words on an accent field: the header row and a band. */
 export const ON_ACCENT = '#ffffff';
 
-/** The handle at the foot: a quiet grey, so it signs without competing. */
-export const HANDLE_INK = '#8c8ca1';
+/** The signature at the foot: a quiet grey, so it signs without competing. */
+export const SIGNATURE_INK = '#8c8ca1';
 
 /* --------------------------------------------------------------------------- page -- */
 
 /** Paper around everything. */
 export const PAGE = { top: 64, side: 64, bottom: 56 } as const;
 
-/** The owl's row: the mark's height, and the room the row takes. */
-export const BRAND_ROW = { owl: 92, height: 96 } as const;
+/** The logo's row: the mark's height, and the room the row takes. */
+export const BRAND_ROW = { logo: 92, height: 96 } as const;
 
-/** The handle's row at the foot, its words standing on the row's bottom. */
-export const HANDLE = { size: 19, tracking: 0.28, height: 60 } as const;
+/** The signature's row at the foot, its words standing on the row's bottom. */
+export const SIGNATURE = { size: 19, tracking: 0.28, height: 60 } as const;
 
 /* ------------------------------------------------------------------------- title -- */
 

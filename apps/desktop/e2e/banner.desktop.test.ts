@@ -28,8 +28,9 @@ import { closeApp } from './close-app.js';
  * - the preview embeds the background's own bytes;
  * - the window's SVG for every format is **byte for byte** the CLI's SVG of the same brief,
  *   and embeds that format's background;
- * - the window's PNG for every format draws that format's background: outside the text's box,
- *   every pixel is the background composited on white, within the raster tolerance.
+ * - the window's PNG for every format draws that format's background: outside the text's and
+ *   the logo's boxes, every pixel is the background composited on white, within the raster
+ *   tolerance.
  *
  * CI has no CircularXX and draws the substitute in both programs, so nothing here depends on
  * a glyph's size. Its own `--user-data-dir` and `TYTO_HOME`; `closeApp` answers the quit
@@ -48,12 +49,35 @@ for (const file of [built, cli]) {
   }
 }
 
-/** The three formats, their canvas, and the box `banner-roxo/template.ts` sets the text in. */
+/**
+ * The three formats, their canvas, and the boxes `banner-roxo/template.ts` draws over the
+ * background: the text's, and the logo's (TYTO-225, where the brand kit's logo or its
+ * placeholder now stands instead of being painted into the background).
+ */
 const FORMATS = {
-  banner: { w: 1200, h: 628, text: { x: 260, y: 332, w: 680, h: 200 } },
-  'banner-1x1': { w: 600, h: 600, text: { x: 30, y: 210, w: 540, h: 180 } },
-  'banner-345x146': { w: 345, h: 146, text: { x: 129, y: 40, w: 196, h: 66 } },
+  banner: {
+    w: 1200,
+    h: 628,
+    text: { x: 260, y: 332, w: 680, h: 200 },
+    logo: { x: 555, y: 56, w: 91, h: 184 },
+  },
+  'banner-1x1': {
+    w: 600,
+    h: 600,
+    text: { x: 30, y: 210, w: 540, h: 180 },
+    logo: { x: 184, y: 507, w: 31, h: 60 },
+  },
+  'banner-345x146': {
+    w: 345,
+    h: 146,
+    text: { x: 129, y: 40, w: 196, h: 66 },
+    logo: { x: 61, y: 38, w: 35, h: 71 },
+  },
 } as const;
+
+type Box = { readonly x: number; readonly y: number; readonly w: number; readonly h: number };
+const within = (box: Box, x: number, y: number) =>
+  x >= box.x && x < box.x + box.w && y >= box.y && y < box.y + box.h;
 type Format = keyof typeof FORMATS;
 const FORMAT_IDS = Object.keys(FORMATS) as Format[];
 
@@ -61,6 +85,13 @@ const FORMAT_IDS = Object.keys(FORMATS) as Format[];
 const CHANNEL_TOLERANCE = 8;
 /** The share of pixels outside the text box that may stray further: the raster tolerance. */
 const TOLERANCE = 0.001;
+
+/**
+ * Inside the logo box, the share of pixels that must differ from the cleared background. The
+ * placeholder fills its box but for a round hole and rounded corners, about nine tenths; half
+ * is far below that and far above a box left empty.
+ */
+const LOGO_DRAWN = 0.5;
 
 const background = (format: Format): Buffer =>
   readFileSync(join(BANNER, 'assets', `bg-${format}.png`));
@@ -207,7 +238,7 @@ describe("banner-roxo's backgrounds in the window and the CLI (TYTO-210)", () =>
     });
 
     for (const format of FORMAT_IDS) {
-      const { w, h, text } = FORMATS[format];
+      const { w, h, text, logo } = FORMATS[format];
 
       // The SVG: its own background, and byte for byte what the CLI wrote.
       const svg = readFileSync(join(fromWindow, `${format}-01.svg`), 'utf8');
@@ -219,31 +250,43 @@ describe("banner-roxo's backgrounds in the window and the CLI (TYTO-210)", () =>
       }
       expect(readFileSync(join(fromCli, `${format}-01.svg`), 'utf8'), format).toBe(svg);
 
-      // The PNG: outside the text's box, the background itself.
+      // The PNG: outside the text's and the logo's boxes, the background itself.
       const png = PNG.sync.read(readFileSync(join(fromWindow, `${format}-01.png`)));
       expect([png.width, png.height], format).toEqual([w, h]);
       const reference = onWhite(format);
+      const differs = (x: number, y: number) => {
+        const offset = (w * y + x) * 4;
+        for (let channel = 0; channel < 3; channel++) {
+          const delta = Math.abs(png.data[offset + channel]! - reference.data[offset + channel]!);
+          if (delta > CHANNEL_TOLERANCE) return true;
+        }
+        return false;
+      };
       let outside = 0;
       let differing = 0;
+      let drawnInLogo = 0;
       for (let y = 0; y < h; y++) {
         for (let x = 0; x < w; x++) {
-          const inText = x >= text.x && x < text.x + text.w && y >= text.y && y < text.y + text.h;
-          if (inText) continue;
-          outside++;
-          const offset = (w * y + x) * 4;
-          for (let channel = 0; channel < 3; channel++) {
-            const delta = Math.abs(png.data[offset + channel]! - reference.data[offset + channel]!);
-            if (delta > CHANNEL_TOLERANCE) {
-              differing++;
-              break;
-            }
+          if (within(logo, x, y)) {
+            if (differs(x, y)) drawnInLogo++;
+            continue;
           }
+          if (within(text, x, y)) continue;
+          outside++;
+          if (differs(x, y)) differing++;
         }
       }
       process.stdout.write(
-        `[TYTO-210] ${format} window png vs background outside the text: ${String(differing)} of ${String(outside)} pixels differ\n`,
+        `[TYTO-210] ${format} window png vs background outside the text and logo: ${String(differing)} of ${String(outside)} pixels differ\n`,
       );
       expect(differing / outside, format).toBeLessThanOrEqual(TOLERANCE);
+
+      // Skipping the logo box must not leave it unchecked: the background was cleared there,
+      // so the logo, or its placeholder, is what makes those pixels differ.
+      process.stdout.write(
+        `[TYTO-225] ${format} logo box: ${String(drawnInLogo)} of ${String(logo.w * logo.h)} pixels drawn over the background\n`,
+      );
+      expect(drawnInLogo / (logo.w * logo.h), `${format} logo`).toBeGreaterThanOrEqual(LOGO_DRAWN);
     }
   }, 180_000);
 });

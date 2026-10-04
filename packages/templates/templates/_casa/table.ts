@@ -9,10 +9,10 @@
  *
  * | row    | what                                     | size                               |
  * | ------ | ---------------------------------------- | ---------------------------------- |
- * | brand  | the owl, top left                        | `BRAND_ROW`                        |
+ * | brand  | the logo, top left                        | `BRAND_ROW`                        |
  * | title  | the brief's `titulo`, uppercase, centred | measured: ≤ `TITLE.maxLines` lines |
  * | table  | header, rows, bands; centred below title | measured: the fit loop             |
- * | handle | the brand's handle, centred, at the foot | `HANDLE`                           |
+ * | signature | the brand's signature, centred, at the foot | `SIGNATURE`                           |
  *
  * ## What is decided by measuring, and how
  *
@@ -30,7 +30,7 @@
  *    `TITLE.maxLines` lines — so neither the title nor the table dwarfs the other.
  *
  * The **fit loop** is a binary search for the largest `s` between `BODY.floor` and
- * `BODY.ceiling` whose title and table fit the room between the brand row and the handle.
+ * `BODY.ceiling` whose title and table fit the room between the brand row and the signature.
  * Height only grows with `s`, which is what makes the search valid. When even the floor does
  * not fit, the table is drawn at the floor and **`W_TEMPLATE_OVERFLOW` says by how much**
  * (ADR 0058) — never a silent cut.
@@ -43,7 +43,7 @@
 import { frame, group, lineBreak, rect, run, solid, text } from '@tyto/core/template';
 import { type Block, at, block, lines, mark, plain, reportOverflow } from '@tyto/template-kit';
 
-import { OWL } from './marks.js';
+import { logoOf, signatureOf } from './kit.js';
 import { pieces } from './breaks.js';
 import { glue, readTable } from './table-text.js';
 import {
@@ -51,8 +51,8 @@ import {
   BODY,
   BRAND_ROW,
   CELL,
-  HANDLE,
-  HANDLE_INK,
+  SIGNATURE,
+  SIGNATURE_INK,
   HEADER,
   INK,
   ON_ACCENT,
@@ -67,7 +67,7 @@ import { BLACK, BOLD, BOOK, FACE } from './tokens.js';
 
 import type { TableBrand } from './brands.js';
 import type { TableContent, TableRow } from './table-text.js';
-import type { RichText, TemplateBuild, TemplateContext, TextRun } from '@tyto/core';
+import type { BrandKit, RichText, TemplateBuild, TemplateContext, TextRun } from '@tyto/core';
 import type { NodeDraft, NonEmpty } from '@tyto/core/template';
 import type { Measure } from '@tyto/template-kit';
 
@@ -76,7 +76,7 @@ export function oneImageTable(brand: TableBrand): TemplateBuild {
   return (context: TemplateContext) => {
     const width = context.size.w - PAGE.side * 2;
     const regionTop = PAGE.top + BRAND_ROW.height;
-    const regionBottom = context.size.h - PAGE.bottom - HANDLE.height;
+    const regionBottom = context.size.h - PAGE.bottom - SIGNATURE.height;
     const room = regionBottom - regionTop;
 
     const table = readTable(richTextOf(context, 'tabela') ?? []);
@@ -98,10 +98,10 @@ export function oneImageTable(brand: TableBrand): TemplateBuild {
       idPrefix: context.idPrefix,
       background: solid(PAPER),
       children: [
-        at(PAGE.side, PAGE.top, mark(OWL, BRAND_ROW.owl, brand.accent, 'owl')),
+        at(PAGE.side, PAGE.top, mark(logoOf(context.brand), BRAND_ROW.logo, brand.accent, 'logo')),
         at(PAGE.side, regionTop, titleBlock),
         at(PAGE.side, tableY, tableBlock),
-        at(PAGE.side, regionBottom, drawHandle(brand, width)),
+        at(PAGE.side, regionBottom, drawSignature(context.brand, width)),
       ],
     });
   };
@@ -589,17 +589,24 @@ function drawTable(table: TableContent, glued: GluedTable, plan: TablePlan, acce
   return block(whole, height, group({ name: 'table', children }));
 }
 
-/** The handle, centred and tracked out, standing on the foot of its row. */
-function drawHandle(brand: TableBrand, width: number): Block {
+/** The signature, centred and tracked out, standing on the foot of its row. */
+function drawSignature(kit: BrandKit, width: number): Block {
   const words = text({
-    name: 'handle',
-    runs: [run(brand.handle, { font: FACE, size: HANDLE.size, weight: BOOK, color: HANDLE_INK })],
-    box: { w: width, h: HANDLE.height },
+    name: 'signature',
+    runs: [
+      run(signatureOf(kit), {
+        font: FACE,
+        size: SIGNATURE.size,
+        weight: BOOK,
+        color: SIGNATURE_INK,
+      }),
+    ],
+    box: { w: width, h: SIGNATURE.height },
     align: 'center',
     valign: 'bottom',
-    letterSpacing: HANDLE.tracking * HANDLE.size,
+    letterSpacing: SIGNATURE.tracking * SIGNATURE.size,
   });
-  return block(width, HANDLE.height, group({ name: 'sign-off', children: [words] }));
+  return block(width, SIGNATURE.height, group({ name: 'sign-off', children: [words] }));
 }
 
 /* ------------------------------------------------------------------------ helpers -- */

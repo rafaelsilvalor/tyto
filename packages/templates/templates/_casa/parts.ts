@@ -1,5 +1,5 @@
 /**
- * Pieces the weekly mock-exam agenda draws in every brand's accent: the owl, the sign-off
+ * Pieces the weekly mock-exam agenda draws in every brand's accent: the logo, the sign-off
  * and the grid's call to comment (TYTO-200).
  *
  * Each answers with a `Block`, so the composition places it without restating a number, and
@@ -9,41 +9,51 @@
 import { group, rect, run, solid, text } from '@tyto/core/template';
 import { type Block, at, block, mark, naturalWidth, textBlock } from '@tyto/template-kit';
 
-import { BALLOON, OWL } from './marks.js';
-import { BOLD, CHROME, CTA, FACE, HANDLE_TRACKING, LIGHT, SIGN_OFF_BOX, TYPE } from './tokens.js';
+import { logoOf, signatureOf } from './kit.js';
+import { BALLOON } from './marks.js';
+import {
+  BOLD,
+  CHROME,
+  CTA,
+  FACE,
+  LIGHT,
+  SIGNATURE_TRACKING,
+  SIGN_OFF_BOX,
+  TYPE,
+} from './tokens.js';
 
 import type { Brand } from './brands.js';
-import type { RichText } from '@tyto/core';
+import type { BrandKit, RichText } from '@tyto/core';
 import type { Measure } from '@tyto/template-kit';
 
-/** The owl, in the brand's accent: the same geometry as azul's. */
-export function owl(accent: string): Block {
-  return mark(OWL, CHROME.owl, accent, 'owl');
+/** The brand kit's logo, or its placeholder, in the brand's accent. */
+export function logo(kit: BrandKit, accent: string): Block {
+  return mark(logoOf(kit), CHROME.logo, accent, 'logo');
 }
 
 /**
- * The bottom area's words, left-aligned on one line: the handle, tracked out and light, or
- * roxo's note, bold.
+ * The bottom area's words, left-aligned on one line: the brand kit's signature, tracked out
+ * and light, or roxo's note, bold.
  *
- * A token and not a slot, as azul's handle is: the account a piece is published from does
- * not change from week to week.
+ * Not a slot, as azul's signature is not: the account a piece is published from does not
+ * change from week to week.
  */
-export function signOff(brand: Brand, width: number): Block {
-  const handle = brand.signOff.kind === 'handle';
+export function signOff(brand: Brand, kit: BrandKit, width: number): Block {
+  const signature = brand.signOff.kind === 'signature';
   const words = text({
-    name: handle ? 'handle' : 'note',
+    name: signature ? 'signature' : 'note',
     runs: [
-      run(brand.signOff.text, {
+      run(brand.signOff.kind === 'signature' ? signatureOf(kit) : brand.signOff.text, {
         font: FACE,
-        size: handle ? TYPE.handle : TYPE.note,
-        weight: handle ? LIGHT : BOLD,
+        size: signature ? TYPE.signature : TYPE.note,
+        weight: signature ? LIGHT : BOLD,
         color: brand.accent,
       }),
     ],
     box: { w: width, h: SIGN_OFF_BOX },
     align: 'left',
     valign: 'top',
-    ...(handle ? { letterSpacing: HANDLE_TRACKING } : {}),
+    ...(signature ? { letterSpacing: SIGNATURE_TRACKING } : {}),
   });
   return block(width, SIGN_OFF_BOX, group({ name: 'sign-off', children: [words] }));
 }

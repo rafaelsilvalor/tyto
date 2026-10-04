@@ -5,9 +5,9 @@
  *
  * | band   | what                                          | drawn by                               |
  * | ------ | --------------------------------------------- | -------------------------------------- |
- * | header | the owl                                       | `header()` — `_azul`                   |
+ * | header | the logo                                       | `header()` — `_azul`                   |
  * | middle | the cover (first slide only), then the table  | `titleBlock(coverTitle)`, `pillTable(sessionTable)` |
- * | footer | the handle, and the arrow unless last slide   | `footer()` — `_azul`                   |
+ * | footer | the signature, and the arrow unless last slide   | `footer()` — `_azul`                   |
  * | seal   | last slide only, when the brief has a `selo`  | `sealed` — kit; `sealOf` — house       |
  *
  * `bandedPage` centres the middle between the header and the footer, whatever the brief put
@@ -53,8 +53,8 @@ export const build: TemplateBuild = (context: TemplateContext) => {
       ...bandedPage({
         size: page.size,
         edges: { top: EDGE.top, bottom: EDGE.bottom, side: MARGIN },
-        header: { item: header(), band: BAND.header },
-        footer: footer(width, { next: hasNextSlide(context.artwork) }),
+        header: { item: header(context.brand), band: BAND.header },
+        footer: footer(width, context.brand, { next: hasNextSlide(context.artwork) }),
         middle,
       }),
       ...page.seal,

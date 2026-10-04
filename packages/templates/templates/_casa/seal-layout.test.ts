@@ -1,4 +1,4 @@
-import { measureNothing } from '@tyto/core';
+import { measureNothing, noBrandKit } from '@tyto/core';
 import { describe, expect, it } from 'vitest';
 
 import { build as agendaSemana } from '../agenda-semana/template.js';
@@ -93,6 +93,7 @@ function slide(each: Case, selo: AssetRef | undefined, index = 0, count = 1): Sc
     slots,
     adjustments: {},
     measure: measureNothing,
+    brand: noBrandKit,
   } as TemplateContext;
   return [...each.build(context).children];
 }
