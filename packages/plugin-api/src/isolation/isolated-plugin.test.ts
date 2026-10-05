@@ -1,4 +1,5 @@
 import {
+  type BrandMark,
   type Diagnostics,
   type Directive,
   MARK_PATH_LIMIT,
@@ -9,6 +10,7 @@ import {
   type TemplateRegistry,
   type TemplateReport,
   ok,
+  isTonedMark,
   parseManifest,
   resolve,
   sourceRange,
@@ -35,7 +37,7 @@ import type { HostCapabilities } from '../capabilities.js';
 import type { GuestChannel, PluginChannel } from './channel.js';
 import { runGuest } from './guest.js';
 import { type IsolatedPlugin, connectIsolatedPlugin } from './isolated-plugin.js';
-import type { SandboxReport } from './protocol.js';
+import { RPC_PROTOCOL_VERSION, type SandboxReport } from './protocol.js';
 
 /** What a confined process reports: its canary was refused (ADR 0049). */
 const CONFINED: SandboxReport = { runtime: 'Node v24.21.0', canary: 'denied', detail: '' };
@@ -388,8 +390,8 @@ describe('what an isolated plugin cannot do', () => {
     );
   });
 
-  // A bootstrap left behind by an upgrade: 2 is the number before the brand kit joined the
-  // template call (ADR 0063), and it is refused by name rather than by a schema complaint.
+  // A bootstrap left behind by an upgrade: 3 is the number before the kit's marks could be
+  // toned (ADR 0066), and it is refused by name rather than by a schema complaint.
   it('speaks another protocol', async () => {
     const pair = channelPair(() => undefined);
     const connecting = connectIsolatedPlugin({
@@ -398,10 +400,10 @@ describe('what an isolated plugin cannot do', () => {
       manifest: MANIFEST,
       channel: pair.host,
     });
-    pair.inject({ type: 'hello', protocol: 2, sandbox: CONFINED });
+    pair.inject({ type: 'hello', protocol: RPC_PROTOCOL_VERSION - 1, sandbox: CONFINED });
     const connected = await connecting;
     expect(connected.ok ? '' : connected.error[0]?.message).toBe(
-      "Plugin 'texto' failed to activate: its process speaks protocol 2 and this host speaks 3.",
+      "Plugin 'texto' failed to activate: its process speaks protocol 3 and this host speaks 4.",
     );
   });
 
@@ -921,6 +923,13 @@ describe('an isolated template’s files (ADR 0062)', () => {
   });
 });
 
+/** A kit mark as one string, so a template can hand what it received back through `format`. */
+function logoPaths(mark: BrandMark | undefined): string {
+  if (mark === undefined) return 'none';
+  if (!isTonedMark(mark)) return mark.d;
+  return mark.layers.map((layer) => `${layer.tone}:${layer.d}`).join(',');
+}
+
 describe('an isolated plugin’s brand kit (ADR 0063)', () => {
   // Invented: a brand nobody has and a triangle.
   const TRIANGLE = {
@@ -929,6 +938,17 @@ describe('an isolated plugin’s brand kit (ADR 0063)', () => {
     fillRule: 'nonzero',
   } as const;
   const KIT = { logo: TRIANGLE, signature: '@test-brand' };
+  // Invented: a square in a frame, in two tones, and two bars standing in for a name.
+  const TONED_KIT = {
+    logo: {
+      box: { w: 10, h: 10 },
+      layers: [
+        { tone: 'secondary', d: 'M0 0H10V10H0Z M2 2V8H8V2Z', fillRule: 'evenodd' },
+        { tone: 'primary', d: 'M3 3H7V7H3Z', fillRule: 'nonzero' },
+      ],
+    },
+    wordmark: TRIANGLE,
+  } as const;
 
   async function registered(
     kit: BrandKitContribution,
@@ -951,6 +971,13 @@ describe('an isolated plugin’s brand kit (ADR 0063)', () => {
     expect(activated.host.registry.brandKitsByBrand().kits.get('test-brand')).toEqual(KIT);
   });
 
+  it('crosses a toned logo and a wordmark as data (ADR 0066)', async () => {
+    const activated = await registered({ id: 'kit', brands: { 'test-brand': TONED_KIT } });
+
+    expect(activated.ok).toBe(true);
+    expect(activated.host.registry.brandKitsByBrand().kits.get('test-brand')).toEqual(TONED_KIT);
+  });
+
   it.each([
     ['a brand id a manifest could not name', { 'Test Brand': KIT }],
     [
@@ -962,6 +989,40 @@ describe('an isolated plugin’s brand kit (ADR 0063)', () => {
       { 'test-brand': { logo: { ...TRIANGLE, d: 'M0 0'.padEnd(MARK_PATH_LIMIT + 1, ' ') } } },
     ],
     ['a box of no size', { 'test-brand': { logo: { ...TRIANGLE, box: { w: 0, h: 10 } } } }],
+    [
+      'a layer with a colour',
+      {
+        'test-brand': {
+          logo: {
+            box: TRIANGLE.box,
+            layers: [{ tone: 'primary', d: 'M0 0', fillRule: 'nonzero', fill: '#f00' }],
+          },
+        },
+      },
+    ],
+    [
+      'a tone outside the list',
+      {
+        'test-brand': {
+          logo: { box: TRIANGLE.box, layers: [{ tone: 'accent', d: 'M0 0', fillRule: 'nonzero' }] },
+        },
+      },
+    ],
+    [
+      'layers whose paths together pass the limit, each under it',
+      {
+        'test-brand': {
+          wordmark: {
+            box: TRIANGLE.box,
+            layers: ['primary', 'secondary'].map((tone) => ({
+              tone,
+              d: 'M0 0'.padEnd(MARK_PATH_LIMIT / 2 + 1, ' '),
+              fillRule: 'nonzero',
+            })),
+          },
+        },
+      },
+    ],
   ])('refuses %s, at activation, before the host holds anything', async (_, brands) => {
     const { connected } = await isolate(
       (host) => host.registerBrandKit({ id: 'kit', brands } as unknown as BrandKitContribution),
@@ -980,7 +1041,11 @@ describe('an isolated plugin’s brand kit (ADR 0063)', () => {
       // The template writes what it was handed into the frame's format, which is the one
       // string that crosses back unchecked against a vocabulary.
       build: (_template, context) => ({
-        format: `${context.brand.signature ?? 'none'}|${context.brand.logo?.d ?? 'none'}`,
+        format: [
+          context.brand.signature ?? 'none',
+          logoPaths(context.brand.logo),
+          logoPaths(context.brand.wordmark),
+        ].join('|'),
         size: context.size,
         children: [],
       }),
@@ -1004,9 +1069,13 @@ describe('an isolated plugin’s brand kit (ADR 0063)', () => {
     };
 
     const withKit = await build('demo', call, []);
+    const withTonedKit = await build('demo', { ...call, brand: TONED_KIT }, []);
     const withoutKit = await build('demo', { ...call, brand: {} }, []);
 
-    expect(withKit.ok && withKit.value.frame.format).toBe('@test-brand|M0 10 L5 0 L10 10 Z');
-    expect(withoutKit.ok && withoutKit.value.frame.format).toBe('none|none');
+    expect(withKit.ok && withKit.value.frame.format).toBe('@test-brand|M0 10 L5 0 L10 10 Z|none');
+    expect(withTonedKit.ok && withTonedKit.value.frame.format).toBe(
+      'none|secondary:M0 0H10V10H0Z M2 2V8H8V2Z,primary:M3 3H7V7H3Z|M0 10 L5 0 L10 10 Z',
+    );
+    expect(withoutKit.ok && withoutKit.value.frame.format).toBe('none|none|none');
   });
 });

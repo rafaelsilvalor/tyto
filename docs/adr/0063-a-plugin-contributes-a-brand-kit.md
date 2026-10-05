@@ -2,7 +2,13 @@
 
 Status: accepted · 2026-10-04 · TYTO-223 · extends ADR 0007 (built-in is a plugin), ADR 0020
 (earlier source wins), ADR 0048 (an installed code template's context crosses without its
-functions) and ADR 0052 (a manifest names its brand)
+functions) and ADR 0052 (a manifest names its brand) · amended by ADR 0066, which lets a mark
+carry tones and a kit carry a wordmark
+
+## Amended by ADR 0066
+
+A kit's logo may be toned layers as well as one `MarkShape`, a kit may carry a `wordmark`, the
+path limit bounds the sum of a toned mark's layers, and the protocol is 4. The rest stands.
 
 ## Context
 

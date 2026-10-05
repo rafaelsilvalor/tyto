@@ -18,9 +18,11 @@ import { z } from 'zod';
 
 /**
  * 2 since `hello` carried the sandbox report (ADR 0049); 3 since a template call carries
- * the brand kit, which a strict schema on an older guest would refuse (ADR 0063).
+ * the brand kit, which a strict schema on an older guest would refuse (ADR 0063); 4 since
+ * the kit's marks may be toned and it may carry a wordmark, which a guest on 3 would
+ * refuse the same way (ADR 0066).
  */
-export const RPC_PROTOCOL_VERSION = 3;
+export const RPC_PROTOCOL_VERSION = 4;
 
 const protocol = z.literal(RPC_PROTOCOL_VERSION);
 

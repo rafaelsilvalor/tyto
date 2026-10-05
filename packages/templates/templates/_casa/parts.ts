@@ -9,7 +9,7 @@
 import { group, rect, run, solid, text } from '@tyto/core/template';
 import { type Block, at, block, mark, naturalWidth, textBlock } from '@tyto/template-kit';
 
-import { logoOf, signatureOf } from './kit.js';
+import { drawLogo, oneInk, signatureOf } from './kit.js';
 import { BALLOON } from './marks.js';
 import {
   BOLD,
@@ -28,7 +28,7 @@ import type { Measure } from '@tyto/template-kit';
 
 /** The brand kit's logo, or its placeholder, in the brand's accent. */
 export function logo(kit: BrandKit, accent: string): Block {
-  return mark(logoOf(kit), CHROME.logo, accent, 'logo');
+  return drawLogo(kit, CHROME.logo, oneInk(accent));
 }
 
 /**

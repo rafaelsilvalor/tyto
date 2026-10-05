@@ -8,6 +8,7 @@ import { PLACEHOLDER_LOGO } from '../_casa/marks.js';
 
 import type {
   AssetRef,
+  BrandKit,
   Frame,
   Inline,
   RichText,
@@ -150,6 +151,7 @@ function render(
   titulo: string,
   format: string,
   measure: TemplateContext['measure'] = proportional,
+  brand: BrandKit = noBrandKit,
 ): Built {
   const reports: TemplateReport[] = [];
   const frame = build({
@@ -164,7 +166,7 @@ function render(
     measure,
     report: (report) => reports.push(report),
     files: folder,
-    brand: noBrandKit,
+    brand,
   });
   return { frame, reports };
 }
@@ -311,6 +313,116 @@ describe('banner-roxo with nothing to measure', () => {
     const node = titleOf(render(PREFEITURA, 'banner', measureNothing).frame);
     expect(node.overflow).toBe('shrink');
     expect(linesOf({ ...node, box: {} }).join(' ')).toBe(PREFEITURA.replaceAll('**', ''));
+  });
+});
+
+/* -------------------------------------------------------------- with a brand kit -- */
+
+/**
+ * An invented kit (ADR 0066): a frame around a bar for a logo, two bars for a wordmark. Each
+ * mark holds both tones, so a template that drew every layer in one colour would show here.
+ */
+const TONED_KIT: BrandKit = {
+  logo: {
+    box: { w: 10, h: 20 },
+    layers: [
+      { tone: 'secondary', d: 'M0 0H10V20H0Z M2 2V18H8V2Z', fillRule: 'evenodd' },
+      { tone: 'primary', d: 'M3 6H7V16H3Z', fillRule: 'nonzero' },
+    ],
+  },
+  wordmark: {
+    box: { w: 100, h: 26 },
+    layers: [
+      { tone: 'primary', d: 'M0 0H100V20H0Z', fillRule: 'nonzero' },
+      { tone: 'secondary', d: 'M0 22H40V26H0Z', fillRule: 'nonzero' },
+    ],
+  },
+};
+
+/** The two purples #301 measured on the backgrounds: the darker inside, the lighter around. */
+const DARKER = solidOf('#4c30a6');
+const LIGHTER = solidOf('#7560ef');
+
+function nodeNamed(frame: Frame, name: string): SceneNode | undefined {
+  return frame.children.find((child: SceneNode) => child.name === name);
+}
+
+/** A toned mark's layers as the scene holds them: each fill, and the box it is drawn in. */
+function layersOf(node: SceneNode | undefined) {
+  if (node?.kind !== 'group') throw new Error(`not a group: ${String(node?.kind)}`);
+  return node.children.map((child) => {
+    if (child.kind !== 'vector') throw new Error('a layer that is not a vector');
+    return {
+      fill: child.fill,
+      x: node.transform.x,
+      y: node.transform.y,
+      w: child.size.w * child.transform.scaleX,
+      h: child.size.h * child.transform.scaleY,
+    };
+  });
+}
+
+describe('banner-roxo with a kit whose marks have two tones (ADR 0066)', () => {
+  it.each(Object.keys(SIZES))('draws the logo in %s in both purples, in its box', (format) => {
+    const box = LAYOUTS[format]!.logo!;
+    const layers = layersOf(
+      nodeNamed(render(PREFEITURA, format, proportional, TONED_KIT).frame, 'logo'),
+    );
+
+    expect(layers.map((layer) => layer.fill)).toEqual([
+      { kind: 'solid', color: LIGHTER },
+      { kind: 'solid', color: DARKER },
+    ]);
+    for (const layer of layers) {
+      expect(layer.h).toBeCloseTo(box.h);
+      expect(layer.y).toBe(box.y);
+      expect(layer.x + layer.w / 2).toBeCloseTo(box.x + box.w / 2);
+    }
+  });
+
+  it('draws the wordmark in the square format, inside the box the painted-out one took', () => {
+    const box = LAYOUTS['banner-1x1']!.wordmark!;
+    const layers = layersOf(
+      nodeNamed(render(PREFEITURA, 'banner-1x1', proportional, TONED_KIT).frame, 'wordmark'),
+    );
+
+    // The first line in the darker purple and the second in the lighter, as measured.
+    expect(layers.map((layer) => layer.fill)).toEqual([
+      { kind: 'solid', color: DARKER },
+      { kind: 'solid', color: LIGHTER },
+    ]);
+    for (const layer of layers) {
+      expect(layer.x).toBe(box.x);
+      expect(layer.y).toBeGreaterThanOrEqual(box.y);
+      expect(layer.y + layer.h).toBeLessThanOrEqual(box.y + box.h);
+      expect(layer.w).toBeLessThanOrEqual(box.w);
+      // As large as fits: this wordmark is a hair wider than the box, so the width decides.
+      expect(layer.w).toBeCloseTo(box.w);
+    }
+  });
+
+  it.each(['banner', 'banner-345x146'])(
+    'draws no wordmark in %s, which has no room for one',
+    (format) => {
+      expect(
+        nodeNamed(render(PREFEITURA, format, proportional, TONED_KIT).frame, 'wordmark'),
+      ).toBeUndefined();
+    },
+  );
+
+  it('draws no wordmark, and no stand-in for one, without a kit', () => {
+    expect(nodeNamed(render(PREFEITURA, 'banner-1x1').frame, 'wordmark')).toBeUndefined();
+  });
+
+  it('draws a one-shape logo (ADR 0063) in the darker purple, as before marks had tones', () => {
+    const shape = { box: { w: 10, h: 20 }, d: 'M0 0H10V20H0Z', fillRule: 'nonzero' } as const;
+    const logo = nodeNamed(
+      render(PREFEITURA, 'banner', proportional, { logo: shape }).frame,
+      'logo',
+    );
+
+    expect(logo?.kind).toBe('vector');
+    expect(logo?.kind === 'vector' && logo.fill).toEqual({ kind: 'solid', color: DARKER });
   });
 });
 

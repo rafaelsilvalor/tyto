@@ -527,17 +527,17 @@ remembering.
 build: (context: TemplateContext) => Frame;
 ```
 
-| `context`     | What it is                                                                                                                               |
-| ------------- | ---------------------------------------------------------------------------------------------------------------------------------------- |
-| `format`      | the format this call is for, one of the manifest's                                                                                       |
-| `idPrefix`    | **pass it to `frame({ idPrefix })`** — see below                                                                                         |
-| `artwork`     | `{ id, index, count }`, so a slide can number itself `2/3`                                                                               |
-| `slots`       | every slot the brief gave a value, with the repeatable one already resolved to _this_ artwork's occurrence — `slots.slide` is this slide |
-| `adjustments` | this artwork's, flattened: `true` for a flag, the value for an enum                                                                      |
-| `measure`     | `measure(textDraft)` — the lines, width and height a text node will be laid out at, or `undefined` when nothing can measure (ADR 0038)   |
-| `report`      | `report({ code: 'W_TEMPLATE_OVERFLOW', overflow })` — a warning about this frame, from a closed list, which `compile` writes (ADR 0058)  |
-| `files`       | `files.image(path)` and `files.svg(path)` — the files in the template's own folder, by folder-relative path, or `undefined` (ADR 0062)   |
-| `brand`       | `{ logo?, signature? }` — the kit a plugin supplied for the manifest's `brand`; both `undefined` when there is none (ADR 0063)           |
+| `context`     | What it is                                                                                                                                     |
+| ------------- | ---------------------------------------------------------------------------------------------------------------------------------------------- |
+| `format`      | the format this call is for, one of the manifest's                                                                                             |
+| `idPrefix`    | **pass it to `frame({ idPrefix })`** — see below                                                                                               |
+| `artwork`     | `{ id, index, count }`, so a slide can number itself `2/3`                                                                                     |
+| `slots`       | every slot the brief gave a value, with the repeatable one already resolved to _this_ artwork's occurrence — `slots.slide` is this slide       |
+| `adjustments` | this artwork's, flattened: `true` for a flag, the value for an enum                                                                            |
+| `measure`     | `measure(textDraft)` — the lines, width and height a text node will be laid out at, or `undefined` when nothing can measure (ADR 0038)         |
+| `report`      | `report({ code: 'W_TEMPLATE_OVERFLOW', overflow })` — a warning about this frame, from a closed list, which `compile` writes (ADR 0058)        |
+| `files`       | `files.image(path)` and `files.svg(path)` — the files in the template's own folder, by folder-relative path, or `undefined` (ADR 0062)         |
+| `brand`       | `{ logo?, wordmark?, signature? }` — the kit a plugin supplied for the manifest's `brand`; all `undefined` when there is none (ADR 0063, 0066) |
 
 **`measure` is how a box grows with its text.** Build the text node first, ask, then size
 what surrounds it: `const m = context.measure(title)` and a pill `m.height + padding` tall.

@@ -189,9 +189,10 @@ Lifting only the geometry has a second payoff: the same mark is white on a dark 
 blue on a light one without a second file.
 
 **A brand's logo and signature are not tokens of the repository.** A brand kit supplies them
-(ADR 0063) and the template reads them through `logoOf(context.brand)` and
+(ADR 0063) and the template reads them through `drawLogo(context.brand, height, inks)` and
 `signatureOf(context.brand)` in `_casa/kit.ts`, which answer the placeholders when the kit
-leaves a field out (ADR 0065). `tools/repo-checks` fails when a known brand token comes back
+leaves a field out (ADR 0065). A kit's mark may come in two tones (ADR 0066); the template
+passes the colour of each, and `oneInk(colour)` where it draws the logo in one. `tools/repo-checks` fails when a known brand token comes back
 into a tracked text file.
 
 **A path vector's `size` is its viewport, not the size it is drawn at.** `export-html` emits

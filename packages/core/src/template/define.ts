@@ -105,7 +105,8 @@ export interface TemplateContext {
 
   /**
    * The kit of the template's own brand — the manifest's `brand` (ADR 0052) — as a plugin
-   * contributed it (ADR 0063): a logo `Mark` and a signature.
+   * contributed it (ADR 0063): a logo, a wordmark (each one shape or toned layers, ADR 0066)
+   * and a signature.
    *
    * Always an object. **A field that is `undefined` means nobody supplied it**, for this
    * brand or because the manifest names none, and the template decides what stands in its

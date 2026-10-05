@@ -41,9 +41,9 @@
  */
 
 import { frame, group, lineBreak, rect, run, solid, text } from '@tyto/core/template';
-import { type Block, at, block, lines, mark, plain, reportOverflow } from '@tyto/template-kit';
+import { type Block, at, block, lines, plain, reportOverflow } from '@tyto/template-kit';
 
-import { logoOf, signatureOf } from './kit.js';
+import { drawLogo, oneInk, signatureOf } from './kit.js';
 import { pieces } from './breaks.js';
 import { glue, readTable } from './table-text.js';
 import {
@@ -98,7 +98,7 @@ export function oneImageTable(brand: TableBrand): TemplateBuild {
       idPrefix: context.idPrefix,
       background: solid(PAPER),
       children: [
-        at(PAGE.side, PAGE.top, mark(logoOf(context.brand), BRAND_ROW.logo, brand.accent, 'logo')),
+        at(PAGE.side, PAGE.top, drawLogo(context.brand, BRAND_ROW.logo, oneInk(brand.accent))),
         at(PAGE.side, regionTop, titleBlock),
         at(PAGE.side, tableY, tableBlock),
         at(PAGE.side, regionBottom, drawSignature(context.brand, width)),

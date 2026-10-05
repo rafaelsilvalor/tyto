@@ -65,7 +65,7 @@ The last four are named `<id>.tyto-plugin.json` and that is the one place a buil
 | `exporter`        | one **frame** to a document + mime + extension + the kinds it produces  | html, svg                                             |
 | `rasterizer`      | `Rasterizer` — `raster(html, opts): Promise<Uint8Array>`                | chromium                                              |
 | `template-pack`   | folder of templates                                                     | built-in templates                                    |
-| `brand-kit`       | a logo mark and a signature per brand id (ADR 0063)                     | —                                                     |
+| `brand-kit`       | a logo, a wordmark and a signature per brand id (ADR 0063, ADR 0066)    | —                                                     |
 | `directive`       | `::ns/name` in the brief → the slot directives it stands for (ADR 0043) | —                                                     |
 | `editor.command`  | `{ id, run(ctx), undo? }`                                               | core-commands                                         |
 | `editor.keymap`   | binding → command id (normal and vim)                                   | default-keymap, vim                                   |
@@ -225,9 +225,11 @@ what a `font:<family>` permission sends.
 A kit is what a template draws as its brand's logo and signature, supplied by a plugin rather
 than written into the template (ADR 0063). The contribution is `{ id, brands }`: `id` names the
 kit, and `brands` maps a brand id — spelled as a manifest's `brand` (ADR 0052) — to
-`{ logo?, signature? }`. A logo is a `MarkShape`, `{ box, d, fillRule }`, with no colour: the
-template fills it where it places it. A path is at most 65 536 characters and a signature at
-most 500.
+`{ logo?, wordmark?, signature? }`. A logo or a wordmark is a `MarkShape`, `{ box, d, fillRule }`,
+or toned layers, `{ box, layers: [{ tone, d, fillRule }] }` with `tone` `primary` or
+`secondary` (ADR 0066) — never a colour: the template decides each tone's colour where it places
+the mark, and a one-shape mark is all `primary`. A mark's paths together are at most 65 536
+characters, a toned mark has at most 16 layers, and a signature is at most 500 characters.
 
 A template reads the kit of **its own** brand from `context.brand`, and never another's. A
 template that names no brand, or whose brand nobody supplied, gets both fields `undefined`, and

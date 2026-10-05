@@ -13,7 +13,7 @@
 import { group, run, text } from '@tyto/core/template';
 import { type Block, at, block, mark } from '@tyto/template-kit';
 
-import { logoOf, signatureOf } from '../_casa/kit.js';
+import { drawLogo, oneInk, signatureOf } from '../_casa/kit.js';
 
 import { ARROW, BAND, CHROME, FACE, INK, LIGHT, TYPE } from './tokens.js';
 
@@ -21,7 +21,7 @@ import type { BrandKit } from '@tyto/core';
 
 /** The brand kit's logo, or its placeholder, top left of every slide. */
 export function header(kit: BrandKit): Block {
-  return mark(logoOf(kit), CHROME.logo, INK, 'logo');
+  return drawLogo(kit, CHROME.logo, oneInk(INK));
 }
 
 /**

@@ -21,17 +21,55 @@ export const MARK_PATH_LIMIT = 65_536;
 /** The longest signature a kit may carry, in characters: a line of text, not a document. */
 export const SIGNATURE_LIMIT = 500;
 
-export const markSchema = z.strictObject({
-  box: z.strictObject({
-    w: z.number().positive().finite(),
-    h: z.number().positive().finite(),
-  }),
-  d: z.string().min(1).max(MARK_PATH_LIMIT),
-  fillRule: z.enum(['nonzero', 'evenodd']),
+const boxSchema = z.strictObject({
+  w: z.number().positive().finite(),
+  h: z.number().positive().finite(),
 });
 
+const fillRuleSchema = z.enum(['nonzero', 'evenodd']);
+
+export const markSchema = z.strictObject({
+  box: boxSchema,
+  d: z.string().min(1).max(MARK_PATH_LIMIT),
+  fillRule: fillRuleSchema,
+});
+
+/**
+ * The most layers a toned mark may hold (ADR 0066). A logo in two tones needs two; sixteen
+ * leaves room for a shape cut into several pieces without inviting one layer per detail.
+ */
+export const MARK_LAYER_LIMIT = 16;
+
+/**
+ * A toned mark. `MARK_PATH_LIMIT` bounds the **sum** of its layers' paths, not each one: the
+ * cost the limit exists for is the kit riding every call, and sixteen layers each at the limit
+ * would be sixteen times what a one-path mark may cost.
+ */
+export const tonedMarkSchema = z
+  .strictObject({
+    box: boxSchema,
+    layers: z
+      .array(
+        z.strictObject({
+          tone: z.enum(['primary', 'secondary']),
+          d: z.string().min(1),
+          fillRule: fillRuleSchema,
+        }),
+      )
+      .min(1)
+      .max(MARK_LAYER_LIMIT),
+  })
+  .refine(
+    (mark) => mark.layers.reduce((total, layer) => total + layer.d.length, 0) <= MARK_PATH_LIMIT,
+    { message: `the layers' paths together must be at most ${String(MARK_PATH_LIMIT)} characters` },
+  );
+
+/** A kit's logo or wordmark: one shape, or toned layers (ADR 0066). */
+export const brandMarkSchema = z.union([markSchema, tonedMarkSchema]);
+
 export const brandKitSchema = z.strictObject({
-  logo: markSchema.optional(),
+  logo: brandMarkSchema.optional(),
+  wordmark: brandMarkSchema.optional(),
   signature: z.string().max(SIGNATURE_LIMIT).optional(),
 });
 

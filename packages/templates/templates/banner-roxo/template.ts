@@ -18,14 +18,15 @@ import type { TemplateBuild } from '@tyto/core';
 const LINE_HEIGHT = 1.18;
 
 /**
- * The logo's colour: the darker of the two purples the backgrounds had it painted in, read off
- * their pixels. The kit's mark is one colour, so one of the two had to be chosen.
+ * The two purples the backgrounds had the logo and the wordmark painted in, read off their
+ * pixels (table below). `primary` is the darker, which is also the one a one-shape logo is
+ * drawn in, as it was before a kit's marks had tones (ADR 0066).
  */
-const LOGO_INK = '#4c30a6';
+const MARK_INKS = { primary: '#4c30a6', secondary: '#7560ef' } as const;
 
 /*
  * What the backgrounds held before the logo was painted out of them (TYTO-225), measured on
- * their pixels, for a kit that draws the art as it was (TYTO-230). Boxes are x, y, w, h.
+ * their pixels; a kit draws the art as it was into these boxes (TYTO-230). Boxes are x, y, w, h.
  *
  * | format         | logo box          | wordmark box       |
  * | -------------- | ----------------- | ------------------ |
@@ -53,6 +54,7 @@ export const LAYOUTS: Readonly<Record<string, BannerLayout>> = {
     sizes: { floor: 36, ceiling: 50, step: 0.5 },
     lineHeight: LINE_HEIGHT,
     logo: { x: 184, y: 507, w: 31, h: 60 },
+    wordmark: { x: 226, y: 513, w: 188, h: 49 },
   },
   // Right of the logo, in the white area before the purple shapes.
   'banner-345x146': {
@@ -65,6 +67,6 @@ export const LAYOUTS: Readonly<Record<string, BannerLayout>> = {
 
 export const build: TemplateBuild = productBanner({
   ink: ROXO.accent,
-  logoInk: LOGO_INK,
+  markInks: MARK_INKS,
   layouts: LAYOUTS,
 });

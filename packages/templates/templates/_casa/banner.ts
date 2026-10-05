@@ -4,7 +4,8 @@
  *
  * The background is a PNG per format in the template's own folder, read through
  * `context.files` (ADR 0062): `assets/bg-<format>.png`, drawn full-bleed. Over it go the
- * brand kit's logo, or its placeholder (ADR 0065), in the format's logo box, and the text.
+ * brand kit's logo, or its placeholder (ADR 0065), in the format's logo box; the kit's
+ * wordmark, when it has one and the format has a box for it (ADR 0066); and the text.
  *
  * The text is set by `balance.ts` in the format's {@link BannerLayout} box: the largest size
  * between the layout's floor and ceiling at which it fits, its lines balanced, a
@@ -18,17 +19,26 @@
  */
 
 import { frame, image, lineBreak, run, runsOf, solid, text } from '@tyto/core/template';
-import { at, atLeastOne, mark, reportOverflow } from '@tyto/template-kit';
+import { at, atLeastOne, reportOverflow } from '@tyto/template-kit';
 
 import { balance } from './balance.js';
 import { glueParenthesised } from './breaks.js';
-import { logoOf } from './kit.js';
+import { drawBrandMark, drawLogo } from './kit.js';
 import { BOLD, BOOK, FACE, PAPER } from './tokens.js';
 
 import type { SizeRange } from './balance.js';
+import type { ToneInks } from './kit.js';
 import type { RichText, TemplateBuild, TemplateContext, TextRun, TextSpan } from '@tyto/core';
 import type { NodeDraft } from '@tyto/core/template';
 import type { Measure } from '@tyto/template-kit';
+
+/** A box in a format's pixels. */
+interface Box {
+  readonly x: number;
+  readonly y: number;
+  readonly w: number;
+  readonly h: number;
+}
 
 /** Where one format's text goes, and how large it may be. */
 export interface BannerLayout {
@@ -42,20 +52,21 @@ export interface BannerLayout {
    * The box the logo is drawn in, in the format's pixels. It is drawn at the box's height and
    * centred across its width, so a kit's logo of another shape keeps the same centre line.
    */
-  readonly logo?: {
-    readonly x: number;
-    readonly y: number;
-    readonly w: number;
-    readonly h: number;
-  };
+  readonly logo?: Box;
+  /**
+   * The box the kit's wordmark is drawn in, when the kit has one (ADR 0066): as large as fits,
+   * from the box's left edge, centred across its height. Without a kit nothing stands here —
+   * no layout needs the room held, and the banner without a kit stays what it was.
+   */
+  readonly wordmark?: Box;
 }
 
 /** What one brand's banner is drawn with. */
 export interface BannerStyle {
   /** The text's colour. */
   readonly ink: string;
-  /** The logo's colour. */
-  readonly logoInk: string;
+  /** The colours of the logo's and the wordmark's tones; a one-shape mark is all `primary`. */
+  readonly markInks: ToneInks;
   /** Each format's layout, by format id. */
   readonly layouts: Readonly<Record<string, BannerLayout>>;
 }
@@ -78,8 +89,15 @@ export function productBanner(style: BannerStyle): TemplateBuild {
       children.push(image({ name: 'background', asset: background, size: context.size }));
     }
     if (layout.logo !== undefined) {
-      const logo = mark(logoOf(context.brand), layout.logo.h, style.logoInk, 'logo');
+      const logo = drawLogo(context.brand, layout.logo.h, style.markInks);
       children.push(at(layout.logo.x + (layout.logo.w - logo.width) / 2, layout.logo.y, logo));
+    }
+    const wordmark = context.brand.wordmark;
+    if (layout.wordmark !== undefined && wordmark !== undefined) {
+      const box = layout.wordmark;
+      const height = Math.min(box.h, (box.w * wordmark.box.h) / wordmark.box.w);
+      const drawn = drawBrandMark(wordmark, height, style.markInks, 'wordmark');
+      children.push(at(box.x, box.y + (box.h - height) / 2, drawn));
     }
     const titulo = setTitle(words, layout, context.measure);
     if (titulo !== undefined) {
