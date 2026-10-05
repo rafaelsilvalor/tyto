@@ -92,6 +92,31 @@ async function runFromBar(id: string): Promise<void> {
   await page.waitForTimeout(500);
 }
 
+/**
+ * Waits until the bar offers `id`, then closes it again.
+ *
+ * A plugin's panel command is registered only when main answers `plugins:panels`, which
+ * the window does not wait for, and nothing in the DOM marks that moment except the
+ * command itself. Idle on Windows it arrives about 1.2 s after the window; under load it
+ * took 2.7 to 15.6 s, and a fixed sleep typed into a bar that said "no match" (TYTO-228).
+ * The deadline sits well inside the test's own timeout, so a red names this wait instead
+ * of a Vitest timeout.
+ */
+async function waitForCommand(id: string): Promise<void> {
+  const started = Date.now();
+  for (;;) {
+    await page.keyboard.press('Control+k');
+    await page.waitForSelector('.command-bar__input', { state: 'visible' });
+    await page.keyboard.type(id);
+    await page.waitForTimeout(100);
+    const offered = (await page.locator('.command-bar__option').count()) > 0;
+    await page.keyboard.press('Escape');
+    if (offered) return;
+    if (Date.now() - started > 30_000) throw new Error(`the command bar never offered ${id}`);
+    await page.waitForTimeout(200);
+  }
+}
+
 /** The panel's frame, once its page has loaded. */
 async function panelFrame(): Promise<Frame> {
   const started = Date.now();
@@ -136,7 +161,7 @@ describe('a plugin panel in the window', () => {
   it('is offered closed, and opens from the command bar', async () => {
     await page.waitForFunction(() => document.querySelector('tyto-plugin-panel') === null);
     // The panels arrive once the plugins have started; the command appears with them.
-    await page.waitForTimeout(1_500);
+    await waitForCommand(`layout.togglePanel:${PANEL_ID}`);
     await runFromBar(`layout.togglePanel:${PANEL_ID}`);
     await page.waitForSelector(`[data-panel="${PANEL_ID}"] iframe`, { timeout: 10_000 });
     expect(await page.textContent(`[data-panel="${PANEL_ID}"] .work__title`)).toBe('Contagem');
