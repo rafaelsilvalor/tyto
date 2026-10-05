@@ -1,4 +1,4 @@
-import { mkdir, mkdtemp, readFile, readdir, rm, writeFile } from 'node:fs/promises';
+import { open, mkdir, mkdtemp, readFile, readdir, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
@@ -8,7 +8,7 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
 import { isInside } from './contain.js';
 import { fileResources } from './file-resources.js';
-import { fsInbox } from './fs-inbox.js';
+import { fsInbox, renameRetryingLocks } from './fs-inbox.js';
 import { fileTemplateAssets } from './file-template-assets.js';
 import { fsDeliveryOutput, fsOutbox, fsTaskOutput } from './fs-outbox.js';
 import { nodeFileSystem } from './node-file-system.js';
@@ -79,6 +79,80 @@ describe('fsInbox', () => {
 
     expect(task?.briefDirectory.endsWith('bare')).toBe(true);
   });
+});
+
+describe('the ack rename (TYTO-198)', () => {
+  /** A rename that fails with `codes` in order, then succeeds. */
+  function failing(...codes: string[]) {
+    const calls: string[] = [];
+    const move = (from: string): Promise<void> => {
+      calls.push(from);
+      const code = codes.shift();
+      if (code === undefined) return Promise.resolve();
+      return Promise.reject(Object.assign(new Error(`${code}: rename`), { code }));
+    };
+    return { calls, move };
+  }
+
+  it('gets past a lock that lets go within the window', async () => {
+    const { calls, move } = failing('EPERM', 'EBUSY', 'EACCES');
+
+    await renameRetryingLocks('from', 'to', move);
+
+    expect(calls).toHaveLength(4);
+  });
+
+  it('still fails on a lock that outlives the window, as a folder open in Explorer does', async () => {
+    // The promise `queue.ts` makes: a task the OS will not let go of is reported on the
+    // task, not retried for ever and not swallowed.
+    const { calls, move } = failing('EPERM', 'EPERM', 'EPERM', 'EPERM', 'EPERM', 'EPERM', 'EPERM');
+
+    await expect(renameRetryingLocks('from', 'to', move)).rejects.toMatchObject({
+      code: 'EPERM',
+    });
+    expect(calls).toHaveLength(6);
+  });
+
+  it('does not retry a task that is gone, which is a second consumer having moved it', async () => {
+    const { calls, move } = failing('ENOENT');
+
+    await expect(renameRetryingLocks('from', 'to', move, [0, 0, 0, 0, 0])).rejects.toMatchObject({
+      code: 'ENOENT',
+    });
+    expect(calls).toHaveLength(1);
+  });
+
+  // Only Windows refuses to rename a folder with a file open inside; elsewhere both pass
+  // without a lock ever happening, so they would prove nothing there.
+  it.runIf(process.platform === 'win32')(
+    'acks a task whose brief somebody is reading, once they stop',
+    async () => {
+      await mkdir(join(workspace, 'inbox', 'task'), { recursive: true });
+      await writeFile(join(workspace, 'inbox', 'task', 'brief.brief'), '::titulo Oi\n');
+      const reader = await open(join(workspace, 'inbox', 'task', 'brief.brief'), 'r');
+      setTimeout(() => void reader.close(), 30);
+
+      await fsInbox({ root: join(workspace, 'inbox') }).ack('task');
+
+      expect(await readdir(join(workspace, 'done'))).toEqual(['task']);
+    },
+  );
+
+  it.runIf(process.platform === 'win32')(
+    'reports a brief held open past the window instead of waiting for it',
+    async () => {
+      await mkdir(join(workspace, 'inbox', 'task'), { recursive: true });
+      await writeFile(join(workspace, 'inbox', 'task', 'brief.brief'), '::titulo Oi\n');
+      const reader = await open(join(workspace, 'inbox', 'task', 'brief.brief'), 'r');
+      try {
+        await expect(fsInbox({ root: join(workspace, 'inbox') }).ack('task')).rejects.toMatchObject(
+          { code: 'EPERM' },
+        );
+      } finally {
+        await reader.close();
+      }
+    },
+  );
 });
 
 describe('fsOutbox', () => {

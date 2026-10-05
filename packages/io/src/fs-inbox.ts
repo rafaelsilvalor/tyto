@@ -33,6 +33,50 @@ export interface FsInboxOptions {
   readonly done?: string;
 }
 
+/**
+ * Waits between attempts at the `ack` rename: six attempts, 310 ms of waiting at most.
+ *
+ * Windows refuses to rename a folder while any file inside it is open, with `EPERM` (or
+ * `EACCES`/`EBUSY`, depending on who holds it). Measured for TYTO-198: an `ack` racing a
+ * `pull` of the same inbox — which reads every `brief.brief` — failed 25 times in 300, and 0
+ * in 300 alone. The queue panel races itself that way (its sweep and its listing read the
+ * brief while it acknowledges), and an antivirus or indexer opening a fresh file does the
+ * same. Those locks last milliseconds, so a short wait gets past them. A lock that outlives
+ * the window — a folder open in Explorer — still fails, and the caller reports it.
+ */
+export const ACK_RETRY_DELAYS_MS: readonly number[] = [10, 20, 40, 80, 160];
+
+/** The codes a held file gives a rename on Windows. `ENOENT` is not one: it is gone. */
+const TRANSIENT_LOCK = new Set(['EPERM', 'EACCES', 'EBUSY']);
+
+const wait = (ms: number): Promise<void> =>
+  new Promise((done) => {
+    setTimeout(done, ms);
+  });
+
+/**
+ * `rename`, tried again while the failure is a lock somebody else is holding. Anything else —
+ * above all `ENOENT`, a second consumer that moved the task first — fails at once.
+ */
+export async function renameRetryingLocks(
+  from: string,
+  to: string,
+  move: (from: string, to: string) => Promise<void> = rename,
+  delays: readonly number[] = ACK_RETRY_DELAYS_MS,
+): Promise<void> {
+  for (let attempt = 0; ; attempt += 1) {
+    try {
+      await move(from, to);
+      return;
+    } catch (cause) {
+      const code = (cause as NodeJS.ErrnoException | undefined)?.code;
+      const delay = delays[attempt];
+      if (delay === undefined || code === undefined || !TRANSIENT_LOCK.has(code)) throw cause;
+      await wait(delay);
+    }
+  }
+}
+
 async function isFile(path: string): Promise<boolean> {
   try {
     return (await stat(path)).isFile();
@@ -86,8 +130,9 @@ export function fsInbox(options: FsInboxOptions): BriefSource {
       // `rename` rather than copy-then-delete: on one filesystem it is atomic, so a task
       // is never visible in both folders and never in neither. Across devices it fails
       // loudly, which is the right answer — a caller that moved its inbox onto a network
-      // share should hear about it rather than silently get a copy.
-      await rename(join(root, id), join(done, id));
+      // share should hear about it rather than silently get a copy. Tried again for a
+      // moment while Windows says the folder is held (TYTO-198), never longer.
+      await renameRetryingLocks(join(root, id), join(done, id));
     },
   };
 }

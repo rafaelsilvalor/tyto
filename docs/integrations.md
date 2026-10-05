@@ -196,6 +196,14 @@ operating system's reason. It is not a crash and not an unhandled rejection in m
 (`queue.test.ts`, "one consumer per folder"). The same path catches Windows refusing the
 rename of a folder that is open in Explorer. Point one consumer at a folder at a time.
 
+**A lock that lets go is waited out; one that does not is reported.** Windows refuses to
+rename a folder while any file inside it is open, and the queue itself opens one: its sweep
+and its listing read `brief.brief` while `ack` moves the task (TYTO-198 measured 25 failed
+renames in 300 with a listing racing the ack, and 0 in 300 without). An antivirus or indexer
+opening a fresh file does the same. So `fsInbox`'s `ack` tries the rename again on `EPERM`,
+`EACCES` or `EBUSY`, six attempts and 310 ms of waiting at most, and then fails as before.
+`ENOENT` — another consumer moved the task first — is never retried.
+
 ## Deferred (E10) — only if Jacurutu does not cover it
 
 Jira/Trello/Notion/Sheets sources and a Drive sink as Tyto plugins, with per-connection field mapping and a polling scheduler. Contract preserved:

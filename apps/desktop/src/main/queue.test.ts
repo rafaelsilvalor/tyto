@@ -1,9 +1,9 @@
-import { existsSync, mkdirSync, mkdtempSync, renameSync, rmSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
 import type { Diagnostic } from '@tyto/core';
-import { RESULT_FILE, fsInbox, renderResult } from '@tyto/io';
+import { type BriefSource, RESULT_FILE, fsInbox, renderResult } from '@tyto/io';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import type { ExportProgress, ExportRequest } from './export.js';
@@ -48,11 +48,11 @@ function drop(id: string, brief: string): void {
 }
 
 /** Stands for `ExportService.run`: an error for a brief that says so, a clean run otherwise. */
-function fakeRender(before?: (request: ExportRequest) => void) {
+function fakeRender(before?: (request: ExportRequest) => void | Promise<void>) {
   const calls: ExportRequest[] = [];
-  const render = (request: ExportRequest): Promise<ExportProgress> => {
+  const render = async (request: ExportRequest): Promise<ExportProgress> => {
     calls.push(request);
-    before?.(request);
+    await before?.(request);
     const diagnostics = request.brief.includes(BROKEN) ? [brokenDiagnostic] : [];
     const result = renderResult({
       cancelled: false,
@@ -64,7 +64,7 @@ function fakeRender(before?: (request: ExportRequest) => void) {
     });
     mkdirSync(request.directory, { recursive: true });
     writeFileSync(join(request.directory, RESULT_FILE), JSON.stringify(result), 'utf8');
-    return Promise.resolve({
+    return {
       status: 'finished',
       directory: request.directory,
       total: 1,
@@ -72,9 +72,60 @@ function fakeRender(before?: (request: ExportRequest) => void) {
       failed: diagnostics.length,
       result,
       diagnostics,
-    });
+    };
   };
   return { calls, render };
+}
+
+/**
+ * What the test waits on instead of the clock (TYTO-198). A deadline polled against the real
+ * filesystem fails on a loaded machine with nothing wrong; the queue already says when
+ * something changed (`onChange`, which the app pushes as `queue:changed`), and the sweep's
+ * listing is a fact that can be counted.
+ */
+let changeWaiters: (() => void)[] = [];
+let listings = 0;
+let listingWaiters: { at: number; done: () => void }[] = [];
+
+beforeEach(() => {
+  changeWaiters = [];
+  listings = 0;
+  listingWaiters = [];
+});
+
+/** Resolves on the queue's next `onChange`. Armed before the look that might miss it. */
+function nextChange(): Promise<void> {
+  return new Promise((done) => {
+    changeWaiters.push(done);
+  });
+}
+
+/**
+ * Resolves once the inbox has been listed `count` more times. Nothing else lists it while a
+ * test waits here, so these are sweeps, and the sweep before the last one has finished
+ * handing its tasks over — which is what "a few sweeps later, nothing ran" needs.
+ */
+function afterSweeps(count: number): Promise<void> {
+  return new Promise((done) => {
+    listingWaiters.push({ at: listings + count, done });
+  });
+}
+
+/** The inbox the app composes, counting its listings for `afterSweeps`. */
+function countedInbox(folder: string): BriefSource {
+  const inbox = fsInbox({ root: join(folder, 'inbox'), done: join(folder, 'done') });
+  return {
+    pull() {
+      listings += 1;
+      listingWaiters = listingWaiters.filter((waiter) => {
+        if (waiter.at > listings) return true;
+        waiter.done();
+        return false;
+      });
+      return inbox.pull();
+    },
+    ack: (id) => inbox.ack(id),
+  };
 }
 
 function start(
@@ -82,13 +133,18 @@ function start(
   options: {
     autoRun: boolean;
     onError?: (message: string, cause: unknown) => void;
+    onMoved?: (from: string, to: string) => void;
     kinds?: Record<string, readonly string[]>;
   },
 ) {
-  const onChange = vi.fn();
+  const onChange = vi.fn(() => {
+    const waiting = changeWaiters;
+    changeWaiters = [];
+    for (const done of waiting) done();
+  });
   service = createQueueService({
     sources: (folder) => ({
-      inbox: fsInbox({ root: join(folder, 'inbox'), done: join(folder, 'done') }),
+      inbox: countedInbox(folder),
       done: fsInbox({ root: join(folder, 'done') }),
     }),
     render,
@@ -97,25 +153,25 @@ function start(
     onChange,
     intervalMs: 20,
     ...(options.onError === undefined ? {} : { onError: options.onError }),
+    ...(options.onMoved === undefined ? {} : { onMoved: options.onMoved }),
     ...(options.kinds === undefined ? {} : { kinds: options.kinds }),
   });
   return { service, onChange };
 }
 
-/** The queue's view once `predicate` holds, or the last view it had when time ran out. */
+/**
+ * The queue's view once `predicate` holds, looked at again each time the queue announces a
+ * change. No deadline of its own: a queue that never gets there fails on the test's timeout.
+ */
 async function until(
   queue: QueueService,
   predicate: (view: QueueView) => boolean,
-  timeoutMs = 5000,
 ): Promise<QueueView> {
-  const started = Date.now();
   for (;;) {
+    const changed = nextChange();
     const view = await queue.view();
     if (predicate(view)) return view;
-    if (Date.now() - started > timeoutMs) {
-      throw new Error(`timed out; last view: ${JSON.stringify(view.tasks)}`);
-    }
-    await new Promise((resolve) => setTimeout(resolve, 20));
+    await changed;
   }
 }
 
@@ -124,18 +180,18 @@ const statusOf = (view: QueueView, id: string) => view.tasks.find((task) => task
 describe('with auto-run off', () => {
   it('lists a dropped folder as pending, says so, and renders nothing', async () => {
     const { calls, render } = fakeRender();
-    const { service: queue, onChange } = start(render, { autoRun: false });
+    const { service: queue } = start(render, { autoRun: false });
 
+    // The sweep noticing it is what makes the panel redraw while nobody clicks. Armed before
+    // the drop, so a sweep that is quick about it cannot be missed.
+    const noticed = nextChange();
     drop('tarefa-1', '::titulo Olá');
+    await noticed;
     const view = await until(queue, (current) => statusOf(current, 'tarefa-1') === 'pending');
 
     expect(view.inbox).toBe(join(root, 'inbox'));
-    // The sweep noticed it, which is what makes the panel redraw while nobody clicks.
-    await vi.waitFor(() => {
-      expect(onChange).toHaveBeenCalled();
-    });
     // A few sweeps later, still nothing rendered.
-    await new Promise((resolve) => setTimeout(resolve, 100));
+    await afterSweeps(3);
     expect(calls).toHaveLength(0);
   });
 
@@ -234,24 +290,16 @@ describe('with auto-run on', () => {
   it('says where a brief went when it moves a task to done/', async () => {
     const { render } = fakeRender();
     const moved: [string, string][] = [];
-    service = createQueueService({
-      sources: (folder) => ({
-        inbox: fsInbox({ root: join(folder, 'inbox'), done: join(folder, 'done') }),
-        done: fsInbox({ root: join(folder, 'done') }),
-      }),
-      render,
-      folder: root,
+    const { service: queue } = start(render, {
       autoRun: false,
-      onChange: () => undefined,
       onMoved: (from, to) => {
         moved.push([from, to]);
       },
-      intervalMs: 20,
     });
     drop('tarefa-1', '::titulo Olá');
-    await until(service, (current) => statusOf(current, 'tarefa-1') === 'pending');
+    await until(queue, (current) => statusOf(current, 'tarefa-1') === 'pending');
 
-    await service.run('tarefa-1');
+    await queue.run('tarefa-1');
 
     const to = join(root, 'done', 'tarefa-1', 'brief.brief');
     expect(moved).toEqual([[join(root, 'inbox', 'tarefa-1', 'brief.brief'), to]]);
@@ -282,7 +330,7 @@ describe('with auto-run on', () => {
     // ADR 0008: never acknowledge a failure. The folder is where a person can fix it.
     expect(existsSync(join(root, 'inbox', 'tarefa-1', 'brief.brief'))).toBe(true);
     // Several sweeps later, it has still been tried once: a failure waits for a person.
-    await new Promise((resolve) => setTimeout(resolve, 150));
+    await afterSweeps(3);
     expect(calls).toHaveLength(1);
   });
 
@@ -307,7 +355,7 @@ describe('with auto-run on', () => {
 
     drop('tarefa-1', '::titulo Olá');
     const view = await until(queue, (current) => statusOf(current, 'tarefa-1') === 'error');
-    await new Promise((resolve) => setTimeout(resolve, 150));
+    await afterSweeps(3);
 
     expect(view.tasks[0]?.failure).toBe('the browser would not start');
     expect(calls).toHaveLength(1);
@@ -350,7 +398,7 @@ describe('with auto-run on', () => {
 
     const { service: queue } = start(render, { autoRun: true });
     const view = await until(queue, (current) => statusOf(current, 'tarefa-1') === 'error');
-    await new Promise((resolve) => setTimeout(resolve, 150));
+    await afterSweeps(3);
 
     expect(view.tasks[0]?.diagnostics.map((item) => item.code)).toEqual(['E_UNKNOWN_TEMPLATE']);
     expect(calls).toHaveLength(0);
@@ -360,11 +408,13 @@ describe('with auto-run on', () => {
 describe('one consumer per folder', () => {
   it('reports a task somebody else moved first as a failure on the task, not a crash', async () => {
     // A `tyto watch` on the same folder, standing in: it finishes the task and moves it to
-    // done/ while this render is still going, so this side's rename finds nothing.
-    const { render } = fakeRender((request) => {
+    // done/ while this render is still going, so this side's rename finds nothing. It acks
+    // through its own `fsInbox`, as `tyto watch` does: a bare rename here races this queue's
+    // sweep reading the brief, and fails the test on Windows for a reason that is not the
+    // test's (TYTO-198).
+    const { render } = fakeRender(async (request) => {
       if (request.label !== 'tarefa-1') return;
-      mkdirSync(join(root, 'done'), { recursive: true });
-      renameSync(join(root, 'inbox', 'tarefa-1'), join(root, 'done', 'tarefa-1'));
+      await fsInbox({ root: join(root, 'inbox'), done: join(root, 'done') }).ack('tarefa-1');
     });
     const errors: string[] = [];
     const rejections: unknown[] = [];
