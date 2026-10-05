@@ -151,6 +151,26 @@ describe('a plugin in a child process', () => {
     expect(crashes).toEqual([]);
     expect(isolated.crashed()).toBeUndefined();
   }, 60_000);
+
+  // Starts a plugin's process, which a full `pnpm check` can hold past Vitest's 5 s.
+  it('closes a process that already ended at once, without referencing it again', async () => {
+    // TYTO-232 references the child before waiting for its exit; a child that is already gone
+    // has no exit left to wait for, so close must neither throw nor wait.
+    const crashes: string[] = [];
+    const { isolated, exporter } = await connect(
+      "setTimeout(() => { throw new Error('gone'); }); return new Promise(() => {});",
+      crashes,
+    );
+    await exporter.exportFrame(SCENE, ARTWORK, FRAME);
+    expect(crashes).toEqual(['gone']);
+
+    const outcome = await Promise.race([
+      isolated.close().then(() => 'closed'),
+      new Promise((resolve) => setTimeout(() => resolve('still waiting'), 2_000)),
+    ]);
+
+    expect(outcome).toBe('closed');
+  }, 60_000);
 });
 
 /** A frame whose text is what the promise `expression` resolves to, or the code it threw. */

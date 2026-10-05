@@ -164,6 +164,11 @@ export function pluginProcessLauncher(options: PluginProcessOptions = {}): Plugi
       async close() {
         closing = true;
         if (child.exitCode !== null || child.signalCode !== null) return;
+        // Referenced again before waiting: the host unreferences an idle plugin, and an
+        // unreferenced child holds nothing open while its exit is on the way. Without this the
+        // event loop empties under `await exited`, and Node ends the CLI with 13 — an unsettled
+        // top-level await — after a render that succeeded (TYTO-232).
+        child.ref();
         child.kill();
         await exited;
       },
