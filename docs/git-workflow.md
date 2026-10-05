@@ -203,6 +203,16 @@ The move cost less than it looked like it would, which is why it was made rather
 
 An `ignore` is a refusal with no expiry date written on it, and Dependabot never reports what it skipped, so `github-config.test.ts` fails once the workflows or the manifests move to a major being ignored. That check compares files and **cannot tell whether Dependabot honoured any of it** — it passed green on the `2.x` entry that ignored nothing. Only a real updater run measures that.
 
+## Hooks in every worktree
+
+`core.hooksPath` is `.husky/_`, and `prepare: husky` writes that value on every install. **A relative hooks path is resolved inside whichever worktree runs the hook**, so each linked worktree reads its own `.husky/_` and runs its own branch's `.husky/commit-msg`, `pre-commit` and `pre-push`. The config itself is shared: every worktree of one clone reads the same `.git/config`, and an install in any of them rewrites the value for all of them. Husky has no worktree mode; it sets the relative path unconditionally.
+
+**The shims under `.husky/_` are committed**, against husky's default of generating them and ignoring them. Generated-only, the folder existed only where somebody had run `pnpm install`, and git treats a missing hooks folder as no hooks: a worktree without an install committed with no commitlint and no warning, measured in TYTO-233. Committed, every checkout has the folder, and the install's rewrite writes the same bytes — `git status --short .husky` stays empty after it.
+
+`husky-shims.test.ts` in `tools/repo-checks` keeps the committed copies equal to what the installed husky writes: the runner `h` byte for byte, one shim per hook husky knows, and mode `100755` in the index, which is what makes Linux run them. A husky bump that changes its output fails that test with the commands to re-commit them; `.husky/_/.gitignore` is `*`, so a new file there needs `git add -f`.
+
+An absolute `core.hooksPath` pointing at one checkout also works, and is worse: every worktree then runs that checkout's hook scripts, so a branch that edits a hook never exercises the edit where it is written.
+
 ## Line endings in Git
 
 `* text=auto eol=lf` gives every checkout LF, on every platform. One directory is exempt with `-text`: `tools/contract-test/src/fixture/line-endings/`, where a line ending is the subject rather than the medium. `crlf.brief` is a brief saved the way an editor on Windows saves one, and the test beside it asserts the carriage returns are still there **before** it asserts the parser accepts them — without the exemption the fixture would arrive normalised and the test would pass while measuring nothing (TYTO-68).
