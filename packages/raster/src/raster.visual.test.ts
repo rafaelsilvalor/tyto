@@ -323,6 +323,28 @@ function write(directory: string, file: string, bytes: Uint8Array): string {
   return path;
 }
 
+/** The first line of every Git LFS pointer file. */
+const LFS_POINTER_PREFIX = 'version https://git-lfs.github.com/spec/v1';
+
+/**
+ * Throws when a reference is the Git LFS pointer and not the image, naming the file.
+ *
+ * Without it a checkout that never ran `git lfs pull` fails in the PNG decoder with
+ * "unrecognised content at end of stream", which reads as a broken render (TYTO-221).
+ *
+ * `apps/desktop/e2e/raster.desktop.test.ts` holds a copy of this, deliberately. The only
+ * shared home would be this package's exports, which are what it ships, and a test-data
+ * check does not belong there — the same reason that suite copies `checkerboardDataUri`.
+ */
+function assertNotLfsPointer(path: string, bytes: Buffer): void {
+  if (bytes.subarray(0, LFS_POINTER_PREFIX.length).toString('latin1') === LFS_POINTER_PREFIX) {
+    throw new Error(
+      `${path} is a Git LFS pointer, not a PNG — this checkout never fetched the reference ` +
+        'images. Run `git lfs pull` and run the suite again.',
+    );
+  }
+}
+
 /**
  * Compares one render against its reference and returns the fraction of pixels that
  * differ, writing the render and the diff into `__diff__/` when they do.
@@ -355,6 +377,8 @@ function mismatchFraction(document: Document, rendered: Uint8Array): number {
           : ''),
     );
   }
+
+  assertNotLfsPointer(join(REFERENCE_DIR, file), referenceBytes);
 
   const reference = PNG.sync.read(referenceBytes);
   const actual = PNG.sync.read(Buffer.from(rendered));

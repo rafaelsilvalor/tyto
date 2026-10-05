@@ -302,9 +302,8 @@ beforeAll(async () => {
   // version folder beside the current one both used to reach this suite through them.
   scratch = mkdtempSync(join(tmpdir(), 'tyto-raster-e2e-'));
   app = await _electron.launch({
-    // The same five flags the CLI's Chromium is launched with. They are what makes a
-    // reference comparable at all; whether the *shipped* app applies them is a separate
-    // question this card answers in `src/main/index.ts`.
+    // No determinism flags: the app is launched as it ships (ADR 0028, and the header
+    // above). The data folders are the only additions, and they are TYTO-139's.
     args: ['.', `--user-data-dir=${join(scratch, 'user-data')}`],
     cwd: join(here, '..'),
     env: { ...process.env, TYTO_HEADLESS: '1', TYTO_HOME: join(scratch, 'tyto-home') },
@@ -315,6 +314,28 @@ afterAll(async () => {
   await closeApp(app);
   rmSync(scratch, { recursive: true, force: true });
 });
+
+/** The first line of every Git LFS pointer file. */
+const LFS_POINTER_PREFIX = 'version https://git-lfs.github.com/spec/v1';
+
+/**
+ * Throws when a reference is the Git LFS pointer and not the image, naming the file.
+ *
+ * Without it a checkout that never ran `git lfs pull` fails in the PNG decoder with
+ * "unrecognised content at end of stream", which reads as a broken adapter (TYTO-221).
+ *
+ * A copy of the one in `packages/raster/src/raster.visual.test.ts`, deliberately. The only
+ * shared home would be that package's exports, which are what it ships, and a test-data
+ * check does not belong there — the same reason `checkerboardDataUri` above is a copy.
+ */
+function assertNotLfsPointer(path: string, bytes: Buffer): void {
+  if (bytes.subarray(0, LFS_POINTER_PREFIX.length).toString('latin1') === LFS_POINTER_PREFIX) {
+    throw new Error(
+      `${path} is a Git LFS pointer, not a PNG — this checkout never fetched the reference ` +
+        'images. Run `git lfs pull` and run the suite again.',
+    );
+  }
+}
 
 /**
  * The fraction of pixels that differ from the committed Playwright reference.
@@ -327,7 +348,10 @@ afterAll(async () => {
  */
 function mismatchFraction(document: Document, rendered: Uint8Array): number {
   const directory = document.perPlatform ? DESKTOP_REFERENCE_DIR : REFERENCE_DIR;
-  const reference = PNG.sync.read(readFileSync(join(directory, referenceFile(document))));
+  const path = join(directory, referenceFile(document));
+  const referenceBytes = readFileSync(path);
+  assertNotLfsPointer(path, referenceBytes);
+  const reference = PNG.sync.read(referenceBytes);
   const actual = PNG.sync.read(Buffer.from(rendered));
 
   if (reference.width !== actual.width || reference.height !== actual.height) {
