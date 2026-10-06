@@ -17,7 +17,7 @@ Node has a permission model: `--permission`, with `--allow-fs-read=<path>` and t
 `^22.22.2 || ^24.15 || >=26`. It was measured before anything was designed, with a probe
 plugin that reads a file outside its folder, opens a TCP socket, spawns a child and starts a
 worker. It was measured on this machine (Node 24.15, Electron 44.4.1, which embeds Node 24.21),
-and on CI in a throwaway workflow (draft PR #254, closed, run 36410437811) on Node 22.23.2 and
+and on CI in a throwaway workflow (draft PR rafaelsilvalor/tyto-archive#254, closed, run 36410437811) on Node 22.23.2 and
 24.20, on Linux, Windows and macOS:
 
 | Where                                                            | read outside | TCP     | child   | worker  |

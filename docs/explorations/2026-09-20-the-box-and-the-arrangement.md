@@ -174,12 +174,12 @@ what. A container that arranges its children is a third thing in the same neighb
 
 ## Audit — what was measured, when, and how
 
-Measured on 2026-09-20 against `main` at `c339725`, clean tree except the two uncommitted
+Measured on 2026-09-20 against `main` at `f2666ae`, clean tree except the two uncommitted
 exploration notes. Line numbers are a snapshot and rot.
 
 ```
 $ git rev-parse --short HEAD
-c339725
+f2666ae
 
 $ grep -rnE "\b(flex|gap|padding|margin|stack|constraint|auto-?layout|hug|grid)\b" packages/core/src/scene/
 (no matches)
