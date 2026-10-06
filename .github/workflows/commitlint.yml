@@ -1,5 +1,9 @@
 name: commitlint
-on: pull_request
+# `edited` because the description is linted below and is edited after a PR opens; the
+# three default types stay listed so the required `lint` context still reports on every push.
+on:
+  pull_request:
+    types: [opened, synchronize, reopened, edited]
 permissions: { contents: read }
 concurrency: { group: 'commitlint-${{ github.ref }}', cancel-in-progress: true }
 jobs:
@@ -25,3 +29,13 @@ jobs:
         env:
           PR_TITLE: ${{ github.event.pull_request.title }}
         run: printf '%s\n' "$PR_TITLE" | pnpm exec commitlint
+      # The squash body is the PR description, where a tool footer or a co-author trailer
+      # would ride onto main (TYTO-234). It is markdown, so it gets the attribution rule
+      # only — commitlint.description.config.js says why. Same `env:` rule as the title.
+      - name: Lint the PR description, which squash merge turns into the commit body
+        env:
+          PR_TITLE: ${{ github.event.pull_request.title }}
+          PR_BODY: ${{ github.event.pull_request.body }}
+        run: >-
+          printf '%s\n\n%s\n' "$PR_TITLE" "$PR_BODY"
+          | pnpm exec commitlint --config commitlint.description.config.js

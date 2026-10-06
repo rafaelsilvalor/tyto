@@ -22,6 +22,42 @@ const JIRA_KEY_IN_SUBJECT = /^TYTO-\d+ [a-z0-9]/;
  */
 const KEYLESS_SCOPES = new Set(['deps', 'deps-dev']);
 
+/**
+ * Lines that credit a tool or a session instead of describing the change (TYTO-234).
+ *
+ * The repository is public, and a cloud session committed with a co-author trailer and a
+ * link to the session that wrote it. `.claude/settings.json` turns attribution off for
+ * sessions that read it; this rule is the check that holds when one does not. It is keyed
+ * on line starts, so prose that names a trailer mid-sentence stays legal, and on every
+ * co-author rather than on one tool's address: the repository has one maintainer and no
+ * pairing to credit.
+ *
+ * `main` takes squash merges whose body is the PR description, so `commitlint.yml` lints
+ * the description with this rule too — which is why the PR footer is here at all. The
+ * `Co-authored-by` lines GitHub writes into a squash commit for other commit authors
+ * (Changesets, Dependabot) are added after this check runs, and are not what it is for.
+ */
+export const ATTRIBUTION_LINES = [
+  /^\s*co-authored-by\s*:/im,
+  /^\s*claude-session\s*:/im,
+  /^\W*generated with \[?claude code\]?/im,
+];
+
+/**
+ * The attribution rule on its own, because `commitlint.description.config.js` lints the PR
+ * description with it and nothing else. Both configs take these rules, so the patterns
+ * cannot drift apart.
+ */
+export const attributionPlugin = {
+  rules: {
+    'no-attribution-trailers': ({ raw }) => [
+      !ATTRIBUTION_LINES.some((pattern) => pattern.test(raw ?? '')),
+      'commit messages and PR descriptions carry no Co-Authored-By or Claude-Session ' +
+        'trailer and no "Generated with Claude Code" footer (docs/git-workflow.md).',
+    ],
+  },
+};
+
 export default {
   extends: ['@commitlint/config-conventional'],
   plugins: [
@@ -34,6 +70,9 @@ export default {
             'e.g. "feat(core): TYTO-123 add Frame schema". ' +
             'Only chore(deps) and chore(deps-dev) may omit it.',
         ],
+        // Spread into this plugin rather than listed as a second one: commitlint keeps only
+        // one unnamed inline plugin, and a second replaced subject-jira-key outright.
+        ...attributionPlugin.rules,
       },
     },
   ],
@@ -42,6 +81,7 @@ export default {
     // subject the house style requires, so subject-jira-key owns subject shape instead.
     'subject-case': [0],
     'subject-jira-key': [2, 'always'],
+    'no-attribution-trailers': [2, 'always'],
     'header-max-length': [2, 'always', 100],
     'body-max-line-length': [1, 'always', 100],
   },

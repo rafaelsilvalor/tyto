@@ -10,6 +10,8 @@
 
 Conventional Commits with the Jira key: `feat(export-svg): TYTO-042 support <mask>`. Scope = package name. Validated by commitlint in the hook and in CI: the `subject-jira-key` rule requires the key followed by a lowercase description. It replaces `subject-case` from config-conventional, which reads the leading key as upper-case and would reject every subject in this format. Squash merge uses the PR title as the message — PR titles follow the same format.
 
+**Commits and PR descriptions carry no attribution** — no `Co-Authored-By` or `Claude-Session` trailer, no tool footer — because squash merge makes the description the commit body on `main`. The committed `.claude/settings.json` turns attribution off for every Claude Code session, local or cloud; the `no-attribution-trailers` commitlint rule refuses them in the branch's commits and in the PR description either way (TYTO-234, pinned by `tools/repo-checks/src/commit-trailers.test.ts`).
+
 ## Pull requests
 
 Template in `.github/pull_request_template.md`: card, what changed, how to test, docs/ADR touched. Rules:

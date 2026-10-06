@@ -318,10 +318,11 @@ describe('workflows', () => {
     }
   });
 
-  it('never interpolate the PR title into a shell script', () => {
+  it('never interpolate the PR title or description into a shell script', () => {
     // `${{ … }}` is substituted before the shell parses the line, so a title containing
-    // `$(…)` would run as code with the workflow token in scope. The title has to arrive
-    // through `env:` instead. See the commitlint workflow.
+    // `$(…)` would run as code with the workflow token in scope. The title — and since
+    // TYTO-234 the description — has to arrive through `env:` instead. See the commitlint
+    // workflow.
     for (const file of workflowFiles) {
       const workflow = readYaml<Workflow>(`${WORKFLOWS_DIR}/${file}`);
       const scripts = Object.values(workflow.jobs ?? {}).flatMap((job) =>
@@ -329,7 +330,7 @@ describe('workflows', () => {
       );
       for (const script of scripts) {
         expect(script, `${file} interpolates the PR title into a run step`).not.toMatch(
-          /\$\{\{[^}]*github\.event\.pull_request\.title/,
+          /\$\{\{[^}]*github\.event\.pull_request\.(title|body)/,
         );
       }
     }
@@ -591,11 +592,19 @@ describe('required checks', () => {
         typeof on === 'object' && !Array.isArray(on)
           ? (on.pull_request as Record<string, unknown> | null)
           : null;
-      for (const filter of ['paths', 'paths-ignore', 'branches', 'branches-ignore', 'types']) {
+      for (const filter of ['paths', 'paths-ignore', 'branches', 'branches-ignore']) {
         expect(
           pullRequest?.[filter],
           `${workflow} filters pull_request on ${filter}`,
         ).toBeUndefined();
+      }
+      // A `types` list may add events (commitlint adds `edited` to re-lint a description,
+      // TYTO-234) but never drop a default one, or a push stops reporting the context.
+      const types = pullRequest?.types;
+      if (types !== undefined) {
+        expect(types, `${workflow} narrows the pull_request types`).toEqual(
+          expect.arrayContaining(['opened', 'synchronize', 'reopened']),
+        );
       }
     },
   );
