@@ -55,15 +55,16 @@ The same layout, with a real template, is in `examples/plugins/tyto-plugin-examp
 {
   "name": "meu-pack",
   "version": "0.1.0",
-  "engine": ">=0.3.9",
+  "engine": ">=<plugin API version>",
   "contributes": ["template-pack"],
   "permissions": []
 }
 ```
 
-The scaffold writes `engine` as `>=` the plugin API version of the CLI that ran it, and `0.3.9`
-is this repository's today. That is `@tyto/plugin-api`'s version and **not the app's** (ADR
-0040). The field-by-field rules, and the error each one produces, are the table in
+`<plugin API version>` is a placeholder, not something to type: the scaffold fills it in with
+the plugin API version of the CLI that ran it, so the file it writes says something like
+`"engine": ">=0.3.9"`. Writing a manifest by hand, put a real version there: `@tyto/plugin-api`'s
+version, **not the app's** (ADR 0040). The field-by-field rules, and the error each one produces, are the table in
 `docs/plugin-api.md` › _Plugin package_. `name` is the plugin's id everywhere: in `plugin list`,
 in `~/.tyto/plugins/<name>/` and in every warning about it.
 

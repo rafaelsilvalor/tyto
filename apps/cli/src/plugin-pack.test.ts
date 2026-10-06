@@ -234,6 +234,9 @@ describe('tyto plugin new', () => {
 });
 
 describe('docs/plugin-authoring.md', () => {
+  /** What the guide's manifest shows where the scaffold writes `>=` and a version. */
+  const ENGINE_PLACEHOLDER = '>=<plugin API version>';
+
   const guide = (): Promise<string> =>
     readFile(resolve(EXAMPLE_PACK, '..', '..', '..', 'docs', 'plugin-authoring.md'), 'utf8');
 
@@ -251,8 +254,15 @@ describe('docs/plugin-authoring.md', () => {
     const entry = await readFile(join(folder, 'dist', 'index.js'), 'utf8');
     const activate = entry.slice(entry.indexOf('export function activate'));
 
+    // The guide cannot pin the number: every release that bumps @tyto/plugin-api would
+    // break this test on the version PR, which nobody may edit (TYTO-240). So the number
+    // is checked here, and the guide is held to every other byte of the manifest.
+    const engine = `"engine": ">=${PLUGIN_API_VERSION}",`;
+    expect(manifest).toContain(engine);
+    const shown = manifest.replace(engine, `"engine": "${ENGINE_PLACEHOLDER}",`);
+
     const text = await guide();
-    expect(text).toContain(`\`\`\`json\n${manifest}\`\`\``);
+    expect(text).toContain(`\`\`\`json\n${shown}\`\`\``);
     expect(text).toContain(`\`\`\`js\n${activate}\`\`\``);
   });
 });
