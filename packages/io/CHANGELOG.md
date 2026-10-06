@@ -1,5 +1,130 @@
 # @tyto/io
 
+## 2.0.0
+
+### Major Changes
+
+- 0937670: TYTO-204: an asset path in a brief is read as written, from the brief's folder first, and from `assets/` beside the brief when nothing is there (ADR 0056). The same rule holds in `tyto render`, `tyto watch`, the desktop queue, preview, export box and the template editor's preview, so a folder with its images in `assets/` renders the same in the CLI and in the app. `./assets/logo.png` now resolves everywhere, and when a file of the same name exists both beside the brief and in `assets/`, the one beside the brief wins. `tyto render --assets <dir>` still names the one folder searched, with no fallback. `E_ASSET_NOT_FOUND` now says it looked in `assets/` too.
+
+  `@tyto/io` migration: `BriefTask.assetBase` is now `briefDirectory` (the brief's folder); resolve assets with `briefAssetResolver`.
+
+### Minor Changes
+
+- 8ca8eed: TYTO-205: a delivery carries its brief in `editaveis/` and the images the brief used in `assets/` (ADR 0057). The desktop export box now delivers into the picked folder — artwork at the top, `editaveis/`, `assets/` — and `tyto render --folder` gains `assets/` under its `<out>/<brief-name>/` level. The copied brief's image paths name the copies, and a brief in a folder named `editaveis` also reads `../assets`, so it renders again from where it sits. `E_ASSET_NOT_FOUND` names the folders actually searched.
+- a84b756: TYTO-127: exporting again into a folder used before removes what the previous export wrote there and this one did not produce, and says so (ADR 0054). It applies to `tyto render --folder` and to the desktop's export box. `--out`, `tyto watch` and the queue panel are unchanged.
+
+  A carousel edited from four slides down to three no longer delivers the fourth, and a delivery made before ADR 0053 loses its `lamina-*` files on the first export after the upgrade. Only a file the previous `result.json` listed can go, and only while its size is still the recorded one. A file somebody added or replaced by hand stays. Each removal is a `W_LEFTOVER_REMOVED` warning on stderr, in `result.json` and in the export box. A kept file is a `W_LEFTOVER_KEPT` with the reason, and a previous report that cannot be read is a `W_PREVIOUS_RESULT_UNREADABLE`.
+
+  `@tyto/io`: `fsTaskOutput` takes `removeLeftovers` and, like `fsDeliveryOutput`, returns a `ReusableTaskOutput` whose `removeLeftovers(run)` is called before `finish`.
+
+- d4aac5b: TYTO-189: an installed plugin can ship code templates, and they run in its own thread. A folder
+  in an installed pack with a `manifest.yaml` and no `template.html` is drawn by the pack's new
+  `build(template, context)`, called through the isolation with the 30 s deadline. The frame is
+  checked against the IR, and a timeout, throw or refused answer is `E_PLUGIN_TEMPLATE`, which
+  costs that frame and not the render. `context.measure` still answers synchronously. The manifest
+  lists the faces it measures under `faces:`, and those cross with the call. A face installed on
+  the machine crosses only under the `font:<family>` permission (`W_PLUGIN_FONT_WITHHELD` otherwise).
+  `tyto plugin new --code` scaffolds one that installs and renders on the first try. `compile` is
+  unchanged for every other template, and `compileDeferred` is the new path (ADR 0048).
+- 94fdee3: TYTO-50: the desktop lists an installed plugin's templates in the Template picker and previews
+  and exports with them, searched after a chosen folder and the built-in pack and checked by the
+  CLI's own rule (ADR 0046), now `installedPacks` in `@tyto/io`. A plugin refused over its pack is
+  a row in the problems panel and is kept out of the preview, the panels and the export. Installing
+  a folder that holds a link no longer fails with an internal error on Windows: a link inside the
+  folder is copied as its target, and one that leads out or nowhere is `E_PLUGIN_LINK`, exit 1.
+  `PluginStore.add` answers a `Result`.
+- a69f493: TYTO-48: an installed plugin runs in a worker thread of its own, and the `PluginHost` it holds is
+  a proxy whose every call is a Zod-checked message (ADR 0041). `@tyto/plugin-api` gains the
+  protocol, the `PluginChannel` port, `runGuest` and `connectIsolatedPlugin`; `Exporter.exportFrame`
+  may return a `Promise`, which the job awaits. A plugin whose thread ends unasked costs the frames
+  waiting on it (`E_PLUGIN_CRASHED`, non-fatal) and is shown as `crashed` in `plugin list` until it
+  is installed or enabled again; the history is `crashes.json`, beside `plugins.json`, and
+  `plugins.json` now drops keys it does not know instead of refusing the file. The thread is a crash and API boundary, not a sandbox, and the
+  install prompt says so.
+- 64c75bb: TYTO-47: plugins can be installed. `tyto plugin install <folder|git-url|npm-spec>` checks the
+  manifest's `engine` against `PLUGIN_API_VERSION` (the plugin API's own version, ADR 0040), shows
+  the permissions — recorded, not yet enforced — and copies the plugin to `~/.tyto/plugins/`;
+  `remove`, `disable` and `enable` change what is activated, and `plugin list` gains a status column
+  and `--active`. `InProcessHost.tryActivate` activates an installed plugin as data rather than
+  throwing, and a plugin whose contribution id is taken is refused by name while the render goes on
+  (`W_PLUGIN_SKIPPED`). `ArtifactKind` is open, so `--types` accepts any kind an installed exporter
+  declares, and a document exporter's `extension` and `mime` name the file; `artifactExtension` and
+  `artifactMimeType` are replaced by `artifactEncoding`, and `artifactName` takes the extension.
+- 091e2a2: Run each installed plugin in the CLI confined to its own folder by Node's permission model
+  (TYTO-186, ADR 0049).
+
+  - **CLI**: a plugin's process is a child process started with `--permission` and read access to
+    its installed folder and its bootstrap only, both as real paths. It cannot read other files,
+    write, start a process or a worker, or load an addon, and its environment is empty. The
+    bootstrap (`dist/guest/plugin-guest.js`) inlines everything it imports. Before the plugin's
+    code is imported, the process tries to read a file outside its grant. A plugin whose process
+    could read it, or did not say, is refused with `E_PLUGIN_SANDBOX`, which names the runtime.
+    The network stays advisory on Node 22 and 24: `net:` filters `host.fetch` only. The install
+    prompt says so.
+  - **`@tyto/plugin-api`**: `RPC_PROTOCOL_VERSION` is 2, and `hello` carries a `sandbox` report.
+    `runGuest` takes that report, `connectIsolatedPlugin` and `startInstalledPlugins` take
+    `requireSandbox`, `PluginProcessRequest` gains `directory`, and `PluginStore` gains
+    `linksLeaving`, which every load asks before a plugin starts.
+  - **`@tyto/core`**: `E_PLUGIN_SANDBOX` is new. `E_PLUGIN_LINK` is also reported at load, and its
+    message no longer names install.
+  - **`@tyto/io`**: `fsPluginStore` implements `linksLeaving`.
+  - **Desktop**: unchanged in behaviour. It does not require the sandbox yet, because a
+    `utilityProcess` accepts `--permission` and does not enforce it. The bundled Node that will
+    confine it comes in the second TYTO-186 pull request.
+
+- 743910b: TYTO-216: `layeredExportResources` in `@tyto/io` puts several sources of export bytes together,
+  the first that answers a ref winning, for `asset` and `assetSize`. `tyto render` binds the brief's
+  files and the template's through it, in place of its own two copies. No output changes: the CLI's
+  SVG for a `cover` image is byte-identical before and after, and to the window's.
+
+### Patch Changes
+
+- 8f58e18: TYTO-198: `fsInbox`'s `ack` tries the rename again while Windows says the task folder is held
+  (`EPERM`, `EACCES`, `EBUSY`) — six attempts, 310 ms of waiting at most — and then fails as
+  before. A file read inside the folder during the rename, by the queue's own listing or by an
+  antivirus, no longer fails a task that rendered cleanly. `ENOENT` is never retried.
+- 5f4c609: TYTO-214: `tyto render` and `tyto watch` hand a bundled code template the files in its own folder,
+  through `context.files` (ADR 0062). Before, a code template could not draw a background kept beside
+  its manifest. `fileTemplateAssets`
+  now types its `assets` as `TemplateFiles`, which it always was.
+- 8300c78: TYTO-214: a code template reads the files in its own folder through `context.files.image(path)`
+  and `context.files.svg(path)` (ADR 0062). `TemplateContext` gains the required `files` field, and
+  a context built by hand passes `noFiles`. `bundledTemplateSource` takes an optional
+  `readFiles(directory)`; without it, a bundled template is handed no files, as before. An
+  installed plugin's code template is handed `noFiles`.
+- 525639b: TYTO-202: a template reports warnings beside its frame (ADR 0058). `TemplateContext` gains `report`, which takes one of a closed list of codes — the first is `W_TEMPLATE_OVERFLOW` — and `compile` writes the catalog's diagnostic with the artwork, the format and the range of the directive the artwork came from. An installed code template's reports cross back from its plugin's process beside the frame, as `ok({ frame, reports })`, checked against that list. `reportOverflow` in `@tyto/template-kit` reports content that runs past the page, and the weekly mock-exam agendas use it: a slide that runs off the grid now renders with a warning instead of being cut in silence. A context built by hand passes `reportNothing`.
+- Updated dependencies [0937670]
+- Updated dependencies [37fd201]
+- Updated dependencies [7950dc3]
+- Updated dependencies [8300c78]
+- Updated dependencies [bf7c79a]
+- Updated dependencies [8ca8eed]
+- Updated dependencies [a84b756]
+- Updated dependencies [536046d]
+- Updated dependencies [a33a192]
+- Updated dependencies [a888001]
+- Updated dependencies [733f779]
+- Updated dependencies [d4aac5b]
+- Updated dependencies [94fdee3]
+- Updated dependencies [eaf6ece]
+- Updated dependencies [cd25d2d]
+- Updated dependencies [5c0611f]
+- Updated dependencies [82927c8]
+- Updated dependencies [a69f493]
+- Updated dependencies [64c75bb]
+- Updated dependencies [b1b0745]
+- Updated dependencies [091e2a2]
+- Updated dependencies [e35546e]
+- Updated dependencies [7659e7e]
+- Updated dependencies [525639b]
+- Updated dependencies [1ee0051]
+  - @tyto/core@0.27.0
+  - @tyto/plugin-api@0.4.0
+  - @tyto/pipeline@0.10.0
+  - @tyto/template-lang@0.7.0
+  - @tyto/export-html@0.6.4
+  - @tyto/export-svg@1.3.4
+
 ## 1.3.7
 
 ### Patch Changes

@@ -1,5 +1,35 @@
 # @tyto/export-html
 
+## 0.6.4
+
+### Patch Changes
+
+- Updated dependencies [0937670]
+- Updated dependencies [37fd201]
+- Updated dependencies [7950dc3]
+- Updated dependencies [8300c78]
+- Updated dependencies [bf7c79a]
+- Updated dependencies [8ca8eed]
+- Updated dependencies [a84b756]
+- Updated dependencies [536046d]
+- Updated dependencies [a33a192]
+- Updated dependencies [733f779]
+- Updated dependencies [d4aac5b]
+- Updated dependencies [94fdee3]
+- Updated dependencies [eaf6ece]
+- Updated dependencies [cd25d2d]
+- Updated dependencies [5c0611f]
+- Updated dependencies [82927c8]
+- Updated dependencies [a69f493]
+- Updated dependencies [64c75bb]
+- Updated dependencies [b1b0745]
+- Updated dependencies [091e2a2]
+- Updated dependencies [e35546e]
+- Updated dependencies [7659e7e]
+- Updated dependencies [525639b]
+  - @tyto/core@0.27.0
+  - @tyto/plugin-api@0.4.0
+
 ## 0.6.3
 
 ### Patch Changes

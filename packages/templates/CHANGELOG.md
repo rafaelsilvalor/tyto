@@ -1,5 +1,78 @@
 # @tyto/templates
 
+## 1.0.0
+
+### Major Changes
+
+- bacf1c5: TYTO-190: `aprovados` 3.0.0 runs across several slides. Each `::lamina` is one slide and holds its specialties and `rank | name` rows; the title block (imagem, chamada, subtitulo, titulo) is drawn on the first slide only, and the arrow on every slide but the last. **Briefs must be edited**: `::lista` becomes `::lamina`, and an old `::lista` is reported as `E_UNKNOWN_SLOT`. One `::lamina` with the old list renders the same pixels as 2.0.0.
+- 733f779: TYTO-194: formats are named by piece kind, and each format says which kind it is (`docs/format-kinds.md`, ADR 0051).
+
+  **Briefs must be edited.** The built-in pack's `retrato` is now `grid`, and `feed` is now `grid-1x1`; `story` is unchanged. All four built-in templates take a major version (`agenda-semana` 4.0.0, `aprovados` 4.0.0, `carrossel-lista` 3.0.0, `promo-curso` 3.0.0). A brief that still writes the old ids is told the format is not defined.
+
+  ```
+  before                          after
+  formats: [retrato]              formats: [grid]
+  formats: [feed, story]          formats: [grid-1x1, story]
+  lamina-1-retrato.png            lamina-1-grid.png
+  artwork-1-feed.png              artwork-1-grid-1x1.png
+  ```
+
+  The pixels are unchanged: every built-in example renders identical to the previous ids, 14 of 14 files, and only the file names change.
+
+  `formats.yaml` entries gain an optional `kind` (`grid`, `story`, `banner`, `capa-ebook`, `thumbnail`), and `@tyto/core` exports `pieceKinds`, which derives what a template makes from its formats and whether it repeats: a repeating grid is a `carrossel`, a repeating story is `stories`. `tyto template new` and `tyto plugin new` scaffold `grid` by default. An installed plugin whose templates declare `feed` needs a project `formats.yaml` that defines it, or its own ids moved to the new names.
+
+### Minor Changes
+
+- 35c8732: TYTO-210: a new template, `banner-roxo`, and three new formats in the built-in pack: `banner` (1200 × 628), `banner-1x1` (600 × 600) and `banner-345x146` (345 × 146), all of kind `banner`. The template draws roxo's product banner: write only `::titulo`, for example `Prefeitura Municipal de São Bento do Vale Alto **(VA)**`, and each format draws its own fixed background from the template's folder with the text centred where the reference draws it. The template chooses the line breaks: the largest size that fits, balanced lines, a group in parentheses never split or alone on a line, and no line ending on `de`, `do` or `e` when a better break exists. A text too long for the smallest size is drawn at that size and reported as `W_TEMPLATE_OVERFLOW`. `tabela-roxo` now also keeps a multi-word qualifier in parentheses whole after a number.
+- 37fd201: TYTO-230: a brand kit's logo may be toned layers — `{ box, layers: [{ tone, d, fillRule }] }`, with `tone` `primary` or `secondary` and still no colour — as well as one `MarkShape`, which keeps working as all `primary`; and a kit may carry a `wordmark` under the same rules (ADR 0066). A mark's paths together are bounded by `MARK_PATH_LIMIT`, and a toned mark has at most `MARK_LAYER_LIMIT` (16) layers. The isolation protocol is now version 4. The built-in templates map each tone to a colour of their own, and `banner-roxo` draws the kit's wordmark in its square format; without a kit their output is unchanged.
+- 3574889: TYTO-225: the built-in templates no longer carry a brand's logo or signature. Each draws its brand kit's (ADR 0063) and, where no kit supplies one, a placeholder in the same box and style: an invented rounded mark for the logo and `@assinatura` for the signature (ADR 0065). The three `banner-roxo` backgrounds lose the logo painted into them, and the banner draws the kit's logo, or the placeholder, where it stood. The drawn nodes are named `logo` and `signature`.
+- bf7c79a: TYTO-224: the built-in brands and templates are renamed by colour. The brand ids are `azul`, `roxo`, `ocre` and `vinho`; the templates are `simulados-semana-roxo`, `simulados-semana-ocre`, `simulados-semana-vinho`, `tabela-roxo` and `banner-roxo`, and `agenda-semana` and `aprovados` keep their names. A brief naming a template by its previous name must use the new one. Every template draws the same bytes as before for the same brief; the examples of `aprovados`, `banner-roxo`, `simulados-semana-vinho` and `tabela-roxo` now carry invented copy of the same shape. `@tyto/core`'s message for a malformed `brand` gives `azul` as its example.
+- eaf6ece: TYTO-195: a template's manifest can name its brand (`brand: azul`), lower case letters, digits and single hyphens (ADR 0052). It is optional, so existing manifests still load. The built-in templates name theirs: `agenda-semana` and `aprovados` are `azul`, `carrossel-lista` and `promo-curso` are `tyto-demo`. No brief changes and no render changes.
+- 3fab91f: TYTO-185: add the configurable components `pillTable` (a table read out of one slot) and `titleBlock` (a centred column of optional picture, words and rule), the `bandedPage` arrangement, and `mark`, `textBlock`, `grownTextBlock` and the brief-row readers (`lines`, `fields`, `rowGroups`). Add the `aprovados` template, the azul approved list, built only from those and the brand module. `agenda-semana` now composes the azul brand module (`templates/_azul/`) and renders the same pixels, except that the footer arrow is no longer drawn on the last slide: it announces a next slide, and the last one has none.
+- e35546e: TYTO-201: an optional `selo` slot on `agenda-semana` (4.2.0), `aprovados` (4.2.0), `simulados-semana-ocre` and `simulados-semana-vinho` (1.1.0) — an art 1080 × 140 glued to the foot of the last grid slide, never on a story. With it the page above shrinks by 140: the middle centres above the seal and the footer stands on it. Write `selo: ./selo.png` in the frontmatter. The kit gains `sealed`, and `selo` joins the standard slot vocabulary as a reserved `image` name.
+- b02313b: TYTO-200: three new templates, `simulados-semana-roxo`, `simulados-semana-ocre` and `simulados-semana-vinho` — the weekly mock-exam agenda of roxo (stories only), ocre and vinho, one composition in three accents. Each `::lamina` is one slide: `Domingo 26/10 | Aplicação às 08h30 & correção às 14h` starts a day and every line with no `|` under it is one of its exams. The title is on every slide; the call to comment is on the last grid only, in the brief's optional `::chamada` or in the house's line. Rows are 700 px wide, or as wide as the slide's longest exam up to 856; the owl and the sign-off stand on a 112 px gutter. `pillTable` gains a group `caption`, the band under a heading drawn from the heading line's second field.
+- 441b545: TYTO-157: the built-in templates use the standard slot vocabulary (`docs/slot-vocabulary.md`). **Briefs written against the previous versions must be edited**: `promo-curso` 2.0.0 renames `cor` to `tom`; `carrossel-lista` 2.0.0 renames `item` to `lamina`; `agenda-semana` 3.0.0 renames `ilustracao` to `imagem` and `slide` to `lamina`; `aprovados` 2.0.0 renames `emblema` to `imagem`. An old name is reported as `E_UNKNOWN_SLOT` on its line. The pixels are unchanged; exported files and SVG element ids of the two carousel templates are now named `lamina-N` instead of `item-N` and `slide-N`.
+- 98d432e: TYTO-218: a new template, `tabela-roxo`. It draws roxo's title over a whole table in one 1080 × 1350 image. Write `::titulo`, then `::tabela`: the first line is the header (`Concurso | Banca | Vagas | Salário`) and fixes the column count, each later `a | b | c` line is a row, and a line with no `|` is a band across the table. The template measures to decide column widths, line breaks, the body size and the title size. It never splits a value such as `R$ 33.820,39`, breaks a range `R$ X a R$ Y` between its two values, and reports `W_TEMPLATE_OVERFLOW` when the table does not fit even at its 16 px floor. The accent is roxo's registered `#5900a6`, the agenda's.
+- 525639b: TYTO-202: a template reports warnings beside its frame (ADR 0058). `TemplateContext` gains `report`, which takes one of a closed list of codes — the first is `W_TEMPLATE_OVERFLOW` — and `compile` writes the catalog's diagnostic with the artwork, the format and the range of the directive the artwork came from. An installed code template's reports cross back from its plugin's process beside the frame, as `ok({ frame, reports })`, checked against that list. `reportOverflow` in `@tyto/template-kit` reports content that runs past the page, and the weekly mock-exam agendas use it: a slide that runs off the grid now renders with a warning instead of being cut in silence. A context built by hand passes `reportNothing`.
+
+### Patch Changes
+
+- 7950dc3: TYTO-223: a plugin contributes a brand kit — a logo mark and a signature per brand id — through
+  the new `brand-kit` extension point, and a template reads the kit of its own manifest's `brand`
+  from `context.brand` (ADR 0063). `TemplateContext` gains the required `brand` field; a context
+  built by hand passes `noBrandKit`. `CompileOptions` and `JobPorts` take `brandKits`, which
+  `PluginRegistry.brandKitsByBrand()` merges: the plugin registered first keeps a brand, and
+  `W_BRAND_KIT_SHADOWED` names the one it hid. The kit is data and crosses to an installed code
+  template with the call, so the isolation protocol is now version 3. `Mark` moves to
+  `@tyto/core` as `MarkShape`; `@tyto/template-kit` still exports it as `Mark`.
+- 8ff5137: TYTO-237: the `agenda-semana` and `simulados-semana-ocre` examples carry invented copy of the same shape in their last lines that still quoted real names. Every template draws the same bytes as before for the same brief; only those two examples' renders change.
+- 861bf8b: `simulados-semana-roxo` 1.0.1, `-ocre` and `-vinho` 1.1.1: the owl and the sign-off now start on the middle's left edge, with the title, the days, the band and the call to comment, instead of on the 112 px gutter. No brief changes.
+- Updated dependencies [0937670]
+- Updated dependencies [37fd201]
+- Updated dependencies [7950dc3]
+- Updated dependencies [8300c78]
+- Updated dependencies [bf7c79a]
+- Updated dependencies [8ca8eed]
+- Updated dependencies [a84b756]
+- Updated dependencies [a33a192]
+- Updated dependencies [733f779]
+- Updated dependencies [d4aac5b]
+- Updated dependencies [94fdee3]
+- Updated dependencies [eaf6ece]
+- Updated dependencies [3fab91f]
+- Updated dependencies [cd25d2d]
+- Updated dependencies [5c0611f]
+- Updated dependencies [82927c8]
+- Updated dependencies [a69f493]
+- Updated dependencies [64c75bb]
+- Updated dependencies [091e2a2]
+- Updated dependencies [e35546e]
+- Updated dependencies [b02313b]
+- Updated dependencies [7659e7e]
+- Updated dependencies [525639b]
+  - @tyto/core@0.27.0
+  - @tyto/template-kit@0.2.0
+
 ## 0.6.0
 
 ### Minor Changes

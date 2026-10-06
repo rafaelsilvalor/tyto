@@ -1,5 +1,104 @@
 # @tyto/pipeline
 
+## 0.10.0
+
+### Minor Changes
+
+- 7950dc3: TYTO-223: a plugin contributes a brand kit — a logo mark and a signature per brand id — through
+  the new `brand-kit` extension point, and a template reads the kit of its own manifest's `brand`
+  from `context.brand` (ADR 0063). `TemplateContext` gains the required `brand` field; a context
+  built by hand passes `noBrandKit`. `CompileOptions` and `JobPorts` take `brandKits`, which
+  `PluginRegistry.brandKitsByBrand()` merges: the plugin registered first keeps a brand, and
+  `W_BRAND_KIT_SHADOWED` names the one it hid. The kit is data and crosses to an installed code
+  template with the call, so the isolation protocol is now version 3. `Mark` moves to
+  `@tyto/core` as `MarkShape`; `@tyto/template-kit` still exports it as `Mark`.
+- 8300c78: TYTO-214: a code template reads the files in its own folder through `context.files.image(path)`
+  and `context.files.svg(path)` (ADR 0062). `TemplateContext` gains the required `files` field, and
+  a context built by hand passes `noFiles`. `bundledTemplateSource` takes an optional
+  `readFiles(directory)`; without it, a bundled template is handed no files, as before. An
+  installed plugin's code template is handed `noFiles`.
+- a888001: TYTO-197: exported files are named by format and number: `<format>-<NN>.<ext>` (ADR 0053). The artwork's id stays in `result.json`, beside each file's name.
+
+  ```
+  before (TYTO-194)            after
+  lamina-1-grid.png            grid-01.png
+  lamina-2-grid.png            grid-02.png
+  artwork-1-grid-1x1.svg       grid-1x1-01.svg
+  lamina-3-story.png           story-03.png
+  ```
+
+  The number counts from 01 in slide order and is the same width across a delivery (three digits only past 99 slides). The pixels are unchanged. A script that reads the output folder by name must use the new names; one that reads `result.json` keeps working. Re-exporting into a folder that holds a delivery from before this change leaves the old-name files beside the new ones (TYTO-127).
+
+  `@tyto/pipeline`: `artifactName(format, number, extension)` replaces `artifactName(artwork, format, extension)`, and `artworkNumber(index, count)` is exported.
+
+- d4aac5b: TYTO-189: an installed plugin can ship code templates, and they run in its own thread. A folder
+  in an installed pack with a `manifest.yaml` and no `template.html` is drawn by the pack's new
+  `build(template, context)`, called through the isolation with the 30 s deadline. The frame is
+  checked against the IR, and a timeout, throw or refused answer is `E_PLUGIN_TEMPLATE`, which
+  costs that frame and not the render. `context.measure` still answers synchronously. The manifest
+  lists the faces it measures under `faces:`, and those cross with the call. A face installed on
+  the machine crosses only under the `font:<family>` permission (`W_PLUGIN_FONT_WITHHELD` otherwise).
+  `tyto plugin new --code` scaffolds one that installs and renders on the first try. `compile` is
+  unchanged for every other template, and `compileDeferred` is the new path (ADR 0048).
+- 5c0611f: TYTO-49: plugin directives (ADR 0043). A plugin registers a `directive` contribution whose `id`
+  is its namespace, with the `names` it answers and a `transform` that turns `::ns/name` into
+  ordinary slot directives, which `resolve` checks against the manifest as if they were typed. The
+  directive's adjustments are the plugin's arguments, handed over parsed and ranged, and the host
+  stamps every range in the answer. `ResolveOptions.directives` and `JobPorts.directives` take the
+  host's point through `directiveResolverOf`. The CLI wires it into every render, and an installed
+  plugin's transform runs in its worker under the per-call deadline. The editor offers `ns/name`
+  after `::`. Without the plugin the brief still gives `E_UNKNOWN_DIRECTIVE` on the name, and a
+  plugin's refusal of its arguments is the new `E_DIRECTIVE_ARGUMENT`.
+- a69f493: TYTO-48: an installed plugin runs in a worker thread of its own, and the `PluginHost` it holds is
+  a proxy whose every call is a Zod-checked message (ADR 0041). `@tyto/plugin-api` gains the
+  protocol, the `PluginChannel` port, `runGuest` and `connectIsolatedPlugin`; `Exporter.exportFrame`
+  may return a `Promise`, which the job awaits. A plugin whose thread ends unasked costs the frames
+  waiting on it (`E_PLUGIN_CRASHED`, non-fatal) and is shown as `crashed` in `plugin list` until it
+  is installed or enabled again; the history is `crashes.json`, beside `plugins.json`, and
+  `plugins.json` now drops keys it does not know instead of refusing the file. The thread is a crash and API boundary, not a sandbox, and the
+  install prompt says so.
+- 64c75bb: TYTO-47: plugins can be installed. `tyto plugin install <folder|git-url|npm-spec>` checks the
+  manifest's `engine` against `PLUGIN_API_VERSION` (the plugin API's own version, ADR 0040), shows
+  the permissions — recorded, not yet enforced — and copies the plugin to `~/.tyto/plugins/`;
+  `remove`, `disable` and `enable` change what is activated, and `plugin list` gains a status column
+  and `--active`. `InProcessHost.tryActivate` activates an installed plugin as data rather than
+  throwing, and a plugin whose contribution id is taken is refused by name while the render goes on
+  (`W_PLUGIN_SKIPPED`). `ArtifactKind` is open, so `--types` accepts any kind an installed exporter
+  declares, and a document exporter's `extension` and `mime` name the file; `artifactExtension` and
+  `artifactMimeType` are replaced by `artifactEncoding`, and `artifactName` takes the extension.
+
+### Patch Changes
+
+- Updated dependencies [0937670]
+- Updated dependencies [37fd201]
+- Updated dependencies [7950dc3]
+- Updated dependencies [8300c78]
+- Updated dependencies [bf7c79a]
+- Updated dependencies [8ca8eed]
+- Updated dependencies [a84b756]
+- Updated dependencies [536046d]
+- Updated dependencies [a33a192]
+- Updated dependencies [733f779]
+- Updated dependencies [d4aac5b]
+- Updated dependencies [94fdee3]
+- Updated dependencies [eaf6ece]
+- Updated dependencies [cd25d2d]
+- Updated dependencies [5c0611f]
+- Updated dependencies [82927c8]
+- Updated dependencies [a69f493]
+- Updated dependencies [64c75bb]
+- Updated dependencies [b1b0745]
+- Updated dependencies [091e2a2]
+- Updated dependencies [e35546e]
+- Updated dependencies [7659e7e]
+- Updated dependencies [525639b]
+- Updated dependencies [1ee0051]
+  - @tyto/core@0.27.0
+  - @tyto/plugin-api@0.4.0
+  - @tyto/template-lang@0.7.0
+  - @tyto/brief-lang@0.6.7
+  - @tyto/raster@0.2.1
+
 ## 0.9.1
 
 ### Patch Changes
