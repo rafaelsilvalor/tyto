@@ -107,7 +107,7 @@ almost everything is a component.
 
 ## Audit — what was measured, when, and how
 
-Measured on 2026-09-18 against `main` at `e308855`. Line numbers are a snapshot and rot.
+Measured on 2026-09-18 against `main` at `153f4ce`. Line numbers are a snapshot and rot.
 
 ```
 $ grep -c "<define\|<use" packages/templates/templates/*/template.html

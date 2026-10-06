@@ -12,7 +12,7 @@ to `markupTemplateSource`, so `<image src="assets/bg.png">` resolves. A code tem
 returned `defineTemplate(manifest, build)`, and the context `build` receives had no field that
 names a file.
 
-Measured on `origin/main` 193f775 with a throwaway test that ran `tyto render --types svg`
+Measured on `origin/main` 7efc445 with a throwaway test that ran `tyto render --types svg`
 on a bundled code template whose folder holds `assets/bg.png`. The best a template could
 write was a hand-made ref with the folder-relative path and a guessed hash, because it has
 no bytes to hash:

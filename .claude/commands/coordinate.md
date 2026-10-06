@@ -112,7 +112,7 @@ rafaelsilvalor/tyto --state open`, the latest ADR on `origin/main`, and the
 7. After a merge: tell the executor, free the package and the ADR rows in the
    registry, and update the batch file.
 
-**Never merge #238** (the npm release PR): it is Rafael's. **Never move a card
+**Never merge the version PR** (branch `changeset-release/main`, opened by release.yml): it is Rafael's. **Never move a card
 to Done**: that is Rafael's too. Leave the card in Review, and list for him what
 is ready to close.
 

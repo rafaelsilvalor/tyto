@@ -176,7 +176,7 @@ named `selo`".
 
 # Audit — how the code diverges, as measured on 2026-09-16
 
-Measured against `main` at `aa043cf`, after TYTO-102. Line numbers are a snapshot and will
+Measured against `main` at `37a50c6`, after TYTO-102. Line numbers are a snapshot and will
 rot; the file and the symptom outlive them.
 
 ## Symptom 1 — `EditorView` is treated as the owner of content

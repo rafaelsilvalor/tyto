@@ -15,7 +15,7 @@ shared list of formats instead of one per template.
 ## Why this exists now
 
 **Four templates had already drifted three ways.** Measured on 2026-09-27 against `main` at
-`cc4ca1d`, plus `aprovados` from PR #237:
+`cd25d2d`, plus `aprovados` from PR rafaelsilvalor/tyto-archive#237:
 
 | Role                                | `promo-curso` | `carrossel-lista` | `agenda-semana` | `aprovados` |
 | ----------------------------------- | ------------- | ----------------- | --------------- | ----------- |

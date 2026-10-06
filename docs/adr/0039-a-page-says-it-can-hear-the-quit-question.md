@@ -13,9 +13,9 @@ reaching a listener that is already registered", and nothing made that premise t
 listener was registered in `load()` after three awaits (`app:info`, `layout:get`, `applyLayout`),
 so a quit that arrived while the page was still starting pushed into a page with no listener: no
 acknowledgement, the question dropped at 30 s, and the app open for good with nobody left to ask
-again. PR #223 (TYTO-44) did not introduce the race. It moved the page's timing enough for
+again. PR rafaelsilvalor/tyto-archive#223 (TYTO-44) did not introduce the race. It moved the page's timing enough for
 `packaged.package.test.ts`, which quits the app a few hundred milliseconds after launch, to land
-in it every time on CI. The packaged step hung its 600 s `afterAll`, and #225 reverted the card.
+in it every time on CI. The packaged step hung its 600 s `afterAll`, and rafaelsilvalor/tyto-archive#225 reverted the card.
 
 Measured on CI (run 36327839636) with temporary `[quit-probe]` lines on every step of the quit.
 The packaged app, quit by `closeApp` (main's clock starts at main's module load; the renderer's

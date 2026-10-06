@@ -19,7 +19,7 @@ against the host's font cache. A function does not cross a message boundary, so 
 a way to answer the same question.
 
 The two options were measured on `agenda-semana`'s example brief, which makes 16 measurements
-per render, before anything was built. A throwaway probe on `origin/main` (cc4ca1d) ran 500
+per render, before anything was built. A throwaway probe on `origin/main` (cd25d2d) ran 500
 renders in-process and 200 sequences of 16 round trips over `worker_threads`. Three runs:
 
 ```

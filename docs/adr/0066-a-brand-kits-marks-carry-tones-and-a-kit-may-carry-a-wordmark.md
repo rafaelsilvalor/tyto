@@ -8,7 +8,7 @@ follows ADR 0065 (built-in templates draw placeholders without a kit), part of e
 ADR 0063's kit holds a logo as one `MarkShape` — one path, one colour chosen by the template —
 and a signature. Removing the brand art from the banner backgrounds (TYTO-225, ADR 0065) showed
 two things the kit could not carry: the logo painted on the backgrounds was in **two tones**,
-and the square banner carried the brand's **wordmark** beside it. #301 measured both on the
+and the square banner carried the brand's **wordmark** beside it. rafaelsilvalor/tyto-archive#301 measured both on the
 backgrounds' pixels before painting them out: the tones' colours and where each sits, and the
 wordmark's box in the square format (the table in `banner-roxo/template.ts`).
 
@@ -53,7 +53,7 @@ outside the two is refused at activation, as before.
 The house reads every kit mark through `drawBrandMark` and `drawLogo` in `_casa/kit.ts`. A
 one-shape mark still goes through template-kit's `mark()`, so the placeholder's nodes did not
 move by a byte; a toned mark is a group of one vector per layer. `banner-roxo` maps `primary`
-to the darker purple #301 measured and `secondary` to the lighter, and draws the wordmark in
+to the darker purple rafaelsilvalor/tyto-archive#301 measured and `secondary` to the lighter, and draws the wordmark in
 the square format's measured box, as large as fits, from its left edge. The other places that
 draw the logo use one ink, so both tones take it, which is what they drew before.
 

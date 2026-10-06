@@ -10,7 +10,7 @@ boundary only (`requireSandbox: false`). The reason was measured: Electron 44.4.
 measurement found that Electron run as Node (`ELECTRON_RUN_AS_NODE=1`) does enforce it. Rafael
 chose to carry a separate Node binary instead, because that route needs the RunAsNode fuse,
 which Electron's hardening guidance says to switch off. That choice was measured before
-anything was built, on CI (throwaway draft PR #254, run 36410437811):
+anything was built, on CI (throwaway draft PR rafaelsilvalor/tyto-archive#254, run 36410437811):
 
 | Platform            | installer without → with Node           | the Node binary | signature on the binary                        |
 | ------------------- | --------------------------------------- | --------------- | ---------------------------------------------- |

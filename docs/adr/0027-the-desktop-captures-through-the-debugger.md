@@ -4,7 +4,7 @@ Status: accepted · 2026-09-18 · TYTO-125 · amends the desktop half of ADR 000
 
 ## Context
 
-ADR 0002 named one mechanism for the desktop — `webContents.capturePage` on an offscreen `BrowserWindow` — and `docs/architecture.md` repeated it for a year. Neither half of that sentence survived being run. TYTO-30 measured both on both platforms (#177) and stopped there on purpose, because what it found is a decision rather than an implementation detail.
+ADR 0002 named one mechanism for the desktop — `webContents.capturePage` on an offscreen `BrowserWindow` — and `docs/architecture.md` repeated it for a year. Neither half of that sentence survived being run. TYTO-30 measured both on both platforms (rafaelsilvalor/tyto-archive#177) and stopped there on purpose, because what it found is a decision rather than an implementation detail.
 
 **Every route that reads the window's composited surface is clipped to the primary display's work area, and the crop is silent.** A story is 1080×1920 and no display this project runs on is 1920 tall; CI's `xvfb` is 1280×1024. Measured on win32, Electron 44.3.0 / Chromium 152.0.7977.78, `display=3072x1728 workArea=3072x1680 scaleFactor=1.25`, asking for 1080×1920 of a document that is 1080×1920:
 

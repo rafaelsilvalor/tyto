@@ -16,8 +16,8 @@ the filter did not match. Its objection is recorded in `docs/git-workflow.md` â€
 green-by-construction context is a check whose name lies about what it measured._
 
 The filter also had a blind spot of its own. `desktop-e2e.yml` ran on `apps/desktop/**`, and the
-app bundles almost the whole workspace. Measured on the last 40 merged pull requests (#250 to
-#292) for TYTO-138:
+app bundles almost the whole workspace. Measured on the last 40 merged pull requests (rafaelsilvalor/tyto-archive#250 to
+rafaelsilvalor/tyto-archive#292) for TYTO-138:
 
 | Filter                                                                        | PRs that ran it |
 | ----------------------------------------------------------------------------- | --------------- |
