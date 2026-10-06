@@ -18,6 +18,7 @@ import { type ElectronApplication, type Page, _electron } from 'playwright';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 
 import { closeApp } from './close-app.js';
+import { firstWindow } from './first-window.js';
 
 /**
  * **The card's acceptance criterion, which needs two programs** (E9.4, TYTO-43).
@@ -167,7 +168,7 @@ beforeAll(async () => {
     cwd: join(here, '..'),
     env: { ...process.env, TYTO_HEADLESS: '1', TYTO_HOME: join(scratch, 'tyto-home') },
   });
-  window = await app.firstWindow();
+  window = await firstWindow(app);
   // **`.shell` is in `index.html` and is therefore no signal at all** (TYTO-154): it is there
   // before a line of the renderer has run, so waiting for it was waiting for nothing. Every
   // other suite here waits for something the script builds; this one now waits for the same

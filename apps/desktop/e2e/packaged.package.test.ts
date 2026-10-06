@@ -18,6 +18,7 @@ import { type ElectronApplication, type Page, _electron } from 'playwright';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 
 import { closeApp } from './close-app.js';
+import { firstWindow } from './first-window.js';
 
 /**
  * The installer's app, launched.
@@ -238,7 +239,7 @@ beforeAll(async () => {
     // The same flag `window.desktop.test.ts` uses.
     env: { ...process.env, TYTO_HEADLESS: '1', TYTO_HOME: join(scratch, 'tyto-home') },
   });
-  page = await app.firstWindow();
+  page = await firstWindow(app);
   // The editor and not the bridge (TYTO-175, TYTO-154's rule). `window.tyto` is put on the page
   // by the preload, before a line of the renderer has run, so waiting for it answered _is the
   // preload there_ and then handed a half-loaded window to `afterAll`, which quits it. That

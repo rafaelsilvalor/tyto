@@ -8,6 +8,7 @@ import { type ElectronApplication, type Page, _electron } from 'playwright';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 
 import { closeApp } from './close-app.js';
+import { firstWindow } from './first-window.js';
 
 /**
  * E9.3's two acceptance criteria, through a real window, plus the layout claim behind them.
@@ -123,7 +124,7 @@ beforeAll(async () => {
     cwd: join(here, '..'),
     env: { ...process.env, TYTO_HEADLESS: '1', TYTO_HOME: join(scratch, 'tyto-home') },
   });
-  page = await app.firstWindow();
+  page = await firstWindow(app);
   await page.waitForFunction(() => document.querySelector('#editor .cm-content') !== null);
   await page.setViewportSize({ width: 1360, height: 860 });
 });

@@ -8,6 +8,7 @@ import { type ElectronApplication, type Page, _electron } from 'playwright';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 
 import { closeApp } from './close-app.js';
+import { firstWindow } from './first-window.js';
 
 /**
  * A plugin directive in the window (TYTO-49, ADR 0043).
@@ -88,7 +89,7 @@ async function launch(withPlugin: boolean): Promise<Launched> {
     cwd: join(here, '..'),
     env: { ...process.env, TYTO_HEADLESS: '1', TYTO_HOME: home },
   });
-  const page = await app.firstWindow();
+  const page = await firstWindow(app);
   // Something the script builds, never the markup it shipped with (TYTO-154, TYTO-175).
   await page.waitForSelector('#editor .cm-content');
   await page.waitForSelector('.tabs__tab');
@@ -135,7 +136,7 @@ describe('with the demo plugin installed', () => {
 
   beforeAll(async () => {
     launched = await launch(true);
-  }, 120_000);
+  });
 
   afterAll(async () => {
     await closeApp(launched.app);
@@ -249,7 +250,7 @@ describe('without the plugin', () => {
 
   beforeAll(async () => {
     launched = await launch(false);
-  }, 120_000);
+  });
 
   afterAll(async () => {
     await closeApp(launched.app);

@@ -6,6 +6,8 @@ import { fileURLToPath } from 'node:url';
 import { type ElectronApplication, type Page, _electron } from 'playwright';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 
+import { firstWindow } from './first-window.js';
+
 /**
  * Quitting with unsaved text, through a real window (TYTO-123).
  *
@@ -141,7 +143,7 @@ const launch = async (name: string): Promise<{ app: ElectronApplication; page: P
     cwd: join(here, '..'),
     env: { ...process.env, TYTO_HEADLESS: '1', TYTO_HOME: join(scratch, 'tyto-home') },
   });
-  const page = await app.firstWindow();
+  const page = await firstWindow(app);
   await page.waitForSelector('#editor .cm-content');
   await page.waitForSelector('.tabs__tab');
   return { app, page };

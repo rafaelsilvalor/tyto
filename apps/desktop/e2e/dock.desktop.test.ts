@@ -7,6 +7,7 @@ import { type ElectronApplication, type Page, _electron } from 'playwright';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 
 import { closeApp } from './close-app.js';
+import { firstWindow } from './first-window.js';
 
 /**
  * The dock, through a real window (E9.10).
@@ -33,7 +34,7 @@ async function launch(): Promise<{ app: ElectronApplication; page: Page }> {
     cwd: join(here, '..'),
     env: { ...process.env, TYTO_HEADLESS: '1', TYTO_HOME: join(scratch, 'tyto-home') },
   });
-  const window = await started.firstWindow();
+  const window = await firstWindow(started);
   await window.waitForSelector('[data-panel="editor"]');
   return { app: started, page: window };
 }

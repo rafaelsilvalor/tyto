@@ -7,6 +7,7 @@ import { type ElectronApplication, type Page, _electron } from 'playwright';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 
 import { closeApp } from './close-app.js';
+import { firstWindow } from './first-window.js';
 
 /**
  * The log, from a failure in a real window to a line on a real disk (TYTO-132).
@@ -68,7 +69,7 @@ beforeAll(async () => {
     cwd: join(here, '..'),
     env: { ...process.env, TYTO_HEADLESS: '1', TYTO_HOME: join(scratch, 'tyto-home') },
   });
-  page = await app.firstWindow();
+  page = await firstWindow(app);
   await page.waitForSelector('#editor .cm-content');
   await page.waitForSelector('.tabs__tab');
 });

@@ -7,6 +7,7 @@ import { type ElectronApplication, type Page, _electron } from 'playwright';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 
 import { closeApp } from './close-app.js';
+import { firstWindow } from './first-window.js';
 
 /**
  * Opening, saving and reopening, through a real window (E9.8).
@@ -118,7 +119,7 @@ beforeAll(async () => {
     cwd: join(here, '..'),
     env: { ...process.env, TYTO_HEADLESS: '1', TYTO_HOME: join(scratch, 'tyto-home') },
   });
-  page = await app.firstWindow();
+  page = await firstWindow(app);
   await page.waitForSelector('#editor .cm-content');
 });
 
@@ -236,7 +237,7 @@ describe('quitting and reopening', () => {
     });
 
     try {
-      const reopened = await second.firstWindow();
+      const reopened = await firstWindow(second);
       await reopened.waitForSelector('#editor .cm-content');
       await reopened.keyboard.press('Control+k');
       await reopened.waitForSelector('.command-bar__input', { state: 'visible' });

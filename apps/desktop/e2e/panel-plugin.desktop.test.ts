@@ -8,6 +8,7 @@ import { type ElectronApplication, type Frame, type Page, _electron } from 'play
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 
 import { closeApp } from './close-app.js';
+import { firstWindow } from './first-window.js';
 
 /**
  * A plugin's panel in the running window (TYTO-49, ADR 0045).
@@ -142,7 +143,7 @@ beforeAll(async () => {
     cwd: join(here, '..'),
     env: { ...process.env, TYTO_HEADLESS: '1', TYTO_HOME: home },
   });
-  page = await app.firstWindow();
+  page = await firstWindow(app);
   // Something the script builds, never the markup it shipped with (TYTO-154, TYTO-175).
   await page.waitForSelector('#editor .cm-content');
   await page.waitForSelector('.tabs__tab');
@@ -150,7 +151,7 @@ beforeAll(async () => {
   await page.evaluate(() => {
     localStorage.setItem('tyto-e2e-secret', 'do app');
   });
-}, 120_000);
+});
 
 afterAll(async () => {
   await closeApp(app);

@@ -5,6 +5,8 @@ import { fileURLToPath } from 'node:url';
 import ts from 'typescript';
 import { describe, expect, it } from 'vitest';
 
+import { MINIMUM_LAUNCH_HOOK_TIMEOUT_MS } from './first-window.js';
+
 /**
  * Every Electron an end-to-end suite launches gets its own data folders (TYTO-139).
  *
@@ -25,6 +27,20 @@ import { describe, expect, it } from 'vitest';
  * The rule is deliberately strict about shape: `args` must be an array literal and `env` an
  * object literal, because a value built elsewhere is one this test cannot read, and a check
  * that waves through what it cannot read is the convention again.
+ */
+
+/**
+ * The same file holds a second rule about launching: no suite waits for the first window on
+ * its own (TYTO-231). Every suite left `firstWindow()` at Playwright's 30 s default, and under
+ * load a start took longer while the hook still had 270 s of budget. The deadline now lives in
+ * one place, `first-window.ts`, and a suite that calls `.firstWindow(` directly fails here.
+ * The helper is not a `*.test.ts`, so its own direct call is never scanned — on purpose.
+ *
+ * A third rule keeps that deadline inside its hook: a `beforeAll` or `beforeEach` that calls
+ * `firstWindow(` may not give itself less than `MINIMUM_LAUNCH_HOOK_TIMEOUT_MS`, or a slow start
+ * ends in an anonymous hook timeout instead of a named wait (`first-window.ts` says why 180 s).
+ * It sees only a call written in the hook itself: a hook that launches through a local helper
+ * (`dock`, `quit`, `directives`) is not checked, and neither is a test that launches.
  */
 
 const here = dirname(fileURLToPath(import.meta.url));
@@ -151,6 +167,68 @@ function scanLaunches(fileName: string, source: string): LaunchScan {
   return { importsElectron, launches, problems };
 }
 
+const HOW_TO_WAIT =
+  `import { firstWindow } from './first-window.js' and await firstWindow(app), ` +
+  `so the wait uses the one deadline every suite shares`;
+
+/** Every `<anything>.firstWindow(…)` call, by line: each one bypasses the shared deadline. */
+function scanDirectWindowWaits(fileName: string, source: string): number[] {
+  const file = ts.createSourceFile(fileName, source, ts.ScriptTarget.Latest, true);
+  const lines: number[] = [];
+  const visit = (node: ts.Node): void => {
+    if (
+      ts.isCallExpression(node) &&
+      ts.isPropertyAccessExpression(node.expression) &&
+      node.expression.name.text === 'firstWindow'
+    ) {
+      lines.push(file.getLineAndCharacterOfPosition(node.getStart(file)).line + 1);
+    }
+    ts.forEachChild(node, visit);
+  };
+  visit(file);
+  return lines;
+}
+
+const SETUP_HOOKS = new Set(['beforeAll', 'beforeEach']);
+
+function callsFirstWindow(node: ts.Node): boolean {
+  if (
+    ts.isCallExpression(node) &&
+    ((ts.isIdentifier(node.expression) && node.expression.text === 'firstWindow') ||
+      (ts.isPropertyAccessExpression(node.expression) &&
+        node.expression.name.text === 'firstWindow'))
+  ) {
+    return true;
+  }
+  return ts.forEachChild(node, callsFirstWindow) ?? false;
+}
+
+/** Every setup hook that waits for the first window on a budget below the minimum, by line. */
+function scanShortLaunchHooks(fileName: string, source: string): LaunchProblem[] {
+  const file = ts.createSourceFile(fileName, source, ts.ScriptTarget.Latest, true);
+  const problems: LaunchProblem[] = [];
+  const visit = (node: ts.Node): void => {
+    if (
+      ts.isCallExpression(node) &&
+      ts.isIdentifier(node.expression) &&
+      SETUP_HOOKS.has(node.expression.text)
+    ) {
+      const [body, timeout] = node.arguments;
+      if (body !== undefined && timeout !== undefined && callsFirstWindow(body)) {
+        const line = file.getLineAndCharacterOfPosition(node.getStart(file)).line + 1;
+        if (!ts.isNumericLiteral(timeout)) {
+          problems.push({ line, reason: 'its timeout is not a number this check can read' });
+        } else if (Number(timeout.text) < MINIMUM_LAUNCH_HOOK_TIMEOUT_MS) {
+          problems.push({ line, reason: `it gives itself ${timeout.getText(file)} ms` });
+        }
+      }
+    }
+    ts.forEachChild(node, visit);
+  };
+  visit(file);
+  return problems;
+}
+
 function suiteFiles(): string[] {
   return readdirSync(here)
     .filter((name) => name.endsWith('.test.ts') && name !== 'launch-isolation.test.ts')
@@ -182,6 +260,86 @@ describe('every end-to-end suite launches Electron in its own data folders', () 
           'call it directly, with an object literal, so this check can read what it is given',
       );
     expect(unseen).toEqual([]);
+  });
+});
+
+describe('every end-to-end suite waits for the first window through first-window.ts', () => {
+  it('finds no direct .firstWindow( call in a suite', () => {
+    const messages = suiteFiles().flatMap((name) =>
+      scanDirectWindowWaits(name, readFileSync(join(here, name), 'utf8')).map(
+        (line) => `e2e/${name}:${line}: waits for the first window itself — ${HOW_TO_WAIT}`,
+      ),
+    );
+    expect(messages).toEqual([]);
+  });
+
+  // The helper's own direct call is the one that is allowed, and it is allowed by not being a
+  // suite. If it ever became one, the rule above would report the helper instead of the suites.
+  it('leaves the helper outside the files it scans', () => {
+    expect(suiteFiles()).not.toContain('first-window.ts');
+  });
+});
+
+describe('every hook that waits for the first window has room for it', () => {
+  it(`finds no setup hook calling firstWindow( with less than ${MINIMUM_LAUNCH_HOOK_TIMEOUT_MS} ms`, () => {
+    const messages = suiteFiles().flatMap((name) =>
+      scanShortLaunchHooks(name, readFileSync(join(here, name), 'utf8')).map(
+        (problem) =>
+          `e2e/${name}:${problem.line}: waits for the first window but ${problem.reason} — ` +
+          `drop the timeout to use the config's hookTimeout, or pass at least ` +
+          `${MINIMUM_LAUNCH_HOOK_TIMEOUT_MS}, so a slow start fails on a named wait`,
+      ),
+    );
+    expect(messages).toEqual([]);
+  });
+});
+
+describe('scanShortLaunchHooks', () => {
+  it('reports a short hook that waits for the window, and one it cannot read', () => {
+    const scan = scanShortLaunchHooks(
+      'a.ts',
+      [
+        'beforeAll(async () => { page = await firstWindow(app); }, 120_000);',
+        'beforeEach(async () => { page = await firstWindow(app); }, budget);',
+      ].join('\n'),
+    );
+    expect(scan).toEqual([
+      { line: 1, reason: 'it gives itself 120_000 ms' },
+      { line: 2, reason: 'its timeout is not a number this check can read' },
+    ]);
+  });
+
+  it('accepts the default, a long enough budget, and a short hook that does not launch', () => {
+    const scan = scanShortLaunchHooks(
+      'a.ts',
+      [
+        'beforeAll(async () => { page = await firstWindow(app); });',
+        'beforeAll(async () => { page = await firstWindow(app); }, 180_000);',
+        'beforeAll(async () => { await page.click("#x"); }, 60_000);',
+        'afterAll(async () => { await firstWindow(app); }, 1);',
+      ].join('\n'),
+    );
+    expect(scan).toEqual([]);
+  });
+});
+
+describe('scanDirectWindowWaits', () => {
+  it('reports a direct call on any receiver, with or without options', () => {
+    expect(
+      scanDirectWindowWaits(
+        'a.ts',
+        `const page = await app.firstWindow();\nconst again = await second.firstWindow({ timeout: 1 });`,
+      ),
+    ).toEqual([1, 2]);
+  });
+
+  it('accepts the helper, and a mention in a comment', () => {
+    expect(
+      scanDirectWindowWaits(
+        'a.ts',
+        `// not app.firstWindow() here\nconst page = await firstWindow(app);`,
+      ),
+    ).toEqual([]);
   });
 });
 

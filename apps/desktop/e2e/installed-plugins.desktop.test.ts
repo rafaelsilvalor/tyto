@@ -17,6 +17,7 @@ import { type ElectronApplication, type Page, _electron } from 'playwright';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 
 import { closeApp } from './close-app.js';
+import { firstWindow } from './first-window.js';
 
 /**
  * Installed plugins in a running app, each in a process of its own on the bundled Node, under
@@ -168,11 +169,11 @@ beforeAll(async () => {
     cwd: join(here, '..'),
     env: { ...process.env, TYTO_HEADLESS: '1', TYTO_HOME: home },
   });
-  page = await app.firstWindow();
+  page = await firstWindow(app);
   // Something the script builds, never the markup it shipped with (TYTO-154, TYTO-175).
   await page.waitForSelector('#editor .cm-content');
   await page.waitForSelector('.tabs__tab');
-}, 120_000);
+});
 
 afterAll(async () => {
   await closeApp(app);

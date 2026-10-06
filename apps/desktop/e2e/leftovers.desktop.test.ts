@@ -7,6 +7,7 @@ import { type ElectronApplication, type Page, _electron } from 'playwright';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 
 import { closeApp } from './close-app.js';
+import { firstWindow } from './first-window.js';
 
 /**
  * A second export from the window into the same folder (TYTO-127, ADR 0054).
@@ -104,7 +105,7 @@ beforeAll(async () => {
     cwd: join(here, '..'),
     env: { ...process.env, TYTO_HEADLESS: '1', TYTO_HOME: join(scratch, 'tyto-home') },
   });
-  window = await app.firstWindow();
+  window = await firstWindow(app);
   await window.waitForSelector('#editor .cm-content');
   await window.waitForSelector('.tabs__tab');
 });

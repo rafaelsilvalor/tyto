@@ -8,6 +8,7 @@ import { type ElectronApplication, type Page, _electron } from 'playwright';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 
 import { closeApp } from './close-app.js';
+import { firstWindow } from './first-window.js';
 
 import { type CatalogueKey, CATALOGUE_KEYS, translate } from '../shared/i18n/index.js';
 import { en } from '../shared/i18n/en.js';
@@ -72,7 +73,7 @@ beforeAll(async () => {
     // changes about the app it is testing; every flag it asserts on is the shipped one.
     env: { ...process.env, TYTO_HEADLESS: '1', TYTO_HOME: join(scratch, 'tyto-home') },
   });
-  page = await app.firstWindow();
+  page = await firstWindow(app);
   await page.waitForFunction(
     ([attribute]) => document.querySelector(`[${attribute}]`)?.textContent !== '',
     [I18N_ATTRIBUTE],

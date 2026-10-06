@@ -8,6 +8,7 @@ import { type ElectronApplication, type Page, _electron } from 'playwright';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 
 import { closeApp } from './close-app.js';
+import { firstWindow } from './first-window.js';
 
 /**
  * A story in the preview panel is drawn at its full height (TYTO-177).
@@ -227,7 +228,7 @@ describe.each([
       cwd: join(here, '..'),
       env: { ...launchEnvironment(shown), TYTO_HOME: join(scratch, 'tyto-home') },
     });
-    page = await app.firstWindow();
+    page = await firstWindow(app);
     await page.waitForFunction(() => document.querySelector('#editor .cm-content') !== null);
     await page.click('#editor .cm-content');
     await page.keyboard.insertText(readFileSync(EXAMPLE, 'utf8'));

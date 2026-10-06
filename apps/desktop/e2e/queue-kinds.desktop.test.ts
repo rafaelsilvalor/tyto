@@ -16,6 +16,7 @@ import { type ElectronApplication, type Page, _electron } from 'playwright';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 
 import { closeApp } from './close-app.js';
+import { firstWindow } from './first-window.js';
 
 /**
  * The file types a queue folder produces, in a running app (TYTO-188, ADR 0061).
@@ -164,7 +165,7 @@ beforeAll(async () => {
     cwd: join(here, '..'),
     env: { ...process.env, TYTO_HEADLESS: '1', TYTO_HOME: home },
   });
-  page = await app.firstWindow();
+  page = await firstWindow(app);
   // Something the script builds, never the markup it shipped with (TYTO-154, TYTO-175).
   await page.waitForSelector('#editor .cm-content');
   await page.waitForSelector('.tabs__tab');
@@ -177,7 +178,7 @@ beforeAll(async () => {
   }, queueFolder);
   await page.click('tyto-queue-panel .queue__choose');
   await page.waitForSelector('tyto-queue-panel .queue__path');
-}, 120_000);
+});
 
 afterAll(async () => {
   await closeApp(app);
