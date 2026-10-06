@@ -117,7 +117,12 @@ jobs:
       # suites grew. `test:package` was 6.4 s of it, measured on this workflow's own runs. `test:package` is that cheap because
       # `electron-builder` repacks the Electron `test:desktop` has already fetched, so the
       # two suites share one download whatever caching is or is not in front of them.
+      #
+      # **Three files at a time here, one everywhere else** (TYTO-235). The variable is read
+      # by `vitest.desktop.config.ts`, whose default is serial because a maintainer's
+      # machine has the memory this runner does not need to share.
       - if: steps.scope.outputs.run == 'true'
+        env: { TYTO_E2E_WORKERS: 3 }
         run: xvfb-run -a pnpm --filter @tyto/desktop test:desktop
       # `!cancelled()` rather than nothing, so a red `test:desktop` does not hide whether
       # the package is also broken. They answer different questions and one run should
