@@ -1,3 +1,4 @@
+// @vitest-environment jsdom
 import { type Diagnostic as LintDiagnostic, forEachDiagnostic } from '@codemirror/lint';
 import { type DiagnosticCode, type TemplateManifest, diagnostic, parseManifest } from '@tyto/core';
 import { afterEach, describe, expect, it, vi } from 'vitest';

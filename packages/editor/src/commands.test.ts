@@ -1,3 +1,4 @@
+// @vitest-environment jsdom
 import { isolateHistory, undoDepth } from '@codemirror/commands';
 import { afterEach, describe, expect, it } from 'vitest';
 

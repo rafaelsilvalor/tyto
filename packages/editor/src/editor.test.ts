@@ -1,3 +1,4 @@
+// @vitest-environment jsdom
 import { insertNewlineAndIndent, undo as undoCommand } from '@codemirror/commands';
 import { type StateEffect } from '@codemirror/state';
 import { EditorView } from '@codemirror/view';

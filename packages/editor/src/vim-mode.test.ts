@@ -1,3 +1,4 @@
+// @vitest-environment jsdom
 import { EditorSelection } from '@codemirror/state';
 import { type EditorView, runScopeHandlers } from '@codemirror/view';
 import { Vim, getCM } from '@replit/codemirror-vim';

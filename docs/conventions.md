@@ -65,6 +65,9 @@ See `docs/git-workflow.md`.
 ## Tests
 
 - Pure: Vitest unit tests.
+- Vitest's environment is `node` everywhere; a test file that needs a DOM opts in with
+  `// @vitest-environment jsdom` as its first line (`apps/desktop`, `packages/editor`).
+  jsdom costs seconds per file, so a package never makes it the default (TYTO-236).
 - Exporters: `.brief` fixture → committed `.html`/`.svg` snapshot.
 - Raster: reference PNG + tolerant diff (`pixelmatch`), runs in CI with Playwright.
 - Desktop: Playwright for critical flows (open brief, see preview, export).

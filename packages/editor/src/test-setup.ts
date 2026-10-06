@@ -10,6 +10,10 @@
  * no rectangle, and the measuring code already handles a range it cannot measure. Faking a
  * plausible geometry would make a layout-dependent test pass for a reason that does not
  * exist (TYTO-92).
+ *
+ * The setup file runs for every test file, and most of them run under node, where there is
+ * no `Range` at all: the guard below makes this a no-op there. Nothing in a node file mounts
+ * an `EditorView`, so there is no measuring pass to quiet (TYTO-236).
  */
 const emptyRectList = (): DOMRectList => {
   const rects: DOMRect[] = [];

@@ -1,3 +1,4 @@
+// @vitest-environment jsdom
 import { searchPanelOpen } from '@codemirror/search';
 import { afterEach, describe, expect, it } from 'vitest';
 

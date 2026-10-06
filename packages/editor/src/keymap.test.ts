@@ -1,3 +1,4 @@
+// @vitest-environment jsdom
 import { type EditorView, runScopeHandlers } from '@codemirror/view';
 import { afterEach, describe, expect, it } from 'vitest';
 
