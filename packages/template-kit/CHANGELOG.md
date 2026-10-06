@@ -1,5 +1,47 @@
 # @tyto/template-kit
 
+## 0.2.0
+
+### Minor Changes
+
+- 3fab91f: TYTO-185: add the configurable components `pillTable` (a table read out of one slot) and `titleBlock` (a centred column of optional picture, words and rule), the `bandedPage` arrangement, and `mark`, `textBlock`, `grownTextBlock` and the brief-row readers (`lines`, `fields`, `rowGroups`). Add the `aprovados` template, the azul approved list, built only from those and the brand module. `agenda-semana` now composes the azul brand module (`templates/_azul/`) and renders the same pixels, except that the footer arrow is no longer drawn on the last slide: it announces a next slide, and the last one has none.
+- e35546e: TYTO-201: an optional `selo` slot on `agenda-semana` (4.2.0), `aprovados` (4.2.0), `simulados-semana-ocre` and `simulados-semana-vinho` (1.1.0) — an art 1080 × 140 glued to the foot of the last grid slide, never on a story. With it the page above shrinks by 140: the middle centres above the seal and the footer stands on it. Write `selo: ./selo.png` in the frontmatter. The kit gains `sealed`, and `selo` joins the standard slot vocabulary as a reserved `image` name.
+- b02313b: TYTO-200: three new templates, `simulados-semana-roxo`, `simulados-semana-ocre` and `simulados-semana-vinho` — the weekly mock-exam agenda of roxo (stories only), ocre and vinho, one composition in three accents. Each `::lamina` is one slide: `Domingo 26/10 | Aplicação às 08h30 & correção às 14h` starts a day and every line with no `|` under it is one of its exams. The title is on every slide; the call to comment is on the last grid only, in the brief's optional `::chamada` or in the house's line. Rows are 700 px wide, or as wide as the slide's longest exam up to 856; the owl and the sign-off stand on a 112 px gutter. `pillTable` gains a group `caption`, the band under a heading drawn from the heading line's second field.
+- 525639b: TYTO-202: a template reports warnings beside its frame (ADR 0058). `TemplateContext` gains `report`, which takes one of a closed list of codes — the first is `W_TEMPLATE_OVERFLOW` — and `compile` writes the catalog's diagnostic with the artwork, the format and the range of the directive the artwork came from. An installed code template's reports cross back from its plugin's process beside the frame, as `ok({ frame, reports })`, checked against that list. `reportOverflow` in `@tyto/template-kit` reports content that runs past the page, and the weekly mock-exam agendas use it: a slide that runs off the grid now renders with a warning instead of being cut in silence. A context built by hand passes `reportNothing`.
+
+### Patch Changes
+
+- 7950dc3: TYTO-223: a plugin contributes a brand kit — a logo mark and a signature per brand id — through
+  the new `brand-kit` extension point, and a template reads the kit of its own manifest's `brand`
+  from `context.brand` (ADR 0063). `TemplateContext` gains the required `brand` field; a context
+  built by hand passes `noBrandKit`. `CompileOptions` and `JobPorts` take `brandKits`, which
+  `PluginRegistry.brandKitsByBrand()` merges: the plugin registered first keeps a brand, and
+  `W_BRAND_KIT_SHADOWED` names the one it hid. The kit is data and crosses to an installed code
+  template with the call, so the isolation protocol is now version 3. `Mark` moves to
+  `@tyto/core` as `MarkShape`; `@tyto/template-kit` still exports it as `Mark`.
+- Updated dependencies [0937670]
+- Updated dependencies [37fd201]
+- Updated dependencies [7950dc3]
+- Updated dependencies [8300c78]
+- Updated dependencies [bf7c79a]
+- Updated dependencies [8ca8eed]
+- Updated dependencies [a84b756]
+- Updated dependencies [a33a192]
+- Updated dependencies [733f779]
+- Updated dependencies [d4aac5b]
+- Updated dependencies [94fdee3]
+- Updated dependencies [eaf6ece]
+- Updated dependencies [cd25d2d]
+- Updated dependencies [5c0611f]
+- Updated dependencies [82927c8]
+- Updated dependencies [a69f493]
+- Updated dependencies [64c75bb]
+- Updated dependencies [091e2a2]
+- Updated dependencies [e35546e]
+- Updated dependencies [7659e7e]
+- Updated dependencies [525639b]
+  - @tyto/core@0.27.0
+
 ## 0.1.4
 
 ### Patch Changes

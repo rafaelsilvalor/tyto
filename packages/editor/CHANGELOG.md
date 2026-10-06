@@ -1,5 +1,65 @@
 # @tyto/editor
 
+## 0.7.0
+
+### Minor Changes
+
+- 5c0611f: TYTO-49: plugin directives (ADR 0043). A plugin registers a `directive` contribution whose `id`
+  is its namespace, with the `names` it answers and a `transform` that turns `::ns/name` into
+  ordinary slot directives, which `resolve` checks against the manifest as if they were typed. The
+  directive's adjustments are the plugin's arguments, handed over parsed and ranged, and the host
+  stamps every range in the answer. `ResolveOptions.directives` and `JobPorts.directives` take the
+  host's point through `directiveResolverOf`. The CLI wires it into every render, and an installed
+  plugin's transform runs in its worker under the per-call deadline. The editor offers `ns/name`
+  after `::`. Without the plugin the brief still gives `E_UNKNOWN_DIRECTIVE` on the name, and a
+  plugin's refusal of its arguments is the new `E_DIRECTIVE_ARGUMENT`.
+- 1ee0051: TYTO-44 — the desktop app has a template mode. _File ▸ Edit template…_ opens a markup template
+  folder with `manifest.yaml` and `template.html` in tabs of their own, one of the folder's
+  `examples/*.brief` as the sample, and every format the manifest declares drawn side by side
+  from the unsaved buffers. Saving writes both files and reads the template folders again, and
+  every open brief is compiled again; a manifest that does not parse is not written, and the
+  diagnostic that stopped it is shown. A folder whose layout is a `template.ts` is refused with a
+  sentence saying why (ADR 0007). _File ▸ New template…_ writes the same scaffold as
+  `tyto template new`, into the template folder in force.
+
+  The scaffold moved to `@tyto/template-lang` (`scaffoldTemplate`, `isTemplateName`) so both hosts
+  write one text. It now also writes `examples/<name>.brief`, and its title uses "Source Sans 3"
+  instead of "Inter": no install of Tyto has Inter, so every scaffolded template failed its first
+  render with `E_EXPORT_FONT_UNRESOLVED`. `@tyto/editor` takes `language: 'plain'` for a buffer
+  with no grammar.
+
+  A quit that arrives while the window is still starting now quits (ADR 0039). The page tells main
+  it can hear the quit question (`app:exit-listening`) before main asks it anything; before that,
+  the push was dropped and the app stayed open with nobody left to ask.
+
+### Patch Changes
+
+- Updated dependencies [0937670]
+- Updated dependencies [37fd201]
+- Updated dependencies [7950dc3]
+- Updated dependencies [8300c78]
+- Updated dependencies [bf7c79a]
+- Updated dependencies [8ca8eed]
+- Updated dependencies [a84b756]
+- Updated dependencies [a33a192]
+- Updated dependencies [733f779]
+- Updated dependencies [d4aac5b]
+- Updated dependencies [94fdee3]
+- Updated dependencies [eaf6ece]
+- Updated dependencies [cd25d2d]
+- Updated dependencies [5c0611f]
+- Updated dependencies [82927c8]
+- Updated dependencies [a69f493]
+- Updated dependencies [64c75bb]
+- Updated dependencies [091e2a2]
+- Updated dependencies [e35546e]
+- Updated dependencies [7659e7e]
+- Updated dependencies [525639b]
+- Updated dependencies [1ee0051]
+  - @tyto/core@0.27.0
+  - @tyto/template-lang@0.7.0
+  - @tyto/brief-lang@0.6.7
+
 ## 0.6.7
 
 ### Patch Changes
