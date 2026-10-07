@@ -1,7 +1,7 @@
-import { copyFile, lstat, mkdir, readFile, rename, rm, writeFile } from 'node:fs/promises';
-import { basename, extname, join, resolve } from 'node:path';
+import { copyFile, lstat, mkdir, readFile, rename, rm, stat, writeFile } from 'node:fs/promises';
+import { basename, dirname, extname, join, resolve } from 'node:path';
 
-import { type Diagnostic, type Diagnostics, diagnostic } from '@tyto/core';
+import { type Diagnostic, type Diagnostics, type Result, diagnostic, err, ok } from '@tyto/core';
 import type { Artifact } from '@tyto/pipeline';
 
 import { frontmatterValues, rewriteFrontmatterValues } from './delivery-brief.js';
@@ -90,6 +90,10 @@ export interface DeliveryOutput extends ReusableTaskOutput {
    * copied brief's frontmatter at them, and removes what the previous delivery's brief
    * pointed at there and this one does not (ADR 0057). Returns one warning per file
    * removed or kept. Call it **before** `finish`, for {@link describeTemplate}'s reason.
+   *
+   * A file already holding the name `assets` is an `E_DELIVERY_FOLDER_BLOCKED` in the
+   * answer, not a throw: nothing is copied and the run is an error, as when the delivery
+   * folder itself is held (TYTO-129).
    */
   deliverAssets(assets: readonly DeliveredAsset[]): Promise<Diagnostics>;
 }
@@ -293,7 +297,7 @@ async function taskOutput(directories: TaskOutputDirectories): Promise<ReusableT
 export async function fsDeliveryOutput(
   destination: string,
   options: FsDeliveryOutputOptions,
-): Promise<DeliveryOutput> {
+): Promise<Result<DeliveryOutput, Diagnostic[]>> {
   // Refused, not rewritten. A guard is not the second sanitiser the doc comment argues
   // against: it changes no name, it declines one that would put the delivery somewhere the
   // caller did not name. `basename` at the caller already guarantees this; an embedder
@@ -312,7 +316,8 @@ export async function fsDeliveryOutput(
   const editable = join(folder, EDITABLE_DIR);
   const briefPath = join(editable, `${options.name}.${BRIEF_EXTENSION}`);
   // One `mkdir -p` makes both: `editaveis/` is inside the folder it is created under.
-  await mkdir(editable, { recursive: true });
+  const blocked = await makeFolder(editable);
+  if (blocked !== undefined) return err([blocked]);
 
   // Read before it is replaced: the previous delivery's brief is the one record of which
   // files in `assets/` an earlier export put there (ADR 0057).
@@ -322,7 +327,7 @@ export async function fsDeliveryOutput(
   // `result.json` is the finished signal and is still the last thing written.
   await writeAtomic(briefPath, options.brief);
 
-  return {
+  return ok({
     ...(await taskOutput({
       artifacts: folder,
       result: editable,
@@ -339,7 +344,10 @@ export async function fsDeliveryOutput(
     async deliverAssets(assets: readonly DeliveredAsset[]): Promise<Diagnostics> {
       const directory = join(folder, ASSETS_DIR);
       const names = deliveredNames(assets);
-      if (names.size > 0) await mkdir(directory, { recursive: true });
+      if (names.size > 0) {
+        const held = await makeFolder(directory);
+        if (held !== undefined) return [held];
+      }
       for (const [path, name] of names) await copyAtomic(path, join(directory, name));
 
       const renames = new Map<string, string>();
@@ -352,7 +360,44 @@ export async function fsDeliveryOutput(
 
       return removeAssetLeftovers(directory, previousAssets, new Set(names.values()));
     },
-  };
+  });
+}
+
+/**
+ * `mkdir -p`, answering `E_DELIVERY_FOLDER_BLOCKED` when a file holds a name the path needs
+ * as a folder, and throwing for every other failure (TYTO-129).
+ *
+ * The two are different answers on purpose. A file in the way fails the same way on every
+ * attempt until somebody moves it, which is exit 1 in the render contract; a folder that
+ * refuses the write — permissions, a full disk — is exit 2, the code worth retrying, and
+ * must stay a throw so it reaches the one place that turns a throw into that code.
+ *
+ * **Decided by looking, not by the error code.** The operating system's answer depends on
+ * which segment is held and on the platform — Windows says `EEXIST` for a file at the last
+ * segment and `ENOTDIR` for one above it, and Linux has its own mapping — so the nearest
+ * entry that exists is asked what it is instead. Only when that entry is not a folder is
+ * the failure the caller's to fix. `stat` and not `lstat`, because a link to a folder is a
+ * folder to `mkdir`.
+ *
+ * `make` is the seam a test uses to stand in for a failure this machine will not produce.
+ */
+export async function makeFolder(
+  path: string,
+  make: (path: string) => Promise<unknown> = (target) => mkdir(target, { recursive: true }),
+): Promise<Diagnostic | undefined> {
+  try {
+    await make(path);
+    return undefined;
+  } catch (cause) {
+    for (let current = path; ; current = dirname(current)) {
+      const found = await stat(current).catch(() => undefined);
+      if (found !== undefined) {
+        if (found.isDirectory()) throw cause;
+        return diagnostic('E_DELIVERY_FOLDER_BLOCKED', { path: current });
+      }
+      if (dirname(current) === current) throw cause;
+    }
+  }
 }
 
 /**

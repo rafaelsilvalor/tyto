@@ -47,8 +47,10 @@ export const EXIT_CODES: readonly {
     name: 'error diagnostics',
     meaning:
       'The brief, the template or a frame produced an error — or the command line was ' +
-      'refused. `result.json` has `status: "error"` and lists what went wrong, except ' +
-      'when the command line was refused, in which case no run started and no ' +
+      'refused, or a `--folder` delivery found a file where its folder or `editaveis/` ' +
+      'has to go ' +
+      '(`E_DELIVERY_FOLDER_BLOCKED`). `result.json` has `status: "error"` and lists what ' +
+      'went wrong, except in those last two cases, where no run started and no ' +
       '`result.json` was written.',
     retry: false,
   },

@@ -1,4 +1,4 @@
-import { mkdtempSync, readFileSync, readdirSync, rmSync } from 'node:fs';
+import { mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync } from 'node:fs';
 import { createRequire } from 'node:module';
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
@@ -123,6 +123,53 @@ describe('the export service', () => {
     expect(readFileSync(join(out, 'editaveis', 'agenda.brief'), 'utf8')).toContain(
       'imagem: calendario.png\n',
     );
+  }, 60_000);
+
+  it('answers a file named editaveis in the picked folder with a diagnostic, not a failure', async () => {
+    // Was `failure: "ENOTDIR … mkdir '…\editaveis'"` in the dialog: the operating system's
+    // wording for something the person fixes by renaming a file (TYTO-129).
+    writeFileSync(join(out, 'editaveis'), 'nao sou pasta');
+    const { exportId } = await service.start({
+      brief: exampleBrief('agenda-semana', 'agenda.brief'),
+      directory: out,
+      briefDirectory: join(packDirectory, 'agenda-semana', 'examples'),
+      label: 'agenda',
+      outputs: [{ kind: 'svg' }],
+      delivery: true,
+    });
+
+    const progress = await settled(exportId);
+
+    expect(progress.failure).toBeUndefined();
+    expect(progress.status).toBe('finished');
+    expect(progress.diagnostics.map((item) => [item.code, item.message])).toEqual([
+      [
+        'E_DELIVERY_FOLDER_BLOCKED',
+        `'${join(out, 'editaveis')}' is a file, and the delivery needs a folder with that name. Rename or move the file, or deliver somewhere else.`,
+      ],
+    ]);
+    expect(readdirSync(out)).toEqual(['editaveis']);
+  }, 60_000);
+
+  it('answers a file named assets with an error beside the artwork it did write', async () => {
+    writeFileSync(join(out, 'assets'), 'nao sou pasta');
+    const { exportId } = await service.start({
+      brief: exampleBrief('agenda-semana', 'agenda.brief'),
+      directory: out,
+      briefDirectory: join(packDirectory, 'agenda-semana', 'examples'),
+      label: 'agenda',
+      outputs: [{ kind: 'svg' }],
+      delivery: true,
+    });
+
+    const progress = await settled(exportId);
+
+    expect(progress.failure).toBeUndefined();
+    expect(progress.diagnostics.map((item) => [item.code, item.severity])).toEqual([
+      ['E_DELIVERY_FOLDER_BLOCKED', 'error'],
+    ]);
+    expect(progress.result?.status).toBe('error');
+    expect(readdirSync(out).sort()).toEqual(['assets', 'editaveis', 'grid-01.svg', 'grid-02.svg']);
   }, 60_000);
 
   it('answers with a plan before it answers with files', async () => {

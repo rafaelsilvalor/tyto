@@ -48,7 +48,7 @@ writes it into the frontmatter.
 | Code | Means | Detail | Worth retrying |
 | --- | --- | --- | --- |
 | `0` | ok | Nothing went wrong. `result.json` has `status: "ok"`. | no |
-| `1` | error diagnostics | The brief, the template or a frame produced an error — or the command line was refused. `result.json` has `status: "error"` and lists what went wrong, except when the command line was refused, in which case no run started and no `result.json` was written. | no |
+| `1` | error diagnostics | The brief, the template or a frame produced an error — or the command line was refused, or a `--folder` delivery found a file where its folder or `editaveis/` has to go (`E_DELIVERY_FOLDER_BLOCKED`). `result.json` has `status: "error"` and lists what went wrong, except in those last two cases, where no run started and no `result.json` was written. | no |
 | `2` | internal failure | Something threw that is not about this brief: a browser that will not launch, an unwritable output folder. `result.json` may be absent. | **yes** |
 
 **Only `2` is worth retrying.** That is the whole reason there are two non-zero codes: a

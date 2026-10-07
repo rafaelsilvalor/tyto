@@ -334,7 +334,7 @@ export async function createExportService(options: ExportServiceOptions): Promis
         : { outputs: request.outputs, dropped: [] };
     // The export box delivers into the folder the person picked; `tyto render --folder`
     // adds a level named after the brief, and the two differ on purpose (ADR 0057).
-    const delivery =
+    const opened =
       request.delivery === true
         ? await fsDeliveryOutput(request.directory, {
             name: request.label,
@@ -344,6 +344,15 @@ export async function createExportService(options: ExportServiceOptions): Promis
             label: request.label,
           })
         : undefined;
+    // A file named `editaveis` in the folder the person picked. A diagnostic in the dialog
+    // and not `failure`, which is for what nobody can fix by moving a file (TYTO-129); and no
+    // `result.json`, because the folder it goes in is the one that could not be made.
+    if (opened !== undefined && !opened.ok) {
+      run.status = 'finished';
+      run.diagnostics = [...startup, ...skipped, ...opened.error];
+      return;
+    }
+    const delivery = opened?.value;
     const sink =
       delivery ??
       (await fsTaskOutput(request.directory, {
