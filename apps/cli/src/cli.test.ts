@@ -1,4 +1,4 @@
-import { mkdir, mkdtemp, readFile, readdir, rm, writeFile } from 'node:fs/promises';
+import { chmod, mkdir, mkdtemp, readFile, readdir, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
@@ -697,6 +697,91 @@ describe('tyto render --folder', () => {
     expect(await outFiles('saida')).toContain('feed-03.svg');
     expect(stderr()).not.toContain('W_LEFTOVER');
   });
+});
+
+/**
+ * TYTO-129: a file where `--folder` has to make a folder is exit 1, because retrying the same
+ * invocation fails the same way until somebody moves the file. A folder that refuses the
+ * write is still exit 2, the code the render contract says is worth retrying.
+ */
+describe('tyto render --folder with a file in the way', () => {
+  const NAME = 'agenda';
+  const render = (...extra: string[]) =>
+    run(
+      ['render', `task/${NAME}.brief`, '--out', 'entregas', '--folder', '--types', 'svg', ...extra],
+      environment(),
+    );
+
+  beforeEach(async () => {
+    await writeFile(join(workspace, 'task', `${NAME}.brief`), briefSource);
+    await mkdir(join(workspace, 'entregas'));
+  });
+
+  it('exits 1 naming the file that holds the delivery folder, with no stack trace', async () => {
+    await writeFile(join(workspace, 'entregas', NAME), 'nao sou pasta');
+
+    const code = await render();
+
+    expect(code).toBe(EXIT_DIAGNOSTICS);
+    expect(stderr()).toContain(
+      `error E_DELIVERY_FOLDER_BLOCKED '${join(workspace, 'entregas', NAME)}' is a file, and the delivery needs a folder with that name. Rename or move the file, or deliver somewhere else.`,
+    );
+    expect(stderr()).not.toContain('internal failure');
+    expect(stderr()).not.toMatch(/\n\s+at /u);
+    expect(stdout()).toBe('');
+    expect(await readFile(join(workspace, 'entregas', NAME), 'utf8')).toBe('nao sou pasta');
+  });
+
+  it('says the same on stdout under --json, still exit 1', async () => {
+    await writeFile(join(workspace, 'entregas', NAME), 'nao sou pasta');
+
+    const code = await render('--json');
+
+    expect(code).toBe(EXIT_DIAGNOSTICS);
+    const report = JSON.parse(stdout()) as {
+      status: string;
+      diagnostics: { code: string }[];
+    };
+    expect(report.status).toBe('error');
+    expect(report.diagnostics.map((item) => item.code)).toEqual(['E_DELIVERY_FOLDER_BLOCKED']);
+  });
+
+  it('exits 1 when only assets/ is held, with the artwork written and result.json saying error', async () => {
+    await mkdir(join(workspace, 'entregas', NAME));
+    await writeFile(join(workspace, 'entregas', NAME, 'assets'), 'nao sou pasta');
+
+    const code = await render();
+
+    expect(code).toBe(EXIT_DIAGNOSTICS);
+    expect(stderr()).toContain(
+      `error E_DELIVERY_FOLDER_BLOCKED '${join(workspace, 'entregas', NAME, 'assets')}' is a file`,
+    );
+    expect(await outFiles('entregas', NAME)).toEqual([
+      'assets',
+      'editaveis',
+      'feed-01.svg',
+      'feed-02.svg',
+    ]);
+    const parsed = parseRenderResult(await resultAt('entregas', NAME, 'editaveis'));
+    if (!parsed.ok) throw new Error(parsed.error.join('; '));
+    expect(parsed.value.status).toBe('error');
+    expect(parsed.value.diagnostics.map((item) => item.code)).toEqual([
+      'E_DELIVERY_FOLDER_BLOCKED',
+    ]);
+  });
+
+  it.skipIf(process.platform === 'win32' || process.getuid?.() === 0)(
+    'still exits 2 for a folder that refuses the write',
+    async () => {
+      await chmod(join(workspace, 'entregas'), 0o555);
+      try {
+        expect(await render()).toBe(EXIT_INTERNAL);
+        expect(stderr()).toContain('internal failure');
+      } finally {
+        await chmod(join(workspace, 'entregas'), 0o755);
+      }
+    },
+  );
 });
 
 /* ----------------------------------------------------------------------- exit codes -- */

@@ -88,7 +88,10 @@ export interface RenderTaskOptions {
 export interface RenderTaskReport {
   /** Everything the run produced, errors and warnings together. */
   readonly diagnostics: Diagnostics;
-  /** The document that was written, so a caller can print it without reading it back. */
+  /**
+   * The document that was written, so a caller can print it without reading it back — or,
+   * when a file held the delivery folder, the one there was nowhere to write.
+   */
   readonly result: RenderResult;
   /** False when anything in `diagnostics` is an error, which is what exit 1 means. */
   readonly ok: boolean;
@@ -134,6 +137,28 @@ function exportResources(brief: ExportResources, template: ExportResources): Exp
   return { html: { ...layered.html, font }, svg: { ...layered.svg, font } };
 }
 
+/**
+ * A `--folder` delivery whose folder a file is holding: nothing rendered and nothing written,
+ * not even `result.json`, because there is nowhere to write it. Exit 1 and not 2, because
+ * the same invocation fails the same way until somebody moves the file (TYTO-129).
+ */
+function blockedReport(
+  blocked: Diagnostics,
+  inherited: Diagnostics,
+  options: RenderTaskOptions,
+): RenderTaskReport {
+  const diagnostics = [...inherited, ...blocked];
+  const result = renderResult({
+    cancelled: false,
+    planned: 0,
+    artifacts: [],
+    diagnostics,
+    version: options.version,
+    templates: [],
+  });
+  return { diagnostics, result, ok: false };
+}
+
 export async function renderTask(
   context: RenderContext,
   task: RenderTask,
@@ -147,7 +172,7 @@ export async function renderTask(
   });
   // Typed as the wider one where there is one, because the template it used is only known
   // once the job has run and `TaskOutput` has nowhere to put that.
-  const delivery =
+  const opened =
     task.delivery === undefined
       ? undefined
       : await fsDeliveryOutput(task.outDirectory, {
@@ -159,6 +184,8 @@ export async function renderTask(
           brief: new TextEncoder().encode(task.brief),
           label: task.id,
         });
+  if (opened !== undefined && !opened.ok) return blockedReport(opened.error, inherited, options);
+  const delivery = opened?.value;
   const output =
     delivery ??
     (await fsTaskOutput(task.outDirectory, {

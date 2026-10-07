@@ -666,6 +666,20 @@ export const diagnosticCodes = {
     fatal: false,
     fatality: 'The same: one artifact that did not reach the output, counted against `planned`.',
   },
+  // An error and not an internal failure: the file stays where it is until somebody moves
+  // it, so retrying the same invocation fails the same way every time (TYTO-129).
+  E_DELIVERY_FOLDER_BLOCKED: {
+    severity: 'error',
+    summary: 'A delivery needs a folder at a path where a file already is.',
+    template:
+      "'{path}' is a file, and the delivery needs a folder with that name. Rename or move the file, or deliver somewhere else.",
+    spec: 'docs/adr/0057-a-delivery-carries-its-brief-and-its-images.md',
+    fatal: true,
+    fatality:
+      'Fatal when the delivery folder or `editaveis/` is held: there is nowhere to write the ' +
+      'artwork or `result.json`, so nothing is. When only `assets/` is held, the artwork is ' +
+      'already written and the images are not copied beside it.',
+  },
   W_TEXT_OVERFLOW: {
     severity: 'warning',
     summary: 'Compiled text does not fit its frame in one of the requested formats.',

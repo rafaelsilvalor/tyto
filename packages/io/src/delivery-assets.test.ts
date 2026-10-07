@@ -6,7 +6,14 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
 import { rewriteFrontmatterValues } from './delivery-brief.js';
 import { briefAssetResolver, recordingAssetResolver } from './file-assets.js';
-import { fsDeliveryOutput } from './fs-outbox.js';
+import { type DeliveryOutput, fsDeliveryOutput } from './fs-outbox.js';
+
+/** The delivery output, or a failed test naming why it could not be opened. */
+async function openDelivery(...args: Parameters<typeof fsDeliveryOutput>): Promise<DeliveryOutput> {
+  const opened = await fsDeliveryOutput(...args);
+  if (!opened.ok) throw new Error(opened.error.map((item) => item.message).join('\n'));
+  return opened.value;
+}
 
 /**
  * ADR 0057: a delivery carries its brief in `editaveis/` and the images the brief used in
@@ -143,7 +150,7 @@ describe('fsDeliveryOutput.deliverAssets', () => {
 
   it('copies the images into assets/ and points the copied brief at them', async () => {
     const briefs = await sourceFolder();
-    const output = await fsDeliveryOutput(join(workspace, 'entrega'), {
+    const output = await openDelivery(join(workspace, 'entrega'), {
       name: 'agenda',
       brief: new TextEncoder().encode(BRIEF),
       folder: 'destination',
@@ -167,7 +174,7 @@ describe('fsDeliveryOutput.deliverAssets', () => {
 
   it('writes into the named subfolder by default, as tyto render --folder does', async () => {
     const briefs = await sourceFolder();
-    const output = await fsDeliveryOutput(join(workspace, 'entregas'), {
+    const output = await openDelivery(join(workspace, 'entregas'), {
       name: 'agenda',
       brief: new TextEncoder().encode(BRIEF),
     });
@@ -180,7 +187,7 @@ describe('fsDeliveryOutput.deliverAssets', () => {
   it('suffixes a second file that shares a name, and copies one file named twice once', async () => {
     const briefs = await sourceFolder();
     await writeFile(join(briefs, 'selo.png'), 'another seal');
-    const output = await fsDeliveryOutput(join(workspace, 'entrega'), {
+    const output = await openDelivery(join(workspace, 'entrega'), {
       name: 'agenda',
       brief: new TextEncoder().encode(
         '---\na: ./fotos/selo.png\nb: selo.png\nc: fotos/selo.png\n---\n',
@@ -204,7 +211,7 @@ describe('fsDeliveryOutput.deliverAssets', () => {
   it('removes what the previous delivery brought and this one does not, and nothing else', async () => {
     const briefs = await sourceFolder();
     const root = join(workspace, 'entrega');
-    const first = await fsDeliveryOutput(root, {
+    const first = await openDelivery(root, {
       name: 'agenda',
       brief: new TextEncoder().encode(BRIEF),
       folder: 'destination',
@@ -213,7 +220,7 @@ describe('fsDeliveryOutput.deliverAssets', () => {
     await writeFile(join(root, 'assets', 'da-pessoa.png'), 'somebody else put this here');
 
     // The next export of the same brief no longer uses the seal.
-    const second = await fsDeliveryOutput(root, {
+    const second = await openDelivery(root, {
       name: 'agenda',
       brief: new TextEncoder().encode(
         "---\ntemplate: agenda-semana\nimagem: 'calendario.png'\n---\n",

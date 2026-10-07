@@ -6,9 +6,22 @@ import type { Diagnostics } from '@tyto/core';
 import type { Artifact } from '@tyto/pipeline';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
-import { EDITABLE_DIR, RESULT_FILE, fsDeliveryOutput, fsTaskOutput } from './fs-outbox.js';
+import {
+  type DeliveryOutput,
+  EDITABLE_DIR,
+  RESULT_FILE,
+  fsDeliveryOutput,
+  fsTaskOutput,
+} from './fs-outbox.js';
 import type { ReusableTaskOutput } from './fs-outbox.js';
 import { renderResult } from './result.js';
+
+/** The delivery output, or a failed test naming why it could not be opened. */
+async function openDelivery(...args: Parameters<typeof fsDeliveryOutput>): Promise<DeliveryOutput> {
+  const opened = await fsDeliveryOutput(...args);
+  if (!opened.ok) throw new Error(opened.error.map((item) => item.message).join('\n'));
+  return opened.value;
+}
 
 /**
  * ADR 0054: a reused folder loses what Tyto wrote there last time and did not write this
@@ -69,7 +82,7 @@ async function exportInto(output: ReusableTaskOutput, run: Export): Promise<Diag
 }
 
 const delivery = (): Promise<ReusableTaskOutput> =>
-  fsDeliveryOutput(join(workspace, 'entregas'), { name: 'campanha', brief: BRIEF });
+  openDelivery(join(workspace, 'entregas'), { name: 'campanha', brief: BRIEF });
 
 const folder = (): string => join(workspace, 'entregas', 'campanha');
 

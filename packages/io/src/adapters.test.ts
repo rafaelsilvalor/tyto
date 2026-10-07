@@ -10,11 +10,18 @@ import { isInside } from './contain.js';
 import { fileResources } from './file-resources.js';
 import { fsInbox, renameRetryingLocks } from './fs-inbox.js';
 import { fileTemplateAssets } from './file-template-assets.js';
-import { fsDeliveryOutput, fsOutbox, fsTaskOutput } from './fs-outbox.js';
+import { type DeliveryOutput, fsDeliveryOutput, fsOutbox, fsTaskOutput } from './fs-outbox.js';
 import { nodeFileSystem } from './node-file-system.js';
 import { pollSource } from './poll.js';
 import type { BriefSource, BriefTask } from './ports.js';
 import { type RenderResult, parseRenderResult, renderResult } from './result.js';
+
+/** The delivery output, or a failed test naming why it could not be opened. */
+async function openDelivery(...args: Parameters<typeof fsDeliveryOutput>): Promise<DeliveryOutput> {
+  const opened = await fsDeliveryOutput(...args);
+  if (!opened.ok) throw new Error(opened.error.map((item) => item.message).join('\n'));
+  return opened.value;
+}
 
 let workspace: string;
 
@@ -243,7 +250,7 @@ describe('fsDeliveryOutput', () => {
     });
 
   it('puts artwork at the top and the brief and result.json under editaveis/', async () => {
-    const output = await fsDeliveryOutput(join(workspace, 'entregas'), {
+    const output = await openDelivery(join(workspace, 'entregas'), {
       name: 'campanha',
       brief: BRIEF,
     });
@@ -261,7 +268,7 @@ describe('fsDeliveryOutput', () => {
   });
 
   it('copies the brief unchanged, bytes and all', async () => {
-    const output = await fsDeliveryOutput(join(workspace, 'entregas'), {
+    const output = await openDelivery(join(workspace, 'entregas'), {
       name: 'campanha',
       brief: BRIEF,
     });
@@ -277,7 +284,7 @@ describe('fsDeliveryOutput', () => {
     // The factory is where it happens, and that is the claim: the folder is never a set of
     // images with nothing to explain them. `result.json` is still last — it is the finished
     // signal — so the brief cannot wait for `finish`.
-    await fsDeliveryOutput(join(workspace, 'entregas'), { name: 'campanha', brief: BRIEF });
+    await openDelivery(join(workspace, 'entregas'), { name: 'campanha', brief: BRIEF });
 
     expect(await readdir(join(workspace, 'entregas', 'campanha', 'editaveis'))).toEqual([
       'campanha.brief',
@@ -285,7 +292,7 @@ describe('fsDeliveryOutput', () => {
   });
 
   it('names the template that made the artwork, and says it is not in the folder', async () => {
-    const output = await fsDeliveryOutput(join(workspace, 'entregas'), {
+    const output = await openDelivery(join(workspace, 'entregas'), {
       name: 'campanha',
       brief: BRIEF,
     });
@@ -311,7 +318,7 @@ describe('fsDeliveryOutput', () => {
   it('leaves the pointer out when nothing named a template', async () => {
     // A brief that does not parse never loads one, and a delivery that invented a name would
     // be claiming something the run did not do.
-    const output = await fsDeliveryOutput(join(workspace, 'entregas'), {
+    const output = await openDelivery(join(workspace, 'entregas'), {
       name: 'campanha',
       brief: BRIEF,
     });
@@ -332,7 +339,7 @@ describe('fsDeliveryOutput', () => {
   });
 
   it('validates result.json the same way the task output does', async () => {
-    const output = await fsDeliveryOutput(join(workspace, 'entregas'), {
+    const output = await openDelivery(join(workspace, 'entregas'), {
       name: 'campanha',
       brief: BRIEF,
     });
