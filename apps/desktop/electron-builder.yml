@@ -65,6 +65,29 @@ extraResources:
 asarUnpack:
   - out/guest/**
 
+# **Two of Electron's fuses are switched off, one stays on for a measured reason** (TYTO-193,
+# ADR 0067). A fuse is a byte in the executable that electron-builder flips after packing and
+# before signing, so this applies to the packaged app only — never to the Electron in
+# `node_modules` that `test:desktop` and `pnpm dev` run.
+#
+# - `runAsNode`: off. With it on, `ELECTRON_RUN_AS_NODE=1 Tyto.exe` is a plain Node any program
+#   on the machine can drive. Plugins run on the bundled Node (ADR 0050), and their process
+#   is started with `spawn`, because Electron refuses `fork` once this fuse is off.
+# - `enableNodeOptionsEnvironmentVariable`: off. Nothing in the app reads `NODE_OPTIONS`, and
+#   Playwright deletes it from the environment of the app it launches.
+# - `enableNodeCliInspectArguments`: **left on.** `test:package` launches this executable with
+#   Playwright's `_electron.launch`, which always passes `--inspect=0` and waits for Node's
+#   `Debugger listening on` line; with the fuse off that line never comes and the launch hangs.
+#
+# The others stay at Electron's default; ADR 0067 gives the reason for each.
+# `e2e/packaged.package.test.ts` reads the wire back out of the packaged executable.
+electronFuses:
+  runAsNode: false
+  enableNodeOptionsEnvironmentVariable: false
+  enableNodeCliInspectArguments: true
+  # Flipping a byte breaks the ad-hoc signature an arm64 macOS binary must carry to start.
+  resetAdHocDarwinSignature: true
+
 # Named rather than inferred. electron-builder can read the repository out of a
 # `package.json`, but `apps/desktop/package.json` has no `repository` field and the one it
 # falls back to is the workspace root's — a lookup that works today and says nothing about

@@ -13,12 +13,14 @@ import { createRequire } from 'node:module';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
+import { FuseV1Options, getCurrentFuseWire } from '@electron/fuses';
 import { PLUGIN_API_VERSION } from '@tyto/plugin-api';
 import { type ElectronApplication, type Page, _electron } from 'playwright';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 
 import { closeApp } from './close-app.js';
 import { firstWindow } from './first-window.js';
+import { probeRunAsNode } from './run-as-node-probe.js';
 
 /**
  * The installer's app, launched.
@@ -421,4 +423,63 @@ describe('the packaged app', () => {
     expect(code).toBe('ERR_ACCESS_DENIED');
     expect(execPath?.endsWith(join('resources', 'node', binary))).toBe(true);
   }, 120_000);
+
+  it('cannot be run as Node, and the probe that says so can see a Node (TYTO-193)', async () => {
+    // **Three facts, and the packaged one alone would prove nothing.** A probe whose stdout was
+    // never captured also prints no `1`. So the same `probeRunAsNode` first runs the Electron in
+    // `node_modules`, which no fuse has touched and which must print `1`; the wire is then read
+    // out of the packaged executable; and only then is the packaged answer worth reading.
+    const control = await probeRunAsNode(createRequire(import.meta.url)('electron') as string, {
+      userData: undefined,
+      home: join(scratch, 'tyto-home'),
+      deadlineMs: 15_000,
+    });
+    process.stdout.write(
+      `[TYTO-193] control: unfused node_modules Electron run as Node printed 1 → ` +
+        `${String(control.printedOne)} (${control.ended}, code ${String(control.code)})\n`,
+    );
+
+    const wire = await getCurrentFuseWire(packagedExecutable());
+    const state = (fuse: FuseV1Options): string => {
+      const value = wire[fuse] as unknown as number | undefined;
+      return value === 48 ? 'off' : value === 49 ? 'on' : `0x${(value ?? 0).toString(16)}`;
+    };
+    // Every position the wire has, named where `@electron/fuses` knows the name: Electron 44's
+    // wire is one longer than the eight it names, and a fuse nobody printed is one nobody reads.
+    const named = Object.keys(wire)
+      .filter((key) => key !== 'version')
+      .map((key) => {
+        const fuse = Number(key) as FuseV1Options;
+        return `${FuseV1Options[fuse] ?? `fuse${key}`}=${state(fuse)}`;
+      });
+    process.stdout.write(`[TYTO-193] packaged fuse wire: ${named.join(' ')}\n`);
+
+    // The wire decides which program is about to start, and so whether it gets the app's
+    // isolating switches (see `appSwitches`). A wire that still says `on` gets none, so the
+    // probe can print `1` and the assertion below says so, instead of a Node refusing a switch.
+    //
+    // A booted app never exits on its own, so the deadline is the whole cost of this line: short,
+    // and the tree is killed at it.
+    const packaged = await probeRunAsNode(packagedExecutable(), {
+      userData:
+        state(FuseV1Options.RunAsNode) === 'off' ? join(scratch, 'probe-packaged-data') : undefined,
+      home: join(scratch, 'tyto-home'),
+      deadlineMs: 15_000,
+    });
+    process.stdout.write(
+      `[TYTO-193] ELECTRON_RUN_AS_NODE=1 <packaged exe> -e "console.log(1)" printed 1 → ` +
+        `${String(packaged.printedOne)} (${packaged.ended}, code ${String(packaged.code)}, ` +
+        `${String(packaged.stdoutBytes)} stdout bytes)\n`,
+    );
+
+    expect(control.printedOne).toBe(true);
+    expect(state(FuseV1Options.RunAsNode)).toBe('off');
+    expect(state(FuseV1Options.EnableNodeOptionsEnvironmentVariable)).toBe('off');
+    // On for `_electron.launch` above, which passes `--inspect=0` (ADR 0067).
+    expect(state(FuseV1Options.EnableNodeCliInspectArguments)).toBe('on');
+    expect(packaged.printedOne).toBe(false);
+    // Still running at the deadline means it booted as the app. A Node exits at once, with or
+    // without its `1`, so this is what tells "ignored the variable" from "never got to answer".
+    expect(packaged.ended).toBe('killed');
+  }, 60_000);
 });

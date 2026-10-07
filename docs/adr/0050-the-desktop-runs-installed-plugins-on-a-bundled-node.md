@@ -113,3 +113,5 @@ nothing else changed for them.
   - SmartScreen and Mark-of-the-Web on a downloaded installer.
 - The RunAsNode fuse is still at Electron's default. The app no longer needs it, and switching
   it off is a hardening card of its own.
+  **Done in ADR 0067** (TYTO-193). That required starting the plugin's process with `spawn`
+  instead of `fork`, which Electron refuses once the fuse is off; everything above is unchanged.

@@ -15,8 +15,16 @@ import { decodeFromWire, encodeForWire } from './plugin-wire.js';
  * The CLI's `plugin-process.ts` twin. The two apps cannot import each other, and what the two
  * launchers decide is small enough that a copy beats a package made to hold it.
  *
- * `fork` and `realpath` are taken as arguments, so the composition root binds Node's and a
+ * `spawn` and `realpath` are taken as arguments, so the composition root binds Node's and a
  * test passes fakes that record what they were asked.
+ *
+ * **`spawn` with an `ipc` slot, and not `fork`** (TYTO-193, ADR 0067). They build the same
+ * channel — `fork` is `spawn` with that slot and `execPath` — but Electron replaces `fork` with
+ * one that throws whenever its RunAsNode fuse is off, because a `fork` that defaults to
+ * `process.execPath` would be Electron run as Node. This launcher never runs Electron: the
+ * command is the bundled Node, always. Measured with the fuse off: `fork` threw
+ * `child_process.fork() is not supported when the runAsNode fuse is disabled`, and `spawn` with
+ * `'ipc'` carried a JSON message from the bundled Node and back.
  */
 
 /** The slice of Node's `ChildProcess` this uses. */
@@ -31,20 +39,19 @@ export interface NodeChild {
   kill(): boolean;
 }
 
-/** What `fork` is asked for, as far as this module asks it. */
-export interface ForkOptions {
-  readonly execPath: string;
-  readonly execArgv: string[];
+/** What `spawn` is asked for, as far as this module asks it. */
+export interface SpawnOptions {
   readonly env: Record<string, string>;
   readonly serialization: 'json';
+  /** The fourth slot is the `ipc` channel `send` and `'message'` travel on. */
   readonly stdio: ['ignore', 'inherit', 'inherit', 'ipc'];
 }
 
-/** `child_process.fork`, as far as this module calls it. */
-export type ForkNode = (modulePath: string, args: string[], options: ForkOptions) => NodeChild;
+/** `child_process.spawn`, as far as this module calls it. */
+export type SpawnNode = (command: string, args: string[], options: SpawnOptions) => NodeChild;
 
 export interface BundledNodeOptions {
-  readonly fork: ForkNode;
+  readonly spawn: SpawnNode;
   /** `fs.realpathSync`; every path the child is given or granted is a real one (ADR 0049). */
   readonly realpath: (path: string) => string;
   /** The bundled Node binary. */
@@ -66,13 +73,18 @@ export function bundledNodeLauncher(options: BundledNodeOptions): PluginProcessL
   return (request): PluginChannel => {
     const guest = options.realpath(options.guest);
     const grants = [options.realpath(request.directory), guest];
-    const child = options.fork(
-      guest,
-      [options.realpath(request.entry), options.realpath(options.canary)],
+    const child = options.spawn(
+      options.node,
+      [
+        // Node's own options first, as `fork` puts its `execArgv`. The bundled Node is 24, which
+        // knows the model; the canary is what proves it.
+        '--permission',
+        ...grants.map((path) => `--allow-fs-read=${path}`),
+        guest,
+        options.realpath(request.entry),
+        options.realpath(options.canary),
+      ],
       {
-        execPath: options.node,
-        // The bundled Node is 24, which knows the model; the canary is what proves it.
-        execArgv: ['--permission', ...grants.map((path) => `--allow-fs-read=${path}`)],
         // Empty: the permission model does not confine `process.env`. On Windows libuv adds its
         // required variables back, and none of them is the app's.
         env: {},
