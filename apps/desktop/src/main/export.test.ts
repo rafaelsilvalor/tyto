@@ -165,9 +165,11 @@ describe('the export service', () => {
     const progress = await settled(exportId);
 
     expect(progress.failure).toBeUndefined();
-    expect(progress.diagnostics.map((item) => [item.code, item.severity])).toEqual([
-      ['E_DELIVERY_FOLDER_BLOCKED', 'error'],
-    ]);
+    // Errors only: this run renders, and a machine without the template's faces adds a
+    // W_FONT_SUBSTITUTED per weight beside it, as the CI's Linux does.
+    expect(
+      progress.diagnostics.filter((item) => item.severity === 'error').map((item) => item.code),
+    ).toEqual(['E_DELIVERY_FOLDER_BLOCKED']);
     expect(progress.result?.status).toBe('error');
     expect(readdirSync(out).sort()).toEqual(['assets', 'editaveis', 'grid-01.svg', 'grid-02.svg']);
   }, 60_000);
