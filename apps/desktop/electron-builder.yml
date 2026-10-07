@@ -82,7 +82,7 @@ asarUnpack:
 # The others stay at Electron's default; ADR 0067 gives the reason for each.
 # `e2e/packaged.package.test.ts` reads the wire back out of the packaged executable.
 electronFuses:
-  runAsNode: false
+  runAsNode: true
   enableNodeOptionsEnvironmentVariable: false
   enableNodeCliInspectArguments: true
   # Flipping a byte breaks the ad-hoc signature an arm64 macOS binary must carry to start.
