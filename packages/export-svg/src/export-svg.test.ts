@@ -1,5 +1,5 @@
 import type { Diagnostic, Scene } from '@tyto/core';
-import { GAP_ASSET_URI, parseScene } from '@tyto/core';
+import { GAP_ASSET_URI, parseScene, sceneSchema } from '@tyto/core';
 import { describe, expect, it } from 'vitest';
 
 import type { SvgFontFace, SvgResources } from './defs.js';
@@ -7,6 +7,7 @@ import { exportSvg } from './export-svg.js';
 import type { SvgExportOptions } from './svg.js';
 import mappingFixture from './__fixtures__/mapping.json';
 import promoFixture from './__fixtures__/promo.json';
+import twoIconsFixture from './__fixtures__/two-icons.json';
 
 /**
  * The card asks for three things: a committed snapshot per fixture, output that opens in
@@ -444,5 +445,35 @@ describe('a mask is a def, drawn in the masked node’s coordinates', () => {
     expect(mask).not.toContain('display="none"');
     expect(feed).toContain('<g id="badge-mask"');
     expect(feed).toContain('display="none"');
+  });
+});
+
+describe('inline SVG markup outside the subset (ADR 0068)', () => {
+  // Shape only, on purpose: `parseScene` refuses this scene, and the point here is what an
+  // exporter does with one that reached it some other way.
+  const twoIcons = (): Scene => sceneSchema.parse(twoIconsFixture);
+
+  it('draws neither styled icon, and says so for each of them', () => {
+    const result = exportSvg(twoIcons(), { resources });
+    if (!result.ok) throw new Error(result.error.map((item) => item.message).join('; '));
+
+    expect(result.diagnostics.map((item) => [item.code, item.message.split("'")[1]])).toEqual([
+      ['E_EXPORT_UNSUPPORTED', 'seta'],
+      ['E_EXPORT_UNSUPPORTED', 'white'],
+    ]);
+    expect(result.diagnostics[0]?.message).toContain('Presentation Attributes');
+  });
+
+  it('lets no class rule out of one icon to repaint the other', async () => {
+    const [feed = ''] = svgOf(twoIcons());
+
+    // The collision from TYTO-168: both files declare `.cls-1`, and inlined together the
+    // first rule wins for both. Nothing of either file's stylesheet may reach the output —
+    // the same guarantee through both exporters — and the same two icons with their fill
+    // on the path each keep their own colour.
+    expect(feed).not.toContain('cls-1');
+    expect(feed).toContain('fill="#4D4D4D"');
+    expect(feed).toContain('fill="#F4F4F4"');
+    await expect(feed).toMatchFileSnapshot('./__snapshots__/two-icons.feed.svg');
   });
 });

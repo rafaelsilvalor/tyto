@@ -96,8 +96,9 @@ export type TextRun = z.infer<typeof textRunSchema>;
 
 /**
  * `svg` and `path` are the two shapes the spec gives a Vector, tagged so that an exporter
- * cannot mistake one for the other. `markup` is expected to be sanitized before it
- * reaches the IR; the schema cannot verify that and does not pretend to.
+ * cannot mistake one for the other. `markup` is not sanitised by anyone: it is
+ * refused unless it is flat geometry, by `checkSvgMarkup` — which `parseScene` runs on
+ * every scene and both exporters run again before they inline it (ADR 0068).
  */
 export const vectorGeometrySchema = z.discriminatedUnion('kind', [
   z.strictObject({ kind: z.literal('svg'), markup: z.string().min(1) }),

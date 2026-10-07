@@ -10,7 +10,7 @@ import type {
   Stroke,
   VectorNode,
 } from '@tyto/core';
-import { GAP_ASSET_URI, nodeMatrix } from '@tyto/core';
+import { GAP_ASSET_URI, SVG_MARKUP_WAY_OUT, checkSvgMarkup, nodeMatrix } from '@tyto/core';
 
 import { escapeHtml } from './escape.js';
 import { cssColor, cssLength, cssMatrix, cssNumber, isIdentity } from './values.js';
@@ -223,9 +223,20 @@ function vectorShape(node: VectorNode, defs: Defs, context: ShapeContext): strin
     return `<path d="${escapeHtml(node.geometry.d)}"${rule}${fill}${stroke}/>`;
   }
 
+  const refused = checkSvgMarkup(node.geometry.markup);
+  if (refused !== undefined) {
+    context.report({
+      kind: 'unsupported',
+      node: node.id,
+      feature: 'SVG markup outside the subset ADR 0068 admits',
+      detail: `it carries ${refused}; ${SVG_MARKUP_WAY_OUT}`,
+    });
+    return '';
+  }
+
   // A nested `<svg>` gives the file its own viewport at the node's size, which is the
-  // only way to size markup this package may not rewrite: `template-lang` hands the file
-  // over verbatim and the schema calls it already sanitized.
+  // only way to size markup this package does not rewrite: `checkSvgMarkup` accepted it
+  // as flat geometry, and it is inlined as it stands.
   return `<svg width="${cssNumber(node.size.w)}" height="${cssNumber(node.size.h)}" overflow="visible">${node.geometry.markup}</svg>`;
 }
 

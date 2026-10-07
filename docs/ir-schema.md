@@ -17,7 +17,7 @@ TextRun  = TextSpan{kind:'text', text, font: FontRef, size, weight, style, color
 Image    extends Base { asset: AssetRef; size; fit: 'cover'|'contain'|'fill'; position }
 Vector   extends Base { geometry: VectorGeometry; size; fill?; stroke? }
 
-VectorGeometry = { kind: 'svg'; markup: string /* sanitized */ } | { kind: 'path'; d: string; fillRule }
+VectorGeometry = { kind: 'svg'; markup: string /* flat geometry only, ADR 0068 */ } | { kind: 'path'; d: string; fillRule }
 Transform { x; y; rotation; scaleX; scaleY; anchor }
 Color     { r: 0..255; g: 0..255; b: 0..255; a: 0..1 }
 Paint     = Solid{color} | LinearGradient{angle, stops} | RadialGradient{center, radius, stops} | ImagePaint{asset, fit}
@@ -41,6 +41,7 @@ The prose above is the contract; these are the decisions taken while writing the
 - **Unknown keys are an error.** Every object is a Zod `strictObject`. A misspelled property in a template must reach its author, not be stripped on the way to an exporter that would then render something nobody asked for.
 - **Fields that almost always take the same value carry a default** — `transform`, `opacity`, `blend`, `visible`, `clip`, `effects`, `letterSpacing`, `Color.a`, `Stroke.align`, `Image.position`, `fillRule`. Input may omit them; a parsed `Scene` always has them, so no exporter writes `?? 'normal'`.
 - **`Vector.geometry` is a tagged union** rather than the spec's `svg | path` shorthand, so an exporter cannot mistake one for the other.
+- **`Vector.svg` markup is flat geometry or it is refused** (ADR 0068). Nobody sanitises it: `checkSvgMarkup` admits shape elements and the presentation attributes that paint them, and nothing that names or can be named — no `<style>`, no `id`, no `class`, no `url()`. `parseScene` refuses anything else as `E_SCENE_SVG_MARKUP`, and both exporters run the same check before they inline the file verbatim.
 - **Gradients need at least two stops.** One stop is a solid paint written the long way.
 - **`Text.lineHeight` multiplies the size of the node's _largest_ run.** The field is one
   number for a node whose runs may each declare a size, and the prose above never said
@@ -139,7 +140,7 @@ per node id or wants hidden nodes counted after all.
 | Shadow/Blur              | `filter: drop-shadow()/blur()`                    | `<filter>`                                                                    |
 | Text                     | `div` + spans; bundled `@font-face`               | `<text>`+`<tspan>`; font embedded in `<style>` or converted to paths (option) |
 | TextRun `break`          | `<br>`                                            | ends the `<tspan>`; the next one starts at `x` with `dy` of one line          |
-| Vector.svg               | inline `<svg>`                                    | inline (namespaces normalized)                                                |
+| Vector.svg               | inline `<svg>`, once `checkSvgMarkup` accepts it  | inline (namespaces normalized), once `checkSvgMarkup` accepts it              |
 
 Where the table is silent and a visitor cannot be, ADR 0018 decides: `clip` on a group is
 ignored (a group has no box to clip to), a radial gradient's `radius` is a fraction of the

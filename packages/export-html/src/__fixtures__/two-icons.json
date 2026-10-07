@@ -1,0 +1,93 @@
+{
+  "version": 1,
+  "artworks": [
+    {
+      "id": "agenda",
+      "frames": [
+        {
+          "format": "feed",
+          "size": {
+            "w": 160,
+            "h": 140
+          },
+          "background": {
+            "kind": "solid",
+            "color": {
+              "r": 0,
+              "g": 0,
+              "b": 0
+            }
+          },
+          "children": [
+            {
+              "kind": "vector",
+              "id": "seta",
+              "transform": {
+                "x": 20,
+                "y": 20
+              },
+              "size": {
+                "w": 48,
+                "h": 48
+              },
+              "geometry": {
+                "kind": "svg",
+                "markup": "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n<svg id=\"Camada_1\" data-name=\"Camada 1\" xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 24 24\">\n  <defs>\n    <style>\n      .cls-1 {\n        fill: #4d4d4d;\n      }\n    </style>\n  </defs>\n  <path class=\"cls-1\" d=\"M4 11h12l-5-5 1.4-1.4L20 12l-7.6 7.4L11 18l5-5H4z\"/>\n</svg>\n"
+              }
+            },
+            {
+              "kind": "vector",
+              "id": "white",
+              "transform": {
+                "x": 90,
+                "y": 20
+              },
+              "size": {
+                "w": 48,
+                "h": 48
+              },
+              "geometry": {
+                "kind": "svg",
+                "markup": "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n<svg id=\"Camada_1\" data-name=\"Camada 1\" xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 24 24\">\n  <defs>\n    <style>\n      .cls-1 {\n        fill: #f4f4f4;\n      }\n    </style>\n  </defs>\n  <path class=\"cls-1\" d=\"M4 11h12l-5-5 1.4-1.4L20 12l-7.6 7.4L11 18l5-5H4z\"/>\n</svg>\n"
+              }
+            },
+            {
+              "kind": "vector",
+              "id": "seta-flat",
+              "transform": {
+                "x": 20,
+                "y": 80
+              },
+              "size": {
+                "w": 48,
+                "h": 48
+              },
+              "geometry": {
+                "kind": "svg",
+                "markup": "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 24 24\">\n  <path fill=\"#4D4D4D\" d=\"M4 11h12l-5-5 1.4-1.4L20 12l-7.6 7.4L11 18l5-5H4z\"/>\n</svg>\n"
+              }
+            },
+            {
+              "kind": "vector",
+              "id": "white-flat",
+              "transform": {
+                "x": 90,
+                "y": 80
+              },
+              "size": {
+                "w": 48,
+                "h": 48
+              },
+              "geometry": {
+                "kind": "svg",
+                "markup": "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 24 24\">\n  <path fill=\"#F4F4F4\" d=\"M4 11h12l-5-5 1.4-1.4L20 12l-7.6 7.4L11 18l5-5H4z\"/>\n</svg>\n"
+              }
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "fonts": [],
+  "assets": []
+}

@@ -1,0 +1,30 @@
+<!doctype html>
+<html>
+  <head>
+    <meta charset="utf-8">
+    <title>agenda:feed</title>
+    <style>
+      * { margin: 0; padding: 0; border: 0; box-sizing: border-box; }
+      html, body { background: transparent; }
+      .tyto-frame { position: relative; overflow: hidden; }
+      .tyto-node { position: absolute; left: 0; top: 0; transform-origin: 0 0; }
+      .tyto-node > svg { display: block; width: 100%; height: 100%; }
+      .tyto-frame { width: 160px; height: 140px; background-color: #000000; }
+      #seta { transform: matrix(1, 0, 0, 1, 20, 20); width: 48px; height: 48px; }
+      #white { transform: matrix(1, 0, 0, 1, 90, 20); width: 48px; height: 48px; }
+      #seta-flat { transform: matrix(1, 0, 0, 1, 20, 80); width: 48px; height: 48px; }
+      #white-flat { transform: matrix(1, 0, 0, 1, 90, 80); width: 48px; height: 48px; }
+    </style>
+  </head>
+  <body>
+    <div class="tyto-frame"><div id="seta" class="tyto-node"></div><div id="white" class="tyto-node"></div><div id="seta-flat" class="tyto-node"><?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">
+  <path fill="#4D4D4D" d="M4 11h12l-5-5 1.4-1.4L20 12l-7.6 7.4L11 18l5-5H4z"/>
+</svg>
+</div><div id="white-flat" class="tyto-node"><?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">
+  <path fill="#F4F4F4" d="M4 11h12l-5-5 1.4-1.4L20 12l-7.6 7.4L11 18l5-5H4z"/>
+</svg>
+</div></div>
+  </body>
+</html>

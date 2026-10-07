@@ -35,6 +35,7 @@ import componentsMarkup from './__fixtures__/components.html?raw';
 import parametersExpandedMarkup from './__fixtures__/parameters-expanded.html?raw';
 import parametersMarkup from './__fixtures__/parameters.html?raw';
 import promoCursoMarkup from './__fixtures__/promo-curso.html?raw';
+import setaSvg from './__fixtures__/seta.svg?raw';
 import { compileTemplate } from './compile-template.js';
 
 /**
@@ -734,11 +735,45 @@ slots:
         '<style>.v { w: 200; h: 60 }</style>',
       {
         manifest,
-        assets: { svg: (path) => (path === 'assets/logo.svg' ? '<path d="M0 0" />' : undefined) },
+        assets: {
+          svg: (path) =>
+            path === 'assets/logo.svg'
+              ? '<svg xmlns="http://www.w3.org/2000/svg"><path d="M0 0" /></svg>'
+              : undefined,
+        },
       },
     );
 
     expect(result.ok).toBe(true);
+  });
+
+  it('refuses an SVG with a stylesheet on its src, before any brief is written', () => {
+    // The Illustrator export from TYTO-168: `.cls-1` in a `<style>`, which every file from
+    // the same tool declares again. Refused where the author named the file, with the way
+    // out in the message (ADR 0068).
+    const manifest = manifestOf(`name: cartao
+version: 1.0.0
+formats: [feed]
+slots:
+  titulo: { type: rich-text }
+`);
+    const source =
+      '<frame format="feed"><vector src="assets/seta.svg" class="v" /></frame>' +
+      '<style>.v { w: 48; h: 48 }</style>';
+    const result = compileTemplate(source, {
+      manifest,
+      assets: { svg: (path) => (path === 'assets/seta.svg' ? setaSvg : undefined) },
+    });
+
+    expect(result.ok).toBe(false);
+    if (result.ok) return;
+    const [problem] = result.error;
+    expect(problem?.code).toBe('E_TEMPLATE_MARKUP');
+    expect(problem?.message).toContain("the SVG at 'assets/seta.svg'");
+    expect(problem?.message).toContain('Presentation Attributes');
+    expect(source.slice(problem?.range?.start ?? 0, problem?.range?.end ?? 0)).toContain(
+      'assets/seta.svg',
+    );
   });
 
   it('says which SVG is missing, before any brief is written', () => {

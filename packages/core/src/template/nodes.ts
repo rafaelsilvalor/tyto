@@ -170,7 +170,10 @@ export function image(options: ImageOptions): ImageDraft {
 }
 
 export interface VectorOptions extends NodeOptions {
-  /** `{ kind: 'svg', markup }` or `{ kind: 'path', d }`; markup is sanitized upstream. */
+  /**
+   * `{ kind: 'svg', markup }` or `{ kind: 'path', d }`. Markup outside the flat-geometry subset
+   * is refused by `parseScene` (ADR 0068).
+   */
   readonly geometry: VectorGeometry;
   readonly size: Size;
   readonly fill?: Paint;

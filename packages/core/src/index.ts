@@ -280,6 +280,8 @@ export {
 
 export { sceneInvariants } from './scene/invariants.js';
 
+export { SVG_MARKUP_WAY_OUT, checkSvgMarkup } from './scene/svg-markup.js';
+
 export {
   type Matrix,
   type Point,

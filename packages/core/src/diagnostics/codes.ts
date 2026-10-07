@@ -9,6 +9,8 @@
  * Adding a code means adding an entry here and regenerating the doc with `pnpm docs:gen`.
  */
 
+import { SVG_MARKUP_WAY_OUT } from '../scene/svg-markup.js';
+
 export type DiagnosticSeverity = 'error' | 'warning';
 
 export interface DiagnosticCodeDefinition {
@@ -466,6 +468,17 @@ export const diagnosticCodes = {
     fatal: true,
     fatality: 'The IR is malformed, so the exporter has nothing it can draw.',
   },
+  // The way out is part of the message because a refusal that does not say what to do
+  // instead sends the author to the ADR to find out (ADR 0068).
+  E_SCENE_SVG_MARKUP: {
+    severity: 'error',
+    summary: "A vector of kind 'svg' carries markup outside the subset Tyto inlines.",
+    template: `Vector '{id}' carries {problem}, which Tyto will not inline; ${SVG_MARKUP_WAY_OUT}.`,
+    spec: 'docs/adr/0068-inline-svg-markup-is-a-closed-subset-checked-in-core.md',
+    fatal: true,
+    fatality:
+      'The IR is malformed like any other broken invariant, and drawing the markup anyway is the harm the check exists to prevent.',
+  },
   E_TEMPLATE_VALUE: {
     severity: 'error',
     summary: 'A template SDK builder was given a value it cannot turn into IR.',
@@ -615,7 +628,9 @@ export const diagnosticCodes = {
     fatality:
       'Every producer of this code now leaves the node visible rather than leaving it out ' +
       '(ADR 0035): a mask that cannot be built is dropped instead of hiding what it was ' +
-      'applied to, and text that cannot be drawn as outlines is drawn as text.',
+      'applied to, and text that cannot be drawn as outlines is drawn as text. Inline SVG ' +
+      'markup outside the subset is the one exception: the node keeps its box and draws ' +
+      'nothing, because drawing that markup is the harm (ADR 0068).',
   },
   W_EXPORT_APPROXIMATED: {
     severity: 'warning',
