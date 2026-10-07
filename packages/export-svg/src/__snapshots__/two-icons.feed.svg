@@ -1,0 +1,19 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="160" height="140" viewBox="0 0 160 140">
+  <rect width="160" height="140" fill="#000000"/>
+  <g id="seta" transform="matrix(1 0 0 1 20 20)"/>
+  <g id="white" transform="matrix(1 0 0 1 90 20)"/>
+  <g id="seta-flat" transform="matrix(1 0 0 1 20 80)">
+    <g transform="scale(2)">
+  
+      <path fill="#4D4D4D" d="M4 11h12l-5-5 1.4-1.4L20 12l-7.6 7.4L11 18l5-5H4z"/>
+
+    </g>
+  </g>
+  <g id="white-flat" transform="matrix(1 0 0 1 90 80)">
+    <g transform="scale(2)">
+  
+      <path fill="#F4F4F4" d="M4 11h12l-5-5 1.4-1.4L20 12l-7.6 7.4L11 18l5-5H4z"/>
+
+    </g>
+  </g>
+</svg>

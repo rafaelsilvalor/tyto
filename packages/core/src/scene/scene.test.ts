@@ -8,6 +8,7 @@ import maskDescendant from './__fixtures__/invalid-mask-descendant.json';
 import maskNotFound from './__fixtures__/invalid-mask-not-found.json';
 import onlyBreaks from './__fixtures__/invalid-only-breaks.json';
 import invalidShape from './__fixtures__/invalid-shape.json';
+import svgMarkup from './__fixtures__/invalid-svg-markup.json';
 import validLineBreaks from './__fixtures__/valid-line-breaks.json';
 import validPromo from './__fixtures__/valid-promo.json';
 import { identityTransform } from './primitives.js';
@@ -138,6 +139,18 @@ describe('invariants', () => {
 
     expect(codes(errors)).toEqual(['E_SCENE_EMPTY_TEXT']);
     expect(errors[0]?.message).toContain("'silent'");
+  });
+
+  it('rejects inline SVG markup outside the subset, naming the node and the way out', () => {
+    // The Illustrator file from TYTO-168: an `id` on the root, then a `<style>` that
+    // declares `.cls-1`. Any code template can hand this to `vector()`, so the rule lives
+    // here and not only in `template-lang` (ADR 0068).
+    const errors = errorsOf(svgMarkup);
+
+    expect(codes(errors)).toEqual(['E_SCENE_SVG_MARKUP']);
+    expect(errors[0]?.message).toContain("'seta'");
+    expect(errors[0]?.message).toContain("the attribute 'id' on <svg>");
+    expect(errors[0]?.message).toContain('Presentation Attributes');
   });
 
   it('rejects a text node whose runs are all line breaks', () => {

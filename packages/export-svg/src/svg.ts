@@ -12,9 +12,11 @@ import type {
   VectorNode,
 } from '@tyto/core';
 import {
+  SVG_MARKUP_WAY_OUT,
   type SceneVisitor,
   type VisitContext,
   applyMatrix,
+  checkSvgMarkup,
   diagnostic,
   fontFaceKey,
   invertMatrix,
@@ -129,6 +131,19 @@ function vectorShape(node: VectorNode, sink: Sink): string {
     return fill + stroke;
   }
 
+  // `parseScene` already refused this, so a scene that reaches here with it was built some
+  // other way; the node draws nothing, because drawing the markup is the harm (ADR 0068).
+  // `export-html` runs the same function and answers the same way.
+  const refused = checkSvgMarkup(node.geometry.markup);
+  if (refused !== undefined) {
+    unsupported(
+      sink,
+      node.id,
+      'SVG markup outside the subset ADR 0068 admits',
+      `it carries ${refused}; ${SVG_MARKUP_WAY_OUT}`,
+    );
+    return '';
+  }
   return inlineSvgShape(node, node.geometry.markup, sink);
 }
 
@@ -138,7 +153,8 @@ function vectorShape(node: VectorNode, sink: Sink): string {
  * Both say the same thing to a browser — take this file's `viewBox` and draw it at the
  * node's size — and only one of them survives an import. Figma reads a `<g transform>`
  * and ignores a nested `<svg>`'s viewport, so a 24×24 mark on a 48×48 node arrived at
- * 24×24 (TYTO-60). The file itself is still handed over verbatim: what changes is which
+ * 24×24 (TYTO-60). The file itself is still inlined verbatim, once `checkSvgMarkup` has
+ * accepted it as flat geometry (ADR 0068): what changes is which
  * element carries the scale, and the root `<svg>`'s namespace declarations move onto the
  * `<g>` with it.
  *

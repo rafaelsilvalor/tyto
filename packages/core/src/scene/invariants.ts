@@ -1,6 +1,7 @@
 import type { SceneNode } from './nodes.js';
 import type { Paint } from './primitives.js';
 import type { Artwork, Frame, Scene } from './scene.js';
+import { checkSvgMarkup } from './svg-markup.js';
 import { type SceneVisitor, type VisitContext, walk } from './visitor.js';
 import { type Diagnostic, diagnostic } from '../diagnostics/diagnostic.js';
 
@@ -154,6 +155,23 @@ function emptyText(records: readonly NodeRecord[]): Diagnostic[] {
 }
 
 /**
+ * Inline SVG markup stays inside the subset ADR 0068 admits.
+ *
+ * Here and not only where `template-lang` reads the file, because a code template —
+ * a plugin's included — calls `vector()` with any string it likes, and every scene, from
+ * whichever kind of template, passes through this function on its way to an exporter.
+ */
+function refusedMarkup(records: readonly NodeRecord[]): Diagnostic[] {
+  return records.flatMap(({ node }) => {
+    if (node.kind !== 'vector' || node.geometry.kind !== 'svg') return [];
+    const problem = checkSvgMarkup(node.geometry.markup);
+    return problem === undefined
+      ? []
+      : [diagnostic('E_SCENE_SVG_MARKUP', { id: node.id, problem })];
+  });
+}
+
+/**
  * Runs every rule and returns everything wrong, rather than stopping at the first —
  * a scene is usually fixed in one editing pass, not one problem per compile.
  */
@@ -165,5 +183,6 @@ export function sceneInvariants(scene: Scene): readonly Diagnostic[] {
     ...undeclaredFonts(scene, records),
     ...undeclaredAssets(scene, records),
     ...emptyText(records),
+    ...refusedMarkup(records),
   ];
 }

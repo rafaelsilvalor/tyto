@@ -15,7 +15,15 @@ import type {
   TextOverflow,
   TextVerticalAlign,
 } from '@tyto/core';
-import { blendModes, measureNothing, noBrandKit, noFiles, reportNothing } from '@tyto/core';
+import {
+  SVG_MARKUP_WAY_OUT,
+  blendModes,
+  checkSvgMarkup,
+  measureNothing,
+  noBrandKit,
+  noFiles,
+  reportNothing,
+} from '@tyto/core';
 import {
   TemplateError,
   font,
@@ -883,8 +891,18 @@ function checkElements(elements: readonly TemplateElement[], scope: Scope, repor
     if (element.tag === 'vector') {
       const source = attributeOf(element, 'src');
       const literal = source !== undefined && interpolatedSlots(source.value).length === 0;
-      if (literal && scope.program.assets.svg?.(source.value) === undefined) {
+      const markup = literal ? scope.program.assets.svg?.(source.value) : undefined;
+      if (literal && markup === undefined) {
         report(markupProblem(`no SVG file at '${source.value}'`, source.valueRange));
+      }
+      // On the `src` value, before any brief is written: the file is the template's, so the
+      // template is what is wrong, and the author fixes it where they named it (ADR 0068).
+      // An interpolated `src` is only known per brief, and `parseScene` refuses that one by
+      // the node's id — the rule every code template meets too.
+      const refused = markup === undefined ? undefined : checkSvgMarkup(markup);
+      if (source !== undefined && refused !== undefined) {
+        const problem = `the SVG at '${source.value}' carries ${refused}, which Tyto will not inline; ${SVG_MARKUP_WAY_OUT}`;
+        report(markupProblem(problem, source.valueRange));
       }
     }
 

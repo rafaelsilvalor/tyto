@@ -1,11 +1,12 @@
 import type { Diagnostic, Scene } from '@tyto/core';
-import { GAP_ASSET_URI, parseScene } from '@tyto/core';
+import { GAP_ASSET_URI, parseScene, sceneSchema } from '@tyto/core';
 import { describe, expect, it } from 'vitest';
 
 import { exportHtml } from './export-html.js';
 import type { HtmlFontFace, HtmlResources } from './html.js';
 import mappingFixture from './__fixtures__/mapping.json';
 import promoFixture from './__fixtures__/promo.json';
+import twoIconsFixture from './__fixtures__/two-icons.json';
 
 /**
  * The acceptance criteria are two: a committed snapshot per fixture, and markup that is
@@ -390,5 +391,69 @@ describe('the SVG renderer inside this exporter', () => {
     expect(html).toContain('patternUnits="userSpaceOnUse"');
     expect(html).not.toContain('objectBoundingBox');
     expect(html).toContain('<pattern id="p0" width="400" height="200"');
+  });
+});
+
+describe('inline SVG markup outside the subset (ADR 0068)', () => {
+  // Shape only, on purpose: `parseScene` refuses this scene, and the point here is what an
+  // exporter does with one that reached it some other way.
+  const twoIcons = (): Scene => sceneSchema.parse(twoIconsFixture);
+
+  it('draws neither styled icon, and says so for each of them', () => {
+    const result = exportHtml(twoIcons(), { resources });
+    if (!result.ok) throw new Error(result.error.map((item) => item.message).join('; '));
+
+    expect(result.diagnostics.map((item) => [item.code, item.message.split("'")[1]])).toEqual([
+      ['E_EXPORT_UNSUPPORTED', 'seta'],
+      ['E_EXPORT_UNSUPPORTED', 'white'],
+    ]);
+    expect(result.diagnostics[0]?.message).toContain('Presentation Attributes');
+  });
+
+  it('lets no class rule out of one icon to repaint the other', async () => {
+    const [feed = ''] = htmlOf(twoIcons());
+
+    // The collision from TYTO-168: both files declare `.cls-1`, and inlined together the
+    // first rule wins for both. Nothing of either file's stylesheet may reach the output —
+    // the same guarantee through both exporters — and the same two icons with their fill
+    // on the path each keep their own colour.
+    expect(feed).not.toContain('cls-1');
+    expect(feed).toContain('fill="#4D4D4D"');
+    expect(feed).toContain('fill="#F4F4F4"');
+    await expect(feed).toMatchFileSnapshot('./__snapshots__/two-icons.feed.html');
+  });
+
+  it('refuses the same markup when it is the shape of a mask', () => {
+    const [icon] = twoIcons().artworks[0]?.frames[0]?.children ?? [];
+    const scene = sceneSchema.parse({
+      version: 1,
+      artworks: [
+        {
+          id: 'a',
+          frames: [
+            {
+              format: 'feed',
+              size: { w: 10, h: 10 },
+              children: [
+                {
+                  kind: 'rect',
+                  id: 'box',
+                  size: { w: 10, h: 10 },
+                  radius: [0, 0, 0, 0],
+                  fill: { kind: 'solid', color: { r: 0, g: 0, b: 0 } },
+                  mask: { nodeId: 'seta', mode: 'alpha' },
+                },
+                { ...icon, visible: false },
+              ],
+            },
+          ],
+        },
+      ],
+    });
+    const result = exportHtml(scene, { resources });
+    if (!result.ok) throw new Error(result.error.map((item) => item.message).join('; '));
+
+    expect(result.diagnostics.map((item) => item.code)).toContain('E_EXPORT_UNSUPPORTED');
+    expect(result.value[0]?.html).not.toContain('cls-1');
   });
 });

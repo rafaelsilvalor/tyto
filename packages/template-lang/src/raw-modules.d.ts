@@ -9,3 +9,9 @@ declare module '*.html?raw' {
   const content: string;
   export default content;
 }
+
+/** An SVG file as the loader would hand it over, for the inline-markup refusal (ADR 0068). */
+declare module '*.svg?raw' {
+  const content: string;
+  export default content;
+}

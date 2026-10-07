@@ -63,6 +63,7 @@ non-zero.
 | `E_SCENE_FONT_NOT_DECLARED` | error | yes | Text uses a font family the scene does not declare. |
 | `E_SCENE_ASSET_NOT_DECLARED` | error | yes | A node or paint uses an asset the scene does not declare. |
 | `E_SCENE_EMPTY_TEXT` | error | yes | A text node has nothing to draw — no runs at all, or only line breaks. |
+| `E_SCENE_SVG_MARKUP` | error | yes | A vector of kind 'svg' carries markup outside the subset Tyto inlines. |
 | `E_TEMPLATE_VALUE` | error | yes | A template SDK builder was given a value it cannot turn into IR. |
 | `E_TEMPLATE_CRASH` | error | yes | A template threw while building its scene, which is a bug in the template. |
 | `E_FORMATS_READ` | error | yes | The project's formats.yaml could not be read from the filesystem. |
@@ -159,6 +160,7 @@ incomplete brief, and a crossed box where a picture the exporter could not load 
 | `E_SCENE_FONT_NOT_DECLARED` | yes | The IR is malformed, so the exporter has nothing it can draw. |
 | `E_SCENE_ASSET_NOT_DECLARED` | yes | The IR is malformed, so the exporter has nothing it can draw. |
 | `E_SCENE_EMPTY_TEXT` | yes | The IR is malformed, so the exporter has nothing it can draw. |
+| `E_SCENE_SVG_MARKUP` | yes | The IR is malformed like any other broken invariant, and drawing the markup anyway is the harm the check exists to prevent. |
 | `E_TEMPLATE_VALUE` | yes | The template is what every artwork is drawn through, so a broken one breaks all of them rather than one slot. |
 | `E_TEMPLATE_CRASH` | yes | The template is what every artwork is drawn through, so a broken one breaks all of them rather than one slot. |
 | `E_FORMATS_READ` | yes | No formats file means no frame has a size. |
@@ -173,7 +175,7 @@ incomplete brief, and a crossed box where a picture the exporter could not load 
 | `E_INPUT_READ` | yes | There is no brief to render. |
 | `E_EXPORT_ASSET_UNRESOLVED` | no | The bytes were never loaded, which is a wiring failure rather than something the brief said — and since ADR 0035 the exporter draws the gap mark in the box the picture would have filled, so the artwork names the hole itself. |
 | `E_EXPORT_FONT_UNRESOLVED` | yes | Text drawn in whatever the viewer has is a different artwork, and the substitution is invisible in the output. |
-| `E_EXPORT_UNSUPPORTED` | no | Every producer of this code now leaves the node visible rather than leaving it out (ADR 0035): a mask that cannot be built is dropped instead of hiding what it was applied to, and text that cannot be drawn as outlines is drawn as text. |
+| `E_EXPORT_UNSUPPORTED` | no | Every producer of this code now leaves the node visible rather than leaving it out (ADR 0035): a mask that cannot be built is dropped instead of hiding what it was applied to, and text that cannot be drawn as outlines is drawn as text. Inline SVG markup outside the subset is the one exception: the node keeps its box and draws nothing, because drawing that markup is the harm (ADR 0068). |
 | `E_RENDER_FAILED` | no | One frame of twelve. The others are already written, and a file that is missing from `result.json` is visible in a way a hole inside an artwork is not. |
 | `E_OUTPUT_WRITE` | no | The same: one artifact that did not reach the output, counted against `planned`. |
 | `E_DELIVERY_FOLDER_BLOCKED` | yes | Fatal when the delivery folder or `editaveis/` is held: there is nowhere to write the artwork or `result.json`, so nothing is. When only `assets/` is held, the artwork is already written and the images are not copied beside it. |
@@ -824,6 +826,20 @@ Text node '{id}' has nothing to draw; it needs at least one run of text.
 
 Parameters: `id`
 
+### `E_SCENE_SVG_MARKUP`
+
+**Severity:** error · **Fatal:** yes · **Spec:** `docs/adr/0068-inline-svg-markup-is-a-closed-subset-checked-in-core.md`
+
+A vector of kind 'svg' carries markup outside the subset Tyto inlines.
+
+The IR is malformed like any other broken invariant, and drawing the markup anyway is the harm the check exists to prevent.
+
+```
+Vector '{id}' carries {problem}, which Tyto will not inline; only flat shapes painted by presentation attributes are inlined: draw it as a contour (a vector of kind 'path'), place it as a PNG, or re-export it from Illustrator with Styling set to Presentation Attributes.
+```
+
+Parameters: `id`, `problem`
+
 ### `E_TEMPLATE_VALUE`
 
 **Severity:** error · **Fatal:** yes · **Spec:** `docs/template-authoring.md`
@@ -1026,7 +1042,7 @@ Parameters: `font`
 
 A scene uses something the chosen exporter cannot express at all.
 
-Every producer of this code now leaves the node visible rather than leaving it out (ADR 0035): a mask that cannot be built is dropped instead of hiding what it was applied to, and text that cannot be drawn as outlines is drawn as text.
+Every producer of this code now leaves the node visible rather than leaving it out (ADR 0035): a mask that cannot be built is dropped instead of hiding what it was applied to, and text that cannot be drawn as outlines is drawn as text. Inline SVG markup outside the subset is the one exception: the node keeps its box and draws nothing, because drawing that markup is the harm (ADR 0068).
 
 ```
 '{node}' uses {feature}, which {exporter} cannot express: {detail}.

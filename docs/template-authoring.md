@@ -225,6 +225,16 @@ takes `src`. A `frame` is not a node and takes its own set: `format`, `extends`,
 a CSS property say the same thing (`opacity`), **the stylesheet wins** — the attribute is the
 shorthand and a rule is the override.
 
+**A `vector`'s file has to be flat geometry** (ADR 0068). It is inlined into the artwork as it
+stands, so it may hold `svg`, `g`, `path`, `rect`, `circle`, `ellipse`, `line`, `polyline`,
+`polygon`, `title` and `desc`, painted by presentation attributes (`fill`, `stroke`,
+`opacity`, `transform`…) — and nothing that names anything: no `<style>`, no `class`, no
+`id`, no `<defs>`, no `url()`. Illustrator and Figma number their classes from `.cls-1` in
+every export, so two such files in one artwork repaint each other. A file outside the subset
+is `E_TEMPLATE_MARKUP` on its `src`, before any brief is written. The ways out: re-export
+from Illustrator with Styling set to Presentation Attributes, draw the shape as a contour (a
+vector of kind `path`), or place an illustration as a PNG with `image`.
+
 **Accepted CSS properties**: `x y w h rotation anchor`, `font font-size font-weight
 line-height letter-spacing color text-align vertical-align overflow`, `fill stroke radius`,
 `opacity mix-blend-mode`, `shadow blur`, `visible`. Any other property is
@@ -559,7 +569,8 @@ test passes `reportNothing`.
 logo or a badge goes in the template's folder, and the template asks for it by the path it
 has there, as a markup template's `src=` does: `context.files.image('assets/bg.png')` answers
 an `AssetRef` to hand to `image({ asset })`, and `context.files.svg('assets/mark.svg')` the
-SVG markup. A template cannot write that ref itself: it carries the hash of bytes the template
+SVG markup — which `vector()` accepts only as the flat geometry described for `<vector>`
+above, or the scene is refused as `E_SCENE_SVG_MARKUP`. A template cannot write that ref itself: it carries the hash of bytes the template
 never sees, so a hand-made one renders as `E_EXPORT_ASSET_UNRESOLVED`. **`undefined` means the
 folder has no such file**: draw without it, or report it. The folder is read once per load, by
 whoever composed the source, so nothing here touches a disk. An installed plugin's code

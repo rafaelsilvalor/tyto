@@ -21,8 +21,10 @@ import type {
 } from '@tyto/core';
 import {
   GAP_ASSET_URI,
+  SVG_MARKUP_WAY_OUT,
   type SceneVisitor,
   applyMatrix,
+  checkSvgMarkup,
   diagnostic,
   fontFaceKey,
   identityMatrix,
@@ -555,7 +557,20 @@ function imageHtml(node: ImageNode, context: VisitContext, emit: Emit): string {
 }
 
 function vectorHtml(node: VectorNode, context: VisitContext, emit: Emit): string {
-  const paint = node.geometry.kind === 'svg' ? svgGeometryPaint(node, emit) : [];
+  // `parseScene` already refused this, so a scene that reaches here with it was built some
+  // other way; the node keeps its box and draws nothing, because drawing the markup is the
+  // harm (ADR 0068). `export-svg` runs the same function and answers the same way.
+  const refused = node.geometry.kind === 'svg' ? checkSvgMarkup(node.geometry.markup) : undefined;
+  if (refused !== undefined) {
+    unsupported(
+      emit,
+      node.id,
+      'SVG markup outside the subset ADR 0068 admits',
+      `it carries ${refused}; ${SVG_MARKUP_WAY_OUT}`,
+    );
+  }
+  const paint =
+    node.geometry.kind === 'svg' && refused === undefined ? svgGeometryPaint(node, emit) : [];
 
   addRule(emit, node.id, [
     ...baseDeclarations(node, context, emit),
@@ -564,10 +579,10 @@ function vectorHtml(node: VectorNode, context: VisitContext, emit: Emit): string
   ]);
 
   if (node.geometry.kind === 'svg') {
-    // The file is inlined as it stands — `template-lang` hands it over verbatim and the
-    // schema calls it already sanitized — and the stylesheet stretches it to the node's
-    // box, which is the one thing the file cannot know.
-    return `<div${attributesFor(node)}>${node.geometry.markup}</div>`;
+    // The file is inlined as it stands — `checkSvgMarkup` has accepted it as flat geometry
+    // that names nothing and can be named by nothing — and the stylesheet stretches it to
+    // the node's box, which is the one thing the file cannot know.
+    return `<div${attributesFor(node)}>${refused === undefined ? node.geometry.markup : ''}</div>`;
   }
 
   const fill = node.fill === undefined ? '' : svgPaintAttribute('fill', node.fill, node, emit);
