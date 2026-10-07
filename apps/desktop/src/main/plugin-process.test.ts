@@ -5,9 +5,9 @@ import { RPC_PROTOCOL_VERSION } from '@tyto/plugin-api';
 import { describe, expect, it } from 'vitest';
 
 import {
-  type ForkNode,
-  type ForkOptions,
   type NodeChild,
+  type SpawnNode,
+  type SpawnOptions,
   bundledNodeLauncher,
   bundledNodePaths,
 } from './plugin-process.js';
@@ -44,14 +44,14 @@ class FakeChild extends EventEmitter implements NodeChild {
 }
 
 function launched() {
-  const forks: { modulePath: string; args: string[]; options: ForkOptions }[] = [];
+  const spawns: { command: string; args: string[]; options: SpawnOptions }[] = [];
   const child = new FakeChild();
-  const fork: ForkNode = (modulePath, args, options) => {
-    forks.push({ modulePath, args, options });
+  const spawn: SpawnNode = (command, args, options) => {
+    spawns.push({ command, args, options });
     return child;
   };
   const channel = bundledNodeLauncher({
-    fork,
+    spawn,
     // A link resolved, as `realpathSync` would: every granted path must be the real one.
     realpath: (path) => path.replace('/linked/', '/real/'),
     node: '/app/resources/node/node',
@@ -62,23 +62,28 @@ function launched() {
     entry: '/home/linked/.tyto/plugins/texto/dist/index.js',
     directory: '/home/linked/.tyto/plugins/texto',
   });
-  return { forks, child, channel };
+  return { spawns, child, channel };
 }
 
 describe('a plugin on the bundled Node', () => {
   it('starts the bootstrap on that Node, granted its folder and itself as real paths', () => {
-    const { forks } = launched();
-    expect(forks).toEqual([
+    // The command is the bundled Node and the fourth slot is `ipc`: that pair is what `fork`
+    // used to build, and Electron refuses `fork` once the RunAsNode fuse is off (TYTO-193).
+    // Node's options come before the bootstrap, where `fork` put its `execArgv`; after it they
+    // would be the plugin's `process.argv`, and the permission model would never switch on.
+    const { spawns } = launched();
+    expect(spawns).toEqual([
       {
-        modulePath: '/app/resources/app.asar.unpacked/out/guest/plugin-guest.js',
-        args: ['/home/real/.tyto/plugins/texto/dist/index.js', '/app/resources/app.asar'],
+        command: '/app/resources/node/node',
+        args: [
+          '--permission',
+          '--allow-fs-read=/home/real/.tyto/plugins/texto',
+          '--allow-fs-read=/app/resources/app.asar.unpacked/out/guest/plugin-guest.js',
+          '/app/resources/app.asar.unpacked/out/guest/plugin-guest.js',
+          '/home/real/.tyto/plugins/texto/dist/index.js',
+          '/app/resources/app.asar',
+        ],
         options: {
-          execPath: '/app/resources/node/node',
-          execArgv: [
-            '--permission',
-            '--allow-fs-read=/home/real/.tyto/plugins/texto',
-            '--allow-fs-read=/app/resources/app.asar.unpacked/out/guest/plugin-guest.js',
-          ],
           env: {},
           serialization: 'json',
           stdio: ['ignore', 'inherit', 'inherit', 'ipc'],

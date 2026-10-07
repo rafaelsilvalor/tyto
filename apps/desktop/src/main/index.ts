@@ -1,4 +1,4 @@
-import { fork } from 'node:child_process';
+import { spawn } from 'node:child_process';
 import { realpathSync } from 'node:fs';
 import { readFile } from 'node:fs/promises';
 import { fileURLToPath } from 'node:url';
@@ -392,7 +392,7 @@ async function start(): Promise<void> {
   const plugins = startDesktopPlugins({
     store: pluginStore,
     launch: bundledNodeLauncher({
-      fork: (modulePath, args, options) => fork(modulePath, args, options),
+      spawn: (command, args, options) => spawn(command, args, options),
       realpath: (path) => realpathSync(path),
       ...bundledNodePaths({
         packaged: app.isPackaged,
