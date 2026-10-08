@@ -146,9 +146,12 @@ export function windowPages(browser: Browser): Page[] {
  */
 export async function requestQuit(app: CdpApp): Promise<void> {
   const session = await app.browser.newBrowserCDPSession();
-  void session.send('Browser.close').catch(() => {
-    // The connection closes with the browser. That is the answer, not an error.
-  });
+  void session;
+  void app.page
+    .evaluate(() => window.close())
+    .catch(() => {
+      // The connection closes with the browser. That is the answer, not an error.
+    });
 }
 
 /** How a deadline-bounded wait for the process ended. */
