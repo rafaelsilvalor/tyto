@@ -74,6 +74,29 @@ describe('credentials', () => {
     expect(await credentials.delete('jira')).toBe(false);
     expect(await credentials.get('jira')).toBeNull();
   });
+
+  it('says whether one is stored without ever decrypting it (TYTO-187)', async () => {
+    const store = memoryStore();
+    await createCredentials({ store, encryption: fakeEncryption() }).set('plugin:a:k', 'dummy');
+
+    // Every decrypt throws, and so does the availability check `get` runs first: an answer
+    // that went through either is a red test rather than a quiet plaintext in memory.
+    const refusing: SafeStorage = {
+      isEncryptionAvailable: () => {
+        throw new Error('has() asked the keychain');
+      },
+      encryptString: () => {
+        throw new Error('has() encrypted');
+      },
+      decryptString: () => {
+        throw new Error('has() decrypted');
+      },
+    };
+    const credentials = createCredentials({ store, encryption: refusing });
+
+    expect(await credentials.has('plugin:a:k')).toBe(true);
+    expect(await credentials.has('plugin:a:other')).toBe(false);
+  });
 });
 
 /**

@@ -16,6 +16,11 @@ import type { IpcResponse } from '../../shared/ipc.js';
  * installs nothing either: install, remove and disable are the CLI's, and the screen says so
  * rather than offering buttons that would lead there.
  *
+ * **One thing it writes: a plugin's credentials (TYTO-187).** Beside each `credentials:<key>`
+ * a plugin declares, a field to set it and a button to clear it, handed to `onCredential`
+ * — whoever opened the screen owns the bridge and asks the list again afterwards. The value
+ * leaves through that call once and never comes back: the row knows only whether a key is set.
+ *
  * **The notice is not decoration.** A permission a person approved at install is recorded
  * and shown, and until TYTO-48 isolates plugins it is not enforced; a screen listing
  * permissions without that sentence would read as a sandbox that does not exist.
@@ -25,6 +30,13 @@ export const PLUGINS_DIALOG_TAG = 'tyto-plugins-dialog';
 
 export type PluginsView = IpcResponse<'plugins:list'>;
 type PluginRow = PluginsView['plugins'][number];
+
+/** Set a key to `secret`, or clear it when `secret` is absent. Rejects when main refused. */
+export type CredentialChange = (change: {
+  readonly plugin: string;
+  readonly key: string;
+  readonly secret?: string;
+}) => Promise<void>;
 
 const ORIGIN_KEYS: Record<PluginRow['origin'], CatalogueKey> = {
   'built-in': 'plugins.origin.builtIn',
@@ -43,18 +55,26 @@ export class PluginsDialog extends LitElement {
     open: { type: Boolean, reflect: true },
     locale: { attribute: false },
     view: { attribute: false },
+    onCredential: { attribute: false },
+    failedCredential: { state: true },
   };
 
   declare open: boolean;
   declare locale: Locale;
   /** The list, `'failed'` when the bridge could not answer, or nothing while it is asked. */
   declare view: PluginsView | 'failed' | undefined;
+  /** Where a set or a clear goes. Nothing is offered while it is absent. */
+  declare onCredential: CredentialChange | undefined;
+  /** `plugin:key` of the change main refused last, so its row can say so. */
+  declare failedCredential: string | undefined;
 
   constructor() {
     super();
     this.open = false;
     this.locale = DEFAULT_LOCALE;
     this.view = undefined;
+    this.onCredential = undefined;
+    this.failedCredential = undefined;
   }
 
   /** Light DOM, so `shell.css` reaches inside — the reasoning is in ADR 0024. */
@@ -84,7 +104,7 @@ export class PluginsDialog extends LitElement {
             ? html`<p class="plugins__disclosure">${say('plugins.panel.readsDocument')}</p>`
             : nothing
         }
-        ${this.fonts(say, plugin)}
+        ${this.fonts(say, plugin)} ${this.credentials(say, plugin)}
         ${
           plugin.problems.length === 0
             ? nothing
@@ -108,6 +128,89 @@ export class PluginsDialog extends LitElement {
     return html`<p class="plugins__disclosure plugins__fonts">
       ${say('plugins.font.sendsMachineFaces')} ${families.join(', ')}
     </p>`;
+  }
+
+  /**
+   * One line per declared key: its name, whether it is set, a field and Save, and Clear when
+   * there is something to clear. The field is a password field and is emptied once saved,
+   * so the value is on screen only while it is being typed.
+   */
+  private credentials(say: (key: CatalogueKey) => string, plugin: PluginRow): unknown {
+    const change = this.onCredential;
+    if (plugin.credentials.length === 0 || change === undefined) return nothing;
+
+    const run = async (key: string, secret?: string, form?: HTMLFormElement): Promise<void> => {
+      const id = `${plugin.name}:${key}`;
+      try {
+        await change({ plugin: plugin.name, key, ...(secret === undefined ? {} : { secret }) });
+        if (this.failedCredential === id) this.failedCredential = undefined;
+        form?.reset();
+      } catch {
+        this.failedCredential = id;
+      }
+    };
+
+    return html`<div class="plugins__credentials">
+      ${plugin.credentials.map(
+        ({ key, set }) =>
+          html`<form
+            class="plugins__credential"
+            data-key=${key}
+            data-set=${set ? 'true' : 'false'}
+            @submit=${(event: SubmitEvent) => {
+              event.preventDefault();
+              const form = event.currentTarget as HTMLFormElement;
+              const field = form.querySelector('input');
+              const secret = field?.value ?? '';
+              if (secret === '') return;
+              void run(key, secret, form);
+            }}
+          >
+            <span class="plugins__credential-key"
+              >${say('plugins.credential.label')} <code>${key}</code></span
+            >
+            <span class="plugins__credential-state"
+              >${say(set ? 'plugins.credential.set' : 'plugins.credential.notSet')}</span
+            >
+            <input
+              class="plugins__credential-field"
+              type="password"
+              autocomplete="off"
+              spellcheck="false"
+              placeholder=${say('plugins.credential.placeholder')}
+              aria-label=${`${say('plugins.credential.label')} ${key}`}
+            />
+            <button class="plugins__credential-save" type="submit">
+              ${say('plugins.credential.save')}
+            </button>
+            ${
+              set
+                ? html`<button
+                    class="plugins__credential-clear"
+                    type="button"
+                    @click=${() => {
+                      void run(key);
+                    }}
+                  >
+                    ${say('plugins.credential.clear')}
+                  </button>`
+                : nothing
+            }
+            ${
+              this.failedCredential === `${plugin.name}:${key}`
+                ? html`<p class="plugins__credential-failed" role="alert">
+                    ${say('plugins.credential.failed')}
+                  </p>`
+                : nothing
+            }
+          </form>`,
+      )}
+      ${
+        plugin.credentials.some((credential) => credential.set)
+          ? html`<p class="plugins__disclosure">${say('plugins.credential.kept')}</p>`
+          : nothing
+      }
+    </div>`;
   }
 
   private body(say: (key: CatalogueKey) => string): unknown {

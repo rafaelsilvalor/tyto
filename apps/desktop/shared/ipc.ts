@@ -34,13 +34,19 @@ const channel = <Request extends z.ZodType, Response extends z.ZodType>(
 ): IpcChannel<Request, Response> => ({ request, response });
 
 /**
- * An account name a credential is filed under.
+ * Which credential a request is about: a plugin's name and one key its manifest declares as
+ * `credentials:<key>` (TYTO-187).
  *
- * Constrained rather than left as a string: it becomes a key in a store the user cannot
- * see, and a blank or whitespace-only one would be a credential nobody can ever ask for
- * again.
+ * **Not an account name.** Until TYTO-187 the renderer named the keychain entry itself, so
+ * any code running in the page could overwrite or forget any entry main keeps. Main now
+ * builds `plugin:<name>:<key>` and refuses a pair no installed manifest declares, which
+ * makes the renderer's reach exactly what the plugins screen shows. Matched exactly, with
+ * no trimming: `'meu-pdf '` is not `'meu-pdf'`, and a refusal says so.
  */
-const accountName = z.string().trim().min(1).max(200);
+const pluginCredential = {
+  plugin: z.string().min(1).max(200),
+  key: z.string().min(1).max(200),
+};
 
 /**
  * A diagnostic, flattened to what survives a structured clone.
@@ -543,28 +549,27 @@ export const IPC_CHANNELS = {
   'layout:set': channel(z.object({ layout: layoutSchema }), z.object({})),
 
   /**
-   * Stores a secret through `safeStorage`, which is the OS keychain (ADR 0001).
+   * Stores a plugin's secret through `safeStorage`, which is the OS keychain (ADR 0001).
    *
-   * The renderer hands over the plaintext and never sees the ciphertext: encryption is
-   * main's, because `safeStorage` is an Electron main-process API and a renderer with no
-   * Node cannot reach it even if it wanted to.
+   * The renderer hands over the plaintext once and never sees it again, nor the
+   * ciphertext: encryption is main's, because `safeStorage` is an Electron main-process API.
+   * **There is no channel that reads one back** (TYTO-187): the plugins screen learns only
+   * whether a key is set, through `plugins:list`, and the secret's one reader is the plugin
+   * that declared it, through `host.credentials` in its own process.
+   *
+   * Refused — a rejected call, not `stored: false` — when no installed plugin called `plugin`
+   * declares `credentials:<key>`.
    */
   'credentials:set': channel(
-    z.object({ account: accountName, secret: z.string().min(1) }),
+    z.object({ ...pluginCredential, secret: z.string().min(1) }),
     z.object({ stored: z.boolean() }),
   ),
 
-  /** Reads one back. `null` for an account nothing was ever stored under. */
-  'credentials:get': channel(
-    z.object({ account: accountName }),
-    z.object({ secret: z.string().nullable() }),
-  ),
-
-  /** Forgets one. `false` when there was nothing to forget, which is not an error. */
-  'credentials:delete': channel(
-    z.object({ account: accountName }),
-    z.object({ deleted: z.boolean() }),
-  ),
+  /**
+   * Forgets one, refused on the same terms as `credentials:set`. `false` when there was
+   * nothing to forget, which is not an error.
+   */
+  'credentials:delete': channel(z.object(pluginCredential), z.object({ deleted: z.boolean() })),
 
   /**
    * Starts an export and answers with its id — not with its result (E9.4, TYTO-43).
@@ -689,6 +694,12 @@ export const IPC_CHANNELS = {
             contributes: z.array(z.string()),
             permissions: z.array(z.string()),
             problems: z.array(z.string()),
+            /**
+             * Each `credentials:<key>` the manifest declares, and whether a value is stored
+             * for it (TYTO-187). Whether, never what: this is the only answer about a
+             * credential the renderer gets.
+             */
+            credentials: z.array(z.object({ key: z.string().min(1), set: z.boolean() })),
           }),
         )
         .max(500),

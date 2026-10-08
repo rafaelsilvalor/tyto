@@ -282,8 +282,8 @@ plugin is installed again (`E_PLUGIN_PERMISSIONS_CHANGED`). Wildcards and redire
 **In the CLI a credential is an environment variable**: `TYTO_PLUGIN_<NAME>_<KEY>`, upper-cased,
 with every character that is not a letter or a digit turned into `_`. For `meu-pack`'s
 `api.token` that is `TYTO_PLUGIN_MEU_PACK_API_TOKEN`. **On the desktop a credential comes from the
-system keychain only, and this version has no screen to store one** (TYTO-187). A declared
-credential therefore answers `E_CREDENTIAL_MISSING` there.
+system keychain only**, and a person types it into the plugins screen, next to your plugin
+(TYTO-187). Until they do, a declared credential answers `E_CREDENTIAL_MISSING` there.
 
 **In the CLI your code runs confined to its own folder** (ADR 0049). It runs in a process of its
 own under Node's permission model, which can read the plugin's installed folder and nothing else.

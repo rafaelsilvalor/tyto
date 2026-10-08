@@ -364,6 +364,18 @@ export interface Catalogue {
   readonly 'plugins.font.sendsMachineFaces': string;
   readonly 'plugins.close': string;
   readonly 'plugins.unavailable': string;
+  /**
+   * Beside each `credentials:<key>` a plugin declares (TYTO-187): its state and a way to set or
+   * clear it. Whether it is set, never what it is set to — `kept` says so on the screen.
+   */
+  readonly 'plugins.credential.label': string;
+  readonly 'plugins.credential.set': string;
+  readonly 'plugins.credential.notSet': string;
+  readonly 'plugins.credential.placeholder': string;
+  readonly 'plugins.credential.save': string;
+  readonly 'plugins.credential.clear': string;
+  readonly 'plugins.credential.kept': string;
+  readonly 'plugins.credential.failed': string;
 
   /**
    * The local queue panel (TYTO-45). Closed in the default layout, so none of these is on
@@ -571,6 +583,14 @@ export const CATALOGUE_KEYS = [
   'plugins.font.sendsMachineFaces',
   'plugins.close',
   'plugins.unavailable',
+  'plugins.credential.label',
+  'plugins.credential.set',
+  'plugins.credential.notSet',
+  'plugins.credential.placeholder',
+  'plugins.credential.save',
+  'plugins.credential.clear',
+  'plugins.credential.kept',
+  'plugins.credential.failed',
   'command.queue.show',
   'queue.heading',
   'queue.folder.none',

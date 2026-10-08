@@ -21,6 +21,7 @@ const VIEW: PluginsView = {
       contributes: ['exporter'],
       permissions: [],
       problems: [],
+      credentials: [],
     },
     {
       name: 'pdf',
@@ -30,6 +31,7 @@ const VIEW: PluginsView = {
       contributes: ['exporter'],
       permissions: ['net:api.example.com'],
       problems: [],
+      credentials: [],
     },
     {
       name: 'velho',
@@ -39,6 +41,7 @@ const VIEW: PluginsView = {
       contributes: [],
       permissions: [],
       problems: ["Plugin 'velho' needs plugin API >=99, and this Tyto provides plugin API 0.4.0."],
+      credentials: [],
     },
   ],
 };
@@ -167,5 +170,84 @@ describe('the plugins screen', () => {
     await element.updateComplete;
 
     expect(element.open).toBe(false);
+  });
+});
+
+describe('a plugin’s credentials on the screen (TYTO-187)', () => {
+  const ROW = {
+    ...VIEW.plugins[1]!,
+    name: 'gerador',
+    permissions: ['credentials:api-token', 'credentials:conta'],
+    credentials: [
+      { key: 'api-token', set: false },
+      { key: 'conta', set: true },
+    ],
+  };
+  const changes: { plugin: string; key: string; secret?: string }[] = [];
+
+  async function withCredentials(refuse = false): Promise<PluginsDialog> {
+    changes.length = 0;
+    const element = await dialog({ folder: VIEW.folder, plugins: [ROW, VIEW.plugins[0]!] });
+    element.onCredential = (change) => {
+      changes.push(change);
+      return refuse ? Promise.reject(new Error('refused')) : Promise.resolve();
+    };
+    await element.updateComplete;
+    return element;
+  }
+
+  const line = (element: Element, key: string): HTMLFormElement =>
+    element.querySelector<HTMLFormElement>(`[data-plugin="gerador"] [data-key="${key}"]`)!;
+
+  it('shows each declared key with whether it is set, and Clear only where it is', async () => {
+    const element = await withCredentials();
+
+    expect(text(line(element, 'api-token'), '.plugins__credential-state')).toBe('not set');
+    expect(text(line(element, 'conta'), '.plugins__credential-state')).toBe('set');
+    expect(line(element, 'api-token').querySelector('.plugins__credential-clear')).toBeNull();
+    expect(line(element, 'conta').querySelector('.plugins__credential-clear')).not.toBeNull();
+    expect(element.querySelector('[data-plugin="svg"] .plugins__credentials')).toBeNull();
+    // A password field, so what is typed is not on screen even while it is typed.
+    expect(line(element, 'api-token').querySelector('input')?.type).toBe('password');
+  });
+
+  it('hands the typed value over once, and empties the field after', async () => {
+    const element = await withCredentials();
+    const form = line(element, 'api-token');
+    const field = form.querySelector('input')!;
+    field.value = 'dummy-value';
+
+    form.requestSubmit();
+    await Promise.resolve();
+    await element.updateComplete;
+
+    expect(changes).toEqual([{ plugin: 'gerador', key: 'api-token', secret: 'dummy-value' }]);
+    expect(field.value).toBe('');
+  });
+
+  it('sends nothing for an empty field', async () => {
+    const element = await withCredentials();
+    line(element, 'api-token').requestSubmit();
+
+    expect(changes).toEqual([]);
+  });
+
+  it('clears a key with no value at all', async () => {
+    const element = await withCredentials();
+    line(element, 'conta').querySelector<HTMLButtonElement>('.plugins__credential-clear')!.click();
+
+    expect(changes).toEqual([{ plugin: 'gerador', key: 'conta' }]);
+  });
+
+  it('says so on the row when main refused the change', async () => {
+    const element = await withCredentials(true);
+    line(element, 'conta').querySelector<HTMLButtonElement>('.plugins__credential-clear')!.click();
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    await element.updateComplete;
+
+    expect(text(line(element, 'conta'), '.plugins__credential-failed')).toBe(
+      translate('en', 'plugins.credential.failed'),
+    );
+    expect(line(element, 'api-token').querySelector('.plugins__credential-failed')).toBeNull();
   });
 });

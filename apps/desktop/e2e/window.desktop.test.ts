@@ -209,7 +209,7 @@ describe('the bridge', () => {
         }
       ).tyto;
       try {
-        await bridge['credentials:set']?.({ account: 42, secret: '' });
+        await bridge['credentials:set']?.({ plugin: 42, key: 'k', secret: '' });
         return 'accepted';
       } catch (error) {
         return (error as Error).message;
@@ -218,7 +218,7 @@ describe('the bridge', () => {
 
     expect(refusal).not.toBe('accepted');
     expect(refusal).toContain('credentials:set');
-    expect(refusal).toContain('account');
+    expect(refusal).toContain('plugin');
   });
 
   it('exposes the channels the contract declares and no others', async () => {
@@ -240,7 +240,7 @@ describe('the bridge', () => {
       'app:locale',
       'brief:preview',
       'credentials:delete',
-      'credentials:get',
+      // No `credentials:get` since TYTO-187: nothing in the renderer may read a secret back.
       'credentials:set',
       'dialog:confirm',
       'dialog:save-changes',

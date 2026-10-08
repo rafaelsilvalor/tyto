@@ -638,7 +638,13 @@ async function start(): Promise<void> {
     // the ordinary way a plugin arrives, and a list cached at startup would never show it.
     plugins: {
       folder: join(pluginsHome, PLUGINS_DIR),
-      list: () => listPlugins([...exporterBuiltIns(), ...host.registry.plugins()], pluginStore),
+      // `has`, never `get`: the screen learns whether a key is set and nothing else (TYTO-187).
+      list: () =>
+        listPlugins(
+          [...exporterBuiltIns(), ...host.registry.plugins()],
+          pluginStore,
+          credentials.has,
+        ),
     },
     panels,
     preview,

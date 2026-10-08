@@ -32,7 +32,13 @@ const svg = {
   origin: 'built-in' as const,
 };
 
-async function installed(name: string, engine = `>=${PLUGIN_API_VERSION}`): Promise<void> {
+const nothingStored = (): Promise<boolean> => Promise.resolve(false);
+
+async function installed(
+  name: string,
+  engine = `>=${PLUGIN_API_VERSION}`,
+  permissions: readonly string[] = ['net:api.example.com'],
+): Promise<void> {
   const folder = join(home, 'plugins', name);
   await mkdir(folder, { recursive: true });
   await writeFile(
@@ -42,7 +48,7 @@ async function installed(name: string, engine = `>=${PLUGIN_API_VERSION}`): Prom
       version: '1.0.0',
       engine,
       contributes: ['exporter'],
-      permissions: ['net:api.example.com'],
+      permissions,
     }),
   );
 }
@@ -57,7 +63,7 @@ afterEach(async () => {
 
 describe('listPlugins', () => {
   it('lists the built-ins first, and nothing else when nothing is installed', async () => {
-    const rows = await listPlugins([svg], fsPluginStore(home));
+    const rows = await listPlugins([svg], fsPluginStore(home), nothingStored);
 
     expect(rows).toEqual([
       {
@@ -68,6 +74,7 @@ describe('listPlugins', () => {
         contributes: ['exporter'],
         permissions: [],
         problems: [],
+        credentials: [],
       },
     ]);
   });
@@ -83,7 +90,7 @@ describe('listPlugins', () => {
       }),
     );
 
-    const rows = await listPlugins([svg], store);
+    const rows = await listPlugins([svg], store, nothingStored);
 
     expect(rows.at(-1)).toMatchObject({
       name: 'pdf',
@@ -96,7 +103,7 @@ describe('listPlugins', () => {
   it('refuses a folder nobody installed, and says why', async () => {
     await installed('solto');
 
-    const rows = await listPlugins([svg], fsPluginStore(home));
+    const rows = await listPlugins([svg], fsPluginStore(home), nothingStored);
 
     expect(rows.at(-1)).toMatchObject({ name: 'solto', status: 'refused', version: null });
     expect(rows.at(-1)?.problems[0]).toMatch(/never recorded it/u);
@@ -113,7 +120,7 @@ describe('listPlugins', () => {
       }),
     );
 
-    const rows = await listPlugins([svg], store);
+    const rows = await listPlugins([svg], store, nothingStored);
 
     expect(rows.at(-1)?.problems).toEqual([
       `Plugin 'velho' needs plugin API >=99, and this Tyto provides plugin API ${PLUGIN_API_VERSION}.`,
@@ -124,7 +131,7 @@ describe('listPlugins', () => {
     await installed('pdf');
     await writeFile(join(home, 'plugins.json'), 'not json');
 
-    const rows = await listPlugins([svg], fsPluginStore(home));
+    const rows = await listPlugins([svg], fsPluginStore(home), nothingStored);
 
     expect(rows.at(-1)).toMatchObject({ name: 'pdf', status: 'refused' });
   });
@@ -141,7 +148,7 @@ describe('listPlugins', () => {
       }),
     );
 
-    expect((await listPlugins([svg], store)).at(-1)).toMatchObject({
+    expect((await listPlugins([svg], store, nothingStored)).at(-1)).toMatchObject({
       name: 'pdf',
       status: 'crashed',
       problems: [
@@ -153,10 +160,35 @@ describe('listPlugins', () => {
     await store.writeState(
       withPluginEntry(EMPTY_PLUGIN_STATE, 'pdf', { ...approved, enabled: false }),
     );
-    expect((await listPlugins([svg], store)).at(-1)).toMatchObject({
+    expect((await listPlugins([svg], store, nothingStored)).at(-1)).toMatchObject({
       status: 'disabled',
       problems: [],
     });
+  });
+});
+
+describe('the credentials a row declares (TYTO-187)', () => {
+  it('says whether each declared key is set, asking by account and never for a value', async () => {
+    const store = fsPluginStore(home);
+    const permissions = ['net:api.example.com', 'credentials:api-token', 'credentials:conta'];
+    await installed('pdf', `>=${PLUGIN_API_VERSION}`, permissions);
+    await store.writeState(
+      withPluginEntry(EMPTY_PLUGIN_STATE, 'pdf', { enabled: true, permissions, source: './pdf' }),
+    );
+    const asked: string[] = [];
+    const isStored = (account: string): Promise<boolean> => {
+      asked.push(account);
+      return Promise.resolve(account === 'plugin:pdf:conta');
+    };
+
+    const rows = await listPlugins([svg], store, isStored);
+
+    expect(rows.at(-1)?.credentials).toEqual([
+      { key: 'api-token', set: false },
+      { key: 'conta', set: true },
+    ]);
+    expect(rows[0]?.credentials).toEqual([]);
+    expect(asked).toEqual(['plugin:pdf:api-token', 'plugin:pdf:conta']);
   });
 });
 
