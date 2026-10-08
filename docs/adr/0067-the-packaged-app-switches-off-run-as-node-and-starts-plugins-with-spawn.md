@@ -1,6 +1,6 @@
 # 0067 — The packaged app switches off RunAsNode, and starts plugins with `spawn`
 
-Status: accepted · 2026-10-07 · TYTO-193 · amends ADR 0050 (the launcher's mechanism, not its
+Status: accepted · 2026-10-07 · TYTO-193 · amended 2026-10-08 by TYTO-241 · amends ADR 0050 (the launcher's mechanism, not its
 decision)
 
 ## Context
@@ -43,19 +43,20 @@ The other fuses were measured against what drives the packaged app.
 The wire of Electron 44 has nine positions. `@electron/fuses` 1.8.0 names eight; the ninth
 prints as `fuse8`.
 
-| Fuse                                    | Packaged     | Why                                                                                                                                                                                                                                                |
-| --------------------------------------- | ------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `RunAsNode`                             | **off**      | Nothing in the app runs Electron as Node once plugins start with `spawn` (below).                                                                                                                                                                  |
-| `EnableNodeOptionsEnvironmentVariable`  | **off**      | Nothing in the app reads `NODE_OPTIONS`, and Playwright deletes it anyway.                                                                                                                                                                         |
-| `EnableNodeCliInspectArguments`         | **on**, kept | `test:package` launches this executable through `_electron.launch`, which passes `--inspect=0` and waits for the debugger's line. With the fuse off that line never comes, so the launch would wait it out (read in Playwright's source, not run). |
-| `GrantFileProtocolExtraPrivileges`      | on, default  | The window and the rasterizer load `file://` pages with `loadFile`. Switching it off means first moving them to a custom protocol, which is a card of its own.                                                                                     |
-| `EnableCookieEncryption`                | off, default | Not measured here. Left open.                                                                                                                                                                                                                      |
-| `EnableEmbeddedAsarIntegrityValidation` | off, default | Not measured here. Left open.                                                                                                                                                                                                                      |
-| `OnlyLoadAppFromAsar`                   | off, default | Not measured here. Left open.                                                                                                                                                                                                                      |
-| `LoadBrowserProcessSpecificV8Snapshot`  | off, default | The app ships no snapshot of its own. Nothing to switch on.                                                                                                                                                                                        |
-| `fuse8` (unnamed by `@electron/fuses`)  | on, default  | Not named by the library that flips the others, so not flipped. Printed in the proof line, so a reader sees it.                                                                                                                                    |
+| Fuse                                    | Packaged          | Why                                                                                                                                                                                                                                                |
+| --------------------------------------- | ----------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `RunAsNode`                             | **off**           | Nothing in the app runs Electron as Node once plugins start with `spawn` (below).                                                                                                                                                                  |
+| `EnableNodeOptionsEnvironmentVariable`  | **off**           | Nothing in the app reads `NODE_OPTIONS`, and Playwright deletes it anyway.                                                                                                                                                                         |
+| `EnableNodeCliInspectArguments`         | **on**, kept      | `test:package` launches this executable through `_electron.launch`, which passes `--inspect=0` and waits for the debugger's line. With the fuse off that line never comes, so the launch would wait it out (read in Playwright's source, not run). |
+| `GrantFileProtocolExtraPrivileges`      | on, default       | The window and the rasterizer load `file://` pages with `loadFile`. Switching it off means first moving them to a custom protocol, which is a card of its own.                                                                                     |
+| `EnableCookieEncryption`                | off, default      | Not measured here. Left open.                                                                                                                                                                                                                      |
+| `EnableEmbeddedAsarIntegrityValidation` | **on** (TYTO-241) | electron-builder writes the hash on Windows and macOS, and Electron refuses an archive that no longer matches it. See "Amended by TYTO-241" below.                                                                                                 |
+| `OnlyLoadAppFromAsar`                   | **on** (TYTO-241) | The app loads only from `app.asar`. The unpacked guest, `resources/node` and the templates are still reached. See "Amended by TYTO-241" below.                                                                                                     |
+| `LoadBrowserProcessSpecificV8Snapshot`  | off, default      | The app ships no snapshot of its own. Nothing to switch on.                                                                                                                                                                                        |
+| `fuse8` (unnamed by `@electron/fuses`)  | on, default       | Not named by the library that flips the others, so not flipped. Printed in the proof line, so a reader sees it.                                                                                                                                    |
 
-`electron-builder.yml` sets the first three under `electronFuses`, with
+`electron-builder.yml` sets the first three, and since TYTO-241 the two asar fuses, under
+`electronFuses`, with
 `resetAdHocDarwinSignature: true`, because flipping a byte breaks the ad-hoc signature an arm64
 macOS binary needs to start.
 

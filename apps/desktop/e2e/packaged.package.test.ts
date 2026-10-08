@@ -1,5 +1,6 @@
 import { execFileSync } from 'node:child_process';
 import {
+  cpSync,
   existsSync,
   mkdirSync,
   mkdtempSync,
@@ -10,7 +11,7 @@ import {
 } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { createRequire } from 'node:module';
-import { dirname, join } from 'node:path';
+import { dirname, join, relative } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 import { FuseV1Options, getCurrentFuseWire } from '@electron/fuses';
@@ -18,8 +19,10 @@ import { PLUGIN_API_VERSION } from '@tyto/plugin-api';
 import { type ElectronApplication, type Page, _electron } from 'playwright';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 
+import { swapWhitespaceByte } from './asar-patch.js';
 import { closeApp } from './close-app.js';
 import { firstWindow } from './first-window.js';
+import { probeLaunch } from './launch-probe.js';
 import { probeRunAsNode } from './run-as-node-probe.js';
 
 /**
@@ -67,9 +70,7 @@ const built = join(projectDirectory, 'out', 'main', 'index.js');
  * binary is named after `productName` everywhere except Linux, where `electron-builder.yml`
  * has to set `executableName` because the packager would otherwise use the npm package name.
  */
-function packagedExecutable(): string {
-  const release = join(projectDirectory, 'release');
-
+function packagedExecutable(release = join(projectDirectory, 'release')): string {
   if (process.platform === 'win32') return join(release, 'win-unpacked', 'Tyto.exe');
   if (process.platform === 'linux') return join(release, 'linux-unpacked', 'tyto');
 
@@ -482,4 +483,71 @@ describe('the packaged app', () => {
     // without its `1`, so this is what tells "ignored the variable" from "never got to answer".
     expect(packaged.ended).toBe('killed');
   }, 60_000);
+
+  it('refuses a modified app.asar wherever electron-builder wrote its hash (TYTO-241)', async () => {
+    // **The two fuses this card switched on, read off the wire first.** `OnlyLoadAppFromAsar`
+    // has no test of its own: every test above ran with it on, and the TYTO-48, TYTO-189 and
+    // TYTO-186 lines are what it could have broken, since `asarUnpack`, `extraResources` and
+    // the bundled Node all sit outside the archive.
+    const wire = await getCurrentFuseWire(packagedExecutable());
+    const state = (fuse: FuseV1Options): string =>
+      (wire[fuse] as unknown as number | undefined) === 49 ? 'on' : 'off';
+    const integrity = state(FuseV1Options.EnableEmbeddedAsarIntegrityValidation);
+    const asarOnly = state(FuseV1Options.OnlyLoadAppFromAsar);
+
+    // **A copy, so the build the other tests use is never the one patched.** The app from
+    // `beforeAll` still has the original archive open, and Windows will not always let it be
+    // written; patching a copy also means nothing has to be put back for a later test.
+    const release = join(projectDirectory, 'release');
+    const copy = join(scratch, 'release-copy');
+    cpSync(release, copy, { recursive: true, verbatimSymlinks: true });
+    const executable = packagedExecutable(copy);
+    const archive =
+      process.platform === 'darwin'
+        ? join(dirname(executable), '..', 'Resources', 'app.asar')
+        : join(dirname(executable), 'resources', 'app.asar');
+
+    // The positive control: the intact copy boots, so a refusal below is the patch's doing and
+    // not the copy's.
+    const intact = await probeLaunch(executable, {
+      userData: join(scratch, 'integrity-intact-data'),
+      home: join(scratch, 'tyto-home'),
+      deadlineMs: 15_000,
+    });
+
+    const unpatched = readFileSync(archive);
+    const patch = swapWhitespaceByte(unpatched, 'out/main/index.js');
+    writeFileSync(archive, patch.bytes);
+    const patched = await probeLaunch(executable, {
+      userData: join(scratch, 'integrity-patched-data'),
+      home: join(scratch, 'tyto-home'),
+      deadlineMs: 15_000,
+    });
+
+    // Said rather than assumed: the archive the other tests launched is still byte for byte the
+    // one electron-builder wrote.
+    const untouched = readFileSync(join(release, relative(copy, archive))).equals(unpatched);
+    process.stdout.write(
+      `[TYTO-241] packaged fuses on ${process.platform}: ` +
+        `EnableEmbeddedAsarIntegrityValidation=${integrity} OnlyLoadAppFromAsar=${asarOnly}\n` +
+        `[TYTO-241] asar integrity on ${process.platform}: intact copy → ${intact.ended} ` +
+        `(code ${String(intact.code)}); 1 whitespace byte of out/main/index.js swapped at ` +
+        `archive offset ${String(patch.archiveOffset)} → ${patched.ended} ` +
+        `(code ${String(patched.code)}, signal ${String(patched.signal)}); ` +
+        `original release archive untouched → ${String(untouched)}\n` +
+        `[TYTO-241] patched stderr tail: ${JSON.stringify(patched.stderrTail.slice(-400))}\n`,
+    );
+
+    expect(integrity).toBe('on');
+    expect(asarOnly).toBe('on');
+    expect(untouched).toBe(true);
+    expect(intact.ended).toBe('killed');
+    // **Linux is measured and printed, not asserted.** electron-builder 26 writes the hash
+    // into the Windows executable's resources and the macOS `Info.plist`, and nowhere on
+    // Linux, so there is nothing for Electron to check the archive against (ADR 0067).
+    if (process.platform !== 'linux') {
+      expect(patched.ended).toBe('exited');
+      expect(patched.code).not.toBe(0);
+    }
+  }, 120_000);
 });

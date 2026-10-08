@@ -7,6 +7,13 @@ export default defineConfig({
     // `packages/raster` makes for its visual suite. `pnpm test:desktop` runs it from its
     // own config. `launch-isolation` is the exception that proves it: it reads the suites'
     // source and launches nothing, so every pull request runs it (TYTO-139).
-    include: ['shared/**/*.test.ts', 'src/**/*.test.ts', 'e2e/launch-isolation.test.ts'],
+    // `asar-patch` is pure byte work for the packaged suite, and is checked here for the same
+    // reason (TYTO-241).
+    include: [
+      'shared/**/*.test.ts',
+      'src/**/*.test.ts',
+      'e2e/launch-isolation.test.ts',
+      'e2e/asar-patch.test.ts',
+    ],
   },
 });

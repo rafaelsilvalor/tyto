@@ -79,12 +79,24 @@ asarUnpack:
 #   Playwright's `_electron.launch`, which always passes `--inspect=0` and waits for Node's
 #   `Debugger listening on` line; with the fuse off that line never comes and the launch hangs.
 #
+# **Two more are switched on** (TYTO-241, ADR 0067):
+#
+# - `enableEmbeddedAsarIntegrityValidation`: on. electron-builder writes the archive's hash
+#   into `Tyto.exe`'s resources and into the macOS `Info.plist`, and Electron then refuses an
+#   `app.asar` that no longer matches it. **Linux gets no hash**, so there the fuse checks
+#   nothing; the packaged test prints that rather than asserting a refusal.
+# - `onlyLoadAppFromAsar`: on. The app is only looked for in `app.asar`, never in an `app/`
+#   folder put beside it. The unpacked guest, `resources/node` and the templates are files
+#   the app reads, not where it loads from, and the packaged test still reaches all three.
+#
 # The others stay at Electron's default; ADR 0067 gives the reason for each.
 # `e2e/packaged.package.test.ts` reads the wire back out of the packaged executable.
 electronFuses:
   runAsNode: false
   enableNodeOptionsEnvironmentVariable: false
   enableNodeCliInspectArguments: true
+  enableEmbeddedAsarIntegrityValidation: true
+  onlyLoadAppFromAsar: true
   # Flipping a byte breaks the ad-hoc signature an arm64 macOS binary must carry to start.
   resetAdHocDarwinSignature: true
 
