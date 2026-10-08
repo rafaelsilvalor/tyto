@@ -1,6 +1,6 @@
 # 0067 — The packaged app switches off RunAsNode, and starts plugins with `spawn`
 
-Status: accepted · 2026-10-07 · TYTO-193 · amended 2026-10-08 by TYTO-241 · amends ADR 0050 (the launcher's mechanism, not its
+Status: accepted · 2026-10-07 · TYTO-193 · amended 2026-10-08 by TYTO-241 and TYTO-249 · amends ADR 0050 (the launcher's mechanism, not its
 decision)
 
 ## Context
@@ -43,17 +43,17 @@ The other fuses were measured against what drives the packaged app.
 The wire of Electron 44 has nine positions. `@electron/fuses` 1.8.0 names eight; the ninth
 prints as `fuse8`.
 
-| Fuse                                    | Packaged          | Why                                                                                                                                                                                                                                                |
-| --------------------------------------- | ----------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `RunAsNode`                             | **off**           | Nothing in the app runs Electron as Node once plugins start with `spawn` (below).                                                                                                                                                                  |
-| `EnableNodeOptionsEnvironmentVariable`  | **off**           | Nothing in the app reads `NODE_OPTIONS`, and Playwright deletes it anyway.                                                                                                                                                                         |
-| `EnableNodeCliInspectArguments`         | **on**, kept      | `test:package` launches this executable through `_electron.launch`, which passes `--inspect=0` and waits for the debugger's line. With the fuse off that line never comes, so the launch would wait it out (read in Playwright's source, not run). |
-| `GrantFileProtocolExtraPrivileges`      | on, default       | The window and the rasterizer load `file://` pages with `loadFile`. Switching it off means first moving them to a custom protocol, which is a card of its own.                                                                                     |
-| `EnableCookieEncryption`                | off, default      | Not measured here. Left open.                                                                                                                                                                                                                      |
-| `EnableEmbeddedAsarIntegrityValidation` | **on** (TYTO-241) | electron-builder writes the hash on Windows and macOS, and Electron refuses an archive that no longer matches it. See "Amended by TYTO-241" below.                                                                                                 |
-| `OnlyLoadAppFromAsar`                   | **on** (TYTO-241) | The app loads only from `app.asar`. The unpacked guest, `resources/node` and the templates are still reached. See "Amended by TYTO-241" below.                                                                                                     |
-| `LoadBrowserProcessSpecificV8Snapshot`  | off, default      | The app ships no snapshot of its own. Nothing to switch on.                                                                                                                                                                                        |
-| `fuse8` (unnamed by `@electron/fuses`)  | on, default       | Not named by the library that flips the others, so not flipped. Printed in the proof line, so a reader sees it.                                                                                                                                    |
+| Fuse                                    | Packaged           | Why                                                                                                                                                            |
+| --------------------------------------- | ------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `RunAsNode`                             | **off**            | Nothing in the app runs Electron as Node once plugins start with `spawn` (below).                                                                              |
+| `EnableNodeOptionsEnvironmentVariable`  | **off**            | Nothing in the app reads `NODE_OPTIONS`, and Playwright deletes it anyway.                                                                                     |
+| `EnableNodeCliInspectArguments`         | **off** (TYTO-249) | `test:package` drives the packaged app over CDP, not `_electron.launch`. See "Amended by TYTO-249" below.                                                      |
+| `GrantFileProtocolExtraPrivileges`      | on, default        | The window and the rasterizer load `file://` pages with `loadFile`. Switching it off means first moving them to a custom protocol, which is a card of its own. |
+| `EnableCookieEncryption`                | off, default       | Not measured here. Left open.                                                                                                                                  |
+| `EnableEmbeddedAsarIntegrityValidation` | **on** (TYTO-241)  | electron-builder writes the hash on Windows and macOS, and Electron refuses an archive that no longer matches it. See "Amended by TYTO-241" below.             |
+| `OnlyLoadAppFromAsar`                   | **on** (TYTO-241)  | The app loads only from `app.asar`. The unpacked guest, `resources/node` and the templates are still reached. See "Amended by TYTO-241" below.                 |
+| `LoadBrowserProcessSpecificV8Snapshot`  | off, default       | The app ships no snapshot of its own. Nothing to switch on.                                                                                                    |
+| `fuse8` (unnamed by `@electron/fuses`)  | on, default        | Not named by the library that flips the others, so not flipped. Printed in the proof line, so a reader sees it.                                                |
 
 `electron-builder.yml` sets the first three, and since TYTO-241 the two asar fuses, under
 `electronFuses`, with
@@ -136,13 +136,53 @@ work over `chromium.connectOverCDP`, and CDP `Browser.close` ended the process w
 
 - **Run as Node, the packaged Tyto is no longer a Node.** A program that sets the variable gets
   the app, isolated or not, and no `-e`.
-- **The inspect arguments are still honoured.** A local program can start `Tyto.exe --inspect`
-  and attach a debugger to main. That is what the test harness needs today. Closing it means
-  driving `test:package` without Playwright's `_electron`, through CDP on
-  `--remote-debugging-port`, which is a Chromium switch that no fuse gates.
+- **The inspect arguments are ignored since TYTO-249.** A local program can no longer start
+  `Tyto.exe --inspect` and run code in main. It can still start it with
+  `--remote-debugging-port`, which no fuse gates, and drive the window and the bridge. See
+  "Amended by TYTO-249".
 - **An Electron bump can add fuses.** The proof line prints every position, and the wire assertion
   fails if one of the three set here moves. A new fuse shows up as `fuseN` in the log; it is not
   a red test.
 - **macOS packaging is not measured by a pull request.** `desktop.yml` packages on macOS only
   for a `desktop-v*` tag. `resetAdHocDarwinSignature` is set from the library's documentation,
   not from a run.
+
+## Amended by TYTO-249: the inspect fuse is off, and `test:package` drives the app over CDP
+
+**`EnableNodeCliInspectArguments` is off.** It was the last fuse kept on, for the test harness
+alone. `test:package` now starts the packaged executable itself, with its own `--user-data-dir`,
+`TYTO_HOME` and `--remote-debugging-port=0`, reads the port out of `DevToolsActivePort`, and
+connects with Playwright's `chromium.connectOverCDP` (`e2e/cdp-app.ts`). Every assertion it made
+through `_electron` it now makes on the CDP page: the window count, `app:info`, and the
+`[TYTO-48]`, `[TYTO-189]` and `[TYTO-186]` bridge calls. The `[TYTO-193]` and `[TYTO-241]` tests
+never used `_electron`.
+
+**What the reduction is, plainly.** A local program can no longer run code in main through
+`--inspect`. That is all. `--remote-debugging-port` is a Chromium switch and stays available to
+anybody who can start `Tyto.exe`, and it reaches the window's page and, through it, the bridge:
+every channel the renderer can call. It does not reach main's Node. "Nothing can drive the app"
+is not what this fuse buys.
+
+**The harness quits through the quit guard, measured before it was chosen.** On Electron 44,
+with an unsaved tab, CDP `Browser.close` left the app running at 10 s, held by the quit
+question (ADR 0031, ADR 0039); with a clean tab it exited with code 0 in 85 ms. A page's own
+`window.close()` did not go through the guard: with the same unsaved tab the app exited in
+93 ms. That is a product finding of its own and is not changed here. So the harness quits with
+`Browser.close`, and `test:package` has a test that an unsaved tab holds that exact call in the
+packaged app. Swapping the call for `window.close()` turned that test red.
+
+**`closeApp`'s answer to the quit box has no replacement, on purpose.** It ran in main through
+`app.evaluate`, which needs the inspector. No packaged test opens or edits a tab, so the guard
+asks the page, the clean page answers at once, and no box is drawn. If a later test leaves text
+behind, the close waits 30 s (the guard's acknowledgement deadline), kills the process tree and
+fails with a message that names the guard. A test-only switch in the shipped binary would have
+bought nothing the packaged suite uses.
+
+**The proof** is in `e2e/packaged.package.test.ts`, line `[TYTO-249]`. The Electron in
+`node_modules`, started as the app with `--inspect=0`, must print `Debugger listening on`. That is
+the positive control, through the same `probeLaunch`. The packaged executable, started the same
+way, must print no such line and still be running at a 15 s deadline, which means it booted and
+ignored the switch rather than refusing to start. The wire assertion reads the fuse as off.
+
+`test:desktop` still launches through `_electron`. It runs the Electron in `node_modules`, which
+no fuse touches, and its quit suite and `closeApp` need `app.evaluate` in main.
