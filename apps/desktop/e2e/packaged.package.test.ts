@@ -16,14 +16,21 @@ import { fileURLToPath } from 'node:url';
 
 import { FuseV1Options, getCurrentFuseWire } from '@electron/fuses';
 import { PLUGIN_API_VERSION } from '@tyto/plugin-api';
-import { type ElectronApplication, type Page, _electron } from 'playwright';
+import type { Page } from 'playwright';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 
 import { swapWhitespaceByte } from './asar-patch.js';
-import { closeApp } from './close-app.js';
-import { firstWindow } from './first-window.js';
+import {
+  type CdpApp,
+  closeOverCdp,
+  launchOverCdp,
+  requestQuit,
+  survivorsOf,
+  waitForExit,
+  windowPages,
+} from './cdp-app.js';
 import { probeLaunch } from './launch-probe.js';
-import { probeRunAsNode } from './run-as-node-probe.js';
+import { killTree, probeRunAsNode } from './run-as-node-probe.js';
 
 /**
  * The installer's app, launched.
@@ -83,7 +90,7 @@ function packagedExecutable(release = join(projectDirectory, 'release')): string
   return join(release, macDirectory, 'Tyto.app', 'Contents', 'MacOS', 'Tyto');
 }
 
-let app: ElectronApplication;
+let app: CdpApp | undefined;
 let page: Page;
 let scratch: string;
 
@@ -234,26 +241,33 @@ beforeAll(async () => {
   scratch = mkdtempSync(join(tmpdir(), 'tyto-packaged-'));
   writeHome(join(scratch, 'tyto-home'));
 
-  app = await _electron.launch({
-    executablePath: packagedExecutable(),
-    // Its own data folder and its own `TYTO_HOME`, so the packaged app neither reads nor
-    // writes the machine's (TYTO-150, TYTO-48).
-    args: [`--user-data-dir=${join(scratch, 'user-data')}`],
-    // The same flag `window.desktop.test.ts` uses.
-    env: { ...process.env, TYTO_HEADLESS: '1', TYTO_HOME: join(scratch, 'tyto-home') },
+  // Over CDP and not `_electron.launch`, which needs the inspect fuse this build switches off
+  // (TYTO-249, ADR 0067). Its own data folder and its own `TYTO_HOME`, so the packaged app
+  // neither reads nor writes the machine's (TYTO-150, TYTO-48).
+  app = await launchOverCdp(packagedExecutable(), {
+    userData: join(scratch, 'user-data'),
+    home: join(scratch, 'tyto-home'),
   });
-  page = await firstWindow(app);
-  // The editor and not the bridge (TYTO-175, TYTO-154's rule). `window.tyto` is put on the page
-  // by the preload, before a line of the renderer has run, so waiting for it answered _is the
+  page = app.page;
+  // `launchOverCdp` waits for the editor and not the bridge (TYTO-175, TYTO-154's rule).
+  // `window.tyto` is put on the page by the preload, before a line of the renderer has run, so waiting for it answered _is the
   // preload there_ and then handed a half-loaded window to `afterAll`, which quits it. That
   // quit reaching a page with no listener is a product question and ADR 0039 settled it; this
   // wait is what keeps the suite from asking it by accident. Measured on CI with the renderer
   // slowed by 2.5 s between the exit listener and the editor mount: see the PR for TYTO-175.
-  await page.waitForSelector('#editor .cm-content');
 });
 
 afterAll(async () => {
-  await closeApp(app);
+  // Through the quit guard, which a dirty tab is shown to hold below; a clean window answers it
+  // at once. `closeOverCdp` says why if it does not (TYTO-249).
+  const ending = await closeOverCdp(app);
+  if (app !== undefined) {
+    process.stdout.write(
+      `[TYTO-249] packaged app quit through Browser.close and the quit guard: ` +
+        `${ending.ended}, code ${String(ending.ended === 'exited' ? ending.code : null)}, ` +
+        `in ${String(ending.ms)} ms\n`,
+    );
+  }
   rmSync(scratch, { recursive: true, force: true });
 });
 
@@ -263,7 +277,7 @@ describe('the packaged app', () => {
     // the shape the packaging failure takes: not a wrong answer, an app that never gets far
     // enough to be asked. Reading it as "no first window" instead of as a timeout inside a
     // longer test is the difference between a diagnosis and a flake.
-    expect(app.windows()).toHaveLength(1);
+    expect(windowPages(app!.browser)).toHaveLength(1);
   });
 
   it('finds the built-in template pack through the asar', async () => {
@@ -476,8 +490,9 @@ describe('the packaged app', () => {
     expect(control.printedOne).toBe(true);
     expect(state(FuseV1Options.RunAsNode)).toBe('off');
     expect(state(FuseV1Options.EnableNodeOptionsEnvironmentVariable)).toBe('off');
-    // On for `_electron.launch` above, which passes `--inspect=0` (ADR 0067).
-    expect(state(FuseV1Options.EnableNodeCliInspectArguments)).toBe('on');
+    // Off since TYTO-249: the suite drives the app over CDP, and the TYTO-249 test below shows
+    // the switch it gated is ignored.
+    expect(state(FuseV1Options.EnableNodeCliInspectArguments)).toBe('off');
     expect(packaged.printedOne).toBe(false);
     // Still running at the deadline means it booted as the app. A Node exits at once, with or
     // without its `1`, so this is what tells "ignored the variable" from "never got to answer".
@@ -549,5 +564,83 @@ describe('the packaged app', () => {
       expect(patched.ended).toBe('exited');
       expect(patched.code).not.toBe(0);
     }
+  }, 120_000);
+
+  it('quits through the quit guard when the harness closes it over CDP (TYTO-249)', async () => {
+    // **The harness's own quit, held by a dirty tab.** `afterAll` quits with this same
+    // `requestQuit`, and a clean window lets it through at once. Without this test that exit
+    // would prove nothing about the guard: a close that skipped it ends the app the same way.
+    // A page's `window.close()` was measured to do exactly that. A second launch, so the app
+    // the other tests use is never left holding a question.
+    const dirty = await launchOverCdp(packagedExecutable(), {
+      userData: join(scratch, 'guard-data'),
+      home: join(scratch, 'tyto-home'),
+    });
+    let ending: Awaited<ReturnType<typeof waitForExit>>;
+    let markers: number;
+    try {
+      await dirty.page.click('#editor .cm-content');
+      await dirty.page.keyboard.type('sujo');
+      await dirty.page.waitForSelector('.tabs__dirty');
+      markers = await dirty.page.locator('.tabs__dirty').count();
+      await requestQuit(dirty);
+      ending = await waitForExit(dirty, 5_000);
+    } finally {
+      // The box is up, in front of nobody: the process tree is ended here, and checked.
+      killTree(dirty.child.pid);
+      await dirty.browser.close().catch(() => {});
+    }
+    await dirty.exited;
+    const left = await survivorsOf(dirty.child.pid);
+    process.stdout.write(
+      `[TYTO-249] packaged app, ${String(markers)} unsaved tab(s), Browser.close → ` +
+        `${ending.ended} at ${String(ending.ms)} ms` +
+        `${ending.ended === 'exited' ? ` (code ${String(ending.code)})` : ''}; ` +
+        `process group after the kill → ${JSON.stringify(left ?? 'not measured')}\n`,
+    );
+
+    expect(markers).toBe(1);
+    expect(ending.ended).toBe('still running');
+    if (left !== undefined) expect(left).toEqual([]);
+  }, 120_000);
+
+  it('ignores --inspect, and the probe that says so sees a debugger elsewhere (TYTO-249)', async () => {
+    // **The positive control first, through the same probe.** The Electron in `node_modules`,
+    // which no fuse has touched, started as this app with `--inspect=0`, must print Node's
+    // `Debugger listening on`. Without that, a missing line in the packaged run below could be
+    // a probe that never read stderr.
+    const control = await probeLaunch(createRequire(import.meta.url)('electron') as string, {
+      userData: join(scratch, 'inspect-control-data'),
+      home: join(scratch, 'tyto-home'),
+      deadlineMs: 15_000,
+      before: ['--inspect=0'],
+      after: [projectDirectory],
+    });
+    const packaged = await probeLaunch(packagedExecutable(), {
+      userData: join(scratch, 'inspect-packaged-data'),
+      home: join(scratch, 'tyto-home'),
+      deadlineMs: 15_000,
+      before: ['--inspect=0'],
+    });
+
+    const wire = await getCurrentFuseWire(packagedExecutable());
+    const inspect =
+      (wire[FuseV1Options.EnableNodeCliInspectArguments] as unknown as number) === 49
+        ? 'on'
+        : 'off';
+    process.stdout.write(
+      `[TYTO-249] packaged fuse EnableNodeCliInspectArguments=${inspect}\n` +
+        `[TYTO-249] control: unfused node_modules Electron --inspect=0 printed "Debugger ` +
+        `listening" → ${String(control.debuggerListening)} (${control.ended})\n` +
+        `[TYTO-249] <packaged exe> --inspect=0 printed "Debugger listening" → ` +
+        `${String(packaged.debuggerListening)} (${packaged.ended}, code ${String(packaged.code)})\n`,
+    );
+
+    expect(control.debuggerListening).toBe(true);
+    expect(inspect).toBe('off');
+    expect(packaged.debuggerListening).toBe(false);
+    // Still running at the deadline: it booted as the app and ignored the switch, rather than
+    // refusing to start, which would also print no line.
+    expect(packaged.ended).toBe('killed');
   }, 120_000);
 });
