@@ -1,5 +1,6 @@
 // @vitest-environment jsdom
 import { insertNewlineAndIndent, undo as undoCommand } from '@codemirror/commands';
+import { forceParsing } from '@codemirror/language';
 import { type StateEffect } from '@codemirror/state';
 import { EditorView } from '@codemirror/view';
 import { afterEach, describe, expect, it } from 'vitest';
@@ -28,6 +29,28 @@ afterEach(() => {
   handle = undefined;
   document.body.replaceChildren();
 });
+
+/**
+ * Let the parser reach the end of the document before reading what it painted (TYTO-242).
+ *
+ * CodeMirror parses a new state with a 20 ms wall-clock budget and paints whatever tree the
+ * budget bought. A CI worker descheduled inside those 20 ms paints a cut tree — seen as
+ * `'**Constitucional'` where the whole token was expected — with nothing wrong in the
+ * language. `forceParsing` resumes the parse and dispatches the longer tree to the view, so
+ * the highlighter repaints from it.
+ *
+ * Bounded by a count, not a time. Idle, the first call reports the parse complete; with a
+ * stand-in clock that advances 50 ms per read, so every budget lapses after one step, the
+ * one-line document here needed 3. The case is about which language paints,
+ * not about reaching past a window, so parsing in the test hides nothing it guards.
+ */
+const PARSE_ATTEMPTS = 100;
+
+const parseToTheEnd = (editor: EditorHandle): void => {
+  for (let attempt = 1; attempt <= PARSE_ATTEMPTS; attempt += 1) {
+    if (forceParsing(editor.view, editor.view.state.doc.length)) return;
+  }
+};
 
 /** What a person typing does, as opposed to what `setValue` does. */
 const type = (editor: EditorHandle, text: string): void => {
@@ -156,6 +179,7 @@ describe('createEditor', () => {
   it('paints the brief language, not plain text', () => {
     const { parent } = open();
     handle = createEditor(parent, { doc: '::titulo Direito **Constitucional**\n' });
+    parseToTheEnd(handle);
 
     const painted = [...parent.querySelectorAll('.cm-line span')].map((span) => span.textContent);
 
