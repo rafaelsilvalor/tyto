@@ -1,4 +1,4 @@
-import { mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync } from 'node:fs';
+import { mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync } from 'node:fs';
 import { createRequire } from 'node:module';
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
@@ -173,6 +173,45 @@ describe('the export service', () => {
     expect(progress.result?.status).toBe('error');
     expect(readdirSync(out).sort()).toEqual(['assets', 'editaveis', 'grid-01.svg', 'grid-02.svg']);
   }, 60_000);
+
+  // TYTO-243: a folder where the delivery writes a file. Was `failure: "EPERM … rename"`.
+  it.each([
+    ['the copied brief', ['editaveis', 'agenda.brief']],
+    ['template.txt', ['editaveis', 'template.txt']],
+    ['an image in assets/', ['assets', 'calendario.png']],
+    ['result.json', ['editaveis', 'result.json']],
+  ])(
+    'answers a folder holding %s with a diagnostic, not a failure',
+    async (_, segments) => {
+      const held = join(out, ...segments);
+      mkdirSync(held, { recursive: true });
+      const { exportId } = await service.start({
+        brief: exampleBrief('agenda-semana', 'agenda.brief'),
+        directory: out,
+        briefDirectory: join(packDirectory, 'agenda-semana', 'examples'),
+        label: 'agenda',
+        outputs: [{ kind: 'svg' }],
+        delivery: true,
+      });
+
+      const progress = await settled(exportId);
+
+      expect(progress.failure).toBeUndefined();
+      expect(progress.status).toBe('finished');
+      // Errors only, for the W_FONT_SUBSTITUTED the CI's Linux adds beside a run that renders.
+      expect(
+        progress.diagnostics
+          .filter((item) => item.severity === 'error')
+          .map((item) => [item.code, item.message]),
+      ).toEqual([
+        [
+          'E_OUTPUT_FILE_BLOCKED',
+          `'${held}' is a folder, and Tyto needs to write a file with that name. Rename or move the folder, or write somewhere else.`,
+        ],
+      ]);
+    },
+    60_000,
+  );
 
   it('answers with a plan before it answers with files', async () => {
     // The whole reason progress is pollable. `total` arrives from the job's `planned` event,

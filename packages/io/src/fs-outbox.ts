@@ -81,9 +81,10 @@ export interface ReusableTaskOutput extends TaskOutput {
 export interface DeliveryOutput extends ReusableTaskOutput {
   /**
    * Writes {@link TEMPLATE_FILE}. Call it **before** `finish`, so `result.json` stays the
-   * last file to appear and keeps meaning "this delivery is complete".
+   * last file to appear and keeps meaning "this delivery is complete". Answers
+   * `E_OUTPUT_FILE_BLOCKED` when a folder holds the name, which belongs in that `result.json`.
    */
-  describeTemplate(template: DeliveryTemplate): Promise<void>;
+  describeTemplate(template: DeliveryTemplate): Promise<Diagnostics>;
 
   /**
    * Copies every image the brief resolved into `assets/` beside the artwork, points the
@@ -142,16 +143,63 @@ export interface FsOutboxOptions {
  * or the desktop queue panel — would otherwise be able to pick up a truncated image and
  * have no way to tell.
  */
-async function writeAtomic(path: string, bytes: Uint8Array | string): Promise<void> {
+async function writeAtomic(
+  path: string,
+  bytes: Uint8Array | string,
+): Promise<Diagnostic | undefined> {
+  return placeAtomic(path, (temporary) => writeFile(temporary, bytes));
+}
+
+/** `writeAtomic` for a file that is already on disk: copied to `.part`, then renamed. */
+async function copyAtomic(from: string, to: string): Promise<Diagnostic | undefined> {
+  return placeAtomic(to, (temporary) => copyFile(from, temporary));
+}
+
+/**
+ * Fills `<path>.part`, renames it over `path`, and answers `E_OUTPUT_FILE_BLOCKED` when a
+ * folder holds `path`; every other failure is thrown (TYTO-243).
+ *
+ * The mirror of {@link makeFolder}, and decided the same way: **by looking, not by the error
+ * code.** Windows answers a rename onto a folder with `EPERM`, which is also what it says for
+ * a file another program holds open, and only the second can go away by itself. So the name
+ * is asked what it is once the write has failed. Anything but a file there fails the same way
+ * on every attempt until somebody moves it, which is exit 1; a file (held, or read-only) or
+ * nothing at all keeps the throw, and with it exit 2. `lstat`, because a link is not a file
+ * this could have written into either.
+ *
+ * Not `renameRetryingLocks`: the lock that one waits out is the queue reading its own inbox,
+ * and nothing in Tyto reads a delivery while it is being written. So a folder in the way is
+ * answered at once, without the retry window.
+ *
+ * `move` is the seam a test uses to stand in for a failure it cannot cause from Node.
+ */
+export async function placeAtomic(
+  path: string,
+  fill: (temporary: string) => Promise<void>,
+  move: (from: string, to: string) => Promise<void> = rename,
+): Promise<Diagnostic | undefined> {
   const temporary = `${path}.part`;
   try {
-    await writeFile(temporary, bytes);
-    await rename(temporary, path);
+    await fill(temporary);
+    await move(temporary, path);
+    return undefined;
   } catch (cause) {
     // A failed write must not leave the scratch file behind pretending to be output.
     await rm(temporary, { force: true }).catch(() => undefined);
-    throw cause;
+    const found = await lstat(path).catch(() => undefined);
+    if (found === undefined || found.isFile()) throw cause;
+    return diagnostic('E_OUTPUT_FILE_BLOCKED', { path });
   }
+}
+
+/**
+ * {@link writeAtomic} behind a port that can only reject: the blocked answer becomes the
+ * rejection's text, so the `E_OUTPUT_WRITE` the job turns it into still names the folder and
+ * what to do. Its full stop is dropped, because that code's own sentence ends with one.
+ */
+async function writeOrReject(path: string, bytes: Uint8Array): Promise<void> {
+  const blocked = await writeAtomic(path, bytes);
+  if (blocked !== undefined) throw new Error(blocked.message.replace(/\.$/, ''));
 }
 
 export interface FsTaskOutputOptions {
@@ -230,10 +278,12 @@ async function taskOutput(directories: TaskOutputDirectories): Promise<ReusableT
     },
 
     async write(artifact: Artifact): Promise<void> {
-      await writeAtomic(join(directories.artifacts, artifact.name), artifact.bytes);
+      // The pipeline's `ArtifactSink` rejects by contract and the job turns the rejection into
+      // `E_OUTPUT_WRITE`, already an error; only the text is this adapter's to choose.
+      await writeOrReject(join(directories.artifacts, artifact.name), artifact.bytes);
     },
 
-    async finish(result: RenderResult): Promise<void> {
+    async finish(result: RenderResult): Promise<Diagnostics> {
       if (validate) {
         const parsed = renderResultSchema.safeParse(result);
         if (!parsed.success) {
@@ -247,10 +297,11 @@ async function taskOutput(directories: TaskOutputDirectories): Promise<ReusableT
 
       // Last, and atomically. `result.json` appearing is how a reader knows the task is
       // finished, so it must not appear before the artifacts it lists.
-      await writeAtomic(
+      const blocked = await writeAtomic(
         join(directories.result, RESULT_FILE),
         `${JSON.stringify(result, null, 2)}\n`,
       );
+      return blocked === undefined ? [] : [blocked];
     },
   };
 }
@@ -325,7 +376,8 @@ export async function fsDeliveryOutput(
 
   // Before any artifact, so a run that dies half way still shows what it was rendering.
   // `result.json` is the finished signal and is still the last thing written.
-  await writeAtomic(briefPath, options.brief);
+  const briefBlocked = await writeAtomic(briefPath, options.brief);
+  if (briefBlocked !== undefined) return err([briefBlocked]);
 
   return ok({
     ...(await taskOutput({
@@ -337,8 +389,9 @@ export async function fsDeliveryOutput(
       removeLeftovers: true,
     })),
 
-    async describeTemplate(template: DeliveryTemplate): Promise<void> {
-      await writeAtomic(join(editable, TEMPLATE_FILE), templateNote(template));
+    async describeTemplate(template: DeliveryTemplate): Promise<Diagnostics> {
+      const blocked = await writeAtomic(join(editable, TEMPLATE_FILE), templateNote(template));
+      return blocked === undefined ? [] : [blocked];
     },
 
     async deliverAssets(assets: readonly DeliveredAsset[]): Promise<Diagnostics> {
@@ -348,17 +401,29 @@ export async function fsDeliveryOutput(
         const held = await makeFolder(directory);
         if (held !== undefined) return [held];
       }
-      for (const [path, name] of names) await copyAtomic(path, join(directory, name));
+      const blocked: Diagnostic[] = [];
+      const copied = new Set<string>();
+      for (const [path, name] of names) {
+        const held = await copyAtomic(path, join(directory, name));
+        if (held === undefined) copied.add(path);
+        else blocked.push(held);
+      }
 
+      // Only what reached `assets/`: an image a folder kept out keeps the path that resolved,
+      // rather than the copied brief naming a file that is not there.
       const renames = new Map<string, string>();
       for (const asset of assets) {
         const name = names.get(asset.path);
-        if (name !== undefined) renames.set(asset.reference, name);
+        if (name !== undefined && copied.has(asset.path)) renames.set(asset.reference, name);
       }
       const source = new TextDecoder().decode(options.brief);
-      await writeAtomic(briefPath, rewriteFrontmatterValues(source, renames));
+      const rewritten = await writeAtomic(briefPath, rewriteFrontmatterValues(source, renames));
+      if (rewritten !== undefined) blocked.push(rewritten);
 
-      return removeAssetLeftovers(directory, previousAssets, new Set(names.values()));
+      return [
+        ...blocked,
+        ...(await removeAssetLeftovers(directory, previousAssets, new Set(names.values()))),
+      ];
     },
   });
 }
@@ -420,18 +485,6 @@ function deliveredNames(assets: readonly DeliveredAsset[]): Map<string, string> 
     names.set(path, name);
   }
   return names;
-}
-
-/** `writeAtomic` for a file that is already on disk: copied to `.part`, then renamed. */
-async function copyAtomic(from: string, to: string): Promise<void> {
-  const temporary = `${to}.part`;
-  try {
-    await copyFile(from, temporary);
-    await rename(temporary, to);
-  } catch (cause) {
-    await rm(temporary, { force: true }).catch(() => undefined);
-    throw cause;
-  }
 }
 
 /**

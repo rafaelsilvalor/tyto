@@ -276,6 +276,21 @@ export async function renderTask(
   // Before `result.json`, whose warnings include what it removed from `assets/`.
   const delivered = delivery === undefined ? [] : await delivery.deliverAssets(assets.delivered());
 
+  // Before `finish`, so `result.json` is still the last file to appear, and before the result
+  // is built, because a folder holding `template.txt` is an error that belongs in it. A run
+  // that never loaded a template names none — a brief that does not parse has no template to
+  // point at, and inventing one would be the delivery claiming something the run did not do.
+  const described =
+    delivery !== undefined && job.ok && job.value.template !== undefined
+      ? await delivery.describeTemplate({
+          name: job.value.template.name,
+          version: job.value.template.version,
+          ...(job.value.template.description === undefined
+            ? {}
+            : { description: job.value.template.description }),
+        })
+      : [];
+
   const diagnostics = [
     ...inherited,
     ...pluginWarnings,
@@ -283,33 +298,30 @@ export async function renderTask(
     ...produced,
     ...leftovers,
     ...delivered,
+    ...described,
   ];
-  const result = renderResult({
-    cancelled: job.ok ? job.value.cancelled : false,
-    planned: job.ok ? job.value.planned : 0,
-    artifacts,
-    diagnostics,
-    version: options.version,
-    templates: context.templateVersions,
-  });
-
-  // Before `finish`, so `result.json` is still the last file to appear. A run that never
-  // loaded a template names none — a brief that does not parse has no template to point at,
-  // and inventing one would be the delivery claiming something the run did not do.
-  if (delivery !== undefined && job.ok && job.value.template !== undefined) {
-    const { name, version, description } = job.value.template;
-    await delivery.describeTemplate({
-      name,
-      version,
-      ...(description === undefined ? {} : { description }),
+  const resultOf = (listed: Diagnostics): RenderResult =>
+    renderResult({
+      cancelled: job.ok ? job.value.cancelled : false,
+      planned: job.ok ? job.value.planned : 0,
+      artifacts,
+      diagnostics: listed,
+      version: options.version,
+      templates: context.templateVersions,
     });
-  }
+  const result = resultOf(diagnostics);
 
   // Written even for a failed run: `result.json` is the only thing the other side of ADR
   // 0011 reads, and a task that produced nothing but errors has to say so in the one file
   // its reader is watching for. A throw here is an internal failure — the document we
-  // were about to write does not match its own schema — and is left to escape.
-  await output.finish(result);
+  // were about to write does not match its own schema — and is left to escape. A folder
+  // holding the name is answered instead (TYTO-243): it is reported here, exit 1, because
+  // the file it would have gone in is the one that was not written.
+  const unwritten = await output.finish(result);
+  if (unwritten.length > 0) {
+    const reported = [...diagnostics, ...unwritten];
+    return { diagnostics: reported, result: resultOf(reported), ok: false };
+  }
 
   return { diagnostics, result, ok: !hasErrors(diagnostics) };
 }

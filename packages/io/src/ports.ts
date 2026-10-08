@@ -1,3 +1,4 @@
+import type { Diagnostics } from '@tyto/core';
 import type { ArtifactSink } from '@tyto/pipeline';
 
 import type { RenderResult } from './result.js';
@@ -58,8 +59,16 @@ export interface BriefSource {
  * holding a whole carousel's PNGs in memory to hand them over at the end.
  */
 export interface TaskOutput extends ArtifactSink {
-  /** Writes `result.json` and releases anything the output was holding. */
-  finish(result: RenderResult): Promise<void>;
+  /**
+   * Writes `result.json` and releases anything the output was holding.
+   *
+   * Answers rather than rejects when something in the output's own folder holds the name —
+   * a folder called `result.json` (TYTO-243) — because that fails the same way until somebody
+   * moves it. Those diagnostics cannot go in the file that was not written, so the caller is
+   * the one who reports them. A rejection is still what an unwritable folder or a full disk
+   * gives.
+   */
+  finish(result: RenderResult): Promise<Diagnostics>;
 }
 
 export interface OutputSink {

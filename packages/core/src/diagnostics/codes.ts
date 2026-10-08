@@ -695,6 +695,22 @@ export const diagnosticCodes = {
       'artwork or `result.json`, so nothing is. When only `assets/` is held, the artwork is ' +
       'already written and the images are not copied beside it.',
   },
+  // The mirror of the one above, and a code of its own because the fix is the inverse and the
+  // catalogue has one sentence per code. "Output" and not "delivery": `result.json` and the
+  // artwork go through the writer `--out` shares with `--folder` (TYTO-243).
+  E_OUTPUT_FILE_BLOCKED: {
+    severity: 'error',
+    summary: 'Tyto needs to write a file at a path where a folder already is.',
+    template:
+      "'{path}' is a folder, and Tyto needs to write a file with that name. Rename or move the folder, or write somewhere else.",
+    spec: 'docs/adr/0057-a-delivery-carries-its-brief-and-its-images.md',
+    fatal: true,
+    fatality:
+      'Depends on the file. The copied brief: nothing is rendered. An artwork file: that one ' +
+      'artifact is missing, reported as `E_OUTPUT_WRITE` with this sentence. `template.txt` or ' +
+      'an image in `assets/`: the artwork is written and that file is not. `result.json`: the ' +
+      'artwork is written and no report is.',
+  },
   W_TEXT_OVERFLOW: {
     severity: 'warning',
     summary: 'Compiled text does not fit its frame in one of the requested formats.',
