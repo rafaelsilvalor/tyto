@@ -96,7 +96,7 @@ electronFuses:
   enableNodeOptionsEnvironmentVariable: false
   enableNodeCliInspectArguments: true
   enableEmbeddedAsarIntegrityValidation: true
-  onlyLoadAppFromAsar: true
+  onlyLoadAppFromAsar: false
   # Flipping a byte breaks the ad-hoc signature an arm64 macOS binary must carry to start.
   resetAdHocDarwinSignature: true
 
