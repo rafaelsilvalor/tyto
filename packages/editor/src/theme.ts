@@ -29,7 +29,15 @@ interface Palette {
   readonly foreground: string;
   readonly caret: string;
   readonly selection: string;
+  /**
+   * Translucent on purpose (TYTO-246). `drawSelection` paints the selection on a layer behind
+   * the text, and the active line's background sits on the line element above that layer, so
+   * an opaque colour here hides any selection on the cursor's line. Each value is chosen so
+   * that, over `background`, it composites to the colour the line had when it was opaque.
+   */
   readonly activeLine: string;
+  /** The gutter has no selection under it, so it keeps the opaque colour the line used to have. */
+  readonly activeLineGutter: string;
   readonly gutterBackground: string;
   readonly gutterForeground: string;
   readonly frontmatter: string;
@@ -54,12 +62,15 @@ interface Palette {
   readonly bracket: string;
 }
 
-const light: Palette = {
+// Exported for `theme.test.ts`, not from the package: the themes below are the public surface.
+export const lightPalette: Palette = {
   background: '#ffffff',
   foreground: '#1f2328',
   caret: '#1f2328',
   selection: '#cfe3ff',
-  activeLine: '#f6f8fa',
+  // Over #ffffff: (246, 248, 250), which is #f6f8fa.
+  activeLine: 'rgba(165, 185, 205, 0.1)',
+  activeLineGutter: '#f6f8fa',
   gutterBackground: '#f6f8fa',
   gutterForeground: '#8c959f',
   frontmatter: '#6639ba',
@@ -81,12 +92,14 @@ const light: Palette = {
   bracket: '#57606a',
 };
 
-const dark: Palette = {
+export const darkPalette: Palette = {
   background: '#1e2127',
   foreground: '#abb2bf',
   caret: '#528bff',
   selection: '#3e4451',
-  activeLine: '#2c313a',
+  // Over #1e2127: (44, 49, 58), which is #2c313a.
+  activeLine: 'rgba(147, 166, 197, 0.12)',
+  activeLineGutter: '#2c313a',
   gutterBackground: '#1e2127',
   gutterForeground: '#545862',
   frontmatter: '#c678dd',
@@ -125,7 +138,7 @@ const chrome = (palette: Palette, isDark: boolean): Extension =>
       },
       '.cm-activeLine': { backgroundColor: palette.activeLine },
       '.cm-activeLineGutter': {
-        backgroundColor: palette.activeLine,
+        backgroundColor: palette.activeLineGutter,
         color: palette.foreground,
       },
       '.cm-gutters': {
@@ -179,9 +192,15 @@ const syntax = (palette: Palette): HighlightStyle =>
     { tag: [tags.angleBracket, tags.brace, tags.derefOperator], color: palette.bracket },
   ]);
 
-export const briefLightTheme: Extension = [chrome(light, false), syntaxHighlighting(syntax(light))];
+export const briefLightTheme: Extension = [
+  chrome(lightPalette, false),
+  syntaxHighlighting(syntax(lightPalette)),
+];
 
-export const briefDarkTheme: Extension = [chrome(dark, true), syntaxHighlighting(syntax(dark))];
+export const briefDarkTheme: Extension = [
+  chrome(darkPalette, true),
+  syntaxHighlighting(syntax(darkPalette)),
+];
 
 /** The two names `createEditor` accepts, and what `setTheme` switches between. */
 export type ThemeName = 'light' | 'dark';
