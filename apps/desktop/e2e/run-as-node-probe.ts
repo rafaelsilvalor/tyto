@@ -30,7 +30,7 @@ export interface RunAsNodeProbeOptions {
  * packaged app booted into the real `%APPDATA%\Tyto\<version>`. So the caller decides from
  * the fuse wire which program it is about to start, and only an app gets the switches.
  */
-function appSwitches(userData: string): string[] {
+export function appSwitches(userData: string): string[] {
   const switches = [`--user-data-dir=${userData}`];
   // The same switch Playwright adds on Linux: the unpacked folder's `chrome-sandbox` is not
   // setuid on a runner, and without it a booted app aborts instead of booting.
@@ -105,7 +105,7 @@ export function probeRunAsNode(
   });
 }
 
-function killTree(pid: number | undefined): void {
+export function killTree(pid: number | undefined): void {
   if (pid === undefined) return;
   try {
     if (process.platform === 'win32') {
