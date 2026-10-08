@@ -66,6 +66,15 @@ export class EncryptionUnavailableError extends Error {
 export interface Credentials {
   set(account: string, secret: string): Promise<void>;
   get(account: string): Promise<string | null>;
+  /**
+   * Whether anything is stored under `account`, answered from the ciphertext's presence.
+   *
+   * **Never decrypts** (TYTO-187). The plugins screen asks it for every declared key each
+   * time it opens, and an answer that went through `get` would hold every plaintext in main's
+   * memory to compute a boolean — and would fail on a locked keyring for a question that
+   * needs no key at all.
+   */
+  has(account: string): Promise<boolean>;
   delete(account: string): Promise<boolean>;
 }
 
@@ -87,6 +96,8 @@ export function createCredentials(options: CredentialsOptions): Credentials {
       if (ciphertext === undefined) return null;
       return requireEncryption().decryptString(ciphertext);
     },
+
+    has: async (account) => (await store.read(account)) !== undefined,
 
     delete: (account) => store.delete(account),
   };

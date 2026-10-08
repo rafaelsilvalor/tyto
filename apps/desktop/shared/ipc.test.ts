@@ -23,7 +23,6 @@ describe('the IPC contract', () => {
       'app:locale',
       'brief:preview',
       'credentials:delete',
-      'credentials:get',
       'credentials:set',
       'dialog:confirm',
       'dialog:save-changes',
@@ -141,39 +140,38 @@ describe('the event table', () => {
  */
 describe('a request that does not match', () => {
   it('is refused, with the channel and the field named', () => {
-    expect(() => parseIpc('credentials:set', 'request', { account: 42, secret: 'x' })).toThrow(
-      IpcContractError,
-    );
+    expect(() =>
+      parseIpc('credentials:set', 'request', { plugin: 42, key: 'k', secret: 'x' }),
+    ).toThrow(IpcContractError);
 
     try {
-      parseIpc('credentials:set', 'request', { account: 42, secret: 'x' });
+      parseIpc('credentials:set', 'request', { plugin: 42, key: 'k', secret: 'x' });
       expect.unreachable('the contract accepted a number where a name goes');
     } catch (error) {
       expect(error).toBeInstanceOf(TypeError);
       expect((error as IpcContractError).channel).toBe('credentials:set');
       expect((error as IpcContractError).direction).toBe('request');
       // A reader has to be able to find the field without opening the schema.
-      expect((error as Error).message).toContain('account');
+      expect((error as Error).message).toContain('plugin');
     }
   });
 
-  it('refuses a blank account, which would be a credential nobody can ask for again', () => {
-    expect(() => parseIpc('credentials:get', 'request', { account: '   ' })).toThrow(
+  it('refuses a blank key, which would be a credential no manifest can declare', () => {
+    expect(() => parseIpc('credentials:delete', 'request', { plugin: 'pdf', key: '' })).toThrow(
       IpcContractError,
     );
   });
 
   it('refuses a missing field as readily as a wrong one', () => {
-    expect(() => parseIpc('credentials:set', 'request', { account: 'jira' })).toThrow(
+    expect(() => parseIpc('credentials:set', 'request', { plugin: 'pdf', key: 'k' })).toThrow(
       IpcContractError,
     );
   });
 
   it('accepts the shape the channel declares, and hands back the parsed value', () => {
-    expect(parseIpc('credentials:set', 'request', { account: ' jira ', secret: 'token' })).toEqual({
-      account: 'jira',
-      secret: 'token',
-    });
+    expect(
+      parseIpc('credentials:set', 'request', { plugin: 'pdf', key: 'k', secret: 'token' }),
+    ).toEqual({ plugin: 'pdf', key: 'k', secret: 'token' });
   });
 });
 
@@ -197,17 +195,18 @@ describe('what the contract does not promise', () => {
     // Zod objects strip by default, and that is the right default across a version skew: a
     // renderer built against a newer contract sending one extra field should still work,
     // and the field it sent is simply not read.
-    const parsed = parseIpc('credentials:get', 'request', {
-      account: 'jira',
+    const parsed = parseIpc('credentials:delete', 'request', {
+      plugin: 'pdf',
+      key: 'k',
       unexpected: true,
     }) as Record<string, unknown>;
 
-    expect(parsed).toEqual({ account: 'jira' });
+    expect(parsed).toEqual({ plugin: 'pdf', key: 'k' });
   });
 
   it('checks every declared channel, not only the ones a test remembers', () => {
     // `{}` is a valid request for the two channels that ask the app about itself and an
-    // invalid one for all three credential channels. Asserting it per channel from the
+    // invalid one for both credential channels. Asserting it per channel from the
     // table means a channel added later is covered by this test the day it is added.
     const optional: readonly IpcChannelName[] = [
       'app:info',

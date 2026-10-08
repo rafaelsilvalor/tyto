@@ -63,7 +63,13 @@ let app: ElectronApplication;
 let page: Page;
 
 /** A plugin folder, installed and enabled, whose one exporter's frame is `body`. */
-function install(name: string, id: string, kind: string, body: string): void {
+function install(
+  name: string,
+  id: string,
+  kind: string,
+  body: string,
+  permissions: readonly string[] = [],
+): void {
   const folder = join(home, 'plugins', name);
   mkdirSync(join(folder, 'dist'), { recursive: true });
   writeFileSync(
@@ -73,7 +79,7 @@ function install(name: string, id: string, kind: string, body: string): void {
       version: '1.0.0',
       engine: `>=${PLUGIN_API_VERSION}`,
       contributes: ['exporter'],
-      permissions: [],
+      permissions,
     }),
   );
   writeFileSync(join(folder, 'package.json'), JSON.stringify({ name, type: 'module' }));
@@ -112,10 +118,27 @@ function writeHome(): void {
     `return import('node:fs').then((fs) => { try { fs.readFileSync(${JSON.stringify(secret)}); return 'read'; } catch (cause) { return cause.code; } })` +
       `.then((code) => ({ ok: true, value: [process.version, process.execPath, code].join('|'), diagnostics: [] }));`,
   );
+  // Writes what `host.credentials` answered — the value, or the refusal's code (TYTO-187).
+  install(
+    'chave',
+    'chave',
+    'key',
+    `return host.credentials('api-token').then((value) => 'value:' + value, (cause) => 'refused:' + (cause.code ?? cause.message))` +
+      `.then((value) => ({ ok: true, value, diagnostics: [] }));`,
+    ['credentials:api-token'],
+  );
   const entry = { enabled: true, permissions: [], source: '.' };
   writeFileSync(
     join(home, 'plugins.json'),
-    JSON.stringify({ plugins: { texto: entry, vetor: entry, quebra: entry, espia: entry } }),
+    JSON.stringify({
+      plugins: {
+        texto: entry,
+        vetor: entry,
+        quebra: entry,
+        espia: entry,
+        chave: { ...entry, permissions: ['credentials:api-token'] },
+      },
+    }),
   );
 }
 
@@ -239,6 +262,94 @@ describe('installed plugins in the window', () => {
     expect(plugins.find((row) => row.name === 'quebra')?.status).toBe('crashed');
     expect(plugins.find((row) => row.name === 'texto')?.status).toBe('enabled');
   }, 120_000);
+});
+
+/**
+ * A plugin's credential, typed into the plugins screen and read by the plugin (TYTO-187).
+ *
+ * The value is a test fixture's dummy and nothing else. What is measured is the route a person
+ * takes — the File menu, the field, Save, Clear — and that the plugin's own process is what
+ * reads it back, while the window only ever learns whether the key is set.
+ */
+describe('a credential set from the plugins screen', () => {
+  const DUMMY = 'dummy-not-a-real-key-187';
+  const line = '[data-plugin="chave"] .plugins__credential[data-key="api-token"]';
+
+  /** What the plugin's exporter wrote: `value:<secret>` or `refused:<code>`. */
+  async function answered(name: string): Promise<string> {
+    const out = join(scratch, name);
+    const progress = await exported('key', out);
+    expect(progress.failure).toBeUndefined();
+    const [file] = readdirSync(out).filter((entry) => entry.endsWith('.key'));
+    return readFileSync(join(out, file!), 'utf8');
+  }
+
+  it('is read by the plugin once saved, never shown again, and missing once cleared', async () => {
+    expect(await answered('key-before')).toBe('refused:E_CREDENTIAL_MISSING');
+
+    await app.evaluate(({ Menu }) => {
+      Menu.getApplicationMenu()?.getMenuItemById('plugins.show')?.click();
+    });
+    await page.waitForSelector(`${line}[data-set="false"]`);
+    // Measured, not assumed: a machine with no keychain (a Linux runner with no session
+    // keyring) has nothing to encrypt with, and there the app refuses rather than storing
+    // plaintext (`credentials.ts`). That machine proves the refusal; one with a keychain proves
+    // the whole route.
+    const keychain = await app.evaluate(({ safeStorage }) => ({
+      available: safeStorage.isEncryptionAvailable(),
+      backend: process.platform === 'linux' ? safeStorage.getSelectedStorageBackend() : 'os',
+    }));
+    process.stdout.write(
+      `[TYTO-187] safeStorage available=${String(keychain.available)} backend=${keychain.backend}\n`,
+    );
+    const file = join(
+      scratch,
+      'user-data',
+      'credentials',
+      `${encodeURIComponent('plugin:chave:api-token')}.bin`,
+    );
+
+    await page.fill(`${line} .plugins__credential-field`, DUMMY);
+    await page.click(`${line} .plugins__credential-save`);
+
+    if (!keychain.available) {
+      await page.waitForSelector(`${line} .plugins__credential-failed`);
+      expect(await page.getAttribute(line, 'data-set')).toBe('false');
+      expect(existsSync(file)).toBe(false);
+      expect(await answered('key-no-keychain')).toBe('refused:E_CREDENTIAL_MISSING');
+      await page.click('.plugins__close');
+      return;
+    }
+    await page.waitForSelector(`${line}[data-set="true"]`);
+
+    // The window holds no copy: not in the field, not anywhere in the page, not in the list.
+    expect(await page.inputValue(`${line} .plugins__credential-field`)).toBe('');
+    expect(await page.evaluate(() => document.documentElement.outerHTML)).not.toContain(DUMMY);
+    const listed = await call<unknown>('plugins:list', {});
+    expect(JSON.stringify(listed)).not.toContain(DUMMY);
+    // And the disk holds ciphertext, under the plugin's account.
+    expect(readFileSync(file).toString('utf8')).not.toContain(DUMMY);
+
+    expect(await answered('key-set')).toBe(`value:${DUMMY}`);
+
+    await page.click(`${line} .plugins__credential-clear`);
+    await page.waitForSelector(`${line}[data-set="false"]`);
+    expect(await answered('key-cleared')).toBe('refused:E_CREDENTIAL_MISSING');
+    await page.click('.plugins__close');
+  }, 180_000);
+
+  it('refuses, from the page, a key no installed plugin declares', async () => {
+    const refusal = await page.evaluate(async () => {
+      const bridge = (window as unknown as { tyto: Bridge }).tyto;
+      try {
+        await bridge['credentials:set']!({ plugin: 'texto', key: 'api-token', secret: 'x' });
+        return 'accepted';
+      } catch (error) {
+        return (error as Error).message;
+      }
+    });
+    expect(refusal).toContain("No installed plugin 'texto' declares credentials:api-token");
+  });
 });
 
 describe('the Node installed plugins run on (ADR 0050)', () => {

@@ -12,6 +12,7 @@ import {
 } from '@tyto/plugin-api';
 
 import type { IpcResponse } from '../../shared/ipc.js';
+import { credentialAccount } from './installed-plugins.js';
 
 /**
  * What the plugins screen lists: the built-ins this app activated and what `tyto plugin
@@ -61,11 +62,25 @@ export function exporterBuiltIns(): readonly InstalledPlugin[] {
   });
 }
 
+/** The keys a manifest declares as `credentials:<key>`, in the order it declares them. */
+export function declaredCredentialKeys(permissions: readonly string[]): readonly string[] {
+  return permissions
+    .filter((permission) => permission.startsWith('credentials:'))
+    .map((permission) => permission.slice('credentials:'.length));
+}
+
+/**
+ * Whether a credential is stored under an account, without reading it (`Credentials.has`).
+ * Taken as a function so this module names no keychain.
+ */
+export type IsStored = (account: string) => Promise<boolean>;
+
 export async function listPlugins(
   builtIns: readonly InstalledPlugin[],
   store: PluginStore,
+  isStored: IsStored,
 ): Promise<readonly PluginRow[]> {
-  const rows: PluginRow[] = builtIns.map(({ manifest }) => ({
+  const rows: Omit<PluginRow, 'credentials'>[] = builtIns.map(({ manifest }) => ({
     name: manifest.name,
     version: manifest.version,
     origin: 'built-in',
@@ -115,5 +130,16 @@ export async function listPlugins(
     });
   }
 
-  return rows;
+  // Whether each declared key is set, never what it is set to (TYTO-187).
+  return Promise.all(
+    rows.map(async (row) => ({
+      ...row,
+      credentials: await Promise.all(
+        declaredCredentialKeys(row.permissions).map(async (key) => ({
+          key,
+          set: await isStored(credentialAccount(row.name, key)),
+        })),
+      ),
+    })),
+  );
 }

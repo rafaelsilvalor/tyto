@@ -641,6 +641,16 @@ function openPluginsDialog(): void {
   dialog.locale = state.locale;
   dialog.view = undefined;
   dialog.open = true;
+  // A set or a clear goes to main, and the list is asked again for what changed: the screen
+  // never learns the value, only that the key is now set or not (TYTO-187). A refusal is
+  // rethrown so the row can say so.
+  dialog.onCredential = async ({ plugin, key, secret }) => {
+    const bridge = window.tyto;
+    if (bridge === undefined) throw new Error('no bridge');
+    if (secret === undefined) await bridge['credentials:delete']({ plugin, key });
+    else await bridge['credentials:set']({ plugin, key, secret });
+    dialog.view = await bridge['plugins:list']({});
+  };
   void withBridge(async (bridge) => {
     try {
       dialog.view = await bridge['plugins:list']({});

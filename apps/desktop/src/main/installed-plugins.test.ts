@@ -45,7 +45,7 @@ describe('credentials on the desktop', () => {
     expect(asked).toEqual([credentialAccount('meu-pdf', 'api-token')]);
   });
 
-  it('says, when nothing is stored, that the app has no screen to store one yet', async () => {
+  it('says, when nothing is stored, where a person stores one', async () => {
     const capabilities = desktopCapabilities({ get: () => Promise.resolve(null) }, noNetwork);
     const checked = checkedCapabilities('meu-pdf', ['credentials:api-token'], capabilities);
 
@@ -54,7 +54,7 @@ describe('credentials on the desktop', () => {
     expect((refusal as PluginCapabilityError).code).toBe('E_CREDENTIAL_MISSING');
     expect((refusal as Error).message).toBe(
       "Plugin 'meu-pdf' asked for credential 'api-token', and the keychain entry " +
-        "'plugin:meu-pdf:api-token' (this version of the app has no screen to store one yet) " +
+        "'plugin:meu-pdf:api-token' (set it in the plugins screen) " +
         'holds none.',
     );
   });

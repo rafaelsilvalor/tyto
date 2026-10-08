@@ -16,6 +16,8 @@ import {
   parseIpcEvent,
 } from '../../shared/ipc.js';
 import { type Credentials } from './credentials.js';
+import { credentialAccount } from './installed-plugins.js';
+import { declaredCredentialKeys } from './plugin-list.js';
 import { type DesktopLog } from './log.js';
 import { type DocumentService } from './documents.js';
 import { type ExportService } from './export.js';
@@ -168,6 +170,28 @@ const wireDiagnostic = (item: TemplateDiagnostic) => ({
   ...(item.range === undefined ? {} : { range: item.range }),
 });
 
+/**
+ * The keychain account for a plugin's credential, or a refusal when no plugin the screen lists
+ * declares `credentials:<key>` (TYTO-187).
+ *
+ * Read from the same list the screen shows, on every ask, so what the renderer may write or
+ * forget is exactly the keys it can see — and a plugin installed in a terminal a moment ago
+ * is already there. The refusal names the pair and never a secret.
+ */
+async function declaredAccount(
+  plugins: IpcDependencies['plugins'],
+  plugin: string,
+  key: string,
+): Promise<string> {
+  const row = (await plugins.list()).find((candidate) => candidate.name === plugin);
+  if (row === undefined || !declaredCredentialKeys(row.permissions).includes(key)) {
+    throw new Error(
+      `No installed plugin '${plugin}' declares credentials:${key}, so nothing was stored or forgotten.`,
+    );
+  }
+  return credentialAccount(plugin, key);
+}
+
 /** One handler per channel, typed against the contract in both directions. */
 type Handlers = {
   readonly [Name in IpcChannelName]: (request: IpcRequest<Name>) => Promise<IpcResponse<Name>>;
@@ -267,14 +291,14 @@ export function createHandlers(dependencies: IpcDependencies): Handlers {
       return {};
     },
 
-    'credentials:set': async ({ account, secret }) => {
-      await credentials.set(account, secret);
+    'credentials:set': async ({ plugin, key, secret }) => {
+      await credentials.set(await declaredAccount(plugins, plugin, key), secret);
       return { stored: true };
     },
 
-    'credentials:get': async ({ account }) => ({ secret: await credentials.get(account) }),
-
-    'credentials:delete': async ({ account }) => ({ deleted: await credentials.delete(account) }),
+    'credentials:delete': async ({ plugin, key }) => ({
+      deleted: await credentials.delete(await declaredAccount(plugins, plugin, key)),
+    }),
 
     'export:start': ({ documentId, brief, directory, outputs, formats }) => {
       // The text is the request's and the folder is main's, which is `brief:preview`'s

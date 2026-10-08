@@ -29,7 +29,7 @@ describe('createBridge', () => {
     const invoke = vi.fn(() => Promise.resolve({}));
     const bridge = createBridge(invoke, () => () => {});
 
-    expect(() => bridge['credentials:set']({ account: 42, secret: 'x' } as never)).toThrow(
+    expect(() => bridge['credentials:set']({ plugin: 42, key: 'k', secret: 'x' } as never)).toThrow(
       IpcContractError,
     );
     // The point: main was not woken at all. Without this side the message would travel, be
@@ -45,25 +45,31 @@ describe('createBridge', () => {
 
     // A rejected promise would carry a stack from inside the IPC machinery instead. `toThrow`
     // passing at all is the assertion — a promise rejection would not be caught here.
-    expect(() => bridge['credentials:get']({ account: '' } as never)).toThrow(IpcContractError);
+    expect(() => bridge['credentials:delete']({ plugin: '' } as never)).toThrow(IpcContractError);
   });
 
   it('passes a good request straight through, unchanged', async () => {
     const invoke = vi.fn(() => Promise.resolve({ stored: true }));
     const bridge = createBridge(invoke, () => () => {});
 
-    await bridge['credentials:set']({ account: 'jira', secret: 'token' });
+    await bridge['credentials:set']({ plugin: 'pdf', key: 'k', secret: 'token' });
 
-    expect(invoke).toHaveBeenCalledWith('credentials:set', { account: 'jira', secret: 'token' });
+    expect(invoke).toHaveBeenCalledWith('credentials:set', {
+      plugin: 'pdf',
+      key: 'k',
+      secret: 'token',
+    });
   });
 
   it('hands back whatever main answered', async () => {
     const bridge = createBridge(
-      () => Promise.resolve({ secret: 'token' }),
+      () => Promise.resolve({ deleted: true }),
       () => () => {},
     );
 
-    expect(await bridge['credentials:get']({ account: 'jira' })).toEqual({ secret: 'token' });
+    expect(await bridge['credentials:delete']({ plugin: 'pdf', key: 'k' })).toEqual({
+      deleted: true,
+    });
   });
 });
 

@@ -53,8 +53,8 @@ export type NetFetch = (
  *
  * **`safeStorage` and nothing else** for a credential (`CLAUDE.md`): no environment
  * variable, because on the desktop the one place a secret lives is the OS keychain. A key
- * nobody has stored answers `E_CREDENTIAL_MISSING`, and its message says the app has no
- * screen to store one yet (TYTO-187).
+ * nobody has stored answers `E_CREDENTIAL_MISSING`, and its message points to the plugins
+ * screen, where a person stores one (TYTO-187).
  */
 export function desktopCapabilities(
   credentials: Pick<Credentials, 'get'>,
@@ -82,8 +82,7 @@ export function desktopCapabilities(
       return (await credentials.get(credentialAccount(plugin, key))) ?? undefined;
     },
     describeCredential: (plugin, key) =>
-      `the keychain entry '${credentialAccount(plugin, key)}' (this version of the app has ` +
-      'no screen to store one yet)',
+      `the keychain entry '${credentialAccount(plugin, key)}' (set it in the plugins screen)`,
   };
 }
 

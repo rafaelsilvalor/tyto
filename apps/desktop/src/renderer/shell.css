@@ -1377,3 +1377,41 @@ tyto-plugins-dialog[open] {
   margin: 4px 0 0;
   color: var(--muted, #555);
 }
+
+/* A plugin's declared credentials (TYTO-187): one line per key, wrapping under the
+   permissions rather than widening the table. */
+.plugins__credentials {
+  display: flex;
+  flex-direction: column;
+  margin-top: 6px;
+  gap: 4px;
+}
+
+.plugins__credential {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  margin: 0;
+  gap: 6px;
+}
+
+.plugins__credential-state {
+  color: var(--muted, #555);
+}
+
+.plugins__credential[data-set='true'] .plugins__credential-state {
+  color: inherit;
+  font-weight: 600;
+}
+
+.plugins__credential-field {
+  width: 14ch;
+  min-width: 0;
+  font: inherit;
+}
+
+.plugins__credential-failed {
+  width: 100%;
+  margin: 0;
+  color: var(--error, #c53030);
+}

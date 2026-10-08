@@ -22,6 +22,7 @@ const credentials = (): Credentials => {
       return Promise.resolve();
     },
     get: (account) => Promise.resolve(stored.get(account) ?? null),
+    has: (account) => Promise.resolve(stored.has(account)),
     delete: (account) => Promise.resolve(stored.delete(account)),
   };
 };
@@ -381,52 +382,72 @@ const templateDialogs = (answer: string | null = '/escolhida') => {
   };
 };
 
-const dependencies = () => ({
-  confirm: () => Promise.resolve(true),
-  askToSave: () => Promise.resolve('cancel' as const),
-  log: recordingLog(),
-  credentials: credentials(),
-  documents: documents(),
-  exit: exitAnswers(),
-  exports: exportService(),
-  folders: folderDialogs(),
-  layout: layoutStore(),
-  menu: menuRebuilds(),
-  plugins: {
-    folder: '/home/ana/.tyto/plugins',
-    list: () =>
-      Promise.resolve([
-        {
-          name: 'pdf',
-          version: '1.0.0',
-          origin: 'external' as const,
-          status: 'disabled' as const,
-          contributes: ['exporter'],
-          permissions: ['net:api.example.com'],
-          problems: [],
-        },
-      ]),
-  },
-  info: () => ({ version: '0.1.0', platform: 'linux', locale: 'pt-BR', templates: ['promo'] }),
-  panels: {
-    list: () =>
-      Promise.resolve([
-        {
-          id: 'plugin:demo/contagem',
-          plugin: 'demo',
-          title: 'Contagem',
-          src: 'tyto-plugin://demo/panel.html',
-        },
-      ]),
-    request: () => Promise.resolve({ ok: false as const, code: 'E_PERMISSION', message: 'no' }),
-  },
-  preview: preview(),
-  project: projectFolder(),
-  queue: queueDependency(),
-  templates: catalogue(),
-  templateEditor: templateEditor(),
-  templateDialogs: templateDialogs(),
+/**
+ * The plugins the screen lists, with each declared key's state asked of `keychain.has` —
+ * the composition `index.ts` makes with the real `listPlugins`.
+ */
+const pluginList = (keychain: Credentials) => ({
+  folder: '/home/ana/.tyto/plugins',
+  list: () =>
+    Promise.all(
+      [
+        { name: 'pdf', permissions: ['net:api.example.com', 'credentials:api-token'] },
+        { name: 'texto', permissions: [] },
+      ].map(async ({ name, permissions }) => ({
+        name,
+        version: '1.0.0',
+        origin: 'external' as const,
+        status: 'disabled' as const,
+        contributes: ['exporter'],
+        permissions,
+        problems: [],
+        credentials: await Promise.all(
+          permissions
+            .filter((permission) => permission.startsWith('credentials:'))
+            .map(async (permission) => {
+              const key = permission.slice('credentials:'.length);
+              return { key, set: await keychain.has(`plugin:${name}:${key}`) };
+            }),
+        ),
+      })),
+    ),
 });
+
+const dependencies = () => {
+  const keychain = credentials();
+  return {
+    confirm: () => Promise.resolve(true),
+    askToSave: () => Promise.resolve('cancel' as const),
+    log: recordingLog(),
+    credentials: keychain,
+    documents: documents(),
+    exit: exitAnswers(),
+    exports: exportService(),
+    folders: folderDialogs(),
+    layout: layoutStore(),
+    menu: menuRebuilds(),
+    plugins: pluginList(keychain),
+    info: () => ({ version: '0.1.0', platform: 'linux', locale: 'pt-BR', templates: ['promo'] }),
+    panels: {
+      list: () =>
+        Promise.resolve([
+          {
+            id: 'plugin:demo/contagem',
+            plugin: 'demo',
+            title: 'Contagem',
+            src: 'tyto-plugin://demo/panel.html',
+          },
+        ]),
+      request: () => Promise.resolve({ ok: false as const, code: 'E_PERMISSION', message: 'no' }),
+    },
+    preview: preview(),
+    project: projectFolder(),
+    queue: queueDependency(),
+    templates: catalogue(),
+    templateEditor: templateEditor(),
+    templateDialogs: templateDialogs(),
+  };
+};
 
 describe('registerIpcHandlers', () => {
   it('binds every channel the contract declares, and nothing else', () => {
@@ -449,22 +470,72 @@ describe('registerIpcHandlers', () => {
       dependencies(),
     );
 
-    await expect(handlers.get('credentials:get')?.(null, { account: '' })).rejects.toBeInstanceOf(
-      IpcContractError,
-    );
+    await expect(
+      handlers.get('credentials:delete')?.(null, { plugin: '', key: 'api-token' }),
+    ).rejects.toBeInstanceOf(IpcContractError);
   });
 });
 
 describe('the handlers', () => {
-  it('round-trips a credential through the channels that own it', async () => {
-    const handlers = createHandlers(dependencies());
+  it('stores a declared key under its plugin account, and forgets it', async () => {
+    const deps = dependencies();
+    const handlers = createHandlers(deps);
 
-    expect(await handlers['credentials:set']({ account: 'jira', secret: 'token' })).toEqual({
-      stored: true,
+    expect(
+      await handlers['credentials:set']({ plugin: 'pdf', key: 'api-token', secret: 'dummy' }),
+    ).toEqual({ stored: true });
+    expect(await deps.credentials.get('plugin:pdf:api-token')).toBe('dummy');
+    expect(await handlers['credentials:delete']({ plugin: 'pdf', key: 'api-token' })).toEqual({
+      deleted: true,
     });
-    expect(await handlers['credentials:get']({ account: 'jira' })).toEqual({ secret: 'token' });
-    expect(await handlers['credentials:delete']({ account: 'jira' })).toEqual({ deleted: true });
-    expect(await handlers['credentials:get']({ account: 'jira' })).toEqual({ secret: null });
+    expect(await deps.credentials.has('plugin:pdf:api-token')).toBe(false);
+  });
+
+  it('refuses a key no listed plugin declares, and touches nothing (TYTO-187)', async () => {
+    const deps = dependencies();
+    await deps.credentials.set('plugin:texto:api-token', 'kept');
+    await deps.credentials.set('jira', 'kept');
+    const handlers = createHandlers(deps);
+
+    for (const [plugin, key] of [
+      ['texto', 'api-token'], // a listed plugin that does not declare it
+      ['ausente', 'api-token'], // no such plugin
+      ['pdf', 'net:api.example.com'], // a permission that is not a credential
+      ['pdf ', 'api-token'], // not trimmed into a match
+    ] as const) {
+      await expect(
+        handlers['credentials:set']({ plugin, key, secret: 'overwritten' }),
+      ).rejects.toThrow(`No installed plugin '${plugin}' declares credentials:${key}`);
+      await expect(handlers['credentials:delete']({ plugin, key })).rejects.toThrow(
+        /declares credentials/u,
+      );
+    }
+    expect(await deps.credentials.get('plugin:texto:api-token')).toBe('kept');
+    expect(await deps.credentials.get('jira')).toBe('kept');
+    expect(await deps.credentials.has('plugin:pdf:api-token')).toBe(false);
+  });
+
+  it('never hands the secret back: not in the list, not in a reply to set or delete', async () => {
+    const SECRET = 'dummy-secret-7f3a';
+    const handlers = createHandlers(dependencies());
+    const replies: unknown[] = [];
+
+    replies.push(await handlers['plugins:list']({}));
+    replies.push(
+      await handlers['credentials:set']({ plugin: 'pdf', key: 'api-token', secret: SECRET }),
+    );
+    const listed = await handlers['plugins:list']({});
+    replies.push(listed);
+    replies.push(await handlers['credentials:delete']({ plugin: 'pdf', key: 'api-token' }));
+    replies.push(await handlers['plugins:list']({}));
+
+    // The state moved, so the list was asked about this very key …
+    expect(listed.plugins.find((row) => row.name === 'pdf')?.credentials).toEqual([
+      { key: 'api-token', set: true },
+    ]);
+    // … and no answer the renderer received carries its value, in any field.
+    for (const reply of replies) expect(JSON.stringify(reply)).not.toContain(SECRET);
+    expect(Object.keys(handlers)).not.toContain('credentials:get');
   });
 
   it('answers app:info from what the composition root injected', async () => {
@@ -548,9 +619,11 @@ describe('the tab a message is about (E9.11)', () => {
 describe('guard', () => {
   it('refuses a request that does not match, before the handler runs', async () => {
     const handler = vi.fn();
-    const guarded = guard('credentials:get', handler as never);
+    const guarded = guard('credentials:delete', handler as never);
 
-    await expect(guarded({ account: 42 })).rejects.toBeInstanceOf(IpcContractError);
+    await expect(guarded({ plugin: 42, key: 'api-token' })).rejects.toBeInstanceOf(
+      IpcContractError,
+    );
     expect(handler).not.toHaveBeenCalled();
   });
 
@@ -562,14 +635,14 @@ describe('guard', () => {
   });
 
   it('hands the handler the parsed value, not the raw one', async () => {
-    const handler = vi.fn(() => Promise.resolve({ secret: null }));
-    const guarded = guard('credentials:get', handler as never);
+    const handler = vi.fn(() => Promise.resolve({ deleted: false }));
+    const guarded = guard('credentials:delete', handler as never);
 
-    await guarded({ account: '  jira  ', extra: 'dropped' });
+    await guarded({ plugin: 'pdf', key: 'api-token', extra: 'dropped' });
 
-    // Trimmed by the schema and stripped of the key nobody declared: the handler sees the
-    // contract's shape, so it never has to defend itself.
-    expect(handler).toHaveBeenCalledWith({ account: 'jira' });
+    // Stripped of the key nobody declared: the handler sees the contract's shape, so it
+    // never has to defend itself.
+    expect(handler).toHaveBeenCalledWith({ plugin: 'pdf', key: 'api-token' });
   });
 });
 
@@ -740,6 +813,7 @@ describe('plugins:list', () => {
     expect(answer.folder).toBe('/home/ana/.tyto/plugins');
     expect(answer.plugins.map((plugin) => [plugin.name, plugin.status])).toEqual([
       ['pdf', 'disabled'],
+      ['texto', 'disabled'],
     ]);
     // What main sends must satisfy the contract the preload validates it against.
     expect(IPC_CHANNELS['plugins:list'].response.safeParse(answer).success).toBe(true);
