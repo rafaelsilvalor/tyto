@@ -28,8 +28,14 @@ const REPOSITORY = 'rafaelsilvalor/tyto';
  * The REST list and not the Atom feed: the feed carries the ten newest releases, and one
  * Version Packages merge has created thirteen at once, which would push the desktop release
  * off it. Unauthenticated calls get 60 an hour per address; this is one per launch.
+ *
+ * **Written out whole, not composed from `REPOSITORY`.** A template literal survives bundling as
+ * a template, so the URL the app requests never appeared in `out/main/index.js` as one string,
+ * and `packaged.package.test.ts` — which reads the shipped bundle for it — could not find it
+ * (PR rafaelsilvalor/tyto#19's first run). Whole, the bytes in the package are the request.
  */
-export const RELEASES_URL = `https://api.github.com/repos/${REPOSITORY}/releases?per_page=100`;
+export const RELEASES_URL =
+  'https://api.github.com/repos/rafaelsilvalor/tyto/releases?per_page=100';
 
 /** The folder a release's assets download from; `latest.yml` and the installers sit in it. */
 export function releaseDownloads(tag: string): string {

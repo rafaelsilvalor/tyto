@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 
 import {
+  RELEASES_URL,
   isNewer,
   newestDesktopRelease,
   releaseDownloads,
@@ -106,6 +107,14 @@ describe('isNewer', () => {
   it('says no when either side is not a version', () => {
     expect(isNewer('next', '0.6.0')).toBe(false);
     expect(isNewer('0.7.0', 'dev')).toBe(false);
+  });
+});
+
+describe('RELEASES_URL', () => {
+  it('is the exact string packaged.package.test.ts looks for in the shipped bundle', () => {
+    expect(RELEASES_URL).toBe(
+      'https://api.github.com/repos/rafaelsilvalor/tyto/releases?per_page=100',
+    );
   });
 });
 
