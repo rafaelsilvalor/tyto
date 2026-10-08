@@ -291,8 +291,35 @@ describe('a credential set from the plugins screen', () => {
       Menu.getApplicationMenu()?.getMenuItemById('plugins.show')?.click();
     });
     await page.waitForSelector(`${line}[data-set="false"]`);
+    // Measured, not assumed: a machine with no keychain (a Linux runner with no session
+    // keyring) has nothing to encrypt with, and there the app refuses rather than storing
+    // plaintext (`credentials.ts`). That machine proves the refusal; one with a keychain proves
+    // the whole route.
+    const keychain = await app.evaluate(({ safeStorage }) => ({
+      available: safeStorage.isEncryptionAvailable(),
+      backend: process.platform === 'linux' ? safeStorage.getSelectedStorageBackend() : 'os',
+    }));
+    process.stdout.write(
+      `[TYTO-187] safeStorage available=${String(keychain.available)} backend=${keychain.backend}\n`,
+    );
+    const file = join(
+      scratch,
+      'user-data',
+      'credentials',
+      `${encodeURIComponent('plugin:chave:api-token')}.bin`,
+    );
+
     await page.fill(`${line} .plugins__credential-field`, DUMMY);
     await page.click(`${line} .plugins__credential-save`);
+
+    if (!keychain.available) {
+      await page.waitForSelector(`${line} .plugins__credential-failed`);
+      expect(await page.getAttribute(line, 'data-set')).toBe('false');
+      expect(existsSync(file)).toBe(false);
+      expect(await answered('key-no-keychain')).toBe('refused:E_CREDENTIAL_MISSING');
+      await page.click('.plugins__close');
+      return;
+    }
     await page.waitForSelector(`${line}[data-set="true"]`);
 
     // The window holds no copy: not in the field, not anywhere in the page, not in the list.
@@ -301,15 +328,7 @@ describe('a credential set from the plugins screen', () => {
     const listed = await call<unknown>('plugins:list', {});
     expect(JSON.stringify(listed)).not.toContain(DUMMY);
     // And the disk holds ciphertext, under the plugin's account.
-    const stored = readFileSync(
-      join(
-        scratch,
-        'user-data',
-        'credentials',
-        `${encodeURIComponent('plugin:chave:api-token')}.bin`,
-      ),
-    );
-    expect(stored.toString('utf8')).not.toContain(DUMMY);
+    expect(readFileSync(file).toString('utf8')).not.toContain(DUMMY);
 
     expect(await answered('key-set')).toBe(`value:${DUMMY}`);
 
