@@ -122,6 +122,12 @@ electronFuses:
 # per-package tags like `@tyto/core@0.19.0`, a bare `v0.1.0` reads as a version of Tyto as a
 # whole. `desktop-release.test.ts` now reads this string and `desktop.yml`'s trigger together,
 # so changing one alone fails.
+#
+# **The installed app does not read this block to find its updates** (TYTO-131, ADR 0069).
+# electron-updater's `github` provider would ask for the repository's _Latest_ release, and the
+# `@tyto/*` package releases compete for that; the app looks up the newest `desktop-v*` release
+# itself and reads `latest.yml` out of that one. What this block still decides is where the
+# installers and `latest*.yml` are uploaded, and `app-update.yml`'s presence in the package.
 publish:
   provider: github
   owner: rafaelsilvalor
@@ -138,8 +144,10 @@ publish:
 # another version of itself.
 #
 # **This is not the `zip`-beside-the-`dmg` case, and the difference is who downloads it.** No
-# `zip` on macOS because electron-updater wants one and there is no updater yet (epic E9), so
-# it would be an artifact nothing downloads — a file added for a machine that does not exist.
+# `zip` on macOS because electron-updater wants one only to *install*, and macOS installs an
+# update only into a signed app, which Tyto is not (TYTO-131, ADR 0069): a Mac copy is told a
+# newer version exists and sent to the release page. So the zip would be an artifact nothing
+# downloads. Signing is what turns it on — the certificate, then a `zip` target here.
 # The portable `.exe` is for a person, and the person exists now: the beta testers TYTO-130
 # cuts the release for. `test:package`'s `--dir` build already covers *run the packaged app
 # without installing it, here*; what it cannot do is leave the machine that built it, because

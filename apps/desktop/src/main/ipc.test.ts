@@ -1,7 +1,12 @@
 import { type Layout, DEFAULT_LAYOUT } from '../../shared/layout.js';
 import { describe, expect, it, vi } from 'vitest';
 
-import { IPC_CHANNELS, IPC_CHANNEL_NAMES, IpcContractError } from '../../shared/ipc.js';
+import {
+  IPC_CHANNELS,
+  IPC_CHANNEL_NAMES,
+  IpcContractError,
+  type UpdateStatus,
+} from '../../shared/ipc.js';
 import { type Credentials } from './credentials.js';
 import { createHandlers, guard, registerIpcHandlers } from './ipc.js';
 
@@ -413,6 +418,18 @@ const pluginList = (keychain: Credentials) => ({
     ),
 });
 
+/** The update notice, recording what clicking it asked for (TYTO-131). */
+const updateNotice = (status: UpdateStatus = { state: 'none' }) => {
+  const acted = { count: 0 };
+  return {
+    acted,
+    status: () => status,
+    act: () => {
+      acted.count += 1;
+    },
+  };
+};
+
 const dependencies = () => {
   const keychain = credentials();
   return {
@@ -446,6 +463,7 @@ const dependencies = () => {
     templates: catalogue(),
     templateEditor: templateEditor(),
     templateDialogs: templateDialogs(),
+    updates: updateNotice(),
   };
 };
 
@@ -734,6 +752,18 @@ describe('app:exit-listening', () => {
     expect(exit.heard.count).toBe(1);
     expect(exit.acknowledged).toEqual([]);
     expect(exit.given).toEqual([]);
+  });
+});
+
+describe('update:status and update:act', () => {
+  it('answers with the status the service holds, and passes a click on untouched', async () => {
+    const updates = updateNotice({ state: 'ready', version: '0.7.0' });
+    const handlers = createHandlers({ ...dependencies(), updates });
+
+    expect(await handlers['update:status']({})).toEqual({ state: 'ready', version: '0.7.0' });
+    expect(updates.acted.count).toBe(0);
+    await handlers['update:act']({});
+    expect(updates.acted.count).toBe(1);
   });
 });
 

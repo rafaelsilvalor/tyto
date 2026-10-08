@@ -205,6 +205,13 @@ export interface Catalogue {
   readonly 'import.confirm': string;
   readonly 'import.decline': string;
   /**
+   * The footer's update notice (TYTO-131, ADR 0069). `{version}` is the newer version.
+   * Only one of the three is ever on screen, and none while there is nothing newer.
+   */
+  readonly 'update.available': string;
+  readonly 'update.downloading': string;
+  readonly 'update.ready': string;
+  /**
    * The File submenu's own title (TYTO-124).
    *
    * Written by this app rather than left to `role: 'fileMenu'`, because that role's entire
@@ -472,6 +479,9 @@ export const CATALOGUE_KEYS = [
   'import.credentials',
   'import.confirm',
   'import.decline',
+  'update.available',
+  'update.downloading',
+  'update.ready',
   'menu.file',
   'command.document.new',
   'command.document.close',

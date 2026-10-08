@@ -27,6 +27,7 @@ import { type PreviewService } from './preview.js';
 import { type QueueService, type QueueView } from './queue.js';
 import { type TemplateDiagnostic, type TemplateEditorService } from './template-editor.js';
 import { type TemplateCatalogue } from './templates.js';
+import { type UpdateService } from './updates.js';
 
 /**
  * Every handler, registered from the contract rather than beside it.
@@ -88,6 +89,8 @@ export interface IpcDependencies {
   };
   /** Brief text to files on disk (E9.4). Injected for the reason `preview` is. */
   readonly exports: ExportService;
+  /** A newer version: what the notice says, and what clicking it does (TYTO-131). */
+  readonly updates: Pick<UpdateService, 'status' | 'act'>;
   /**
    * The native folder picker and the OS file manager, wrapped here for the reason the other
    * dialogs are: `dialog` and `shell` are Electron main-process APIs, and a service that
@@ -217,6 +220,7 @@ export function createHandlers(dependencies: IpcDependencies): Handlers {
     templateDialogs,
     templateEditor,
     templates,
+    updates,
   } = dependencies;
 
   return {
@@ -279,6 +283,13 @@ export function createHandlers(dependencies: IpcDependencies): Handlers {
 
     'app:exit-listening': () => {
       exit.listening();
+      return Promise.resolve({});
+    },
+
+    'update:status': () => Promise.resolve(updates.status()),
+
+    'update:act': () => {
+      updates.act();
       return Promise.resolve({});
     },
 

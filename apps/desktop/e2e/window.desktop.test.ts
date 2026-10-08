@@ -282,6 +282,9 @@ describe('the bridge', () => {
       'templates:folder',
       'templates:list',
       'templates:set-folder',
+      // TYTO-131, ADR 0069: the update notice. Exercised by `e2e/update.package.test.ts`.
+      'update:act',
+      'update:status',
     ]);
   });
 });
@@ -420,6 +423,12 @@ describe('the language picker', () => {
     'import.credentials',
     'import.confirm',
     'import.decline',
+    // TYTO-131: the footer's update notice. Hidden until a newer version exists, which it never
+    // does here — a suite never checks the real feed — and only one of the three at a time.
+    // `src/renderer/update-notice.test.ts` holds them to a locale.
+    'update.available',
+    'update.downloading',
+    'update.ready',
     'menu.file',
     'command.document.new',
     'command.document.close',

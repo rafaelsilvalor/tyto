@@ -30,7 +30,8 @@ const SPACE = 0x20;
 const TAB = 0x09;
 const NEWLINE = 0x0a;
 
-export function swapWhitespaceByte(archive: Buffer, entryPath: string): AsarPatch {
+/** Where one packed file's bytes sit in the archive. */
+function locate(archive: Buffer, entryPath: string): { start: number; end: number } {
   // First pickle: a 4-byte payload holding the size of the second.
   const headerPickleSize = archive.readUInt32LE(4);
   // Second pickle: payload size, then the string's length, then the string.
@@ -47,7 +48,17 @@ export function swapWhitespaceByte(archive: Buffer, entryPath: string): AsarPatc
   }
 
   const start = contentStart + Number(entry.offset);
-  const end = start + entry.size;
+  return { start, end: start + entry.size };
+}
+
+/** One packed file's bytes, read out of the archive as the packaged app would (TYTO-131). */
+export function readPackedFile(archive: Buffer, entryPath: string): Buffer {
+  const { start, end } = locate(archive, entryPath);
+  return archive.subarray(start, end);
+}
+
+export function swapWhitespaceByte(archive: Buffer, entryPath: string): AsarPatch {
+  const { start, end } = locate(archive, entryPath);
   for (let index = start + 1; index < end; index += 1) {
     if (archive[index] === SPACE && archive[index - 1] === NEWLINE) {
       const bytes = Buffer.from(archive);

@@ -6,7 +6,7 @@ import {
   createEditor,
 } from '@tyto/editor';
 
-import { type IpcResponse, type TytoBridge } from '../../shared/ipc.js';
+import { type IpcResponse, type TytoBridge, type UpdateStatus } from '../../shared/ipc.js';
 import {
   type CatalogueKey,
   type Locale,
@@ -94,6 +94,7 @@ import {
 import { type SaveOutcome, listenForExit, resolveExit } from './exit.js';
 import { installErrorReporting, reportToLog } from './report-errors.js';
 import { searchPhrasesFor } from './search-phrases.js';
+import { paintUpdateNotice } from './update-notice.js';
 import { type ShellState, fillLocalePicker, localeFromPicker, paint, paintTitle } from './shell.js';
 import {
   type PreviewElements,
@@ -284,6 +285,8 @@ const byId = <T extends HTMLElement>(id: string): T | null =>
  */
 let elements = resolveElements();
 let pane: PreviewElements | undefined;
+/** What main last said about a newer version (TYTO-131). Asked for, never only pushed. */
+let updateStatus: UpdateStatus = { state: 'none' };
 
 function resolveElements() {
   return {
@@ -308,6 +311,8 @@ function resolveElements() {
     // Outside the docks, like the command bar: the strip lists what the *window* has open,
     // so it must not disappear with a panel.
     tabs: document.querySelector<DocumentTabs>(TABS_TAG),
+    // TYTO-131. Beside the version in the footer; hidden while there is nothing newer.
+    updateNotice: byId<HTMLButtonElement>('update-notice'),
   };
 }
 
@@ -1564,6 +1569,15 @@ function repaint(): void {
   paintPanel();
   paintTabs();
   paintCommandBar();
+  if (elements.updateNotice !== null) {
+    paintUpdateNotice(elements.updateNotice, updateStatus, state.locale);
+  }
+}
+
+/** Asks main where the update stands and shows it (TYTO-131). */
+async function refreshUpdate(bridge: TytoBridge): Promise<void> {
+  updateStatus = await bridge['update:status']({});
+  repaint();
 }
 
 /**
@@ -1972,6 +1986,17 @@ async function load(): Promise<void> {
     bridge.on('queue:changed', () => {
       if (elements.queuePanel !== null) void refreshQueue();
     });
+
+    // A newer version (TYTO-131, ADR 0069). Subscribed first and asked second: the check runs
+    // from the moment main starts, and a push into a page that was not yet listening is
+    // dropped without a trace (ADR 0039), so the question is what catches anything earlier.
+    bridge.on('update:changed', () => {
+      void refreshUpdate(bridge);
+    });
+    once(elements.updateNotice, 'click', () => {
+      void bridge['update:act']({});
+    });
+    void refreshUpdate(bridge);
   }
 
   if (bridge !== undefined) {

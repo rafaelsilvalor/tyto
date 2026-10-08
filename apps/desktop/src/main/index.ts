@@ -51,6 +51,8 @@ import { createTemplateEditor } from './template-editor.js';
 import { createExitGuard } from './quit.js';
 import { fileSettingsStore } from './settings-store.js';
 import { createTemplateCatalogue } from './templates.js';
+import { shouldCheck, updateFeedFrom, updateRoute } from './update-feed.js';
+import { type InstallingUpdater, createUpdateService } from './updates.js';
 import { chooseUserDataPath } from './user-data.js';
 import { bundledRenderer, createMainWindow } from './window.js';
 
@@ -523,6 +525,75 @@ async function start(): Promise<void> {
     },
   });
 
+  // **A newer version** (TYTO-131, ADR 0069). Composed before the handlers, so the window can
+  // ask for the status the moment it loads; started after the window exists, so a check that
+  // answers fast has somebody to tell.
+  const feed = updateFeedFrom(
+    await readFile(join(app.getAppPath(), 'package.json'), 'utf8')
+      .then((text): unknown => JSON.parse(text))
+      .catch(() => undefined),
+  );
+  // A feed this build names and cannot use is not a reason to fall back to GitHub: the build
+  // that names one is a suite's, and a suite must not reach the real releases.
+  if (!feed.ok) log.warn(`Update feed ignored: ${feed.reason}`);
+  const updates = createUpdateService({
+    route: updateRoute({
+      packaged: app.isPackaged,
+      platform: process.platform,
+      portableDirectory: process.env['PORTABLE_EXECUTABLE_DIR'],
+      appImage: process.env['APPIMAGE'],
+    }),
+    feed: feed.ok ? feed.value : { kind: 'github' },
+    check:
+      feed.ok &&
+      shouldCheck({
+        feed: feed.value,
+        headless: process.env['TYTO_HEADLESS'] === '1',
+        explicitUserData: app.commandLine.hasSwitch('user-data-dir'),
+      }),
+    currentVersion: app.getVersion(),
+    fetchJson: async (url) => {
+      const response = await net.fetch(url, {
+        headers: { accept: 'application/vnd.github+json' },
+      });
+      if (!response.ok) throw new Error(`${url} answered ${String(response.status)}`);
+      return (await response.json()) as unknown;
+    },
+    updater: async () => {
+      // Loaded here and only here, so a build that never installs never loads the library.
+      // `default` first: electron-updater is CommonJS, and what an ESM import of it exposes by
+      // name depends on what the bundler could see.
+      const module = (await import('electron-updater')) as unknown as {
+        default?: { autoUpdater: unknown };
+        autoUpdater?: unknown;
+      };
+      const loaded = (module.default?.autoUpdater ?? module.autoUpdater) as InstallingUpdater & {
+        logger: unknown;
+      };
+      // Its own logger writes to the console, which a packaged app has nobody reading; what
+      // matters reaches this app's log through the service, one line per event.
+      loaded.logger = null;
+      return loaded;
+    },
+    log,
+    changed: () => {
+      const contents = mainWindow?.webContents;
+      if (contents === undefined || contents.isDestroyed()) return;
+      sendIpcEvent(contents, 'update:changed', {});
+    },
+    quit: () => {
+      app.quit();
+    },
+    openExternal: (url) => {
+      void shell.openExternal(url);
+    },
+  });
+  // `quit` and not `before-quit`: it fires only once the guard above let the app go, so a
+  // person who chose to stay for an unsaved tab keeps the version they are typing in.
+  app.on('quit', (_event, exitCode) => {
+    updates.quitting(exitCode);
+  });
+
   registerIpcHandlers(ipcMain, {
     // The only question this app asks a person that is not a file picker: closing a tab
     // with unsaved text. `cancelId` and `defaultId` both point at the safe button, so
@@ -650,6 +721,7 @@ async function start(): Promise<void> {
     preview,
     templates,
     templateEditor,
+    updates,
     templateDialogs: {
       // No `createDirectory`: a template to edit is a folder that already has one in it.
       chooseTemplate: async () => {
@@ -749,6 +821,8 @@ async function start(): Promise<void> {
   mainWindow.webContents.on('did-start-navigation', ({ isMainFrame, isSameDocument }) => {
     if (isMainFrame && !isSameDocument) exit.windowGone();
   });
+
+  void updates.start();
 
   app.on('window-all-closed', () => {
     // macOS keeps an app alive with no windows; every other platform does not.

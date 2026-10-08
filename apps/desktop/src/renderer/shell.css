@@ -105,6 +105,15 @@ body {
   margin: 0;
 }
 
+/* TYTO-131: the update notice, at the footer's size so it reads as part of the version line. */
+.shell__update {
+  font-size: 13px;
+}
+
+.shell__update[hidden] {
+  display: none;
+}
+
 /*
  * E9.2: the split, the preview stage and the checkerboard.
  *
