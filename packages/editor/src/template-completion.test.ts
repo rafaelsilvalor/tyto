@@ -41,7 +41,7 @@ slots:
  * reason. The analysis is optional, the way it is in a real editor — a host may mount
  * `templateCompletion()` without `templateLint()`, and everything but `slot="…"` still works.
  */
-const completeAt = (marked: string, manifest?: TemplateManifest): CompletionResult | null => {
+const contextAt = (marked: string, manifest?: TemplateManifest): CompletionContext => {
   const pos = marked.indexOf('|');
   if (pos === -1) throw new Error('the fixture has no | marking the cursor');
   const doc = marked.replace('|', '');
@@ -57,7 +57,40 @@ const completeAt = (marked: string, manifest?: TemplateManifest): CompletionResu
           effects: setTemplateAnalysis.of({ source: doc, diagnostics: [], manifest }),
         }).state;
 
-  return completeTemplate(new CompletionContext(state, pos, false));
+  return new CompletionContext(state, pos, false);
+};
+
+const completeAt = (marked: string, manifest?: TemplateManifest): CompletionResult | null =>
+  completeTemplate(contextAt(marked, manifest));
+
+/**
+ * How many times a long-document case asks the source before it gives up (TYTO-242).
+ *
+ * A count, not a time, sized the way `completion.test.ts` sizes its own: with a stand-in
+ * clock that advances 50 ms per read, so the budget lapses after a couple of parser steps
+ * on every ask, the 200-, 400- and 1 000-line cases answered on asks 47, 91 and 224
+ * (idle: 1, 1 and 1). 5 000 is twenty times the worst; one bound for both files.
+ */
+const ASKS_BEFORE_GIVING_UP = 5000;
+
+/**
+ * Ask the source again, on the same state, until it answers — the product path, repeated.
+ *
+ * `treeAt` gives the parser 100 ms of wall clock, and a descheduled CI worker gets `null`
+ * back with nothing wrong in the source. CodeMirror keeps the parse on the state, so each
+ * ask resumes it. Parsing the state here instead would keep this case green with
+ * `ensureSyntaxTree` gone from `syntax.ts`, which is the call it guards (TYTO-114).
+ */
+const completeOnceParsed = (
+  marked: string,
+  manifest?: TemplateManifest,
+): CompletionResult | null => {
+  const context = contextAt(marked, manifest);
+  for (let ask = 1; ask < ASKS_BEFORE_GIVING_UP; ask += 1) {
+    const result = completeTemplate(context);
+    if (result !== null) return result;
+  }
+  return completeTemplate(context);
 };
 
 const labelsOf = (result: CompletionResult | null): string[] =>
@@ -254,8 +287,9 @@ describe('completeTemplate — slot values', () => {
 
       // Asserted before the labels: `null` and "no options" are one value through
       // `labelsOf`, and telling them apart is the whole diagnosis here.
-      expect(completeAt(document_, CARROSSEL), `${String(lines)} lines`).not.toBeNull();
-      expect(labelsOf(completeAt(document_, CARROSSEL)), `${String(lines)} lines`).toEqual(
+      const result = completeOnceParsed(document_, CARROSSEL);
+      expect(result, `${String(lines)} lines`).not.toBeNull();
+      expect(labelsOf(result), `${String(lines)} lines`).toEqual(
         sorted([...TAGS, ...STRUCTURAL_TAGS]),
       );
     }

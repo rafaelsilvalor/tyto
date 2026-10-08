@@ -54,7 +54,7 @@ const analysisOf = (manifest?: TemplateManifest): BriefAnalysis => ({
  * without a language in the state there is no tree to read — every case would answer
  * `null` for the wrong reason.
  */
-const completeAt = (marked: string, analysis: BriefAnalysis): CompletionResult | null => {
+const contextAt = (marked: string, analysis: BriefAnalysis): CompletionContext => {
   const pos = marked.indexOf('|');
   if (pos === -1) throw new Error('the fixture has no | marking the cursor');
   const doc = marked.replace('|', '');
@@ -62,7 +62,45 @@ const completeAt = (marked: string, analysis: BriefAnalysis): CompletionResult |
   const created = EditorState.create({ doc, extensions: [briefAnalysisField, briefLanguage] });
   const state = created.update({ effects: setBriefAnalysis.of(analysis) }).state;
 
-  return completeBrief(new CompletionContext(state, pos, false));
+  return new CompletionContext(state, pos, false);
+};
+
+const completeAt = (marked: string, analysis: BriefAnalysis): CompletionResult | null =>
+  completeBrief(contextAt(marked, analysis));
+
+/**
+ * How many times a long-document case asks the source before it gives up (TYTO-242).
+ *
+ * A count, not a time: on an idle machine the first ask answers, and the bound only has to
+ * outlast a parse that loses its budget on every ask. Measured with a stand-in clock that
+ * advances 50 ms per read, so the budget lapses after a couple of parser steps on every
+ * ask: the 200-, 400- and 1 000-line cases answered on asks 137, 271 and 670 (idle: 1, 1
+ * and 1). 5 000 is seven times the worst of those. Running out costs nothing worth
+ * counting, because an ask against a tree that stopped short answers `null` at once.
+ */
+const ASKS_BEFORE_GIVING_UP = 5000;
+
+/**
+ * Ask the source again, on the same state, until it answers — the product path, repeated.
+ *
+ * `treeAt` gives the parser 100 ms of wall clock. A CI worker descheduled for longer than
+ * that gets `null` back with nothing wrong in the source, which is the flake TYTO-242
+ * measured three times in two days. CodeMirror keeps the parse on the state, so every ask
+ * resumes it where the last one stopped and is guaranteed at least one step of progress.
+ *
+ * The repetition goes through `completeBrief` rather than parsing the state up front on
+ * purpose: a test that parsed for itself would stay green with `ensureSyntaxTree` deleted
+ * from `syntax.ts`, and that call is what this case exists to guard (TYTO-114). Without it
+ * no number of asks moves `syntaxTree(state)` past the initial window, so the loop runs out
+ * and the case still goes red.
+ */
+const completeOnceParsed = (marked: string, analysis: BriefAnalysis): CompletionResult | null => {
+  const context = contextAt(marked, analysis);
+  for (let ask = 1; ask < ASKS_BEFORE_GIVING_UP; ask += 1) {
+    const result = completeBrief(context);
+    if (result !== null) return result;
+  }
+  return completeBrief(context);
 };
 
 const labelsOf = (result: CompletionResult | null): string[] =>
@@ -304,7 +342,7 @@ describe('completeBrief', () => {
       // arithmetic: they are past the window, and the 200 case is inside it.
       expect(document_.length > 3000, `${String(lines)} lines`).toBe(lines > 200);
 
-      const result = completeAt(document_, analysisOf(CARROSSEL));
+      const result = completeOnceParsed(document_, analysisOf(CARROSSEL));
 
       // Asserted before the labels, so a future failure says "no tree" rather than being
       // read as "no suggestions" — the two are indistinguishable through `labelsOf` alone,
