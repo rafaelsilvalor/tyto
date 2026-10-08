@@ -85,6 +85,7 @@ non-zero.
 | `E_RENDER_FAILED` | error | no | A frame could not be turned into bytes by the exporter or the rasterizer. |
 | `E_OUTPUT_WRITE` | error | no | An artifact was rendered but could not be written to the output. |
 | `E_DELIVERY_FOLDER_BLOCKED` | error | yes | A delivery needs a folder at a path where a file already is. |
+| `E_OUTPUT_FILE_BLOCKED` | error | yes | Tyto needs to write a file at a path where a folder already is. |
 | `W_TEXT_OVERFLOW` | warning | no | Compiled text does not fit its frame in one of the requested formats. |
 | `W_TEMPLATE_OVERFLOW` | warning | no | An artwork's content runs past the room its template has for it in one format. |
 | `W_UNUSED_SLOT` | warning | no | The brief sets a slot the chosen template never renders. |
@@ -179,6 +180,7 @@ incomplete brief, and a crossed box where a picture the exporter could not load 
 | `E_RENDER_FAILED` | no | One frame of twelve. The others are already written, and a file that is missing from `result.json` is visible in a way a hole inside an artwork is not. |
 | `E_OUTPUT_WRITE` | no | The same: one artifact that did not reach the output, counted against `planned`. |
 | `E_DELIVERY_FOLDER_BLOCKED` | yes | Fatal when the delivery folder or `editaveis/` is held: there is nowhere to write the artwork or `result.json`, so nothing is. When only `assets/` is held, the artwork is already written and the images are not copied beside it. |
+| `E_OUTPUT_FILE_BLOCKED` | yes | Depends on the file. The copied brief: nothing is rendered. An artwork file: that one artifact is missing, reported as `E_OUTPUT_WRITE` with this sentence. `template.txt` or an image in `assets/`: the artwork is written and that file is not. `result.json`: the artwork is written and no report is. |
 
 ## Errors
 
@@ -1088,6 +1090,20 @@ Fatal when the delivery folder or `editaveis/` is held: there is nowhere to writ
 
 ```
 '{path}' is a file, and the delivery needs a folder with that name. Rename or move the file, or deliver somewhere else.
+```
+
+Parameters: `path`
+
+### `E_OUTPUT_FILE_BLOCKED`
+
+**Severity:** error · **Fatal:** yes · **Spec:** `docs/adr/0057-a-delivery-carries-its-brief-and-its-images.md`
+
+Tyto needs to write a file at a path where a folder already is.
+
+Depends on the file. The copied brief: nothing is rendered. An artwork file: that one artifact is missing, reported as `E_OUTPUT_WRITE` with this sentence. `template.txt` or an image in `assets/`: the artwork is written and that file is not. `result.json`: the artwork is written and no report is.
+
+```
+'{path}' is a folder, and Tyto needs to write a file with that name. Rename or move the folder, or write somewhere else.
 ```
 
 Parameters: `path`

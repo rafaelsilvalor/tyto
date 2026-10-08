@@ -428,14 +428,17 @@ export async function createExportService(options: ExportServiceOptions): Promis
     // Before `result.json`, whose warnings include what it removed from `assets/`.
     const delivered =
       delivery === undefined ? [] : await delivery.deliverAssets(assets.delivered());
-    if (delivery !== undefined && job.ok && job.value.template !== undefined) {
-      const { name, version, description } = job.value.template;
-      await delivery.describeTemplate({
-        name,
-        version,
-        ...(description === undefined ? {} : { description }),
-      });
-    }
+    // A folder holding `template.txt` is an error, and it goes in the `result.json` below.
+    const described =
+      delivery !== undefined && job.ok && job.value.template !== undefined
+        ? await delivery.describeTemplate({
+            name: job.value.template.name,
+            version: job.value.template.version,
+            ...(job.value.template.description === undefined
+              ? {}
+              : { description: job.value.template.description }),
+          })
+        : [];
     run.diagnostics = [
       ...startup,
       ...skipped,
@@ -444,6 +447,7 @@ export async function createExportService(options: ExportServiceOptions): Promis
       ...produced,
       ...leftovers,
       ...delivered,
+      ...described,
     ];
 
     run.result = renderResult({
@@ -462,7 +466,10 @@ export async function createExportService(options: ExportServiceOptions): Promis
 
     // Written even for a failed run, and last: `result.json` is what the other side of ADR
     // 0011 reads, so a run that produced nothing but errors still has to say so.
-    await sink.finish(run.result);
+    // A folder holding `result.json` is answered, not thrown (TYTO-243): shown in the dialog
+    // as a diagnostic, because the file it would have gone in is the one that was not written.
+    const unwritten = await sink.finish(run.result);
+    run.diagnostics = [...run.diagnostics, ...unwritten];
 
     run.status = cancelled ? 'cancelled' : 'finished';
   }

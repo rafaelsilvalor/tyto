@@ -784,6 +784,94 @@ describe('tyto render --folder with a file in the way', () => {
   );
 });
 
+/**
+ * TYTO-243, the mirror: a folder where `--folder` writes a file is exit 1 as well. Windows says
+ * `EPERM` for it, which is why the adapter looks at the name instead of reading the code.
+ */
+describe('tyto render --folder with a folder where a file goes', () => {
+  const NAME = 'agenda';
+  const delivery = (...segments: string[]) => join(workspace, 'entregas', NAME, ...segments);
+  const render = () =>
+    run(
+      ['render', `task/${NAME}.brief`, '--out', 'entregas', '--folder', '--types', 'svg'],
+      environment(),
+    );
+  const sentence = (path: string) =>
+    `'${path}' is a folder, and Tyto needs to write a file with that name. Rename or move the folder, or write somewhere else`;
+
+  beforeEach(async () => {
+    await writeFile(join(workspace, 'task', `${NAME}.brief`), briefSource);
+  });
+
+  it('exits 1 naming the folder that holds the copied brief, and renders nothing', async () => {
+    await mkdir(delivery('editaveis', `${NAME}.brief`), { recursive: true });
+
+    const code = await render();
+
+    expect(code).toBe(EXIT_DIAGNOSTICS);
+    expect(stderr()).toContain(
+      `error E_OUTPUT_FILE_BLOCKED ${sentence(delivery('editaveis', `${NAME}.brief`))}.`,
+    );
+    expect(stderr()).not.toContain('internal failure');
+    expect(stderr()).not.toMatch(/\n\s+at /u);
+    expect(await outFiles('entregas', NAME)).toEqual(['editaveis']);
+  });
+
+  it('exits 1 for a folder holding result.json, with the artwork written and no report', async () => {
+    await mkdir(delivery('editaveis', 'result.json'), { recursive: true });
+
+    const code = await render();
+
+    expect(code).toBe(EXIT_DIAGNOSTICS);
+    expect(stderr()).toContain(
+      `error E_OUTPUT_FILE_BLOCKED ${sentence(delivery('editaveis', 'result.json'))}.`,
+    );
+    expect(stderr()).not.toContain('internal failure');
+    expect(await outFiles('entregas', NAME)).toEqual([
+      'assets',
+      'editaveis',
+      'feed-01.svg',
+      'feed-02.svg',
+    ]);
+  });
+
+  it('exits 1 for a folder holding template.txt, and result.json says so', async () => {
+    await mkdir(delivery('editaveis', 'template.txt'), { recursive: true });
+
+    expect(await render()).toBe(EXIT_DIAGNOSTICS);
+
+    const parsed = parseRenderResult(await resultAt('entregas', NAME, 'editaveis'));
+    if (!parsed.ok) throw new Error(parsed.error.join('; '));
+    expect(parsed.value.status).toBe('error');
+    expect(parsed.value.diagnostics.map((item) => item.code)).toEqual(['E_OUTPUT_FILE_BLOCKED']);
+  });
+
+  it('exits 1 for a folder holding an image in assets/, and result.json says so', async () => {
+    await mkdir(delivery('assets', 'logo.png'), { recursive: true });
+
+    expect(await render()).toBe(EXIT_DIAGNOSTICS);
+
+    expect(stderr()).toContain(
+      `error E_OUTPUT_FILE_BLOCKED ${sentence(delivery('assets', 'logo.png'))}.`,
+    );
+    const parsed = parseRenderResult(await resultAt('entregas', NAME, 'editaveis'));
+    if (!parsed.ok) throw new Error(parsed.error.join('; '));
+    expect(parsed.value.diagnostics.map((item) => item.code)).toEqual(['E_OUTPUT_FILE_BLOCKED']);
+  });
+
+  it('exits 1 for a folder holding an artwork file, with E_OUTPUT_WRITE naming the folder', async () => {
+    await mkdir(delivery('feed-01.svg'), { recursive: true });
+
+    expect(await render()).toBe(EXIT_DIAGNOSTICS);
+
+    expect(stderr()).toContain(
+      `error E_OUTPUT_WRITE Could not write 'feed-01.svg': ${sentence(delivery('feed-01.svg'))}.`,
+    );
+    expect(stderr()).not.toContain('EPERM');
+    expect(stderr()).not.toContain('EISDIR');
+  });
+});
+
 /* ----------------------------------------------------------------------- exit codes -- */
 
 describe('the three exit codes ADR 0011 fixes', () => {
