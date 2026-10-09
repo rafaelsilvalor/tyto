@@ -857,5 +857,3 @@ void app
   .catch((reason: unknown) => {
     reportCrash(reason);
   });
-
-// TYTO-52 measurement: a one-line change to a leaf package, reverted by the next commit.
