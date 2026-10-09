@@ -48,6 +48,8 @@ arbiter**, and a Windows checkout can see green on a range CI will reject.
 
 Name `@tyto/<name>`. `src/index.ts` is the only public API. `exports` in package.json. Tests beside the code: `foo.test.ts`. Fixtures in `__fixtures__/`.
 
+**A published `.d.ts` promises no value its bundle lacks.** tsup's declaration rollup can drop a `type` modifier — `export type { EditorState }` came out as `export { EditorState } from '@codemirror/state'` (TYTO-115) — so re-export a third-party type through a local alias, `export type EditorState = CodeMirrorEditorState`. `tools/repo-checks/src/declared-value-exports.test.ts` compares every `types` entry's value exports against its `.js` and fails naming the name. A new package with a `types` entry is added as a `workspace:*` devDependency of `@tyto/repo-checks`, which is how the check gets a fresh `dist` (ADR 0071); it fails until you do.
+
 ## Runtime boundary
 
 Every package is _pure_, _Node_ or _DOM_ (ADR 0010). The category is declared twice on purpose: `tsconfig.{pure,node,dom}.json` decide which types the package can even see, and the `boundary/*` blocks in `eslint.config.js` forbid the matching imports and globals with a message that names the way out. `tools/repo-checks` lints throwaway sources against the real config, so weakening a boundary rule fails `pnpm check`.
