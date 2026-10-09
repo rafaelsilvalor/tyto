@@ -8,12 +8,13 @@ export default defineConfig({
     // own config. `launch-isolation` is the exception that proves it: it reads the suites'
     // source and launches nothing, so every pull request runs it (TYTO-139).
     // `asar-patch` is pure byte work for the packaged suite, and is checked here for the same
-    // reason (TYTO-241).
+    // reason (TYTO-241). So is `port-file`, the CDP harness reading Chromium's port (TYTO-95).
     include: [
       'shared/**/*.test.ts',
       'src/**/*.test.ts',
       'e2e/launch-isolation.test.ts',
       'e2e/asar-patch.test.ts',
+      'e2e/port-file.test.ts',
     ],
   },
 });

@@ -1,10 +1,11 @@
 import { type ChildProcess, spawn } from 'node:child_process';
-import { existsSync, readFileSync, readdirSync } from 'node:fs';
+import { readFileSync, readdirSync } from 'node:fs';
 import { join } from 'node:path';
 
 import { type Browser, type Page, chromium } from 'playwright';
 
 import { FIRST_WINDOW_TIMEOUT_MS } from './first-window.js';
+import { readPortFile } from './port-file.js';
 import { appSwitches, killTree } from './run-as-node-probe.js';
 
 /**
@@ -105,11 +106,12 @@ export async function launchOverCdp(
     };
     // Two lines, port and path: Chromium writes the file in one go, but a read can land
     // between the create and the write.
-    while (!existsSync(portFile) || readFileSync(portFile, 'utf8').split('\n').length < 2) {
+    let lines: string[] | undefined;
+    while ((lines = readPortFile(portFile)) === undefined) {
       deadline('DevToolsActivePort');
       await sleep(50);
     }
-    const port = readFileSync(portFile, 'utf8').split('\n')[0]!;
+    const port = lines[0]!;
     const browser = await chromium.connectOverCDP(`http://127.0.0.1:${port}`);
 
     let page: Page | undefined;

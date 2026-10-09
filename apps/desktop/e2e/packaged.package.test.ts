@@ -436,7 +436,13 @@ describe('the packaged app', () => {
         `read outside grant → ${String(code)}\n`,
     );
     expect(code).toBe('ERR_ACCESS_DENIED');
-    expect(execPath?.endsWith(join('resources', 'node', binary))).toBe(true);
+    // `Tyto.app/Contents/Resources` on macOS, capitalised; `resources` beside the binary on the
+    // other two. Found by the first macOS run of this suite, the release gate's (TYTO-95).
+    const resources = process.platform === 'darwin' ? 'Resources' : 'resources';
+    expect(
+      execPath?.endsWith(join(resources, 'node', binary)),
+      `the guest ran on ${String(execPath)}, not on the Node the package carries`,
+    ).toBe(true);
   }, 120_000);
 
   it('cannot be run as Node, and the probe that says so can see a Node (TYTO-193)', async () => {

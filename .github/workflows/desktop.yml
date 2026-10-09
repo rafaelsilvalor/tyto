@@ -1,6 +1,20 @@
 name: desktop
+# **A pull request that changes the release runs it too, and uploads nothing** (TYTO-95). A
+# tag is pushed to release, not to find out, and until this trigger the only run of this
+# file a change ever got was the release itself — which is how the tag-prefix defect and the
+# empty `CSC_LINK` on macOS were both found (TYTO-97, TYTO-98). So a pull request touching
+# this file, the electron-builder configuration or the gate's own suite runs all three legs
+# through the build and the packaged-app gate, and stops there: every step that can reach a
+# release or a secret is `if: github.event_name == 'push'`, and `desktop-release.test.ts`
+# fails if one is not. Not a required check, so the `paths:` filter cannot leave a pull
+# request pending; the required `desktop` context in `desktop-e2e.yml` is unchanged.
 on:
   push: { tags: ['desktop-v*'] }
+  pull_request:
+    paths:
+      - .github/workflows/desktop.yml
+      - apps/desktop/electron-builder.yml
+      - apps/desktop/e2e/*.package.test.ts
 permissions: { contents: write }
 jobs:
   build:
@@ -12,7 +26,11 @@ jobs:
       matrix: { os: [macos-latest, windows-latest, ubuntu-latest] }
     runs-on: ${{ matrix.os }}
     steps:
+      # No token left in the git config. Nothing here pushes — the publish step reads `GH_TOKEN`
+      # from its own `env:` — and on a pull request the gate runs repository code with a token
+      # this job's `contents: write` would otherwise have handed it.
       - uses: actions/checkout@v7
+        with: { persist-credentials: false }
       - uses: pnpm/action-setup@v6
       - uses: actions/setup-node@v7
         with: { node-version: 22, cache: pnpm }
@@ -27,6 +45,7 @@ jobs:
       # substituted before the shell parses the line. `shell: bash` because the Windows
       # runner would otherwise read this as PowerShell.
       - name: The tag names the version being packaged
+        if: github.event_name == 'push'
         shell: bash
         run: |
           packaged="desktop-v$(node -p "require('./apps/desktop/package.json').version")"
@@ -44,6 +63,39 @@ jobs:
       # "apps/desktop/src/main/plugins.ts"`. Turborepo's `^build` is what orders them, and
       # the root script is what reaches it.
       - run: pnpm build
+
+      # **The gate: the packaged app opens, or this leg uploads nothing** (TYTO-95). The same
+      # command `desktop-e2e.yml` runs on every scoped pull request, on all three runners —
+      # `packaged.package.test.ts` packages with `electron-builder --dir` from the same
+      # `electron-builder.yml`, so the fuses flipped and the asar hash written are the ones the
+      # installers below carry, and it reads the fuse wire back out of the binary.
+      # `update.package.test.ts` runs on Linux and prints its skip on the other two.
+      #
+      # It packages a second time rather than reusing the publish step's output: the card
+      # allowed that only if it did not change what is tested, and the publish step comes
+      # after the gate by construction. **Before the signing step**, so no certificate is in
+      # the environment of a process running repository tests — which means that once
+      # `CSC_LINK` exists the gate tests the unsigned pack and the installers are signed.
+      # Today no certificate is configured and the two are the same build.
+      #
+      # `--reporter=verbose` because the default reporter lists only the slow tests of a green
+      # file: the first run of this gate passed all eleven on Linux and named four of them, so
+      # the log could not show that `opens a window at all` had run. The names are the proof.
+      #
+      # Linux wants Chromium's shared libraries and a display, the arrangement
+      # `desktop-e2e.yml` explains: `show: false` is not headless there.
+      - if: runner.os == 'Linux'
+        run: pnpm exec playwright install-deps chromium
+      - if: runner.os == 'Linux'
+        run: sudo apt-get install -y --no-install-recommends xvfb
+      - name: The packaged app opens before anything is uploaded
+        shell: bash
+        run: |
+          if [ "$RUNNER_OS" = Linux ]; then
+            xvfb-run -a pnpm --filter @tyto/desktop test:package --reporter=verbose
+          else
+            pnpm --filter @tyto/desktop test:package --reporter=verbose
+          fi
 
       # **A secret that does not exist is not an absent variable.** `${{ secrets.CSC_LINK }}`
       # in a step's `env:` writes the variable either way — to the empty string when no such
@@ -65,6 +117,7 @@ jobs:
       # script, the same rule the tag guard above follows; the heredoc delimiter is random
       # because a certificate or a password may contain any fixed one.
       - name: Pass the signing certificate through only when there is one
+        if: github.event_name == 'push'
         shell: bash
         run: |
           if [ -n "$SIGNING_CERTIFICATE" ]; then
@@ -85,6 +138,7 @@ jobs:
       # makes *not* setting them work. Notarizing a macOS build additionally wants `APPLE_ID`,
       # `APPLE_APP_SPECIFIC_PASSWORD` and `APPLE_TEAM_ID`, and is a separate decision
       # (`docs/git-workflow.md`).
-      - run: pnpm --filter @tyto/desktop exec electron-builder --publish always
+      - if: github.event_name == 'push'
+        run: pnpm --filter @tyto/desktop exec electron-builder --publish always
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
