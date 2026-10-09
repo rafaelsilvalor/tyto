@@ -1,0 +1,18 @@
+{
+  "$schema": "https://turbo.build/schema.json",
+  "extends": ["//"],
+  "tasks": {
+    "test": {
+      // `desktop-diagnostic-codes.test.ts` reads the desktop sources and the generated
+      // catalogue, neither of which is in this package or among its workspace dependencies.
+      // Without these inputs a change that mints a new code in the window would replay this
+      // suite's last green result from the cache (TYTO-141).
+      "inputs": [
+        "$TURBO_DEFAULT$",
+        "$TURBO_ROOT$/apps/desktop/src/**",
+        "$TURBO_ROOT$/apps/desktop/shared/**",
+        "$TURBO_ROOT$/docs/diagnostic-codes.md"
+      ]
+    }
+  }
+}
