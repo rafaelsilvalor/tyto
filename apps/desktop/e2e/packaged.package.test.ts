@@ -239,8 +239,8 @@ beforeAll(async () => {
   // universal one (TYTO-146). With it, the app launched below is the one the `dmg` carries,
   // and on an Intel runner the slice that starts is the x64 one.
   const cli = createRequire(import.meta.url).resolve('electron-builder/cli.js');
-  void process.platform;
-  execFileSync(process.execPath, [cli, '--dir', '--publish', 'never'], {
+  const architecture = process.platform === 'darwin' ? ['--universal'] : [];
+  execFileSync(process.execPath, [cli, '--dir', ...architecture, '--publish', 'never'], {
     cwd: projectDirectory,
     stdio: 'inherit',
   });
