@@ -263,7 +263,12 @@ describe("a template's own folder, in the window and the CLI (TYTO-176)", () => 
     execFileSync(
       process.execPath,
       [cli, 'render', briefPath, '--out', fromCli, '--types', 'svg', '--templates', templates],
-      { cwd: scratch, stdio: 'pipe' },
+      // The window's scratch home, or the CLI loads the plugins ~/.tyto enables (TYTO-252).
+      {
+        cwd: scratch,
+        stdio: 'pipe',
+        env: { ...process.env, TYTO_HOME: join(scratch, 'tyto-home') },
+      },
     );
     const background = solidPng(16, BACKGROUND_RGB).toString('base64');
     for (const folder of [fromWindow, fromCli]) {

@@ -282,7 +282,12 @@ describe('exporting from the window (E9.4)', () => {
     execFileSync(
       process.execPath,
       [cli, 'render', briefPath, '--out', fromCli, '--types', 'svg', '--templates', TEMPLATES],
-      { cwd: scratch, stdio: 'pipe' },
+      // The window's scratch home, or the CLI loads the plugins ~/.tyto enables (TYTO-252).
+      {
+        cwd: scratch,
+        stdio: 'pipe',
+        env: { ...process.env, TYTO_HOME: join(scratch, 'tyto-home') },
+      },
     );
 
     const listing = (directory: string): string[] =>

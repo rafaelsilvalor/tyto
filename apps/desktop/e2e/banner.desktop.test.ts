@@ -236,6 +236,8 @@ describe("banner-roxo's backgrounds in the window and the CLI (TYTO-210)", () =>
     execFileSync(process.execPath, [cli, 'render', briefPath, '--out', fromCli, '--types', 'svg'], {
       cwd: scratch,
       stdio: 'pipe',
+      // The window's scratch home, or the CLI loads the plugins ~/.tyto enables (TYTO-252).
+      env: { ...process.env, TYTO_HOME: join(scratch, 'tyto-home') },
     });
 
     for (const format of FORMAT_IDS) {
