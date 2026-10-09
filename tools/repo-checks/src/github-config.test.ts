@@ -444,54 +444,106 @@ describe('formatting', () => {
 });
 
 /**
- * `changeset status`, which reads the files `release.yml` would version.
+ * The changeset check, which asks whether every versioned package a pull request changed is
+ * named in a changeset that pull request added (ADR 0070, TYTO-155).
  *
- * `changesets.test.ts` holds the one failure that has actually happened — a file naming a
- * private package beside a published one. This holds the *class*: the tool itself, run on
- * every pull request, where `release.yml` runs only after the merge. Both exist because the
- * two answer different questions, and the expensive one is "what else does Changesets
- * refuse that nobody has hit yet".
+ * It replaced a bare `changeset status`, which answered "is any changeset pending?" and was
+ * read as "is this change accounted for?". The script still runs `changeset status` when the
+ * folder holds a file, so the class `changesets.test.ts` holds one case of — a file
+ * Changesets refuses, found only after the merge (TYTO-109) — is still caught before it.
  */
-describe('changeset status', () => {
+const CHANGESET_CHECK = 'tools/repo-checks/src/changeset-coverage.mjs';
+
+const ciSteps = () =>
+  Object.values(readYaml<Workflow>(`${WORKFLOWS_DIR}/ci.yml`).jobs ?? {}).flatMap(
+    (job) => job.steps ?? [],
+  );
+
+describe('changeset check', () => {
   it('is run by a workflow, on a pull request', () => {
-    const running = workflowsRunning('changeset status');
-    expect(running, 'no workflow runs `changeset status`').not.toHaveLength(0);
+    const running = workflowsRunning(CHANGESET_CHECK);
+    expect(running, 'no workflow runs the changeset check').not.toHaveLength(0);
 
     const onPullRequest = running.filter((file) =>
       triggersOf(readYaml<Workflow>(`${WORKFLOWS_DIR}/${file}`)).includes('pull_request'),
     );
-    expect(onPullRequest, '`changeset status` runs, but not before a merge').not.toHaveLength(0);
+    expect(onPullRequest, 'the changeset check runs, but not before a merge').not.toHaveLength(0);
+  });
+
+  it('still asks Changesets itself to validate the pending files', () => {
+    // Moving the check into a script must not drop the one thing `changeset status` did
+    // that nothing else here does.
+    expect(readRepoFile(CHANGESET_CHECK)).toContain("['exec', 'changeset', 'status']");
   });
 
   it('is not `changeset version`, which writes', () => {
-    // The one way this step could be wrong rather than missing. `version` rewrites every
-    // manifest and consumes the folder; on a pull request it would either fail or commit.
+    // `version` rewrites every manifest and consumes the folder; on a pull request it would
+    // either fail or commit.
     const ci = readRepoFile(`${WORKFLOWS_DIR}/ci.yml`);
     expect(ci).not.toMatch(/run:.*changeset version/u);
   });
 
   it('is skipped on the version PR, and on nothing else', () => {
     // **The version PR is the one pull request that must have no changeset**, because it
-    // exists to consume them, and `changeset status` errors when packages changed against
-    // the base and the folder is empty. It passed by accident until TYTO-94: private
-    // packages were not versioned, so eight or nine files were left behind on every run and
-    // the folder was never empty. The first version PR after that config change went red
-    // (TYTO-134).
+    // exists to consume them (TYTO-134).
     //
     // The condition is asserted as a literal string on purpose. Anything broader —
     // `always()`, `continue-on-error`, a `startsWith` on the ref — would keep this describe
-    // green while switching the step off for the pull requests it exists for, and the two
-    // assertions above cannot tell those apart. Widening it should cost a reading of this
-    // comment.
-    const steps = Object.values(readYaml<Workflow>(`${WORKFLOWS_DIR}/ci.yml`).jobs ?? {})
-      .flatMap((job) => job.steps ?? [])
-      .filter((step) => step.run?.includes('changeset status') === true);
+    // green while switching the step off for the pull requests it exists for. Widening it
+    // should cost a reading of this comment.
+    const steps = ciSteps().filter((step) => step.run?.includes(CHANGESET_CHECK) === true);
 
-    expect(steps, 'ci.yml no longer runs `changeset status` exactly once').toHaveLength(1);
+    expect(steps, 'ci.yml no longer runs the changeset check exactly once').toHaveLength(1);
     expect(steps[0]!.if).toBe("github.head_ref != 'changeset-release/main'");
     // On the step, not on the file: `ci.yml` uses `continue-on-error` legitimately on the
     // artifact upload, and a file-wide match reads that one as this one.
     expect(steps[0]!['continue-on-error']).toBeUndefined();
+  });
+
+  it('is told who opened the pull request, which is what the Dependabot rule reads', () => {
+    // Without it the script sees no author, applies the human rule, and every Dependabot
+    // bump of a shipped dependency is red again — through one deleted line.
+    const step = ciSteps().find((candidate) => candidate.run?.includes(CHANGESET_CHECK) === true);
+    expect(step?.env?.PR_AUTHOR).toBe('${{ github.event.pull_request.user.login }}');
+  });
+
+  it('is no longer the bare `changeset status` step it replaced', () => {
+    const steps = ciSteps().filter((step) => step.run?.includes('changeset status') === true);
+    expect(steps, 'ci.yml runs `changeset status` on its own again').toEqual([]);
+  });
+});
+
+/**
+ * The release side of the same decision: the changesets Dependabot's bumps could not carry
+ * are written by `release.yml` before the version PR is built. The version-PR title the
+ * generator stops at is pinned against `release.yml` in `dependabot-changesets.test.mjs`.
+ */
+describe('Dependabot changesets at release', () => {
+  const GENERATOR = 'tools/repo-checks/src/dependabot-changesets.mjs';
+  const releaseSteps = () =>
+    Object.values(readYaml<Workflow>(`${WORKFLOWS_DIR}/release.yml`).jobs ?? {}).flatMap(
+      (job) => job.steps ?? [],
+    );
+
+  it('are written before changesets/action reads the folder', () => {
+    const steps = releaseSteps();
+    const generator = steps.findIndex((step) => step.run?.includes(GENERATOR) === true);
+    const action = steps.findIndex((step) => step.uses?.startsWith('changesets/action@') === true);
+
+    expect(generator, 'release.yml no longer writes the Dependabot changesets').not.toBe(-1);
+    expect(generator).toBeLessThan(action);
+  });
+
+  it('see the whole history, which the default checkout does not fetch', () => {
+    const checkout = releaseSteps().find((step) => step.uses?.startsWith('actions/checkout@'));
+    expect(checkout?.with?.['fetch-depth']).toBe(0);
+  });
+
+  it('are never committed or pushed by the generator itself', () => {
+    // ADR 0070 rejected committing onto the Dependabot branch, and committing to `main`
+    // from here would be a second writer. The version PR stays the only thing this job
+    // writes, through changesets/action.
+    expect(readRepoFile(GENERATOR)).not.toMatch(/['"](?:commit|push)['"]/u);
   });
 });
 
