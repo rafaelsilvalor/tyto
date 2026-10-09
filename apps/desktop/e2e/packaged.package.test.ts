@@ -19,7 +19,7 @@ import { PLUGIN_API_VERSION } from '@tyto/plugin-api';
 import type { Page } from 'playwright';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 
-import { swapWhitespaceByte } from './asar-patch.js';
+import { readPackedFile, swapWhitespaceByte } from './asar-patch.js';
 import {
   type CdpApp,
   closeOverCdp,
@@ -498,6 +498,35 @@ describe('the packaged app', () => {
     // without its `1`, so this is what tells "ignored the variable" from "never got to answer".
     expect(packaged.ended).toBe('killed');
   }, 60_000);
+
+  it('carries the GitHub update feed and no local one (TYTO-131, ADR 0069)', () => {
+    // **What `desktop.yml` packs is what this packs**: the same CLI over the same `out/`, with
+    // no `extraMetadata`. `e2e/update.package.test.ts` bakes a loopback feed into its own two
+    // builds through `extraMetadata.tytoUpdateFeed`, which lands in the packaged
+    // `package.json` and nowhere else; so the field's absence here is the proof that an
+    // ordinary build cannot carry one, and the URL in the bundle is the proof of where it
+    // looks instead.
+    const executable = packagedExecutable();
+    const archive = readFileSync(
+      process.platform === 'darwin'
+        ? join(dirname(executable), '..', 'Resources', 'app.asar')
+        : join(dirname(executable), 'resources', 'app.asar'),
+    );
+    const manifest = JSON.parse(readPackedFile(archive, 'package.json').toString('utf8')) as Record<
+      string,
+      unknown
+    >;
+    const bundle = readPackedFile(archive, 'out/main/index.js').toString('utf8');
+    const feed = 'https://api.github.com/repos/rafaelsilvalor/tyto/releases?per_page=100';
+    process.stdout.write(
+      `[TYTO-131] packaged package.json tytoUpdateFeed=${JSON.stringify(manifest['tytoUpdateFeed'])}; ` +
+        `main bundle names ${feed} → ${String(bundle.includes(feed))}
+`,
+    );
+
+    expect(manifest).not.toHaveProperty('tytoUpdateFeed');
+    expect(bundle).toContain(feed);
+  });
 
   it('refuses a modified app.asar wherever electron-builder wrote its hash (TYTO-241)', async () => {
     // **The two fuses this card switched on, read off the wire first.** `OnlyLoadAppFromAsar`

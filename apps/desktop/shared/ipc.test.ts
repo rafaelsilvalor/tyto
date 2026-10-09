@@ -58,6 +58,8 @@ describe('the IPC contract', () => {
       'templates:folder',
       'templates:list',
       'templates:set-folder',
+      'update:act',
+      'update:status',
     ]);
     expect(new Set(IPC_CHANNEL_NAMES).size).toBe(IPC_CHANNEL_NAMES.length);
   });
@@ -93,6 +95,8 @@ describe('the event table', () => {
       'command:run',
       // TYTO-45. The queue changed; the panel asks `queue:list` when it hears it.
       'queue:changed',
+      // TYTO-131. The update status changed; the window asks `update:status`.
+      'update:changed',
     ]);
     expect(new Set(IPC_EVENT_NAMES).size).toBe(IPC_EVENT_NAMES.length);
   });
@@ -242,6 +246,10 @@ describe('what the contract does not promise', () => {
       // TYTO-45. "What is in the queue" has no subject: there is one queue folder, and where
       // it is, is main's.
       'queue:list',
+      // TYTO-131. "Is there a newer version" and "do what the notice offers" name nothing:
+      // there is one app, and main holds the version and the release page.
+      'update:status',
+      'update:act',
     ];
 
     for (const name of IPC_CHANNEL_NAMES) {

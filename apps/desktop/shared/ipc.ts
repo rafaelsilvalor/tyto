@@ -19,6 +19,23 @@ import { layoutSchema } from './layout.js';
  * check the one side that was already correct. The schema is what survives the crossing.
  */
 
+/**
+ * What the window shows about a newer version (TYTO-131, ADR 0069).
+ *
+ * - `none`: nothing to say — up to date, not checked, or the check failed (which is logged).
+ * - `available`: a newer version this copy cannot install by itself; `url` is its release page.
+ * - `downloading`: one is on its way.
+ * - `ready`: downloaded; it installs when the app quits, or now on "restart".
+ */
+export const updateStatusSchema = z.discriminatedUnion('state', [
+  z.object({ state: z.literal('none') }),
+  z.object({ state: z.literal('available'), version: z.string(), url: z.string() }),
+  z.object({ state: z.literal('downloading'), version: z.string() }),
+  z.object({ state: z.literal('ready'), version: z.string() }),
+]);
+
+export type UpdateStatus = z.infer<typeof updateStatusSchema>;
+
 /** One channel: what may be asked, and what comes back. */
 export interface IpcChannel<
   Request extends z.ZodType = z.ZodType,
@@ -165,6 +182,24 @@ export const IPC_CHANNELS = {
       templates: z.array(z.string()),
     }),
   ),
+
+  /**
+   * Whether a newer version exists, and how far along it is (TYTO-131, ADR 0069).
+   *
+   * **Asked for, not only pushed.** The check starts before the page has a listener, and a
+   * push into a page with no listener is dropped without a trace (ADR 0039); so the page asks
+   * once when it loads and again on every `update:changed`.
+   */
+  'update:status': channel(z.object({}), updateStatusSchema),
+
+  /**
+   * The update notice was clicked (TYTO-131).
+   *
+   * No arguments, because main already knows what the notice offers: restart into a
+   * downloaded update, through the same quit guard Cmd+Q goes through, or open the release
+   * page. The window never hands main a URL to open.
+   */
+  'update:act': channel(z.object({}), z.object({})),
 
   /**
    * A brief, compiled to one HTML document per frame (E9.2).
@@ -1000,6 +1035,12 @@ export const IPC_EVENTS = {
    * once. The third push, and the second that is a notice rather than a question (ADR 0029).
    */
   'queue:changed': z.object({}),
+
+  /**
+   * The update status changed (TYTO-131). Empty, for `queue:changed`'s reason: the window asks
+   * `update:status` for the whole of it.
+   */
+  'update:changed': z.object({}),
 } as const;
 
 export type IpcEvents = typeof IPC_EVENTS;
