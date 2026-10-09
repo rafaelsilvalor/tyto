@@ -3,16 +3,14 @@
   "extends": ["//"],
   "tasks": {
     "test": {
-      // `desktop-diagnostic-codes.test.ts` reads the desktop sources and the generated
-      // catalogue, neither of which is in this package or among its workspace dependencies.
-      // Without these inputs a change that mints a new code in the window would replay this
-      // suite's last green result from the cache (TYTO-141).
-      "inputs": [
-        "$TURBO_DEFAULT$",
-        "$TURBO_ROOT$/apps/desktop/src/**",
-        "$TURBO_ROOT$/apps/desktop/shared/**",
-        "$TURBO_ROOT$/docs/diagnostic-codes.md"
-      ]
+      // Never cached. 17 of these 18 suites read outside this package — workflows, the
+      // husky shims, every manifest, the desktop sources, `node_modules`, the generated
+      // catalogue — and `brand-tokens`, `husky-shims` and `dependabot-changesets` ask git,
+      // whose answer is not a file Turborepo can hash. TYTO-141 listed three of those
+      // reads as inputs; listing all of them is a list that rots the day a suite reads one
+      // more file, and a replay here is a green check about a repository that is no longer
+      // the one being checked. The suite costs seconds; a wrong green costs a merge (ADR 0072).
+      "cache": false
     }
   }
 }

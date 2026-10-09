@@ -16,6 +16,7 @@ jobs:
         with: { lfs: true, fetch-depth: 0 }
       - uses: pnpm/action-setup@v6
       - uses: actions/setup-node@v7
+        id: node
         with: { node-version: 22, cache: pnpm }
       - run: pnpm install --frozen-lockfile
       # Before the turbo run, because it is the cheap failure: seconds against two minutes,
@@ -62,10 +63,32 @@ jobs:
         run: node tools/repo-checks/src/changeset-coverage.mjs --base main
         env:
           PR_AUTHOR: ${{ github.event.pull_request.user.login }}
+      # **A green `check` can now be a replay** (ADR 0072, TYTO-52). Turborepo's local cache is
+      # carried from run to run by `actions/cache`, so a task whose hash did not move prints
+      # `cache hit, replaying logs` and does not run. That is only sound while every file a
+      # task reads is in its hash: root configs are `globalDependencies` in `turbo.json`, a
+      # read outside the package is a `$TURBO_ROOT$` input in that package's `turbo.json`, and
+      # `repo-checks#test`, which reads the whole repository and asks git, is `cache: false`.
+      #
+      # The key carries what Turborepo does not hash: the runner image (system fonts and the
+      # libraries Chromium links) and the Node version, so an image or Node bump starts cold.
+      # The lockfile hash bounds the folder, which Turborepo never prunes: every entry
+      # restored is saved again with this run's additions, and a dependency bump — weekly,
+      # with Dependabot — starts a new chain instead of carrying the old one forward.
+      #
+      # Only this job. `desktop-e2e.yml`, `desktop.yml`, `release.yml` and `visual.yml` build
+      # cold on purpose: what they ship or measure must not be a replay.
+      - id: turbo-key
+        run: echo "runtime=${ImageOS:-none}-${ImageVersion:-none}-node${{ steps.node.outputs.node-version }}" >> "$GITHUB_OUTPUT"
+      - uses: actions/cache@v6
+        with:
+          path: .turbo/cache
+          key: turbo-${{ runner.os }}-${{ steps.turbo-key.outputs.runtime }}-${{ hashFiles('pnpm-lock.yaml') }}-${{ github.sha }}
+          restore-keys: |
+            turbo-${{ runner.os }}-${{ steps.turbo-key.outputs.runtime }}-${{ hashFiles('pnpm-lock.yaml') }}-
       - run: pnpm turbo typecheck lint test build
-        env:
-          TURBO_TOKEN: ${{ secrets.TURBO_TOKEN }}
-          TURBO_TEAM: ${{ vars.TURBO_TEAM }}
+      # The size the next run will restore, in the log, so the bound above is a number.
+      - run: du -sh .turbo/cache && find .turbo/cache -type f | wc -l
       - uses: actions/upload-artifact@v7
         if: failure()
         with: { name: test-results, path: '**/test-results/**' }

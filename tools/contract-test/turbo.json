@@ -1,0 +1,13 @@
+{
+  "$schema": "https://turbo.build/schema.json",
+  "extends": ["//"],
+  "tasks": {
+    "test": {
+      // `render-contract.test.ts` validates every `result.json` the CLI writes against
+      // `docs/render-result.schema.json`, outside this package. The CLI's `dist/` and the
+      // template pack it also reads are declared dependencies, so their builds are already in
+      // this task's hash; the schema was not (TYTO-52, ADR 0072).
+      "inputs": ["$TURBO_DEFAULT$", "$TURBO_ROOT$/docs/render-result.schema.json"]
+    }
+  }
+}
