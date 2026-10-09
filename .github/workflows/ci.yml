@@ -27,7 +27,7 @@ jobs:
       # desktop end-to-end suites before TYTO-111. `github-config.test.ts` fails if it stops
       # being run, or stops being run before a merge.
       - run: pnpm format:check
-      # `changeset status` runs `git merge-base main HEAD`, and on a **pull request**
+      # The changeset check below runs `git merge-base main HEAD`, and on a **pull request**
       # `actions/checkout` leaves no ref called `main` — it fetches into
       # `refs/remotes/origin/*` and checks out a detached merge commit. `fetch-depth: 0` above
       # gives the history; this gives the name.
@@ -39,38 +39,29 @@ jobs:
       # the third distinct failure of one step, after the default depth and after the
       # missing ref.
       - run: git rev-parse --verify --quiet main >/dev/null || git branch main origin/main
-      # `changeset status` and not `changeset version`: it reads the `.changeset/` folder and
-      # writes nothing, so it can run on a pull request where versioning cannot.
+      # **Every versioned package this pull request changed is named in a changeset the pull
+      # request itself added** (ADR 0070, TYTO-155). It replaced a bare `changeset status`,
+      # which only failed when `.changeset/` held no file at all: a branch editing
+      # `packages/core` with no changeset passed whenever another card's was pending, and a
+      # Dependabot bump went red whenever none was — which is right after every version PR.
+      # The script prints one verdict per changed package; the exceptions are in its header
+      # (devDependencies only, an empty changeset, Dependabot's dependency-only bumps, whose
+      # changeset `release.yml` writes at release time).
       #
-      # **It is here because the release workflow is the only other thing that reads those
-      # files, and it runs after the merge.** A changeset naming a private package beside a
-      # published one is refused by Changesets v3 — `Mixed changesets that contain both
-      # ignored and not ignored packages are not allowed` — and it took `release` down on
-      # `main` twice while every check on the pull request stayed green (TYTO-109, TYTO-0).
-      # `changesets.test.ts` catches that one case in `pnpm check`; this catches the class,
-      # by asking the tool itself.
+      # It still runs `changeset status` after its own verdict whenever `.changeset/` holds a
+      # file, because that is the tool validating what `release.yml` will version — the mixed
+      # ignored and not ignored file took `release` down on `main` twice while this job was
+      # green (TYTO-109). It reads and writes nothing else.
       #
-      # Safe on a pull request that adds no changeset: measured, `changeset status` prints an
-      # empty "Packages to be bumped:" and exits 0 — because the folder still holds whatever
-      # is waiting for the next release.
-      #
-      # **The version PR is the one pull request where that folder is empty, and the step
-      # fails on it.** `changeset status` errors when packages changed against the base *and*
-      # there is no changeset to explain them, which is exactly what
-      # `chore(release): version packages` is: every changeset consumed, every manifest
-      # rewritten. It passed by accident until TYTO-94 — private packages were not versioned,
-      # so eight or nine of them were left behind on every run (#171, #176) and the folder was
-      # never empty. The first version PR after that config change went red in a minute:
-      #
-      #     Some packages have been changed but no changesets were found.
-      #     Run changeset add to resolve this error.
-      #     🦋 Exited with code 1
-      #
-      # Excluded by branch name and not by `always()` or `continue-on-error`, so the step still
-      # fails a real pull request. `github-config.test.ts` pins both halves: that it runs before
-      # a merge, and that this is the only thing it is skipped for.
+      # **Skipped on the version PR, and only there.** That pull request consumes every
+      # changeset and rewrites every manifest, so it is the one whose changes legitimately
+      # carry none (TYTO-134). Excluded by branch name and not by `always()` or
+      # `continue-on-error`, so the step still fails a real pull request;
+      # `github-config.test.ts` pins both halves.
       - if: github.head_ref != 'changeset-release/main'
-        run: pnpm exec changeset status
+        run: node tools/repo-checks/src/changeset-coverage.mjs --base main
+        env:
+          PR_AUTHOR: ${{ github.event.pull_request.user.login }}
       - run: pnpm turbo typecheck lint test build
         env:
           TURBO_TOKEN: ${{ secrets.TURBO_TOKEN }}

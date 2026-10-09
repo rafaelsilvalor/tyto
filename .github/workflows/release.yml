@@ -11,12 +11,24 @@ jobs:
     # version PR. The rule stays as it is; the hook simply does not belong in CI.
     env: { HUSKY: 0 }
     steps:
+      # `fetch-depth: 0` for the Dependabot step below: it walks `main` back to the last
+      # version-packages commit and reads each bump's manifests at its parent, none of which
+      # the default single-commit clone has.
       - uses: actions/checkout@v7
+        with: { fetch-depth: 0 }
       - uses: pnpm/action-setup@v6
       - uses: actions/setup-node@v7
         with: { node-version: 22, cache: pnpm }
       - run: pnpm install --frozen-lockfile
       - run: pnpm build
+      # The changesets Dependabot's merged bumps could not carry (ADR 0070, TYTO-155). One
+      # file per package whose shipped dependencies a Dependabot commit since the last version
+      # PR moved, naming each `dep old → new`; written to the working tree and never
+      # committed, so the action below versions them into the version PR and the next run
+      # writes them again until that PR is merged. A commit that already added a changeset by
+      # hand is left alone. With no version-packages commit to stop at it fails, rather than
+      # announce every bump in history again.
+      - run: node tools/repo-checks/src/dependabot-changesets.mjs
       # The action's major and the CLI's major move together: v1 runs against Changesets
       # CLI v2, v2 against CLI v3, and each refuses the other outright. `@changesets/cli`
       # is v3 here, so this is v2 — the v1 pin TYTO-78 put in was for the CLI of the day
