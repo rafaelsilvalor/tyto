@@ -160,8 +160,20 @@ publish:
 # Linux its bundled `electron-linux` set — so the AppImage build does not fail for the lack of
 # one, it ships Electron's. Read out of `app-builder-lib`; not run on Linux from here. A real
 # icon is design work and belongs to whoever draws it.
+#
+# **The `dmg` is universal: one file that opens on an Intel Mac and on Apple Silicon**
+# (TYTO-146). `macos-latest` is Apple Silicon, so with no `arch` the release shipped
+# `Tyto-<version>-arm64.dmg` alone, and an Intel Mac got an app that bounced and never opened.
+# Two runners would have meant two files and a choice between them on the release page; one
+# universal file needs no instructions, the same argument that put `portable` beside the
+# installer. It is roughly twice the size. electron-builder packs an x64 and an arm64 app and
+# `@electron/universal` joins them, then flips the fuses below on the joined app
+# (`macPackager.doUniversalPack`); the bundled Node arrives already universal from
+# `scripts/fetch-node.ts`, the one Mach-O file the merge would otherwise refuse.
 mac:
-  target: dmg
+  target:
+    - target: dmg
+      arch: universal
 win:
   target:
     - nsis

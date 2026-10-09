@@ -3,10 +3,10 @@ name: desktop
 # tag is pushed to release, not to find out, and until this trigger the only run of this
 # file a change ever got was the release itself — which is how the tag-prefix defect and the
 # empty `CSC_LINK` on macOS were both found (TYTO-97, TYTO-98). So a pull request touching
-# this file, the electron-builder configuration or the gate's own suite runs all three legs
-# through the build and the packaged-app gate, and stops there: every step that can reach a
-# release or a secret is `if: github.event_name == 'push'`, and `desktop-release.test.ts`
-# fails if one is not. Not a required check, so the `paths:` filter cannot leave a pull
+# this file, the electron-builder configuration, the bundled Node or the gate's own suite runs
+# every leg through the build and the packaged-app gate, and stops there: every step that can
+# reach a release or a secret is `if: github.event_name == 'push' && matrix.publish`, and
+# `desktop-release.test.ts` fails if one is not. Not a required check, so the `paths:` filter cannot leave a pull
 # request pending; the required `desktop` context in `desktop-e2e.yml` is unchanged.
 on:
   push: { tags: ['desktop-v*'] }
@@ -14,6 +14,8 @@ on:
     paths:
       - .github/workflows/desktop.yml
       - apps/desktop/electron-builder.yml
+      - apps/desktop/bundled-node.json
+      - apps/desktop/scripts/fetch-node.ts
       - apps/desktop/e2e/*.package.test.ts
 permissions: { contents: write }
 jobs:
@@ -23,7 +25,22 @@ jobs:
       # same release from three jobs, so fail-fast would leave a release holding whichever
       # installers happened to finish first and no record of what was cancelled.
       fail-fast: false
-      matrix: { os: [macos-latest, windows-latest, ubuntu-latest] }
+      # **A fourth leg that builds and tests and never publishes: the Intel Mac** (TYTO-146).
+      # macOS ships one universal `dmg`, built and uploaded by the Apple Silicon leg; on that
+      # runner only the arm64 slice ever starts. `macos-26-intel` runs the same build and the
+      # same `test:package` against the same universal app, so the x64 slice is opened on an
+      # Intel machine before any release carries it. `publish: false` keeps it off every step
+      # that uploads or reads a secret — two legs uploading one `dmg` would race for one asset
+      # name — and `desktop-release.test.ts` pins both.
+      #
+      # On a tag push it is still a separate leg, so an Intel failure turns the run red but
+      # does not stop the arm leg uploading the universal `dmg` it already built. Nothing orders
+      # the two today; `docs/git-workflow.md` says so.
+      matrix:
+        os: [macos-latest, windows-latest, ubuntu-latest]
+        publish: [true]
+        include:
+          - { os: macos-26-intel, publish: false }
     runs-on: ${{ matrix.os }}
     steps:
       # No token left in the git config. Nothing here pushes — the publish step reads `GH_TOKEN`
@@ -97,6 +114,17 @@ jobs:
             pnpm --filter @tyto/desktop test:package --reporter=verbose
           fi
 
+      # **On a pull request the Mac leg that publishes also builds the `dmg`, and uploads
+      # nothing** (TYTO-146). The gate above packages with `--dir`, so until a tag nothing
+      # showed that the configured target — one universal `dmg` — builds at all, nor its name
+      # or its size. `--publish never` is what keeps it a dry run, and `ls` puts both in the log.
+      - name: The universal dmg builds, without publishing
+        if: github.event_name == 'pull_request' && runner.os == 'macOS' && matrix.publish
+        shell: bash
+        run: |
+          pnpm --filter @tyto/desktop exec electron-builder --mac --publish never
+          ls -l apps/desktop/release/*.dmg
+
       # **A secret that does not exist is not an absent variable.** `${{ secrets.CSC_LINK }}`
       # in a step's `env:` writes the variable either way — to the empty string when no such
       # secret is configured — and electron-builder's two platforms disagree about what that
@@ -117,7 +145,7 @@ jobs:
       # script, the same rule the tag guard above follows; the heredoc delimiter is random
       # because a certificate or a password may contain any fixed one.
       - name: Pass the signing certificate through only when there is one
-        if: github.event_name == 'push'
+        if: github.event_name == 'push' && matrix.publish
         shell: bash
         run: |
           if [ -n "$SIGNING_CERTIFICATE" ]; then
@@ -138,7 +166,7 @@ jobs:
       # makes *not* setting them work. Notarizing a macOS build additionally wants `APPLE_ID`,
       # `APPLE_APP_SPECIFIC_PASSWORD` and `APPLE_TEAM_ID`, and is a separate decision
       # (`docs/git-workflow.md`).
-      - if: github.event_name == 'push'
+      - if: github.event_name == 'push' && matrix.publish
         run: pnpm --filter @tyto/desktop exec electron-builder --publish always
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}

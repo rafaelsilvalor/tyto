@@ -73,7 +73,7 @@ const built = join(projectDirectory, 'out', 'main', 'index.js');
 /**
  * Where `--dir` leaves the runnable app, per platform.
  *
- * The folder carries the architecture on macOS (`mac-arm64`) and not on the others, and the
+ * The folder carries the architecture on macOS (`mac-universal`) and not on the others, and the
  * binary is named after `productName` everywhere except Linux, where `electron-builder.yml`
  * has to set `executableName` because the packager would otherwise use the npm package name.
  */
@@ -232,8 +232,15 @@ beforeAll(async () => {
   // of the environment, and called as a function it detects npm and walks the whole
   // dependency tree instead. Same `app.asar` either way, measured — but a test of what CI
   // does should run what CI runs.
+  //
+  // `--universal` on macOS because `--dir` alone ignores the `arch` the configuration gives the
+  // `dmg`: electron-builder's `normalizeOptions` turns a bare `--dir` into one target for
+  // `process.arch`, so without it this suite would test an arm64 app while the release ships a
+  // universal one (TYTO-146). With it, the app launched below is the one the `dmg` carries,
+  // and on an Intel runner the slice that starts is the x64 one.
   const cli = createRequire(import.meta.url).resolve('electron-builder/cli.js');
-  execFileSync(process.execPath, [cli, '--dir', '--publish', 'never'], {
+  const architecture = process.platform === 'darwin' ? ['--universal'] : [];
+  execFileSync(process.execPath, [cli, '--dir', ...architecture, '--publish', 'never'], {
     cwd: projectDirectory,
     stdio: 'inherit',
   });
@@ -278,6 +285,36 @@ describe('the packaged app', () => {
     // enough to be asked. Reading it as "no first window" instead of as a timeout inside a
     // longer test is the difference between a diagnosis and a flake.
     expect(windowPages(app!.browser)).toHaveLength(1);
+  });
+
+  it('carries both Mac architectures in the app and in its Node (TYTO-146)', () => {
+    // **Read off the two Mach-O files the release depends on, on the machine that just opened
+    // the app.** The app's own executable is what an Intel Mac starts; `resources/node/node`
+    // is what runs its plugins, and the one file `@electron/universal` cannot join by itself.
+    // `uname -m` says which slice the window above came from: `x86_64` on the Intel leg of
+    // `desktop.yml`, `arm64` on the other. Printed on the other platforms too, so a log that
+    // lacks the line is a suite that did not run rather than a platform that has no answer.
+    if (process.platform !== 'darwin') {
+      process.stdout.write(`[TYTO-146] ${process.platform}: one architecture, nothing to read\n`);
+      return;
+    }
+    const executable = packagedExecutable();
+    const node = join(dirname(dirname(executable)), 'Resources', 'node', 'node');
+    const archs = (file: string): string =>
+      execFileSync('lipo', ['-archs', file], { encoding: 'utf8' }).trim();
+    const machine = execFileSync('uname', ['-m'], { encoding: 'utf8' }).trim();
+    const appArchs = archs(executable);
+    const nodeArchs = archs(node);
+    process.stdout.write(
+      `[TYTO-146] uname -m ${machine}; lipo -archs Tyto → "${appArchs}"; ` +
+        `lipo -archs resources/node/node → "${nodeArchs}"\n`,
+    );
+
+    // Compared as sets: `lipo` lists slices in the order they were joined, which is not a fact
+    // about what the file can run.
+    const slices = (listed: string): string[] => listed.split(/\s+/u).sort();
+    expect(slices(appArchs)).toEqual(['arm64', 'x86_64']);
+    expect(slices(nodeArchs)).toEqual(['arm64', 'x86_64']);
   });
 
   it('finds the built-in template pack through the asar', async () => {
