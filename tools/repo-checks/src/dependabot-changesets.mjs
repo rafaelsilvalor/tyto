@@ -186,7 +186,10 @@ function main() {
       ignoreHandWritten: options.dryRun === 'true' && options.ignoreHandWritten === 'true',
     });
     console.log(
-      `  ${commit.sha.slice(0, 7)} ${commit.subject} — ${changesets.length} changeset(s)`,
+      `  ${commit.sha.slice(0, 7)} ${commit.subject} — ${changesets.length} changeset(s)` +
+        (changesets.length === 0
+          ? ' (it adds its own changeset, or moves no shipped dependency)'
+          : ''),
     );
     for (const { file, text } of changesets) {
       if (options.dryRun === 'true') {
