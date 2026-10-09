@@ -197,7 +197,12 @@ describe('the desktop release workflow', () => {
 /** The condition that keeps a step off the pull-request dry run (TYTO-95). */
 const PUSH_ONLY = "github.event_name == 'push'";
 
-const GATE_COMMAND = 'pnpm --filter @tyto/desktop test:package';
+/**
+ * Verbose because the default reporter lists only the slow tests of a green file, and the
+ * card's proof is the test names in the Linux log: the first run passed all eleven and named
+ * four, none of them `opens a window at all`.
+ */
+const GATE_COMMAND = 'pnpm --filter @tyto/desktop test:package --reporter=verbose';
 
 const describeStep = (step: { name?: string; run?: string; uses?: string }): string =>
   step.name ?? step.run?.split('\n')[0] ?? step.uses ?? '(unnamed step)';

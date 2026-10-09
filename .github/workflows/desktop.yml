@@ -78,6 +78,10 @@ jobs:
       # `CSC_LINK` exists the gate tests the unsigned pack and the installers are signed.
       # Today no certificate is configured and the two are the same build.
       #
+      # `--reporter=verbose` because the default reporter lists only the slow tests of a green
+      # file: the first run of this gate passed all eleven on Linux and named four of them, so
+      # the log could not show that `opens a window at all` had run. The names are the proof.
+      #
       # Linux wants Chromium's shared libraries and a display, the arrangement
       # `desktop-e2e.yml` explains: `show: false` is not headless there.
       - if: runner.os == 'Linux'
@@ -88,9 +92,9 @@ jobs:
         shell: bash
         run: |
           if [ "$RUNNER_OS" = Linux ]; then
-            xvfb-run -a pnpm --filter @tyto/desktop test:package
+            xvfb-run -a pnpm --filter @tyto/desktop test:package --reporter=verbose
           else
-            pnpm --filter @tyto/desktop test:package
+            pnpm --filter @tyto/desktop test:package --reporter=verbose
           fi
 
       # **A secret that does not exist is not an absent variable.** `${{ secrets.CSC_LINK }}`
