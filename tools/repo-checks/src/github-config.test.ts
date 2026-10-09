@@ -612,7 +612,8 @@ describe('required checks', () => {
   it.each(REQUIRED_CHECKS)(
     'report "$context" from exactly one job a pull request runs',
     ({ context }) => {
-      // `desktop.yml` has a job too, and runs on tags only; `labeler.yml` runs on
+      // `desktop.yml` has a job too, `build`, which runs on a pull request only when it touches
+      // the release (TYTO-95) and reports per matrix leg; `labeler.yml` runs on
       // `pull_request_target`, which is a different event. Neither counts, and that is the point
       // of asking by event rather than by file.
       const owners = contextsOnPullRequest().filter((entry) => entry.context === context);

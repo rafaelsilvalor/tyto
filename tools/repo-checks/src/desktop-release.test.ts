@@ -25,7 +25,7 @@ const WORKFLOW = '.github/workflows/desktop.yml';
 const BUILDER_CONFIG = 'apps/desktop/electron-builder.yml';
 
 interface Workflow {
-  on?: { push?: { tags?: string[] } };
+  on?: { push?: { tags?: string[] }; pull_request?: { paths?: string[] } };
   jobs?: Record<
     string,
     {
@@ -33,10 +33,13 @@ interface Workflow {
       strategy?: { 'fail-fast'?: boolean; matrix?: { os?: string[] } };
       steps?: {
         name?: string;
+        if?: string;
         uses?: string;
+        with?: Record<string, unknown>;
         run?: string;
         shell?: string;
         env?: Record<string, string>;
+        'continue-on-error'?: boolean | string;
       }[];
     }
   >;
@@ -188,6 +191,142 @@ describe('the desktop release workflow', () => {
       conditional?.shell,
       `${WORKFLOW}'s signing step would be read as PowerShell on the Windows runner`,
     ).toBe('bash');
+  });
+});
+
+/** The condition that keeps a step off the pull-request dry run (TYTO-95). */
+const PUSH_ONLY = "github.event_name == 'push'";
+
+const GATE_COMMAND = 'pnpm --filter @tyto/desktop test:package';
+
+const describeStep = (step: { name?: string; run?: string; uses?: string }): string =>
+  step.name ?? step.run?.split('\n')[0] ?? step.uses ?? '(unnamed step)';
+
+/**
+ * Whether a step can reach a release or a secret: it runs electron-builder without
+ * `--publish never`, calls `gh release`, or names a secret or the workflow token anywhere in
+ * its script, its inputs or its environment. Read off everything the step carries rather than
+ * off a list of known step names, so a new uploading step is caught without anybody
+ * remembering to add it here.
+ */
+const canPublish = (step: NonNullable<ReturnType<typeof steps>[number]>): boolean => {
+  const run = step.run ?? '';
+  const carried = JSON.stringify([step.run, step.with, step.env]);
+  return (
+    (run.includes('electron-builder') && !run.includes('--publish never')) ||
+    /\bgh\s+release\b/.test(run) ||
+    /secrets\.|github\.token|GH_TOKEN|GITHUB_TOKEN/.test(carried) ||
+    /softprops\/action-gh-release|actions\/create-release|upload-release-asset/.test(
+      step.uses ?? '',
+    )
+  );
+};
+
+describe('the packaged-app gate (TYTO-95)', () => {
+  const gateIndex = () => steps().findIndex((step) => step.run?.includes(GATE_COMMAND) === true);
+
+  it('runs test:package on every leg, before anything is signed or uploaded', () => {
+    // One job, one matrix: a step with no `if:` is a step on all three runners. The card's
+    // trap is a gate that exits 0 without having run, so the step may not be conditional at
+    // all, may not be allowed to fail, and must come before the first step that can publish.
+    const all = steps();
+    const index = gateIndex();
+    const gate = all[index];
+
+    expect(Object.keys(workflow().jobs ?? {}), `${WORKFLOW} grew a second job`).toHaveLength(1);
+    expect(gate, `${WORKFLOW} no longer runs ${GATE_COMMAND}`).toBeDefined();
+    expect(gate?.if, `${WORKFLOW}'s gate is conditional, so some leg skips it`).toBeUndefined();
+    expect(
+      gate?.['continue-on-error'],
+      `${WORKFLOW}'s gate may fail without stopping the leg`,
+    ).toBe(undefined);
+    expect(gate?.shell, `${WORKFLOW}'s gate would be read as PowerShell on Windows`).toBe('bash');
+
+    const firstPublishing = all.findIndex(canPublish);
+    expect(firstPublishing, `${WORKFLOW} has no step that publishes`).toBeGreaterThan(-1);
+    expect(
+      index,
+      `${WORKFLOW} runs the gate after "${describeStep(all[firstPublishing]!)}"`,
+    ).toBeLessThan(firstPublishing);
+
+    // After the build, because the suite refuses to run without `out/main/index.js`.
+    const build = all.findIndex((step) => step.run === 'pnpm build');
+    expect(build, `${WORKFLOW} no longer runs pnpm build`).toBeGreaterThan(-1);
+    expect(index, `${WORKFLOW} runs the gate before pnpm build`).toBeGreaterThan(build);
+  });
+
+  it('gives the Linux leg a display, and only the Linux leg', () => {
+    // `show: false` is not headless on Linux: Electron opens a display connection at startup
+    // and dies with `Missing X server or $DISPLAY` without one. The same arrangement as
+    // `desktop-e2e.yml` — Chromium's libraries, Xvfb, `xvfb-run -a` — on the runner that needs it.
+    const all = steps();
+    const gate = all[gateIndex()];
+
+    // The script, line by line: Linux under Xvfb, the other two bare, and nothing else.
+    expect(
+      gate?.run
+        ?.trim()
+        .split('\n')
+        .map((line) => line.trim()),
+    ).toEqual([
+      'if [ "$RUNNER_OS" = Linux ]; then',
+      `xvfb-run -a ${GATE_COMMAND}`,
+      'else',
+      GATE_COMMAND,
+      'fi',
+    ]);
+    for (const install of [
+      'playwright install-deps chromium',
+      'apt-get install -y --no-install-recommends xvfb',
+    ]) {
+      const index = all.findIndex((step) => step.run?.includes(install) === true);
+      expect(index, `${WORKFLOW} no longer runs ${install}`).toBeGreaterThan(-1);
+      expect(index, `${WORKFLOW} installs ${install} after the gate`).toBeLessThan(gateIndex());
+      expect(all[index]?.if).toBe("runner.os == 'Linux'");
+    }
+  });
+
+  it('runs on a pull request that changes the release or the gate', () => {
+    expect(workflow().on?.push?.tags).toEqual(['desktop-v*']);
+    expect(workflow().on?.pull_request?.paths).toEqual([
+      '.github/workflows/desktop.yml',
+      'apps/desktop/electron-builder.yml',
+      'apps/desktop/e2e/*.package.test.ts',
+    ]);
+  });
+
+  it('keeps every step that can publish or read a secret off the pull-request run', () => {
+    // The dry run is proven by structure, not by intent: anything that could upload, touch a
+    // release or see a secret carries the push-only condition, and the gate carries none of
+    // them. Nothing else in the job would stop a pull request publishing a release.
+    const publishing = steps().filter(canPublish);
+
+    expect(publishing.map(describeStep), `${WORKFLOW} has no publishing step to guard`).not.toEqual(
+      [],
+    );
+    for (const step of publishing) {
+      expect(
+        step.if,
+        `${WORKFLOW} step "${describeStep(step)}" can publish on a pull request`,
+      ).toBe(PUSH_ONLY);
+    }
+    // The tag guard is push-only too: on a pull request `GITHUB_REF_NAME` is `<n>/merge`.
+    const guard = steps().find((step) => step.run?.includes('GITHUB_REF_NAME') === true);
+    expect(guard?.if).toBe(PUSH_ONLY);
+
+    const gate = steps()[gateIndex()];
+    expect(gate && canPublish(gate), `${WORKFLOW}'s gate is handed a token or a secret`).toBe(
+      false,
+    );
+    expect(gate?.env, `${WORKFLOW}'s gate has an env: of its own`).toBeUndefined();
+  });
+
+  it('leaves no token in the git config for the gate to find', () => {
+    // `contents: write` is the job's, and `actions/checkout` persists the token into
+    // `.git/config` by default — where repository code run by the gate on a pull request
+    // could push with it. Nothing in the job pushes.
+    const checkout = steps().find((step) => step.uses?.startsWith('actions/checkout@') === true);
+    expect(checkout?.with?.['persist-credentials']).toBe(false);
   });
 });
 
