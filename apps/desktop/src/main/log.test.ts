@@ -176,7 +176,8 @@ describe('installCrashHandlers', () => {
 /**
  * The half TYTO-140 added: a crash that reaches a screen as well as a file.
  *
- * The box itself is `dialog.showErrorBox`, which is Electron's and so the composition root's.
+ * The box itself is `dialog.showMessageBoxSync` (TYTO-144), which is Electron's and so the
+ * composition root's; `e2e/crash.desktop.test.ts` watches it drawn.
  * What is testable here is the port — that it is called, with what, for both kinds of crash,
  * and that it cannot take the process down.
  */

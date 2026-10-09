@@ -189,6 +189,11 @@ export interface Catalogue {
   readonly 'crash.detail': string;
   readonly 'crash.noLog': string;
   /**
+   * The button that dismisses the crash box (TYTO-144). The other button is `menu.revealLogs`,
+   * reused rather than copied, because it does exactly what the Help menu item does.
+   */
+  readonly 'crash.close': string;
+  /**
    * The one question a new version asks on its first run (TYTO-151, ADR 0036).
    *
    * `{version}` is the older version's folder name, spliced in at the point of use the way
@@ -474,6 +479,7 @@ export const CATALOGUE_KEYS = [
   'crash.title',
   'crash.detail',
   'crash.noLog',
+  'crash.close',
   'import.message',
   'import.detail',
   'import.credentials',
