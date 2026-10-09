@@ -1,5 +1,5 @@
 /**
- * @tyto/core — the vocabulary every other package speaks. (TYTO-155 perturbation, reverted next.)
+ * @tyto/core — the vocabulary every other package speaks.
  *
  * Today: `Result`, `Diagnostic`, the diagnostic catalog, source ranges, the Scene IR and
  * the visitor that walks it, the `FileSystem` port, and the template manifest with the
