@@ -1,5 +1,51 @@
 # @tyto/io
 
+## 3.0.0
+
+### Major Changes
+
+- b20fe47: A file sitting where a delivery needs a folder is now an error diagnostic instead of a crash
+  (TYTO-129). `fsDeliveryOutput` returns `Result<DeliveryOutput, Diagnostic[]>` instead of
+  throwing when a file holds the name of the delivery folder or of `editaveis/`, and
+  `deliverAssets` answers a file holding `assets/` the same way. Both use the new code
+  `E_DELIVERY_FOLDER_BLOCKED`, which names the path. A folder that really cannot be written to
+  (no permission, full disk) still throws.
+
+  **Breaking for `@tyto/io` callers:** check `.ok` on what `fsDeliveryOutput` returns before you
+  use the output.
+
+  `tyto render --folder` exits 1 with that diagnostic, where it used to exit 2 with a stack
+  trace, so a caller that follows the render contract no longer retries forever. The desktop
+  export box shows it under "Finished with problems" instead of the raw `ENOTDIR` text.
+
+- 4532332: A folder sitting where Tyto writes a file is now an error diagnostic instead of a crash
+  (TYTO-243, the mirror of TYTO-129). The copied brief, `template.txt`, `result.json`, an image
+  in `assets/` and an artwork file are all covered, under `--folder` and, for `result.json` and
+  the artwork, under `--out` too. The new code `E_OUTPUT_FILE_BLOCKED` names the path. A file
+  held open by another program, a folder without permission and a full disk still throw.
+
+  **Breaking for `@tyto/io` callers:** `TaskOutput.finish` and `DeliveryOutput.describeTemplate`
+  now return `Promise<Diagnostics>`. Report what they answer: `finish`'s diagnostics cannot be in
+  the `result.json` that was not written, and `describeTemplate`'s belong in the one `finish`
+  writes.
+
+  `tyto render --folder` exits 1 with that diagnostic, where it used to exit 2 with a stack
+  trace for every file but the artwork. The artwork was already exit 1, and its `E_OUTPUT_WRITE`
+  now carries the same sentence instead of the raw `EPERM … rename` text. The desktop export box
+  shows the diagnostic under "Finished with problems" instead of an `EPERM` failure.
+
+### Patch Changes
+
+- Updated dependencies [b20fe47]
+- Updated dependencies [7dad141]
+- Updated dependencies [4532332]
+  - @tyto/core@0.28.0
+  - @tyto/template-lang@0.8.0
+  - @tyto/export-html@0.7.0
+  - @tyto/export-svg@2.0.0
+  - @tyto/pipeline@0.10.1
+  - @tyto/plugin-api@0.4.1
+
 ## 2.0.0
 
 ### Major Changes

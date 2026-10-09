@@ -1,5 +1,14 @@
 # @tyto/template-kit
 
+## 0.2.1
+
+### Patch Changes
+
+- Updated dependencies [b20fe47]
+- Updated dependencies [7dad141]
+- Updated dependencies [4532332]
+  - @tyto/core@0.28.0
+
 ## 0.2.0
 
 ### Minor Changes

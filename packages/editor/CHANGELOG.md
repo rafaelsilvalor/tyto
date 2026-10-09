@@ -1,5 +1,20 @@
 # @tyto/editor
 
+## 0.7.1
+
+### Patch Changes
+
+- e9984eb: A selection on the cursor's line shows again (TYTO-246). The active line's background is now
+  translucent, composited to the same colour it had when opaque, so the selection that
+  `drawSelection` paints behind the text shows through it — with the mouse, with vim's `V` and with
+  vim's Ctrl+V. The gutter keeps the opaque colour.
+- Updated dependencies [b20fe47]
+- Updated dependencies [7dad141]
+- Updated dependencies [4532332]
+  - @tyto/core@0.28.0
+  - @tyto/template-lang@0.8.0
+  - @tyto/brief-lang@0.6.8
+
 ## 0.7.0
 
 ### Minor Changes
