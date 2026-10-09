@@ -1063,6 +1063,10 @@ async function reopen(path: string, name: string): Promise<void> {
     const answer = await bridge['file:reopen']({ documentId: wanted, path });
 
     if (answer.missing) {
+      // Minted in the window and not in main because the window owns the locale. A code
+      // minted here is not in core's catalogue, so it goes in the "Codes the desktop window
+      // mints" section of docs/diagnostic-codes.md (tools/docs-gen/src/desktop-codes.ts);
+      // tools/repo-checks fails until it does (TYTO-141).
       panel.installation = [
         {
           severity: 'error',
@@ -1103,7 +1107,9 @@ async function refreshTemplates(bridge: TytoBridge): Promise<void> {
   panel.installation = [
     ...answer.failures.flatMap((failure) => failure.diagnostics),
     // Minted here and not in main, the way `E_FILE_NOT_FOUND` is: main can tell that a folder
-    // produced nothing, and only the window knows which language to say it in.
+    // produced nothing, and only the window knows which language to say it in. Listed under
+    // "Codes the desktop window mints" in docs/diagnostic-codes.md, as every code minted in
+    // this window must be (TYTO-141).
     ...(state.templatesFolder !== null && state.templatesFound === 0
       ? [
           {

@@ -1,7 +1,13 @@
 import { type Locale, translate } from '../../shared/i18n/index.js';
 import type { Diagnostic } from './panel.js';
 
-/** The code every save failure is filed under, so the next one replaces the last. */
+/**
+ * The code every save failure is filed under, so the next one replaces the last.
+ *
+ * Minted in the window, not in main and not in core, because the window owns the locale; so
+ * it is listed under "Codes the desktop window mints" in `docs/diagnostic-codes.md`, from
+ * `tools/docs-gen/src/desktop-codes.ts`, and `tools/repo-checks` fails if it is not (TYTO-141).
+ */
 export const SAVE_FAILED = 'E_SAVE_FAILED';
 
 /**

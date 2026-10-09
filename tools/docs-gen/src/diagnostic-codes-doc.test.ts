@@ -3,6 +3,7 @@ import { readFile } from 'node:fs/promises';
 import { diagnosticCodeList } from '@tyto/core';
 import { describe, expect, it } from 'vitest';
 
+import { desktopCodes } from './desktop-codes.js';
 import { DIAGNOSTIC_CODES_DOC } from './paths.js';
 import { renderDiagnosticCodes } from './render-diagnostic-codes.js';
 
@@ -27,5 +28,12 @@ describe('docs/diagnostic-codes.md', () => {
     for (const code of diagnosticCodeList) {
       expect(committed).toContain(`\`${code}\``);
     }
+  });
+
+  it('keeps the window-minted codes out of the core catalogue', () => {
+    // A code in both places would be documented twice, under two different claims about
+    // who mints it (TYTO-141).
+    const catalogued = new Set<string>(diagnosticCodeList);
+    expect(desktopCodes.filter((entry) => catalogued.has(entry.code))).toEqual([]);
   });
 });
