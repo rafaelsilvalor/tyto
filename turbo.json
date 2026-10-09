@@ -1,6 +1,20 @@
 {
   "$schema": "https://turbo.build/schema.json",
   "ui": "stream",
+  // Root files every package reads without Turborepo seeing it: ESLint finds the root
+  // `eslint.config.js` by walking up, every `tsconfig.json` extends a root one, and Vitest
+  // reads the tsconfig chain to transpile. A task's default inputs are its own package, so
+  // before TYTO-52 an edit to any of these changed 0 of 76 task hashes — harmless while CI
+  // started cold, a replayed green once `ci.yml` restores `.turbo/cache` (ADR 0072). The root
+  // `package.json` is here for its `type` and scripts; its dependencies were already hashed.
+  "globalDependencies": [
+    "eslint.config.js",
+    "tsconfig*.json",
+    ".prettierrc.json",
+    "commitlint.config.js",
+    "commitlint.description.config.js",
+    "package.json"
+  ],
   "tasks": {
     "build": {
       "dependsOn": ["^build", "generate:parser"],

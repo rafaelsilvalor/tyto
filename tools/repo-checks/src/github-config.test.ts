@@ -514,6 +514,96 @@ describe('changeset check', () => {
 });
 
 /**
+ * The Turborepo cache `ci.yml` carries between runs (ADR 0072, TYTO-52).
+ *
+ * Since it went in, a green `check` can be a replay, and the few lines that make a replay
+ * trustworthy are each one unrelated-looking edit away from going: a key without the runtime
+ * replays a result measured on another image or Node, a cache step after the turbo run restores
+ * nothing, a run without the prune step saves every old entry again (44M to 86M on one desktop
+ * edit), and the same step in a workflow that ships would put a replayed build in a release.
+ */
+const TURBO_CACHE_PATH = '.turbo/cache';
+
+const stepsOf = (file: string) =>
+  Object.values(readYaml<Workflow>(`${WORKFLOWS_DIR}/${file}`).jobs ?? {}).flatMap(
+    (job) => job.steps ?? [],
+  );
+
+/** A `turbo.json` is JSON with whole-line `//` comments, which `JSON.parse` refuses. */
+const readTurboJson = (relativePath: string) =>
+  JSON.parse(
+    readRepoFile(relativePath)
+      .split('\n')
+      .filter((line) => !line.trim().startsWith('//'))
+      .join('\n'),
+  ) as {
+    globalDependencies?: string[];
+    tasks?: Record<string, { cache?: boolean; inputs?: string[] }>;
+  };
+
+describe('turbo cache', () => {
+  const steps = stepsOf('ci.yml');
+  const cacheSteps = steps.filter(
+    (step) =>
+      step.uses?.startsWith('actions/cache@') === true && step.with?.path === TURBO_CACHE_PATH,
+  );
+
+  it('is restored once in ci.yml, before the turbo run', () => {
+    expect(cacheSteps, 'ci.yml no longer caches .turbo/cache exactly once').toHaveLength(1);
+    const turbo = steps.findIndex((step) => step.run?.startsWith('pnpm turbo ') === true);
+    expect(turbo, 'ci.yml no longer runs turbo').toBeGreaterThan(-1);
+    expect(steps.indexOf(cacheSteps[0]!)).toBeLessThan(turbo);
+  });
+
+  it('is keyed on the runtime, the lockfile and the commit, and restores by the same prefix', () => {
+    const key = String(cacheSteps[0]?.with?.key);
+    const prefix =
+      "turbo-${{ runner.os }}-${{ steps.turbo-key.outputs.runtime }}-${{ hashFiles('pnpm-lock.yaml') }}-";
+    expect(key).toBe(`${prefix}\${{ github.sha }}`);
+    expect(String(cacheSteps[0]?.with?.['restore-keys']).trim()).toBe(prefix);
+
+    const runtime = steps.find((step) => step.id === 'turbo-key');
+    expect(runtime?.run).toContain('ImageVersion');
+    expect(runtime?.run).toContain('${{ steps.node.outputs.node-version }}');
+  });
+
+  it('keeps only the entries the run used, read from the run summary', () => {
+    const turbo = steps.findIndex((step) => step.run?.startsWith('pnpm turbo ') === true);
+    expect(steps[turbo]?.run).toContain('--summarize');
+    const prune = steps.findIndex(
+      (step) => step.run?.includes('.turbo/runs/') === true && step.run.includes('rm -f') === true,
+    );
+    expect(prune, 'ci.yml no longer prunes .turbo/cache to the run that just finished').toBe(
+      turbo + 1,
+    );
+  });
+
+  it('stays out of every workflow that ships or measures a build', () => {
+    const elsewhere = workflowFiles
+      .filter((file) => file !== 'ci.yml')
+      .filter((file) => readRepoFile(`${WORKFLOWS_DIR}/${file}`).includes(TURBO_CACHE_PATH));
+    expect(elsewhere).toEqual([]);
+  });
+
+  it('has no remote-cache variables left that nothing sets', () => {
+    const reading = workflowFiles.filter((file) =>
+      /TURBO_(TOKEN|TEAM)/u.test(readRepoFile(`${WORKFLOWS_DIR}/${file}`)),
+    );
+    expect(reading).toEqual([]);
+  });
+
+  it('never replays the repo-checks suite, which reads the whole repository and asks git', () => {
+    expect(readTurboJson('tools/repo-checks/turbo.json').tasks?.test?.cache).toBe(false);
+  });
+
+  it('hashes the root configs every package reads', () => {
+    expect(readTurboJson('turbo.json').globalDependencies).toEqual(
+      expect.arrayContaining(['eslint.config.js', 'tsconfig*.json', 'package.json']),
+    );
+  });
+});
+
+/**
  * The release side of the same decision: the changesets Dependabot's bumps could not carry
  * are written by `release.yml` before the version PR is built. The version-PR title the
  * generator stops at is pinned against `release.yml` in `dependabot-changesets.test.mjs`.

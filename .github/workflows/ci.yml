@@ -16,6 +16,7 @@ jobs:
         with: { lfs: true, fetch-depth: 0 }
       - uses: pnpm/action-setup@v6
       - uses: actions/setup-node@v7
+        id: node
         with: { node-version: 22, cache: pnpm }
       - run: pnpm install --frozen-lockfile
       # Before the turbo run, because it is the cheap failure: seconds against two minutes,
@@ -62,10 +63,41 @@ jobs:
         run: node tools/repo-checks/src/changeset-coverage.mjs --base main
         env:
           PR_AUTHOR: ${{ github.event.pull_request.user.login }}
-      - run: pnpm turbo typecheck lint test build
-        env:
-          TURBO_TOKEN: ${{ secrets.TURBO_TOKEN }}
-          TURBO_TEAM: ${{ vars.TURBO_TEAM }}
+      # **A green `check` can now be a replay** (ADR 0072, TYTO-52). Turborepo's local cache is
+      # carried from run to run by `actions/cache`, so a task whose hash did not move prints
+      # `cache hit, replaying logs` and does not run. That is only sound while every file a
+      # task reads is in its hash: root configs are `globalDependencies` in `turbo.json`, a
+      # read outside the package is a `$TURBO_ROOT$` input in that package's `turbo.json`, and
+      # `repo-checks#test`, which reads the whole repository and asks git, is `cache: false`.
+      #
+      # The key carries what Turborepo does not hash: the runner image (system fonts and the
+      # libraries Chromium links), the Node version and the lockfile, so an image, Node or
+      # dependency bump starts cold rather than replaying a result from the old runtime.
+      #
+      # Only this job. `desktop-e2e.yml`, `desktop.yml`, `release.yml` and `visual.yml` build
+      # cold on purpose: what they ship or measure must not be a replay.
+      - id: turbo-key
+        run: echo "runtime=${ImageOS:-none}-${ImageVersion:-none}-node${{ steps.node.outputs.node-version }}" >> "$GITHUB_OUTPUT"
+      - uses: actions/cache@v6
+        with:
+          path: .turbo/cache
+          key: turbo-${{ runner.os }}-${{ steps.turbo-key.outputs.runtime }}-${{ hashFiles('pnpm-lock.yaml') }}-${{ github.sha }}
+          restore-keys: |
+            turbo-${{ runner.os }}-${{ steps.turbo-key.outputs.runtime }}-${{ hashFiles('pnpm-lock.yaml') }}-
+      - run: pnpm turbo typecheck lint test build --summarize
+      # **The folder keeps this run's entries and nothing else.** Turborepo never prunes its
+      # cache, and every restored entry is saved again with the run's additions: measured on
+      # TYTO-52, one edit to `apps/desktop` took the folder from 44M to 86M, because the
+      # desktop build carries the bundled Node. The run summary lists every task hash this run
+      # used, hit or miss; a file named after any other hash is a state no later run of this
+      # branch asks for. Then the size the next run will restore, in the log.
+      - run: |
+          used=$(jq -r '.tasks[].hash' .turbo/runs/*.json)
+          for file in .turbo/cache/*; do
+            name=$(basename "$file")
+            grep -qxF "${name%%[.-]*}" <<<"$used" || rm -f "$file"
+          done
+          du -sh .turbo/cache && find .turbo/cache -type f | wc -l
       - uses: actions/upload-artifact@v7
         if: failure()
         with: { name: test-results, path: '**/test-results/**' }

@@ -1,0 +1,18 @@
+{
+  "$schema": "https://turbo.build/schema.json",
+  "extends": ["//"],
+  "tasks": {
+    "test": {
+      // Both suites compare what this package generates with the committed copy under
+      // `docs/` (`src/paths.ts`), which is outside the package. Without these inputs an edit
+      // to one of the three files changed no task hash, and the cache replayed the last green
+      // against a document that no longer matches (TYTO-52, ADR 0072).
+      "inputs": [
+        "$TURBO_DEFAULT$",
+        "$TURBO_ROOT$/docs/diagnostic-codes.md",
+        "$TURBO_ROOT$/docs/render-contract.md",
+        "$TURBO_ROOT$/docs/render-result.schema.json"
+      ]
+    }
+  }
+}

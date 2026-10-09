@@ -1,0 +1,18 @@
+{
+  "$schema": "https://turbo.build/schema.json",
+  "extends": ["//"],
+  "tasks": {
+    "test": {
+      // Three suites import two built-in templates as raw text (`?raw`) to check the editor's
+      // grammars and lint against real files. `@tyto/templates` is not a dependency of this
+      // package — it must not be, the editor is a library the desktop composes — so its build
+      // is not in this hash, and an edit to either template replayed the last green
+      // (TYTO-52, ADR 0072).
+      "inputs": [
+        "$TURBO_DEFAULT$",
+        "$TURBO_ROOT$/packages/templates/templates/promo-curso/**",
+        "$TURBO_ROOT$/packages/templates/templates/carrossel-lista/**"
+      ]
+    }
+  }
+}

@@ -1,0 +1,18 @@
+{
+  "$schema": "https://turbo.build/schema.json",
+  "extends": ["//"],
+  "tasks": {
+    "test": {
+      // `plugin-pack.test.ts` installs the example pack from `examples/plugins/` and checks
+      // that `docs/plugin-authoring.md` still prints what `tyto plugin new` prints. Neither is
+      // in this package nor a workspace dependency of it, so without these inputs an edit to
+      // either replayed the last green (TYTO-52, ADR 0072). The built-in pack the other suites
+      // read is `@tyto/templates`, a dependency whose build is already in this hash.
+      "inputs": [
+        "$TURBO_DEFAULT$",
+        "$TURBO_ROOT$/examples/plugins/**",
+        "$TURBO_ROOT$/docs/plugin-authoring.md"
+      ]
+    }
+  }
+}
