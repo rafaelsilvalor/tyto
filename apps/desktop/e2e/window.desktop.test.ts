@@ -415,6 +415,8 @@ describe('the language picker', () => {
     'crash.title',
     'crash.detail',
     'crash.noLog',
+    // TYTO-144: the crash box's second button; `e2e/crash.desktop.test.ts` holds it to the box.
+    'crash.close',
     // TYTO-151: the first-run question about the previous version's settings, a native box
     // main shows before the window exists — and never to a folder named with `--user-data-dir`
     // or under `TYTO_HEADLESS`, and this suite has both.

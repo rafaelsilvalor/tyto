@@ -194,7 +194,7 @@ export function crashSummary(reason: unknown): string {
  * Re-throwing would not give the box back: Node treats an exception raised **inside** an
  * `uncaughtException` listener as fatal, and the process ends printing to a stream a packaged
  * app has nobody reading. The box therefore has to be drawn by somebody who can call
- * `dialog.showErrorBox`, which is an Electron API and so the composition root's — this file
+ * an Electron dialog, which is the composition root's — this file
  * imports no Electron on purpose, and that is what lets the whole decision be unit-tested.
  *
  * **`onCrash` is called inside a `try`, and that is not defensive.** It runs in a handler

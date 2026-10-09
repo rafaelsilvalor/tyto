@@ -263,12 +263,25 @@ async function start(): Promise<void> {
   installMenu(uiLocale);
 
   // What a crash looks like, now that the log line alone is not enough (TYTO-140). Assigned
-  // over the module-level fallback as soon as there is a folder worth naming.
+  // over the module-level fallback as soon as there is a folder worth naming — and since
+  // TYTO-144 it opens that folder instead of only naming it.
+  //
+  // **Synchronous on purpose.** `onCrash` runs inside an `uncaughtException` listener, where
+  // a process that is about to die may never resolve the promise `showMessageBox` returns, so
+  // the button would be drawn and its answer lost. `showMessageBoxSync` blocks main the way
+  // `showErrorBox` always did, which is the trade TYTO-140 already accepted: nothing else in
+  // main runs while a person reads about a crash. The path stays in the detail as well, so the
+  // box still says where the file is if opening the folder fails.
   reportCrash = (reason) => {
-    dialog.showErrorBox(
-      translate(uiLocale, 'crash.title'),
-      `${crashSummary(reason)}\n\n${translate(uiLocale, 'crash.detail')}\n${log.directory}`,
-    );
+    const response = dialog.showMessageBoxSync({
+      type: 'error',
+      message: translate(uiLocale, 'crash.title'),
+      detail: `${crashSummary(reason)}\n\n${translate(uiLocale, 'crash.detail')}\n${log.directory}`,
+      buttons: [translate(uiLocale, 'menu.revealLogs'), translate(uiLocale, 'crash.close')],
+      defaultId: 0,
+      cancelId: 1,
+    });
+    if (response === 0) void shell.openPath(log.directory);
   };
 
   installCrashHandlers(process, log, (reason) => {
