@@ -28,24 +28,44 @@ import { fileURLToPath } from 'node:url';
  * Run by `pnpm build`, for the platform it runs on. Every packaging runs on the platform it
  * packages (`desktop.yml`'s matrix and `test:package`), so that is the platform whose Node the
  * package needs.
+ *
+ * **On macOS that Node is universal: both official archives, joined with `lipo`** (TYTO-146).
+ * The macOS package is one universal `dmg`, which electron-builder makes by packing an x64 and
+ * an arm64 app and handing both to `@electron/universal`. That refuses a Mach-O file that is
+ * byte-identical in the two and not already universal (`Detected file … that's the same in
+ * both x64 and arm64 builds`), and an `out/node/node` built for one architecture is exactly
+ * that. A file that is already universal on both sides it keeps as it is ("is already
+ * universal across builds, skipping lipo"), so joining the two here is what lets the merge
+ * through and what gives the Intel slice a Node it can run.
  */
+
+interface Archive {
+  readonly file: string;
+  readonly sha256: string;
+}
 
 interface Pin {
   readonly version: string;
-  readonly archives: Readonly<Record<string, { readonly file: string; readonly sha256: string }>>;
+  readonly archives: Readonly<Record<string, Archive>>;
 }
 
 const root = dirname(dirname(fileURLToPath(import.meta.url)));
 const pin = JSON.parse(readFileSync(join(root, 'bundled-node.json'), 'utf8')) as Pin;
-const target = `${process.platform}-${process.arch}`;
-function archiveFor(key: string): { readonly file: string; readonly sha256: string } {
+
+/** The archives this platform's Node is made of: one, or on macOS the two `lipo` joins. */
+const sources =
+  process.platform === 'darwin'
+    ? ['darwin-x64', 'darwin-arm64']
+    : [`${process.platform}-${process.arch}`];
+const target = process.platform === 'darwin' ? 'darwin-universal' : sources[0]!;
+
+function archiveFor(key: string): Archive {
   const found = pin.archives[key];
   if (found !== undefined) return found;
   throw new Error(
     `bundled-node.json pins no Node archive for ${key}; it has ${Object.keys(pin.archives).join(', ')}`,
   );
 }
-const archive = archiveFor(target);
 
 const out = join(root, 'out', 'node');
 const binaryName = process.platform === 'win32' ? 'node.exe' : 'node';
@@ -55,7 +75,7 @@ function sha256Of(bytes: Buffer): string {
   return createHash('sha256').update(bytes).digest('hex');
 }
 
-async function archiveBytes(): Promise<Buffer> {
+async function archiveBytes(archive: Archive): Promise<Buffer> {
   const cached = join(homedir(), '.cache', 'tyto', 'node', archive.file);
   if (existsSync(cached)) {
     const bytes = readFileSync(cached);
@@ -74,29 +94,37 @@ async function archiveBytes(): Promise<Buffer> {
   return bytes;
 }
 
+/** Extracts one pinned archive under `work` and returns the folder its files are in. */
+async function extract(key: string, work: string): Promise<string> {
+  const archive = archiveFor(key);
+  const file = join(work, archive.file);
+  writeFileSync(file, await archiveBytes(archive));
+  // Windows' own bsdtar reads a zip; the GNU tar Git Bash puts first on PATH does not.
+  const tar =
+    process.platform === 'win32'
+      ? join(process.env['SystemRoot'] ?? 'C:\\Windows', 'System32', 'tar.exe')
+      : 'tar';
+  execFileSync(tar, ['-xf', file, '-C', work], { stdio: 'inherit' });
+  return join(work, archive.file.replace(/\.(zip|tar\.gz|tar\.xz)$/u, ''));
+}
+
 if (existsSync(stamp) && readFileSync(stamp, 'utf8').trim() === `${pin.version} ${target}`) {
   process.stdout.write(`bundled Node ${pin.version} for ${target} is already in out/node\n`);
 } else {
   const work = mkdtempSync(join(tmpdir(), 'tyto-node-'));
   try {
-    const file = join(work, archive.file);
-    writeFileSync(file, await archiveBytes());
-    // Windows' own bsdtar reads a zip; the GNU tar Git Bash puts first on PATH does not.
-    const tar =
-      process.platform === 'win32'
-        ? join(process.env['SystemRoot'] ?? 'C:\\Windows', 'System32', 'tar.exe')
-        : 'tar';
-    execFileSync(tar, ['-xf', file, '-C', work], { stdio: 'inherit' });
+    const folders: string[] = [];
+    for (const key of sources) folders.push(await extract(key, work));
+    const binaries = folders.map((folder) =>
+      process.platform === 'win32' ? join(folder, binaryName) : join(folder, 'bin', binaryName),
+    );
 
-    const stem = archive.file.replace(/\.(zip|tar\.gz|tar\.xz)$/u, '');
-    const binary =
-      process.platform === 'win32'
-        ? join(work, stem, binaryName)
-        : join(work, stem, 'bin', binaryName);
     rmSync(out, { recursive: true, force: true });
     mkdirSync(out, { recursive: true });
-    copyFileSync(binary, join(out, binaryName));
-    copyFileSync(join(work, stem, 'LICENSE'), join(out, 'LICENSE'));
+    if (binaries.length === 1) copyFileSync(binaries[0]!, join(out, binaryName));
+    else execFileSync('lipo', ['-create', ...binaries, '-output', join(out, binaryName)]);
+    // Both macOS archives carry the same LICENSE; the first one's is kept.
+    copyFileSync(join(folders[0]!, 'LICENSE'), join(out, 'LICENSE'));
     writeFileSync(stamp, `${pin.version} ${target}\n`);
     process.stdout.write(`bundled Node ${pin.version} for ${target} into out/node\n`);
   } finally {

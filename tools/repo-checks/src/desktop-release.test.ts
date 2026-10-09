@@ -30,7 +30,14 @@ interface Workflow {
     string,
     {
       'runs-on'?: string;
-      strategy?: { 'fail-fast'?: boolean; matrix?: { os?: string[] } };
+      strategy?: {
+        'fail-fast'?: boolean;
+        matrix?: {
+          os?: string[];
+          publish?: boolean[];
+          include?: { os?: string; publish?: boolean }[];
+        };
+      };
       steps?: {
         name?: string;
         if?: string;
@@ -55,7 +62,7 @@ interface BuilderConfig {
     tagNamePrefix?: string;
     vPrefixedTagName?: boolean;
   };
-  mac?: { target?: string };
+  mac?: { target?: string | { target?: string; arch?: string | string[] }[] };
   /** An array since TYTO-136 — Windows is the one platform with two. */
   win?: { target?: string | string[] };
   linux?: { target?: string; executableName?: string };
@@ -86,7 +93,42 @@ describe('the desktop release workflow', () => {
     const job = Object.values(workflow().jobs ?? {})[0];
 
     expect(job?.strategy?.matrix?.os).toEqual(['macos-latest', 'windows-latest', 'ubuntu-latest']);
+    expect(job?.strategy?.matrix?.publish).toEqual([true]);
     expect(job?.strategy?.['fail-fast']).toBe(false);
+  });
+
+  it('opens the universal Mac app on an Intel runner, which never publishes (TYTO-146)', () => {
+    // The `dmg` is universal and the Apple Silicon leg builds and uploads it, but that runner
+    // only ever starts the arm64 slice. The Intel leg is the one place the x64 slice opens
+    // before a release carries it, so it has to exist; and it has to stay off every step that
+    // uploads or reads a secret, or two legs race to upload one `dmg` and an extra runner
+    // holds the signing certificate for nothing.
+    const include = Object.values(workflow().jobs ?? {})[0]?.strategy?.matrix?.include;
+
+    expect(include, `${WORKFLOW} no longer runs an Intel Mac leg`).toEqual([
+      { os: 'macos-26-intel', publish: false },
+    ]);
+    for (const step of steps().filter(canPublish)) {
+      expect(
+        step.if,
+        `${WORKFLOW} step "${describeStep(step)}" runs on the leg that must not publish`,
+      ).toBe(PUBLISHING_LEG);
+    }
+  });
+
+  it('builds the dmg on a pull request, on one Mac leg, and uploads it nowhere (TYTO-146)', () => {
+    // The gate packages with `--dir`, so without this step the configured target — one
+    // universal `dmg` — first meets a build at the tag.
+    const dmg = steps().find(
+      (step) => step.run?.includes('electron-builder --mac --publish never') === true,
+    );
+
+    expect(dmg, `${WORKFLOW} no longer builds the dmg on a pull request`).toBeDefined();
+    expect(dmg?.if).toBe(
+      "github.event_name == 'pull_request' && runner.os == 'macOS' && matrix.publish",
+    );
+    expect(dmg && canPublish(dmg)).toBe(false);
+    expect(dmg?.run).toContain('ls -l apps/desktop/release/*.dmg');
   });
 
   it('builds through Turborepo rather than through the package script alone', () => {
@@ -145,7 +187,10 @@ describe('the desktop release workflow', () => {
   });
 
   it('publishes, which is the only reason the job has write permission', () => {
-    const publishing = steps().filter((step) => step.run?.includes('electron-builder') === true);
+    const publishing = steps().filter(
+      (step) =>
+        step.run?.includes('electron-builder') === true && !step.run.includes('--publish never'),
+    );
 
     expect(publishing, `${WORKFLOW} no longer runs electron-builder`).toHaveLength(1);
     expect(publishing[0]?.run).toContain('--publish always');
@@ -163,7 +208,7 @@ describe('the desktop release workflow', () => {
     // So these names must not appear in the publishing step's own `env:` at all. Absence is
     // the thing being asserted, which is why this reads the step rather than the file — a
     // grep would also match the step that writes them conditionally, which is the fix.
-    const publishing = steps().find((step) => step.run?.includes('electron-builder') === true);
+    const publishing = steps().find((step) => step.run?.includes('--publish always') === true);
 
     expect(publishing, `${WORKFLOW} no longer runs electron-builder`).toBeDefined();
     expect(
@@ -196,6 +241,12 @@ describe('the desktop release workflow', () => {
 
 /** The condition that keeps a step off the pull-request dry run (TYTO-95). */
 const PUSH_ONLY = "github.event_name == 'push'";
+
+/**
+ * The condition on a step that uploads or reads a secret: a tag push, on a leg that publishes.
+ * The Intel Mac leg builds and tests the universal app and is not one (TYTO-146).
+ */
+const PUBLISHING_LEG = "github.event_name == 'push' && matrix.publish";
 
 /**
  * Verbose because the default reporter lists only the slow tests of a green file, and the
@@ -296,6 +347,8 @@ describe('the packaged-app gate (TYTO-95)', () => {
     expect(workflow().on?.pull_request?.paths).toEqual([
       '.github/workflows/desktop.yml',
       'apps/desktop/electron-builder.yml',
+      'apps/desktop/bundled-node.json',
+      'apps/desktop/scripts/fetch-node.ts',
       'apps/desktop/e2e/*.package.test.ts',
     ]);
   });
@@ -313,7 +366,7 @@ describe('the packaged-app gate (TYTO-95)', () => {
       expect(
         step.if,
         `${WORKFLOW} step "${describeStep(step)}" can publish on a pull request`,
-      ).toBe(PUSH_ONLY);
+      ).toBe(PUBLISHING_LEG);
     }
     // The tag guard is push-only too: on a pull request `GITHUB_REF_NAME` is `<n>/merge`.
     const guard = steps().find((step) => step.run?.includes('GITHUB_REF_NAME') === true);
@@ -356,7 +409,28 @@ describe('the electron-builder configuration', () => {
       mac: config.mac?.target,
       win: config.win?.target,
       linux: config.linux?.target,
-    }).toEqual({ mac: 'dmg', win: ['nsis', 'portable'], linux: 'AppImage' });
+    }).toEqual({
+      mac: [{ target: 'dmg', arch: 'universal' }],
+      win: ['nsis', 'portable'],
+      linux: 'AppImage',
+    });
+  });
+
+  it('builds the dmg universal, with a Node the merge can join (TYTO-146)', () => {
+    // **One file that opens on an Intel Mac and on Apple Silicon**, rather than two files and a
+    // choice on the release page (`docs/git-workflow.md`). The `arch` is asserted above with
+    // the target; this is the other half of the coupling. electron-builder joins an x64 and an
+    // arm64 pack with `@electron/universal`, which refuses a Mach-O file identical in both and
+    // not already universal — and the bundled Node is the one such file the package carries.
+    // `scripts/fetch-node.ts` makes it universal out of these two pins; with either gone the
+    // macOS build fails at the merge, or a slice ships with no Node it can run.
+    const pin = JSON.parse(readRepoFile('apps/desktop/bundled-node.json')) as {
+      archives?: Record<string, { file?: string }>;
+    };
+
+    expect(pin.archives?.['darwin-x64']?.file).toMatch(/-darwin-x64\.tar\.gz$/u);
+    expect(pin.archives?.['darwin-arm64']?.file).toMatch(/-darwin-arm64\.tar\.gz$/u);
+    expect(readRepoFile('apps/desktop/scripts/fetch-node.ts')).toContain("'lipo', ['-create'");
   });
 
   it('keeps the built-in template pack inside the package', () => {
