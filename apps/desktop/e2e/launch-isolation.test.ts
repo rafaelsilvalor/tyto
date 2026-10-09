@@ -167,6 +167,193 @@ function scanLaunches(fileName: string, source: string): LaunchScan {
   return { importsElectron, launches, problems };
 }
 
+/**
+ * The command-line program is the same leak through a child process (TYTO-252). A suite that
+ * runs `tyto render` beside the window and passes no `env` hands the CLI the developer's
+ * environment, `TYTO_HOME` falls back to `~/.tyto`, and the CLI loads whatever plugins that
+ * folder enables: `banner.desktop.test.ts` compared the window's placeholder logo with the
+ * maintainer's real brand-kit logo, red on his machine and green on CI, which has no `~/.tyto`.
+ *
+ * A CLI entry is a variable whose initializer names `@tyto/cli` or the path segments
+ * `'cli', 'dist', 'index.js'`; the check is on the call that runs it, not on the variable,
+ * so `electron-builder/cli.js` and `node --version` are left alone.
+ */
+
+const CHILD_PROCESS_CALLS = new Set(['execFile', 'execFileSync', 'spawn', 'spawnSync', 'fork']);
+
+const HOW_TO_ISOLATE_CLI =
+  `pass the child env: { ...process.env, ${HOME_VARIABLE}: join(scratch, 'tyto-home') }, ` +
+  `the same scratch home the window gets`;
+
+interface CliScan {
+  /** Whether the file names the CLI's entry at all. */
+  readonly resolvesCli: boolean;
+  /** How many child-process calls run that entry, isolated or not. */
+  readonly runs: number;
+  readonly problems: readonly LaunchProblem[];
+}
+
+function stringLiterals(node: ts.Node): string[] {
+  const found: string[] = [];
+  const visit = (child: ts.Node): void => {
+    if (ts.isStringLiteral(child) || ts.isNoSubstitutionTemplateLiteral(child)) {
+      found.push(child.text);
+    }
+    ts.forEachChild(child, visit);
+  };
+  visit(node);
+  return found;
+}
+
+/** Whether an expression computes the CLI's built entry, by the strings it is built from. */
+function namesCliEntry(initializer: ts.Expression): boolean {
+  const texts = stringLiterals(initializer);
+  if (texts.some((text) => text.startsWith('@tyto/cli'))) return true;
+  const segments = texts.join('/');
+  return segments.includes('cli/dist/index.js');
+}
+
+/** The array a child-process call runs: `spawn(file, args, options)` or `fork(module, args, options)`. */
+function runsIdentifier(call: ts.CallExpression, names: ReadonlySet<string>): boolean {
+  const [first, second] = call.arguments;
+  const candidates: ts.Expression[] = [];
+  if (first !== undefined) candidates.push(first);
+  if (second !== undefined && ts.isArrayLiteralExpression(second)) {
+    candidates.push(...second.elements);
+  }
+  return candidates.some((element) => ts.isIdentifier(element) && names.has(element.text));
+}
+
+/** The options object of a child-process call: the first object literal after the command. */
+function childOptions(call: ts.CallExpression): ts.Expression | undefined {
+  const rest = call.arguments.slice(1);
+  return rest.find((argument) => !ts.isArrayLiteralExpression(argument));
+}
+
+function callName(call: ts.CallExpression): string | undefined {
+  if (ts.isIdentifier(call.expression)) return call.expression.text;
+  if (ts.isPropertyAccessExpression(call.expression)) return call.expression.name.text;
+  return undefined;
+}
+
+/** Every child process that runs the CLI in one source file, and what keeps it from being isolated. */
+function scanCliRuns(fileName: string, source: string): CliScan {
+  const file = ts.createSourceFile(fileName, source, ts.ScriptTarget.Latest, true);
+  const entries = new Set<string>();
+  const collect = (node: ts.Node): void => {
+    if (
+      ts.isVariableDeclaration(node) &&
+      ts.isIdentifier(node.name) &&
+      node.initializer !== undefined &&
+      namesCliEntry(node.initializer)
+    ) {
+      entries.add(node.name.text);
+    }
+    ts.forEachChild(node, collect);
+  };
+  collect(file);
+
+  const problems: LaunchProblem[] = [];
+  let runs = 0;
+  const visit = (node: ts.Node): void => {
+    if (ts.isCallExpression(node)) {
+      const name = callName(node);
+      if (name !== undefined && CHILD_PROCESS_CALLS.has(name) && runsIdentifier(node, entries)) {
+        runs += 1;
+        const line = file.getLineAndCharacterOfPosition(node.getStart(file)).line + 1;
+        const options = childOptions(node);
+        const reason =
+          options === undefined
+            ? `it passes no options, so \`${HOME_VARIABLE}\` falls back to the real ~/.tyto`
+            : ts.isObjectLiteralExpression(options)
+              ? envProblem(options)
+              : 'its options are not an object literal, so this check cannot read them';
+        if (reason !== undefined) problems.push({ line, reason });
+      }
+    }
+    ts.forEachChild(node, visit);
+  };
+  visit(file);
+
+  return { resolvesCli: entries.size > 0, runs, problems };
+}
+
+describe('every end-to-end suite runs the CLI with its own TYTO_HOME', () => {
+  it('finds no CLI child process without a TYTO_HOME in its env', () => {
+    const messages = suiteFiles().flatMap((name) =>
+      scanCliRuns(name, readFileSync(join(here, name), 'utf8')).problems.map(
+        (problem) =>
+          `e2e/${name}:${problem.line}: runs the CLI but ${problem.reason} — ${HOW_TO_ISOLATE_CLI}`,
+      ),
+    );
+    expect(messages).toEqual([]);
+  });
+
+  // As with `_electron`: a file that names the CLI's entry but whose run this scan does not
+  // recognise would pass the rule above by being invisible to it.
+  it('recognises a run in every suite that names the CLI entry', () => {
+    const unseen = suiteFiles()
+      .filter((name) => {
+        const scan = scanCliRuns(name, readFileSync(join(here, name), 'utf8'));
+        return scan.resolvesCli && scan.runs === 0;
+      })
+      .map(
+        (name) =>
+          `e2e/${name}: names the CLI entry but no execFileSync/spawnSync/… of it was recognised — ` +
+          'pass the entry variable directly in the call so this check can read it',
+      );
+    expect(unseen).toEqual([]);
+  });
+});
+
+describe('scanCliRuns', () => {
+  it('reports a CLI run without env, and accepts one with TYTO_HOME', () => {
+    const scan = scanCliRuns(
+      'a.ts',
+      [
+        "const cli = require_.resolve('@tyto/cli/dist/index.js');",
+        "execFileSync(process.execPath, [cli, 'render'], { cwd: scratch, stdio: 'pipe' });",
+        "execFileSync(process.execPath, [cli, 'render'], { env: { ...process.env, TYTO_HOME: home } });",
+      ].join('\n'),
+    );
+    expect(scan).toMatchObject({ resolvesCli: true, runs: 2 });
+    expect(scan.problems).toEqual([
+      { line: 2, reason: 'it passes no `env`, so `TYTO_HOME` falls back to the real ~/.tyto' },
+    ]);
+  });
+
+  it('recognises the entry built from path segments, and a call without options', () => {
+    const scan = scanCliRuns(
+      'a.ts',
+      [
+        "const cli = resolve(here, '..', '..', 'cli', 'dist', 'index.js');",
+        "spawnSync(process.execPath, [cli, 'plugin', 'install']);",
+        'fork(cli, [], { env: environment });',
+      ].join('\n'),
+    );
+    expect(scan.problems).toEqual([
+      { line: 2, reason: 'it passes no options, so `TYTO_HOME` falls back to the real ~/.tyto' },
+      {
+        line: 3,
+        reason: 'its `env` is not an object literal, so this check cannot see a `TYTO_HOME`',
+      },
+    ]);
+  });
+
+  it('leaves other child processes alone', () => {
+    const scan = scanCliRuns(
+      'a.ts',
+      [
+        "const cli = createRequire(import.meta.url).resolve('electron-builder/cli.js');",
+        "execFileSync(process.execPath, [cli, '--dir'], { stdio: 'inherit' });",
+        "execFileSync(BUNDLED_NODE, ['--version'], { encoding: 'utf8' });",
+        "// execFileSync(process.execPath, [tyto, 'render']) with '@tyto/cli' in a comment",
+      ].join('\n'),
+    );
+    expect(scan).toEqual({ resolvesCli: false, runs: 0, problems: [] });
+  });
+});
+
 const HOW_TO_WAIT =
   `import { firstWindow } from './first-window.js' and await firstWindow(app), ` +
   `so the wait uses the one deadline every suite shares`;
