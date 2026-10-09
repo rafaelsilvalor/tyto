@@ -517,10 +517,10 @@ describe('changeset check', () => {
  * The Turborepo cache `ci.yml` carries between runs (ADR 0072, TYTO-52).
  *
  * Since it went in, a green `check` can be a replay, and the few lines that make a replay
- * trustworthy are each one unrelated-looking edit away from going: a key without the lockfile
- * grows the folder forever, a key without the runtime replays a result measured on another
- * image, a cache step after the turbo run restores nothing, and the same step in a workflow
- * that ships would put a replayed build in a release.
+ * trustworthy are each one unrelated-looking edit away from going: a key without the runtime
+ * replays a result measured on another image or Node, a cache step after the turbo run restores
+ * nothing, a run without the prune step saves every old entry again (44M to 86M on one desktop
+ * edit), and the same step in a workflow that ships would put a replayed build in a release.
  */
 const TURBO_CACHE_PATH = '.turbo/cache';
 
@@ -565,6 +565,17 @@ describe('turbo cache', () => {
     const runtime = steps.find((step) => step.id === 'turbo-key');
     expect(runtime?.run).toContain('ImageVersion');
     expect(runtime?.run).toContain('${{ steps.node.outputs.node-version }}');
+  });
+
+  it('keeps only the entries the run used, read from the run summary', () => {
+    const turbo = steps.findIndex((step) => step.run?.startsWith('pnpm turbo ') === true);
+    expect(steps[turbo]?.run).toContain('--summarize');
+    const prune = steps.findIndex(
+      (step) => step.run?.includes('.turbo/runs/') === true && step.run.includes('rm -f') === true,
+    );
+    expect(prune, 'ci.yml no longer prunes .turbo/cache to the run that just finished').toBe(
+      turbo + 1,
+    );
   });
 
   it('stays out of every workflow that ships or measures a build', () => {
