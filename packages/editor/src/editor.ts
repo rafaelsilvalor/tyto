@@ -302,6 +302,12 @@ export function createEditor(parent: HTMLElement, options: EditorOptions = {}): 
   const vimInput = (): Extension => vimMode(vimKeymap === undefined ? {} : { keymap: vimKeymap });
   /** What the input compartment holds now, which every shown tab is brought up to. */
   let input: Extension = vimEnabled ? vimInput() : keys;
+  /**
+   * What the theme compartment holds now, for the input layer's reason: a tab built or stored
+   * before the system switched to dark still holds `light`, and `restore` brings it up to this
+   * (TYTO-96). The desktop switches it whenever the system does.
+   */
+  let theme: Extension = themes[options.theme ?? 'light'];
 
   /**
    * One listener for both directions, and the order inside it carries weight.
@@ -350,7 +356,7 @@ export function createEditor(parent: HTMLElement, options: EditorOptions = {}): 
     // stops the commands, and `editable` takes the `contenteditable` off the content
     // element so the caret and the input method never arrive in the first place.
     ...(readOnly ? [CodeMirrorEditorState.readOnly.of(true), EditorView.editable.of(false)] : []),
-    themeCompartment.of(themes[options.theme ?? 'light']),
+    themeCompartment.of(theme),
     searchSupport(() => searchPhrases),
     languages[language](),
     ...baseExtensions(),
@@ -387,6 +393,9 @@ export function createEditor(parent: HTMLElement, options: EditorOptions = {}): 
       if (inputCompartment.get(view.state) !== input) {
         view.dispatch({ effects: inputCompartment.reconfigure(input) });
       }
+      if (themeCompartment.get(view.state) !== theme) {
+        view.dispatch({ effects: themeCompartment.reconfigure(theme) });
+      }
       // Dispatched after, because a scroll effect is a property of the view and the view
       // has just been given a different state to measure. The phrases ride along: a state
       // carries the language it was built in, so a tab that was away while the window
@@ -416,8 +425,9 @@ export function createEditor(parent: HTMLElement, options: EditorOptions = {}): 
       };
     },
 
-    setTheme: (theme: ThemeName) => {
-      view.dispatch({ effects: themeCompartment.reconfigure(themes[theme]) });
+    setTheme: (name: ThemeName) => {
+      theme = themes[name];
+      view.dispatch({ effects: themeCompartment.reconfigure(theme) });
     },
 
     setSearchPhrases: (phrases: SearchPhrases) => {

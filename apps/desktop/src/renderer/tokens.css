@@ -1,0 +1,160 @@
+/*
+ * The window's visual language, and the only file in the renderer that writes a literal
+ * value (TYTO-96, ADR 0075).
+ *
+ * Every token is named for the role it plays — a surface, a line, a kind of text — and never
+ * for the colour it happens to be, so a theme later (TYTO-208) is a reader that sets these
+ * custom properties and touches no rule. `shell.css` and the editor (`@tyto/editor`'s
+ * palette) read nothing else; `e2e/renderer-tokens.test.ts` fails on a literal anywhere else
+ * in the renderer and on a `var(--tyto-…)` that names a token this file does not define,
+ * which would otherwise drop the colour without a word.
+ *
+ * The palette is Zed's One Light and One Dark, written from memory rather than measured off
+ * Zed, and judged in the real window at 900x600 in both themes.
+ */
+
+/*
+ * Source Sans 3, the face `@tyto/fonts` already ships (ADR 0021), and never `system-ui`.
+ * `@tyto-fonts` is an alias `electron.vite.config.ts` points at that package's folder: Vite
+ * copies the two files into the renderer bundle, so the window reads its own `assets/` under
+ * `font-src 'self'` in dev and in the packaged app alike, and nothing resolves a folder at
+ * run time. There is no 600 and no italic face, so the UI uses 400 and 700 only.
+ */
+@font-face {
+  font-family: 'Source Sans 3';
+  font-style: normal;
+  font-weight: 400;
+  font-display: block;
+  src: url('@tyto-fonts/source-sans-3/SourceSans3-Regular.ttf.woff2') format('woff2');
+}
+
+@font-face {
+  font-family: 'Source Sans 3';
+  font-style: normal;
+  font-weight: 700;
+  font-display: block;
+  src: url('@tyto-fonts/source-sans-3/SourceSans3-Bold.ttf.woff2') format('woff2');
+}
+
+:root {
+  color-scheme: light dark;
+
+  /* Type. The mono stack is the machine's, provisionally: a bundled mono face would be a new
+     dependency, and that is the maintainer's call (ADR 0075). It lives here and nowhere else. */
+  --tyto-font-ui: 'Source Sans 3';
+  --tyto-font-mono:
+    'JetBrains Mono', 'Cascadia Mono', 'SF Mono', Menlo, Consolas, ui-monospace, monospace;
+  --tyto-text-xs: 12px;
+  --tyto-text-sm: 13px;
+  --tyto-text-md: 14px;
+  --tyto-text-lg: 16px;
+  --tyto-line-height: 1.45;
+  --tyto-weight-strong: 700;
+
+  /* Space, radius and the line between two things. */
+  --tyto-space-1: 2px;
+  --tyto-space-2: 4px;
+  --tyto-space-3: 6px;
+  --tyto-space-4: 8px;
+  --tyto-space-5: 12px;
+  --tyto-space-6: 16px;
+  --tyto-radius-sm: 3px;
+  --tyto-radius-md: 6px;
+  --tyto-radius-full: 999px;
+  --tyto-hairline-width: 1px;
+  --tyto-focus-width: 2px;
+
+  /* One Light. */
+  --tyto-surface: #fafafa;
+  --tyto-surface-raised: #ebebec;
+  --tyto-surface-sunken: #e5e5e6;
+  --tyto-border: #c9c9ca;
+  --tyto-hairline: #dcdcdd;
+  --tyto-text: #242529;
+  --tyto-text-muted: #58585a;
+  --tyto-text-disabled: #8e8f94;
+  --tyto-accent: #5c78e2;
+  --tyto-accent-text: #ffffff;
+  --tyto-focus-ring: #5c78e2;
+  --tyto-selection: #cdd6f8;
+  --tyto-hover: #dfdfe0;
+  /* The background of a button that is on (TYTO-248): about 22 % grey, the same in both. */
+  --tyto-button-on: rgb(128 128 128 / 22%);
+  --tyto-error: #c4473a;
+  --tyto-warning: #a48819;
+  --tyto-info: #5c78e2;
+  --tyto-success: #4f8a43;
+  /* Lighter than dark's: at 25 % it turned the light window a muddy grey behind the bar. */
+  --tyto-scrim: rgb(0 0 0 / 12%);
+  --tyto-shadow-overlay: 0 12px 40px rgb(0 0 0 / 18%);
+  --tyto-shadow-paper: 0 1px 6px rgb(0 0 0 / 18%);
+
+  /*
+   * The editor's line under the cursor is translucent (TYTO-246): the selection is drawn on a
+   * layer behind it, and an opaque line would hide a selection on that line. Each value
+   * composites over `--tyto-surface` to its `-gutter` twin, which
+   * `e2e/renderer-tokens.test.ts` checks.
+   */
+  --tyto-active-line: rgb(221 221 224 / 35%);
+  --tyto-active-line-gutter: #f0f0f1;
+
+  /* Syntax, by role. Both languages' grammars map their tags onto these eight. */
+  --tyto-syntax-keyword: #a449ab;
+  --tyto-syntax-function: #4f6fd8;
+  --tyto-syntax-constant: #2f76aa;
+  --tyto-syntax-attribute: #9a6220;
+  --tyto-syntax-string: #4f8a43;
+  --tyto-syntax-tag: #c4473a;
+  --tyto-syntax-punctuation: #4d4f52;
+  --tyto-syntax-comment: #7e8086;
+
+  /* What an artwork is shown on, which is about the artwork and not the theme: a frame with
+     no background is transparent, and the squares are what make that visible. */
+  --tyto-checker-light: #ffffff;
+  --tyto-checker-dark: #d9d9e0;
+  --tyto-checker-square: 8px;
+  /* Behind a plugin's page, which may assume a background it does not paint. */
+  --tyto-plugin-page: #ffffff;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    /* One Dark. */
+    --tyto-surface: #282c33;
+    --tyto-surface-raised: #2f343e;
+    --tyto-surface-sunken: #21242b;
+    --tyto-border: #464b57;
+    --tyto-hairline: #363c46;
+    --tyto-text: #dce0e5;
+    --tyto-text-muted: #a9afbc;
+    --tyto-text-disabled: #878a98;
+    --tyto-accent: #74ade8;
+    --tyto-accent-text: #1c1f24;
+    --tyto-focus-ring: #74ade8;
+    /* #3e4451 mixed with the accent at 30 %: the old selection was 4/18/12 per channel above
+       its background and faint on every line (TYTO-96, comment 1291677). */
+    --tyto-selection: #4e647e;
+    --tyto-hover: #363c46;
+    /* A step lighter than Zed's #d07277, which read at 4.24:1 on the surface: errors are
+       text here as well as dots, and text is held to 4.5. */
+    --tyto-error: #d87b80;
+    --tyto-warning: #dec184;
+    --tyto-info: #74ade8;
+    --tyto-success: #a1c181;
+    --tyto-scrim: rgb(0 0 0 / 40%);
+    --tyto-shadow-overlay: 0 12px 40px rgb(0 0 0 / 45%);
+    --tyto-shadow-paper: 0 1px 6px rgb(0 0 0 / 50%);
+
+    --tyto-active-line: rgb(60 67 82 / 35%);
+    --tyto-active-line-gutter: #2f343e;
+
+    --tyto-syntax-keyword: #b477cf;
+    --tyto-syntax-function: #73ade9;
+    --tyto-syntax-constant: #6eb4bf;
+    --tyto-syntax-attribute: #bf956a;
+    --tyto-syntax-string: #a1c181;
+    --tyto-syntax-tag: #d07277;
+    --tyto-syntax-punctuation: #acb2be;
+    --tyto-syntax-comment: #808590;
+  }
+}

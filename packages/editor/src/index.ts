@@ -22,7 +22,7 @@ export {
   textOf,
 } from './editor.js';
 
-export { briefDarkTheme, briefLightTheme, type ThemeName, themes } from './theme.js';
+export { briefDarkTheme, briefLightTheme, type ThemeName, themes, themeTokens } from './theme.js';
 
 export {
   type BriefAnalysis,

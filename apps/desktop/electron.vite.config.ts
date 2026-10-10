@@ -1,4 +1,5 @@
-import { resolve } from 'node:path';
+import { createRequire } from 'node:module';
+import { dirname, resolve } from 'node:path';
 
 import { defineConfig, externalizeDepsPlugin } from 'electron-vite';
 
@@ -93,6 +94,20 @@ export default defineConfig({
 
   renderer: {
     root: resolve(import.meta.dirname, 'src/renderer'),
+    resolve: {
+      alias: {
+        // The window's face is Source Sans 3 from `@tyto/fonts` (TYTO-96, ADR 0075), and
+        // `tokens.css` names the files through this alias. The renderer is the opposite case
+        // from main above: Vite copies the two `.woff2` files into the bundle's `assets/`, so
+        // the window reads its own copy under `font-src 'self'` and nothing has to find the
+        // package's folder at run time. Resolved through `package.json`, the one subpath the
+        // package exports.
+        '@tyto-fonts': resolve(
+          dirname(createRequire(import.meta.url).resolve('@tyto/fonts/package.json')),
+          'fonts',
+        ),
+      },
+    },
     build: {
       rollupOptions: {
         input: { index: resolve(import.meta.dirname, 'src/renderer/index.html') },

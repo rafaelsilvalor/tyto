@@ -218,6 +218,22 @@ describe('createEditor', () => {
  * on screen" and fail all four.
  */
 describe('document states', () => {
+  it('shows a tab in the theme the editor is in now, not the one it was stored in', () => {
+    // The system turning dark while a tab is in the background (TYTO-96): the stored state
+    // still holds the light compartment, and a tab made by `blank` was built from the
+    // extensions captured when the editor opened light.
+    handle = createEditor(open().parent, { doc: 'first' });
+    const first = handle.state();
+    handle.setTheme('dark');
+
+    handle.restore(handle.blank('second'));
+    expect(handle.view.state.facet(EditorView.darkTheme)).toBe(true);
+
+    handle.restore(first);
+    expect(handle.view.state.facet(EditorView.darkTheme)).toBe(true);
+    expect(handle.getValue()).toBe('first');
+  });
+
   it('puts back the text a state was taken of', () => {
     handle = createEditor(open().parent, { doc: 'first' });
     const first = handle.state();

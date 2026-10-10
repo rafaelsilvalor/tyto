@@ -21,9 +21,14 @@ import { tags } from '@lezer/highlight';
  * `attributeName`, `attributeValue`, `definitionKeyword`, `punctuation`. That is the tag
  * vocabulary doing its job: neither grammar was written to match the other, and an
  * attribute name still looks like an attribute name in both.
+ *
+ * **The colours are the host's** (TYTO-96, ADR 0075). Every field below is a CSS custom
+ * property the host defines — the desktop's `tokens.css`, for light and for dark — so the
+ * window and the buffer are painted from one source and change together when the system
+ * does, with no reconfiguration here.
  */
 
-/** Named so the two palettes can be read side by side rather than diffed. */
+/** Named so each part of the buffer reads as the role it plays. */
 interface Palette {
   readonly background: string;
   readonly foreground: string;
@@ -32,11 +37,11 @@ interface Palette {
   /**
    * Translucent on purpose (TYTO-246). `drawSelection` paints the selection on a layer behind
    * the text, and the active line's background sits on the line element above that layer, so
-   * an opaque colour here hides any selection on the cursor's line. Each value is chosen so
-   * that, over `background`, it composites to the colour the line had when it was opaque.
+   * an opaque colour here hides any selection on the cursor's line. The host's token is chosen
+   * so that, over `background`, it composites to `activeLineGutter`.
    */
   readonly activeLine: string;
-  /** The gutter has no selection under it, so it keeps the opaque colour the line used to have. */
+  /** The gutter has no selection under it, so it keeps the opaque colour. */
   readonly activeLineGutter: string;
   readonly gutterBackground: string;
   readonly gutterForeground: string;
@@ -62,144 +67,153 @@ interface Palette {
   readonly bracket: string;
 }
 
-// Exported for `theme.test.ts`, not from the package: the themes below are the public surface.
-export const lightPalette: Palette = {
-  background: '#ffffff',
-  foreground: '#1f2328',
-  caret: '#1f2328',
-  selection: '#cfe3ff',
-  // Over #ffffff: (246, 248, 250), which is #f6f8fa.
-  activeLine: 'rgba(165, 185, 205, 0.1)',
-  activeLineGutter: '#f6f8fa',
-  gutterBackground: '#f6f8fa',
-  gutterForeground: '#8c959f',
-  frontmatter: '#6639ba',
-  comment: '#6e7781',
-  directiveName: '#0550ae',
-  namespace: '#0a7ea4',
-  punctuation: '#57606a',
-  attributeName: '#953800',
-  attributeValue: '#0a3069',
-  escape: '#cf222e',
-  tagName: '#116329',
-  propertyName: '#0550ae',
-  selectorClass: '#953800',
-  selectorId: '#8250df',
-  keyword: '#cf222e',
-  functionName: '#8250df',
-  literal: '#0550ae',
-  string: '#0a3069',
-  bracket: '#57606a',
+/**
+ * The custom property a role reads. A host that defines none of them gets an uncoloured
+ * editor, which is visible, rather than a second palette that silently disagrees with its
+ * window.
+ */
+const token = (role: string): string => `var(--tyto-${role})`;
+
+/**
+ * One palette for both themes, because the colours are no longer here.
+ *
+ * Twenty-five fields over fifteen roles: the fields that always had one colour in the dark
+ * palette share a role, so a theme sets eight syntax colours rather than seventeen.
+ */
+export const palette: Palette = {
+  background: token('surface'),
+  foreground: token('text'),
+  caret: token('accent'),
+  selection: token('selection'),
+  activeLine: token('active-line'),
+  activeLineGutter: token('active-line-gutter'),
+  gutterBackground: token('surface'),
+  gutterForeground: token('text-disabled'),
+  frontmatter: token('syntax-keyword'),
+  comment: token('syntax-comment'),
+  directiveName: token('syntax-function'),
+  namespace: token('syntax-constant'),
+  punctuation: token('syntax-punctuation'),
+  attributeName: token('syntax-attribute'),
+  attributeValue: token('syntax-string'),
+  escape: token('syntax-tag'),
+  tagName: token('syntax-tag'),
+  propertyName: token('syntax-function'),
+  selectorClass: token('syntax-attribute'),
+  selectorId: token('syntax-keyword'),
+  keyword: token('syntax-keyword'),
+  functionName: token('syntax-function'),
+  literal: token('syntax-constant'),
+  string: token('syntax-string'),
+  bracket: token('syntax-punctuation'),
 };
 
-export const darkPalette: Palette = {
-  background: '#1e2127',
-  foreground: '#abb2bf',
-  caret: '#528bff',
-  selection: '#3e4451',
-  // Over #1e2127: (44, 49, 58), which is #2c313a.
-  activeLine: 'rgba(147, 166, 197, 0.12)',
-  activeLineGutter: '#2c313a',
-  gutterBackground: '#1e2127',
-  gutterForeground: '#545862',
-  frontmatter: '#c678dd',
-  comment: '#7f848e',
-  directiveName: '#61afef',
-  namespace: '#56b6c2',
-  punctuation: '#828997',
-  attributeName: '#d19a66',
-  attributeValue: '#98c379',
-  escape: '#e06c75',
-  tagName: '#e06c75',
-  propertyName: '#61afef',
-  selectorClass: '#d19a66',
-  selectorId: '#c678dd',
-  keyword: '#c678dd',
-  functionName: '#61afef',
-  literal: '#56b6c2',
-  string: '#98c379',
-  bracket: '#828997',
-};
+const monoFont = token('font-mono');
 
-const chrome = (palette: Palette, isDark: boolean): Extension =>
+/**
+ * Every custom property the editor reads, for a host to define. The desktop's
+ * `e2e/renderer-tokens.test.ts` holds its token file to this list, because a name nobody
+ * defines drops the colour without a word — jsdom resolves no `var()`, so no test of the
+ * editor alone could notice.
+ */
+export const themeTokens: readonly string[] = [
+  ...new Set(
+    [...Object.values(palette), monoFont].map((value) =>
+      value.replace(/^var\((--[a-z0-9-]+)\)$/, '$1'),
+    ),
+  ),
+];
+
+const chrome = (colours: Palette, isDark: boolean): Extension =>
   EditorView.theme(
     {
       '&': {
-        color: palette.foreground,
-        backgroundColor: palette.background,
+        color: colours.foreground,
+        backgroundColor: colours.background,
       },
       '.cm-content': {
-        caretColor: palette.caret,
-        fontFamily: "'JetBrains Mono', 'Cascadia Mono', 'SF Mono', Menlo, Consolas, monospace",
+        caretColor: colours.caret,
+        fontFamily: monoFont,
       },
-      '.cm-cursor, .cm-dropCursor': { borderLeftColor: palette.caret },
-      '&.cm-focused .cm-selectionBackground, .cm-selectionBackground, .cm-content ::selection': {
-        backgroundColor: palette.selection,
-      },
-      '.cm-activeLine': { backgroundColor: palette.activeLine },
+      '.cm-cursor, .cm-dropCursor': { borderLeftColor: colours.caret },
+      // The first selector repeats CodeMirror's own base rule, chain and all, because with
+      // anything shorter that rule wins on specificity whenever the editor is focused: a
+      // person saw CodeMirror's lilac in light, and in dark a selection 4/18/12 per channel
+      // above the background (TYTO-96, comment 1291677). At equal specificity a theme's rule
+      // is mounted after the base theme's, and wins.
+      '&.cm-focused > .cm-scroller > .cm-selectionLayer .cm-selectionBackground, &.cm-focused .cm-selectionBackground, .cm-selectionBackground, .cm-content ::selection':
+        {
+          backgroundColor: colours.selection,
+        },
+      '.cm-activeLine': { backgroundColor: colours.activeLine },
       '.cm-activeLineGutter': {
-        backgroundColor: palette.activeLineGutter,
-        color: palette.foreground,
+        backgroundColor: colours.activeLineGutter,
+        color: colours.foreground,
       },
       '.cm-gutters': {
-        backgroundColor: palette.gutterBackground,
-        color: palette.gutterForeground,
+        backgroundColor: colours.gutterBackground,
+        color: colours.gutterForeground,
         border: 'none',
       },
       '.cm-foldPlaceholder': {
         backgroundColor: 'transparent',
         border: 'none',
-        color: palette.gutterForeground,
+        color: colours.gutterForeground,
       },
     },
     { dark: isDark },
   );
 
-const syntax = (palette: Palette): HighlightStyle =>
+const syntax = (colours: Palette): HighlightStyle =>
   HighlightStyle.define([
-    { tag: tags.meta, color: palette.frontmatter },
+    { tag: tags.meta, color: colours.frontmatter },
     // `tags.comment` and not `tags.lineComment`: the brief's `//` and the template's
     // `<!-- -->` are both comments, and one rule covering the parent tag styles both.
-    { tag: tags.comment, color: palette.comment, fontStyle: 'italic' },
+    { tag: tags.comment, color: colours.comment, fontStyle: 'italic' },
 
-    { tag: tags.definitionKeyword, color: palette.directiveName, fontWeight: 'bold' },
-    { tag: tags.namespace, color: palette.namespace },
-    { tag: tags.punctuation, color: palette.punctuation },
+    { tag: tags.definitionKeyword, color: colours.directiveName, fontWeight: 'bold' },
+    { tag: tags.namespace, color: colours.namespace },
+    { tag: tags.punctuation, color: colours.punctuation },
 
-    { tag: tags.attributeName, color: palette.attributeName },
-    { tag: tags.attributeValue, color: palette.attributeValue },
+    { tag: tags.attributeName, color: colours.attributeName },
+    { tag: tags.attributeValue, color: colours.attributeValue },
 
     // Bold and italic are the one place the editor shows what the render will do rather
     // than what the source says, so they carry weight and slant and no colour of their own.
     { tag: tags.strong, fontWeight: 'bold' },
     { tag: tags.emphasis, fontStyle: 'italic' },
 
-    { tag: tags.escape, color: palette.escape },
-    { tag: tags.processingInstruction, color: palette.punctuation },
-    { tag: tags.separator, color: palette.punctuation },
+    { tag: tags.escape, color: colours.escape },
+    { tag: tags.processingInstruction, color: colours.punctuation },
+    { tag: tags.separator, color: colours.punctuation },
 
     // The template language. `attributeName`, `attributeValue`, `definitionKeyword` and
     // `punctuation` above are shared with the brief — the two languages agreed on those
     // four without being made to, which is what the tag vocabulary is for.
-    { tag: tags.tagName, color: palette.tagName },
-    { tag: tags.propertyName, color: palette.propertyName },
-    { tag: tags.className, color: palette.selectorClass },
-    { tag: tags.labelName, color: palette.selectorId },
-    { tag: tags.keyword, color: palette.keyword },
-    { tag: tags.function(tags.variableName), color: palette.functionName },
-    { tag: [tags.atom, tags.number, tags.color], color: palette.literal },
-    { tag: tags.string, color: palette.string },
-    { tag: [tags.angleBracket, tags.brace, tags.derefOperator], color: palette.bracket },
+    { tag: tags.tagName, color: colours.tagName },
+    { tag: tags.propertyName, color: colours.propertyName },
+    { tag: tags.className, color: colours.selectorClass },
+    { tag: tags.labelName, color: colours.selectorId },
+    { tag: tags.keyword, color: colours.keyword },
+    { tag: tags.function(tags.variableName), color: colours.functionName },
+    { tag: [tags.atom, tags.number, tags.color], color: colours.literal },
+    { tag: tags.string, color: colours.string },
+    { tag: [tags.angleBracket, tags.brace, tags.derefOperator], color: colours.bracket },
   ]);
 
+/**
+ * Light and dark differ only in CodeMirror's `dark` flag, which picks the base theme for the
+ * parts this file does not style (the search panel, tooltips). The host flips it with
+ * `setTheme` when the system does; the colours above follow the host's properties on their own.
+ */
 export const briefLightTheme: Extension = [
-  chrome(lightPalette, false),
-  syntaxHighlighting(syntax(lightPalette)),
+  chrome(palette, false),
+  syntaxHighlighting(syntax(palette)),
 ];
 
 export const briefDarkTheme: Extension = [
-  chrome(darkPalette, true),
-  syntaxHighlighting(syntax(darkPalette)),
+  chrome(palette, true),
+  syntaxHighlighting(syntax(palette)),
 ];
 
 /** The two names `createEditor` accepts, and what `setTheme` switches between. */
