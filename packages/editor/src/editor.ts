@@ -187,8 +187,15 @@ export interface EditorHandle {
    * `scroll` left out means the top, which is where a document no pane has shown yet is.
    */
   restore(state: EditorState, scroll?: ScrollPosition): void;
-  /** A new document with this editor's own extensions — an empty history, no selection. */
-  blank(doc: string): EditorState;
+  /**
+   * A new document with this editor's own extensions — an empty history, no selection.
+   *
+   * `language` names another language for this one document, the way a window of `.brief`
+   * tabs opens its `settings.json` as plain text (TYTO-206). Such a document gets the keys,
+   * the commands, the theme and search, and **not the host's `extensions`**: those are the
+   * editor's language's own lint and completion, and they would read the other text as one.
+   */
+  blank(doc: string, language?: LanguageName): EditorState;
   /** Returns the function that stops the listener. */
   onChange(listener: (value: string) => void): () => void;
   setTheme(theme: ThemeName): void;
@@ -319,8 +326,8 @@ export function createEditor(parent: HTMLElement, options: EditorOptions = {}): 
    * language and the theme are what make two documents behave like the same editor rather
    * than like two editors that happen to be in one window.
    */
-  const extensions = [
-    ...(options.extensions ?? []),
+  const ownLanguage = options.language ?? 'brief';
+  const shared = (language: LanguageName): Extension[] => [
     // Ahead of `baseExtensions`, so this package's `Mod-z` is reached before the
     // `historyKeymap` in there. Both stay: when there is no registry, or nothing left
     // to undo, ours returns false and CodeMirror's own binding still works.
@@ -333,9 +340,10 @@ export function createEditor(parent: HTMLElement, options: EditorOptions = {}): 
     ...(readOnly ? [CodeMirrorEditorState.readOnly.of(true), EditorView.editable.of(false)] : []),
     themeCompartment.of(themes[options.theme ?? 'light']),
     searchSupport(() => searchPhrases),
-    languages[options.language ?? 'brief'](),
+    languages[language](),
     ...baseExtensions(),
   ];
+  const extensions = [...(options.extensions ?? []), ...shared(ownLanguage)];
 
   const view = new EditorView({
     parent,
@@ -371,7 +379,11 @@ export function createEditor(parent: HTMLElement, options: EditorOptions = {}): 
       });
     },
 
-    blank: (doc: string) => CodeMirrorEditorState.create({ doc, extensions }),
+    blank: (doc: string, language: LanguageName = ownLanguage) =>
+      CodeMirrorEditorState.create({
+        doc,
+        extensions: language === ownLanguage ? extensions : shared(language),
+      }),
 
     setValue: (value: string) => {
       view.dispatch({

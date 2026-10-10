@@ -61,6 +61,8 @@ export const FILE_MENU_GROUPS: readonly (readonly MenuCommand[])[] = [
     // TYTO-45. Beside the plugins screen: both are about the app rather than about a file.
     // It opens the panel, or brings it forward when it is already open.
     { id: 'queue.show', label: 'command.queue.show' },
+    // TYTO-206. `settings.json` in a tab, as VS Code and Zed open theirs.
+    { id: 'settings.open', label: 'command.settings.open' },
   ],
   [{ id: 'document.close', label: 'command.document.close' }],
 ];

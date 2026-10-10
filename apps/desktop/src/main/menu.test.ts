@@ -204,6 +204,7 @@ describe('the File submenu', () => {
       '—',
       'plugins.show',
       'queue.show',
+      'settings.open',
       '—',
       'document.close',
       '—',

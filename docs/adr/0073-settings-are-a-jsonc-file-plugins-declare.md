@@ -96,3 +96,13 @@ the content hash of the last text the app wrote. PR A states this; PR B builds i
   is JSONC, and the defaults it wrote out in full are simply values equal to the defaults.
 - Out of PR A: the "Preferences: Open Settings (JSON)" command, the settings tab, the problems
   panel rows, the file watcher and live reload, and the end-to-end suite that proves them.
+- PR B (`src/main/settings-live.ts`, `e2e/settings.desktop.test.ts`) builds them, and settles
+  four details decision 8 left open. The hash the watcher compares is of the text the app
+  **knows is on disk** — the last it wrote _or applied_ — so the same text written back by
+  somebody else after a different one is still a change. A reload applies only the keys whose
+  effective value moved, so none of the four needs a restart and `requiresRestart` was not
+  added. A clean settings tab follows the disk, as an editor reverts a file nobody is typing
+  in; a dirty one keeps the person's typing. A refused screen change puts the session back on
+  the value in effect and opens the tab, where the `E_SETTINGS_SYNTAX` that refused it shows.
+  The tab is plain text: `@tyto/editor`'s `blank(doc, language)` opens one document in another
+  language without the host's brief lint and completion; JSON colouring is not built.

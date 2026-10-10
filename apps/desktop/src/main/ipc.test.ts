@@ -236,6 +236,7 @@ const queueDependency = () => {
       kinds = next;
       return { '/outra': ['jpeg'], '/fila': next };
     },
+    replaceKinds: () => undefined,
     run: (id: string) => {
       ran.push(id);
       return Promise.resolve();
@@ -460,6 +461,11 @@ const dependencies = () => {
     preview: preview(),
     project: projectFolder(),
     queue: queueDependency(),
+    settings: {
+      open: () => Promise.resolve({ document: null, documentId: null }),
+      validate: () => [],
+      closed: () => undefined,
+    },
     templates: catalogue(),
     templateEditor: templateEditor(),
     templateDialogs: templateDialogs(),

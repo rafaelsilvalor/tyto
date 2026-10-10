@@ -6,7 +6,12 @@ import {
   createEditor,
 } from '@tyto/editor';
 
-import { type IpcResponse, type TytoBridge, type UpdateStatus } from '../../shared/ipc.js';
+import {
+  type IpcEventPayload,
+  type IpcResponse,
+  type TytoBridge,
+  type UpdateStatus,
+} from '../../shared/ipc.js';
 import {
   type CatalogueKey,
   type Locale,
@@ -47,6 +52,7 @@ import {
   PREVIEW_ZOOM_FIT,
   PREVIEW_ZOOM_IN,
   PREVIEW_ZOOM_OUT,
+  SETTINGS_OPEN,
   bindingsOf,
   createDesktopRegistry,
   keymapSetFor,
@@ -70,6 +76,7 @@ import {
   isStale,
   isUnsaved,
   newDocument,
+  rebaseEdit,
   releaseDocument,
   selectDocument,
   stepDocument,
@@ -806,6 +813,19 @@ const registry: CommandRegistry = createDesktopRegistry({
   showPlugins: () => {
     openPluginsDialog();
   },
+  openSettings: () => {
+    void withBridge(async (bridge) => {
+      // One settings tab: asking again brings it forward rather than opening a second buffer.
+      const open = workspace.documents.find(isSettings);
+      if (open !== undefined) {
+        activate(open.id);
+        return;
+      }
+      const wanted = nextDocumentId();
+      const answer = await bridge['settings:open']({ documentId: wanted });
+      adopt(answer.document, answer.documentId, wanted, 'settings');
+    });
+  },
   showQueue: () => {
     void changeLayout(withPanelOpen(layout, QUEUE_PANEL, true)).then(() => {
       // Brought forward: the panel may have been open all along, behind the editor's focus.
@@ -969,6 +989,7 @@ function adopt(
   opened: { name: string; text: string } | null,
   documentId: string | null,
   wanted: string,
+  kind?: 'settings',
 ): void {
   if (opened === null || documentId === null) return;
 
@@ -978,9 +999,14 @@ function adopt(
   }
   if (editor === undefined) return;
 
-  const born = newDocument(documentId, editor.blank(opened.text));
+  // Settings are plain text: no brief colouring, and no brief lint reading JSON (TYTO-206).
+  const born = newDocument(
+    documentId,
+    editor.blank(opened.text, kind === undefined ? undefined : 'plain'),
+  );
   const created: DocumentState = {
     ...born,
+    ...(kind === undefined ? {} : { kind }),
     name: opened.name,
     // Born saved, because it was just read: the buffer and the file say the same thing and
     // the comparison that paints the dot says so without anybody writing `dirty: false`.
@@ -1014,8 +1040,104 @@ function adopt(
 
   restoreActive();
   repaint();
-  void withBridge((bridge) => request(bridge, created.id, opened.text));
+  void withBridge((bridge) =>
+    kind === 'settings'
+      ? validateSettings(bridge, created.id)
+      : request(bridge, created.id, opened.text),
+  );
   void refreshRecent();
+}
+
+const isSettings = (document_: DocumentState): boolean => document_.kind === 'settings';
+
+/**
+ * The settings tab's buffer, checked by main against what the plugins declared (TYTO-206).
+ *
+ * Its problems go where a brief's go — the document's own diagnostics, shown in the problems
+ * panel with the text their ranges index. Whether the tab is unsaved travels with it, which is
+ * how main knows to put a screen's change into this buffer rather than onto the disk.
+ */
+async function validateSettings(bridge: TytoBridge, documentId: string): Promise<void> {
+  const target = documentOf(workspace, documentId);
+  if (target === undefined) return;
+  const text = contentOf(target);
+  const { diagnostics } = await bridge['settings:validate']({
+    documentId,
+    text,
+    dirty: isUnsaved(target),
+  });
+  workspace = updateDocument(workspace, documentId, (document_) => ({
+    ...document_,
+    diagnostics,
+    brief: text,
+    problems: diagnostics.length,
+    errors: errorCount(diagnostics),
+  }));
+  if (documentId === workspace.activeId) repaint();
+}
+
+/** {@link validateSettings} on the pause the preview compiles on. */
+function askSettings(bridge: TytoBridge, documentId: string): void {
+  const existing = pending.get(documentId);
+  if (existing !== undefined) clearTimeout(existing);
+  pending.set(
+    documentId,
+    setTimeout(() => {
+      pending.delete(documentId);
+      void validateSettings(bridge, documentId);
+    }, PREVIEW_DELAY),
+  );
+}
+
+/**
+ * Puts text main sent into the settings tab: a screen's change while it had unsaved typing,
+ * or the disk followed while it had none (ADR 0073, decision 8).
+ *
+ * One change over the span that differs, so the caret and the undo history survive it and an
+ * undo takes the screen's change back out. `base` is the buffer main edited, which keystrokes
+ * since its last check are moved past (`rebaseEdit`).
+ */
+function replaceSettingsText(documentId: string, text: string, base: string | undefined): void {
+  const target = documentOf(workspace, documentId);
+  if (target?.state === undefined) return;
+  const current = contentOf(target);
+  if (current === text) return;
+  const changes = rebaseEdit(base ?? current, current, text);
+  if (documentId === workspace.activeId && editor !== undefined) {
+    editor.view.dispatch({ changes });
+    return;
+  }
+  workspace = updateDocument(workspace, documentId, (document_) => ({
+    ...document_,
+    state: document_.state?.update({ changes }).state,
+  }));
+}
+
+/** `settings:changed`: the file moved, a screen wrote it, or a screen's change was refused. */
+async function settingsChanged(
+  bridge: TytoBridge,
+  change: IpcEventPayload<'settings:changed'>,
+): Promise<void> {
+  const tab = workspace.documents.find(isSettings);
+  // The disk, followed by a tab main thought clean — not over typing main has not heard of.
+  const typing = tab !== undefined && change.saved && isUnsaved(tab);
+  if (tab !== undefined && change.text !== undefined && !typing) {
+    replaceSettingsText(tab.id, change.text, change.base);
+    if (change.saved) {
+      workspace = updateDocument(workspace, tab.id, (document_) => ({
+        ...document_,
+        savedText: contentOf(document_),
+      }));
+    }
+    void validateSettings(bridge, tab.id);
+  }
+  // Refused because the file does not parse: the tab is where that is shown, at the error.
+  if (change.refused) runCommand(SETTINGS_OPEN);
+  const chosen = await bridge['templates:folder']({});
+  state.templatesFolder = chosen.folder;
+  state.templatesFound = chosen.found;
+  await refreshTemplates(bridge);
+  repaint();
 }
 
 /**
@@ -1251,6 +1373,8 @@ async function saveOneDocument(
 
   repaint();
   void refreshRecent();
+  // Saved, so main stops routing a screen's change into this buffer (TYTO-206).
+  if (isSettings(target)) void validateSettings(bridge, documentId);
   return 'saved';
 }
 
@@ -1906,7 +2030,9 @@ async function afterTemplatesReread(bridge: TytoBridge): Promise<void> {
   state.templatesFound = chosen.found;
   await refreshTemplates(bridge);
   await Promise.all(
-    workspace.documents.map((document_) => request(bridge, document_.id, contentOf(document_))),
+    workspace.documents
+      .filter((document_) => !isSettings(document_))
+      .map((document_) => request(bridge, document_.id, contentOf(document_))),
   );
   repaint();
 }
@@ -1991,6 +2117,11 @@ async function load(): Promise<void> {
     // it is closed: the panel asks once when it opens, so nothing is lost by not listening.
     bridge.on('queue:changed', () => {
       if (elements.queuePanel !== null) void refreshQueue();
+    });
+
+    // `settings.json` changed or refused a screen's change (TYTO-206).
+    bridge.on('settings:changed', (change) => {
+      void settingsChanged(bridge, change);
     });
 
     // A newer version (TYTO-131, ADR 0069). Subscribed first and asked second: the check runs
@@ -2092,7 +2223,8 @@ async function load(): Promise<void> {
         // order is asserted in `packages/editor/src/editor.test.ts`. Reading the pane here
         // would give the same string today and the wrong one the moment a second pane
         // exists.
-        ask(bridge, documentId, activeText());
+        if (isSettings(active())) askSettings(bridge, documentId);
+        else ask(bridge, documentId, activeText());
       });
       // Once on load as well: a brief restored into the buffer should show, and the first
       // answer is what fills the format tabs.

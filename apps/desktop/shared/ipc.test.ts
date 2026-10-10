@@ -51,6 +51,8 @@ describe('the IPC contract', () => {
       'queue:set-auto-run',
       'queue:set-folder',
       'queue:set-kinds',
+      'settings:open',
+      'settings:validate',
       'template:new',
       'template:open',
       'template:preview',
@@ -95,6 +97,8 @@ describe('the event table', () => {
       'command:run',
       // TYTO-45. The queue changed; the panel asks `queue:list` when it hears it.
       'queue:changed',
+      // TYTO-206. settings.json changed, or a screen's change to it was refused.
+      'settings:changed',
       // TYTO-131. The update status changed; the window asks `update:status`.
       'update:changed',
     ]);

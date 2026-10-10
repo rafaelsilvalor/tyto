@@ -36,6 +36,11 @@ export interface FileDialogs {
 export interface DocumentServiceOptions {
   readonly dialogs: FileDialogs;
   readonly recent: RecentFiles;
+  /**
+   * Paths opened and saved like any brief but never put in the recent list — the app's own
+   * `settings.json` (TYTO-206), which has a command of its own and is not a document of work.
+   */
+  readonly unlisted?: readonly string[];
   /** Injected so a test can drive the whole service without touching a disk. */
   readonly disk?: {
     read(path: string): Promise<string>;
@@ -118,6 +123,9 @@ const nodeDisk = {
 
 export function createDocumentService(options: DocumentServiceOptions): DocumentService {
   const { dialogs, recent } = options;
+  const remember = async (entry: RecentEntry): Promise<void> => {
+    if (!(options.unlisted ?? []).includes(entry.path)) await recent.remember(entry);
+  };
   const disk = options.disk ?? nodeDisk;
 
   /** Where each open tab's brief lives, which is the whole of this service's state. */
@@ -144,7 +152,7 @@ export function createDocumentService(options: DocumentServiceOptions): Document
     paths.set(holder, path);
 
     const entry: RecentEntry = { path, name: nameFor(path) };
-    await recent.remember(entry);
+    await remember(entry);
     return { document: { path, name: entry.name, text }, documentId: holder };
   };
 
@@ -215,7 +223,7 @@ export function createDocumentService(options: DocumentServiceOptions): Document
       if (released !== null) paths.delete(released);
 
       const entry: RecentEntry = { path, name: nameFor(path) };
-      await recent.remember(entry);
+      await remember(entry);
       return { document: { path, name: entry.name, text }, released };
     },
 
