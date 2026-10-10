@@ -2,6 +2,7 @@ import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
+import { ok } from '@tyto/core';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
 import { DEFAULT_SETTINGS } from '../../shared/settings.js';
@@ -78,10 +79,7 @@ describe('fileSettingsStore', () => {
     const nested = join(scratch, 'deeper', 'settings.json');
     await fileSettingsStore(nested).write({ templatesFolder: '/x' });
 
-    expect(JSON.parse(readFileSync(nested, 'utf8'))).toEqual({
-      ...DEFAULT_SETTINGS,
-      templatesFolder: '/x',
-    });
+    expect(JSON.parse(readFileSync(nested, 'utf8'))).toEqual({ templatesFolder: '/x' });
   });
 
   it('reads a file written before the queue existed without losing its folder', async () => {
@@ -156,6 +154,100 @@ describe('fileSettingsStore', () => {
       fileSettingsStore(join(scratch, 'blocked', 'settings.json')).write({
         templatesFolder: '/x',
       }),
-    ).resolves.toBeUndefined();
+    ).resolves.toEqual(ok(undefined));
+  });
+});
+
+/**
+ * The file a person edits by hand (TYTO-206, ADR 0073): JSON with comments, tolerant one key
+ * at a time, edited in place, and never written while it does not parse.
+ */
+describe('a settings file somebody edits by hand', () => {
+  const rangeOf = (text: string, fragment: string) => {
+    const start = text.indexOf(fragment);
+    return { start, end: start + fragment.length };
+  };
+
+  it('keeps every good key when one value is bad, and points at that value', async () => {
+    const text = [
+      '{',
+      '  // my own templates',
+      '  "templatesFolder": "/t",',
+      '  "queueAutoRun": "yes",',
+      '  "queueFolder": "/q"',
+      '}',
+    ].join('\n');
+    writeFileSync(file, text, 'utf8');
+
+    const reading = await fileSettingsStore(file).load();
+
+    expect(reading.settings).toEqual({
+      ...DEFAULT_SETTINGS,
+      templatesFolder: '/t',
+      queueFolder: '/q',
+    });
+    expect(reading.diagnostics.map((item) => [item.code, item.range])).toEqual([
+      ['W_SETTING_INVALID', rangeOf(text, '"yes"')],
+    ]);
+  });
+
+  it('names an unknown key at the key, and still applies the rest', async () => {
+    const text = '{ "queueAutoRn": true, "queueAutoRun": true }';
+    writeFileSync(file, text, 'utf8');
+
+    const reading = await fileSettingsStore(file).load();
+
+    expect(reading.settings.queueAutoRun).toBe(true);
+    expect(reading.diagnostics.map((item) => [item.code, item.range, item.message])).toEqual([
+      ['W_SETTING_UNKNOWN', rangeOf(text, '"queueAutoRn"'), "Unknown setting 'queueAutoRn'."],
+    ]);
+  });
+
+  it('keeps a comment the person wrote when a screen changes a key', async () => {
+    const text = '{\n  // the queue I share with Ana\n  "queueFolder": "/q",\n}\n';
+    writeFileSync(file, text, 'utf8');
+
+    expect(await fileSettingsStore(file).write({ templatesFolder: '/t' })).toEqual(ok(undefined));
+
+    const after = readFileSync(file, 'utf8');
+    expect(after).toContain('// the queue I share with Ana');
+    expect(after.startsWith('{\n  // the queue I share with Ana\n  "queueFolder": "/q",')).toBe(
+      true,
+    );
+    expect(await fileSettingsStore(file).read()).toEqual({
+      ...DEFAULT_SETTINGS,
+      templatesFolder: '/t',
+      queueFolder: '/q',
+    });
+  });
+
+  it('writes only what differs from the default, and removes a key set back to it', async () => {
+    const store = fileSettingsStore(file);
+    await store.write({ queueAutoRun: true, queueFolder: null });
+
+    expect(readFileSync(file, 'utf8')).toBe('{\n  "queueAutoRun": true\n}');
+
+    await store.write({ queueAutoRun: false });
+    expect(JSON.parse(readFileSync(file, 'utf8'))).toEqual({});
+  });
+
+  it('never writes over a file that does not parse, and says why', async () => {
+    const text = '{\n  "templatesFolder": "/t"\n  "queueAutoRun": tru';
+    writeFileSync(file, text, 'utf8');
+
+    const written = await fileSettingsStore(file).write({ queueFolder: '/q' });
+
+    expect(written.ok).toBe(false);
+    expect(written.ok ? [] : written.error.map((item) => item.code)).toContain('E_SETTINGS_SYNTAX');
+    expect(readFileSync(file, 'utf8')).toBe(text);
+  });
+
+  it('still opens on a file that does not parse, with what could be read', async () => {
+    writeFileSync(file, '{ "templatesFolder": "/t" "queueAutoRun": true', 'utf8');
+
+    const reading = await fileSettingsStore(file).load();
+
+    expect(reading.settings.templatesFolder).toBe('/t');
+    expect(reading.diagnostics.some((item) => item.code === 'E_SETTINGS_SYNTAX')).toBe(true);
   });
 });

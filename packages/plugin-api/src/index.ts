@@ -29,6 +29,15 @@ export type {
 export { directiveNamesOf, directiveResolverOf } from './directives.js';
 
 export {
+  type ConfigurationContribution,
+  type DeclaredSetting,
+  type ResolvedSettings,
+  type SettingEntry,
+  declaredSetting,
+  resolveSettings,
+} from './configuration.js';
+
+export {
   type ContributionPoint,
   type PluginManifest,
   CONTRIBUTION_POINTS,

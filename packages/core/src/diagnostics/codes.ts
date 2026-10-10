@@ -806,6 +806,41 @@ export const diagnosticCodes = {
     fatal: false,
     fatality: 'A warning never replaces a value (ADR 0013).',
   },
+  // The settings file a person edits by hand (TYTO-206, ADR 0073). Reading it never fails:
+  // each of these costs one key, or the keys after a syntax error, and the rest still apply.
+  // The syntax code is an error because it is also why the app refuses to write the file.
+  E_SETTINGS_SYNTAX: {
+    severity: 'error',
+    summary: 'The settings file is not valid JSON with comments, so the app will not write it.',
+    template: 'The settings file cannot be read here: {problem}.',
+    spec: 'docs/adr/0073-settings-are-a-jsonc-file-plugins-declare.md',
+    fatal: false,
+    fatality: 'Every key that parsed still applies and the rest fall back to their defaults.',
+  },
+  W_SETTING_UNKNOWN: {
+    severity: 'warning',
+    summary: 'The settings file names a key no plugin declares.',
+    template: "Unknown setting '{key}'.",
+    spec: 'docs/adr/0073-settings-are-a-jsonc-file-plugins-declare.md',
+    fatal: false,
+    fatality: 'A warning never replaces a value (ADR 0013).',
+  },
+  W_SETTING_UNPREFIXED: {
+    severity: 'warning',
+    summary: "The settings file names a plugin's setting without the plugin id in front of it.",
+    template: "Setting '{key}' belongs to plugin '{plugin}' and is written '{expected}'.",
+    spec: 'docs/adr/0073-settings-are-a-jsonc-file-plugins-declare.md',
+    fatal: false,
+    fatality: 'A warning never replaces a value (ADR 0013).',
+  },
+  W_SETTING_INVALID: {
+    severity: 'warning',
+    summary: "A setting's value is not one its plugin accepts, so its default applies instead.",
+    template: "Setting '{key}' {problem}; its default applies.",
+    spec: 'docs/adr/0073-settings-are-a-jsonc-file-plugins-declare.md',
+    fatal: false,
+    fatality: 'A warning never replaces a value (ADR 0013).',
+  },
   // The three leftover codes (TYTO-127). Warnings, because the artwork this run made is
   // exactly what the brief asked for; they exist so that a file deleted from somebody's
   // delivery, or one that could have been and was not, is never deleted or kept in silence.

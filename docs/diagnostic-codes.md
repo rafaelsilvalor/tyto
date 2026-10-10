@@ -96,6 +96,10 @@ non-zero.
 | `W_SLOT_VOCABULARY` | warning | no | A manifest names a slot against the standard slot vocabulary: a known synonym, a reserved name with the wrong shape, or a repeatable slot not named lamina. |
 | `W_PLUGIN_SKIPPED` | warning | no | An installed plugin was not activated for this run, and the run went on without it. |
 | `W_IMPORT_SKIPPED` | warning | no | Something in the previous version's data folder could not be brought across to this one. |
+| `E_SETTINGS_SYNTAX` | error | no | The settings file is not valid JSON with comments, so the app will not write it. |
+| `W_SETTING_UNKNOWN` | warning | no | The settings file names a key no plugin declares. |
+| `W_SETTING_UNPREFIXED` | warning | no | The settings file names a plugin's setting without the plugin id in front of it. |
+| `W_SETTING_INVALID` | warning | no | A setting's value is not one its plugin accepts, so its default applies instead. |
 | `W_LEFTOVER_REMOVED` | warning | no | A file the previous export wrote into this folder, and this one did not produce, was removed. |
 | `W_LEFTOVER_KEPT` | warning | no | A file the previous export listed, and this one did not produce, was left in the folder. |
 | `W_QUEUE_KIND_UNAVAILABLE` | warning | no | A file type chosen for the queue folder has no exporter on this machine, so the task was rendered without it. |
@@ -182,6 +186,7 @@ incomplete brief, and a crossed box where a picture the exporter could not load 
 | `E_OUTPUT_WRITE` | no | The same: one artifact that did not reach the output, counted against `planned`. |
 | `E_DELIVERY_FOLDER_BLOCKED` | yes | Fatal when the delivery folder or `editaveis/` is held: there is nowhere to write the artwork or `result.json`, so nothing is. When only `assets/` is held, the artwork is already written and the images are not copied beside it. |
 | `E_OUTPUT_FILE_BLOCKED` | yes | Depends on the file. The copied brief: nothing is rendered. An artwork file: that one artifact is missing, reported as `E_OUTPUT_WRITE` with this sentence. `template.txt` or an image in `assets/`: the artwork is written and that file is not. `result.json`: the artwork is written and no report is. |
+| `E_SETTINGS_SYNTAX` | no | Every key that parsed still applies and the rest fall back to their defaults. |
 
 ## Errors
 
@@ -1109,6 +1114,20 @@ Depends on the file. The copied brief: nothing is rendered. An artwork file: tha
 
 Parameters: `path`
 
+### `E_SETTINGS_SYNTAX`
+
+**Severity:** error · **Fatal:** no · **Spec:** `docs/adr/0073-settings-are-a-jsonc-file-plugins-declare.md`
+
+The settings file is not valid JSON with comments, so the app will not write it.
+
+Every key that parsed still applies and the rest fall back to their defaults.
+
+```
+The settings file cannot be read here: {problem}.
+```
+
+Parameters: `problem`
+
 ## Warnings
 
 ### `W_PLUGIN_CRASHED`
@@ -1292,6 +1311,48 @@ Could not bring '{item}' across from version {version}: {problem}.
 ```
 
 Parameters: `item`, `version`, `problem`
+
+### `W_SETTING_UNKNOWN`
+
+**Severity:** warning · **Fatal:** no · **Spec:** `docs/adr/0073-settings-are-a-jsonc-file-plugins-declare.md`
+
+The settings file names a key no plugin declares.
+
+A warning never replaces a value (ADR 0013).
+
+```
+Unknown setting '{key}'.
+```
+
+Parameters: `key`
+
+### `W_SETTING_UNPREFIXED`
+
+**Severity:** warning · **Fatal:** no · **Spec:** `docs/adr/0073-settings-are-a-jsonc-file-plugins-declare.md`
+
+The settings file names a plugin's setting without the plugin id in front of it.
+
+A warning never replaces a value (ADR 0013).
+
+```
+Setting '{key}' belongs to plugin '{plugin}' and is written '{expected}'.
+```
+
+Parameters: `key`, `plugin`, `expected`
+
+### `W_SETTING_INVALID`
+
+**Severity:** warning · **Fatal:** no · **Spec:** `docs/adr/0073-settings-are-a-jsonc-file-plugins-declare.md`
+
+A setting's value is not one its plugin accepts, so its default applies instead.
+
+A warning never replaces a value (ADR 0013).
+
+```
+Setting '{key}' {problem}; its default applies.
+```
+
+Parameters: `key`, `problem`
 
 ### `W_LEFTOVER_REMOVED`
 

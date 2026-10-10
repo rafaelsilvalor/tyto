@@ -7,7 +7,9 @@ import type { Rasterizer } from '@tyto/raster';
 import { BUILT_IN_TEMPLATES_DIRECTORY } from '@tyto/templates';
 
 import manifest from './built-in-templates.tyto-plugin.json';
+import { SETTING_CONTRIBUTIONS } from '../../shared/settings.js';
 import chromiumManifest from './chromium.tyto-plugin.json';
+import desktopManifest from './desktop.tyto-plugin.json';
 import { createDebuggerRasterizer } from './rasterizer.js';
 
 /**
@@ -67,8 +69,8 @@ export interface BuiltInsOptions {
 /**
  * Activates every built-in this app ships, and hands back the host holding them.
  *
- * A template pack and a rasterizer. The exporters are still deliberately absent: the CLI
- * binds an exporter to the bytes of the folder it is rendering, and the desktop has not
+ * A template pack, a rasterizer and the app's settings. The exporters are still deliberately
+ * absent: the CLI binds an exporter to the bytes of the folder it is rendering, and the desktop has not
  * rendered anything yet — an exporter registered now would be bound to nothing, which is a
  * worse answer than not being registered. They arrive with the card that renders (E9.3).
  *
@@ -118,6 +120,17 @@ export async function activateBuiltIns(options: BuiltInsOptions): Promise<InProc
   };
 
   host.activate(chromium);
+
+  // The app's own settings, declared through the `configuration` point like any plugin's
+  // (TYTO-206, ADR 0073). A built-in, so its keys stay unprefixed — `templatesFolder`, as
+  // every settings file written before the point existed already spells it.
+  host.activate({
+    id: desktopManifest.name,
+    manifest: desktopManifest,
+    activate: (host) => {
+      for (const setting of SETTING_CONTRIBUTIONS) host.registerConfiguration(setting);
+    },
+  });
 
   return host;
 }

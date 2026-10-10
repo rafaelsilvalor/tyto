@@ -212,6 +212,25 @@ describe('saying yes', () => {
     );
   });
 
+  it('brings a settings file with comments byte for byte (ADR 0073)', async () => {
+    // JSON with comments since TYTO-206: a `JSON.parse` check here would call the comment
+    // "not JSON" and leave the person's settings behind.
+    const older = await seedOlder('0.3.3');
+    const commented =
+      '{\n  // where my templates live\n  "templatesFolder": "/meus-templates",\n  "queueAutoRun": true,\n}\n';
+    writeFileSync(join(older, 'settings.json'), commented);
+
+    const outcome = await run('0.3.4', yes);
+
+    expect(outcome).toMatchObject({ kind: 'imported', diagnostics: [] });
+    expect(readFileSync(join(root, '0.3.4', 'settings.json'), 'utf8')).toBe(commented);
+    expect(await fileSettingsStore(join(root, '0.3.4', 'settings.json')).read()).toEqual({
+      ...DEFAULT_SETTINGS,
+      templatesFolder: '/meus-templates',
+      queueAutoRun: true,
+    });
+  });
+
   it('does not bring the log, which is that build’s and not this one’s', async () => {
     await seedOlder('0.3.3');
 

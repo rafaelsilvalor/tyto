@@ -171,6 +171,8 @@ describe('the template folder, from the command to the reloaded picker (TYTO-142
 
     await expect.poll(pickerRows, { timeout: 15_000 }).not.toContain(TEMPLATE);
     expect(await pickerRows()).toEqual(builtIn);
-    expect(remembered()).toBeNull();
+    // Removed rather than written as `null`: the file holds only what differs from the
+    // defaults (ADR 0073), and no folder is the default.
+    expect(remembered()).toBeUndefined();
   });
 });

@@ -84,6 +84,7 @@ describe('activateBuiltIns', () => {
     expect(host.registry.plugins().map((plugin) => plugin.manifest.name)).toEqual([
       'built-in-templates',
       'chromium',
+      'desktop',
     ]);
   });
 

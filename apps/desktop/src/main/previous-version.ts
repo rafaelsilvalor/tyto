@@ -3,6 +3,8 @@ import { dirname, join } from 'node:path';
 
 import { type Diagnostic, type Ok, diagnostic, ok } from '@tyto/core';
 
+import { readSettingsText } from './settings-file.js';
+
 /**
  * Bringing a person's settings across from the version they were using before (TYTO-151,
  * ADR 0036).
@@ -263,9 +265,7 @@ export async function importFrom(inputs: {
       skip(name, `could not be read (${problemOf(error)})`);
       continue;
     }
-    try {
-      JSON.parse(bytes.toString('utf8'));
-    } catch {
+    if (!readable(name, bytes.toString('utf8'))) {
       skip(name, 'it is not JSON, so this version would not have understood it either');
       continue;
     }
@@ -284,6 +284,21 @@ export async function importFrom(inputs: {
   }
 
   return ok({ copied }, skipped);
+}
+
+/**
+ * Whether this version's store could read a record. `settings.json` is JSON with comments
+ * since ADR 0073, so a comment the person wrote must not be what stops it travelling; the
+ * other records are still the app's own plain JSON.
+ */
+function readable(name: string, text: string): boolean {
+  if (name === 'settings.json') return readSettingsText(text).syntax.length === 0;
+  try {
+    JSON.parse(text);
+    return true;
+  } catch {
+    return false;
+  }
 }
 
 /** The person's answer, as the composition root's dialog reports it. */
