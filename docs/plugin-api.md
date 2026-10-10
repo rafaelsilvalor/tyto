@@ -60,18 +60,19 @@ The last five are named `<id>.tyto-plugin.json` and that is the one place a buil
 
 ## Extension points
 
-| `contributes`     | Registers                                                                   | Built-in                                              |
-| ----------------- | --------------------------------------------------------------------------- | ----------------------------------------------------- |
-| `source` / `sink` | `BriefSource` — `pull()`, `ack()`; `OutputSink` — `push()`                  | fs-inbox, fs-outbox (remote ones deferred — ADR 0011) |
-| `exporter`        | one **frame** to a document + mime + extension + the kinds it produces      | html, svg                                             |
-| `rasterizer`      | `Rasterizer` — `raster(html, opts): Promise<Uint8Array>`                    | chromium                                              |
-| `template-pack`   | folder of templates                                                         | built-in templates                                    |
-| `brand-kit`       | a logo, a wordmark and a signature per brand id (ADR 0063, ADR 0066)        | —                                                     |
-| `directive`       | `::ns/name` in the brief → the slot directives it stands for (ADR 0043)     | —                                                     |
-| `editor.command`  | `{ id, run(ctx), undo? }`                                                   | core-commands                                         |
-| `editor.keymap`   | binding → command id (normal and vim)                                       | default-keymap, vim                                   |
-| `panel`           | a page in the desktop window, `sandbox="allow-scripts"` (ADR 0045)          | —                                                     |
-| `configuration`   | a key of `settings.json`: `{ id, schema, default, description }` (ADR 0073) | desktop (the four app settings)                       |
+| `contributes`     | Registers                                                                     | Built-in                                              |
+| ----------------- | ----------------------------------------------------------------------------- | ----------------------------------------------------- |
+| `source` / `sink` | `BriefSource` — `pull()`, `ack()`; `OutputSink` — `push()`                    | fs-inbox, fs-outbox (remote ones deferred — ADR 0011) |
+| `exporter`        | one **frame** to a document + mime + extension + the kinds it produces        | html, svg                                             |
+| `rasterizer`      | `Rasterizer` — `raster(html, opts): Promise<Uint8Array>`                      | chromium                                              |
+| `template-pack`   | folder of templates                                                           | built-in templates                                    |
+| `brand-kit`       | a logo, a wordmark and a signature per brand id (ADR 0063, ADR 0066)          | —                                                     |
+| `directive`       | `::ns/name` in the brief → the slot directives it stands for (ADR 0043)       | —                                                     |
+| `editor.command`  | `{ id, run(ctx), undo? }`                                                     | core-commands                                         |
+| `editor.keymap`   | binding → command id (normal and vim)                                         | default-keymap, vim                                   |
+| `panel`           | a page in the desktop window, `sandbox="allow-scripts"` (ADR 0045)            | —                                                     |
+| `configuration`   | a key of `settings.json`: `{ id, schema, default, description }` (ADR 0073)   | desktop (the four app settings)                       |
+| `theme`           | a colour theme, a JSON file in the plugin: `{ id, label, kind, path }` (0077) | desktop (Tyto Light, Tyto Dark)                       |
 
 ### `configuration`, in full
 
@@ -148,6 +149,37 @@ never recurses.
 
 `directiveResolverOf(() => host.registry.directives())` is the port `resolve` asks.
 `directiveNamesOf` lists `ns/name` for an editor. The CLI wires the first into every task. The desktop wires both since TYTO-49: an export resolves through the run's own host, and the preview through one host holding the installed plugins, whose `directiveNamesOf` rides on `brief:preview` for the editor's list after `::`.
+
+### `theme`, in full
+
+```ts
+interface ThemeContribution {
+  id: string;
+  label: string; // what a picker shows: 'Dusk'
+  kind: 'light' | 'dark'; // the base theme that fills in what this one leaves out
+  path: string; // a JSON file inside the plugin's folder: 'themes/dusk.json'
+}
+```
+
+```jsonc
+// themes/dusk.json — data only; nothing the plugin wrote runs to apply it
+{
+  "name": "Dusk",
+  "kind": "dark",
+  "colors": { "surface": "#1b1d22", "text-muted": "#9aa0ab", "syntax-keyword": "#c792ea" },
+}
+```
+
+A colour is named by the window's role without the `--tyto-` prefix — the 30 colours
+`apps/desktop/src/main/themes/tyto-dark.json` lists — and its value is a hex colour, `rgb()`,
+`hsl()` or a `color-mix()` of those (`isThemeColor`, which also refuses anything that could
+close the declaration). **A token the theme leaves out is the base theme's of its kind**; an
+unknown name is `W_THEME_TOKEN_UNKNOWN`, a value that is not a colour `W_THEME_COLOR_INVALID`, and
+a file that cannot be used `E_THEME_INVALID`, after which the base theme applies whole (ADR
+0077). The path is refused at registration if it leaves the folder by name, and on the disk if
+it leaves through a link or junction. An installed plugin may contribute one: it crosses as
+data. A theme colours the window and the editor and **never** the exported artwork, whose
+colours come from the template.
 
 ### `panel`, in full
 
@@ -370,7 +402,7 @@ host (CLI process)                               guest (plugin's process)
                         ◀── result {value} ──      answer checked by the host
 ```
 
-**Each side validates what it receives**, with the Zod schemas in `isolation/protocol.ts` and `isolation/points.ts`: the host every guest message and every answer, the guest every host message and a call's arguments, before the plugin's code sees them. **A contribution crosses as data, and its functions stay behind as handles**; a function is callable only if its point names it, with a schema for its arguments and one for its answer. Today that is `exporter.exportFrame` and `directive.transform` (TYTO-49), which may therefore return a `Promise`; the job and `resolve` await them. `template-pack`, `brand-kit`, `editor.command`, `editor.keymap` and `panel` cross as data. `source`, `sink` and `rasterizer` are refused by name — _not available to an isolated plugin yet_. A directive's answer schema is strict: a replacement that carries a `namespace` or a `range` is `E_PLUGIN_PROTOCOL`.
+**Each side validates what it receives**, with the Zod schemas in `isolation/protocol.ts` and `isolation/points.ts`: the host every guest message and every answer, the guest every host message and a call's arguments, before the plugin's code sees them. **A contribution crosses as data, and its functions stay behind as handles**; a function is callable only if its point names it, with a schema for its arguments and one for its answer. Today that is `exporter.exportFrame` and `directive.transform` (TYTO-49), which may therefore return a `Promise`; the job and `resolve` await them. `template-pack`, `brand-kit`, `editor.command`, `editor.keymap`, `panel` and `theme` cross as data. `source`, `sink` and `rasterizer` are refused by name — _not available to an isolated plugin yet_. A directive's answer schema is strict: a replacement that carries a `namespace` or a `range` is `E_PLUGIN_PROTOCOL`.
 
 **The proxy goes through `tryActivate`**, so an isolated plugin meets every check an in-process one does. `protocol` is its own number, compared at the `hello` handshake and nowhere else; it is not the engine (ADR 0040), because a plugin never sees these messages.
 

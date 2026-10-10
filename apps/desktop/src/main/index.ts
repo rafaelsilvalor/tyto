@@ -45,6 +45,7 @@ import { offerPreviousVersion } from './previous-version.js';
 import { createQueueService } from './queue.js';
 import { createPanelService } from './panels.js';
 import { PLUGIN_SCHEME, confinedPath, contentTypeOf, panelPolicy } from './plugin-protocol.js';
+import { builtInThemeReader, createThemeService } from './themes.js';
 import { type WindowPlugins, windowPlugins } from './window-plugins.js';
 import { createPreviewService } from './preview.js';
 import { createProjectSources } from './project.js';
@@ -909,6 +910,17 @@ async function start(): Promise<void> {
         ),
     },
     panels,
+    // The built-in themes of each kind, through the point that registered them (TYTO-208). A
+    // problem in one is a log line in PR A; the problems panel shows it with the setting.
+    themes: createThemeService({
+      sources: () =>
+        host.registry
+          .themes()
+          .map((theme) => ({ plugin: 'desktop', theme, read: builtInThemeReader })),
+      report: (problem) => {
+        log.warn(problem.message);
+      },
+    }),
     // After `ready`, as the panels are, so the window's first answer is the whole list.
     keymaps: async () => {
       await contributed.ready;

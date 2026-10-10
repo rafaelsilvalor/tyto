@@ -19,6 +19,7 @@ import {
 import { z } from 'zod';
 
 import type { ContributionPoint } from '../manifest.js';
+import { THEME_KINDS, isThemePath } from '../theme.js';
 import type { GuestFaces, ShippedFace } from './faces.js';
 import { resultSchema } from './protocol.js';
 
@@ -83,7 +84,8 @@ export type RegisterMethod =
   | 'registerCommand'
   | 'registerKeymap'
   | 'registerPanel'
-  | 'registerConfiguration';
+  | 'registerConfiguration'
+  | 'registerTheme';
 
 const rangeSchema = z.strictObject({
   start: z.number().int().nonnegative(),
@@ -320,6 +322,18 @@ export const ISOLATED_POINTS: Readonly<Partial<Record<ContributionPoint, PointSp
       title: z.string().min(1),
       location: z.enum(['left', 'right', 'bottom']).optional(),
       entry: z.string().min(1).max(500),
+    }),
+    callables: {},
+  },
+  // Data: the theme is a file the host reads out of the plugin's folder and validates itself,
+  // so nothing is called back and no schema has to cross (ADR 0077).
+  theme: {
+    method: 'registerTheme',
+    data: z.strictObject({
+      id: z.string().min(1).max(200),
+      label: z.string().min(1).max(200),
+      kind: z.enum(THEME_KINDS),
+      path: z.string().refine(isThemePath, 'must be a relative path inside the plugin folder'),
     }),
     callables: {},
   },

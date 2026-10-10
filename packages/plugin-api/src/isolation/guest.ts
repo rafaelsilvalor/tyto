@@ -190,6 +190,7 @@ export function runGuest(
     registerKeymap: (value) => register('registerKeymap', value),
     registerPanel: (value) => register('registerPanel', value),
     registerConfiguration: (value) => register('registerConfiguration', value),
+    registerTheme: (value) => register('registerTheme', value),
     config<T>(schema: ZodType<T>): T {
       const parsed = schema.safeParse(config);
       if (!parsed.success) {

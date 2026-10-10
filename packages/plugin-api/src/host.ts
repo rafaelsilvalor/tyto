@@ -34,6 +34,7 @@ import {
   declaredSetting,
 } from './configuration.js';
 import { type ContributionPoint, type PluginManifest, validatePluginManifest } from './manifest.js';
+import { type ThemeContribution, checkThemeContribution } from './theme.js';
 
 /**
  * `PluginHost` and the in-process implementation of it (`docs/plugin-api.md`, Phase 1).
@@ -96,6 +97,11 @@ export interface PluginHost {
    * `<plugin id>.<id>`, or `id` alone for a built-in.
    */
   registerConfiguration<T>(setting: ConfigurationContribution<T>): Disposable;
+  /**
+   * A colour theme: a JSON file inside the plugin's folder the window can apply (ADR 0077).
+   * Data only, so an installed plugin may contribute one.
+   */
+  registerTheme(theme: ThemeContribution): Disposable;
 
   /**
    * The plugin's own configuration, validated.
@@ -167,6 +173,8 @@ export interface PluginRegistry {
   panels(): readonly PanelContribution[];
   /** Every declared setting, in registration order, by the key a settings file uses. */
   configurations(): readonly DeclaredSetting[];
+  /** Every colour theme, in registration order: built-ins first (ADR 0077). */
+  themes(): readonly ThemeContribution[];
 }
 
 /** The kits of every plugin merged into one per brand, and the warnings the merge made. */
@@ -403,6 +411,7 @@ export function createPluginHost(options: PluginHostOptions = {}): InProcessHost
     emitter,
     contributed,
   );
+  const themes = new Point<ThemeContribution>('theme', emitter, contributed);
   let rawConfig: Readonly<Record<string, unknown>> | undefined = options.config;
 
   const points = [
@@ -417,6 +426,7 @@ export function createPluginHost(options: PluginHostOptions = {}): InProcessHost
     keymaps,
     panels,
     configurations,
+    themes,
   ];
 
   const registry: PluginRegistry = {
@@ -436,6 +446,7 @@ export function createPluginHost(options: PluginHostOptions = {}): InProcessHost
     keymaps: () => keymaps.list(),
     panels: () => panels.list(),
     configurations: () => configurations.list().map((entry) => entry.setting),
+    themes: () => themes.list(),
   };
 
   function hostWith(
@@ -464,6 +475,10 @@ export function createPluginHost(options: PluginHostOptions = {}): InProcessHost
           setting as ConfigurationContribution,
         );
         return configurations.add(pluginId, { id: declared.key, setting: declared }, onConflict);
+      },
+      registerTheme: (theme) => {
+        checkThemeContribution(pluginId, theme);
+        return themes.add(pluginId, theme, onConflict);
       },
 
       config<T>(schema: ZodType<T>): T {

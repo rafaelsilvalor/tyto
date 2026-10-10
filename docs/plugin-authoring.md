@@ -264,6 +264,8 @@ into, or activation is refused. The shapes are in `docs/plugin-api.md`:
 - `exporter` — one frame to a document. An installed exporter's kind works with `--types`.
 - `directive` — `::ns/name` in a brief expands to slot directives (ADR 0043).
 - `panel` — a page in the desktop window (ADR 0045).
+- `theme` — a colour theme for the window and the editor, as a JSON file in the plugin's
+  folder (ADR 0077). Data only, so an installed plugin may contribute one.
 - `editor.command`, `editor.keymap` — cross as data.
 - `source`, `sink`, `rasterizer` — **refused for an installed plugin** today.
 - `configuration` — a setting in the desktop app's `settings.json` (ADR 0073). Declared with a

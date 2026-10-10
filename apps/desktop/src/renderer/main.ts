@@ -32,6 +32,7 @@ import {
   translate,
 } from '../../shared/i18n/index.js';
 import { followScheme } from './color-scheme.js';
+import { applyTheme } from './theme.js';
 import { planTemplateEdit, templateOf } from './frontmatter.js';
 import { readKeybindingsText } from './keybindings-file.js';
 import {
@@ -2338,6 +2339,21 @@ async function load(): Promise<void> {
         },
       },
       (askId) => answerExitRequest(bridge, askId),
+    );
+
+    // The theme's colours over the token file's, which painted the first frame (TYTO-208). Not
+    // awaited: a window whose theme never arrives keeps the token file's, which are the same.
+    void bridge['theme:current']({}).then(
+      (applied) => {
+        applyTheme(applied);
+      },
+      (cause: unknown) => {
+        void bridge['log:write']({
+          level: 'warn',
+          message: 'The colour theme could not be applied; the built-in colours stay.',
+          detail: String(cause).slice(0, 4000),
+        });
+      },
     );
 
     const info = await bridge['app:info']({});

@@ -291,6 +291,8 @@ describe('the bridge', () => {
       'templates:folder',
       'templates:list',
       'templates:set-folder',
+      // TYTO-208: the colours the window applies. Exercised by `e2e/theme.desktop.test.ts`.
+      'theme:current',
       // TYTO-131, ADR 0069: the update notice. Exercised by `e2e/update.package.test.ts`.
       'update:act',
       'update:status',

@@ -893,6 +893,33 @@ export const diagnosticCodes = {
     fatal: false,
     fatality: 'A warning never replaces a value (ADR 0013).',
   },
+  // A colour theme a plugin ships (TYTO-208, ADR 0077). Reading one never breaks the window: a
+  // file that cannot be used costs the whole theme and the base theme of its kind applies; a
+  // token costs that token, which the base theme fills in.
+  E_THEME_INVALID: {
+    severity: 'error',
+    summary: 'A colour theme file cannot be read or is not shaped like a theme.',
+    template: "Theme '{theme}' cannot be used: {problem}. The base {kind} theme applies.",
+    spec: 'docs/adr/0077-a-colour-theme-is-a-data-file-a-plugin-contributes.md',
+    fatal: false,
+    fatality: 'The base theme of the same kind replaces it, so the window keeps every colour.',
+  },
+  W_THEME_TOKEN_UNKNOWN: {
+    severity: 'warning',
+    summary: 'A colour theme sets a name that is not one of the colours Tyto themes.',
+    template: "Theme '{theme}' sets '{token}', which is not a colour a theme can set.",
+    spec: 'docs/adr/0077-a-colour-theme-is-a-data-file-a-plugin-contributes.md',
+    fatal: false,
+    fatality: 'A warning never replaces a value (ADR 0013).',
+  },
+  W_THEME_COLOR_INVALID: {
+    severity: 'warning',
+    summary: 'A colour theme gives a token a value that is not a colour.',
+    template: "Theme '{theme}' gives '{token}' a value that is not a colour: {value}.",
+    spec: 'docs/adr/0077-a-colour-theme-is-a-data-file-a-plugin-contributes.md',
+    fatal: false,
+    fatality: "The base theme's colour for that token applies instead.",
+  },
   // The three leftover codes (TYTO-127). Warnings, because the artwork this run made is
   // exactly what the brief asked for; they exist so that a file deleted from somebody's
   // delivery, or one that could have been and was not, is never deleted or kept in silence.

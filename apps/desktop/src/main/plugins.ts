@@ -11,6 +11,7 @@ import { SETTING_CONTRIBUTIONS } from '../../shared/settings.js';
 import chromiumManifest from './chromium.tyto-plugin.json';
 import desktopManifest from './desktop.tyto-plugin.json';
 import { createDebuggerRasterizer } from './rasterizer.js';
+import { BUILT_IN_THEMES } from './themes.js';
 
 /**
  * The desktop app's composition root for plugins (ADR 0007, ADR 0010).
@@ -123,12 +124,15 @@ export async function activateBuiltIns(options: BuiltInsOptions): Promise<InProc
 
   // The app's own settings, declared through the `configuration` point like any plugin's
   // (TYTO-206, ADR 0073). A built-in, so its keys stay unprefixed — `templatesFolder`, as
-  // every settings file written before the point existed already spells it.
+  // every settings file written before the point existed already spells it. And its two
+  // colour themes, through the `theme` point a third party's would use (TYTO-208, ADR 0077).
   host.activate({
     id: desktopManifest.name,
     manifest: desktopManifest,
     activate: (host) => {
       for (const setting of SETTING_CONTRIBUTIONS) host.registerConfiguration(setting);
+      host.registerTheme(BUILT_IN_THEMES.light);
+      host.registerTheme(BUILT_IN_THEMES.dark);
     },
   });
 

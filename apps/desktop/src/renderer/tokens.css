@@ -4,7 +4,11 @@
  *
  * Every token is named for the role it plays — a surface, a line, a kind of text — and never
  * for the colour it happens to be, so a theme later (TYTO-208) is a reader that sets these
- * custom properties and touches no rule. `shell.css` and the editor (`@tyto/editor`'s
+ * custom properties and touches no rule. The colours redefined under `prefers-color-scheme:
+ * dark` are exactly the set a theme sets, and they equal the built-in theme files
+ * `src/main/themes/tyto-light.json` and `tyto-dark.json`, which `e2e/renderer-tokens.test.ts`
+ * holds them to (ADR 0077): this file is the first paint and the fallback, the themes are what
+ * is applied. `shell.css` and the editor (`@tyto/editor`'s
  * palette) read nothing else; `e2e/renderer-tokens.test.ts` fails on a literal anywhere else
  * in the renderer and on a `var(--tyto-…)` that names a token this file does not define,
  * which would otherwise drop the colour without a word.
@@ -86,8 +90,12 @@
   --tyto-success: #4f8a43;
   /* Lighter than dark's: at 25 % it turned the light window a muddy grey behind the bar. */
   --tyto-scrim: rgb(0 0 0 / 12%);
-  --tyto-shadow-overlay: 0 12px 40px rgb(0 0 0 / 18%);
-  --tyto-shadow-paper: 0 1px 6px rgb(0 0 0 / 18%);
+  /* A shadow's geometry is not a colour, so it is declared here once and only its tint is
+     themed (TYTO-208, ADR 0077): a theme file holds colours and nothing else. */
+  --tyto-shadow-overlay-tint: rgb(0 0 0 / 18%);
+  --tyto-shadow-paper-tint: rgb(0 0 0 / 18%);
+  --tyto-shadow-overlay: 0 12px 40px var(--tyto-shadow-overlay-tint);
+  --tyto-shadow-paper: 0 1px 6px var(--tyto-shadow-paper-tint);
 
   /*
    * The editor's line under the cursor is translucent (TYTO-246): the selection is drawn on a
@@ -142,8 +150,8 @@
     --tyto-info: #74ade8;
     --tyto-success: #a1c181;
     --tyto-scrim: rgb(0 0 0 / 40%);
-    --tyto-shadow-overlay: 0 12px 40px rgb(0 0 0 / 45%);
-    --tyto-shadow-paper: 0 1px 6px rgb(0 0 0 / 50%);
+    --tyto-shadow-overlay-tint: rgb(0 0 0 / 45%);
+    --tyto-shadow-paper-tint: rgb(0 0 0 / 50%);
 
     --tyto-active-line: rgb(60 67 82 / 35%);
     --tyto-active-line-gutter: #2f343e;
