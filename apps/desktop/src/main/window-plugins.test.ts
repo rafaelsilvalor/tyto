@@ -64,6 +64,29 @@ describe('windowPlugins', () => {
     expect(window.permissionsOf('nobody')).toBeUndefined();
   });
 
+  it('knows which plugin bound which keys, in activation order (TYTO-207)', async () => {
+    const KEYS: Plugin = {
+      id: 'teclas',
+      manifest: manifest('teclas', ['editor.keymap']),
+      activate: (host) =>
+        host.registerKeymap({
+          id: 'vim',
+          bindings: { 'alt+j': 'preview.zoomIn' },
+          when: 'vim.normal',
+        }),
+    };
+    const window = windowPlugins(Promise.resolve(loaded(DEMO, KEYS)));
+    expect(window.keymaps()).toEqual([]);
+    await window.ready;
+
+    expect(window.keymaps()).toEqual([
+      {
+        plugin: 'teclas',
+        keymap: { id: 'vim', bindings: { 'alt+j': 'preview.zoomIn' }, when: 'vim.normal' },
+      },
+    ]);
+  });
+
   it('is ready, with nothing, when the plugins could not be started', async () => {
     const window = windowPlugins(Promise.reject(new Error('disk')));
     await window.ready;

@@ -1,6 +1,7 @@
 import type { DirectiveResolver } from '@tyto/core';
 import {
   type BrandKits,
+  type EditorKeymap,
   type LoadedPlugins,
   type PanelContribution,
   createPluginHost,
@@ -32,6 +33,8 @@ export interface WindowPlugins {
   readonly ready: Promise<void>;
   /** Every panel, with the plugin that registered it. Empty until `ready`. */
   panels(): readonly WindowPanel[];
+  /** Every `editor.keymap`, in activation order, with its plugin. Empty until `ready`. */
+  keymaps(): readonly WindowKeymap[];
   /** The permissions the host validated for a plugin, or `undefined` for one it has not. */
   permissionsOf(plugin: string): readonly string[] | undefined;
   /**
@@ -46,9 +49,15 @@ export interface WindowPanel {
   readonly panel: PanelContribution;
 }
 
+export interface WindowKeymap {
+  readonly plugin: string;
+  readonly keymap: EditorKeymap;
+}
+
 export function windowPlugins(plugins: Promise<LoadedPlugins>): WindowPlugins {
   const host = createPluginHost();
   const owned: WindowPanel[] = [];
+  const keymaps: WindowKeymap[] = [];
   const permissions = new Map<string, readonly string[]>();
   let started = false;
 
@@ -56,6 +65,7 @@ export function windowPlugins(plugins: Promise<LoadedPlugins>): WindowPlugins {
     (loaded) => {
       for (const plugin of loaded.plugins) {
         const before = new Set(host.registry.panels());
+        const keymapsBefore = new Set(host.registry.keymaps());
         // A plugin this host refuses is refused by the export too, where the run reports it;
         // saying it twice on every keystroke would bury the one that matters.
         const activated = host.tryActivate(plugin, 'external');
@@ -64,6 +74,9 @@ export function windowPlugins(plugins: Promise<LoadedPlugins>): WindowPlugins {
         permissions.set(plugin.id, manifest.ok ? manifest.value.permissions : []);
         for (const panel of host.registry.panels()) {
           if (!before.has(panel)) owned.push({ plugin: plugin.id, panel });
+        }
+        for (const keymap of host.registry.keymaps()) {
+          if (!keymapsBefore.has(keymap)) keymaps.push({ plugin: plugin.id, keymap });
         }
       }
       started = true;
@@ -81,6 +94,7 @@ export function windowPlugins(plugins: Promise<LoadedPlugins>): WindowPlugins {
     ready,
     // Filtered against the registry, so a panel its plugin withdrew is not offered again.
     panels: () => owned.filter(({ panel }) => host.registry.panels().includes(panel)),
+    keymaps: () => keymaps.filter(({ keymap }) => host.registry.keymaps().includes(keymap)),
     permissionsOf: (plugin) => permissions.get(plugin),
     brandKits: () => (started ? host.registry.brandKitsByBrand() : noKits),
   };

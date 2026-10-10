@@ -458,6 +458,7 @@ const dependencies = () => {
         ]),
       request: () => Promise.resolve({ ok: false as const, code: 'E_PERMISSION', message: 'no' }),
     },
+    keymaps: () => Promise.resolve([]),
     preview: preview(),
     project: projectFolder(),
     queue: queueDependency(),

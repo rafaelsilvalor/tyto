@@ -168,6 +168,57 @@ describe('vim mode', () => {
   });
 });
 
+/**
+ * A table binding limited to one half of vim (TYTO-207, ADR 0074).
+ *
+ * The engine keeps insert mode in its own state, so the binding asks it at the keystroke and
+ * answers `false` in the other half, which lets the key travel on as if it were not bound.
+ */
+describe('a binding with when vim.normal', () => {
+  const altJ = () => new KeyboardEvent('keydown', { key: 'j', altKey: true });
+
+  it('runs in normal mode, not in insert mode, and again after Escape', () => {
+    const registry = createCommandRegistry();
+    const seen = seenCommands(registry, 'preview.zoomIn');
+    const parent = document.createElement('div');
+    document.body.append(parent);
+    handle = createEditor(parent, {
+      doc: BRIEF,
+      commands: registry,
+      vim: true,
+      vimKeymap: {
+        id: 'vim',
+        bindings: [{ key: 'Alt-j', command: 'preview.zoomIn', when: 'vim.normal' }],
+      },
+    });
+    const view = handle.view;
+
+    expect(runScopeHandlers(view, altJ(), 'editor')).toBe(true);
+    Vim.handleKey(vimEditor(view), 'i', 'user');
+    expect(runScopeHandlers(view, altJ(), 'editor')).toBe(false);
+    Vim.handleKey(vimEditor(view), '<Esc>', 'user');
+    expect(runScopeHandlers(view, altJ(), 'editor')).toBe(true);
+
+    expect(seen).toEqual(['preview.zoomIn', 'preview.zoomIn']);
+  });
+
+  it('reaches a tab built before the bindings changed, when that tab is shown', () => {
+    const registry = createCommandRegistry();
+    const seen = seenCommands(registry, 'preview.zoomIn');
+    const editor = open(registry, true);
+    const older = editor.blank('outro');
+
+    editor.setKeymaps({
+      normal: { id: 'desktop', bindings: [] },
+      vim: { id: 'vim', bindings: [{ key: 'Alt-j', command: 'preview.zoomIn' }] },
+    });
+    editor.restore(older);
+
+    expect(runScopeHandlers(editor.view, altJ(), 'editor')).toBe(true);
+    expect(seen).toEqual(['preview.zoomIn']);
+  });
+});
+
 describe('defaultExCommands', () => {
   it('maps the two the card names, with w as the abbreviation of write', () => {
     expect(defaultExCommands).toEqual([

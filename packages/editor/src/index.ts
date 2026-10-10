@@ -68,6 +68,32 @@ export {
 } from './keymap.js';
 
 export {
+  type KeyStroke,
+  type Keybinding,
+  type KeybindingContext,
+  type KeybindingEntry,
+  type KeybindingInput,
+  type KeybindingLayer,
+  type KeybindingSource,
+  type KeybindingTable,
+  type ParsedKey,
+  type ResolvedKeybindings,
+  COMMAND_BAR_KEY,
+  COMMAND_BAR_TOGGLE,
+  EDITOR_CONTEXTS,
+  KEYBINDING_CONTEXTS,
+  bindingsOf,
+  concreteKey,
+  keyOfStroke,
+  keybindingsOf,
+  keymapSetFor,
+  parseKey,
+  resolveKeybindings,
+  shownBindingsOf,
+  windowBindingsOf,
+} from './keybindings.js';
+
+export {
   type SearchPhraseKey,
   type SearchPhrases,
   EDITOR_FIND,

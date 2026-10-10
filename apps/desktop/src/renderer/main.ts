@@ -1,9 +1,18 @@
 import {
   type CommandRegistry,
   type EditorHandle,
+  type KeybindingContext,
+  type KeybindingLayer,
+  type KeybindingTable,
+  COMMAND_BAR_TOGGLE,
   briefCompletion,
   briefLint,
+  concreteKey,
   createEditor,
+  keyOfStroke,
+  resolveKeybindings,
+  shownBindingsOf,
+  windowBindingsOf,
 } from '@tyto/editor';
 
 import {
@@ -53,9 +62,11 @@ import {
   PREVIEW_ZOOM_IN,
   PREVIEW_ZOOM_OUT,
   SETTINGS_OPEN,
-  bindingsOf,
+  builtInKeybindings,
+  builtInTable,
   createDesktopRegistry,
   keymapSetFor,
+  pluginKeybindingLayer,
   panelOfToggleCommand,
   pathOfRecentCommand,
   recentCommandId,
@@ -91,6 +102,7 @@ import './panels.js';
 import {
   type Layout,
   DEFAULT_LAYOUT,
+  EDITOR_PANEL,
   PLUGIN_PANEL_ELEMENT,
   QUEUE_PANEL,
   panelOf,
@@ -273,6 +285,14 @@ const panel = {
  * for the window to keep in step.
  */
 let editor: EditorHandle | undefined;
+
+/**
+ * The window's one keybinding table (TYTO-207, ADR 0074): what the editor runs, what the
+ * window dispatcher runs and what the bar shows, all read off this. The built-in layer until
+ * the plugins have answered; then theirs on top, and later the person's own file.
+ */
+let keybindings: KeybindingTable = builtInTable;
+let pluginKeybindings: readonly KeybindingLayer[] = [];
 
 const byId = <T extends HTMLElement>(id: string): T | null =>
   document.getElementById(id) as T | null;
@@ -1517,6 +1537,40 @@ async function loadPluginPanels(bridge: TytoBridge): Promise<void> {
   }
   layout = withPluginPanels(layout, panels);
   await applyLayout(false);
+  // After the panels, whose toggles a plugin's keys may name.
+  const { keymaps } = await bridge['plugins:keymaps']({});
+  pluginKeybindings = keymaps.map(pluginKeybindingLayer);
+  if (pluginKeybindings.length > 0) applyKeybindings(bridge);
+}
+
+/**
+ * Resolves the table again and hands it to everything that reads it.
+ *
+ * Only when a layer above the built-in one exists: with none the table is the built-in one
+ * already, and reconfiguring the editor would reset the vim engine for nothing. What the
+ * resolver refused goes to the log, one line per entry, until PR B gives the keybindings
+ * file a problems row to put it in.
+ */
+function applyKeybindings(bridge: TytoBridge): void {
+  const resolved = resolveKeybindings({
+    builtIn: builtInKeybindings,
+    plugins: pluginKeybindings,
+    user: [],
+    commands: new Set(registry.list().map((command) => command.id)),
+    platform: state.platform,
+  });
+  keybindings = resolved.table;
+  for (const problem of resolved.diagnostics) {
+    void bridge['log:write']({
+      level: 'warn',
+      message: `${problem.code}: ${problem.message}`.slice(0, 200),
+    });
+  }
+  editor?.setKeymaps({
+    normal: keymapSetFor(false, keybindings),
+    vim: keymapSetFor(true, keybindings),
+  });
+  paintCommandBar();
 }
 
 /**
@@ -1551,7 +1605,7 @@ const PANEL_NAMES: Readonly<Record<string, CatalogueKey>> = {
 
 /** Every command the registry holds, translated and with the key that runs it. */
 function commandEntries(): readonly CommandEntry[] {
-  const bindings = bindingsOf(keymapSetFor(editor?.isVimMode() ?? false), state.platform);
+  const bindings = shownBindingsOf(keybindings, editor?.isVimMode() ?? false, state.platform);
 
   return registry.list().flatMap((command) => {
     const key = COMMAND_LABELS[command.id];
@@ -1902,29 +1956,62 @@ function wireTabs(): void {
 }
 
 /**
- * `Mod-K`, on the window and **exactly once for the life of the window**.
+ * The window's keybinding dispatcher, registered **exactly once for the life of the window**.
+ *
+ * It runs the table's global bindings and its `commandBar` and `panel` ones — `Mod-K` among
+ * them — and CodeMirror runs the rest. It reads `keybindings` at the keystroke, so a table
+ * that changes needs no second listener.
  *
  * Separate from `wireCommandBar` because that one runs on every rearrange, and this must
  * not: a second listener toggles the bar a second time on the same keystroke, so with two
  * of them the palette opens and closes inside one keypress and never appears. Two arranges
  * is the ordinary case — load, then the first time anybody closes a panel — so the bug
- * arrives the moment somebody uses the feature this card adds.
+ * arrives the moment somebody uses the feature (TYTO-101).
  *
  * Found by the end-to-end suite, which could not open the bar after closing a panel. No
  * unit sees it: each function is right on its own and the fault is in how often one runs.
  */
-function wireCommandBarShortcut(): void {
+function wireKeybindingDispatcher(): void {
   window.addEventListener('keydown', (event) => {
-    const bar = elements.commandBar;
-    if (bar === null) return;
-    if (!(event.ctrlKey || event.metaKey) || event.altKey) return;
-    if (event.key.toLowerCase() !== 'k') return;
-    event.preventDefault();
-    // A toggle, because the muscle memory for closing a palette is the key that opened it
-    // as often as it is Escape.
-    if (bar.open) bar.dismiss();
-    else bar.show();
+    const stroke = keyOfStroke(event);
+    for (const binding of windowBindingsOf(keybindings)) {
+      if (concreteKey(binding, state.platform) !== stroke) continue;
+      if (!windowContextHolds(binding.when)) continue;
+      // A key the editor already ran is the editor's — except the bar's, which is the one
+      // key nothing may take (ADR 0074) and which this listener always answered.
+      if (event.defaultPrevented && binding.command !== COMMAND_BAR_TOGGLE) return;
+      if (!runWindowCommand(binding.command)) continue;
+      event.preventDefault();
+      return;
+    }
   });
+}
+
+/** `commandBar`, `panel` and global, the three contexts the window answers (ADR 0074). */
+function windowContextHolds(when: KeybindingContext | undefined): boolean {
+  if (when === undefined) return true;
+  const barOpen = elements.commandBar?.open === true;
+  if (when === 'commandBar') return barOpen;
+  const panel = document.activeElement?.closest('[data-panel]');
+  return (
+    when === 'panel' &&
+    !barOpen &&
+    panel !== null &&
+    panel !== undefined &&
+    panel.getAttribute('data-panel') !== EDITOR_PANEL
+  );
+}
+
+/** The bar's toggle, which is the window's own; every other id is the registry's. */
+function runWindowCommand(id: string): boolean {
+  if (id !== COMMAND_BAR_TOGGLE) return runCommand(id);
+  const bar = elements.commandBar;
+  if (bar === null) return false;
+  // A toggle, because the muscle memory for closing a palette is the key that opened it
+  // as often as it is Escape.
+  if (bar.open) bar.dismiss();
+  else bar.show();
+  return true;
 }
 
 /** The panel's own two controls: a row that moves the cursor, and a picker that edits. */
@@ -2081,7 +2168,7 @@ async function load(): Promise<void> {
   // the dock has made them, so every `getElementById` before this line would answer null.
   await applyLayout(false);
   if (bridge !== undefined) void loadPluginPanels(bridge);
-  wireCommandBarShortcut();
+  wireKeybindingDispatcher();
   wireSplitters(document, () => layout, {
     locale: state.locale,
     onClose: (panelId) => {
@@ -2160,10 +2247,10 @@ async function load(): Promise<void> {
     editor = createEditor(elements.editor, {
       doc: '',
       commands: registry,
-      // The desktop's set, which is the editor's plus `Mod-o`, `Mod-Shift-s` and the tab
-      // keys. Passed here rather than bound in a window listener so that the bar and the
-      // editor read one table — `bindingsOf` is given this same set.
-      keymap: keymapSetFor(false),
+      // Both input modes' halves of the one table: the desktop set with vim off, and save
+      // and render with it on. The bar reads the same table (`shownBindingsOf`).
+      keymap: keymapSetFor(false, keybindings),
+      vimKeymap: keymapSetFor(true, keybindings),
       // The search panel's words, which are the catalogue's even though the panel is
       // CodeMirror's. `applyLocale` is what keeps them current afterwards.
       searchPhrases: searchPhrasesFor(state.locale),

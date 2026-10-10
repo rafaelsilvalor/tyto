@@ -100,6 +100,12 @@ non-zero.
 | `W_SETTING_UNKNOWN` | warning | no | The settings file names a key no plugin declares. |
 | `W_SETTING_UNPREFIXED` | warning | no | The settings file names a plugin's setting without the plugin id in front of it. |
 | `W_SETTING_INVALID` | warning | no | A setting's value is not one its plugin accepts, so its default applies instead. |
+| `E_KEYBINDINGS_SYNTAX` | error | no | The keybindings file is not valid JSON with comments. |
+| `W_KEYBINDING_UNKNOWN_COMMAND` | warning | no | A keybinding names a command nothing registers. |
+| `W_KEYBINDING_INVALID_KEY` | warning | no | A keybinding is written with a key Tyto cannot bind. |
+| `W_KEYBINDING_UNKNOWN_CONTEXT` | warning | no | A keybinding's `when` is not one of the contexts Tyto knows. |
+| `W_KEYBINDING_DUPLICATE` | warning | no | The same key is bound twice in the same context by one source. |
+| `W_KEYBINDING_LOCKED` | warning | no | A keybinding would take the command bar's key away, and is refused. |
 | `W_LEFTOVER_REMOVED` | warning | no | A file the previous export wrote into this folder, and this one did not produce, was removed. |
 | `W_LEFTOVER_KEPT` | warning | no | A file the previous export listed, and this one did not produce, was left in the folder. |
 | `W_QUEUE_KIND_UNAVAILABLE` | warning | no | A file type chosen for the queue folder has no exporter on this machine, so the task was rendered without it. |
@@ -187,6 +193,7 @@ incomplete brief, and a crossed box where a picture the exporter could not load 
 | `E_DELIVERY_FOLDER_BLOCKED` | yes | Fatal when the delivery folder or `editaveis/` is held: there is nowhere to write the artwork or `result.json`, so nothing is. When only `assets/` is held, the artwork is already written and the images are not copied beside it. |
 | `E_OUTPUT_FILE_BLOCKED` | yes | Depends on the file. The copied brief: nothing is rendered. An artwork file: that one artifact is missing, reported as `E_OUTPUT_WRITE` with this sentence. `template.txt` or an image in `assets/`: the artwork is written and that file is not. `result.json`: the artwork is written and no report is. |
 | `E_SETTINGS_SYNTAX` | no | Every key that parsed still applies and the rest fall back to their defaults. |
+| `E_KEYBINDINGS_SYNTAX` | no | Every entry that parsed still applies, and the built-in keys stay bound. |
 
 ## Errors
 
@@ -1128,6 +1135,20 @@ The settings file cannot be read here: {problem}.
 
 Parameters: `problem`
 
+### `E_KEYBINDINGS_SYNTAX`
+
+**Severity:** error · **Fatal:** no · **Spec:** `docs/adr/0074-one-keybinding-table-with-closed-contexts.md`
+
+The keybindings file is not valid JSON with comments.
+
+Every entry that parsed still applies, and the built-in keys stay bound.
+
+```
+The keybindings file cannot be read here: {problem}.
+```
+
+Parameters: `problem`
+
 ## Warnings
 
 ### `W_PLUGIN_CRASHED`
@@ -1350,6 +1371,76 @@ A warning never replaces a value (ADR 0013).
 
 ```
 Setting '{key}' {problem}; its default applies.
+```
+
+Parameters: `key`, `problem`
+
+### `W_KEYBINDING_UNKNOWN_COMMAND`
+
+**Severity:** warning · **Fatal:** no · **Spec:** `docs/adr/0074-one-keybinding-table-with-closed-contexts.md`
+
+A keybinding names a command nothing registers.
+
+A warning never replaces a value (ADR 0013).
+
+```
+Key '{key}' names command '{command}', which nothing registers.
+```
+
+Parameters: `key`, `command`
+
+### `W_KEYBINDING_INVALID_KEY`
+
+**Severity:** warning · **Fatal:** no · **Spec:** `docs/adr/0074-one-keybinding-table-with-closed-contexts.md`
+
+A keybinding is written with a key Tyto cannot bind.
+
+A warning never replaces a value (ADR 0013).
+
+```
+'{key}' cannot be bound: {problem}.
+```
+
+Parameters: `key`, `problem`
+
+### `W_KEYBINDING_UNKNOWN_CONTEXT`
+
+**Severity:** warning · **Fatal:** no · **Spec:** `docs/adr/0074-one-keybinding-table-with-closed-contexts.md`
+
+A keybinding's `when` is not one of the contexts Tyto knows.
+
+A warning never replaces a value (ADR 0013).
+
+```
+Key '{key}' has when '{when}', which is not one of {contexts}.
+```
+
+Parameters: `key`, `when`, `contexts`
+
+### `W_KEYBINDING_DUPLICATE`
+
+**Severity:** warning · **Fatal:** no · **Spec:** `docs/adr/0074-one-keybinding-table-with-closed-contexts.md`
+
+The same key is bound twice in the same context by one source.
+
+A warning never replaces a value (ADR 0013).
+
+```
+Key '{key}' is already bound {where} by this source; the first binding applies.
+```
+
+Parameters: `key`, `where`
+
+### `W_KEYBINDING_LOCKED`
+
+**Severity:** warning · **Fatal:** no · **Spec:** `docs/adr/0074-one-keybinding-table-with-closed-contexts.md`
+
+A keybinding would take the command bar's key away, and is refused.
+
+A warning never replaces a value (ADR 0013).
+
+```
+Key '{key}' cannot {problem}: it opens the command bar, the way to every command.
 ```
 
 Parameters: `key`, `problem`

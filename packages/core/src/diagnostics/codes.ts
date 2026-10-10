@@ -841,6 +841,57 @@ export const diagnosticCodes = {
     fatal: false,
     fatality: 'A warning never replaces a value (ADR 0013).',
   },
+  // The keybinding table (TYTO-207, ADR 0074). Resolving it never fails: each of these costs
+  // the one entry it names, and every other binding still applies. The syntax code is an
+  // error for the reason `E_SETTINGS_SYNTAX` is one — it is also why the file is not trusted.
+  E_KEYBINDINGS_SYNTAX: {
+    severity: 'error',
+    summary: 'The keybindings file is not valid JSON with comments.',
+    template: 'The keybindings file cannot be read here: {problem}.',
+    spec: 'docs/adr/0074-one-keybinding-table-with-closed-contexts.md',
+    fatal: false,
+    fatality: 'Every entry that parsed still applies, and the built-in keys stay bound.',
+  },
+  W_KEYBINDING_UNKNOWN_COMMAND: {
+    severity: 'warning',
+    summary: 'A keybinding names a command nothing registers.',
+    template: "Key '{key}' names command '{command}', which nothing registers.",
+    spec: 'docs/adr/0074-one-keybinding-table-with-closed-contexts.md',
+    fatal: false,
+    fatality: 'A warning never replaces a value (ADR 0013).',
+  },
+  W_KEYBINDING_INVALID_KEY: {
+    severity: 'warning',
+    summary: 'A keybinding is written with a key Tyto cannot bind.',
+    template: "'{key}' cannot be bound: {problem}.",
+    spec: 'docs/adr/0074-one-keybinding-table-with-closed-contexts.md',
+    fatal: false,
+    fatality: 'A warning never replaces a value (ADR 0013).',
+  },
+  W_KEYBINDING_UNKNOWN_CONTEXT: {
+    severity: 'warning',
+    summary: "A keybinding's `when` is not one of the contexts Tyto knows.",
+    template: "Key '{key}' has when '{when}', which is not one of {contexts}.",
+    spec: 'docs/adr/0074-one-keybinding-table-with-closed-contexts.md',
+    fatal: false,
+    fatality: 'A warning never replaces a value (ADR 0013).',
+  },
+  W_KEYBINDING_DUPLICATE: {
+    severity: 'warning',
+    summary: 'The same key is bound twice in the same context by one source.',
+    template: "Key '{key}' is already bound {where} by this source; the first binding applies.",
+    spec: 'docs/adr/0074-one-keybinding-table-with-closed-contexts.md',
+    fatal: false,
+    fatality: 'A warning never replaces a value (ADR 0013).',
+  },
+  W_KEYBINDING_LOCKED: {
+    severity: 'warning',
+    summary: "A keybinding would take the command bar's key away, and is refused.",
+    template: "Key '{key}' cannot {problem}: it opens the command bar, the way to every command.",
+    spec: 'docs/adr/0074-one-keybinding-table-with-closed-contexts.md',
+    fatal: false,
+    fatality: 'A warning never replaces a value (ADR 0013).',
+  },
   // The three leftover codes (TYTO-127). Warnings, because the artwork this run made is
   // exactly what the brief asked for; they exist so that a file deleted from somebody's
   // delivery, or one that could have been and was not, is never deleted or kept in silence.

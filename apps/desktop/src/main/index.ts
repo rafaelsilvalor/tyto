@@ -820,6 +820,17 @@ async function start(): Promise<void> {
         ),
     },
     panels,
+    // After `ready`, as the panels are, so the window's first answer is the whole list.
+    keymaps: async () => {
+      await contributed.ready;
+      return contributed.keymaps().map(({ plugin, keymap }) => ({
+        plugin,
+        id: keymap.id,
+        bindings: { ...keymap.bindings },
+        ...(keymap.mode === undefined ? {} : { mode: keymap.mode }),
+        ...(keymap.when === undefined ? {} : { when: keymap.when }),
+      }));
+    },
     preview,
     templates,
     templateEditor,
