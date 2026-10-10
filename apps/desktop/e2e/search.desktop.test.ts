@@ -46,8 +46,15 @@ const panelWords = (): Promise<string> =>
     return [panel.textContent ?? '', ...fields].join(' ');
   });
 
+/** Through the command bar, the only way to switch since TYTO-248 removed the footer picker. */
 const setLocale = async (locale: 'en' | 'pt-BR'): Promise<void> => {
-  await page.selectOption('#locale', locale);
+  if ((await page.evaluate(() => document.documentElement.lang)) === locale) return;
+  await page.keyboard.press('Control+k');
+  await page.waitForSelector('.command-bar__input', { state: 'visible' });
+  await page.keyboard.type('shell.toggleLocale');
+  await page.waitForTimeout(150);
+  await page.keyboard.press('Enter');
+  await page.waitForFunction((wanted) => document.documentElement.lang === wanted, locale);
 };
 
 beforeAll(async () => {

@@ -12,6 +12,9 @@ import {
   QUEUE_PANEL,
   clampSize,
   dockIsOpen,
+  dockIsShown,
+  shownPanelsOf,
+  withDockToggled,
   layoutFrom,
   openPanelsOf,
   panelOf,
@@ -255,5 +258,70 @@ describe('a plugin’s panels (TYTO-49)', () => {
     const next = withPluginPanels(DEFAULT_LAYOUT, [{ id: 'editor' }]);
     expect(next.panels.filter((panel) => panel.id === 'editor')).toHaveLength(1);
     expect(panelOf(next, 'editor')?.element).toBe('tyto-editor-panel');
+  });
+});
+
+describe('hiding a whole area (TYTO-248, ADR 0076)', () => {
+  it('hides a shown area and gives back exactly what was in it', () => {
+    const hidden = withDockToggled(DEFAULT_LAYOUT, 'bottom');
+
+    expect(dockIsShown(hidden, 'bottom')).toBe(false);
+    expect(shownPanelsOf(hidden, 'bottom')).toEqual([]);
+    // The panel's own record is untouched: the area hid, the panel did not close.
+    expect(panelOf(hidden, PROBLEMS_PANEL)?.open).toBe(true);
+
+    const back = withDockToggled(hidden, 'bottom');
+    expect(shownPanelsOf(back, 'bottom').map((panel) => panel.id)).toEqual([PROBLEMS_PANEL]);
+  });
+
+  it('keeps a plugin panel and the queue together when their area comes back', () => {
+    const both = withPanelOpen(
+      withPluginPanels(withPanelOpen(DEFAULT_LAYOUT, QUEUE_PANEL, true), [
+        { id: 'plugin:demo', location: 'left' },
+      ]),
+      'plugin:demo',
+      true,
+    );
+    const round = withDockToggled(withDockToggled(both, 'left'), 'left');
+
+    expect(shownPanelsOf(round, 'left').map((panel) => panel.id)).toEqual([
+      QUEUE_PANEL,
+      'plugin:demo',
+    ]);
+  });
+
+  it('opens the first panel of an empty area rather than lighting up nothing', () => {
+    // The left area is empty by default: the queue lives there, closed.
+    const shown = withDockToggled(DEFAULT_LAYOUT, 'left');
+
+    expect(dockIsShown(shown, 'left')).toBe(true);
+    expect(panelOf(shown, QUEUE_PANEL)?.open).toBe(true);
+  });
+
+  it('does nothing for an area no panel lives in', () => {
+    const noLeft: Layout = {
+      panels: DEFAULT_LAYOUT.panels.filter((panel) => panel.dock !== 'left'),
+    };
+    expect(withDockToggled(noLeft, 'left')).toBe(noLeft);
+  });
+
+  it('shows the area again when a panel in it is opened', () => {
+    const hidden = withDockToggled(DEFAULT_LAYOUT, 'bottom');
+    const reopened = withPanelOpen(
+      withPanelOpen(hidden, PROBLEMS_PANEL, false),
+      PROBLEMS_PANEL,
+      true,
+    );
+
+    expect(dockIsShown(reopened, 'bottom')).toBe(true);
+  });
+
+  it('is remembered by layout.json and read back, and an older file still reads', () => {
+    const hidden = withDockToggled(DEFAULT_LAYOUT, 'right');
+
+    expect(layoutFrom(JSON.parse(JSON.stringify(hidden))).hiddenDocks).toEqual(['right']);
+    expect(layoutFrom({ panels: DEFAULT_LAYOUT.panels }).hiddenDocks).toBeUndefined();
+    // A hand-edited `centre` is refused with the rest of the file rather than hiding the editor.
+    expect(layoutFrom({ ...hidden, hiddenDocks: ['centre'] }).hiddenDocks).toBeUndefined();
   });
 });

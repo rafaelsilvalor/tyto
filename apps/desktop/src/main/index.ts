@@ -35,7 +35,7 @@ import { createExportService } from './export.js';
 import { desktopCapabilities, startDesktopPlugins } from './installed-plugins.js';
 import { fileLayoutStore } from './layout-store.js';
 import { crashSummary, fileLog, installCrashHandlers } from './log.js';
-import { menuTemplate } from './menu.js';
+import { type AboutFacts, aboutText, menuTemplate } from './menu.js';
 import { fileRecentFiles } from './recent-files.js';
 import { registerIpcHandlers, sendIpcEvent } from './ipc.js';
 import { exporterBuiltIns, listPlugins, tytoHome } from './plugin-list.js';
@@ -239,6 +239,15 @@ async function start(): Promise<void> {
   // and `app:locale` replaces it when the footer picker moves (TYTO-124).
   let uiLocale: Locale = localeFor(app.getLocale());
 
+  // What Help > About says (TYTO-248). Reassigned once the template sources exist; until then
+  // the panel says no templates rather than waiting for them.
+  let aboutFacts = (): AboutFacts => ({
+    version: app.getVersion(),
+    platform: process.platform,
+    templates: 0,
+    templatesFolder: null,
+  });
+
   /**
    * Builds the application menu in one language, and is called again when that changes.
    *
@@ -263,6 +272,30 @@ async function start(): Promise<void> {
             const contents = mainWindow?.webContents;
             if (contents === undefined || contents.isDestroyed()) return;
             sendIpcEvent(contents, 'command:run', { id });
+          },
+          // macOS's own about panel shows the credits; on Windows `showAboutPanel` draws a box
+          // with the app name alone (measured, TYTO-248), so there it is a message box.
+          onAbout: () => {
+            const t = (key: Parameters<typeof translate>[1]): string => translate(locale, key);
+            const detail = aboutText(t, aboutFacts());
+            if (process.platform === 'darwin') {
+              app.setAboutPanelOptions({
+                applicationName: t('app.name'),
+                applicationVersion: app.getVersion(),
+                credits: detail,
+              });
+              app.showAboutPanel();
+              return;
+            }
+            const box = {
+              type: 'info' as const,
+              title: t('menu.about'),
+              message: t('app.name'),
+              detail,
+            };
+            void (mainWindow === undefined
+              ? dialog.showMessageBox(box)
+              : dialog.showMessageBox(mainWindow, box));
           },
         }),
       ),
@@ -389,6 +422,13 @@ async function start(): Promise<void> {
     // Spread rather than `?? undefined`, because `exactOptionalPropertyTypes` tells an absent
     // key and an explicit `undefined` apart and the option wants the first.
     ...(saved.templatesFolder === null ? {} : { folder: saved.templatesFolder }),
+  });
+
+  aboutFacts = () => ({
+    version: app.getVersion(),
+    platform: process.platform,
+    templates: host.registry.templatePacks().flatMap((pack) => pack.templates).length,
+    templatesFolder: sources.current().folder?.path ?? null,
   });
 
   // Opening and saving, and the only object in this app that knows where the open brief

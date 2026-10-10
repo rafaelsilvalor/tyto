@@ -4,14 +4,7 @@ import { beforeEach, describe, expect, it } from 'vitest';
 import { CATALOGUE_KEYS, type Locale, translate } from '../../shared/i18n/index.js';
 import { en } from '../../shared/i18n/en.js';
 import { ptBR } from '../../shared/i18n/pt-BR.js';
-import {
-  I18N_ATTRIBUTE,
-  fillLocalePicker,
-  localeFromPicker,
-  paint,
-  paintTitle,
-  windowTitle,
-} from './shell.js';
+import { I18N_ATTRIBUTE, paint, paintTitle, windowTitle } from './shell.js';
 
 /**
  * The acceptance criterion — *switching locale changes every visible string* — as a unit.
@@ -27,10 +20,6 @@ const markup = (...keys: readonly string[]): string =>
 
 const state = (locale: Locale, document?: { name: string | undefined; dirty: boolean }) => ({
   locale,
-  version: '0.1.0',
-  platform: 'linux',
-  templates: ['carrossel-lista', 'promo-curso'],
-  templatesFolder: null,
   document: document ?? { name: undefined, dirty: false },
 });
 
@@ -71,36 +60,6 @@ describe('paint', () => {
     expect(changed).toBe(translated);
   });
 
-  it('splices the machine facts into the two keys that take one', () => {
-    paint(document, state('pt-BR'));
-
-    expect(document.querySelector('[data-i18n="shell.about.version"]')?.textContent).toBe(
-      `${translate('pt-BR', 'shell.about.version')}: 0.1.0`,
-    );
-    expect(document.querySelector('[data-i18n="shell.about.platform"]')?.textContent).toBe(
-      `${translate('pt-BR', 'shell.about.platform')}: linux`,
-    );
-    expect(document.querySelector('[data-i18n="shell.about.templates"]')?.textContent).toBe(
-      `${translate('pt-BR', 'shell.about.templates')}: 2`,
-    );
-  });
-
-  it('names the template folder in force, and says so when there is none', () => {
-    // The whole failure this setting guards against is somebody wondering why their template
-    // is not in the picker, so the answer is on screen rather than buried in a settings file
-    // (TYTO-122). A word and not a blank when nobody has chosen one: an empty cell in a row
-    // that has a label reads as something that failed to load.
-    paint(document, state('pt-BR'));
-    expect(document.querySelector('[data-i18n="templates.folder.label"]')?.textContent).toBe(
-      `${translate('pt-BR', 'templates.folder.label')}: ${translate('pt-BR', 'templates.folder.none')}`,
-    );
-
-    paint(document, { ...state('pt-BR'), templatesFolder: '/home/rafael/meus-templates' });
-    expect(document.querySelector('[data-i18n="templates.folder.label"]')?.textContent).toBe(
-      `${translate('pt-BR', 'templates.folder.label')}: /home/rafael/meus-templates`,
-    );
-  });
-
   it('leaves an element alone whose key the catalogue does not have', () => {
     // Recoverable beats blank: a stale string is readable and an empty one is not.
     document.body.innerHTML = `<p ${I18N_ATTRIBUTE}="shell.nothing">kept</p>`;
@@ -115,38 +74,6 @@ describe('paint', () => {
 
     paint(document, state('pt-BR'));
     expect(document.documentElement.lang).toBe('pt-BR');
-  });
-});
-
-describe('the language picker', () => {
-  it('offers every locale, in offer order, with the current one selected', () => {
-    const picker = document.createElement('select');
-    fillLocalePicker(picker, 'en');
-
-    expect([...picker.options].map((option) => option.value)).toEqual(['pt-BR', 'en']);
-    expect(picker.value).toBe('en');
-  });
-
-  it('names each language in its own language, not in the window’s', () => {
-    // A translated language list is the one list that is harder to use translated.
-    const picker = document.createElement('select');
-    fillLocalePicker(picker, 'pt-BR');
-
-    expect([...picker.options].map((option) => option.textContent)).toEqual([
-      'Português (Brasil)',
-      'English',
-    ]);
-  });
-
-  it('keeps the current locale when the picker holds something that is not one', () => {
-    const picker = document.createElement('select');
-    fillLocalePicker(picker, 'pt-BR');
-    const stray = document.createElement('option');
-    stray.value = 'ja-JP';
-    picker.append(stray);
-    picker.value = 'ja-JP';
-
-    expect(localeFromPicker(picker, 'pt-BR')).toBe('pt-BR');
   });
 });
 

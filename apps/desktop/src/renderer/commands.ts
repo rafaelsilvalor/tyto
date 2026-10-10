@@ -27,6 +27,7 @@ import {
 import type { IpcResponse } from '../../shared/ipc.js';
 
 import { type CatalogueKey } from '../../shared/i18n/index.js';
+import { type HideableDock } from '../../shared/layout.js';
 
 /**
  * What the window can be told to do, as ids (E9.12).
@@ -60,6 +61,13 @@ export const TOGGLE_PANEL_PREFIX = 'layout.togglePanel:';
 export const togglePanelCommandId = (panelId: string): string => `${TOGGLE_PANEL_PREFIX}${panelId}`;
 export const panelOfToggleCommand = (id: string): string | undefined =>
   id.startsWith(TOGGLE_PANEL_PREFIX) ? id.slice(TOGGLE_PANEL_PREFIX.length) : undefined;
+
+/**
+ * Hiding and showing a whole area, as a command per area (TYTO-248, ADR 0076): what the
+ * status bar's three area buttons run, and what a person can bind in `keybindings.json`.
+ */
+export const TOGGLE_DOCK_PREFIX = 'layout.toggleDock:';
+export const toggleDockCommandId = (dock: HideableDock): string => `${TOGGLE_DOCK_PREFIX}${dock}`;
 
 export const EDITOR_OPEN = 'editor.open';
 export const EDITOR_SAVE_AS = 'editor.saveAs';
@@ -178,6 +186,9 @@ export const COMMAND_LABELS: Readonly<Record<string, CatalogueKey>> = {
   [TEMPLATE_EDIT]: 'command.template.edit',
   [TEMPLATE_NEW]: 'command.template.new',
   [LAYOUT_RESTORE]: 'command.layout.restore',
+  [toggleDockCommandId('left')]: 'command.layout.toggleDock.left',
+  [toggleDockCommandId('bottom')]: 'command.layout.toggleDock.bottom',
+  [toggleDockCommandId('right')]: 'command.layout.toggleDock.right',
   [DOCUMENT_CLOSE]: 'command.document.close',
   [DOCUMENT_NEXT]: 'command.document.next',
   [DOCUMENT_PREVIOUS]: 'command.document.previous',
@@ -213,6 +224,8 @@ export interface DesktopActions {
   saveDocument(saveAs: boolean): void;
   /** E9.10. Puts every panel back where ADR 0024 says it goes. */
   restoreLayout(): void;
+  /** TYTO-248. Hides or shows one area whole; `shared/layout.ts` says what that means. */
+  toggleDock(dock: HideableDock): void;
   /** E9.11. Closing asks first when the tab has unsaved text, so it answers nothing here. */
   closeDocument(): void;
   stepDocument(direction: 1 | -1): void;
@@ -345,6 +358,11 @@ export function createDesktopRegistry(actions: DesktopActions): CommandRegistry 
   add(LAYOUT_RESTORE, () => {
     actions.restoreLayout();
   });
+  for (const dock of ['left', 'bottom', 'right'] as const) {
+    add(toggleDockCommandId(dock), () => {
+      actions.toggleDock(dock);
+    });
+  }
 
   add(DOCUMENT_CLOSE, () => {
     actions.closeDocument();

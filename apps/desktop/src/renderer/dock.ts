@@ -5,7 +5,7 @@ import {
   DOCKS,
   ELASTIC_DOCK,
   clampSize,
-  openPanelsOf,
+  shownPanelsOf,
 } from '../../shared/layout.js';
 import { type Locale } from '../../shared/i18n/index.js';
 import { type DockedPanel } from './panels.js';
@@ -50,7 +50,7 @@ const splitterElement = (root: ParentNode, dock: Dock): HTMLElement | null =>
  * and it will have a second panel on screen to decide it against.
  */
 const resizedPanelOf = (layout: Layout, dock: Dock): PanelRecord | undefined =>
-  openPanelsOf(layout, dock)[0];
+  shownPanelsOf(layout, dock)[0];
 
 /**
  * Puts the window in the shape the record describes.
@@ -67,7 +67,9 @@ export async function arrange(root: ParentNode, layout: Layout, host: DockHost):
     const container = dockElement(root, dock);
     if (container === null) continue;
 
-    const open = openPanelsOf(layout, dock);
+    // A hidden area shows nothing, and its panels' elements go with it (ADR 0076): the
+    // record keeps them open, so showing the area again rebuilds exactly what was there.
+    const open = shownPanelsOf(layout, dock);
     const wanted = new Set(open.map((panel) => panel.id));
 
     // Gone first, so a panel that closed is out of the document before anything is measured.

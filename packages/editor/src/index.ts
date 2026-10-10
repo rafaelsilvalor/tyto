@@ -14,6 +14,8 @@ export { brief, briefLanguage } from './brief-language.js';
 
 export {
   createEditor,
+  type CursorPosition,
+  cursorOf,
   type EditorHandle,
   type EditorOptions,
   type EditorState,
@@ -105,7 +107,13 @@ export {
   SEARCH_PHRASE_KEYS,
 } from './search.js';
 
-export { type VimExCommand, type VimModeOptions, defaultExCommands, vimMode } from './vim-mode.js';
+export {
+  type VimExCommand,
+  type VimModeOptions,
+  type VimStatus,
+  defaultExCommands,
+  vimMode,
+} from './vim-mode.js';
 
 export { template, templateLanguage } from './template-language.js';
 

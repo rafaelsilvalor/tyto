@@ -88,18 +88,13 @@
         <div class="dock dock--bottom" data-dock="bottom"></div>
       </div>
 
+      <!--
+        The status bar (TYTO-248, ADR 0076): one line, the buttons and facts `status-bar.ts`
+        draws, and the update notice at its end. The version, the platform and the template
+        folder moved to Help > About; the language is a command in the bar.
+      -->
       <footer class="shell__foot">
-        <label class="shell__language">
-          <span data-i18n="shell.language.label"></span>
-          <select id="locale"></select>
-        </label>
-        <dl class="shell__about">
-          <dd data-i18n="shell.about.version"></dd>
-          <dd data-i18n="shell.about.platform"></dd>
-          <dd data-i18n="shell.about.templates"></dd>
-          <!-- TYTO-122. Fourth `<dd>` in a row that already lays out three; no CSS change. -->
-          <dd data-i18n="templates.folder.label"></dd>
-        </dl>
+        <tyto-status-bar class="status-bar"></tyto-status-bar>
         <!-- TYTO-131. Hidden until main says a newer version exists; `update-notice.ts` paints it. -->
         <button type="button" class="shell__update" id="update-notice" hidden></button>
       </footer>

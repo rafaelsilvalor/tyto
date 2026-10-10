@@ -171,13 +171,11 @@ describe('running a command', () => {
     expect(after).not.toBe(before);
     expect(['Prévia', 'Preview']).toContain(after);
 
-    // The footer's picker agrees, which is the half that would rot silently: it is a view
-    // of the locale and not its owner, so a command that moved one and not the other would
-    // leave the window disagreeing with itself.
-    const picker = await page.evaluate(
-      () => (document.getElementById('locale') as HTMLSelectElement | null)?.value ?? '',
-    );
-    expect(picker).toBe(after === 'Prévia' ? 'pt-BR' : 'en');
+    // The document's language agrees, which is the half that would rot silently. The
+    // footer's picker used to be checked here; since TYTO-248 this command is the only way
+    // to switch, and `lang` is what a screen reader reads.
+    const lang = await page.evaluate(() => document.documentElement.lang);
+    expect(lang).toBe(after === 'Prévia' ? 'pt-BR' : 'en');
 
     // Put it back, so every test after this one sees the locale the window started in.
     await openBar();

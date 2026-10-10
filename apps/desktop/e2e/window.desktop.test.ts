@@ -298,8 +298,22 @@ describe('the bridge', () => {
   });
 });
 
+/**
+ * Switches the window to `locale` the only way left since the footer's picker went: the
+ * command bar's `shell.toggleLocale` (TYTO-248, ADR 0076).
+ */
+const setLocale = async (locale: 'en' | 'pt-BR'): Promise<void> => {
+  if ((await page.evaluate(() => document.documentElement.lang)) === locale) return;
+  await page.keyboard.press('Control+k');
+  await page.waitForSelector('.command-bar__input', { state: 'visible' });
+  await page.keyboard.type('shell.toggleLocale');
+  await page.waitForTimeout(150);
+  await page.keyboard.press('Enter');
+  await page.waitForFunction((wanted) => document.documentElement.lang === wanted, locale);
+};
+
 /** *Switching locale changes every visible string.* */
-describe('the language picker', () => {
+describe('switching the language', () => {
   const visibleStrings = (): Promise<readonly string[]> =>
     page.evaluate(
       ([attribute]) =>
@@ -342,8 +356,8 @@ describe('the language picker', () => {
     'problems.nowhere',
     'template.none',
     // TYTO-122: three of the five are the picker's and the bar's, and the fourth is minted as
-    // a diagnostic rather than painted. `templates.folder.label` is the one that *is* element
-    // text and is deliberately not here — `src/renderer/shell.test.ts` pins what it says.
+    // a diagnostic rather than painted. The fifth, `templates.folder.label`, was the footer's
+    // and is listed below with Help > About since TYTO-248.
     'templates.folder.none',
     'templates.folder.empty',
     'command.templates.chooseFolder',
@@ -534,6 +548,25 @@ describe('the language picker', () => {
     'command.settings.open',
     // TYTO-207: the same, for the keybindings file. `e2e/keybindings-file.desktop.test.ts`.
     'command.keybindings.open',
+    // TYTO-248: the status bar is an element and translates inside its own `render`; the
+    // area toggles are also command labels. `src/renderer/status-bar.test.ts` renders every
+    // one of them in both languages.
+    'command.layout.toggleDock.left',
+    'command.layout.toggleDock.right',
+    'command.layout.toggleDock.bottom',
+    'status.commandBar',
+    'status.position',
+    'status.selected',
+    'status.kind.settings',
+    'status.kind.keybindings',
+    // TYTO-248: what the footer used to say is Help > About now, a box main shows — menu
+    // chrome, like `menu.revealLogs`. `src/main/menu.test.ts` holds the five to `aboutText`, and
+    // `e2e/status-bar.desktop.test.ts` opens the real item.
+    'menu.about',
+    'shell.about.version',
+    'shell.about.platform',
+    'shell.about.templates',
+    'templates.folder.label',
   ];
 
   it('paints every catalogue string on load, with none left blank', async () => {
@@ -555,10 +588,10 @@ describe('the language picker', () => {
     ));
 
   it('changes every string that differs between the two catalogues', async () => {
-    await page.selectOption('#locale', 'pt-BR');
+    await setLocale('pt-BR');
     const portuguese = await visibleStrings();
 
-    await page.selectOption('#locale', 'en');
+    await setLocale('en');
     const english = await visibleStrings();
 
     const translated = CATALOGUE_KEYS.filter(
@@ -575,10 +608,10 @@ describe('the language picker', () => {
   });
 
   it('changes the document language with it', async () => {
-    await page.selectOption('#locale', 'en');
+    await setLocale('en');
     expect(await page.evaluate(() => document.documentElement.lang)).toBe('en');
 
-    await page.selectOption('#locale', 'pt-BR');
+    await setLocale('pt-BR');
     expect(await page.evaluate(() => document.documentElement.lang)).toBe('pt-BR');
   });
 });
