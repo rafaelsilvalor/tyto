@@ -202,6 +202,7 @@ export const en: Catalogue = {
   'plugins.credential.kept':
     'Kept in the system keychain. Tyto never shows it again; type a new one to replace it.',
   'plugins.credential.failed': 'The credential could not be saved or cleared.',
+  'command.settings.open': 'Preferences: Open Settings (JSON)',
   'command.queue.show': 'Show the local queue',
   'queue.heading': 'Local queue',
   'queue.folder.none': 'No queue folder chosen yet.',

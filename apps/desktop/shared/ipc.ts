@@ -837,6 +837,27 @@ export const IPC_CHANNELS = {
   ),
 
   /**
+   * Opens the user's `settings.json` in a tab (TYTO-206, ADR 0073), creating it with an empty
+   * object and a comment when there is none. **No path crosses**: main knows the one file this
+   * opens. The answer is `file:open`'s, so the tab saves through `file:save` like any other.
+   */
+  'settings:open': channel(
+    z.object({ documentId }),
+    z.object({ document: openDocument.nullable(), documentId: documentId.nullable() }),
+  ),
+
+  /**
+   * The settings tab's buffer, checked while the person types, by the code that reads the file
+   * and against what the plugins declared. `dirty` is how main knows a screen's change has to
+   * go into this buffer rather than onto the disk (ADR 0073, decision 8). Never fails: what is
+   * wrong travels in `diagnostics`, with ranges into `text`.
+   */
+  'settings:validate': channel(
+    z.object({ documentId, text: z.string(), dirty: z.boolean() }),
+    z.object({ diagnostics: z.array(diagnostic) }),
+  ),
+
+  /**
    * Something went wrong in the window, written down where a report can reach it (TYTO-132).
    *
    * An ordinary question and deliberately not a push: the renderer is the side that *has* the
@@ -1041,6 +1062,21 @@ export const IPC_EVENTS = {
    * `update:status` for the whole of it.
    */
   'update:changed': z.object({}),
+
+  /**
+   * `settings.json` changed, or a screen's change to it was refused (TYTO-206). The window
+   * asks `templates:folder` again either way. `text` is the settings tab's new buffer — a
+   * screen's change put into unsaved typing, or the disk followed by a clean tab — and `saved`
+   * says whether that text is now also the file's. `base` is the buffer main edited, so the
+   * window can keep what was typed since. `refused` opens the tab, where the syntax error that
+   * refused the change is shown.
+   */
+  'settings:changed': z.object({
+    text: z.string().optional(),
+    base: z.string().optional(),
+    saved: z.boolean(),
+    refused: z.boolean(),
+  }),
 } as const;
 
 export type IpcEvents = typeof IPC_EVENTS;

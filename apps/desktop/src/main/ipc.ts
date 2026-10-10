@@ -4,6 +4,7 @@
 import { basename } from 'node:path';
 
 import type { IpcMain, WebContents } from 'electron';
+import type { Diagnostics } from '@tyto/core';
 
 import {
   type IpcChannelName,
@@ -147,7 +148,13 @@ export interface IpcDependencies {
       queueFolder?: string | null;
       queueAutoRun?: boolean;
       queueKinds?: Readonly<Record<string, readonly string[]>>;
-    }) => Promise<void>;
+    }) => Promise<unknown>;
+  };
+  /** The settings tab (TYTO-206): the one file it opens, its validation, its closing. */
+  readonly settings: {
+    open: (documentId: string) => Promise<IpcResponse<'settings:open'>>;
+    validate: (request: IpcRequest<'settings:validate'>) => Diagnostics;
+    closed: (documentId: string) => void;
   };
   /** The plugins screen (TYTO-47): built-ins and installed plugins, read and never run. */
   readonly plugins: {
@@ -217,6 +224,7 @@ export function createHandlers(dependencies: IpcDependencies): Handlers {
     preview,
     project,
     queue,
+    settings,
     templateDialogs,
     templateEditor,
     templates,
@@ -264,6 +272,7 @@ export function createHandlers(dependencies: IpcDependencies): Handlers {
 
     'file:close': ({ documentId }) => {
       documents.close(documentId);
+      settings.closed(documentId);
       return Promise.resolve({});
     },
 
@@ -439,6 +448,19 @@ export function createHandlers(dependencies: IpcDependencies): Handlers {
       // once would otherwise be two tabs nobody could tell apart.
       return documents.openPath(documentId, path, `${taskId} · ${basename(path)}`);
     },
+
+    'settings:open': ({ documentId }) => settings.open(documentId),
+
+    'settings:validate': (request) =>
+      Promise.resolve({
+        diagnostics: settings.validate(request).map((item) => ({
+          severity: item.severity,
+          code: item.code,
+          message: item.message,
+          ...(item.range === undefined ? {} : { range: item.range }),
+          ...(item.hint === undefined ? {} : { hint: item.hint }),
+        })),
+      }),
 
     'log:reveal': async () => {
       await folders.reveal(log.directory);

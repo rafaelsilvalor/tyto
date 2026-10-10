@@ -13,6 +13,7 @@ import {
   isStale,
   isUnsaved,
   newDocument,
+  rebaseEdit,
   releaseDocument,
   selectDocument,
   stepDocument,
@@ -365,5 +366,29 @@ describe('isStale', () => {
   it('is false for a brief that has never rendered, which is empty rather than stale', () => {
     expect(isStale(rendered(0, '', 'anything at all'))).toBe(false);
     expect(isStale(newDocument('a'))).toBe(false);
+  });
+});
+
+describe("a screen's change to the settings buffer (TYTO-206)", () => {
+  const apply = (text: string, edit: { from: number; to: number; insert: string }): string =>
+    text.slice(0, edit.from) + edit.insert + text.slice(edit.to);
+
+  const base = '{\n  "a": 1\n}\n';
+  const edited = '{\n  "a": 1,\n  "queueAutoRun": true\n}\n';
+
+  it('is the one span that changed, when nobody typed since', () => {
+    expect(apply(base, rebaseEdit(base, base, edited))).toBe(edited);
+  });
+
+  it('keeps what the person typed before the span, which main has not heard of yet', () => {
+    const typed = '// mine\n{\n  "a": 1\n}\n';
+    expect(apply(typed, rebaseEdit(base, typed, edited))).toBe(
+      '// mine\n{\n  "a": 1,\n  "queueAutoRun": true\n}\n',
+    );
+  });
+
+  it('keeps what the person typed after the span', () => {
+    const typed = '{\n  "a": 1\n}\n// after\n';
+    expect(apply(typed, rebaseEdit(base, typed, edited))).toBe(edited + '// after\n');
   });
 });

@@ -59,9 +59,46 @@ export const BUILT_IN_SETTINGS: readonly DeclaredSetting[] = SETTING_CONTRIBUTIO
   (contribution) => declaredSetting(desktopManifest.name, false, contribution),
 );
 
+/**
+ * What a settings text says is wrong with it, against what the plugins declared: the syntax
+ * errors and every key's own problem. The store's reading and the settings tab's typing
+ * (TYTO-206, PR B) both ask this, so a problem is the same problem in the log and on screen.
+ */
+export function validateSettingsText(
+  text: string,
+  declared: readonly DeclaredSetting[],
+): Diagnostics {
+  const { entries, syntax } = readSettingsText(text);
+  return [...syntax, ...resolveSettings(declared, entries).diagnostics];
+}
+
+/**
+ * The text with a screen's changes applied in place, or the syntax errors that refuse it.
+ *
+ * Shared by the disk and the settings tab's unsaved buffer (ADR 0073, decision 8): a screen's
+ * change lands in whichever of the two holds the person's latest word, by the same edit.
+ */
+export function applySettingsChanges(
+  text: string,
+  changes: Partial<Settings>,
+): Result<string, Diagnostics> {
+  const { syntax } = readSettingsText(text);
+  if (syntax.length > 0) return err(syntax);
+  const edits: Record<string, unknown> = {};
+  for (const [key, value] of Object.entries(changes)) {
+    const fallback = DEFAULT_SETTINGS[key as keyof Settings];
+    // Only what differs from the default is written: the file is what the person chose,
+    // not a dump of what the app assumes.
+    edits[key] = JSON.stringify(value) === JSON.stringify(fallback) ? undefined : value;
+  }
+  return ok(editSettingsText(text, edits));
+}
+
 export function fileSettingsStore(
   file: string,
   declared: () => readonly DeclaredSetting[] = () => BUILT_IN_SETTINGS,
+  /** Told the text just before it is written, so a watcher can recognise the app's own write. */
+  onWrite: (text: string) => void = () => undefined,
 ): SettingsStore {
   // One write at a time: two patches racing through read-then-write would each keep the
   // other's old value.
@@ -102,22 +139,15 @@ export function fileSettingsStore(
     } catch {
       return ok(undefined);
     }
-    const { syntax } = readSettingsText(source);
-    if (syntax.length > 0) return err(syntax);
-
-    const edits: Record<string, unknown> = {};
-    for (const [key, value] of Object.entries(changes)) {
-      const fallback = DEFAULT_SETTINGS[key as keyof Settings];
-      // Only what differs from the default is written: the file is what the person chose,
-      // not a dump of what the app assumes.
-      edits[key] = JSON.stringify(value) === JSON.stringify(fallback) ? undefined : value;
-    }
-    const next = editSettingsText(source, edits);
+    const applied = applySettingsChanges(source, changes);
+    if (!applied.ok) return err(applied.error);
+    const next = applied.value;
     if (next === source || (source === '' && next.replace(/\s/gu, '') === '{}')) {
       return ok(undefined);
     }
     try {
       await mkdir(dirname(file), { recursive: true });
+      onWrite(next);
       await writeFile(file, next, 'utf8');
     } catch {
       // The folder is still searched for this session — `reload` has already happened by

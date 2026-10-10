@@ -393,6 +393,8 @@ export interface Catalogue {
    * The local queue panel (TYTO-45). Closed in the default layout, so none of these is on
    * screen at load; `queue.status.*` are the words a row's status is shown in.
    */
+  /** TYTO-206. Opens `settings.json` in a tab; a command, so it is not on screen at load. */
+  readonly 'command.settings.open': string;
   readonly 'command.queue.show': string;
   readonly 'queue.heading': string;
   readonly 'queue.folder.none': string;
@@ -607,6 +609,7 @@ export const CATALOGUE_KEYS = [
   'plugins.credential.clear',
   'plugins.credential.kept',
   'plugins.credential.failed',
+  'command.settings.open',
   'command.queue.show',
   'queue.heading',
   'queue.folder.none',

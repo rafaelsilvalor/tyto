@@ -275,6 +275,9 @@ describe('the bridge', () => {
       'queue:set-auto-run',
       'queue:set-folder',
       'queue:set-kinds',
+      // TYTO-206: the settings tab. Exercised by `e2e/settings.desktop.test.ts`.
+      'settings:open',
+      'settings:validate',
       'template:new',
       'template:open',
       'template:preview',
@@ -520,6 +523,9 @@ describe('the language picker', () => {
     // it is drawn inside the window.
     'command.queue.show',
     ...CATALOGUE_KEYS.filter((key) => key.startsWith('queue.')),
+    // TYTO-206: a command's label, shown only in the bar and the menu, like the two above.
+    // `e2e/settings.desktop.test.ts` runs it from the bar.
+    'command.settings.open',
   ];
 
   it('paints every catalogue string on load, with none left blank', async () => {

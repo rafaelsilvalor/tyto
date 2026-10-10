@@ -29,6 +29,11 @@ export interface DocumentState {
   /** The file's name, or nothing for a brief that has never been saved. */
   readonly name: string | undefined;
   /**
+   * `settings` for the app's own `settings.json` (TYTO-206): plain text, checked by main
+   * against what the plugins declared instead of compiled. Absent for a brief.
+   */
+  readonly kind?: 'settings';
+  /**
    * The text that is in the file — and the **empty string for a document that is in no
    * file at all** (ADR 0026, ratifying D3).
    *
@@ -329,3 +334,48 @@ export function stepDocument(workspace: Workspace, direction: 1 | -1): string {
 /** The document `Mod-<slot>` selects, counting from one. Nothing, past the last tab. */
 export const documentAtSlot = (workspace: Workspace, slot: number): DocumentState | undefined =>
   workspace.documents[slot - 1];
+
+/** One replacement over a text: what CodeMirror's `changes` takes. */
+export interface TextEdit {
+  readonly from: number;
+  readonly to: number;
+  readonly insert: string;
+}
+
+/** The one span where `before` and `after` differ, found from both ends. */
+export function editBetween(before: string, after: string): TextEdit {
+  let start = 0;
+  while (start < before.length && start < after.length && before[start] === after[start]) {
+    start += 1;
+  }
+  let end = 0;
+  while (
+    end < before.length - start &&
+    end < after.length - start &&
+    before[before.length - 1 - end] === after[after.length - 1 - end]
+  ) {
+    end += 1;
+  }
+  return { from: start, to: before.length - end, insert: after.slice(start, after.length - end) };
+}
+
+/**
+ * A screen's change to the settings tab's buffer, onto text that may have moved since
+ * (TYTO-206, ADR 0073 decision 8).
+ *
+ * Main edited `base` — the buffer as it last heard of it, up to one pause old — into
+ * `edited`. The person may have typed since, so the screen's span is moved past what they
+ * typed rather than the buffer being replaced, which would take those keystrokes back out.
+ * Only when both touched the same span does the screen's text win over it.
+ */
+export function rebaseEdit(base: string, current: string, edited: string): TextEdit {
+  const change = editBetween(base, edited);
+  if (current === base) return change;
+  const typed = editBetween(base, current);
+  if (change.to <= typed.from) return change;
+  if (change.from >= typed.to) {
+    const shift = typed.insert.length - (typed.to - typed.from);
+    return { from: change.from + shift, to: change.to + shift, insert: change.insert };
+  }
+  return editBetween(current, edited);
+}

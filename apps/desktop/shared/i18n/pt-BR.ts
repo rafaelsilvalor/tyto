@@ -203,6 +203,7 @@ export const ptBR: Catalogue = {
   'plugins.credential.kept':
     'Guardada no cofre do sistema. O Tyto não a mostra de novo; digite outra para trocá-la.',
   'plugins.credential.failed': 'Não foi possível salvar nem apagar a credencial.',
+  'command.settings.open': 'Preferências: Abrir configurações (JSON)',
   'command.queue.show': 'Mostrar a fila local',
   'queue.heading': 'Fila local',
   'queue.folder.none': 'Nenhuma pasta de fila escolhida ainda.',

@@ -107,6 +107,8 @@ export interface QueueService {
    * choice, which is what `settings.json` keeps. Ignored with no folder or no kind.
    */
   setKinds(kinds: readonly string[]): Readonly<Record<string, readonly string[]>>;
+  /** Every folder's choice at once, as `settings.json` holds it — a hand edit (TYTO-206). */
+  replaceKinds(kinds: Readonly<Record<string, readonly string[]>>): void;
   /** Renders the task now, whatever auto-run says. Resolves when the render is over. */
   run(id: string): Promise<void>;
   /** Where the task's brief is, if the queue has listed it. Only a listed task is openable. */
@@ -145,9 +147,11 @@ export function createQueueService(options: QueueOptions): QueueService {
   let autoRun = options.autoRun;
   // Keys resolved on the way in, as `folder` is, so `C:\q` and `C:\q\` are one folder's
   // choice whichever way `settings.json` spelled it.
-  let kindsByFolder: Readonly<Record<string, readonly string[]>> = Object.fromEntries(
-    Object.entries(options.kinds ?? {}).map(([path, kinds]) => [resolve(path), kinds]),
-  );
+  const resolveKinds = (
+    record: Readonly<Record<string, readonly string[]>>,
+  ): Readonly<Record<string, readonly string[]>> =>
+    Object.fromEntries(Object.entries(record).map(([path, kinds]) => [resolve(path), kinds]));
+  let kindsByFolder = resolveKinds(options.kinds ?? {});
   const kindsOf = (root: string): readonly string[] =>
     kindsByFolder[resolve(root)] ?? DEFAULT_QUEUE_KINDS;
   let sources = folder === null ? undefined : options.sources(folder);
@@ -349,6 +353,11 @@ export function createQueueService(options: QueueOptions): QueueService {
       kindsByFolder = { ...kindsByFolder, [folder]: [...new Set(kinds)] };
       options.onChange();
       return kindsByFolder;
+    },
+
+    replaceKinds(kinds): void {
+      kindsByFolder = resolveKinds(kinds);
+      options.onChange();
     },
 
     run(id: string): Promise<void> {

@@ -58,6 +58,8 @@ export const FILE_EXPORT = 'file.export';
 export const PLUGINS_SHOW = 'plugins.show';
 /** TYTO-45. Opens the local queue panel, or brings it forward when it is already open. */
 export const QUEUE_SHOW = 'queue.show';
+/** TYTO-206. Opens `settings.json` in a tab, or brings its tab forward. */
+export const SETTINGS_OPEN = 'settings.open';
 /**
  * TYTO-122. Points the app at a folder of templates, or goes back to the built-in pack.
  *
@@ -156,6 +158,7 @@ export const COMMAND_LABELS: Readonly<Record<string, CatalogueKey>> = {
   [FILE_EXPORT]: 'command.file.export',
   [PLUGINS_SHOW]: 'command.plugins.show',
   [QUEUE_SHOW]: 'command.queue.show',
+  [SETTINGS_OPEN]: 'command.settings.open',
   [TEMPLATES_CHOOSE_FOLDER]: 'command.templates.chooseFolder',
   [TEMPLATES_CLEAR_FOLDER]: 'command.templates.clearFolder',
   [TEMPLATE_EDIT]: 'command.template.edit',
@@ -209,6 +212,7 @@ export interface DesktopActions {
    * second time would be a menu item that lies.
    */
   showQueue(): void;
+  openSettings(): void;
   /**
    * TYTO-122. Points the app at a folder of templates, or clears the choice.
    *
@@ -295,6 +299,9 @@ export function createDesktopRegistry(actions: DesktopActions): CommandRegistry 
   });
   add(QUEUE_SHOW, () => {
     actions.showQueue();
+  });
+  add(SETTINGS_OPEN, () => {
+    actions.openSettings();
   });
 
   // Registration order is display order, so these land next to Export rather than at the

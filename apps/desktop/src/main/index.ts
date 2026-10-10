@@ -1,8 +1,8 @@
 import { spawn } from 'node:child_process';
-import { realpathSync } from 'node:fs';
-import { readFile } from 'node:fs/promises';
+import { realpathSync, watch } from 'node:fs';
+import { access, readFile, writeFile } from 'node:fs/promises';
 import { fileURLToPath } from 'node:url';
-import { dirname, join } from 'node:path';
+import { basename, dirname, join } from 'node:path';
 
 import {
   type BrowserWindow,
@@ -27,6 +27,7 @@ import { NO_PLUGINS, createPluginHost } from '@tyto/plugin-api';
 import type { Rasterizer } from '@tyto/raster';
 
 import { type Locale, localeFor, translate } from '../../shared/i18n/index.js';
+import { type Settings } from '../../shared/settings.js';
 import { fileCredentialStore } from './credential-store.js';
 import { createCredentials } from './credentials.js';
 import { createDocumentService } from './documents.js';
@@ -49,6 +50,7 @@ import { createPreviewService } from './preview.js';
 import { createProjectSources } from './project.js';
 import { createTemplateEditor } from './template-editor.js';
 import { createExitGuard } from './quit.js';
+import { type LiveSettings, createLiveSettings } from './settings-live.js';
 import { fileSettingsStore } from './settings-store.js';
 import { createTemplateCatalogue } from './templates.js';
 import { shouldCheck, updateFeedFrom, updateRoute } from './update-feed.js';
@@ -79,6 +81,13 @@ const here = dirname(fileURLToPath(import.meta.url));
  * file tells the two apart. A built app reads `index.html` off its own folder.
  */
 const devServerUrl = process.env['ELECTRON_RENDERER_URL'];
+
+/** How long a burst of watcher events on `settings.json` has to go quiet (TYTO-206). */
+const SETTINGS_SETTLE_MS = 100;
+
+/** `settings.json` as "Open Settings (JSON)" creates it when there is none (TYTO-206). */
+const NEW_SETTINGS_FILE =
+  '// Tyto settings: JSON with comments. Saving this file applies it, with no restart.\n{\n}\n';
 
 /**
  * Puts a crash on screen (TYTO-140).
@@ -347,25 +356,23 @@ async function start(): Promise<void> {
   // through the plugin extension point, and a folder somebody points at is not a plugin —
   // that is the whole of why this card is not TYTO-47.
   //
-  // The file is read against what the plugins declared (ADR 0073), and its problems go to the
-  // log until the settings tab can show them where they were typed (TYTO-206, PR B).
-  const settings = fileSettingsStore(join(app.getPath('userData'), 'settings.json'), () =>
-    host.registry.configurations(),
+  // The file is read against what the plugins declared (ADR 0073). Its problems go to the log
+  // at launch, and to the problems panel once the settings tab is open (TYTO-206).
+  const settingsFile = join(app.getPath('userData'), 'settings.json');
+  // Bound below, once the queue it applies to exists; the store tells it every write it makes.
+  const late: { live?: LiveSettings } = {};
+  const settings = fileSettingsStore(
+    settingsFile,
+    () => host.registry.configurations(),
+    (text) => late.live?.wrote(text),
   );
   const reading = await settings.load();
   host.configure(reading.config);
   for (const problem of reading.diagnostics) log.warn(`settings.json: ${problem.message}`);
   const saved = reading.settings;
-  // A screen's change to a file that does not parse is refused, and the file is left alone.
-  const remember = async (changes: Parameters<typeof settings.write>[0]): Promise<void> => {
-    const written = await settings.write(changes);
-    if (!written.ok) {
-      log.warn('settings.json was not written, because it does not parse', {
-        changes,
-        problems: written.error.map((problem) => problem.message),
-      });
-    }
-  };
+  // A screen's change: `false` when it was refused because the file does not parse.
+  const remember = (changes: Partial<Settings>): Promise<boolean> =>
+    late.live === undefined ? Promise.resolve(false) : late.live.remember(changes);
   const sources = await createProjectSources({
     fileSystem,
     builtIn: builtInTemplatesDirectory(),
@@ -380,6 +387,7 @@ async function start(): Promise<void> {
   // launching one (E9.8).
   const documents = createDocumentService({
     recent: fileRecentFiles(join(app.getPath('userData'), 'recent-files.json')),
+    unlisted: [settingsFile],
     dialogs: {
       openBrief: async () => {
         const answer = await dialog.showOpenDialog({
@@ -543,6 +551,50 @@ async function start(): Promise<void> {
   app.on('will-quit', () => {
     queue.close();
   });
+
+  // **Live settings** (TYTO-206): a save of `settings.json` from the tab or any editor applies
+  // with no restart. Bound here, after the queue, because applying a key means reaching it.
+  const liveSettings = createLiveSettings({
+    store: settings,
+    declared: () => host.registry.configurations(),
+    initial: saved,
+    readText: () =>
+      readFile(settingsFile, 'utf8').catch((error: unknown) => {
+        if ((error as NodeJS.ErrnoException).code === 'ENOENT') return '';
+        throw error;
+      }),
+    apply: async (next, keys) => {
+      if (keys.includes('templatesFolder')) await sources.reload(next.templatesFolder ?? undefined);
+      if (keys.includes('queueFolder')) await queue.setFolder(next.queueFolder);
+      if (keys.includes('queueAutoRun')) queue.setAutoRun(next.queueAutoRun);
+      if (keys.includes('queueKinds')) queue.replaceKinds(next.queueKinds);
+    },
+    configure: (config) => {
+      host.configure(config);
+    },
+    send: (payload) => {
+      const contents = mainWindow?.webContents;
+      if (contents === undefined || contents.isDestroyed()) return;
+      sendIpcEvent(contents, 'settings:changed', payload);
+    },
+    log,
+  });
+  late.live = liveSettings;
+  // The folder and not the file: an editor that saves by replacing the file would leave a
+  // watch on the old one listening to nothing. Events come in bursts, so they settle first.
+  let settle: ReturnType<typeof setTimeout> | undefined;
+  try {
+    const watcher = watch(dirname(settingsFile), (_event, name) => {
+      if (name !== basename(settingsFile)) return;
+      clearTimeout(settle);
+      settle = setTimeout(() => void liveSettings.changed(), SETTINGS_SETTLE_MS);
+    });
+    app.on('will-quit', () => {
+      watcher.close();
+    });
+  } catch (cause) {
+    log.error('settings.json cannot be watched; a save applies at the next launch.', cause);
+  }
 
   // The one question main asks. `send` is deliberately the whole of what this file lends it:
   // `quit.ts` holds the latch and the ids and knows nothing about Electron, which is what
@@ -720,8 +772,8 @@ async function start(): Promise<void> {
 
         // Written before the reload, so a disk that refuses the file still leaves this session
         // searching the folder the person just picked — they lose the memory, not the choice.
-        await remember({ templatesFolder: chosen ?? null });
-        await sources.reload(chosen);
+        // A refused write leaves the folder in force as it was (TYTO-206).
+        if (await remember({ templatesFolder: chosen ?? null })) await sources.reload(chosen);
         return inForce();
       },
     },
@@ -735,6 +787,25 @@ async function start(): Promise<void> {
         return answer.canceled ? undefined : answer.filePaths[0];
       },
       remember,
+    },
+    settings: {
+      open: async (documentId) => {
+        // Created on first open, with a line saying what it is: an empty file in an editor
+        // tab says nothing about what may go in it.
+        const missing = await access(settingsFile).then(
+          () => false,
+          () => true,
+        );
+        if (missing) {
+          liveSettings.wrote(NEW_SETTINGS_FILE);
+          await writeFile(settingsFile, NEW_SETTINGS_FILE, 'utf8').catch(() => undefined);
+        }
+        return documents.openPath(documentId, settingsFile, 'settings.json');
+      },
+      validate: ({ documentId, text, dirty }) => liveSettings.validate(documentId, text, dirty),
+      closed: (documentId) => {
+        liveSettings.closed(documentId);
+      },
     },
     // Read on every ask, not held: `tyto plugin install` in a terminal beside the window is
     // the ordinary way a plugin arrives, and a list cached at startup would never show it.

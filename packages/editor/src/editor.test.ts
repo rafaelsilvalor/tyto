@@ -303,6 +303,24 @@ describe('document states', () => {
     );
   });
 
+  it("opens a document in another language without the host's language extensions", () => {
+    const registry = createCommandRegistry();
+    const { parent } = open();
+    const hostOnly = EditorView.editorAttributes.of({ 'data-host-extension': 'brief' });
+    handle = createEditor(parent, { doc: 'x', commands: registry, extensions: [hostOnly] });
+
+    handle.restore(handle.blank('::titulo Direito\n', 'plain'));
+
+    // Keys, commands and theme stay; the brief colouring and the host's own extensions go,
+    // because those read the text as a brief (TYTO-206: `settings.json` in a brief window).
+    expect(commandRegistryOf(handle.view)).toBe(registry);
+    expect(parent.querySelectorAll('.cm-line span')).toHaveLength(0);
+    expect(handle.view.dom.getAttribute('data-host-extension')).toBeNull();
+
+    handle.restore(handle.blank('x', 'brief'));
+    expect(handle.view.dom.getAttribute('data-host-extension')).toBe('brief');
+  });
+
   it('notifies nobody when a document is swapped', () => {
     handle = createEditor(open().parent, { doc: 'x' });
     const seen: string[] = [];
