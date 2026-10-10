@@ -156,6 +156,14 @@ export interface IpcDependencies {
     validate: (request: IpcRequest<'settings:validate'>) => Diagnostics;
     closed: (documentId: string) => void;
   };
+  /**
+   * The keybindings tab (TYTO-207): the one file it opens, and its text for the window to
+   * read. No validation here — the window checks it against its own command registry.
+   */
+  readonly keybindings: {
+    open: (documentId: string) => Promise<IpcResponse<'keybindings:open'>>;
+    read: () => Promise<string>;
+  };
   /** The plugins screen (TYTO-47): built-ins and installed plugins, read and never run. */
   readonly plugins: {
     readonly folder: string;
@@ -219,6 +227,7 @@ export function createHandlers(dependencies: IpcDependencies): Handlers {
     exports,
     folders,
     info,
+    keybindings,
     layout,
     log,
     menu,
@@ -453,6 +462,10 @@ export function createHandlers(dependencies: IpcDependencies): Handlers {
     },
 
     'settings:open': ({ documentId }) => settings.open(documentId),
+
+    'keybindings:open': ({ documentId }) => keybindings.open(documentId),
+
+    'keybindings:read': async () => ({ text: await keybindings.read() }),
 
     'settings:validate': (request) =>
       Promise.resolve({

@@ -883,6 +883,23 @@ export const IPC_CHANNELS = {
   ),
 
   /**
+   * Opens the user's `keybindings.json` in a tab (TYTO-207, ADR 0074), creating it with `[]`
+   * and a comment when there is none. `settings:open`'s shape and its containment: no path
+   * crosses, and the tab saves through `file:save`.
+   */
+  'keybindings:open': channel(
+    z.object({ documentId }),
+    z.object({ document: openDocument.nullable(), documentId: documentId.nullable() }),
+  ),
+
+  /**
+   * The text of `keybindings.json`, or `''` when there is none — read by the window at load.
+   * The window parses and checks it: the command ids it is checked against live in the
+   * renderer's registry, so main has nothing to validate it with (ADR 0074).
+   */
+  'keybindings:read': channel(z.object({}), z.object({ text: z.string() })),
+
+  /**
    * Something went wrong in the window, written down where a report can reach it (TYTO-132).
    *
    * An ordinary question and deliberately not a push: the renderer is the side that *has* the
@@ -1102,6 +1119,13 @@ export const IPC_EVENTS = {
     saved: z.boolean(),
     refused: z.boolean(),
   }),
+
+  /**
+   * `keybindings.json` changed on disk (TYTO-207), saved from its tab or from any editor.
+   * Carries the new text, so the window applies it without asking again; the app never
+   * writes the file after creating it, so every change is the person's.
+   */
+  'keybindings:changed': z.object({ text: z.string() }),
 } as const;
 
 export type IpcEvents = typeof IPC_EVENTS;

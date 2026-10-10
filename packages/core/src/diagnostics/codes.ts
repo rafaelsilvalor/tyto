@@ -850,7 +850,8 @@ export const diagnosticCodes = {
     template: 'The keybindings file cannot be read here: {problem}.',
     spec: 'docs/adr/0074-one-keybinding-table-with-closed-contexts.md',
     fatal: false,
-    fatality: 'Every entry that parsed still applies, and the built-in keys stay bound.',
+    fatality:
+      'The last file that read without one stays in effect, and the built-in keys stay bound.',
   },
   W_KEYBINDING_UNKNOWN_COMMAND: {
     severity: 'warning',

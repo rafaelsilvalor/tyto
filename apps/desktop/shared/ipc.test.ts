@@ -37,6 +37,8 @@ describe('the IPC contract', () => {
       'file:reopen',
       'file:save',
       'files:recent',
+      'keybindings:open',
+      'keybindings:read',
       'layout:get',
       'layout:set',
       'log:reveal',
@@ -96,6 +98,8 @@ describe('the event table', () => {
     expect([...IPC_EVENT_NAMES].sort()).toEqual([
       'app:exit-requested',
       'command:run',
+      // TYTO-207. keybindings.json changed on disk; the push carries its text.
+      'keybindings:changed',
       // TYTO-45. The queue changed; the panel asks `queue:list` when it hears it.
       'queue:changed',
       // TYTO-206. settings.json changed, or a screen's change to it was refused.
@@ -250,6 +254,8 @@ describe('what the contract does not promise', () => {
       'plugins:panels',
       // TYTO-207. Nor "which keys do the plugins bind".
       'plugins:keymaps',
+      // TYTO-207. Nor "what does keybindings.json say": there is one file, and main knows it.
+      'keybindings:read',
       // TYTO-45. "What is in the queue" has no subject: there is one queue folder, and where
       // it is, is main's.
       'queue:list',

@@ -395,6 +395,8 @@ export interface Catalogue {
    */
   /** TYTO-206. Opens `settings.json` in a tab; a command, so it is not on screen at load. */
   readonly 'command.settings.open': string;
+  /** TYTO-207. Opens `keybindings.json` in a tab; a command, so it is not on screen at load. */
+  readonly 'command.keybindings.open': string;
   readonly 'command.queue.show': string;
   readonly 'queue.heading': string;
   readonly 'queue.folder.none': string;
@@ -610,6 +612,7 @@ export const CATALOGUE_KEYS = [
   'plugins.credential.kept',
   'plugins.credential.failed',
   'command.settings.open',
+  'command.keybindings.open',
   'command.queue.show',
   'queue.heading',
   'queue.folder.none',

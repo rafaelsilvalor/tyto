@@ -2,6 +2,7 @@ import {
   type CommandRegistry,
   type EditorHandle,
   type KeybindingContext,
+  type KeybindingEntry,
   type KeybindingLayer,
   type KeybindingTable,
   COMMAND_BAR_TOGGLE,
@@ -29,6 +30,7 @@ import {
   translate,
 } from '../../shared/i18n/index.js';
 import { planTemplateEdit, templateOf } from './frontmatter.js';
+import { readKeybindingsText } from './keybindings-file.js';
 import {
   type Diagnostic,
   type SourceRange,
@@ -288,11 +290,17 @@ let editor: EditorHandle | undefined;
 
 /**
  * The window's one keybinding table (TYTO-207, ADR 0074): what the editor runs, what the
- * window dispatcher runs and what the bar shows, all read off this. The built-in layer until
- * the plugins have answered; then theirs on top, and later the person's own file.
+ * window dispatcher runs and what the bar shows, all read off this. The built-in layer, the
+ * plugins' once they have answered, and the person's `keybindings.json` on top.
  */
 let keybindings: KeybindingTable = builtInTable;
 let pluginKeybindings: readonly KeybindingLayer[] = [];
+/**
+ * The person's layer: the entries of the last `keybindings.json` that read without a syntax
+ * error (TYTO-207). Kept as entries and not as a table, so they are resolved again whenever a
+ * layer under them or the registry they name changes.
+ */
+let userKeybindings: readonly KeybindingEntry[] = [];
 
 const byId = <T extends HTMLElement>(id: string): T | null =>
   document.getElementById(id) as T | null;
@@ -834,17 +842,10 @@ const registry: CommandRegistry = createDesktopRegistry({
     openPluginsDialog();
   },
   openSettings: () => {
-    void withBridge(async (bridge) => {
-      // One settings tab: asking again brings it forward rather than opening a second buffer.
-      const open = workspace.documents.find(isSettings);
-      if (open !== undefined) {
-        activate(open.id);
-        return;
-      }
-      const wanted = nextDocumentId();
-      const answer = await bridge['settings:open']({ documentId: wanted });
-      adopt(answer.document, answer.documentId, wanted, 'settings');
-    });
+    openAppFile('settings');
+  },
+  openKeybindings: () => {
+    openAppFile('keybindings');
   },
   showQueue: () => {
     void changeLayout(withPanelOpen(layout, QUEUE_PANEL, true)).then(() => {
@@ -1009,7 +1010,7 @@ function adopt(
   opened: { name: string; text: string } | null,
   documentId: string | null,
   wanted: string,
-  kind?: 'settings',
+  kind?: AppFile,
 ): void {
   if (opened === null || documentId === null) return;
 
@@ -1019,7 +1020,8 @@ function adopt(
   }
   if (editor === undefined) return;
 
-  // Settings are plain text: no brief colouring, and no brief lint reading JSON (TYTO-206).
+  // The app's own files are plain text: no brief colouring, and no brief lint reading JSON
+  // (TYTO-206, TYTO-207).
   const born = newDocument(
     documentId,
     editor.blank(opened.text, kind === undefined ? undefined : 'plain'),
@@ -1061,14 +1063,147 @@ function adopt(
   restoreActive();
   repaint();
   void withBridge((bridge) =>
-    kind === 'settings'
-      ? validateSettings(bridge, created.id)
-      : request(bridge, created.id, opened.text),
+    kind === undefined
+      ? request(bridge, created.id, opened.text)
+      : validateAppFile(bridge, created.id),
   );
   void refreshRecent();
 }
 
+/** The two files of the app's own a tab can hold (TYTO-206, TYTO-207). */
+type AppFile = NonNullable<DocumentState['kind']>;
+
 const isSettings = (document_: DocumentState): boolean => document_.kind === 'settings';
+
+/**
+ * Opens `settings.json` or `keybindings.json` in a tab. One tab each: asking again brings it
+ * forward rather than opening a second buffer over the same file.
+ */
+function openAppFile(kind: AppFile): void {
+  void withBridge(async (bridge) => {
+    const open = workspace.documents.find((document_) => document_.kind === kind);
+    if (open !== undefined) {
+      activate(open.id);
+      return;
+    }
+    const wanted = nextDocumentId();
+    const answer =
+      kind === 'settings'
+        ? await bridge['settings:open']({ documentId: wanted })
+        : await bridge['keybindings:open']({ documentId: wanted });
+    adopt(answer.document, answer.documentId, wanted, kind);
+  });
+}
+
+/** Checks an app file's tab: settings by main, keybindings here. */
+function validateAppFile(bridge: TytoBridge, documentId: string): Promise<void> {
+  const target = documentOf(workspace, documentId);
+  if (target?.kind === 'keybindings') {
+    validateKeybindings(documentId);
+    return Promise.resolve();
+  }
+  return validateSettings(bridge, documentId);
+}
+
+/** A document's diagnostics replaced, with the counts the tab strip and the footer read. */
+function setFileDiagnostics(
+  documentId: string,
+  text: string,
+  diagnostics: readonly Diagnostic[],
+): void {
+  workspace = updateDocument(workspace, documentId, (document_) => ({
+    ...document_,
+    diagnostics,
+    brief: text,
+    problems: diagnostics.length,
+    errors: errorCount(diagnostics),
+  }));
+  if (documentId === workspace.activeId) repaint();
+}
+
+/**
+ * The keybindings tab's buffer, checked by the same resolver the table is built with
+ * (TYTO-207, ADR 0074): its syntax, and every entry against the registry, the contexts and the
+ * layers under it. Shown as the tab's own problems, at each entry's range. Nothing here
+ * applies the buffer: only a save does, through the watcher.
+ */
+function validateKeybindings(documentId: string): void {
+  const target = documentOf(workspace, documentId);
+  if (target === undefined) return;
+  const text = contentOf(target);
+  const read = readKeybindingsText(text);
+  const found = [...read.syntax, ...userKeybindingProblems(read.entries)];
+  setFileDiagnostics(
+    documentId,
+    text,
+    found.map((item) => ({
+      severity: item.severity,
+      code: item.code,
+      message: item.message,
+      ...(item.range === undefined ? {} : { range: item.range }),
+      ...(item.hint === undefined ? {} : { hint: item.hint }),
+    })),
+  );
+}
+
+/** The table as it stands, with `user` as the person's layer. */
+function resolveWith(user: readonly KeybindingEntry[]) {
+  return resolveKeybindings({
+    builtIn: builtInKeybindings,
+    plugins: pluginKeybindings,
+    user,
+    commands: new Set(registry.list().map((command) => command.id)),
+    platform: state.platform,
+  });
+}
+
+/**
+ * What the resolver says about the person's entries alone. The plugin layers resolve first
+ * and the same way whatever the user layer holds, so their diagnostics are the leading ones
+ * and the rest are the person's.
+ */
+function userKeybindingProblems(entries: readonly KeybindingEntry[]) {
+  const below = resolveWith([]).diagnostics.length;
+  return resolveWith(entries).diagnostics.slice(below);
+}
+
+/**
+ * `keybindings.json`'s text, at load and on every change on disk, as the user layer.
+ *
+ * A text with a syntax error changes nothing: the last layer that read stays in effect (or
+ * none), so a file saved half-way through an edit cannot take every key the person had
+ * bound away. The error goes to the log, and to the problems panel when the tab is open.
+ */
+function readUserKeybindings(bridge: TytoBridge, text: string): void {
+  const read = readKeybindingsText(text);
+  if (read.syntax.length > 0) {
+    for (const problem of read.syntax) {
+      void bridge['log:write']({
+        level: 'warn',
+        message: `keybindings.json: ${problem.message}`.slice(0, 200),
+      });
+    }
+    return;
+  }
+  userKeybindings = read.entries;
+  applyKeybindings(bridge);
+}
+
+/** `keybindings:changed`: the file moved on disk, saved from its tab or from anywhere. */
+function keybindingsChanged(bridge: TytoBridge, text: string): void {
+  readUserKeybindings(bridge, text);
+  const tab = workspace.documents.find((document_) => document_.kind === 'keybindings');
+  if (tab === undefined) return;
+  // A clean tab follows the disk, as the settings tab does; unsaved typing is kept.
+  if (!isUnsaved(tab) && contentOf(tab) !== text) {
+    replaceSettingsText(tab.id, text, undefined);
+    workspace = updateDocument(workspace, tab.id, (document_) => ({
+      ...document_,
+      savedText: contentOf(document_),
+    }));
+  }
+  validateKeybindings(tab.id);
+}
 
 /**
  * The settings tab's buffer, checked by main against what the plugins declared (TYTO-206).
@@ -1086,25 +1221,18 @@ async function validateSettings(bridge: TytoBridge, documentId: string): Promise
     text,
     dirty: isUnsaved(target),
   });
-  workspace = updateDocument(workspace, documentId, (document_) => ({
-    ...document_,
-    diagnostics,
-    brief: text,
-    problems: diagnostics.length,
-    errors: errorCount(diagnostics),
-  }));
-  if (documentId === workspace.activeId) repaint();
+  setFileDiagnostics(documentId, text, diagnostics);
 }
 
-/** {@link validateSettings} on the pause the preview compiles on. */
-function askSettings(bridge: TytoBridge, documentId: string): void {
+/** {@link validateAppFile} on the pause the preview compiles on. */
+function askAppFile(bridge: TytoBridge, documentId: string): void {
   const existing = pending.get(documentId);
   if (existing !== undefined) clearTimeout(existing);
   pending.set(
     documentId,
     setTimeout(() => {
       pending.delete(documentId);
-      void validateSettings(bridge, documentId);
+      void validateAppFile(bridge, documentId);
     }, PREVIEW_DELAY),
   );
 }
@@ -1540,25 +1668,20 @@ async function loadPluginPanels(bridge: TytoBridge): Promise<void> {
   // After the panels, whose toggles a plugin's keys may name.
   const { keymaps } = await bridge['plugins:keymaps']({});
   pluginKeybindings = keymaps.map(pluginKeybindingLayer);
-  if (pluginKeybindings.length > 0) applyKeybindings(bridge);
+  // The person's layer too: an entry naming a plugin panel's toggle resolves only now.
+  if (pluginKeybindings.length > 0 || userKeybindings.length > 0) applyKeybindings(bridge);
 }
 
 /**
  * Resolves the table again and hands it to everything that reads it.
  *
- * Only when a layer above the built-in one exists: with none the table is the built-in one
- * already, and reconfiguring the editor would reset the vim engine for nothing. What the
- * resolver refused goes to the log, one line per entry, until PR B gives the keybindings
- * file a problems row to put it in.
+ * Only when a layer above the built-in one exists or has just gone: with none the table is
+ * the built-in one already, and reconfiguring the editor would reset the vim engine for
+ * nothing. What the resolver refused goes to the log, one line per entry; the person's own
+ * entries are also the keybindings tab's problems, at their ranges (`validateKeybindings`).
  */
 function applyKeybindings(bridge: TytoBridge): void {
-  const resolved = resolveKeybindings({
-    builtIn: builtInKeybindings,
-    plugins: pluginKeybindings,
-    user: [],
-    commands: new Set(registry.list().map((command) => command.id)),
-    platform: state.platform,
-  });
+  const resolved = resolveWith(userKeybindings);
   keybindings = resolved.table;
   for (const problem of resolved.diagnostics) {
     void bridge['log:write']({
@@ -2118,7 +2241,7 @@ async function afterTemplatesReread(bridge: TytoBridge): Promise<void> {
   await refreshTemplates(bridge);
   await Promise.all(
     workspace.documents
-      .filter((document_) => !isSettings(document_))
+      .filter((document_) => document_.kind === undefined)
       .map((document_) => request(bridge, document_.id, contentOf(document_))),
   );
   repaint();
@@ -2210,6 +2333,14 @@ async function load(): Promise<void> {
     bridge.on('settings:changed', (change) => {
       void settingsChanged(bridge, change);
     });
+
+    // `keybindings.json` changed on disk (TYTO-207). Subscribed before the first read below,
+    // so a save between the two is not lost; a repeat of the same text resolves the same table.
+    bridge.on('keybindings:changed', ({ text }) => {
+      keybindingsChanged(bridge, text);
+    });
+    // Before the editor is made, so it is born with the person's keys and not reset after.
+    readUserKeybindings(bridge, (await bridge['keybindings:read']({})).text);
 
     // A newer version (TYTO-131, ADR 0069). Subscribed first and asked second: the check runs
     // from the moment main starts, and a push into a page that was not yet listening is
@@ -2310,7 +2441,7 @@ async function load(): Promise<void> {
         // order is asserted in `packages/editor/src/editor.test.ts`. Reading the pane here
         // would give the same string today and the wrong one the moment a second pane
         // exists.
-        if (isSettings(active())) askSettings(bridge, documentId);
+        if (active().kind !== undefined) askAppFile(bridge, documentId);
         else ask(bridge, documentId, activeText());
       });
       // Once on load as well: a brief restored into the buffer should show, and the first

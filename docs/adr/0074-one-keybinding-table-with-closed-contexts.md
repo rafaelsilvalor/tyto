@@ -107,3 +107,18 @@ one, and a key that works in the editor and not in a panel is worse than none.
 - PR B reads `keybindings.json` (beside `settings.json`, per-version, ADR 0032) into the `user`
   layer, mints `E_KEYBINDINGS_SYNTAX`, shows every code in the problems panel at its range, and
   adds the command that opens the file in a tab.
+- PR B (`src/renderer/keybindings-file.ts`, `src/main/keybindings-live.ts`,
+  `e2e/keybindings-file.desktop.test.ts`) settles four details this ADR left open.
+  **The file is read in the window.** The resolver checks command ids against the renderer's
+  registry, which main does not have; main creates the file with `[]` and a comment on first
+  open, watches it beside `settings.json`, and pushes its text on `keybindings:changed`. There
+  is no validation channel. **The app writes it once**, when it creates it, so there is one
+  writer and none of ADR 0073's merging. **A syntax error keeps the last good layer.** Any
+  `E_KEYBINDINGS_SYNTAX` — text that does not parse, a top level that is not a list, or an entry
+  that is not `{ key, command, when? }` — leaves the user layer the last text that read without
+  one (or none), because a file saved half-way through an edit says nothing reliable; the
+  `W_KEYBINDING_*` warnings each cost only their entry, as decision 9 says. `core`'s fatality
+  text for the code says so. **The tab's problems are the window's own**: the same resolver,
+  run on the buffer after the preview's pause, with the plugin layers under it, keeps only the
+  diagnostics past the plugins' and shows them at each entry's range. The previous version's
+  `keybindings.json` is not offered on a new version's first run (ADR 0036 lists what is).

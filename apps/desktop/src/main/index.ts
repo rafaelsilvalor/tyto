@@ -50,6 +50,7 @@ import { createPreviewService } from './preview.js';
 import { createProjectSources } from './project.js';
 import { createTemplateEditor } from './template-editor.js';
 import { createExitGuard } from './quit.js';
+import { createLiveKeybindings } from './keybindings-live.js';
 import { type LiveSettings, createLiveSettings } from './settings-live.js';
 import { fileSettingsStore } from './settings-store.js';
 import { createTemplateCatalogue } from './templates.js';
@@ -88,6 +89,13 @@ const SETTINGS_SETTLE_MS = 100;
 /** `settings.json` as "Open Settings (JSON)" creates it when there is none (TYTO-206). */
 const NEW_SETTINGS_FILE =
   '// Tyto settings: JSON with comments. Saving this file applies it, with no restart.\n{\n}\n';
+
+/** `keybindings.json` as "Open Keyboard Shortcuts (JSON)" creates it (TYTO-207, ADR 0074). */
+const NEW_KEYBINDINGS_FILE =
+  '// Tyto keybindings: JSON with comments. Saving this file applies it, with no restart.\n' +
+  '// Each entry is { "key": "ctrl+shift+e", "command": "<id>", "when": "<context>" };\n' +
+  '// "command": "-<id>" removes a default binding. The command bar lists every id.\n' +
+  '[\n]\n';
 
 /**
  * Puts a crash on screen (TYTO-140).
@@ -359,6 +367,8 @@ async function start(): Promise<void> {
   // The file is read against what the plugins declared (ADR 0073). Its problems go to the log
   // at launch, and to the problems panel once the settings tab is open (TYTO-206).
   const settingsFile = join(app.getPath('userData'), 'settings.json');
+  // Beside it, per version for the same reason (ADR 0032). Read by the window (TYTO-207).
+  const keybindingsFile = join(app.getPath('userData'), 'keybindings.json');
   // Bound below, once the queue it applies to exists; the store tells it every write it makes.
   const late: { live?: LiveSettings } = {};
   const settings = fileSettingsStore(
@@ -387,7 +397,7 @@ async function start(): Promise<void> {
   // launching one (E9.8).
   const documents = createDocumentService({
     recent: fileRecentFiles(join(app.getPath('userData'), 'recent-files.json')),
-    unlisted: [settingsFile],
+    unlisted: [settingsFile, keybindingsFile],
     dialogs: {
       openBrief: async () => {
         const answer = await dialog.showOpenDialog({
@@ -580,11 +590,32 @@ async function start(): Promise<void> {
     log,
   });
   late.live = liveSettings;
+  // **Live keybindings** (TYTO-207): main only watches; the window parses and resolves.
+  const liveKeybindings = createLiveKeybindings({
+    readText: () =>
+      readFile(keybindingsFile, 'utf8').catch((error: unknown) => {
+        if ((error as NodeJS.ErrnoException).code === 'ENOENT') return '';
+        throw error;
+      }),
+    send: (payload) => {
+      const contents = mainWindow?.webContents;
+      if (contents === undefined || contents.isDestroyed()) return;
+      sendIpcEvent(contents, 'keybindings:changed', payload);
+    },
+    log,
+  });
   // The folder and not the file: an editor that saves by replacing the file would leave a
   // watch on the old one listening to nothing. Events come in bursts, so they settle first.
+  // One watch for both files, each with its own settle timer.
   let settle: ReturnType<typeof setTimeout> | undefined;
+  let settleKeybindings: ReturnType<typeof setTimeout> | undefined;
   try {
     const watcher = watch(dirname(settingsFile), (_event, name) => {
+      if (name === basename(keybindingsFile)) {
+        clearTimeout(settleKeybindings);
+        settleKeybindings = setTimeout(() => void liveKeybindings.changed(), SETTINGS_SETTLE_MS);
+        return;
+      }
       if (name !== basename(settingsFile)) return;
       clearTimeout(settle);
       settle = setTimeout(() => void liveSettings.changed(), SETTINGS_SETTLE_MS);
@@ -593,7 +624,10 @@ async function start(): Promise<void> {
       watcher.close();
     });
   } catch (cause) {
-    log.error('settings.json cannot be watched; a save applies at the next launch.', cause);
+    log.error(
+      'settings.json and keybindings.json cannot be watched; a save applies at the next launch.',
+      cause,
+    );
   }
 
   // The one question main asks. `send` is deliberately the whole of what this file lends it:
@@ -806,6 +840,21 @@ async function start(): Promise<void> {
       closed: (documentId) => {
         liveSettings.closed(documentId);
       },
+    },
+    keybindings: {
+      open: async (documentId) => {
+        // Created on first open, as settings.json is; the only write the app makes to it.
+        const missing = await access(keybindingsFile).then(
+          () => false,
+          () => true,
+        );
+        if (missing) {
+          liveKeybindings.wrote(NEW_KEYBINDINGS_FILE);
+          await writeFile(keybindingsFile, NEW_KEYBINDINGS_FILE, 'utf8').catch(() => undefined);
+        }
+        return documents.openPath(documentId, keybindingsFile, 'keybindings.json');
+      },
+      read: () => liveKeybindings.read().catch(() => ''),
     },
     // Read on every ask, not held: `tyto plugin install` in a terminal beside the window is
     // the ordinary way a plugin arrives, and a list cached at startup would never show it.
