@@ -146,6 +146,20 @@ describe('the face', () => {
   });
 });
 
+describe('the colours arrive as the built-in themes (TYTO-208, ADR 0077)', () => {
+  it('writes both built-in themes over the token file, every themed colour of each', async () => {
+    await page.waitForSelector('style#tyto-theme', { state: 'attached', timeout: 10_000 });
+    const sheet = await page.evaluate(
+      () => document.getElementById('tyto-theme')?.textContent ?? '',
+    );
+    // Thirty colours per mode, light at the root and dark under the system's dark mode.
+    expect(sheet.match(/--tyto-[a-z0-9-]+:/g)).toHaveLength(60);
+    expect(sheet).toContain('--tyto-surface: #fafafa;');
+    expect(sheet).toContain('@media (prefers-color-scheme: dark)');
+    expect(sheet).toContain('--tyto-surface: #282c33;');
+  });
+});
+
 describe('light and dark follow the system, live', () => {
   it.each([
     ['light', LIGHT],

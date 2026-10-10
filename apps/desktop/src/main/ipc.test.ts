@@ -9,6 +9,7 @@ import {
 } from '../../shared/ipc.js';
 import { type Credentials } from './credentials.js';
 import { createHandlers, guard, registerIpcHandlers } from './ipc.js';
+import { createThemeService } from './themes.js';
 
 /**
  * The wiring, without Electron.
@@ -459,6 +460,7 @@ const dependencies = () => {
       request: () => Promise.resolve({ ok: false as const, code: 'E_PERMISSION', message: 'no' }),
     },
     keymaps: () => Promise.resolve([]),
+    themes: createThemeService({ sources: () => [], report: () => undefined }),
     keybindings: {
       open: () => Promise.resolve({ document: null, documentId: null }),
       read: () => Promise.resolve(''),

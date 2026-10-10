@@ -29,6 +29,20 @@ export type {
 export { directiveNamesOf, directiveResolverOf } from './directives.js';
 
 export {
+  type ResolvedThemeColors,
+  type ThemeColorEntry,
+  type ThemeColors,
+  type ThemeContribution,
+  type ThemeKind,
+  THEME_KINDS,
+  THEME_TOKEN_NAME,
+  checkThemeContribution,
+  isThemeColor,
+  isThemePath,
+  resolveThemeColors,
+} from './theme.js';
+
+export {
   type ConfigurationContribution,
   type DeclaredSetting,
   type ResolvedSettings,

@@ -747,6 +747,33 @@ describe('an isolated panel (TYTO-49)', () => {
   });
 });
 
+describe('an isolated theme (TYTO-208, ADR 0077)', () => {
+  it('crosses as data, since a theme is a file and not a schema', async () => {
+    const { connected } = await isolate(
+      (host) => host.registerTheme({ id: 'dusk', label: 'Dusk', kind: 'dark', path: 'dusk.json' }),
+      { contributes: ['theme'] },
+    );
+    if (!connected.ok) throw new Error(connected.error[0]?.message);
+
+    const host = createPluginHost();
+    host.tryActivate(connected.value.plugin);
+    expect(host.registry.themes()).toEqual([
+      { id: 'dusk', label: 'Dusk', kind: 'dark', path: 'dusk.json' },
+    ]);
+  });
+
+  it('is refused with a path that leaves its folder', async () => {
+    const { connected } = await isolate(
+      (host) =>
+        host.registerTheme({ id: 'dusk', label: 'Dusk', kind: 'dark', path: '../../dusk.json' }),
+      { contributes: ['theme'] },
+    );
+    expect(connected.ok ? '' : connected.error[0]?.message).toContain(
+      "its 'theme' contribution does not match",
+    );
+  });
+});
+
 describe('the confinement a host requires (ADR 0049)', () => {
   /** Connects to a guest whose bootstrap reported `sandbox`, and says whether it was imported. */
   async function reporting(sandbox: SandboxReport | undefined, requireSandbox: boolean) {

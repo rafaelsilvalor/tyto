@@ -1,4 +1,5 @@
 import { templateManifestSchema } from '@tyto/core';
+import { THEME_TOKEN_NAME, isThemeColor } from '@tyto/plugin-api';
 import { z } from 'zod';
 
 import { layoutSchema } from './layout.js';
@@ -158,6 +159,15 @@ const templateDiagnostic = diagnostic.extend({
  * preview and a job need arrive with the cards that need them, and they arrive *here*
  * rather than beside the code that sends them.
  */
+/** One theme as the window applies it: its id and its colours by role. */
+const appliedThemeSchema = z.object({
+  id: z.string().min(1).max(200),
+  colors: z.record(
+    z.string().regex(THEME_TOKEN_NAME).max(100),
+    z.string().refine(isThemeColor, 'must be a colour'),
+  ),
+});
+
 export const IPC_CHANNELS = {
   /**
    * What the renderer needs to render its shell, asked once on load.
@@ -788,6 +798,20 @@ export const IPC_CHANNELS = {
         )
         .max(100),
     }),
+  ),
+
+  /**
+   * The colours the window applies, for each system mode (TYTO-208, ADR 0077): the theme of
+   * that kind resolved over its base, every token present. Always the built-ins until the
+   * `theme` setting exists.
+   *
+   * **Checked again here, on the renderer's side of the bridge**, with the rule main used: a
+   * name is a colour role's spelling and a value is a colour, so nothing that arrives can close
+   * the declaration it is written into.
+   */
+  'theme:current': channel(
+    z.object({}),
+    z.object({ light: appliedThemeSchema, dark: appliedThemeSchema }),
   ),
 
   /**

@@ -304,10 +304,10 @@ describe('activating a plugin', () => {
     expect(host.registry.exporters.list()).toEqual([]);
   });
 
-  it('knows the same eleven points the manifest vocabulary names', () => {
+  it('knows the same twelve points the manifest vocabulary names', () => {
     // Two declarations of one vocabulary: `CONTRIBUTION_POINTS` is what a JSON file may
     // say, and the host's points are what code may register into. This activates one
-    // plugin into all eleven and compares what was recorded against the list.
+    // plugin into all twelve and compares what was recorded against the list.
     const host = createPluginHost();
     host.activate(
       pluginOf({
@@ -329,15 +329,16 @@ describe('activating a plugin', () => {
             default: false,
             description: 'A switch.',
           });
+          plugin.registerTheme({ id: 'k', label: 'Dusk', kind: 'dark', path: 'dusk.json' });
         },
       }),
     );
 
     // The real assertion is that this did not throw: a point the host knows and
     // `CONTRIBUTION_POINTS` does not would have been registered without being declared,
-    // which `activate` refuses. The counts below say the eleven arrived rather than that
+    // which `activate` refuses. The counts below say the twelve arrived rather than that
     // nothing was attempted.
-    expect(CONTRIBUTION_POINTS).toHaveLength(11);
+    expect(CONTRIBUTION_POINTS).toHaveLength(12);
     expect(
       [
         host.registry.sources(),
@@ -351,8 +352,9 @@ describe('activating a plugin', () => {
         host.registry.keymaps(),
         host.registry.panels(),
         host.registry.configurations(),
+        host.registry.themes(),
       ].map((point) => point.length),
-    ).toEqual([1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1]);
+    ).toEqual([1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1]);
   });
 });
 

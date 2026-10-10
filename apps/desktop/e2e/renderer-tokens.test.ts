@@ -53,6 +53,18 @@ const themes = (): { light: Map<string, string>; dark: Map<string, string> } => 
   return { light: declarations(css.slice(0, media)), dark: declarations(css.slice(media)) };
 };
 
+/**
+ * The built-in themes, `src/main/themes/tyto-*.json` (TYTO-208, ADR 0077): what the window
+ * applies over `tokens.css` once main answers. One truth and not two — the test below holds
+ * every colour of each file equal to the token file's — so a colour changed in only one of
+ * the two places fails here rather than flickering between first paint and theme.
+ */
+const builtInTheme = (kind: 'light' | 'dark'): Map<string, string> => {
+  const file = join(renderer, '..', 'main', 'themes', `tyto-${kind}.json`);
+  const parsed = JSON.parse(readFileSync(file, 'utf8')) as { colors: Record<string, string> };
+  return new Map(Object.entries(parsed.colors).map(([token, value]) => [`--tyto-${token}`, value]));
+};
+
 const usedNames = (text: string): string[] =>
   [...text.matchAll(/var\((--tyto-[a-z0-9-]+)/g)].map((match) => match[1]!);
 
@@ -215,10 +227,32 @@ const contrast = (one: string, two: string): number => {
   return (lighter! + 0.05) / (darker! + 0.05);
 };
 
+describe('the built-in theme files are the token file (ADR 0077)', () => {
+  const { light, dark } = themes();
+
+  it('theme exactly the colours the token file redefines for dark, no more and no fewer', () => {
+    expect(dark.size).toBe(30);
+    for (const kind of ['light', 'dark'] as const) {
+      expect([...builtInTheme(kind).keys()].sort(), kind).toEqual([...dark.keys()].sort());
+    }
+  });
+
+  it.each(['light', 'dark'] as const)('gives every colour of %s the token file’s value', (kind) => {
+    const tokens = kind === 'dark' ? dark : light;
+    const differing = [...builtInTheme(kind)].filter(
+      ([token, value]) => tokens.get(token) !== value,
+    );
+    expect(differing).toEqual([]);
+  });
+});
+
 describe.each(['light', 'dark'] as const)('the %s theme', (name) => {
   const { light, dark } = themes();
+  // The built-in theme's colour first, since that is what is applied; the token file for the
+  // rest. The floors hold the built-ins; a third party's theme is not held to them (ADR 0077).
+  const applied = builtInTheme(name);
   const value = (token: string): string =>
-    (name === 'dark' ? dark.get(token) : undefined) ?? light.get(token) ?? '';
+    applied.get(token) ?? (name === 'dark' ? dark.get(token) : undefined) ?? light.get(token) ?? '';
 
   // `drawSelection` paints the selection on a layer behind the text and the active line's
   // background sits on the line above it: an opaque colour hides the selection on that line.

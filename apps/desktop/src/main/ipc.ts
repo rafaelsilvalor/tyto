@@ -28,6 +28,7 @@ import { type PreviewService } from './preview.js';
 import { type QueueService, type QueueView } from './queue.js';
 import { type TemplateDiagnostic, type TemplateEditorService } from './template-editor.js';
 import { type TemplateCatalogue } from './templates.js';
+import { type ThemeService } from './themes.js';
 import { type UpdateService } from './updates.js';
 
 /**
@@ -173,6 +174,8 @@ export interface IpcDependencies {
   readonly panels: PanelService;
   /** The installed plugins' keymaps, once they have started (TYTO-207). */
   keymaps(): Promise<IpcResponse<'plugins:keymaps'>['keymaps']>;
+  /** The colours the window applies in each system mode (TYTO-208, ADR 0077). */
+  readonly themes: ThemeService;
   readonly templateDialogs: {
     /** A template folder to edit, or nothing when the picker is dismissed. */
     chooseTemplate: () => Promise<string | undefined>;
@@ -408,6 +411,14 @@ export function createHandlers(dependencies: IpcDependencies): Handlers {
 
     'plugins:panels': async () => ({ panels: [...(await dependencies.panels.list())] }),
     'plugins:keymaps': async () => ({ keymaps: await dependencies.keymaps() }),
+
+    'theme:current': async () => {
+      const { light, dark } = await dependencies.themes.current();
+      return {
+        light: { id: light.id, colors: light.colors },
+        dark: { id: dark.id, colors: dark.colors },
+      };
+    },
 
     'panel:request': ({ panelId, capability, args }) =>
       dependencies.panels.request(panelId, capability, args),

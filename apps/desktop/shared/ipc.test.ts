@@ -63,6 +63,7 @@ describe('the IPC contract', () => {
       'templates:folder',
       'templates:list',
       'templates:set-folder',
+      'theme:current',
       'update:act',
       'update:status',
     ]);
@@ -203,6 +204,26 @@ describe('a response that does not match', () => {
   });
 });
 
+describe('the theme the window applies (TYTO-208)', () => {
+  const theme = (colors: Record<string, string>) => ({
+    light: { id: 'tyto-light', colors },
+    dark: { id: 'tyto-dark', colors: {} },
+  });
+
+  it('carries colours by role', () => {
+    expect(() =>
+      parseIpc('theme:current', 'response', theme({ surface: '#fafafa' })),
+    ).not.toThrow();
+  });
+
+  it.each([
+    ['a value that closes the declaration', { surface: '#fff; } body { display: none' }],
+    ['a name that is not a role', { 'surface: red; --x': '#fff' }],
+  ])('refuses %s before the renderer writes it', (_, colors) => {
+    expect(() => parseIpc('theme:current', 'response', theme(colors))).toThrow(IpcContractError);
+  });
+});
+
 describe('what the contract does not promise', () => {
   it('lets an unknown key through rather than refusing the message', () => {
     // Zod objects strip by default, and that is the right default across a version skew: a
@@ -256,6 +277,8 @@ describe('what the contract does not promise', () => {
       'plugins:keymaps',
       // TYTO-207. Nor "what does keybindings.json say": there is one file, and main knows it.
       'keybindings:read',
+      // TYTO-208. Nor "which colours apply": the theme is main's to read and check.
+      'theme:current',
       // TYTO-45. "What is in the queue" has no subject: there is one queue folder, and where
       // it is, is main's.
       'queue:list',

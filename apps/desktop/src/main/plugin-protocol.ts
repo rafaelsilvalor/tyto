@@ -51,7 +51,19 @@ export async function confinedPath(root: string, urlPath: string): Promise<strin
     }
     segments.push(segment);
   }
+  return confinedFile(root, segments);
+}
 
+/**
+ * The file `segments` names under `root`, resolved through the disk, or `undefined` when it is
+ * missing or really lives outside `root` — through a symbolic link or a junction. Shared by a
+ * panel's page and a theme's file (ADR 0045, ADR 0077); the caller has already refused the
+ * segments that leave by name.
+ */
+export async function confinedFile(
+  root: string,
+  segments: readonly string[],
+): Promise<string | undefined> {
   const candidate = join(root, ...segments);
 
   let real: string;
