@@ -37,9 +37,9 @@
     "@tyto/export-html": "workspace:*",
     "@tyto/export-svg": "workspace:*",
     "@tyto/fonts": "workspace:*",
-    "pixelmatch": "^7.2.0",
+    "pixelmatch": "^8.0.0",
     "playwright": "^1.63.0",
     "pngjs": "^7.0.0",
-    "vitest": "^5.0.1"
+    "vitest": "^5.0.3"
   }
 }

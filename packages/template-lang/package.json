@@ -30,6 +30,6 @@
     "@tyto/core": "workspace:*"
   },
   "devDependencies": {
-    "@lezer/generator": "^1.8.0"
+    "@lezer/generator": "^1.8.1"
   }
 }
