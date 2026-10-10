@@ -68,7 +68,7 @@ export const ptBR: Catalogue = {
   'crash.close': 'Fechar',
   'import.message': 'Trazer suas configurações da versão {version}?',
   'import.detail':
-    'A pasta de templates, a posição dos painéis e os arquivos recentes. A versão {version} continua com a cópia dela de qualquer jeito, e esta pergunta não volta.',
+    'A pasta de templates, a posição dos painéis, os arquivos recentes e seus atalhos de teclado. A versão {version} continua com a cópia dela de qualquer jeito, e esta pergunta não volta.',
   'import.credentials': 'Trazer também os acessos salvos',
   'import.confirm': 'Trazer',
   'import.decline': 'Começar do zero',

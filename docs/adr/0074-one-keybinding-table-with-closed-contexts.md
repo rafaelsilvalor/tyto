@@ -121,4 +121,5 @@ one, and a key that works in the editor and not in a panel is worse than none.
   text for the code says so. **The tab's problems are the window's own**: the same resolver,
   run on the buffer after the preview's pause, with the plugin layers under it, keeps only the
   diagnostics past the plugins' and shows them at each entry's range. The previous version's
-  `keybindings.json` is not offered on a new version's first run (ADR 0036 lists what is).
+  `keybindings.json` is offered on a new version's first run with the other records (ADR 0036,
+  TYTO-257).

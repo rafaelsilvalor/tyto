@@ -68,7 +68,7 @@ export const en: Catalogue = {
   'crash.close': 'Close',
   'import.message': 'Bring your settings from version {version}?',
   'import.detail':
-    'The templates folder, where the panels were and the recent files. Version {version} keeps its own copy either way, and this question will not come back.',
+    'The templates folder, where the panels were, the recent files and your keyboard shortcuts. Version {version} keeps its own copy either way, and this question will not come back.',
   'import.credentials': 'Also bring the saved sign-ins',
   'import.confirm': 'Bring them',
   'import.decline': 'Start fresh',
