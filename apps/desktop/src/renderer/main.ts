@@ -29,6 +29,7 @@ import {
   isLocale,
   translate,
 } from '../../shared/i18n/index.js';
+import { followScheme } from './color-scheme.js';
 import { planTemplateEdit, templateOf } from './frontmatter.js';
 import { readKeybindingsText } from './keybindings-file.js';
 import {
@@ -2399,6 +2400,12 @@ async function load(): Promise<void> {
     // (D1, TYTO-115) — there is no window in which a keystroke lands somewhere this record
     // does not follow.
     adoptEditorState(handle);
+    // Light or dark as the system is, now and whenever it changes (TYTO-96). The colours
+    // follow the tokens on their own; this is CodeMirror's base flag, and `restore` brings
+    // every other tab up to it when it is shown.
+    followScheme((scheme) => {
+      handle.setTheme(scheme);
+    });
     handle.onUpdate((next) => {
       // Into the active document, which is the one this pane is showing. A transaction can
       // only have come from the document in front of the person who caused it, and

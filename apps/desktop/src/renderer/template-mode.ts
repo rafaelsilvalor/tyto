@@ -22,6 +22,7 @@ import {
   DEFAULT_LOCALE,
   translate,
 } from '../../shared/i18n/index.js';
+import { followScheme } from './color-scheme.js';
 import { type RequestGate, createRequestGate } from './preview.js';
 import { frameDocument } from './show-document.js';
 import { TEMPLATE_MODE_TAG } from './template-mode-tag.js';
@@ -458,6 +459,11 @@ export class TemplateMode extends LitElement {
         this.revision += 1;
         // Both tabs move the grid: a slot added to the manifest is a slot the markup can draw.
         this.schedule();
+      });
+      // Light or dark with the window, like the brief editor (TYTO-96). The views live as
+      // long as the window does, so the listener is never taken off.
+      followScheme((scheme) => {
+        editor.setTheme(scheme);
       });
       this.editors[buffer] = editor;
     }

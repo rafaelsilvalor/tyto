@@ -1,54 +1,40 @@
 import { describe, expect, it } from 'vitest';
 
-import { darkPalette, lightPalette } from './theme.js';
+import { palette, themeTokens } from './theme.js';
 
-interface Colour {
-  readonly red: number;
-  readonly green: number;
-  readonly blue: number;
-  readonly alpha: number;
-}
+/**
+ * What can be said about the theme without a browser.
+ *
+ * jsdom resolves no `var()`, so whether a colour shows is a question for the window, and
+ * whether each name the editor reads is one the host defines is the desktop's
+ * `e2e/renderer-tokens.test.ts`. The translucent active line of TYTO-246 moved there with its
+ * colours. What is left here is the shape of the contract: every field is one custom property,
+ * and the list a host is given is every property the editor reads.
+ */
 
-/** Reads the two forms the palettes use: `#rrggbb` and `rgba(r, g, b, a)`. */
-const parse = (value: string): Colour => {
-  const hex = /^#([0-9a-f]{2})([0-9a-f]{2})([0-9a-f]{2})$/i.exec(value);
-  if (hex !== null) {
-    const [, red, green, blue] = hex;
-    return {
-      red: Number.parseInt(red ?? '', 16),
-      green: Number.parseInt(green ?? '', 16),
-      blue: Number.parseInt(blue ?? '', 16),
-      alpha: 1,
-    };
-  }
-  const rgba = /^rgba\((\d+), (\d+), (\d+), ([\d.]+)\)$/.exec(value);
-  if (rgba === null) throw new Error(`not a colour this test reads: ${value}`);
-  const [, red, green, blue, alpha] = rgba;
-  return { red: Number(red), green: Number(green), blue: Number(blue), alpha: Number(alpha) };
-};
+// Read through the bundler, not `node:fs`: this package is DOM-only (ADR 0010).
+const sources = import.meta.glob('./*.ts', { query: '?raw', import: 'default', eager: true });
 
-/** `over` painted on `under`, as the browser composites a translucent background. */
-const composite = (over: Colour, under: Colour): readonly number[] =>
-  (['red', 'green', 'blue'] as const).map((channel) =>
-    Math.round(over.alpha * over[channel] + (1 - over.alpha) * under[channel]),
-  );
-
-describe.each([
-  ['light', lightPalette],
-  ['dark', darkPalette],
-])('the %s active line (TYTO-246)', (_name, palette) => {
-  // `drawSelection` paints the selection on a layer behind the text and the active line's
-  // background sits on the line above it: an opaque colour hides the selection on that line.
-  it('is translucent, so the selection drawn behind it shows through', () => {
-    expect(parse(palette.activeLine).alpha).toBeLessThan(1);
+describe('the palette (TYTO-96)', () => {
+  it('reads every colour from a --tyto- custom property and writes none of its own', () => {
+    for (const value of Object.values(palette)) {
+      expect(value).toMatch(/^var\(--tyto-[a-z0-9-]+\)$/);
+    }
   });
 
-  it('still looks like the opaque colour the gutter keeps', () => {
-    const line = composite(parse(palette.activeLine), parse(palette.background));
-    const gutter = parse(palette.activeLineGutter);
-    const difference = line.map((value, index) =>
-      Math.abs(value - [gutter.red, gutter.green, gutter.blue][index]!),
-    );
-    expect(Math.max(...difference)).toBeLessThanOrEqual(1);
+  it('hands the host every property it reads, the mono face included', () => {
+    const fromPalette = Object.values(palette).map((value) => value.slice(4, -1));
+    expect(new Set(themeTokens)).toEqual(new Set([...fromPalette, '--tyto-font-mono']));
+  });
+
+  it('reads no custom property anywhere else in the package', () => {
+    // A `var(--tyto-…)` written outside `theme.ts` would not be in `themeTokens`, and the
+    // desktop could not hold its token file to it.
+    const readers = Object.entries(sources)
+      .filter(([name]) => !name.endsWith('.test.ts') && !name.endsWith('.d.ts'))
+      .filter(([, text]) => text.includes('--tyto-'))
+      .map(([name]) => name);
+    expect(Object.keys(sources).length).toBeGreaterThan(10);
+    expect(readers).toEqual(['./theme.ts']);
   });
 });

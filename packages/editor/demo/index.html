@@ -4,6 +4,13 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>@tyto/editor — brief language</title>
+    <!--
+      The editor's colours are custom properties a host defines (TYTO-96, ADR 0075); this demo
+      borrows the desktop's, so it follows the system's light or dark. The picker below flips
+      only CodeMirror's base `dark` flag. The file's two font URLs are an alias of the desktop's
+      build and do not resolve here, which costs this page nothing: it draws in the system face.
+    -->
+    <link rel="stylesheet" href="../../../apps/desktop/src/renderer/tokens.css" />
     <style>
       :root {
         color-scheme: light dark;

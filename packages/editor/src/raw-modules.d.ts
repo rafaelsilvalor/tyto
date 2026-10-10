@@ -27,3 +27,14 @@ declare module '*.html?raw' {
   const content: string;
   export default content;
 }
+
+/**
+ * The package's own sources as text, through Vite's `import.meta.glob`, for the one test that
+ * asks which of them read a host custom property (`theme.test.ts`, TYTO-96).
+ */
+interface ImportMeta {
+  glob(
+    pattern: string,
+    options: { readonly query: '?raw'; readonly import: 'default'; readonly eager: true },
+  ): Record<string, string>;
+}

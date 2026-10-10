@@ -1,27 +1,12 @@
 /*
- * The shell's own styling, which is deliberately almost nothing.
+ * The window's layout, in Zed's manner: dense type, almost no chrome, flat panels separated by
+ * a hairline rather than by a shadow and a radius, and one accent used sparingly (TYTO-96).
  *
- * E9.2 brings the editor and with it a real theme — `@tyto/editor` already ships a light
- * and a dark one, and the window should read as the same program as the buffer inside it.
- * Styling this window properly now would be a second theme to reconcile then.
+ * **Every value here is a token** from `tokens.css`, which is the only file in the renderer
+ * that writes a literal colour, size, radius or font (ADR 0075), and
+ * `e2e/renderer-tokens.test.ts` fails on one written here. Layout measurements — a column's
+ * width, a dot's size — are the exception, because they are about one rule and not the look.
  */
-
-:root {
-  color-scheme: light dark;
-  --ink: #1b1b1f;
-  --ground: #fbfbfd;
-  --muted: #5b5b66;
-  --line: #e2e2e8;
-}
-
-@media (prefers-color-scheme: dark) {
-  :root {
-    --ink: #ececf1;
-    --ground: #17171b;
-    --muted: #a0a0ad;
-    --line: #2c2c33;
-  }
-}
 
 /*
  * The padding has to come out of the height, not be added to it. `min-height: 100vh` plus
@@ -37,11 +22,25 @@
 
 body {
   margin: 0;
-  background: var(--ground);
-  color: var(--ink);
-  font:
-    15px/1.5 system-ui,
-    sans-serif;
+  background: var(--tyto-surface);
+  color: var(--tyto-text);
+  font-family: var(--tyto-font-ui);
+  font-size: var(--tyto-text-md);
+  line-height: var(--tyto-line-height);
+  accent-color: var(--tyto-accent);
+}
+
+/* Form controls take the window's face; Chromium otherwise gives them the system's. */
+button,
+input,
+select,
+textarea {
+  font-family: inherit;
+}
+
+:focus-visible {
+  outline: var(--tyto-focus-width) solid var(--tyto-focus-ring);
+  outline-offset: calc(var(--tyto-focus-width) * -1);
 }
 
 /*
@@ -58,47 +57,68 @@ body {
  * here is what makes those two the only scrollable things, and it is safe because every box
  * between here and them carries `min-height: 0` — without that a grid or flex child refuses
  * to shrink below its content and the clipping would hide the footer instead of the excess.
+ *
+ * No padding and no gap since TYTO-96: the header, the tabs, the docks and the footer meet
+ * edge to edge, and a hairline is what separates them.
  */
 .shell {
   display: flex;
   height: 100vh;
   overflow: hidden;
   flex-direction: column;
-  gap: 24px;
-  padding: 32px;
+  gap: 0;
+  padding: 0;
+}
+
+.shell__head {
+  display: flex;
+  align-items: baseline;
+  gap: var(--tyto-space-4);
+  padding: var(--tyto-space-2) var(--tyto-space-5);
+  border-bottom: var(--tyto-hairline-width) solid var(--tyto-hairline);
+  background: var(--tyto-surface-raised);
 }
 
 .shell__name {
   margin: 0;
-  font-size: 22px;
+  font-size: var(--tyto-text-md);
+  font-weight: var(--tyto-weight-strong);
 }
 
 .shell__tagline,
 .shell__about {
-  margin: 4px 0 0;
-  color: var(--muted);
+  margin: 0;
+  color: var(--tyto-text-muted);
 }
 
+.shell__tagline {
+  font-size: var(--tyto-text-sm);
+}
+
+/* A status bar: one line at the foot of the window, in the chrome's colour. */
 .shell__foot {
   display: flex;
   flex-wrap: wrap;
-  gap: 16px;
+  gap: var(--tyto-space-2) var(--tyto-space-6);
   align-items: center;
   justify-content: space-between;
-  border-top: 1px solid var(--line);
-  padding-top: 16px;
+  border-top: var(--tyto-hairline-width) solid var(--tyto-hairline);
+  padding: var(--tyto-space-1) var(--tyto-space-5);
+  background: var(--tyto-surface-raised);
+  color: var(--tyto-text-muted);
+  font-size: var(--tyto-text-sm);
 }
 
 .shell__language {
   display: flex;
-  gap: 8px;
+  gap: var(--tyto-space-4);
   align-items: center;
 }
 
 .shell__about {
   display: flex;
-  gap: 16px;
-  font-size: 13px;
+  gap: var(--tyto-space-6);
+  font-size: var(--tyto-text-sm);
 }
 
 .shell__about dd {
@@ -107,20 +127,12 @@ body {
 
 /* TYTO-131: the update notice, at the footer's size so it reads as part of the version line. */
 .shell__update {
-  font-size: 13px;
+  font-size: var(--tyto-text-sm);
 }
 
 .shell__update[hidden] {
   display: none;
 }
-
-/*
- * E9.2: the split, the preview stage and the checkerboard.
- *
- * Still no framework and still not a theme — TYTO-96 is where the app gets a visual language
- * and every value below becomes a token. What is here is layout, which that card should find
- * already working rather than have to invent while it is choosing colours.
- */
 
 /*
  * The docks (E9.10, ADR 0024).
@@ -135,13 +147,9 @@ body {
  * floors the flex item at its content's width and pushes the editor off the window.
  */
 /*
- * Everything between the header and the footer, with **no gap of its own**.
- *
- * The shell puts 24px between its children, which is right for the header and the footer
- * and wrong here: a splitter *is* the gap between two docks, and leaving the shell's one in
- * place stacked 24 + 16 + 24 = 64px of dead space between the panes and the bottom dock.
- * Found by opening the window — the DOM was correct and the picture was not, which is the
- * third time on this app (TYTO-40, TYTO-41, and now this).
+ * Everything between the header and the footer, with **no gap of its own**: a splitter *is*
+ * the gap between two docks. Found by opening the window when the shell still had a gap — the
+ * DOM was correct and the picture was not (TYTO-40, TYTO-41, E9.10).
  */
 .workspace {
   display: flex;
@@ -158,12 +166,17 @@ body {
   gap: 0;
 }
 
+/*
+ * Two panels in one dock are separated by a hairline, and the hairline is the dock's own
+ * background showing through a gap of that width: the panels paint the surface over the rest.
+ */
 .dock {
   display: flex;
   min-height: 0;
   min-width: 0;
   flex-direction: column;
-  gap: 16px;
+  gap: var(--tyto-hairline-width);
+  background: var(--tyto-hairline);
 }
 
 .dock--centre {
@@ -189,46 +202,46 @@ body {
 /*
  * The draggable edge between two docks.
  *
- * 16px of room and a 2px line down the middle of it, because the gap between panes was
- * 16px before this card and the window should not visibly change just because the gap
- * became grabbable. `touch-action: none` so a drag on a trackpad or a touch screen is a
- * drag and not a scroll.
+ * A hairline you can see and a wider strip you can grab: the `::after` reaches a few pixels
+ * past the line on each side, over the panels, and the pointer events it receives are the
+ * splitter's. It turns the accent while it is hovered or dragged, which is the one place the
+ * accent marks something that is not focus. `touch-action: none` so a drag on a trackpad or a
+ * touch screen is a drag and not a scroll.
  */
 .splitter {
-  flex: 0 0 16px;
+  flex: 0 0 var(--tyto-hairline-width);
   position: relative;
+  z-index: 1;
+  background: var(--tyto-hairline);
   cursor: col-resize;
   touch-action: none;
 }
 
 .splitter--row {
-  flex: 0 0 16px;
   cursor: row-resize;
 }
 
 .splitter::after {
   content: '';
   position: absolute;
-  inset: 0 7px;
-  border-radius: 1px;
-  background: transparent;
+  inset: 0 calc(var(--tyto-space-2) * -1);
 }
 
 .splitter--row::after {
-  inset: 7px 0;
+  inset: calc(var(--tyto-space-2) * -1) 0;
 }
 
-.splitter:hover::after,
-.splitter:active::after {
-  background: color-mix(in srgb, var(--ink) 18%, transparent);
+.splitter:hover,
+.splitter:active {
+  background: var(--tyto-accent);
 }
 
 /*
- * A panel is what a dock holds, and it fills it.
+ * A panel is what a dock holds, and it fills it. Flat: no border and no radius of its own,
+ * because the splitter beside it and the dock behind it already draw the line.
  *
- * `display: block` for the same reason `.problems__list` needs one: these are custom
- * elements, and an element the engine has never heard of is `display: inline`, on which
- * `flex` does nothing at all (ADR 0024).
+ * `display: flex` is spelled out because these are custom elements, and an element the engine
+ * has never heard of is `display: inline`, on which `flex` does nothing at all (ADR 0024).
  */
 .panel {
   display: flex;
@@ -236,44 +249,44 @@ body {
   min-height: 0;
   min-width: 0;
   flex-direction: column;
-  border: 1px solid var(--line);
-  border-radius: 10px;
+  background: var(--tyto-surface);
   overflow: hidden;
 }
 
 .panel__close {
   margin-left: auto;
-  padding: 0 6px;
+  padding: 0 var(--tyto-space-3);
   border: 0;
-  border-radius: 4px;
+  border-radius: var(--tyto-radius-sm);
   background: none;
-  color: var(--muted);
+  color: var(--tyto-text-muted);
   cursor: default;
   font: inherit;
-  font-size: 16px;
+  font-size: var(--tyto-text-lg);
   line-height: 1;
 }
 
 .panel__close:hover,
 .panel__close:focus-visible {
-  background: color-mix(in srgb, var(--ink) 8%, transparent);
+  background: var(--tyto-hover);
   color: inherit;
 }
 
 .work__bar {
   display: flex;
   align-items: center;
-  gap: 12px;
+  gap: var(--tyto-space-5);
   flex-wrap: wrap;
-  padding: 8px 12px;
-  border-bottom: 1px solid var(--line);
+  padding: var(--tyto-space-2) var(--tyto-space-5);
+  border-bottom: var(--tyto-hairline-width) solid var(--tyto-hairline);
+  background: var(--tyto-surface-raised);
 }
 
 .work__title {
   margin: 0;
-  font-size: 13px;
-  font-weight: 600;
-  color: var(--muted);
+  font-size: var(--tyto-text-sm);
+  font-weight: var(--tyto-weight-strong);
+  color: var(--tyto-text-muted);
   text-transform: uppercase;
   letter-spacing: 0.04em;
 }
@@ -292,44 +305,48 @@ body {
 
 .preview__tabs {
   display: flex;
-  gap: 4px;
+  gap: var(--tyto-space-2);
   margin-inline-end: auto;
 }
 
 .preview__tab {
-  border: 1px solid transparent;
-  border-radius: 6px;
-  padding: 3px 10px;
+  border: var(--tyto-hairline-width) solid transparent;
+  border-radius: var(--tyto-radius-sm);
+  padding: var(--tyto-space-1) var(--tyto-space-4);
   background: none;
-  color: var(--muted);
+  color: var(--tyto-text-muted);
   font: inherit;
-  font-size: 13px;
+  font-size: var(--tyto-text-sm);
   cursor: pointer;
 }
 
+.preview__tab:hover {
+  background: var(--tyto-hover);
+}
+
 .preview__tab--on {
-  border-color: var(--line);
-  color: var(--ink);
-  font-weight: 600;
+  background: var(--tyto-button-on);
+  color: var(--tyto-text);
+  font-weight: var(--tyto-weight-strong);
 }
 
 .preview__slide,
 .preview__zoom {
   display: flex;
-  gap: 6px;
+  gap: var(--tyto-space-3);
   align-items: center;
-  font-size: 13px;
-  color: var(--muted);
+  font-size: var(--tyto-text-sm);
+  color: var(--tyto-text-muted);
 }
 
 .preview__zoom button {
-  border: 1px solid var(--line);
-  border-radius: 6px;
-  padding: 2px 8px;
+  border: var(--tyto-hairline-width) solid var(--tyto-border);
+  border-radius: var(--tyto-radius-sm);
+  padding: var(--tyto-space-1) var(--tyto-space-4);
   background: none;
-  color: var(--ink);
+  color: var(--tyto-text);
   font: inherit;
-  font-size: 13px;
+  font-size: var(--tyto-text-sm);
   cursor: pointer;
 }
 
@@ -345,7 +362,8 @@ body {
   display: grid;
   place-items: center;
   overflow: auto;
-  padding: 16px;
+  padding: var(--tyto-space-6);
+  background: var(--tyto-surface-sunken);
 }
 
 /*
@@ -358,16 +376,27 @@ body {
  * partly transparent.
  */
 .preview__paper {
-  --square: 8px;
-  background-color: #ffffff;
+  background-color: var(--tyto-checker-light);
   background-image:
-    linear-gradient(45deg, #d9d9e0 25%, transparent 25%, transparent 75%, #d9d9e0 75%),
-    linear-gradient(45deg, #d9d9e0 25%, transparent 25%, transparent 75%, #d9d9e0 75%);
-  background-size: calc(var(--square) * 2) calc(var(--square) * 2);
+    linear-gradient(
+      45deg,
+      var(--tyto-checker-dark) 25%,
+      transparent 25%,
+      transparent 75%,
+      var(--tyto-checker-dark) 75%
+    ),
+    linear-gradient(
+      45deg,
+      var(--tyto-checker-dark) 25%,
+      transparent 25%,
+      transparent 75%,
+      var(--tyto-checker-dark) 75%
+    );
+  background-size: calc(var(--tyto-checker-square) * 2) calc(var(--tyto-checker-square) * 2);
   background-position:
     0 0,
-    var(--square) var(--square);
-  box-shadow: 0 1px 6px rgb(0 0 0 / 18%);
+    var(--tyto-checker-square) var(--tyto-checker-square);
+  box-shadow: var(--tyto-shadow-paper);
   /* The iframe is full size and scaled by a transform, which does not shrink the element's
      own box — so the overflow has to be clipped or a 1080px frame would paint past a 300px
      paper. */
@@ -382,8 +411,8 @@ body {
 .preview__empty,
 .preview__status {
   margin: 0;
-  color: var(--muted);
-  font-size: 13px;
+  color: var(--tyto-text-muted);
+  font-size: var(--tyto-text-sm);
 }
 
 /*
@@ -393,7 +422,7 @@ body {
  * rather than sitting above it in a second row. A row would push the paper down and change
  * what `fit` computes against, so the marker would resize the thing it is commenting on.
  *
- * Read as a state and not as an error: `--muted` text on the window's own ground, the way
+ * Read as a state and not as an error: muted text on the window's own surface, the way
  * the empty state reads, rather than the red `--status--bad` uses. The problems panel says
  * what is wrong; this says only that the picture and the text have stopped agreeing — and it
  * has to say that with the panel closed, which is why it is inside the stage at all.
@@ -406,40 +435,40 @@ body {
   align-self: start;
   justify-self: center;
   margin: 0;
-  padding: 4px 10px;
-  border: 1px solid var(--line);
-  border-radius: 999px;
-  background: var(--ground);
-  color: var(--muted);
-  font-size: 12px;
+  padding: var(--tyto-space-2) var(--tyto-space-4);
+  border: var(--tyto-hairline-width) solid var(--tyto-hairline);
+  border-radius: var(--tyto-radius-full);
+  background: var(--tyto-surface);
+  color: var(--tyto-text-muted);
+  font-size: var(--tyto-text-xs);
   /* Above the paper, which is the point of sharing the cell. */
   z-index: 1;
 }
 
 .preview__status {
-  padding: 8px 12px;
-  border-top: 1px solid var(--line);
+  padding: var(--tyto-space-4) var(--tyto-space-5);
+  border-top: var(--tyto-hairline-width) solid var(--tyto-hairline);
 }
 
 .preview__status--bad {
-  color: #b3261e;
+  color: var(--tyto-error);
 }
 
 /*
  * E9.3: the problems panel and the template picker.
  *
- * Same rule as above — layout, not a theme. The one colour decision here is the severity
- * dot, and it is a decision the panel cannot avoid: a list where an error and a warning look
- * identical is a list nobody reads twice. TYTO-96 turns these three into tokens.
+ * The one colour decision here is the severity dot, and it is a decision the panel cannot
+ * avoid: a list where an error and a warning look identical is a list nobody reads twice. The
+ * three colours are the severity tokens, which the queue's dots share.
  */
 
 .work__template {
   display: flex;
-  gap: 8px;
+  gap: var(--tyto-space-4);
   align-items: center;
   margin-inline-start: auto;
-  font-size: 13px;
-  color: var(--muted);
+  font-size: var(--tyto-text-sm);
+  color: var(--tyto-text-muted);
 }
 
 /*
@@ -467,8 +496,8 @@ body {
 
 .problems__count {
   margin-inline-start: auto;
-  font-size: 13px;
-  color: var(--muted);
+  font-size: var(--tyto-text-sm);
+  color: var(--tyto-text-muted);
   font-variant-numeric: tabular-nums;
 }
 
@@ -487,9 +516,9 @@ body {
 
 .problems__empty {
   margin: 0;
-  padding: 12px;
-  color: var(--muted);
-  font-size: 13px;
+  padding: var(--tyto-space-5);
+  color: var(--tyto-text-muted);
+  font-size: var(--tyto-text-sm);
 }
 
 /*
@@ -503,16 +532,16 @@ body {
 .problems__row {
   display: grid;
   grid-template-columns: auto auto minmax(0, 1fr) auto;
-  gap: 10px;
+  gap: var(--tyto-space-4);
   align-items: baseline;
   width: 100%;
   border: 0;
-  border-bottom: 1px solid var(--line);
-  padding: 7px 12px;
+  border-bottom: var(--tyto-hairline-width) solid var(--tyto-hairline);
+  padding: var(--tyto-space-3) var(--tyto-space-5);
   background: none;
-  color: var(--ink);
+  color: var(--tyto-text);
   font: inherit;
-  font-size: 13px;
+  font-size: var(--tyto-text-sm);
   text-align: start;
 }
 
@@ -522,7 +551,7 @@ button.problems__row {
 
 button.problems__row:hover,
 button.problems__row:focus-visible {
-  background: color-mix(in srgb, var(--ink) 6%, transparent);
+  background: var(--tyto-hover);
 }
 
 .problems__dot {
@@ -536,21 +565,21 @@ button.problems__row:focus-visible {
 }
 
 .problems__dot--error {
-  background: #b3261e;
+  background: var(--tyto-error);
 }
 
 .problems__dot--warning {
-  background: #a06a00;
+  background: var(--tyto-warning);
 }
 
 .problems__dot--info {
-  background: #4a5bb8;
+  background: var(--tyto-info);
 }
 
 .problems__code {
-  color: var(--muted);
-  font-family: ui-monospace, monospace;
-  font-size: 12px;
+  color: var(--tyto-text-muted);
+  font-family: var(--tyto-font-mono);
+  font-size: var(--tyto-text-xs);
 }
 
 .problems__message {
@@ -560,7 +589,7 @@ button.problems__row:focus-visible {
 }
 
 .problems__where {
-  color: var(--muted);
+  color: var(--tyto-text-muted);
   font-variant-numeric: tabular-nums;
 }
 
@@ -585,7 +614,7 @@ tyto-command-bar[open] {
   /* Near the top and not centred: the list grows downwards, and a panel centred on an empty
      query would jump as soon as somebody typed. */
   padding-top: 12vh;
-  background: rgb(0 0 0 / 25%);
+  background: var(--tyto-scrim);
 }
 
 .command-bar__panel {
@@ -593,21 +622,21 @@ tyto-command-bar[open] {
   width: min(560px, calc(100vw - 32px));
   max-height: 60vh;
   flex-direction: column;
-  border: 1px solid var(--line);
-  border-radius: 8px;
-  background: var(--ground);
-  box-shadow: 0 16px 48px rgb(0 0 0 / 18%);
+  border: var(--tyto-hairline-width) solid var(--tyto-border);
+  border-radius: var(--tyto-radius-md);
+  background: var(--tyto-surface-raised);
+  box-shadow: var(--tyto-shadow-overlay);
 }
 
 .command-bar__input {
   border: 0;
-  border-bottom: 1px solid var(--line);
-  border-radius: 8px 8px 0 0;
+  border-bottom: var(--tyto-hairline-width) solid var(--tyto-hairline);
+  border-radius: var(--tyto-radius-md) var(--tyto-radius-md) 0 0;
   background: none;
   color: inherit;
   font: inherit;
-  font-size: 15px;
-  padding: 12px 14px;
+  font-size: var(--tyto-text-md);
+  padding: var(--tyto-space-5) var(--tyto-space-5);
 }
 
 .command-bar__input:focus {
@@ -617,7 +646,7 @@ tyto-command-bar[open] {
 .command-bar__list {
   overflow: auto;
   margin: 0;
-  padding: 4px;
+  padding: var(--tyto-space-2);
   list-style: none;
 }
 
@@ -625,33 +654,31 @@ tyto-command-bar[open] {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 12px;
-  padding: 7px 10px;
-  border-radius: 5px;
+  gap: var(--tyto-space-5);
+  padding: var(--tyto-space-3) var(--tyto-space-4);
+  border-radius: var(--tyto-radius-sm);
   cursor: default;
-  font-size: 13px;
+  font-size: var(--tyto-text-sm);
 }
 
 .command-bar__option--on {
-  /* The same wash a hovered problem row uses, so the two selections read as one idea.
-     TYTO-96 owns the palette; this borrows rather than inventing a token it would have to
-     rename. */
-  background: color-mix(in srgb, var(--ink) 6%, transparent);
+  /* The same wash a hovered problem row uses, so the two selections read as one idea. */
+  background: var(--tyto-hover);
 }
 
 .command-bar__key {
-  color: var(--muted);
+  color: var(--tyto-text-muted);
   font-family: inherit;
-  font-size: 12px;
+  font-size: var(--tyto-text-xs);
   font-variant-numeric: tabular-nums;
   white-space: nowrap;
 }
 
 .command-bar__empty {
   margin: 0;
-  padding: 14px;
-  color: var(--muted);
-  font-size: 13px;
+  padding: var(--tyto-space-5);
+  color: var(--tyto-text-muted);
+  font-size: var(--tyto-text-sm);
 }
 
 /*
@@ -666,11 +693,15 @@ tyto-command-bar[open] {
 .tabs {
   display: block;
   min-height: 0;
+  border-bottom: var(--tyto-hairline-width) solid var(--tyto-hairline);
+  background: var(--tyto-surface-raised);
 }
 
+/* Zed's strip: the tabs sit edge to edge with a hairline between them, and the one in front
+   takes the editor's surface so it reads as the top of the buffer below it. */
 .tabs__strip {
   display: flex;
-  gap: 4px;
+  gap: 0;
   overflow-x: auto;
   scrollbar-width: thin;
 }
@@ -678,29 +709,28 @@ tyto-command-bar[open] {
 .tabs__tab {
   display: flex;
   align-items: center;
-  gap: 2px;
-  border: 1px solid transparent;
-  border-radius: 6px;
-  padding-inline-end: 2px;
-  color: var(--muted);
+  gap: var(--tyto-space-1);
+  border-inline-end: var(--tyto-hairline-width) solid var(--tyto-hairline);
+  padding-inline-end: var(--tyto-space-1);
+  color: var(--tyto-text-muted);
   white-space: nowrap;
 }
 
 .tabs__tab--on {
-  border-color: var(--line);
-  color: var(--ink);
+  background: var(--tyto-surface);
+  color: var(--tyto-text);
 }
 
 .tabs__name {
   display: flex;
   align-items: center;
-  gap: 6px;
+  gap: var(--tyto-space-3);
   border: none;
   background: none;
-  padding: 4px 4px 4px 10px;
+  padding: var(--tyto-space-2) var(--tyto-space-2) var(--tyto-space-2) var(--tyto-space-4);
   color: inherit;
   font: inherit;
-  font-size: 13px;
+  font-size: var(--tyto-text-sm);
   cursor: pointer;
 }
 
@@ -713,29 +743,29 @@ tyto-command-bar[open] {
 }
 
 .tabs__tab--on .tabs__name {
-  font-weight: 600;
+  font-weight: var(--tyto-weight-strong);
 }
 
 .tabs__dirty {
-  font-size: 16px;
+  font-size: var(--tyto-text-lg);
   line-height: 1;
 }
 
 .tabs__close {
   border: none;
-  border-radius: 4px;
+  border-radius: var(--tyto-radius-sm);
   background: none;
-  padding: 0 5px;
+  padding: 0 var(--tyto-space-2);
   color: inherit;
   font: inherit;
-  font-size: 15px;
+  font-size: var(--tyto-text-md);
   line-height: 1.4;
   cursor: pointer;
 }
 
 .tabs__close:hover,
 .tabs__close:focus-visible {
-  background: color-mix(in srgb, var(--ink) 8%, transparent);
+  background: var(--tyto-hover);
 }
 
 /* The export dialog (E9.4, TYTO-43).
@@ -756,37 +786,37 @@ tyto-export-dialog[open] {
   display: flex;
   align-items: center;
   justify-content: center;
-  background: rgb(0 0 0 / 25%);
+  background: var(--tyto-scrim);
 }
 
 .export__panel {
   display: flex;
   width: min(480px, calc(100vw - 32px));
   flex-direction: column;
-  padding: 16px;
-  border: 1px solid var(--line);
-  border-radius: 8px;
-  margin: 16px;
-  background: var(--ground);
-  box-shadow: 0 16px 48px rgb(0 0 0 / 18%);
-  gap: 12px;
+  padding: var(--tyto-space-6);
+  border: var(--tyto-hairline-width) solid var(--tyto-border);
+  border-radius: var(--tyto-radius-md);
+  margin: var(--tyto-space-6);
+  background: var(--tyto-surface-raised);
+  box-shadow: var(--tyto-shadow-overlay);
+  gap: var(--tyto-space-5);
 }
 
 .export__title {
   margin: 0;
-  font-size: 15px;
-  font-weight: 600;
+  font-size: var(--tyto-text-md);
+  font-weight: var(--tyto-weight-strong);
 }
 
 .export__row {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: var(--tyto-space-4);
 }
 
 .export__label {
-  color: var(--muted);
-  font-size: 12px;
+  color: var(--tyto-text-muted);
+  font-size: var(--tyto-text-xs);
   text-transform: uppercase;
   letter-spacing: 0.04em;
 }
@@ -797,7 +827,7 @@ tyto-export-dialog[open] {
   overflow: hidden;
   min-width: 0;
   flex: 1;
-  font-size: 13px;
+  font-size: var(--tyto-text-sm);
   text-overflow: ellipsis;
   white-space: nowrap;
 }
@@ -807,53 +837,53 @@ tyto-export-dialog[open] {
   border: 0;
   padding: 0;
   margin: 0;
-  gap: 12px;
+  gap: var(--tyto-space-5);
 }
 
 .export__type {
   display: flex;
   align-items: center;
-  font-size: 13px;
-  gap: 4px;
+  font-size: var(--tyto-text-sm);
+  gap: var(--tyto-space-2);
 }
 
 .export__note {
   margin: 0;
-  color: var(--muted);
-  font-size: 12px;
+  color: var(--tyto-text-muted);
+  font-size: var(--tyto-text-xs);
 }
 
 .export__status {
   display: flex;
   flex-direction: column;
-  padding-top: 8px;
-  border-top: 1px solid var(--line);
-  gap: 6px;
+  padding-top: var(--tyto-space-4);
+  border-top: var(--tyto-hairline-width) solid var(--tyto-hairline);
+  gap: var(--tyto-space-3);
 }
 
 .export__heading {
   margin: 0;
-  font-size: 13px;
-  font-weight: 600;
+  font-size: var(--tyto-text-sm);
+  font-weight: var(--tyto-weight-strong);
 }
 
 .export__count {
   margin: 0;
-  color: var(--muted);
-  font-size: 12px;
+  color: var(--tyto-text-muted);
+  font-size: var(--tyto-text-xs);
   font-variant-numeric: tabular-nums;
 }
 
 .export__bar {
   overflow: hidden;
   height: 4px;
-  border-radius: 2px;
-  background: var(--line);
+  border-radius: var(--tyto-radius-sm);
+  background: var(--tyto-hairline);
 }
 
 .export__bar-fill {
   height: 100%;
-  background: var(--ink);
+  background: var(--tyto-accent);
   /* The width is the only thing that moves, so the transition is on the width alone: a
      bar that eased its colour too would be animating something nothing changes. */
   transition: width 120ms linear;
@@ -863,19 +893,19 @@ tyto-export-dialog[open] {
 .export__problems,
 .export__leftovers {
   margin: 0;
-  color: var(--muted);
-  font-size: 12px;
+  color: var(--tyto-text-muted);
+  font-size: var(--tyto-text-xs);
 }
 
 .export__problems,
 .export__leftovers ul {
-  padding-left: 16px;
+  padding-left: var(--tyto-space-6);
 }
 
 .export__actions {
   display: flex;
   justify-content: flex-end;
-  gap: 8px;
+  gap: var(--tyto-space-4);
 }
 
 /*
@@ -892,7 +922,7 @@ tyto-template-mode {
   z-index: 9;
   display: flex;
   inset: 0;
-  background: var(--ground);
+  background: var(--tyto-surface);
 }
 
 tyto-template-mode:not([open]),
@@ -906,8 +936,8 @@ tyto-template-mode [hidden] {
   min-height: 0;
   flex: 1;
   flex-direction: column;
-  padding: 16px 24px;
-  gap: 12px;
+  padding: var(--tyto-space-6) var(--tyto-space-6);
+  gap: var(--tyto-space-5);
 }
 
 .template-mode__head {
@@ -915,26 +945,26 @@ tyto-template-mode [hidden] {
   flex-wrap: wrap;
   align-items: center;
   justify-content: space-between;
-  gap: 8px 16px;
+  gap: var(--tyto-space-4) var(--tyto-space-6);
 }
 
 .template-mode__title {
   display: flex;
   min-width: 0;
   align-items: baseline;
-  gap: 12px;
+  gap: var(--tyto-space-5);
 }
 
 .template-mode__heading {
   margin: 0;
-  font-size: 18px;
+  font-size: var(--tyto-text-lg);
   white-space: nowrap;
 }
 
 .template-mode__folder {
   overflow: hidden;
-  color: var(--muted);
-  font-size: 13px;
+  color: var(--tyto-text-muted);
+  font-size: var(--tyto-text-sm);
   text-overflow: ellipsis;
   white-space: nowrap;
 }
@@ -943,20 +973,20 @@ tyto-template-mode [hidden] {
 .template-mode__new {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: var(--tyto-space-4);
 }
 
 .template-mode__problem {
   width: 100%;
   margin: 0;
-  color: #b3261e;
+  color: var(--tyto-error);
 }
 
 .template-mode__refusal {
   max-width: 60ch;
-  padding: 16px;
-  border: 1px solid var(--line);
-  border-radius: 8px;
+  padding: var(--tyto-space-6);
+  border: var(--tyto-hairline-width) solid var(--tyto-hairline);
+  border-radius: var(--tyto-radius-md);
   margin: 0;
 }
 
@@ -967,7 +997,7 @@ tyto-template-mode [hidden] {
   display: grid;
   min-height: 0;
   flex: 1;
-  gap: 16px;
+  gap: var(--tyto-space-6);
   grid-template-columns: minmax(320px, 1fr) minmax(320px, 1.1fr);
 }
 
@@ -977,41 +1007,41 @@ tyto-template-mode [hidden] {
   min-width: 0;
   min-height: 0;
   flex-direction: column;
-  gap: 8px;
+  gap: var(--tyto-space-4);
 }
 
 .template-mode__tabs {
   display: flex;
-  gap: 4px;
+  gap: var(--tyto-space-2);
 }
 
 .template-mode__tab {
-  padding: 4px 12px;
-  border: 1px solid var(--line);
-  border-radius: 6px 6px 0 0;
+  padding: var(--tyto-space-2) var(--tyto-space-5);
+  border: var(--tyto-hairline-width) solid var(--tyto-hairline);
+  border-radius: var(--tyto-radius-md) var(--tyto-radius-md) 0 0;
   background: transparent;
-  color: var(--muted);
+  color: var(--tyto-text-muted);
   font: inherit;
-  font-family: ui-monospace, monospace;
-  font-size: 13px;
+  font-family: var(--tyto-font-mono);
+  font-size: var(--tyto-text-sm);
 }
 
 .template-mode__tab[aria-selected='true'] {
   border-bottom-color: transparent;
-  color: var(--ink);
-  font-weight: 600;
+  color: var(--tyto-text);
+  font-weight: var(--tyto-weight-strong);
 }
 
 .template-mode__dirty {
-  margin-left: 6px;
-  font-size: 10px;
+  margin-left: var(--tyto-space-3);
+  font-size: var(--tyto-text-xs);
 }
 
 .template-mode__buffer {
   min-height: 0;
   flex: 1;
-  border: 1px solid var(--line);
-  border-radius: 0 6px 6px;
+  border: var(--tyto-hairline-width) solid var(--tyto-hairline);
+  border-radius: 0 var(--tyto-radius-md) var(--tyto-radius-md);
 }
 
 .template-mode__buffer .cm-editor {
@@ -1021,13 +1051,13 @@ tyto-template-mode [hidden] {
 .template-mode__sample {
   display: flex;
   flex-wrap: wrap;
-  gap: 8px 16px;
+  gap: var(--tyto-space-4) var(--tyto-space-6);
 }
 
 .template-mode__row {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: var(--tyto-space-4);
 }
 
 /* The grid scrolls, and nothing else in the mode does: a manifest with five formats is a grid
@@ -1038,7 +1068,7 @@ tyto-template-mode [hidden] {
   flex: 1;
   flex-wrap: wrap;
   align-content: flex-start;
-  gap: 16px;
+  gap: var(--tyto-space-6);
   overflow: auto;
 }
 
@@ -1046,12 +1076,12 @@ tyto-template-mode [hidden] {
   display: flex;
   flex-direction: column;
   margin: 0;
-  gap: 4px;
+  gap: var(--tyto-space-2);
 }
 
 .template-mode__paper {
   overflow: hidden;
-  box-shadow: 0 1px 4px rgb(0 0 0 / 20%);
+  box-shadow: var(--tyto-shadow-paper);
 }
 
 .template-mode__frame {
@@ -1062,8 +1092,8 @@ tyto-template-mode [hidden] {
 .template-mode__cell figcaption,
 .template-mode__note {
   margin: 0;
-  color: var(--muted);
-  font-size: 13px;
+  color: var(--tyto-text-muted);
+  font-size: var(--tyto-text-sm);
 }
 
 .template-mode__problems {
@@ -1072,16 +1102,16 @@ tyto-template-mode [hidden] {
 }
 
 .template-mode__subheading {
-  margin: 0 0 4px;
-  font-size: 14px;
+  margin: 0 0 var(--tyto-space-2);
+  font-size: var(--tyto-text-md);
 }
 
 .template-mode__notice {
-  margin: 0 0 4px;
+  margin: 0 0 var(--tyto-space-2);
 }
 
 .template-mode__notice--refused {
-  color: #b3261e;
+  color: var(--tyto-error);
 }
 
 .template-mode__list {
@@ -1092,23 +1122,23 @@ tyto-template-mode [hidden] {
 
 .template-mode__problem-row {
   display: flex;
-  padding: 2px 4px;
+  padding: var(--tyto-space-1) var(--tyto-space-2);
   cursor: pointer;
-  font-size: 13px;
-  gap: 8px;
+  font-size: var(--tyto-text-sm);
+  gap: var(--tyto-space-4);
 }
 
 .template-mode__problem-row:hover {
-  background: var(--line);
+  background: var(--tyto-hover);
 }
 
 .template-mode__problem-row--error code {
-  color: #b3261e;
+  color: var(--tyto-error);
 }
 
 .template-mode__file {
-  color: var(--muted);
-  font-family: ui-monospace, monospace;
+  color: var(--tyto-text-muted);
+  font-family: var(--tyto-font-mono);
 }
 
 /* The plugins screen (TYTO-47). The export dialog's arrangement — it covers the window and the
@@ -1124,7 +1154,7 @@ tyto-plugins-dialog[open] {
   display: flex;
   align-items: center;
   justify-content: center;
-  background: rgb(0 0 0 / 25%);
+  background: var(--tyto-scrim);
 }
 
 .plugins__panel {
@@ -1133,26 +1163,26 @@ tyto-plugins-dialog[open] {
   width: min(820px, calc(100vw - 32px));
   max-height: calc(100vh - 32px);
   flex-direction: column;
-  padding: 16px;
-  border: 1px solid var(--line);
-  border-radius: 8px;
-  margin: 16px;
-  background: var(--ground);
-  box-shadow: 0 16px 48px rgb(0 0 0 / 18%);
-  gap: 10px;
+  padding: var(--tyto-space-6);
+  border: var(--tyto-hairline-width) solid var(--tyto-border);
+  border-radius: var(--tyto-radius-md);
+  margin: var(--tyto-space-6);
+  background: var(--tyto-surface-raised);
+  box-shadow: var(--tyto-shadow-overlay);
+  gap: var(--tyto-space-4);
 }
 
 .plugins__title {
   margin: 0;
-  font-size: 16px;
+  font-size: var(--tyto-text-lg);
 }
 
 .plugins__notice {
-  padding: 8px 10px;
-  border-left: 3px solid var(--warning, #b7791f);
+  padding: var(--tyto-space-4) var(--tyto-space-4);
+  border-left: var(--tyto-focus-width) solid var(--tyto-warning);
   margin: 0;
-  background: rgb(183 121 31 / 10%);
-  font-size: 13px;
+  background: var(--tyto-surface-raised);
+  font-size: var(--tyto-text-sm);
 }
 
 .plugins__inactive,
@@ -1160,7 +1190,7 @@ tyto-plugins-dialog[open] {
 .plugins__folder,
 .plugins__failure {
   margin: 0;
-  font-size: 13px;
+  font-size: var(--tyto-text-sm);
 }
 
 .plugins__folder code {
@@ -1170,13 +1200,13 @@ tyto-plugins-dialog[open] {
 .plugins__table {
   width: 100%;
   border-collapse: collapse;
-  font-size: 13px;
+  font-size: var(--tyto-text-sm);
 }
 
 .plugins__table th,
 .plugins__table td {
-  padding: 4px 8px;
-  border-bottom: 1px solid var(--line);
+  padding: var(--tyto-space-2) var(--tyto-space-4);
+  border-bottom: var(--tyto-hairline-width) solid var(--tyto-hairline);
   text-align: left;
   vertical-align: top;
 }
@@ -1189,13 +1219,13 @@ tyto-plugins-dialog[open] {
 }
 
 .plugins__row[data-status='refused'] .plugins__status {
-  color: var(--error, #c53030);
+  color: var(--tyto-error);
 }
 
 .plugins__problems {
-  padding-left: 16px;
-  margin: 4px 0 0;
-  color: var(--error, #c53030);
+  padding-left: var(--tyto-space-6);
+  margin: var(--tyto-space-2) 0 0;
+  color: var(--tyto-error);
 }
 
 .plugins__actions {
@@ -1215,36 +1245,36 @@ tyto-plugins-dialog[open] {
   flex: 1;
   min-height: 0;
   flex-direction: column;
-  gap: 8px;
-  padding: 10px 12px;
-  font-size: 13px;
+  gap: var(--tyto-space-4);
+  padding: var(--tyto-space-4) var(--tyto-space-5);
+  font-size: var(--tyto-text-sm);
 }
 
 .queue__note {
   margin: 0;
-  color: var(--muted);
+  color: var(--tyto-text-muted);
 }
 
 .queue__note--bad {
-  color: #b3261e;
+  color: var(--tyto-error);
 }
 
 .queue__folder {
   display: flex;
   flex-direction: column;
-  gap: 2px;
+  gap: var(--tyto-space-1);
   min-width: 0;
 }
 
 .queue__label {
-  color: var(--muted);
+  color: var(--tyto-text-muted);
 }
 
 /* A path is one long word; broken anywhere rather than pushing the panel wider. */
 .queue__path {
   overflow-wrap: anywhere;
-  font-family: ui-monospace, monospace;
-  font-size: 12px;
+  font-family: var(--tyto-font-mono);
+  font-size: var(--tyto-text-xs);
 }
 
 .queue__controls,
@@ -1252,29 +1282,29 @@ tyto-plugins-dialog[open] {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
-  gap: 6px;
+  gap: var(--tyto-space-3);
 }
 
 .queue__button {
-  padding: 3px 10px;
-  border: 1px solid var(--line);
-  border-radius: 6px;
-  background: var(--ground);
-  color: var(--ink);
+  padding: var(--tyto-space-1) var(--tyto-space-4);
+  border: var(--tyto-hairline-width) solid var(--tyto-border);
+  border-radius: var(--tyto-radius-sm);
+  background: var(--tyto-surface);
+  color: var(--tyto-text);
   font: inherit;
-  font-size: 12px;
+  font-size: var(--tyto-text-xs);
   cursor: pointer;
 }
 
 .queue__button:hover,
 .queue__button:focus-visible {
-  background: color-mix(in srgb, var(--ink) 6%, var(--ground));
+  background: var(--tyto-hover);
 }
 
 .queue__auto {
   display: inline-flex;
   align-items: center;
-  gap: 4px;
+  gap: var(--tyto-space-2);
 }
 
 .queue__tasks {
@@ -1284,15 +1314,15 @@ tyto-plugins-dialog[open] {
   padding: 0;
   overflow: auto;
   list-style: none;
-  border-top: 1px solid var(--line);
+  border-top: var(--tyto-hairline-width) solid var(--tyto-hairline);
 }
 
 .queue__task {
   display: flex;
   flex-direction: column;
-  gap: 4px;
-  padding: 8px 0;
-  border-bottom: 1px solid var(--line);
+  gap: var(--tyto-space-2);
+  padding: var(--tyto-space-4) 0;
+  border-bottom: var(--tyto-hairline-width) solid var(--tyto-hairline);
 }
 
 /* `minmax(0, 1fr)` on the id, for the problems row's reason: a long folder name ellipsizes
@@ -1301,7 +1331,7 @@ tyto-plugins-dialog[open] {
   display: grid;
   grid-template-columns: auto minmax(0, 1fr) auto;
   align-items: baseline;
-  gap: 8px;
+  gap: var(--tyto-space-4);
 }
 
 .queue__dot {
@@ -1310,35 +1340,35 @@ tyto-plugins-dialog[open] {
   height: 8px;
   border-radius: 50%;
   transform: translateY(-1px);
-  background: var(--muted);
+  background: var(--tyto-text-muted);
 }
 
 .queue__dot--rendering {
-  background: #4a5bb8;
+  background: var(--tyto-info);
 }
 
 .queue__dot--done {
-  background: #2e7d32;
+  background: var(--tyto-success);
 }
 
 .queue__dot--error {
-  background: #b3261e;
+  background: var(--tyto-error);
 }
 
 .queue__id {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-  font-weight: 600;
+  font-weight: var(--tyto-weight-strong);
 }
 
 .queue__status {
-  color: var(--muted);
+  color: var(--tyto-text-muted);
 }
 
 .queue__failure {
   margin: 0;
-  color: #b3261e;
+  color: var(--tyto-error);
   overflow-wrap: anywhere;
 }
 
@@ -1351,18 +1381,18 @@ tyto-plugins-dialog[open] {
 .queue__diagnostic {
   display: grid;
   grid-template-columns: auto minmax(0, 1fr);
-  gap: 8px;
+  gap: var(--tyto-space-4);
   align-items: baseline;
 }
 
 .queue__code {
-  color: var(--muted);
-  font-family: ui-monospace, monospace;
-  font-size: 12px;
+  color: var(--tyto-text-muted);
+  font-family: var(--tyto-font-mono);
+  font-size: var(--tyto-text-xs);
 }
 
 .queue__diagnostic--error .queue__code {
-  color: #b3261e;
+  color: var(--tyto-error);
 }
 
 .queue__message {
@@ -1378,13 +1408,13 @@ tyto-plugins-dialog[open] {
   min-height: 0;
   width: 100%;
   border: 0;
-  background: #fff;
+  background: var(--tyto-plugin-page);
 }
 
 /* A plugin whose panel reads the open brief says so on its own row (ADR 0045). */
 .plugins__disclosure {
-  margin: 4px 0 0;
-  color: var(--muted, #555);
+  margin: var(--tyto-space-2) 0 0;
+  color: var(--tyto-text-muted);
 }
 
 /* A plugin's declared credentials (TYTO-187): one line per key, wrapping under the
@@ -1392,8 +1422,8 @@ tyto-plugins-dialog[open] {
 .plugins__credentials {
   display: flex;
   flex-direction: column;
-  margin-top: 6px;
-  gap: 4px;
+  margin-top: var(--tyto-space-3);
+  gap: var(--tyto-space-2);
 }
 
 .plugins__credential {
@@ -1401,16 +1431,16 @@ tyto-plugins-dialog[open] {
   flex-wrap: wrap;
   align-items: center;
   margin: 0;
-  gap: 6px;
+  gap: var(--tyto-space-3);
 }
 
 .plugins__credential-state {
-  color: var(--muted, #555);
+  color: var(--tyto-text-muted);
 }
 
 .plugins__credential[data-set='true'] .plugins__credential-state {
   color: inherit;
-  font-weight: 600;
+  font-weight: var(--tyto-weight-strong);
 }
 
 .plugins__credential-field {
@@ -1422,5 +1452,5 @@ tyto-plugins-dialog[open] {
 .plugins__credential-failed {
   width: 100%;
   margin: 0;
-  color: var(--error, #c53030);
+  color: var(--tyto-error);
 }
