@@ -163,6 +163,8 @@ export interface IpcDependencies {
   };
   /** The installed plugins' panels and their bridge (ADR 0045). */
   readonly panels: PanelService;
+  /** The installed plugins' keymaps, once they have started (TYTO-207). */
+  keymaps(): Promise<IpcResponse<'plugins:keymaps'>['keymaps']>;
   readonly templateDialogs: {
     /** A template folder to edit, or nothing when the picker is dismissed. */
     chooseTemplate: () => Promise<string | undefined>;
@@ -396,6 +398,7 @@ export function createHandlers(dependencies: IpcDependencies): Handlers {
     'plugins:list': async () => ({ folder: plugins.folder, plugins: [...(await plugins.list())] }),
 
     'plugins:panels': async () => ({ panels: [...(await dependencies.panels.list())] }),
+    'plugins:keymaps': async () => ({ keymaps: await dependencies.keymaps() }),
 
     'panel:request': ({ panelId, capability, args }) =>
       dependencies.panels.request(panelId, capability, args),

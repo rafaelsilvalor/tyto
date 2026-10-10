@@ -89,6 +89,8 @@ export interface EditorOptions {
   readonly commands?: CommandRegistry;
   /** Defaults to `defaultKeymapSet`. Ignored while vim mode is on, which brings its own. */
   readonly keymap?: EditorKeymap;
+  /** What vim mode brings with it. Defaults to `vimKeymapSet` (TYTO-207). */
+  readonly vimKeymap?: EditorKeymap;
   /** Starts in vim mode. Toggle later with `setVimMode`. */
   readonly vim?: boolean;
   /**
@@ -218,6 +220,12 @@ export interface EditorHandle {
    */
   setVimMode(enabled: boolean): void;
   isVimMode(): boolean;
+  /**
+   * Replaces both input modes' bindings, in place, as `setVimMode` swaps between them
+   * (TYTO-207). A tab shown afterwards picks them up in `restore`, so a table that changes
+   * while five tabs are open changes for all five.
+   */
+  setKeymaps(keymaps: { readonly normal: EditorKeymap; readonly vim: EditorKeymap }): void;
   destroy(): void;
 }
 
@@ -288,8 +296,12 @@ export function createEditor(parent: HTMLElement, options: EditorOptions = {}): 
    * language rather than the one the window started in.
    */
   let searchPhrases = options.searchPhrases ?? {};
-  const keys = keymapExtension(options.keymap ?? defaultKeymapSet);
+  let keys = keymapExtension(options.keymap ?? defaultKeymapSet);
+  let vimKeymap = options.vimKeymap;
   let vimEnabled = options.vim ?? false;
+  const vimInput = (): Extension => vimMode(vimKeymap === undefined ? {} : { keymap: vimKeymap });
+  /** What the input compartment holds now, which every shown tab is brought up to. */
+  let input: Extension = vimEnabled ? vimInput() : keys;
 
   /**
    * One listener for both directions, and the order inside it carries weight.
@@ -331,7 +343,7 @@ export function createEditor(parent: HTMLElement, options: EditorOptions = {}): 
     // Ahead of `baseExtensions`, so this package's `Mod-z` is reached before the
     // `historyKeymap` in there. Both stay: when there is no registry, or nothing left
     // to undo, ours returns false and CodeMirror's own binding still works.
-    inputCompartment.of(vimEnabled ? vimMode() : keys),
+    inputCompartment.of(input),
     ...(options.commands === undefined ? [] : [commandRegistryFacet.of(options.commands)]),
     notify,
     // Both halves of read-only, because they answer different questions: the facet
@@ -370,6 +382,11 @@ export function createEditor(parent: HTMLElement, options: EditorOptions = {}): 
       // `setState` and not a change transaction: a transaction would put the swap on the
       // undo stack, so undoing once in a fresh tab would paste the other document back in.
       view.setState(state);
+      // A tab built before the mode or the bindings last changed still holds the input layer
+      // it was born with; the editor has one input layer, and the tab being shown takes it.
+      if (inputCompartment.get(view.state) !== input) {
+        view.dispatch({ effects: inputCompartment.reconfigure(input) });
+      }
       // Dispatched after, because a scroll effect is a property of the view and the view
       // has just been given a different state to measure. The phrases ride along: a state
       // carries the language it was built in, so a tab that was away while the window
@@ -413,12 +430,18 @@ export function createEditor(parent: HTMLElement, options: EditorOptions = {}): 
     setVimMode: (enabled: boolean) => {
       if (enabled === vimEnabled) return;
       vimEnabled = enabled;
-      view.dispatch({
-        effects: inputCompartment.reconfigure(enabled ? vimMode() : keys),
-      });
+      input = enabled ? vimInput() : keys;
+      view.dispatch({ effects: inputCompartment.reconfigure(input) });
     },
 
     isVimMode: () => vimEnabled,
+
+    setKeymaps: (keymaps) => {
+      keys = keymapExtension(keymaps.normal);
+      vimKeymap = keymaps.vim;
+      input = vimEnabled ? vimInput() : keys;
+      view.dispatch({ effects: inputCompartment.reconfigure(input) });
+    },
 
     destroy: () => {
       changeListeners.clear();

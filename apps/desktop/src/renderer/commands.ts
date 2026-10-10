@@ -1,6 +1,12 @@
 import {
   type CommandRegistry,
   type EditorKeymap,
+  type Keybinding,
+  type KeybindingEntry,
+  type KeybindingLayer,
+  type KeybindingTable,
+  COMMAND_BAR_KEY,
+  COMMAND_BAR_TOGGLE,
   EDITOR_FIND,
   EDITOR_FIND_NEXT,
   EDITOR_FIND_PREVIOUS,
@@ -10,10 +16,15 @@ import {
   EDITOR_REPLACE_NEXT,
   EDITOR_SAVE,
   EDITOR_UNDO,
+  bindingsOf,
   createCommandRegistry,
   defaultKeymapSet,
+  keybindingsOf,
+  keymapSetFor as keymapSetOfTable,
   vimKeymapSet,
 } from '@tyto/editor';
+
+import type { IpcResponse } from '../../shared/ipc.js';
 
 import { type CatalogueKey } from '../../shared/i18n/index.js';
 
@@ -341,38 +352,8 @@ export function createDesktopRegistry(actions: DesktopActions): CommandRegistry 
   return registry;
 }
 
-/**
- * The keystroke a command answers to, written the way a person reads it.
- *
- * Read off the keymap set the editor is actually running, never a second table. That is the
- * card's requirement and it is also the only way the bar can be honest: a binding shown
- * beside a command has to be the one that works, and vim mode swaps the set under it —
- * undo is `u` there and belongs to the vim engine, so the set has no `Mod-z` and the bar
- * correctly shows none.
- *
- * `Mod` is `⌘` on macOS and `Ctrl` everywhere else, which is what CodeMirror's notation
- * means by it; a set may also override the whole binding for macOS, and that wins.
- */
-export function bindingsOf(
-  keymapSet: EditorKeymap,
-  platform: string,
-): Readonly<Record<string, string>> {
-  const mac = platform === 'darwin';
-  const bindings: Record<string, string> = {};
-
-  for (const binding of keymapSet.bindings) {
-    const key = (mac ? (binding.mac ?? binding.key) : binding.key)
-      .replace(/\bMod\b/gu, mac ? '⌘' : 'Ctrl')
-      .replace(/\bShift\b/gu, mac ? '⇧' : 'Shift')
-      .replace(/\bAlt\b/gu, mac ? '⌥' : 'Alt')
-      .replaceAll('-', mac ? '' : '+');
-    // The first binding wins. A set may bind two keys to one command — redo has three —
-    // and a person looking for the shortcut wants one of them, not a list.
-    bindings[binding.command] ??= key;
-  }
-
-  return bindings;
-}
+/** Moved to `@tyto/editor` with the table it reads (TYTO-207); re-exported for the window. */
+export { bindingsOf };
 
 /**
  * The default set plus the two keys only a desktop can mean.
@@ -380,8 +361,8 @@ export function bindingsOf(
  * `Mod-s` is already in both of `@tyto/editor`'s sets — the editor ships the binding and
  * leaves the command to the host — so new, open and "save as" are the three this adds.
  * They go in a set rather than in a window listener because they are about the document and
- * the editor is what owns one; `Mod-K` is the opposite case and is a window listener for
- * the opposite reason (`main.ts`).
+ * the editor is what owns one; `Mod-K` is the opposite case and is a global binding, run by
+ * the window's dispatcher for the opposite reason (`main.ts`).
  *
  * **`Mod-n` is here and not on the File menu item, which is the rule for all five verbs**
  * (TYTO-124). A menu accelerator is the browser process's and fires before the page, so it
@@ -412,13 +393,56 @@ export const desktopKeymapSet: EditorKeymap = {
 };
 
 /**
+ * The built-in layer of the window's one keybinding table (TYTO-207, ADR 0074).
+ *
+ * The same three sets as before, now with the context each one was always in. `vimKeymapSet`
+ * is `editor`, because save and render are bound in both input modes; the rest of the desktop
+ * set is `mode.desktop`, because vim mode replaces it; and `Mod-K` is global, because the bar
+ * opens wherever focus is. Plugins and, once the file exists, the person override this.
+ */
+export const builtInKeybindings: readonly Keybinding[] = [
+  ...keybindingsOf(vimKeymapSet, 'editor'),
+  ...keybindingsOf(desktopKeymapSet, 'mode.desktop').filter(
+    (binding) =>
+      !vimKeymapSet.bindings.some(
+        (both) => both.key === binding.key && both.command === binding.command,
+      ),
+  ),
+  { key: COMMAND_BAR_KEY, command: COMMAND_BAR_TOGGLE, source: 'built-in' },
+];
+
+export const builtInTable: KeybindingTable = { bindings: builtInKeybindings };
+
+/**
  * The set that is interpreting the keys right now, which vim mode changes.
  *
  * **Vim gets the plain set and not the extended one, and that is not an oversight.**
- * `vimMode()` in `@tyto/editor` replaces the whole input layer and brings `vimKeymapSet`
- * with it, so `Mod-o` and `Mod-Shift-s` are simply not bound while vim is on. The bar reads
- * its keystrokes off whatever this returns, so returning the extended set here would make
- * it promise two shortcuts that do nothing — which is worse than showing none, because a
- * person would stop looking for the command.
+ * `vimMode()` in `@tyto/editor` replaces the whole input layer and brings its set with it, so
+ * `Mod-o` and `Mod-Shift-s` are simply not bound while vim is on. The bar reads its keystrokes
+ * off whatever this returns, so returning the extended set here would make it promise two
+ * shortcuts that do nothing — which is worse than showing none, because a person would stop
+ * looking for the command.
  */
-export const keymapSetFor = (vim: boolean): EditorKeymap => (vim ? vimKeymapSet : desktopKeymapSet);
+export const keymapSetFor = (vim: boolean, table: KeybindingTable = builtInTable): EditorKeymap =>
+  keymapSetOfTable(table, vim);
+
+/**
+ * A plugin's `editor.keymap` as a layer of the table.
+ *
+ * `when` wins; `mode` stands in for it in the plugins written before it existed — `normal`
+ * was always the desktop's input mode, and `vim` the engine's normal mode, where a key that
+ * is not a character is free. Neither means global, as a missing `when` does in the file.
+ */
+export function pluginKeybindingLayer(
+  keymap: IpcResponse<'plugins:keymaps'>['keymaps'][number],
+): KeybindingLayer {
+  const when =
+    keymap.when ??
+    (keymap.mode === 'vim' ? 'vim.normal' : keymap.mode === 'normal' ? 'mode.desktop' : undefined);
+  const entries: KeybindingEntry[] = Object.entries(keymap.bindings).map(([key, command]) => ({
+    key,
+    command,
+    ...(when === undefined ? {} : { when }),
+  }));
+  return { entries };
+}

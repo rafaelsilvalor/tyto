@@ -1,7 +1,9 @@
 import { type Extension } from '@codemirror/state';
-import { type KeyBinding, keymap } from '@codemirror/view';
+import { type EditorView, type KeyBinding, keymap } from '@codemirror/view';
+import { getCM } from '@replit/codemirror-vim';
 
 import { EDITOR_REDO, EDITOR_UNDO, commandRegistryOf } from './commands.js';
+import type { KeybindingContext } from './keybindings.js';
 import { EDITOR_FIND, EDITOR_FIND_NEXT, EDITOR_FIND_PREVIOUS, EDITOR_GOTO_LINE } from './search.js';
 
 /**
@@ -20,6 +22,12 @@ export interface CommandBinding {
   /** Overrides `key` on macOS, the way `@codemirror/commands` spells the same idea. */
   readonly mac?: string;
   readonly command: string;
+  /**
+   * The vim sub-mode the binding runs in (TYTO-207). Absent means wherever the set is
+   * installed; the set itself is installed per input mode, so only vim's two halves need
+   * asking at the moment of the keystroke.
+   */
+  readonly when?: Extract<KeybindingContext, 'vim.normal' | 'vim.insert'>;
 }
 
 export interface EditorKeymap {
@@ -38,10 +46,30 @@ export interface EditorKeymap {
 export const EDITOR_SAVE = 'editor.save';
 export const EDITOR_RENDER = 'editor.render';
 
+/** `insertMode` off the vim engine's own state, which is the only place it is kept. */
+const vimInsertMode = (view: EditorView): boolean | undefined => {
+  const state = (getCM(view)?.state as { vim?: { insertMode?: boolean } } | undefined)?.vim;
+  return state === undefined ? undefined : state.insertMode === true;
+};
+
+/**
+ * Whether the vim engine is in the half a binding asked for.
+ *
+ * `false` when it is not, so the key falls through to the engine and to the bindings after
+ * this one — a `vim.normal` binding on `alt+j` leaves `alt+j` to insert mode untouched.
+ */
+const holds = (view: EditorView, when: CommandBinding['when']): boolean => {
+  if (when === undefined) return true;
+  const insert = vimInsertMode(view);
+  if (insert === undefined) return false;
+  return when === 'vim.insert' ? insert : !insert;
+};
+
 const toKeyBinding = (binding: CommandBinding): KeyBinding => ({
   key: binding.key,
   ...(binding.mac === undefined ? {} : { mac: binding.mac }),
   run: (view) => {
+    if (!holds(view, binding.when)) return false;
     const registry = commandRegistryOf(view);
     if (registry === undefined) return false;
     // `false` for an id nobody registered, so the keystroke keeps travelling.

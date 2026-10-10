@@ -307,6 +307,7 @@ export const ISOLATED_POINTS: Readonly<Partial<Record<ContributionPoint, PointSp
       id: z.string().min(1),
       bindings: z.record(z.string(), z.string()),
       mode: z.enum(['normal', 'vim']).optional(),
+      when: z.string().min(1).optional(),
     }),
     callables: {},
   },

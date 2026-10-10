@@ -42,6 +42,7 @@ describe('the IPC contract', () => {
       'log:reveal',
       'log:write',
       'panel:request',
+      'plugins:keymaps',
       'plugins:list',
       'plugins:panels',
       'queue:list',
@@ -247,6 +248,8 @@ describe('what the contract does not promise', () => {
       'plugins:list',
       // TYTO-49. "Which panels do the plugins offer" has none either, for the same reason.
       'plugins:panels',
+      // TYTO-207. Nor "which keys do the plugins bind".
+      'plugins:keymaps',
       // TYTO-45. "What is in the queue" has no subject: there is one queue folder, and where
       // it is, is main's.
       'queue:list',

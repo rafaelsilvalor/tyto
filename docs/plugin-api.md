@@ -286,6 +286,14 @@ interface CommandBinding {
 `createCommandRegistry` in `@tyto/editor` is the registry both points feed, and E7 hands a
 plugin the same `register` the built-ins use.
 
+**The desktop consumes `editor.keymap` since TYTO-207** (ADR 0074). A plugin's
+`{ bindings, mode?, when? }` becomes one layer of the window's keybinding table, between the
+built-in set and the person's own file: keys are written `mod+shift+s`, `when` is one of the
+closed contexts `editor`, `vim.normal`, `vim.insert`, `mode.desktop`, `commandBar` and
+`panel`, and `mode` stands in for a missing `when` (`normal` is `mode.desktop`, `vim` is
+`vim.normal`, neither is a global key). An entry the table refuses costs only itself and is a
+`W_KEYBINDING_*` diagnostic; the command bar's own key cannot be taken.
+
 **A command that edits the document must not declare an `undo`, and the registry throws if
 one does.** There is one undo stack and CodeMirror's history is most of it: text is already
 undone by the history, so a second `undo` for the same change would run both and overshoot

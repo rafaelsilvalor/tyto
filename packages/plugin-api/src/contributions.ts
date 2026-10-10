@@ -230,10 +230,18 @@ export interface EditorCommand extends Contribution {
   readonly title: string;
 }
 
-/** `editor.keymap` — a binding to a command id, in normal mode or in vim (E8.3). */
+/**
+ * `editor.keymap` — keys bound to command ids (E8.3), consumed by the desktop since TYTO-207.
+ *
+ * A key is written the way the keybindings file writes one, `mod+shift+s` (ADR 0074). `when`
+ * is one of the closed contexts `@tyto/editor` lists, and wins over `mode`, which is kept for
+ * the plugins written before it: `normal` means `mode.desktop`, `vim` means `vim.normal`, and
+ * neither means a global key. The person's own file wins over every plugin.
+ */
 export interface EditorKeymap extends Contribution {
   readonly bindings: Readonly<Record<string, string>>;
   readonly mode?: 'normal' | 'vim';
+  readonly when?: string;
 }
 
 /**

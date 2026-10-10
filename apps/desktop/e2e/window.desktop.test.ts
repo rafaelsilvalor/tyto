@@ -264,6 +264,8 @@ describe('the bridge', () => {
       'on',
       // TYTO-49: a plugin panel's list and its bridge. Exercised by `e2e/panel-plugin.desktop.test.ts`.
       'panel:request',
+      // TYTO-207: the plugins' keymaps. Exercised by `e2e/keybindings.desktop.test.ts`.
+      'plugins:keymaps',
       'plugins:list',
       'plugins:panels',
       // TYTO-45: the local queue panel's six, and TYTO-188's seventh. Each is exercised by

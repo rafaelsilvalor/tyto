@@ -16,6 +16,7 @@ function contributed(permissions: readonly string[]): WindowPlugins {
         panel: { id: 'contagem', title: 'Contagem', entry: 'panel/index.html', location: 'bottom' },
       },
     ],
+    keymaps: () => [],
     permissionsOf: (plugin) => (plugin === 'demo' ? permissions : undefined),
     brandKits: () => ({ kits: new Map(), diagnostics: [] }),
   };

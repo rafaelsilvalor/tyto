@@ -209,7 +209,8 @@ describe('the keystroke shown beside a command', () => {
 
     expect(bindings[EDITOR_UNDO]).toBeUndefined();
     expect(bindings[EDITOR_SAVE]).toBe('Ctrl+s');
-    expect(keymapSetFor(true)).toBe(vimKeymapSet);
+    // The same bindings as the editor's vim set, now read off the table (TYTO-207).
+    expect(keymapSetFor(true).bindings).toEqual(vimKeymapSet.bindings);
   });
 
   it('gives vim none of the desktop keys, because vim mode replaces the whole layer', () => {

@@ -766,6 +766,31 @@ export const IPC_CHANNELS = {
   ),
 
   /**
+   * The installed plugins' `editor.keymap` contributions (TYTO-207, ADR 0074), answered once
+   * the plugins have started.
+   *
+   * Data as the plugin registered it — keys in the file's `mod+shift+s` spelling, `when` not
+   * yet checked — because the table is resolved in the renderer, where the commands are; a
+   * binding main validated against ids it cannot see would be checked twice and wrong once.
+   */
+  'plugins:keymaps': channel(
+    z.object({}),
+    z.object({
+      keymaps: z
+        .array(
+          z.object({
+            plugin: z.string().min(1),
+            id: z.string().min(1).max(300),
+            bindings: z.record(z.string().max(100), z.string().max(300)),
+            mode: z.enum(['normal', 'vim']).optional(),
+            when: z.string().min(1).max(100).optional(),
+          }),
+        )
+        .max(100),
+    }),
+  ),
+
+  /**
    * What a plugin's panel asked of the host through its bridge, relayed by the renderer.
    *
    * Checked in main against that plugin's permissions — `net:<host>` for `fetch`,

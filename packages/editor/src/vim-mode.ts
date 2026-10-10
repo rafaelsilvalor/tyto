@@ -3,7 +3,13 @@ import { type EditorView } from '@codemirror/view';
 import { CodeMirror, Vim, vim } from '@replit/codemirror-vim';
 
 import { commandRegistryOf } from './commands.js';
-import { keymapExtension, EDITOR_RENDER, EDITOR_SAVE, vimKeymapSet } from './keymap.js';
+import {
+  type EditorKeymap,
+  keymapExtension,
+  EDITOR_RENDER,
+  EDITOR_SAVE,
+  vimKeymapSet,
+} from './keymap.js';
 
 /**
  * Vim mode (ADR 0006), wired so that it drives the same command registry everything else
@@ -89,18 +95,23 @@ export interface VimModeOptions {
   readonly exCommands?: readonly VimExCommand[];
   /** The vim status line at the bottom of the editor. On by default, as vim has one. */
   readonly status?: boolean;
+  /**
+   * The bindings that ride along with the engine. Defaults to `vimKeymapSet`; a host with a
+   * keybinding table hands in its vim half (TYTO-207).
+   */
+  readonly keymap?: EditorKeymap;
 }
 
 /**
  * The extension a host swaps in and out to turn vim on.
  *
- * It carries `vimKeymapSet` with it, so switching modes swaps the bindings and the engine
+ * It carries a keymap set with it, so switching modes swaps the bindings and the engine
  * together — a host cannot end up in vim with the default set's `Mod-z` fighting `u` for
  * the same stack.
  */
 export function vimMode(options: VimModeOptions = {}): Extension {
   install(options.exCommands ?? defaultExCommands);
-  return [vim({ status: options.status ?? true }), keymapExtension(vimKeymapSet)];
+  return [vim({ status: options.status ?? true }), keymapExtension(options.keymap ?? vimKeymapSet)];
 }
 
 /** Test seam: the registrations are global and a test that changes them has to undo that. */
