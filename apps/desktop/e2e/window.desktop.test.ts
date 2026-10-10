@@ -257,6 +257,10 @@ describe('the bridge', () => {
       'file:reopen',
       'file:save',
       'files:recent',
+      // TYTO-207: the keybindings tab and the file's text. Exercised by
+      // `e2e/keybindings-file.desktop.test.ts`.
+      'keybindings:open',
+      'keybindings:read',
       'layout:get',
       'layout:set',
       'log:reveal',
@@ -528,6 +532,8 @@ describe('the language picker', () => {
     // TYTO-206: a command's label, shown only in the bar and the menu, like the two above.
     // `e2e/settings.desktop.test.ts` runs it from the bar.
     'command.settings.open',
+    // TYTO-207: the same, for the keybindings file. `e2e/keybindings-file.desktop.test.ts`.
+    'command.keybindings.open',
   ];
 
   it('paints every catalogue string on load, with none left blank', async () => {

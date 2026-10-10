@@ -71,6 +71,8 @@ export const PLUGINS_SHOW = 'plugins.show';
 export const QUEUE_SHOW = 'queue.show';
 /** TYTO-206. Opens `settings.json` in a tab, or brings its tab forward. */
 export const SETTINGS_OPEN = 'settings.open';
+/** TYTO-207. Opens `keybindings.json` in a tab, or brings its tab forward. */
+export const KEYBINDINGS_OPEN = 'keybindings.open';
 /**
  * TYTO-122. Points the app at a folder of templates, or goes back to the built-in pack.
  *
@@ -170,6 +172,7 @@ export const COMMAND_LABELS: Readonly<Record<string, CatalogueKey>> = {
   [PLUGINS_SHOW]: 'command.plugins.show',
   [QUEUE_SHOW]: 'command.queue.show',
   [SETTINGS_OPEN]: 'command.settings.open',
+  [KEYBINDINGS_OPEN]: 'command.keybindings.open',
   [TEMPLATES_CHOOSE_FOLDER]: 'command.templates.chooseFolder',
   [TEMPLATES_CLEAR_FOLDER]: 'command.templates.clearFolder',
   [TEMPLATE_EDIT]: 'command.template.edit',
@@ -224,6 +227,7 @@ export interface DesktopActions {
    */
   showQueue(): void;
   openSettings(): void;
+  openKeybindings(): void;
   /**
    * TYTO-122. Points the app at a folder of templates, or clears the choice.
    *
@@ -313,6 +317,9 @@ export function createDesktopRegistry(actions: DesktopActions): CommandRegistry 
   });
   add(SETTINGS_OPEN, () => {
     actions.openSettings();
+  });
+  add(KEYBINDINGS_OPEN, () => {
+    actions.openKeybindings();
   });
 
   // Registration order is display order, so these land next to Export rather than at the

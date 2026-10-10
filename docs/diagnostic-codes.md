@@ -193,7 +193,7 @@ incomplete brief, and a crossed box where a picture the exporter could not load 
 | `E_DELIVERY_FOLDER_BLOCKED` | yes | Fatal when the delivery folder or `editaveis/` is held: there is nowhere to write the artwork or `result.json`, so nothing is. When only `assets/` is held, the artwork is already written and the images are not copied beside it. |
 | `E_OUTPUT_FILE_BLOCKED` | yes | Depends on the file. The copied brief: nothing is rendered. An artwork file: that one artifact is missing, reported as `E_OUTPUT_WRITE` with this sentence. `template.txt` or an image in `assets/`: the artwork is written and that file is not. `result.json`: the artwork is written and no report is. |
 | `E_SETTINGS_SYNTAX` | no | Every key that parsed still applies and the rest fall back to their defaults. |
-| `E_KEYBINDINGS_SYNTAX` | no | Every entry that parsed still applies, and the built-in keys stay bound. |
+| `E_KEYBINDINGS_SYNTAX` | no | The last file that read without one stays in effect, and the built-in keys stay bound. |
 
 ## Errors
 
@@ -1141,7 +1141,7 @@ Parameters: `problem`
 
 The keybindings file is not valid JSON with comments.
 
-Every entry that parsed still applies, and the built-in keys stay bound.
+The last file that read without one stays in effect, and the built-in keys stay bound.
 
 ```
 The keybindings file cannot be read here: {problem}.

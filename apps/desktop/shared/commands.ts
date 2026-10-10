@@ -63,6 +63,8 @@ export const FILE_MENU_GROUPS: readonly (readonly MenuCommand[])[] = [
     { id: 'queue.show', label: 'command.queue.show' },
     // TYTO-206. `settings.json` in a tab, as VS Code and Zed open theirs.
     { id: 'settings.open', label: 'command.settings.open' },
+    // TYTO-207. `keybindings.json` beside it, with no accelerator (TYTO-124).
+    { id: 'keybindings.open', label: 'command.keybindings.open' },
   ],
   [{ id: 'document.close', label: 'command.document.close' }],
 ];

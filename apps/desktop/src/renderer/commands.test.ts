@@ -57,6 +57,7 @@ const actions = () =>
     showPlugins: vi.fn<() => void>(),
     showQueue: vi.fn<() => void>(),
     openSettings: vi.fn<() => void>(),
+    openKeybindings: vi.fn<() => void>(),
     chooseTemplateFolder: vi.fn<() => void>(),
     clearTemplateFolder: vi.fn<() => void>(),
     editTemplate: vi.fn<() => void>(),
@@ -276,6 +277,7 @@ describe('the File menu table', () => {
     expect(spies.showPlugins).toHaveBeenCalledTimes(1);
     expect(spies.showQueue).toHaveBeenCalledTimes(1);
     expect(spies.openSettings).toHaveBeenCalledTimes(1);
+    expect(spies.openKeybindings).toHaveBeenCalledTimes(1);
     expect(spies.closeDocument).toHaveBeenCalledTimes(1);
     expect(spies.saveDocument.mock.calls).toEqual([[false], [true]]);
   });
