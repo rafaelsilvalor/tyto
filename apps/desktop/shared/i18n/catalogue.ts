@@ -289,7 +289,24 @@ export interface Catalogue {
   readonly 'command.editor.replaceAll': string;
   readonly 'command.editor.gotoLine': string;
 
-  readonly 'shell.language.label': string;
+  /**
+   * The status bar (TYTO-248, ADR 0076). The three area toggles are commands, so their
+   * labels are the bar's and the buttons' both; the rest are the bar's own words. `{line}`,
+   * `{column}` and `{count}` are placeholders the bar substitutes.
+   */
+  readonly 'command.layout.toggleDock.left': string;
+  readonly 'command.layout.toggleDock.right': string;
+  readonly 'command.layout.toggleDock.bottom': string;
+  readonly 'status.commandBar': string;
+  readonly 'status.position': string;
+  readonly 'status.selected': string;
+  readonly 'status.kind.settings': string;
+  readonly 'status.kind.keybindings': string;
+  /**
+   * Help > About, where the version, the platform, the template count and the template
+   * folder went when the footer became a status bar (TYTO-248).
+   */
+  readonly 'menu.about': string;
   readonly 'shell.about.version': string;
   readonly 'shell.about.platform': string;
   readonly 'shell.about.templates': string;
@@ -528,7 +545,15 @@ export const CATALOGUE_KEYS = [
   'command.editor.replaceNext',
   'command.editor.replaceAll',
   'command.editor.gotoLine',
-  'shell.language.label',
+  'command.layout.toggleDock.left',
+  'command.layout.toggleDock.right',
+  'command.layout.toggleDock.bottom',
+  'status.commandBar',
+  'status.position',
+  'status.selected',
+  'status.kind.settings',
+  'status.kind.keybindings',
+  'menu.about',
   'shell.about.version',
   'shell.about.platform',
   'shell.about.templates',

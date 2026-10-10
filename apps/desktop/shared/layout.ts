@@ -60,8 +60,20 @@ export const panelRecordSchema = z.object({
 
 export type PanelRecord = z.infer<typeof panelRecordSchema>;
 
+/** The three docks a person can hide whole; `centre` is the remainder and never hides. */
+export const HIDEABLE_DOCKS = ['left', 'right', 'bottom'] as const;
+export type HideableDock = (typeof HIDEABLE_DOCKS)[number];
+
 export const layoutSchema = z.object({
   panels: z.array(panelRecordSchema).max(50),
+  /**
+   * Docks hidden whole by the status bar's area buttons (TYTO-248, ADR 0076).
+   *
+   * A flag beside the panels and not `open: false` on each of them, because hiding an area
+   * must give back what was in it: a dock with the queue and a plugin panel open comes back
+   * with both. Optional, so every `layout.json` written before it still reads.
+   */
+  hiddenDocks: z.array(z.enum(HIDEABLE_DOCKS)).max(3).optional(),
 });
 
 export type Layout = z.infer<typeof layoutSchema>;
@@ -156,17 +168,21 @@ export const panelOf = (layout: Layout, id: string): PanelRecord | undefined =>
  * kept in step.
  */
 export function withPanelOpen(layout: Layout, id: string, open: boolean): Layout {
-  return {
-    panels: layout.panels.map((panel) =>
-      // A fixed panel refuses rather than throwing: the caller is a command, and a command
-      // that cannot run is `false`, not an exception in a click handler.
-      panel.id === id && !(panel.fixed && !open) ? { ...panel, open } : panel,
-    ),
-  };
+  const panels = layout.panels.map((panel) =>
+    // A fixed panel refuses rather than throwing: the caller is a command, and a command
+    // that cannot run is `false`, not an exception in a click handler.
+    panel.id === id && !(panel.fixed && !open) ? { ...panel, open } : panel,
+  );
+  // Opening a panel in a hidden area shows the area (ADR 0076): a toggle that changed a
+  // value nobody can see would be a command that does nothing.
+  const dock = panelOf(layout, id)?.dock;
+  const reveal = open && dock !== undefined && dockIsHidden(layout, dock);
+  return reveal ? withHidden({ ...layout, panels }, dock, false) : { ...layout, panels };
 }
 
 export function withPanelSize(layout: Layout, id: string, size: number): Layout {
   return {
+    ...layout,
     panels: layout.panels.map((panel) =>
       panel.id === id ? { ...panel, size: clampSize(size) } : panel,
     ),
@@ -176,6 +192,39 @@ export function withPanelSize(layout: Layout, id: string, size: number): Layout 
 /** Panels of one dock, open ones only, in the order the record lists them. */
 export const openPanelsOf = (layout: Layout, dock: Dock): readonly PanelRecord[] =>
   layout.panels.filter((panel) => panel.dock === dock && panel.open);
+
+export const dockIsHidden = (layout: Layout, dock: Dock): boolean =>
+  layout.hiddenDocks?.includes(dock as HideableDock) ?? false;
+
+/** The panels a dock shows: none while it is hidden, its open ones otherwise. */
+export const shownPanelsOf = (layout: Layout, dock: Dock): readonly PanelRecord[] =>
+  dockIsHidden(layout, dock) ? [] : openPanelsOf(layout, dock);
+
+/** Whether a dock is on screen, which is what its status-bar button shows as on. */
+export const dockIsShown = (layout: Layout, dock: Dock): boolean =>
+  shownPanelsOf(layout, dock).length > 0;
+
+const withHidden = (layout: Layout, dock: Dock, hidden: boolean): Layout => {
+  const others = (layout.hiddenDocks ?? []).filter((each) => each !== dock);
+  const hiddenDocks = hidden ? [...others, dock as HideableDock] : others;
+  return { ...layout, hiddenDocks };
+};
+
+/**
+ * Hides or shows a whole area (TYTO-248, ADR 0076), the way VS Code's and Zed's do.
+ *
+ * Shown and holding something: hidden, with every panel's `open` left as it was. Otherwise
+ * shown again — and a dock that would come back empty opens its first panel, because a
+ * button that lit up over nothing would be a button that seemed broken. A dock no panel
+ * lives in has nothing to show and is returned unchanged.
+ */
+export function withDockToggled(layout: Layout, dock: HideableDock): Layout {
+  if (dockIsShown(layout, dock)) return withHidden(layout, dock, true);
+  const shown = withHidden(layout, dock, false);
+  if (openPanelsOf(shown, dock).length > 0) return shown;
+  const first = shown.panels.find((panel) => panel.dock === dock);
+  return first === undefined ? layout : withPanelOpen(shown, first.id, true);
+}
 
 /**
  * Whether a dock has anything in it, which is what decides if it takes up room.
@@ -216,8 +265,10 @@ export function layoutFrom(value: unknown): Layout {
       size: clampSize(panel.size),
     }));
 
+  const hiddenDocks = parsed.success ? parsed.data.hiddenDocks : undefined;
   return {
     panels: [...builtIns(saved), ...plugins],
+    ...(hiddenDocks === undefined ? {} : { hiddenDocks }),
   };
 }
 
@@ -265,5 +316,5 @@ export function withPluginPanels(layout: Layout, offered: readonly OfferedPlugin
       size: panel.location === 'bottom' ? 200 : 320,
       fixed: false,
     }));
-  return { panels: [...kept, ...added].slice(0, 50) };
+  return { ...layout, panels: [...kept, ...added].slice(0, 50) };
 }

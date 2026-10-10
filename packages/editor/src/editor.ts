@@ -30,7 +30,7 @@ import { type SearchPhrases, searchSupport, setSearchPhrases } from './search.js
 import { type EditorKeymap, defaultKeymapSet, keymapExtension } from './keymap.js';
 import { type ThemeName, themes } from './theme.js';
 import { template } from './template-language.js';
-import { vimMode } from './vim-mode.js';
+import { type VimStatus, vimMode } from './vim-mode.js';
 
 /**
  * `createEditor` is the whole public surface of this package.
@@ -94,6 +94,12 @@ export interface EditorOptions {
   /** Starts in vim mode. Toggle later with `setVimMode`. */
   readonly vim?: boolean;
   /**
+   * Vim's own status line under the buffer. On by default; a host that shows the mode in
+   * its own status bar through {@link EditorHandle.onVimStatus} turns it off (TYTO-248).
+   * Vim's `:` prompt and its notifications still open in the library's panel either way.
+   */
+  readonly vimStatus?: boolean;
+  /**
    * Which language the buffer holds. Defaults to `brief`.
    *
    * A name rather than a `LanguageSupport`, so a host still never imports CodeMirror — the
@@ -149,6 +155,21 @@ export type ScrollPosition = StateEffect<unknown>;
  * string is a fact about the state and never a second copy that can disagree with it.
  */
 export const textOf = (state: EditorState): string => state.doc.toString();
+
+/** Where the main cursor is, one-based, and how many characters every range selects. */
+export interface CursorPosition {
+  readonly line: number;
+  readonly column: number;
+  readonly selected: number;
+}
+
+/** Read off the state the host already holds, for a status bar (TYTO-248). */
+export function cursorOf(state: EditorState): CursorPosition {
+  const head = state.selection.main.head;
+  const line = state.doc.lineAt(head);
+  const selected = state.selection.ranges.reduce((sum, range) => sum + range.to - range.from, 0);
+  return { line: line.number, column: head - line.from + 1, selected };
+}
 
 export interface EditorHandle {
   /**
@@ -220,6 +241,11 @@ export interface EditorHandle {
    */
   setVimMode(enabled: boolean): void;
   isVimMode(): boolean;
+  /**
+   * Vim's mode and pending keys as they change, and `null` when vim is off (TYTO-248).
+   * Called at once with the current answer. Returns the function that stops the listener.
+   */
+  onVimStatus(listener: (status: VimStatus | null) => void): () => void;
   /**
    * Replaces both input modes' bindings, in place, as `setVimMode` swaps between them
    * (TYTO-207). A tab shown afterwards picks them up in `restore`, so a table that changes
@@ -299,7 +325,18 @@ export function createEditor(parent: HTMLElement, options: EditorOptions = {}): 
   let keys = keymapExtension(options.keymap ?? defaultKeymapSet);
   let vimKeymap = options.vimKeymap;
   let vimEnabled = options.vim ?? false;
-  const vimInput = (): Extension => vimMode(vimKeymap === undefined ? {} : { keymap: vimKeymap });
+  const vimListeners = new Set<(status: VimStatus | null) => void>();
+  let vimStatus: VimStatus | null = null;
+  const reportVim = (status: VimStatus | null): void => {
+    vimStatus = status;
+    for (const listener of vimListeners) listener(status);
+  };
+  const vimInput = (): Extension =>
+    vimMode({
+      status: options.vimStatus ?? true,
+      onStatus: reportVim,
+      ...(vimKeymap === undefined ? {} : { keymap: vimKeymap }),
+    });
   /** What the input compartment holds now, which every shown tab is brought up to. */
   let input: Extension = vimEnabled ? vimInput() : keys;
   /**
@@ -446,6 +483,14 @@ export function createEditor(parent: HTMLElement, options: EditorOptions = {}): 
 
     isVimMode: () => vimEnabled,
 
+    onVimStatus: (listener: (status: VimStatus | null) => void) => {
+      vimListeners.add(listener);
+      listener(vimStatus);
+      return () => {
+        vimListeners.delete(listener);
+      };
+    },
+
     setKeymaps: (keymaps) => {
       keys = keymapExtension(keymaps.normal);
       vimKeymap = keymaps.vim;
@@ -456,6 +501,7 @@ export function createEditor(parent: HTMLElement, options: EditorOptions = {}): 
     destroy: () => {
       changeListeners.clear();
       updateListeners.clear();
+      vimListeners.clear();
       view.destroy();
     },
   };

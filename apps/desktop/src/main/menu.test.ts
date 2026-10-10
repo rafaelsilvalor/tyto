@@ -2,7 +2,7 @@ import type { MenuItemConstructorOptions } from 'electron';
 import { describe, expect, it, vi } from 'vitest';
 
 import { FILE_MENU_COMMANDS } from '../../shared/commands.js';
-import { menuTemplate } from './menu.js';
+import { aboutText, menuTemplate } from './menu.js';
 
 /**
  * The template with a fake translator and a no-op reveal (TYTO-132).
@@ -15,7 +15,8 @@ const template = (
   platform: string,
   onRevealLogs: () => void = () => {},
   onCommand: (id: string) => void = () => {},
-) => menuTemplate(platform, { t: (key) => key, onRevealLogs, onCommand });
+  onAbout: () => void = () => {},
+) => menuTemplate(platform, { t: (key) => key, onRevealLogs, onCommand, onAbout });
 
 /** The File submenu, found by its label rather than by a role — it has none (TYTO-124). */
 const fileSubmenu = (
@@ -120,12 +121,46 @@ describe('the rest of the menu', () => {
  * file does not need the catalogue". That stopped being true here, so it is asserted here.
  */
 describe('the Help submenu', () => {
-  it('carries exactly one item, on every platform', () => {
+  it('carries the log folder and About, on every platform', () => {
     for (const platform of ['win32', 'darwin', 'linux']) {
       const help = submenuOf(template(platform), 'help');
-      expect(help, platform).toHaveLength(1);
-      expect(help?.[0]?.label, platform).toBe('menu.revealLogs');
+      expect(
+        help?.map((item) => item.label),
+        platform,
+      ).toEqual(['menu.revealLogs', 'menu.about']);
     }
+  });
+
+  it('opens About through the callback it was given (TYTO-248)', () => {
+    const onAbout = vi.fn();
+    const help = submenuOf(
+      template(
+        'win32',
+        () => {},
+        () => {},
+        onAbout,
+      ),
+      'help',
+    );
+
+    (help?.[1]?.click as (() => void) | undefined)?.();
+
+    expect(onAbout).toHaveBeenCalledTimes(1);
+  });
+
+  it('says in About what the footer said: version, platform, templates and their folder', () => {
+    const facts = { version: '0.1.0', platform: 'linux', templates: 2, templatesFolder: null };
+
+    expect(aboutText((key) => key, facts).split('\n')).toEqual([
+      'shell.about.version: 0.1.0',
+      'shell.about.platform: linux',
+      'shell.about.templates: 2',
+      // A word and not a blank when nobody chose a folder (TYTO-122).
+      'templates.folder.label: templates.folder.none',
+    ]);
+    expect(aboutText((key) => key, { ...facts, templatesFolder: '/home/r/meus' })).toContain(
+      'templates.folder.label: /home/r/meus',
+    );
   });
 
   it('runs the reveal it was given, once', () => {

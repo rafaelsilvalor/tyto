@@ -164,7 +164,7 @@ with a built-in one's name wins, exactly as `templates/` beside a brief does for
 
 The choice is remembered in `settings.json` beside `layout.json` in the app's data folder, so
 it survives a restart, and _Voltar aos templates internos_ clears it with no restart either.
-The footer shows which folder is in force, or `internos` when none is.
+Help ▸ About shows which folder is in force, or `internos` when none is (TYTO-248).
 
 **One rule the CLI does not have.** A chosen folder's own `formats.yaml` replaces the built-in
 pack's when it has one, and falls back to the built-in one when it does not — so a folder that

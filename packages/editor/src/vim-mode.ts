@@ -1,6 +1,6 @@
 import { type Extension } from '@codemirror/state';
-import { type EditorView } from '@codemirror/view';
-import { CodeMirror, Vim, vim } from '@replit/codemirror-vim';
+import { type EditorView, ViewPlugin } from '@codemirror/view';
+import { CodeMirror, Vim, getCM, vim } from '@replit/codemirror-vim';
 
 import { commandRegistryOf } from './commands.js';
 import {
@@ -90,7 +90,79 @@ const install = (exCommands: readonly VimExCommand[]): void => {
   };
 };
 
+/**
+ * What vim is doing, for a host that draws its own status bar (TYTO-248, ADR 0076).
+ *
+ * `mode` is vim's own word — `normal`, `insert`, `visual`, `replace` — with `line` or `block`
+ * after a visual one, the way the library's status line writes it. `pending` is the keys
+ * typed towards a command that has not run yet, such as the `d` of `dw`.
+ */
+export interface VimStatus {
+  readonly mode: string;
+  readonly pending: string;
+}
+
+/**
+ * Follows vim through the library's **public** events only (`vim-mode-change`,
+ * `vim-keypress`, `vim-command-done`), never `cm.state.vim`, which is its internals.
+ *
+ * A key is reported after the engine has handled it, and a command that completed on that
+ * very key has already said so — so the key that finishes a command, or changes the mode,
+ * must not start a new pending string. `settled` is that memory, and it lasts until the end of
+ * the current task only: a mode change with no key behind it — a mouse selection — must not
+ * swallow the next key a person types.
+ */
+const vimStatusPlugin = (report: (status: VimStatus | null) => void): Extension =>
+  ViewPlugin.define((view) => {
+    const adapter = getCM(view);
+    let mode = 'normal';
+    let pending = '';
+    let settled = false;
+    let last = '';
+    const settle = (): void => {
+      settled = true;
+      queueMicrotask(() => {
+        settled = false;
+      });
+    };
+    // Once per change: a key that both ends a command and is reported says nothing new.
+    const emit = (): void => {
+      if (`${mode}|${pending}` === last) return;
+      last = `${mode}|${pending}`;
+      report({ mode, pending });
+    };
+    adapter?.on('vim-mode-change', (event: { mode: string; subMode?: string }) => {
+      // The library's own reading of `subMode`: absent or empty is a plain visual.
+      const sub = event.subMode ?? '';
+      mode = sub === '' ? event.mode : `${event.mode} ${sub === 'linewise' ? 'line' : 'block'}`;
+      pending = '';
+      settle();
+      emit();
+    });
+    adapter?.on('vim-command-done', () => {
+      pending = '';
+      settle();
+      emit();
+    });
+    adapter?.on('vim-keypress', (key: string) => {
+      pending = settled ? '' : `${pending}${key}`;
+      settled = false;
+      emit();
+    });
+    emit();
+    return {
+      destroy: () => {
+        report(null);
+      },
+    };
+  });
+
 export interface VimModeOptions {
+  /**
+   * Called with vim's mode and pending keys whenever they change, and with `null` when vim
+   * is switched off. A host with its own status bar passes this and `status: false`.
+   */
+  readonly onStatus?: (status: VimStatus | null) => void;
   /** Replaces the built-in list rather than adding to it. */
   readonly exCommands?: readonly VimExCommand[];
   /** The vim status line at the bottom of the editor. On by default, as vim has one. */
@@ -111,7 +183,12 @@ export interface VimModeOptions {
  */
 export function vimMode(options: VimModeOptions = {}): Extension {
   install(options.exCommands ?? defaultExCommands);
-  return [vim({ status: options.status ?? true }), keymapExtension(options.keymap ?? vimKeymapSet)];
+  return [
+    vim({ status: options.status ?? true }),
+    // After `vim()`, so the adapter it builds exists when this plugin is constructed.
+    ...(options.onStatus === undefined ? [] : [vimStatusPlugin(options.onStatus)]),
+    keymapExtension(options.keymap ?? vimKeymapSet),
+  ];
 }
 
 /** Test seam: the registrations are global and a test that changes them has to undo that. */

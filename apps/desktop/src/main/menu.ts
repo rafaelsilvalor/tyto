@@ -65,6 +65,32 @@ export interface MenuOptions {
    * running Electron. The composition root is where the id becomes a message.
    */
   readonly onCommand: (id: string) => void;
+  /** Help > About (TYTO-248): shows {@link aboutText}, in a box or macOS's own panel. */
+  readonly onAbout: () => void;
+}
+
+/** What Help > About says, which is what the footer said before it became a status bar. */
+export interface AboutFacts {
+  readonly version: string;
+  readonly platform: string;
+  readonly templates: number;
+  /** The folder searched before the built-in pack, or nothing (TYTO-122). */
+  readonly templatesFolder: string | null;
+}
+
+/**
+ * The about panel's lines, one fact each and labelled from the catalogue (TYTO-248).
+ *
+ * A word rather than a blank for no folder, for the reason the footer gave: an empty value
+ * beside a label reads as something that failed to load.
+ */
+export function aboutText(t: (key: CatalogueKey) => string, facts: AboutFacts): string {
+  return [
+    `${t('shell.about.version')}: ${facts.version}`,
+    `${t('shell.about.platform')}: ${facts.platform}`,
+    `${t('shell.about.templates')}: ${String(facts.templates)}`,
+    `${t('templates.folder.label')}: ${facts.templatesFolder ?? t('templates.folder.none')}`,
+  ].join('\n');
 }
 
 export function menuTemplate(platform: string, options: MenuOptions): MenuItemConstructorOptions[] {
@@ -145,7 +171,13 @@ export function menuTemplate(platform: string, options: MenuOptions): MenuItemCo
     // through `%APPDATA%` is a tester whose report never arrives.
     {
       role: 'help',
-      submenu: [{ label: options.t('menu.revealLogs'), click: options.onRevealLogs }],
+      submenu: [
+        { label: options.t('menu.revealLogs'), click: options.onRevealLogs },
+        // A label and a click rather than `role: 'about'`, so the facts are read when it is
+        // opened (the template folder can change while the app runs), and because the role's
+        // panel on Windows shows the app's name and none of them (ADR 0076).
+        { id: 'about', label: options.t('menu.about'), click: options.onAbout },
+      ],
     },
   ];
 }

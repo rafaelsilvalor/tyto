@@ -5,7 +5,7 @@ import { Vim, getCM } from '@replit/codemirror-vim';
 import { afterEach, describe, expect, it } from 'vitest';
 
 import { type CommandRegistry, createCommandRegistry } from './commands.js';
-import { createEditor, type EditorHandle } from './editor.js';
+import { createEditor, cursorOf, type EditorHandle } from './editor.js';
 import { EDITOR_RENDER, EDITOR_SAVE } from './keymap.js';
 import { defaultExCommands } from './vim-mode.js';
 
@@ -216,6 +216,61 @@ describe('a binding with when vim.normal', () => {
 
     expect(runScopeHandlers(editor.view, altJ(), 'editor')).toBe(true);
     expect(seen).toEqual(['preview.zoomIn']);
+  });
+});
+
+describe('the vim status a host draws itself (TYTO-248)', () => {
+  const press = (view: EditorView, key: string): void => {
+    view.contentDOM.dispatchEvent(new KeyboardEvent('keydown', { key, bubbles: true }));
+  };
+
+  it('reports the mode and the pending keys from the public events, and null when off', () => {
+    const parent = document.createElement('div');
+    document.body.append(parent);
+    // Born in vim: the library adds its status line only to a view created with it — a
+    // reconfigure into vim does not draw one (measured, TYTO-248) — so this is the case where
+    // `status: false` is what keeps the mode from being said twice.
+    handle = createEditor(parent, { doc: BRIEF, vim: true, vimStatus: false });
+    const seen: (string | null)[] = [];
+    handle.onVimStatus((status) => {
+      seen.push(status === null ? null : `${status.mode}|${status.pending}`);
+    });
+
+    press(handle.view, 'd');
+    press(handle.view, 'w');
+    press(handle.view, 'v');
+    expect(parent.querySelector('.cm-vim-panel')).toBeNull();
+    handle.setVimMode(false);
+    handle.setVimMode(true);
+
+    expect(seen).toEqual(['normal|', 'normal|d', 'normal|', 'visual|', null, 'normal|']);
+  });
+
+  it('does not let a mode change with no key behind it swallow the next key', async () => {
+    const parent = document.createElement('div');
+    document.body.append(parent);
+    handle = createEditor(parent, { doc: BRIEF, vim: true, vimStatus: false });
+    let pending = '';
+    handle.onVimStatus((status) => {
+      pending = status?.pending ?? '';
+    });
+
+    // What a mouse selection does: the engine changes mode, and no keypress follows.
+    Vim.handleKey(vimEditor(handle.view), 'v', 'user');
+    Vim.handleKey(vimEditor(handle.view), '<Esc>', 'user');
+    await Promise.resolve();
+    press(handle.view, 'd');
+
+    expect(pending).toBe('d');
+  });
+});
+
+describe('cursorOf', () => {
+  it('counts line and column from one, and every selected character', () => {
+    const editor = open(createCommandRegistry());
+    const at = BRIEF.indexOf('Direito');
+    editor.view.dispatch({ selection: EditorSelection.range(at, at + 7) });
+    expect(cursorOf(editor.state())).toEqual({ line: 4, column: 17, selected: 7 });
   });
 });
 

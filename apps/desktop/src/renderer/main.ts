@@ -6,10 +6,12 @@ import {
   type KeybindingLayer,
   type KeybindingTable,
   COMMAND_BAR_TOGGLE,
+  type VimStatus,
   briefCompletion,
   briefLint,
   concreteKey,
   createEditor,
+  cursorOf,
   keyOfStroke,
   resolveKeybindings,
   shownBindingsOf,
@@ -64,6 +66,8 @@ import {
   PREVIEW_ZOOM_FIT,
   PREVIEW_ZOOM_IN,
   PREVIEW_ZOOM_OUT,
+  FILE_EXPORT,
+  PLUGINS_SHOW,
   SETTINGS_OPEN,
   builtInKeybindings,
   builtInTable,
@@ -77,6 +81,7 @@ import {
   slotOfSelectCommand,
   togglePanelCommandId,
 } from './commands.js';
+import { type StatusBar, type StatusBarCommands, STATUS_BAR_TAG } from './status-bar.js';
 import {
   type DocumentState,
   type Workspace,
@@ -107,8 +112,12 @@ import {
   DEFAULT_LAYOUT,
   EDITOR_PANEL,
   PLUGIN_PANEL_ELEMENT,
+  PROBLEMS_PANEL,
   QUEUE_PANEL,
+  dockIsHidden,
+  dockIsShown,
   panelOf,
+  withDockToggled,
   withPanelOpen,
   withPanelSize,
   withPluginPanels,
@@ -117,7 +126,7 @@ import { type SaveOutcome, listenForExit, resolveExit } from './exit.js';
 import { installErrorReporting, reportToLog } from './report-errors.js';
 import { searchPhrasesFor } from './search-phrases.js';
 import { paintUpdateNotice } from './update-notice.js';
-import { type ShellState, fillLocalePicker, localeFromPicker, paint, paintTitle } from './shell.js';
+import { type ShellState, paint, paintTitle } from './shell.js';
 import {
   type PreviewElements,
   type RequestGate,
@@ -328,7 +337,6 @@ function resolveElements() {
   return {
     status: byId('preview-status'),
     editor: byId('editor'),
-    locale: byId<HTMLSelectElement>('locale'),
     template: byId<HTMLSelectElement>('template'),
     // By tag and not by id: the element is the panel, so what identifies it is what it is.
     // Naming the tag here is also what keeps `problems-panel.js` a runtime import rather
@@ -347,8 +355,10 @@ function resolveElements() {
     // Outside the docks, like the command bar: the strip lists what the *window* has open,
     // so it must not disappear with a panel.
     tabs: document.querySelector<DocumentTabs>(TABS_TAG),
-    // TYTO-131. Beside the version in the footer; hidden while there is nothing newer.
+    // TYTO-131. At the end of the status bar; hidden while there is nothing newer.
     updateNotice: byId<HTMLButtonElement>('update-notice'),
+    // TYTO-248. Outside the docks, like the tabs: the bar belongs to the window.
+    statusBar: document.querySelector<StatusBar>(STATUS_BAR_TAG),
   };
 }
 
@@ -824,9 +834,7 @@ const registry: CommandRegistry = createDesktopRegistry({
   },
 
   toggleLocale: () => {
-    // The picker is a view of the locale and not its owner, so `applyLocale` writes it
-    // rather than reading it; leaving it stale would make the footer disagree with the
-    // window.
+    // The only way to switch language since the footer's picker left (TYTO-248, ADR 0076).
     applyLocale(state.locale === 'pt-BR' ? 'en' : 'pt-BR');
   },
 
@@ -900,6 +908,10 @@ const registry: CommandRegistry = createDesktopRegistry({
 
   restoreLayout: () => {
     void changeLayout(DEFAULT_LAYOUT);
+  },
+
+  toggleDock: (dock) => {
+    void changeLayout(withDockToggled(layout, dock));
   },
 
   closeDocument: () => {
@@ -1771,6 +1783,59 @@ function commandEntries(): readonly CommandEntry[] {
   });
 }
 
+/** What vim last said through `onVimStatus`; `null` while vim is off (TYTO-248). */
+let vimStatus: VimStatus | null = null;
+
+/** The ids the status bar's buttons run; the area toggles are named by the bar itself. */
+const STATUS_COMMANDS: StatusBarCommands = {
+  commandBar: COMMAND_BAR_TOGGLE,
+  problems: togglePanelCommandId(PROBLEMS_PANEL),
+  queue: togglePanelCommandId(QUEUE_PANEL),
+  plugins: PLUGINS_SHOW,
+  export: FILE_EXPORT,
+  settings: SETTINGS_OPEN,
+};
+
+/** A panel is on screen when it is open and its area is not hidden (ADR 0076). */
+const panelShown = (id: string): boolean => {
+  const record = panelOf(layout, id);
+  return record !== undefined && record.open && !dockIsHidden(layout, record.dock);
+};
+
+/**
+ * The status bar, from the tab in front, the layout and the editor (TYTO-248, ADR 0076).
+ *
+ * A property assignment, like the problems panel's: Lit rewrites only what changed, which is
+ * what lets this run on every cursor move.
+ */
+function paintStatusBar(): void {
+  const bar = elements.statusBar;
+  if (bar === null) return;
+  const current = active();
+  const problems = [...panel.installation, ...current.diagnostics];
+  bar.commands = STATUS_COMMANDS;
+  bar.run = (id) => {
+    runWindowCommand(id);
+  };
+  bar.state = {
+    locale: state.locale,
+    vim: editor?.isVimMode() === true ? vimStatus : null,
+    cursor:
+      current.state === undefined ? { line: 1, column: 1, selected: 0 } : cursorOf(current.state),
+    kind: current.kind ?? 'brief',
+    template: current.kind === undefined ? templateOf(activeText()) : undefined,
+    problems: problems.length,
+    errors: errorCount(problems),
+    shown: {
+      left: dockIsShown(layout, 'left'),
+      right: dockIsShown(layout, 'right'),
+      bottom: dockIsShown(layout, 'bottom'),
+      problems: panelShown(PROBLEMS_PANEL),
+      queue: panelShown(QUEUE_PANEL),
+    },
+  };
+}
+
 function paintCommandBar(): void {
   const bar = elements.commandBar;
   if (bar === null) return;
@@ -1845,7 +1910,6 @@ function applyLocale(next: Locale): void {
     elements.templateMode.locale = next;
   }
   if (elements.pluginsDialog) elements.pluginsDialog.locale = next;
-  if (elements.locale !== null) fillLocalePicker(elements.locale, state.locale);
   editor?.setSearchPhrases(searchPhrasesFor(state.locale));
   repaint();
   // And three things, since TYTO-124: the application menu is main's and now carries this
@@ -1877,6 +1941,7 @@ function repaint(): void {
   paintPanel();
   paintTabs();
   paintCommandBar();
+  paintStatusBar();
   if (elements.updateNotice !== null) {
     paintUpdateNotice(elements.updateNotice, updateStatus, state.locale);
   }
@@ -2304,14 +2369,6 @@ async function load(): Promise<void> {
     },
   });
 
-  if (elements.locale instanceof HTMLSelectElement) {
-    const picker = elements.locale;
-    fillLocalePicker(picker, state.locale);
-    once(picker, 'change', () => {
-      applyLocale(localeFromPicker(picker, state.locale));
-    });
-  }
-
   if (bridge !== undefined) {
     // A File menu item was picked (TYTO-124). Straight into `runCommand`, which is the same
     // door the command bar knocks on — the id crossed the bridge precisely so that nothing
@@ -2386,6 +2443,9 @@ async function load(): Promise<void> {
       // The search panel's words, which are the catalogue's even though the panel is
       // CodeMirror's. `applyLocale` is what keeps them current afterwards.
       searchPhrases: searchPhrasesFor(state.locale),
+      // The status bar shows vim's mode (TYTO-248), so the library's own line would say it
+      // twice. Its `:` prompt and its notifications still open in its own panel.
+      vimStatus: false,
       // Slots, adjustments, enum values and plugin directives after `::`, and the
       // underline, both fed from the preview's answer. No delay of the linter's own: the
       // preview's debounce is the pause, and a second one would only add to it.
@@ -2412,6 +2472,12 @@ async function load(): Promise<void> {
       // everything that changes which one that is has already moved `activeId` by the time
       // the view is handed the other state.
       updateActive((document_) => ({ ...document_, state: next }));
+      // The cursor moved or the text did: the bar's Ln/Col reads the state just written.
+      paintStatusBar();
+    });
+    handle.onVimStatus((status) => {
+      vimStatus = status;
+      paintStatusBar();
     });
     // The bindings are read off the keymap set the editor is running, so the bar can only
     // be painted once there is an editor to ask.
