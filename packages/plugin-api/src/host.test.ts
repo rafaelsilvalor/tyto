@@ -304,10 +304,10 @@ describe('activating a plugin', () => {
     expect(host.registry.exporters.list()).toEqual([]);
   });
 
-  it('knows the same ten points the manifest vocabulary names', () => {
+  it('knows the same eleven points the manifest vocabulary names', () => {
     // Two declarations of one vocabulary: `CONTRIBUTION_POINTS` is what a JSON file may
     // say, and the host's points are what code may register into. This activates one
-    // plugin into all ten and compares what was recorded against the list.
+    // plugin into all eleven and compares what was recorded against the list.
     const host = createPluginHost();
     host.activate(
       pluginOf({
@@ -323,15 +323,21 @@ describe('activating a plugin', () => {
           plugin.registerCommand({ id: 'f', title: 'Do' });
           plugin.registerKeymap({ id: 'g', bindings: {} });
           plugin.registerPanel({ id: 'h', title: 'Promo', entry: 'panel.html' });
+          plugin.registerConfiguration({
+            id: 'j',
+            schema: z.boolean(),
+            default: false,
+            description: 'A switch.',
+          });
         },
       }),
     );
 
     // The real assertion is that this did not throw: a point the host knows and
     // `CONTRIBUTION_POINTS` does not would have been registered without being declared,
-    // which `activate` refuses. The counts below say the ten arrived rather than that
+    // which `activate` refuses. The counts below say the eleven arrived rather than that
     // nothing was attempted.
-    expect(CONTRIBUTION_POINTS).toHaveLength(10);
+    expect(CONTRIBUTION_POINTS).toHaveLength(11);
     expect(
       [
         host.registry.sources(),
@@ -344,8 +350,9 @@ describe('activating a plugin', () => {
         host.registry.commands(),
         host.registry.keymaps(),
         host.registry.panels(),
+        host.registry.configurations(),
       ].map((point) => point.length),
-    ).toEqual([1, 1, 1, 1, 1, 1, 1, 1, 1, 1]);
+    ).toEqual([1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1]);
   });
 });
 

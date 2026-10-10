@@ -144,6 +144,9 @@ importers:
       electron-updater:
         specifier: ^6.8.9
         version: 6.8.9(supports-color@7.2.0)
+      jsonc-parser:
+        specifier: ^3.3.1
+        version: 3.3.1
       lit:
         specifier: ^3.3.3
         version: 3.3.3

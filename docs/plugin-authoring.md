@@ -266,6 +266,8 @@ into, or activation is refused. The shapes are in `docs/plugin-api.md`:
 - `panel` — a page in the desktop window (ADR 0045).
 - `editor.command`, `editor.keymap` — cross as data.
 - `source`, `sink`, `rasterizer` — **refused for an installed plugin** today.
+- `configuration` — a setting in the desktop app's `settings.json` (ADR 0073). Declared with a
+  Zod schema, which does not cross to an installed plugin's process, so **refused there too**.
 
 ## Permissions, and what they do not do
 

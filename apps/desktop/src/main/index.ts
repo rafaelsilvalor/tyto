@@ -346,8 +346,26 @@ async function start(): Promise<void> {
   // `activateBuiltIns` above deliberately stays out of it: it registers the *built-in pack*
   // through the plugin extension point, and a folder somebody points at is not a plugin —
   // that is the whole of why this card is not TYTO-47.
-  const settings = fileSettingsStore(join(app.getPath('userData'), 'settings.json'));
-  const saved = await settings.read();
+  //
+  // The file is read against what the plugins declared (ADR 0073), and its problems go to the
+  // log until the settings tab can show them where they were typed (TYTO-206, PR B).
+  const settings = fileSettingsStore(join(app.getPath('userData'), 'settings.json'), () =>
+    host.registry.configurations(),
+  );
+  const reading = await settings.load();
+  host.configure(reading.config);
+  for (const problem of reading.diagnostics) log.warn(`settings.json: ${problem.message}`);
+  const saved = reading.settings;
+  // A screen's change to a file that does not parse is refused, and the file is left alone.
+  const remember = async (changes: Parameters<typeof settings.write>[0]): Promise<void> => {
+    const written = await settings.write(changes);
+    if (!written.ok) {
+      log.warn('settings.json was not written, because it does not parse', {
+        changes,
+        problems: written.error.map((problem) => problem.message),
+      });
+    }
+  };
   const sources = await createProjectSources({
     fileSystem,
     builtIn: builtInTemplatesDirectory(),
@@ -702,7 +720,7 @@ async function start(): Promise<void> {
 
         // Written before the reload, so a disk that refuses the file still leaves this session
         // searching the folder the person just picked — they lose the memory, not the choice.
-        await settings.write({ templatesFolder: chosen ?? null });
+        await remember({ templatesFolder: chosen ?? null });
         await sources.reload(chosen);
         return inForce();
       },
@@ -716,7 +734,7 @@ async function start(): Promise<void> {
         });
         return answer.canceled ? undefined : answer.filePaths[0];
       },
-      remember: (changes) => settings.write(changes),
+      remember,
     },
     // Read on every ask, not held: `tyto plugin install` in a terminal beside the window is
     // the ordinary way a plugin arrives, and a list cached at startup would never show it.

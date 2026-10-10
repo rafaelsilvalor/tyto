@@ -52,24 +52,43 @@ So every built-in ships a real file:
 | `chromium`           | `apps/cli/src/plugins/chromium.tyto-plugin.json`           |
 | `fs-inbox`           | `apps/cli/src/plugins/fs-inbox.tyto-plugin.json`           |
 | `fs-outbox`          | `apps/cli/src/plugins/fs-outbox.tyto-plugin.json`          |
+| `desktop`            | `apps/desktop/src/main/desktop.tyto-plugin.json`           |
 
-The last four are named `<id>.tyto-plugin.json` and that is the one place a built-in differs from a third party. A plugin package puts the file at its root; those four have no package of their own — they are the composition root's wiring around `@tyto/raster`, `@tyto/io` and `@tyto/templates` — and four files cannot share one name in one folder. The document is the same document, validated by the same schema, and the day one of them gets a package the file moves to that package's root under the ordinary name.
+The last five are named `<id>.tyto-plugin.json` and that is the one place a built-in differs from a third party. A plugin package puts the file at its root; those five have no package of their own — they are the composition root's wiring around `@tyto/raster`, `@tyto/io`, `@tyto/templates` and the desktop app's own settings — and five files cannot share one name in one folder. The document is the same document, validated by the same schema, and the day one of them gets a package the file moves to that package's root under the ordinary name.
 
 **`contributes` is verified, not believed.** `InProcessHost.activate` watches which points a plugin registers into and throws when one was not declared. Without that, `tyto plugin list` would print a promise nothing had checked — which is how a manifest field becomes a comment.
 
 ## Extension points
 
-| `contributes`     | Registers                                                               | Built-in                                              |
-| ----------------- | ----------------------------------------------------------------------- | ----------------------------------------------------- |
-| `source` / `sink` | `BriefSource` — `pull()`, `ack()`; `OutputSink` — `push()`              | fs-inbox, fs-outbox (remote ones deferred — ADR 0011) |
-| `exporter`        | one **frame** to a document + mime + extension + the kinds it produces  | html, svg                                             |
-| `rasterizer`      | `Rasterizer` — `raster(html, opts): Promise<Uint8Array>`                | chromium                                              |
-| `template-pack`   | folder of templates                                                     | built-in templates                                    |
-| `brand-kit`       | a logo, a wordmark and a signature per brand id (ADR 0063, ADR 0066)    | —                                                     |
-| `directive`       | `::ns/name` in the brief → the slot directives it stands for (ADR 0043) | —                                                     |
-| `editor.command`  | `{ id, run(ctx), undo? }`                                               | core-commands                                         |
-| `editor.keymap`   | binding → command id (normal and vim)                                   | default-keymap, vim                                   |
-| `panel`           | a page in the desktop window, `sandbox="allow-scripts"` (ADR 0045)      | —                                                     |
+| `contributes`     | Registers                                                                   | Built-in                                              |
+| ----------------- | --------------------------------------------------------------------------- | ----------------------------------------------------- |
+| `source` / `sink` | `BriefSource` — `pull()`, `ack()`; `OutputSink` — `push()`                  | fs-inbox, fs-outbox (remote ones deferred — ADR 0011) |
+| `exporter`        | one **frame** to a document + mime + extension + the kinds it produces      | html, svg                                             |
+| `rasterizer`      | `Rasterizer` — `raster(html, opts): Promise<Uint8Array>`                    | chromium                                              |
+| `template-pack`   | folder of templates                                                         | built-in templates                                    |
+| `brand-kit`       | a logo, a wordmark and a signature per brand id (ADR 0063, ADR 0066)        | —                                                     |
+| `directive`       | `::ns/name` in the brief → the slot directives it stands for (ADR 0043)     | —                                                     |
+| `editor.command`  | `{ id, run(ctx), undo? }`                                                   | core-commands                                         |
+| `editor.keymap`   | binding → command id (normal and vim)                                       | default-keymap, vim                                   |
+| `panel`           | a page in the desktop window, `sandbox="allow-scripts"` (ADR 0045)          | —                                                     |
+| `configuration`   | a key of `settings.json`: `{ id, schema, default, description }` (ADR 0073) | desktop (the four app settings)                       |
+
+### `configuration`, in full
+
+```ts
+interface ConfigurationContribution<T> {
+  id: string; // the plugin's own key: letters and digits, no dot
+  schema: ZodType<T>; // validates this key alone
+  default: T; // must pass `schema`, or activation is refused
+  description: string;
+}
+```
+
+A setting is a key of the desktop app's `settings.json`, a JSON-with-comments file the person edits by hand (ADR 0073). **The host adds the plugin id**: a third party's `fontSize` is written `demo.fontSize`, and a built-in's keys are written as declared, which is how the app's own `templatesFolder`, `queueFolder`, `queueAutoRun` and `queueKinds` keep the names every existing file uses. A third party's key written without its prefix is `W_SETTING_UNPREFIXED` and is not accepted.
+
+**Resolved one key at a time, and never failing** (`resolveSettings`). The user file wins over the default; a value the schema refuses costs that key alone, which takes its default and is `W_SETTING_INVALID` at the value; a key nobody declared is `W_SETTING_UNKNOWN` at the key. Every diagnostic carries the range the file reader found. The result's `config` is the record `PluginHost.config(schema)` reads, by plugin id, handed to the host with `InProcessHost.configure` — so a plugin reads its own settings with `host.config(z.object({ fontSize: z.number() }))`, every declared key present.
+
+**An isolated plugin cannot declare one yet**: the schema is Zod, which is code and does not cross to the plugin's process, so `registerConfiguration` is refused by name there, like `source`.
 
 ### `exporter`, in full
 
@@ -299,7 +318,8 @@ get their own commands.
 ```ts
 interface PluginHost {
   registerSource(s: BriefSource): Disposable;  registerSink(...); registerExporter(...); …
-  config<T>(schema: ZodType<T>): T;             // validated user config
+  registerConfiguration<T>(setting: ConfigurationContribution<T>): Disposable; // ADR 0073
+  config<T>(schema: ZodType<T>): T;             // validated user config, declared settings included
   credentials(key: string): Promise<string>;    // credentials:<key> only; env in the CLI, safeStorage on desktop
   fetch(url, init?): Promise<HostFetchResponse>; // net:<host> only; redirects not followed
   log: Logger; events: TypedEmitter<HostEvents>;

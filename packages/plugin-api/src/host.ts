@@ -28,6 +28,11 @@ import {
   checkedCapabilities,
   responseOf,
 } from './capabilities.js';
+import {
+  type ConfigurationContribution,
+  type DeclaredSetting,
+  declaredSetting,
+} from './configuration.js';
 import { type ContributionPoint, type PluginManifest, validatePluginManifest } from './manifest.js';
 
 /**
@@ -86,9 +91,18 @@ export interface PluginHost {
   registerCommand(command: EditorCommand): Disposable;
   registerKeymap(keymap: EditorKeymap): Disposable;
   registerPanel(panel: PanelContribution): Disposable;
+  /**
+   * A setting the person can write in the settings file (ADR 0073). The key the file uses is
+   * `<plugin id>.<id>`, or `id` alone for a built-in.
+   */
+  registerConfiguration<T>(setting: ConfigurationContribution<T>): Disposable;
 
   /**
    * The plugin's own configuration, validated.
+   *
+   * For a plugin that declared settings, this is the record of them by its own keys, with
+   * every key present: what the file said where the schema accepted it, the default where it
+   * did not (`InProcessHost.configure`). Read it when needed rather than once at activation.
    *
    * A schema rather than a shape, because a plugin's config arrives as JSON somebody typed
    * and "it parsed" is not the same as "it is what this plugin needs". Throws on a
@@ -151,6 +165,8 @@ export interface PluginRegistry {
   commands(): readonly EditorCommand[];
   keymaps(): readonly EditorKeymap[];
   panels(): readonly PanelContribution[];
+  /** Every declared setting, in registration order, by the key a settings file uses. */
+  configurations(): readonly DeclaredSetting[];
 }
 
 /** The kits of every plugin merged into one per brand, and the warnings the merge made. */
@@ -209,6 +225,11 @@ export interface InProcessHost {
   readonly registry: PluginRegistry;
   /** Withdraws every contribution a plugin made, in one call. */
   disposePlugin(pluginId: string): void;
+  /**
+   * Replaces the raw configuration `config()` reads, by plugin id — the `config` of
+   * `resolveSettings`, once the settings file has been read against the declared settings.
+   */
+  configure(config: Readonly<Record<string, unknown>>): void;
 }
 
 const NO_LOG: Logger = {
@@ -375,6 +396,14 @@ export function createPluginHost(options: PluginHostOptions = {}): InProcessHost
   const commands = new Point<EditorCommand>('editor.command', emitter, contributed);
   const keymaps = new Point<EditorKeymap>('editor.keymap', emitter, contributed);
   const panels = new Point<PanelContribution>('panel', emitter, contributed);
+  // Keyed by the key the file uses, so two plugins' `fontSize` are two entries and a second
+  // built-in declaring a key another built-in holds is the ordinary duplicate refusal.
+  const configurations = new Point<{ readonly id: string; readonly setting: DeclaredSetting }>(
+    'configuration',
+    emitter,
+    contributed,
+  );
+  let rawConfig: Readonly<Record<string, unknown>> | undefined = options.config;
 
   const points = [
     exporters,
@@ -387,6 +416,7 @@ export function createPluginHost(options: PluginHostOptions = {}): InProcessHost
     commands,
     keymaps,
     panels,
+    configurations,
   ];
 
   const registry: PluginRegistry = {
@@ -405,12 +435,14 @@ export function createPluginHost(options: PluginHostOptions = {}): InProcessHost
     commands: () => commands.list(),
     keymaps: () => keymaps.list(),
     panels: () => panels.list(),
+    configurations: () => configurations.list().map((entry) => entry.setting),
   };
 
   function hostWith(
     pluginId: string,
     onConflict?: ConflictListener,
     permissions: readonly string[] = [],
+    origin: PluginOrigin = 'external',
   ): PluginHost {
     // The permissions of the manifest the host validated, never what the plugin says.
     const checked = checkedCapabilities(pluginId, permissions, options.capabilities);
@@ -425,9 +457,17 @@ export function createPluginHost(options: PluginHostOptions = {}): InProcessHost
       registerCommand: (command) => commands.add(pluginId, command, onConflict),
       registerKeymap: (keymap) => keymaps.add(pluginId, keymap, onConflict),
       registerPanel: (panel) => panels.add(pluginId, panel, onConflict),
+      registerConfiguration: (setting) => {
+        const declared = declaredSetting(
+          pluginId,
+          origin !== 'built-in',
+          setting as ConfigurationContribution,
+        );
+        return configurations.add(pluginId, { id: declared.key, setting: declared }, onConflict);
+      },
 
       config<T>(schema: ZodType<T>): T {
-        const parsed = schema.safeParse(options.config?.[pluginId]);
+        const parsed = schema.safeParse(rawConfig?.[pluginId]);
         if (!parsed.success) {
           throw new TypeError(
             `Configuration for plugin '${pluginId}' does not match the schema it asked ` +
@@ -470,7 +510,7 @@ export function createPluginHost(options: PluginHostOptions = {}): InProcessHost
         );
       }
 
-      const result = plugin.activate(hostWith(plugin.id, undefined, manifest.permissions));
+      const result = plugin.activate(hostWith(plugin.id, undefined, manifest.permissions, origin));
 
       // Checked *after* activation, against what was actually registered. `contributes` is
       // the manifest's promise about which points this plugin touches, and a promise
@@ -522,7 +562,7 @@ export function createPluginHost(options: PluginHostOptions = {}): InProcessHost
       const conflicts: Conflict[] = [];
       try {
         plugin.activate(
-          hostWith(plugin.id, (conflict) => conflicts.push(conflict), manifest.permissions),
+          hostWith(plugin.id, (conflict) => conflicts.push(conflict), manifest.permissions, origin),
         );
       } catch (cause) {
         // Any throw, whatever its class: this is foreign code, and the question is only
@@ -571,6 +611,10 @@ export function createPluginHost(options: PluginHostOptions = {}): InProcessHost
       for (const point of points) point.removeAllFrom(pluginId);
       contributed.delete(pluginId);
       installed.delete(pluginId);
+    },
+
+    configure(config) {
+      rawConfig = config;
     },
   };
 }

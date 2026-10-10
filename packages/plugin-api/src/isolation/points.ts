@@ -82,7 +82,8 @@ export type RegisterMethod =
   | 'registerDirective'
   | 'registerCommand'
   | 'registerKeymap'
-  | 'registerPanel';
+  | 'registerPanel'
+  | 'registerConfiguration';
 
 const rangeSchema = z.strictObject({
   start: z.number().int().nonnegative(),
@@ -334,6 +335,8 @@ export const NOT_YET_ISOLATED: Readonly<Record<string, ContributionPoint>> = {
   registerSource: 'source',
   registerSink: 'sink',
   registerRasterizer: 'rasterizer',
+  // A setting is declared with a Zod schema, which is code and does not cross (ADR 0073).
+  registerConfiguration: 'configuration',
 };
 
 export function pointSpecOf(point: string): PointSpec | undefined {

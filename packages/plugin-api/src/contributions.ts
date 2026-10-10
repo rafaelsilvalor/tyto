@@ -16,7 +16,8 @@ import type {
 import type { ShippedFace } from './isolation/faces.js';
 
 /**
- * The ten extension points of `docs/plugin-api.md`, as types.
+ * The extension points of `docs/plugin-api.md`, as types. `configuration` lives in
+ * `configuration.ts`, beside the rule that resolves it.
  *
  * Every one of them is a thing a plugin contributes and the host hands back; built-ins use
  * the same shapes, because a built-in that had a shortcut would be a shortcut nobody could

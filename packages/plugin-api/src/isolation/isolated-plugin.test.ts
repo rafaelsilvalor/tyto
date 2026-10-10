@@ -16,6 +16,7 @@ import {
   sourceRange,
 } from '@tyto/core';
 import { describe, expect, it } from 'vitest';
+import { z } from 'zod';
 
 import type {
   BrandKitContribution,
@@ -374,6 +375,17 @@ describe('what an isolated plugin cannot do', () => {
     ['source', (host: PluginHost) => host.registerSource({ id: 'inbox', value: {} })],
     ['sink', (host: PluginHost) => host.registerSink({ id: 'outbox', value: {} })],
     ['rasterizer', (host: PluginHost) => host.registerRasterizer({ id: 'r', value: {} })],
+    // A setting is declared with a Zod schema, which is code (ADR 0073).
+    [
+      'configuration',
+      (host: PluginHost) =>
+        host.registerConfiguration({
+          id: 'size',
+          schema: z.number(),
+          default: 1,
+          description: 'A size.',
+        }),
+    ],
   ])('registers into %s, which is refused by name', async (point, activate) => {
     const { connected } = await isolate(activate);
     expect(connected.ok ? '' : connected.error[0]?.message).toBe(

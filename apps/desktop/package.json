@@ -29,6 +29,7 @@
     "@tyto/template-lang": "workspace:*",
     "@tyto/templates": "workspace:*",
     "electron-updater": "^6.8.9",
+    "jsonc-parser": "^3.3.1",
     "lit": "^3.3.3",
     "zod": "^4.6.5"
   },
