@@ -29,6 +29,7 @@ const base: StatusBarState = {
   template: 'promo-curso',
   problems: 3,
   errors: 1,
+  newProblems: false,
   shown: { left: false, right: true, bottom: true, problems: true, queue: false },
 };
 
@@ -108,6 +109,31 @@ describe('the status bar', () => {
     await bar.updateComplete;
     expect(count?.textContent).toBe('0');
     expect(count?.classList.contains('status-bar__count--bad')).toBe(false);
+  });
+
+  it('draws the "new" dot beside the count only while new problems are flagged (TYTO-143)', async () => {
+    const problemsButton = (bar: StatusBar): HTMLButtonElement =>
+      bar.querySelector<HTMLButtonElement>(`[data-command="${COMMANDS.problems}"]`)!;
+
+    const quiet = (await mount({ ...base, newProblems: false })).bar;
+    expect(problemsButton(quiet).querySelector('.status-bar__new')).toBeNull();
+    expect(problemsButton(quiet).getAttribute('aria-label')).not.toContain(
+      translate('en', 'status.problems.new'),
+    );
+    document.body.replaceChildren();
+
+    for (const locale of ['en', 'pt-BR'] as const) {
+      const { bar } = await mount({ ...base, locale, newProblems: true });
+      const button = problemsButton(bar);
+      const dot = button.querySelector('.status-bar__new');
+      expect(dot).not.toBeNull();
+      // After the count, inside the same button: the number says how many, the dot says new.
+      expect(dot?.previousElementSibling?.classList.contains('status-bar__count')).toBe(true);
+      expect(dot?.getAttribute('aria-hidden')).toBe('true');
+      expect(button.getAttribute('aria-label')).toContain(translate(locale, 'status.problems.new'));
+      expect(button.getAttribute('title')).toBe(button.getAttribute('aria-label'));
+      document.body.replaceChildren();
+    }
   });
 
   it('shows the vim mode and its pending keys only while vim is on', async () => {

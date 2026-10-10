@@ -173,6 +173,17 @@ textarea {
   color: var(--tyto-error);
 }
 
+/* TYTO-143: a problem the window raised arrived since the panel was last on screen. The
+   accent and not the error colour: the count already turns red for an error, and the dot says
+   "new", not "bad". The size is a layout measurement, like the panels' dots. */
+.status-bar__new {
+  width: 6px;
+  height: 6px;
+  flex-shrink: 0;
+  border-radius: 50%;
+  background: var(--tyto-accent);
+}
+
 /* Vim's mode, highlighted the way the card's reference shows it. */
 .status-bar__vim {
   flex-shrink: 0;

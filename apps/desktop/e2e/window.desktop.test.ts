@@ -561,6 +561,7 @@ describe('switching the language', () => {
     'status.selected',
     'status.kind.settings',
     'status.kind.keybindings',
+    'status.problems.new',
     // TYTO-248: what the footer used to say is Help > About now, a box main shows — menu
     // chrome, like `menu.revealLogs`. `src/main/menu.test.ts` holds the five to `aboutText`, and
     // `e2e/status-bar.desktop.test.ts` opens the real item.

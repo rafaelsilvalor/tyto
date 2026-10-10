@@ -36,6 +36,12 @@ export interface StatusBarState {
   readonly template: string | undefined;
   readonly problems: number;
   readonly errors: number;
+  /**
+   * Whether a problem the window raised itself arrived since the problems panel was last on
+   * screen (TYTO-143). Drawn as a dot beside the count: the number says how many, the dot
+   * says new.
+   */
+  readonly newProblems: boolean;
   /** Which areas are on screen, and which of the two toggled panels are open. */
   readonly shown: Readonly<Record<HideableDock | 'problems' | 'queue', boolean>>;
 }
@@ -70,6 +76,15 @@ export function positionText(state: StatusBarState): string {
  * Vim's mode in vim's own word, `VISUAL LINE`, untranslated: it is the editor's vocabulary,
  * the way `:w` is, and the highlight around it does what the library's `--` did.
  */
+/**
+ * The problems button's label, which says "new" while the dot is lit: the dot is drawn and
+ * `aria-hidden`, so a screen reader hears it here or not at all.
+ */
+export function problemsLabel(state: StatusBarState, toggle: string): string {
+  if (!state.newProblems) return toggle;
+  return `${toggle} (${translate(state.locale, 'status.problems.new')})`;
+}
+
 export const vimModeText = (mode: string): string => mode.toUpperCase();
 
 export class StatusBar extends LitElement {
@@ -93,6 +108,7 @@ export class StatusBar extends LitElement {
       template: undefined,
       problems: 0,
       errors: 0,
+      newProblems: false,
       shown: { left: false, right: false, bottom: false, problems: false, queue: false },
     };
     this.commands = {
@@ -164,15 +180,19 @@ export class StatusBar extends LitElement {
                 >${state.template}</span
               >`
         }
-        <!-- The problems button holds its count, and is where TYTO-143's "new" mark will go. -->
+        <!-- The problems button holds its count and, beside it, TYTO-143's "new" dot. -->
         ${this.button(
           'problems',
           this.commands.problems,
-          toggle('panel.problems'),
+          problemsLabel(state, toggle('panel.problems')),
           state.shown.problems,
           html`<span class="status-bar__count ${state.errors > 0 ? 'status-bar__count--bad' : ''}"
-            >${state.problems}</span
-          >`,
+              >${state.problems}</span
+            >${
+              state.newProblems
+                ? html`<span class="status-bar__new" aria-hidden="true"></span>`
+                : nothing
+            }`,
         )}
         ${this.button('queue', this.commands.queue, toggle('panel.queue'), state.shown.queue)}
         ${this.button('plugins', this.commands.plugins, say('command.plugins.show'), undefined)}

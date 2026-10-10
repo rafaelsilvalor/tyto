@@ -302,6 +302,7 @@ export interface Catalogue {
   readonly 'status.selected': string;
   readonly 'status.kind.settings': string;
   readonly 'status.kind.keybindings': string;
+  readonly 'status.problems.new': string;
   /**
    * Help > About, where the version, the platform, the template count and the template
    * folder went when the footer became a status bar (TYTO-248).
@@ -553,6 +554,7 @@ export const CATALOGUE_KEYS = [
   'status.selected',
   'status.kind.settings',
   'status.kind.keybindings',
+  'status.problems.new',
   'menu.about',
   'shell.about.version',
   'shell.about.platform',
