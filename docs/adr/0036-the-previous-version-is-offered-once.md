@@ -23,8 +23,8 @@ before the settings are read, because the templates folder decides which templat
 is built from:
 
 > Bring your settings from version 0.3.3?
-> The templates folder, where the panels were and the recent files. Version 0.3.3 keeps its
-> own copy either way, and this question will not come back.
+> The templates folder, where the panels were, the recent files and your keyboard shortcuts.
+> Version 0.3.3 keeps its own copy either way, and this question will not come back.
 > [Bring them] [Start fresh]
 
 **When.** The new folder has none of the app's own records — no `settings.json`, `layout.json`,
@@ -51,6 +51,11 @@ it. Records are copied byte for byte after checking they parse as JSON; each sto
 reconciles what it reads against the build reading it (`layoutFrom` drops a panel this build no
 longer has), so re-serialising here would be a second, weaker copy of that rule. Writes use the
 `wx` flag, so anything written in the new folder in the meantime wins.
+
+**`keybindings.json` travels too** (TYTO-257): it is a record like `settings.json` since
+TYTO-207, counts towards "has records" in both folders, and is checked with the JSONC parser
+under the same bar — a text that does not parse into a list is a `W_IMPORT_SKIPPED` and stays in
+the older folder, which keeps its copy either way.
 
 **`logs/` never travels.** A log is that build's record of its own failures.
 
@@ -105,6 +110,6 @@ means no offer, and a native message box is not something Playwright can answer.
 this does not read it. That folder is not named by version, so there is nothing to compare it to;
 reading it would be a second import path for a population of a handful of testers.
 
-**The detail line names all three records** even when the older folder had only some of them. It
+**The detail line names all four records** even when the older folder had only some of them. It
 is one sentence in the catalogue rather than one per combination, and a record that was not there
 simply does not arrive.

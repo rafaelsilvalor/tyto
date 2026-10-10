@@ -231,6 +231,41 @@ describe('saying yes', () => {
     });
   });
 
+  it('brings a keybindings file with comments byte for byte (TYTO-257)', async () => {
+    // TYTO-207 put a person's own keys in `keybindings.json`; left behind, they stopped
+    // working after an update with nothing to say so.
+    const older = await seedOlder('0.3.3');
+    const commented =
+      '// my keys\n[\n  { "key": "Mod-Shift-e", "command": "export.run" }, // export\n  { "key": "F5", "command": "-document.save", "when": "editor" },\n]\n';
+    writeFileSync(join(older, 'keybindings.json'), commented);
+
+    const outcome = await run('0.3.4', yes);
+
+    expect(outcome).toMatchObject({ kind: 'imported', diagnostics: [] });
+    if (outcome.kind !== 'imported') return;
+    expect(outcome.copied).toContain('keybindings.json');
+    expect(readFileSync(join(root, '0.3.4', 'keybindings.json'), 'utf8')).toBe(commented);
+    expect(readFileSync(join(older, 'keybindings.json'), 'utf8')).toBe(commented);
+  });
+
+  it('leaves a keybindings file that does not parse behind, as it does settings', async () => {
+    // The same bar as `settings.json`: a text no reader could take is not copied into the new
+    // folder. The older folder keeps it, so the person's text is not lost.
+    const older = await seedOlder('0.3.3');
+    const broken = '[\n  { "key": "F5", "command": \n';
+    writeFileSync(join(older, 'keybindings.json'), broken);
+
+    const outcome = await run('0.3.4', yes);
+
+    expect(outcome.kind).toBe('imported');
+    if (outcome.kind !== 'imported') return;
+    expect(outcome.copied).not.toContain('keybindings.json');
+    expect(outcome.diagnostics.map((item) => item.code)).toEqual(['W_IMPORT_SKIPPED']);
+    expect(outcome.diagnostics[0]?.message).toContain("'keybindings.json'");
+    expect(readdirSync(join(root, '0.3.4'))).not.toContain('keybindings.json');
+    expect(readFileSync(join(older, 'keybindings.json'), 'utf8')).toBe(broken);
+  });
+
   it('does not bring the log, which is that build’s and not this one’s', async () => {
     await seedOlder('0.3.3');
 

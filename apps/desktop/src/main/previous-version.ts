@@ -2,6 +2,7 @@ import { mkdir, readFile, readdir, stat, writeFile } from 'node:fs/promises';
 import { dirname, join } from 'node:path';
 
 import { type Diagnostic, type Ok, diagnostic, ok } from '@tyto/core';
+import { type ParseError, parseTree } from 'jsonc-parser';
 
 import { readSettingsText } from './settings-file.js';
 
@@ -24,12 +25,20 @@ import { readSettingsText } from './settings-file.js';
  */
 
 /**
- * The three records a person would miss, by file name inside a version's folder.
+ * The records a person would miss, by file name inside a version's folder.
+ *
+ * `keybindings.json` joined in TYTO-257: TYTO-207 put a person's own keys in it, and a version
+ * that left it behind made them silently stop working after an update.
  *
  * `logs/` is not among them: a log is a record of *that* build's failures, and one carried
  * into a new version would date a report about this one with lines from the last.
  */
-export const IMPORTED_RECORDS = ['settings.json', 'layout.json', 'recent-files.json'] as const;
+export const IMPORTED_RECORDS = [
+  'settings.json',
+  'layout.json',
+  'recent-files.json',
+  'keybindings.json',
+] as const;
 
 /** The ciphertext folder `credential-store.ts` writes, brought across only when asked. */
 export const CREDENTIALS_FOLDER = 'credentials';
@@ -287,18 +296,38 @@ export async function importFrom(inputs: {
 }
 
 /**
- * Whether this version's store could read a record. `settings.json` is JSON with comments
- * since ADR 0073, so a comment the person wrote must not be what stops it travelling; the
- * other records are still the app's own plain JSON.
+ * Whether this version's store could read a record. `settings.json` (ADR 0073) and
+ * `keybindings.json` (ADR 0074) are JSON with comments, so a comment the person wrote must not
+ * be what stops either travelling; the other records are still the app's own plain JSON.
  */
 function readable(name: string, text: string): boolean {
   if (name === 'settings.json') return readSettingsText(text).syntax.length === 0;
+  if (name === 'keybindings.json') return keybindingsReadable(text);
   try {
     JSON.parse(text);
     return true;
   } catch {
     return false;
   }
+}
+
+const BOM = '﻿';
+
+/**
+ * Whether a keybindings text parses as JSON with comments into a list: the same bar
+ * `readSettingsText` sets for `settings.json`, no syntax error and the right kind of root.
+ *
+ * The file's shape only, not each entry. The entries are checked in the window against its
+ * command registry (`src/renderer/keybindings-file.ts`), and an entry the window refuses is the
+ * person's to see and fix as `E_KEYBINDINGS_SYNTAX`, not a reason to leave the whole file
+ * behind. A blank file is readable: the window reads it as no entries.
+ */
+function keybindingsReadable(text: string): boolean {
+  const source = text.startsWith(BOM) ? text.slice(1) : text;
+  if (source.trim() === '') return true;
+  const errors: ParseError[] = [];
+  const root = parseTree(source, errors, { allowTrailingComma: true, disallowComments: false });
+  return errors.length === 0 && root?.type === 'array';
 }
 
 /** The person's answer, as the composition root's dialog reports it. */
