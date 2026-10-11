@@ -1304,14 +1304,25 @@ async function settingsChanged(
   change: IpcEventPayload<'settings:changed'>,
 ): Promise<void> {
   const tab = workspace.documents.find(isSettings);
-  // The disk, followed by a tab main thought clean — not over typing main has not heard of.
-  const typing = tab !== undefined && change.saved && isUnsaved(tab);
-  if (tab !== undefined && change.text !== undefined && !typing) {
-    replaceSettingsText(tab.id, change.text, change.base);
-    if (change.saved) {
+  if (tab !== undefined && change.text !== undefined) {
+    if (!(change.saved && isUnsaved(tab))) {
+      replaceSettingsText(tab.id, change.text, change.base);
+      if (change.saved) {
+        workspace = updateDocument(workspace, tab.id, (document_) => ({
+          ...document_,
+          savedText: contentOf(document_),
+        }));
+      }
+    } else if (change.text !== tab.savedText) {
+      // New text on disk under typing: a screen's write main made before it heard the tab
+      // was dirty, or another editor's save. The typing moves onto it rather than either
+      // being dropped, and the tab stays unsaved over the new disk text (TYTO-255). Equal to
+      // `savedText` is this tab's own save coming back through the watcher: nothing moved.
+      replaceSettingsText(tab.id, change.text, change.base ?? tab.savedText);
+      const onDisk = change.text;
       workspace = updateDocument(workspace, tab.id, (document_) => ({
         ...document_,
-        savedText: contentOf(document_),
+        savedText: onDisk,
       }));
     }
     void validateSettings(bridge, tab.id);
@@ -1546,7 +1557,12 @@ async function requestClose(id: string): Promise<void> {
     if (bridge !== undefined) {
       const answer = await bridge['dialog:confirm']({
         message: translate(state.locale, 'document.discard.message'),
-        detail: `${labelOf(target)}: ${translate(state.locale, 'document.discard.detail')}`,
+        // The settings tab loses only its typing: a screen's change it held reaches the file
+        // when it closes (TYTO-255).
+        detail: `${labelOf(target)}: ${translate(
+          state.locale,
+          isSettings(target) ? 'document.discard.settingsDetail' : 'document.discard.detail',
+        )}`,
         confirm: translate(state.locale, 'document.discard.confirm'),
         cancel: translate(state.locale, 'document.discard.cancel'),
       });

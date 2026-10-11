@@ -429,6 +429,8 @@ describe('switching the language', () => {
     'document.discard.detail',
     'document.discard.confirm',
     'document.discard.cancel',
+    // TYTO-255: the settings tab's detail in the same message box.
+    'document.discard.settingsDetail',
     // TYTO-123, TYTO-153: the same for the whole window, read out by the OS on the way out —
     // six since the box gained a third button. A message box is not the document either, and
     // `{n}` in two of them is a placeholder the renderer substitutes —

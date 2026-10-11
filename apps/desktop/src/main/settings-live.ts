@@ -24,6 +24,11 @@ import {
  *   never comes back as a reload.
  * - **An open tab with unsaved typing takes a screen's change instead of the disk**, so neither
  *   the typing nor the screen's choice is lost when the tab is saved.
+ * - **No edit is lost to the gaps between the writers (TYTO-255).** Text that reaches the disk
+ *   while the window may hold typing — a screen's write to a tab main still thinks clean, or
+ *   another editor's save under a dirty tab — travels with the `base` it was made from, and
+ *   the window moves the typing onto it. A screen's change put into a dirty tab is also kept
+ *   here, and written to the file if the tab closes without saving.
  * - **A refused write is said and undone.** A file (or buffer) that does not parse refuses a
  *   screen's change; the screens go back to the effective value and the window is told, which
  *   opens the tab where the syntax error is shown.
@@ -60,8 +65,11 @@ export interface LiveSettings {
   wrote(text: string): void;
   /** The tab's buffer, checked against what the plugins declared; also records its state. */
   validate(documentId: string, text: string, dirty: boolean): Diagnostics;
-  /** The tab with this id was closed. */
-  closed(documentId: string): void;
+  /**
+   * The tab with this id was closed. A screen's changes it held unsaved are written to the
+   * file then, so closing without saving discards only the person's typing.
+   */
+  closed(documentId: string): Promise<void>;
   /** A screen's change. `false` when it was refused, after the screens went back. */
   remember(changes: Partial<Settings>): Promise<boolean>;
   /** The watcher saw the file move. Reads it, and applies it unless it was the app's write. */
@@ -82,7 +90,13 @@ export function createLiveSettings(options: LiveSettingsOptions): LiveSettings {
   // The text the app knows is on disk: what it wrote, or what it last applied. Undefined until
   // either happens, so the first event after launch is read and applied like any other.
   let known: string | undefined;
+  // That text itself: the base the window moves its typing from when the disk changes under
+  // it. Undefined for the same reason as the hash; the window then uses its own saved text.
+  let disk: string | undefined;
   let tab: SettingsTab | undefined;
+  // A screen's changes put into the tab's unsaved buffer since it was last clean. They are in
+  // effect already; the file gets them when the tab is saved, or when it closes without that.
+  let pendingFromScreens: Partial<Settings> = {};
   // One reaction at a time: a burst of watcher events must not apply two readings at once.
   let chain: Promise<void> = Promise.resolve();
 
@@ -106,7 +120,9 @@ export function createLiveSettings(options: LiveSettingsOptions): LiveSettings {
       return;
     }
     if (known !== undefined && hashOf(text) === known) return;
+    const before = disk;
     known = hashOf(text);
+    disk = text;
 
     const reading = await store.load();
     options.configure(reading.config);
@@ -117,28 +133,55 @@ export function createLiveSettings(options: LiveSettingsOptions): LiveSettings {
     for (const problem of reading.diagnostics) log.warn(`settings.json: ${problem.message}`);
     log.info('settings.json changed on disk and was applied', { keys: moved });
 
-    // A clean tab follows the disk, the way every editor reverts a file nobody is typing in.
-    // A tab with unsaved typing keeps it: the person's next save is their answer.
-    if (tab !== undefined && !tab.dirty && tab.text !== text) {
+    if (tab === undefined || tab.text === text) {
+      // The tab's own save (the buffer main last heard is what is on disk now): whatever a
+      // screen had put into it has reached the file.
+      if (tab !== undefined) pendingFromScreens = {};
+      send({ saved: false, refused: false });
+    } else if (!tab.dirty) {
+      // A clean tab follows the disk, the way every editor reverts a file nobody is typing in.
       tab.text = text;
       send({ text, saved: true, refused: false });
     } else {
-      send({ saved: false, refused: false });
+      // A tab with unsaved typing gets the new text with the one it replaced, and moves the
+      // typing onto it: the next save keeps both, with no conflict to answer (TYTO-255).
+      send({
+        text,
+        ...(before === undefined ? {} : { base: before }),
+        saved: true,
+        refused: false,
+      });
     }
   };
 
   return {
     wrote(text) {
       known = hashOf(text);
+      disk = text;
     },
 
     validate(documentId, text, dirty) {
       tab = { documentId, text, dirty };
+      // Clean means saved or reverted: either way the buffer no longer holds a screen's change
+      // the file lacks, and writing one on close would undo the person's own choice.
+      if (!dirty) pendingFromScreens = {};
       return validateSettingsText(text, options.declared());
     },
 
-    closed(documentId) {
-      if (tab?.documentId === documentId) tab = undefined;
+    async closed(documentId) {
+      if (tab?.documentId !== documentId) return;
+      tab = undefined;
+      const pending = pendingFromScreens;
+      pendingFromScreens = {};
+      if (keysOf(pending).length === 0) return;
+      // Closing without saving discards the typing, never a screen's choice: that is in effect
+      // already, and here it reaches the file, in place, comments kept.
+      const written = await store.write(pending);
+      if (!written.ok) {
+        log.warn("settings.json was not given the screens' changes on close: it does not parse", {
+          changes: pending,
+        });
+      }
     },
 
     async remember(changes) {
@@ -148,6 +191,7 @@ export function createLiveSettings(options: LiveSettingsOptions): LiveSettings {
         const base = tab.text;
         tab.text = edited.value;
         effective = { ...effective, ...changes };
+        pendingFromScreens = { ...pendingFromScreens, ...changes };
         send({ text: edited.value, base, saved: false, refused: false });
         return true;
       }
@@ -155,11 +199,15 @@ export function createLiveSettings(options: LiveSettingsOptions): LiveSettings {
       if (!written.ok) return refuse(changes, written.error);
       effective = { ...effective, ...changes };
       if (tab !== undefined) {
-        // A clean tab shows what the screen just wrote, and stays clean.
+        // A clean tab shows what the screen just wrote, and stays clean. Clean as far as main
+        // knows: the window says it is dirty only on the preview's pause, so it may already
+        // hold typing. The base is the buffer this was written from, which the window moves
+        // that typing past instead of dropping the screen's change (TYTO-255).
         const text = await options.readText().catch(() => undefined);
         if (text !== undefined && text !== tab.text) {
+          const base = tab.text;
           tab.text = text;
-          send({ text, saved: true, refused: false });
+          send({ text, base, saved: true, refused: false });
         }
       }
       return true;

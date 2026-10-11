@@ -51,6 +51,8 @@ export const en: Catalogue = {
   'document.close': 'Close the tab',
   'document.discard.message': 'Close without saving?',
   'document.discard.detail': 'This brief has changes that have not been written to disk',
+  'document.discard.settingsDetail':
+    "Your typing in this file will be lost. Changes made from the app's screens are kept.",
   'document.discard.confirm': 'Close without saving',
   'document.discard.cancel': 'Cancel',
   'exit.save.message': 'Do you want to save your work?',

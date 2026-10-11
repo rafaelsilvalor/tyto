@@ -512,7 +512,7 @@ const dependencies = () => {
     settings: {
       open: () => Promise.resolve({ document: null, documentId: null }),
       validate: () => [],
-      closed: () => undefined,
+      closed: () => Promise.resolve(),
     },
     templates: catalogue(),
     templateEditor: templateEditor(),

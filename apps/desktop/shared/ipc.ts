@@ -1236,9 +1236,10 @@ export const IPC_EVENTS = {
    * `settings.json` changed, or a screen's change to it was refused (TYTO-206). The window
    * asks `templates:folder` again either way. `text` is the settings tab's new buffer — a
    * screen's change put into unsaved typing, or the disk followed by a clean tab — and `saved`
-   * says whether that text is now also the file's. `base` is the buffer main edited, so the
-   * window can keep what was typed since. `refused` opens the tab, where the syntax error that
-   * refused the change is shown.
+   * says whether that text is now also the file's. `base` is the text it was made from — the
+   * buffer main edited, or the disk text it replaced — so the window can keep what was typed
+   * since, on top of a saved change too (TYTO-255). `refused` opens the tab, where the syntax
+   * error that refused the change is shown.
    */
   'settings:changed': z.object({
     text: z.string().optional(),

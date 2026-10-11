@@ -126,6 +126,11 @@ export interface Catalogue {
   readonly 'document.close': string;
   readonly 'document.discard.message': string;
   readonly 'document.discard.detail': string;
+  /**
+   * The detail in place of `document.discard.detail` for the settings tab (TYTO-255): closing
+   * it unsaved loses the typing, while a screen's change it held still reaches the file.
+   */
+  readonly 'document.discard.settingsDetail': string;
   readonly 'document.discard.confirm': string;
   readonly 'document.discard.cancel': string;
 
@@ -495,6 +500,7 @@ export const CATALOGUE_KEYS = [
   'document.close',
   'document.discard.message',
   'document.discard.detail',
+  'document.discard.settingsDetail',
   'document.discard.confirm',
   'document.discard.cancel',
   'exit.save.message',

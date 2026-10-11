@@ -996,9 +996,7 @@ async function start(): Promise<void> {
         return documents.openPath(documentId, settingsFile, 'settings.json');
       },
       validate: ({ documentId, text, dirty }) => liveSettings.validate(documentId, text, dirty),
-      closed: (documentId) => {
-        liveSettings.closed(documentId);
-      },
+      closed: (documentId) => liveSettings.closed(documentId),
     },
     keybindings: {
       open: async (documentId) => {
