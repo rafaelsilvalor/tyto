@@ -1,5 +1,28 @@
 # @tyto/editor
 
+## 0.8.0
+
+### Minor Changes
+
+- c141ec9: TYTO-206, PR B: "Preferences: Open Settings (JSON)" opens `settings.json` in a tab. Its problems
+  show in the problems panel while you type, a save from the tab or any editor applies with no
+  restart, and a screen's change goes into the tab's unsaved buffer instead of the disk. A screen's
+  change to a file that does not parse is refused, undone and shown. `@tyto/editor`'s `blank`
+  takes an optional language for one document, without the host's language extensions.
+- 7342c02: TYTO-207 (ADR 0074): every key the window answers now comes from one keybinding table. `@tyto/editor` gains a pure resolver (`parseKey`, `resolveKeybindings`, `keymapSetFor`, `windowBindingsOf`, `shownBindingsOf`) over six closed contexts, `vimMode` and `createEditor` take their vim set as an option, and `setKeymaps` swaps both modes' bindings in place. `plugin-api`'s `editor.keymap` gains an optional `when` and is consumed by the desktop for the first time. `core` gains six codes (`E_KEYBINDINGS_SYNTAX`, `W_KEYBINDING_UNKNOWN_COMMAND`, `W_KEYBINDING_INVALID_KEY`, `W_KEYBINDING_UNKNOWN_CONTEXT`, `W_KEYBINDING_DUPLICATE`, `W_KEYBINDING_LOCKED`). The desktop's `Mod-K` listener becomes a window dispatcher for global keys, registered once. No default key changes.
+- 752ddd2: TYTO-248: `EditorHandle.onVimStatus` reports vim's mode and pending keys from the library's public events, and `null` while vim is off, for a host that draws its own status bar; `EditorOptions.vimStatus: false` turns the library's own status line off. `cursorOf(state)` reads the line, the column and the selected character count off a state the host holds.
+- ed73f34: TYTO-96 (ADR 0075): the window gets one visual language, Zed's One Light and One Dark, in one token file. `@tyto/editor`'s palette is now a list of `var(--tyto-…)` custom properties the host defines instead of two sets of literal colours, exported as `themeTokens`; a host that defines none gets an uncoloured editor. Its selection colour now wins over CodeMirror's base rule while the editor is focused, and `restore` brings a stored tab up to the theme the editor is in now. The desktop defines every token in `src/renderer/tokens.css`, draws in the bundled Source Sans 3, follows the system's light or dark live in the window and in every editor, and fails `pnpm check` on a literal colour, radius, size or font anywhere else in the renderer.
+
+### Patch Changes
+
+- Updated dependencies [d4a6939]
+- Updated dependencies [08b936d]
+- Updated dependencies [7342c02]
+- Updated dependencies [15997e9]
+  - @tyto/core@0.29.0
+  - @tyto/brief-lang@0.6.9
+  - @tyto/template-lang@0.8.1
+
 ## 0.7.1
 
 ### Patch Changes

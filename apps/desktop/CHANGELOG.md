@@ -1,5 +1,68 @@
 # @tyto/desktop
 
+## 0.8.0
+
+### Minor Changes
+
+- 814f236: TYTO-143 (ADR 0076): the status bar's problems button carries a small accent dot beside the count when the window raised a problem of its own — a save that failed, a recent file that is gone, a template folder with no templates — while the problems panel was not on screen (closed, or inside a hidden bottom area). Showing the panel clears it; compiler diagnostics from typing never light it. Changing the template folder no longer drops a live failed-save or missing-file row from the panel.
+- d4a6939: TYTO-206 (ADR 0073): `settings.json` becomes a JSON-with-comments file the person owns. `plugin-api` gains the `configuration` extension point (`registerConfiguration`, `registry.configurations()`, `InProcessHost.configure`, `resolveSettings`), and the desktop app's four settings are declared through it by a built-in `desktop` plugin, under their existing names. Reading is tolerant one key at a time; a bad value costs that key alone and is a diagnostic with a range (`E_SETTINGS_SYNTAX`, `W_SETTING_UNKNOWN`, `W_SETTING_UNPREFIXED`, `W_SETTING_INVALID`, new in `core`). The app's screens edit the file in place, keeping comments and writing only keys that differ from their defaults, and never write a file that does not parse. The previous-version import accepts a commented `settings.json`.
+- c141ec9: TYTO-206, PR B: "Preferences: Open Settings (JSON)" opens `settings.json` in a tab. Its problems
+  show in the problems panel while you type, a save from the tab or any editor applies with no
+  restart, and a screen's change goes into the tab's unsaved buffer instead of the disk. A screen's
+  change to a file that does not parse is refused, undone and shown. `@tyto/editor`'s `blank`
+  takes an optional language for one document, without the host's language extensions.
+- 08b936d: TYTO-207, PR B: "Preferences: Open Keyboard Shortcuts (JSON)" opens `keybindings.json` (beside
+  `settings.json`) in a tab, from the command bar or the File menu. Each entry is
+  `{ "key", "command", "when"? }`, and `"command": "-<id>"` removes a default binding. A save from
+  the tab or any editor applies with no restart, and the command bar shows the key that now works.
+  Unknown commands, invalid keys, unknown contexts, duplicates and attempts to take Ctrl+K away
+  show in the problems panel at their line while you type. A file that does not parse changes
+  nothing: the keys it last bound stay.
+- 7342c02: TYTO-207 (ADR 0074): every key the window answers now comes from one keybinding table. `@tyto/editor` gains a pure resolver (`parseKey`, `resolveKeybindings`, `keymapSetFor`, `windowBindingsOf`, `shownBindingsOf`) over six closed contexts, `vimMode` and `createEditor` take their vim set as an option, and `setKeymaps` swaps both modes' bindings in place. `plugin-api`'s `editor.keymap` gains an optional `when` and is consumed by the desktop for the first time. `core` gains six codes (`E_KEYBINDINGS_SYNTAX`, `W_KEYBINDING_UNKNOWN_COMMAND`, `W_KEYBINDING_INVALID_KEY`, `W_KEYBINDING_UNKNOWN_CONTEXT`, `W_KEYBINDING_DUPLICATE`, `W_KEYBINDING_LOCKED`). The desktop's `Mod-K` listener becomes a window dispatcher for global keys, registered once. No default key changes.
+- 15997e9: TYTO-208 (ADR 0077): the window's colours arrive as a theme. The built-in `desktop` plugin registers Tyto Light and Tyto Dark through the `theme` point; main reads and checks them and answers `theme:current`, and the window applies them over `tokens.css`, which stays the first paint and the fallback. Nothing on screen changes: the two files equal the token file, which a test enforces. The shadows' colours become two themed tints.
+- 752ddd2: TYTO-248 (ADR 0076): the foot of the window is a one-line status bar. Left: buttons for the left area and the command bar, and vim's mode and pending keys while vim is on. Right: line and column with the selection size, the tab's kind, the brief's template, a problems button holding the count, queue, plugins, export, settings, the bottom and right area buttons, and the update notice. The area buttons hide and show a whole area through the new `layout.toggleDock:left|bottom|right` commands, and a hidden area is remembered in `layout.json`. The version, the platform, the template count and the template folder moved to Help ▸ About; the language picker left the window, and the language is switched from the command bar.
+- ed73f34: TYTO-96 (ADR 0075): the window gets one visual language, Zed's One Light and One Dark, in one token file. `@tyto/editor`'s palette is now a list of `var(--tyto-…)` custom properties the host defines instead of two sets of literal colours, exported as `themeTokens`; a host that defines none gets an uncoloured editor. Its selection colour now wins over CodeMirror's base rule while the editor is focused, and `restore` brings a stored tab up to the theme the editor is in now. The desktop defines every token in `src/renderer/tokens.css`, draws in the bundled Source Sans 3, follows the system's light or dark live in the window and in every editor, and fails `pnpm check` on a literal colour, radius, size or font anywhere else in the renderer.
+
+### Patch Changes
+
+- 4e440f4: TYTO-144: the crash box now has a button that opens the log folder, so sending the log after a crash is one click instead of copying a path into a file manager.
+- 6847c83: TYTO-146: the macOS `dmg` is universal, so it opens on an Intel Mac as well as on Apple Silicon. The bundled Node that runs plugins carries both architectures too.
+- 7a56ce2: TYTO-155 — nothing in the app changes; this corrects the 0.3.2 entry and records how dependency
+  bumps reach this changelog from now on.
+
+  **The 0.3.2 entry gives the wrong reason for the red Dependabot pull requests.** It says every
+  one of them arrives red on `changeset status` because Dependabot cannot write a changeset. The
+  measurement that followed showed otherwise: `changeset status` fails only when `.changeset/`
+  holds no file at all, so a Dependabot pull request was red whenever no other changeset was
+  pending — right after each version PR — and green otherwise, with no commit of its own. The
+  0.3.2 entry is left as published; this is its correction.
+
+  From now on the pull request check asks whether each changed package is named in a changeset of
+  that pull request's own, and a Dependabot bump of a dependency that ships with the app (Electron
+  among them) gets its line here written by the release workflow, naming the old and new version
+  (ADR 0070).
+
+- 9727c28: TYTO-257: a new version's first run now offers the previous version's `keybindings.json` with the settings, layout and recent files, copied byte for byte, so a person's own keys keep working after an update. A file that does not parse stays behind in the older folder, as an unparsable `settings.json` does.
+- Updated dependencies [d4a6939]
+- Updated dependencies [c141ec9]
+- Updated dependencies [08b936d]
+- Updated dependencies [7342c02]
+- Updated dependencies [15997e9]
+- Updated dependencies [15997e9]
+- Updated dependencies [752ddd2]
+- Updated dependencies [ed73f34]
+  - @tyto/plugin-api@0.5.0
+  - @tyto/core@0.29.0
+  - @tyto/editor@0.8.0
+  - @tyto/export-html@0.7.1
+  - @tyto/export-svg@2.0.1
+  - @tyto/io@3.0.1
+  - @tyto/pipeline@0.10.2
+  - @tyto/brief-lang@0.6.9
+  - @tyto/fonts@0.3.0
+  - @tyto/template-lang@0.8.1
+  - @tyto/templates@1.0.2
+
 ## 0.7.0
 
 ### Minor Changes
