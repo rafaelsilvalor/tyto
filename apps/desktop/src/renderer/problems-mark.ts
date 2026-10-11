@@ -66,3 +66,35 @@ export const carriedAcrossTemplateRead = (
       item.code === SESSION_DRAFT_STALE ||
       THEME_CODES.has(item.code),
   );
+
+/**
+ * What a window-raised row is about (TYTO-260): the document whose save failed, or the path
+ * that was not found. Kept beside the rows rather than on them, because a `Diagnostic` is the
+ * panel's shape and a subject is nothing a person reads. Weak, so a row the list drops takes
+ * its subject with it; a template read carries rows by identity, so the subject survives it.
+ */
+export type RowSubjects = WeakMap<Diagnostic, string>;
+
+/**
+ * The rows left once `subject` stopped being a problem under `code` (TYTO-260): a save of that
+ * document went through, or that path opened. Without it an `E_SAVE_FAILED` row outlived the
+ * save that fixed it — and since TYTO-143 it outlives a template read too — so the panel and
+ * the count said the file was not written when it was. Only rows about that subject go: a
+ * failure about another tab is still true.
+ */
+export const withoutRowsAbout = (
+  installation: readonly Diagnostic[],
+  subjects: RowSubjects,
+  code: string,
+  subject: string,
+): readonly Diagnostic[] =>
+  installation.filter((item) => !(item.code === code && subjects.get(item) === subject));
+
+/**
+ * The mark after rows were taken away (TYTO-260). A removal never lights it — nothing new
+ * arrived — and when no window-raised row is left it goes dark, so it never points at nothing.
+ */
+export const afterRemoval = (
+  mark: ProblemsMark,
+  installation: readonly Diagnostic[],
+): ProblemsMark => (installation.some((item) => WINDOW_RAISED_CODES.has(item.code)) ? mark : UNLIT);

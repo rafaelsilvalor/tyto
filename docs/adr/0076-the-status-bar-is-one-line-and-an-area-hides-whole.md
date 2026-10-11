@@ -83,3 +83,10 @@ is lit.
 **A template read keeps the rows it did not make.** `refreshTemplates` rebuilds the installation
 list from main's answer and used to drop a live failed save or missing file with it, which
 would leave the dot pointing at nothing; those two rows now carry across the read.
+
+**A row that stopped being true goes, and never lights the dot (TYTO-260).** A save failure is
+taken away when the next save of the same tab writes — keyed by the tab, since a failed save-as
+has no path — and a missing-file row raised by reopening a recent entry is taken away when that
+path opens. The session's missing-file rows stay: the window is never told their path (ADR
+0080). A removal never lights the dot, and puts it out when no window-raised row is left, by the
+same reasoning as the template read: a lit dot must point at something.

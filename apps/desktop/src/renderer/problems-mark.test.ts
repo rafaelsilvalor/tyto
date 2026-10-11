@@ -7,9 +7,12 @@ import {
   TEMPLATE_FOLDER_EMPTY,
   UNLIT,
   WINDOW_RAISED_CODES,
+  type RowSubjects,
+  afterRemoval,
   carriedAcrossTemplateRead,
   raised,
   seen,
+  withoutRowsAbout,
 } from './problems-mark.js';
 import { SAVE_FAILED } from './save-failure.js';
 
@@ -65,5 +68,57 @@ describe('carriedAcrossTemplateRead', () => {
   it("keeps the applied theme's rows, which only a theme answer remakes (TYTO-208)", () => {
     const before = [row('E_THEME_INVALID'), row('E_TEMPLATE_MANIFEST_INVALID')];
     expect(carriedAcrossTemplateRead(before).map((item) => item.code)).toEqual(['E_THEME_INVALID']);
+  });
+});
+
+describe('withoutRowsAbout (TYTO-260)', () => {
+  const about = (subjects: RowSubjects, code: string, subject: string): Diagnostic => {
+    const made = row(code);
+    subjects.set(made, subject);
+    return made;
+  };
+
+  it("takes away the save failure of the tab that saved, and keeps another tab's", () => {
+    const subjects: RowSubjects = new WeakMap();
+    const mine = about(subjects, SAVE_FAILED, 'doc-1');
+    const theirs = about(subjects, SAVE_FAILED, 'doc-2');
+    const compiler = row('E_TEMPLATE_MANIFEST_INVALID');
+
+    const left = withoutRowsAbout([mine, compiler, theirs], subjects, SAVE_FAILED, 'doc-1');
+    expect(left).toEqual([compiler, theirs]);
+    expect(left[1]).toBe(theirs);
+  });
+
+  it('takes away a missing file once that path opens, and only under its own code', () => {
+    const subjects: RowSubjects = new WeakMap();
+    const missing = about(subjects, FILE_NOT_FOUND, 'C:/briefs/a.brief');
+    const failed = about(subjects, SAVE_FAILED, 'C:/briefs/a.brief');
+
+    expect(
+      withoutRowsAbout([missing, failed], subjects, FILE_NOT_FOUND, 'C:/briefs/a.brief'),
+    ).toEqual([failed]);
+  });
+
+  it('leaves a row nobody keyed alone, such as a missing file the session restored', () => {
+    const subjects: RowSubjects = new WeakMap();
+    const restored = row(FILE_NOT_FOUND);
+    expect(withoutRowsAbout([restored], subjects, FILE_NOT_FOUND, 'C:/briefs/a.brief')).toEqual([
+      restored,
+    ]);
+  });
+});
+
+describe('afterRemoval (TYTO-260)', () => {
+  it('never lights the mark', () => {
+    expect(afterRemoval(UNLIT, [row(SAVE_FAILED)]).lit).toBe(false);
+    expect(afterRemoval(UNLIT, []).lit).toBe(false);
+  });
+
+  it('puts the mark out when no window row is left for it to point at', () => {
+    expect(afterRemoval({ lit: true }, [row('E_TEMPLATE_MANIFEST_INVALID')]).lit).toBe(false);
+  });
+
+  it('keeps the mark lit while another window row is still there', () => {
+    expect(afterRemoval({ lit: true }, [row(FILE_NOT_FOUND)]).lit).toBe(true);
   });
 });
