@@ -740,6 +740,13 @@ tyto-command-bar[open] {
   background: var(--tyto-hover);
 }
 
+/* A theme's kind in the theme picker (TYTO-208): read after the name, never instead of it. */
+.command-bar__detail {
+  color: var(--tyto-text-muted);
+  font-size: var(--tyto-text-xs);
+  white-space: nowrap;
+}
+
 .command-bar__key {
   color: var(--tyto-text-muted);
   font-family: inherit;

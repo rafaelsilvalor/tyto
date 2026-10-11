@@ -8,8 +8,8 @@ import {
   type UpdateStatus,
 } from '../../shared/ipc.js';
 import { type Credentials } from './credentials.js';
-import { createHandlers, guard, registerIpcHandlers } from './ipc.js';
-import { createThemeService } from './themes.js';
+import { type WindowThemes, createHandlers, guard, registerIpcHandlers } from './ipc.js';
+import { BUILT_IN_THEMES, builtInThemeReader, createThemeService } from './themes.js';
 
 /**
  * The wiring, without Electron.
@@ -432,6 +432,29 @@ const updateNotice = (status: UpdateStatus = { state: 'none' }) => {
   };
 };
 
+/** The built-in two through the real service; a choice is always saved. */
+const windowThemes = (): WindowThemes => {
+  const service = createThemeService({
+    sources: () =>
+      Object.values(BUILT_IN_THEMES).map((theme) => ({
+        plugin: 'desktop',
+        theme,
+        read: builtInThemeReader,
+      })),
+    ready: Promise.resolve(),
+    setting: () => 'tyto-dark',
+    setMode: () => undefined,
+    shown: () => 'light',
+    report: () => undefined,
+  });
+  return {
+    list: () => service.list(),
+    current: () => service.current(),
+    preview: (id) => service.preview(id),
+    choose: async () => ({ applied: await service.current(), saved: true }),
+  };
+};
+
 const dependencies = () => {
   const keychain = credentials();
   return {
@@ -460,7 +483,7 @@ const dependencies = () => {
       request: () => Promise.resolve({ ok: false as const, code: 'E_PERMISSION', message: 'no' }),
     },
     keymaps: () => Promise.resolve([]),
-    themes: createThemeService({ sources: () => [], report: () => undefined }),
+    themes: windowThemes(),
     keybindings: {
       open: () => Promise.resolve({ document: null, documentId: null }),
       read: () => Promise.resolve(''),
@@ -1164,5 +1187,36 @@ describe('the template mode channels (TYTO-44)', () => {
         },
       ],
     });
+  });
+});
+
+describe('the theme channels (TYTO-208)', () => {
+  it('answers the setting’s themes and mode through the contract', async () => {
+    const guarded = guard('theme:current', createHandlers(dependencies())['theme:current']);
+    const answer = await guarded({});
+    expect([answer.mode, answer.light.id, answer.dark.id]).toEqual([
+      'dark',
+      'tyto-light',
+      'tyto-dark',
+    ]);
+    expect(answer.diagnostics).toEqual([]);
+  });
+
+  it('lists every theme with its label and kind, and nothing else', async () => {
+    const guarded = guard('theme:list', createHandlers(dependencies())['theme:list']);
+    expect(await guarded({})).toEqual({
+      themes: [
+        { id: 'tyto-light', label: 'Tyto Light', kind: 'light' },
+        { id: 'tyto-dark', label: 'Tyto Dark', kind: 'dark' },
+      ],
+    });
+  });
+
+  it('previews a theme and says whether a choice was saved', async () => {
+    const handlers = createHandlers(dependencies());
+    const previewed = await guard('theme:preview', handlers['theme:preview'])({ id: 'tyto-light' });
+    expect(previewed.mode).toBe('light');
+    const chosen = await guard('theme:choose', handlers['theme:choose'])({ id: 'tyto-light' });
+    expect(chosen.saved).toBe(true);
   });
 });

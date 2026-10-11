@@ -11,8 +11,10 @@ import { type ThemeName } from '@tyto/editor';
  * whenever the system changes (TYTO-96, comment 1291578). Before this the editor was created
  * `light` and stayed white in a dark window.
  *
- * There is no override in the app: one would be a setting, and it belongs to TYTO-208 (ADR
- * 0075). That card replaces this query with whatever chooses the theme; nothing else changes.
+ * The in-app override is the `theme` setting's `mode` (TYTO-208, ADR 0077), and it reaches
+ * this query rather than replacing it: main sets `nativeTheme.themeSource`, which is what
+ * Electron answers `prefers-color-scheme` from, so the window's colours, this flag and the
+ * native dialogs follow the one value.
  */
 const DARK = '(prefers-color-scheme: dark)';
 

@@ -63,7 +63,10 @@ describe('the IPC contract', () => {
       'templates:folder',
       'templates:list',
       'templates:set-folder',
+      'theme:choose',
       'theme:current',
+      'theme:list',
+      'theme:preview',
       'update:act',
       'update:status',
     ]);
@@ -206,8 +209,25 @@ describe('a response that does not match', () => {
 
 describe('the theme the window applies (TYTO-208)', () => {
   const theme = (colors: Record<string, string>) => ({
+    mode: 'system',
     light: { id: 'tyto-light', colors },
     dark: { id: 'tyto-dark', colors: {} },
+    diagnostics: [],
+  });
+
+  it('refuses a mode that is not one of the three', () => {
+    expect(() => parseIpc('theme:current', 'response', { ...theme({}), mode: 'auto' })).toThrow(
+      IpcContractError,
+    );
+  });
+
+  it('carries a theme problem without a range, which would count lines of the brief', () => {
+    const problem = { severity: 'error', code: 'E_THEME_INVALID', message: 'no' };
+    const parsed = parseIpc('theme:current', 'response', {
+      ...theme({}),
+      diagnostics: [{ ...problem, range: { start: 1, end: 2 } }],
+    }) as { diagnostics: unknown[] };
+    expect(parsed.diagnostics).toEqual([problem]);
   });
 
   it('carries colours by role', () => {
@@ -279,6 +299,8 @@ describe('what the contract does not promise', () => {
       'keybindings:read',
       // TYTO-208. Nor "which colours apply": the theme is main's to read and check.
       'theme:current',
+      // TYTO-208. Nor "which themes are there": every plugin's, which main holds.
+      'theme:list',
       // TYTO-45. "What is in the queue" has no subject: there is one queue folder, and where
       // it is, is main's.
       'queue:list',
