@@ -114,7 +114,10 @@ describe('the status bar at 900x600', () => {
     await app.evaluate(({ BrowserWindow }) => {
       BrowserWindow.getAllWindows()[0]?.setContentSize(900, 600);
     });
-    await page.waitForFunction(() => window.innerWidth === 900);
+    // Within two pixels and not exactly: with the title bar hidden (TYTO-244, ADR 0078) the
+    // window is all content, and at 125 % scaling Windows rounds it to 902 device-independent
+    // pixels where the framed window came back 900. Two pixels do not decide a second row.
+    await page.waitForFunction(() => Math.abs(window.innerWidth - 900) <= 2);
     await typeBrief('---\ntemplate: um-template-de-nome-muito-comprido-para-a-barra\n---\n');
     await page.keyboard.press('Control+A');
     // The longest notice the bar can carry, in Portuguese, painted the way `update-notice.ts`

@@ -32,9 +32,17 @@
   </head>
   <body>
     <main class="shell">
-      <header class="shell__head">
-        <h1 class="shell__name" data-i18n="app.name"></h1>
-        <p class="shell__tagline" data-i18n="app.tagline"></p>
+      <!--
+        The title bar the app draws (TYTO-244, ADR 0078), in place of the system's on Windows and
+        Linux: the system's minimise, maximise and close buttons sit over its right end, and the
+        whole bar drags the window. The empty `menu` is the place the menu row takes (PR B).
+        `shell.ts` writes the title; macOS keeps its native frame and hides this bar.
+      -->
+      <header class="title-bar">
+        <div class="title-bar__area">
+          <div class="title-bar__menu"></div>
+          <span class="title-bar__title"></span>
+        </div>
       </header>
 
       <!--
