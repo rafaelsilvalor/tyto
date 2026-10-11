@@ -265,6 +265,10 @@ describe('the bridge', () => {
       'layout:set',
       'log:reveal',
       'log:write',
+      // TYTO-244: the drawn menu row's model and its native lists. Exercised by
+      // `e2e/menu-row.desktop.test.ts`.
+      'menu:model',
+      'menu:popup',
       'on',
       // TYTO-49: a plugin panel's list and its bridge. Exercised by `e2e/panel-plugin.desktop.test.ts`.
       'panel:request',

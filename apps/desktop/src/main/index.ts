@@ -38,6 +38,7 @@ import { desktopCapabilities, startDesktopPlugins } from './installed-plugins.js
 import { fileLayoutStore } from './layout-store.js';
 import { crashSummary, fileLog, installCrashHandlers } from './log.js';
 import { type AboutFacts, aboutText, menuTemplate } from './menu.js';
+import { findTopLevel, projectMenu } from './menu-model.js';
 import { fileRecentFiles } from './recent-files.js';
 import { registerIpcHandlers, sendIpcEvent } from './ipc.js';
 import { exporterBuiltIns, listPlugins, tytoHome } from './plugin-list.js';
@@ -913,6 +914,31 @@ async function start(): Promise<void> {
     menu: {
       setLocale: (locale) => {
         installMenu(localeFor(locale));
+      },
+      // The drawn menu row (TYTO-244, ADR 0078): read off the menu that is installed, so the
+      // row names exactly what the native lists hold, in the language they were built in.
+      model: () => projectMenu(Menu.getApplicationMenu(), process.platform),
+      // The native list of one top-level menu, under its name in the row. The point arrives
+      // in CSS pixels and `popup` takes the window's, so it is scaled by the page's zoom —
+      // View > Zoom In would otherwise open the list away from the name. Settles when the
+      // list closes, picked from or dismissed.
+      popup: (id, at) => {
+        const submenu = findTopLevel(Menu.getApplicationMenu(), id)?.submenu;
+        const window = mainWindow;
+        if (!(submenu instanceof Menu) || window === undefined || window.isDestroyed()) {
+          return Promise.resolve(false);
+        }
+        const zoom = window.webContents.getZoomFactor();
+        return new Promise((resolve) => {
+          submenu.popup({
+            window,
+            x: Math.round(at.x * zoom),
+            y: Math.round(at.y * zoom),
+            callback: () => {
+              resolve(true);
+            },
+          });
+        });
       },
     },
     project: {

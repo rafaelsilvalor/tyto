@@ -322,13 +322,31 @@ const recordingLog = () => {
   };
 };
 
-/** Records the locales the menu was asked to rebuild in, in order (TYTO-124). */
+/**
+ * Records the locales the menu was asked to rebuild in, in order (TYTO-124), and the menus
+ * the drawn row asked to open (TYTO-244). The model is a fixed one with a Help menu.
+ */
 const menuRebuilds = () => {
   const locales: string[] = [];
+  const popups: { id: string; at: { x: number; y: number } }[] = [];
   return {
     locales,
+    popups,
     setLocale: (locale: string) => {
       locales.push(locale);
+    },
+    model: () => [
+      {
+        id: 'help',
+        label: 'Help',
+        role: 'help',
+        enabled: true,
+        items: [{ id: 'about', label: 'About Tyto', type: 'normal' as const, enabled: true }],
+      },
+    ],
+    popup: (id: string, at: { x: number; y: number }) => {
+      popups.push({ id, at });
+      return Promise.resolve(id === 'help');
     },
   };
 };
@@ -1218,5 +1236,32 @@ describe('the theme channels (TYTO-208)', () => {
     expect(previewed.mode).toBe('light');
     const chosen = await guard('theme:choose', handlers['theme:choose'])({ id: 'tyto-light' });
     expect(chosen.saved).toBe(true);
+  });
+});
+
+describe('the drawn menu row (TYTO-244)', () => {
+  it("answers the installed menu's model through the contract", async () => {
+    const handlers = createHandlers(dependencies());
+    const answer = await guard('menu:model', handlers['menu:model'])({});
+    expect(answer.menus.map((menu) => menu.id)).toEqual(['help']);
+  });
+
+  it('opens the menu it was asked for at the point it was given, and says whether it could', async () => {
+    const deps = dependencies();
+    const handlers = createHandlers(deps);
+    const popup = guard('menu:popup', handlers['menu:popup']);
+    expect(await popup({ id: 'help', x: 12, y: 32 })).toEqual({ opened: true });
+    expect(await popup({ id: 'nothing', x: 0, y: 0 })).toEqual({ opened: false });
+    expect(deps.menu.popups).toEqual([
+      { id: 'help', at: { x: 12, y: 32 } },
+      { id: 'nothing', at: { x: 0, y: 0 } },
+    ]);
+  });
+
+  it('refuses a popup with no id or a point that is not a number', async () => {
+    const handlers = createHandlers(dependencies());
+    const popup = guard('menu:popup', handlers['menu:popup']);
+    await expect(popup({ id: '', x: 0, y: 0 })).rejects.toThrow();
+    await expect(popup({ id: 'help', x: Number.NaN, y: 0 })).rejects.toThrow();
   });
 });

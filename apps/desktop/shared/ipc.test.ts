@@ -43,6 +43,8 @@ describe('the IPC contract', () => {
       'layout:set',
       'log:reveal',
       'log:write',
+      'menu:model',
+      'menu:popup',
       'panel:request',
       'plugins:keymaps',
       'plugins:list',
@@ -308,6 +310,8 @@ describe('what the contract does not promise', () => {
       // there is one app, and main holds the version and the release page.
       'update:status',
       'update:act',
+      // TYTO-244. "What is in the menu" names nothing: there is one installed menu.
+      'menu:model',
     ];
 
     for (const name of IPC_CHANNEL_NAMES) {

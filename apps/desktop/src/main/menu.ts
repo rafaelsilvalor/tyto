@@ -109,6 +109,9 @@ export function menuTemplate(platform: string, options: MenuOptions): MenuItemCo
     // reaches the renderer's registry — the same `registry.run` the command bar calls. Nothing
     // here knows what any of the ids do.
     {
+      // The id the drawn menu row asks for it by (TYTO-244); every other top-level item has a
+      // role, and the row names those by it (`menu-model.ts`).
+      id: 'file',
       label: options.t('menu.file'),
       submenu: [
         ...FILE_MENU_GROUPS.flatMap((group, index) => [

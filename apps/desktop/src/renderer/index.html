@@ -35,7 +35,8 @@
       <!--
         The title bar the app draws (TYTO-244, ADR 0078), in place of the system's on Windows and
         Linux: the system's minimise, maximise and close buttons sit over its right end, and the
-        whole bar drags the window. The empty `menu` is the place the menu row takes (PR B).
+        whole bar drags the window. `menu` is the menu row (PR B): `menu-row.ts` draws the
+        application menu's top-level names into it, and each opens that menu's native list.
         `shell.ts` writes the title; macOS keeps its native frame and hides this bar.
       -->
       <header class="title-bar">

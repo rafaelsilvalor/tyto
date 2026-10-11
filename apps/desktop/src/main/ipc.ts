@@ -12,6 +12,7 @@ import {
   type IpcEventPayload,
   type IpcRequest,
   type IpcResponse,
+  type MenuModel,
   IPC_CHANNEL_NAMES,
   parseIpc,
   parseIpcEvent,
@@ -155,6 +156,13 @@ export interface IpcDependencies {
    */
   readonly menu: {
     setLocale: (locale: string) => void;
+    /** The installed menu, projected for the drawn row (TYTO-244, `menu-model.ts`). */
+    model: () => MenuModel[];
+    /**
+     * Opens the native list of the top-level menu `id` at a point in the page, and settles
+     * when it closes; `false` for an id the installed menu does not have (TYTO-244).
+     */
+    popup: (id: string, at: { x: number; y: number }) => Promise<boolean>;
   };
   /**
    * The template mode (TYTO-44), and the two pickers it needs. Wrapped like `folders`: a
@@ -529,6 +537,10 @@ export function createHandlers(dependencies: IpcDependencies): Handlers {
       menu.setLocale(locale);
       return Promise.resolve({});
     },
+
+    'menu:model': () => Promise.resolve({ menus: menu.model() }),
+
+    'menu:popup': async ({ id, x, y }) => ({ opened: await menu.popup(id, { x, y }) }),
 
     'template:open': async ({ directory }) => {
       const chosen = directory ?? (await templateDialogs.chooseTemplate());
