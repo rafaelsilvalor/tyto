@@ -53,6 +53,33 @@ let page: Page;
 const shown = async (): Promise<string> =>
   page.evaluate(() => document.getElementById('preview-frame')?.getAttribute('srcdoc') ?? '');
 
+/** The status bar's problem count: since TYTO-259 the only one the window shows. */
+const problemCount = async (): Promise<number> =>
+  page.evaluate(() =>
+    Number(document.querySelector('tyto-status-bar .status-bar__count')?.textContent ?? 0),
+  );
+
+/**
+ * Every visible text in the window, outside the status bar, that pairs the word "problem"
+ * with a number — "Problems: 1", "1 problema". The preview footer said exactly that until
+ * TYTO-259, counting only the brief's rows while the bar counts the window's as well, so the
+ * two could disagree (2 and 1 in a TYTO-143 screenshot). Text node by text node: a label
+ * and a number in separate nodes, like the problems panel's heading, are not a sentence.
+ */
+const otherProblemCounts = async (): Promise<string[]> =>
+  page.evaluate(() => {
+    const found: string[] = [];
+    const walker = document.createTreeWalker(document.body, NodeFilter.SHOW_TEXT);
+    for (let node = walker.nextNode(); node !== null; node = walker.nextNode()) {
+      const parent = node.parentElement;
+      const text = node.textContent ?? '';
+      if (parent === null || parent.closest('tyto-status-bar') !== null) continue;
+      if (!parent.checkVisibility()) continue;
+      if (/problem/iu.test(text) && /\d/u.test(text)) found.push(text.trim());
+    }
+    return found;
+  });
+
 beforeAll(async () => {
   if (!existsSync(built)) {
     throw new Error(
@@ -168,17 +195,22 @@ describe('the main screen', () => {
   });
 
   it('reports a broken brief without losing the window', async () => {
-    // A half-typed brief is the normal state of this channel. The status line says how many
+    // A half-typed brief is the normal state of this channel. The status bar says how many
     // problems there are; the editor keeps working, which is the part that matters.
     await page.click('#editor .cm-content');
     await page.keyboard.press('Control+a');
     await page.keyboard.insertText('---\ntemplate: nao-existe\n---\n');
 
-    await expect
-      .poll(() => page.locator('#preview-status').textContent(), { timeout: 10_000 })
-      .toMatch(/\d/u);
+    await expect.poll(() => problemCount(), { timeout: 10_000 }).toBeGreaterThan(0);
 
     expect(await page.locator('#editor .cm-content').isVisible()).toBe(true);
+  });
+
+  it("shows one problem count, the status bar's", async () => {
+    // TYTO-259. The brief above is still in the editor, so the bar has something to count —
+    // asserted first, or "no other count" would pass on a window counting nothing at all.
+    await expect.poll(() => problemCount(), { timeout: 10_000 }).toBeGreaterThan(0);
+    expect(await otherProblemCounts()).toEqual([]);
   });
 });
 
@@ -274,8 +306,8 @@ describe('a brief that stops compiling', () => {
     expect(await stale().isVisible()).toBe(false);
     expect(await paper().isVisible()).toBe(true);
     expect(await page.locator('#preview-empty').isVisible()).toBe(false);
-    // And the problem is still reported, on the surface that lists them.
-    expect(await page.locator('#preview-status').textContent()).toMatch(/\d/u);
+    // And the problem is still reported, in the status bar's count.
+    expect(await problemCount()).toBeGreaterThan(0);
   });
 });
 

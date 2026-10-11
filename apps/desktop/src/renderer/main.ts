@@ -359,7 +359,6 @@ let updateStatus: UpdateStatus = { state: 'none' };
 
 function resolveElements() {
   return {
-    status: byId('preview-status'),
     editor: byId('editor'),
     template: byId<HTMLSelectElement>('template'),
     // By tag and not by id: the element is the panel, so what identifies it is what it is.
@@ -455,27 +454,6 @@ function ask(bridge: TytoBridge, documentId: string, brief: string): void {
       void request(bridge, documentId, brief);
     }, PREVIEW_DELAY),
   );
-}
-
-function paintStatus(): void {
-  const status = elements.status;
-  if (status === null) return;
-  const current = active();
-
-  // No frames and nothing to say about them is the state before anybody types, which the
-  // stage already covers with its own message. A second empty sentence under it would be
-  // noise.
-  if (current.problems === 0) {
-    status.textContent = current.frames.length === 0 ? '' : translate(state.locale, 'preview.ok');
-    status.classList.remove('preview__status--bad');
-    return;
-  }
-
-  const label = translate(state.locale, 'preview.problems');
-  status.textContent = `${label}: ${String(current.problems)}`;
-  // Only errors colour it. A warning is a document that still renders (ADR 0013), and
-  // painting it red would make every unused slot look like a failure.
-  status.classList.toggle('preview__status--bad', current.errors > 0);
 }
 
 /** The card's acceptance criterion, in `panel.ts` where a test can drive it. */
@@ -1151,7 +1129,7 @@ function validateAppFile(bridge: TytoBridge, documentId: string): Promise<void> 
   return validateSettings(bridge, documentId);
 }
 
-/** A document's diagnostics replaced, with the counts the tab strip and the footer read. */
+/** A document's diagnostics replaced; the status bar counts them with the window's own rows. */
 function setFileDiagnostics(
   documentId: string,
   text: string,
@@ -1161,8 +1139,6 @@ function setFileDiagnostics(
     ...document_,
     diagnostics,
     brief: text,
-    problems: diagnostics.length,
-    errors: errorCount(diagnostics),
   }));
   if (documentId === workspace.activeId) repaint();
 }
@@ -2220,7 +2196,6 @@ function repaint(): void {
   keepSessionSoon();
   paint(document, shellState());
   if (pane !== undefined) paintPreview(pane, { ...current, stale: isStale(current) });
-  paintStatus();
   paintPanel();
   paintTabs();
   paintCommandBar();
@@ -2288,8 +2263,6 @@ async function request(bridge: TytoBridge, documentId: string, brief: string): P
       frames,
       artworks,
       selection: keepSelection(document_.selection, frames, artworks),
-      problems: answer.diagnostics.length,
-      errors,
       diagnostics: answer.diagnostics,
       // The brief **as asked**, not as it stands: the ranges index this text, and pairing
       // them with a buffer two keystrokes further on would show a line number that drifts.

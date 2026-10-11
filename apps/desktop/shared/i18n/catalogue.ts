@@ -31,9 +31,6 @@ export interface Catalogue {
    * It has to read well with that panel closed, which is the case the card is about.
    */
   readonly 'preview.stale': string;
-  /** The status line under the stage, with the number of problems spliced in. */
-  readonly 'preview.problems': string;
-  readonly 'preview.ok': string;
   /** The bottom panel that lists what the stages had to say about the brief. */
   readonly 'problems.heading': string;
   readonly 'problems.empty': string;
@@ -468,8 +465,6 @@ export const CATALOGUE_KEYS = [
   'preview.zoom.fit',
   'preview.empty',
   'preview.stale',
-  'preview.problems',
-  'preview.ok',
   'problems.heading',
   'problems.empty',
   'problems.severity.error',

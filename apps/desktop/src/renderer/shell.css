@@ -539,8 +539,7 @@ textarea {
   border: 0;
 }
 
-.preview__empty,
-.preview__status {
+.preview__empty {
   margin: 0;
   color: var(--tyto-text-muted);
   font-size: var(--tyto-text-sm);
@@ -554,7 +553,7 @@ textarea {
  * what `fit` computes against, so the marker would resize the thing it is commenting on.
  *
  * Read as a state and not as an error: muted text on the window's own surface, the way
- * the empty state reads, rather than the red `--status--bad` uses. The problems panel says
+ * the empty state reads, rather than the red the status bar's count uses. The problems panel says
  * what is wrong; this says only that the picture and the text have stopped agreeing — and it
  * has to say that with the panel closed, which is why it is inside the stage at all.
  */
@@ -574,15 +573,6 @@ textarea {
   font-size: var(--tyto-text-xs);
   /* Above the paper, which is the point of sharing the cell. */
   z-index: 1;
-}
-
-.preview__status {
-  padding: var(--tyto-space-4) var(--tyto-space-5);
-  border-top: var(--tyto-hairline-width) solid var(--tyto-hairline);
-}
-
-.preview__status--bad {
-  color: var(--tyto-error);
 }
 
 /*

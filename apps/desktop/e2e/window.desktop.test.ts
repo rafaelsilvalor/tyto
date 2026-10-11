@@ -341,10 +341,7 @@ describe('switching the language', () => {
    * quietly — the same shape as the identical-translation pin in `i18n.test.ts`.
    *
    * The two zoom buttons show a glyph, which is the right thing to see and nothing at all to
-   * hear, so their words go on `title` and `aria-label` (E9.2). The two status keys are
-   * alternatives: the line says either how many problems there are or that there are none,
-   * so neither is on screen unconditionally and counting both would count a string that is
-   * not there.
+   * hear, so their words go on `title` and `aria-label` (E9.2).
    *
    * **The list grows with every component, and that is what ADR 0024 decided.** A component
    * translates inside its own `render`, so its strings never reach the `[data-i18n]` pass
@@ -359,8 +356,6 @@ describe('switching the language', () => {
     'app.name',
     'preview.zoom.out',
     'preview.zoom.in',
-    'preview.problems',
-    'preview.ok',
     // E9.3: the problems panel and the template picker build their own rows, so their
     // strings reach the screen through `panel.ts` rather than through the `data-i18n` pass
     // this counts. They are a locale's strings all the same — `panel.test.ts` is what holds
