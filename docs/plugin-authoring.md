@@ -266,7 +266,11 @@ into, or activation is refused. The shapes are in `docs/plugin-api.md`:
 - `panel` — a page in the desktop window (ADR 0045).
 - `theme` — a colour theme for the window and the editor, as a JSON file in the plugin's
   folder (ADR 0077). Data only, so an installed plugin may contribute one.
-- `editor.command`, `editor.keymap` — cross as data.
+- `editor.keymap` — crosses as data, and the window reads it as a layer of its key table
+  (ADR 0074).
+- `editor.command` — crosses as data, `{ id, title }`, and **nothing runs it yet**: it has no
+  `run`, and the command bar does not list it. TYTO-261 makes it run; ADR 0079 says why user
+  scripts wait for that.
 - `source`, `sink`, `rasterizer` — **refused for an installed plugin** today.
 - `configuration` — a setting in the desktop app's `settings.json` (ADR 0073). Declared with a
   Zod schema, which does not cross to an installed plugin's process, so **refused there too**.

@@ -68,7 +68,7 @@ The last five are named `<id>.tyto-plugin.json` and that is the one place a buil
 | `template-pack`   | folder of templates                                                           | built-in templates                                    |
 | `brand-kit`       | a logo, a wordmark and a signature per brand id (ADR 0063, ADR 0066)          | —                                                     |
 | `directive`       | `::ns/name` in the brief → the slot directives it stands for (ADR 0043)       | —                                                     |
-| `editor.command`  | `{ id, run(ctx), undo? }`                                                     | core-commands                                         |
+| `editor.command`  | `{ id, title }`, data only: nothing runs it yet (TYTO-261, ADR 0079)          | —                                                     |
 | `editor.keymap`   | binding → command id (normal and vim)                                         | default-keymap, vim                                   |
 | `panel`           | a page in the desktop window, `sandbox="allow-scripts"` (ADR 0045)            | —                                                     |
 | `configuration`   | a key of `settings.json`: `{ id, schema, default, description }` (ADR 0073)   | desktop (the four app settings)                       |
@@ -301,6 +301,17 @@ warnings beside its own diagnostics.
 
 ### `editor.command` and `editor.keymap`, in full
 
+**A plugin's `editor.command` is a name and a title, and nothing runs it yet.** The point's
+type is `{ id, title }` with no `run` (`EditorCommand` in `plugin-api`'s `contributions.ts`); an
+installed plugin's crosses as data with no callable (`isolation/points.ts`); nothing in `apps/`
+reads `registry.commands()`, so the command bar (Ctrl+K) does not list it and the CLI cannot
+call it. Making it run, from the command bar and the CLI, with a context for `run`, is TYTO-261.
+ADR 0079 records why user scripts wait for it.
+
+The shape below is `@tyto/editor`'s registry entry, which the window's built-in commands use.
+It is what a plugin's command will be handed to once TYTO-261 lands, not what a plugin
+registers today.
+
 ```ts
 interface EditorCommand {
   id: string; // namespaced by convention: editor.save, preview.toggleFormat, ai.caption
@@ -316,8 +327,9 @@ interface CommandBinding {
 }
 ```
 
-`createCommandRegistry` in `@tyto/editor` is the registry both points feed, and E7 hands a
-plugin the same `register` the built-ins use.
+`createCommandRegistry` in `@tyto/editor` is the registry the window's commands live in. A
+plugin's `editor.keymap` feeds the window's keybinding table (below); a plugin's
+`editor.command` does not reach the registry yet (TYTO-261).
 
 **The desktop consumes `editor.keymap` since TYTO-207** (ADR 0074). A plugin's
 `{ bindings, mode?, when? }` becomes one layer of the window's keybinding table, between the
