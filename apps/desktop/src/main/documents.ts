@@ -92,6 +92,16 @@ export interface DocumentService {
   save(documentId: string, text: string, saveAs: boolean): Promise<SavedDocument>;
   /** Forgets a tab's path. A tab main never heard of is not an error. */
   close(documentId: string): void;
+  /**
+   * The path a tab holds, for the session record only (TYTO-113, ADR 0080). Main keeps it;
+   * it is never asked for by the window.
+   */
+  pathOf(documentId: string): string | undefined;
+  /**
+   * Forgets every tab, because a new page is starting: a reload keeps main and throws the
+   * window's tabs away, and the ids the old page used will be used again (TYTO-113).
+   */
+  reset(): void;
   recent(): Promise<IpcResponse<'files:recent'>>;
   /**
    * The folder that tab's brief lives in, for the preview to resolve assets against.
@@ -238,6 +248,12 @@ export function createDocumentService(options: DocumentServiceOptions): Document
 
     close(documentId) {
       paths.delete(documentId);
+    },
+
+    pathOf: (documentId) => paths.get(documentId),
+
+    reset() {
+      paths.clear();
     },
 
     async recent() {

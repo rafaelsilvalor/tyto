@@ -3,6 +3,10 @@
 Status: accepted · 2026-09-20 · decided by TYTO-153 · amends the two-way box of ADR 0029 and
 ADR 0031, whose staging and deadlines are untouched
 
+_Amended by ADR 0080 (TYTO-113)._ Unsaved tabs are kept in the session and reopened, so the box
+is no longer drawn for them. It remains, unchanged, for the template mode's buffers and for a
+session the disk refused.
+
 ## Context
 
 ADR 0029 gave main a way to ask the window a question and ADR 0031 made the answer wait for a

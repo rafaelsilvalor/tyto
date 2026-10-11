@@ -24,6 +24,7 @@ import { type DesktopLog } from './log.js';
 import { type DocumentService } from './documents.js';
 import { type ExportService } from './export.js';
 import { type LayoutStore } from './layout-store.js';
+import { type SessionService } from './session.js';
 import { type PanelService } from './panels.js';
 import { type PreviewService } from './preview.js';
 import { type QueueService, type QueueView } from './queue.js';
@@ -83,6 +84,8 @@ export interface IpcDependencies {
   readonly documents: DocumentService;
   /** Where the panels were last time (E9.10). */
   readonly layout: LayoutStore;
+  /** The tabs, kept for the next launch and decided against the disk then (TYTO-113). */
+  readonly session: SessionService;
   /**
    * A yes-or-no in front of the window (E9.11), injected for the reason the dialogs are.
    *
@@ -187,7 +190,7 @@ export interface IpcDependencies {
   readonly settings: {
     open: (documentId: string) => Promise<IpcResponse<'settings:open'>>;
     validate: (request: IpcRequest<'settings:validate'>) => Diagnostics;
-    closed: (documentId: string) => Promise<void>;
+    closed: (documentId: string) => Promise<boolean>;
   };
   /**
    * The keybindings tab (TYTO-207): the one file it opens, and its text for the window to
@@ -270,6 +273,7 @@ export function createHandlers(dependencies: IpcDependencies): Handlers {
     preview,
     project,
     queue,
+    session,
     settings,
     templateDialogs,
     templateEditor,
@@ -357,6 +361,10 @@ export function createHandlers(dependencies: IpcDependencies): Handlers {
       await layout.write(request.layout);
       return {};
     },
+
+    'session:write': (request) => session.write(request),
+
+    'session:read': () => session.read(),
 
     'credentials:set': async ({ plugin, key, secret }) => {
       await credentials.set(await declaredAccount(plugins, plugin, key), secret);

@@ -19,10 +19,13 @@ import { THEME_CODES } from './theme.js';
 
 export const FILE_NOT_FOUND = 'E_FILE_NOT_FOUND';
 export const TEMPLATE_FOLDER_EMPTY = 'E_TEMPLATE_FOLDER_EMPTY';
+/** TYTO-113: a kept draft not put back over a file that changed while the app was closed. */
+export const SESSION_DRAFT_STALE = 'W_SESSION_DRAFT_STALE';
 
-/** The three codes this window raises itself, and the only ones that light the mark. */
+/** The codes this window raises itself, and the only ones that light the mark. */
 export const WINDOW_RAISED_CODES: ReadonlySet<string> = new Set([
   FILE_NOT_FOUND,
+  SESSION_DRAFT_STALE,
   SAVE_FAILED,
   TEMPLATE_FOLDER_EMPTY,
 ]);
@@ -58,5 +61,8 @@ export const carriedAcrossTemplateRead = (
 ): readonly Diagnostic[] =>
   installation.filter(
     (item) =>
-      item.code === SAVE_FAILED || item.code === FILE_NOT_FOUND || THEME_CODES.has(item.code),
+      item.code === SAVE_FAILED ||
+      item.code === FILE_NOT_FOUND ||
+      item.code === SESSION_DRAFT_STALE ||
+      THEME_CODES.has(item.code),
   );

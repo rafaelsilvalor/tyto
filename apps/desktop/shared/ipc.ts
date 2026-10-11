@@ -119,6 +119,9 @@ const openDocument = z.object({
  */
 const documentId = z.string().min(1).max(100);
 
+/** What a session tab holds: a brief, or one of the app's own two files (TYTO-113). */
+const sessionTabKind = z.enum(['brief', 'settings', 'keybindings']);
+
 /**
  * A task folder's name, which is the task's id (`@tyto/io`'s `fsInbox`). One path segment in
  * practice; bounded here so a hostile renderer cannot send a megabyte of one.
@@ -632,6 +635,63 @@ export const IPC_CHANNELS = {
    * layout that failed to persist except show a person an error about a splitter.
    */
   'layout:set': channel(z.object({ layout: layoutSchema }), z.object({})),
+
+  /**
+   * The tabs as they are now, for the next launch to reopen (TYTO-113, ADR 0080).
+   *
+   * **No path crosses in this direction.** A tab names its id and main looks the path up in
+   * the table it already keeps; a session can only ever name a file main itself opened, which
+   * is the same containment `file:reopen` gets from the recent list. A tab's `draft` is there
+   * only when it holds text that is in no file — its words and the saved text they differ
+   * from, which main keeps as a hash so a file changed on disk is never overwritten by it.
+   *
+   * `final` is the quit: main then also writes the screens' pending changes into
+   * `settings.json`, as closing the settings tab does (ADR 0073 decision 8). `written` is
+   * whether the record reached the disk; a quit that could not keep the drafts asks instead.
+   */
+  'session:write': channel(
+    z.object({
+      tabs: z
+        .array(
+          z.object({
+            documentId,
+            kind: sessionTabKind,
+            draft: z.object({ text: z.string(), savedText: z.string() }).nullable(),
+          }),
+        )
+        .max(500),
+      active: z.number().int().min(0),
+      final: z.boolean(),
+    }),
+    z.object({ written: z.boolean() }),
+  ),
+
+  /**
+   * The tabs the last session left, decided against the disk as it is now (TYTO-113, ADR 0080).
+   *
+   * Asked once per page. A brief comes back already held by main under `documentId`, with the
+   * text that is on disk; `draft` is the unsaved text to put over it, offered only when the
+   * file still says what it said when the draft was kept. `stale` is a draft the file moved
+   * under — the window shows the disk and keeps the draft beside it, never over it. `missing`
+   * names a file that is gone. The app's own two files come back as a kind, and the window
+   * opens them by their own commands.
+   */
+  'session:read': channel(
+    z.object({}),
+    z.object({
+      tabs: z.array(
+        z.object({
+          kind: sessionTabKind,
+          documentId: documentId.nullable(),
+          document: openDocument.nullable(),
+          draft: z.string().nullable(),
+          stale: z.boolean(),
+          missing: z.string().nullable(),
+        }),
+      ),
+      active: z.number().int().min(0),
+    }),
+  ),
 
   /**
    * Stores a plugin's secret through `safeStorage`, which is the OS keychain (ADR 0001).

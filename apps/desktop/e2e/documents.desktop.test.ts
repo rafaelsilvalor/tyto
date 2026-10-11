@@ -249,8 +249,10 @@ describe('quitting and reopening', () => {
       );
 
       expect(labels.join(' ')).toContain('campanha.brief');
-      // The window itself opened empty: a recent list is an offer, not a session restore.
-      expect(await reopened.title()).toMatch(/^(Sem título|Untitled) — Tyto$/u);
+      // And since TYTO-113 the window itself is not empty: it reopened the tab the first
+      // window had in front, from the session — a second mechanism beside the recent list,
+      // which stays an offer (ADR 0080; `session.desktop.test.ts` holds the session).
+      expect(await reopened.title()).toMatch(/^campanha\.brief — Tyto$/u);
     } finally {
       await second.close();
     }

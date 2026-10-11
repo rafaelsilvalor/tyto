@@ -3,6 +3,7 @@ import { describe, expect, it } from 'vitest';
 import type { Diagnostic } from './panel.js';
 import {
   FILE_NOT_FOUND,
+  SESSION_DRAFT_STALE,
   TEMPLATE_FOLDER_EMPTY,
   UNLIT,
   WINDOW_RAISED_CODES,
@@ -40,9 +41,9 @@ describe('the mark', () => {
     expect(raised(seen(raised(UNLIT, false)), false).lit).toBe(true);
   });
 
-  it('names exactly the three codes the window raises', () => {
+  it('names exactly the four codes the window raises', () => {
     expect([...WINDOW_RAISED_CODES].sort()).toEqual(
-      [FILE_NOT_FOUND, SAVE_FAILED, TEMPLATE_FOLDER_EMPTY].sort(),
+      [FILE_NOT_FOUND, SAVE_FAILED, SESSION_DRAFT_STALE, TEMPLATE_FOLDER_EMPTY].sort(),
     );
   });
 });

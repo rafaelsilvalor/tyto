@@ -106,6 +106,7 @@ import {
 import {
   type ProblemsMark,
   FILE_NOT_FOUND,
+  SESSION_DRAFT_STALE,
   TEMPLATE_FOLDER_EMPTY,
   UNLIT,
   carriedAcrossTemplateRead,
@@ -135,6 +136,7 @@ import {
 import { type SaveOutcome, listenForExit, resolveExit } from './exit.js';
 import { installErrorReporting, reportToLog } from './report-errors.js';
 import { searchPhrasesFor } from './search-phrases.js';
+import { sessionOf } from './session.js';
 import { paintUpdateNotice } from './update-notice.js';
 import { type ShellState, paint, paintTitle } from './shell.js';
 import { AltTap, MenuRow } from './menu-row.js';
@@ -877,6 +879,13 @@ const registry: CommandRegistry = createDesktopRegistry({
   },
   openKeybindings: () => {
     openAppFile('keybindings');
+  },
+  reloadWindow: () => {
+    // The session first, so every tab comes back; a reload that could not keep the drafts
+    // does not happen while there are any (TYTO-113, ADR 0080).
+    void keepSession(false).then((written) => {
+      if (written || !workspace.documents.some(isUnsaved)) window.location.reload();
+    });
   },
   pickTheme: () => {
     void pickTheme();
@@ -1684,8 +1693,11 @@ async function answerExitRequest(bridge: TytoBridge, askId: number): Promise<voi
   let allow = false;
   try {
     allow = await resolveExit({
-      unsaved: () => [
-        ...workspace.documents.filter(isUnsaved).map((document_) => document_.id),
+      // Hot exit (TYTO-113, ADR 0080): the drafts are kept for the next launch, and the box is
+      // left for what the session cannot hold, or for a session the disk refused.
+      keep: () => keepSession(true),
+      unsaved: (kept) => [
+        ...(kept ? [] : workspace.documents.filter(isUnsaved).map((document_) => document_.id)),
         // The template mode's two buffers, as one entry: the box counts things a person would
         // lose, and a template is one thing (TYTO-44).
         ...(elements.templateMode?.unsaved === true ? [TEMPLATE_MODE_ID] : []),
@@ -1723,6 +1735,143 @@ async function answerExitRequest(bridge: TytoBridge, askId: number): Promise<voi
   } finally {
     await bridge['app:exit-answer']({ askId, allow });
   }
+}
+
+/**
+ * How long the window waits after a change before it keeps the session (TYTO-113).
+ *
+ * A pause and not every keystroke: the record is the whole strip, drafts included, and what a
+ * crash costs is at most this much typing. A quit and a reload write it at once.
+ */
+const SESSION_DELAY = 1000;
+let sessionTimer: ReturnType<typeof setTimeout> | undefined;
+/** False until the last session was read back: a write before that would erase it. */
+let sessionRead = false;
+
+function keepSessionSoon(): void {
+  if (!sessionRead) return;
+  if (sessionTimer !== undefined) clearTimeout(sessionTimer);
+  sessionTimer = setTimeout(() => {
+    sessionTimer = undefined;
+    void keepSession(false);
+  }, SESSION_DELAY);
+}
+
+/** Writes the session now, and says whether it reached the disk (ADR 0080). */
+async function keepSession(final: boolean): Promise<boolean> {
+  const bridge = window.tyto;
+  if (bridge === undefined || !sessionRead) return false;
+  if (sessionTimer !== undefined) clearTimeout(sessionTimer);
+  sessionTimer = undefined;
+  try {
+    return (await bridge['session:write']({ ...sessionOf(workspace), final })).written;
+  } catch (cause) {
+    reportToLog(bridge, cause, 'session not written');
+    return false;
+  }
+}
+
+/** One tab as main answered it, or the app file opened by its own command. */
+type RestoredTab = IpcResponse<'session:read'>['tabs'][number];
+
+/** The file a restored tab holds: main's answer for a brief, the open command's for the rest. */
+async function fileOf(
+  bridge: TytoBridge,
+  tab: RestoredTab,
+): Promise<{ document: { name: string; text: string } | null; documentId: string | null }> {
+  if (tab.kind === 'brief') return { document: tab.document, documentId: tab.documentId };
+  const wanted = nextDocumentId();
+  return tab.kind === 'settings'
+    ? bridge['settings:open']({ documentId: wanted })
+    : bridge['keybindings:open']({ documentId: wanted });
+}
+
+/**
+ * Reopens the tabs the last session left, as main decided them against the disk (TYTO-113).
+ *
+ * Main has already chosen: which files are still there, and whether each draft may go over
+ * its file. What is left here is building the documents — the saved text read back out of the
+ * buffer CodeMirror built from the disk, as `adopt` does, and the draft over it as a buffer of
+ * its own. **The undo history does not come back**: a state is opaque and is written nowhere
+ * (ADR 0080). A draft its file moved under opens in a tab of its own beside the file, never
+ * over it, and a problems row says so; a file that is gone says so too.
+ */
+async function restoreSession(bridge: TytoBridge, handle: EditorHandle): Promise<void> {
+  let answer: IpcResponse<'session:read'>;
+  try {
+    answer = await bridge['session:read']({});
+  } catch (cause) {
+    reportToLog(bridge, cause, 'session not read');
+    sessionRead = true;
+    return;
+  }
+
+  const restored: DocumentState[] = [];
+  const rows: Diagnostic[] = [];
+  let activeId: string | undefined;
+  const untitled = (text: string): DocumentState => {
+    const born = newDocument(nextDocumentId(), handle.blank(text));
+    restored.push(born);
+    return born;
+  };
+
+  for (const [index, tab] of answer.tabs.entries()) {
+    const opened = await fileOf(bridge, tab);
+    const kind = tab.kind === 'brief' ? undefined : tab.kind;
+    let built: DocumentState | undefined;
+    if (opened.document !== null && opened.documentId !== null) {
+      const language = kind === undefined ? undefined : 'plain';
+      const born = newDocument(opened.documentId, handle.blank(opened.document.text, language));
+      built = {
+        ...born,
+        ...(kind === undefined ? {} : { kind }),
+        name: opened.document.name,
+        savedText: contentOf(born),
+        state: tab.draft !== null && !tab.stale ? handle.blank(tab.draft, language) : born.state,
+      };
+      restored.push(built);
+      if (tab.draft !== null && tab.stale) {
+        untitled(tab.draft);
+        rows.push({
+          severity: 'warning',
+          code: SESSION_DRAFT_STALE,
+          message: `${translate(state.locale, 'session.draftStale')}: ${opened.document.name}`,
+        });
+      }
+    } else {
+      if (tab.missing !== null) {
+        rows.push({
+          severity: 'error',
+          code: FILE_NOT_FOUND,
+          message: `${translate(state.locale, 'file.missing')}: ${tab.missing}`,
+        });
+      }
+      if (tab.draft !== null) built = untitled(tab.draft);
+    }
+    if (index === answer.active && built !== undefined) activeId = built.id;
+  }
+
+  if (restored.length > 0) {
+    captureScroll();
+    // The tab the window opened on stays only if somebody already typed in it.
+    const kept = workspace.documents.filter((document_) => !isDisposable(document_));
+    workspace = {
+      documents: [...restored, ...kept],
+      activeId: activeId ?? (restored[0] as DocumentState).id,
+    };
+    restoreActive();
+    for (const document_ of restored) {
+      if (document_.kind === undefined) void request(bridge, document_.id, contentOf(document_));
+      else void validateAppFile(bridge, document_.id);
+    }
+  }
+  if (rows.length > 0) {
+    const codes = new Set(rows.map((row) => row.code));
+    panel.installation = [...rows, ...panel.installation.filter((item) => !codes.has(item.code))];
+    raiseWindowProblem();
+  }
+  sessionRead = true;
+  repaint();
 }
 
 /** Takes a tab out of the window, and tells main to stop holding its path. */
@@ -2067,6 +2216,8 @@ function shellState(): ShellState {
 
 function repaint(): void {
   const current = active();
+  // Every change to the strip ends in a repaint, so this is where the session is kept from.
+  keepSessionSoon();
   paint(document, shellState());
   if (pane !== undefined) paintPreview(pane, { ...current, stale: isStale(current) });
   paintStatus();
@@ -2697,10 +2848,14 @@ async function load(): Promise<void> {
         // exists.
         if (active().kind !== undefined) askAppFile(bridge, documentId);
         else ask(bridge, documentId, activeText());
+        // Typing changes no tab but the draft, and a draft is what a crash would cost.
+        keepSessionSoon();
       });
       // Once on load as well: a brief restored into the buffer should show, and the first
       // answer is what fills the format tabs.
       void request(bridge, workspace.activeId, activeText());
+      // The tabs the last session left (TYTO-113), now that there is an editor to build them.
+      await restoreSession(bridge, handle);
     }
   }
 

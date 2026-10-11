@@ -1,4 +1,4 @@
-import { existsSync, mkdtempSync, readFileSync, rmSync } from 'node:fs';
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { tmpdir } from 'node:os';
 import { fileURLToPath } from 'node:url';
@@ -22,6 +22,12 @@ import { firstWindow } from './first-window.js';
  * own describe with its own window, and so is the slow-answer case (TYTO-147), which needs a
  * window that is still there to be measured while a box is on screen, and so is **Sim**
  * (TYTO-153), which ends with a file on disk and an app that went after writing it.
+ *
+ * **Since TYTO-113 the box is the fallback, not the rule** (ADR 0080). Unsaved text is kept in
+ * the session and reopened, so a quit asks nothing; the box is drawn only when the session
+ * could not be written. The describes about the box therefore launch with a folder where
+ * `session.json` should be — the write fails, as a full disk would — and keep proving what they
+ * proved about the handshake (ADR 0031, ADR 0039). The first describe is the hot exit itself.
  *
  * `dialog.showMessageBox` is replaced from main, the same seam `tabs.desktop.test.ts` uses
  * and for its reason: `app.evaluate` runs with the `electron` module in scope, so nothing
@@ -134,7 +140,13 @@ const boxes = async (app: ElectronApplication): Promise<CapturedBox[]> =>
     () => (globalThis as unknown as { tytoBoxes?: CapturedBox[] }).tytoBoxes ?? [],
   ) as Promise<CapturedBox[]>;
 
-const launch = async (name: string): Promise<{ app: ElectronApplication; page: Page }> => {
+const launch = async (
+  name: string,
+  { keepable = false }: { keepable?: boolean } = {},
+): Promise<{ app: ElectronApplication; page: Page }> => {
+  // A folder where the session file goes makes its write fail, which is the only way left to
+  // reach the box (TYTO-113). `keepable` launches the app as it ships.
+  if (!keepable) mkdirSync(join(scratch, name, 'session.json'), { recursive: true });
   const app = await _electron.launch({
     // Its own `userData`, for the reason `panel.desktop.test.ts` gives: `layout.json` is
     // shared otherwise, and a suite that inherited another one's panels would be measuring
@@ -162,7 +174,38 @@ afterAll(() => {
   rmSync(scratch, { recursive: true, force: true });
 });
 
-describe('quitting with unsaved text', () => {
+describe('quitting with unsaved text, which keeps it and asks nothing (TYTO-113)', () => {
+  it('goes through the window button with no box, and the draft is in the session', async () => {
+    const { app, page } = await launch('hot', { keepable: true });
+    const marker = join(scratch, 'hot-asked.txt');
+    await page.click('#editor .cm-content');
+    await page.keyboard.type('::titulo Campanha');
+    await page.waitForSelector('.tabs__dirty');
+    await app.evaluate(({ dialog }, file) => {
+      dialog.showMessageBox = ((): Promise<unknown> => {
+        // eslint-disable-next-line @typescript-eslint/no-require-imports
+        const fs = require('node:fs') as { appendFileSync: (to: string, data: string) => void };
+        fs.appendFileSync(file, 'asked');
+        return Promise.resolve({ response: 2, checkboxChecked: false });
+      }) as never;
+    }, marker);
+
+    // The X: the door that destroys the renderer first on win32 and linux, so the session has
+    // to be written through the quit handshake and not after it.
+    const gone = app.waitForEvent('close');
+    await app.evaluate(({ BrowserWindow }) => {
+      BrowserWindow.getAllWindows()[0]?.close();
+    });
+    await gone;
+
+    expect(existsSync(marker)).toBe(false);
+    expect(readFileSync(join(scratch, 'hot', 'session.json'), 'utf8')).toContain(
+      '::titulo Campanha',
+    );
+  });
+});
+
+describe('quitting with unsaved text the session could not keep', () => {
   let app: ElectronApplication;
   let page: Page;
   let closed = false;
@@ -416,7 +459,7 @@ describe('quitting with Sim, the button that saves', () => {
 
 describe('quitting with nothing unsaved', () => {
   it('does not ask at all', async () => {
-    const { app } = await launch('clean');
+    const { app } = await launch('clean', { keepable: true });
     const marker = join(scratch, 'asked.txt');
 
     // Recorded to **disk** and not to a global, because the app is gone by the time there is
@@ -459,7 +502,7 @@ describe('quitting with nothing unsaved', () => {
  */
 describe('quitting a page that cannot hear the question yet', () => {
   it('goes, instead of waiting for an answer nobody can give', async () => {
-    const { app } = await launch('not-listening');
+    const { app } = await launch('not-listening', { keepable: true });
     await app.evaluate(async ({ BrowserWindow }) => {
       await BrowserWindow.getAllWindows()[0]?.loadURL('about:blank');
     });

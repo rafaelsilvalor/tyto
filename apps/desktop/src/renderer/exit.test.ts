@@ -13,14 +13,21 @@ import { type ExitAnswer, type SaveOutcome, listenForExit, resolveExit } from '.
  * in a launched app makes convenient to reach.
  */
 
+/**
+ * `kept` is whether the session reached the disk (TYTO-113). Most cases below are the box,
+ * which since hot exit is reached only when it did not; `beyond` is what the session never
+ * holds — the template mode's buffers.
+ */
 const question = (
   unsaved: readonly string[],
   answer: ExitAnswer,
   saves: readonly SaveOutcome[] = [],
+  { kept = false, beyond = [] }: { kept?: boolean; beyond?: readonly string[] } = {},
 ) => {
   const queue = [...saves];
   return {
-    unsaved: () => unsaved,
+    keep: vi.fn(() => Promise.resolve(kept)),
+    unsaved: (written: boolean) => (written ? beyond : [...unsaved, ...beyond]),
     ask: vi.fn<(count: number) => Promise<ExitAnswer>>(() => Promise.resolve(answer)),
     save: vi.fn<(documentId: string) => Promise<SaveOutcome>>(() =>
       Promise.resolve(queue.shift() ?? 'saved'),
@@ -29,6 +36,30 @@ const question = (
 };
 
 describe('resolveExit', () => {
+  it('keeps the drafts and goes, asking nothing, when the session was written (TYTO-113)', async () => {
+    const asked = question(['document-1', 'document-2'], 'cancel', [], { kept: true });
+
+    expect(await resolveExit(asked)).toBe(true);
+    expect(asked.keep).toHaveBeenCalledTimes(1);
+    expect(asked.ask).not.toHaveBeenCalled();
+    expect(asked.save).not.toHaveBeenCalled();
+  });
+
+  it('still asks about what the session cannot hold, and only about that', async () => {
+    const asked = question(['document-1'], 'save', [], { kept: true, beyond: ['template-mode'] });
+
+    expect(await resolveExit(asked)).toBe(true);
+    expect(asked.ask).toHaveBeenCalledWith(1);
+    expect(asked.save.mock.calls).toEqual([['template-mode']]);
+  });
+
+  it('asks about every dirty tab when the session could not be written', async () => {
+    const asked = question(['document-1', 'document-2'], 'cancel');
+
+    expect(await resolveExit(asked)).toBe(false);
+    expect(asked.ask).toHaveBeenCalledWith(2);
+  });
+
   it('lets the app go without asking when nothing is unsaved', async () => {
     const asked = question([], 'cancel');
 

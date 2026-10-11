@@ -285,6 +285,9 @@ describe('the bridge', () => {
       'queue:set-auto-run',
       'queue:set-folder',
       'queue:set-kinds',
+      // TYTO-113: the tabs kept for the next launch. Exercised by `e2e/session.desktop.test.ts`.
+      'session:read',
+      'session:write',
       // TYTO-206: the settings tab. Exercised by `e2e/settings.desktop.test.ts`.
       'settings:open',
       'settings:validate',
@@ -408,6 +411,9 @@ describe('switching the language', () => {
     // and in the document only after a save has failed. `src/renderer/save-failure.test.ts`
     // is what holds it to a locale.
     'file.saveFailed',
+    // TYTO-113: a draft not put back over a file that changed, minted like `file.missing`
+    // and in the document only after a restore found one. `e2e/session.desktop.test.ts`.
+    'session.draftStale',
     // E9.10: the close button's word lives on `title` and `aria-label`, and the rest name
     // panels and commands inside the bar. The panel *headings* are still element text and
     // are still counted — what moved is who renders them, not whether they are painted.
@@ -564,6 +570,8 @@ describe('switching the language', () => {
     'command.settings.open',
     // TYTO-207: the same, for the keybindings file. `e2e/keybindings-file.desktop.test.ts`.
     'command.keybindings.open',
+    // TYTO-113: View > Reload's label, in the bar and the menu only.
+    'command.window.reload',
     // TYTO-208: the theme picker's command, placeholder and the two kinds beside each theme,
     // all inside the bar. `e2e/theme-pick.desktop.test.ts` opens it.
     'command.theme.pick',

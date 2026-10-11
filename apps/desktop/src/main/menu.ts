@@ -1,6 +1,6 @@
 import type { MenuItemConstructorOptions } from 'electron';
 
-import { FILE_MENU_GROUPS } from '../../shared/commands.js';
+import { FILE_MENU_GROUPS, RELOAD_COMMAND } from '../../shared/commands.js';
 import type { CatalogueKey } from '../../shared/i18n/index.js';
 
 /**
@@ -31,6 +31,12 @@ import type { CatalogueKey } from '../../shared/i18n/index.js';
  * has none of. Removing the item cannot be got wrong by a race and costs a shortcut that
  * `electron-vite dev` already replaces with a reload of its own. Session restore, which
  * would make a reload harmless, is a feature and not this card.
+ *
+ * **Reload is back since TYTO-113, and not as the role** (ADR 0080). The session now brings
+ * every tab back, drafts included, so a reload costs nothing — provided the window writes the
+ * session first, which the role does not wait for. So it is a command, like the File items,
+ * and its key is the window's `Mod-r` rather than an accelerator here, which would take
+ * `Ctrl-R` from vim's redo. Force Reload stays out.
  *
  * Roles and not labels, **where the label is the system's to write**. A role's label is
  * Electron's own, in the system's language, which is the right answer for *Minimize* and
@@ -139,14 +145,22 @@ export function menuTemplate(platform: string, options: MenuOptions): MenuItemCo
     // Left as Electron built them. `editMenu` is what makes copy and paste work on macOS,
     // where the clipboard shortcuts are the menu's rather than the page's.
     { role: 'editMenu' },
-    // Written out because the default carries Reload and Force Reload, and a reload
-    // discards every open buffer. Everything else the role would have built is kept, item
+    // Written out because the default carries Reload and Force Reload as roles, which tear the
+    // page down before it can keep its tabs. Reload is the window's command instead (TYTO-113).
+    // Originally: a reload discarded every open buffer. Everything else the role would have built is kept, item
     // for item: the developer tools, the three zoom levels and full screen are all
     // harmless, and dropping the submenu wholesale would take them along with the two
     // entries that are the problem.
     {
       role: 'viewMenu',
       submenu: [
+        {
+          id: RELOAD_COMMAND.id,
+          label: options.t(RELOAD_COMMAND.label),
+          click: () => {
+            options.onCommand(RELOAD_COMMAND.id);
+          },
+        },
         { role: 'toggleDevTools' },
         { type: 'separator' },
         { role: 'resetZoom' },

@@ -255,12 +255,13 @@ describe('the drawn menu row', () => {
     expect(ran).toEqual(['open:a folder', 'about:Tyto']);
   });
 
-  it('still installs no Reload and no Close', async () => {
+  it('installs Reload as the window’s command, and still no Close (TYTO-113)', async () => {
     const roles = await app.evaluate(({ Menu }) => {
       const found: string[] = [];
       const walk = (items: Electron.MenuItem[]): void => {
         for (const item of items) {
           if (item.role !== undefined && item.role !== null) found.push(item.role.toLowerCase());
+          if (item.id === 'window.reload') found.push('command:window.reload');
           if (item.submenu) walk(item.submenu.items);
         }
       };
@@ -268,6 +269,9 @@ describe('the drawn menu row', () => {
       return found;
     });
     expect(roles).toContain('toggledevtools');
+    // Reload is back since TYTO-113, as the window's command and not the role that would
+    // tear the page down before it keeps its tabs (ADR 0080). Close stays out.
+    expect(roles).toContain('command:window.reload');
     expect(roles).not.toContain('reload');
     expect(roles).not.toContain('forcereload');
     expect(roles).not.toContain('close');

@@ -48,6 +48,8 @@ export const en: Catalogue = {
   'document.unsaved': 'unsaved',
   'file.missing': 'This file is no longer where it was',
   'file.saveFailed': 'This file was not saved',
+  'session.draftStale':
+    'This file changed while Tyto was closed; your unsaved text is in a new tab beside it',
   'document.close': 'Close the tab',
   'document.discard.message': 'Close without saving?',
   'document.discard.detail': 'This brief has changes that have not been written to disk',
@@ -69,7 +71,7 @@ export const en: Catalogue = {
   'crash.close': 'Close',
   'import.message': 'Bring your settings from version {version}?',
   'import.detail':
-    'The templates folder, where the panels were, the recent files and your keyboard shortcuts. Version {version} keeps its own copy either way, and this question will not come back.',
+    'The templates folder, where the panels were, the recent files, your keyboard shortcuts and the tabs you had open. Version {version} keeps its own copy either way, and this question will not come back.',
   'import.credentials': 'Also bring the saved sign-ins',
   'import.confirm': 'Bring them',
   'import.decline': 'Start fresh',
@@ -214,6 +216,7 @@ export const en: Catalogue = {
   'plugins.credential.failed': 'The credential could not be saved or cleared.',
   'command.settings.open': 'Preferences: Open Settings (JSON)',
   'command.keybindings.open': 'Preferences: Open Keyboard Shortcuts (JSON)',
+  'command.window.reload': 'Reload the window',
   'command.theme.pick': 'Preferences: Color Theme',
   'theme.pick.placeholder': 'Select a color theme',
   'theme.kind.light': 'light',

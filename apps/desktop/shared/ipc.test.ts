@@ -56,6 +56,8 @@ describe('the IPC contract', () => {
       'queue:set-auto-run',
       'queue:set-folder',
       'queue:set-kinds',
+      'session:read',
+      'session:write',
       'settings:open',
       'settings:validate',
       'template:new',
@@ -299,6 +301,9 @@ describe('what the contract does not promise', () => {
       'plugins:keymaps',
       // TYTO-207. Nor "what does keybindings.json say": there is one file, and main knows it.
       'keybindings:read',
+      // TYTO-113. Nor "which tabs did the last session leave": there is one session file,
+      // and only main knows where it is and which paths it names.
+      'session:read',
       // TYTO-208. Nor "which colours apply": the theme is main's to read and check.
       'theme:current',
       // TYTO-208. Nor "which themes are there": every plugin's, which main holds.

@@ -67,9 +67,10 @@ export interface LiveSettings {
   validate(documentId: string, text: string, dirty: boolean): Diagnostics;
   /**
    * The tab with this id was closed. A screen's changes it held unsaved are written to the
-   * file then, so closing without saving discards only the person's typing.
+   * file then, so closing without saving discards only the person's typing. The same holds
+   * for a session that ends with the tab open (TYTO-113). `true` when the file was written.
    */
-  closed(documentId: string): Promise<void>;
+  closed(documentId: string): Promise<boolean>;
   /** A screen's change. `false` when it was refused, after the screens went back. */
   remember(changes: Partial<Settings>): Promise<boolean>;
   /** The watcher saw the file move. Reads it, and applies it unless it was the app's write. */
@@ -169,11 +170,11 @@ export function createLiveSettings(options: LiveSettingsOptions): LiveSettings {
     },
 
     async closed(documentId) {
-      if (tab?.documentId !== documentId) return;
+      if (tab?.documentId !== documentId) return false;
       tab = undefined;
       const pending = pendingFromScreens;
       pendingFromScreens = {};
-      if (keysOf(pending).length === 0) return;
+      if (keysOf(pending).length === 0) return false;
       // Closing without saving discards the typing, never a screen's choice: that is in effect
       // already, and here it reaches the file, in place, comments kept.
       const written = await store.write(pending);
@@ -182,6 +183,7 @@ export function createLiveSettings(options: LiveSettingsOptions): LiveSettings {
           changes: pending,
         });
       }
+      return written.ok;
     },
 
     async remember(changes) {

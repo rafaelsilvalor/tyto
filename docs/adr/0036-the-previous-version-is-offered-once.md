@@ -57,6 +57,10 @@ TYTO-207, counts towards "has records" in both folders, and is checked with the 
 under the same bar — a text that does not parse into a list is a `W_IMPORT_SKIPPED` and stays in
 the older folder, which keeps its copy either way.
 
+**`session.json` travels too** (TYTO-113, ADR 0080): it holds the tabs and the drafts nobody
+saved yet, and an update that left it behind would be the one quit that lost them. It counts
+towards "has records" in both folders and is checked as JSON like the others.
+
 **`logs/` never travels.** A log is that build's record of its own failures.
 
 **What the answer means.** Either answer writes `import.json` into the new folder —
