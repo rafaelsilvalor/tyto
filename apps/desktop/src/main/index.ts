@@ -24,7 +24,7 @@ import {
   nodeFileSystem,
   withoutRefused,
 } from '@tyto/io';
-import { NO_PLUGINS, createPluginHost } from '@tyto/plugin-api';
+import { NO_PLUGINS, type ThemeKind, createPluginHost } from '@tyto/plugin-api';
 import type { Rasterizer } from '@tyto/raster';
 
 import { type Locale, localeFor, translate } from '../../shared/i18n/index.js';
@@ -48,12 +48,15 @@ import { createQueueService } from './queue.js';
 import { createPanelService } from './panels.js';
 import { PLUGIN_SCHEME, confinedPath, contentTypeOf, panelPolicy } from './plugin-protocol.js';
 import {
+  type AppliedThemes,
+  BASE_COLORS,
   BUILT_IN_THEMES,
   type ThemeSource,
   builtInThemeReader,
   createThemeService,
   folderThemeReader,
 } from './themes.js';
+import { drawsTitleBar, frameOptions, overlayFor } from './title-bar.js';
 import { type WindowPlugins, windowPlugins } from './window-plugins.js';
 import { createPreviewService } from './preview.js';
 import { createProjectSources } from './project.js';
@@ -426,6 +429,35 @@ async function start(): Promise<void> {
       log.warn(problem.message);
     },
   });
+  // **The title bar's buttons follow the theme** (TYTO-244, ADR 0078). The minimise, maximise
+  // and close buttons are the system's, drawn over the page's own bar, and the page cannot
+  // colour them: main paints them from the applied theme every time one is answered — at the
+  // window's first question, on a choice, a preview, a save of the `theme` setting — and when
+  // the system flips between light and dark. Until the window first asks, the base theme of the
+  // kind on show, which is what `tokens.css` paints first too.
+  let appliedThemes: Pick<AppliedThemes, ThemeKind> = {
+    light: {
+      id: BUILT_IN_THEMES.light.id,
+      kind: 'light',
+      colors: BASE_COLORS.light,
+      diagnostics: [],
+    },
+    dark: { id: BUILT_IN_THEMES.dark.id, kind: 'dark', colors: BASE_COLORS.dark, diagnostics: [] },
+  };
+  const shownKind = (): ThemeKind => (nativeTheme.shouldUseDarkColors ? 'dark' : 'light');
+  const titleBarColours = () => overlayFor(appliedThemes, BASE_COLORS, shownKind());
+  const paintTitleBar = (): void => {
+    if (!drawsTitleBar(process.platform)) return;
+    if (mainWindow === undefined || mainWindow.isDestroyed()) return;
+    mainWindow.setTitleBarOverlay(titleBarColours());
+  };
+  const applying = async (answer: Promise<AppliedThemes>): Promise<AppliedThemes> => {
+    const applied = await answer;
+    appliedThemes = applied;
+    paintTitleBar();
+    return applied;
+  };
+  nativeTheme.on('updated', paintTitleBar);
   const host = await activateBuiltIns({ fileSystem, log, themes: themes.lookup });
   themeSources.builtIn = () =>
     host.registry.themes().map((theme) => ({ plugin: 'desktop', theme, read: builtInThemeReader }));
@@ -677,7 +709,7 @@ async function start(): Promise<void> {
       if (keys.includes('theme')) {
         // Electron's mode now; the window asks for the colours when it hears the change.
         themeSetting = next.theme;
-        void themes.current();
+        void applying(themes.current());
       }
     },
     configure: (config) => {
@@ -976,8 +1008,8 @@ async function start(): Promise<void> {
     // setting back through `apply`, and the answer is what applies after either.
     themes: {
       list: () => themes.list(),
-      current: () => themes.current(),
-      preview: (id) => themes.preview(id),
+      current: () => applying(themes.current()),
+      preview: (id) => applying(themes.preview(id)),
       choose: async (id) => {
         const next = await themes.choose(id, themeSetting);
         let saved = true;
@@ -985,7 +1017,7 @@ async function start(): Promise<void> {
           themeSetting = next;
           saved = await remember({ theme: next });
         }
-        return { applied: await themes.current(), saved };
+        return { applied: await applying(themes.current()), saved };
       },
     },
     // After `ready`, as the panels are, so the window's first answer is the whole list.
@@ -1040,6 +1072,7 @@ async function start(): Promise<void> {
     // `TYTO_HEADLESS` is the end-to-end suite's: it drives the window through Playwright
     // and has no screen to show one on. The only thing a test changes about the shipped app.
     show: process.env['TYTO_HEADLESS'] !== '1',
+    frame: frameOptions(process.platform, titleBarColours()),
   });
 
   // **Two doors, one latch** (TYTO-123). They are not redundant and dropping either one is a

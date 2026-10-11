@@ -70,25 +70,56 @@ textarea {
   padding: 0;
 }
 
-.shell__head {
+/*
+ * The title bar the app draws (TYTO-244, ADR 0078). On Windows and Linux the system's title bar
+ * is hidden and its minimise, maximise and close buttons are an overlay over this bar's right
+ * end, painted by main in the same theme colour. `env(titlebar-area-*)` is where the overlay
+ * leaves room: the bar is its height, and `.title-bar__area` is the part the buttons do not
+ * cover, so no title runs under them. The fallbacks are a window with no overlay — the bar's
+ * height, and the whole width.
+ *
+ * The bar drags the window; anything a person clicks inside it must say `no-drag`, or the
+ * system takes the click as the start of a move and the page never hears it.
+ */
+.title-bar {
   display: flex;
-  align-items: baseline;
-  gap: var(--tyto-space-4);
-  padding: var(--tyto-space-2) var(--tyto-space-5);
+  flex-shrink: 0;
+  height: env(titlebar-area-height, 32px);
   border-bottom: var(--tyto-hairline-width) solid var(--tyto-hairline);
   background: var(--tyto-surface-raised);
-}
-
-.shell__name {
-  margin: 0;
-  font-size: var(--tyto-text-md);
-  font-weight: var(--tyto-weight-strong);
-}
-
-.shell__tagline {
-  margin: 0;
   color: var(--tyto-text-muted);
   font-size: var(--tyto-text-sm);
+  user-select: none;
+  -webkit-app-region: drag;
+}
+
+.title-bar__area {
+  display: flex;
+  align-items: center;
+  gap: var(--tyto-space-4);
+  width: env(titlebar-area-width, 100%);
+  min-width: 0;
+  margin-left: env(titlebar-area-x, 0);
+  padding: 0 var(--tyto-space-4);
+}
+
+/* The menu row's place (PR B). Empty here; it will hold buttons, so it is already `no-drag`. */
+.title-bar__menu {
+  display: flex;
+  align-items: center;
+  -webkit-app-region: no-drag;
+}
+
+.title-bar__title {
+  overflow: hidden;
+  min-width: 0;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* macOS keeps its native frame and title (ADR 0078), so the drawn bar would be a second one. */
+:root[data-platform='darwin'] .title-bar {
+  display: none;
 }
 
 /*

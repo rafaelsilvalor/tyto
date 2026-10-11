@@ -32,6 +32,14 @@ export interface WindowOptions {
   readonly renderer: { readonly url: string } | { readonly file: string };
   /** Shown windows need a screen; the end-to-end test does not have one. */
   readonly show?: boolean;
+  /**
+   * The frame (TYTO-244, ADR 0078): `frameOptions` in `title-bar.ts`, which is a hidden title
+   * bar with the system's buttons as an overlay on Windows and Linux and nothing on macOS.
+   */
+  readonly frame?: {
+    readonly titleBarStyle?: 'hidden';
+    readonly titleBarOverlay?: { color: string; symbolColor: string; height: number };
+  };
 }
 
 export function createMainWindow(options: WindowOptions): BrowserWindow {
@@ -41,6 +49,12 @@ export function createMainWindow(options: WindowOptions): BrowserWindow {
     minWidth: 900,
     minHeight: 600,
     show: options.show ?? true,
+    ...(options.frame?.titleBarStyle === undefined
+      ? {}
+      : { titleBarStyle: options.frame.titleBarStyle }),
+    ...(options.frame?.titleBarOverlay === undefined
+      ? {}
+      : { titleBarOverlay: { ...options.frame.titleBarOverlay } }),
     // No title here. The window's title is a user-facing string, so it comes from the
     // catalogue in the renderer's `<title>` rather than from a literal in main.
     webPreferences: {

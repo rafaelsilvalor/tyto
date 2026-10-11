@@ -68,6 +68,22 @@ export function windowTitle(state: ShellState): string {
 }
 
 /**
+ * What the drawn title bar says (TYTO-244, ADR 0078): the app, then the file in front.
+ *
+ * `Tyto — brief.brief`, `Tyto — settings.json`, and `Tyto` alone for a tab in no file — the
+ * untitled tab has no name worth repeating, and the tab strip already says *Untitled*. No
+ * unsaved marker: the tab carries the dot, and a second one a few pixels above it would be the
+ * same fact twice. The file's name is never translated.
+ */
+export function titleBarText(locale: Locale, name: string | undefined): string {
+  const app = translate(locale, 'app.name');
+  return name === undefined ? app : `${app} — ${name}`;
+}
+
+/** The element the drawn title bar writes its text into. */
+export const TITLE_BAR_TITLE = '.title-bar__title';
+
+/**
  * The window's name alone, which is the one thing in the shell that moves per keystroke.
  *
  * Apart from {@link paint} because the unsaved marker is derived now and nothing watches for
@@ -79,6 +95,9 @@ export function windowTitle(state: ShellState): string {
 export function paintTitle(root: ParentNode, state: ShellState): void {
   const title = root.querySelector('title');
   if (title !== null) title.textContent = windowTitle(state);
+  // The drawn bar follows the same tab, on the same calls: a switch, a save, a rename.
+  const bar = root.querySelector(TITLE_BAR_TITLE);
+  if (bar !== null) bar.textContent = titleBarText(state.locale, state.document.name);
 }
 
 /**

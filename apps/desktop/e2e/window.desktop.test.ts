@@ -346,6 +346,10 @@ describe('switching the language', () => {
    * now shared between it and the elements, and this list is the seam.
    */
   const NOT_ELEMENT_TEXT: readonly CatalogueKey[] = [
+    // TYTO-244: the header that painted the app's name went, and the name now reaches the
+    // screen inside the drawn title bar's text, which `shell.ts` builds with the file's name
+    // (`titleBarText`). It reads the same in both languages, so it never counted as changed.
+    'app.name',
     'preview.zoom.out',
     'preview.zoom.in',
     'preview.problems',

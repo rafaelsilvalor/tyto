@@ -15,7 +15,6 @@
 /** Every key the app can show. Adding one here makes every locale below fail to compile. */
 export interface Catalogue {
   readonly 'app.name': string;
-  readonly 'app.tagline': string;
   readonly 'editor.heading': string;
   readonly 'preview.heading': string;
   readonly 'preview.slide.label': string;
@@ -448,7 +447,6 @@ export type CatalogueKey = keyof Catalogue;
 
 export const CATALOGUE_KEYS = [
   'app.name',
-  'app.tagline',
   'editor.heading',
   'preview.heading',
   'preview.slide.label',

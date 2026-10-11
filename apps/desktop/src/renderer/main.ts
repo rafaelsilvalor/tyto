@@ -2461,6 +2461,9 @@ async function load(): Promise<void> {
     const info = await bridge['app:info']({});
     state.version = info.version;
     state.platform = info.platform;
+    // Which frame the window has: macOS keeps the system's, so `shell.css` hides the drawn
+    // title bar there (TYTO-244, ADR 0078).
+    document.documentElement.dataset['platform'] = info.platform;
     state.templates = info.templates;
     if (isLocale(info.locale)) state.locale = info.locale;
   }

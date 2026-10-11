@@ -4,7 +4,7 @@ import { beforeEach, describe, expect, it } from 'vitest';
 import { CATALOGUE_KEYS, type Locale, translate } from '../../shared/i18n/index.js';
 import { en } from '../../shared/i18n/en.js';
 import { ptBR } from '../../shared/i18n/pt-BR.js';
-import { I18N_ATTRIBUTE, paint, paintTitle, windowTitle } from './shell.js';
+import { I18N_ATTRIBUTE, paint, paintTitle, titleBarText, windowTitle } from './shell.js';
 
 /**
  * The acceptance criterion — *switching locale changes every visible string* — as a unit.
@@ -122,5 +122,41 @@ describe('the window title', () => {
 
     expect(document.querySelector('title')?.textContent).toBe('promo.brief (não salvo) — Tyto');
     expect(document.querySelector('h1')?.textContent).toBe('stale');
+  });
+});
+
+describe('titleBarText (TYTO-244)', () => {
+  it('names the app and the file in front', () => {
+    expect(titleBarText('pt-BR', 'campanha.brief')).toBe('Tyto — campanha.brief');
+    expect(titleBarText('en', 'campanha.brief')).toBe('Tyto — campanha.brief');
+  });
+
+  it('is the app alone for a tab in no file', () => {
+    expect(titleBarText('pt-BR', undefined)).toBe('Tyto');
+    expect(titleBarText('en', undefined)).toBe('Tyto');
+  });
+
+  it('names the settings and keybindings tabs by their file, as the tab strip does', () => {
+    expect(titleBarText('en', 'settings.json')).toBe('Tyto — settings.json');
+    expect(titleBarText('en', 'keybindings.json')).toBe('Tyto — keybindings.json');
+  });
+
+  it('carries no unsaved marker: the tab has the dot', () => {
+    document.body.innerHTML = '<header><span class="title-bar__title"></span></header>';
+    document.head.innerHTML = '<title>Tyto</title>';
+
+    paintTitle(document, state('pt-BR', { name: 'promo.brief', dirty: true }));
+
+    expect(document.querySelector('.title-bar__title')?.textContent).toBe('Tyto — promo.brief');
+  });
+
+  it('follows the tab on every paint, untitled included', () => {
+    document.body.innerHTML = '<header><span class="title-bar__title"></span></header>';
+
+    paint(document, state('en', { name: 'a.brief', dirty: false }));
+    expect(document.querySelector('.title-bar__title')?.textContent).toBe('Tyto — a.brief');
+
+    paint(document, state('en'));
+    expect(document.querySelector('.title-bar__title')?.textContent).toBe('Tyto');
   });
 });

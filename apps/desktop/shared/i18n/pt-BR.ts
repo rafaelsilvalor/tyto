@@ -3,7 +3,6 @@ import { type Catalogue } from './catalogue.js';
 /** The first locale, and the one that is complete by construction. */
 export const ptBR: Catalogue = {
   'app.name': 'Tyto',
-  'app.tagline': 'Arte publicitária em vários formatos, a partir de um brief',
   'editor.heading': 'Brief',
   'preview.heading': 'Prévia',
   'preview.slide.label': 'Slide',
