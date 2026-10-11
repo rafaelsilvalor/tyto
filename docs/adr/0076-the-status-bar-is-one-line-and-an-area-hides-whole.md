@@ -62,5 +62,24 @@ untouched. The catalogue loses `shell.language.label` and gains the bar's and Ab
 all listed in the e2e's `NOT_ELEMENT_TEXT`. End-to-end suites that switched language through
 `#locale` now go through the command bar.
 
-Not done here: dragging the bar's items, hiding the bar itself, the encoding and line-ending
-facts, and the TYTO-143 mark.
+Not done here: dragging the bar's items, hiding the bar itself, and the encoding and
+line-ending facts.
+
+## Amendment — the "new problems" dot (TYTO-143, 2026-10-10)
+
+**The count says how many; a dot says new.** Rafael chose a small dot in `--tyto-accent` beside
+the count, inside the problems button, with no new token. It lights only for the three codes
+the window raises itself — `E_FILE_NOT_FOUND`, `E_SAVE_FAILED`, `E_TEMPLATE_FOLDER_EMPTY` —
+each the answer to something a person just did; a compiler diagnostic arrives on every
+keystroke and never lights it. It lights when such a row is **created** while the problems
+panel is not on screen (closed, or its area hidden — the same "shown" the button's on-state
+reads), so a second identical save failure lights it again. The empty-folder row is remade on
+every template read, so it lights only when it did not exist before, and not at startup, before
+the layout is read and before anybody has done anything. It clears whenever the panel comes on
+screen, by any route; nothing lights while the panel is shown. The rule is the pure
+`problems-mark.ts`; the button's `aria-label` says "new" while the dot, which is `aria-hidden`,
+is lit.
+
+**A template read keeps the rows it did not make.** `refreshTemplates` rebuilds the installation
+list from main's answer and used to drop a live failed save or missing file with it, which
+would leave the dot pointing at nothing; those two rows now carry across the read.

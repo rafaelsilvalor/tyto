@@ -119,6 +119,7 @@ export const ptBR: Catalogue = {
   'status.selected': '{count} selecionados',
   'status.kind.settings': 'Configurações',
   'status.kind.keybindings': 'Atalhos',
+  'status.problems.new': 'novos desde a última vez que você olhou',
   'menu.about': 'Sobre o Tyto',
   'shell.about.version': 'Versão',
   'shell.about.platform': 'Sistema',

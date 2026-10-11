@@ -103,6 +103,15 @@ import {
   updateDocument,
   workspaceOf,
 } from './documents.js';
+import {
+  type ProblemsMark,
+  FILE_NOT_FOUND,
+  TEMPLATE_FOLDER_EMPTY,
+  UNLIT,
+  carriedAcrossTemplateRead,
+  raised,
+  seen,
+} from './problems-mark.js';
 import { SAVE_FAILED, saveFailureDiagnostic } from './save-failure.js';
 import { type DocumentTabs, TABS_TAG } from './tabs.js';
 import { type ProblemsPanel, PROBLEMS_TAG } from './problems-panel.js';
@@ -284,6 +293,17 @@ const panel = {
   installation: [] as readonly Diagnostic[],
   templates: [] as readonly Template[],
 };
+
+/**
+ * The status bar's "new problems" dot (TYTO-143, ADR 0076): lit when the window raises one of
+ * its own rows while the problems panel is not on screen, cleared when it comes on screen.
+ */
+let problemsMark: ProblemsMark = UNLIT;
+
+/** Called where a window-raised row is created, never by comparing lists (`problems-mark.ts`). */
+function raiseWindowProblem(): void {
+  problemsMark = raised(problemsMark, panelShown(PROBLEMS_PANEL));
+}
 
 /**
  * The editor, held here because three controls now move it.
@@ -1354,11 +1374,12 @@ async function reopen(path: string, name: string): Promise<void> {
       panel.installation = [
         {
           severity: 'error',
-          code: 'E_FILE_NOT_FOUND',
+          code: FILE_NOT_FOUND,
           message: `${translate(state.locale, 'file.missing')}: ${name}`,
         },
-        ...panel.installation.filter((item) => item.code !== 'E_FILE_NOT_FOUND'),
+        ...panel.installation.filter((item) => item.code !== FILE_NOT_FOUND),
       ];
+      raiseWindowProblem();
       repaint();
       // Listed again, so an entry that is gone is marked gone rather than looking untried.
       void refreshRecent();
@@ -1378,9 +1399,16 @@ async function reopen(path: string, name: string): Promise<void> {
  *
  * `panel.installation` is **rebuilt and never appended to**, which is the card's fifth
  * criterion in its literal form: clearing the folder has to make the "this folder has no
- * templates" row go away without a restart, and a list that accumulated could not.
+ * templates" row go away without a restart, and a list that accumulated could not. **Except
+ * the rows a person's own action raised** — a failed save, a recent file gone — which this
+ * read knows nothing about and must not drop (TYTO-143): dropping them left the "new" dot
+ * pointing at nothing.
+ *
+ * `raise` is false only for the read at startup: nobody did anything yet, the layout that
+ * says whether the panel is on screen has not been read, and a folder that was empty last
+ * session is not news.
  */
-async function refreshTemplates(bridge: TytoBridge): Promise<void> {
+async function refreshTemplates(bridge: TytoBridge, raise = true): Promise<void> {
   const answer = await bridge['templates:list']({});
   panel.templates = answer.templates;
   state.templates = answer.templates.map((template) => template.name);
@@ -1388,7 +1416,9 @@ async function refreshTemplates(bridge: TytoBridge): Promise<void> {
   // A folder that meant to be a template and is broken is why a template is missing from the
   // picker, and nothing else in the app would ever say so: the preview service replays the
   // registry's warnings and these are not among them.
+  const wasEmpty = panel.installation.some((item) => item.code === TEMPLATE_FOLDER_EMPTY);
   panel.installation = [
+    ...carriedAcrossTemplateRead(panel.installation),
     ...answer.failures.flatMap((failure) => failure.diagnostics),
     // Minted here and not in main, the way `E_FILE_NOT_FOUND` is: main can tell that a folder
     // produced nothing, and only the window knows which language to say it in. Listed under
@@ -1398,12 +1428,15 @@ async function refreshTemplates(bridge: TytoBridge): Promise<void> {
       ? [
           {
             severity: 'warning' as const,
-            code: 'E_TEMPLATE_FOLDER_EMPTY',
+            code: TEMPLATE_FOLDER_EMPTY,
             message: `${translate(state.locale, 'templates.folder.empty')}: ${state.templatesFolder}`,
           },
         ]
       : []),
   ];
+  // The empty-folder row is made again on every read, so only its first appearance is new.
+  const isEmpty = panel.installation.some((item) => item.code === TEMPLATE_FOLDER_EMPTY);
+  if (raise && isEmpty && !wasEmpty) raiseWindowProblem();
 }
 
 /**
@@ -1496,6 +1529,8 @@ async function saveOneDocument(
       saveFailureDiagnostic(state.locale, target.name, cause),
       ...panel.installation.filter((item) => item.code !== SAVE_FAILED),
     ];
+    // A second identical failure lights the dot again: it answers a second key press.
+    raiseWindowProblem();
     repaint();
     // The sentence on screen is for the person, and the line in the log is for whoever reads
     // their report. Both, and no exception left travelling.
@@ -1814,6 +1849,10 @@ function paintStatusBar(): void {
   if (bar === null) return;
   const current = active();
   const problems = [...panel.installation, ...current.diagnostics];
+  const problemsShown = panelShown(PROBLEMS_PANEL);
+  // Every way the panel comes on screen — its button, the command bar, a key, showing the
+  // bottom area — ends in a repaint, so this is the one place that has to know.
+  if (problemsShown) problemsMark = seen(problemsMark);
   bar.commands = STATUS_COMMANDS;
   bar.run = (id) => {
     runWindowCommand(id);
@@ -1827,11 +1866,12 @@ function paintStatusBar(): void {
     template: current.kind === undefined ? templateOf(activeText()) : undefined,
     problems: problems.length,
     errors: errorCount(problems),
+    newProblems: problemsMark.lit,
     shown: {
       left: dockIsShown(layout, 'left'),
       right: dockIsShown(layout, 'right'),
       bottom: dockIsShown(layout, 'bottom'),
-      problems: panelShown(PROBLEMS_PANEL),
+      problems: problemsShown,
       queue: panelShown(QUEUE_PANEL),
     },
   };
@@ -2438,7 +2478,7 @@ async function load(): Promise<void> {
 
     // Asked once here, and again only when the folder changes. A picker that re-asked per
     // click would be re-reading manifests that cannot have changed in between.
-    await refreshTemplates(bridge);
+    await refreshTemplates(bridge, false);
   }
 
   if (elements.editor !== null) {

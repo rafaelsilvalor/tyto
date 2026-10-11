@@ -119,6 +119,7 @@ export const en: Catalogue = {
   'status.selected': '{count} selected',
   'status.kind.settings': 'Settings',
   'status.kind.keybindings': 'Keybindings',
+  'status.problems.new': 'new since you last looked',
   'menu.about': 'About Tyto',
   'shell.about.version': 'Version',
   'shell.about.platform': 'Platform',
