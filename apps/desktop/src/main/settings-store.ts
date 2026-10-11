@@ -6,8 +6,8 @@ import { type DeclaredSetting, declaredSetting, resolveSettings } from '@tyto/pl
 
 import {
   DEFAULT_SETTINGS,
-  SETTING_CONTRIBUTIONS,
   type Settings,
+  settingContributions,
   settingsFrom,
 } from '../../shared/settings.js';
 import desktopManifest from './desktop.tyto-plugin.json';
@@ -54,8 +54,8 @@ export interface SettingsStore {
   write(changes: Partial<Settings>): Promise<Result<void, Diagnostics>>;
 }
 
-/** The built-in `desktop` plugin's four, for a store composed without a plugin host. */
-export const BUILT_IN_SETTINGS: readonly DeclaredSetting[] = SETTING_CONTRIBUTIONS.map(
+/** The built-in `desktop` plugin's five, for a store composed without a plugin host. */
+export const BUILT_IN_SETTINGS: readonly DeclaredSetting[] = settingContributions().map(
   (contribution) => declaredSetting(desktopManifest.name, false, contribution),
 );
 

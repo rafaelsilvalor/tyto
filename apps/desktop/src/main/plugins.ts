@@ -7,7 +7,8 @@ import type { Rasterizer } from '@tyto/raster';
 import { BUILT_IN_TEMPLATES_DIRECTORY } from '@tyto/templates';
 
 import manifest from './built-in-templates.tyto-plugin.json';
-import { SETTING_CONTRIBUTIONS } from '../../shared/settings.js';
+import { settingContributions } from '../../shared/settings.js';
+import type { ThemeLookup } from '../../shared/theme-setting.js';
 import chromiumManifest from './chromium.tyto-plugin.json';
 import desktopManifest from './desktop.tyto-plugin.json';
 import { createDebuggerRasterizer } from './rasterizer.js';
@@ -65,6 +66,11 @@ export interface BuiltInsOptions {
    * log is the whole of the fix.
    */
   readonly log?: Logger;
+  /**
+   * What the `theme` setting checks its ids against (TYTO-208): every theme the plugins
+   * registered, once the installed ones have started. The built-in two when not given.
+   */
+  readonly themes?: ThemeLookup;
 }
 
 /**
@@ -130,7 +136,9 @@ export async function activateBuiltIns(options: BuiltInsOptions): Promise<InProc
     id: desktopManifest.name,
     manifest: desktopManifest,
     activate: (host) => {
-      for (const setting of SETTING_CONTRIBUTIONS) host.registerConfiguration(setting);
+      for (const setting of settingContributions(options.themes)) {
+        host.registerConfiguration(setting);
+      }
       host.registerTheme(BUILT_IN_THEMES.light);
       host.registerTheme(BUILT_IN_THEMES.dark);
     },

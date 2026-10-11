@@ -32,7 +32,7 @@ import {
   translate,
 } from '../../shared/i18n/index.js';
 import { followScheme } from './color-scheme.js';
-import { applyTheme } from './theme.js';
+import { applyTheme, withThemeRows } from './theme.js';
 import { planTemplateEdit, templateOf } from './frontmatter.js';
 import { readKeybindingsText } from './keybindings-file.js';
 import {
@@ -877,6 +877,9 @@ const registry: CommandRegistry = createDesktopRegistry({
   openKeybindings: () => {
     openAppFile('keybindings');
   },
+  pickTheme: () => {
+    void pickTheme();
+  },
   showQueue: () => {
     void changeLayout(withPanelOpen(layout, QUEUE_PANEL, true)).then(() => {
       // Brought forward: the panel may have been open all along, behind the editor's focus.
@@ -1315,6 +1318,8 @@ async function settingsChanged(
   }
   // Refused because the file does not parse: the tab is where that is shown, at the error.
   if (change.refused) runCommand(SETTINGS_OPEN);
+  // The `theme` setting may be what moved (TYTO-208); main has already set the mode.
+  showTheme(bridge, () => bridge['theme:current']({}));
   const chosen = await bridge['templates:folder']({});
   state.templatesFolder = chosen.folder;
   state.templatesFound = chosen.found;
@@ -1387,6 +1392,74 @@ async function reopen(path: string, name: string): Promise<void> {
     }
 
     adopt(answer.document, answer.documentId, wanted);
+  });
+}
+
+/** Theme answers apply in the order they were asked: one that arrives late is dropped. */
+let themeTurn = 0;
+/** The themes on show, as main last answered: what the theme picker highlights first. */
+let themeShown: IpcResponse<'theme:current'> | undefined;
+
+/**
+ * Applies a theme answer from main (TYTO-208): the colours, and the problems reading the
+ * themes raised, which replace the previous answer's rows in the problems panel. The picker
+ * asks on every move, so an older answer arriving after a newer one is not applied.
+ */
+function showTheme(bridge: TytoBridge, ask: () => Promise<IpcResponse<'theme:current'>>): void {
+  themeTurn += 1;
+  const turn = themeTurn;
+  void ask().then(
+    (applied) => {
+      if (turn !== themeTurn) return;
+      themeShown = applied;
+      applyTheme(applied);
+      panel.installation = withThemeRows(panel.installation, applied.diagnostics);
+      repaint();
+    },
+    (cause: unknown) => {
+      // A window whose theme never arrives keeps the colours it has, which are a theme's.
+      void bridge['log:write']({
+        level: 'warn',
+        message: 'The colour theme could not be applied; the colours on screen stay.',
+        detail: String(cause).slice(0, 4000),
+      });
+    },
+  );
+}
+
+const THEME_KIND_LABEL = { light: 'theme.kind.light', dark: 'theme.kind.dark' } as const;
+
+/**
+ * "Preferences: Color Theme" (TYTO-208): every theme in the bar, the one on show highlighted.
+ * Moving the selection previews the highlighted theme, Enter writes it to the `theme` setting
+ * through main, and Escape goes back to the setting — all three answered by main with the
+ * colours that now apply.
+ */
+async function pickTheme(): Promise<void> {
+  await withBridge(async (bridge) => {
+    const bar = elements.commandBar;
+    if (bar === null) return;
+    const { themes } = await bridge['theme:list']({});
+    const dark = window.matchMedia?.('(prefers-color-scheme: dark)').matches === true;
+    const selected = dark ? themeShown?.dark.id : themeShown?.light.id;
+    bar.pick({
+      entries: themes.map((theme) => ({
+        id: theme.id,
+        label: theme.label,
+        detail: translate(state.locale, THEME_KIND_LABEL[theme.kind]),
+      })),
+      placeholder: translate(state.locale, 'theme.pick.placeholder'),
+      ...(selected === undefined ? {} : { selected }),
+      highlight: (id) => {
+        showTheme(bridge, () => bridge['theme:preview']({ id }));
+      },
+      choose: (id) => {
+        showTheme(bridge, () => bridge['theme:choose']({ id }));
+      },
+      cancel: () => {
+        showTheme(bridge, () => bridge['theme:preview']({ id: null }));
+      },
+    });
   });
 }
 
@@ -2382,19 +2455,8 @@ async function load(): Promise<void> {
     );
 
     // The theme's colours over the token file's, which painted the first frame (TYTO-208). Not
-    // awaited: a window whose theme never arrives keeps the token file's, which are the same.
-    void bridge['theme:current']({}).then(
-      (applied) => {
-        applyTheme(applied);
-      },
-      (cause: unknown) => {
-        void bridge['log:write']({
-          level: 'warn',
-          message: 'The colour theme could not be applied; the built-in colours stay.',
-          detail: String(cause).slice(0, 4000),
-        });
-      },
-    );
+    // awaited: a theme an installed plugin contributes waits for the plugins to start.
+    showTheme(bridge, () => bridge['theme:current']({}));
 
     const info = await bridge['app:info']({});
     state.version = info.version;

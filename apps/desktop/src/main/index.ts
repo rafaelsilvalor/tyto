@@ -10,6 +10,7 @@ import {
   app,
   dialog,
   ipcMain,
+  nativeTheme,
   net,
   safeStorage,
   protocol,
@@ -28,6 +29,7 @@ import type { Rasterizer } from '@tyto/raster';
 
 import { type Locale, localeFor, translate } from '../../shared/i18n/index.js';
 import { type Settings } from '../../shared/settings.js';
+import { DEFAULT_THEME_SETTING, type ThemeSetting, modeOf } from '../../shared/theme-setting.js';
 import { fileCredentialStore } from './credential-store.js';
 import { createCredentials } from './credentials.js';
 import { createDocumentService } from './documents.js';
@@ -45,7 +47,13 @@ import { offerPreviousVersion } from './previous-version.js';
 import { createQueueService } from './queue.js';
 import { createPanelService } from './panels.js';
 import { PLUGIN_SCHEME, confinedPath, contentTypeOf, panelPolicy } from './plugin-protocol.js';
-import { builtInThemeReader, createThemeService } from './themes.js';
+import {
+  BUILT_IN_THEMES,
+  type ThemeSource,
+  builtInThemeReader,
+  createThemeService,
+  folderThemeReader,
+} from './themes.js';
 import { type WindowPlugins, windowPlugins } from './window-plugins.js';
 import { createPreviewService } from './preview.js';
 import { createProjectSources } from './project.js';
@@ -384,7 +392,43 @@ async function start(): Promise<void> {
   // is which templates exist, and answering it with "not yet" would put a loading state in
   // front of every panel for the lifetime of a decision made at startup.
   const fileSystem = nodeFileSystem();
-  const host = await activateBuiltIns({ fileSystem, log });
+  // **The colour themes** (TYTO-208, ADR 0077), composed before the host because the `theme`
+  // setting the host registers checks its ids against them. The built-in two come from the
+  // host and the installed plugins' from `contributed` below, once each exists; until the
+  // installed plugins have started, an id that may be theirs is waited for, not refused.
+  const themeSources: {
+    builtIn?: () => readonly ThemeSource[];
+    installed?: () => readonly ThemeSource[];
+  } = {};
+  let themesReady: () => void = () => undefined;
+  let themeSetting: ThemeSetting = DEFAULT_THEME_SETTING;
+  const themes = createThemeService({
+    sources: () => [
+      ...(themeSources.builtIn?.() ??
+        Object.values(BUILT_IN_THEMES).map((theme) => ({
+          plugin: 'desktop',
+          theme,
+          read: builtInThemeReader,
+        }))),
+      ...(themeSources.installed?.() ?? []),
+    ],
+    ready: new Promise<void>((resolve) => {
+      themesReady = resolve;
+    }),
+    setting: () => themeSetting,
+    // What Electron answers `prefers-color-scheme` from: the window's colours, the editor's
+    // dark flag and the native dialogs, scrollbars and menus all follow this one value.
+    setMode: (mode) => {
+      if (nativeTheme.themeSource !== mode) nativeTheme.themeSource = mode;
+    },
+    shown: () => (nativeTheme.shouldUseDarkColors ? 'dark' : 'light'),
+    report: (problem) => {
+      log.warn(problem.message);
+    },
+  });
+  const host = await activateBuiltIns({ fileSystem, log, themes: themes.lookup });
+  themeSources.builtIn = () =>
+    host.registry.themes().map((theme) => ({ plugin: 'desktop', theme, read: builtInThemeReader }));
   // Composed here and nowhere else (ADR 0010): the store is `@tyto/io`'s adapter and the
   // renderer reaches it only through `plugins:list`.
   const pluginsHome = tytoHome();
@@ -414,6 +458,9 @@ async function start(): Promise<void> {
   host.configure(reading.config);
   for (const problem of reading.diagnostics) log.warn(`settings.json: ${problem.message}`);
   const saved = reading.settings;
+  // Before the window exists, so a window told to be dark is never painted light first.
+  themeSetting = saved.theme;
+  nativeTheme.themeSource = modeOf(saved.theme, themes.lookup);
   // A screen's change: `false` when it was refused because the file does not parse.
   const remember = (changes: Partial<Settings>): Promise<boolean> =>
     late.live === undefined ? Promise.resolve(false) : late.live.remember(changes);
@@ -544,6 +591,14 @@ async function start(): Promise<void> {
   // What the installed plugins contribute to the window itself: the directives the preview
   // and the template mode resolve, and the panels (ADR 0043, ADR 0045).
   const contributed = windowPlugins(checked);
+  // An installed plugin's theme file is read from its own folder, never outside it (ADR 0077).
+  themeSources.installed = () =>
+    contributed.themes().map(({ plugin, theme }) => ({
+      plugin,
+      theme,
+      read: folderThemeReader(pluginStore.directoryOf(plugin)),
+    }));
+  void contributed.ready.then(themesReady);
   const preview = await createPreviewService({
     fileSystem,
     sources,
@@ -619,6 +674,11 @@ async function start(): Promise<void> {
       if (keys.includes('queueFolder')) await queue.setFolder(next.queueFolder);
       if (keys.includes('queueAutoRun')) queue.setAutoRun(next.queueAutoRun);
       if (keys.includes('queueKinds')) queue.replaceKinds(next.queueKinds);
+      if (keys.includes('theme')) {
+        // Electron's mode now; the window asks for the colours when it hears the change.
+        themeSetting = next.theme;
+        void themes.current();
+      }
     },
     configure: (config) => {
       host.configure(config);
@@ -910,17 +970,24 @@ async function start(): Promise<void> {
         ),
     },
     panels,
-    // The built-in themes of each kind, through the point that registered them (TYTO-208). A
-    // problem in one is a log line in PR A; the problems panel shows it with the setting.
-    themes: createThemeService({
-      sources: () =>
-        host.registry
-          .themes()
-          .map((theme) => ({ plugin: 'desktop', theme, read: builtInThemeReader })),
-      report: (problem) => {
-        log.warn(problem.message);
+    // The themes the `theme` setting chooses, and the picker (TYTO-208). A choice is written
+    // through the settings store like any screen's, so it lands in an open settings tab with
+    // unsaved typing instead of under it (ADR 0073, decision 8); a refused write puts the
+    // setting back through `apply`, and the answer is what applies after either.
+    themes: {
+      list: () => themes.list(),
+      current: () => themes.current(),
+      preview: (id) => themes.preview(id),
+      choose: async (id) => {
+        const next = await themes.choose(id, themeSetting);
+        let saved = true;
+        if (next !== undefined) {
+          themeSetting = next;
+          saved = await remember({ theme: next });
+        }
+        return { applied: await themes.current(), saved };
       },
-    }),
+    },
     // After `ready`, as the panels are, so the window's first answer is the whole list.
     keymaps: async () => {
       await contributed.ready;

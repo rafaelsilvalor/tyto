@@ -59,6 +59,7 @@ const actions = () =>
     showQueue: vi.fn<() => void>(),
     openSettings: vi.fn<() => void>(),
     openKeybindings: vi.fn<() => void>(),
+    pickTheme: vi.fn<() => void>(),
     chooseTemplateFolder: vi.fn<() => void>(),
     clearTemplateFolder: vi.fn<() => void>(),
     editTemplate: vi.fn<() => void>(),

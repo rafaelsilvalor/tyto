@@ -415,6 +415,14 @@ export interface Catalogue {
   readonly 'command.settings.open': string;
   /** TYTO-207. Opens `keybindings.json` in a tab; a command, so it is not on screen at load. */
   readonly 'command.keybindings.open': string;
+  /**
+   * TYTO-208. "Preferences: Color Theme", the picker's placeholder and the two kinds shown
+   * beside each theme. All four are the bar's, so none is on screen at load.
+   */
+  readonly 'command.theme.pick': string;
+  readonly 'theme.pick.placeholder': string;
+  readonly 'theme.kind.light': string;
+  readonly 'theme.kind.dark': string;
   readonly 'command.queue.show': string;
   readonly 'queue.heading': string;
   readonly 'queue.folder.none': string;
@@ -640,6 +648,10 @@ export const CATALOGUE_KEYS = [
   'plugins.credential.failed',
   'command.settings.open',
   'command.keybindings.open',
+  'command.theme.pick',
+  'theme.pick.placeholder',
+  'theme.kind.light',
+  'theme.kind.dark',
   'command.queue.show',
   'queue.heading',
   'queue.folder.none',

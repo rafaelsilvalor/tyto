@@ -242,3 +242,63 @@ describe('the bar a person types into', () => {
     expect(closed).toHaveBeenCalledOnce();
   });
 });
+
+describe('the bar as a picker (TYTO-208)', () => {
+  const THEMES: readonly CommandEntry[] = [
+    { id: 'tyto-light', label: 'Tyto Light', detail: 'claro' },
+    { id: 'tyto-dark', label: 'Tyto Dark', detail: 'escuro' },
+    { id: 'sepia', label: 'Sepia', detail: 'claro' },
+  ];
+
+  const pick = async () => {
+    const { bar, ran } = mount();
+    const seen = { highlighted: [] as string[], chosen: [] as string[], cancelled: 0 };
+    bar.pick({
+      entries: THEMES,
+      placeholder: 'Escolha um tema de cores',
+      selected: 'tyto-dark',
+      highlight: (id) => seen.highlighted.push(id),
+      choose: (id) => seen.chosen.push(id),
+      cancel: () => {
+        seen.cancelled += 1;
+      },
+    });
+    await bar.updateComplete;
+    return { bar, ran, seen };
+  };
+
+  it('lists the entries with their detail, the selected one highlighted and not reported', async () => {
+    const { bar, seen } = await pick();
+    expect(labels(bar)).toEqual(['Tyto Light', 'Tyto Dark', 'Sepia']);
+    expect(bar.querySelector('.command-bar__option--on')?.textContent).toContain('Tyto Dark');
+    expect(bar.querySelector('.command-bar__detail')?.textContent).toBe('claro');
+    expect(bar.querySelector('input')?.placeholder).toBe('Escolha um tema de cores');
+    expect(seen.highlighted).toEqual([]);
+  });
+
+  it('reports each entry as the selection moves onto it, typing included', async () => {
+    const { bar, seen } = await pick();
+    await press(bar, 'ArrowDown');
+    await type(bar, 'tyto');
+    expect(seen.highlighted).toEqual(['sepia', 'tyto-light']);
+  });
+
+  it('chooses on Enter, runs no command, and does not call it a cancel', async () => {
+    const { bar, ran, seen } = await pick();
+    await press(bar, 'ArrowDown');
+    await press(bar, 'Enter');
+    expect(seen.chosen).toEqual(['sepia']);
+    expect(seen.cancelled).toBe(0);
+    expect(ran).toEqual([]);
+    expect(bar.open).toBe(false);
+  });
+
+  it('cancels on Escape, once, and is the command bar again when next opened', async () => {
+    const { bar, seen } = await pick();
+    await press(bar, 'Escape');
+    expect(seen.cancelled).toBe(1);
+    bar.show();
+    await bar.updateComplete;
+    expect(labels(bar)).toEqual(ENTRIES.map((entry) => entry.label));
+  });
+});

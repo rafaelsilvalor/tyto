@@ -271,6 +271,63 @@ into, or activation is refused. The shapes are in `docs/plugin-api.md`:
 - `configuration` — a setting in the desktop app's `settings.json` (ADR 0073). Declared with a
   Zod schema, which does not cross to an installed plugin's process, so **refused there too**.
 
+## Ship a theme
+
+A colour theme is a JSON file in the plugin's folder and one call in `activate`. Nothing the
+plugin wrote runs to apply it, so it needs no permission. A plugin that only ships a theme:
+
+```text
+sepia/
+  tyto-plugin.json     { "name": "sepia", "version": "1.0.0", "engine": ">=0.1",
+                         "contributes": ["theme"], "permissions": [] }
+  package.json         { "name": "sepia", "type": "module" }
+  dist/index.js
+  themes/sepia.json
+```
+
+```js
+// dist/index.js
+export function activate(host) {
+  host.registerTheme({ id: 'sepia', label: 'Sepia', kind: 'light', path: 'themes/sepia.json' });
+}
+```
+
+```json
+{
+  "name": "Sepia",
+  "kind": "light",
+  "colors": { "surface": "#f4ecd8", "text": "#433422", "accent": "#9c5a2a" }
+}
+```
+
+1. **Name only what you change.** The 30 names are the window's colour roles without the
+   `--tyto-` prefix; `apps/desktop/src/main/themes/tyto-light.json` lists them with Tyto Light's
+   values. Every name you leave out is the built-in theme of your `kind`. A name that is not a
+   role is `W_THEME_TOKEN_UNKNOWN`; a value that is not a hex colour, `rgb()`, `hsl()` or a
+   `color-mix()` of those is `W_THEME_COLOR_INVALID` and keeps the built-in colour.
+2. **`kind` says when it shows.** The file's `kind` must match the contribution's. With the
+   setting's default, `mode: "system"`, a light theme shows while the system is light.
+3. **Install it** (`tyto plugin install <folder>`) and open "Preferences: Color Theme" with
+   Ctrl+K. Moving through the list previews each theme; Enter writes the choice to
+   `settings.json`, and Escape goes back. By hand, the setting is either one id or a theme per
+   kind:
+
+   ```jsonc
+   // settings.json
+   { "theme": { "mode": "system", "light": "sepia", "dark": "tyto-dark" } }
+   ```
+
+   `mode` is `system`, `light` or `dark`; the last two override the system for the window, the
+   editor and the native dialogs. An id no plugin offers, or a dark theme in the `light` slot,
+   is `W_SETTING_INVALID` and the default applies.
+
+4. **When it does not look right**, open the problems panel. A file that does not parse, or is
+   not shaped like a theme, is `E_THEME_INVALID` there, and the built-in theme of its kind
+   applies whole: a broken theme never breaks the window.
+
+`e2e/__fixtures__/plugins/sepia` in `apps/desktop` is this plugin, and the desktop's suite
+installs it. A theme colours the window, never the exported artwork (ADR 0077).
+
 ## Permissions, and what they do not do
 
 | Permission          | Allows                                                     |

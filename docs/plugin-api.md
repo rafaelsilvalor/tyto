@@ -179,7 +179,8 @@ a file that cannot be used `E_THEME_INVALID`, after which the base theme applies
 0077). The path is refused at registration if it leaves the folder by name, and on the disk if
 it leaves through a link or junction. An installed plugin may contribute one: it crosses as
 data. A theme colours the window and the editor and **never** the exported artwork, whose
-colours come from the template.
+colours come from the template. The person picks it with "Preferences: Color Theme" or in the
+`theme` setting by its `id`; `docs/plugin-authoring.md` walks through shipping one.
 
 ### `panel`, in full
 

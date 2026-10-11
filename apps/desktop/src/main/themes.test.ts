@@ -5,6 +5,7 @@ import { join } from 'node:path';
 import type { ThemeContribution } from '@tyto/plugin-api';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 
+import { DEFAULT_THEME_SETTING, type ThemeSetting } from '../../shared/theme-setting.js';
 import {
   BASE_COLORS,
   BUILT_IN_THEMES,
@@ -51,19 +52,124 @@ describe('the built-in themes', () => {
     expect(Object.keys(loaded.colors)).toHaveLength(30);
   });
 
-  it('are what the service answers for each mode', async () => {
-    const service = createThemeService({
-      sources: () =>
-        Object.values(BUILT_IN_THEMES).map((theme) => ({
-          plugin: 'desktop',
-          theme,
-          read: builtInThemeReader,
-        })),
-      report: () => undefined,
-    });
+  it('are what the service answers for each mode by default', async () => {
+    const { service, modes } = serviceWith({});
     const current = await service.current();
-    expect([current.light.id, current.dark.id]).toEqual(['tyto-light', 'tyto-dark']);
+    expect([current.mode, current.light.id, current.dark.id]).toEqual([
+      'system',
+      'tyto-light',
+      'tyto-dark',
+    ]);
     expect(current.dark.colors).toEqual(BASE_COLORS.dark);
+    expect(modes).toEqual(['system']);
+  });
+});
+
+/** A light theme a plugin ships, read from a string. */
+const SEPIA: ThemeContribution = { id: 'sepia', label: 'Sepia', kind: 'light', path: 'sepia.json' };
+const SEPIA_TEXT = JSON.stringify({ name: 'Sepia', kind: 'light', colors: { surface: '#f4ecd8' } });
+
+/**
+ * The service over the built-in two and Sepia, an installed plugin's, with the setting and
+ * the system's kind as given. `modes` is every mode it told Electron, in order.
+ */
+function serviceWith(options: {
+  setting?: ThemeSetting;
+  shown?: 'light' | 'dark';
+  sepia?: string;
+  ready?: Promise<void>;
+}) {
+  const modes: string[] = [];
+  const reported: string[] = [];
+  const setting: ThemeSetting = options.setting ?? DEFAULT_THEME_SETTING;
+  const service = createThemeService({
+    sources: () => [
+      ...Object.values(BUILT_IN_THEMES).map((theme) => ({
+        plugin: 'desktop',
+        theme,
+        read: builtInThemeReader,
+      })),
+      { plugin: 'sepia', theme: SEPIA, read: fromText(options.sepia ?? SEPIA_TEXT) },
+    ],
+    ready: options.ready ?? Promise.resolve(),
+    setting: () => setting,
+    setMode: (mode) => modes.push(mode),
+    shown: () => options.shown ?? 'light',
+    report: (problem) => reported.push(problem.code),
+  });
+  return { service, modes, reported };
+}
+
+describe('the theme the setting chooses (TYTO-208)', () => {
+  it('applies an installed theme named in its slot', async () => {
+    const { service } = serviceWith({ setting: { ...DEFAULT_THEME_SETTING, light: 'sepia' } });
+    const current = await service.current();
+    expect(current.light.id).toBe('sepia');
+    expect(current.light.colors.surface).toBe('#f4ecd8');
+    // Every other token is Tyto Light's.
+    expect(current.light.colors['text']).toBe(BASE_COLORS.light['text']);
+  });
+
+  it('tells Electron the mode a fixed id or an override asks for', async () => {
+    const fixed = serviceWith({ setting: 'tyto-dark' });
+    expect((await fixed.service.current()).mode).toBe('dark');
+    const forced = serviceWith({ setting: { ...DEFAULT_THEME_SETTING, mode: 'dark' } });
+    await forced.service.current();
+    expect(forced.modes).toEqual(['dark']);
+  });
+
+  it('applies the base of the kind when the theme file is malformed, and reports it', async () => {
+    const { service, reported } = serviceWith({ setting: 'sepia', sepia: '{ not json' });
+    const current = await service.current();
+    expect(current.light.id).toBe('sepia');
+    expect(current.light.colors).toEqual(BASE_COLORS.light);
+    expect(current.light.diagnostics.map((item) => item.code)).toContain('E_THEME_INVALID');
+    expect(reported).toContain('E_THEME_INVALID');
+  });
+
+  it('waits for the installed plugins before it gives up on an id that may be theirs', async () => {
+    let start: () => void = () => undefined;
+    const ready = new Promise<void>((resolve) => {
+      start = resolve;
+    });
+    const { service } = serviceWith({ setting: 'sepia', ready });
+    expect(service.lookup('sepia')).toBe('light');
+    expect(service.lookup('gone')).toBe('not-yet-known');
+    start();
+    await service.list();
+    expect(service.lookup('gone')).toBe('unknown');
+  });
+
+  it('lists every theme once, the built-in two first', async () => {
+    const { service } = serviceWith({});
+    expect((await service.list()).map((theme) => theme.id)).toEqual([
+      'tyto-light',
+      'tyto-dark',
+      'sepia',
+    ]);
+  });
+});
+
+describe('the picker’s preview and choice (TYTO-208)', () => {
+  it('shows a previewed theme and goes back to the setting on cancel', async () => {
+    const { service, modes } = serviceWith({ shown: 'light' });
+    const previewed = await service.preview('tyto-dark');
+    expect([previewed.mode, previewed.dark.id]).toEqual(['dark', 'tyto-dark']);
+    const back = await service.preview(undefined);
+    expect(back.mode).toBe('system');
+    expect(modes).toEqual(['dark', 'system']);
+  });
+
+  it('chooses from the kind the window was in before the preview moved it', async () => {
+    // The system is light; previewing Tyto Dark forced Electron dark, and the choice must
+    // still know the system was light, or it would keep `system` and the dark theme vanish.
+    const { service } = serviceWith({ shown: 'light' });
+    await service.preview('tyto-dark');
+    expect(await service.choose('tyto-dark', DEFAULT_THEME_SETTING)).toEqual({
+      ...DEFAULT_THEME_SETTING,
+      mode: 'dark',
+    });
+    expect(await service.choose('nobody', DEFAULT_THEME_SETTING)).toBeUndefined();
   });
 });
 

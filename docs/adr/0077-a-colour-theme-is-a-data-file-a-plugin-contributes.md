@@ -80,9 +80,10 @@ choice to install, and a guard on somebody else's colours would refuse a high-co
 deliberately quiet theme alike.
 
 **8. Until PR B the applied theme is the built-in of the system's kind.** There is no setting
-and no command in PR A, and installed themes are registered but never applied.
+and no command in PR A, and installed themes are registered but never applied. PR B lifts all
+three (see Consequences).
 
-**9. PR B, decided now.** The `theme` setting has Zed's shape,
+**9. PR B, decided now.** The `theme` setting has Zed's shape, either one theme id or
 `{ mode: "system" | "light" | "dark", light: <theme id>, dark: <theme id> }`, declared by the
 `desktop` plugin through `configuration`. "Preferences: Color Theme" in the command bar lists
 every theme, previews the highlighted one live and writes the setting on choosing. A test plugin
@@ -106,3 +107,21 @@ sees the window's tokens.
 - Changing a built-in colour is now two edits — the token file and the theme file — and the
   token guard fails until both agree. That is the price of keeping a first paint that needs no
   message from main.
+- PR B (`shared/theme-setting.ts`, `theme:list`, `theme:preview`, `theme:choose`,
+  `e2e/theme-pick.desktop.test.ts`) settles five details decision 9 left open. **The mode is
+  Electron's**: main sets `nativeTheme.themeSource` from it — at launch before the window
+  exists, and on every change — so the sheet's media query, CodeMirror's dark flag
+  (`color-scheme.ts`, unchanged) and the native dialogs, scrollbars and menus follow one value;
+  a fixed id is the mode of its kind. **A slot holds its own kind**: an id no plugin offers, or
+  a dark theme in the `light` slot, is `W_SETTING_INVALID` at the value and the default
+  applies, as for any setting; while the installed plugins are still starting an id that may
+  be theirs is let through and waited for, and one that never arrives is its slot's default.
+  **Previewing and choosing are main's**: the picker asks `theme:preview` on each move, and
+  Escape asks it with `null`; Enter asks `theme:choose`, which writes through the settings store
+  (in place, or into a settings tab with unsaved typing, ADR 0073) the setting that keeps the
+  chosen theme on screen — its slot, and the mode of its kind when the system is in the other
+  one. **A theme's problems reach the problems panel** with every answer, without their
+  ranges: those are offsets into the theme's file, and the panel counts lines of the brief.
+  Only the applied themes are read, so a broken theme nobody chose says nothing. **The picker
+  is the command bar** (`pick`), not a second list: the same filter and keys, plus the moment
+  a row becomes the highlighted one.

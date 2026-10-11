@@ -1,6 +1,14 @@
 import type { ConfigurationContribution } from '@tyto/plugin-api';
 import { z } from 'zod';
 
+import {
+  DEFAULT_THEME_SETTING,
+  type ThemeLookup,
+  type ThemeSetting,
+  builtInThemeLookup,
+  themeSettingContribution,
+} from './theme-setting.js';
+
 /**
  * What the app remembers about how this person works, as opposed to where they put a
  * splitter (TYTO-122).
@@ -9,7 +17,7 @@ import { z } from 'zod';
  * reads off a disk and the window is told what the answer was, so the shape has to be one
  * declaration both halves import. Linted pure — no Node, no DOM.
  *
- * **Four settings the built-in `desktop` plugin declares** through the `configuration`
+ * **Five settings the built-in `desktop` plugin declares** through the `configuration`
  * extension point (TYTO-206, ADR 0073), like any plugin's: built-in is a plugin. Their keys
  * stay unprefixed, exactly as every `settings.json` written before that card spells them.
  * Each one is validated alone, so a hand-broken value costs that key and nothing else.
@@ -71,19 +79,29 @@ const queueKinds = {
   description: 'The file types each queue folder produces, by folder path.',
 } satisfies ConfigurationContribution<Readonly<Record<string, readonly string[]>>>;
 
-/** The four, in the order the settings file is documented in. */
-export const SETTING_CONTRIBUTIONS = [
-  templatesFolder,
-  queueFolder,
-  queueAutoRun,
-  queueKinds,
-] as const;
+/**
+ * The five, in the order the settings file is documented in. `theme` checks its ids against
+ * `lookup`, which main builds from every theme the plugins registered (TYTO-208); the default
+ * knows the built-in two and lets any other id through.
+ */
+export function settingContributions(
+  lookup: ThemeLookup = builtInThemeLookup,
+): readonly ConfigurationContribution[] {
+  return [
+    templatesFolder,
+    queueFolder,
+    queueAutoRun,
+    queueKinds,
+    themeSettingContribution(lookup),
+  ] as readonly ConfigurationContribution[];
+}
 
 export interface Settings {
   readonly templatesFolder: string | null;
   readonly queueFolder: string | null;
   readonly queueAutoRun: boolean;
   readonly queueKinds: Readonly<Record<string, readonly string[]>>;
+  readonly theme: ThemeSetting;
 }
 
 export const DEFAULT_SETTINGS: Settings = {
@@ -91,13 +109,14 @@ export const DEFAULT_SETTINGS: Settings = {
   queueFolder: queueFolder.default,
   queueAutoRun: queueAutoRun.default,
   queueKinds: queueKinds.default,
+  theme: DEFAULT_THEME_SETTING,
 };
 
 /** What a queue folder produces until a person chooses otherwise (ADR 0044). */
 export const DEFAULT_QUEUE_KINDS: readonly string[] = ['png'];
 
 /**
- * The four out of the resolved values, which already hold every declared key with a value
+ * The five out of the resolved values, which already hold every declared key with a value
  * its schema accepted or its default (`resolveSettings`).
  */
 export function settingsFrom(values: Readonly<Record<string, unknown>>): Settings {
@@ -108,5 +127,6 @@ export function settingsFrom(values: Readonly<Record<string, unknown>>): Setting
     queueFolder: pick('queueFolder'),
     queueAutoRun: pick('queueAutoRun'),
     queueKinds: pick('queueKinds'),
+    theme: pick('theme'),
   };
 }

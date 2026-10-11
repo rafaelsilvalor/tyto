@@ -1,5 +1,6 @@
 import type { Diagnostic } from './panel.js';
 import { SAVE_FAILED } from './save-failure.js';
+import { THEME_CODES } from './theme.js';
 
 /**
  * The "new problems" mark on the status bar's problems button (TYTO-143, ADR 0076).
@@ -48,10 +49,14 @@ export const seen = (_mark: ProblemsMark): ProblemsMark => UNLIT;
  *
  * `refreshTemplates` rebuilds the installation list from main's answer, so without this a
  * template-folder change dropped a live save failure or missing file — and the mark would
- * point at nothing. `E_TEMPLATE_FOLDER_EMPTY` is not carried: it is the template read's own
+ * point at nothing. The applied theme's rows are carried too (TYTO-208): only a theme answer
+ * remakes them. `E_TEMPLATE_FOLDER_EMPTY` is not carried: it is the template read's own
  * row and is made again by that read whenever it still holds.
  */
 export const carriedAcrossTemplateRead = (
   installation: readonly Diagnostic[],
 ): readonly Diagnostic[] =>
-  installation.filter((item) => item.code === SAVE_FAILED || item.code === FILE_NOT_FOUND);
+  installation.filter(
+    (item) =>
+      item.code === SAVE_FAILED || item.code === FILE_NOT_FOUND || THEME_CODES.has(item.code),
+  );
