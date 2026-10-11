@@ -25,8 +25,9 @@ import {
  * The workspace, driven as the value it is (E9.11).
  *
  * No DOM and no CodeMirror: an `EditorState` is opaque to everything outside `@tyto/editor`,
- * so what this file holds is a stand-in that answers `textOf` and nothing else — which is
- * enough, because `textOf` is also the only read `documents.ts` makes. What is tested here is
+ * so what this file holds is a stand-in that answers `textOf` and reads as never edited.
+ * Whether a tab somebody typed in may be replaced needs a real history, and is asked in
+ * `disposable.test.ts`. What is tested here is
  * the part that decides what a person sees — which tab is in front after a close, which one a
  * key lands on, whether the empty tab the app opens on may be replaced, and whether a tab is
  * showing the unsaved dot.
@@ -39,9 +40,12 @@ import {
 /**
  * A stand-in for an `EditorState`, which is opaque outside `@tyto/editor`.
  *
- * It answers `textOf` and nothing else, because `textOf` is the only read that package
- * offers and therefore the only one `documents.ts` is able to make. Distinct objects per
- * call, so the tests that assert a state survived a change can do it by identity.
+ * It answers `textOf`, and it answers `hasBeenEdited` as a state with no history at all
+ * would — `field` finds nothing, so the undo depth is 0. Every fixture here is therefore a
+ * document nobody typed in; the ones somebody did are in `disposable.test.ts`, against a
+ * real editor, because only CodeMirror can say what its history holds (TYTO-120). Distinct
+ * objects per call, so the tests that assert a state survived a change can do it by
+ * identity.
  *
  * A class and not an object literal with a `toString` on it: a function property is equal
  * only to itself, so two fixtures built the same way would fail the `toEqual` comparisons
@@ -54,8 +58,18 @@ class FakeDocument {
   }
 }
 
-const state = (text: string): EditorState =>
-  ({ doc: new FakeDocument(text) }) as unknown as EditorState;
+/** The state around it: `field` finds no history, so the undo depth CodeMirror reads is 0. */
+class FakeState {
+  readonly doc: FakeDocument;
+  constructor(text: string) {
+    this.doc = new FakeDocument(text);
+  }
+  field(): undefined {
+    return undefined;
+  }
+}
+
+const state = (text: string): EditorState => new FakeState(text) as unknown as EditorState;
 
 /** A document holding nothing, in no file — the tab the window opens on. */
 const doc = (id: string, over: Partial<DocumentState> = {}): DocumentState => ({
@@ -192,11 +206,11 @@ describe('the empty tab the window opens on', () => {
     expect(isDisposable(holding('a', '::titulo Oi', ''))).toBe(false);
   });
 
-  it('may, for a tab that lost its file and was then emptied', () => {
-    // The one behaviour this card changed here, pinned where it can be seen. A stored
-    // `dirty: true` kept a released tab out of this rule for good; a comparison lets it back
-    // in the moment there is nothing in it, and the `brief` left over from its last compile
-    // does not hold it open either (ADR 0026).
+  it('may, for a tab that lost its file while empty and was never typed in', () => {
+    // A stored `dirty: true` kept a released tab out of this rule for good; a comparison lets
+    // it back in when there is nothing in it, and the `brief` left over from its last compile
+    // does not hold it open either (ADR 0026). One that was *emptied* — typed in — is kept
+    // since TYTO-120, and that case is in `disposable.test.ts`.
     const released: DocumentState = {
       ...holding('a', '', ''),
       name: undefined,

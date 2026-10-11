@@ -1086,11 +1086,10 @@ function adopt(
   const current = active();
   workspace = isDisposable(current)
     ? {
-        // An empty tab in no file is replaced rather than pushed aside, and only that:
-        // `isDisposable` is false the moment there is a character in it or a name on it.
-        // Usually that is the tab the window opened on, and since TYTO-112 it can also be
-        // one emptied of everything or one that lost its file (ADR 0026) — the rule is
-        // about what is in the tab and not about how it got that way.
+        // A tab in no file that nobody has typed in is replaced rather than pushed aside,
+        // and only that: `isDisposable` is false the moment there is a character in it, a
+        // name on it or an edit on its undo stack. That is the tab the window opened on;
+        // one typed in and then emptied keeps its history beside the new file (TYTO-120).
         documents: workspace.documents.map((document_) =>
           document_.id === current.id ? created : document_,
         ),

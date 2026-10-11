@@ -19,6 +19,7 @@ export {
   type EditorHandle,
   type EditorOptions,
   type EditorState,
+  hasBeenEdited,
   type LanguageName,
   type ScrollPosition,
   textOf,

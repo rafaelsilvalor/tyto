@@ -6,7 +6,7 @@ import { EditorView } from '@codemirror/view';
 import { afterEach, describe, expect, it } from 'vitest';
 
 import { commandRegistryOf, createCommandRegistry } from './commands.js';
-import { createEditor, type EditorHandle, textOf } from './editor.js';
+import { createEditor, type EditorHandle, hasBeenEdited, textOf } from './editor.js';
 
 /**
  * The handle is tested through a real `EditorView` in jsdom rather than through a stub.
@@ -289,6 +289,32 @@ describe('document states', () => {
 
     handle.restore(first);
     expect(handle.getValue()).toBe('start');
+  });
+
+  it('says whether anything was ever typed, which an empty buffer cannot (TYTO-120)', () => {
+    handle = createEditor(open().parent);
+    handle.restore(handle.blank(''));
+    expect(hasBeenEdited(handle.state())).toBe(false);
+
+    // Typed and then deleted by hand: the text is gone and the history that brings it back
+    // is not, which is the whole difference between this read and `textOf(state) === ''`.
+    type(handle, 'paragraph');
+    handle.view.dispatch({ changes: { from: 0, to: handle.view.state.doc.length } });
+    expect(textOf(handle.state())).toBe('');
+    expect(hasBeenEdited(handle.state())).toBe(true);
+
+    // Undone all the way back is a stack with nothing on it, and reads as never edited.
+    undo(handle);
+    undo(handle);
+    expect(handle.getValue()).toBe('');
+    expect(hasBeenEdited(handle.state())).toBe(false);
+  });
+
+  it('does not count the text a document was built with as an edit', () => {
+    // A file arrives through `blank(text)`, so the text it opens with is the starting point
+    // and not something anybody typed.
+    handle = createEditor(open().parent);
+    expect(hasBeenEdited(handle.blank('::titulo Oi'))).toBe(false);
   });
 
   it('restores where the cursor was', () => {
