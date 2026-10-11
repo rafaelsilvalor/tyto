@@ -629,3 +629,54 @@ describe('a brief written on Windows', () => {
     expect(await tabNames()).not.toContain('windows.brief');
   });
 });
+
+describe('a tab typed in and then emptied (TYTO-120)', () => {
+  /**
+   * Empty is not untouched. A tab whose text was selected and deleted holds nothing, so the
+   * unsaved comparison calls it clean — and its undo history is still the only copy of what
+   * was typed. Opening a file used to replace it, history and all; `isDisposable` now asks
+   * `hasBeenEdited` as well. `src/renderer/disposable.test.ts` proves the rule on real
+   * states; this is the window keeping the tab and Ctrl+Z bringing the text back.
+   */
+  const UNTITLED = /^(Sem título|Untitled)$/u;
+  const untitledCount = async (): Promise<number> =>
+    (await tabNames()).filter((name) => UNTITLED.test(name)).length;
+
+  it('is kept beside the file opened next, and the undo brings the text back', async () => {
+    await runFromBar('document.new');
+    expect(await activeTab()).toMatch(UNTITLED);
+    const untitledBefore = await untitledCount();
+    const tabsBefore = (await tabNames()).length;
+
+    await page.click('#editor .cm-content');
+    await page.keyboard.type('::titulo Rascunho');
+    await page.keyboard.press('Control+a');
+    await page.keyboard.press('Delete');
+    await page.waitForFunction(
+      () => (document.querySelector('#editor .cm-content')?.textContent ?? '') === '',
+    );
+    // Clean by comparison, which is exactly why the comparison alone was not enough.
+    expect(await page.locator('.tabs__tab--on .tabs__dirty').count()).toBe(0);
+
+    await answerDialogsWith(secondPath);
+    await runFromBar('editor.open');
+
+    expect(await activeTab()).toBe('promo.brief');
+    expect((await tabNames()).length).toBe(tabsBefore + 1);
+    expect(await untitledCount()).toBe(untitledBefore);
+
+    // The emptied tab sits just before the file, which was added at the end of the strip.
+    await page.click('#editor .cm-content');
+    await page.keyboard.press('Control+PageUp');
+    await page.waitForTimeout(300);
+    expect(await activeTab()).toMatch(UNTITLED);
+    expect(await editorText()).toBe('');
+
+    await page.click('#editor .cm-content');
+    await page.keyboard.press('Control+z');
+    await page.waitForFunction(() =>
+      (document.querySelector('#editor .cm-content')?.textContent ?? '').includes('Rascunho'),
+    );
+    expect(await editorText()).toBe('::titulo Rascunho');
+  });
+});

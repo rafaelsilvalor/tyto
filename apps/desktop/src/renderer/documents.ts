@@ -1,4 +1,4 @@
-import { type EditorState, type ScrollPosition, textOf } from '@tyto/editor';
+import { type EditorState, type ScrollPosition, hasBeenEdited, textOf } from '@tyto/editor';
 
 import { type Artwork, type Diagnostic, type Frame, type Selection, type Zoom } from './preview.js';
 
@@ -14,8 +14,8 @@ import { type Artwork, type Diagnostic, type Frame, type Selection, type Zoom } 
  * have to be kept in step.
  *
  * Nothing here touches the DOM, the bridge or CodeMirror. An `EditorState` is opaque —
- * `@tyto/editor` owns the dependency, hands the type back, and `textOf` is the one field
- * read anything outside that package is offered.
+ * `@tyto/editor` owns the dependency, hands the type back, and `textOf` and `hasBeenEdited`
+ * are the reads this file makes of it.
  */
 
 export interface DocumentState {
@@ -49,9 +49,8 @@ export interface DocumentState {
    * {@link releaseDocument}, which empties it, because the tab has stopped being in a file
    * at all.
    *
-   * **A string and not CodeMirror's `Text`**, which is what D3 names. `textOf` is the only
-   * read `@tyto/editor` offers and a `Text` is not reachable through it — and it is also not
-   * wanted here, because both ends of the comparison cross the bridge as strings anyway:
+   * **A string and not CodeMirror's `Text`**, which is what D3 names. No read
+   * `@tyto/editor` offers reaches a `Text` — and one is also not wanted here, because both ends of the comparison cross the bridge as strings anyway:
    * `openDocument.text` in `shared/ipc.ts` is what main read off the disk and what main says
    * it wrote. The rule D3 states survives; the type it states does not.
    *
@@ -238,30 +237,31 @@ export function addDocument(workspace: Workspace, document: DocumentState): Work
 /**
  * Whether a document can be replaced rather than pushed aside when a file is opened.
  *
- * An empty tab in no file, and nothing else. Every editor does this — opening a file from a
- * blank window gives you one tab, not two — and the rule has to be exactly this narrow,
- * because getting it wrong throws away something a person wrote.
+ * A tab in no file that nobody has typed in, and nothing else. Every editor does this —
+ * opening a file from a blank window gives you one tab, not two — and the rule has to be
+ * exactly this narrow, because getting it wrong throws away something a person wrote.
  *
- * **Two clauses where there were three, and the third stopped being true rather than being
- * dropped.** It used to also require `brief === ''`, because text restored into a buffer
- * notified nobody and a stored `dirty` could therefore be false with a whole brief in the
- * tab. A derived marker cannot be wrong about that: text in a document whose `savedText` is
- * empty *is* unsaved, whoever put it there and whether or not anything was notified.
+ * **"Nobody has typed in it" and not "it is empty now"** (TYTO-120). A tab typed into and
+ * then emptied holds no text, so it is not unsaved, and it still holds the undo history that
+ * brings the text back — which lives in its `EditorState` and nowhere else, so replacing the
+ * document would throw the paragraph away for good. `hasBeenEdited` is `@tyto/editor`'s
+ * answer to that question; a document with no state yet, or one `blank()` built, has nothing
+ * typed in it. An edit undone all the way back is an empty stack again and reads as
+ * untouched, which is what keeps the tab the window opens on replaceable after a keystroke
+ * and its undo.
  *
- * **"An empty tab in no file" now includes a released one** (TYTO-104), and one that was
- * typed into and then emptied — both of which a stored `dirty: true` used to keep out. It is
- * reached only for the document in front — `adopt` in `main.ts` asks about `active()` — and
- * an active, unnamed, empty tab is the scratch tab whatever it used to hold.
+ * **A tab that lost its file (TYTO-104) gets the same treatment.** Emptying one is an edit,
+ * so since this card it is kept beside the new file rather than replaced, where TYTO-112 let
+ * it go. One released while already empty and never touched is still replaced, as before.
  *
- * **What that costs is the tab and its undo history**, which is worth saying because the
- * buffer being empty does not mean the `EditorState` is: the paragraph somebody typed and
- * deleted stops being recoverable when the next file replaces the document holding it. The
- * question this rule would rather ask is "has anything ever been typed here", which is
- * CodeMirror's `undoDepth` and a second read from `@tyto/editor` — a decision about that
- * package's surface rather than a line here (ADR 0026).
+ * `isUnsaved` stays beside it: a buffer holding text is never disposable, however the text
+ * got there. It is reached only for the document in front — `adopt` in `main.ts` asks about
+ * `active()`.
  */
 export const isDisposable = (document: DocumentState): boolean =>
-  document.name === undefined && !isUnsaved(document);
+  document.name === undefined &&
+  !isUnsaved(document) &&
+  (document.state === undefined || !hasBeenEdited(document.state));
 
 /**
  * Takes the file off a document, leaving every character of its text alone (TYTO-104).

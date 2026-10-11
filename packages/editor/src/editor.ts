@@ -1,4 +1,10 @@
-import { defaultKeymap, history, historyKeymap, indentWithTab } from '@codemirror/commands';
+import {
+  defaultKeymap,
+  history,
+  historyKeymap,
+  indentWithTab,
+  undoDepth,
+} from '@codemirror/commands';
 import { foldGutter, foldKeymap, indentOnInput, indentUnit } from '@codemirror/language';
 import {
   type Extension,
@@ -128,8 +134,8 @@ export interface EditorOptions {
  * the undo history and the selection, and rebuilding one from a string is exactly what
  * throws an undo stack away.
  *
- * It stays opaque all the same: {@link textOf} is the only field read this package offers,
- * and nothing outside reaches past it.
+ * It stays opaque all the same: {@link textOf}, {@link cursorOf} and {@link hasBeenEdited}
+ * are the reads this package offers, and nothing outside reaches past them.
  */
 export type EditorState = CodeMirrorEditorState;
 
@@ -170,6 +176,20 @@ export function cursorOf(state: EditorState): CursorPosition {
   const selected = state.selection.ranges.reduce((sum, range) => sum + range.to - range.from, 0);
   return { line: line.number, column: head - line.from + 1, selected };
 }
+
+/**
+ * Whether this document's undo history holds anything — "has anybody typed here", which is
+ * a different question from "is it empty now" (TYTO-120).
+ *
+ * A tab typed into and then emptied by hand holds no text and still holds the history that
+ * can bring the text back, and only the state knows that. A document `blank()` built answers
+ * `false`, and so does one undone all the way back: the undo stack is empty again, and that
+ * is the stack this reads.
+ *
+ * A boolean and not CodeMirror's `undoDepth`, because the host wants the answer and not the
+ * count, and a number would be one more piece of CodeMirror's shape outside this package.
+ */
+export const hasBeenEdited = (state: EditorState): boolean => undoDepth(state) > 0;
 
 export interface EditorHandle {
   /**
