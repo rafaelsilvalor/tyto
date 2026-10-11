@@ -84,7 +84,9 @@ textarea {
 .title-bar {
   display: flex;
   flex-shrink: 0;
-  height: env(titlebar-area-height, 32px);
+  /* One hairline taller than the overlay, so the line runs under the system's buttons too:
+     inside the overlay's height they painted over its right end (TYTO-244, PR B). */
+  height: calc(env(titlebar-area-height, 32px) + var(--tyto-hairline-width));
   border-bottom: var(--tyto-hairline-width) solid var(--tyto-hairline);
   background: var(--tyto-surface-raised);
   color: var(--tyto-text-muted);
@@ -103,11 +105,35 @@ textarea {
   padding: 0 var(--tyto-space-4);
 }
 
-/* The menu row's place (PR B). Empty here; it will hold buttons, so it is already `no-drag`. */
+/*
+ * The menu row (TYTO-244, PR B): the application menu's top-level names, each opening that
+ * menu's native list. `no-drag`, or the system would take a click on a name as a move.
+ */
 .title-bar__menu {
   display: flex;
+  flex-shrink: 0;
   align-items: center;
   -webkit-app-region: no-drag;
+}
+
+.title-bar__menu-item {
+  border: 0;
+  border-radius: var(--tyto-radius-sm);
+  padding: var(--tyto-space-2) var(--tyto-space-4);
+  background: transparent;
+  color: var(--tyto-text);
+  font: inherit;
+  line-height: 1;
+}
+
+.title-bar__menu-item:hover,
+.title-bar__menu-item:focus-visible,
+.title-bar__menu-item[aria-expanded='true'] {
+  background: var(--tyto-hover);
+}
+
+.title-bar__menu-item:disabled {
+  color: var(--tyto-text-disabled);
 }
 
 .title-bar__title {

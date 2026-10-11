@@ -66,11 +66,40 @@ developer tools with the title bar hidden as it did with the native frame — an
 back (TYTO-104). Not installing a menu at all would put Electron's default one back, with the
 two accelerators `menu.ts` exists to remove.
 
-**8. PR B, decided now.** A menu row in the bar's reserved place: the five names in a row —
-File, Edit, View, Window, Help — each opening the **native** popup list of that submenu with
-`Menu.popup`, which does not follow the theme. Main sends the model (`menu:model`) and the
-window asks it to run an item or open a submenu (`menu:invoke`). Alt and F10 are bindings in the
-window's own dispatcher (ADR 0074), never menu accelerators (TYTO-124). ARIA `menubar` semantics.
+**8. PR B: a row of names, each opening the native list** (Rafael, 2026-10-10). The bar's
+reserved place holds the installed menu's top-level names — File, Edit, View, Window, Help on
+Windows and Linux — and a name opens **that submenu's own native list** with `Menu.popup`. The
+list is the system's: it does not follow the theme (it follows only the system's light or dark),
+and its items run exactly as before, because they are the installed items — a role is
+Electron's, a File item sends its command id (TYTO-124). Nothing in the window knows what an
+item does.
+
+- **One source.** `menu:model` answers `projectMenu(Menu.getApplicationMenu())`
+  (`src/main/menu-model.ts`): per top-level menu its id, label, role and enabled state, and per
+  item its id, label, type, role, enabled state and accelerator **as a label to show** — never a
+  key the window binds. A top-level id is the template's (`file`), else the role (`editmenu`,
+  `help`), else the position; `findTopLevel` reads the same ids back. The window asks again
+  after `app:locale`, which is when main builds the menu again in the other language.
+- **`menu:popup { id, x, y }`** opens the list at the bottom left of the clicked name, in CSS
+  pixels that main scales by the page's zoom, and answers `{ opened }` **when the list closes**
+  — which is how the name stops saying `aria-expanded="true"`. It replaced the `menu:invoke`
+  this decision first named: a channel that ran items would be a second way to run them.
+- **Keys.** F10 and Alt pressed alone focus the first name, and the same key leaves. Both are
+  in the window's one dispatcher (ADR 0074), never menu accelerators (TYTO-124). F10 is tried
+  **after** the table, so a binding on F10 wins and a key the editor took stays the editor's.
+  Alt is decided on the release (`AltTap` in `src/renderer/menu-row.ts`): the press is also the
+  start of every Alt+key the editor, vim and the table own, so any key, mouse button or loss of
+  focus in between disarms it, and a press the editor took never arms. In the row, Left and
+  Right move (wrapping), Home and End jump, Enter, Space and Down open, Escape gives focus back
+  to what had it.
+- **No mnemonics.** No label in the template writes `&`, so Alt+letter opens nothing; the
+  projection strips a marker if one appears. Adding them is a template change and a decision
+  about which letters, not this card's.
+- **ARIA**: the place is `role="menubar"`; each name is a `menuitem` with `aria-haspopup="menu"`
+  and `aria-expanded`, and one name at a time is in the tab order (roving tabindex). No new
+  string: the names are the template's own labels, already in the window's language.
+- **The hairline runs under the system's buttons.** The bar is one hairline taller than the
+  overlay, so the line sits below the buttons instead of being painted over at the right end.
 
 ## What was measured
 
@@ -90,6 +119,12 @@ Electron 44.4.5 on Windows 11, the built app, its own `--user-data-dir` and `TYT
   902-wide window: the overlay's buttons take 138 px at the right.
 - Playwright's `capturePage` and CDP screenshots draw the page and not the overlay, so the
   buttons are visible only in a `PrintWindow` capture.
+- **PR B, same setup.** A click on Help in the row opened the native list under the name;
+  `PrintWindow` of the window does not draw it, but `PrintWindow` of the list's own window does
+  (dark, with _Open the log folder_ and _About Tyto_). Picking each with real key presses ran
+  it: the log folder was asked to open, and the About box showed the version, platform,
+  template count and folder. A real Alt press focused _File_. With the bar 33 px tall the
+  hairline row under the close button is the hairline colour, as it is under the title.
 
 ## Consequences
 
@@ -101,7 +136,12 @@ Electron 44.4.5 on Windows 11, the built app, its own `--user-data-dir` and `TYT
   overlay main asked for when the system flips — by wrapping `setTitleBarOverlay` on the window
   from `app.evaluate`, because Electron has no getter for it — and the menu still carrying no
   Reload and no Close.
-- The window is 32 px of chrome at the top on Windows and Linux where it was the system's title
-  bar, the menu bar and the 27 px header.
+- PR B: `src/main/menu-model.ts` and its unit test, `src/renderer/menu-row.ts` (`MenuRow`,
+  `AltTap`) and its unit test, two channels, and `e2e/menu-row.desktop.test.ts`, which wraps
+  `Menu.prototype.popup` from `app.evaluate` — Playwright cannot see a native list, and on
+  Windows the real call runs a loop the suite could not close — and reads which installed
+  submenu was asked for and where.
+- The window is 33 px of chrome at the top on Windows and Linux (32 since PR A, plus the
+  hairline) where it was the system's title bar, the menu bar and the 27 px header.
 - Not decided here: whether the bar shows more than the title later (a project name, a branch),
   and the macOS frame, which waits for somebody who can look at a Mac.

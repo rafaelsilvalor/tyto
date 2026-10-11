@@ -181,6 +181,33 @@ const appliedThemesSchema = z.object({
   diagnostics: z.array(diagnostic.omit({ range: true })).max(200),
 });
 
+/**
+ * One item inside a top-level menu, as the window may read it (TYTO-244).
+ *
+ * `accelerator` is a label to show and nothing else: the key is the native item's, and a
+ * window that bound it again would take it from the page twice (TYTO-124).
+ */
+export const menuItemSchema = z.object({
+  id: z.string(),
+  label: z.string(),
+  type: z.enum(['normal', 'separator', 'submenu', 'checkbox', 'radio']),
+  role: z.string().optional(),
+  enabled: z.boolean(),
+  accelerator: z.string().optional(),
+});
+
+/** A top-level menu: the name the row draws, and the items its native list holds. */
+export const menuSchema = z.object({
+  id: z.string().min(1),
+  label: z.string(),
+  role: z.string().optional(),
+  enabled: z.boolean(),
+  items: z.array(menuItemSchema),
+});
+
+export type MenuItemModel = z.infer<typeof menuItemSchema>;
+export type MenuModel = z.infer<typeof menuSchema>;
+
 export const IPC_CHANNELS = {
   /**
    * What the renderer needs to render its shell, asked once on load.
@@ -1011,6 +1038,34 @@ export const IPC_CHANNELS = {
    * effect in the browser process and there is nothing for the window to do with the outcome.
    */
   'app:locale': channel(z.object({ locale: z.string().min(1) }), z.object({})),
+
+  /**
+   * The application menu as the window draws it: its top-level names, and what each holds
+   * (TYTO-244, ADR 0078). With the system's title bar hidden the native menu bar is not drawn
+   * on Windows and Linux, so the window draws the row and main keeps the menu.
+   *
+   * A projection of the menu main **installed**, not of the template, so the row and the
+   * native lists can never disagree: one source. The window asks again after `app:locale`,
+   * because that is when main builds the menu again in the other language.
+   */
+  'menu:model': channel(z.object({}), z.object({ menus: z.array(menuSchema) })),
+
+  /**
+   * Opens one top-level menu's own native list at a point in the window (TYTO-244).
+   *
+   * `x` and `y` are CSS pixels from the page's top left — the bottom left of the clicked name
+   * — and main scales them by the page's zoom. **The answer arrives when the list closes**,
+   * picked from or dismissed, which is how the name knows to stop saying it is expanded.
+   * `opened: false` is an id the installed menu does not have.
+   */
+  'menu:popup': channel(
+    z.object({
+      id: z.string().min(1),
+      x: z.number().finite(),
+      y: z.number().finite(),
+    }),
+    z.object({ opened: z.boolean() }),
+  ),
 
   /**
    * The template mode opening a folder (TYTO-44): `directory: null` asks main for a picker,

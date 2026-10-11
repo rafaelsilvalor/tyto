@@ -137,6 +137,7 @@ import { installErrorReporting, reportToLog } from './report-errors.js';
 import { searchPhrasesFor } from './search-phrases.js';
 import { paintUpdateNotice } from './update-notice.js';
 import { type ShellState, paint, paintTitle } from './shell.js';
+import { AltTap, MenuRow } from './menu-row.js';
 import {
   type PreviewElements,
   type RequestGate,
@@ -2032,6 +2033,8 @@ function applyLocale(next: Locale): void {
   // belongs if the message never lands.
   void withBridge(async (bridge) => {
     await bridge['app:locale']({ locale: next });
+    // Main has built the menu again in the new language; the drawn row reads it from there.
+    await drawMenuRow(bridge);
   });
 }
 
@@ -2275,7 +2278,9 @@ function wireTabs(): void {
  * unit sees it: each function is right on its own and the fault is in how often one runs.
  */
 function wireKeybindingDispatcher(): void {
+  const altTap = new AltTap();
   window.addEventListener('keydown', (event) => {
+    altTap.down(event);
     const stroke = keyOfStroke(event);
     for (const binding of windowBindingsOf(keybindings)) {
       if (concreteKey(binding, state.platform) !== stroke) continue;
@@ -2287,7 +2292,46 @@ function wireKeybindingDispatcher(): void {
       event.preventDefault();
       return;
     }
+    // F10 focuses the drawn menu row (TYTO-244, ADR 0078), **after** the table: a binding a
+    // person or a plugin put on F10 wins, and a key the editor took stays the editor's. Not a
+    // menu accelerator, which the browser process would answer before the page (TYTO-124).
+    if (event.defaultPrevented || stroke !== 'F10') return;
+    if (menuRow?.toggle() === true) event.preventDefault();
   });
+  // Alt alone, the other door to the row. Decided on the release, because the press is also
+  // the start of every Alt+key the editor, vim and the table own (`AltTap`). The same wiring
+  // and the same once-only rule as the keydown above; the keyup has nothing else to do.
+  window.addEventListener('keyup', (event) => {
+    if (!altTap.up(event) || menuRow === undefined) return;
+    if (menuRow.toggle()) event.preventDefault();
+  });
+  window.addEventListener(
+    'mousedown',
+    () => {
+      altTap.reset();
+    },
+    true,
+  );
+  window.addEventListener('blur', () => {
+    altTap.reset();
+  });
+}
+
+/**
+ * The drawn menu row (TYTO-244, ADR 0078), on Windows and Linux only: macOS keeps its native
+ * menu bar and hides the drawn title bar. Undefined until `load` has asked main for the model.
+ */
+let menuRow: MenuRow | undefined;
+
+/** Asks main for the installed menu and draws its names; again after the language changes. */
+async function drawMenuRow(bridge: TytoBridge): Promise<void> {
+  if (state.platform === 'darwin') return;
+  if (menuRow === undefined) {
+    const container = document.querySelector<HTMLElement>('.title-bar__menu');
+    if (container === null) return;
+    menuRow = new MenuRow(container, (id, at) => bridge['menu:popup']({ id, ...at }));
+  }
+  menuRow.draw((await bridge['menu:model']({})).menus);
 }
 
 /** `commandBar`, `panel` and global, the three contexts the window answers (ADR 0074). */
@@ -2479,6 +2523,7 @@ async function load(): Promise<void> {
   await applyLayout(false);
   if (bridge !== undefined) void loadPluginPanels(bridge);
   wireKeybindingDispatcher();
+  if (bridge !== undefined) await drawMenuRow(bridge);
   wireSplitters(document, () => layout, {
     locale: state.locale,
     onClose: (panelId) => {
