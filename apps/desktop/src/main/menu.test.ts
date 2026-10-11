@@ -91,6 +91,22 @@ describe('the View menu', () => {
       'togglefullscreen',
     ]);
   });
+
+  it('offers Reload as the window’s command, with no accelerator (TYTO-113)', () => {
+    // The command writes the session before the page goes (ADR 0080); the role would not wait.
+    const onCommand = vi.fn();
+    const submenu =
+      submenuOf(
+        template('win32', () => {}, onCommand),
+        'viewMenu',
+      ) ?? [];
+    const reload = submenu.find((item) => item.id === 'window.reload');
+
+    expect(reload?.label).toBe('command.window.reload');
+    expect(reload?.accelerator).toBeUndefined();
+    (reload?.click as (() => void) | undefined)?.();
+    expect(onCommand).toHaveBeenCalledWith('window.reload');
+  });
 });
 
 describe('the rest of the menu', () => {

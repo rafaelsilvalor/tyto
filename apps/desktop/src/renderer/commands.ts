@@ -82,6 +82,11 @@ export const SETTINGS_OPEN = 'settings.open';
 /** TYTO-207. Opens `keybindings.json` in a tab, or brings its tab forward. */
 export const KEYBINDINGS_OPEN = 'keybindings.open';
 /**
+ * TYTO-113. Reloads the window, after writing the session so every tab comes back (ADR 0080).
+ * Written here and on View in `shared/commands.ts`, pinned together by `commands.test.ts`.
+ */
+export const WINDOW_RELOAD = 'window.reload';
+/**
  * TYTO-208. "Preferences: Color Theme": the themes in the bar, previewed as the selection
  * moves, written to the `theme` setting on Enter. No key by default (ADR 0074): a person
  * binds one in `keybindings.json` if they switch often.
@@ -187,6 +192,7 @@ export const COMMAND_LABELS: Readonly<Record<string, CatalogueKey>> = {
   [QUEUE_SHOW]: 'command.queue.show',
   [SETTINGS_OPEN]: 'command.settings.open',
   [KEYBINDINGS_OPEN]: 'command.keybindings.open',
+  [WINDOW_RELOAD]: 'command.window.reload',
   [THEME_PICK]: 'command.theme.pick',
   [TEMPLATES_CHOOSE_FOLDER]: 'command.templates.chooseFolder',
   [TEMPLATES_CLEAR_FOLDER]: 'command.templates.clearFolder',
@@ -248,6 +254,8 @@ export interface DesktopActions {
   showQueue(): void;
   openSettings(): void;
   openKeybindings(): void;
+  /** TYTO-113. Keeps the session, then reloads: nothing open is lost (ADR 0080). */
+  reloadWindow(): void;
   /** TYTO-208. Lists the colour themes in the bar; the list and the choice are main's. */
   pickTheme(): void;
   /**
@@ -343,6 +351,9 @@ export function createDesktopRegistry(actions: DesktopActions): CommandRegistry 
   add(KEYBINDINGS_OPEN, () => {
     actions.openKeybindings();
   });
+  add(WINDOW_RELOAD, () => {
+    actions.reloadWindow();
+  });
   add(THEME_PICK, () => {
     actions.pickTheme();
   });
@@ -420,6 +431,9 @@ export const desktopKeymapSet: EditorKeymap = {
     // asks for one table: the bar reads its keystrokes off this set, so a binding invented
     // beside it would be a shortcut the palette does not know about.
     { key: 'Mod-w', command: DOCUMENT_CLOSE },
+    // TYTO-113. Back since the session makes a reload lose nothing (ADR 0080). Here and not
+    // on the menu item, so vim keeps `Ctrl-R` for redo.
+    { key: 'Mod-r', command: WINDOW_RELOAD },
     { key: 'Mod-PageDown', command: DOCUMENT_NEXT },
     { key: 'Mod-PageUp', command: DOCUMENT_PREVIOUS },
     ...DOCUMENT_SLOTS.map((slot) => ({

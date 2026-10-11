@@ -36,6 +36,8 @@ import { createDocumentService } from './documents.js';
 import { createExportService } from './export.js';
 import { desktopCapabilities, startDesktopPlugins } from './installed-plugins.js';
 import { fileLayoutStore } from './layout-store.js';
+import { createSessionService } from './session.js';
+import { fileSessionStore } from './session-store.js';
 import { crashSummary, fileLog, installCrashHandlers } from './log.js';
 import { type AboutFacts, aboutText, menuTemplate } from './menu.js';
 import { findTopLevel, projectMenu } from './menu-model.js';
@@ -724,6 +726,14 @@ async function start(): Promise<void> {
     log,
   });
   late.live = liveSettings;
+  // **The tabs, kept for the next launch** (TYTO-113, ADR 0080), beside `layout.json`.
+  const session = createSessionService({
+    store: fileSessionStore(join(app.getPath('userData'), 'session.json')),
+    documents,
+    appFiles: { settings: settingsFile, keybindings: keybindingsFile },
+    readText: (path) => readFile(path, 'utf8'),
+    endSettingsTab: (documentId) => liveSettings.closed(documentId),
+  });
   // **Live keybindings** (TYTO-207): main only watches; the window parses and resolves.
   const liveKeybindings = createLiveKeybindings({
     readText: () =>
@@ -908,6 +918,7 @@ async function start(): Promise<void> {
     // Beside the credential store and the recent list, for the third time and on the same
     // argument: a file a person can read, edit and delete (ADR 0009).
     layout: fileLayoutStore(join(app.getPath('userData'), 'layout.json')),
+    session,
     log,
     // `localeFor` and not a cast: the window sends a string and this is the one place that
     // decides what an unrecognised one means, which is the same fallback `app:info` uses.

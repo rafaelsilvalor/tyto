@@ -140,6 +140,8 @@ const documents = () => {
     // One folder per tab, which is what `brief:preview` looks up from the id it is given.
     folderOf: (documentId: string) => (documentId === 'document-1' ? '/briefs' : undefined),
     nameOf: (documentId: string) => (documentId === 'document-1' ? 'promo' : undefined),
+    pathOf: () => undefined,
+    reset: () => undefined,
   };
 };
 
@@ -485,6 +487,11 @@ const dependencies = () => {
     exports: exportService(),
     folders: folderDialogs(),
     layout: layoutStore(),
+    // TYTO-113. Its decisions are `session.test.ts`'s; here it only has to be wired.
+    session: {
+      write: () => Promise.resolve({ written: true }),
+      read: () => Promise.resolve({ tabs: [], active: 0 }),
+    },
     menu: menuRebuilds(),
     plugins: pluginList(keychain),
     info: () => ({ version: '0.1.0', platform: 'linux', locale: 'pt-BR', templates: ['promo'] }),
@@ -512,7 +519,7 @@ const dependencies = () => {
     settings: {
       open: () => Promise.resolve({ document: null, documentId: null }),
       validate: () => [],
-      closed: () => Promise.resolve(),
+      closed: () => Promise.resolve(false),
     },
     templates: catalogue(),
     templateEditor: templateEditor(),

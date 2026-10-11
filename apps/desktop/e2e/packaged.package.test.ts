@@ -644,6 +644,11 @@ describe('the packaged app', () => {
     // would prove nothing about the guard: a close that skipped it ends the app the same way.
     // A page's `window.close()` was measured to do exactly that. A second launch, so the app
     // the other tests use is never left holding a question.
+    //
+    // **Since TYTO-113 a dirty tab alone holds nothing**: the quit keeps it in the session and
+    // goes (ADR 0080). A folder where `session.json` goes makes that write fail, as a full disk
+    // would, and the box is back — which is what this test needs to stand in front of the exit.
+    mkdirSync(join(scratch, 'guard-data', 'session.json'), { recursive: true });
     const dirty = await launchOverCdp(packagedExecutable(), {
       userData: join(scratch, 'guard-data'),
       home: join(scratch, 'tyto-home'),

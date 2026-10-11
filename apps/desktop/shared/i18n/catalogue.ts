@@ -114,6 +114,12 @@ export interface Catalogue {
    * `file.missing` appends the name.
    */
   readonly 'file.saveFailed': string;
+  /**
+   * TYTO-113, ADR 0080. A kept draft that was not put back over its file, because the file
+   * changed while the app was closed; the draft is in a new tab beside it. The file's name is
+   * appended, as `file.missing` appends it.
+   */
+  readonly 'session.draftStale': string;
 
   /**
    * The document tabs (E9.11).
@@ -419,6 +425,8 @@ export interface Catalogue {
   readonly 'command.settings.open': string;
   /** TYTO-207. Opens `keybindings.json` in a tab; a command, so it is not on screen at load. */
   readonly 'command.keybindings.open': string;
+  /** TYTO-113. View > Reload, and the bar's row for `Mod-r`; not on screen at load. */
+  readonly 'command.window.reload': string;
   /**
    * TYTO-208. "Preferences: Color Theme", the picker's placeholder and the two kinds shown
    * beside each theme. All four are the bar's, so none is on screen at load.
@@ -497,6 +505,7 @@ export const CATALOGUE_KEYS = [
   'document.unsaved',
   'file.missing',
   'file.saveFailed',
+  'session.draftStale',
   'document.close',
   'document.discard.message',
   'document.discard.detail',
@@ -652,6 +661,7 @@ export const CATALOGUE_KEYS = [
   'plugins.credential.failed',
   'command.settings.open',
   'command.keybindings.open',
+  'command.window.reload',
   'command.theme.pick',
   'theme.pick.placeholder',
   'theme.kind.light',

@@ -7,7 +7,7 @@ import {
 } from '@tyto/editor';
 import { describe, expect, it, vi } from 'vitest';
 
-import { FILE_MENU_COMMANDS } from '../../shared/commands.js';
+import { FILE_MENU_COMMANDS, RELOAD_COMMAND } from '../../shared/commands.js';
 import {
   type DesktopActions,
   COMMAND_LABELS,
@@ -59,6 +59,7 @@ const actions = () =>
     showQueue: vi.fn<() => void>(),
     openSettings: vi.fn<() => void>(),
     openKeybindings: vi.fn<() => void>(),
+    reloadWindow: vi.fn<() => void>(),
     pickTheme: vi.fn<() => void>(),
     chooseTemplateFolder: vi.fn<() => void>(),
     clearTemplateFolder: vi.fn<() => void>(),
@@ -282,6 +283,15 @@ describe('the File menu table', () => {
     expect(spies.openKeybindings).toHaveBeenCalledTimes(1);
     expect(spies.closeDocument).toHaveBeenCalledTimes(1);
     expect(spies.saveDocument.mock.calls).toEqual([[false], [true]]);
+  });
+
+  it('names, on View, a Reload this window registers under the same label (TYTO-113)', () => {
+    const spies = actions();
+    const registry = createDesktopRegistry(spies);
+    expect(registry.get(RELOAD_COMMAND.id)).toBeDefined();
+    expect(COMMAND_LABELS[RELOAD_COMMAND.id]).toBe(RELOAD_COMMAND.label);
+    registry.run(RELOAD_COMMAND.id, NO_VIEW);
+    expect(spies.reloadWindow).toHaveBeenCalledTimes(1);
   });
 
   it('pins `editor.save` to the id `@tyto/editor` ships', () => {

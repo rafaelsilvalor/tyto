@@ -57,4 +57,14 @@ export const desktopCodes: readonly DesktopCode[] = [
     english: 'This file was not saved',
     suffix: 'the file name, then the reason the system gave, when it gave one',
   },
+  {
+    code: 'W_SESSION_DRAFT_STALE',
+    severity: 'warning',
+    mintedIn: 'renderer/main.ts',
+    summary:
+      'A draft kept when the app closed was not put back over its file, which changed on disk in the meantime; the draft is in a new tab beside it (TYTO-113).',
+    messageKey: 'session.draftStale',
+    english: 'This file changed while Tyto was closed; your unsaved text is in a new tab beside it',
+    suffix: 'the file name',
+  },
 ];

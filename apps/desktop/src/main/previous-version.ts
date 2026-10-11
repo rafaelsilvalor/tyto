@@ -30,6 +30,9 @@ import { readSettingsText } from './settings-file.js';
  * `keybindings.json` joined in TYTO-257: TYTO-207 put a person's own keys in it, and a version
  * that left it behind made them silently stop working after an update.
  *
+ * `session.json` joined in TYTO-113 (ADR 0080): it holds the tabs and the drafts nobody saved
+ * yet, and an update that left it behind would be the one quit that lost them.
+ *
  * `logs/` is not among them: a log is a record of *that* build's failures, and one carried
  * into a new version would date a report about this one with lines from the last.
  */
@@ -38,6 +41,7 @@ export const IMPORTED_RECORDS = [
   'layout.json',
   'recent-files.json',
   'keybindings.json',
+  'session.json',
 ] as const;
 
 /** The ciphertext folder `credential-store.ts` writes, brought across only when asked. */

@@ -69,5 +69,12 @@ export const FILE_MENU_GROUPS: readonly (readonly MenuCommand[])[] = [
   [{ id: 'document.close', label: 'command.document.close' }],
 ];
 
+/**
+ * View > Reload (TYTO-113, ADR 0080). A command and not Electron's `reload` role: the role
+ * tears the page down before the window can write the session, and its accelerator would take
+ * `Ctrl-R` from vim's redo. `Mod-r` is the window's binding instead.
+ */
+export const RELOAD_COMMAND: MenuCommand = { id: 'window.reload', label: 'command.window.reload' };
+
 /** Every command the File menu offers, flat, for the tests that count them. */
 export const FILE_MENU_COMMANDS: readonly MenuCommand[] = FILE_MENU_GROUPS.flat();

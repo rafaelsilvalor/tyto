@@ -36,13 +36,21 @@ export type ExitAnswer = 'save' | 'discard' | 'cancel';
 
 export interface ExitQuestion {
   /**
-   * The tabs holding text that is in no file, in tab order (ADR 0026).
+   * Writes the session for the next launch, drafts included (TYTO-113, ADR 0080), and says
+   * whether it reached the disk. When it did, the tabs' unsaved text is kept and nothing about
+   * them needs asking.
+   */
+  readonly keep: () => Promise<boolean>;
+  /**
+   * What would be lost by going, in tab order (ADR 0026): the tabs holding text that is in no
+   * file when `kept` is false, and only what the session cannot hold — the template mode's
+   * buffers — when it is true.
    *
    * Ids and not documents: what the answer does with them is ask the *caller* to save each
    * one, and a snapshot of a document would be a second copy of the text — stale by the time
    * a Save-As three pickers later reads it.
    */
-  readonly unsaved: () => readonly string[];
+  readonly unsaved: (kept: boolean) => readonly string[];
   /** Puts the box in front of the person. The count is the box's, not the caller's. */
   readonly ask: (count: number) => Promise<ExitAnswer>;
   /** Writes one tab, asking for a name when it has none. */
@@ -64,7 +72,10 @@ export interface ExitQuestion {
  * which is the bug ADR 0031 exists to have closed, wearing the label of a feature.
  */
 export async function resolveExit(question: ExitQuestion): Promise<boolean> {
-  const dirty = question.unsaved();
+  // **Hot exit** (TYTO-113, ADR 0080): the drafts go into the session and come back on the
+  // next launch, so there is no question about them. The box is left for what the session
+  // cannot keep, and for a session the disk refused — asking then is the only way not to lose.
+  const dirty = question.unsaved(await question.keep());
   // Nothing to lose, so nothing to ask. A box on every quit is what trains a person to
   // dismiss the one that matters.
   if (dirty.length === 0) return true;

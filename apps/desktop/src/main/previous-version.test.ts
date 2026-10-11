@@ -18,6 +18,7 @@ import {
   parseVersion,
 } from './previous-version.js';
 import { fileRecentFiles } from './recent-files.js';
+import { fileSessionStore } from './session-store.js';
 import { DEFAULT_SETTINGS } from '../../shared/settings.js';
 import { fileSettingsStore } from './settings-store.js';
 
@@ -246,6 +247,25 @@ describe('saying yes', () => {
     expect(outcome.copied).toContain('keybindings.json');
     expect(readFileSync(join(root, '0.3.4', 'keybindings.json'), 'utf8')).toBe(commented);
     expect(readFileSync(join(older, 'keybindings.json'), 'utf8')).toBe(commented);
+  });
+
+  it('brings the session, so an update keeps the drafts nobody saved (TYTO-113)', async () => {
+    const older = await seedOlder('0.3.3');
+    const kept = await fileSessionStore(join(older, 'session.json')).write({
+      version: 1,
+      tabs: [{ kind: 'brief', draft: { text: '::titulo Rascunho', savedHash: 'h' } }],
+      active: 0,
+    });
+    expect(kept).toBe(true);
+
+    const outcome = await run('0.3.4', yes);
+
+    expect(outcome).toMatchObject({ kind: 'imported', diagnostics: [] });
+    if (outcome.kind !== 'imported') return;
+    expect(outcome.copied).toContain('session.json');
+    expect((await fileSessionStore(join(root, '0.3.4', 'session.json')).read()).tabs).toEqual([
+      { kind: 'brief', draft: { text: '::titulo Rascunho', savedHash: 'h' } },
+    ]);
   });
 
   it('leaves a keybindings file that does not parse behind, as it does settings', async () => {

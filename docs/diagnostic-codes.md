@@ -1583,3 +1583,11 @@ Message: the `templates.folder.empty` sentence in the window's language ("This f
 A save did not write the file; the unsaved marker stays lit (TYTO-124).
 
 Message: the `file.saveFailed` sentence in the window's language ("This file was not saved" in English), then the file name, then the reason the system gave, when it gave one.
+
+### `W_SESSION_DRAFT_STALE`
+
+**Severity:** warning · **Minted in:** `apps/desktop/src/renderer/main.ts`
+
+A draft kept when the app closed was not put back over its file, which changed on disk in the meantime; the draft is in a new tab beside it (TYTO-113).
+
+Message: the `session.draftStale` sentence in the window's language ("This file changed while Tyto was closed; your unsaved text is in a new tab beside it" in English), then the file name.

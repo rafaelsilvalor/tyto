@@ -258,12 +258,12 @@ describe('the window a person opens', () => {
     expect(found).toContain('CommandOrControl+C');
   });
 
-  it('gives Mod-R to nobody, because a reload discards every open tab', async () => {
-    // TYTO-104, and read the same way and for the same reason: this is the assertion that
-    // would catch the accelerator coming back, either because `menu.ts` asked for the role
-    // again or because Electron moved a default onto an item that is still here.
-    // `src/main/menu.test.ts` asserts the template; what a role *becomes* is Electron's,
-    // and this is where Electron is running.
+  it('leaves Mod-R to the window, which keeps the session before it reloads', async () => {
+    // TYTO-104 took the accelerator away because a reload discarded every open tab. TYTO-113
+    // brought Reload back as the window's own command (`Mod-r`, View > Reload), which writes
+    // the session first (ADR 0080) — so the menu still carries no accelerator for it: one here
+    // would reload before the page could keep anything, and take `Ctrl-R` from vim's redo.
+    // `e2e/session.desktop.test.ts` presses the key and finds every tab again.
     const found = await accelerators();
 
     expect(found).not.toContain('CommandOrControl+R');

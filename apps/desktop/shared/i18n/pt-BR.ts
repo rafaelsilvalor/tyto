@@ -48,6 +48,8 @@ export const ptBR: Catalogue = {
   'document.unsaved': 'não salvo',
   'file.missing': 'Este arquivo não está mais onde estava',
   'file.saveFailed': 'Este arquivo não foi salvo',
+  'session.draftStale':
+    'Este arquivo mudou enquanto o Tyto estava fechado; o texto não salvo está numa aba nova ao lado',
   'document.close': 'Fechar a aba',
   'document.discard.message': 'Fechar sem salvar?',
   'document.discard.detail': 'Este brief tem alterações que ainda não foram escritas no disco',
@@ -69,7 +71,7 @@ export const ptBR: Catalogue = {
   'crash.close': 'Fechar',
   'import.message': 'Trazer suas configurações da versão {version}?',
   'import.detail':
-    'A pasta de templates, a posição dos painéis, os arquivos recentes e seus atalhos de teclado. A versão {version} continua com a cópia dela de qualquer jeito, e esta pergunta não volta.',
+    'A pasta de templates, a posição dos painéis, os arquivos recentes, seus atalhos de teclado e as abas que estavam abertas. A versão {version} continua com a cópia dela de qualquer jeito, e esta pergunta não volta.',
   'import.credentials': 'Trazer também os acessos salvos',
   'import.confirm': 'Trazer',
   'import.decline': 'Começar do zero',
@@ -215,6 +217,7 @@ export const ptBR: Catalogue = {
   'plugins.credential.failed': 'Não foi possível salvar nem apagar a credencial.',
   'command.settings.open': 'Preferências: Abrir configurações (JSON)',
   'command.keybindings.open': 'Preferências: Abrir atalhos de teclado (JSON)',
+  'command.window.reload': 'Recarregar a janela',
   'command.theme.pick': 'Preferências: Tema de cores',
   'theme.pick.placeholder': 'Escolha um tema de cores',
   'theme.kind.light': 'claro',
