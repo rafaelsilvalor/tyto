@@ -92,6 +92,7 @@ describe('fileSettingsStore', () => {
       queueFolder: null,
       queueAutoRun: false,
       queueKinds: {},
+      theme: DEFAULT_SETTINGS.theme,
     });
   });
 
@@ -109,6 +110,7 @@ describe('fileSettingsStore', () => {
       queueFolder: '/q',
       queueAutoRun: true,
       queueKinds: {},
+      theme: DEFAULT_SETTINGS.theme,
     });
   });
 
@@ -126,6 +128,7 @@ describe('fileSettingsStore', () => {
       queueFolder: '/q',
       queueAutoRun: false,
       queueKinds: {},
+      theme: DEFAULT_SETTINGS.theme,
     });
   });
 
@@ -142,6 +145,7 @@ describe('fileSettingsStore', () => {
       queueFolder: '/queue',
       queueAutoRun: true,
       queueKinds: {},
+      theme: DEFAULT_SETTINGS.theme,
     });
   });
 

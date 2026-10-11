@@ -82,6 +82,12 @@ export const SETTINGS_OPEN = 'settings.open';
 /** TYTO-207. Opens `keybindings.json` in a tab, or brings its tab forward. */
 export const KEYBINDINGS_OPEN = 'keybindings.open';
 /**
+ * TYTO-208. "Preferences: Color Theme": the themes in the bar, previewed as the selection
+ * moves, written to the `theme` setting on Enter. No key by default (ADR 0074): a person
+ * binds one in `keybindings.json` if they switch often.
+ */
+export const THEME_PICK = 'theme.pick';
+/**
  * TYTO-122. Points the app at a folder of templates, or goes back to the built-in pack.
  *
  * Two commands and not one toggle, because a toggle would have to say which state it is in
@@ -181,6 +187,7 @@ export const COMMAND_LABELS: Readonly<Record<string, CatalogueKey>> = {
   [QUEUE_SHOW]: 'command.queue.show',
   [SETTINGS_OPEN]: 'command.settings.open',
   [KEYBINDINGS_OPEN]: 'command.keybindings.open',
+  [THEME_PICK]: 'command.theme.pick',
   [TEMPLATES_CHOOSE_FOLDER]: 'command.templates.chooseFolder',
   [TEMPLATES_CLEAR_FOLDER]: 'command.templates.clearFolder',
   [TEMPLATE_EDIT]: 'command.template.edit',
@@ -241,6 +248,8 @@ export interface DesktopActions {
   showQueue(): void;
   openSettings(): void;
   openKeybindings(): void;
+  /** TYTO-208. Lists the colour themes in the bar; the list and the choice are main's. */
+  pickTheme(): void;
   /**
    * TYTO-122. Points the app at a folder of templates, or clears the choice.
    *
@@ -333,6 +342,9 @@ export function createDesktopRegistry(actions: DesktopActions): CommandRegistry 
   });
   add(KEYBINDINGS_OPEN, () => {
     actions.openKeybindings();
+  });
+  add(THEME_PICK, () => {
+    actions.pickTheme();
   });
 
   // Registration order is display order, so these land next to Export rather than at the

@@ -1,0 +1,15 @@
+{
+  "name": "Sepia",
+  "kind": "light",
+  "colors": {
+    "surface": "#f4ecd8",
+    "surface-raised": "#ebe0c6",
+    "surface-sunken": "#e6dabd",
+    "border": "#c9b994",
+    "hairline": "#dccfb0",
+    "text": "#433422",
+    "text-muted": "#6b5a43",
+    "accent": "#9c5a2a",
+    "selection": "#e3cfa3"
+  }
+}

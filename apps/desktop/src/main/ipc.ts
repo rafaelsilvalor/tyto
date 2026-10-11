@@ -28,8 +28,32 @@ import { type PreviewService } from './preview.js';
 import { type QueueService, type QueueView } from './queue.js';
 import { type TemplateDiagnostic, type TemplateEditorService } from './template-editor.js';
 import { type TemplateCatalogue } from './templates.js';
-import { type ThemeService } from './themes.js';
+import type { AppliedThemes, ThemeService } from './themes.js';
 import { type UpdateService } from './updates.js';
+
+/**
+ * What the window asks of the themes (TYTO-208): the service's reading half, and `choose`,
+ * which `index.ts` composes with the settings store that writes the choice.
+ */
+export interface WindowThemes extends Pick<ThemeService, 'list' | 'current' | 'preview'> {
+  choose(id: string): Promise<{ readonly applied: AppliedThemes; readonly saved: boolean }>;
+}
+
+/**
+ * The applied themes as the window takes them. Each diagnostic loses its range, which is an
+ * offset into the theme's file: the problems panel would count it as lines of the brief.
+ */
+function appliedForWindow(applied: AppliedThemes): IpcResponse<'theme:current'> {
+  const { light, dark } = applied;
+  return {
+    mode: applied.mode,
+    light: { id: light.id, colors: light.colors },
+    dark: { id: dark.id, colors: dark.colors },
+    diagnostics: [...light.diagnostics, ...dark.diagnostics]
+      .slice(0, 200)
+      .map(({ severity, code, message }) => ({ severity, code, message })),
+  };
+}
 
 /**
  * Every handler, registered from the contract rather than beside it.
@@ -174,8 +198,8 @@ export interface IpcDependencies {
   readonly panels: PanelService;
   /** The installed plugins' keymaps, once they have started (TYTO-207). */
   keymaps(): Promise<IpcResponse<'plugins:keymaps'>['keymaps']>;
-  /** The colours the window applies in each system mode (TYTO-208, ADR 0077). */
-  readonly themes: ThemeService;
+  /** The colours the window applies in each system mode, and the theme picker (TYTO-208). */
+  readonly themes: WindowThemes;
   readonly templateDialogs: {
     /** A template folder to edit, or nothing when the picker is dismissed. */
     chooseTemplate: () => Promise<string | undefined>;
@@ -412,12 +436,19 @@ export function createHandlers(dependencies: IpcDependencies): Handlers {
     'plugins:panels': async () => ({ panels: [...(await dependencies.panels.list())] }),
     'plugins:keymaps': async () => ({ keymaps: await dependencies.keymaps() }),
 
-    'theme:current': async () => {
-      const { light, dark } = await dependencies.themes.current();
-      return {
-        light: { id: light.id, colors: light.colors },
-        dark: { id: dark.id, colors: dark.colors },
-      };
+    'theme:current': async () => appliedForWindow(await dependencies.themes.current()),
+    'theme:list': async () => ({
+      themes: (await dependencies.themes.list()).map(({ id, label, kind }) => ({
+        id,
+        label,
+        kind,
+      })),
+    }),
+    'theme:preview': async ({ id }) =>
+      appliedForWindow(await dependencies.themes.preview(id ?? undefined)),
+    'theme:choose': async ({ id }) => {
+      const { applied, saved } = await dependencies.themes.choose(id);
+      return { ...appliedForWindow(applied), saved };
     },
 
     'panel:request': ({ panelId, capability, args }) =>

@@ -24,6 +24,26 @@ export interface CommandEntry {
   readonly label: string;
   /** The keystroke, or nothing for a command no set binds. */
   readonly binding?: string;
+  /** A second, quieter word after the label: a theme's kind in the theme picker. */
+  readonly detail?: string;
+}
+
+/**
+ * One choice among a list, which the bar shows in place of the commands (TYTO-208): the
+ * colour themes for "Preferences: Color Theme". The same input, filter and keys; what the
+ * bar adds is the moment each entry becomes the highlighted one, so a theme can be previewed
+ * while the person moves through the list.
+ */
+export interface CommandBarPick {
+  readonly entries: readonly CommandEntry[];
+  readonly placeholder: string;
+  /** The entry highlighted when the list opens, which is already on show. */
+  readonly selected?: string;
+  /** Each entry as it becomes the highlighted one. */
+  readonly highlight: (id: string) => void;
+  readonly choose: (id: string) => void;
+  /** The bar closed with nothing chosen: Escape, the bar's own key. */
+  readonly cancel: () => void;
 }
 
 /**
@@ -59,6 +79,7 @@ export class CommandBar extends LitElement {
     close: { attribute: false },
     query: { state: true },
     active: { state: true },
+    picking: { state: true },
   };
 
   declare open: boolean;
@@ -81,6 +102,11 @@ export class CommandBar extends LitElement {
   declare query: string;
   /** Index into the *filtered* list. Reset to the top on every keystroke, never clamped. */
   declare active: number;
+  /** The list being chosen from, when the bar is a picker rather than the commands. */
+  declare picking: CommandBarPick | undefined;
+
+  /** The entry the picker last reported as highlighted, so each move is reported once. */
+  private highlighted: string | undefined;
 
   /** Where focus was when the bar opened, so Escape can put it back. */
   private returnFocusTo: HTMLElement | undefined;
@@ -94,6 +120,7 @@ export class CommandBar extends LitElement {
     this.close = () => undefined;
     this.query = '';
     this.active = 0;
+    this.picking = undefined;
   }
 
   /** Light DOM, so `shell.css` styles it — the reasoning is in ADR 0024. */
@@ -102,7 +129,7 @@ export class CommandBar extends LitElement {
   }
 
   get visible(): readonly CommandEntry[] {
-    return filterCommands(this.commands, this.query);
+    return filterCommands(this.picking?.entries ?? this.commands, this.query);
   }
 
   /**
@@ -116,23 +143,45 @@ export class CommandBar extends LitElement {
     this.returnFocusTo = active instanceof HTMLElement ? active : undefined;
     this.query = '';
     this.active = 0;
+    this.picking = undefined;
     this.open = true;
   }
 
-  /** Closes and puts focus back where it was, which is the half a person notices. */
+  /**
+   * Opens the bar as a picker over `request.entries`, with the selected entry highlighted.
+   * Called from a command, so focus is still wherever it was before the bar ran it.
+   */
+  pick(request: CommandBarPick): void {
+    this.show();
+    this.picking = request;
+    this.highlighted = request.selected;
+    const selected = request.entries.findIndex((entry) => entry.id === request.selected);
+    this.active = Math.max(selected, 0);
+  }
+
+  /**
+   * Closes and puts focus back where it was, which is the half a person notices. A picker
+   * closed this way chose nothing, and is told so.
+   */
   dismiss(): void {
+    const picking = this.picking;
+    this.picking = undefined;
     this.open = false;
     this.returnFocusTo?.focus();
     this.returnFocusTo = undefined;
     this.close();
+    picking?.cancel();
   }
 
   private choose(id: string): void {
+    const picking = this.picking;
+    this.picking = undefined;
     // Closed **before** the command runs, and focus restored first: a command that moves
     // the cursor or toggles vim needs the editor focused, and running it under an open
     // overlay would put the effect behind the thing covering it.
     this.dismiss();
-    this.run(id);
+    if (picking === undefined) this.run(id);
+    else picking.choose(id);
   }
 
   private onKeyDown(event: KeyboardEvent): void {
@@ -175,6 +224,16 @@ export class CommandBar extends LitElement {
     if (!this.open) return;
     const input = this.querySelector<HTMLInputElement>('.command-bar__input');
     if (input !== null && this.ownerDocument.activeElement !== input) input.focus();
+    // After the render, so the entry reported is the one on screen.
+    const highlighted = this.picking === undefined ? undefined : this.visible[this.active]?.id;
+    if (
+      this.picking !== undefined &&
+      highlighted !== undefined &&
+      highlighted !== this.highlighted
+    ) {
+      this.highlighted = highlighted;
+      this.picking.highlight(highlighted);
+    }
   }
 
   private option(entry: CommandEntry, index: number): TemplateResult {
@@ -194,6 +253,11 @@ export class CommandBar extends LitElement {
     >
       <span class="command-bar__label">${entry.label}</span>
       ${
+        entry.detail === undefined
+          ? nothing
+          : html`<span class="command-bar__detail">${entry.detail}</span>`
+      }
+      ${
         entry.binding === undefined
           ? nothing
           : html`<kbd class="command-bar__key">${entry.binding}</kbd>`
@@ -206,12 +270,13 @@ export class CommandBar extends LitElement {
 
     const visible = this.visible;
     const say = translate.bind(null, this.locale);
+    const placeholder = this.picking?.placeholder ?? say('command.bar.placeholder');
 
     return html`<div
       class="command-bar__panel"
       role="dialog"
       aria-modal="true"
-      aria-label=${say('command.bar.placeholder')}
+      aria-label=${placeholder}
       @keydown=${(event: KeyboardEvent) => {
         this.onKeyDown(event);
       }}
@@ -226,7 +291,7 @@ export class CommandBar extends LitElement {
         aria-activedescendant=${
           visible.length === 0 ? nothing : `command-bar-option-${String(this.active)}`
         }
-        placeholder=${say('command.bar.placeholder')}
+        placeholder=${placeholder}
         .value=${this.query}
         @input=${(event: Event) => {
           this.onInput(event);

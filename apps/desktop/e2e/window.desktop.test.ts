@@ -291,8 +291,12 @@ describe('the bridge', () => {
       'templates:folder',
       'templates:list',
       'templates:set-folder',
-      // TYTO-208: the colours the window applies. Exercised by `e2e/theme.desktop.test.ts`.
+      // TYTO-208: the colours the window applies, and the theme picker's three. Exercised by
+      // `e2e/theme.desktop.test.ts` and `e2e/theme-pick.desktop.test.ts`.
+      'theme:choose',
       'theme:current',
+      'theme:list',
+      'theme:preview',
       // TYTO-131, ADR 0069: the update notice. Exercised by `e2e/update.package.test.ts`.
       'update:act',
       'update:status',
@@ -550,6 +554,12 @@ describe('switching the language', () => {
     'command.settings.open',
     // TYTO-207: the same, for the keybindings file. `e2e/keybindings-file.desktop.test.ts`.
     'command.keybindings.open',
+    // TYTO-208: the theme picker's command, placeholder and the two kinds beside each theme,
+    // all inside the bar. `e2e/theme-pick.desktop.test.ts` opens it.
+    'command.theme.pick',
+    'theme.pick.placeholder',
+    'theme.kind.light',
+    'theme.kind.dark',
     // TYTO-248: the status bar is an element and translates inside its own `render`; the
     // area toggles are also command labels. `src/renderer/status-bar.test.ts` renders every
     // one of them in both languages.

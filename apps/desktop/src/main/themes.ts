@@ -12,6 +12,13 @@ import {
 } from '@tyto/plugin-api';
 import { type Node, type ParseError, parseTree, printParseErrorCode } from 'jsonc-parser';
 
+import {
+  type ThemeLookup,
+  type ThemeMode,
+  type ThemeSetting,
+  chosenThemeSetting,
+  resolveThemeSetting,
+} from '../../shared/theme-setting.js';
 import { confinedFile } from './plugin-protocol.js';
 import tytoDark from './themes/tyto-dark.json';
 import tytoLight from './themes/tyto-light.json';
@@ -177,35 +184,129 @@ export interface ThemeSource {
   readonly read: ThemeReader;
 }
 
-export interface ThemeService {
-  /**
-   * The theme the window applies in each system mode. Always the built-in of that kind until
-   * the `theme` setting exists (PR B of TYTO-208); a built-in the registry does not hold is the
-   * base colours, so the window never lacks one.
-   */
-  current(): Promise<Readonly<Record<ThemeKind, LoadedTheme>>>;
+/** The two themes the window applies and the mode Electron answers, as the window gets them. */
+export interface AppliedThemes {
+  readonly mode: ThemeMode;
+  readonly light: LoadedTheme;
+  readonly dark: LoadedTheme;
 }
 
-export function createThemeService(options: {
+export interface ThemeService {
+  /** What the `theme` setting checks an id against: every theme registered so far. */
+  readonly lookup: ThemeLookup;
+  /** Every theme a plugin offers, the built-in two first. Waits for the installed plugins. */
+  list(): Promise<readonly ThemeContribution[]>;
+  /**
+   * The themes the setting chooses — or the one being previewed — loaded over their base,
+   * with Electron told which mode to answer (`setMode`), so the window's media query, the
+   * editor's dark flag and the native dialogs and scrollbars all follow one choice.
+   */
+  current(): Promise<AppliedThemes>;
+  /**
+   * Shows `id` as if it were chosen, until a choice or `preview(undefined)` goes back to the
+   * setting. An id nobody offers previews nothing.
+   */
+  preview(id: string | undefined): Promise<AppliedThemes>;
+  /**
+   * The setting that shows `id`, from `setting` (ADR 0077): the caller writes it. Ends any
+   * preview. `undefined` for an id nobody offers.
+   */
+  choose(id: string, setting: ThemeSetting): Promise<ThemeSetting | undefined>;
+}
+
+export interface ThemeServiceOptions {
+  /** Every theme registered, in order: the built-in plugin's first. The first id wins. */
   readonly sources: () => readonly ThemeSource[];
+  /** Settles when the installed plugins have started and their themes are in `sources`. */
+  readonly ready: Promise<void>;
+  /** The `theme` setting in effect. */
+  readonly setting: () => ThemeSetting;
+  /** `nativeTheme.themeSource`. */
+  readonly setMode: (mode: ThemeMode) => void;
+  /** Which kind the window is in now (`nativeTheme.shouldUseDarkColors`). */
+  readonly shown: () => ThemeKind;
   readonly report: (problem: Diagnostic) => void;
-}): ThemeService {
-  const builtIn = async (kind: ThemeKind): Promise<LoadedTheme> => {
-    const wanted = BUILT_IN_THEMES[kind];
-    const source = options
-      .sources()
-      .find(({ plugin, theme }) => plugin === 'desktop' && theme.id === wanted.id);
+}
+
+const idsOf = (setting: ThemeSetting): readonly string[] =>
+  typeof setting === 'string' ? [setting] : [setting.light, setting.dark];
+
+export function createThemeService(options: ThemeServiceOptions): ThemeService {
+  let settled = false;
+  const ready = options.ready.then(
+    () => {
+      settled = true;
+    },
+    () => {
+      settled = true;
+    },
+  );
+  // The theme on show while the picker is open, and the kind the window was in before it.
+  let previewing: { readonly id: string; readonly before: ThemeKind } | undefined;
+
+  const sourceOf = (id: string): ThemeSource | undefined =>
+    options.sources().find(({ theme }) => theme.id === id);
+
+  const lookup: ThemeLookup = (id) =>
+    sourceOf(id)?.theme.kind ?? (settled ? 'unknown' : 'not-yet-known');
+
+  const load = async (id: string, kind: ThemeKind, report: boolean): Promise<LoadedTheme> => {
+    const source = sourceOf(id);
     const loaded =
-      source === undefined
-        ? await loadTheme(wanted, builtInThemeReader)
+      source === undefined || source.theme.kind !== kind
+        ? await loadTheme(BUILT_IN_THEMES[kind], builtInThemeReader)
         : await loadTheme(source.theme, source.read);
-    for (const problem of loaded.diagnostics) options.report(problem);
+    if (report) for (const problem of loaded.diagnostics) options.report(problem);
     return loaded;
   };
+
+  const current = async (): Promise<AppliedThemes> => {
+    // A theme an installed plugin will register is waited for, not replaced by the default
+    // for the second the plugins take to start.
+    const wanted = [
+      ...idsOf(options.setting()),
+      ...(previewing === undefined ? [] : [previewing.id]),
+    ];
+    if (wanted.some((id) => lookup(id) === 'not-yet-known')) await ready;
+    let slots = resolveThemeSetting(options.setting(), lookup);
+    const shown = previewing === undefined ? undefined : sourceOf(previewing.id)?.theme;
+    if (shown !== undefined) slots = { ...slots, mode: shown.kind, [shown.kind]: shown.id };
+    options.setMode(slots.mode);
+    // A preview's problems are not logged: the person is scrolling past it.
+    const report = previewing === undefined;
+    const [light, dark] = await Promise.all([
+      load(slots.light, 'light', report),
+      load(slots.dark, 'dark', report),
+    ]);
+    return { mode: slots.mode, light, dark };
+  };
+
   return {
-    current: async () => {
-      const [light, dark] = await Promise.all([builtIn('light'), builtIn('dark')]);
-      return { light, dark };
+    lookup,
+    list: async () => {
+      await ready;
+      const seen = new Set<string>();
+      return options
+        .sources()
+        .map(({ theme }) => theme)
+        .filter((theme) => {
+          if (seen.has(theme.id)) return false;
+          seen.add(theme.id);
+          return true;
+        });
+    },
+    current,
+    preview: (id) => {
+      previewing =
+        id === undefined ? undefined : { id, before: previewing?.before ?? options.shown() };
+      return current();
+    },
+    choose: async (id, setting) => {
+      const shown = previewing?.before ?? options.shown();
+      previewing = undefined;
+      await ready;
+      const theme = sourceOf(id)?.theme;
+      return theme === undefined ? undefined : chosenThemeSetting(setting, theme, shown);
     },
   };
 }

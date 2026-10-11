@@ -60,4 +60,9 @@ describe('carriedAcrossTemplateRead', () => {
       FILE_NOT_FOUND,
     ]);
   });
+
+  it("keeps the applied theme's rows, which only a theme answer remakes (TYTO-208)", () => {
+    const before = [row('E_THEME_INVALID'), row('E_TEMPLATE_MANIFEST_INVALID')];
+    expect(carriedAcrossTemplateRead(before).map((item) => item.code)).toEqual(['E_THEME_INVALID']);
+  });
 });

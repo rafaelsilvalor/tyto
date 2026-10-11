@@ -1,8 +1,9 @@
 import { templateManifestSchema } from '@tyto/core';
-import { THEME_TOKEN_NAME, isThemeColor } from '@tyto/plugin-api';
+import { THEME_KINDS, THEME_TOKEN_NAME, isThemeColor } from '@tyto/plugin-api';
 import { z } from 'zod';
 
 import { layoutSchema } from './layout.js';
+import { THEME_MODES } from './theme-setting.js';
 
 /**
  * The contract between the three processes, written once.
@@ -166,6 +167,18 @@ const appliedThemeSchema = z.object({
     z.string().regex(THEME_TOKEN_NAME).max(100),
     z.string().refine(isThemeColor, 'must be a colour'),
   ),
+});
+
+/**
+ * What the window applies: a theme per system mode, the mode main told Electron to answer, and
+ * what reading the two said — without ranges, which point into a theme's file and not into
+ * the brief the problems panel counts lines in.
+ */
+const appliedThemesSchema = z.object({
+  mode: z.enum(THEME_MODES),
+  light: appliedThemeSchema,
+  dark: appliedThemeSchema,
+  diagnostics: z.array(diagnostic.omit({ range: true })).max(200),
 });
 
 export const IPC_CHANNELS = {
@@ -801,17 +814,52 @@ export const IPC_CHANNELS = {
   ),
 
   /**
-   * The colours the window applies, for each system mode (TYTO-208, ADR 0077): the theme of
-   * that kind resolved over its base, every token present. Always the built-ins until the
-   * `theme` setting exists.
+   * The colours the window applies, for each system mode (TYTO-208, ADR 0077): the theme the
+   * `theme` setting chooses for that kind, resolved over its base, every token present.
    *
    * **Checked again here, on the renderer's side of the bridge**, with the rule main used: a
    * name is a colour role's spelling and a value is a colour, so nothing that arrives can close
    * the declaration it is written into.
    */
-  'theme:current': channel(
+  'theme:current': channel(z.object({}), appliedThemesSchema),
+
+  /**
+   * Every colour theme the plugins offer, built-in and installed, for "Preferences: Color
+   * Theme" (TYTO-208). Waits for the installed plugins to start.
+   */
+  'theme:list': channel(
     z.object({}),
-    z.object({ light: appliedThemeSchema, dark: appliedThemeSchema }),
+    z.object({
+      themes: z
+        .array(
+          z.object({
+            id: z.string().min(1).max(200),
+            label: z.string().min(1).max(200),
+            kind: z.enum(THEME_KINDS),
+          }),
+        )
+        .max(500),
+    }),
+  ),
+
+  /**
+   * Shows a theme as if it were chosen, while the picker highlights it; `null` goes back to
+   * the setting. The answer is `theme:current`'s, so the window applies it the same way.
+   */
+  'theme:preview': channel(
+    z.object({ id: z.string().min(1).max(200).nullable() }),
+    appliedThemesSchema,
+  ),
+
+  /**
+   * Writes the `theme` setting that shows this theme through the settings store — in place,
+   * comments kept, into an open settings tab with unsaved typing (ADR 0073) — and answers
+   * what now applies. `saved` is false when the store refused the write because the file does
+   * not parse; the setting in effect is then the one before.
+   */
+  'theme:choose': channel(
+    z.object({ id: z.string().min(1).max(200) }),
+    appliedThemesSchema.extend({ saved: z.boolean() }),
   ),
 
   /**
