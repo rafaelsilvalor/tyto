@@ -283,6 +283,6 @@ export function paintPreview(elements: PreviewElements, state: PreviewState): nu
   return zoom;
 }
 
-/** How many of `diagnostics` are errors, which is the number the status line leads with. */
+/** How many of `diagnostics` are errors, which is what turns the status bar's count red. */
 export const errorCount = (diagnostics: readonly Diagnostic[]): number =>
   diagnostics.filter((item) => item.severity === 'error').length;

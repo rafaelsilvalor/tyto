@@ -95,8 +95,6 @@ export interface DocumentState {
   readonly artworks: readonly Artwork[];
   readonly selection: Selection;
   readonly zoom: Zoom;
-  readonly errors: number;
-  readonly problems: number;
 
   /** What the stages said about this brief, and the text their offsets index. */
   readonly diagnostics: readonly Diagnostic[];
@@ -181,8 +179,6 @@ export function newDocument(id: string, state?: EditorState): DocumentState {
     artworks: [],
     selection: { format: undefined, artwork: undefined },
     zoom: 'fit',
-    errors: 0,
-    problems: 0,
     diagnostics: [],
     brief: '',
     renderedBrief: '',
