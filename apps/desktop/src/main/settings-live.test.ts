@@ -141,6 +141,76 @@ describe('live settings', () => {
     expect(sent.every((payload) => payload.saved)).toBe(true);
   });
 
+  it("sends the base with a screen's write to a tab it thinks clean (TYTO-255)", async () => {
+    // The window may have typing main has not heard of yet: the base is what lets it move
+    // that typing onto the text the screen just wrote, instead of dropping one of them.
+    writeFileSync(file, '{}', 'utf8');
+    const settings = live();
+    settings.validate('document-2', '{}', false);
+
+    await settings.remember({ queueAutoRun: true });
+
+    expect(sent).toEqual([
+      {
+        text: expect.stringContaining('"queueAutoRun": true') as unknown as string,
+        base: '{}',
+        saved: true,
+        refused: false,
+      },
+    ]);
+  });
+
+  it('sends the base with an outside save that reaches a dirty tab (TYTO-255)', async () => {
+    const before = '{\n  "queueAutoRun": false\n}\n';
+    writeFileSync(file, before, 'utf8');
+    const settings = live();
+    await settings.changed();
+    settings.validate('document-2', `// typing\n${before}`, true);
+    sent = [];
+
+    const outside = '{\n  "queueAutoRun": true\n}\n';
+    writeFileSync(file, outside, 'utf8');
+    await settings.changed();
+
+    expect(sent).toEqual([{ text: outside, base: before, saved: true, refused: false }]);
+  });
+
+  it("writes a dirty tab's screen changes to disk when it closes unsaved (TYTO-255)", async () => {
+    const onDisk = '{\n  // kept\n  "queueAutoRun": false\n}\n';
+    writeFileSync(file, onDisk, 'utf8');
+    const settings = live();
+    settings.validate('document-2', `// typing\n${onDisk}`, true);
+    await settings.remember({ queueAutoRun: true });
+    await settings.remember({ queueFolder: '/fila' });
+    expect(readFileSync(file, 'utf8')).toBe(onDisk);
+
+    await settings.closed('document-2');
+
+    const text = readFileSync(file, 'utf8');
+    expect(text).toContain('// kept');
+    expect(text).not.toContain('// typing');
+    expect(text).toContain('"queueAutoRun": true');
+    expect(text).toContain('"queueFolder": "/fila"');
+    // The app's own write: the watcher that follows it applies nothing.
+    await settings.changed();
+    expect(applied).toEqual([]);
+  });
+
+  it('forgets the screen changes once the tab is saved (TYTO-255)', async () => {
+    const onDisk = '{\n  "queueAutoRun": false\n}\n';
+    writeFileSync(file, onDisk, 'utf8');
+    const settings = live();
+    settings.validate('document-2', `// typing\n${onDisk}`, true);
+    await settings.remember({ queueAutoRun: true });
+    // The person saved, and then set the value back by hand and saved again.
+    writeFileSync(file, onDisk, 'utf8');
+    settings.validate('document-2', onDisk, false);
+
+    await settings.closed('document-2');
+
+    expect(readFileSync(file, 'utf8')).toBe(onDisk);
+  });
+
   it("finds a buffer's problems the way the store finds the file's", () => {
     const settings = live();
     const diagnostics = settings.validate('document-2', '{ "queueAutRun": true }', false);

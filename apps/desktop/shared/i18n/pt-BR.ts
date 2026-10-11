@@ -51,6 +51,8 @@ export const ptBR: Catalogue = {
   'document.close': 'Fechar a aba',
   'document.discard.message': 'Fechar sem salvar?',
   'document.discard.detail': 'Este brief tem alterações que ainda não foram escritas no disco',
+  'document.discard.settingsDetail':
+    'O que você digitou neste arquivo será perdido. As mudanças feitas pelas telas do app ficam.',
   'document.discard.confirm': 'Fechar sem salvar',
   'document.discard.cancel': 'Cancelar',
   'exit.save.message': 'Deseja salvar o trabalho?',

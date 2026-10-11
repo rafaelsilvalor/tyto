@@ -187,7 +187,7 @@ export interface IpcDependencies {
   readonly settings: {
     open: (documentId: string) => Promise<IpcResponse<'settings:open'>>;
     validate: (request: IpcRequest<'settings:validate'>) => Diagnostics;
-    closed: (documentId: string) => void;
+    closed: (documentId: string) => Promise<void>;
   };
   /**
    * The keybindings tab (TYTO-207): the one file it opens, and its text for the window to
@@ -316,10 +316,11 @@ export function createHandlers(dependencies: IpcDependencies): Handlers {
 
     'file:save': ({ documentId, text, saveAs }) => documents.save(documentId, text, saveAs),
 
-    'file:close': ({ documentId }) => {
+    'file:close': async ({ documentId }) => {
       documents.close(documentId);
-      settings.closed(documentId);
-      return Promise.resolve({});
+      // Awaited: a settings tab closed unsaved may still owe the file a screen's change.
+      await settings.closed(documentId);
+      return {};
     },
 
     'dialog:confirm': async (question) => ({ confirmed: await confirm(question) }),

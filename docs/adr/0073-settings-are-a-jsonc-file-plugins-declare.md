@@ -82,6 +82,24 @@ buffer instead of the disk, so the person's unsaved typing is neither overwritte
 overwrites the screen's change on save. The watcher ignores the app's own write by comparing
 the content hash of the last text the app wrote. PR A states this; PR B builds it.
 
+_Amended by TYTO-255._ **No edit is lost between the writers.** Three gaps PR B left are closed
+by one rule, with no new dialog:
+
+- **New disk text under typing travels with its base.** When text reaches the disk while the
+  window may hold typing main has not heard of — a screen's write in the pause before the tab
+  reports itself dirty, or another editor's save while it is dirty — main sends it with the
+  text it replaced. The window moves the typing onto it (the same rebase a screen's change into
+  a dirty buffer uses), takes it as the tab's saved text, and the tab stays unsaved; the next
+  save keeps both. Where the window has no base from main it uses its own saved text, which is
+  the text its typing diverged from. A change that overlaps the typing is the one case where the
+  disk's text wins over that span.
+- **A screen's change survives closing the tab unsaved.** Screen changes put into a dirty tab
+  are kept by main until a check reports the tab clean; when the tab closes without saving, they
+  are written to the file in place, comments kept. Discarding a settings tab discards only the
+  typing, and its question says so.
+- **The same holds at session end.** Whatever ends the tab's life without a save — a close, or
+  the hot exit of TYTO-113 — must still bring the screens' changes to the disk.
+
 ## Consequences
 
 - `plugin-api` gains a contribution point (`configuration`, the eleventh), `registerConfiguration`,
