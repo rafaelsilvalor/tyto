@@ -11,6 +11,7 @@ import {
   type StateEffect,
   Annotation,
   Compartment,
+  Transaction,
   // Aliased so that the type this package re-exports below can be an **alias** rather than a
   // re-export. `export type { EditorState }` reads correctly in the source and comes out of
   // tsup's declaration rollup as `export { EditorState } from '@codemirror/state'` with the
@@ -134,20 +135,40 @@ export interface EditorOptions {
  * the undo history and the selection, and rebuilding one from a string is exactly what
  * throws an undo stack away.
  *
- * It stays opaque all the same: {@link textOf}, {@link cursorOf} and {@link hasBeenEdited}
- * are the reads this package offers, and nothing outside reaches past them.
+ * It stays opaque all the same: {@link textOf}, {@link cursorOf}, {@link selectionOf} and
+ * {@link hasBeenEdited} are the reads this package offers and {@link withSelection} its one
+ * write, and nothing outside reaches past them.
  */
 export type EditorState = CodeMirrorEditorState;
 
 /**
- * Where a pane is looking, as an effect that can be dispatched into one later.
+ * Where a pane is looking: the document position of the line at the top of it.
  *
  * A type of its own because it is the half of an open document that is **not** the document:
  * an `EditorState` carries no scroll position at all, since scroll is a property of the view
- * and two views on one document scroll independently (D7). `scrollSnapshot()` is
- * CodeMirror's own way of naming one.
+ * and two views on one document scroll independently (D7).
+ *
+ * **Plain data, so a host can write it down** (TYTO-265): the desktop keeps it in
+ * `session.json` and hands it back after a relaunch. A position in the text and not a pixel
+ * offset, because a pixel is an answer about one window: the same `scrollTop` in a window of
+ * another width, where the long lines wrap into a different number of rows, is another line.
+ * A position names the line whatever the width, and one past the end of a shorter text is
+ * clamped to it.
+ *
+ * Within one run the pane comes back more exactly than that: `scroll()` also keeps
+ * CodeMirror's own snapshot of the pixel it measured, keyed by the object it returns, and
+ * `restore` uses the snapshot when it has one. A position read back from a record has none,
+ * and lands with its line at the top of the pane.
  */
-export type ScrollPosition = StateEffect<unknown>;
+export interface ScrollPosition {
+  readonly top: number;
+}
+
+/** The main selection as two document positions, which is what a session can write down. */
+export interface SelectionRange {
+  readonly anchor: number;
+  readonly head: number;
+}
 
 /**
  * What a document says, read without a view.
@@ -175,6 +196,29 @@ export function cursorOf(state: EditorState): CursorPosition {
   const line = state.doc.lineAt(head);
   const selected = state.selection.ranges.reduce((sum, range) => sum + range.to - range.from, 0);
   return { line: line.number, column: head - line.from + 1, selected };
+}
+
+/** The main selection's two ends (TYTO-265). Other ranges of a multiple selection are dropped. */
+export function selectionOf(state: EditorState): SelectionRange {
+  const { anchor, head } = state.selection.main;
+  return { anchor, head };
+}
+
+/**
+ * The same document with this selection, each end clamped to the text (TYTO-265).
+ *
+ * Clamped because the selection may have been written down against another text: a file that
+ * changed on disk between two launches, or got shorter. Kept off the undo history, so a
+ * restored tab still answers `false` to {@link hasBeenEdited} and undo has nothing to take back
+ * that the person did not do.
+ */
+export function withSelection(state: EditorState, selection: SelectionRange): EditorState {
+  const clamp = (position: number): number =>
+    Math.min(Math.max(Math.trunc(position), 0), state.doc.length);
+  return state.update({
+    selection: { anchor: clamp(selection.anchor), head: clamp(selection.head) },
+    annotations: Transaction.addToHistory.of(false),
+  }).state;
 }
 
 /**
@@ -425,6 +469,23 @@ export function createEditor(parent: HTMLElement, options: EditorOptions = {}): 
     state: CodeMirrorEditorState.create({ doc: options.doc ?? '', extensions }),
   });
 
+  /**
+   * CodeMirror's own snapshot for each position `scroll()` measured, which puts the pane back
+   * to the pixel. Weak, so a position the host drops takes its snapshot with it.
+   */
+  const snapshots = new WeakMap<ScrollPosition, StateEffect<unknown>>();
+  const scrollEffect = (
+    scroll: ScrollPosition | undefined,
+    state: EditorState,
+  ): StateEffect<unknown> => {
+    if (scroll === undefined) return EditorView.scrollIntoView(0);
+    const snapshot = snapshots.get(scroll);
+    if (snapshot !== undefined) return snapshot;
+    // A position read back from a record: its line at the top, clamped to this text.
+    const top = Math.min(Math.max(Math.trunc(scroll.top), 0), state.doc.length);
+    return EditorView.scrollIntoView(top, { y: 'start', yMargin: 0 });
+  };
+
   return {
     view,
 
@@ -432,7 +493,14 @@ export function createEditor(parent: HTMLElement, options: EditorOptions = {}): 
 
     state: () => view.state,
 
-    scroll: () => view.scrollSnapshot(),
+    scroll: () => {
+      // The document height at the pane's top edge: where the scroller starts on screen, less
+      // where the document starts on screen (negative once it is scrolled down).
+      const height = Math.max(view.scrollDOM.getBoundingClientRect().top - view.documentTop, 0);
+      const position: ScrollPosition = { top: view.lineBlockAtHeight(height).from };
+      snapshots.set(position, view.scrollSnapshot());
+      return position;
+    },
 
     onUpdate: (listener: (state: EditorState) => void) => {
       updateListeners.add(listener);
@@ -458,7 +526,7 @@ export function createEditor(parent: HTMLElement, options: EditorOptions = {}): 
       // carries the language it was built in, so a tab that was away while the window
       // switched would come back with the panel in the old one.
       view.dispatch({
-        effects: [scroll ?? EditorView.scrollIntoView(0), setSearchPhrases.of(searchPhrases)],
+        effects: [scrollEffect(scroll, state), setSearchPhrases.of(searchPhrases)],
       });
     },
 

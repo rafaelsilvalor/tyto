@@ -96,6 +96,8 @@ export function createSessionService(options: SessionServiceOptions): SessionSer
       draft: tab.draft?.text ?? null,
       stale: false,
       missing: null,
+      // As written: main does not hold the text the window will open, so the window clamps.
+      place: tab.place ?? null,
     };
     const staleAgainst = (text: string): boolean =>
       tab.draft !== undefined && savedHashOf(text) !== tab.draft.savedHash;
@@ -187,6 +189,7 @@ export function createSessionService(options: SessionServiceOptions): SessionSer
           kind: tab.kind,
           ...(path === undefined ? {} : { path }),
           ...(draft === undefined ? {} : { draft }),
+          ...(tab.place === null ? {} : { place: tab.place }),
         });
       }
       const keptMode = keptTemplate(template);

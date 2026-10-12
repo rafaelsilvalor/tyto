@@ -1,4 +1,4 @@
-import { hasBeenEdited } from '@tyto/editor';
+import { hasBeenEdited, selectionOf } from '@tyto/editor';
 
 import type { IpcRequest } from '../../shared/ipc.js';
 import { type DocumentState, type Workspace, contentOf, isUnsaved } from './documents.js';
@@ -14,6 +14,8 @@ import { type DocumentState, type Workspace, contentOf, isUnsaved } from './docu
  * untouched tab the window opens on is not a session, and reopening one would be clutter. One
  * typed in and emptied is kept, as it is kept beside the next file opened, though what made it
  * worth keeping — its undo history — does not survive the restart (ADR 0080).
+ *
+ * Every tab also says where it was looking — its selection and its scroll, `place` (TYTO-265).
  *
  * `template` is the template mode's snapshot (TYTO-266), null while the mode is closed or was
  * never opened: its buffers and which one is in front, and no folder, which main keeps.
@@ -32,6 +34,7 @@ export function sessionOf(
         isUnsaved(document_) || document_.name === undefined
           ? { text: contentOf(document_), savedText: document_.savedText }
           : null,
+      place: placeOf(document_),
     })),
     active: Math.max(at, 0),
     template,
@@ -40,6 +43,18 @@ export function sessionOf(
 
 /** What the template mode hands the session: `TemplateMode.snapshot()`'s answer. */
 export type TemplateSnapshot = IpcRequest<'session:write'>['template'];
+
+/**
+ * Where a tab was looking (TYTO-265): the selection, off the state the workspace holds live,
+ * and the scroll the pane last measured for it. For a tab in the background that is where it
+ * was when it was last in front, which is where it still is; the one in front is measured
+ * fresh by the caller, since its pane may have moved since. A tab never shown has scrolled
+ * nowhere, and says the top.
+ */
+const placeOf = (document_: DocumentState): IpcRequest<'session:write'>['tabs'][number]['place'] =>
+  document_.state === undefined
+    ? null
+    : { ...selectionOf(document_.state), top: document_.scroll?.top ?? 0 };
 
 const isKept = (document_: DocumentState): boolean =>
   document_.name !== undefined ||

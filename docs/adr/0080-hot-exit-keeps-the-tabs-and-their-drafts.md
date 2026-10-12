@@ -30,7 +30,10 @@ _Amended by TYTO-266:_ and, when the template mode is open on a markup folder, a
 `template` — the folder, which buffer is in front, and a draft per buffer that holds unsaved text,
 in the same text-and-hash shape. A mode open with nothing unsaved is kept too, and reopens. The
 field is optional and the version stays 1, so a file written before it (and one an update imports,
-decision 9) reads as a session with no template mode rather than as an empty one. The
+decision 9) reads as a session with no template mode rather than as an empty one.
+_Amended by TYTO-265:_ and, per tab, an optional `place` — the main selection's `anchor` and
+`head` and the `top` of the pane, all document offsets — under the same rule: optional, version
+still 1, and a `place` that does not parse is dropped alone rather than costing the session. The
 store copies `fileLayoutStore`: reading never fails (a missing or unparseable file is an empty
 session), writing swallows the error but **answers whether it wrote**, because the quit acts on
 that answer. Line endings are normalised before hashing, since CodeMirror reads CR LF as LF
@@ -90,8 +93,22 @@ from vim's redo. `Mod-r` is in the desktop keymap set, so vim mode keeps redo. F
 Close stay off the menu.
 
 **8. The undo history does not survive** a quit or a reload. An `EditorState` is opaque
-(`@tyto/editor` offers three reads of it) and none of them is a serialisation; a restored tab
-starts with an empty history. Scroll and cursor position are not kept either.
+(`@tyto/editor` offers reads of it) and none of them is a serialisation; a restored tab starts
+with an empty history. _Amended by TYTO-265:_ scroll and cursor position were not kept either,
+and now are. The window reads the main selection off each tab's state (`selectionOf`) and the
+offset of the line at the top of its pane (`ScrollPosition`, plain data since then) — for the
+tab in front measured at the write, for a tab behind it the scroll it had when it was last in
+front — and puts them back after the tab's text is in place, clamped to that text
+(`withSelection`, and the editor clamps the scroll), because the file may have changed on disk
+or got shorter. A tab whose draft went stale gives its place to the disk's text, clamped, and to
+the draft beside it. An offset and not a pixel, because a pixel names another line in a window
+of another width: measured on a brief whose lines wrap, the same `scrollTop` of 3046 px was line
+41 at a 705 px pane and line 27 at 325 px. Only the main selection is kept, and the template
+mode's buffers keep neither. The undo history stays out. CodeMirror can write it down
+(`toJSON` with its `historyField`), but what it writes is valid only against the exact text it
+was recorded on, so every draft that went stale or file that changed would have to drop it, and
+it grows with every edit since the tab was opened, into a file that crosses the bridge each
+second of typing and that an update imports. Not cheap enough to ride on this card.
 
 **9. `session.json` joins `IMPORTED_RECORDS`** (ADR 0036, amended in place), so an update keeps
 the drafts.

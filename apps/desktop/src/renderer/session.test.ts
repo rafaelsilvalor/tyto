@@ -38,6 +38,9 @@ const tab = (
   ...over,
 });
 
+/** A tab no pane measured: the selection is whatever typing left, and the scroll the top. */
+const AT_START = expect.objectContaining({ top: 0 }) as unknown;
+
 describe('the tabs the window keeps', () => {
   it('leaves out an untitled tab nobody typed in, and keeps one somebody did', () => {
     const handle = open();
@@ -50,7 +53,12 @@ describe('the tabs the window keeps', () => {
 
     expect(kept).toEqual({
       tabs: [
-        { documentId: 'b', kind: 'brief', draft: { text: '::titulo Rascunho', savedText: '' } },
+        {
+          documentId: 'b',
+          kind: 'brief',
+          draft: { text: '::titulo Rascunho', savedText: '' },
+          place: AT_START,
+        },
       ],
       active: 0,
       template: null,
@@ -64,7 +72,7 @@ describe('the tabs the window keeps', () => {
     handle.view.dispatch({ changes: { from: 0, to: 1 } });
 
     expect(sessionOf({ documents: [tab(handle, 'a')], activeId: 'a' }).tabs).toEqual([
-      { documentId: 'a', kind: 'brief', draft: { text: '', savedText: '' } },
+      { documentId: 'a', kind: 'brief', draft: { text: '', savedText: '' }, place: AT_START },
     ]);
   });
 
@@ -82,13 +90,35 @@ describe('the tabs the window keeps', () => {
 
     expect(sessionOf({ documents: [saved, dirty, settings], activeId: 'c' })).toEqual({
       tabs: [
-        { documentId: 'a', kind: 'brief', draft: null },
-        { documentId: 'b', kind: 'brief', draft: { text: '::a mais', savedText: '::a' } },
-        { documentId: 'c', kind: 'settings', draft: null },
+        { documentId: 'a', kind: 'brief', draft: null, place: AT_START },
+        {
+          documentId: 'b',
+          kind: 'brief',
+          draft: { text: '::a mais', savedText: '::a' },
+          place: AT_START,
+        },
+        { documentId: 'c', kind: 'settings', draft: null, place: AT_START },
       ],
       active: 2,
       template: null,
     });
+  });
+
+  it('carries where each tab was looking: its selection and its last scroll (TYTO-265)', () => {
+    const handle = open();
+    handle.restore(handle.blank('::titulo Um\n::titulo Dois\n::titulo Tres'));
+    handle.view.dispatch({ selection: { anchor: 14, head: 18 } });
+    // In the background: the scroll its pane measured when it was last in front.
+    const behind = tab(handle, 'a', { name: 'a.brief', savedText: '', scroll: { top: 12 } });
+    // Never shown: no state at all, so nothing to say about where it was.
+    const unborn = { ...tab(handle, 'b', { name: 'b.brief' }), state: undefined };
+
+    const kept = sessionOf({ documents: [behind, unborn], activeId: 'a' });
+
+    expect(kept.tabs.map((entry) => entry.place)).toEqual([
+      { anchor: 14, head: 18, top: 12 },
+      null,
+    ]);
   });
 
   it('carries the template mode beside the tabs, with no folder in it (TYTO-266)', () => {

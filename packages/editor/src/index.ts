@@ -22,7 +22,10 @@ export {
   hasBeenEdited,
   type LanguageName,
   type ScrollPosition,
+  type SelectionRange,
+  selectionOf,
   textOf,
+  withSelection,
 } from './editor.js';
 
 export { briefDarkTheme, briefLightTheme, type ThemeName, themes, themeTokens } from './theme.js';
