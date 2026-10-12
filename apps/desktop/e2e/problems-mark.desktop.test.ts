@@ -146,8 +146,9 @@ describe('the new-problems dot', () => {
       `tyto-status-bar [data-command="${PROBLEMS}"]`,
       'aria-label',
     );
+    // The count first, since TYTO-267 put it in the label: "Problems (2, new since …)".
     expect(label).toMatch(
-      /\((new since you last looked|novos desde a última vez que você olhou)\)$/u,
+      /\(\d+, (new since you last looked|novos desde a última vez que você olhou)\)$/u,
     );
 
     await click(PROBLEMS);

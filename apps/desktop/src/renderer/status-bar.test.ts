@@ -104,10 +104,14 @@ describe('the status bar', () => {
 
     expect(count?.textContent).toBe('3');
     expect(count?.classList.contains('status-bar__count--bad')).toBe(true);
+    // TYTO-267: `aria-label` hides the visible number from a screen reader, so the label
+    // says it too — the panel heading's own count, the one that used to be heard, is gone.
+    expect(count?.closest('button')?.getAttribute('aria-label')).toContain('(3)');
 
     bar.state = { ...base, problems: 0, errors: 0 };
     await bar.updateComplete;
     expect(count?.textContent).toBe('0');
+    expect(count?.closest('button')?.getAttribute('aria-label')).toContain('(0)');
     expect(count?.classList.contains('status-bar__count--bad')).toBe(false);
   });
 

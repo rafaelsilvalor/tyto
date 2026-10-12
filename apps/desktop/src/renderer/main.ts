@@ -395,7 +395,6 @@ function resolveElements() {
     // than a type-only one that the bundler would drop — and dropping it would mean the
     // custom element is never defined and the panel silently stays empty.
     problems: document.querySelector<ProblemsPanel>(PROBLEMS_TAG),
-    problemsCount: byId('problems-count'),
     commandBar: document.querySelector<CommandBar>(COMMAND_BAR_TAG),
     exportDialog: document.querySelector<ExportDialog>(EXPORT_DIALOG_TAG),
     // TYTO-47. By tag, for the problems panel's reason: naming it keeps the import a runtime one.
@@ -504,12 +503,6 @@ function paintPanel(): void {
       brief: current.brief,
       locale: state.locale,
     };
-  }
-
-  if (elements.problemsCount !== null) {
-    // The number, with no word in front of it: the panel's own heading already says what is
-    // being counted, and a second label beside it would say it twice.
-    elements.problemsCount.textContent = problems.length === 0 ? '' : String(problems.length);
   }
 
   if (elements.template !== null) {

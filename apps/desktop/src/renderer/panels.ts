@@ -160,14 +160,16 @@ export class PreviewPanel extends DockedPanel {
   }
 }
 
-/** What the stages said about the brief, and the count beside the heading. */
+/**
+ * What the stages said about the brief.
+ *
+ * No count beside the heading (TYTO-267): the status bar's problems button carries the
+ * window's one count (TYTO-248, TYTO-259), and a second copy here showed the same number
+ * twice whenever the panel was open.
+ */
 export class ProblemsPanelFrame extends DockedPanel {
   protected override render(): unknown {
-    return html`${this.bar(
-        'problems-heading',
-        'problems.heading',
-        html`<output class="problems__count" id="problems-count"></output>`,
-      )}
+    return html`${this.bar('problems-heading', 'problems.heading', nothing)}
       <!--
       Written out and not interpolated: lit-html allows a binding anywhere except in a tag
       name, because the template is parsed once as HTML before any value is seen.
