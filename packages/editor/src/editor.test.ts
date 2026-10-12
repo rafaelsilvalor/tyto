@@ -6,7 +6,15 @@ import { EditorView } from '@codemirror/view';
 import { afterEach, describe, expect, it } from 'vitest';
 
 import { commandRegistryOf, createCommandRegistry } from './commands.js';
-import { createEditor, type EditorHandle, hasBeenEdited, textOf } from './editor.js';
+import {
+  createEditor,
+  cursorOf,
+  type EditorHandle,
+  hasBeenEdited,
+  selectionOf,
+  textOf,
+  withSelection,
+} from './editor.js';
 
 /**
  * The handle is tested through a real `EditorView` in jsdom rather than through a stub.
@@ -493,9 +501,26 @@ describe('scroll', () => {
     return { handle: created, effects };
   };
 
-  it('dispatches the scroll it was handed, and not one of its own', () => {
+  /**
+   * The snapshot `scroll()` measured, made recognisable: CodeMirror's own is an effect like any
+   * other, and identity is the only thing that tells it apart from one `restore` built itself.
+   */
+  const markSnapshot = (created: EditorHandle): StateEffect<unknown> => {
+    const marker = EditorView.scrollIntoView(1, { y: 'center' });
+    created.view.scrollSnapshot = () => marker as ReturnType<EditorView['scrollSnapshot']>;
+    return marker;
+  };
+
+  /** Where a dispatched scroll effect points, read off CodeMirror's `ScrollTarget`. */
+  const targetOf = (effect: StateEffect<unknown> | undefined): { head: number; y: string } => {
+    const value = effect?.value as { range: { head: number }; y: string } | undefined;
+    return { head: value?.range.head ?? -1, y: value?.y ?? '' };
+  };
+
+  it('dispatches the snapshot it measured, and not one of its own', () => {
     const { handle: created, effects } = withEffectLog('first');
     handle = created;
+    const marker = markSnapshot(created);
     const state = created.state();
     const scroll = created.scroll();
 
@@ -506,7 +531,7 @@ describe('scroll', () => {
     // By identity. A `restore` that built its own `scrollIntoView(0)` instead would put the
     // person back at the top of a document they had scrolled halfway down, and nothing else
     // in this repository would notice.
-    expect(effects).toContain(scroll);
+    expect(effects).toContain(marker);
   });
 
   it('takes the top for a document no pane has shown yet', () => {
@@ -515,7 +540,8 @@ describe('scroll', () => {
     // those, so this is the call the app makes on every new tab.
     const { handle: created, effects } = withEffectLog('start');
     handle = created;
-    const scroll = created.scroll();
+    const marker = markSnapshot(created);
+    created.scroll();
 
     created.restore(created.blank('fresh'));
 
@@ -523,7 +549,52 @@ describe('scroll', () => {
     expect(created.view.state.selection.main.head).toBe(0);
     // Something was dispatched to put it at the top, and it is not the one measured off the
     // outgoing document.
-    expect(effects).not.toContain(scroll);
-    expect(effects.length).toBeGreaterThan(0);
+    expect(effects).not.toContain(marker);
+    expect(targetOf(effects.at(-2)).head).toBe(0);
+  });
+
+  it('measures a position that is plain data, which a record can carry (TYTO-265)', () => {
+    handle = createEditor(open().parent, { doc: 'one\ntwo' });
+    const scroll = handle.scroll();
+    // Through JSON and back, as `session.json` carries it: nothing of CodeMirror's in it.
+    expect(JSON.parse(JSON.stringify(scroll))).toEqual({ top: 0 });
+  });
+
+  it('puts the line of a position read back from a record at the top (TYTO-265)', () => {
+    const { handle: created, effects } = withEffectLog('');
+    handle = created;
+    const text = 'line one\nline two\nline three';
+
+    created.restore(created.blank(text), { top: 9 });
+
+    // A fresh object, so no snapshot: the effect is built from the position, line at the top.
+    expect(targetOf(effects.at(-2))).toEqual({ head: 9, y: 'start' });
+  });
+
+  it('clamps a position past the end of a shorter text (TYTO-265)', () => {
+    const { handle: created, effects } = withEffectLog('');
+    handle = created;
+
+    created.restore(created.blank('short'), { top: 4000 });
+
+    expect(targetOf(effects.at(-2)).head).toBe(5);
+  });
+});
+
+describe('selection (TYTO-265)', () => {
+  it('reads the main selection as two positions', () => {
+    handle = createEditor(open().parent, { doc: 'abcdef' });
+    handle.view.dispatch({ selection: { anchor: 4, head: 1 } });
+    expect(selectionOf(handle.state())).toEqual({ anchor: 4, head: 1 });
+  });
+
+  it('puts a selection on a state, clamped to its text and off the undo history', () => {
+    handle = createEditor(open().parent);
+    const placed = withSelection(handle.blank('abc\ndef'), { anchor: 5, head: 400 });
+
+    expect(selectionOf(placed)).toEqual({ anchor: 5, head: 7 });
+    // A restored tab nobody typed in is still one nobody typed in.
+    expect(hasBeenEdited(placed)).toBe(false);
+    expect(cursorOf(placed)).toEqual({ line: 2, column: 4, selected: 2 });
   });
 });

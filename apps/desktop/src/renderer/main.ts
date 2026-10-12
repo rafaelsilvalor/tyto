@@ -16,6 +16,7 @@ import {
   resolveKeybindings,
   shownBindingsOf,
   windowBindingsOf,
+  withSelection,
 } from '@tyto/editor';
 
 import {
@@ -1795,12 +1796,31 @@ async function keepSession(final: boolean): Promise<boolean> {
   if (sessionTimer !== undefined) clearTimeout(sessionTimer);
   sessionTimer = undefined;
   try {
-    return (await bridge['session:write']({ ...sessionOf(workspace, templateSnapshot()), final }))
-      .written;
+    const kept = sessionOf(withLiveScroll(workspace), templateSnapshot());
+    return (await bridge['session:write']({ ...kept, final })).written;
   } catch (cause) {
     reportToLog(bridge, cause, 'session not written');
     return false;
   }
+}
+
+/**
+ * The workspace with the tab in front scrolled where its pane is now (TYTO-265).
+ *
+ * Measured here and not kept live, for `captureScroll`'s reason: a scroll is a layout read, and
+ * the wheel moves it without a transaction. Not written back into the workspace either, since
+ * that is a repaint and a repaint asks for another write. A pane with no height — hidden behind
+ * the template mode — measures the top whatever it shows, so the last capture stands then.
+ */
+function withLiveScroll(current: Workspace): Workspace {
+  if (editor === undefined || editor.view.scrollDOM.clientHeight === 0) return current;
+  const scroll = editor.scroll();
+  return {
+    ...current,
+    documents: current.documents.map((document_) =>
+      document_.id === current.activeId ? { ...document_, scroll } : document_,
+    ),
+  };
 }
 
 /**
@@ -1816,6 +1836,20 @@ function templateSnapshot(): TemplateSnapshot {
 
 /** One tab as main answered it, or the app file opened by its own command. */
 type RestoredTab = IpcResponse<'session:read'>['tabs'][number];
+
+/**
+ * A restored document put back where it was looking (TYTO-265): the selection on its state,
+ * clamped to whichever text it opened with — the file may have changed on disk, or the draft
+ * be the stale one beside it — and the scroll as a position the editor clamps when it shows it.
+ */
+function placed(document_: DocumentState, place: RestoredTab['place']): DocumentState {
+  if (place === null || document_.state === undefined) return document_;
+  return {
+    ...document_,
+    state: withSelection(document_.state, place),
+    scroll: { top: place.top },
+  };
+}
 
 /** The file a restored tab holds: main's answer for a brief, the open command's for the rest. */
 async function fileOf(
@@ -1852,8 +1886,8 @@ async function restoreSession(bridge: TytoBridge, handle: EditorHandle): Promise
   const restored: DocumentState[] = [];
   const rows: Diagnostic[] = [];
   let activeId: string | undefined;
-  const untitled = (text: string): DocumentState => {
-    const born = newDocument(nextDocumentId(), handle.blank(text));
+  const untitled = (text: string, place: RestoredTab['place']): DocumentState => {
+    const born = placed(newDocument(nextDocumentId(), handle.blank(text)), place);
     restored.push(born);
     return born;
   };
@@ -1865,16 +1899,19 @@ async function restoreSession(bridge: TytoBridge, handle: EditorHandle): Promise
     if (opened.document !== null && opened.documentId !== null) {
       const language = kind === undefined ? undefined : 'plain';
       const born = newDocument(opened.documentId, handle.blank(opened.document.text, language));
-      built = {
-        ...born,
-        ...(kind === undefined ? {} : { kind }),
-        name: opened.document.name,
-        savedText: contentOf(born),
-        state: tab.draft !== null && !tab.stale ? handle.blank(tab.draft, language) : born.state,
-      };
+      built = placed(
+        {
+          ...born,
+          ...(kind === undefined ? {} : { kind }),
+          name: opened.document.name,
+          savedText: contentOf(born),
+          state: tab.draft !== null && !tab.stale ? handle.blank(tab.draft, language) : born.state,
+        },
+        tab.place,
+      );
       restored.push(built);
       if (tab.draft !== null && tab.stale) {
-        untitled(tab.draft);
+        untitled(tab.draft, tab.place);
         rows.push({
           severity: 'warning',
           code: SESSION_DRAFT_STALE,
@@ -1889,7 +1926,7 @@ async function restoreSession(bridge: TytoBridge, handle: EditorHandle): Promise
           message: `${translate(state.locale, 'file.missing')}: ${tab.missing}`,
         });
       }
-      if (tab.draft !== null) built = untitled(tab.draft);
+      if (tab.draft !== null) built = untitled(tab.draft, tab.place);
     }
     if (index === answer.active && built !== undefined) activeId = built.id;
   }
@@ -1913,7 +1950,7 @@ async function restoreSession(bridge: TytoBridge, handle: EditorHandle): Promise
         fresh[buffer] = draft;
         continue;
       }
-      untitled(draft);
+      untitled(draft, null);
       if (stale) {
         rows.push({
           severity: 'warning',
@@ -2908,6 +2945,8 @@ async function load(): Promise<void> {
       updateActive((document_) => ({ ...document_, state: next }));
       // The cursor moved or the text did: the bar's Ln/Col reads the state just written.
       paintStatusBar();
+      // And the session keeps where the cursor is (TYTO-265), a pause after it stops moving.
+      keepSessionSoon();
     });
     handle.onVimStatus((status) => {
       vimStatus = status;

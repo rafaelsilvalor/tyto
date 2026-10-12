@@ -63,6 +63,45 @@ describe('the session file', () => {
     expect(await fileSessionStore(file).read()).toEqual(before);
   });
 
+  it('reads a version 1 file written before the cursor was kept (TYTO-265)', async () => {
+    // TYTO-113's and TYTO-266's shape, with no `place`: tabs that open at the top, as before.
+    const file = join(scratch, 'session.json');
+    const before = {
+      version: 1,
+      tabs: [{ kind: 'brief', path: '/a.brief' }, { kind: 'settings' }],
+      active: 1,
+    };
+    writeFileSync(file, JSON.stringify(before));
+    expect(await fileSessionStore(file).read()).toEqual(before);
+  });
+
+  it('reads back where a tab was looking, and drops only a place that does not parse', async () => {
+    const file = join(scratch, 'session.json');
+    const store = fileSessionStore(file);
+    const session = {
+      version: 1 as const,
+      tabs: [{ kind: 'brief' as const, path: '/a.brief', place: { anchor: 3, head: 9, top: 2 } }],
+      active: 0,
+    };
+    expect(await store.write(session)).toBe(true);
+    expect(await store.read()).toEqual(session);
+
+    // A hand edit that broke the cursor costs the cursor, not the tabs and their drafts.
+    writeFileSync(
+      file,
+      JSON.stringify({
+        version: 1,
+        tabs: [{ kind: 'brief', path: '/a.brief', place: { anchor: -1, head: 'x' } }],
+        active: 0,
+      }),
+    );
+    expect(await store.read()).toEqual({
+      version: 1,
+      tabs: [{ kind: 'brief', path: '/a.brief' }],
+      active: 0,
+    });
+  });
+
   it('reads back a template mode, with a draft per buffer', async () => {
     const store = fileSessionStore(join(scratch, 'session.json'));
     const session = {
@@ -161,7 +200,7 @@ describe('writing the session', () => {
     await documents.openPath('document-1', '/b/a.brief');
 
     await session.write({
-      tabs: [{ documentId: 'document-1', kind: 'brief', draft: null }],
+      tabs: [{ documentId: 'document-1', kind: 'brief', draft: null, place: null }],
       active: 0,
       template: null,
       final: false,
@@ -174,10 +213,38 @@ describe('writing the session', () => {
     });
   });
 
+  it('keeps where each tab was looking, and hands it back as it was written (TYTO-265)', async () => {
+    const { documents, store, session } = setup({ '/b/a.brief': '::titulo A' });
+    await documents.openPath('document-1', '/b/a.brief');
+    const place = { anchor: 4, head: 4, top: 0 };
+
+    await session.write({
+      tabs: [{ documentId: 'document-1', kind: 'brief', draft: null, place }],
+      active: 0,
+      template: null,
+      final: false,
+    });
+    expect(store.saved()).toEqual({
+      version: 1,
+      tabs: [{ kind: 'brief', path: '/b/a.brief', place }],
+      active: 0,
+    });
+
+    // Unclamped: main does not hold the text the window opens, and the window clamps.
+    expect((await session.read()).tabs[0]).toMatchObject({ documentId: 'session-1', place });
+  });
+
   it('keeps a draft as its text and the hash of the text it differs from', async () => {
     const { store, session } = setup({});
     await session.write({
-      tabs: [{ documentId: 'document-1', kind: 'brief', draft: { text: '::novo', savedText: '' } }],
+      tabs: [
+        {
+          documentId: 'document-1',
+          kind: 'brief',
+          draft: { text: '::novo', savedText: '' },
+          place: null,
+        },
+      ],
       active: 0,
       template: null,
       final: false,
@@ -194,8 +261,8 @@ describe('writing the session', () => {
     await documents.openPath('document-2', '/b/a.brief');
     await session.write({
       tabs: [
-        { documentId: 'document-1', kind: 'brief', draft: null },
-        { documentId: 'document-2', kind: 'brief', draft: null },
+        { documentId: 'document-1', kind: 'brief', draft: null, place: null },
+        { documentId: 'document-2', kind: 'brief', draft: null, place: null },
       ],
       active: 1,
       template: null,
@@ -220,14 +287,14 @@ describe('writing the session', () => {
     const draft = { text: '// mine\n{ "queueAutoRun": true, "theme": "light" }', savedText: '{}' };
 
     await session.write({
-      tabs: [{ documentId: 'document-3', kind: 'settings', draft }],
+      tabs: [{ documentId: 'document-3', kind: 'settings', draft, place: null }],
       active: 0,
       template: null,
       final: false,
     });
     expect(ended).toEqual([]);
     await session.write({
-      tabs: [{ documentId: 'document-3', kind: 'settings', draft }],
+      tabs: [{ documentId: 'document-3', kind: 'settings', draft, place: null }],
       active: 0,
       template: null,
       final: true,
@@ -267,6 +334,7 @@ describe('reading the session back', () => {
         draft: null,
         stale: false,
         missing: null,
+        place: null,
       },
     ]);
     expect(documents.pathOf('session-1')).toBe('/b/a.brief');
@@ -332,6 +400,7 @@ describe('reading the session back', () => {
         draft: '::rascunho',
         stale: false,
         missing: null,
+        place: null,
       },
     ]);
   });

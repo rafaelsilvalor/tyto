@@ -31,6 +31,22 @@ const storedTab = z.object({
    * what this draft was written against".
    */
   draft: storedDraft.optional(),
+  /**
+   * Where the tab was looking (TYTO-265): the main selection's two ends and the position of
+   * the line at the top of the pane, as document offsets. Offsets and not a line and a pixel,
+   * because the window clamps them to whatever text the tab reopens with; a pixel would be an
+   * answer about one window size. Optional, as `template` is and for its reason: a file
+   * written before it reads as tabs that open at the top, which is what they did. One that
+   * does not parse is dropped on its own: a cursor is not worth the tabs and their drafts.
+   */
+  place: z
+    .object({
+      anchor: z.number().int().min(0),
+      head: z.number().int().min(0),
+      top: z.number().int().min(0),
+    })
+    .optional()
+    .catch(undefined),
 });
 
 /**

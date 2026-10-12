@@ -128,6 +128,22 @@ const templateBuffer = z.enum(['manifest', 'markup']);
 /** A buffer's unsaved text and the saved text it differs from, as a session tab's draft. */
 const sessionDraft = z.object({ text: z.string(), savedText: z.string() });
 
+/**
+ * Where a session tab was looking (TYTO-265): the main selection's two ends and the position
+ * of the line at the top of the pane, all document offsets. Bounded by the largest text a
+ * string can hold, so a hostile renderer cannot send a number nothing can mean.
+ */
+const documentOffset = z
+  .number()
+  .int()
+  .min(0)
+  .max(2 ** 30);
+const sessionPlace = z.object({
+  anchor: documentOffset,
+  head: documentOffset,
+  top: documentOffset,
+});
+
 /** A markup template folder as `template:open` reads it: both files and the samples. */
 const markupTemplate = z.object({
   kind: z.literal('markup'),
@@ -675,6 +691,8 @@ export const IPC_CHANNELS = {
             documentId,
             kind: sessionTabKind,
             draft: sessionDraft.nullable(),
+            /** The cursor and the scroll (TYTO-265); null for a tab no pane has shown. */
+            place: sessionPlace.nullable(),
           }),
         )
         .max(500),
@@ -717,6 +735,11 @@ export const IPC_CHANNELS = {
           draft: z.string().nullable(),
           stale: z.boolean(),
           missing: z.string().nullable(),
+          /**
+           * Where the tab was looking (TYTO-265), as it was written down: the window clamps it
+           * to whichever text the tab opens with, since the file may have changed under it.
+           */
+          place: sessionPlace.nullable(),
         }),
       ),
       active: z.number().int().min(0),
