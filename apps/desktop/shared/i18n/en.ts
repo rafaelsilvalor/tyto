@@ -11,6 +11,8 @@ export const en: Catalogue = {
   'preview.zoom.fit': 'Fit',
   'preview.empty': 'Write a brief to see it here',
   'preview.stale': 'Older than the text you are writing',
+  'preview.note.settings': 'Settings apply when you save',
+  'preview.note.keybindings': 'Keybindings apply when you save',
   'problems.heading': 'Problems',
   'problems.empty': 'Nothing to report about this brief',
   'problems.severity.error': 'Error',

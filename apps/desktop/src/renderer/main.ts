@@ -16,6 +16,7 @@ import {
   resolveKeybindings,
   shownBindingsOf,
   windowBindingsOf,
+  withDiagnostics,
   withSelection,
 } from '@tyto/editor';
 
@@ -34,7 +35,13 @@ import {
 } from '../../shared/i18n/index.js';
 import { followScheme } from './color-scheme.js';
 import { applyTheme, withThemeRows } from './theme.js';
-import { planTemplateEdit, templateOf } from './frontmatter.js';
+import { templateOf } from './frontmatter.js';
+import {
+  editorChromeFor,
+  languageOf,
+  paintEditorChrome,
+  templateEditFor,
+} from './editor-chrome.js';
 import { readKeybindingsText } from './keybindings-file.js';
 import {
   type Diagnostic,
@@ -1067,12 +1074,9 @@ function adopt(
   }
   if (editor === undefined) return;
 
-  // The app's own files are plain text: no brief colouring, and no brief lint reading JSON
-  // (TYTO-206, TYTO-207).
-  const born = newDocument(
-    documentId,
-    editor.blank(opened.text, kind === undefined ? undefined : 'plain'),
-  );
+  // The app's own files are not briefs: no brief colouring, and no brief lint reading JSON
+  // (TYTO-206, TYTO-207). Their checks arrive as markers instead (`setFileDiagnostics`).
+  const born = newDocument(documentId, editor.blank(opened.text, languageOf(kind)));
   const created: DocumentState = {
     ...born,
     ...(kind === undefined ? {} : { kind }),
@@ -1151,7 +1155,15 @@ function validateAppFile(bridge: TytoBridge, documentId: string): Promise<void> 
   return validateSettings(bridge, documentId);
 }
 
-/** A document's diagnostics replaced; the status bar counts them with the window's own rows. */
+/**
+ * A document's diagnostics replaced; the status bar counts them with the window's own rows.
+ *
+ * And underlined in the buffer since TYTO-256, as a brief's are. The tab has no linter of its
+ * own — settings are checked in main — so the markers are pushed: into the pane when the tab is
+ * in front, into its stored state when it is not. Only while the buffer still holds the text
+ * that was checked: an answer about older text would land on the wrong characters, and the
+ * check of the newer text is already on its way.
+ */
 function setFileDiagnostics(
   documentId: string,
   text: string,
@@ -1162,6 +1174,19 @@ function setFileDiagnostics(
     diagnostics,
     brief: text,
   }));
+  const target = documentOf(workspace, documentId);
+  if (target?.state !== undefined && contentOf(target) === text) {
+    if (documentId === workspace.activeId && editor !== undefined) {
+      // Through the view, which tells the store in `onUpdate`; not `onChange`, so no loop.
+      editor.showDiagnostics(diagnostics);
+    } else {
+      const marked = withDiagnostics(target.state, diagnostics);
+      workspace = updateDocument(workspace, documentId, (document_) => ({
+        ...document_,
+        state: marked,
+      }));
+    }
+  }
   if (documentId === workspace.activeId) repaint();
 }
 
@@ -1897,7 +1922,7 @@ async function restoreSession(bridge: TytoBridge, handle: EditorHandle): Promise
     const kind = tab.kind === 'brief' ? undefined : tab.kind;
     let built: DocumentState | undefined;
     if (opened.document !== null && opened.documentId !== null) {
-      const language = kind === undefined ? undefined : 'plain';
+      const language = languageOf(kind);
       const born = newDocument(opened.documentId, handle.blank(opened.document.text, language));
       built = placed(
         {
@@ -2336,8 +2361,11 @@ function repaint(): void {
   const current = active();
   // Every change to the strip ends in a repaint, so this is where the session is kept from.
   keepSessionSoon();
-  paint(document, shellState());
   if (pane !== undefined) paintPreview(pane, { ...current, stale: isStale(current) });
+  // After the preview, whose empty line it replaces on an app file, and before the translation
+  // pass, which writes the heading it names (TYTO-256).
+  paintEditorChrome(document, editorChromeFor(current.kind));
+  paint(document, shellState());
   paintPanel();
   paintTabs();
   paintCommandBar();
@@ -2658,7 +2686,9 @@ function wirePanelControls(): void {
     // where it was, puts the old template back under Ctrl+Z, and — the part that matters
     // most — notifies `onChange`, so the preview refreshes through the same path typing
     // uses. `setValue` deliberately notifies nobody.
-    const edit = planTemplateEdit(activeText(), picker.value);
+    // Refused on an app file even if the hidden picker is changed somehow: on `settings.json`
+    // the edit would be a YAML block written into the JSON (TYTO-256).
+    const edit = templateEditFor(active().kind, activeText(), picker.value);
     if (edit === undefined) return;
     editor.view.dispatch({
       changes: { from: edit.from, to: edit.to, insert: edit.insert },

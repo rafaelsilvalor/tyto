@@ -11,6 +11,8 @@ export const ptBR: Catalogue = {
   'preview.zoom.fit': 'Ajustar',
   'preview.empty': 'Escreva um brief para vê-lo aqui',
   'preview.stale': 'Mais antigo que o texto que você está escrevendo',
+  'preview.note.settings': 'Configurações valem ao salvar',
+  'preview.note.keybindings': 'Atalhos valem ao salvar',
   'problems.heading': 'Problemas',
   'problems.empty': 'Nada a relatar sobre este brief',
   'problems.severity.error': 'Erro',

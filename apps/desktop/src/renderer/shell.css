@@ -593,6 +593,17 @@ textarea {
 }
 
 /*
+ * TYTO-256: a settings or keybindings tab hides the brief's controls with `hidden`, and a
+ * `display` on a class outranks the attribute's own rule, so it is restated for each.
+ */
+.work__template[hidden],
+.preview__tabs[hidden],
+.preview__slide[hidden],
+.preview__zoom[hidden] {
+  display: none;
+}
+
+/*
  * As tall as its contents, up to a ceiling, and the list scrolls past that.
  *
  * It was a flat 168px until the window was opened and looked at. A clean brief — which is

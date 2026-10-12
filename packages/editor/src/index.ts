@@ -12,6 +12,8 @@
 
 export { brief, briefLanguage } from './brief-language.js';
 
+export { type MarkedDiagnostic } from './diagnostic-markers.js';
+
 export {
   createEditor,
   type CursorPosition,
@@ -25,6 +27,7 @@ export {
   type SelectionRange,
   selectionOf,
   textOf,
+  withDiagnostics,
   withSelection,
 } from './editor.js';
 
@@ -120,6 +123,8 @@ export {
 } from './vim-mode.js';
 
 export { template, templateLanguage } from './template-language.js';
+
+export { json, jsonLanguage } from './json-language.js';
 
 export {
   type TemplateAnalysis,

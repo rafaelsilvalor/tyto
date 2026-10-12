@@ -31,6 +31,12 @@ export interface Catalogue {
    * It has to read well with that panel closed, which is the case the card is about.
    */
   readonly 'preview.stale': string;
+  /**
+   * What the preview says on the settings and keybindings tabs, in place of a picture
+   * (TYTO-256). Either file applies when it is saved, through the watcher; typing only checks.
+   */
+  readonly 'preview.note.settings': string;
+  readonly 'preview.note.keybindings': string;
   /** The bottom panel that lists what the stages had to say about the brief. */
   readonly 'problems.heading': string;
   readonly 'problems.empty': string;
@@ -465,6 +471,8 @@ export const CATALOGUE_KEYS = [
   'preview.zoom.fit',
   'preview.empty',
   'preview.stale',
+  'preview.note.settings',
+  'preview.note.keybindings',
   'problems.heading',
   'problems.empty',
   'problems.severity.error',

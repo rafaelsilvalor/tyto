@@ -32,10 +32,12 @@ import {
 } from '@codemirror/view';
 
 import { brief } from './brief-language.js';
+import { type MarkedDiagnostic, diagnosticsSpec } from './diagnostic-markers.js';
 import { type CommandRegistry, commandRegistryFacet } from './commands.js';
 import { type SearchPhrases, searchSupport, setSearchPhrases } from './search.js';
 import { type EditorKeymap, defaultKeymapSet, keymapExtension } from './keymap.js';
 import { type ThemeName, themes } from './theme.js';
+import { json } from './json-language.js';
 import { template } from './template-language.js';
 import { type VimStatus, vimMode } from './vim-mode.js';
 
@@ -64,13 +66,17 @@ const programmatic = Annotation.define<boolean>();
  * the desktop's template mode edits in a tab of its own (TYTO-44). No YAML grammar is
  * shipped: what makes a manifest right is `parseManifest`, and a colour table would only say
  * that a line is YAML, which every line in that file is.
+ *
+ * `json` is JSON with comments, coloured and nothing more — the desktop's `settings.json` and
+ * `keybindings.json` tabs (TYTO-256). Their checks are pushed in by the host as markers.
  */
-export type LanguageName = 'brief' | 'template' | 'plain';
+export type LanguageName = 'brief' | 'template' | 'plain' | 'json';
 
 const languages: Readonly<Record<LanguageName, () => Extension>> = {
   brief,
   template,
   plain: () => [],
+  json,
 };
 
 export interface EditorOptions {
@@ -222,6 +228,19 @@ export function withSelection(state: EditorState, selection: SelectionRange): Ed
 }
 
 /**
+ * The same document with these diagnostics as its markers, replacing any it had (TYTO-256).
+ *
+ * For a document no pane is showing; {@link EditorHandle.showDiagnostics} is the same for the one
+ * that is. A buffer in a language with no lint of its own gets the markers all the same — the
+ * desktop's `settings.json` tab, checked by another process — and they map through later edits.
+ * Kept off the undo history.
+ */
+export const withDiagnostics = (
+  state: EditorState,
+  diagnostics: readonly MarkedDiagnostic[],
+): EditorState => state.update(diagnosticsSpec(state, diagnostics)).state;
+
+/**
  * Whether this document's undo history holds anything — "has anybody typed here", which is
  * a different question from "is it empty now" (TYTO-120).
  *
@@ -283,6 +302,12 @@ export interface EditorHandle {
    * editor's language's own lint and completion, and they would read the other text as one.
    */
   blank(doc: string, language?: LanguageName): EditorState;
+  /**
+   * {@link withDiagnostics} for the document this view is showing: its markers replaced by
+   * these. Notifies `onUpdate` listeners, which is how a store holding the state learns of
+   * them, and not `onChange` ones: the text did not move.
+   */
+  showDiagnostics(diagnostics: readonly MarkedDiagnostic[]): void;
   /** Returns the function that stops the listener. */
   onChange(listener: (value: string) => void): () => void;
   setTheme(theme: ThemeName): void;
@@ -541,6 +566,10 @@ export function createEditor(parent: HTMLElement, options: EditorOptions = {}): 
         changes: { from: 0, to: view.state.doc.length, insert: value },
         annotations: programmatic.of(true),
       });
+    },
+
+    showDiagnostics: (diagnostics: readonly MarkedDiagnostic[]) => {
+      view.dispatch(diagnosticsSpec(view.state, diagnostics));
     },
 
     onChange: (listener: (value: string) => void) => {

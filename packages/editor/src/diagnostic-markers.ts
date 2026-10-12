@@ -1,7 +1,26 @@
-import { type Diagnostic as LintDiagnostic } from '@codemirror/lint';
-import { type Extension } from '@codemirror/state';
+import { type Diagnostic as LintDiagnostic, setDiagnostics } from '@codemirror/lint';
+import {
+  type EditorState,
+  type Extension,
+  type TransactionSpec,
+  Transaction,
+} from '@codemirror/state';
 import { type EditorView, ViewPlugin } from '@codemirror/view';
-import { type Diagnostic } from '@tyto/core';
+
+/**
+ * What a marker is built from: a Tyto `Diagnostic`, or anything shaped like one.
+ *
+ * Wider than `Diagnostic` on purpose (TYTO-256). A host's diagnostics cross a process boundary
+ * as plain data — the desktop's settings checks come back from main with `code: string` and an
+ * `info` severity the compiler never raises — and a marker needs only these five fields.
+ */
+export interface MarkedDiagnostic {
+  readonly severity: 'error' | 'warning' | 'info';
+  readonly code: string;
+  readonly message: string;
+  readonly range?: { readonly start: number; readonly end: number } | undefined;
+  readonly hint?: string | undefined;
+}
 
 /**
  * Turning a Tyto `Diagnostic` into a CodeMirror marker, for whichever language produced it.
@@ -24,10 +43,10 @@ import { type Diagnostic } from '@tyto/core';
  * than at offset zero, because a zero-width marker on an empty document is a squiggle
  * nobody can see or hover.
  */
-export function spanOf(item: Diagnostic, view: EditorView): { from: number; to: number } {
-  const length = view.state.doc.length;
+export function spanOf(item: MarkedDiagnostic, state: EditorState): { from: number; to: number } {
+  const length = state.doc.length;
   if (item.range === undefined) {
-    const first = view.state.doc.line(1);
+    const first = state.doc.line(1);
     return { from: first.from, to: first.to };
   }
   // Clamped because an analyzer answers about the text it was given, and the author may
@@ -57,8 +76,12 @@ export interface MarkerFix {
  * from a manifest, a template's unsupported property from a fixed vocabulary, and neither
  * list belongs here.
  */
-export function toMarker(item: Diagnostic, view: EditorView, fix?: MarkerFix): LintDiagnostic {
-  const { from, to } = spanOf(item, view);
+export function toMarker(
+  item: MarkedDiagnostic,
+  state: EditorState,
+  fix?: MarkerFix,
+): LintDiagnostic {
+  const { from, to } = spanOf(item, state);
 
   return {
     from,
@@ -92,6 +115,29 @@ export function toMarker(item: Diagnostic, view: EditorView, fix?: MarkerFix): L
             },
           ],
         }),
+  };
+}
+
+/**
+ * A transaction that puts these diagnostics on the document as its markers, replacing any it had.
+ *
+ * Pushed rather than pulled: a buffer with no linter of its own — the desktop's `settings.json`
+ * tab, whose checks run in another process (TYTO-256) — is told its markers when the answer
+ * arrives. `setDiagnostics` turns the lint extension on in a state that lacked it, and from then
+ * on the markers map through every edit like a linter's do.
+ *
+ * Effect only, and kept off the undo history: Ctrl+Z must not take a squiggle back.
+ */
+export function diagnosticsSpec(
+  state: EditorState,
+  diagnostics: readonly MarkedDiagnostic[],
+): TransactionSpec {
+  return {
+    ...setDiagnostics(
+      state,
+      diagnostics.map((item) => toMarker(item, state)),
+    ),
+    annotations: Transaction.addToHistory.of(false),
   };
 }
 
