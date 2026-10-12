@@ -36,8 +36,8 @@ describe('editorChromeFor (TYTO-256)', () => {
 
   it('opens a brief in its own language and an app file in another', () => {
     expect(languageOf(undefined)).toBeUndefined();
-    expect(languageOf('settings')).not.toBeUndefined();
-    expect(languageOf('keybindings')).toBe(languageOf('settings'));
+    expect(languageOf('settings')).toBe('json');
+    expect(languageOf('keybindings')).toBe('json');
   });
 });
 

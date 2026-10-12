@@ -37,6 +37,7 @@ import { type CommandRegistry, commandRegistryFacet } from './commands.js';
 import { type SearchPhrases, searchSupport, setSearchPhrases } from './search.js';
 import { type EditorKeymap, defaultKeymapSet, keymapExtension } from './keymap.js';
 import { type ThemeName, themes } from './theme.js';
+import { json } from './json-language.js';
 import { template } from './template-language.js';
 import { type VimStatus, vimMode } from './vim-mode.js';
 
@@ -65,13 +66,17 @@ const programmatic = Annotation.define<boolean>();
  * the desktop's template mode edits in a tab of its own (TYTO-44). No YAML grammar is
  * shipped: what makes a manifest right is `parseManifest`, and a colour table would only say
  * that a line is YAML, which every line in that file is.
+ *
+ * `json` is JSON with comments, coloured and nothing more — the desktop's `settings.json` and
+ * `keybindings.json` tabs (TYTO-256). Their checks are pushed in by the host as markers.
  */
-export type LanguageName = 'brief' | 'template' | 'plain';
+export type LanguageName = 'brief' | 'template' | 'plain' | 'json';
 
 const languages: Readonly<Record<LanguageName, () => Extension>> = {
   brief,
   template,
   plain: () => [],
+  json,
 };
 
 export interface EditorOptions {

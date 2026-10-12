@@ -61,7 +61,7 @@ export function editorChromeFor(kind: Kind): EditorChrome {
  * the editor's own language, the brief's.
  */
 export const languageOf = (kind: Kind): LanguageName | undefined =>
-  kind === undefined ? undefined : 'plain';
+  kind === undefined ? undefined : 'json';
 
 /**
  * The edit choosing `template` in the picker makes to this tab's text, or none.

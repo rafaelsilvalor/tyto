@@ -124,6 +124,8 @@ export {
 
 export { template, templateLanguage } from './template-language.js';
 
+export { json, jsonLanguage } from './json-language.js';
+
 export {
   type TemplateAnalysis,
   type TemplateAnalyzer,

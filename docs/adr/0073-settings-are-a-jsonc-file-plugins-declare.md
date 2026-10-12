@@ -124,3 +124,7 @@ by one rule, with no new dialog:
   the value in effect and opens the tab, where the `E_SETTINGS_SYNTAX` that refused it shows.
   The tab is plain text: `@tyto/editor`'s `blank(doc, language)` opens one document in another
   language without the host's brief lint and completion; JSON colouring is not built.
+  _Amended by TYTO-256:_ it is now — a small JSONC stream tokenizer in `@tyto/editor`
+  (`LanguageName` `json`), with no new dependency, colouring keys, values, literals and comments
+  with the highlight tags the brief and template languages already use. The tab's diagnostics
+  are underlined in the buffer, pushed by the window as markers.
