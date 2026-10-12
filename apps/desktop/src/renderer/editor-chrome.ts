@@ -99,7 +99,7 @@ export function paintEditorChrome(root: ParentNode, chrome: EditorChrome): void 
   }
 
   if (chrome.previewNote !== undefined) {
-    for (const id of ['preview-empty', 'preview-stale']) {
+    for (const id of ['preview-empty', 'preview-broken', 'preview-stale']) {
       const line = root.querySelector<HTMLElement>(`#${id}`);
       if (line !== null) line.hidden = true;
     }

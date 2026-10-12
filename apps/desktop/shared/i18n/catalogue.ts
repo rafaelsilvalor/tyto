@@ -24,6 +24,12 @@ export interface Catalogue {
   /** Shown in place of a frame while the brief produces none. */
   readonly 'preview.empty': string;
   /**
+   * Shown in place of a frame when a brief is written and cannot be drawn (TYTO-268): its
+   * compile failed fatally and there is no older artwork to keep on screen. Points at the
+   * problems panel rather than repeating the error, which is that panel's job.
+   */
+  readonly 'preview.broken': string;
+  /**
    * The artwork on screen is older than the brief being typed (E9.13).
    *
    * A state of the preview and not a second error message: the problems panel already lists
@@ -470,6 +476,7 @@ export const CATALOGUE_KEYS = [
   'preview.zoom.in',
   'preview.zoom.fit',
   'preview.empty',
+  'preview.broken',
   'preview.stale',
   'preview.note.settings',
   'preview.note.keybindings',
