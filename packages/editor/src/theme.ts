@@ -134,6 +134,8 @@ export const panels = {
   pressed: token('button-on'),
   accent: token('accent'),
   accentText: token('accent-text'),
+  /** The characters of a completion that matched what was typed. */
+  strong: token('weight-strong'),
   /** The selected completion is quiet: the selection's colour, the text's own colour on it. */
   selected: token('selection'),
   error: token('error'),
@@ -242,7 +244,12 @@ export const panelStyles = {
     color: panels.text,
   },
   '.cm-tooltip-autocomplete-disabled ul li[aria-selected]': { background: panels.hover },
-  '.cm-completionMatchedText': { textDecoration: 'none', color: panels.accent },
+  // Bold in the text's colour, not the accent: the accent on the selection is 2.58:1 in dark.
+  '.cm-completionMatchedText': {
+    textDecoration: 'none',
+    color: panels.text,
+    fontWeight: panels.strong,
+  },
   '.cm-completionDetail': { color: panels.muted },
   '.cm-completionIcon': { color: panels.muted },
 

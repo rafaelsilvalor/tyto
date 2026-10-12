@@ -36,10 +36,12 @@ colour is put on**: CodeMirror's buttons are a gradient and its underlines an SV
 under an image never shows.
 
 **3. The choices, made on screenshots.** The selected completion is quiet — `selection` behind
-the text's own colour — and the characters that matched the typed prefix are `accent`. A search
-match is outlined, never filled (`accent` for the current one, `text-muted` for the rest), so the
-selection and the syntax colours under it still read. A diagnostic's underline is a wavy text
-decoration in `error`, `warning` or `info`, and its bar in the tooltip is `space-2` wide.
+the text's own colour — and the characters that matched what was typed are bold
+(`weight-strong`) in `text`, on every item. The accent was tried first and read at 2.58:1 on the
+dark selection. A search match is outlined, never filled (`accent` for the current one,
+`text-muted` for the rest), so the selection and the syntax colours under it still read. A
+diagnostic's underline is a wavy text decoration in `error`, `warning` or `info`, and its bar in
+the tooltip is `space-2` wide.
 
 **4. Not styled, because nothing mounts it**: the lint panel and the lint gutter, and the arrow a
 tooltip can carry. CodeMirror's `dark` flag still picks their colours, and still flips with the

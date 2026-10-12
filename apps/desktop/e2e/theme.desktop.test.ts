@@ -295,7 +295,8 @@ describe("the editor's own panels, tooltips and diagnostics read the tokens (TYT
       await page.click('#editor .cm-content');
       await page.keyboard.press('Control+End');
       await page.keyboard.press('Enter');
-      await page.keyboard.type('::la');
+      // `titulo` and `tom` both start with `t`, so the list holds a selected item and another.
+      await page.keyboard.type('::t');
       await page.waitForSelector('#editor .cm-tooltip-autocomplete li[aria-selected]', {
         timeout: 10_000,
       });
@@ -312,9 +313,28 @@ describe("the editor's own panels, tooltips and diagnostics read the tokens (TYT
           'color',
         ]),
       ).toEqual({ 'background-color': expected.selection, color: expected.text });
-      expect(await computed('#editor .cm-completionMatchedText', ['color'])).toEqual({
-        color: expected.accent,
-      });
+      // Bold in the text colour on the selected item and on the others alike (Rafael, on the
+      // screenshots: the accent on the selection read at 2.58:1 in dark).
+      const matched = await page.evaluate(() =>
+        [...document.querySelectorAll('#editor .cm-completionMatchedText')].map((element) => {
+          const style = getComputedStyle(element);
+          return {
+            color: style.color,
+            weight: style.fontWeight,
+            line: style.textDecorationLine,
+            selected: element.closest('li')?.hasAttribute('aria-selected') ?? false,
+          };
+        }),
+      );
+      expect(new Set(matched.map((piece) => piece.selected))).toEqual(new Set([true, false]));
+      for (const piece of matched) {
+        expect(piece).toEqual({
+          color: expected.text,
+          weight: '700',
+          line: 'none',
+          selected: piece.selected,
+        });
+      }
       await shoot(`${scheme}-completion`);
 
       // Leave the brief as it was: close the list, take the typed line back out.
