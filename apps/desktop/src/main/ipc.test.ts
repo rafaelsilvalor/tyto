@@ -9,6 +9,7 @@ import {
 } from '../../shared/ipc.js';
 import { type Credentials } from './credentials.js';
 import { type WindowThemes, createHandlers, guard, registerIpcHandlers } from './ipc.js';
+import { createTemplateFolder } from './session.js';
 import { BUILT_IN_THEMES, builtInThemeReader, createThemeService } from './themes.js';
 
 /**
@@ -490,7 +491,7 @@ const dependencies = () => {
     // TYTO-113. Its decisions are `session.test.ts`'s; here it only has to be wired.
     session: {
       write: () => Promise.resolve({ written: true }),
-      read: () => Promise.resolve({ tabs: [], active: 0 }),
+      read: () => Promise.resolve({ tabs: [], active: 0, template: null }),
     },
     menu: menuRebuilds(),
     plugins: pluginList(keychain),
@@ -524,6 +525,7 @@ const dependencies = () => {
     templates: catalogue(),
     templateEditor: templateEditor(),
     templateDialogs: templateDialogs(),
+    templateFolder: createTemplateFolder(),
     updates: updateNotice(),
   };
 };
@@ -1141,6 +1143,32 @@ describe('the template mode channels (TYTO-44)', () => {
     await handlers['template:open']({ directory: null });
     expect(dialogs.asked).toEqual(['template']);
     expect(editor.opened).toEqual(['/dada', '/escolhida']);
+  });
+
+  it('files the folder of a markup template for the session, and forgets it for the rest', async () => {
+    const templateFolder = createTemplateFolder();
+    const markup = {
+      ...templateEditor(),
+      open: (directory: string) =>
+        Promise.resolve({
+          kind: 'markup' as const,
+          directory,
+          manifest: '',
+          markup: '',
+          examples: [],
+        }),
+    };
+    await createHandlers({ ...dependencies(), templateEditor: markup, templateFolder })[
+      'template:open'
+    ]({ directory: '/t/cartaz' });
+    // TYTO-266: the session names this folder, so the window never has to.
+    expect(templateFolder.current()).toBe('/t/cartaz');
+
+    // A code template has no buffers to keep.
+    await createHandlers({ ...dependencies(), templateFolder })['template:open']({
+      directory: '/t/codigo',
+    });
+    expect(templateFolder.current()).toBeUndefined();
   });
 
   it('answers a dismissed picker with no template, and opens nothing', async () => {

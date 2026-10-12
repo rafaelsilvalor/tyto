@@ -43,8 +43,8 @@ export interface ExitQuestion {
   readonly keep: () => Promise<boolean>;
   /**
    * What would be lost by going, in tab order (ADR 0026): the tabs holding text that is in no
-   * file when `kept` is false, and only what the session cannot hold — the template mode's
-   * buffers — when it is true.
+   * file, and the template mode's buffers, when `kept` is false — and nothing when it is true,
+   * because since TYTO-266 the session holds the template mode too.
    *
    * Ids and not documents: what the answer does with them is ask the *caller* to save each
    * one, and a snapshot of a document would be a second copy of the text — stale by the time
@@ -73,8 +73,8 @@ export interface ExitQuestion {
  */
 export async function resolveExit(question: ExitQuestion): Promise<boolean> {
   // **Hot exit** (TYTO-113, ADR 0080): the drafts go into the session and come back on the
-  // next launch, so there is no question about them. The box is left for what the session
-  // cannot keep, and for a session the disk refused — asking then is the only way not to lose.
+  // next launch, so there is no question about them. The box is left for a session the disk
+  // refused — asking then is the only way not to lose.
   const dirty = question.unsaved(await question.keep());
   // Nothing to lose, so nothing to ask. A box on every quit is what trains a person to
   // dismiss the one that matters.

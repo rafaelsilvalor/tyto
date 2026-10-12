@@ -21,19 +21,19 @@ import {
 
 /**
  * `kept` is whether the session reached the disk (TYTO-113). Most cases below are the box,
- * which since hot exit is reached only when it did not; `beyond` is what the session never
- * holds — the template mode's buffers.
+ * which since hot exit is reached only when it did not: since TYTO-266 the session holds the
+ * template mode's buffers too, so a written session leaves nothing to ask about.
  */
 const question = (
   unsaved: readonly string[],
   answer: ExitAnswer,
   saves: readonly SaveOutcome[] = [],
-  { kept = false, beyond = [] }: { kept?: boolean; beyond?: readonly string[] } = {},
+  { kept = false }: { kept?: boolean } = {},
 ) => {
   const queue = [...saves];
   return {
     keep: vi.fn(() => Promise.resolve(kept)),
-    unsaved: (written: boolean) => (written ? beyond : [...unsaved, ...beyond]),
+    unsaved: (written: boolean) => (written ? [] : unsaved),
     ask: vi.fn<(count: number) => Promise<ExitAnswer>>(() => Promise.resolve(answer)),
     save: vi.fn<(documentId: string) => Promise<SaveOutcome>>(() =>
       Promise.resolve(queue.shift() ?? 'saved'),
@@ -51,12 +51,12 @@ describe('resolveExit', () => {
     expect(asked.save).not.toHaveBeenCalled();
   });
 
-  it('still asks about what the session cannot hold, and only about that', async () => {
-    const asked = question(['document-1'], 'save', [], { kept: true, beyond: ['template-mode'] });
+  it('asks about the template mode with the tabs when the session was refused (TYTO-266)', async () => {
+    const asked = question(['document-1', 'template-mode'], 'save');
 
     expect(await resolveExit(asked)).toBe(true);
-    expect(asked.ask).toHaveBeenCalledWith(1);
-    expect(asked.save.mock.calls).toEqual([['template-mode']]);
+    expect(asked.ask).toHaveBeenCalledWith(2);
+    expect(asked.save.mock.calls).toEqual([['document-1'], ['template-mode']]);
   });
 
   it('asks about every dirty tab when the session could not be written', async () => {

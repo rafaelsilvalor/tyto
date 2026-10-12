@@ -19,6 +19,8 @@ import { z } from 'zod';
  * of keeping drafts it could not keep, so the answer is a boolean and not nothing.
  */
 
+const storedDraft = z.object({ text: z.string(), savedHash: z.string() });
+
 const storedTab = z.object({
   kind: z.enum(['brief', 'settings', 'keybindings']),
   /** A brief's file. Absent for a brief that is in no file, and for the app's own two. */
@@ -28,16 +30,33 @@ const storedTab = z.object({
    * differ from. The hash, not the text, because all it has to answer is "is the file still
    * what this draft was written against".
    */
-  draft: z.object({ text: z.string(), savedHash: z.string() }).optional(),
+  draft: storedDraft.optional(),
+});
+
+/**
+ * The template mode, when it was open on a markup folder (TYTO-266). Its folder, which buffer
+ * was in front, and a draft per buffer that held unsaved text. A mode open with nothing unsaved
+ * is kept too, so it reopens where it was.
+ *
+ * **Optional, and the version stays 1.** A file written before this field is a session with
+ * no template mode, which is exactly what it was; a version bump would read every v1 file —
+ * including the ones an update imports (ADR 0036) — as an empty session instead.
+ */
+const storedTemplate = z.object({
+  directory: z.string().min(1),
+  visible: z.enum(['manifest', 'markup']),
+  drafts: z.object({ manifest: storedDraft.optional(), markup: storedDraft.optional() }),
 });
 
 const storedSession = z.object({
   version: z.literal(1),
   tabs: z.array(storedTab),
   active: z.number().int().min(0),
+  template: storedTemplate.optional(),
 });
 
 export type StoredTab = z.infer<typeof storedTab>;
+export type StoredTemplate = z.infer<typeof storedTemplate>;
 export type StoredSession = z.infer<typeof storedSession>;
 
 export const EMPTY_SESSION: StoredSession = { version: 1, tabs: [], active: 0 };

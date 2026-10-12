@@ -41,6 +41,7 @@ interface Recorded {
   saves: IpcRequest<'template:save'>[];
   confirms: number;
   savedAnswers: IpcResponse<'template:save'>[];
+  changes: number;
 }
 
 function ports(
@@ -48,7 +49,7 @@ function ports(
   confirm = false,
   template: OpenedTemplate = opened(),
 ): TemplateModePorts & { recorded: Recorded } {
-  const recorded: Recorded = { saves: [], confirms: 0, savedAnswers: [] };
+  const recorded: Recorded = { saves: [], confirms: 0, savedAnswers: [], changes: 0 };
   return {
     recorded,
     open: () => Promise.resolve(template),
@@ -65,6 +66,9 @@ function ports(
     },
     saved: (saved) => {
       recorded.savedAnswers.push(saved);
+    },
+    changed: () => {
+      recorded.changes += 1;
     },
   };
 }
@@ -193,6 +197,19 @@ describe('<tyto-template-mode>', () => {
     expect(await element.close()).toBe(false);
     expect(given.recorded.confirms).toBe(1);
     expect(element.open).toBe(true);
+  });
+
+  it('drops the drafts when a close is confirmed, so nothing waits in a hidden view', async () => {
+    const given = ports({}, true);
+    const element = await mode(given);
+    type(element, 'markup', '<!-- x -->');
+
+    expect(await element.close()).toBe(true);
+
+    expect(given.recorded.confirms).toBe(1);
+    expect(element.open).toBe(false);
+    expect(element.unsaved).toBe(false);
+    expect(element.textOf('markup')).toBe(MARKUP);
   });
 
   it('shows a code template as one sentence and no buffers', async () => {
@@ -333,5 +350,58 @@ describe('the grid shows one srcdoc navigation at a time (TYTO-220)', () => {
 
     loaded(story);
     expect(story.getAttribute('srcdoc')).toBe('<p>story third</p>');
+  });
+});
+
+describe('the template mode in the session (TYTO-266)', () => {
+  it('is nothing to keep before it opens, and after it closes', async () => {
+    const element = document.createElement(TEMPLATE_MODE_TAG);
+    element.ports = ports();
+    document.body.append(element);
+    await element.updateComplete;
+    expect(element.snapshot()).toBeNull();
+
+    await element.openFolder('/t/cartaz');
+    expect(element.snapshot()).toEqual({ visible: 'markup', manifest: null, markup: null });
+
+    await element.close();
+    expect(element.snapshot()).toBeNull();
+  });
+
+  it('hands over each unsaved buffer as its text and the text it differs from', async () => {
+    const given = ports();
+    const element = await mode(given);
+    const before = given.recorded.changes;
+    type(element, 'markup', '<!-- x -->');
+
+    expect(element.snapshot()).toEqual({
+      visible: 'markup',
+      manifest: null,
+      markup: { text: `${MARKUP}<!-- x -->`, savedText: MARKUP },
+    });
+    // A keystroke is a change the session has to hear about.
+    expect(given.recorded.changes).toBeGreaterThan(before);
+  });
+
+  it('restores over the folder as read now: drafts in the views, unsaved, the file as saved', async () => {
+    const element = document.createElement(TEMPLATE_MODE_TAG);
+    element.ports = ports();
+    document.body.append(element);
+    await element.updateComplete;
+    const folder = opened();
+    if (folder.kind !== 'markup') throw new Error('a markup folder');
+
+    element.restore(folder, { manifest: `${MANIFEST}# meu\n` }, 'manifest');
+    await element.updateComplete;
+
+    expect(element.open).toBe(true);
+    expect(element.visible).toBe('manifest');
+    expect(element.textOf('manifest')).toBe(`${MANIFEST}# meu\n`);
+    expect(element.isDirty('manifest')).toBe(true);
+    expect(element.isDirty('markup')).toBe(false);
+    expect(element.snapshot()?.manifest).toEqual({
+      text: `${MANIFEST}# meu\n`,
+      savedText: MANIFEST,
+    });
   });
 });
