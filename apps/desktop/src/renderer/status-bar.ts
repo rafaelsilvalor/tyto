@@ -77,12 +77,17 @@ export function positionText(state: StatusBarState): string {
  * the way `:w` is, and the highlight around it does what the library's `--` did.
  */
 /**
- * The problems button's label, which says "new" while the dot is lit: the dot is drawn and
- * `aria-hidden`, so a screen reader hears it here or not at all.
+ * The problems button's label, which says how many and, while the dot is lit, "new": the
+ * dot is drawn and `aria-hidden`, so a screen reader hears it here or not at all.
+ *
+ * The count is in the label because `aria-label` replaces the button's content as its
+ * accessible name, so the visible number never reaches a screen reader on its own. Until
+ * TYTO-267 the problems panel's heading carried a second count in an `<output>`, and that
+ * was the one a screen reader could find; with it gone, this is the window's only count.
  */
 export function problemsLabel(state: StatusBarState, toggle: string): string {
-  if (!state.newProblems) return toggle;
-  return `${toggle} (${translate(state.locale, 'status.problems.new')})`;
+  if (!state.newProblems) return `${toggle} (${state.problems})`;
+  return `${toggle} (${state.problems}, ${translate(state.locale, 'status.problems.new')})`;
 }
 
 export const vimModeText = (mode: string): string => mode.toUpperCase();

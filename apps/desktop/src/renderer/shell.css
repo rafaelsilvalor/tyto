@@ -626,13 +626,6 @@ textarea {
  * drag it, and the app remembers.
  */
 
-.problems__count {
-  margin-inline-start: auto;
-  font-size: var(--tyto-text-sm);
-  color: var(--tyto-text-muted);
-  font-variant-numeric: tabular-nums;
-}
-
 /*
  * `display: block` because this is `<tyto-problems>` now (ADR 0024), and an element the
  * engine has never heard of is `display: inline` — on which `flex: 1` and `overflow: auto`

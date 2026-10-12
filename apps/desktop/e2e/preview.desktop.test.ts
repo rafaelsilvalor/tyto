@@ -60,24 +60,31 @@ const problemCount = async (): Promise<number> =>
   );
 
 /**
- * Every visible text in the window, outside the status bar, that pairs the word "problem"
- * with a number — "Problems: 1", "1 problema". The preview footer said exactly that until
- * TYTO-259, counting only the brief's rows while the bar counts the window's as well, so the
- * two could disagree (2 and 1 in a TYTO-143 screenshot). Text node by text node: a label
- * and a number in separate nodes, like the problems panel's heading, are not a sentence.
+ * Every place in the window, outside the status bar, where the word "problem" sits next to a
+ * number — "Problems: 1", "1 problema", or a panel heading with its count beside it.
+ *
+ * Read from the window's whole rendered text (`document.body.innerText`) rather than node by
+ * node. Until TYTO-267 this walked text nodes one at a time, and that is exactly how the
+ * problems panel's heading escaped it: "PROBLEMS" in an `<h2>` and "1" in an `<output>`
+ * beside it are two nodes, neither of which pairs a word with a number on its own. In
+ * `innerText` they are what a person reads — "PROBLEMS\n1" — and only what is rendered is
+ * there: a hidden element contributes nothing, so no `checkVisibility` is needed either.
+ *
+ * The status bar is cut out by its own `innerText`, which is the one count allowed. If that
+ * text cannot be found in the window's, the helper throws instead of returning nothing: a
+ * reader that silently read the whole window, bar included, would fail for the wrong reason,
+ * and one that read nothing would pass for it.
  */
 const otherProblemCounts = async (): Promise<string[]> =>
   page.evaluate(() => {
-    const found: string[] = [];
-    const walker = document.createTreeWalker(document.body, NodeFilter.SHOW_TEXT);
-    for (let node = walker.nextNode(); node !== null; node = walker.nextNode()) {
-      const parent = node.parentElement;
-      const text = node.textContent ?? '';
-      if (parent === null || parent.closest('tyto-status-bar') !== null) continue;
-      if (!parent.checkVisibility()) continue;
-      if (/problem/iu.test(text) && /\d/u.test(text)) found.push(text.trim());
-    }
-    return found;
+    const whole = document.body.innerText;
+    const bar = document.querySelector<HTMLElement>('tyto-status-bar')?.innerText ?? '';
+    const at = bar === '' ? -1 : whole.lastIndexOf(bar);
+    if (at < 0) throw new Error(`status bar text ${JSON.stringify(bar)} not found in the window`);
+    const rest = whole.slice(0, at) + whole.slice(at + bar.length);
+    // A separator of spaces, line breaks, a colon or brackets — what lies between a label and
+    // its number in "Problems: 1", "PROBLEMS\n1" or "(1) problems".
+    return rest.match(/problem\w*[\s:()]*\d+|\d+[\s()]*problem/giu) ?? [];
   });
 
 beforeAll(async () => {
@@ -210,6 +217,9 @@ describe('the main screen', () => {
     // TYTO-259. The brief above is still in the editor, so the bar has something to count —
     // asserted first, or "no other count" would pass on a window counting nothing at all.
     await expect.poll(() => problemCount(), { timeout: 10_000 }).toBeGreaterThan(0);
+    // TYTO-267: and the problems panel is on screen, or its heading — the second count this
+    // card removed — would have nothing to show and the assertion below nothing to catch.
+    expect(await page.locator('#problems-heading').isVisible()).toBe(true);
     expect(await otherProblemCounts()).toEqual([]);
   });
 });
