@@ -21,7 +21,8 @@ import { firstWindow } from './first-window.js';
  *
  * With `TYTO_THEME_SHOTS` set to a folder, the suite also leaves four CDP screenshots there
  * at the smallest window the app allows (900x600): each theme with a selection in the editor,
- * a problem row and a preview, and each with the command bar open. The card's gate is a person
+ * a problem row and a preview, and each with the command bar open — and, since TYTO-258, six more:
+ * each theme's search panel, completion list and lint tooltip. The card's gate is a person
  * looking at those; off in CI, where nobody would.
  */
 
@@ -44,8 +45,24 @@ const BRIEF = [
 ].join('\n');
 
 /** The token values, as `getComputedStyle` reports them. */
-const LIGHT = { surface: 'rgb(250, 250, 250)', selection: 'rgb(205, 214, 248)' };
-const DARK = { surface: 'rgb(40, 44, 51)', selection: 'rgb(78, 100, 126)' };
+const LIGHT = {
+  surface: 'rgb(250, 250, 250)',
+  selection: 'rgb(205, 214, 248)',
+  raised: 'rgb(235, 235, 236)',
+  accent: 'rgb(92, 120, 226)',
+  text: 'rgb(36, 37, 41)',
+  error: 'rgb(196, 71, 58)',
+  hairline: 'rgb(220, 220, 221)',
+};
+const DARK = {
+  surface: 'rgb(40, 44, 51)',
+  selection: 'rgb(78, 100, 126)',
+  raised: 'rgb(47, 52, 62)',
+  accent: 'rgb(116, 173, 232)',
+  text: 'rgb(220, 224, 229)',
+  error: 'rgb(216, 123, 128)',
+  hairline: 'rgb(54, 60, 70)',
+};
 
 let app: ElectronApplication;
 let scratch: string;
@@ -201,6 +218,178 @@ describe('light and dark follow the system, live', () => {
       await page.waitForTimeout(150);
       await shoot(`${scheme}-command-bar`);
       await page.keyboard.press('Escape');
+    },
+    30_000,
+  );
+});
+
+/**
+ * TYTO-258: CodeMirror's own search panel, completion list and lint tooltip, read off the
+ * computed style. Every rule mirrors CodeMirror's selector and wins only by mount order, so a
+ * screenshot that looks right is not enough — a lost tie would leave CodeMirror's colour in one
+ * scheme and not the other.
+ */
+const computed = async (
+  selector: string,
+  properties: readonly string[],
+): Promise<Record<string, string>> =>
+  page.evaluate(
+    ([target, names]) => {
+      const element = document.querySelector(target!);
+      if (element === null) return { missing: target! };
+      const style = getComputedStyle(element);
+      return Object.fromEntries(names!.map((name) => [name, style.getPropertyValue(name)]));
+    },
+    [selector, properties] as const,
+  );
+
+describe("the editor's own panels, tooltips and diagnostics read the tokens (TYTO-258)", () => {
+  it.each([
+    ['light', LIGHT],
+    ['dark', DARK],
+  ] as const)(
+    'paints the %s search panel and its matches from the tokens',
+    async (scheme, expected) => {
+      await setSystem(scheme);
+      await waitForSurface(expected.surface);
+      await page.click('#editor .cm-content');
+      await page.keyboard.press('Control+f');
+      await page.waitForSelector('#editor .cm-panel.cm-search', { timeout: 10_000 });
+      // Typed, not filled: the panel commits its query on keyup, and `fill` fires none.
+      await page.click('#editor .cm-search input[name="search"]');
+      await page.keyboard.press('Control+a');
+      await page.keyboard.type('lei');
+      await page.keyboard.press('Enter');
+      await page.waitForSelector('#editor .cm-searchMatch-selected', { timeout: 10_000 });
+
+      expect(await computed('#editor .cm-panels', ['background-color', 'color'])).toEqual({
+        'background-color': expected.raised,
+        color: expected.text,
+      });
+      expect(
+        await computed('#editor .cm-search .cm-button', ['background-image', 'background-color']),
+      ).toEqual({ 'background-image': 'none', 'background-color': expected.surface });
+      expect(
+        await computed('#editor .cm-search .cm-textfield', ['background-color', 'color']),
+      ).toEqual({ 'background-color': expected.surface, color: expected.text });
+      // Outlined, never filled: the selection under the current match stays visible.
+      expect(
+        await computed('#editor .cm-searchMatch-selected', ['background-color', 'outline-color']),
+      ).toEqual({ 'background-color': 'rgba(0, 0, 0, 0)', 'outline-color': expected.accent });
+      await shoot(`${scheme}-search`);
+
+      await page.keyboard.press('Escape');
+      await page.waitForFunction(() => document.querySelector('#editor .cm-search') === null);
+    },
+    30_000,
+  );
+
+  it.each([
+    ['light', LIGHT],
+    ['dark', DARK],
+  ] as const)(
+    'paints the %s completion list quiet, the selected item in the selection colour',
+    async (scheme, expected) => {
+      await setSystem(scheme);
+      await waitForSurface(expected.surface);
+      await page.click('#editor .cm-content');
+      await page.keyboard.press('Control+End');
+      await page.keyboard.press('Enter');
+      // `titulo` and `tom` both start with `t`, so the list holds a selected item and another.
+      await page.keyboard.type('::t');
+      await page.waitForSelector('#editor .cm-tooltip-autocomplete li[aria-selected]', {
+        timeout: 10_000,
+      });
+
+      expect(
+        await computed('#editor .cm-tooltip-autocomplete', [
+          'background-color',
+          'border-top-color',
+        ]),
+      ).toEqual({ 'background-color': expected.raised, 'border-top-color': expected.hairline });
+      expect(
+        await computed('#editor .cm-tooltip-autocomplete ul li[aria-selected]', [
+          'background-color',
+          'color',
+        ]),
+      ).toEqual({ 'background-color': expected.selection, color: expected.text });
+      // Bold in the text colour on the selected item and on the others alike (Rafael, on the
+      // screenshots: the accent on the selection read at 2.58:1 in dark).
+      const matched = await page.evaluate(() =>
+        [...document.querySelectorAll('#editor .cm-completionMatchedText')].map((element) => {
+          const style = getComputedStyle(element);
+          return {
+            color: style.color,
+            weight: style.fontWeight,
+            line: style.textDecorationLine,
+            selected: element.closest('li')?.hasAttribute('aria-selected') ?? false,
+          };
+        }),
+      );
+      expect(new Set(matched.map((piece) => piece.selected))).toEqual(new Set([true, false]));
+      for (const piece of matched) {
+        expect(piece).toEqual({
+          color: expected.text,
+          weight: '700',
+          line: 'none',
+          selected: piece.selected,
+        });
+      }
+      await shoot(`${scheme}-completion`);
+
+      // Leave the brief as it was: close the list, take the typed line back out.
+      await page.keyboard.press('Escape');
+      await page.keyboard.press('Shift+Home');
+      await page.keyboard.press('Backspace');
+      await page.keyboard.press('Backspace');
+    },
+    30_000,
+  );
+
+  it.each([
+    ['light', LIGHT],
+    ['dark', DARK],
+  ] as const)(
+    'paints the %s lint tooltip and underline in the error token',
+    async (scheme, expected) => {
+      await setSystem(scheme);
+      await waitForSurface(expected.surface);
+      await page.waitForSelector('#editor .cm-lintRange-error', { timeout: 10_000 });
+
+      // CodeMirror's underline is an image with its colour written in; this one is a wavy
+      // text decoration in the token's colour.
+      expect(
+        await computed('#editor .cm-lintRange-error', [
+          'background-image',
+          'text-decoration-line',
+          'text-decoration-color',
+        ]),
+      ).toEqual({
+        'background-image': 'none',
+        'text-decoration-line': 'underline',
+        'text-decoration-color': expected.error,
+      });
+
+      await page.hover('#editor .cm-lintRange-error');
+      await page.waitForSelector('#editor .cm-tooltip-hover .cm-diagnostic-error', {
+        timeout: 10_000,
+      });
+      expect(
+        await computed('#editor .cm-tooltip-hover', ['background-color', 'color', 'box-shadow']),
+      ).toEqual({
+        'background-color': expected.raised,
+        color: expected.text,
+        'box-shadow': 'none',
+      });
+      expect(await computed('#editor .cm-diagnostic-error', ['border-left-color'])).toEqual({
+        'border-left-color': expected.error,
+      });
+      await shoot(`${scheme}-lint`);
+
+      await page.mouse.move(0, 0);
+      await page.waitForFunction(
+        () => document.querySelector('#editor .cm-tooltip-hover') === null,
+      );
     },
     30_000,
   );

@@ -111,18 +111,177 @@ export const palette: Palette = {
 const monoFont = token('font-mono');
 
 /**
+ * The roles CodeMirror's own furniture reads: the search panel, the completion list, the lint
+ * tooltip and the underlines under a diagnostic (TYTO-258, ADR 0081). Named by the part they
+ * paint, like `palette`, and every value one custom property — sizes and widths included, so
+ * nothing here is a literal a theme could not reach.
+ */
+export const panels = {
+  /** The panel above the buffer and every tooltip: raised, flat, one hairline. */
+  surface: token('surface-raised'),
+  text: token('text'),
+  muted: token('text-muted'),
+  line: token('hairline'),
+  lineWidth: token('hairline-width'),
+  radius: token('radius-sm'),
+  textSize: token('text-sm'),
+  /** A text field and a button sit on the buffer's surface, inside a field's border. */
+  field: token('surface'),
+  fieldBorder: token('border'),
+  focusRing: token('focus-ring'),
+  focusWidth: token('focus-width'),
+  hover: token('hover'),
+  pressed: token('button-on'),
+  accent: token('accent'),
+  accentText: token('accent-text'),
+  /** The characters of a completion that matched what was typed. */
+  strong: token('weight-strong'),
+  /** The selected completion is quiet: the selection's colour, the text's own colour on it. */
+  selected: token('selection'),
+  error: token('error'),
+  warning: token('warning'),
+  info: token('info'),
+  /** The bar at the left of a diagnostic in its tooltip. */
+  barWidth: token('space-2'),
+  paddingBlock: token('space-1'),
+  paddingInline: token('space-2'),
+} as const;
+
+/** The custom property a `var(--tyto-…)` value names. */
+const propertyOf = (value: string): string => value.replace(/^var\((--[a-z0-9-]+)\)$/, '$1');
+
+/**
  * Every custom property the editor reads, for a host to define. The desktop's
  * `e2e/renderer-tokens.test.ts` holds its token file to this list, because a name nobody
  * defines drops the colour without a word — jsdom resolves no `var()`, so no test of the
  * editor alone could notice.
  */
 export const themeTokens: readonly string[] = [
-  ...new Set(
-    [...Object.values(palette), monoFont].map((value) =>
-      value.replace(/^var\((--[a-z0-9-]+)\)$/, '$1'),
-    ),
-  ),
+  ...new Set([...Object.values(palette), ...Object.values(panels), monoFont].map(propertyOf)),
 ];
+
+const border = (width: string, colour: string): string => `${width} solid ${colour}`;
+const hairline = border(panels.lineWidth, panels.line);
+
+/**
+ * CodeMirror's panels, tooltips and diagnostics, painted from the tokens.
+ *
+ * **Every selector repeats CodeMirror's own, compound and all.** A base theme's `&light X`
+ * becomes a generated class and `X` (`.ͼ2 X`), and a theme's `X` its own class and `X`
+ * (`.ͼ9 X`): the two tie on specificity and the theme's wins only because CodeMirror mounts it
+ * later. A shorter selector — `li[aria-selected]` where
+ * CodeMirror writes `.cm-tooltip-autocomplete ul li[aria-selected]` — loses to the base theme in
+ * silence, the same trap the selection rule above fell into (ADR 0075, 6). Within this object a
+ * later key wins a tie, so the general rule of a family comes before its variants.
+ *
+ * Exported for `theme.test.ts`, which holds the list of mirrored selectors; not part of the
+ * package's surface.
+ */
+export const panelStyles = {
+  // @codemirror/view: the panel container, a text field, a button.
+  '.cm-panels': { backgroundColor: panels.surface, color: panels.text },
+  '.cm-panels-top': { borderBottom: hairline },
+  '.cm-panels-bottom': { borderTop: hairline },
+  '.cm-textfield': {
+    backgroundColor: panels.field,
+    color: panels.text,
+    border: border(panels.lineWidth, panels.fieldBorder),
+    borderRadius: panels.radius,
+    fontSize: panels.textSize,
+  },
+  '.cm-textfield:focus': {
+    outline: border(panels.focusWidth, panels.focusRing),
+  },
+  // CodeMirror draws its buttons with a gradient image, which a background colour sits under.
+  '.cm-button': {
+    backgroundImage: 'none',
+    backgroundColor: panels.field,
+    color: panels.text,
+    border: border(panels.lineWidth, panels.fieldBorder),
+    borderRadius: panels.radius,
+    fontSize: panels.textSize,
+  },
+  '.cm-button:hover': { backgroundColor: panels.hover },
+  '.cm-button:active': { backgroundImage: 'none', backgroundColor: panels.pressed },
+
+  // @codemirror/search: the panel's labels, its close button and the matches in the buffer.
+  // A match is outlined and never filled, so the selection and the syntax colours under it read.
+  '.cm-panel.cm-search label': { fontSize: panels.textSize, color: panels.muted },
+  '.cm-panel.cm-search input[type=checkbox]': { accentColor: panels.accent },
+  '.cm-panel.cm-search [name=close]': { color: panels.muted },
+  '.cm-searchMatch': {
+    backgroundColor: 'transparent',
+    outline: border(panels.lineWidth, panels.muted),
+  },
+  '.cm-searchMatch-selected': {
+    backgroundColor: 'transparent',
+    outline: border(panels.lineWidth, panels.accent),
+  },
+  '.cm-selectionMatch': { backgroundColor: panels.hover },
+
+  // @replit/codemirror-vim: the `:` prompt is a panel too. A field does not inherit its colour
+  // from the page, so without `inherit` the typed command is the system's field colour.
+  '.cm-vim-panel': { fontFamily: monoFont },
+  '.cm-vim-panel input': { color: 'inherit', fontFamily: 'inherit' },
+
+  // Tooltips: flat, one hairline, no shadow (ADR 0075's "almost no chrome").
+  '.cm-tooltip': {
+    backgroundColor: panels.surface,
+    color: panels.text,
+    border: hairline,
+    borderRadius: panels.radius,
+  },
+  '.cm-tooltip-section:not(:first-child)': { borderTop: hairline },
+
+  // @codemirror/autocomplete.
+  '.cm-tooltip.cm-tooltip-autocomplete > ul': { fontFamily: monoFont },
+  '.cm-tooltip.cm-tooltip-autocomplete > ul > li': {
+    padding: `${panels.paddingBlock} ${panels.paddingInline}`,
+  },
+  '.cm-tooltip.cm-tooltip-autocomplete > ul > completion-section': { borderBottom: hairline },
+  '.cm-tooltip-autocomplete ul li[aria-selected]': {
+    background: panels.selected,
+    color: panels.text,
+  },
+  '.cm-tooltip-autocomplete-disabled ul li[aria-selected]': { background: panels.hover },
+  // Bold in the text's colour, not the accent: the accent on the selection is 2.58:1 in dark.
+  '.cm-completionMatchedText': {
+    textDecoration: 'none',
+    color: panels.text,
+    fontWeight: panels.strong,
+  },
+  '.cm-completionDetail': { color: panels.muted },
+  '.cm-completionIcon': { color: panels.muted },
+
+  // @codemirror/lint: the tooltip's diagnostics and the marks in the buffer. CodeMirror's
+  // underline is an SVG with its colour written into the image, which no custom property can
+  // reach, so the image goes and a wavy text decoration in the token's colour replaces it.
+  '.cm-diagnostic-error': { borderLeft: border(panels.barWidth, panels.error) },
+  '.cm-diagnostic-warning': { borderLeft: border(panels.barWidth, panels.warning) },
+  '.cm-diagnostic-info': { borderLeft: border(panels.barWidth, panels.info) },
+  '.cm-diagnostic-hint': { borderLeft: border(panels.barWidth, panels.muted) },
+  '.cm-diagnosticAction': {
+    backgroundColor: panels.accent,
+    color: panels.accentText,
+    borderRadius: panels.radius,
+  },
+  '.cm-diagnosticSource': { color: panels.muted },
+  '.cm-lintRange': {
+    backgroundImage: 'none',
+    textDecorationLine: 'underline',
+    textDecorationStyle: 'wavy',
+    textDecorationSkipInk: 'none',
+  },
+  '.cm-lintRange-error': { backgroundImage: 'none', textDecorationColor: panels.error },
+  '.cm-lintRange-warning': { backgroundImage: 'none', textDecorationColor: panels.warning },
+  '.cm-lintRange-info': { backgroundImage: 'none', textDecorationColor: panels.info },
+  '.cm-lintRange-hint': { backgroundImage: 'none', textDecorationColor: panels.muted },
+  '.cm-lintRange-active': { backgroundColor: panels.hover },
+  '.cm-lintPoint:after': { borderBottomColor: panels.error },
+  '.cm-lintPoint-warning:after': { borderBottomColor: panels.warning },
+  '.cm-lintPoint-info:after': { borderBottomColor: panels.info },
+  '.cm-lintPoint-hint:after': { borderBottomColor: panels.muted },
+} as const;
 
 const chrome = (colours: Palette, isDark: boolean): Extension =>
   EditorView.theme(
@@ -160,6 +319,7 @@ const chrome = (colours: Palette, isDark: boolean): Extension =>
         border: 'none',
         color: colours.gutterForeground,
       },
+      ...panelStyles,
     },
     { dark: isDark },
   );
@@ -202,9 +362,11 @@ const syntax = (colours: Palette): HighlightStyle =>
   ]);
 
 /**
- * Light and dark differ only in CodeMirror's `dark` flag, which picks the base theme for the
- * parts this file does not style (the search panel, tooltips). The host flips it with
- * `setTheme` when the system does; the colours above follow the host's properties on their own.
+ * Light and dark differ only in CodeMirror's `dark` flag. Since TYTO-258 every colour CodeMirror's
+ * own panels, tooltips and diagnostics show is one of the tokens above, so the flag no longer
+ * picks a colour anyone sees in a styled part; it still picks the base theme for what nothing
+ * here mounts (the lint panel and gutter, the tooltip arrow). The host flips it with `setTheme`
+ * when the system does; the colours follow the host's properties on their own.
  */
 export const briefLightTheme: Extension = [
   chrome(palette, false),
