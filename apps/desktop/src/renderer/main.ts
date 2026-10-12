@@ -105,13 +105,16 @@ import {
 } from './documents.js';
 import {
   type ProblemsMark,
+  type RowSubjects,
   FILE_NOT_FOUND,
   SESSION_DRAFT_STALE,
   TEMPLATE_FOLDER_EMPTY,
   UNLIT,
+  afterRemoval,
   carriedAcrossTemplateRead,
   raised,
   seen,
+  withoutRowsAbout,
 } from './problems-mark.js';
 import { SAVE_FAILED, saveFailureDiagnostic } from './save-failure.js';
 import { type DocumentTabs, TABS_TAG } from './tabs.js';
@@ -302,6 +305,24 @@ const panel = {
  * its own rows while the problems panel is not on screen, cleared when it comes on screen.
  */
 let problemsMark: ProblemsMark = UNLIT;
+
+/**
+ * Which tab or path a save-failure or missing-file row is about, so the save or open that fixes
+ * it can take it away (TYTO-260). Not saved anywhere: these rows live as long as the window.
+ */
+const rowSubjects: RowSubjects = new WeakMap();
+
+/**
+ * Takes away the `code` rows about `subject`, which stopped being a problem (TYTO-260). It
+ * never lights the mark, and puts it out when no window row is left for it to point at.
+ */
+function clearWindowProblem(code: string, subject: string): void {
+  const before = panel.installation;
+  panel.installation = withoutRowsAbout(before, rowSubjects, code, subject);
+  if (panel.installation.length !== before.length) {
+    problemsMark = afterRemoval(problemsMark, panel.installation);
+  }
+}
 
 /** Called where a window-raised row is created, never by comparing lists (`problems-mark.ts`). */
 function raiseWindowProblem(): void {
@@ -1372,12 +1393,14 @@ async function reopen(path: string, name: string): Promise<void> {
       // minted here is not in core's catalogue, so it goes in the "Codes the desktop window
       // mints" section of docs/diagnostic-codes.md (tools/docs-gen/src/desktop-codes.ts);
       // tools/repo-checks fails until it does (TYTO-141).
+      const row: Diagnostic = {
+        severity: 'error',
+        code: FILE_NOT_FOUND,
+        message: `${translate(state.locale, 'file.missing')}: ${name}`,
+      };
+      rowSubjects.set(row, path);
       panel.installation = [
-        {
-          severity: 'error',
-          code: FILE_NOT_FOUND,
-          message: `${translate(state.locale, 'file.missing')}: ${name}`,
-        },
+        row,
         ...panel.installation.filter((item) => item.code !== FILE_NOT_FOUND),
       ];
       raiseWindowProblem();
@@ -1387,7 +1410,12 @@ async function reopen(path: string, name: string): Promise<void> {
       return;
     }
 
+    // The file is back where the recent list says, so the row saying it was gone is not true
+    // any more (TYTO-260). Only a row raised here knows its path: the session's missing rows
+    // name a file the window was never told the path of (ADR 0080).
+    clearWindowProblem(FILE_NOT_FOUND, path);
     adopt(answer.document, answer.documentId, wanted);
+    repaint();
   });
 }
 
@@ -1599,10 +1627,11 @@ async function saveOneDocument(
   } catch (cause) {
     // Rebuilt and not appended to, the way `E_FILE_NOT_FOUND` above is: a second failed
     // save is the same problem said again, not a second problem.
-    panel.installation = [
-      saveFailureDiagnostic(state.locale, target.name, cause),
-      ...panel.installation.filter((item) => item.code !== SAVE_FAILED),
-    ];
+    const row = saveFailureDiagnostic(state.locale, target.name, cause);
+    // Keyed by the tab and not by a path: a save-as that failed has no path, and the row means
+    // "this tab's text is not on disk", which is what the next good save of this tab undoes.
+    rowSubjects.set(row, documentId);
+    panel.installation = [row, ...panel.installation.filter((item) => item.code !== SAVE_FAILED)];
     // A second identical failure lights the dot again: it answers a second key press.
     raiseWindowProblem();
     repaint();
@@ -1642,6 +1671,9 @@ async function saveOneDocument(
     workspace = releaseDocument(workspace, answer.released);
   }
 
+  // Written, so a failure this tab's last save left in the panel is not true any more
+  // (TYTO-260). Before, it stayed — and counted — until the next failure or a restart.
+  clearWindowProblem(SAVE_FAILED, documentId);
   repaint();
   void refreshRecent();
   // Saved, so main stops routing a screen's change into this buffer (TYTO-206).
