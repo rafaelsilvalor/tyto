@@ -127,3 +127,53 @@ export function listenForExit(
   });
   channel.listening();
 }
+
+/** The two page events `holdPageClose` listens to, as ports so a test can fire them. */
+export interface PageLifecycle {
+  /**
+   * The Navigation API's `navigate`, which fires before `beforeunload` when **this page**
+   * starts a navigation: `location.reload()`, a link, a form.
+   */
+  readonly onNavigate: (
+    handler: (navigation: { sameDocument: boolean; download: boolean }) => void,
+  ) => void;
+  /** `beforeunload`. The handler answers whether to veto the unload. */
+  readonly onBeforeUnload: (handler: () => boolean) => void;
+}
+
+/**
+ * Turns this page's own `window.close()` into a question for main (TYTO-250).
+ *
+ * **A third door, and the one Electron never shows main.** `window.close()` called in the page
+ * skips `BrowserWindow`'s `close` event — measured: `closed → before-quit → will-quit` — so the
+ * latch was never consulted and the session's final write never ran. What the page's close
+ * *does* run is `beforeunload`. Vetoing it makes Electron emit `will-prevent-unload` in main,
+ * which takes it to the same latch as the X button; once the latch is granted, main overrules
+ * this veto and the window goes.
+ *
+ * **A navigation this page starts is let through**, because a veto cannot say why the page is
+ * unloading and main cannot tell a page-started reload from a close — `Mod-r` is
+ * `location.reload()`. The Navigation API's `navigate` fires before `beforeunload` for exactly
+ * those (measured), so it marks the page as leaving. A reload main starts — DevTools,
+ * `page.reload()` — fires no `navigate`; main recognises that one by itself.
+ *
+ * **And once this page has said the app may go, it stops vetoing.** `BrowserWindow.close()`
+ * runs `beforeunload` again on the way out, after the question was answered. Main would
+ * overrule that veto from its latch anyway, but each veto is a `beforeunload` dialog to
+ * whatever is attached over the DevTools protocol — Playwright answers it after Electron
+ * already has, and every end-to-end suite's teardown failed on the rejection. `release` is
+ * called with the yes, before it is sent.
+ */
+export function holdPageClose(page: PageLifecycle): { readonly release: () => void } {
+  let leaving = false;
+  page.onNavigate(({ sameDocument, download }) => {
+    // A fragment change keeps the page, and so does a download: neither one unloads it.
+    if (!sameDocument && !download) leaving = true;
+  });
+  page.onBeforeUnload(() => !leaving);
+  return {
+    release: () => {
+      leaving = true;
+    },
+  };
+}

@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
-import { type ExitGuard, type ExitGuardOptions, createExitGuard } from './quit.js';
+import { type ExitGuard, type ExitGuardOptions, createExitGuard, mayUnload } from './quit.js';
 
 /**
  * What this suite is for, and what it deliberately cannot reach.
@@ -321,5 +321,45 @@ describe('a page that cannot hear the question yet', () => {
 
     expect(guard.mayExit(vi.fn())).toBe(true);
     expect(send).not.toHaveBeenCalled();
+  });
+});
+
+/**
+ * The page's `beforeunload` veto, as main reads it (TYTO-250). That the veto is raised and the
+ * window really goes is `e2e/page-close.desktop.test.ts`.
+ */
+describe('mayUnload', () => {
+  it("asks the window about the page's own close, and closes once it is allowed", () => {
+    const send = vi.fn(() => true);
+    const guard = listeningGuard({ send });
+    const close = vi.fn();
+
+    expect(mayUnload(guard, false, close)).toBe(false);
+    expect(send).toHaveBeenCalledWith(0);
+    guard.answer(0, true);
+
+    expect(close).toHaveBeenCalledTimes(1);
+  });
+
+  it('overrules the veto once the latch is granted, or the X button would deadlock', () => {
+    const send = vi.fn(() => true);
+    const guard = listeningGuard({ send });
+    // The X button: `close` asked and was answered, and `BrowserWindow.close()` then runs the
+    // page's `beforeunload` a second time on its way out.
+    guard.mayExit(vi.fn());
+    guard.answer(0, true);
+
+    expect(mayUnload(guard, false, vi.fn())).toBe(true);
+    expect(send).toHaveBeenCalledTimes(1);
+  });
+
+  it('lets a reload main started through without asking or latching anything', () => {
+    const send = vi.fn(() => true);
+    const guard = listeningGuard({ send });
+
+    expect(mayUnload(guard, true, vi.fn())).toBe(true);
+    expect(send).not.toHaveBeenCalled();
+    // Still unlatched: the next quit asks.
+    expect(guard.mayExit(vi.fn())).toBe(false);
   });
 });

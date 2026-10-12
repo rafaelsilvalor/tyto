@@ -64,7 +64,7 @@ import { type WindowPlugins, windowPlugins } from './window-plugins.js';
 import { createPreviewService } from './preview.js';
 import { createProjectSources } from './project.js';
 import { createTemplateEditor } from './template-editor.js';
-import { createExitGuard } from './quit.js';
+import { createExitGuard, mayUnload } from './quit.js';
 import { createLiveKeybindings } from './keybindings-live.js';
 import { type LiveSettings, createLiveSettings } from './settings-live.js';
 import { fileSettingsStore } from './settings-store.js';
@@ -1110,8 +1110,8 @@ async function start(): Promise<void> {
     frame: frameOptions(process.platform, titleBarColours()),
   });
 
-  // **Two doors, one latch** (TYTO-123). They are not redundant and dropping either one is a
-  // silent regression:
+  // **Three doors, one latch** (TYTO-123, TYTO-250). They are not redundant and dropping any
+  // one of them is a silent regression:
   //
   // `close` is the X button and `Mod-W`. On win32 and linux it destroys the renderer first
   // and only *then* runs `window-all-closed` → `app.quit()` → `before-quit`, so a guard that
@@ -1121,10 +1121,23 @@ async function start(): Promise<void> {
   // `before-quit` is Cmd+Q, the macOS dock's Quit, and a shutdown. On macOS closing the last
   // window quits nothing, so `close` alone would leave that platform unguarded.
   //
+  // `will-prevent-unload` is the page's own `window.close()`, which fires neither of the other
+  // two before the window is gone — measured: `closed → before-quit → will-quit`, the session's
+  // final write never sent. The page vetoes the unload (`holdPageClose`), and `mayUnload` sends
+  // the veto to this latch, overrules it once the latch is granted — `BrowserWindow.close()`
+  // runs `beforeunload` too, so the X button needs that — and lets a reload main started
+  // through untouched.
+  //
   // The guard is shared, so whichever fires second finds the permission the first one already
   // got instead of putting a second dialog in front of one click.
   mainWindow.on('close', (event) => {
     if (!exit.mayExit(() => mainWindow?.close())) event.preventDefault();
+  });
+
+  mainWindow.webContents.on('will-prevent-unload', (event) => {
+    const contents = mainWindow?.webContents;
+    const navigating = contents?.isWaitingForResponse() ?? false;
+    if (mayUnload(exit, navigating, () => mainWindow?.close())) event.preventDefault();
   });
 
   app.on('before-quit', (event) => {

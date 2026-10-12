@@ -1,7 +1,13 @@
 import { describe, expect, it, vi } from 'vitest';
 
 import { isUnsaved, newDocument, workspaceOf } from './documents.js';
-import { type ExitAnswer, type SaveOutcome, listenForExit, resolveExit } from './exit.js';
+import {
+  type ExitAnswer,
+  type SaveOutcome,
+  holdPageClose,
+  listenForExit,
+  resolveExit,
+} from './exit.js';
 
 /**
  * The three buttons and what each one is worth (TYTO-153).
@@ -182,5 +188,53 @@ describe('listenForExit', () => {
 
     expect(await resolveExit(asked)).toBe(true);
     expect(asked.ask).not.toHaveBeenCalled();
+  });
+});
+
+/**
+ * The page's own `window.close()` is vetoed so main can ask the latch; a navigation the page
+ * starts is not, so `Mod-r` still reloads (TYTO-250). The end-to-end suite
+ * `page-close.desktop.test.ts` holds the two processes together.
+ */
+describe('holdPageClose', () => {
+  const page = () => {
+    let navigate: ((navigation: { sameDocument: boolean; download: boolean }) => void) | undefined;
+    let beforeUnload: (() => boolean) | undefined;
+    const hold = holdPageClose({
+      onNavigate: (handler) => {
+        navigate = handler;
+      },
+      onBeforeUnload: (handler) => {
+        beforeUnload = handler;
+      },
+    });
+    return {
+      navigate: (sameDocument: boolean, download = false) => navigate?.({ sameDocument, download }),
+      vetoes: () => beforeUnload?.(),
+      release: hold.release,
+    };
+  };
+
+  it('stops vetoing once the window has said the app may go', () => {
+    const held = page();
+    held.release();
+    expect(held.vetoes()).toBe(false);
+  });
+
+  it('vetoes an unload nothing in the page navigated towards: a close', () => {
+    expect(page().vetoes()).toBe(true);
+  });
+
+  it('lets a navigation the page started unload it', () => {
+    const held = page();
+    held.navigate(false);
+    expect(held.vetoes()).toBe(false);
+  });
+
+  it('still vetoes after a fragment change or a download, which keep the page', () => {
+    const held = page();
+    held.navigate(true);
+    held.navigate(false, true);
+    expect(held.vetoes()).toBe(true);
   });
 });
