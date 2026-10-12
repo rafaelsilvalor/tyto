@@ -38,6 +38,26 @@ export const MINIMUM_LAUNCH_HOOK_TIMEOUT_MS = 180_000;
  * `*.test.ts`, which is why the one direct call below is allowed: this file is where the rule
  * sends everybody, not a suite the rule forgot.
  */
-export function firstWindow(app: ElectronApplication): Promise<Page> {
-  return app.firstWindow({ timeout: FIRST_WINDOW_TIMEOUT_MS });
+export async function firstWindow(app: ElectronApplication): Promise<Page> {
+  const page = await app.firstWindow({ timeout: FIRST_WINDOW_TIMEOUT_MS });
+  answerDialogsQuietly(page);
+  return page;
+}
+
+/**
+ * Playwright's own answers to the page's dialogs, minus a rejection nobody can catch (TYTO-250).
+ *
+ * The window vetoes every unload it did not start, so that its own `window.close()` reaches the
+ * quit latch (`holdPageClose`). Electron answers that veto in main, on `will-prevent-unload`,
+ * before anything else hears of it — but the DevTools protocol still reports a `beforeunload`
+ * dialog, Playwright answers it by default, and by then there is no dialog: "No dialog is
+ * showing", unhandled, and Vitest fails the file with every assertion green — 9 errors over 4
+ * passing tests in `page-close.desktop.test.ts`. A listener of our own takes over Playwright's
+ * default — accept a `beforeunload`, dismiss the rest, as it does — and drops that one rejection.
+ */
+function answerDialogsQuietly(page: Page): void {
+  page.on('dialog', (dialog) => {
+    const answered = dialog.type() === 'beforeunload' ? dialog.accept() : dialog.dismiss();
+    answered.catch(() => undefined);
+  });
 }

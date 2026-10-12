@@ -136,7 +136,7 @@ import {
   withPanelSize,
   withPluginPanels,
 } from '../../shared/layout.js';
-import { type SaveOutcome, listenForExit, resolveExit } from './exit.js';
+import { type SaveOutcome, holdPageClose, listenForExit, resolveExit } from './exit.js';
 import { installErrorReporting, reportToLog } from './report-errors.js';
 import { searchPhrasesFor } from './search-phrases.js';
 import { sessionOf } from './session.js';
@@ -1741,8 +1741,28 @@ async function answerExitRequest(bridge: TytoBridge, askId: number): Promise<voi
       },
     });
   } finally {
+    // Before the yes is sent: main closes the window the moment it arrives (TYTO-250).
+    if (allow) pageClose?.release();
     await bridge['app:exit-answer']({ askId, allow });
   }
+}
+
+/** The veto on this page's own close, released by a yes above (TYTO-250). */
+let pageClose: { readonly release: () => void } | undefined;
+
+/**
+ * The two fields of a Navigation API `NavigateEvent` that `holdPageClose` reads (TYTO-250).
+ * Written out because the DOM lib this package compiles against does not declare the API yet,
+ * though Electron's Chromium has shipped it.
+ */
+interface NavigateEventFields {
+  readonly destination: { readonly sameDocument: boolean };
+  readonly downloadRequest: string | null;
+}
+
+/** `window.navigation`, or undefined where it is absent — jsdom, for one. */
+function navigationOf(target: Window): EventTarget | undefined {
+  return (target as Window & { navigation?: EventTarget }).navigation;
 }
 
 /**
@@ -2668,6 +2688,25 @@ async function load(): Promise<void> {
       },
       (askId) => answerExitRequest(bridge, askId),
     );
+    // The page's own `window.close()`, which main is never told about, sent to the same
+    // question (TYTO-250). Registered right after the listener: until main has heard
+    // `app:exit-listening` it overrules this veto, as it lets every other quit through then.
+    pageClose = holdPageClose({
+      onNavigate: (handler) => {
+        navigationOf(window)?.addEventListener('navigate', (event) => {
+          const navigation = event as unknown as NavigateEventFields;
+          handler({
+            sameDocument: navigation.destination.sameDocument,
+            download: navigation.downloadRequest !== null,
+          });
+        });
+      },
+      onBeforeUnload: (vetoes) => {
+        window.addEventListener('beforeunload', (event) => {
+          if (vetoes()) event.preventDefault();
+        });
+      },
+    });
 
     // The theme's colours over the token file's, which painted the first frame (TYTO-208). Not
     // awaited: a theme an installed plugin contributes waits for the plugins to start.

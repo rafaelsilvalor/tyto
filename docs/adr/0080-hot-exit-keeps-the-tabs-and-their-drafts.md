@@ -93,3 +93,8 @@ the drafts.
   full disk looks to the store; what it proved about the handshake stands.
 - `e2e/session.desktop.test.ts` launches one data folder four times: hot exit, restore with the
   same order, active tab and drafts, `Mod-r` mid-typing, and a deleted and a changed file.
+
+**Note, 2026-10-12 (TYTO-250).** The final write is reached through the quit handshake, and a
+page's own `window.close()` used to skip it: it fires no `close` on the window, so a draft typed
+inside the one-second pause was lost. The decision stands; the handshake gained a third door
+(`will-prevent-unload`, `docs/architecture.md`).

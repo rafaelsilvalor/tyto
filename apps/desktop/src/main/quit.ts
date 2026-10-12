@@ -249,3 +249,31 @@ export function createExitGuard({ send, ackTimeoutMs = 30_000 }: ExitGuardOption
     },
   };
 }
+
+/**
+ * Whether to overrule the page's `beforeunload` veto, arriving on `will-prevent-unload`
+ * (TYTO-250). `true` means the caller calls `event.preventDefault()` and the page unloads.
+ *
+ * **The third door.** The page vetoes every unload it did not start (`holdPageClose` in the
+ * renderer), so what reaches main here is one of three things, and it tells them apart:
+ *
+ * - **A navigation main started** — DevTools' reload, `webContents.reload()`, `page.reload()`.
+ *   `navigating` is `webContents.isWaitingForResponse()`, true only while a main-frame request
+ *   is outstanding: measured true for those three and false for a close. Always let through,
+ *   and the latch is not touched, so a reload stays a reload and TYTO-147's navigation hook
+ *   ends any question it interrupts.
+ * - **The X button's or Cmd+Q's close, already granted.** `BrowserWindow.close()` runs
+ *   `beforeunload` too, after `close` asked; `mayExit` answers `true` from the latch and the
+ *   veto is overruled. Without this branch the X button would deadlock against the page.
+ * - **The page's own `window.close()`**, which Electron reports to nothing else. `mayExit`
+ *   asks the window exactly as the X button does, and its `resume` closes the window through
+ *   the guarded door, so the session's final write runs before anything is torn down.
+ */
+export function mayUnload(
+  guard: Pick<ExitGuard, 'mayExit'>,
+  navigating: boolean,
+  resume: () => void,
+): boolean {
+  if (navigating) return true;
+  return guard.mayExit(resume);
+}
