@@ -53,6 +53,7 @@ describe('the tabs the window keeps', () => {
         { documentId: 'b', kind: 'brief', draft: { text: '::titulo Rascunho', savedText: '' } },
       ],
       active: 0,
+      template: null,
     });
   });
 
@@ -86,6 +87,21 @@ describe('the tabs the window keeps', () => {
         { documentId: 'c', kind: 'settings', draft: null },
       ],
       active: 2,
+      template: null,
     });
+  });
+
+  it('carries the template mode beside the tabs, with no folder in it (TYTO-266)', () => {
+    const handle = open();
+    const mode = {
+      visible: 'manifest' as const,
+      manifest: { text: 'name: x\n', savedText: 'name: y\n' },
+      markup: null,
+    };
+
+    const kept = sessionOf({ documents: [tab(handle, 'a')], activeId: 'a' }, mode);
+
+    expect(kept.template).toEqual(mode);
+    expect(JSON.stringify(kept)).not.toContain('directory');
   });
 });

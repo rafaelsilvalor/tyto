@@ -24,7 +24,7 @@ import { type DesktopLog } from './log.js';
 import { type DocumentService } from './documents.js';
 import { type ExportService } from './export.js';
 import { type LayoutStore } from './layout-store.js';
-import { type SessionService } from './session.js';
+import { type SessionService, type TemplateFolder } from './session.js';
 import { type PanelService } from './panels.js';
 import { type PreviewService } from './preview.js';
 import { type QueueService, type QueueView } from './queue.js';
@@ -173,6 +173,11 @@ export interface IpcDependencies {
    */
   readonly templateEditor: TemplateEditorService;
   /**
+   * The folder the template mode has open, filed here so the session can keep it without the
+   * window naming it (TYTO-266). Shared with `createSessionService`.
+   */
+  readonly templateFolder: TemplateFolder;
+  /**
    * The local queue panel (TYTO-45). `chooseFolder` is the native picker, wrapped by the
    * composition root like every other dialog here; `remember` writes the choice to
    * `settings.json`.
@@ -277,6 +282,7 @@ export function createHandlers(dependencies: IpcDependencies): Handlers {
     settings,
     templateDialogs,
     templateEditor,
+    templateFolder,
     templates,
     updates,
   } = dependencies;
@@ -555,6 +561,8 @@ export function createHandlers(dependencies: IpcDependencies): Handlers {
       const chosen = directory ?? (await templateDialogs.chooseTemplate());
       if (chosen === undefined) return { template: null };
       const opened = await templateEditor.open(chosen);
+      // What the mode now shows: its buffers only for a markup folder, nothing for the rest.
+      templateFolder.set(opened.kind === 'markup' ? opened.directory : undefined);
       return {
         template:
           opened.kind === 'markup'

@@ -36,7 +36,7 @@ import { createDocumentService } from './documents.js';
 import { createExportService } from './export.js';
 import { desktopCapabilities, startDesktopPlugins } from './installed-plugins.js';
 import { fileLayoutStore } from './layout-store.js';
-import { createSessionService } from './session.js';
+import { createSessionService, createTemplateFolder } from './session.js';
 import { fileSessionStore } from './session-store.js';
 import { crashSummary, fileLog, installCrashHandlers } from './log.js';
 import { type AboutFacts, aboutText, menuTemplate } from './menu.js';
@@ -644,6 +644,8 @@ async function start(): Promise<void> {
   // The template mode (TYTO-44). The same `sources` as the preview, so a save that reads the
   // folders again is seen by the preview, the export and the picker with nothing rebuilt.
   const templateEditor = createTemplateEditor({ sources, directives: contributed.resolver });
+  // The folder it has open, which `template:open` files and the session keeps (TYTO-266).
+  const templateFolder = createTemplateFolder();
 
   const panels = createPanelService(contributed, capabilities);
   servePluginPages(contributed, (name) => pluginStore.directoryOf(name));
@@ -733,6 +735,8 @@ async function start(): Promise<void> {
     appFiles: { settings: settingsFile, keybindings: keybindingsFile },
     readText: (path) => readFile(path, 'utf8'),
     endSettingsTab: (documentId) => liveSettings.closed(documentId),
+    templateFolder,
+    openTemplate: (directory) => templateEditor.open(directory),
   });
   // **Live keybindings** (TYTO-207): main only watches; the window parses and resolves.
   const liveKeybindings = createLiveKeybindings({
@@ -1069,6 +1073,7 @@ async function start(): Promise<void> {
     preview,
     templates,
     templateEditor,
+    templateFolder,
     updates,
     templateDialogs: {
       // No `createDirectory`: a template to edit is a folder that already has one in it.

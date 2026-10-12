@@ -25,7 +25,12 @@ every tab's path under its id (E9.11), and `layout.json` is the pattern for a re
 **1. `session.json`, in the per-version data folder, written and read by main only.** Main is
 the only side that knows paths (ADR 0010). The record lists the tabs in order — a kind (`brief`,
 `settings`, `keybindings`), a brief's path, and, for a tab holding text that is in no file, the
-text and a SHA-256 of the saved text it differs from — and the index of the tab in front. The
+text and a SHA-256 of the saved text it differs from — and the index of the tab in front.
+_Amended by TYTO-266:_ and, when the template mode is open on a markup folder, an optional
+`template` — the folder, which buffer is in front, and a draft per buffer that holds unsaved text,
+in the same text-and-hash shape. A mode open with nothing unsaved is kept too, and reopens. The
+field is optional and the version stays 1, so a file written before it (and one an update imports,
+decision 9) reads as a session with no template mode rather than as an empty one. The
 store copies `fileLayoutStore`: reading never fails (a missing or unparseable file is an empty
 session), writing swallows the error but **answers whether it wrote**, because the quit acts on
 that answer. Line endings are normalised before hashing, since CodeMirror reads CR LF as LF
@@ -56,9 +61,18 @@ that already exists (ADR 0029, 0031, 0039 are untouched).
 
 **5. The quit asks nothing about drafts.** `resolveExit` writes the session first; when it was
 written, the tabs' unsaved text is kept and the three-answer box of ADR 0034 is not drawn. The
-box stays for two cases, because hot exit must not become a way to lose work: the template
-mode's buffers, which the session does not hold, and a session the disk refused — then it asks
-about every unsaved tab exactly as before. **What the removal changes:** a person who wanted to
+box stays for one case, because hot exit must not become a way to lose work: a session the disk
+refused — then it asks about every unsaved tab, and the template mode's buffers, exactly as
+before. _Amended by TYTO-266:_ the box used to stay for the template mode's buffers too, which
+the session did not hold. It holds them now, decided like a brief's: the window sends the buffers
+and never the folder — main files the folder `template:open` last read, as it files a brief's
+path (decision 3) — and on the next page main reads the folder again, puts a draft over its file
+only if the file still hashes to what the draft was written against, and otherwise opens the
+disk's text with the draft in an untitled tab beside it and a `W_SESSION_DRAFT_STALE` row naming
+`<folder>/template.html` or `manifest.yaml`. A folder that is gone is `E_FILE_NOT_FOUND`, and its
+drafts come back as untitled tabs. Two consequences follow: closing the mode and confirming
+_Discard_ now really drops its drafts, since a closed mode is not in the session; and the sample
+brief picked in the mode is not kept. **What the removal changes:** a person who wanted to
 _discard_ unsaved text on the way out now finds it again on the next launch and closes the tab
 there; nothing is written into their files without them asking, because drafts live only in the
 app's own folder.
@@ -84,7 +98,8 @@ the drafts.
 
 ## Consequences
 
-- Template-edit mode is out of the session: its two buffers are still the box's to ask about.
+- Template-edit mode is in the session since TYTO-266 (decision 5): its two buffers are the box's
+  only when the session could not be written.
 - A huge untitled draft crosses the bridge on every pause and lands in `session.json` whole.
   Nothing caps it; no brief this app has seen is near the size where that costs anything.
 - One window, one session. A second window (ADR 0029's open bullet) would need one record per

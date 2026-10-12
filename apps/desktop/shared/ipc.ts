@@ -122,6 +122,24 @@ const documentId = z.string().min(1).max(100);
 /** What a session tab holds: a brief, or one of the app's own two files (TYTO-113). */
 const sessionTabKind = z.enum(['brief', 'settings', 'keybindings']);
 
+/** The template mode's two files, by the name each buffer has in the window (TYTO-44). */
+const templateBuffer = z.enum(['manifest', 'markup']);
+
+/** A buffer's unsaved text and the saved text it differs from, as a session tab's draft. */
+const sessionDraft = z.object({ text: z.string(), savedText: z.string() });
+
+/** A markup template folder as `template:open` reads it: both files and the samples. */
+const markupTemplate = z.object({
+  kind: z.literal('markup'),
+  directory: z.string(),
+  manifest: z.string(),
+  markup: z.string(),
+  examples: z.array(z.object({ name: z.string(), path: z.string(), text: z.string() })),
+});
+
+/** One template buffer as the session hands it back: its draft, and whether the file moved. */
+const restoredBuffer = z.object({ draft: z.string().nullable(), stale: z.boolean() });
+
 /**
  * A task folder's name, which is the task's id (`@tyto/io`'s `fsInbox`). One path segment in
  * practice; bounded here so a hostile renderer cannot send a megabyte of one.
@@ -656,11 +674,23 @@ export const IPC_CHANNELS = {
           z.object({
             documentId,
             kind: sessionTabKind,
-            draft: z.object({ text: z.string(), savedText: z.string() }).nullable(),
+            draft: sessionDraft.nullable(),
           }),
         )
         .max(500),
       active: z.number().int().min(0),
+      /**
+       * The template mode, when it is open on a markup folder (TYTO-266): which buffer is in
+       * front and each buffer's draft. **No folder**: main keeps the one `template:open` last
+       * read, as it keeps a brief's path (ADR 0080 decision 3).
+       */
+      template: z
+        .object({
+          visible: templateBuffer,
+          manifest: sessionDraft.nullable(),
+          markup: sessionDraft.nullable(),
+        })
+        .nullable(),
       final: z.boolean(),
     }),
     z.object({ written: z.boolean() }),
@@ -690,6 +720,20 @@ export const IPC_CHANNELS = {
         }),
       ),
       active: z.number().int().min(0),
+      /**
+       * The template mode the last session left open (TYTO-266), decided like a brief: `opened`
+       * is the folder as it reads now, or null when it is gone or no longer a markup template;
+       * a buffer's `draft` goes over its file unless `stale`. `name` is the folder's, for rows.
+       */
+      template: z
+        .object({
+          opened: markupTemplate.nullable(),
+          name: z.string(),
+          visible: templateBuffer,
+          manifest: restoredBuffer,
+          markup: restoredBuffer,
+        })
+        .nullable(),
     }),
   ),
 
@@ -1141,13 +1185,7 @@ export const IPC_CHANNELS = {
     z.object({
       template: z
         .discriminatedUnion('kind', [
-          z.object({
-            kind: z.literal('markup'),
-            directory: z.string(),
-            manifest: z.string(),
-            markup: z.string(),
-            examples: z.array(z.object({ name: z.string(), path: z.string(), text: z.string() })),
-          }),
+          markupTemplate,
           z.object({ kind: z.literal('code'), directory: z.string() }),
           z.object({
             kind: z.literal('refused'),

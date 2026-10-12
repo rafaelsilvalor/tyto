@@ -59,7 +59,7 @@ import {
   servePanelBridge,
 } from './plugin-panel.js';
 import { type QueuePanel, QUEUE_PANEL_TAG } from './queue-panel.js';
-import type { TemplateMode } from './template-mode.js';
+import type { RestoredDrafts, TemplateMode } from './template-mode.js';
 import { TEMPLATE_MODE_TAG } from './template-mode-tag.js';
 import {
   COMMAND_LABELS,
@@ -139,7 +139,7 @@ import {
 import { type SaveOutcome, holdPageClose, listenForExit, resolveExit } from './exit.js';
 import { installErrorReporting, reportToLog } from './report-errors.js';
 import { searchPhrasesFor } from './search-phrases.js';
-import { sessionOf } from './session.js';
+import { type TemplateSnapshot, sessionOf } from './session.js';
 import { paintUpdateNotice } from './update-notice.js';
 import { type ShellState, paint, paintTitle } from './shell.js';
 import { AltTap, MenuRow } from './menu-row.js';
@@ -1701,15 +1701,18 @@ async function answerExitRequest(bridge: TytoBridge, askId: number): Promise<voi
   let allow = false;
   try {
     allow = await resolveExit({
-      // Hot exit (TYTO-113, ADR 0080): the drafts are kept for the next launch, and the box is
-      // left for what the session cannot hold, or for a session the disk refused.
+      // Hot exit (TYTO-113, ADR 0080): the drafts are kept for the next launch — the template
+      // mode's too since TYTO-266 — and the box is left for a session the disk refused.
       keep: () => keepSession(true),
-      unsaved: (kept) => [
-        ...(kept ? [] : workspace.documents.filter(isUnsaved).map((document_) => document_.id)),
-        // The template mode's two buffers, as one entry: the box counts things a person would
-        // lose, and a template is one thing (TYTO-44).
-        ...(elements.templateMode?.unsaved === true ? [TEMPLATE_MODE_ID] : []),
-      ],
+      unsaved: (kept) =>
+        kept
+          ? []
+          : [
+              ...workspace.documents.filter(isUnsaved).map((document_) => document_.id),
+              // The template mode's two buffers, as one entry: the box counts things a person
+              // would lose, and a template is one thing (TYTO-44).
+              ...(elements.templateMode?.unsaved === true ? [TEMPLATE_MODE_ID] : []),
+            ],
 
       ask: async (count) => {
         const detail = translate(
@@ -1792,11 +1795,23 @@ async function keepSession(final: boolean): Promise<boolean> {
   if (sessionTimer !== undefined) clearTimeout(sessionTimer);
   sessionTimer = undefined;
   try {
-    return (await bridge['session:write']({ ...sessionOf(workspace), final })).written;
+    return (await bridge['session:write']({ ...sessionOf(workspace, templateSnapshot()), final }))
+      .written;
   } catch (cause) {
     reportToLog(bridge, cause, 'session not written');
     return false;
   }
+}
+
+/**
+ * The template mode's part of the session (TYTO-266), or null before the mode was ever loaded:
+ * until then the element is not upgraded and has no buffers to keep.
+ */
+function templateSnapshot(): TemplateSnapshot {
+  const mode = elements.templateMode;
+  if (mode === null || mode === undefined) return null;
+  if (customElements.get(TEMPLATE_MODE_TAG) === undefined) return null;
+  return mode.snapshot();
 }
 
 /** One tab as main answered it, or the app file opened by its own command. */
@@ -1879,6 +1894,36 @@ async function restoreSession(bridge: TytoBridge, handle: EditorHandle): Promise
     if (index === answer.active && built !== undefined) activeId = built.id;
   }
 
+  // The template mode (TYTO-266), decided by main like a brief: a stale draft and the drafts of
+  // a folder that is gone come back as untitled tabs beside the rest, never over a file.
+  const template = answer.template;
+  const fresh: RestoredDrafts = {};
+  if (template !== null) {
+    if (template.opened === null) {
+      rows.push({
+        severity: 'error',
+        code: FILE_NOT_FOUND,
+        message: `${translate(state.locale, 'file.missing')}: ${template.name}`,
+      });
+    }
+    for (const buffer of ['manifest', 'markup'] as const) {
+      const { draft, stale } = template[buffer];
+      if (draft === null) continue;
+      if (template.opened !== null && !stale) {
+        fresh[buffer] = draft;
+        continue;
+      }
+      untitled(draft);
+      if (stale) {
+        rows.push({
+          severity: 'warning',
+          code: SESSION_DRAFT_STALE,
+          message: `${translate(state.locale, 'session.draftStale')}: ${template.name}/${TEMPLATE_FILES[buffer]}`,
+        });
+      }
+    }
+  }
+
   if (restored.length > 0) {
     captureScroll();
     // The tab the window opened on stays only if somebody already typed in it.
@@ -1898,9 +1943,17 @@ async function restoreSession(bridge: TytoBridge, handle: EditorHandle): Promise
     panel.installation = [...rows, ...panel.installation.filter((item) => !codes.has(item.code))];
     raiseWindowProblem();
   }
+  // After the tabs, so the mode opens over a window that already has them behind it.
+  if (template?.opened !== null && template?.opened !== undefined) {
+    const mode = await loadTemplateMode();
+    mode?.restore(template.opened, fresh, template.visible);
+  }
   sessionRead = true;
   repaint();
 }
+
+/** The file behind each template buffer, for the row that names a stale draft (TYTO-266). */
+const TEMPLATE_FILES = { manifest: 'manifest.yaml', markup: 'template.html' } as const;
 
 /** Takes a tab out of the window, and tells main to stop holding its path. */
 function closeTab(id: string): void {
@@ -2582,7 +2635,8 @@ function wirePanelControls(): void {
  * The mode is not a tab, and the question counts tabs: `resolveExit` asks for ids, then saves
  * each one. Filing the mode under an id of its own is what lets unsaved template work stop a
  * quit without a second question or a second box — and it cannot collide with a tab, whose ids
- * are `doc-<n>`.
+ * are `doc-<n>`. Since TYTO-266 the session keeps the mode's buffers, so this id reaches the
+ * question only when the session could not be written (ADR 0080 decision 5).
  */
 const TEMPLATE_MODE_ID = 'template-mode';
 
@@ -2632,6 +2686,10 @@ function wireTemplateMode(mode: TemplateMode, bridge: TytoBridge): void {
       ).confirmed,
     saved: () => {
       void afterTemplatesReread(bridge);
+    },
+    // The mode is part of the session (TYTO-266), kept on the same pause as the tabs.
+    changed: () => {
+      keepSessionSoon();
     },
   };
 }

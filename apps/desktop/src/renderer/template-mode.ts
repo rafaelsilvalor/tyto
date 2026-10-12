@@ -48,6 +48,10 @@ import { TEMPLATE_MODE_TAG } from './template-mode-tag.js';
  *
  * **Whether it has unsaved work is compared, never remembered** — ADR 0026's rule, applied to
  * two buffers: each is dirty when its text differs from what was last read or written.
+ *
+ * **It is part of the session** (TYTO-266, ADR 0080): `snapshot` is what the window keeps of it
+ * for the next launch, and `restore` puts that back over the folder as it reads then. So the
+ * quit asks nothing about its buffers either, unless the session could not be written.
  */
 
 export { TEMPLATE_MODE_TAG };
@@ -72,7 +76,15 @@ export interface TemplateModePorts {
   confirmDiscard(): Promise<boolean>;
   /** A save went through: whatever else renders with templates has to be told. */
   saved(answer: IpcResponse<'template:save'>): void;
+  /** What the session keeps of the mode changed: a keystroke, an open, a save, a close. */
+  changed(): void;
 }
+
+/** What the session keeps of the mode (TYTO-266); null when there is nothing to reopen. */
+export type TemplateModeSnapshot = IpcRequest<'session:write'>['template'];
+
+/** The drafts a restored mode puts over its files: only the ones that are not stale. */
+export type RestoredDrafts = Partial<Record<BufferName, string>>;
 
 export type SaveNotice = 'saved' | 'unregistered' | 'refused';
 
@@ -226,6 +238,41 @@ export class TemplateMode extends LitElement {
     return this.isDirty('manifest') || this.isDirty('markup');
   }
 
+  /**
+   * What the session keeps (TYTO-266): which buffer is in front and each buffer's draft, or
+   * null when the mode is closed or open on a folder it cannot edit. An open mode with nothing
+   * unsaved is still a snapshot, so the next launch reopens it. The folder is not in it: main
+   * filed it when `template:open` read it (ADR 0080 decision 3).
+   */
+  snapshot(): TemplateModeSnapshot {
+    if (!this.open || this.markup === undefined) return null;
+    const draft = (buffer: BufferName) =>
+      this.isDirty(buffer)
+        ? { text: this.textOf(buffer), savedText: this.savedText[buffer] }
+        : null;
+    return { visible: this.visible, manifest: draft('manifest'), markup: draft('markup') };
+  }
+
+  /**
+   * Reopens the mode as the last session left it, over the folder as main read it now.
+   *
+   * `load` first, so each buffer's saved text is the disk's; then each draft goes into its view
+   * and leaves that buffer unsaved, exactly as typing it would. A draft whose file moved is not
+   * offered here — the window opens it beside, as it does a brief's (ADR 0080 decision 4).
+   */
+  restore(opened: MarkupTemplate, drafts: RestoredDrafts, visible: BufferName): void {
+    this.load(opened);
+    for (const buffer of ['manifest', 'markup'] as const) {
+      const draft = drafts[buffer];
+      const editor = this.editors[buffer];
+      if (draft !== undefined && editor !== undefined) editor.restore(editor.blank(draft));
+    }
+    this.visible = visible;
+    this.open = true;
+    this.revision += 1;
+    this.schedule(0);
+  }
+
   private get markup(): MarkupTemplate | undefined {
     return this.template?.kind === 'markup' ? this.template : undefined;
   }
@@ -242,6 +289,7 @@ export class TemplateMode extends LitElement {
     if (opened === null) return;
     this.load(opened);
     this.open = true;
+    ports.changed();
   }
 
   /** The scaffold, then the folder it made. */
@@ -269,6 +317,7 @@ export class TemplateMode extends LitElement {
     if (opened === null) return false;
     this.load(opened);
     this.open = true;
+    ports.changed();
     return true;
   }
 
@@ -299,15 +348,32 @@ export class TemplateMode extends LitElement {
     this.savedText = { manifest, markup };
     this.revision += 1;
     ports.saved(answer);
+    ports.changed();
     return true;
   }
 
-  /** Closes the mode, asking first when a buffer has unsaved text. */
+  /**
+   * Closes the mode, asking first when a buffer has unsaved text.
+   *
+   * **A confirmed Discard drops the text** (TYTO-266): both buffers go back to what the files
+   * say. Before the session kept the mode, a closed mode kept its dirty buffers and the quit
+   * asked about them again; now a closed mode is not in the session, so what was discarded
+   * here has to be gone rather than waiting in a hidden view.
+   */
   async close(): Promise<boolean> {
-    if (this.unsaved && this.ports !== undefined && !(await this.ports.confirmDiscard())) {
-      return false;
+    const ports = this.ports;
+    if (this.unsaved && ports !== undefined) {
+      if (!(await ports.confirmDiscard())) return false;
+      for (const buffer of ['manifest', 'markup'] as const) {
+        const editor = this.editors[buffer];
+        if (editor !== undefined && this.isDirty(buffer)) {
+          editor.restore(editor.blank(this.savedText[buffer]));
+        }
+      }
+      this.revision += 1;
     }
     this.open = false;
+    ports?.changed();
     return true;
   }
 
@@ -457,6 +523,7 @@ export class TemplateMode extends LitElement {
       editor.onChange(() => {
         this.notice = undefined;
         this.revision += 1;
+        this.ports?.changed();
         // Both tabs move the grid: a slot added to the manifest is a slot the markup can draw.
         this.schedule();
       });
@@ -577,6 +644,7 @@ export class TemplateMode extends LitElement {
             @click=${() => {
               this.visible = buffer;
               this.editors[buffer]?.view.focus();
+              this.ports?.changed();
             }}
           >
             ${FILE_OF[buffer]}${

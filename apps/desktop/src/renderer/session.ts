@@ -14,8 +14,14 @@ import { type DocumentState, type Workspace, contentOf, isUnsaved } from './docu
  * untouched tab the window opens on is not a session, and reopening one would be clutter. One
  * typed in and emptied is kept, as it is kept beside the next file opened, though what made it
  * worth keeping — its undo history — does not survive the restart (ADR 0080).
+ *
+ * `template` is the template mode's snapshot (TYTO-266), null while the mode is closed or was
+ * never opened: its buffers and which one is in front, and no folder, which main keeps.
  */
-export function sessionOf(workspace: Workspace): Omit<IpcRequest<'session:write'>, 'final'> {
+export function sessionOf(
+  workspace: Workspace,
+  template: TemplateSnapshot = null,
+): Omit<IpcRequest<'session:write'>, 'final'> {
   const kept = workspace.documents.filter(isKept);
   const at = kept.findIndex((document_) => document_.id === workspace.activeId);
   return {
@@ -28,8 +34,12 @@ export function sessionOf(workspace: Workspace): Omit<IpcRequest<'session:write'
           : null,
     })),
     active: Math.max(at, 0),
+    template,
   };
 }
+
+/** What the template mode hands the session: `TemplateMode.snapshot()`'s answer. */
+export type TemplateSnapshot = IpcRequest<'session:write'>['template'];
 
 const isKept = (document_: DocumentState): boolean =>
   document_.name !== undefined ||

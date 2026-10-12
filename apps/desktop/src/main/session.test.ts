@@ -6,8 +6,9 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
 import { createDocumentService } from './documents.js';
 import { type RecentFiles } from './recent-files.js';
-import { createSessionService, savedHashOf } from './session.js';
+import { createSessionService, createTemplateFolder, savedHashOf } from './session.js';
 import { EMPTY_SESSION, type SessionStore, fileSessionStore } from './session-store.js';
+import { type OpenedTemplate } from './template-editor.js';
 
 /**
  * The session record and the decisions taken when it is read (TYTO-113, ADR 0080).
@@ -53,6 +54,30 @@ describe('the session file', () => {
     expect(await store.write(session)).toBe(true);
     expect(await store.read()).toEqual(session);
   });
+
+  it('reads a version 1 file written before the template mode was kept (TYTO-266)', async () => {
+    // The shape TYTO-113 wrote, and the shape an update imports (ADR 0036): no `template`.
+    const file = join(scratch, 'session.json');
+    const before = { version: 1, tabs: [{ kind: 'brief', path: '/a.brief' }], active: 0 };
+    writeFileSync(file, JSON.stringify(before));
+    expect(await fileSessionStore(file).read()).toEqual(before);
+  });
+
+  it('reads back a template mode, with a draft per buffer', async () => {
+    const store = fileSessionStore(join(scratch, 'session.json'));
+    const session = {
+      version: 1 as const,
+      tabs: [],
+      active: 0,
+      template: {
+        directory: '/t/cartaz',
+        visible: 'markup' as const,
+        drafts: { markup: { text: '<frame/>', savedHash: savedHashOf('') } },
+      },
+    };
+    expect(await store.write(session)).toBe(true);
+    expect(await store.read()).toEqual(session);
+  });
 });
 
 /** A disk in memory, which a test changes between the two launches. */
@@ -86,6 +111,20 @@ const memoryStore = (): SessionStore & { saved: () => unknown } => {
   };
 };
 
+/** `template-editor.ts`'s `open` over the memory disk: a markup folder or a refused one. */
+const openTemplate = (
+  files: Record<string, string>,
+  directory: string,
+): Promise<OpenedTemplate> => {
+  const manifest = files[`${directory}/manifest.yaml`];
+  const markup = files[`${directory}/template.html`];
+  return Promise.resolve(
+    manifest === undefined || markup === undefined
+      ? { kind: 'refused', directory, missing: 'manifest.yaml' }
+      : { kind: 'markup', directory, manifest, markup, examples: [] },
+  );
+};
+
 const SETTINGS = '/data/settings.json';
 const KEYS = '/data/keybindings.json';
 
@@ -103,14 +142,17 @@ const setup = (
     disk,
   });
   const store = memoryStore();
+  const templateFolder = createTemplateFolder();
   const session = createSessionService({
     store,
     documents,
     appFiles: { settings: SETTINGS, keybindings: KEYS },
     readText: (path) => disk.read(path),
     endSettingsTab,
+    templateFolder,
+    openTemplate: (directory) => openTemplate(files, directory),
   });
-  return { documents, store, session };
+  return { documents, store, session, templateFolder };
 };
 
 describe('writing the session', () => {
@@ -121,6 +163,7 @@ describe('writing the session', () => {
     await session.write({
       tabs: [{ documentId: 'document-1', kind: 'brief', draft: null }],
       active: 0,
+      template: null,
       final: false,
     });
 
@@ -136,6 +179,7 @@ describe('writing the session', () => {
     await session.write({
       tabs: [{ documentId: 'document-1', kind: 'brief', draft: { text: '::novo', savedText: '' } }],
       active: 0,
+      template: null,
       final: false,
     });
     expect(store.saved()).toEqual({
@@ -154,6 +198,7 @@ describe('writing the session', () => {
         { documentId: 'document-2', kind: 'brief', draft: null },
       ],
       active: 1,
+      template: null,
       final: false,
     });
     expect(store.saved()).toEqual({
@@ -177,12 +222,14 @@ describe('writing the session', () => {
     await session.write({
       tabs: [{ documentId: 'document-3', kind: 'settings', draft }],
       active: 0,
+      template: null,
       final: false,
     });
     expect(ended).toEqual([]);
     await session.write({
       tabs: [{ documentId: 'document-3', kind: 'settings', draft }],
       active: 0,
+      template: null,
       final: true,
     });
 
@@ -304,5 +351,111 @@ describe('reading the session back', () => {
     await documents.openPath('document-1', '/b/a.brief');
     await session.read();
     expect(documents.pathOf('document-1')).toBeUndefined();
+  });
+});
+
+describe('the template mode in the session (TYTO-266)', () => {
+  const FOLDER = '/t/cartaz';
+  const MANIFEST = 'name: cartaz\n';
+  const MARKUP = '<frame format="feed" />\n';
+  const folder = (): Record<string, string> => ({
+    [`${FOLDER}/manifest.yaml`]: MANIFEST,
+    [`${FOLDER}/template.html`]: MARKUP,
+  });
+  const mode = {
+    visible: 'markup' as const,
+    manifest: null,
+    markup: { text: `${MARKUP}<!-- meu -->`, savedText: MARKUP },
+  };
+
+  it('keeps the folder main filed, never one the window sent, and each draft as a hash', async () => {
+    const { store, session, templateFolder } = setup(folder());
+    templateFolder.set(FOLDER);
+
+    await session.write({ tabs: [], active: 0, template: mode, final: true });
+
+    expect(store.saved()).toEqual({
+      version: 1,
+      tabs: [],
+      active: 0,
+      template: {
+        directory: FOLDER,
+        visible: 'markup',
+        drafts: { markup: { text: mode.markup.text, savedHash: savedHashOf(MARKUP) } },
+      },
+    });
+  });
+
+  it('keeps nothing of the mode when it is closed, or when main filed no folder', async () => {
+    const { store, session, templateFolder } = setup(folder());
+    templateFolder.set(FOLDER);
+    await session.write({ tabs: [], active: 0, template: null, final: false });
+    expect(store.saved()).toEqual({ version: 1, tabs: [], active: 0 });
+
+    templateFolder.set(undefined);
+    await session.write({ tabs: [], active: 0, template: mode, final: false });
+    expect(store.saved()).toEqual({ version: 1, tabs: [], active: 0 });
+  });
+
+  it('reopens the folder as it reads now, with a fresh draft offered over its file', async () => {
+    const { session, templateFolder } = setup(folder());
+    templateFolder.set(FOLDER);
+    await session.write({ tabs: [], active: 0, template: mode, final: true });
+    templateFolder.set(undefined);
+
+    const { template } = await session.read();
+
+    expect(template).toEqual({
+      opened: {
+        kind: 'markup',
+        directory: FOLDER,
+        manifest: MANIFEST,
+        markup: MARKUP,
+        examples: [],
+      },
+      name: 'cartaz',
+      visible: 'markup',
+      manifest: { draft: null, stale: false },
+      markup: { draft: mode.markup.text, stale: false },
+    });
+    // Filed again for the page that restores it, so its next write names the same folder.
+    expect(templateFolder.current()).toBe(FOLDER);
+  });
+
+  it('never puts a draft over a template file that changed on disk: it is stale', async () => {
+    const files = folder();
+    const { session, templateFolder } = setup(files);
+    templateFolder.set(FOLDER);
+    await session.write({ tabs: [], active: 0, template: mode, final: true });
+    files[`${FOLDER}/template.html`] = '<frame format="story" />\n';
+
+    const { template } = await session.read();
+
+    expect(template?.opened?.markup).toBe('<frame format="story" />\n');
+    expect(template?.markup).toEqual({ draft: mode.markup.text, stale: true });
+    expect(template?.manifest).toEqual({ draft: null, stale: false });
+  });
+
+  it('hands back the drafts of a folder that is gone, with nothing to open', async () => {
+    const files = folder();
+    const { session, templateFolder } = setup(files);
+    templateFolder.set(FOLDER);
+    await session.write({ tabs: [], active: 0, template: mode, final: true });
+    delete files[`${FOLDER}/manifest.yaml`];
+    delete files[`${FOLDER}/template.html`];
+
+    const { template } = await session.read();
+
+    expect(template).toMatchObject({
+      opened: null,
+      name: 'cartaz',
+      markup: { draft: mode.markup.text, stale: false },
+    });
+    expect(templateFolder.current()).toBeUndefined();
+  });
+
+  it('answers no template mode for a session that had none', async () => {
+    const { session } = setup({});
+    expect((await session.read()).template).toBeNull();
   });
 });
