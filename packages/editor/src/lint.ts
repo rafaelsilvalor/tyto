@@ -130,8 +130,12 @@ const toLintDiagnostic = (
   analysis: BriefAnalysis,
   view: EditorView,
 ): LintDiagnostic => {
-  const { from, to } = spanOf(item, view);
-  return toMarker(item, view, suggestionFor(item, analysis, view.state.doc.sliceString(from, to)));
+  const { from, to } = spanOf(item, view.state);
+  return toMarker(
+    item,
+    view.state,
+    suggestionFor(item, analysis, view.state.doc.sliceString(from, to)),
+  );
 };
 
 export interface BriefLintOptions {

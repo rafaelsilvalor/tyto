@@ -12,6 +12,8 @@
 
 export { brief, briefLanguage } from './brief-language.js';
 
+export { type MarkedDiagnostic } from './diagnostic-markers.js';
+
 export {
   createEditor,
   type CursorPosition,
@@ -25,6 +27,7 @@ export {
   type SelectionRange,
   selectionOf,
   textOf,
+  withDiagnostics,
   withSelection,
 } from './editor.js';
 

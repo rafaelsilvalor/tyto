@@ -1,6 +1,7 @@
 // @vitest-environment jsdom
 import { insertNewlineAndIndent, undo as undoCommand } from '@codemirror/commands';
 import { forceParsing } from '@codemirror/language';
+import { forEachDiagnostic } from '@codemirror/lint';
 import { type StateEffect } from '@codemirror/state';
 import { EditorView } from '@codemirror/view';
 import { afterEach, describe, expect, it } from 'vitest';
@@ -13,6 +14,7 @@ import {
   hasBeenEdited,
   selectionOf,
   textOf,
+  withDiagnostics,
   withSelection,
 } from './editor.js';
 
@@ -596,5 +598,68 @@ describe('selection (TYTO-265)', () => {
     // A restored tab nobody typed in is still one nobody typed in.
     expect(hasBeenEdited(placed)).toBe(false);
     expect(cursorOf(placed)).toEqual({ line: 2, column: 4, selected: 2 });
+  });
+});
+
+describe('diagnostics pushed onto a buffer with no lint of its own (TYTO-256)', () => {
+  const settings = '{\n  "themee": "dark"\n}\n';
+  const typo = {
+    severity: 'warning' as const,
+    code: 'W_SETTING_UNKNOWN' as const,
+    message: 'Unknown setting "themee".',
+    range: { start: 4, end: 12 },
+  };
+
+  const markers = (state: ReturnType<EditorHandle['state']>) => {
+    const found: { from: number; to: number; severity: string; source: string | undefined }[] = [];
+    forEachDiagnostic(state, (item, from, to) => {
+      found.push({ from, to, severity: item.severity, source: item.source });
+    });
+    return found;
+  };
+
+  it('puts one marker at the key, with its severity and code, off the undo history', () => {
+    handle = createEditor(open().parent);
+    const marked = withDiagnostics(handle.blank(settings, 'plain'), [typo]);
+
+    expect(markers(marked)).toEqual([
+      { from: 4, to: 12, severity: 'warning', source: 'W_SETTING_UNKNOWN' },
+    ]);
+    expect(settings.slice(4, 12)).toBe('"themee"');
+    expect(hasBeenEdited(marked)).toBe(false);
+  });
+
+  it('moves the marker with an edit typed before it', () => {
+    handle = createEditor(open().parent);
+    const marked = withDiagnostics(handle.blank(settings, 'plain'), [typo]);
+    const edited = marked.update({ changes: { from: 1, insert: '\n  // mine' } }).state;
+
+    expect(markers(edited)).toEqual([
+      { from: 14, to: 22, severity: 'warning', source: 'W_SETTING_UNKNOWN' },
+    ]);
+  });
+
+  it('underlines the shown buffer and tells the store, without an onChange', () => {
+    handle = createEditor(open().parent);
+    handle.restore(handle.blank(settings, 'plain'));
+    let changes = 0;
+    let updates = 0;
+    handle.onChange(() => (changes += 1));
+    handle.onUpdate(() => (updates += 1));
+
+    handle.showDiagnostics([{ ...typo, severity: 'error', code: 'E_SETTINGS_SYNTAX' }]);
+
+    const underline = handle.view.dom.querySelector('.cm-lintRange-error');
+    expect(underline?.textContent).toBe('"themee"');
+    expect(changes).toBe(0);
+    expect(updates).toBe(1);
+    expect(markers(handle.state())).toHaveLength(1);
+  });
+
+  it('takes the markers away when the answer is empty', () => {
+    handle = createEditor(open().parent);
+    handle.restore(withDiagnostics(handle.blank(settings, 'plain'), [typo]));
+    handle.showDiagnostics([]);
+    expect(markers(handle.state())).toEqual([]);
   });
 });

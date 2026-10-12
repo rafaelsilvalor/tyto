@@ -72,6 +72,14 @@ const problems = (): Promise<string[]> =>
     ),
   );
 
+/** The text under each lint underline in the editor (TYTO-256). */
+const underlined = (): Promise<string[]> =>
+  page.evaluate(() =>
+    [
+      ...document.querySelectorAll('#editor .cm-lintRange-warning, #editor .cm-lintRange-error'),
+    ].map((mark) => mark.textContent ?? ''),
+  );
+
 const lang = (): Promise<string> => page.evaluate(() => document.documentElement.lang);
 const tabCount = (): Promise<number> => page.locator('.tabs__tab').count();
 const barOpen = (): Promise<boolean> =>
@@ -224,6 +232,13 @@ describe('the keybindings tab', () => {
       },
       `the two warnings, the panel shows ${JSON.stringify(await problems())}`,
     );
+
+    // TYTO-256: and underlined in the buffer, at the entry the warning is about.
+    await waitFor(
+      async () => (await underlined()).some((text) => text.includes('no.such.command')),
+      `an underline on no.such.command, the editor shows ${JSON.stringify(await underlined())}`,
+    );
+    expect(await page.textContent('#editor-heading')).toBe('Keybindings');
 
     await page.keyboard.press('Control+s');
     await page.waitForTimeout(800);

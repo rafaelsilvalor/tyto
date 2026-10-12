@@ -90,6 +90,22 @@ const problems = (page: Page): Promise<string[]> =>
     ),
   );
 
+/** The text under each lint underline in the editor. */
+const underlined = (page: Page): Promise<string[]> =>
+  page.evaluate(() =>
+    [
+      ...document.querySelectorAll('#editor .cm-lintRange-warning, #editor .cm-lintRange-error'),
+    ].map((mark) => mark.textContent ?? ''),
+  );
+
+/** The lines of the buffer in front, as the pane draws them. */
+const buffer = (page: Page): Promise<string> =>
+  page.evaluate(() =>
+    [...document.querySelectorAll('#editor .cm-line')]
+      .map((line) => line.textContent ?? '')
+      .join('|'),
+  );
+
 const reloads = (userData: string): number => {
   const log = join(userData, 'logs', 'tyto.log');
   if (!existsSync(log)) return 0;
@@ -196,6 +212,56 @@ describe('the settings tab', () => {
       async () => (await problems(page)).includes('W_SETTING_UNKNOWN@2:3'),
       `W_SETTING_UNKNOWN at 2:3, the panel shows ${JSON.stringify(await problems(page))}`,
     );
+  });
+
+  // TYTO-256: the tab reads as a settings file, not as a brief.
+  it('underlines the misspelt key in the editor, as a brief is underlined', async () => {
+    const { page } = launched;
+    await waitFor(
+      () => underlined(page).then((texts) => texts.includes('"queueAutRun"')),
+      `an underline on "queueAutRun", the editor shows ${JSON.stringify(await underlined(page))}`,
+    );
+  });
+
+  it("shows none of a brief's chrome", async () => {
+    const { page } = launched;
+    const chrome = await page.evaluate(() => {
+      const shown = (selector: string): boolean => {
+        const element = document.querySelector<HTMLElement>(selector);
+        return element !== null && element.offsetParent !== null;
+      };
+      return {
+        heading: document.querySelector('#editor-heading')?.textContent ?? '',
+        picker: shown('.work__template'),
+        formats: shown('#format-tabs'),
+        slide: shown('.preview__slide'),
+        zoom: shown('.preview__zoom'),
+        text: document.body.innerText,
+      };
+    });
+
+    expect(chrome.heading).toBe('Settings');
+    expect(chrome).toMatchObject({ picker: false, formats: false, slide: false, zoom: false });
+    expect(chrome.text).not.toContain('Write a brief');
+    expect(chrome.text).toContain('Settings apply when you save');
+  });
+
+  it('writes no template into the JSON when the picker is changed anyway', async () => {
+    const { page } = launched;
+    const before = await buffer(page);
+
+    // The picker is hidden; this is the change event a stale or scripted one would send.
+    await page.evaluate(() => {
+      const picker = document.querySelector<HTMLSelectElement>('#template');
+      if (picker === null) throw new Error('no #template');
+      picker.add(new Option('promo-curso', 'promo-curso'));
+      picker.value = 'promo-curso';
+      picker.dispatchEvent(new Event('change'));
+    });
+    await new Promise((resolve) => setTimeout(resolve, 300));
+
+    expect(await buffer(page)).toBe(before);
+    expect(await buffer(page)).not.toContain('template:');
   });
 });
 

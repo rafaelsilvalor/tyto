@@ -125,8 +125,8 @@ export function templateLint(
     if (!isMounted(view)) return [];
     view.dispatch({ effects: setTemplateAnalysis.of(analysis) });
     return analysis.diagnostics.map((item) => {
-      const span = spanOf(item, view);
-      return toMarker(item, view, templateSuggestionFor(item, view, span));
+      const span = spanOf(item, view.state);
+      return toMarker(item, view.state, templateSuggestionFor(item, view, span));
     });
   };
 
