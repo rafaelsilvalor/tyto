@@ -16,8 +16,13 @@ import { palette, panelStyles, panels, themeTokens } from './theme.js';
 const sources = import.meta.glob('./*.ts', { query: '?raw', import: 'default', eager: true });
 const themeSource = sources['./theme.ts'] as string;
 
-/** The source without its comments, which name pull requests as `#287` and quote CodeMirror. */
-const themeCode = themeSource.replace(/\/\*[\s\S]*?\*\//g, '').replace(/^\s*\/\/.*$/gm, '');
+/**
+ * The source without its comments, which name pull requests as `#287` and quote CodeMirror. A
+ * comment keeps its line breaks, so a finding names the line in `theme.ts`.
+ */
+const themeCode = themeSource
+  .replace(/\/\*[\s\S]*?\*\//g, (comment) => comment.replace(/[^\n]/g, ''))
+  .replace(/^[ \t]*\/\/.*$/gm, '');
 
 describe('the palette (TYTO-96)', () => {
   it('reads every colour from a --tyto- custom property and writes none of its own', () => {
