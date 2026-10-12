@@ -10,6 +10,7 @@ export const en: Catalogue = {
   'preview.zoom.in': 'Zoom in',
   'preview.zoom.fit': 'Fit',
   'preview.empty': 'Write a brief to see it here',
+  'preview.broken': 'This brief has an error — see Problems',
   'preview.stale': 'Older than the text you are writing',
   'preview.note.settings': 'Settings apply when you save',
   'preview.note.keybindings': 'Keybindings apply when you save',

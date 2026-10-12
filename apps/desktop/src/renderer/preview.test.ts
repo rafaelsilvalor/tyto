@@ -75,12 +75,14 @@ function pane(document_: Document): PreviewElements {
     paper: make('div'),
     frame: make<HTMLIFrameElement>('iframe'),
     empty: make('p'),
+    broken: make('p'),
     stale: make('p'),
     zoomLevel: make('span'),
   };
   elements.stale.hidden = true;
+  elements.broken.hidden = true;
   elements.paper.append(elements.frame);
-  elements.stage.append(elements.paper, elements.empty, elements.stale);
+  elements.stage.append(elements.paper, elements.empty, elements.broken, elements.stale);
   document_.body.append(elements.tabs, elements.slide, elements.slideLabel, elements.stage);
   return elements;
 }
@@ -316,6 +318,48 @@ describe('showing a frame', () => {
 
     expect(elements.empty.hidden).toBe(false);
     expect(elements.stale.hidden).toBe(true);
+  });
+
+  it('says the brief cannot be drawn in place of "write a brief" when told so (TYTO-268)', () => {
+    const { document } = globalThis;
+    const elements = pane(document);
+    const nothing = {
+      frames: [],
+      artworks: [],
+      selection: NOTHING,
+      zoom: 'fit',
+      stale: false,
+    } as const;
+
+    paintPreview(elements, { ...nothing, broken: true });
+
+    expect(elements.paper.hidden).toBe(true);
+    expect(elements.empty.hidden).toBe(true);
+    expect(elements.broken.hidden).toBe(false);
+
+    paintPreview(elements, { ...nothing, broken: false });
+
+    expect(elements.empty.hidden).toBe(false);
+    expect(elements.broken.hidden).toBe(true);
+  });
+
+  it('hides the broken line once a frame is on screen', () => {
+    const { document } = globalThis;
+    const elements = pane(document);
+    elements.broken.hidden = false;
+
+    paintPreview(elements, {
+      frames: CAROUSEL,
+      artworks: SLIDES,
+      selection: { format: 'feed', artwork: 'artwork-1' },
+      zoom: 1,
+      stale: true,
+      broken: true,
+    });
+
+    expect(elements.paper.hidden).toBe(false);
+    expect(elements.broken.hidden).toBe(true);
+    expect(elements.empty.hidden).toBe(true);
   });
 
   it('does not rewrite srcdoc for a document that has not changed', () => {

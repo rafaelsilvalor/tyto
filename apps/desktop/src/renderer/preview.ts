@@ -155,6 +155,8 @@ export interface PreviewElements {
   readonly paper: HTMLElement;
   readonly frame: HTMLIFrameElement;
   readonly empty: HTMLElement;
+  /** The empty line's other wording: a brief is written and cannot be drawn (TYTO-268). */
+  readonly broken: HTMLElement;
   readonly zoomLevel: HTMLElement;
   /**
    * The "this is older than your text" marker (E9.13).
@@ -179,6 +181,12 @@ export interface PreviewState {
    * against its text — and `documents.ts` owns both. This pane draws it.
    */
   readonly stale: boolean;
+  /**
+   * Whether the pane is empty because the brief **cannot** be drawn, not because there is
+   * none yet (TYTO-268). Passed in for {@link stale}'s reason — `isBroken` in `documents.ts`
+   * works it out — and absent means no, which is every caller that only ever has frames.
+   */
+  readonly broken?: boolean;
 }
 
 /** The attribute a format tab carries, which is how a click knows what it selected. */
@@ -261,7 +269,11 @@ export function paintPreview(elements: PreviewElements, state: PreviewState): nu
 
   if (frame === undefined) {
     elements.paper.hidden = true;
-    elements.empty.hidden = false;
+    // One line or the other, never both: "write a brief" under a brief that is written is
+    // the line this card took away (TYTO-268).
+    const broken = state.broken === true;
+    elements.empty.hidden = broken;
+    elements.broken.hidden = !broken;
     // Never on the empty state: there is no artwork to be out of date, and a brief that has
     // never compiled would otherwise open marked.
     elements.stale.hidden = true;
@@ -271,6 +283,7 @@ export function paintPreview(elements: PreviewElements, state: PreviewState): nu
 
   elements.paper.hidden = false;
   elements.empty.hidden = true;
+  elements.broken.hidden = true;
   // A state of the preview rather than a second error message. The problems panel already
   // lists what is wrong and this does not repeat it; what it says is that the picture and
   // the text have stopped agreeing.

@@ -10,6 +10,7 @@ import {
   documentAtSlot,
   documentOf,
   isDisposable,
+  isBroken,
   isStale,
   isUnsaved,
   newDocument,
@@ -404,5 +405,51 @@ describe("a screen's change to the settings buffer (TYTO-206)", () => {
   it('keeps what the person typed after the span', () => {
     const typed = '{\n  "a": 1\n}\n// after\n';
     expect(apply(typed, rebaseEdit(base, typed, edited))).toBe(edited + '// after\n');
+  });
+});
+
+/**
+ * The other empty pane (TYTO-268): a brief is written and nothing can be drawn from it.
+ */
+describe('isBroken', () => {
+  const error = {
+    severity: 'error',
+    code: 'E_UNKNOWN_TEMPLATE',
+    message: 'no such template',
+    range: { start: 0, end: 1 },
+  } as const;
+  const warning = { ...error, severity: 'warning', code: 'W_SOMETHING' } as const;
+  const answered = (
+    frames: number,
+    brief: string,
+    diagnostics: DocumentState['diagnostics'],
+  ): DocumentState => ({
+    ...newDocument('a'),
+    frames: Array.from({ length: frames }, () => ({
+      artwork: 'artwork-1',
+      format: 'feed',
+      width: 1080,
+      height: 1080,
+      html: '<html></html>',
+    })),
+    brief,
+    diagnostics,
+  });
+
+  it('is true for a written brief with an error and no frames', () => {
+    expect(isBroken(answered(0, 'template: nao-existe', [error]))).toBe(true);
+  });
+
+  it('is false while older artwork is kept on screen, which is the stale case', () => {
+    expect(isBroken(answered(1, 'template: nao-existe', [error]))).toBe(false);
+  });
+
+  it('is false for warnings alone, which do not stop a brief from drawing', () => {
+    expect(isBroken(answered(0, 'template: x', [warning]))).toBe(false);
+  });
+
+  it('is false for a blank text, which is "no brief yet" whatever was said about it', () => {
+    expect(isBroken(answered(0, '  \n', [error]))).toBe(false);
+    expect(isBroken(newDocument('a'))).toBe(false);
   });
 });

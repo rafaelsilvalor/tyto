@@ -152,6 +152,8 @@ export class PreviewPanel extends DockedPanel {
           <iframe id="preview-frame" sandbox="" title="Tyto"></iframe>
         </div>
         <p class="preview__empty" id="preview-empty" data-i18n="preview.empty"></p>
+        <!-- TYTO-268: in the empty line's place when the brief is written and cannot be drawn. -->
+        <p class="preview__empty" id="preview-broken" data-i18n="preview.broken" hidden></p>
         <p class="preview__stale" id="preview-stale" data-i18n="preview.stale" hidden></p>
         <!-- TYTO-256: what an app file's tab shows here instead (\`editor-chrome.ts\`). -->
         <p class="preview__empty" data-preview-note data-i18n="preview.note.settings" hidden></p>

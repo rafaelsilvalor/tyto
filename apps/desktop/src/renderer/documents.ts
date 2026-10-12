@@ -1,6 +1,13 @@
 import { type EditorState, type ScrollPosition, hasBeenEdited, textOf } from '@tyto/editor';
 
-import { type Artwork, type Diagnostic, type Frame, type Selection, type Zoom } from './preview.js';
+import {
+  type Artwork,
+  type Diagnostic,
+  type Frame,
+  type Selection,
+  type Zoom,
+  errorCount,
+} from './preview.js';
 
 /**
  * What the window has open, as a value (E9.11).
@@ -127,6 +134,25 @@ export interface DocumentState {
  */
 export const isStale = (document_: DocumentState): boolean =>
   document_.frames.length > 0 && document_.renderedBrief !== document_.brief;
+
+/**
+ * Whether the pane is empty because this brief cannot be drawn (TYTO-268).
+ *
+ * **Fatal is read the way `request` in `main.ts` reads it**: an answer with no frames and at
+ * least one error. That is a stage that could not hand back any of its value (ADR 0025) — no
+ * template by that name, a frontmatter that will not parse, a face that will not resolve —
+ * and it is the same condition that keeps the old artwork, so the two cannot disagree about
+ * what failed. A brief whose only errors are non-fatal still draws and never reaches here,
+ * and warnings alone are not errors.
+ *
+ * With older artwork kept on screen there are frames, so this is `false` and the pane shows
+ * that artwork marked stale instead (E9.13). A blank text is `false` whatever was said about
+ * it: that is "no brief yet", and the pane keeps saying so.
+ */
+export const isBroken = (document_: DocumentState): boolean =>
+  document_.frames.length === 0 &&
+  document_.brief.trim() !== '' &&
+  errorCount(document_.diagnostics) > 0;
 
 /**
  * What this document says right now, which is a question the store answers (D1, TYTO-115).

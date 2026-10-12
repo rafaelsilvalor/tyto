@@ -100,6 +100,7 @@ import {
   contentOf,
   documentAtSlot,
   documentOf,
+  isBroken,
   isDisposable,
   isStale,
   isUnsaved,
@@ -422,6 +423,7 @@ function previewElements(): PreviewElements | undefined {
   const paper = byId('preview-paper');
   const frame = byId<HTMLIFrameElement>('preview-frame');
   const empty = byId('preview-empty');
+  const broken = byId('preview-broken');
   const stale = byId('preview-stale');
   const zoomLevel = byId('zoom-level');
 
@@ -433,6 +435,7 @@ function previewElements(): PreviewElements | undefined {
     paper === null ||
     frame === null ||
     empty === null ||
+    broken === null ||
     stale === null ||
     zoomLevel === null
   ) {
@@ -441,7 +444,7 @@ function previewElements(): PreviewElements | undefined {
     // thing a person is allowed to do.
     return undefined;
   }
-  return { tabs, slide, slideLabel, stage, paper, frame, empty, stale, zoomLevel };
+  return { tabs, slide, slideLabel, stage, paper, frame, empty, broken, stale, zoomLevel };
 }
 
 /**
@@ -821,7 +824,11 @@ const registry: CommandRegistry = createDesktopRegistry({
     if (pane === undefined) return;
     // A step from whatever is on screen, the same as the buttons: the first step after
     // `fit` moves from the size the user is looking at.
-    const from = paintPreview(pane, { ...active(), stale: isStale(active()) });
+    const from = paintPreview(pane, {
+      ...active(),
+      stale: isStale(active()),
+      broken: isBroken(active()),
+    });
     updateActive((document_) => ({ ...document_, zoom: stepZoom(from, direction) }));
     repaint();
   },
@@ -2354,7 +2361,9 @@ function repaint(): void {
   const current = active();
   // Every change to the strip ends in a repaint, so this is where the session is kept from.
   keepSessionSoon();
-  if (pane !== undefined) paintPreview(pane, { ...current, stale: isStale(current) });
+  if (pane !== undefined) {
+    paintPreview(pane, { ...current, stale: isStale(current), broken: isBroken(current) });
+  }
   // After the preview, whose empty line it replaces on an app file, and before the translation
   // pass, which writes the heading it names (TYTO-256).
   paintEditorChrome(document, editorChromeFor(current.kind));
