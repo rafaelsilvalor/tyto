@@ -459,6 +459,17 @@ export interface Catalogue {
   readonly 'command.document.newFromTemplate': string;
   readonly 'template.pick.placeholder': string;
   readonly 'template.root.builtIn': string;
+  /**
+   * TYTO-276. The "/" menu: the command that opens it without a "/", its section heading and
+   * the line beside each template saying what choosing it does. `{current}` is the template
+   * the brief names now. All of it is CodeMirror's list or the bar, so none is on screen at load.
+   */
+  readonly 'command.editor.insertMenu': string;
+  readonly 'slash.section.templates': string;
+  readonly 'slash.template.new': string;
+  readonly 'slash.template.set': string;
+  readonly 'slash.template.current': string;
+  readonly 'slash.template.switch': string;
   readonly 'command.queue.show': string;
   readonly 'queue.heading': string;
   readonly 'queue.folder.none': string;
@@ -698,6 +709,12 @@ export const CATALOGUE_KEYS = [
   'command.document.newFromTemplate',
   'template.pick.placeholder',
   'template.root.builtIn',
+  'command.editor.insertMenu',
+  'slash.section.templates',
+  'slash.template.new',
+  'slash.template.set',
+  'slash.template.current',
+  'slash.template.switch',
   'command.queue.show',
   'queue.heading',
   'queue.folder.none',

@@ -610,6 +610,14 @@ describe('switching the language', () => {
     'command.document.newFromTemplate',
     'template.pick.placeholder',
     'template.root.builtIn',
+    // TYTO-276: the "/" menu's command, section heading and the line beside each template, all
+    // inside CodeMirror's list or the bar. `e2e/slash-menu.desktop.test.ts` opens it.
+    'command.editor.insertMenu',
+    'slash.section.templates',
+    'slash.template.new',
+    'slash.template.set',
+    'slash.template.current',
+    'slash.template.switch',
     // TYTO-248: the status bar is an element and translates inside its own `render`; the
     // area toggles are also command labels. `src/renderer/status-bar.test.ts` renders every
     // one of them in both languages.

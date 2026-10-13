@@ -146,3 +146,12 @@ export {
   insertBriefSkeleton,
   skeletonText,
 } from './skeleton.js';
+
+export {
+  type SlashItem,
+  type SlashSource,
+  completeSlash,
+  openSlashMenu,
+  slashCompletion,
+  slashRequested,
+} from './slash.js';

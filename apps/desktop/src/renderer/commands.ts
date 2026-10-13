@@ -123,6 +123,12 @@ export const recentCommandId = (path: string): string => `${RECENT_PREFIX}${path
 export const pathOfRecentCommand = (id: string): string | undefined =>
   id.startsWith(RECENT_PREFIX) ? id.slice(RECENT_PREFIX.length) : undefined;
 export const EDITOR_TOGGLE_VIM = 'editor.toggleVim';
+/**
+ * The "/" menu without typing "/" (TYTO-276): the templates at the cursor, for a binding in
+ * `keybindings.json`. No key by default — `Mod-/` is the comment toggle — and brief-only, because
+ * the menu inserts into a brief and an app file's language never offers it.
+ */
+export const EDITOR_INSERT_MENU = 'editor.insertMenu';
 
 /**
  * A new, empty tab (TYTO-124).
@@ -189,6 +195,7 @@ export const COMMAND_LABELS: Readonly<Record<string, CatalogueKey>> = {
   [PREVIEW_PREVIOUS_SLIDE]: 'command.preview.previousSlide',
   [SHELL_TOGGLE_LOCALE]: 'command.shell.toggleLocale',
   [EDITOR_TOGGLE_VIM]: 'command.editor.toggleVim',
+  [EDITOR_INSERT_MENU]: 'command.editor.insertMenu',
   [DOCUMENT_NEW]: 'command.document.new',
   [DOCUMENT_NEW_FROM_TEMPLATE]: 'command.document.newFromTemplate',
   [EDITOR_OPEN]: 'command.file.open',
@@ -238,6 +245,8 @@ export interface DesktopActions {
   stepSlide(direction: 1 | -1): void;
   toggleLocale(): void;
   toggleVimMode(): void;
+  /** TYTO-276. Opens the "/" menu at the cursor, with no "/" typed. */
+  openInsertMenu(): void;
   /** E9.8. Each of these ends in a round trip to main, which owns every path. */
   newDocument(): void;
   /** TYTO-275. Lists the templates in the bar; the chosen one's skeleton opens in a new tab. */
@@ -327,6 +336,9 @@ export function createDesktopRegistry(actions: DesktopActions): CommandRegistry 
   });
   add(EDITOR_TOGGLE_VIM, () => {
     actions.toggleVimMode();
+  });
+  add(EDITOR_INSERT_MENU, () => {
+    actions.openInsertMenu();
   });
 
   // `editor.save` is `@tyto/editor`'s id and not one invented here, which is the whole
@@ -430,6 +442,7 @@ export const BRIEF_ONLY_COMMANDS: ReadonlySet<string> = new Set([
   PREVIEW_NEXT_SLIDE,
   PREVIEW_PREVIOUS_SLIDE,
   FILE_EXPORT,
+  EDITOR_INSERT_MENU,
 ]);
 
 /**

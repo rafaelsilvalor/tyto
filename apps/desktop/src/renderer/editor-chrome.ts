@@ -3,7 +3,7 @@ import { type LanguageName } from '@tyto/editor';
 import { type CatalogueKey } from '../../shared/i18n/index.js';
 import { BRIEF_ONLY_COMMANDS } from './commands.js';
 import { type DocumentState } from './documents.js';
-import { planTemplateEdit, type TemplateEdit } from './frontmatter.js';
+import { planTemplateEdit, type TemplateEdit, templateOf } from './frontmatter.js';
 import { I18N_ATTRIBUTE } from './shell.js';
 
 /**
@@ -119,6 +119,65 @@ export function templateChoiceFor(
   const edit = templateEditFor(kind, text, template);
   if (edit === undefined) return undefined;
   return text.trim() === '' ? { kind: 'skeleton' } : { kind: 'edit', edit };
+}
+
+/**
+ * What choosing `template` in the "/" menu does (TYTO-276), as changes to the text as it stands.
+ *
+ * `from`..`to` is the "/" and its query, which the choice always takes away; everything else is
+ * decided on the text **without** them, so a brief holding only "/agen" is an empty brief and
+ * gets the skeleton. On a brief with content the one-line edit and the removal are returned
+ * together, in the original text's positions, so the window dispatches them as one transaction
+ * and one Ctrl+Z takes both back. The template already named leaves only the removal.
+ */
+export type SlashTemplateChoice =
+  { readonly kind: 'skeleton' } | { readonly kind: 'changes'; readonly changes: TemplateEdit[] };
+
+export function slashTemplateChoiceFor(
+  kind: Kind,
+  text: string,
+  from: number,
+  to: number,
+  template: string,
+): SlashTemplateChoice | undefined {
+  if (!editorChromeFor(kind).templatePicker || template === '') return undefined;
+  const removal: TemplateEdit = { from, to, insert: '' };
+  const choice = templateChoiceFor(kind, text.slice(0, from) + text.slice(to), template);
+  if (choice === undefined) return { kind: 'changes', changes: [removal] };
+  if (choice.kind === 'skeleton') return choice;
+
+  // From the text without the query back to the text with it. The edit is in the frontmatter,
+  // which ends before the line the "/" is on, so nothing it touches straddles the removal.
+  const back = (position: number): number => (position <= from ? position : position + to - from);
+  const { edit } = choice;
+  return {
+    kind: 'changes',
+    changes: [{ from: back(edit.from), to: back(edit.to), insert: edit.insert }, removal],
+  };
+}
+
+/**
+ * What a template's row in the "/" menu says it will do to this brief: start it, set its
+ * template, leave it as it is, or switch it — the warning, since a switch keeps slots the new
+ * template may not have. A line beside the row rather than a dialog, which was decided.
+ */
+export type SlashTemplateNote =
+  | { readonly key: 'slash.template.new' | 'slash.template.set' | 'slash.template.current' }
+  | { readonly key: 'slash.template.switch'; readonly current: string };
+
+export function slashTemplateNote(
+  text: string,
+  from: number,
+  to: number,
+  template: string,
+): SlashTemplateNote {
+  const rest = text.slice(0, from) + text.slice(to);
+  if (rest.trim() === '') return { key: 'slash.template.new' };
+  const current = templateOf(rest);
+  if (current === undefined) return { key: 'slash.template.set' };
+  return current === template
+    ? { key: 'slash.template.current' }
+    : { key: 'slash.template.switch', current };
 }
 
 /**
