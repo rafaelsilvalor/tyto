@@ -163,6 +163,64 @@ describe('the face', () => {
   });
 });
 
+/**
+ * TYTO-269: the editor's face is the bundled IBM Plex Mono, never the machine's mono.
+ *
+ * `document.fonts.check()` is not the instrument: it answers true for a family no
+ * `@font-face` declares at all (measured: `'13px "No Such Face 269"'` came back true), so it
+ * would pass with the old system stack. The question is which font the engine actually drew
+ * with, and only Chromium knows that: `CSS.getPlatformFontsForNode` names the face that
+ * painted a node's glyphs and whether it came from a web font (`isCustomFont`) or from the
+ * operating system. A machine that has Plex installed would still answer a web font here,
+ * because a family an `@font-face` declares is matched before any local one.
+ */
+describe('the editor face (TYTO-269)', () => {
+  it.each([
+    ['light', LIGHT],
+    ['dark', DARK],
+  ] as const)(
+    'draws the brief with the bundled IBM Plex Mono in %s',
+    async (scheme, expected) => {
+      await setSystem(scheme);
+      await waitForSurface(expected.surface);
+
+      const loaded = await page.evaluate(async () => {
+        await document.fonts.ready;
+        return [...document.fonts]
+          .filter((font) => font.family.replace(/"/g, '') === 'IBM Plex Mono')
+          .filter((font) => font.status === 'loaded')
+          .map((font) => font.weight)
+          .sort();
+      });
+      expect(loaded).toEqual(['400', '700']);
+
+      const cdp = await page.context().newCDPSession(page);
+      try {
+        await cdp.send('DOM.enable');
+        await cdp.send('CSS.enable');
+        const { root } = await cdp.send('DOM.getDocument', { depth: -1 });
+        const { nodeId } = await cdp.send('DOM.querySelector', {
+          nodeId: root.nodeId,
+          selector: '#editor .cm-line',
+        });
+        expect(nodeId).not.toBe(0);
+        const { fonts } = await cdp.send('CSS.getPlatformFontsForNode', { nodeId });
+        expect(fonts.length).toBeGreaterThan(0);
+        for (const font of fonts) {
+          expect(font).toMatchObject({
+            familyName: 'IBM Plex Mono',
+            isCustomFont: true,
+            postScriptName: expect.stringMatching(/^IBMPlexMono/) as unknown,
+          });
+        }
+      } finally {
+        await cdp.detach();
+      }
+    },
+    30_000,
+  );
+});
+
 describe('the colours arrive as the built-in themes (TYTO-208, ADR 0077)', () => {
   it('writes both built-in themes over the token file, every themed colour of each', async () => {
     await page.waitForSelector('style#tyto-theme', { state: 'attached', timeout: 10_000 });

@@ -33,9 +33,21 @@ without knowing what a fixture is.
 
 ## What is here
 
-| Family        | Version | Faces                 | Licence |
-| ------------- | ------- | --------------------- | ------- |
-| Source Sans 3 | 3.052R  | Regular 400, Bold 700 | OFL 1.1 |
+| Family        | Version              | Faces                 | Licence | Read by                 |
+| ------------- | -------------------- | --------------------- | ------- | ----------------------- |
+| Source Sans 3 | 3.052R               | Regular 400, Bold 700 | OFL 1.1 | renders and the window  |
+| IBM Plex Mono | @ibm/plex-mono@2.5.0 | Regular 400, Bold 700 | OFL 1.1 | the desktop editor only |
+
+**IBM Plex Mono is the window's, not a render's** (TYTO-269, ADR 0075). The desktop renderer
+reads its two `.woff2` files through the `@tyto-fonts` alias, as it does Source Sans 3's, so the
+brief editor has the same face and the same columns on every machine. It is deliberately not
+in `BUNDLED` in `src/index.ts`: registering it would put it in `BUNDLED_FONT_FAMILIES`, which
+lets a scene name it and changes how `system.ts` decides what is bundled, and nothing on the
+export side asked for that. The `.ttf` files are committed anyway, from the same archive, so
+that registering it later is one table entry and not a second download (rule 2 below). "Plex"
+is a Reserved Font Name under the OFL; the files are shipped unmodified and under their own
+name. There is no italic face — the editor's italic comments are the Regular face slanted by
+the browser.
 
 Two faces rather than one because the exporters key a `@font-face` on family **and**
 weight, and a corpus with a single weight cannot tell a resolver that ignores the weight
