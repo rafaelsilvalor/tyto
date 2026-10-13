@@ -604,6 +604,12 @@ describe('switching the language', () => {
     'theme.pick.placeholder',
     'theme.kind.light',
     'theme.kind.dark',
+    // TYTO-275: "New brief from template…", the picker's placeholder and the built-in pack's
+    // name beside each template, all inside the bar and the File menu.
+    // `e2e/new-from-template.desktop.test.ts` opens it.
+    'command.document.newFromTemplate',
+    'template.pick.placeholder',
+    'template.root.builtIn',
     // TYTO-248: the status bar is an element and translates inside its own `render`; the
     // area toggles are also command labels. `src/renderer/status-bar.test.ts` renders every
     // one of them in both languages.

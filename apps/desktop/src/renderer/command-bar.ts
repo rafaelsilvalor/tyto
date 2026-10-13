@@ -255,7 +255,7 @@ export class CommandBar extends LitElement {
       ${
         entry.detail === undefined
           ? nothing
-          : html`<span class="command-bar__detail">${entry.detail}</span>`
+          : html`<span class="command-bar__detail" title=${entry.detail}>${entry.detail}</span>`
       }
       ${
         entry.binding === undefined

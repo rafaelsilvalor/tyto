@@ -116,6 +116,8 @@ describe('the template picker', () => {
       version: '1.0.0',
       description: 'One poster',
       formats: [{ id: 'grid-1x1', label: 'Grid 1:1' }],
+      slots: {},
+      root: null,
     },
     {
       name: 'promo-curso',
@@ -124,6 +126,8 @@ describe('the template picker', () => {
         { id: 'grid', label: 'Grid' },
         { id: 'story', label: 'Story' },
       ],
+      slots: {},
+      root: null,
     },
   ];
 

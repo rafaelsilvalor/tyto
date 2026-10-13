@@ -189,6 +189,24 @@ describe('completeBrief', () => {
     expect(labelsOf(result)).toEqual(['claro', 'escuro']);
   });
 
+  // TYTO-275. A skeleton's enum field is the value, selected: what a person wants there is
+  // the other values, and a list filtered by the selected word offers only that word.
+  it('offers every value, unfiltered, in place of an enum value that is selected', () => {
+    const doc = frontmatter('tom: escuro');
+    const from = doc.indexOf('escuro');
+    const created = EditorState.create({
+      doc,
+      selection: { anchor: from, head: from + 'escuro'.length },
+      extensions: [briefAnalysisField, briefLanguage],
+    });
+    const state = created.update({ effects: setBriefAnalysis.of(analysisOf(CARROSSEL)) }).state;
+
+    const result = completeBrief(new CompletionContext(state, from + 'escuro'.length, true));
+
+    expect(labelsOf(result)).toEqual(['claro', 'escuro']);
+    expect(result).toMatchObject({ from, to: from + 'escuro'.length, filter: false });
+  });
+
   it('offers nothing for a frontmatter key that is not an enum slot', () => {
     const result = completeAt(frontmatter('titulo: |'), analysisOf(CARROSSEL));
 

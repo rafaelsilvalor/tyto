@@ -133,6 +133,12 @@ export const EDITOR_TOGGLE_VIM = 'editor.toggleVim';
  * and registration order is display order.
  */
 export const DOCUMENT_NEW = 'document.new';
+/**
+ * A new tab holding a template's skeleton (TYTO-275): the templates in the bar, and the one
+ * chosen opens with its required slots written as fields Tab walks. Not brief-only — it opens a
+ * tab of its own, whatever is in front — and no key by default (ADR 0074).
+ */
+export const DOCUMENT_NEW_FROM_TEMPLATE = 'document.newFromTemplate';
 export const DOCUMENT_CLOSE = 'document.close';
 export const DOCUMENT_NEXT = 'document.next';
 export const DOCUMENT_PREVIOUS = 'document.previous';
@@ -184,6 +190,7 @@ export const COMMAND_LABELS: Readonly<Record<string, CatalogueKey>> = {
   [SHELL_TOGGLE_LOCALE]: 'command.shell.toggleLocale',
   [EDITOR_TOGGLE_VIM]: 'command.editor.toggleVim',
   [DOCUMENT_NEW]: 'command.document.new',
+  [DOCUMENT_NEW_FROM_TEMPLATE]: 'command.document.newFromTemplate',
   [EDITOR_OPEN]: 'command.file.open',
   [EDITOR_SAVE]: 'command.file.save',
   [EDITOR_SAVE_AS]: 'command.file.saveAs',
@@ -233,6 +240,8 @@ export interface DesktopActions {
   toggleVimMode(): void;
   /** E9.8. Each of these ends in a round trip to main, which owns every path. */
   newDocument(): void;
+  /** TYTO-275. Lists the templates in the bar; the chosen one's skeleton opens in a new tab. */
+  newDocumentFromTemplate(): void;
   openDocument(): void;
   saveDocument(saveAs: boolean): void;
   /** E9.10. Puts every panel back where ADR 0024 says it goes. */
@@ -325,6 +334,9 @@ export function createDesktopRegistry(actions: DesktopActions): CommandRegistry 
   // registered it the key did nothing. This is the host registering it.
   add(DOCUMENT_NEW, () => {
     actions.newDocument();
+  });
+  add(DOCUMENT_NEW_FROM_TEMPLATE, () => {
+    actions.newDocumentFromTemplate();
   });
   add(EDITOR_OPEN, () => {
     actions.openDocument();

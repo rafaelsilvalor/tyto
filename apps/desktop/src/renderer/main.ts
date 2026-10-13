@@ -12,6 +12,7 @@ import {
   concreteKey,
   createEditor,
   cursorOf,
+  insertBriefSkeleton,
   keyOfStroke,
   resolveKeybindings,
   shownBindingsOf,
@@ -41,7 +42,7 @@ import {
   editorChromeFor,
   languageOf,
   paintEditorChrome,
-  templateEditFor,
+  templateChoiceFor,
 } from './editor-chrome.js';
 import { readKeybindingsText } from './keybindings-file.js';
 import {
@@ -927,6 +928,10 @@ const registry: CommandRegistry = withCommandGate(
       });
     },
 
+    newDocumentFromTemplate: () => {
+      pickTemplate();
+    },
+
     newDocument: () => {
       // **Added and never substituted, which is the whole of the card's second criterion.**
       // `adopt` replaces the tab in front when `isDisposable` says it holds nothing — right for
@@ -1523,6 +1528,69 @@ async function pickTheme(): Promise<void> {
       },
     });
   });
+}
+
+/**
+ * "New brief from template…" (TYTO-275): every template in the bar, with the folder it came from
+ * and its description beside the name, and the chosen one's skeleton in a new tab.
+ *
+ * The rows are the template picker's, as `templates:list` last answered — on load and on every
+ * folder change — so the bar and the picker cannot list different templates, and nothing is
+ * asked of main while the bar is open. Nothing is previewed while the selection moves: a
+ * skeleton is text, and the tab it would go in does not exist until the choice.
+ */
+function pickTemplate(): void {
+  const bar = elements.commandBar;
+  if (bar === null) return;
+  bar.pick({
+    entries: panel.templates.map((template) => ({
+      id: template.name,
+      label: template.name,
+      detail: [
+        template.root ?? translate(state.locale, 'template.root.builtIn'),
+        template.description,
+      ]
+        .filter((part): part is string => part !== undefined)
+        .join(' · '),
+    })),
+    placeholder: translate(state.locale, 'template.pick.placeholder'),
+    highlight: () => undefined,
+    choose: (name) => {
+      openSkeleton(name);
+    },
+    cancel: () => undefined,
+  });
+}
+
+/**
+ * A new tab holding `name`'s skeleton, with its first field selected (TYTO-275).
+ *
+ * The tab is added the way New adds one — never substituted, for New's reason — and the skeleton
+ * goes in as an edit once the tab is in front, so the fields are a live snippet in that tab's own
+ * state and Ctrl+Z takes the whole skeleton back to the empty tab.
+ */
+function openSkeleton(name: string): void {
+  if (editor === undefined || !panel.templates.some((template) => template.name === name)) return;
+  captureScroll();
+  workspace = addDocument(workspace, newDocument(nextDocumentId(), editor.blank('')));
+  restoreActive();
+  repaint();
+  insertSkeleton(name);
+}
+
+/**
+ * Replaces the text in the editor with `name`'s skeleton and focuses its first field. The
+ * manifest is the picker's row: the formats go by id, which is what a brief writes.
+ */
+function insertSkeleton(name: string): void {
+  const template = panel.templates.find((candidate) => candidate.name === name);
+  if (template === undefined || editor === undefined) return;
+  insertBriefSkeleton(editor.view, {
+    name: template.name,
+    formats: template.formats.map((format) => format.id),
+    slots: template.slots,
+  });
+  editor.view.focus();
 }
 
 /**
@@ -2748,8 +2816,14 @@ function wirePanelControls(): void {
     // uses. `setValue` deliberately notifies nobody.
     // Refused on an app file even if the hidden picker is changed somehow: on `settings.json`
     // the edit would be a YAML block written into the JSON (TYTO-256).
-    const edit = templateEditFor(active().kind, activeText(), picker.value);
-    if (edit === undefined) return;
+    // On an empty brief the template's skeleton goes in instead, fields and all (TYTO-275).
+    const choice = templateChoiceFor(active().kind, activeText(), picker.value);
+    if (choice === undefined) return;
+    if (choice.kind === 'skeleton') {
+      insertSkeleton(picker.value);
+      return;
+    }
+    const { edit } = choice;
     editor.view.dispatch({
       changes: { from: edit.from, to: edit.to, insert: edit.insert },
     });

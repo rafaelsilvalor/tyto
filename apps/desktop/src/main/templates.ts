@@ -1,7 +1,7 @@
 import { readFile } from 'node:fs/promises';
-import { join } from 'node:path';
+import { basename, isAbsolute, join, relative } from 'node:path';
 
-import { type FormatCatalogue, type TemplateRegistry } from '@tyto/core';
+import { type TemplateRegistry } from '@tyto/core';
 
 import { type IpcResponse } from '../../shared/ipc.js';
 import { type ProjectSnapshot, type ProjectSources } from './project.js';
@@ -79,14 +79,36 @@ async function previewUri(directory: string): Promise<string | undefined> {
  */
 function entriesOf(
   registry: TemplateRegistry,
-  formats: FormatCatalogue | undefined,
+  snapshot: ProjectSnapshot,
 ): IpcResponse<'templates:list'>['templates'] {
+  const formats = snapshot.formats;
   return registry.list().map((manifest) => ({
     name: manifest.name,
     version: manifest.version,
     ...(manifest.description === undefined ? {} : { description: manifest.description }),
     formats: manifest.formats.map((id) => ({ id, label: formats?.labelOf(id) ?? id })),
+    slots: manifest.slots,
+    root: rootOf(registry.directoryOf(manifest.name), snapshot),
   }));
+}
+
+/**
+ * The name of the folder a template was found under, or `null` for the built-in pack
+ * (TYTO-275).
+ *
+ * The built-in root is found by its place in `roots`, which `ProjectSnapshot` documents as the
+ * chosen folder (when there is one), then the built-in pack, then the installed packs. A
+ * template under no root — which the registry does not produce — is answered as built-in
+ * rather than as a path a person cannot use.
+ */
+function rootOf(directory: string | undefined, snapshot: ProjectSnapshot): string | null {
+  if (directory === undefined) return null;
+  const builtIn = snapshot.roots[snapshot.folder === undefined ? 0 : 1];
+  const root = snapshot.roots.find((candidate) => {
+    const inside = relative(candidate, directory);
+    return !inside.startsWith('..') && !isAbsolute(inside);
+  });
+  return root === undefined || root === builtIn ? null : basename(root);
 }
 
 /**
@@ -107,7 +129,7 @@ export async function createTemplateCatalogue(
     // desktop opens and says it has no templates; that is the same call `plugins.ts` makes.
     const registry = snapshot.registry;
 
-    const templates = registry === undefined ? [] : entriesOf(registry, snapshot.formats);
+    const templates = registry === undefined ? [] : entriesOf(registry, snapshot);
 
     // The preview image is per template and optional, so it is read after the list exists
     // rather than being folded into the map above — a missing file must not cost the entry.

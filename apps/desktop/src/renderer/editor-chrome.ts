@@ -102,6 +102,26 @@ export function templateEditFor(
 }
 
 /**
+ * What choosing `template` in the picker does to this tab (TYTO-275): on a brief with nothing
+ * in it, the template's whole skeleton, and on any other the one-line edit above. A blank tab is
+ * one with only whitespace — the picker is most used on a brief being started, and a skeleton
+ * there is the template's slots instead of a frontmatter the person then fills by memory. The
+ * app-file refusal is `templateEditFor`'s, kept for both answers.
+ */
+export type TemplateChoice =
+  { readonly kind: 'skeleton' } | { readonly kind: 'edit'; readonly edit: TemplateEdit };
+
+export function templateChoiceFor(
+  kind: Kind,
+  text: string,
+  template: string,
+): TemplateChoice | undefined {
+  const edit = templateEditFor(kind, text, template);
+  if (edit === undefined) return undefined;
+  return text.trim() === '' ? { kind: 'skeleton' } : { kind: 'edit', edit };
+}
+
+/**
  * Paints the answer into the window's panels, any of which may be closed.
  *
  * The heading's key goes on its `data-i18n` attribute, so the window's translation pass — which

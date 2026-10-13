@@ -39,6 +39,8 @@ export interface MenuCommand {
 export const FILE_MENU_GROUPS: readonly (readonly MenuCommand[])[] = [
   [
     { id: 'document.new', label: 'command.document.new' },
+    // TYTO-275. Beside New: the same verb, with a template's skeleton in the tab.
+    { id: 'document.newFromTemplate', label: 'command.document.newFromTemplate' },
     { id: 'editor.open', label: 'command.file.open' },
   ],
   [

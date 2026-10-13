@@ -1,4 +1,4 @@
-import { templateManifestSchema } from '@tyto/core';
+import { slotSchema, templateManifestSchema } from '@tyto/core';
 import { THEME_KINDS, THEME_TOKEN_NAME, isThemeColor } from '@tyto/plugin-api';
 import { z } from 'zod';
 
@@ -407,6 +407,18 @@ export const IPC_CHANNELS = {
            */
           formats: z.array(z.object({ id: z.string(), label: z.string().min(1) })),
           preview: z.string().optional(),
+          /**
+           * The manifest's slots, as declared (TYTO-275): what "New brief from template"
+           * builds a skeleton from. Read off the manifest like the rest of this entry, so
+           * listing them runs no template code.
+           */
+          slots: z.record(z.string(), slotSchema),
+          /**
+           * The folder the template came from, by its name, or `null` for the built-in pack,
+           * which the window names in its own language. Two templates of one name cannot both
+           * be listed, so this is what tells a person whose `agenda-semana` they are picking.
+           */
+          root: z.string().nullable(),
         }),
       ),
       /**

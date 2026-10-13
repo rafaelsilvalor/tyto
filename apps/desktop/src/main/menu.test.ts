@@ -268,6 +268,7 @@ describe('the File submenu', () => {
     // appended on this platform rather than coming from the table.
     expect(shape).toEqual([
       'document.new',
+      'document.newFromTemplate',
       'editor.open',
       '—',
       'editor.save',

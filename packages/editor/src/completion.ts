@@ -154,7 +154,17 @@ const completeFrontmatter = (
   if (scalar) {
     const slot = manifest.slots[scalar[1] ?? ''];
     if (slot?.type === 'enum' && slot.values !== undefined) {
-      return result(at(scalar, 2), slot.values.map(valueOption));
+      const written = at(scalar, 2);
+      const options = slot.values.map(valueOption);
+      // A value that is selected — a skeleton's field (TYTO-275) — is one about to be
+      // replaced, not a prefix being typed: filtered by itself, the list would offer only
+      // the value already there. So every value is offered, and the choice replaces the
+      // selection.
+      const selection = context.state.selection.main;
+      if (!selection.empty && selection.from === written.from && selection.to === context.pos) {
+        return { from: selection.from, to: selection.to, options, filter: false };
+      }
+      return result(written, options);
     }
   }
 
