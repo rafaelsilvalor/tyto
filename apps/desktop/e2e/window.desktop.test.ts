@@ -472,6 +472,12 @@ describe('switching the language', () => {
     'update.downloading',
     'update.ready',
     'menu.file',
+    // TYTO-264: the other four titles, menu chrome as `menu.file` is. The row draws them
+    // without their `&`, so the catalogue's text is never an element's text as written.
+    'menu.edit',
+    'menu.view',
+    'menu.window',
+    'menu.help',
     'command.document.new',
     'command.document.close',
     'command.document.next',

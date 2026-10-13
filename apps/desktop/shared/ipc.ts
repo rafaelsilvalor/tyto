@@ -233,10 +233,17 @@ export const menuItemSchema = z.object({
   accelerator: z.string().optional(),
 });
 
-/** A top-level menu: the name the row draws, and the items its native list holds. */
+/**
+ * A top-level menu: the name the row draws, and the items its native list holds.
+ *
+ * `mnemonic` is the letter Alt opens it with and `mnemonicAt` where it sits in `label`, which
+ * carries no `&` (TYTO-264, ADR 0078). Absent on macOS, whose titles have none.
+ */
 export const menuSchema = z.object({
   id: z.string().min(1),
   label: z.string(),
+  mnemonic: z.string().length(1).optional(),
+  mnemonicAt: z.number().int().nonnegative().optional(),
   role: z.string().optional(),
   enabled: z.boolean(),
   items: z.array(menuItemSchema),

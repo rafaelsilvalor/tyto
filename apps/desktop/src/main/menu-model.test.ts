@@ -7,6 +7,7 @@ import {
   type MenuLike,
   acceleratorLabel,
   findTopLevel,
+  mnemonicOf,
   projectMenu,
   withoutMnemonic,
 } from './menu-model.js';
@@ -61,9 +62,18 @@ function build(item: TemplateItem): MenuItemLike {
   };
 }
 
+const TITLES: Partial<Record<string, string>> = {
+  'menu.file': '&File',
+  'menu.edit': '&Edit',
+  'menu.view': '&View',
+  'menu.window': '&Window',
+  'menu.help': '&Help',
+};
+
 const installed = (platform: string): MenuLike => ({
   items: menuTemplate(platform, {
-    t: (key) => (key === 'menu.file' ? 'File' : key),
+    // The English catalogue's five titles, with their mnemonics (TYTO-264).
+    t: (key) => TITLES[key] ?? key,
     onRevealLogs: () => {},
     onCommand: () => {},
     onAbout: () => {},
@@ -80,6 +90,16 @@ describe("the menu row's model", () => {
       ['windowmenu', 'Window'],
       ['help', 'Help'],
     ]);
+  });
+
+  it('gives each title off macOS its letter and where it sits, and macOS none (TYTO-264)', () => {
+    const model = projectMenu(installed('win32'), 'win32');
+    expect(
+      model.map(({ mnemonic, mnemonicAt }) => `${mnemonic ?? ''}@${String(mnemonicAt)}`),
+    ).toEqual(['F@0', 'E@0', 'V@0', 'W@0', 'H@0']);
+    const mac = projectMenu(installed('darwin'), 'darwin');
+    expect(mac.filter((menu) => menu.mnemonic !== undefined)).toEqual([]);
+    expect(mac.find((menu) => menu.id === 'file')?.label).toBe('File');
   });
 
   it("carries each menu's items: roles, separators and the about item's id", () => {
@@ -150,6 +170,8 @@ describe("the menu row's model", () => {
       {
         id: 'menu-0',
         label: 'Tools',
+        mnemonic: 'T',
+        mnemonicAt: 0,
         enabled: true,
         items: [
           { id: 'a', label: 'On', type: 'normal', enabled: true },
@@ -185,6 +207,19 @@ describe('labels and keys', () => {
     expect(withoutMnemonic('&File')).toBe('File');
     expect(withoutMnemonic('Save && Close')).toBe('Save & Close');
     expect(withoutMnemonic('Help')).toBe('Help');
+  });
+
+  it('reads the letter after the first single ampersand, and none from a doubled one', () => {
+    expect(mnemonicOf('E&xibir')).toEqual({ label: 'Exibir', mnemonic: 'x', mnemonicAt: 1 });
+    expect(mnemonicOf('Aju&da')).toEqual({ label: 'Ajuda', mnemonic: 'd', mnemonicAt: 3 });
+    expect(mnemonicOf('Save && &Close')).toEqual({
+      label: 'Save & Close',
+      mnemonic: 'C',
+      mnemonicAt: 7,
+    });
+    expect(mnemonicOf('&A&B')).toEqual({ label: 'AB', mnemonic: 'A', mnemonicAt: 0 });
+    expect(mnemonicOf('Help')).toEqual({ label: 'Help' });
+    expect(mnemonicOf('Odd&')).toEqual({ label: 'Odd' });
   });
 
   it('spells the modifiers the way each platform does', () => {

@@ -79,7 +79,12 @@ export const ptBR: Catalogue = {
   'update.available': 'Versão {version} disponível — Baixar',
   'update.downloading': 'Baixando a versão {version}',
   'update.ready': 'Versão {version} pronta — Reiniciar para atualizar',
-  'menu.file': 'Arquivo',
+  'menu.file': '&Arquivo',
+  'menu.edit': '&Editar',
+  'menu.view': 'E&xibir',
+  'menu.window': '&Janela',
+  // D and not U: Alt+U is CodeMirror's redoSelection, which the editor takes first (TYTO-264).
+  'menu.help': 'Aju&da',
   'command.document.new': 'Novo brief',
   'command.document.close': 'Fechar a aba',
   'command.document.next': 'Próxima aba',

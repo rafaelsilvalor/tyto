@@ -151,7 +151,7 @@ import { searchPhrasesFor } from './search-phrases.js';
 import { type TemplateSnapshot, sessionOf } from './session.js';
 import { paintUpdateNotice } from './update-notice.js';
 import { type ShellState, paint, paintTitle } from './shell.js';
-import { AltTap, MenuRow } from './menu-row.js';
+import { AltTap, MenuRow, altLettersTaken, isMenuLetterStroke } from './menu-row.js';
 import {
   type PreviewElements,
   type RequestGate,
@@ -2606,15 +2606,31 @@ function wireKeybindingDispatcher(): void {
     // F10 focuses the drawn menu row (TYTO-244, ADR 0078), **after** the table: a binding a
     // person or a plugin put on F10 wins, and a key the editor took stays the editor's. Not a
     // menu accelerator, which the browser process would answer before the page (TYTO-124).
-    if (event.defaultPrevented || stroke !== 'F10') return;
-    if (menuRow?.toggle() === true) event.preventDefault();
+    if (event.defaultPrevented || menuRow === undefined) return;
+    if (stroke === 'F10') {
+      if (menuRow.toggle()) event.preventDefault();
+      if (menuRow.focused) menuRow.showMnemonics(true, takenAltLetters());
+      return;
+    }
+    // Alt held shows each name's letter, and Alt and that letter opens its menu (TYTO-264, ADR
+    // 0078) — here, after the table, for F10's reasons: a binding on Alt+<letter> wins, and a
+    // key the editor took (Alt+L selects the line) stays the editor's. Never an `&` the
+    // browser process answers first: the row is drawn, so the native bar that would is gone.
+    if (event.key === 'Alt' && !event.ctrlKey && !event.metaKey) {
+      menuRow.showMnemonics(true, takenAltLetters());
+    } else if (isMenuLetterStroke(event) && menuRow.openByLetter(event.key, takenAltLetters())) {
+      event.preventDefault();
+    }
   });
   // Alt alone, the other door to the row. Decided on the release, because the press is also
   // the start of every Alt+key the editor, vim and the table own (`AltTap`). The same wiring
-  // and the same once-only rule as the keydown above; the keyup has nothing else to do.
+  // and the same once-only rule as the keydown above.
   window.addEventListener('keyup', (event) => {
+    if (event.key === 'Alt') menuRow?.showMnemonics(false);
     if (!altTap.up(event) || menuRow === undefined) return;
     if (menuRow.toggle()) event.preventDefault();
+    // Into the row: its letters stay underlined while it has focus. Out of it: they went with it.
+    if (menuRow.focused) menuRow.showMnemonics(true, takenAltLetters());
   });
   window.addEventListener(
     'mousedown',
@@ -2625,7 +2641,15 @@ function wireKeybindingDispatcher(): void {
   );
   window.addEventListener('blur', () => {
     altTap.reset();
+    menuRow?.showMnemonics(false);
   });
+}
+
+/** The letters the table holds with Alt, read at the keystroke as the table is (TYTO-264). */
+function takenAltLetters(): ReadonlySet<string> {
+  return altLettersTaken(
+    keybindings.bindings.map((binding) => concreteKey(binding, state.platform)),
+  );
 }
 
 /**

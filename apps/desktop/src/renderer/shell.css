@@ -136,6 +136,15 @@ textarea {
   color: var(--tyto-text-disabled);
 }
 
+/* The letter Alt opens a name with (TYTO-264): underlined only while Alt is held or a key put
+   focus in the row, as Windows does, and never for a letter the keybinding table holds. The
+   line is the text's own colour, so it follows the theme with it. */
+.title-bar__menu[data-mnemonics]
+  .title-bar__menu-item:not([data-mnemonic-taken])
+  .title-bar__mnemonic {
+  text-decoration: underline;
+}
+
 .title-bar__title {
   overflow: hidden;
   min-width: 0;

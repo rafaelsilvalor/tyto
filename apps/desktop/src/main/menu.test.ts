@@ -190,12 +190,15 @@ describe('the Help submenu', () => {
     expect(onRevealLogs).toHaveBeenCalledTimes(1);
   });
 
-  it('leaves the submenu title to Electron', () => {
-    // `role: 'help'` and no `label`, so the word "Help"/"Ajuda" is the system's rather than a
-    // second thing this repository has to translate.
-    const help = template('linux').find((item) => item.role === 'help');
-
-    expect(help?.label).toBeUndefined();
+  it('keeps the role, and names the title from the catalogue off macOS only (TYTO-264)', () => {
+    // A role's own title is Electron's fixed English on Windows and carries no mnemonic, so off
+    // macOS the catalogue's word — with its `&` — goes over it. macOS keeps the role's (ADR 0078).
+    for (const platform of ['win32', 'linux']) {
+      expect(template(platform).find((item) => item.role === 'help')?.label, platform).toBe(
+        'menu.help',
+      );
+    }
+    expect(template('darwin').find((item) => item.role === 'help')?.label).toBeUndefined();
   });
 });
 
@@ -216,6 +219,28 @@ describe('the File submenu', () => {
     // *Close Window* on `Mod-W` on the third, which is the accelerator `menu.ts` exists for.
     expect(roles(built)).not.toContain('fileMenu');
     expect(built.find((item) => item.label === 'menu.file')).toBeDefined();
+  });
+
+  it.each(['win32', 'linux'])('titles all five from the catalogue on %s (TYTO-264)', (platform) => {
+    const built = template(platform);
+    expect(built.map((item) => [item.role ?? item.id, item.label])).toEqual([
+      ['file', 'menu.file'],
+      ['editMenu', 'menu.edit'],
+      ['viewMenu', 'menu.view'],
+      ['windowMenu', 'menu.window'],
+      ['help', 'menu.help'],
+    ]);
+  });
+
+  it('drops the mnemonic from the File title on macOS, which has none (TYTO-264)', () => {
+    const mac = menuTemplate('darwin', {
+      t: (key) => (key === 'menu.file' ? '&Arquivo' : key),
+      onRevealLogs: () => {},
+      onCommand: () => {},
+      onAbout: () => {},
+    });
+    expect(mac.find((item) => item.id === 'file')?.label).toBe('Arquivo');
+    expect(mac.filter((item) => item.role !== undefined && item.label !== undefined)).toEqual([]);
   });
 
   it.each(['win32', 'darwin', 'linux'])(

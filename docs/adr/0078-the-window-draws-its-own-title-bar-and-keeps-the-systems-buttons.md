@@ -1,7 +1,8 @@
 # 0078 — The window draws its own title bar and keeps the system's buttons
 
 Status: accepted · 2026-10-11 · TYTO-244 · builds on ADR 0024, ADR 0074, ADR 0075 and ADR 0077 ·
-point 8 amended 2026-10-13 by TYTO-263, Left and Right inside an open list
+point 8 amended 2026-10-13 by TYTO-263, Left and Right inside an open list, and by TYTO-264,
+Alt and a letter
 
 ## Context
 
@@ -94,12 +95,13 @@ item does.
   Right move (wrapping), Home and End jump, Enter, Space and Down open, Escape gives focus back
   to what had it. _Amended 2026-10-13, TYTO-263:_ Left and Right **inside an open list** close
   it and open the neighbour's, wrapping, on Windows only — see the amendment below.
-- **No mnemonics.** No label in the template writes `&`, so Alt+letter opens nothing; the
-  projection strips a marker if one appears. Adding them is a template change and a decision
-  about which letters, not this card's.
+- ~~**No mnemonics.**~~ _Amended 2026-10-13, TYTO-264:_ **Alt and a letter open a menu on
+  Windows and Linux**; macOS is unchanged. See the second amendment below for the letters, the
+  rule that the keybinding table wins, and where the key is decided. (Originally: no label
+  wrote `&`, so Alt+letter opened nothing, and adding letters was left to a later card.)
 - **ARIA**: the place is `role="menubar"`; each name is a `menuitem` with `aria-haspopup="menu"`
-  and `aria-expanded`, and one name at a time is in the tab order (roving tabindex). No new
-  string: the names are the template's own labels, already in the window's language.
+  and `aria-expanded`, and one name at a time is in the tab order (roving tabindex). The names
+  are the installed menu's labels — since TYTO-264 the catalogue's on Windows and Linux.
 - **The hairline runs under the system's buttons.** The bar is one hairline taller than the
   overlay, so the line sits below the buttons instead of being painted over at the right end.
 
@@ -205,3 +207,68 @@ the Linux CI runs the mechanism); `neighbourOf` and its unit test; a Windows-onl
 `e2e/menu-row.desktop.test.ts` that wraps `hookWindowMessage` on the window from
 `app.evaluate`, hands main's handler the arrows' codes, and reads which installed submenu was
 popped next. The CI's desktop job is Linux, so that block runs on a Windows machine only.
+
+## Amendment — 2026-10-13, TYTO-264: Alt and a letter
+
+Windows opens a menu bar's menu with Alt and its underlined letter, and the drawn row did not:
+point 8 had left mnemonics out. Measured before the change on a pt-BR machine: only File's title
+was this app's; Edit, View, Window and Help were the roles' own labels, which Electron writes
+in **fixed English** on Windows, not in the system's language — the row read _Arquivo, Edit,
+View, Window, Help_.
+
+**Decision.**
+
+- **The five titles are the catalogue's on Windows and Linux, each with an `&`.** `menu.file`
+  gains its `&` and `menu.edit`, `menu.view`, `menu.window` and `menu.help` are new; `menu.ts`
+  writes them as the label over each role, so the role and everything its list does stay as
+  they were. Rafael chose the letters, unique within each language:
+
+  | Menu   | en        | pt-BR      |
+  | ------ | --------- | ---------- |
+  | File   | `&File`   | `&Arquivo` |
+  | Edit   | `&Edit`   | `&Editar`  |
+  | View   | `&View`   | `E&xibir`  |
+  | Window | `&Window` | `&Janela`  |
+  | Help   | `&Help`   | `Aju&da`   |
+
+  Help is **D** in Portuguese and not U, because Alt+U is CodeMirror's `redoSelection`, bound
+  with `preventDefault`, so the editor would always take it first.
+
+- **macOS does not change** (point 2): the roles keep their own titles, and File's title is
+  written without its `&`.
+- **The model carries the letter.** `projectMenu` answers each title's label without the `&`,
+  and beside it `mnemonic` (the letter as written) and `mnemonicAt` (where it sits in the label).
+  The row draws the letter in a span of its own.
+- **The key is decided in the window's one dispatcher** (ADR 0074), **after** the keybinding
+  table, the same place F10 is. It is never an accelerator (TYTO-124). Alt and a letter opens a
+  menu only when the stroke is Alt with neither Ctrl nor Meta, because **AltGr arrives as
+  Ctrl+Alt** and types characters on layouts such as ABNT2. The letter is compared without case
+  against the labels the row has now, so the language switch needs no restart. A key the editor
+  took (`defaultPrevented`) stays the editor's: Alt+L still selects the line.
+- **The table wins.** A binding on `Alt+<letter>` in the table — built-in, a plugin's or the
+  person's, in any context — takes that letter away from the menus. It opens nothing, and the
+  name shows no underline. Any context, because an underline cannot say "except in the
+  editor". Today the built-in table and vim hold no `Alt+<letter>`.
+- **The letter is underlined only while Alt is held, or while a key put focus in the row**
+  (Alt alone, F10, Alt+letter), as Windows does. It is the text's own colour, so it follows the
+  theme. Focus leaving the row takes the underlines with it.
+
+**Measured after the change**, the built app on Windows 11 at 900x600:
+
+- Real presses sent with `keybd_event`, the window in English: Alt+F asked main for File's list,
+  once, and Alt+H for Help's. The native side opened no second list, even though the installed
+  labels now carry `&`. With the title bar hidden there is no native menu bar to answer them
+  (point 1).
+- Portuguese through Playwright, in `e2e/menu-row.desktop.test.ts`: Alt+A opened _Arquivo_ and
+  Alt+D opened _Ajuda_ after the switch, and Alt+F opened nothing.
+
+**Consequences.**
+
+- `mnemonicOf` in `src/main/menu-model.ts`, and `isMenuLetterStroke`, `altLettersTaken`,
+  `menuForLetter`, `MenuRow.openByLetter` and `MenuRow.showMnemonics` in
+  `src/renderer/menu-row.ts`, each with unit tests.
+- A block in `e2e/menu-row.desktop.test.ts` launches the window with a `keybindings.json` that
+  binds Alt+W, and asserts four things: the underlines, Alt+F in English, the Portuguese
+  letters, and the person's Alt+W winning over Window.
+- The items inside each list that are roles (_Undo_, _Exit_, _Toggle Developer Tools_) keep
+  Electron's English on Windows. This amendment translates the titles only.
