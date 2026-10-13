@@ -2,7 +2,15 @@
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
 import type { MenuModel } from '../../shared/ipc.js';
-import { AltTap, MenuRow, type MenuOpened, neighbourOf } from './menu-row.js';
+import {
+  AltTap,
+  MenuRow,
+  type MenuOpened,
+  altLettersTaken,
+  isMenuLetterStroke,
+  menuForLetter,
+  neighbourOf,
+} from './menu-row.js';
 
 /**
  * The drawn menu row (TYTO-244, ADR 0078) in jsdom: its names, its ARIA, and its keys.
@@ -255,5 +263,141 @@ describe('the neighbour of a menu (TYTO-263)', () => {
     expect(neighbourOf(0, 1, 'next')).toBe(0);
     expect(neighbourOf(0, 1, 'previous')).toBe(0);
     expect(neighbourOf(0, 0, 'next')).toBe(0);
+  });
+});
+
+/** A title as the model carries it: the label without `&`, and its letter (TYTO-264). */
+const lettered = (id: string, label: string, at: number, enabled = true): MenuModel => ({
+  ...menu(id, label, enabled),
+  mnemonic: label.slice(at, at + 1),
+  mnemonicAt: at,
+});
+
+const ENGLISH = [
+  lettered('file', 'File', 0),
+  lettered('editmenu', 'Edit', 0),
+  lettered('viewmenu', 'View', 0),
+  lettered('windowmenu', 'Window', 0),
+  lettered('help', 'Help', 0),
+];
+
+const PORTUGUESE = [
+  lettered('file', 'Arquivo', 0),
+  lettered('editmenu', 'Editar', 0),
+  lettered('viewmenu', 'Exibir', 1),
+  lettered('windowmenu', 'Janela', 0),
+  lettered('help', 'Ajuda', 3),
+];
+
+describe('a menu by its letter (TYTO-264)', () => {
+  const none = new Set<string>();
+
+  it("finds each menu by the current language's letter, without case", () => {
+    expect(['f', 'E', 'v', 'w', 'h'].map((key) => menuForLetter(ENGLISH, key, none))).toEqual([
+      'file',
+      'editmenu',
+      'viewmenu',
+      'windowmenu',
+      'help',
+    ]);
+    expect(['a', 'e', 'X', 'j', 'd'].map((key) => menuForLetter(PORTUGUESE, key, none))).toEqual([
+      'file',
+      'editmenu',
+      'viewmenu',
+      'windowmenu',
+      'help',
+    ]);
+    // The other language's letters open nothing: Help is D in Portuguese, not H or U.
+    expect(['f', 'h', 'u'].map((key) => menuForLetter(PORTUGUESE, key, none))).toEqual([
+      undefined,
+      undefined,
+      undefined,
+    ]);
+  });
+
+  it('opens nothing for a letter the table holds, or a disabled menu', () => {
+    expect(menuForLetter(ENGLISH, 'f', new Set(['f']))).toBeUndefined();
+    expect(menuForLetter(ENGLISH, 'e', new Set(['f']))).toBe('editmenu');
+    expect(menuForLetter([lettered('file', 'File', 0, false)], 'f', none)).toBeUndefined();
+  });
+
+  it("reads the table's Alt letters from its keys, and nothing with another modifier", () => {
+    expect([
+      ...altLettersTaken(['Alt-f', 'Ctrl-Alt-g', 'Alt-Shift-h', 'Alt-F4', 'Ctrl-k']),
+    ]).toEqual(['f']);
+  });
+
+  it('is Alt and one character, never with Ctrl (AltGr) or Meta', () => {
+    const stroke = (key: string, init: { ctrlKey?: boolean; metaKey?: boolean } = {}) => ({
+      key,
+      altKey: true,
+      ctrlKey: false,
+      metaKey: false,
+      ...init,
+    });
+    expect(isMenuLetterStroke(stroke('f'))).toBe(true);
+    expect(isMenuLetterStroke(stroke('F'))).toBe(true);
+    expect(isMenuLetterStroke(stroke('f', { ctrlKey: true }))).toBe(false);
+    expect(isMenuLetterStroke(stroke('f', { metaKey: true }))).toBe(false);
+    expect(isMenuLetterStroke(stroke('Alt'))).toBe(false);
+    expect(isMenuLetterStroke(stroke('ArrowLeft'))).toBe(false);
+    expect(isMenuLetterStroke({ ...stroke('f'), altKey: false })).toBe(false);
+  });
+});
+
+describe('the row and its letters (TYTO-264)', () => {
+  const none = new Set<string>();
+  const underlined = (): string[] =>
+    container.dataset['mnemonics'] === undefined
+      ? []
+      : names()
+          .filter((button) => !button.hasAttribute('data-mnemonic-taken'))
+          .map((button) => button.querySelector('.title-bar__mnemonic')?.textContent ?? '');
+
+  it('draws the letter in its own span and keeps the name whole', () => {
+    row.draw(PORTUGUESE);
+    expect(names().map((button) => button.textContent)).toEqual([
+      'Arquivo',
+      'Editar',
+      'Exibir',
+      'Janela',
+      'Ajuda',
+    ]);
+    expect(
+      names().map((button) => button.querySelector('.title-bar__mnemonic')?.textContent),
+    ).toEqual(['A', 'E', 'x', 'J', 'd']);
+  });
+
+  it('opens the menu of a letter, from wherever focus was, and Escape gives focus back', () => {
+    row.draw(PORTUGUESE);
+    editor.focus();
+    expect(row.openByLetter('d', none)).toBe(true);
+    expect(opened.map(({ id }) => id)).toEqual(['help']);
+    expect(focusedName()).toBe('help');
+    expect(row.openByLetter('h', none)).toBe(false);
+    press('Escape');
+    expect(document.activeElement).toBe(editor);
+  });
+
+  it('underlines only while shown, and never a letter the table holds', () => {
+    row.draw(ENGLISH);
+    expect(underlined()).toEqual([]);
+    row.showMnemonics(true, new Set(['v']));
+    expect(underlined()).toEqual(['F', 'E', 'W', 'H']);
+    row.showMnemonics(false);
+    expect(underlined()).toEqual([]);
+  });
+
+  it('keeps them while a key holds the row, and drops them when focus leaves it', () => {
+    row.draw(ENGLISH);
+    editor.focus();
+    row.toggle();
+    row.showMnemonics(true);
+    // Alt's release, after Alt alone put focus here: the letters stay.
+    row.showMnemonics(false);
+    expect(underlined()).toHaveLength(5);
+    press('Escape');
+    expect(document.activeElement).toBe(editor);
+    expect(underlined()).toEqual([]);
   });
 });

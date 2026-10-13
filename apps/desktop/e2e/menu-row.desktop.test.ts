@@ -1,4 +1,4 @@
-import { existsSync, mkdirSync, mkdtempSync, rmSync } from 'node:fs';
+import { existsSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -75,13 +75,18 @@ const rowNames = (): Promise<{ id: string; label: string }[]> =>
     })),
   );
 
-/** The installed menu's own top-level labels: the one source the row must agree with. */
-const installedLabels = (): Promise<string[]> =>
-  app.evaluate(({ Menu }) =>
-    (Menu.getApplicationMenu()?.items ?? [])
-      .filter((item) => item.submenu !== undefined && item.submenu !== null)
-      .map((item) => item.label),
-  );
+/**
+ * The installed menu's own top-level labels: the one source the row must agree with. Without
+ * their mnemonic marker, which the row draws as an underline and not as an `&` (TYTO-264).
+ */
+const installedLabels = async (): Promise<string[]> =>
+  (
+    await app.evaluate(({ Menu }) =>
+      (Menu.getApplicationMenu()?.items ?? [])
+        .filter((item) => item.submenu !== undefined && item.submenu !== null)
+        .map((item) => item.label),
+    )
+  ).map((label) => label.replace(/&(&?)/g, '$1'));
 
 const focusedMenu = (): Promise<string | null> =>
   page.evaluate(() => (document.activeElement as HTMLElement | null)?.dataset['menuId'] ?? null);
@@ -108,6 +113,13 @@ beforeAll(async () => {
   }
   // Its own data folders, never the machine's (TYTO-139).
   scratch = mkdtempSync(join(tmpdir(), 'tyto-menu-row-e2e-'));
+  // TYTO-264: a person's binding on Alt+W, which must win over Window's letter. Written before
+  // launch so the window reads it with the rest of its table; nothing else here presses Alt+W.
+  mkdirSync(join(scratch, 'user-data'), { recursive: true });
+  writeFileSync(
+    join(scratch, 'user-data', 'keybindings.json'),
+    '[{ "key": "alt+w", "command": "shell.toggleLocale" }]\n',
+  );
   app = await _electron.launch({
     args: ['.', `--user-data-dir=${join(scratch, 'user-data')}`],
     cwd: join(here, '..'),
@@ -326,6 +338,134 @@ describe('the drawn menu row', () => {
     expect(after[0]?.label).not.toBe(before);
     expect(after.map(({ label }) => label)).toEqual(await installedLabels());
     await shoot('row-other-language');
+  });
+});
+
+/** The window's language, put where a case needs it through the command bar. */
+const useLocale = async (locale: 'en' | 'pt-BR'): Promise<void> => {
+  if ((await page.evaluate(() => document.documentElement.lang)) === locale) return;
+  const first = locale === 'en' ? 'File' : 'Arquivo';
+  await page.keyboard.press('Control+k');
+  await page.waitForSelector('.command-bar__input', { state: 'visible' });
+  await page.keyboard.type('shell.toggleLocale');
+  await page.waitForTimeout(150);
+  await page.keyboard.press('Enter');
+  await page.waitForFunction(
+    (label) => document.querySelector('.title-bar__menu-item')?.textContent === label,
+    first,
+    { polling: 25, timeout: 15_000 },
+  );
+};
+
+/** Alt held, a letter pressed, Alt released: what a person does for Alt+F. */
+const altAnd = async (letter: string): Promise<void> => {
+  await page.keyboard.down('Alt');
+  await page.keyboard.press(letter);
+  await page.keyboard.up('Alt');
+};
+
+/** The letters the row underlines right now, as the stylesheet draws them. */
+const underlinedLetters = (): Promise<string[]> =>
+  page.evaluate(() =>
+    [...document.querySelectorAll<HTMLElement>('.title-bar__mnemonic')]
+      .filter((letter) => getComputedStyle(letter).textDecorationLine.includes('underline'))
+      .map((letter) => letter.textContent ?? ''),
+  );
+
+describe('Alt and a letter (TYTO-264)', () => {
+  it('underlines the letters only while Alt is held, and opens File on Alt+F', async () => {
+    await useLocale('en');
+    await focusEditor();
+    expect(await underlinedLetters()).toEqual([]);
+    await page.keyboard.down('Alt');
+    // W is the person's own Alt+W (written before launch), so Window shows no underline.
+    expect(await underlinedLetters()).toEqual(['F', 'E', 'V', 'H']);
+    await shoot('alt-en');
+    await page.keyboard.up('Alt');
+    // Alt alone was a tap: the row has focus, and keeps its letters while it does.
+    expect(await focusedMenu()).toBe('file');
+    expect(await underlinedLetters()).toEqual(['F', 'E', 'V', 'H']);
+    await page.keyboard.press('Escape');
+    expect(await editorFocused()).toBe(true);
+    expect(await underlinedLetters()).toEqual([]);
+
+    const before = (await popups()).length;
+    await altAnd('f');
+    expect((await waitForPopups(before + 1)).at(-1)?.owner).toBe('file');
+    expect(await focusedMenu()).toBe('file');
+    await closeList();
+    await page.keyboard.press('Escape');
+    expect(await editorFocused()).toBe(true);
+  });
+
+  it('opens Arquivo on Alt+A and Ajuda on Alt+D in Portuguese, with no restart', async () => {
+    await useLocale('pt-BR');
+    await focusEditor();
+    await page.keyboard.down('Alt');
+    expect(await underlinedLetters()).toEqual(['A', 'E', 'x', 'J', 'd']);
+    await shoot('alt-ptbr');
+    await page.keyboard.up('Alt');
+    await page.keyboard.press('Escape');
+
+    let before = (await popups()).length;
+    await altAnd('a');
+    expect((await waitForPopups(before + 1)).at(-1)?.owner).toBe('file');
+    await closeList();
+    await page.keyboard.press('Escape');
+
+    before = (await popups()).length;
+    await altAnd('d');
+    expect((await waitForPopups(before + 1)).at(-1)?.owner).toBe('help');
+    await closeList();
+    await page.keyboard.press('Escape');
+
+    // English's letter for File opens nothing in Portuguese.
+    before = (await popups()).length;
+    await focusEditor();
+    await altAnd('f');
+    await page.waitForTimeout(200);
+    expect(await popups()).toHaveLength(before);
+    expect(await focusedMenu()).toBeNull();
+  });
+
+  it('leaves Alt+L to the editor, which selects the line, and opens no menu', async () => {
+    await useLocale('en');
+    await focusEditor();
+    await page.keyboard.press('Control+End');
+    await page.keyboard.press('Enter');
+    await page.keyboard.insertText('linha');
+    const position = (): Promise<string> =>
+      page.evaluate(() => document.querySelector('.status-bar__position')?.textContent ?? '');
+    expect(await position()).not.toContain('(');
+    const before = (await popups()).length;
+    await altAnd('l');
+    // The status bar counts what is selected in brackets: the line, and its line break.
+    await page.waitForFunction(
+      () => document.querySelector('.status-bar__position')?.textContent?.includes('(') === true,
+      undefined,
+      { polling: 25, timeout: 5_000 },
+    );
+    expect(await popups()).toHaveLength(before);
+    expect(await editorFocused()).toBe(true);
+  });
+
+  it("gives Alt+W to the person's binding, not to Window", async () => {
+    await useLocale('en');
+    await focusEditor();
+    const before = (await popups()).length;
+    await altAnd('w');
+    await page.waitForFunction(() => document.documentElement.lang === 'pt-BR', undefined, {
+      polling: 25,
+      timeout: 15_000,
+    });
+    expect(await popups()).toHaveLength(before);
+    expect(await focusedMenu()).toBeNull();
+    // And Janela's letter is J, which nothing holds: it opens.
+    await altAnd('j');
+    expect((await waitForPopups(before + 1)).at(-1)?.owner).toBe('windowmenu');
+    await closeList();
+    await page.keyboard.press('Escape');
+    await useLocale('en');
   });
 });
 

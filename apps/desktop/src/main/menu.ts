@@ -2,6 +2,7 @@ import type { MenuItemConstructorOptions } from 'electron';
 
 import { FILE_MENU_GROUPS, RELOAD_COMMAND } from '../../shared/commands.js';
 import type { CatalogueKey } from '../../shared/i18n/index.js';
+import { withoutMnemonic } from './menu-model.js';
 
 /**
  * The application menu, which exists for one reason: **two of its default accelerators
@@ -38,11 +39,17 @@ import type { CatalogueKey } from '../../shared/i18n/index.js';
  * and its key is the window's `Mod-r` rather than an accelerator here, which would take
  * `Ctrl-R` from vim's redo. Force Reload stays out.
  *
- * Roles and not labels, **where the label is the system's to write**. A role's label is
- * Electron's own, in the system's language, which is the right answer for *Minimize* and
- * *Quit*. TYTO-132 added the first exception, the Help submenu's one item; TYTO-124 added the
- * larger one, the File submenu, which is this app's verbs and so this app's words. The two
- * submenu titles Electron still owns are Help's and Edit's, because their roles keep them.
+ * Roles and not labels, **where the label is Electron's to write**. A role's label is
+ * Electron's own — and on Windows that is **fixed English**, not the system's language:
+ * measured on a pt-BR machine, the row read "Arquivo, Edit, View, Window, Help" (TYTO-264).
+ * That is accepted for the items inside the lists (*Minimize*, *Exit*) and is a gap, not a
+ * decision. TYTO-132 added the first label of this app's own, the Help submenu's one item;
+ * TYTO-124 added the File submenu, which is this app's verbs and so this app's words.
+ *
+ * **The five top-level titles are this app's off macOS** (TYTO-264, ADR 0078): each carries a
+ * mnemonic — `&File`, `E&xibir` — so Alt and that letter open it, and a role's label has none.
+ * The role stays, so what each list holds and does is unchanged. macOS keeps the roles' own
+ * titles and the File title without its `&` (ADR 0078 §2): a Mac has no mnemonics.
  *
  * **The File items name commands rather than implement them.** `shared/commands.ts` is the
  * table both processes read — the renderer registers those ids, this file draws them, and
@@ -101,6 +108,8 @@ export function aboutText(t: (key: CatalogueKey) => string, facts: AboutFacts): 
 
 export function menuTemplate(platform: string, options: MenuOptions): MenuItemConstructorOptions[] {
   const mac = platform === 'darwin';
+  // A top-level title off macOS, with its mnemonic; nothing on macOS, where the role's stays.
+  const title = (key: CatalogueKey): { label?: string } => (mac ? {} : { label: options.t(key) });
 
   return [
     // On macOS the app menu is where Quit lives and the first submenu is always the app's.
@@ -118,7 +127,7 @@ export function menuTemplate(platform: string, options: MenuOptions): MenuItemCo
       // The id the drawn menu row asks for it by (TYTO-244); every other top-level item has a
       // role, and the row names those by it (`menu-model.ts`).
       id: 'file',
-      label: options.t('menu.file'),
+      label: mac ? withoutMnemonic(options.t('menu.file')) : options.t('menu.file'),
       submenu: [
         ...FILE_MENU_GROUPS.flatMap((group, index) => [
           ...(index === 0 ? [] : [{ type: 'separator' } as const]),
@@ -144,7 +153,7 @@ export function menuTemplate(platform: string, options: MenuOptions): MenuItemCo
     },
     // Left as Electron built them. `editMenu` is what makes copy and paste work on macOS,
     // where the clipboard shortcuts are the menu's rather than the page's.
-    { role: 'editMenu' },
+    { role: 'editMenu', ...title('menu.edit') },
     // Written out because the default carries Reload and Force Reload as roles, which tear the
     // page down before it can keep its tabs. Reload is the window's command instead (TYTO-113).
     // Originally: a reload discarded every open buffer. Everything else the role would have built is kept, item
@@ -153,6 +162,7 @@ export function menuTemplate(platform: string, options: MenuOptions): MenuItemCo
     // entries that are the problem.
     {
       role: 'viewMenu',
+      ...title('menu.view'),
       submenu: [
         {
           id: RELOAD_COMMAND.id,
@@ -174,20 +184,22 @@ export function menuTemplate(platform: string, options: MenuOptions): MenuItemCo
     // the key a tab now answers to.
     {
       role: 'windowMenu',
+      ...title('menu.window'),
       submenu: [
         { role: 'minimize' },
         { role: 'zoom' },
         ...(mac ? [{ role: 'front' } as const] : []),
       ],
     },
-    // TYTO-132. `role: 'help'` rather than a labelled top-level item, so the submenu's title
-    // stays Electron's in the system's language and only the item inside it is this app's.
+    // TYTO-132. `role: 'help'` rather than a plain top-level item, so the role keeps what it
+    // means to the system; its title is this app's off macOS since TYTO-264, for the mnemonic.
     //
     // A menu item and not a path printed somewhere: the acceptance criterion is that a person
     // reaches the file **without being told a path**, and a tester who has to be talked
     // through `%APPDATA%` is a tester whose report never arrives.
     {
       role: 'help',
+      ...title('menu.help'),
       submenu: [
         { label: options.t('menu.revealLogs'), click: options.onRevealLogs },
         // A label and a click rather than `role: 'about'`, so the facts are read when it is

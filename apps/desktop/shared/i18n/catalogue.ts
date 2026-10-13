@@ -241,8 +241,20 @@ export interface Catalogue {
    * Written by this app rather than left to `role: 'fileMenu'`, because that role's entire
    * content on Windows and Linux is Quit — and on macOS it brings *Close Window* on `Mod-W`,
    * which is the accelerator `src/main/menu.ts` exists to keep away from the page.
+   *
+   * Since TYTO-264 it carries its mnemonic, `&` before the letter Alt opens it with, as the four
+   * keys after it do (ADR 0078). Each language picks its own letters, unique within it.
    */
   readonly 'menu.file': string;
+  /**
+   * The other four top-level titles (TYTO-264). Their roles' own labels are Electron's fixed
+   * English on Windows and Linux — not the system's language — and carry no mnemonic, so off
+   * macOS the template writes these over them. macOS keeps the roles' titles (ADR 0078 §2).
+   */
+  readonly 'menu.edit': string;
+  readonly 'menu.view': string;
+  readonly 'menu.window': string;
+  readonly 'menu.help': string;
   readonly 'command.document.new': string;
   readonly 'command.document.close': string;
   readonly 'command.document.next': string;
@@ -542,6 +554,10 @@ export const CATALOGUE_KEYS = [
   'update.downloading',
   'update.ready',
   'menu.file',
+  'menu.edit',
+  'menu.view',
+  'menu.window',
+  'menu.help',
   'command.document.new',
   'command.document.close',
   'command.document.next',

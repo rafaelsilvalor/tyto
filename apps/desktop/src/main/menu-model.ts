@@ -53,12 +53,40 @@ export function topLevelId(item: MenuItemLike, index: number): string {
 
 /**
  * The label without its mnemonic marker: `&File` reads `File`, and `&&` is a literal `&`.
- *
- * Today's template writes no `&`, so nothing has a mnemonic and Alt+letter opens nothing;
- * this keeps a marker out of the row if a label ever grows one.
  */
 export function withoutMnemonic(label: string): string {
   return label.replace(/&(&?)/g, (_match, literal: string) => literal);
+}
+
+/** A label as the row draws it, and the letter Alt opens it with, if it has one. */
+export interface Mnemonic {
+  readonly label: string;
+  /** The character after the first single `&`, as written: `x` for `E&xibir`. */
+  readonly mnemonic?: string;
+  /** Where that character sits in {@link Mnemonic.label}, so the row can underline it. */
+  readonly mnemonicAt?: number;
+}
+
+/**
+ * `E&xibir` → `Exibir`, `x` at 1 (TYTO-264, ADR 0078). The first single `&` marks the letter, as
+ * Windows reads it; `&&` is a literal `&` and marks nothing, and a trailing `&` marks nothing.
+ */
+export function mnemonicOf(written: string): Mnemonic {
+  let label = '';
+  let found: { mnemonic: string; mnemonicAt: number } | undefined;
+  for (let index = 0; index < written.length; index += 1) {
+    const char = written[index]!;
+    if (char !== '&') {
+      label += char;
+      continue;
+    }
+    const next = written[index + 1];
+    index += 1;
+    if (next === undefined) break;
+    if (next !== '&' && found === undefined) found = { mnemonic: next, mnemonicAt: label.length };
+    label += next;
+  }
+  return found === undefined ? { label } : { label, ...found };
 }
 
 /** An Electron accelerator as a person reads it on this platform: `Ctrl+Shift+I`. */
@@ -128,7 +156,8 @@ export function projectMenu(menu: MenuLike | null, platform: string): MenuModel[
     const role = typeof item.role === 'string' && item.role !== '' ? item.role.toLowerCase() : '';
     models.push({
       id: topLevelId(item, index),
-      label: withoutMnemonic(item.label ?? ''),
+      // The label and its letter: the row draws the one and underlines the other (TYTO-264).
+      ...mnemonicOf(item.label ?? ''),
       ...(role === '' ? {} : { role }),
       enabled: item.enabled !== false,
       items: item.submenu.items
