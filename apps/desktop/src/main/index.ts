@@ -40,6 +40,7 @@ import { createSessionService, createTemplateFolder } from './session.js';
 import { fileSessionStore } from './session-store.js';
 import { crashSummary, fileLog, installCrashHandlers } from './log.js';
 import { type AboutFacts, aboutText, menuTemplate } from './menu.js';
+import { LeakedArrow, popupWithArrows } from './menu-arrows.js';
 import { findTopLevel, projectMenu } from './menu-model.js';
 import { fileRecentFiles } from './recent-files.js';
 import { registerIpcHandlers, sendIpcEvent } from './ipc.js';
@@ -248,6 +249,8 @@ async function start(): Promise<void> {
   // to `prefer-const` as a `const` written the long way round. It is genuinely reassigned —
   // below, after the window exists.
   let mainWindow: BrowserWindow | undefined = undefined;
+  // The arrow press that moved an open menu list, swallowed once it reaches the page (TYTO-263).
+  const leakedArrow = new LeakedArrow();
 
   // The language everything main draws is in: the menu, and the crash box below. It starts as
   // the system's, because that is the only one main has before the window has said anything,
@@ -936,23 +939,21 @@ async function start(): Promise<void> {
       // The native list of one top-level menu, under its name in the row. The point arrives
       // in CSS pixels and `popup` takes the window's, so it is scaled by the page's zoom —
       // View > Zoom In would otherwise open the list away from the name. Settles when the
-      // list closes, picked from or dismissed.
+      // list closes, picked from or dismissed — or, on Windows, closed by Left or Right,
+      // which the answer carries so the window opens the neighbour (TYTO-263).
       popup: (id, at) => {
         const submenu = findTopLevel(Menu.getApplicationMenu(), id)?.submenu;
         const window = mainWindow;
         if (!(submenu instanceof Menu) || window === undefined || window.isDestroyed()) {
-          return Promise.resolve(false);
+          return Promise.resolve({ opened: false });
         }
         const zoom = window.webContents.getZoomFactor();
-        return new Promise((resolve) => {
-          submenu.popup({
-            window,
-            x: Math.round(at.x * zoom),
-            y: Math.round(at.y * zoom),
-            callback: () => {
-              resolve(true);
-            },
-          });
+        return popupWithArrows<BrowserWindow>({
+          menu: submenu,
+          window,
+          at: { x: Math.round(at.x * zoom), y: Math.round(at.y * zoom) },
+          platform: process.platform,
+          leaked: leakedArrow,
         });
       },
     },
@@ -1137,6 +1138,12 @@ async function start(): Promise<void> {
   // got instead of putting a second dialog in front of one click.
   mainWindow.on('close', (event) => {
     if (!exit.mayExit(() => mainWindow?.close())) event.preventDefault();
+  });
+
+  // The arrow that moved an open menu to its neighbour reaches the page once the list is
+  // gone, where the row and the editor would act on it a second time (TYTO-263).
+  mainWindow.webContents.on('before-input-event', (event, input) => {
+    if (leakedArrow.take(input)) event.preventDefault();
   });
 
   mainWindow.webContents.on('will-prevent-unload', (event) => {

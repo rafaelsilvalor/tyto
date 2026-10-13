@@ -1,4 +1,21 @@
-import type { MenuModel } from '../../shared/ipc.js';
+import type { MenuModel, MenuMove } from '../../shared/ipc.js';
+
+/** What opening a list answers: whether it opened, and which way an arrow left it (TYTO-263). */
+export interface MenuOpened {
+  readonly opened: boolean;
+  readonly move?: MenuMove | undefined;
+}
+
+/**
+ * The name beside `index` in a row of `count`, wrapping at both ends, as a menu bar does.
+ *
+ * One function for both doors: Left and Right on the row itself, and Left and Right inside an
+ * open list, which main reports as a `move` (TYTO-263).
+ */
+export function neighbourOf(index: number, count: number, move: MenuMove): number {
+  if (count <= 0) return 0;
+  return move === 'next' ? (index + 1) % count : (index - 1 + count) % count;
+}
 
 /**
  * The menu row the window draws in its title bar (TYTO-244, ADR 0078).
@@ -13,7 +30,8 @@ import type { MenuModel } from '../../shared/ipc.js';
  * ARIA's menubar pattern: the container is `menubar`, each name a `menuitem` that says it has
  * a popup and whether it is open, and one name at a time is in the tab order (roving
  * tabindex). Left and Right move between names, Enter, Space and Down open the list, Escape
- * leaves the row for whatever had focus before it.
+ * leaves the row for whatever had focus before it. Left and Right **inside** an open list
+ * close it and open the neighbour's, on Windows, where main can hear them (TYTO-263).
  *
  * Alt and F10 are not here. They are keys of the whole window, so they live in its one
  * dispatcher (ADR 0074) and call {@link MenuRow.toggle}; {@link AltTap} is the part of that
@@ -21,7 +39,7 @@ import type { MenuModel } from '../../shared/ipc.js';
  */
 export class MenuRow {
   private readonly container: HTMLElement;
-  private readonly open: (id: string, at: { x: number; y: number }) => Promise<unknown>;
+  private readonly open: (id: string, at: { x: number; y: number }) => Promise<MenuOpened>;
   private buttons: HTMLButtonElement[] = [];
   private current = 0;
   /** What had focus before the row took it, so Escape can give it back. */
@@ -29,7 +47,7 @@ export class MenuRow {
 
   constructor(
     container: HTMLElement,
-    open: (id: string, at: { x: number; y: number }) => Promise<unknown>,
+    open: (id: string, at: { x: number; y: number }) => Promise<MenuOpened>,
   ) {
     this.container = container;
     this.open = open;
@@ -108,10 +126,10 @@ export class MenuRow {
     const last = this.buttons.length - 1;
     switch (event.key) {
       case 'ArrowRight':
-        this.rove(index === last ? 0 : index + 1, true);
+        this.rove(neighbourOf(index, this.buttons.length, 'next'), true);
         break;
       case 'ArrowLeft':
-        this.rove(index === 0 ? last : index - 1, true);
+        this.rove(neighbourOf(index, this.buttons.length, 'previous'), true);
         break;
       case 'Home':
         this.rove(0, true);
@@ -143,7 +161,10 @@ export class MenuRow {
     if (focus) this.buttons[index]?.focus();
   }
 
-  /** Asks main for the native list under the name, and says it is open until it closes. */
+  /**
+   * Asks main for the native list under the name, and says it is open until it closes. A list
+   * an arrow closed opens the neighbour's in its place, the way a menu bar walks (TYTO-263).
+   */
   private async openAt(index: number): Promise<void> {
     const button = this.buttons[index];
     const id = button?.dataset['menuId'];
@@ -152,11 +173,13 @@ export class MenuRow {
     this.rove(index, true);
     const box = button.getBoundingClientRect();
     button.setAttribute('aria-expanded', 'true');
+    let move: MenuMove | undefined;
     try {
-      await this.open(id, { x: box.left, y: box.bottom });
+      move = (await this.open(id, { x: box.left, y: box.bottom })).move;
     } finally {
       button.setAttribute('aria-expanded', 'false');
     }
+    if (move !== undefined) await this.openAt(neighbourOf(index, this.buttons.length, move));
   }
 }
 

@@ -21,6 +21,11 @@ import { firstWindow } from './first-window.js';
  * shipped app grows a hook; it is the same seam `title-bar.desktop.test.ts` uses for
  * `setTitleBarOverlay`.
  *
+ * Left and Right inside an open list (TYTO-263) go through a second seam of the same kind:
+ * main listens to the window's `WM_KEYDOWN` with `hookWindowMessage` while a list is open, so
+ * the suite wraps that method on the window and calls the handler main gave it with the
+ * arrow's virtual-key code, as Windows would. Only on Windows, where the method exists.
+ *
  * With `TYTO_MENU_ROW_SHOTS` set to a folder, the suite leaves CDP screenshots there.
  */
 
@@ -130,7 +135,34 @@ beforeAll(async () => {
       });
       store.tytoClose = options?.callback;
     };
+    // The list closing because main closed it — which it does when an arrow moves the menu.
+    Menu.prototype.closePopup = function () {
+      const close = store.tytoClose;
+      delete store.tytoClose;
+      close?.();
+    };
   });
+  if (process.platform === 'win32') {
+    await app.evaluate(({ BrowserWindow }) => {
+      const window = BrowserWindow.getAllWindows()[0]!;
+      const store = globalThis as unknown as {
+        tytoHooks: Record<number, (wParam: Buffer, lParam: Buffer) => void>;
+      };
+      store.tytoHooks = {};
+      // The second seam (TYTO-263): the handler main hooks while a list is open, held so a
+      // case can hand it a key. The real hook is still installed, as main asked.
+      const hook = window.hookWindowMessage.bind(window);
+      const unhook = window.unhookWindowMessage.bind(window);
+      window.hookWindowMessage = (message, callback) => {
+        store.tytoHooks[message] = callback;
+        hook(message, callback);
+      };
+      window.unhookWindowMessage = (message) => {
+        delete store.tytoHooks[message];
+        unhook(message);
+      };
+    });
+  }
 });
 
 afterAll(async () => {
@@ -296,3 +328,134 @@ describe('the drawn menu row', () => {
     await shoot('row-other-language');
   });
 });
+
+/** `WM_KEYDOWN` and the arrows' virtual-key codes, as Windows hands them to the hook. */
+const WM_KEYDOWN = 0x0100;
+const VK_LEFT = 0x25;
+const VK_RIGHT = 0x27;
+
+/** The window receiving an arrow while a list is open: what main's hook would be handed. */
+const pressInList = (code: number): Promise<boolean> =>
+  app.evaluate(
+    (_electron, { message, code }) => {
+      const store = globalThis as unknown as {
+        tytoHooks: Record<number, ((wParam: Buffer, lParam: Buffer) => void) | undefined>;
+      };
+      const handler = store.tytoHooks[message];
+      if (handler === undefined) return false;
+      const wParam = Buffer.alloc(8);
+      wParam.writeUInt32LE(code, 0);
+      handler(wParam, Buffer.alloc(8));
+      return true;
+    },
+    { message: WM_KEYDOWN, code },
+  );
+
+const expanded = (): Promise<string[]> =>
+  page.evaluate(() =>
+    [...document.querySelectorAll('.title-bar__menu-item')]
+      .filter((button) => button.getAttribute('aria-expanded') === 'true')
+      .map((button) => (button as HTMLElement).dataset['menuId'] ?? ''),
+  );
+
+// `hookWindowMessage` is Windows-only, and so is the mechanism: on Linux and macOS a list
+// stays as it was (ADR 0078). The CI's desktop job runs Linux, so this block runs on a
+// Windows machine only.
+describe.skipIf(process.platform !== 'win32')(
+  'Left and Right inside an open list (TYTO-263, Windows only: hookWindowMessage)',
+  () => {
+    it('holds no list with a nested submenu, so Right inside a list always moves', async () => {
+      const nested = await app.evaluate(({ Menu }) =>
+        (Menu.getApplicationMenu()?.items ?? []).flatMap((top) =>
+          (top.submenu?.items ?? [])
+            .filter((item) => item.submenu !== undefined && item.submenu !== null)
+            .map((item) => `${top.label} > ${item.label}`),
+        ),
+      );
+      expect(nested).toEqual([]);
+    });
+
+    it('opens Window from Help on Left, and Help from File on Left, wrapping', async () => {
+      let before = (await popups()).length;
+      await page.click('.title-bar__menu-item[data-menu-id="help"]');
+      await waitForPopups(before + 1);
+      expect(await pressInList(VK_LEFT)).toBe(true);
+      expect((await waitForPopups(before + 2)).at(-1)?.owner).toBe('windowmenu');
+      await page.waitForFunction(
+        () => (document.activeElement as HTMLElement | null)?.dataset['menuId'] === 'windowmenu',
+      );
+      expect(await expanded()).toEqual(['windowmenu']);
+      await closeList();
+      await page.waitForFunction(
+        () => document.querySelector('.title-bar__menu-item[aria-expanded="true"]') === null,
+      );
+
+      before = (await popups()).length;
+      await page.click('.title-bar__menu-item[data-menu-id="file"]');
+      await waitForPopups(before + 1);
+      expect(await pressInList(VK_LEFT)).toBe(true);
+      expect((await waitForPopups(before + 2)).at(-1)?.owner).toBe('help');
+      expect(await expanded()).toEqual(['help']);
+      await closeList();
+    });
+
+    it('opens File from Help on Right, wrapping, and unhooks when the list closes', async () => {
+      const before = (await popups()).length;
+      await page.click('.title-bar__menu-item[data-menu-id="help"]');
+      await waitForPopups(before + 1);
+      expect(await pressInList(VK_RIGHT)).toBe(true);
+      expect((await waitForPopups(before + 2)).at(-1)?.owner).toBe('file');
+      await closeList();
+      // The list closed by a click away, not an arrow: the hook is gone with it.
+      expect(await pressInList(VK_LEFT)).toBe(false);
+    });
+
+    it("swallows the arrow's own press when it reaches the page, and only that one", async () => {
+      await page.evaluate(() => {
+        const seen: string[] = [];
+        (globalThis as unknown as { tytoKeys: string[] }).tytoKeys = seen;
+        window.addEventListener(
+          'keydown',
+          (event) => {
+            seen.push(event.key);
+          },
+          { capture: true },
+        );
+      });
+      const before = (await popups()).length;
+      await page.click('.title-bar__menu-item[data-menu-id="help"]');
+      await waitForPopups(before + 1);
+      // The move and, at once, the same press arriving at the page as Windows delivers it
+      // once the list has gone.
+      await app.evaluate(
+        ({ BrowserWindow }, { message, code }) => {
+          const store = globalThis as unknown as {
+            tytoHooks: Record<number, (wParam: Buffer, lParam: Buffer) => void>;
+          };
+          const wParam = Buffer.alloc(8);
+          wParam.writeUInt32LE(code, 0);
+          store.tytoHooks[message]?.(wParam, Buffer.alloc(8));
+          const contents = BrowserWindow.getAllWindows()[0]!.webContents;
+          contents.sendInputEvent({ type: 'keyDown', keyCode: 'Left' });
+          contents.sendInputEvent({ type: 'keyUp', keyCode: 'Left' });
+        },
+        { message: WM_KEYDOWN, code: VK_LEFT },
+      );
+      await waitForPopups(before + 2);
+      await closeList();
+      // A second press is the person's own, and the page has it.
+      await app.evaluate(({ BrowserWindow }) => {
+        const contents = BrowserWindow.getAllWindows()[0]!.webContents;
+        contents.sendInputEvent({ type: 'keyDown', keyCode: 'Left' });
+        contents.sendInputEvent({ type: 'keyUp', keyCode: 'Left' });
+      });
+      await page.waitForFunction(() =>
+        (globalThis as unknown as { tytoKeys: string[] }).tytoKeys.includes('ArrowLeft'),
+      );
+      const keys = await page.evaluate(
+        () => (globalThis as unknown as { tytoKeys: string[] }).tytoKeys,
+      );
+      expect(keys.filter((key) => key === 'ArrowLeft')).toHaveLength(1);
+    });
+  },
+);
