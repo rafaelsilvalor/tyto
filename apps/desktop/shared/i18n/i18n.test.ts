@@ -62,6 +62,8 @@ describe('the catalogue', () => {
       'shell.about.templates',
       // TYTO-44's slide picker, for `preview.slide.label`'s reason.
       'templateMode.slide',
+      // TYTO-276's heading over the templates in the "/" menu, for `template.label`'s reason.
+      'slash.section.templates',
     ]);
   });
 });

@@ -14,6 +14,9 @@ import {
   cursorOf,
   insertBriefSkeleton,
   keyOfStroke,
+  openSlashMenu,
+  type SlashSource,
+  slashCompletion,
   resolveKeybindings,
   shownBindingsOf,
   windowBindingsOf,
@@ -42,6 +45,9 @@ import {
   editorChromeFor,
   languageOf,
   paintEditorChrome,
+  type SlashTemplateNote,
+  slashTemplateChoiceFor,
+  slashTemplateNote,
   templateChoiceFor,
 } from './editor-chrome.js';
 import { readKeybindingsText } from './keybindings-file.js';
@@ -932,6 +938,14 @@ const registry: CommandRegistry = withCommandGate(
       pickTemplate();
     },
 
+    openInsertMenu: () => {
+      if (editor === undefined) return;
+      // Focus first: the list closes when the editor loses focus, and the command may have
+      // come from the bar, which held it.
+      editor.view.focus();
+      openSlashMenu(editor.view);
+    },
+
     newDocument: () => {
       // **Added and never substituted, which is the whole of the card's second criterion.**
       // `adopt` replaces the tab in front when `isDisposable` says it holds nothing — right for
@@ -1592,6 +1606,46 @@ function insertSkeleton(name: string): void {
   });
   editor.view.focus();
 }
+
+/**
+ * The templates in the "/" menu (TYTO-276): the picker's rows as `templates:list` last answered,
+ * each saying what choosing it does to the brief in front. On a brief with nothing but the "/"
+ * the skeleton goes in, as the picker does; on one with content, `template:` switches and the
+ * "/" goes in the same transaction, so one Ctrl+Z takes both back.
+ */
+const templatesSlashSource = (): SlashSource => ({
+  // A getter, so the heading is in the window's language each time the menu opens.
+  get section() {
+    return translate(state.locale, 'slash.section.templates');
+  },
+  items: (editorState, from, to) => {
+    const text = editorState.doc.toString();
+    return panel.templates.map((template) => ({
+      label: template.name,
+      detail: slashNoteText(slashTemplateNote(text, from, to, template.name)),
+      apply: (view, start, end) => {
+        const choice = slashTemplateChoiceFor(
+          active().kind,
+          view.state.doc.toString(),
+          start,
+          end,
+          template.name,
+        );
+        if (choice === undefined) return;
+        if (choice.kind === 'skeleton') {
+          insertSkeleton(template.name);
+          return;
+        }
+        view.dispatch({ changes: choice.changes, userEvent: 'input.complete' });
+      },
+    }));
+  },
+});
+
+const slashNoteText = (note: SlashTemplateNote): string => {
+  const text = translate(state.locale, note.key);
+  return note.key === 'slash.template.switch' ? text.replace('{current}', note.current) : text;
+};
 
 /**
  * The picker's rows and the installation problems, from one answer (TYTO-122).
@@ -3084,7 +3138,12 @@ async function load(): Promise<void> {
       // Slots, adjustments, enum values and plugin directives after `::`, and the
       // underline, both fed from the preview's answer. No delay of the linter's own: the
       // preview's debounce is the pause, and a second one would only add to it.
-      extensions: [briefLint(analysis.analyzer, { delay: 0 }), briefCompletion()],
+      // The "/" menu beside them (TYTO-276): the templates, read at each opening.
+      extensions: [
+        briefLint(analysis.analyzer, { delay: 0 }),
+        briefCompletion(),
+        slashCompletion([templatesSlashSource()]),
+      ],
     });
     // Narrowed once, because `editor` is a module-level `let` and TypeScript widens it
     // again inside every callback below.

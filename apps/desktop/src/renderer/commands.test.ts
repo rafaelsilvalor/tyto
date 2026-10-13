@@ -15,6 +15,7 @@ import {
   DOCUMENT_NEW,
   DOCUMENT_NEW_FROM_TEMPLATE,
   FILE_EXPORT,
+  EDITOR_INSERT_MENU,
   EDITOR_OPEN,
   EDITOR_SAVE_AS,
   EDITOR_TOGGLE_VIM,
@@ -51,6 +52,7 @@ const actions = () =>
     stepSlide: vi.fn<(direction: 1 | -1) => void>(),
     toggleLocale: vi.fn<() => void>(),
     toggleVimMode: vi.fn<() => void>(),
+    openInsertMenu: vi.fn<() => void>(),
     newDocument: vi.fn<() => void>(),
     newDocumentFromTemplate: vi.fn<() => void>(),
     openDocument: vi.fn<() => void>(),
@@ -197,6 +199,23 @@ describe('the ids the window registers', () => {
     expect(spies.newDocumentFromTemplate).toHaveBeenCalledOnce();
     expect(spies.newDocument).not.toHaveBeenCalled();
     expect(bindingsOf(keymapSetFor(false), 'linux')[DOCUMENT_NEW_FROM_TEMPLATE]).toBeUndefined();
+  });
+
+  it('runs the insert menu on a brief only, with no keystroke (TYTO-276)', () => {
+    const spies = actions();
+    let brief = true;
+    const registry = withCommandGate(
+      createDesktopRegistry(spies),
+      (id) => brief || !BRIEF_ONLY_COMMANDS.has(id),
+    );
+
+    expect(registry.run(EDITOR_INSERT_MENU, NO_VIEW)).toBe(true);
+    brief = false;
+    expect(registry.run(EDITOR_INSERT_MENU, NO_VIEW)).toBe(false);
+    expect(spies.openInsertMenu).toHaveBeenCalledOnce();
+    // `Mod-/` is the comment toggle; the menu's key is whatever `keybindings.json` gives it.
+    expect(bindingsOf(keymapSetFor(false), 'linux')[EDITOR_INSERT_MENU]).toBeUndefined();
+    expect(bindingsOf(keymapSetFor(true), 'linux')[EDITOR_INSERT_MENU]).toBeUndefined();
   });
 
   it('gives the template folder commands no keystroke', () => {
