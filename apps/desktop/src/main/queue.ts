@@ -17,6 +17,7 @@ import type { OutputRequest } from '@tyto/pipeline';
 import { DEFAULT_QUEUE_KINDS } from '../../shared/settings.js';
 
 import type { ExportProgress, ExportRequest } from './export.js';
+import { gateInbox } from './queue-gate.js';
 
 /**
  * The local queue panel's half in main (TYTO-45, `docs/integrations.md` What stays in Tyto).
@@ -154,7 +155,14 @@ export function createQueueService(options: QueueOptions): QueueService {
   let kindsByFolder = resolveKinds(options.kinds ?? {});
   const kindsOf = (root: string): readonly string[] =>
     kindsByFolder[resolve(root)] ?? DEFAULT_QUEUE_KINDS;
-  let sources = folder === null ? undefined : options.sources(folder);
+  // Every reader and the acknowledgement of one folder go through one gate (TYTO-239): a
+  // listing opens every brief in the inbox, and Windows will not move a folder with a file in
+  // it open, so the queue must never read the inbox while it moves a task out of it.
+  const open = (root: string): QueueSources => {
+    const opened = options.sources(root);
+    return { inbox: gateInbox(opened.inbox), done: opened.done };
+  };
+  let sources = folder === null ? undefined : open(folder);
   let controller: AbortController | undefined;
   // Replaced, not cleared, when the folder changes: pointing the window somewhere else must
   // not carry one folder's `task-1` failure onto another's, and a render still finishing in
@@ -328,7 +336,7 @@ export function createQueueService(options: QueueOptions): QueueService {
 
     async setFolder(next: string | null): Promise<void> {
       folder = next === null ? null : resolve(next);
-      sources = folder === null ? undefined : options.sources(folder);
+      sources = folder === null ? undefined : open(folder);
       known = new Map();
       listed = new Map();
       lastInbox = '';
