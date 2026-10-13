@@ -45,6 +45,13 @@ export interface EditorKeymap {
  */
 export const EDITOR_SAVE = 'editor.save';
 export const EDITOR_RENDER = 'editor.render';
+/**
+ * Split the editor group in front, to the right or down (TYTO-286). Named here, beside save,
+ * because vim's `:vsplit` and `:split` reach them by id and vim is this package's; what a
+ * split *is* belongs to the host, which registers them.
+ */
+export const EDITOR_SPLIT_RIGHT = 'editor.splitRight';
+export const EDITOR_SPLIT_DOWN = 'editor.splitDown';
 
 /** `insertMode` off the vim engine's own state, which is the only place it is kept. */
 const vimInsertMode = (view: EditorView): boolean | undefined => {

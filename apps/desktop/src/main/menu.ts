@@ -1,6 +1,6 @@
 import type { MenuItemConstructorOptions } from 'electron';
 
-import { FILE_MENU_GROUPS, RELOAD_COMMAND } from '../../shared/commands.js';
+import { FILE_MENU_GROUPS, RELOAD_COMMAND, VIEW_MENU_COMMANDS } from '../../shared/commands.js';
 import type { CatalogueKey } from '../../shared/i18n/index.js';
 import { withoutMnemonic } from './menu-model.js';
 
@@ -170,6 +170,15 @@ export function menuTemplate(platform: string, options: MenuOptions): MenuItemCo
       role: 'viewMenu',
       ...title('menu.view'),
       submenu: [
+        // TYTO-286. No accelerators, for the File menu's reason: the keys are the page's.
+        ...VIEW_MENU_COMMANDS.map((command) => ({
+          id: command.id,
+          label: options.t(command.label),
+          click: () => {
+            options.onCommand(command.id);
+          },
+        })),
+        { type: 'separator' as const },
         {
           id: RELOAD_COMMAND.id,
           label: options.t(RELOAD_COMMAND.label),

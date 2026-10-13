@@ -97,6 +97,10 @@ Seven panels in four docks, plus a status bar and a command bar:
 └──────────────────────────────────────────────────┘
 ```
 
+> **Amended by ADR 0083 (TYTO-286).** The document tabs are no longer the window's strip across
+> the top: the editor panel holds a tree of editor groups, each with its own row of tabs over
+> its own pane, and the strip in the drawing above is now drawn by each group.
+
 **No panel is bound to a dock.** The arrangement above is the default record, not a structure: a panel is `{ panel: 'tyto-problems', dock: 'bottom', open: true, size: 240 }`, and the dock creates the element from the tag. What a person can do with it in the next cards is **show, hide and resize**, with the arrangement and the sizes persisted. Dragging a panel from one dock to another is a later card and needs no change to the shape above — that is the whole reason the shape is a record.
 
 **No docking library, and its cost is therefore not measured.** The card asked what one would cost in bytes and in what it assumes about its host; none was installed, so that number does not exist and this ADR does not invent it. The reason is that the thing a docking library is for — dragging a panel from one dock to another — is explicitly not in the next card, and a dependency bought for an interaction nobody is building yet is a second framework decision made on no evidence. Show, hide and resize is a splitter and a record. When dragging does get a card, that card measures the libraries against a dock that already exists, which is a far better comparison than this one could have been.

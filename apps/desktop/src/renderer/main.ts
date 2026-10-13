@@ -2,6 +2,7 @@ import {
   type BriefSnippet,
   type CommandRegistry,
   type EditorHandle,
+  type EditorPane,
   type KeybindingContext,
   type KeybindingEntry,
   type KeybindingLayer,
@@ -15,6 +16,7 @@ import {
   createEditor,
   cursorOf,
   insertBriefSkeleton,
+  isFollower,
   keyOfStroke,
   openSlashMenu,
   type SlashSource,
@@ -22,6 +24,7 @@ import {
   snippetsSlashSource,
   tabThroughCompletions,
   resolveKeybindings,
+  selectionOf,
   shownBindingsOf,
   windowBindingsOf,
   withDiagnostics,
@@ -113,7 +116,6 @@ import {
   addDocument,
   closeDocument,
   contentOf,
-  documentAtSlot,
   documentOf,
   isBroken,
   isDisposable,
@@ -123,7 +125,6 @@ import {
   rebaseEdit,
   releaseDocument,
   selectDocument,
-  stepDocument,
   updateDocument,
   workspaceOf,
 } from './documents.js';
@@ -141,7 +142,28 @@ import {
   withoutRowsAbout,
 } from './problems-mark.js';
 import { SAVE_FAILED, saveFailureDiagnostic } from './save-failure.js';
-import { type DocumentTabs, TABS_TAG } from './tabs.js';
+import { type EditorGroupElement, arrangeGroups } from './editor-group.js';
+import {
+  type EditorGroup,
+  type EditorGroups,
+  type GroupNode,
+  activateTab,
+  activeTabOf,
+  closeDocumentTabs,
+  closeTab as closeGroupTab,
+  focusGroup,
+  focusNeighbour,
+  focusedDocumentId,
+  focusedGroup,
+  groupById,
+  groupList,
+  groupOfTab,
+  groupsOf,
+  openDocument,
+  replaceDocument,
+  shownDocumentIds,
+  splitGroup,
+} from './editor-groups.js';
 import { type ProblemsPanel, PROBLEMS_TAG } from './problems-panel.js';
 import { arrange, wireSplitters } from './dock.js';
 import './panels.js';
@@ -227,7 +249,11 @@ const PREVIEW_DELAY = 200;
  * `brief-analysis.ts` says why there is no second analyzer. The template names come from
  * the picker's list, which is the same registry the preview resolves against.
  */
-const analysis = previewAnalysis(() => state.templates);
+const analysis = previewAnalysis(
+  () => state.templates,
+  // Per document since TYTO-286: the pane asking is matched to the document it shows.
+  (view) => documentShownBy(view),
+);
 
 /** The installed plugins' panels by layout id, once main has said which there are (ADR 0045). */
 const offeredPanels = new Map<string, OfferedPanel>();
@@ -264,8 +290,20 @@ const nextDocumentId = (): string => {
  */
 let workspace: Workspace = workspaceOf(newDocument(nextDocumentId()));
 
-/** The document every painter below reads. */
-const active = (): DocumentState => activeOf(workspace);
+/**
+ * Where each open document is shown: the editor groups (TYTO-286, ADR 0083). A tree of splits
+ * whose leaves each have a row of tabs and one in front; the window opens on one group holding
+ * the one document. `workspace.activeId` is kept equal to the focused group's document by
+ * {@link showGroups}, so `documents.ts`'s own operations still read a consistent workspace.
+ */
+let groups: EditorGroups = groupsOf([workspace.activeId], workspace.activeId);
+
+/**
+ * The document every painter below reads: **the focused group's** tab in front (ADR 0083).
+ * The status bar, the problems panel, the preview, the command bar and the title follow it.
+ */
+const active = (): DocumentState =>
+  documentOf(workspace, focusedDocumentId(groups) ?? workspace.activeId) ?? activeOf(workspace);
 
 /**
  * What the document in front says, read from the workspace and never from the editor.
@@ -288,7 +326,7 @@ const activeText = (): string => contentOf(active());
 
 /** Changes the active document and leaves every other one exactly as it was. */
 function updateActive(change: (document: DocumentState) => DocumentState): void {
-  workspace = updateDocument(workspace, workspace.activeId, change);
+  workspace = updateDocument(workspace, active().id, change);
 }
 
 /**
@@ -424,12 +462,9 @@ function resolveElements() {
     queuePanel: document.querySelector<QueuePanel>(QUEUE_PANEL_TAG),
     // TYTO-44. Outside `.shell` for the export dialog's reason: it covers the window.
     templateMode: document.querySelector<TemplateMode>(TEMPLATE_MODE_TAG),
-    // Outside the docks, like the command bar: the strip lists what the *window* has open,
-    // so it must not disappear with a panel.
-    tabs: document.querySelector<DocumentTabs>(TABS_TAG),
     // TYTO-131. At the end of the status bar; hidden while there is nothing newer.
     updateNotice: byId<HTMLButtonElement>('update-notice'),
-    // TYTO-248. Outside the docks, like the tabs: the bar belongs to the window.
+    // TYTO-248. Outside the docks, like the command bar: the bar belongs to the window.
     statusBar: document.querySelector<StatusBar>(STATUS_BAR_TAG),
   };
 }
@@ -509,7 +544,8 @@ function ask(bridge: TytoBridge, documentId: string, brief: string): void {
 
 /** The card's acceptance criterion, in `panel.ts` where a test can drive it. */
 function reveal(range: SourceRange): void {
-  if (editor !== undefined) revealRange(editor.view, range);
+  const target = focusedPane();
+  if (target !== undefined) revealRange(target.view, range);
 }
 
 function paintPanel(): void {
@@ -542,20 +578,30 @@ const labelOf = (document_: DocumentState): string =>
   document_.name ?? translate(state.locale, 'document.untitled');
 
 function paintTabs(): void {
-  const strip = elements.tabs;
-  if (strip === null) return;
-  strip.locale = state.locale;
-  strip.activeId = workspace.activeId;
-  // A fresh array every time, for the reason the problems panel's state object is fresh:
-  // Lit compares by identity and `repeat` keyed by document id is what makes rebuilding
-  // this list cost only the tabs that changed.
-  strip.tabs = workspace.documents.map((document_) => ({
-    id: document_.id,
-    label: labelOf(document_),
-    // Compared, never looked up: there is no field on a document that says it has been
-    // typed in, and this is the only place the strip learns of one that has (TYTO-112).
-    dirty: isUnsaved(document_),
-  }));
+  // One strip per group (TYTO-286). A fresh array every time, for the reason the problems
+  // panel's state object is fresh: Lit compares by identity and `repeat` keyed by tab id is
+  // what makes rebuilding a strip cost only the tabs that changed.
+  for (const group of groupList(groups)) {
+    const element = groupElements.get(group.id);
+    if (element === undefined) continue;
+    element.locale = state.locale;
+    element.focused = group.id === groups.focusedGroupId;
+    element.activeTabId = group.activeTabId ?? '';
+    element.tabs = group.tabs.flatMap((tab) => {
+      const document_ = documentOf(workspace, tab.documentId);
+      // Compared, never looked up: there is no field on a document that says it has been
+      // typed in, and this is the only place a strip learns of one that has (TYTO-112).
+      return document_ === undefined
+        ? []
+        : [{ id: tab.id, label: labelOf(document_), dirty: isUnsaved(document_) }];
+    });
+    element.select = (tabId) => {
+      selectTab(tabId);
+    };
+    element.close = (tabId) => {
+      void requestCloseTab(tabId);
+    };
+  }
 }
 
 /**
@@ -783,7 +829,7 @@ function openExportDialog(): void {
   dialog.start = (request) => {
     void withBridge(async (bridge) => {
       const answer = await bridge['export:start']({
-        documentId: workspace.activeId,
+        documentId: active().id,
         // The buffer, not the file: an unsaved edit is still what the person is looking at.
         brief: activeText(),
         directory: request.directory,
@@ -952,11 +998,12 @@ const registry: CommandRegistry = withCommandGate(
     },
 
     openInsertMenu: () => {
-      if (editor === undefined) return;
+      const target = focusedPane();
+      if (target === undefined) return;
       // Focus first: the list closes when the editor loses focus, and the command may have
       // come from the bar, which held it.
-      editor.view.focus();
-      openSlashMenu(editor.view);
+      target.view.focus();
+      openSlashMenu(target.view);
     },
 
     newDocument: () => {
@@ -965,10 +1012,8 @@ const registry: CommandRegistry = withCommandGate(
       // opening a file, wrong here: a New pressed on an empty tab would open no tab at all, and
       // the person who asked for a blank page would watch nothing happen. So `isDisposable`'s
       // rule is not consulted and not changed.
-      captureScroll();
       workspace = addDocument(workspace, newDocument(nextDocumentId(), editor?.blank('')));
-      restoreActive();
-      repaint();
+      followWorkspace();
     },
 
     openDocument: () => {
@@ -985,7 +1030,7 @@ const registry: CommandRegistry = withCommandGate(
         // where the text comes from. A save fired in the paint before CodeMirror is mounted
         // would write the empty string over a file.
         if (editor === undefined) return;
-        await saveOneDocument(bridge, workspace.activeId, saveAs);
+        await saveOneDocument(bridge, active().id, saveAs);
       });
     },
 
@@ -998,11 +1043,28 @@ const registry: CommandRegistry = withCommandGate(
     },
 
     closeDocument: () => {
-      void requestClose(workspace.activeId);
+      // The focused group's tab in front (TYTO-286): `Mod-w` acts within the group.
+      const tab = activeTabOf(focusedGroup(groups));
+      if (tab !== undefined) void requestCloseTab(tab.id);
     },
 
     stepDocument: (direction) => {
-      activate(stepDocument(workspace, direction));
+      const group = focusedGroup(groups);
+      const at = group.tabs.findIndex((tab) => tab.id === group.activeTabId);
+      const next = group.tabs[(at + direction + group.tabs.length) % group.tabs.length];
+      if (next !== undefined) selectTab(next.id);
+    },
+
+    splitGroup: (direction) => {
+      // The same document in the new group, which takes the focus (ADR 0083).
+      if (editor === undefined) return;
+      groups = splitGroup(groups, direction);
+      showGroups();
+    },
+
+    focusGroup: (direction) => {
+      groups = focusNeighbour(groups, direction);
+      showGroups();
     },
 
     toggleVimMode: () => {
@@ -1040,48 +1102,222 @@ async function withBridge(use: (bridge: TytoBridge) => Promise<void>): Promise<v
 }
 
 /**
- * Remembers where the pane was looking, before it is pointed at another document.
+ * The editor groups on screen (TYTO-286, ADR 0083): each group's element, the CodeMirror pane
+ * in it, and which document that pane is showing right now.
  *
- * **This used to capture the document too, and no longer has to** (TYTO-115). The state
- * arrives here on every transaction, so what is left is the half that is genuinely the
- * pane's: scroll is a property of the view and the store cannot derive it (D7). It is
- * measured rather than watched because reading it costs a layout flush, and a pane is about
- * to change document at most as often as somebody clicks a tab.
+ * **One editor and several panes**, not one editor per group: every pane is made by the one
+ * `createEditor` handle, so they share its compartments, its command registry and the listener
+ * that tells this file about a transaction. A document shown in two groups has one **primary**
+ * pane, holding the record the workspace keeps (with its undo history), and a **follower** in
+ * every other: same text, own selection, no history, edits copied both ways by the editor.
  */
-function captureScroll(): void {
-  if (editor === undefined) return;
-  const scroll = editor.scroll();
-  updateActive((document_) => ({ ...document_, scroll }));
+const groupElements = new Map<string, EditorGroupElement>();
+const panes = new Map<string, EditorPane>();
+/** Group id to the document its pane shows: the truth `onUpdate` writes by, never `active()`. */
+const shownIn = new Map<string, string>();
+/** The tree's shape when it was last laid out, so a repaint that changed no split moves nothing. */
+let arrangedShape = '';
+
+const shapeOf = (node: GroupNode): string =>
+  node.kind === 'group'
+    ? node.id
+    : `${node.direction}(${node.children.map(shapeOf).join(',')}:${node.sizes.join(',')})`;
+
+/** The group whose pane is `view`, with that pane. */
+function paneOfView(view: object | undefined): [string, EditorPane] | undefined {
+  for (const entry of panes) if (entry[1].view === view) return entry;
+  return undefined;
 }
 
-/** Puts a document in the editor and in front of every panel. */
-function activate(id: string): void {
-  if (id === workspace.activeId || documentOf(workspace, id) === undefined) return;
-  captureScroll();
-  workspace = selectDocument(workspace, id);
-  restoreActive();
+/** The document a pane is showing, by its view: what the analysis and `onUpdate` key by. */
+function documentShownBy(view: object | undefined): string | undefined {
+  const found = paneOfView(view);
+  return found === undefined ? undefined : shownIn.get(found[0]);
+}
+
+/** The focused group's pane: where a command, a reveal or the caret goes. */
+const focusedPane = (): EditorPane | undefined => panes.get(groups.focusedGroupId);
+
+/** The pane holding a document's record, if any pane shows it: the one to dispatch into. */
+function primaryPaneOf(documentId: string): EditorPane | undefined {
+  for (const [groupId, shown] of shownIn) {
+    const candidate = panes.get(groupId);
+    if (shown === documentId && candidate !== undefined && !isFollower(candidate.state())) {
+      return candidate;
+    }
+  }
+  return undefined;
+}
+
+/**
+ * Lays the groups out when the tree changed shape, and makes or takes away their panes.
+ *
+ * A group that went away first lets go of its document ({@link leave}), so a record it held
+ * passes to another pane before the view is destroyed. A new group gets a pane at once, since
+ * its element is connected and its mount exists the moment `arrangeGroups` returns.
+ */
+function arrangeEditorGroups(): void {
+  const container = document.querySelector<HTMLElement>('[data-editor-groups]');
+  if (container === null) return;
+  const shape = shapeOf(groups.root);
+  if (shape === arrangedShape && container.firstElementChild !== null) return;
+  arrangedShape = shape;
+
+  const live = new Set(groupList(groups).map((group) => group.id));
+  for (const id of [...panes.keys()]) if (!live.has(id)) leave(id);
+
+  const { created, removed } = arrangeGroups(container, groups, groupElements);
+  for (const id of removed) {
+    panes.get(id)?.destroy();
+    panes.delete(id);
+    shownIn.delete(id);
+  }
+  if (editor !== undefined) {
+    for (const element of created) {
+      if (!panes.has(element.groupId)) panes.set(element.groupId, editor.createPane(element.mount));
+    }
+  }
+  // A view that was moved measures again: its box is another size now.
+  for (const each of panes.values()) each.view.requestMeasure();
+
+  // Focus follows the person into a group: a click in its pane or on its tabs (ADR 0083). A
+  // click in the problems panel or the preview is outside every group and changes nothing.
+  once(container, 'focusin', (event) => {
+    const target = event.target instanceof Element ? event.target : null;
+    const groupId = target?.closest<HTMLElement>('[data-editor-group]')?.dataset['editorGroup'];
+    if (groupId === undefined || groupId === groups.focusedGroupId) return;
+    if (groupById(groups, groupId) === undefined) return;
+    groups = focusGroup(groups, groupId);
+    syncActiveDocument();
+    repaint();
+  });
+}
+
+/**
+ * A pane stops showing its document. If it held the record and another pane still shows the
+ * document, that pane is promoted: it takes the record with its own selection, and every other
+ * follower is rebuilt to follow it. Where the pane was scrolled is kept for the document.
+ */
+function leave(groupId: string): void {
+  const pane_ = panes.get(groupId);
+  const documentId = shownIn.get(groupId);
+  shownIn.delete(groupId);
+  if (pane_ === undefined || documentId === undefined) return;
+  const current = documentOf(workspace, documentId);
+  if (current === undefined || isFollower(pane_.state())) return;
+  if (pane_.view.scrollDOM.clientHeight > 0) {
+    const scroll = pane_.scroll();
+    workspace = updateDocument(workspace, documentId, (document_) => ({ ...document_, scroll }));
+  }
+  const others = [...shownIn].filter(([, shown]) => shown === documentId).map(([id]) => id);
+  const [heir, ...rest] = others.map((id) => panes.get(id));
+  const record = current.state;
+  if (heir === undefined || record === undefined) return;
+  heir.restore(withSelection(record, selectionOf(heir.state())), heir.scroll());
+  for (const follower of rest)
+    follower?.restore(editor?.followerOf(heir) ?? record, follower.scroll());
+}
+
+/** A pane starts showing a document: as its primary, or as a follower of the pane that is. */
+function enter(groupId: string, documentId: string): void {
+  const pane_ = panes.get(groupId);
+  const target = documentOf(workspace, documentId);
+  if (pane_ === undefined || editor === undefined || target?.state === undefined) return;
+  const primary = primaryPaneOf(documentId);
+  // Set before the restore: its reconfigure transactions reach `onUpdate`, which must already
+  // know which document this pane holds.
+  shownIn.set(groupId, documentId);
+  pane_.restore(primary === undefined ? target.state : editor.followerOf(primary), target.scroll);
+}
+
+/**
+ * Puts every pane on its group's tab in front: what the groups say, the panes now show.
+ *
+ * Nothing is read out of a pane here except at a hand-off ({@link leave}), which is the
+ * direction TYTO-115 removed: the workspace holds the state and this only points views at it.
+ */
+function present(): void {
+  arrangeEditorGroups();
+  if (editor === undefined) return;
+  for (const group of groupList(groups)) {
+    const wanted = activeTabOf(group)?.documentId;
+    if (shownIn.get(group.id) === wanted) continue;
+    leave(group.id);
+    if (wanted !== undefined) enter(group.id, wanted);
+  }
+}
+
+/** `workspace.activeId` brought to the focused group's document, the one {@link active} reads. */
+function syncActiveDocument(): void {
+  const id = focusedDocumentId(groups);
+  if (id !== undefined && id !== workspace.activeId) workspace = selectDocument(workspace, id);
+}
+
+/**
+ * The groups changed — a tab chosen, a split, a close, focus moved: the panes follow, the
+ * caret goes into the focused one, and the window is painted.
+ *
+ * And the caret goes back in. Clicking a tab moves focus to the tab's own button, and a person
+ * who has just chosen a document wants to type into it — every editor does this, and without
+ * it the first keystroke after a switch goes nowhere a person can see.
+ */
+function showGroups(): void {
+  syncActiveDocument();
+  present();
+  focusedPane()?.view.focus();
   repaint();
 }
 
 /**
- * Shows the active document in the pane, undo history, cursor and scroll included.
- *
- * And puts the caret back in it. Clicking a tab moves focus to the tab's own button, and a
- * person who has just chosen a document wants to type into it — every editor does this, and
- * without it the first keystroke after a switch goes nowhere a person can see.
- *
- * Nothing is read *out* of the pane here, which is the direction the refactor removed: the
- * workspace is holding the state already and this only points a viewport at it.
+ * The workspace gained or lost documents — a file opened, a new tab, a close, a session read:
+ * the groups follow. A document no tab shows goes into the focused group; a tab whose document
+ * is gone closes, and a group left with none closes with it. The focused group then shows the
+ * workspace's active document.
  */
-function restoreActive(): void {
-  if (editor === undefined) return;
-  const current = active();
-  if (current.state !== undefined) editor.restore(current.state, current.scroll);
-  editor.view.focus();
+function followWorkspace(): void {
+  const open = new Set(workspace.documents.map((document_) => document_.id));
+  for (const id of shownDocumentIds(groups)) {
+    if (!open.has(id)) groups = closeDocumentTabs(groups, id);
+  }
+  const shown = shownDocumentIds(groups);
+  for (const document_ of workspace.documents) {
+    if (!shown.has(document_.id)) groups = openDocument(groups, document_.id);
+  }
+  groups = revealDocument(groups, workspace.activeId);
+  showGroups();
 }
 
 /**
- * Takes the state CodeMirror was born holding into the document the window opened on.
+ * The tab a document already has — in the focused group first, then in any — brought to the
+ * front; a new tab in the focused group when it has none. Opening a file another group holds
+ * goes there rather than making a second tab of it.
+ */
+function revealDocument(current: EditorGroups, documentId: string): EditorGroups {
+  const tabs = [focusedGroup(current), ...groupList(current)].flatMap(
+    (group: EditorGroup) => group.tabs,
+  );
+  const existing = tabs.find((tab) => tab.documentId === documentId);
+  return existing === undefined
+    ? openDocument(current, documentId)
+    : activateTab(current, existing.id);
+}
+
+/** Puts a document in front of every panel, wherever its tab is. */
+function activate(id: string): void {
+  if (documentOf(workspace, id) === undefined) return;
+  groups = revealDocument(groups, id);
+  showGroups();
+}
+
+/** A tab clicked, a slot key, a step: that tab in front of its group, and its group focused. */
+function selectTab(tabId: string): void {
+  groups = activateTab(groups, tabId);
+  showGroups();
+}
+
+/**
+ * Takes the state CodeMirror was born holding into the document the window opened on, and
+ * says the first group's pane shows it.
  *
  * The one seam where the store is *behind* the pane, and it lasts one statement: the
  * workspace is built at module load and the editor is created after the dock has arranged,
@@ -1090,7 +1326,12 @@ function restoreActive(): void {
  * store can answer for.
  */
 function adoptEditorState(handle: EditorHandle): void {
+  const first = groupList(groups)[0];
   updateActive((document_) => ({ ...document_, state: handle.state() }));
+  if (first !== undefined) {
+    panes.set(first.id, handle.firstPane);
+    shownIn.set(first.id, active().id);
+  }
 }
 
 /**
@@ -1139,8 +1380,9 @@ function adopt(
     savedText: contentOf(born),
   };
 
-  captureScroll();
   const current = active();
+  // The tab nobody typed in becomes the file in every group that shows it (TYTO-286).
+  if (isDisposable(current)) groups = replaceDocument(groups, current.id, created.id);
   workspace = isDisposable(current)
     ? {
         // A tab in no file that nobody has typed in is replaced rather than pushed aside,
@@ -1154,8 +1396,7 @@ function adopt(
       }
     : addDocument(workspace, created);
 
-  restoreActive();
-  repaint();
+  followWorkspace();
   void withBridge((bridge) =>
     kind === undefined
       ? request(bridge, created.id, opened.text)
@@ -1233,10 +1474,13 @@ function setFileDiagnostics(
   }));
   const target = documentOf(workspace, documentId);
   if (target?.state !== undefined && contentOf(target) === text) {
-    if (documentId === workspace.activeId && editor !== undefined) {
-      // Through the view, which tells the store in `onUpdate`; not `onChange`, so no loop.
-      editor.showDiagnostics(diagnostics);
-    } else {
+    // Every pane that shows it, in any group (TYTO-286): the primary's tells the store in
+    // `onUpdate`; not `onChange`, so no loop. A follower's markers are its own to draw.
+    const showing = [...shownIn]
+      .filter(([, shown]) => shown === documentId)
+      .flatMap(([groupId]) => panes.get(groupId) ?? []);
+    for (const each of showing) each.showDiagnostics(diagnostics);
+    if (showing.length === 0) {
       const marked = withDiagnostics(target.state, diagnostics);
       workspace = updateDocument(workspace, documentId, (document_) => ({
         ...document_,
@@ -1244,7 +1488,7 @@ function setFileDiagnostics(
       }));
     }
   }
-  if (documentId === workspace.activeId) repaint();
+  if (documentId === active().id) repaint();
 }
 
 /**
@@ -1433,8 +1677,11 @@ function replaceSettingsText(documentId: string, text: string, base: string | un
   const current = contentOf(target);
   if (current === text) return;
   const changes = rebaseEdit(base ?? current, current, text);
-  if (documentId === workspace.activeId && editor !== undefined) {
-    editor.view.dispatch({ changes });
+  // Through the pane holding the record when any group shows it (TYTO-286), so a follower is
+  // given the change too.
+  const primary = primaryPaneOf(documentId);
+  if (primary !== undefined) {
+    primary.view.dispatch({ changes });
     return;
   }
   workspace = updateDocument(workspace, documentId, (document_) => ({
@@ -1667,10 +1914,8 @@ function pickTemplate(): void {
  */
 function openSkeleton(name: string): void {
   if (editor === undefined || !panel.templates.some((template) => template.name === name)) return;
-  captureScroll();
   workspace = addDocument(workspace, newDocument(nextDocumentId(), editor.blank('')));
-  restoreActive();
-  repaint();
+  followWorkspace();
   insertSkeleton(name);
 }
 
@@ -1680,13 +1925,14 @@ function openSkeleton(name: string): void {
  */
 function insertSkeleton(name: string): void {
   const template = panel.templates.find((candidate) => candidate.name === name);
-  if (template === undefined || editor === undefined) return;
-  insertBriefSkeleton(editor.view, {
+  const target = focusedPane();
+  if (template === undefined || target === undefined) return;
+  insertBriefSkeleton(target.view, {
     name: template.name,
     formats: template.formats.map((format) => format.id),
     slots: template.slots,
   });
-  editor.view.focus();
+  target.view.focus();
 }
 
 /**
@@ -2048,19 +2294,28 @@ async function keepSession(final: boolean): Promise<boolean> {
 /**
  * The workspace with the tab in front scrolled where its pane is now (TYTO-265).
  *
- * Measured here and not kept live, for `captureScroll`'s reason: a scroll is a layout read, and
+ * Measured here and not kept live, for `leave`'s reason: a scroll is a layout read, and
  * the wheel moves it without a transaction. Not written back into the workspace either, since
  * that is a repaint and a repaint asks for another write. A pane with no height — hidden behind
  * the template mode — measures the top whatever it shows, so the last capture stands then.
  */
 function withLiveScroll(current: Workspace): Workspace {
-  if (editor === undefined || editor.view.scrollDOM.clientHeight === 0) return current;
-  const scroll = editor.scroll();
+  // Every group's primary pane, for the document it shows (TYTO-286); a follower's scroll is
+  // its own and the document keeps one.
+  const scrolls = new Map<string, ReturnType<EditorPane['scroll']>>();
+  for (const [groupId, documentId] of shownIn) {
+    const shown = panes.get(groupId);
+    if (shown === undefined || isFollower(shown.state())) continue;
+    if (shown.view.scrollDOM.clientHeight === 0) continue;
+    scrolls.set(documentId, shown.scroll());
+  }
+  if (scrolls.size === 0) return current;
   return {
     ...current,
-    documents: current.documents.map((document_) =>
-      document_.id === current.activeId ? { ...document_, scroll } : document_,
-    ),
+    documents: current.documents.map((document_) => {
+      const scroll = scrolls.get(document_.id);
+      return scroll === undefined ? document_ : { ...document_, scroll };
+    }),
   };
 }
 
@@ -2200,14 +2455,15 @@ async function restoreSession(bridge: TytoBridge, handle: EditorHandle): Promise
   }
 
   if (restored.length > 0) {
-    captureScroll();
     // The tab the window opened on stays only if somebody already typed in it.
     const kept = workspace.documents.filter((document_) => !isDisposable(document_));
     workspace = {
       documents: [...restored, ...kept],
       activeId: activeId ?? (restored[0] as DocumentState).id,
     };
-    restoreActive();
+    // Into the groups as they are; a session written with several comes back as one for now
+    // (TYTO-286 PR A — the session keeps no groups yet).
+    followWorkspace();
     for (const document_ of restored) {
       if (document_.kind === undefined) void request(bridge, document_.id, contentOf(document_));
       else void validateAppFile(bridge, document_.id);
@@ -2240,13 +2496,36 @@ function closeTab(id: string): void {
     await bridge['file:close']({ documentId: id });
   });
 
-  const before = workspace.activeId;
-  if (id === before) captureScroll();
   // Closing the last tab leaves an empty one rather than an empty window: there would be
   // nowhere to type, and typing is the state this app opens in.
   workspace = closeDocument(workspace, id, () => newDocument(nextDocumentId(), editor?.blank('')));
-  if (workspace.activeId !== before) restoreActive();
-  repaint();
+  // Every tab of it, in every group; the focused group's neighbour comes to the front there.
+  groups = closeDocumentTabs(groups, id);
+  const open = new Set(workspace.documents.map((document_) => document_.id));
+  for (const document_ of workspace.documents) {
+    if (!shownDocumentIds(groups).has(document_.id) && open.has(document_.id)) {
+      groups = openDocument(groups, document_.id);
+    }
+  }
+  showGroups();
+}
+
+/**
+ * Closes one tab (TYTO-286). A document another group also shows only loses this tab, with no
+ * question — nothing is lost; its last tab closes the document, asking first when it is unsaved.
+ */
+async function requestCloseTab(tabId: string): Promise<void> {
+  const tab = groupOfTab(groups, tabId)?.tabs.find((each) => each.id === tabId);
+  if (tab === undefined) return;
+  const elsewhere = groupList(groups).some((group) =>
+    group.tabs.some((each) => each.id !== tabId && each.documentId === tab.documentId),
+  );
+  if (!elsewhere) {
+    await requestClose(tab.documentId);
+    return;
+  }
+  groups = closeGroupTab(groups, tabId);
+  showGroups();
 }
 
 /**
@@ -2354,8 +2633,9 @@ function registerDocumentCommands(): void {
       id: selectDocumentCommandId(slot),
       label: String(slot),
       run: () => {
-        const target = documentAtSlot(workspace, slot);
-        if (target !== undefined) activate(target.id);
+        // The focused group's tabs (TYTO-286): `Mod-2` is the second tab of the group in front.
+        const target = focusedGroup(groups).tabs[slot - 1];
+        if (target !== undefined) selectTab(target.id);
       },
     });
   }
@@ -2389,7 +2669,8 @@ function commandEntries(): readonly CommandEntry[] {
     // A slot past the last tab is left out rather than shown doing nothing. The command
     // stays registered, because the keystroke table is fixed and a `Mod-7` pressed with six
     // tabs open should be a key that does nothing, not a key that runs the wrong tab.
-    const tab = slot === undefined ? undefined : documentAtSlot(workspace, slot);
+    const slotTab = slot === undefined ? undefined : focusedGroup(groups).tabs[slot - 1];
+    const tab = slotTab === undefined ? undefined : documentOf(workspace, slotTab.documentId);
     if (slot !== undefined && tab === undefined) return [];
 
     const label =
@@ -2449,6 +2730,7 @@ function paintStatusBar(): void {
   // Every way the panel comes on screen — its button, the command bar, a key, showing the
   // bottom area — ends in a repaint, so this is the one place that has to know.
   if (problemsShown) problemsMark = seen(problemsMark);
+  const shownState = focusedPane()?.state() ?? current.state;
   bar.commands = STATUS_COMMANDS;
   bar.offered = offeredNow;
   bar.run = (id) => {
@@ -2457,8 +2739,8 @@ function paintStatusBar(): void {
   bar.state = {
     locale: state.locale,
     vim: editor?.isVimMode() === true ? vimStatus : null,
-    cursor:
-      current.state === undefined ? { line: 1, column: 1, selected: 0 } : cursorOf(current.state),
+    // The focused pane's caret (TYTO-286): a follower's selection is its own, not the record's.
+    cursor: shownState === undefined ? { line: 1, column: 1, selected: 0 } : cursorOf(shownState),
     kind: current.kind ?? 'brief',
     template: current.kind === undefined ? templateOf(activeText()) : undefined,
     problems: problems.length,
@@ -2509,13 +2791,15 @@ async function applyLayout(persist: boolean): Promise<void> {
     if (panel instanceof PluginPanel) panel.offered = offeredPanels.get(panel.panelId);
   }
 
+  // The editor groups before the lookup: the first group's pane is `#editor` (TYTO-286).
+  arrangeEditorGroups();
   elements = resolveElements();
   pane = previewElements();
   wirePreviewControls(window.tyto === undefined);
   wirePanelControls();
   wireQueuePanel();
   wireCommandBar();
-  wireTabs();
+  present();
   repaint();
 
   if (persist) {
@@ -2631,13 +2915,12 @@ async function request(bridge: TytoBridge, documentId: string, brief: string): P
   const requestId = gate.next();
   const answer = await bridge['brief:preview']({ requestId, documentId, brief });
   if (!gate.accept(answer.requestId)) return;
-  // The editor shows the active document, so only its answers reach the gutter. A tab
-  // compiled in the background is published when it is compiled again in front.
-  if (documentId === workspace.activeId) {
-    analysis.publish({ ...answer, brief });
-    // The plugins' panels hear the document on the same pause the preview compiles on.
-    announceDocument(document, brief);
-  }
+  // Every document a group shows has its answers reach that pane's gutter (TYTO-286); a tab
+  // compiled in the background is published when it is compiled again on screen.
+  if ([...shownIn.values()].includes(documentId))
+    analysis.publish(documentId, { ...answer, brief });
+  // The plugins' panels hear the focused document on the same pause the preview compiles on.
+  if (documentId === active().id) announceDocument(document, brief);
 
   const errors = errorCount(answer.diagnostics);
 
@@ -2681,7 +2964,7 @@ async function request(bridge: TytoBridge, documentId: string, brief: string): P
     };
   });
 
-  if (documentId === workspace.activeId) repaint();
+  if (documentId === active().id) repaint();
 }
 
 /**
@@ -2773,8 +3056,10 @@ function wirePreviewControls(bridgeless: boolean): void {
  * yet.
  */
 function runCommand(id: string): boolean {
-  if (editor === undefined) return false;
-  return registry.run(id, { view: editor.view });
+  // The focused group's view (TYTO-286): undo there, find there, save its document.
+  const target = focusedPane();
+  if (target === undefined) return false;
+  return registry.run(id, { view: target.view });
 }
 
 /**
@@ -2791,20 +3076,6 @@ function wireCommandBar(): void {
   bar.run = (id) => runCommand(id);
   bar.close = () => undefined;
   paintCommandBar();
-}
-
-/** The strip's two callbacks, set for the same reason and at the same time as the bar's. */
-function wireTabs(): void {
-  const strip = elements.tabs;
-  if (strip === null) return;
-
-  strip.select = (id) => {
-    activate(id);
-  };
-  strip.close = (id) => {
-    void requestClose(id);
-  };
-  paintTabs();
 }
 
 /**
@@ -2941,7 +3212,8 @@ function wirePanelControls(): void {
 
   once(elements.template, 'change', () => {
     const picker = elements.template;
-    if (picker === null || editor === undefined || picker.value === '') return;
+    const target = focusedPane();
+    if (picker === null || target === undefined || picker.value === '') return;
 
     // An edit dispatched into the document, not a `setValue`. That is what keeps the cursor
     // where it was, puts the old template back under Ctrl+Z, and — the part that matters
@@ -2957,7 +3229,7 @@ function wirePanelControls(): void {
       return;
     }
     const { edit } = choice;
-    editor.view.dispatch({
+    target.view.dispatch({
       changes: { from: edit.from, to: edit.to, insert: edit.insert },
     });
   });
@@ -3024,6 +3296,10 @@ function wireTemplateMode(mode: TemplateMode, bridge: TytoBridge): void {
     // The mode is part of the session (TYTO-266), kept on the same pause as the tabs.
     changed: () => {
       keepSessionSoon();
+    },
+    // Back into the focused group's pane, where the person was before the mode (TYTO-286).
+    closed: () => {
+      focusedPane()?.view.focus();
     },
   };
 }
@@ -3122,6 +3398,7 @@ async function load(): Promise<void> {
   registerDocumentCommands();
   // Arranged **before** anything is looked up: there are no panels in the document until
   // the dock has made them, so every `getElementById` before this line would answer null.
+  // `applyLayout` also lays out the editor groups, which is what makes `#editor` (TYTO-286).
   await applyLayout(false);
   if (bridge !== undefined) void loadPluginPanels(bridge);
   wireKeybindingDispatcher();
@@ -3255,12 +3532,22 @@ async function load(): Promise<void> {
     followScheme((scheme) => {
       handle.setTheme(scheme);
     });
-    handle.onUpdate((next) => {
-      // Into the active document, which is the one this pane is showing. A transaction can
-      // only have come from the document in front of the person who caused it, and
-      // everything that changes which one that is has already moved `activeId` by the time
-      // the view is handed the other state.
-      updateActive((document_) => ({ ...document_, state: next }));
+    handle.onUpdate((next, view) => {
+      // Into the document **the pane it happened in** is showing — never the active one
+      // (TYTO-286). With groups a transaction can come from a pane nobody is looking at: a
+      // lint answer, a copy from the pane beside it. A follower's state is not the record:
+      // its change was copied into the primary, whose own update lands here.
+      const documentId = documentShownBy(view);
+      if (documentId === undefined) return;
+      if (isFollower(next)) {
+        // Its caret moved, which the status bar shows; its text reaches the record by the copy.
+        paintStatusBar();
+        return;
+      }
+      workspace = updateDocument(workspace, documentId, (document_) => ({
+        ...document_,
+        state: next,
+      }));
       // The cursor moved or the text did: the bar's Ln/Col reads the state just written.
       paintStatusBar();
       // And the session keeps where the cursor is (TYTO-265), a pause after it stops moving.
@@ -3276,11 +3563,12 @@ async function load(): Promise<void> {
     if (bridge !== undefined) {
       // Repainted on every keystroke and not only on the answer: the picker shows the
       // template the *brief* names, so typing the line by hand has to move it too.
-      handle.onChange(() => {
+      handle.onChange((_value, view) => {
         // The id is read now rather than inside the timeout: a person can switch tabs
-        // before the compile fires, and this edit belongs to the document that was in the
-        // editor when the key was pressed.
-        const documentId = workspace.activeId;
+        // before the compile fires, and this edit belongs to the document the pane it was
+        // typed in was showing (TYTO-286) when the key was pressed.
+        const documentId = documentShownBy(view);
+        if (documentId === undefined) return;
         // The two things the unsaved marker paints, and only those two (TYTO-112).
         //
         // There used to be an `if` here, because the marker was a flag and a flag has an
@@ -3305,14 +3593,16 @@ async function load(): Promise<void> {
         // order is asserted in `packages/editor/src/editor.test.ts`. Reading the pane here
         // would give the same string today and the wrong one the moment a second pane
         // exists.
-        if (active().kind !== undefined) askAppFile(bridge, documentId);
-        else ask(bridge, documentId, activeText());
+        const edited = documentOf(workspace, documentId);
+        if (edited === undefined) return;
+        if (edited.kind !== undefined) askAppFile(bridge, documentId);
+        else ask(bridge, documentId, contentOf(edited));
         // Typing changes no tab but the draft, and a draft is what a crash would cost.
         keepSessionSoon();
       });
       // Once on load as well: a brief restored into the buffer should show, and the first
       // answer is what fills the format tabs.
-      void request(bridge, workspace.activeId, activeText());
+      void request(bridge, active().id, activeText());
       // The tabs the last session left (TYTO-113), now that there is an editor to build them.
       await restoreSession(bridge, handle);
     }

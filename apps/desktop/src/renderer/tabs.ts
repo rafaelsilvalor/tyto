@@ -4,17 +4,15 @@ import { repeat } from 'lit/directives/repeat.js';
 import { type Locale, DEFAULT_LOCALE, translate } from '../../shared/i18n/index.js';
 
 /**
- * The document tabs, across the top of the window (E9.11, ADR 0024).
+ * One editor group's tabs, over that group's pane (E9.11; TYTO-286, ADR 0083).
  *
- * Where the ADR draws them, and outside the docks for the reason `<tyto-command-bar>` is:
- * the strip belongs to the window rather than to a panel, so a person closing the editor
- * panel — which they cannot today and will be able to — does not close the list of what is
- * open. It also means this element is created once by `index.html` and never rebuilt by a
- * rearrange, so the tab a person is pointing at survives a splitter being dragged.
+ * It used to be one strip across the top of the window, outside the docks, where ADR 0024
+ * drew it. The tabs were only ever the editor's, and since the editor splits into groups each
+ * group draws its own strip: `<tyto-editor-group>` renders one of these above its pane.
  *
- * It holds no state. Which documents exist and which one is in front is `documents.ts`, and
- * `main.ts` hands the answer down as a property; a click reports back through a callback.
- * The strip is a view of the workspace and never a second copy of it.
+ * It holds no state. Which tabs a group has and which one is in front is `editor-groups.ts`,
+ * and `main.ts` hands the answer down as a property; a click reports back through a callback.
+ * An entry's id is the **tab's**, not the document's: one document can be a tab in two groups.
  */
 
 export const TABS_TAG = 'tyto-tabs';

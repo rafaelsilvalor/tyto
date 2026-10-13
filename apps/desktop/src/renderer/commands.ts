@@ -15,6 +15,8 @@ import {
   EDITOR_REPLACE_ALL,
   EDITOR_REPLACE_NEXT,
   EDITOR_SAVE,
+  EDITOR_SPLIT_DOWN,
+  EDITOR_SPLIT_RIGHT,
   EDITOR_UNDO,
   bindingsOf,
   createCommandRegistry,
@@ -152,6 +154,14 @@ export const DOCUMENT_NEXT = 'document.next';
 export const DOCUMENT_PREVIOUS = 'document.previous';
 
 /**
+ * The editor groups (TYTO-286, ADR 0083). The two splits are `@tyto/editor`'s ids, so vim's
+ * `:vsplit` and `:split` name them; moving focus between groups is the window's alone.
+ */
+export const GROUP_FOCUS_NEXT = 'editor.focusNextGroup';
+export const GROUP_FOCUS_PREVIOUS = 'editor.focusPreviousGroup';
+export { EDITOR_SPLIT_DOWN, EDITOR_SPLIT_RIGHT };
+
+/**
  * Going to the nth tab, as a command per slot (E9.11).
  *
  * Nine ids and not one command taking a number, for the reason the panel toggles and the
@@ -222,6 +232,10 @@ export const COMMAND_LABELS: Readonly<Record<string, CatalogueKey>> = {
   [DOCUMENT_CLOSE]: 'command.document.close',
   [DOCUMENT_NEXT]: 'command.document.next',
   [DOCUMENT_PREVIOUS]: 'command.document.previous',
+  [EDITOR_SPLIT_RIGHT]: 'command.group.splitRight',
+  [EDITOR_SPLIT_DOWN]: 'command.group.splitDown',
+  [GROUP_FOCUS_NEXT]: 'command.group.focusNext',
+  [GROUP_FOCUS_PREVIOUS]: 'command.group.focusPrevious',
   // The six `@tyto/editor` brings with the search panel (E8.5). Their ids and their English
   // labels are the editor's, the same as undo and redo above; what this table adds is the
   // catalogue key, so the bar shows them in the window's language.
@@ -263,6 +277,10 @@ export interface DesktopActions {
   /** E9.11. Closing asks first when the tab has unsaved text, so it answers nothing here. */
   closeDocument(): void;
   stepDocument(direction: 1 | -1): void;
+  /** TYTO-286. A new group beside (`row`) or under (`column`) the focused one, same document. */
+  splitGroup(direction: 'row' | 'column'): void;
+  /** TYTO-286. Focus to the group before or after the focused one. */
+  focusGroup(direction: 1 | -1): void;
   /** E9.4. Shows the export dialog. Everything it then does is a round trip to main. */
   openExport(): void;
   /** TYTO-47. Shows the plugins screen; the list is a round trip to main. */
@@ -427,6 +445,18 @@ export function createDesktopRegistry(actions: DesktopActions): CommandRegistry 
   add(DOCUMENT_PREVIOUS, () => {
     actions.stepDocument(-1);
   });
+  add(EDITOR_SPLIT_RIGHT, () => {
+    actions.splitGroup('row');
+  });
+  add(EDITOR_SPLIT_DOWN, () => {
+    actions.splitGroup('column');
+  });
+  add(GROUP_FOCUS_NEXT, () => {
+    actions.focusGroup(1);
+  });
+  add(GROUP_FOCUS_PREVIOUS, () => {
+    actions.focusGroup(-1);
+  });
 
   return registry;
 }
@@ -509,6 +539,12 @@ export const desktopKeymapSet: EditorKeymap = {
     { key: 'Mod-r', command: WINDOW_RELOAD },
     { key: 'Mod-PageDown', command: DOCUMENT_NEXT },
     { key: 'Mod-PageUp', command: DOCUMENT_PREVIOUS },
+    // TYTO-286. VS Code's split key; `Mod-Shift-\` takes CodeMirror's "go to the matching
+    // bracket" in this set, which a brief has little use for. Vim splits with `:vsplit`.
+    { key: 'Mod-\\', command: EDITOR_SPLIT_RIGHT },
+    { key: 'Mod-Shift-\\', command: EDITOR_SPLIT_DOWN },
+    { key: 'Mod-Alt-ArrowLeft', command: GROUP_FOCUS_PREVIOUS },
+    { key: 'Mod-Alt-ArrowRight', command: GROUP_FOCUS_NEXT },
     ...DOCUMENT_SLOTS.map((slot) => ({
       key: `Mod-${String(slot)}`,
       command: selectDocumentCommandId(slot),

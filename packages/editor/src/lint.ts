@@ -154,18 +154,21 @@ export function briefLint(analyzer: BriefAnalyzer, options: BriefLintOptions = {
   /**
    * Answers can arrive out of order once an analyzer is a worker, and the field must not
    * go backwards: a slow answer about older text would put a stale manifest in front of
-   * completion. The counter is per `briefLint()` call, which is per editor.
+   * completion.
    */
-  let issued = 0;
-  let newest = 0;
+  // Per view since TYTO-286: two panes of one editor share this extension, and a counter
+  // shared between them would let one pane's newer request discard the other's answer.
+  const counters = new WeakMap<EditorView, { issued: number; newest: number }>();
 
   const source = async (view: EditorView): Promise<readonly LintDiagnostic[]> => {
-    issued += 1;
-    const request = issued;
-    const analysis = await analyzer.analyze(view.state.doc.toString());
+    const counter = counters.get(view) ?? { issued: 0, newest: 0 };
+    counters.set(view, counter);
+    counter.issued += 1;
+    const request = counter.issued;
+    const analysis = await analyzer.analyze(view.state.doc.toString(), view);
 
-    if (request > newest && isMounted(view)) {
-      newest = request;
+    if (request > counter.newest && isMounted(view)) {
+      counter.newest = request;
       view.dispatch({ effects: setBriefAnalysis.of(analysis) });
     }
 

@@ -1,13 +1,15 @@
 import {
   EDITOR_REDO,
   EDITOR_SAVE,
+  EDITOR_SPLIT_DOWN,
+  EDITOR_SPLIT_RIGHT,
   EDITOR_UNDO,
   defaultKeymapSet,
   vimKeymapSet,
 } from '@tyto/editor';
 import { describe, expect, it, vi } from 'vitest';
 
-import { FILE_MENU_COMMANDS, RELOAD_COMMAND } from '../../shared/commands.js';
+import { FILE_MENU_COMMANDS, RELOAD_COMMAND, VIEW_MENU_COMMANDS } from '../../shared/commands.js';
 import {
   type DesktopActions,
   BRIEF_ONLY_COMMANDS,
@@ -61,6 +63,8 @@ const actions = () =>
     toggleDock: vi.fn<(dock: 'left' | 'right' | 'bottom') => void>(),
     closeDocument: vi.fn<() => void>(),
     stepDocument: vi.fn<(direction: 1 | -1) => void>(),
+    splitGroup: vi.fn<(direction: 'row' | 'column') => void>(),
+    focusGroup: vi.fn<(direction: 1 | -1) => void>(),
     openExport: vi.fn<() => void>(),
     showPlugins: vi.fn<() => void>(),
     showQueue: vi.fn<() => void>(),
@@ -372,6 +376,20 @@ describe('the File menu table', () => {
     expect(COMMAND_LABELS[RELOAD_COMMAND.id]).toBe(RELOAD_COMMAND.label);
     registry.run(RELOAD_COMMAND.id, NO_VIEW);
     expect(spies.reloadWindow).toHaveBeenCalledTimes(1);
+  });
+
+  it('names, on View, the two splits under their labels, pinned to `@tyto/editor` (TYTO-286)', () => {
+    const spies = actions();
+    const registry = createDesktopRegistry(spies);
+    expect(VIEW_MENU_COMMANDS.map((command) => command.id)).toEqual([
+      EDITOR_SPLIT_RIGHT,
+      EDITOR_SPLIT_DOWN,
+    ]);
+    for (const command of VIEW_MENU_COMMANDS) {
+      expect(COMMAND_LABELS[command.id]).toBe(command.label);
+      registry.run(command.id, NO_VIEW);
+    }
+    expect(spies.splitGroup.mock.calls).toEqual([['row'], ['column']]);
   });
 
   it('pins `editor.save` to the id `@tyto/editor` ships', () => {

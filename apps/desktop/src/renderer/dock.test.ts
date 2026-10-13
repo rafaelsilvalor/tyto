@@ -58,11 +58,12 @@ describe('building the window from the record', () => {
   });
 
   it('renders what is inside each panel, which is what everything else looks up', async () => {
-    // `preview.ts` writes into `#preview-stage` and `main.ts` finds `#editor` by id. Those
-    // ids used to be in `index.html`; they are in the panels now and nothing else changed.
+    // `preview.ts` writes into `#preview-stage` and `main.ts` lays the editor groups out in
+    // `[data-editor-groups]`, whose first pane is `#editor` (TYTO-286). Those nodes used to be
+    // in `index.html`; they are in the panels now and nothing else changed.
     await arrange(document, DEFAULT_LAYOUT, host());
 
-    expect(document.getElementById('editor')).not.toBeNull();
+    expect(document.querySelector('[data-editor-groups]')).not.toBeNull();
     expect(document.getElementById('preview-stage')).not.toBeNull();
     expect(document.getElementById('problems-list')).not.toBeNull();
     expect(document.getElementById('template')).not.toBeNull();
@@ -118,17 +119,19 @@ describe('closing a panel', () => {
 });
 
 describe('what survives a rearrangement', () => {
-  it('keeps the node CodeMirror is mounted in', async () => {
-    // The failure this prevents is silent and total: a rebuilt `#editor` is an editor with
-    // no text in it and no way back. The editor panel is `fixed` so it is never removed,
-    // and Lit keeps a node it did not have to change.
+  it('keeps the node the CodeMirror panes are mounted in', async () => {
+    // The failure this prevents is silent and total: a rebuilt container is every editor
+    // group gone, with no text in it and no way back. The editor panel is `fixed` so it is
+    // never removed, and Lit keeps a node it did not have to change.
     await arrange(document, DEFAULT_LAYOUT, host());
-    const before = document.getElementById('editor');
+    const before = document.querySelector('[data-editor-groups]');
+    before?.append(document.createElement('tyto-editor-group'));
 
     await arrange(document, withPanelSize(DEFAULT_LAYOUT, PREVIEW_PANEL, 300), host());
     await arrange(document, withPanelOpen(DEFAULT_LAYOUT, PROBLEMS_PANEL, false), host());
 
-    expect(document.getElementById('editor')).toBe(before);
+    expect(document.querySelector('[data-editor-groups]')).toBe(before);
+    expect(before?.childElementCount).toBe(1);
   });
 
   it('gives no close button to a fixed panel', async () => {

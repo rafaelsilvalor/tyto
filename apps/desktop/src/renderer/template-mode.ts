@@ -78,6 +78,8 @@ export interface TemplateModePorts {
   saved(answer: IpcResponse<'template:save'>): void;
   /** What the session keeps of the mode changed: a keystroke, an open, a save, a close. */
   changed(): void;
+  /** The mode closed: the window puts the caret back in the focused editor group (TYTO-286). */
+  closed?(): void;
 }
 
 /** What the session keeps of the mode (TYTO-266); null when there is nothing to reopen. */
@@ -374,6 +376,7 @@ export class TemplateMode extends LitElement {
     }
     this.open = false;
     ports?.changed();
+    ports?.closed?.();
     return true;
   }
 

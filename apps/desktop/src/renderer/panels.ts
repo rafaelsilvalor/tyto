@@ -105,10 +105,11 @@ export abstract class DockedPanel extends LitElement {
  * template rewrites a line of the brief, so it is an edit, and the preview updating is the
  * consequence.
  *
- * `#editor` is the node CodeMirror mounts into and it must survive every re-render. Lit
- * keeps a node it did not have to change, and this panel is `fixed` in the default layout
- * so the element is never removed either — between the two, the editor is never unmounted
- * out from under a person's text.
+ * The editor groups go in `[data-editor-groups]` (TYTO-286, ADR 0083): `main.ts` lays the
+ * `<tyto-editor-group>` elements out there, each with its own tabs and a CodeMirror pane, and
+ * the first group's pane is still `#editor`. Lit renders that node once and never touches what
+ * is put inside it, and this panel is `fixed` in the default layout so the element is never
+ * removed either — between the two, no pane is unmounted out from under a person's text.
  */
 export class EditorPanel extends DockedPanel {
   protected override render(): unknown {
@@ -120,7 +121,7 @@ export class EditorPanel extends DockedPanel {
           <select id="template"></select>
         </label>`,
       )}
-      <div class="editor" id="editor"></div>`;
+      <div class="editor-groups" data-editor-groups></div>`;
   }
 }
 
