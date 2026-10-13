@@ -6,7 +6,7 @@ import { afterEach, describe, expect, it } from 'vitest';
 
 import { type CommandRegistry, createCommandRegistry } from './commands.js';
 import { createEditor, cursorOf, type EditorHandle } from './editor.js';
-import { EDITOR_RENDER, EDITOR_SAVE } from './keymap.js';
+import { EDITOR_RENDER, EDITOR_SAVE, EDITOR_SPLIT_DOWN, EDITOR_SPLIT_RIGHT } from './keymap.js';
 import { defaultExCommands } from './vim-mode.js';
 
 const BRIEF = ['---', 'template: promo-curso', '---', '::titulo Direito', '::subtitulo Turma'].join(
@@ -275,10 +275,13 @@ describe('cursorOf', () => {
 });
 
 describe('defaultExCommands', () => {
-  it('maps the two the card names, with w as the abbreviation of write', () => {
+  it('maps the two the card names, with w as the abbreviation of write, and the splits', () => {
     expect(defaultExCommands).toEqual([
       { name: 'write', shortName: 'w', command: EDITOR_SAVE },
       { name: 'render', command: EDITOR_RENDER },
+      // TYTO-286: vim's own names for the editor's two splits.
+      { name: 'vsplit', shortName: 'vs', command: EDITOR_SPLIT_RIGHT },
+      { name: 'split', shortName: 'sp', command: EDITOR_SPLIT_DOWN },
     ]);
   });
 });

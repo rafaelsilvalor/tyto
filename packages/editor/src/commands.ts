@@ -2,6 +2,7 @@ import { redo as redoText, redoDepth, undo as undoText, undoDepth } from '@codem
 import { Facet, type Text } from '@codemirror/state';
 import { type EditorView } from '@codemirror/view';
 
+import { undoViewOf } from './mirror.js';
 import { SEARCH_COMMANDS } from './search.js';
 
 /**
@@ -137,7 +138,9 @@ export function createCommandRegistry(): CommandRegistry {
       return true;
     },
 
-    undo: (context: CommandContext) => {
+    undo: (asked: CommandContext) => {
+      // A follower has no history of its own: its primary's is the one stack (TYTO-286).
+      const context = { ...asked, view: undoViewOf(asked.view) };
       const top = done.at(-1);
       // `<=` and not `===`: CodeMirror caps its history, so the depth recorded here can
       // outlive the events it counted. Preferring the command in that case undoes something
@@ -152,7 +155,8 @@ export function createCommandRegistry(): CommandRegistry {
       return undoText(context.view);
     },
 
-    redo: (context: CommandContext) => {
+    redo: (asked: CommandContext) => {
+      const context = { ...asked, view: undoViewOf(asked.view) };
       const top = undone.at(-1);
       if (top !== undefined && redoDepth(context.view.state) <= top.redoAt) {
         top.command.run(context);

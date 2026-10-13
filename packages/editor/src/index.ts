@@ -20,6 +20,7 @@ export {
   cursorOf,
   type EditorHandle,
   type EditorOptions,
+  type EditorPane,
   type EditorState,
   hasBeenEdited,
   type LanguageName,
@@ -30,6 +31,8 @@ export {
   withDiagnostics,
   withSelection,
 } from './editor.js';
+
+export { isFollower } from './mirror.js';
 
 export { briefDarkTheme, briefLightTheme, type ThemeName, themes, themeTokens } from './theme.js';
 
@@ -69,6 +72,8 @@ export {
   type CommandBinding,
   type EditorKeymap,
   EDITOR_RENDER,
+  EDITOR_SPLIT_DOWN,
+  EDITOR_SPLIT_RIGHT,
   EDITOR_SAVE,
   defaultKeymapSet,
   keymapExtension,

@@ -65,7 +65,11 @@ export interface EditorDirectives {
  * on the thread that has to paint the caret.
  */
 export interface BriefAnalyzer {
-  analyze(source: string): Promise<BriefAnalysis>;
+  /**
+   * `view` is the pane asking, for a host whose answer depends on which document that pane
+   * shows — the desktop's, with one brief in each editor group (TYTO-286). Opaque here.
+   */
+  analyze(source: string, view?: object): Promise<BriefAnalysis>;
 }
 
 export interface BriefAnalyzerOptions {

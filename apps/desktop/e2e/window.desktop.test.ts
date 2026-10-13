@@ -512,6 +512,11 @@ describe('switching the language', () => {
     'command.document.next',
     'command.document.previous',
     'command.document.select',
+    // TYTO-286: the editor groups' commands, set by script in the bar and the View menu.
+    'command.group.splitRight',
+    'command.group.splitDown',
+    'command.group.focusNext',
+    'command.group.focusPrevious',
     // E8.5: the find-and-replace panel is `@codemirror/search`'s own DOM, reached through
     // `EditorState.phrases` rather than through this app's markup, and it is not in the
     // document at all until somebody presses `Ctrl+F`. So none of its seventeen strings can

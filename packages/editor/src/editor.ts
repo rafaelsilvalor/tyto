@@ -1,10 +1,4 @@
-import {
-  defaultKeymap,
-  history,
-  historyKeymap,
-  indentWithTab,
-  undoDepth,
-} from '@codemirror/commands';
+import { defaultKeymap, historyKeymap, indentWithTab, undoDepth } from '@codemirror/commands';
 import { foldGutter, foldKeymap, indentOnInput, indentUnit } from '@codemirror/language';
 import {
   type Extension,
@@ -22,6 +16,7 @@ import {
 } from '@codemirror/state';
 import {
   EditorView,
+  type ViewUpdate,
   drawSelection,
   dropCursor,
   highlightActiveLine,
@@ -38,6 +33,7 @@ import { type SearchPhrases, searchSupport, setSearchPhrases } from './search.js
 import { type EditorKeymap, defaultKeymapSet, keymapExtension } from './keymap.js';
 import { type ThemeName, themes } from './theme.js';
 import { json } from './json-language.js';
+import { followerState, historyExtension, mirrored, primaryFacet } from './mirror.js';
 import { template } from './template-language.js';
 import { type VimStatus, vimMode } from './vim-mode.js';
 
@@ -254,12 +250,42 @@ export const withDiagnostics = (
  */
 export const hasBeenEdited = (state: EditorState): boolean => undoDepth(state) > 0;
 
-export interface EditorHandle {
+/**
+ * One view of the editor: what a window with several editor groups holds per group (TYTO-286).
+ *
+ * Every pane of one editor shares that editor's extensions — the keymap and theme compartments,
+ * the command registry and the listener that tells the host about a transaction — so a state
+ * born in one pane is understood by every other, and a theme or a keymap change reaches them
+ * all. A second {@link createEditor} per group would be a second set of compartments, and a
+ * state moved between the two would notify the wrong listeners and be reconfigured through a
+ * compartment it does not carry, with no error.
+ */
+export interface EditorPane {
   /**
    * The view underneath, for the extension points this handle does not wrap — a host that
    * needs the selection or wants to dispatch its own transaction reaches through here.
    */
   readonly view: EditorView;
+  /** The document this pane is showing. */
+  state(): EditorState;
+  /** Where this pane is scrolled, measured: see {@link EditorHandle.scroll}. */
+  scroll(): ScrollPosition;
+  /** Puts a document in this pane: see {@link EditorHandle.restore}. */
+  restore(state: EditorState, scroll?: ScrollPosition): void;
+  /** {@link withDiagnostics} for the document this pane is showing. */
+  showDiagnostics(diagnostics: readonly MarkedDiagnostic[]): void;
+  /** Runs a registered command with this pane's view as its context. */
+  runCommand(id: string): boolean;
+  /** Takes the pane away. The editor's own first pane goes with {@link EditorHandle.destroy}. */
+  destroy(): void;
+}
+
+export interface EditorHandle extends EditorPane {
+  /**
+   * The pane the editor was created with, as a pane of its own: its `destroy` takes only that
+   * view away, where the handle's takes every pane. The handle's own pane methods act on it.
+   */
+  readonly firstPane: EditorPane;
   getValue(): string;
   /** Replaces the whole document. Does not notify `onChange` listeners. */
   setValue(value: string): void;
@@ -280,12 +306,24 @@ export interface EditorHandle {
    */
   scroll(): ScrollPosition;
   /**
-   * The state that came out of every transaction, for the store that owns it.
+   * The state that came out of every transaction, for the store that owns it, and the view
+   * it happened in — with several panes that is what says which document moved (TYTO-286).
    *
    * Fires for the host's own `setValue` too: the store tracks what the document *is*,
    * irrespective of who moved it. Returns the function that stops the listener.
    */
-  onUpdate(listener: (state: EditorState) => void): () => void;
+  onUpdate(listener: (state: EditorState, view: EditorView) => void): () => void;
+  /**
+   * Another pane over this editor's extensions, mounted in `parent` and showing an empty
+   * document until the host restores one into it (TYTO-286).
+   */
+  createPane(parent: HTMLElement): EditorPane;
+  /**
+   * A copy of the document `primary` is showing, for a second pane to show: the same text and
+   * selection, no history of its own (ADR 0083). Edits in either pane are copied into the
+   * other, and an undo asked of the copy runs in `primary`, so the one history stays whole.
+   */
+  followerOf(primary: EditorPane): EditorState;
   /**
    * Puts a document back in the view, undo history, cursor and scroll included. Notifies
    * `onChange` listeners of nothing.
@@ -308,8 +346,12 @@ export interface EditorHandle {
    * them, and not `onChange` ones: the text did not move.
    */
   showDiagnostics(diagnostics: readonly MarkedDiagnostic[]): void;
-  /** Returns the function that stops the listener. */
-  onChange(listener: (value: string) => void): () => void;
+  /**
+   * The author changed the text, in `view`. Not fired for `setValue`, nor for a change copied
+   * in from another pane showing the same document — that one was already reported where it
+   * was typed. Returns the function that stops the listener.
+   */
+  onChange(listener: (value: string, view: EditorView) => void): () => void;
   setTheme(theme: ThemeName): void;
   /**
    * Changes the search panel's language, now and for every document opened afterwards.
@@ -366,7 +408,7 @@ const baseExtensions = (): Extension[] => [
   highlightActiveLineGutter(),
   highlightActiveLine(),
   foldGutter(),
-  history(),
+  historyExtension(),
   drawSelection(),
   dropCursor(),
   rectangularSelection(),
@@ -386,8 +428,10 @@ const baseExtensions = (): Extension[] => [
 ];
 
 export function createEditor(parent: HTMLElement, options: EditorOptions = {}): EditorHandle {
-  const changeListeners = new Set<(value: string) => void>();
-  const updateListeners = new Set<(state: EditorState) => void>();
+  const changeListeners = new Set<(value: string, view: EditorView) => void>();
+  const updateListeners = new Set<(state: EditorState, view: EditorView) => void>();
+  /** Every pane's view, the first one included: what a theme or a keymap change reaches. */
+  const views = new Set<EditorView>();
 
   /** Swapped in place by `setTheme`, so switching does not rebuild the state. */
   const themeCompartment = new Compartment();
@@ -444,19 +488,48 @@ export function createEditor(parent: HTMLElement, options: EditorOptions = {}): 
    * leave that order to the extension array, where it would be reversed one day by an edit
    * that looked like a reordering of imports.
    */
+  /**
+   * Copies a change into every other pane showing the same document (ADR 0083): the primary
+   * and its followers. First, so the record already holds the text when the host hears of it.
+   *
+   * A change that is itself a copy goes no further — without the annotation the two panes
+   * would hand the same change back and forth for ever.
+   */
+  const mirror = (update: ViewUpdate): void => {
+    if (!update.docChanged) return;
+    if (update.transactions.every((transaction) => transaction.annotation(mirrored) === true)) {
+      return;
+    }
+    const source = update.view;
+    const primary = update.state.facet(primaryFacet) ?? source;
+    for (const target of views) {
+      if (target === source) continue;
+      if (target !== primary && target.state.facet(primaryFacet) !== primary) continue;
+      target.dispatch({ changes: update.changes, annotations: mirrored.of(true) });
+    }
+  };
+
   const notify = EditorView.updateListener.of((update) => {
     // A view update with no transaction behind it is a measure, a viewport change or a
     // `setState` — the document has not moved, and D1 is about transactions.
     if (update.transactions.length === 0) return;
 
-    for (const listener of updateListeners) listener(update.state);
+    mirror(update);
+
+    for (const listener of updateListeners) listener(update.state, update.view);
 
     if (!update.docChanged) return;
-    if (update.transactions.every((transaction) => transaction.annotation(programmatic) === true)) {
+    if (
+      update.transactions.every(
+        (transaction) =>
+          transaction.annotation(programmatic) === true ||
+          transaction.annotation(mirrored) === true,
+      )
+    ) {
       return;
     }
     const value = textOf(update.state);
-    for (const listener of changeListeners) listener(value);
+    for (const listener of changeListeners) listener(value, update.view);
   });
 
   const readOnly = options.readOnly ?? false;
@@ -489,11 +562,6 @@ export function createEditor(parent: HTMLElement, options: EditorOptions = {}): 
   ];
   const extensions = [...(options.extensions ?? []), ...shared(ownLanguage)];
 
-  const view = new EditorView({
-    parent,
-    state: CodeMirrorEditorState.create({ doc: options.doc ?? '', extensions }),
-  });
-
   /**
    * CodeMirror's own snapshot for each position `scroll()` measured, which puts the pane back
    * to the pixel. Weak, so a position the host drops takes its snapshot with it.
@@ -511,49 +579,90 @@ export function createEditor(parent: HTMLElement, options: EditorOptions = {}): 
     return EditorView.scrollIntoView(top, { y: 'start', yMargin: 0 });
   };
 
+  const paneOn = (view: EditorView): EditorPane => {
+    views.add(view);
+    return {
+      view,
+
+      state: () => view.state,
+
+      scroll: () => {
+        // The document height at the pane's top edge: where the scroller starts on screen,
+        // less where the document starts on screen (negative once it is scrolled down).
+        const height = Math.max(view.scrollDOM.getBoundingClientRect().top - view.documentTop, 0);
+        const position: ScrollPosition = { top: view.lineBlockAtHeight(height).from };
+        snapshots.set(position, view.scrollSnapshot());
+        return position;
+      },
+
+      restore: (state: EditorState, scroll?: ScrollPosition) => {
+        // `setState` and not a change transaction: a transaction would put the swap on the
+        // undo stack, so undoing once in a fresh tab would paste the other document back in.
+        view.setState(state);
+        // A tab built before the mode or the bindings last changed still holds the input
+        // layer it was born with; the editor has one input layer, and the tab shown takes it.
+        if (inputCompartment.get(view.state) !== input) {
+          view.dispatch({ effects: inputCompartment.reconfigure(input) });
+        }
+        if (themeCompartment.get(view.state) !== theme) {
+          view.dispatch({ effects: themeCompartment.reconfigure(theme) });
+        }
+        // Dispatched after, because a scroll effect is a property of the view and the view
+        // has just been given a different state to measure. The phrases ride along: a state
+        // carries the language it was built in, so a tab that was away while the window
+        // switched would come back with the panel in the old one.
+        view.dispatch({
+          effects: [scrollEffect(scroll, state), setSearchPhrases.of(searchPhrases)],
+        });
+      },
+
+      showDiagnostics: (diagnostics: readonly MarkedDiagnostic[]) => {
+        view.dispatch(diagnosticsSpec(view.state, diagnostics));
+      },
+
+      runCommand: (id: string) => options.commands?.run(id, { view }) ?? false,
+
+      destroy: () => {
+        views.delete(view);
+        view.destroy();
+      },
+    };
+  };
+
+  const first = paneOn(
+    new EditorView({
+      parent,
+      state: CodeMirrorEditorState.create({ doc: options.doc ?? '', extensions }),
+    }),
+  );
+  const view = first.view;
+  /** Every view at once, for the settings that belong to the editor and not to one pane. */
+  const everyView = (effects: StateEffect<unknown>): void => {
+    for (const each of views) each.dispatch({ effects });
+  };
+
   return {
-    view,
+    ...first,
+    firstPane: first,
 
     getValue: () => textOf(view.state),
 
-    state: () => view.state,
-
-    scroll: () => {
-      // The document height at the pane's top edge: where the scroller starts on screen, less
-      // where the document starts on screen (negative once it is scrolled down).
-      const height = Math.max(view.scrollDOM.getBoundingClientRect().top - view.documentTop, 0);
-      const position: ScrollPosition = { top: view.lineBlockAtHeight(height).from };
-      snapshots.set(position, view.scrollSnapshot());
-      return position;
-    },
-
-    onUpdate: (listener: (state: EditorState) => void) => {
+    onUpdate: (listener: (state: EditorState, view: EditorView) => void) => {
       updateListeners.add(listener);
       return () => {
         updateListeners.delete(listener);
       };
     },
 
-    restore: (state: EditorState, scroll?: ScrollPosition) => {
-      // `setState` and not a change transaction: a transaction would put the swap on the
-      // undo stack, so undoing once in a fresh tab would paste the other document back in.
-      view.setState(state);
-      // A tab built before the mode or the bindings last changed still holds the input layer
-      // it was born with; the editor has one input layer, and the tab being shown takes it.
-      if (inputCompartment.get(view.state) !== input) {
-        view.dispatch({ effects: inputCompartment.reconfigure(input) });
-      }
-      if (themeCompartment.get(view.state) !== theme) {
-        view.dispatch({ effects: themeCompartment.reconfigure(theme) });
-      }
-      // Dispatched after, because a scroll effect is a property of the view and the view
-      // has just been given a different state to measure. The phrases ride along: a state
-      // carries the language it was built in, so a tab that was away while the window
-      // switched would come back with the panel in the old one.
-      view.dispatch({
-        effects: [scrollEffect(scroll, state), setSearchPhrases.of(searchPhrases)],
-      });
-    },
+    createPane: (parent: HTMLElement) =>
+      paneOn(
+        new EditorView({
+          parent,
+          state: CodeMirrorEditorState.create({ doc: '', extensions }),
+        }),
+      ),
+
+    followerOf: (primary: EditorPane) => followerState(primary.view.state, primary.view),
 
     blank: (doc: string, language: LanguageName = ownLanguage) =>
       CodeMirrorEditorState.create({
@@ -568,11 +677,7 @@ export function createEditor(parent: HTMLElement, options: EditorOptions = {}): 
       });
     },
 
-    showDiagnostics: (diagnostics: readonly MarkedDiagnostic[]) => {
-      view.dispatch(diagnosticsSpec(view.state, diagnostics));
-    },
-
-    onChange: (listener: (value: string) => void) => {
+    onChange: (listener: (value: string, view: EditorView) => void) => {
       changeListeners.add(listener);
       return () => {
         changeListeners.delete(listener);
@@ -581,21 +686,19 @@ export function createEditor(parent: HTMLElement, options: EditorOptions = {}): 
 
     setTheme: (name: ThemeName) => {
       theme = themes[name];
-      view.dispatch({ effects: themeCompartment.reconfigure(theme) });
+      everyView(themeCompartment.reconfigure(theme));
     },
 
     setSearchPhrases: (phrases: SearchPhrases) => {
       searchPhrases = phrases;
-      view.dispatch({ effects: setSearchPhrases.of(phrases) });
+      everyView(setSearchPhrases.of(phrases));
     },
-
-    runCommand: (id: string) => options.commands?.run(id, { view }) ?? false,
 
     setVimMode: (enabled: boolean) => {
       if (enabled === vimEnabled) return;
       vimEnabled = enabled;
       input = enabled ? vimInput() : keys;
-      view.dispatch({ effects: inputCompartment.reconfigure(input) });
+      everyView(inputCompartment.reconfigure(input));
     },
 
     isVimMode: () => vimEnabled,
@@ -612,14 +715,15 @@ export function createEditor(parent: HTMLElement, options: EditorOptions = {}): 
       keys = keymapExtension(keymaps.normal);
       vimKeymap = keymaps.vim;
       input = vimEnabled ? vimInput() : keys;
-      view.dispatch({ effects: inputCompartment.reconfigure(input) });
+      everyView(inputCompartment.reconfigure(input));
     },
 
     destroy: () => {
       changeListeners.clear();
       updateListeners.clear();
       vimListeners.clear();
-      view.destroy();
+      for (const each of [...views]) each.destroy();
+      views.clear();
     },
   };
 }
