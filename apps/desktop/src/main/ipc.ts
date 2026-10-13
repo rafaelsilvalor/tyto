@@ -13,6 +13,7 @@ import {
   type IpcRequest,
   type IpcResponse,
   type MenuModel,
+  type MenuMove,
   IPC_CHANNEL_NAMES,
   parseIpc,
   parseIpcEvent,
@@ -163,9 +164,13 @@ export interface IpcDependencies {
     model: () => MenuModel[];
     /**
      * Opens the native list of the top-level menu `id` at a point in the page, and settles
-     * when it closes; `false` for an id the installed menu does not have (TYTO-244).
+     * when it closes; `opened: false` for an id the installed menu does not have (TYTO-244),
+     * and `move` when Left or Right closed it on Windows (TYTO-263, `menu-arrows.ts`).
      */
-    popup: (id: string, at: { x: number; y: number }) => Promise<boolean>;
+    popup: (
+      id: string,
+      at: { x: number; y: number },
+    ) => Promise<{ opened: boolean; move?: MenuMove }>;
   };
   /**
    * The template mode (TYTO-44), and the two pickers it needs. Wrapped like `folders`: a
@@ -555,7 +560,7 @@ export function createHandlers(dependencies: IpcDependencies): Handlers {
 
     'menu:model': () => Promise.resolve({ menus: menu.model() }),
 
-    'menu:popup': async ({ id, x, y }) => ({ opened: await menu.popup(id, { x, y }) }),
+    'menu:popup': ({ id, x, y }) => menu.popup(id, { x, y }),
 
     'template:open': async ({ directory }) => {
       const chosen = directory ?? (await templateDialogs.chooseTemplate());

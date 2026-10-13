@@ -245,6 +245,13 @@ export const menuSchema = z.object({
 export type MenuItemModel = z.infer<typeof menuItemSchema>;
 export type MenuModel = z.infer<typeof menuSchema>;
 
+/**
+ * Which way an arrow pressed inside an open list moved the menu (TYTO-263): `previous` is
+ * Left and `next` is Right. The window picks the neighbour, wrapping at the ends.
+ */
+export const menuMoveSchema = z.enum(['previous', 'next']);
+export type MenuMove = z.infer<typeof menuMoveSchema>;
+
 export const IPC_CHANNELS = {
   /**
    * What the renderer needs to render its shell, asked once on load.
@@ -1184,6 +1191,10 @@ export const IPC_CHANNELS = {
    * — and main scales them by the page's zoom. **The answer arrives when the list closes**,
    * picked from or dismissed, which is how the name knows to stop saying it is expanded.
    * `opened: false` is an id the installed menu does not have.
+   *
+   * `move` says Left or Right closed the list (TYTO-263), so the window opens the neighbour.
+   * Only on Windows, the one platform where main can hear the arrows while a native list is
+   * open (`src/main/menu-arrows.ts`); elsewhere it never comes.
    */
   'menu:popup': channel(
     z.object({
@@ -1191,7 +1202,7 @@ export const IPC_CHANNELS = {
       x: z.number().finite(),
       y: z.number().finite(),
     }),
-    z.object({ opened: z.boolean() }),
+    z.object({ opened: z.boolean(), move: menuMoveSchema.optional() }),
   ),
 
   /**

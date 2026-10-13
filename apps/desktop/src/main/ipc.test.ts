@@ -349,7 +349,13 @@ const menuRebuilds = () => {
     ],
     popup: (id: string, at: { x: number; y: number }) => {
       popups.push({ id, at });
-      return Promise.resolve(id === 'help');
+      return Promise.resolve(
+        id === 'help'
+          ? { opened: true }
+          : id === 'viewmenu'
+            ? { opened: true, move: 'next' as const }
+            : { opened: false },
+      );
     },
   };
 };
@@ -1291,6 +1297,12 @@ describe('the drawn menu row (TYTO-244)', () => {
       { id: 'help', at: { x: 12, y: 32 } },
       { id: 'nothing', at: { x: 0, y: 0 } },
     ]);
+  });
+
+  it('passes on which way an arrow moved the menu when one closed the list (TYTO-263)', async () => {
+    const handlers = createHandlers(dependencies());
+    const popup = guard('menu:popup', handlers['menu:popup']);
+    expect(await popup({ id: 'viewmenu', x: 0, y: 0 })).toEqual({ opened: true, move: 'next' });
   });
 
   it('refuses a popup with no id or a point that is not a number', async () => {

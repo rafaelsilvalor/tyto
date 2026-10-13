@@ -1,6 +1,7 @@
 # 0078 — The window draws its own title bar and keeps the system's buttons
 
-Status: accepted · 2026-10-11 · TYTO-244 · builds on ADR 0024, ADR 0074, ADR 0075 and ADR 0077
+Status: accepted · 2026-10-11 · TYTO-244 · builds on ADR 0024, ADR 0074, ADR 0075 and ADR 0077 ·
+point 8 amended 2026-10-13 by TYTO-263, Left and Right inside an open list
 
 ## Context
 
@@ -91,7 +92,8 @@ item does.
   start of every Alt+key the editor, vim and the table own, so any key, mouse button or loss of
   focus in between disarms it, and a press the editor took never arms. In the row, Left and
   Right move (wrapping), Home and End jump, Enter, Space and Down open, Escape gives focus back
-  to what had it.
+  to what had it. _Amended 2026-10-13, TYTO-263:_ Left and Right **inside an open list** close
+  it and open the neighbour's, wrapping, on Windows only — see the amendment below.
 - **No mnemonics.** No label in the template writes `&`, so Alt+letter opens nothing; the
   projection strips a marker if one appears. Adding them is a template change and a decision
   about which letters, not this card's.
@@ -145,3 +147,61 @@ Electron 44.4.5 on Windows 11, the built app, its own `--user-data-dir` and `TYT
   hairline) where it was the system's title bar, the menu bar and the 27 px header.
 - Not decided here: whether the bar shows more than the title later (a project name, a branch),
   and the macOS frame, which waits for somebody who can look at a Mac.
+
+## Amendment — 2026-10-13, TYTO-263: Left and Right inside an open list
+
+A native list popped on its own does not know a bar is beside it, so Left and Right inside it
+did nothing and the person had to press Escape first. Rafael asked for the menu-bar behaviour on
+2026-10-11. The card's condition was that a drawn list, which would reopen point 8, was his
+call; it was not needed.
+
+**What Electron 44.4.5 lets main hear while a native list is open on Windows** — real key
+presses sent with `keybd_event`, the list captured with `PrintWindow` of its own window after
+`SetProcessDPIAware`:
+
+| Instrument                                             | Sees Left / Right with the list open?    |
+| ------------------------------------------------------ | ---------------------------------------- |
+| `webContents` `before-input-event`                     | no                                       |
+| the page's `keydown`                                   | no                                       |
+| `Menu` `menu-will-close` (arguments carry no key)      | no                                       |
+| `Menu.popup` callback                                  | no (runs, but says nothing of why)       |
+| `BrowserWindow.hookWindowMessage(WM_KEYDOWN = 0x0100)` | **yes**: `VK_LEFT` 0x25, `VK_RIGHT` 0x27 |
+| `globalShortcut`                                       | yes, but system-wide — rejected          |
+
+**Decision.**
+
+- **On Windows, and only while a list is open, main hooks `WM_KEYDOWN`** on the window
+  (`popupWithArrows` in `src/main/menu-arrows.ts`). On an arrow it records the direction and
+  calls `closePopup`; the popup's callback — which every way of closing runs — unhooks. The
+  first arrow decides; a repeat before the list has gone is ignored.
+- **`menu:popup` answers `{ opened, move? }`**, `move` being `previous` (Left) or `next`
+  (Right). A schema change, no new channel. **The window picks the neighbour**
+  (`neighbourOf` in `src/renderer/menu-row.ts`, wrapping, the same function Left and Right on
+  the row use), moves focus to it and opens its list; `aria-expanded` follows.
+- **The arrow's own press is swallowed once.** The hook reads the message and does not take
+  it: once the list is gone the same press reaches the page as `ArrowLeft` or `ArrowRight`
+  (measured in phase 1), where the row would move a second time. `LeakedArrow` makes main's
+  `before-input-event` prevent **the next one arrow keyDown within 500 ms of the move**, armed
+  at the hook rather than in the callback, and nothing else. A bound in time rather than "until
+  the next list opens", because the window opens the neighbour as soon as it has the answer.
+- **Right always moves.** Natively, Right on a highlighted item that has a submenu opens that
+  submenu; main cannot tell which item is highlighted. No list in the installed menu has a
+  nested submenu on Windows (the e2e asserts it), so nothing is lost today; a template that adds
+  one would take Right from it, and the assertion is there to say so.
+- **Linux and macOS do not change.** `hookWindowMessage` exists only on Windows, and
+  `globalShortcut` would take the arrows from every other application while a list is open.
+  Linux is **not measured**: nobody has looked at whether its native list already walks. macOS
+  keeps its native menu bar (point 2).
+
+**Measured after the change**, the built app, real keys, a 900x600 window: Alt, Left on the row
+and Down opened Help; Left inside the list closed it and opened Window's (_Minimize_, _Zoom_),
+`aria-expanded` on Window and focus with it. File's list and Left opened Help's; Right in
+Help's opened File's. In those three moves the page's capture-phase `keydown` saw no
+`ArrowLeft` or `ArrowRight`. The neighbour's list opens with no item highlighted, where the
+system's own bar highlights the first one; Down highlights it.
+
+**Consequences.** `src/main/menu-arrows.ts` and its unit test (a fake window and a fake menu, so
+the Linux CI runs the mechanism); `neighbourOf` and its unit test; a Windows-only block in
+`e2e/menu-row.desktop.test.ts` that wraps `hookWindowMessage` on the window from
+`app.evaluate`, hands main's handler the arrows' codes, and reads which installed submenu was
+popped next. The CI's desktop job is Linux, so that block runs on a Windows machine only.
