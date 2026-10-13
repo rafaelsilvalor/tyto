@@ -66,6 +66,14 @@ describe('the folder this package ships', () => {
     expect(directory.replaceAll('\\', '/').endsWith('/packages/fonts/fonts')).toBe(true);
     expect(readFileSync(`${directory}/source-sans-3/LICENSE.md`, 'utf8')).toContain('OFL');
   });
+
+  it('carries the licence of the editor face it ships without registering (TYTO-269)', () => {
+    // IBM Plex Mono is the desktop editor's, read through the renderer alias and never by a
+    // render, so it is absent from BUNDLED_FONT_FAMILIES (asserted above) and present here.
+    const licence = readFileSync(`${bundledFontsDirectory()}/ibm-plex-mono/LICENSE.md`, 'utf8');
+    expect(licence).toContain('SIL OPEN FONT LICENSE Version 1.1');
+    expect(licence).toContain('@ibm/plex-mono@2.5.0');
+  });
 });
 
 describe('a face nothing bundles', () => {

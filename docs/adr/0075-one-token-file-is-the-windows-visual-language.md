@@ -1,6 +1,7 @@
 # 0075 — One token file is the window's visual language, and the editor reads it too
 
-Status: accepted · 2026-10-10 · TYTO-96 · amends the look ADR 0024 left to this card
+Status: accepted · 2026-10-10 · TYTO-96 · amends the look ADR 0024 left to this card · point 3
+amended 2026-10-12 by TYTO-269, which bundles the mono face
 
 ## Context
 
@@ -56,6 +57,20 @@ where `@tyto/fonts` must stay external because it reads its own folder at run ti
 face stays a system stack, provisionally**, and only inside `--tyto-font-mono`: a bundled mono
 face is a new dependency and that is the maintainer's call later.
 
+_Amended 2026-10-12, TYTO-269: the mono face is no longer provisional._ `--tyto-font-mono` is
+`'IBM Plex Mono', monospace`, Regular and Bold from `@tyto/fonts` (`fonts/ibm-plex-mono/`,
+release `@ibm/plex-mono@2.5.0`, OFL 1.1), reached through the same alias and the same
+`font-src 'self'` as Source Sans 3. The maintainer chose it over JetBrains Mono by looking at
+both in the real window: Plex is about half the bytes (49 and 50 KB of `.woff2` per weight
+against 92 and 95) and has no ligatures, where JetBrains drew `=>` and `!=` as `⇒` and `≠`, so
+the editor stopped showing the characters typed. The machine stack it replaces resolved to
+Cascadia Mono on the maintainer's machine, 8.20 px per character at 14 px against Plex's
+8.40, one column fewer in a 506 px editor; the line height is the token's and did not move.
+There is no italic face: a comment, which the editor paints italic, is the Regular face
+slanted by the browser, and the italic face (about 54 KB) is left for when somebody asks. The
+face is not registered in `BUNDLED_FONT_FAMILIES`, so no scene can name it and nothing the
+exporters embed changes: it is the window's face, not a render's.
+
 **4. Light and dark follow the system, live, and there is no override in the app.** The token
 file redefines its colours under `prefers-color-scheme: dark`, which Electron answers from the
 system; nothing restarts. An in-app override is a new setting, and this batch builds only the
@@ -108,5 +123,5 @@ the editor changes. That is the whole reason the names are roles.
 - `packages/editor/demo` borrows the desktop's token file to have colours at all; its picker now
   flips only the base flag, and the colours follow the system.
 - What is not decided: the theme file format, where a theme comes from and who may contribute
-  one (TYTO-208); a bundled mono face; and styling the editor's own panels and tooltips beyond
+  one (TYTO-208); a bundled mono face (decided since, TYTO-269, point 3); and styling the editor's own panels and tooltips beyond
   CodeMirror's light and dark defaults.
