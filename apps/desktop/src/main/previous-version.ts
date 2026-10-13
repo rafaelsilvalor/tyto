@@ -30,6 +30,8 @@ import { readSettingsText } from './settings-file.js';
  * `keybindings.json` joined in TYTO-257: TYTO-207 put a person's own keys in it, and a version
  * that left it behind made them silently stop working after an update.
  *
+ * `snippets.json` joined with the file itself (TYTO-277, ADR 0082), for the same reason.
+ *
  * `session.json` joined in TYTO-113 (ADR 0080): it holds the tabs and the drafts nobody saved
  * yet, and an update that left it behind would be the one quit that lost them.
  *
@@ -41,6 +43,7 @@ export const IMPORTED_RECORDS = [
   'layout.json',
   'recent-files.json',
   'keybindings.json',
+  'snippets.json',
   'session.json',
 ] as const;
 
@@ -300,13 +303,15 @@ export async function importFrom(inputs: {
 }
 
 /**
- * Whether this version's store could read a record. `settings.json` (ADR 0073) and
- * `keybindings.json` (ADR 0074) are JSON with comments, so a comment the person wrote must not
- * be what stops either travelling; the other records are still the app's own plain JSON.
+ * Whether this version's store could read a record. `settings.json` (ADR 0073),
+ * `keybindings.json` (ADR 0074) and `snippets.json` (ADR 0082) are JSON with comments, so a
+ * comment the person wrote must not be what stops one travelling; the other records are still
+ * the app's own plain JSON.
  */
 function readable(name: string, text: string): boolean {
   if (name === 'settings.json') return readSettingsText(text).syntax.length === 0;
-  if (name === 'keybindings.json') return keybindingsReadable(text);
+  if (name === 'keybindings.json') return jsoncReadable(text, 'array');
+  if (name === 'snippets.json') return jsoncReadable(text, 'object');
   try {
     JSON.parse(text);
     return true;
@@ -318,20 +323,21 @@ function readable(name: string, text: string): boolean {
 const BOM = '﻿';
 
 /**
- * Whether a keybindings text parses as JSON with comments into a list: the same bar
- * `readSettingsText` sets for `settings.json`, no syntax error and the right kind of root.
+ * Whether a keybindings or snippets text parses as JSON with comments into the root it needs —
+ * a list of keybindings, a map of snippets: the same bar `readSettingsText` sets for
+ * `settings.json`, no syntax error and the right kind of root.
  *
- * The file's shape only, not each entry. The entries are checked in the window against its
- * command registry (`src/renderer/keybindings-file.ts`), and an entry the window refuses is the
- * person's to see and fix as `E_KEYBINDINGS_SYNTAX`, not a reason to leave the whole file
- * behind. A blank file is readable: the window reads it as no entries.
+ * The file's shape only, not each entry. The entries are checked in the window
+ * (`src/renderer/keybindings-file.ts`, `src/renderer/snippets-file.ts`), and an entry the
+ * window refuses is the person's to see and fix, not a reason to leave the whole file behind.
+ * A blank file is readable: the window reads it as no entries.
  */
-function keybindingsReadable(text: string): boolean {
+function jsoncReadable(text: string, rootType: 'array' | 'object'): boolean {
   const source = text.startsWith(BOM) ? text.slice(1) : text;
   if (source.trim() === '') return true;
   const errors: ParseError[] = [];
   const root = parseTree(source, errors, { allowTrailingComma: true, disallowComments: false });
-  return errors.length === 0 && root?.type === 'array';
+  return errors.length === 0 && root?.type === rootType;
 }
 
 /** The person's answer, as the composition root's dialog reports it. */

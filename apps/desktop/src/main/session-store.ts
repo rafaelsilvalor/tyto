@@ -22,8 +22,8 @@ import { z } from 'zod';
 const storedDraft = z.object({ text: z.string(), savedHash: z.string() });
 
 const storedTab = z.object({
-  kind: z.enum(['brief', 'settings', 'keybindings']),
-  /** A brief's file. Absent for a brief that is in no file, and for the app's own two. */
+  kind: z.enum(['brief', 'settings', 'keybindings', 'snippets']),
+  /** A brief's file. Absent for a brief that is in no file, and for the app's own files. */
   path: z.string().min(1).optional(),
   /**
    * Text the tab held that is in no file: its words, and a hash of the saved text they

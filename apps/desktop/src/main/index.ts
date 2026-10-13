@@ -66,7 +66,7 @@ import { createPreviewService } from './preview.js';
 import { createProjectSources } from './project.js';
 import { createTemplateEditor } from './template-editor.js';
 import { createExitGuard, mayUnload } from './quit.js';
-import { createLiveKeybindings } from './keybindings-live.js';
+import { createLiveTextFile } from './live-text-file.js';
 import { type LiveSettings, createLiveSettings } from './settings-live.js';
 import { fileSettingsStore } from './settings-store.js';
 import { createTemplateCatalogue } from './templates.js';
@@ -112,6 +112,14 @@ const NEW_KEYBINDINGS_FILE =
   '// Each entry is { "key": "ctrl+shift+e", "command": "<id>", "when": "<context>" };\n' +
   '// "command": "-<id>" removes a default binding. The command bar lists every id.\n' +
   '[\n]\n';
+
+/** `snippets.json` as "Open Snippets (JSON)" creates it (TYTO-277, ADR 0082). */
+const NEW_SNIPPETS_FILE =
+  "// Tyto snippets: JSON with comments, in VS Code's shape. Saving this file applies it.\n" +
+  '// Each entry is "Name": { "prefix": "aula", "body": ["::aula ${1:titulo}", "::prof ${2:nome}"],\n' +
+  '// "description": "...", "template": "<only while a brief names this template>" }.\n' +
+  '// Type the prefix at the start of a line, or "/" there, and Tab moves between its fields.\n' +
+  '{\n}\n';
 
 /**
  * Puts a crash on screen (TYTO-140).
@@ -489,6 +497,8 @@ async function start(): Promise<void> {
   const settingsFile = join(app.getPath('userData'), 'settings.json');
   // Beside it, per version for the same reason (ADR 0032). Read by the window (TYTO-207).
   const keybindingsFile = join(app.getPath('userData'), 'keybindings.json');
+  // And the snippets, read by the window for the same reason (TYTO-277, ADR 0082).
+  const snippetsFile = join(app.getPath('userData'), 'snippets.json');
   // Bound below, once the queue it applies to exists; the store tells it every write it makes.
   const late: { live?: LiveSettings } = {};
   const settings = fileSettingsStore(
@@ -527,7 +537,7 @@ async function start(): Promise<void> {
   // launching one (E9.8).
   const documents = createDocumentService({
     recent: fileRecentFiles(join(app.getPath('userData'), 'recent-files.json')),
-    unlisted: [settingsFile, keybindingsFile],
+    unlisted: [settingsFile, keybindingsFile, snippetsFile],
     dialogs: {
       openBrief: async () => {
         const answer = await dialog.showOpenDialog({
@@ -739,36 +749,52 @@ async function start(): Promise<void> {
   const session = createSessionService({
     store: fileSessionStore(join(app.getPath('userData'), 'session.json')),
     documents,
-    appFiles: { settings: settingsFile, keybindings: keybindingsFile },
+    appFiles: { settings: settingsFile, keybindings: keybindingsFile, snippets: snippetsFile },
     readText: (path) => readFile(path, 'utf8'),
     endSettingsTab: (documentId) => liveSettings.closed(documentId),
     templateFolder,
     openTemplate: (directory) => templateEditor.open(directory),
   });
-  // **Live keybindings** (TYTO-207): main only watches; the window parses and resolves.
-  const liveKeybindings = createLiveKeybindings({
-    readText: () =>
-      readFile(keybindingsFile, 'utf8').catch((error: unknown) => {
-        if ((error as NodeJS.ErrnoException).code === 'ENOENT') return '';
-        throw error;
-      }),
-    send: (payload) => {
+  // **Live keybindings** (TYTO-207) and **live snippets** (TYTO-277): main only watches; the
+  // window parses them, against its command registry and its templates.
+  const textOrNothing = (path: string) => () =>
+    readFile(path, 'utf8').catch((error: unknown) => {
+      if ((error as NodeJS.ErrnoException).code === 'ENOENT') return '';
+      throw error;
+    });
+  const pushTo =
+    (event: 'keybindings:changed' | 'snippets:changed') =>
+    (payload: { readonly text: string }): void => {
       const contents = mainWindow?.webContents;
       if (contents === undefined || contents.isDestroyed()) return;
-      sendIpcEvent(contents, 'keybindings:changed', payload);
-    },
+      sendIpcEvent(contents, event, { text: payload.text });
+    };
+  const liveKeybindings = createLiveTextFile('keybindings.json', {
+    readText: textOrNothing(keybindingsFile),
+    send: pushTo('keybindings:changed'),
+    log,
+  });
+  const liveSnippets = createLiveTextFile('snippets.json', {
+    readText: textOrNothing(snippetsFile),
+    send: pushTo('snippets:changed'),
     log,
   });
   // The folder and not the file: an editor that saves by replacing the file would leave a
   // watch on the old one listening to nothing. Events come in bursts, so they settle first.
-  // One watch for both files, each with its own settle timer.
+  // One watch for the three files, each with its own settle timer.
   let settle: ReturnType<typeof setTimeout> | undefined;
   let settleKeybindings: ReturnType<typeof setTimeout> | undefined;
+  let settleSnippets: ReturnType<typeof setTimeout> | undefined;
   try {
     const watcher = watch(dirname(settingsFile), (_event, name) => {
       if (name === basename(keybindingsFile)) {
         clearTimeout(settleKeybindings);
         settleKeybindings = setTimeout(() => void liveKeybindings.changed(), SETTINGS_SETTLE_MS);
+        return;
+      }
+      if (name === basename(snippetsFile)) {
+        clearTimeout(settleSnippets);
+        settleSnippets = setTimeout(() => void liveSnippets.changed(), SETTINGS_SETTLE_MS);
         return;
       }
       if (name !== basename(settingsFile)) return;
@@ -780,7 +806,7 @@ async function start(): Promise<void> {
     });
   } catch (cause) {
     log.error(
-      'settings.json and keybindings.json cannot be watched; a save applies at the next launch.',
+      'The app files in userData cannot be watched; a save applies at the next launch.',
       cause,
     );
   }
@@ -1036,6 +1062,21 @@ async function start(): Promise<void> {
         return documents.openPath(documentId, keybindingsFile, 'keybindings.json');
       },
       read: () => liveKeybindings.read().catch(() => ''),
+    },
+    snippets: {
+      open: async (documentId) => {
+        // Created on first open with a comment saying what goes in it, as the other two are.
+        const missing = await access(snippetsFile).then(
+          () => false,
+          () => true,
+        );
+        if (missing) {
+          liveSnippets.wrote(NEW_SNIPPETS_FILE);
+          await writeFile(snippetsFile, NEW_SNIPPETS_FILE, 'utf8').catch(() => undefined);
+        }
+        return documents.openPath(documentId, snippetsFile, 'snippets.json');
+      },
+      read: () => liveSnippets.read().catch(() => ''),
     },
     // Read on every ask, not held: `tyto plugin install` in a terminal beside the window is
     // the ordinary way a plugin arrives, and a list cached at startup would never show it.

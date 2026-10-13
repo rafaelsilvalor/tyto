@@ -67,6 +67,8 @@ export const FILE_MENU_GROUPS: readonly (readonly MenuCommand[])[] = [
     { id: 'settings.open', label: 'command.settings.open' },
     // TYTO-207. `keybindings.json` beside it, with no accelerator (TYTO-124).
     { id: 'keybindings.open', label: 'command.keybindings.open' },
+    // TYTO-277. `snippets.json` after it, the third of the person's files.
+    { id: 'snippets.open', label: 'command.snippets.open' },
   ],
   [{ id: 'document.close', label: 'command.document.close' }],
 ];

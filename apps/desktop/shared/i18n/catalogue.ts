@@ -38,11 +38,13 @@ export interface Catalogue {
    */
   readonly 'preview.stale': string;
   /**
-   * What the preview says on the settings and keybindings tabs, in place of a picture
-   * (TYTO-256). Either file applies when it is saved, through the watcher; typing only checks.
+   * What the preview says on the settings, keybindings and snippets tabs, in place of a
+   * picture (TYTO-256, TYTO-277). Each file applies when it is saved, through the watcher;
+   * typing only checks.
    */
   readonly 'preview.note.settings': string;
   readonly 'preview.note.keybindings': string;
+  readonly 'preview.note.snippets': string;
   /** The bottom panel that lists what the stages had to say about the brief. */
   readonly 'problems.heading': string;
   readonly 'problems.empty': string;
@@ -333,6 +335,7 @@ export interface Catalogue {
   readonly 'status.selected': string;
   readonly 'status.kind.settings': string;
   readonly 'status.kind.keybindings': string;
+  readonly 'status.kind.snippets': string;
   readonly 'status.problems.new': string;
   /**
    * Help > About, where the version, the platform, the template count and the template
@@ -446,6 +449,8 @@ export interface Catalogue {
   readonly 'command.settings.open': string;
   /** TYTO-207. Opens `keybindings.json` in a tab; a command, so it is not on screen at load. */
   readonly 'command.keybindings.open': string;
+  /** TYTO-277. Opens `snippets.json` in a tab; a command, so it is not on screen at load. */
+  readonly 'command.snippets.open': string;
   /** TYTO-113. View > Reload, and the bar's row for `Mod-r`; not on screen at load. */
   readonly 'command.window.reload': string;
   /**
@@ -466,6 +471,8 @@ export interface Catalogue {
    */
   readonly 'command.editor.insertMenu': string;
   readonly 'slash.section.templates': string;
+  /** TYTO-277. The heading over the person's snippets in the same menu. */
+  readonly 'slash.section.snippets': string;
   readonly 'slash.template.new': string;
   readonly 'slash.template.set': string;
   readonly 'slash.template.current': string;
@@ -506,6 +513,7 @@ export const CATALOGUE_KEYS = [
   'preview.stale',
   'preview.note.settings',
   'preview.note.keybindings',
+  'preview.note.snippets',
   'problems.heading',
   'problems.empty',
   'problems.severity.error',
@@ -615,6 +623,7 @@ export const CATALOGUE_KEYS = [
   'status.selected',
   'status.kind.settings',
   'status.kind.keybindings',
+  'status.kind.snippets',
   'status.problems.new',
   'menu.about',
   'shell.about.version',
@@ -701,6 +710,7 @@ export const CATALOGUE_KEYS = [
   'plugins.credential.failed',
   'command.settings.open',
   'command.keybindings.open',
+  'command.snippets.open',
   'command.window.reload',
   'command.theme.pick',
   'theme.pick.placeholder',
@@ -711,6 +721,7 @@ export const CATALOGUE_KEYS = [
   'template.root.builtIn',
   'command.editor.insertMenu',
   'slash.section.templates',
+  'slash.section.snippets',
   'slash.template.new',
   'slash.template.set',
   'slash.template.current',

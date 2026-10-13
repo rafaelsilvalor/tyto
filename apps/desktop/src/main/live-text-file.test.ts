@@ -5,8 +5,7 @@ import { join } from 'node:path';
 
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
-import type { IpcEventPayload } from '../../shared/ipc.js';
-import { type LiveKeybindings, createLiveKeybindings } from './keybindings-live.js';
+import { type LiveTextFile, createLiveTextFile } from './live-text-file.js';
 
 /**
  * The watcher's half of `keybindings.json` (TYTO-207), against a real file. The watcher is the
@@ -15,10 +14,10 @@ import { type LiveKeybindings, createLiveKeybindings } from './keybindings-live.
 
 let scratch: string;
 let file: string;
-let sent: IpcEventPayload<'keybindings:changed'>[];
+let sent: { readonly text: string }[];
 
-const live = (): LiveKeybindings =>
-  createLiveKeybindings({
+const live = (): LiveTextFile =>
+  createLiveTextFile('keybindings.json', {
     readText: () => readFile(file, 'utf8').catch(() => ''),
     send: (payload) => sent.push(payload),
     log: { info: () => undefined },

@@ -86,11 +86,13 @@ const optionsOf = (
   to: number,
   slash: boolean,
 ): Completion[] =>
-  sources.flatMap((source) =>
+  sources.flatMap((source, rank) =>
     source.items(state, from, to).map((item): Completion => ({
       label: item.label,
       type: 'class',
-      section: source.section,
+      // Ranked in the order the host gave the sources, so the headings do not reorder with the
+      // language they are written in (TYTO-277): unranked, CodeMirror sorts them by name.
+      section: { name: source.section, rank },
       ...(item.detail === undefined ? {} : { detail: item.detail }),
       // CodeMirror hands over the span the query covers; the "/" in front of it goes too.
       apply: (view, _completion, start, end) => {

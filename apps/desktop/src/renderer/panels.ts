@@ -158,6 +158,7 @@ export class PreviewPanel extends DockedPanel {
         <!-- TYTO-256: what an app file's tab shows here instead (\`editor-chrome.ts\`). -->
         <p class="preview__empty" data-preview-note data-i18n="preview.note.settings" hidden></p>
         <p class="preview__empty" data-preview-note data-i18n="preview.note.keybindings" hidden></p>
+        <p class="preview__empty" data-preview-note data-i18n="preview.note.snippets" hidden></p>
       </div>`;
   }
 }

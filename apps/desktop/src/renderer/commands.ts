@@ -81,6 +81,8 @@ export const QUEUE_SHOW = 'queue.show';
 export const SETTINGS_OPEN = 'settings.open';
 /** TYTO-207. Opens `keybindings.json` in a tab, or brings its tab forward. */
 export const KEYBINDINGS_OPEN = 'keybindings.open';
+/** TYTO-277. Opens `snippets.json` in a tab, or brings its tab forward. No key by default. */
+export const SNIPPETS_OPEN = 'snippets.open';
 /**
  * TYTO-113. Reloads the window, after writing the session so every tab comes back (ADR 0080).
  * Written here and on View in `shared/commands.ts`, pinned together by `commands.test.ts`.
@@ -206,6 +208,7 @@ export const COMMAND_LABELS: Readonly<Record<string, CatalogueKey>> = {
   [QUEUE_SHOW]: 'command.queue.show',
   [SETTINGS_OPEN]: 'command.settings.open',
   [KEYBINDINGS_OPEN]: 'command.keybindings.open',
+  [SNIPPETS_OPEN]: 'command.snippets.open',
   [WINDOW_RELOAD]: 'command.window.reload',
   [THEME_PICK]: 'command.theme.pick',
   [TEMPLATES_CHOOSE_FOLDER]: 'command.templates.chooseFolder',
@@ -272,6 +275,7 @@ export interface DesktopActions {
   showQueue(): void;
   openSettings(): void;
   openKeybindings(): void;
+  openSnippets(): void;
   /** TYTO-113. Keeps the session, then reloads: nothing open is lost (ADR 0080). */
   reloadWindow(): void;
   /** TYTO-208. Lists the colour themes in the bar; the list and the choice are main's. */
@@ -374,6 +378,9 @@ export function createDesktopRegistry(actions: DesktopActions): CommandRegistry 
   });
   add(KEYBINDINGS_OPEN, () => {
     actions.openKeybindings();
+  });
+  add(SNIPPETS_OPEN, () => {
+    actions.openSnippets();
   });
   add(WINDOW_RELOAD, () => {
     actions.reloadWindow();

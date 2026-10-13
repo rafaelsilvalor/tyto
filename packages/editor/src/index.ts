@@ -155,3 +155,15 @@ export {
   slashCompletion,
   slashRequested,
 } from './slash.js';
+
+export {
+  type BriefSnippet,
+  type SnippetBodyProblem,
+  type SnippetTranslation,
+  briefSnippets,
+  completeSnippets,
+  snippetTemplate,
+  snippetsFor,
+  snippetsSlashSource,
+  tabThroughCompletions,
+} from './snippets.js';

@@ -283,6 +283,7 @@ describe('the File submenu', () => {
       'queue.show',
       'settings.open',
       'keybindings.open',
+      'snippets.open',
       '—',
       'document.close',
       '—',

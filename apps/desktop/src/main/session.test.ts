@@ -166,6 +166,7 @@ const openTemplate = (
 
 const SETTINGS = '/data/settings.json';
 const KEYS = '/data/keybindings.json';
+const SNIPPETS = '/data/snippets.json';
 
 const setup = (
   files: Record<string, string>,
@@ -185,7 +186,7 @@ const setup = (
   const session = createSessionService({
     store,
     documents,
-    appFiles: { settings: SETTINGS, keybindings: KEYS },
+    appFiles: { settings: SETTINGS, keybindings: KEYS, snippets: SNIPPETS },
     readText: (path) => disk.read(path),
     endSettingsTab,
     templateFolder,
@@ -406,13 +407,16 @@ describe('reading the session back', () => {
   });
 
   it('compares a draft of the app’s own file against that file', async () => {
-    const { session } = await kept({ [SETTINGS]: '{}', [KEYS]: '[1]' }, [
+    const { session } = await kept({ [SETTINGS]: '{}', [KEYS]: '[1]', [SNIPPETS]: '{}' }, [
       { kind: 'settings', draft: { text: '{ "x": 1 }', savedHash: savedHashOf('{}') } },
       { kind: 'keybindings', draft: { text: '[]', savedHash: savedHashOf('[]') } },
+      // TYTO-277: the snippets tab is the third of the app's files, compared the same way.
+      { kind: 'snippets', draft: { text: '{ "A": {} }', savedHash: savedHashOf('{}') } },
     ]);
     const tabs = (await session.read()).tabs;
     expect(tabs[0]).toMatchObject({ kind: 'settings', draft: '{ "x": 1 }', stale: false });
     expect(tabs[1]).toMatchObject({ kind: 'keybindings', draft: '[]', stale: true });
+    expect(tabs[2]).toMatchObject({ kind: 'snippets', draft: '{ "A": {} }', stale: false });
   });
 
   it('forgets the tabs of the page before, whose ids the new page reuses', async () => {
