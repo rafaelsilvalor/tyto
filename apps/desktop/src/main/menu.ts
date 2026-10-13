@@ -80,6 +80,11 @@ export interface MenuOptions {
   readonly onCommand: (id: string) => void;
   /** Help > About (TYTO-248): shows {@link aboutText}, in a box or macOS's own panel. */
   readonly onAbout: () => void;
+  /**
+   * The File items to grey, by command id: what the window said does nothing with the tab in
+   * front (TYTO-283, `menu:disabled`). Absent is none.
+   */
+  readonly disabled?: ReadonlySet<string>;
 }
 
 /** What Help > About says, which is what the footer said before it became a status bar. */
@@ -136,6 +141,7 @@ export function menuTemplate(platform: string, options: MenuOptions): MenuItemCo
             // without matching a translated label.
             id: command.id,
             label: options.t(command.label),
+            enabled: options.disabled?.has(command.id) !== true,
             click: () => {
               options.onCommand(command.id);
             },

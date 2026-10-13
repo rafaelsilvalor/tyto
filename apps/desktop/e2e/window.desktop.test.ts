@@ -287,6 +287,9 @@ describe('the bridge', () => {
       'layout:set',
       'log:reveal',
       'log:write',
+      // TYTO-283: the File menu items greyed with an app file in front. Exercised by
+      // `e2e/brief-commands.desktop.test.ts`.
+      'menu:disabled',
       // TYTO-244: the drawn menu row's model and its native lists. Exercised by
       // `e2e/menu-row.desktop.test.ts`.
       'menu:model',

@@ -1,6 +1,7 @@
 import { type LanguageName } from '@tyto/editor';
 
 import { type CatalogueKey } from '../../shared/i18n/index.js';
+import { BRIEF_ONLY_COMMANDS } from './commands.js';
 import { type DocumentState } from './documents.js';
 import { planTemplateEdit, type TemplateEdit } from './frontmatter.js';
 import { I18N_ATTRIBUTE } from './shell.js';
@@ -23,6 +24,11 @@ export interface EditorChrome {
   readonly previewControls: boolean;
   /** The one muted line the preview shows instead of a picture, for an app file. */
   readonly previewNote: CatalogueKey | undefined;
+  /**
+   * Whether the commands that act on a brief (`BRIEF_ONLY_COMMANDS`) are offered and run
+   * (TYTO-283). Read through {@link commandOffered}, never field by field at a call site.
+   */
+  readonly briefCommands: boolean;
 }
 
 type Kind = DocumentState['kind'];
@@ -32,6 +38,7 @@ const BRIEF: EditorChrome = {
   templatePicker: true,
   previewControls: true,
   previewNote: undefined,
+  briefCommands: true,
 };
 
 export function editorChromeFor(kind: Kind): EditorChrome {
@@ -44,6 +51,7 @@ export function editorChromeFor(kind: Kind): EditorChrome {
         templatePicker: false,
         previewControls: false,
         previewNote: 'preview.note.settings',
+        briefCommands: false,
       };
     case 'keybindings':
       return {
@@ -51,9 +59,22 @@ export function editorChromeFor(kind: Kind): EditorChrome {
         templatePicker: false,
         previewControls: false,
         previewNote: 'preview.note.keybindings',
+        briefCommands: false,
       };
   }
 }
+
+/**
+ * Whether the command `id` is offered with a tab of this kind in front (TYTO-283).
+ *
+ * **The one predicate every door asks**: the command bar's list, the registry's `run` (which is
+ * what the bar, a key in the editor, the window's dispatcher, the status bar and a File menu
+ * item all reach), and the File menu's enabled flags. Before it, `settings.json` in front
+ * opened the export dialog and the run wrote `editaveis/settings.json.brief` and a
+ * `result.json` of syntax errors into the chosen folder — measured, not read.
+ */
+export const commandOffered = (kind: Kind, id: string): boolean =>
+  editorChromeFor(kind).briefCommands || !BRIEF_ONLY_COMMANDS.has(id);
 
 /**
  * The language a tab of this kind is opened in. One place for both ways a tab is born — opened

@@ -338,6 +338,7 @@ const menuRebuilds = () => {
     setLocale: (locale: string) => {
       locales.push(locale);
     },
+    setDisabled: () => undefined,
     model: () => [
       {
         id: 'help',

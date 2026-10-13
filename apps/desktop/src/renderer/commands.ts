@@ -400,6 +400,47 @@ export function createDesktopRegistry(actions: DesktopActions): CommandRegistry 
   return registry;
 }
 
+/**
+ * The commands that act on the brief in front, and on nothing else (TYTO-283).
+ *
+ * Decided from the running app with `settings.json` in front, not from the names: export opened
+ * its dialog and wrote the JSON out as `<name>.json.brief` beside a `result.json` of syntax
+ * errors; the zoom, format and slide steps moved state the hidden preview controls hold. The
+ * template mode's two verbs are not here: they open a template folder, whatever tab is in
+ * front. `editor.render` is not here either, because the window registers no such command.
+ */
+export const BRIEF_ONLY_COMMANDS: ReadonlySet<string> = new Set([
+  PREVIEW_ZOOM_IN,
+  PREVIEW_ZOOM_OUT,
+  PREVIEW_ZOOM_FIT,
+  PREVIEW_NEXT_FORMAT,
+  PREVIEW_PREVIOUS_FORMAT,
+  PREVIEW_NEXT_SLIDE,
+  PREVIEW_PREVIOUS_SLIDE,
+  FILE_EXPORT,
+]);
+
+/**
+ * The registry, with `run` refusing what `offered` says no to (TYTO-283).
+ *
+ * At `run` and not at each command's action, because `run` is the one door every caller shares:
+ * the bar, the editor's keymap (through the registry facet), the window's dispatcher, the status
+ * bar and the File menu's `command:run`. A refused id answers `false`, exactly as an id nobody
+ * registered does, so a key bound to it falls through to whatever binds it below — VS Code's
+ * answer for a binding whose `when` does not hold. `list` is left whole on purpose: the
+ * keybindings resolver checks ids against it, and an id that vanished with `settings.json` in
+ * front would turn every binding to it into `W_KEYBINDING_UNKNOWN_COMMAND` there.
+ */
+export function withCommandGate(
+  registry: CommandRegistry,
+  offered: (id: string) => boolean,
+): CommandRegistry {
+  return {
+    ...registry,
+    run: (id, context) => offered(id) && registry.run(id, context),
+  };
+}
+
 /** Moved to `@tyto/editor` with the table it reads (TYTO-207); re-exported for the window. */
 export { bindingsOf };
 

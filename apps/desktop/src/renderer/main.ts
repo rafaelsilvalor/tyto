@@ -37,6 +37,7 @@ import { followScheme } from './color-scheme.js';
 import { applyTheme, withThemeRows } from './theme.js';
 import { templateOf } from './frontmatter.js';
 import {
+  commandOffered,
   editorChromeFor,
   languageOf,
   paintEditorChrome,
@@ -89,7 +90,9 @@ import {
   selectDocumentCommandId,
   slotOfSelectCommand,
   togglePanelCommandId,
+  withCommandGate,
 } from './commands.js';
+import { FILE_MENU_COMMANDS } from '../../shared/commands.js';
 import { type StatusBar, type StatusBarCommands, STATUS_BAR_TAG } from './status-bar.js';
 import {
   type DocumentState,
@@ -819,158 +822,167 @@ function openExportDialog(): void {
   dialog.open = true;
 }
 
-const registry: CommandRegistry = createDesktopRegistry({
-  stepZoom: (direction) => {
-    if (pane === undefined) return;
-    // A step from whatever is on screen, the same as the buttons: the first step after
-    // `fit` moves from the size the user is looking at.
-    const from = paintPreview(pane, {
-      ...active(),
-      stale: isStale(active()),
-      broken: isBroken(active()),
-    });
-    updateActive((document_) => ({ ...document_, zoom: stepZoom(from, direction) }));
-    repaint();
-  },
+/**
+ * Whether `id` is offered with the tab in front: the one question every door asks (TYTO-283).
+ * Lazy, so it reads the workspace at the moment a command is listed or run.
+ */
+const offeredNow = (id: string): boolean => commandOffered(active().kind, id);
 
-  zoomToFit: () => {
-    updateActive((document_) => ({ ...document_, zoom: 'fit' as Zoom }));
-    repaint();
-  },
+const registry: CommandRegistry = withCommandGate(
+  createDesktopRegistry({
+    stepZoom: (direction) => {
+      if (pane === undefined) return;
+      // A step from whatever is on screen, the same as the buttons: the first step after
+      // `fit` moves from the size the user is looking at.
+      const from = paintPreview(pane, {
+        ...active(),
+        stale: isStale(active()),
+        broken: isBroken(active()),
+      });
+      updateActive((document_) => ({ ...document_, zoom: stepZoom(from, direction) }));
+      repaint();
+    },
 
-  stepFormat: (direction) => {
-    updateActive((document_) => ({
-      ...document_,
-      selection: {
-        ...document_.selection,
-        format: cycle(formatsOf(document_.frames), document_.selection.format, direction),
-      },
-    }));
-    repaint();
-  },
+    zoomToFit: () => {
+      updateActive((document_) => ({ ...document_, zoom: 'fit' as Zoom }));
+      repaint();
+    },
 
-  stepSlide: (direction) => {
-    const current = active();
-    const artwork = cycle(artworksOf(current.artworks), current.selection.artwork, direction);
-    updateActive((document_) => ({
-      ...document_,
-      selection: { ...document_.selection, artwork },
-    }));
-    repaint();
-    // The editor follows, the same as choosing from the picker does. A command that moved
-    // the picture and left the text behind would be a different feature wearing the same
-    // name.
-    const at = rangeOfArtwork(current.artworks, artwork);
-    if (at !== undefined) reveal(at);
-  },
+    stepFormat: (direction) => {
+      updateActive((document_) => ({
+        ...document_,
+        selection: {
+          ...document_.selection,
+          format: cycle(formatsOf(document_.frames), document_.selection.format, direction),
+        },
+      }));
+      repaint();
+    },
 
-  toggleLocale: () => {
-    // The only way to switch language since the footer's picker left (TYTO-248, ADR 0076).
-    applyLocale(state.locale === 'pt-BR' ? 'en' : 'pt-BR');
-  },
+    stepSlide: (direction) => {
+      const current = active();
+      const artwork = cycle(artworksOf(current.artworks), current.selection.artwork, direction);
+      updateActive((document_) => ({
+        ...document_,
+        selection: { ...document_.selection, artwork },
+      }));
+      repaint();
+      // The editor follows, the same as choosing from the picker does. A command that moved
+      // the picture and left the text behind would be a different feature wearing the same
+      // name.
+      const at = rangeOfArtwork(current.artworks, artwork);
+      if (at !== undefined) reveal(at);
+    },
 
-  chooseTemplateFolder: () => {
-    void setTemplateFolder(true);
-  },
-  clearTemplateFolder: () => {
-    void setTemplateFolder(false);
-  },
-  openExport: () => {
-    openExportDialog();
-  },
-  showPlugins: () => {
-    openPluginsDialog();
-  },
-  openSettings: () => {
-    openAppFile('settings');
-  },
-  openKeybindings: () => {
-    openAppFile('keybindings');
-  },
-  reloadWindow: () => {
-    // The session first, so every tab comes back; a reload that could not keep the drafts
-    // does not happen while there are any (TYTO-113, ADR 0080).
-    void keepSession(false).then((written) => {
-      if (written || !workspace.documents.some(isUnsaved)) window.location.reload();
-    });
-  },
-  pickTheme: () => {
-    void pickTheme();
-  },
-  showQueue: () => {
-    void changeLayout(withPanelOpen(layout, QUEUE_PANEL, true)).then(() => {
-      // Brought forward: the panel may have been open all along, behind the editor's focus.
-      elements.queuePanel?.querySelector<HTMLButtonElement>('button')?.focus();
-    });
-  },
+    toggleLocale: () => {
+      // The only way to switch language since the footer's picker left (TYTO-248, ADR 0076).
+      applyLocale(state.locale === 'pt-BR' ? 'en' : 'pt-BR');
+    },
 
-  editTemplate: () => {
-    void loadTemplateMode().then((mode) => mode?.openFolder(null));
-  },
-  newTemplate: () => {
-    void loadTemplateMode().then(async (mode) => {
-      if (mode === undefined) return;
-      mode.open = true;
-      // Straight to the name, which is the only thing a New needs from the person.
-      await mode.updateComplete;
-      mode.querySelector<HTMLInputElement>('.template-mode__new-name')?.focus();
-    });
-  },
+    chooseTemplateFolder: () => {
+      void setTemplateFolder(true);
+    },
+    clearTemplateFolder: () => {
+      void setTemplateFolder(false);
+    },
+    openExport: () => {
+      openExportDialog();
+    },
+    showPlugins: () => {
+      openPluginsDialog();
+    },
+    openSettings: () => {
+      openAppFile('settings');
+    },
+    openKeybindings: () => {
+      openAppFile('keybindings');
+    },
+    reloadWindow: () => {
+      // The session first, so every tab comes back; a reload that could not keep the drafts
+      // does not happen while there are any (TYTO-113, ADR 0080).
+      void keepSession(false).then((written) => {
+        if (written || !workspace.documents.some(isUnsaved)) window.location.reload();
+      });
+    },
+    pickTheme: () => {
+      void pickTheme();
+    },
+    showQueue: () => {
+      void changeLayout(withPanelOpen(layout, QUEUE_PANEL, true)).then(() => {
+        // Brought forward: the panel may have been open all along, behind the editor's focus.
+        elements.queuePanel?.querySelector<HTMLButtonElement>('button')?.focus();
+      });
+    },
 
-  newDocument: () => {
-    // **Added and never substituted, which is the whole of the card's second criterion.**
-    // `adopt` replaces the tab in front when `isDisposable` says it holds nothing — right for
-    // opening a file, wrong here: a New pressed on an empty tab would open no tab at all, and
-    // the person who asked for a blank page would watch nothing happen. So `isDisposable`'s
-    // rule is not consulted and not changed.
-    captureScroll();
-    workspace = addDocument(workspace, newDocument(nextDocumentId(), editor?.blank('')));
-    restoreActive();
-    repaint();
-  },
+    editTemplate: () => {
+      void loadTemplateMode().then((mode) => mode?.openFolder(null));
+    },
+    newTemplate: () => {
+      void loadTemplateMode().then(async (mode) => {
+        if (mode === undefined) return;
+        mode.open = true;
+        // Straight to the name, which is the only thing a New needs from the person.
+        await mode.updateComplete;
+        mode.querySelector<HTMLInputElement>('.template-mode__new-name')?.focus();
+      });
+    },
 
-  openDocument: () => {
-    void withBridge(async (bridge) => {
-      const wanted = nextDocumentId();
-      const answer = await bridge['file:open']({ documentId: wanted });
-      adopt(answer.document, answer.documentId, wanted);
-    });
-  },
+    newDocument: () => {
+      // **Added and never substituted, which is the whole of the card's second criterion.**
+      // `adopt` replaces the tab in front when `isDisposable` says it holds nothing — right for
+      // opening a file, wrong here: a New pressed on an empty tab would open no tab at all, and
+      // the person who asked for a blank page would watch nothing happen. So `isDisposable`'s
+      // rule is not consulted and not changed.
+      captureScroll();
+      workspace = addDocument(workspace, newDocument(nextDocumentId(), editor?.blank('')));
+      restoreActive();
+      repaint();
+    },
 
-  saveDocument: (saveAs) => {
-    void withBridge(async (bridge) => {
-      // Still the pane, and deliberately: the guard asks whether the window is up, not
-      // where the text comes from. A save fired in the paint before CodeMirror is mounted
-      // would write the empty string over a file.
+    openDocument: () => {
+      void withBridge(async (bridge) => {
+        const wanted = nextDocumentId();
+        const answer = await bridge['file:open']({ documentId: wanted });
+        adopt(answer.document, answer.documentId, wanted);
+      });
+    },
+
+    saveDocument: (saveAs) => {
+      void withBridge(async (bridge) => {
+        // Still the pane, and deliberately: the guard asks whether the window is up, not
+        // where the text comes from. A save fired in the paint before CodeMirror is mounted
+        // would write the empty string over a file.
+        if (editor === undefined) return;
+        await saveOneDocument(bridge, workspace.activeId, saveAs);
+      });
+    },
+
+    restoreLayout: () => {
+      void changeLayout(DEFAULT_LAYOUT);
+    },
+
+    toggleDock: (dock) => {
+      void changeLayout(withDockToggled(layout, dock));
+    },
+
+    closeDocument: () => {
+      void requestClose(workspace.activeId);
+    },
+
+    stepDocument: (direction) => {
+      activate(stepDocument(workspace, direction));
+    },
+
+    toggleVimMode: () => {
       if (editor === undefined) return;
-      await saveOneDocument(bridge, workspace.activeId, saveAs);
-    });
-  },
-
-  restoreLayout: () => {
-    void changeLayout(DEFAULT_LAYOUT);
-  },
-
-  toggleDock: (dock) => {
-    void changeLayout(withDockToggled(layout, dock));
-  },
-
-  closeDocument: () => {
-    void requestClose(workspace.activeId);
-  },
-
-  stepDocument: (direction) => {
-    activate(stepDocument(workspace, direction));
-  },
-
-  toggleVimMode: () => {
-    if (editor === undefined) return;
-    editor.setVimMode(!editor.isVimMode());
-    // The bindings change with the mode — vim has no `Mod-z`, because undo is `u` and
-    // belongs to the vim engine — so the bar has to be told what it now shows.
-    paintCommandBar();
-  },
-});
+      editor.setVimMode(!editor.isVimMode());
+      // The bindings change with the mode — vim has no `Mod-z`, because undo is `u` and
+      // belongs to the vim engine — so the bar has to be told what it now shows.
+      paintCommandBar();
+    },
+  }),
+  offeredNow,
+);
 
 /**
  * The next value in a ring, or the first one when nothing is selected yet.
@@ -2161,6 +2173,8 @@ function commandEntries(): readonly CommandEntry[] {
   const bindings = shownBindingsOf(keybindings, editor?.isVimMode() ?? false, state.platform);
 
   return registry.list().flatMap((command) => {
+    // Not offered with this tab in front (TYTO-283): the registry would refuse to run it.
+    if (!offeredNow(command.id)) return [];
     const key = COMMAND_LABELS[command.id];
     const binding = bindings[command.id];
     // Three commands build their label from a word plus something that is not the
@@ -2235,6 +2249,7 @@ function paintStatusBar(): void {
   // bottom area — ends in a repaint, so this is the one place that has to know.
   if (problemsShown) problemsMark = seen(problemsMark);
   bar.commands = STATUS_COMMANDS;
+  bar.offered = offeredNow;
   bar.run = (id) => {
     runWindowCommand(id);
   };
@@ -2372,9 +2387,28 @@ function repaint(): void {
   paintTabs();
   paintCommandBar();
   paintStatusBar();
+  tellMenuWhatIsOffered();
   if (elements.updateNotice !== null) {
     paintUpdateNotice(elements.updateNotice, updateStatus, state.locale);
   }
+}
+
+/** The File menu ids main was last told to disable, joined; `undefined` before the first. */
+let menuDisabledSent: string | undefined;
+
+/**
+ * Tells main which File menu items do nothing with this tab in front, so it greys them
+ * (TYTO-283). The same predicate the bar and the registry ask; sent only when the answer
+ * changes, because this runs on every repaint and main rebuilds the menu on each message.
+ */
+function tellMenuWhatIsOffered(): void {
+  const ids = FILE_MENU_COMMANDS.map((command) => command.id).filter((id) => !offeredNow(id));
+  const joined = ids.join(' ');
+  if (joined === menuDisabledSent) return;
+  menuDisabledSent = joined;
+  void withBridge(async (bridge) => {
+    await bridge['menu:disabled']({ ids });
+  });
 }
 
 /** Asks main where the update stands and shows it (TYTO-131). */

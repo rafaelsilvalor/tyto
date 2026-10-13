@@ -73,6 +73,18 @@ describe('the status bar', () => {
     ]);
   });
 
+  it('greys a button whose command is not offered with the tab in front (TYTO-283)', async () => {
+    const { bar } = await mount({ ...base, kind: 'settings' });
+    bar.offered = (id) => id !== COMMANDS.export;
+    bar.requestUpdate();
+    await bar.updateComplete;
+
+    const disabled = buttons(bar)
+      .filter((button) => button.disabled)
+      .map((button) => button.dataset['command']);
+    expect(disabled).toEqual([COMMANDS.export]);
+  });
+
   it('labels every button from the catalogue, in both languages', async () => {
     for (const locale of ['en', 'pt-BR'] as const) {
       const { bar } = await mount({ ...base, locale });

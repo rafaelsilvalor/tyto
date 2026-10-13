@@ -10,8 +10,10 @@ import { describe, expect, it, vi } from 'vitest';
 import { FILE_MENU_COMMANDS, RELOAD_COMMAND } from '../../shared/commands.js';
 import {
   type DesktopActions,
+  BRIEF_ONLY_COMMANDS,
   COMMAND_LABELS,
   DOCUMENT_NEW,
+  FILE_EXPORT,
   EDITOR_OPEN,
   EDITOR_SAVE_AS,
   EDITOR_TOGGLE_VIM,
@@ -28,6 +30,7 @@ import {
   bindingsOf,
   createDesktopRegistry,
   keymapSetFor,
+  withCommandGate,
 } from './commands.js';
 import { CATALOGUE_KEYS } from '../../shared/i18n/index.js';
 
@@ -76,6 +79,45 @@ const actions = () =>
  * still taken, so a double without a `doc` throws before the command runs.
  */
 const NO_VIEW = { view: { state: { doc: { eq: () => true } } } } as never;
+
+describe('the gate on the registry (TYTO-283)', () => {
+  it('runs nothing the predicate refuses, and answers false as for an unknown id', () => {
+    const spies = actions();
+    const registry = withCommandGate(createDesktopRegistry(spies), (id) => id !== FILE_EXPORT);
+
+    expect(registry.run(FILE_EXPORT, NO_VIEW)).toBe(false);
+    expect(spies.openExport).not.toHaveBeenCalled();
+    expect(registry.run(PREVIEW_ZOOM_IN, NO_VIEW)).toBe(true);
+    expect(spies.stepZoom).toHaveBeenCalledWith(1);
+  });
+
+  it('asks at every run, so the answer follows the tab in front', () => {
+    const spies = actions();
+    let brief = false;
+    const registry = withCommandGate(createDesktopRegistry(spies), () => brief);
+
+    registry.run(FILE_EXPORT, NO_VIEW);
+    brief = true;
+    registry.run(FILE_EXPORT, NO_VIEW);
+
+    expect(spies.openExport).toHaveBeenCalledTimes(1);
+  });
+
+  it('still lists every command, so a keybinding to one is not reported unknown', () => {
+    const registry = withCommandGate(createDesktopRegistry(actions()), () => false);
+    const ids = registry.list().map((command) => command.id);
+
+    for (const id of BRIEF_ONLY_COMMANDS) expect(ids).toContain(id);
+  });
+
+  it('names only commands the window registers', () => {
+    const ids = createDesktopRegistry(actions())
+      .list()
+      .map((command) => command.id);
+
+    for (const id of BRIEF_ONLY_COMMANDS) expect(ids).toContain(id);
+  });
+});
 
 describe('the ids the window registers', () => {
   it('reaches the action the id names, with the direction it means', () => {
