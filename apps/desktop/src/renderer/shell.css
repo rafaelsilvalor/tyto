@@ -808,9 +808,19 @@ tyto-command-bar[open] {
 
 /* A theme's kind in the theme picker (TYTO-208): read after the name, never instead of it. */
 .command-bar__detail {
+  overflow: hidden;
+  min-width: 0;
   color: var(--tyto-text-muted);
   font-size: var(--tyto-text-xs);
+  text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+/* A template's description is a sentence (TYTO-275): the detail gives way, cut with an ellipsis,
+   and the name it follows is not squeezed: it wraps only when it is wider than the row. */
+.command-bar__label {
+  flex-shrink: 0;
+  max-width: 100%;
 }
 
 .command-bar__key {

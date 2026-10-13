@@ -1,7 +1,7 @@
 import { mkdtempSync, mkdirSync, writeFileSync, rmSync } from 'node:fs';
 import { createRequire } from 'node:module';
 import { tmpdir } from 'node:os';
-import { dirname, join } from 'node:path';
+import { basename, dirname, join } from 'node:path';
 
 import { nodeFileSystem } from '@tyto/io';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
@@ -173,6 +173,25 @@ describe('the template catalogue', () => {
     expect(answer.failures[0]?.diagnostics.length).toBeGreaterThan(0);
     expect(answer.failures[0]?.diagnostics[0]?.code).toMatch(/^E_/u);
     expect(answer.failures[0]?.diagnostics[0]?.message).not.toBe('');
+  });
+
+  it('carries each manifest’s slots and names the folder a template came from', async () => {
+    // TYTO-275: the skeleton is built from the slots in the window, and the picker says whose
+    // template it is — `null` is the built-in pack, which the window names in its language.
+    const catalogue = await createTemplateCatalogue({
+      sources: await sourcesOver(packDirectory, scratch),
+    });
+
+    const { templates } = await catalogue.list();
+    const chosen = templates.find((item) => item.name === 'with-preview');
+    const agenda = templates.find((item) => item.name === 'agenda-semana');
+
+    expect(chosen?.root).toBe(basename(scratch));
+    expect(chosen?.slots).toEqual({
+      titulo: { type: 'rich-text', required: false, repeat: false },
+    });
+    expect(agenda?.root).toBeNull();
+    expect(agenda?.slots['lamina']).toMatchObject({ repeat: true, min: 1 });
   });
 
   it('answers an empty list for a folder that is not there', async () => {

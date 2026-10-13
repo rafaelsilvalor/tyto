@@ -7,6 +7,7 @@ import {
   editorChromeFor,
   languageOf,
   paintEditorChrome,
+  templateChoiceFor,
   templateEditFor,
 } from './editor-chrome.js';
 import { EDITOR_PANEL_TAG, PREVIEW_PANEL_TAG } from './panels.js';
@@ -87,6 +88,25 @@ describe('templateEditFor', () => {
 
   it('does nothing for the empty choice', () => {
     expect(templateEditFor(undefined, 'Olá\n', '')).toBeUndefined();
+  });
+});
+
+describe('templateChoiceFor (TYTO-275)', () => {
+  it('answers the skeleton on a brief with nothing in it', () => {
+    expect(templateChoiceFor(undefined, '', 'agenda-semana')).toEqual({ kind: 'skeleton' });
+    expect(templateChoiceFor(undefined, '  \n\n', 'agenda-semana')).toEqual({ kind: 'skeleton' });
+  });
+
+  it('answers the one-line edit on a brief that says something', () => {
+    expect(templateChoiceFor(undefined, 'Olá\n', 'promo-curso')).toEqual({
+      kind: 'edit',
+      edit: { from: 0, to: 0, insert: '---\ntemplate: promo-curso\n---\n' },
+    });
+  });
+
+  it('answers nothing on an app file, even an empty one', () => {
+    expect(templateChoiceFor('settings', '', 'agenda-semana')).toBeUndefined();
+    expect(templateChoiceFor('keybindings', '', 'agenda-semana')).toBeUndefined();
   });
 });
 

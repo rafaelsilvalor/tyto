@@ -13,6 +13,7 @@ import {
   BRIEF_ONLY_COMMANDS,
   COMMAND_LABELS,
   DOCUMENT_NEW,
+  DOCUMENT_NEW_FROM_TEMPLATE,
   FILE_EXPORT,
   EDITOR_OPEN,
   EDITOR_SAVE_AS,
@@ -51,6 +52,7 @@ const actions = () =>
     toggleLocale: vi.fn<() => void>(),
     toggleVimMode: vi.fn<() => void>(),
     newDocument: vi.fn<() => void>(),
+    newDocumentFromTemplate: vi.fn<() => void>(),
     openDocument: vi.fn<() => void>(),
     saveDocument: vi.fn<(saveAs: boolean) => void>(),
     restoreLayout: vi.fn<() => void>(),
@@ -180,6 +182,21 @@ describe('the ids the window registers', () => {
 
     expect(registry.run(TEMPLATE_NEW, NO_VIEW)).toBe(true);
     expect(spies.newTemplate).toHaveBeenCalledOnce();
+  });
+
+  it('runs New brief from template on any tab, with no keystroke (TYTO-275)', () => {
+    const spies = actions();
+    // Refusing every brief-only command, as the gate does with an app file in front: this one
+    // opens a tab of its own, so it is not among them.
+    const registry = withCommandGate(
+      createDesktopRegistry(spies),
+      (id) => !BRIEF_ONLY_COMMANDS.has(id),
+    );
+
+    expect(registry.run(DOCUMENT_NEW_FROM_TEMPLATE, NO_VIEW)).toBe(true);
+    expect(spies.newDocumentFromTemplate).toHaveBeenCalledOnce();
+    expect(spies.newDocument).not.toHaveBeenCalled();
+    expect(bindingsOf(keymapSetFor(false), 'linux')[DOCUMENT_NEW_FROM_TEMPLATE]).toBeUndefined();
   });
 
   it('gives the template folder commands no keystroke', () => {

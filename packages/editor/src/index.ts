@@ -138,3 +138,11 @@ export {
 export { type TemplateLintOptions, templateLint, templateSuggestionFor } from './template-lint.js';
 
 export { completeTemplate, templateCompletion } from './template-completion.js';
+
+export {
+  type SkeletonManifest,
+  briefSkeleton,
+  inSkeleton,
+  insertBriefSkeleton,
+  skeletonText,
+} from './skeleton.js';

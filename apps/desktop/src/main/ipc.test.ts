@@ -71,6 +71,8 @@ const catalogue = () => ({
             { id: 'feed', label: 'Feed' },
             { id: 'story', label: 'Story' },
           ],
+          slots: {},
+          root: null,
         },
       ],
       failures: [],
