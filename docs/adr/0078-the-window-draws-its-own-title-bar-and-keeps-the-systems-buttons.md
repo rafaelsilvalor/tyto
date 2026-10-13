@@ -123,6 +123,10 @@ Electron 44.4.5 on Windows 11, the built app, its own `--user-data-dir` and `TYT
   902-wide window: the overlay's buttons take 138 px at the right.
 - Playwright's `capturePage` and CDP screenshots draw the page and not the overlay, so the
   buttons are visible only in a `PrintWindow` capture.
+- _Added 2026-10-13, TYTO-284:_ light bar under dark buttons was Playwright's, not the app's —
+  its default `prefers-color-scheme: light` emulation reaches the page and never main, so on a
+  dark Windows the bar measured #ebebec under a #2f343e close button, and #2f343e under both
+  without it; `firstWindow` now hands the scheme back to Electron in every suite.
 - **PR B, same setup.** A click on Help in the row opened the native list under the name;
   `PrintWindow` of the window does not draw it, but `PrintWindow` of the list's own window does
   (dark, with _Open the log folder_ and _About Tyto_). Picking each with real key presses ran

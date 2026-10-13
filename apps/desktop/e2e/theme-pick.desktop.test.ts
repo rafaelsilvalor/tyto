@@ -29,7 +29,8 @@ import { firstWindow } from './first-window.js';
  *
  * Playwright emulates a light colour scheme unless told otherwise, and an emulated value
  * outranks the one Electron answers from `nativeTheme.themeSource` — the value the `mode` sets.
- * So the media emulation is handed back to Electron on every launch.
+ * So the media emulation is handed back to Electron on every launch, by `firstWindow` since
+ * TYTO-284.
  *
  * With `TYTO_THEME_SHOTS` set to a folder, the suite leaves five CDP screenshots there at
  * 900x600: the picker open, the test theme applied, `mode: "light"` and `mode: "dark"`, and
@@ -85,7 +86,6 @@ async function launch(): Promise<void> {
   });
   page = await firstWindow(app);
   await page.waitForSelector('#editor .cm-content');
-  await page.emulateMedia({ colorScheme: null });
   await app.evaluate(({ BrowserWindow }) => {
     BrowserWindow.getAllWindows()[0]?.setSize(900, 600);
   });

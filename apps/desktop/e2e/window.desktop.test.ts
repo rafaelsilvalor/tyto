@@ -164,6 +164,28 @@ describe('the renderer is a browser, not a shell', () => {
   });
 });
 
+/**
+ * The page sees the scheme the system's buttons are painted from (TYTO-284).
+ *
+ * Playwright emulates `prefers-color-scheme: light` unless `firstWindow` drops it, and main never
+ * sees an emulated scheme: on a dark Windows the page went light while the title bar's system
+ * buttons stayed dark. This suite sets no theme, so both sides answer from the system.
+ *
+ * **Only a dark machine can redden it.** Where the system is light — CI's Linux under xvfb, as
+ * far as anybody has looked — the emulated light and the real light agree, and this passes with
+ * or without the call. The proof is the local red with the call removed, in the pull request.
+ */
+describe('the colour scheme', () => {
+  it("is the one main paints the window's buttons from", async () => {
+    const pageIsDark = await page.evaluate(
+      () => window.matchMedia('(prefers-color-scheme: dark)').matches,
+    );
+    const mainIsDark = await app.evaluate(({ nativeTheme }) => nativeTheme.shouldUseDarkColors);
+
+    expect({ pageIsDark }).toEqual({ pageIsDark: mainIsDark });
+  });
+});
+
 /** *A round-trip IPC call with an invalid payload is rejected by the Zod contract.* */
 describe('the bridge', () => {
   it('answers app:info with what main knows', async () => {

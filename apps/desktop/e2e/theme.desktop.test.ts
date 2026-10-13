@@ -127,10 +127,6 @@ beforeAll(async () => {
   });
   page = await firstWindow(app);
   await page.waitForSelector('#editor .cm-content');
-  // Playwright emulates `prefers-color-scheme: light` on every page it drives unless told not
-  // to, and an emulated value outranks the system's — so `themeSource` alone moved nothing.
-  // `null` hands the query back to Electron, which is what a person's window answers from.
-  await page.emulateMedia({ colorScheme: null });
   // The smallest window the app allows, which is where a dense layout runs out of room first.
   await app.evaluate(({ BrowserWindow }) => {
     BrowserWindow.getAllWindows()[0]?.setSize(900, 600);

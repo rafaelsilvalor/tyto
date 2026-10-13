@@ -134,8 +134,6 @@ describe.runIf(shots !== undefined)('screenshots', () => {
   it('shoots the broken line in pt-BR, light and dark', async () => {
     const folder = shots ?? '';
     mkdirSync(folder, { recursive: true });
-    // Playwright forces `light` unless told not to; `null` hands the query back to Electron.
-    await page.emulateMedia({ colorScheme: null });
     await page.keyboard.press('Control+k');
     await page.waitForSelector('.command-bar__input', { state: 'visible' });
     await page.keyboard.type('shell.toggleLocale');

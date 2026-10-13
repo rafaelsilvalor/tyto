@@ -113,9 +113,6 @@ beforeAll(async () => {
   page = await firstWindow(app);
   await page.waitForSelector('#editor .cm-content');
   await page.waitForSelector('.tabs__tab');
-  // Playwright emulates a light scheme unless told otherwise, and an emulated value outranks
-  // what Electron answers from `nativeTheme` — the value this suite flips.
-  await page.emulateMedia({ colorScheme: null });
   await app.evaluate(({ BrowserWindow, dialog }, path) => {
     const window = BrowserWindow.getAllWindows()[0];
     window?.setSize(900, 600);
