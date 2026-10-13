@@ -452,6 +452,54 @@ describe('one consumer per folder', () => {
   });
 });
 
+describe('its own readers (TYTO-239)', () => {
+  it('never lists the inbox while it moves a task out of it', async () => {
+    // On Windows a listing holds every brief open and the ack is a rename of the task's
+    // folder, which then fails with EPERM. The listing here is a view the panel asks for in
+    // the middle of the render, and it is slowed down so it is still open when the render
+    // ends: without the gate the ack lands inside it every time, on every platform.
+    const real = fsInbox({ root: join(root, 'inbox'), done: join(root, 'done') });
+    let listing = 0;
+    const acksDuringListing: string[] = [];
+    const inbox: BriefSource = {
+      async pull() {
+        listing += 1;
+        try {
+          await new Promise((done) => {
+            setTimeout(done, 20);
+          });
+          return await real.pull();
+        } finally {
+          listing -= 1;
+        }
+      },
+      async ack(id) {
+        if (listing > 0) acksDuringListing.push(id);
+        await real.ack(id);
+      },
+    };
+    const views: Promise<QueueView>[] = [];
+    const { render } = fakeRender(() => {
+      if (service !== undefined) views.push(service.view());
+    });
+    service = createQueueService({
+      sources: (folder) => ({ inbox, done: fsInbox({ root: join(folder, 'done') }) }),
+      render,
+      folder: root,
+      autoRun: false,
+      onChange: () => undefined,
+    });
+    drop('tarefa-1', '::titulo Olá');
+
+    await service.run('tarefa-1');
+    await Promise.all(views);
+
+    expect(views).toHaveLength(1);
+    expect(acksDuringListing).toEqual([]);
+    expect(statusOf(await service.view(), 'tarefa-1')).toBe('done');
+  });
+});
+
 describe('the folder', () => {
   it('lists nothing and runs nothing before one is chosen', async () => {
     const { calls, render } = fakeRender();

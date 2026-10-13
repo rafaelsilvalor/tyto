@@ -39,10 +39,11 @@ export interface FsInboxOptions {
  * Windows refuses to rename a folder while any file inside it is open, with `EPERM` (or
  * `EACCES`/`EBUSY`, depending on who holds it). Measured for TYTO-198: an `ack` racing a
  * `pull` of the same inbox — which reads every `brief.brief` — failed 25 times in 300, and 0
- * in 300 alone. The queue panel races itself that way (its sweep and its listing read the
- * brief while it acknowledges), and an antivirus or indexer opening a fresh file does the
- * same. Those locks last milliseconds, so a short wait gets past them. A lock that outlives
- * the window — a folder open in Explorer — still fails, and the caller reports it.
+ * in 300 alone. The desktop queue no longer races itself that way (TYTO-239 keeps its
+ * listings and its acks apart), but an antivirus or indexer opening a fresh file, or a second
+ * reader of the folder, still does. Those locks last milliseconds, so a short wait gets past
+ * them. A lock that outlives the window — a folder open in Explorer — still fails, and the
+ * caller reports it.
  */
 export const ACK_RETRY_DELAYS_MS: readonly number[] = [10, 20, 40, 80, 160];
 
