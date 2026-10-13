@@ -41,8 +41,26 @@ export const MINIMUM_LAUNCH_HOOK_TIMEOUT_MS = 180_000;
 export async function firstWindow(app: ElectronApplication): Promise<Page> {
   const page = await app.firstWindow({ timeout: FIRST_WINDOW_TIMEOUT_MS });
   answerDialogsQuietly(page);
+  await page.emulateMedia({ colorScheme: null });
   return page;
 }
+
+/*
+ * Why every launch hands the colour scheme back to Electron (TYTO-284).
+ *
+ * Playwright's `_electron` emulates `prefers-color-scheme: light` on every page it drives
+ * unless told otherwise, and an emulated value outranks what Electron answers from
+ * `nativeTheme`. Main does not see the emulation: on a machine whose system is dark the page
+ * went light while main painted the title bar's system buttons dark. Measured on 6e2e350 with
+ * `PrintWindow`, title-bar background against close-button background: #ebebec / #2f343e under
+ * Playwright's default, #2f343e / #2f343e without it, and the app launched without Playwright
+ * consistent in both themes. So the app was right and the tests were looking at a window no
+ * person sees. `null` drops the emulation, which is what the four suites that cared already did
+ * one by one; `window.desktop.test.ts` holds that the page and `nativeTheme` agree.
+ *
+ * A suite that wants a fixed scheme still calls `page.emulateMedia({ colorScheme: 'dark' })`
+ * itself, and `launch-isolation.test.ts` asks for a `// scheme:` comment saying why.
+ */
 
 /**
  * Playwright's own answers to the page's dialogs, minus a rejection nobody can catch (TYTO-250).

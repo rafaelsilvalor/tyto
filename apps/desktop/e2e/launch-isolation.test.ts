@@ -530,6 +530,113 @@ describe('scanDirectWindowWaits', () => {
   });
 });
 
+/**
+ * A fourth rule keeps the colour scheme Electron's (TYTO-284). `firstWindow` drops Playwright's
+ * default `prefers-color-scheme: light` emulation, because main never sees an emulated scheme
+ * and a dark system painted dark window buttons over a light page. A suite may still force a
+ * scheme on purpose, but then the page and `nativeTheme` disagree again for the rest of the
+ * file, so the call must say why in a `// scheme:` comment on the line or lines right above it.
+ * `colorScheme: null` is not forcing anything and needs no reason.
+ */
+const SCHEME_REASON = /\/\/\s*scheme:/u;
+
+function isEmulateMediaCall(node: ts.Node): node is ts.CallExpression {
+  return (
+    ts.isCallExpression(node) &&
+    ts.isPropertyAccessExpression(node.expression) &&
+    node.expression.name.text === 'emulateMedia'
+  );
+}
+
+/** Whether an `emulateMedia(…)` call leaves `colorScheme` alone or hands it back with `null`. */
+function leavesSchemeToElectron(call: ts.CallExpression): boolean {
+  const [options] = call.arguments;
+  if (options === undefined || !ts.isObjectLiteralExpression(options)) return false;
+  const scheme = propertyNamed(options, 'colorScheme');
+  if (scheme === undefined) return true;
+  return ts.isPropertyAssignment(scheme) && scheme.initializer.kind === ts.SyntaxKind.NullKeyword;
+}
+
+/** The statement a call is written in, whose leading comments are the ones above that line. */
+function enclosingStatement(node: ts.Node): ts.Node {
+  let current = node;
+  while (
+    current.parent !== undefined &&
+    !ts.isBlock(current.parent) &&
+    !ts.isSourceFile(current.parent)
+  ) {
+    current = current.parent;
+  }
+  return current;
+}
+
+/** Every `emulateMedia` call that forces a colour scheme without a `// scheme:` reason, by line. */
+function scanForcedSchemes(fileName: string, source: string): number[] {
+  const file = ts.createSourceFile(fileName, source, ts.ScriptTarget.Latest, true);
+  const lines: number[] = [];
+  const visit = (node: ts.Node): void => {
+    if (isEmulateMediaCall(node) && !leavesSchemeToElectron(node)) {
+      const statement = enclosingStatement(node);
+      const comments = ts.getLeadingCommentRanges(source, statement.getFullStart()) ?? [];
+      const explained = comments.some((range) =>
+        SCHEME_REASON.test(source.slice(range.pos, range.end)),
+      );
+      if (!explained) lines.push(file.getLineAndCharacterOfPosition(node.getStart(file)).line + 1);
+    }
+    ts.forEachChild(node, visit);
+  };
+  visit(file);
+  return lines;
+}
+
+describe('every end-to-end suite leaves the colour scheme to Electron unless it says why', () => {
+  it('finds no emulateMedia forcing a colour scheme without a // scheme: comment', () => {
+    const messages = suiteFiles().flatMap((name) =>
+      scanForcedSchemes(name, readFileSync(join(here, name), 'utf8')).map(
+        (line) =>
+          `e2e/${name}:${line}: forces a colour scheme the main process does not see — ` +
+          `drop it (firstWindow already hands the scheme to Electron), or write a ` +
+          `\`// scheme: <why>\` comment right above the call`,
+      ),
+    );
+    expect(messages).toEqual([]);
+  });
+});
+
+describe('scanForcedSchemes', () => {
+  it('reports a forced scheme without a reason, and one it cannot read', () => {
+    expect(
+      scanForcedSchemes(
+        'a.ts',
+        [
+          "await page.emulateMedia({ colorScheme: 'dark' });",
+          '// a comment that gives no reason',
+          "await page.emulateMedia({ colorScheme: 'light' });",
+          'await page.emulateMedia(options);',
+        ].join('\n'),
+      ),
+    ).toEqual([1, 3, 4]);
+  });
+
+  it('accepts null, no colorScheme at all, and a forced scheme with a reason', () => {
+    expect(
+      scanForcedSchemes(
+        'a.ts',
+        [
+          'await page.emulateMedia({ colorScheme: null });',
+          "await page.emulateMedia({ media: 'print' });",
+          '// scheme: the dark screenshot Rafael approves',
+          "await page.emulateMedia({ colorScheme: 'dark' });",
+          'beforeAll(async () => {',
+          '  // scheme: inside a hook too',
+          "  const done = page.emulateMedia({ colorScheme: 'light' });",
+          '});',
+        ].join('\n'),
+      ),
+    ).toEqual([]);
+  });
+});
+
 describe('scanLaunches', () => {
   const isolated = `
     await _electron.launch({
