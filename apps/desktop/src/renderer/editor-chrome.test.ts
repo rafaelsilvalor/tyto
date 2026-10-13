@@ -1,7 +1,9 @@
 // @vitest-environment jsdom
 import { describe, expect, it } from 'vitest';
 
+import { BRIEF_ONLY_COMMANDS, FILE_EXPORT, SETTINGS_OPEN, TEMPLATE_EDIT } from './commands.js';
 import {
+  commandOffered,
   editorChromeFor,
   languageOf,
   paintEditorChrome,
@@ -16,6 +18,7 @@ describe('editorChromeFor (TYTO-256)', () => {
       templatePicker: true,
       previewControls: true,
       previewNote: undefined,
+      briefCommands: true,
     });
   });
 
@@ -25,12 +28,14 @@ describe('editorChromeFor (TYTO-256)', () => {
       templatePicker: false,
       previewControls: false,
       previewNote: 'preview.note.settings',
+      briefCommands: false,
     });
     expect(editorChromeFor('keybindings')).toEqual({
       heading: 'status.kind.keybindings',
       templatePicker: false,
       previewControls: false,
       previewNote: 'preview.note.keybindings',
+      briefCommands: false,
     });
   });
 
@@ -38,6 +43,28 @@ describe('editorChromeFor (TYTO-256)', () => {
     expect(languageOf(undefined)).toBeUndefined();
     expect(languageOf('settings')).toBe('json');
     expect(languageOf('keybindings')).toBe('json');
+  });
+});
+
+describe('commandOffered (TYTO-283)', () => {
+  it('offers every brief-only command with a brief in front', () => {
+    for (const id of BRIEF_ONLY_COMMANDS) expect(commandOffered(undefined, id), id).toBe(true);
+  });
+
+  it('offers none of them with an app file in front', () => {
+    for (const kind of ['settings', 'keybindings'] as const) {
+      for (const id of BRIEF_ONLY_COMMANDS) expect(commandOffered(kind, id), id).toBe(false);
+    }
+  });
+
+  it('leaves every other command alone, whatever is in front', () => {
+    for (const kind of [undefined, 'settings', 'keybindings'] as const) {
+      expect(commandOffered(kind, SETTINGS_OPEN)).toBe(true);
+      // The template mode opens a folder, not the tab in front.
+      expect(commandOffered(kind, TEMPLATE_EDIT)).toBe(true);
+      expect(commandOffered(kind, 'a.plugin:command')).toBe(true);
+    }
+    expect(BRIEF_ONLY_COMMANDS.has(FILE_EXPORT)).toBe(true);
   });
 });
 

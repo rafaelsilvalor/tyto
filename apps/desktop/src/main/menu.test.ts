@@ -310,6 +310,29 @@ describe('the File submenu', () => {
     expect(onCommand).toHaveBeenCalledWith('editor.save');
   });
 
+  it('greys the items the window said do nothing, and only those (TYTO-283)', () => {
+    const items = fileSubmenu(
+      menuTemplate('win32', {
+        t: (key) => key,
+        onRevealLogs: () => {},
+        onCommand: () => {},
+        onAbout: () => {},
+        disabled: new Set(['file.export']),
+      }),
+    );
+    const enabled = (id: string): boolean | undefined =>
+      items.find((item) => item.id === id)?.enabled;
+
+    expect(enabled('file.export')).toBe(false);
+    for (const command of FILE_MENU_COMMANDS) {
+      if (command.id !== 'file.export') expect(enabled(command.id), command.id).toBe(true);
+    }
+    // Absent is none greyed.
+    for (const item of fileSubmenu(template('win32'))) {
+      if (item.id !== undefined) expect(item.enabled, item.id).not.toBe(false);
+    }
+  });
+
   it('gives no item an accelerator, on any platform', () => {
     // **The decision, asserted.** A menu accelerator is handled by the browser process before
     // the page sees the key, so one here would override `desktopKeymapSet` unconditionally —

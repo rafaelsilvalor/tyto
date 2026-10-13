@@ -97,11 +97,17 @@ export class StatusBar extends LitElement {
     state: { attribute: false },
     commands: { attribute: false },
     run: { attribute: false },
+    offered: { attribute: false },
   };
 
   declare state: StatusBarState;
   declare commands: StatusBarCommands;
   declare run: (id: string) => void;
+  /**
+   * Whether a button's command is offered with the tab in front (TYTO-283): Export is greyed
+   * with `settings.json` in front, as the File menu's item is. The window's predicate, handed in.
+   */
+  declare offered: (id: string) => boolean;
 
   constructor() {
     super();
@@ -125,6 +131,7 @@ export class StatusBar extends LitElement {
       settings: '',
     };
     this.run = () => undefined;
+    this.offered = () => true;
   }
 
   /** Light DOM, so `shell.css` reaches inside — the reasoning is in ADR 0024. */
@@ -147,6 +154,7 @@ export class StatusBar extends LitElement {
       title=${label}
       aria-label=${label}
       aria-pressed=${on === undefined ? nothing : String(on)}
+      ?disabled=${!this.offered(command)}
       @click=${() => {
         this.run(command);
       }}

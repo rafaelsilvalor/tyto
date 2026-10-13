@@ -160,6 +160,8 @@ export interface IpcDependencies {
    */
   readonly menu: {
     setLocale: (locale: string) => void;
+    /** Greys these File menu items, and only these, in every menu built from now on (TYTO-283). */
+    setDisabled: (ids: readonly string[]) => void;
     /** The installed menu, projected for the drawn row (TYTO-244, `menu-model.ts`). */
     model: () => MenuModel[];
     /**
@@ -555,6 +557,11 @@ export function createHandlers(dependencies: IpcDependencies): Handlers {
 
     'app:locale': ({ locale }) => {
       menu.setLocale(locale);
+      return Promise.resolve({});
+    },
+
+    'menu:disabled': ({ ids }) => {
+      menu.setDisabled(ids);
       return Promise.resolve({});
     },
 

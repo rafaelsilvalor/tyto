@@ -1213,6 +1213,16 @@ export const IPC_CHANNELS = {
   ),
 
   /**
+   * The File menu items that do nothing with the tab in front, which main greys (TYTO-283).
+   *
+   * The window's answer and not main's: what a tab is, and which commands act on it, are the
+   * renderer's (`commandOffered` in `src/renderer/editor-chrome.ts`). Main only keeps the last
+   * list and applies it to every menu it builds, a locale switch included. The whole list each
+   * time, so a message lost or repeated cannot leave an item greyed that should not be.
+   */
+  'menu:disabled': channel(z.object({ ids: z.array(z.string().min(1)) }), z.object({})),
+
+  /**
    * The template mode opening a folder (TYTO-44): `directory: null` asks main for a picker,
    * a path opens that folder — which is what _New template_ does with the folder it made.
    *

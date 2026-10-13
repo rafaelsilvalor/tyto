@@ -43,6 +43,7 @@ describe('the IPC contract', () => {
       'layout:set',
       'log:reveal',
       'log:write',
+      'menu:disabled',
       'menu:model',
       'menu:popup',
       'panel:request',

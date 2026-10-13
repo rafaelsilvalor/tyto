@@ -256,6 +256,9 @@ async function start(): Promise<void> {
   // the system's, because that is the only one main has before the window has said anything,
   // and `app:locale` replaces it when the footer picker moves (TYTO-124).
   let uiLocale: Locale = localeFor(app.getLocale());
+  // The File items the window last said do nothing with its tab in front (TYTO-283). Kept here
+  // so a menu rebuilt for a new language greys the same ones.
+  let menuDisabled: ReadonlySet<string> = new Set();
 
   // What Help > About says (TYTO-248). Reassigned once the template sources exist; until then
   // the panel says no templates rather than waiting for them.
@@ -281,6 +284,7 @@ async function start(): Promise<void> {
       Menu.buildFromTemplate(
         menuTemplate(process.platform, {
           t: (key) => translate(locale, key),
+          disabled: menuDisabled,
           onRevealLogs: () => {
             void shell.openPath(log.directory);
           },
@@ -932,6 +936,10 @@ async function start(): Promise<void> {
     menu: {
       setLocale: (locale) => {
         installMenu(localeFor(locale));
+      },
+      setDisabled: (ids) => {
+        menuDisabled = new Set(ids);
+        installMenu(uiLocale);
       },
       // The drawn menu row (TYTO-244, ADR 0078): read off the menu that is installed, so the
       // row names exactly what the native lists hold, in the language they were built in.

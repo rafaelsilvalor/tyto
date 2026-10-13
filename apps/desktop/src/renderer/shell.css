@@ -226,6 +226,12 @@ textarea {
   color: var(--tyto-text);
 }
 
+/* TYTO-283: Export with an app file in front. No hover, so it does not look clickable. */
+.status-bar__button:disabled {
+  background: transparent;
+  color: var(--tyto-text-disabled);
+}
+
 .status-bar__button--on {
   background: var(--tyto-button-on);
   color: var(--tyto-text);
