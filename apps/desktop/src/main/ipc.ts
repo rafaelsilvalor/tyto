@@ -212,6 +212,11 @@ export interface IpcDependencies {
     open: (documentId: string) => Promise<IpcResponse<'keybindings:open'>>;
     read: () => Promise<string>;
   };
+  /** The snippets tab (TYTO-277): `keybindings`'s shape, and checked in the window too. */
+  readonly snippets: {
+    open: (documentId: string) => Promise<IpcResponse<'snippets:open'>>;
+    read: () => Promise<string>;
+  };
   /** The plugins screen (TYTO-47): built-ins and installed plugins, read and never run. */
   readonly plugins: {
     readonly folder: string;
@@ -278,6 +283,7 @@ export function createHandlers(dependencies: IpcDependencies): Handlers {
     folders,
     info,
     keybindings,
+    snippets,
     layout,
     log,
     menu,
@@ -538,6 +544,10 @@ export function createHandlers(dependencies: IpcDependencies): Handlers {
     'keybindings:open': ({ documentId }) => keybindings.open(documentId),
 
     'keybindings:read': async () => ({ text: await keybindings.read() }),
+
+    'snippets:open': ({ documentId }) => snippets.open(documentId),
+
+    'snippets:read': async () => ({ text: await snippets.read() }),
 
     'settings:validate': (request) =>
       Promise.resolve({

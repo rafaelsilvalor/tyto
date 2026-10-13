@@ -106,6 +106,11 @@ non-zero.
 | `W_KEYBINDING_UNKNOWN_CONTEXT` | warning | no | A keybinding's `when` is not one of the contexts Tyto knows. |
 | `W_KEYBINDING_DUPLICATE` | warning | no | The same key is bound twice in the same context by one source. |
 | `W_KEYBINDING_LOCKED` | warning | no | A keybinding would take the command bar's key away, and is refused. |
+| `E_SNIPPETS_SYNTAX` | error | no | The snippets file is not valid JSON with comments, or not a map of snippets. |
+| `W_SNIPPET_INVALID` | warning | no | A snippet is not shaped like { prefix, body, description?, template? }. |
+| `W_SNIPPET_UNSUPPORTED_BODY` | warning | no | A snippet's body uses VS Code syntax Tyto does not translate. |
+| `W_SNIPPET_CHOICE_FLATTENED` | warning | no | A snippet's choice field is inserted as its first option. |
+| `W_SNIPPET_UNKNOWN_TEMPLATE` | warning | no | A snippet is limited to a template that is not installed. |
 | `E_THEME_INVALID` | error | no | A colour theme file cannot be read or is not shaped like a theme. |
 | `W_THEME_TOKEN_UNKNOWN` | warning | no | A colour theme sets a name that is not one of the colours Tyto themes. |
 | `W_THEME_COLOR_INVALID` | warning | no | A colour theme gives a token a value that is not a colour. |
@@ -197,6 +202,7 @@ incomplete brief, and a crossed box where a picture the exporter could not load 
 | `E_OUTPUT_FILE_BLOCKED` | yes | Depends on the file. The copied brief: nothing is rendered. An artwork file: that one artifact is missing, reported as `E_OUTPUT_WRITE` with this sentence. `template.txt` or an image in `assets/`: the artwork is written and that file is not. `result.json`: the artwork is written and no report is. |
 | `E_SETTINGS_SYNTAX` | no | Every key that parsed still applies and the rest fall back to their defaults. |
 | `E_KEYBINDINGS_SYNTAX` | no | The last file that read without one stays in effect, and the built-in keys stay bound. |
+| `E_SNIPPETS_SYNTAX` | no | The last file that read without one stays in effect. |
 | `E_THEME_INVALID` | no | The base theme of the same kind replaces it, so the window keeps every colour. |
 
 ## Errors
@@ -1153,6 +1159,20 @@ The keybindings file cannot be read here: {problem}.
 
 Parameters: `problem`
 
+### `E_SNIPPETS_SYNTAX`
+
+**Severity:** error · **Fatal:** no · **Spec:** `docs/adr/0082-snippets-are-a-jsonc-map-in-vs-codes-shape.md`
+
+The snippets file is not valid JSON with comments, or not a map of snippets.
+
+The last file that read without one stays in effect.
+
+```
+The snippets file cannot be read here: {problem}.
+```
+
+Parameters: `problem`
+
 ### `E_THEME_INVALID`
 
 **Severity:** error · **Fatal:** no · **Spec:** `docs/adr/0077-a-colour-theme-is-a-data-file-a-plugin-contributes.md`
@@ -1462,6 +1482,62 @@ Key '{key}' cannot {problem}: it opens the command bar, the way to every command
 ```
 
 Parameters: `key`, `problem`
+
+### `W_SNIPPET_INVALID`
+
+**Severity:** warning · **Fatal:** no · **Spec:** `docs/adr/0082-snippets-are-a-jsonc-map-in-vs-codes-shape.md`
+
+A snippet is not shaped like { prefix, body, description?, template? }.
+
+A warning never replaces a value (ADR 0013).
+
+```
+Snippet '{name}' is left out: {problem}.
+```
+
+Parameters: `name`, `problem`
+
+### `W_SNIPPET_UNSUPPORTED_BODY`
+
+**Severity:** warning · **Fatal:** no · **Spec:** `docs/adr/0082-snippets-are-a-jsonc-map-in-vs-codes-shape.md`
+
+A snippet's body uses VS Code syntax Tyto does not translate.
+
+A warning never replaces a value (ADR 0013).
+
+```
+Snippet '{name}' is left out: its body uses {problem}, which Tyto does not support.
+```
+
+Parameters: `name`, `problem`
+
+### `W_SNIPPET_CHOICE_FLATTENED`
+
+**Severity:** warning · **Fatal:** no · **Spec:** `docs/adr/0082-snippets-are-a-jsonc-map-in-vs-codes-shape.md`
+
+A snippet's choice field is inserted as its first option.
+
+A warning never replaces a value (ADR 0013).
+
+```
+Snippet '{name}' offers field {field} as '{first}' only; the other options are dropped.
+```
+
+Parameters: `name`, `field`, `first`
+
+### `W_SNIPPET_UNKNOWN_TEMPLATE`
+
+**Severity:** warning · **Fatal:** no · **Spec:** `docs/adr/0082-snippets-are-a-jsonc-map-in-vs-codes-shape.md`
+
+A snippet is limited to a template that is not installed.
+
+A warning never replaces a value (ADR 0013).
+
+```
+Snippet '{name}' is limited to template '{template}', which is not installed.
+```
+
+Parameters: `name`, `template`
 
 ### `W_THEME_TOKEN_UNKNOWN`
 

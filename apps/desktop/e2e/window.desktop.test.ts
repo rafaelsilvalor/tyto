@@ -316,6 +316,10 @@ describe('the bridge', () => {
       // TYTO-206: the settings tab. Exercised by `e2e/settings.desktop.test.ts`.
       'settings:open',
       'settings:validate',
+      // TYTO-277: the snippets tab and the file's text. Exercised by
+      // `e2e/snippets-file.desktop.test.ts`.
+      'snippets:open',
+      'snippets:read',
       'template:new',
       'template:open',
       'template:preview',
@@ -596,6 +600,10 @@ describe('switching the language', () => {
     'command.settings.open',
     // TYTO-207: the same, for the keybindings file. `e2e/keybindings-file.desktop.test.ts`.
     'command.keybindings.open',
+    // TYTO-277: the same, for the snippets file, and the heading over the snippets in the "/"
+    // menu, which is CodeMirror's list. `e2e/snippets-file.desktop.test.ts` opens both.
+    'command.snippets.open',
+    'slash.section.snippets',
     // TYTO-113: View > Reload's label, in the bar and the menu only.
     'command.window.reload',
     // TYTO-208: the theme picker's command, placeholder and the two kinds beside each theme,
@@ -629,6 +637,7 @@ describe('switching the language', () => {
     'status.selected',
     'status.kind.settings',
     'status.kind.keybindings',
+    'status.kind.snippets',
     'status.problems.new',
     // TYTO-248: what the footer used to say is Help > About now, a box main shows — menu
     // chrome, like `menu.revealLogs`. `src/main/menu.test.ts` holds the five to `aboutText`, and

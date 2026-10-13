@@ -39,9 +39,10 @@ export interface DocumentState {
    * `settings` for the app's own `settings.json` (TYTO-206): plain text, checked by main
    * against what the plugins declared instead of compiled. `keybindings` for
    * `keybindings.json` (TYTO-207): plain text, checked in the window against the command
-   * registry. Absent for a brief.
+   * registry. `snippets` for `snippets.json` (TYTO-277): checked in the window against the
+   * snippet syntax and the template list. Absent for a brief.
    */
-  readonly kind?: 'settings' | 'keybindings';
+  readonly kind?: 'settings' | 'keybindings' | 'snippets';
   /**
    * The text that is in the file — and the **empty string for a document that is in no
    * file at all** (ADR 0026, ratifying D3).

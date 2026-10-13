@@ -51,8 +51,12 @@ export function createTemplateFolder(): TemplateFolder {
 export interface SessionServiceOptions {
   readonly store: SessionStore;
   readonly documents: Pick<DocumentService, 'openPath' | 'pathOf' | 'reset'>;
-  /** The app's own two files, which the window opens by their commands and not by path. */
-  readonly appFiles: { readonly settings: string; readonly keybindings: string };
+  /** The app's own files, which the window opens by their commands and not by path. */
+  readonly appFiles: {
+    readonly settings: string;
+    readonly keybindings: string;
+    readonly snippets: string;
+  };
   /** A file's text, for comparing a draft of one of the app's files against it. */
   readonly readText: (path: string) => Promise<string>;
   /**
@@ -85,8 +89,8 @@ export const savedHashOf = (text: string): string =>
 export function createSessionService(options: SessionServiceOptions): SessionService {
   const { store, documents } = options;
 
-  const appFileOf = (kind: 'settings' | 'keybindings'): string =>
-    kind === 'settings' ? options.appFiles.settings : options.appFiles.keybindings;
+  const appFileOf = (kind: keyof SessionServiceOptions['appFiles']): string =>
+    options.appFiles[kind];
 
   const restore = async (tab: StoredTab, index: number): Promise<RestoredTab> => {
     const nothing: RestoredTab = {

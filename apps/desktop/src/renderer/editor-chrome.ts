@@ -61,6 +61,14 @@ export function editorChromeFor(kind: Kind): EditorChrome {
         previewNote: 'preview.note.keybindings',
         briefCommands: false,
       };
+    case 'snippets':
+      return {
+        heading: 'status.kind.snippets',
+        templatePicker: false,
+        previewControls: false,
+        previewNote: 'preview.note.snippets',
+        briefCommands: false,
+      };
   }
 }
 

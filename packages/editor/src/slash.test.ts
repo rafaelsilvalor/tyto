@@ -103,7 +103,7 @@ describe('the "/" menu', () => {
 
     expect(labels(target)).toEqual(['agenda-semana', 'banner-roxo', 'tabela-roxo']);
     const option = currentCompletions(target.state)[0];
-    expect(option?.section).toBe('Templates');
+    expect(option?.section).toEqual({ name: 'Templates', rank: 0 });
     expect(option?.detail).toBe('detail of agenda-semana');
   });
 

@@ -249,6 +249,31 @@ describe('saying yes', () => {
     expect(readFileSync(join(older, 'keybindings.json'), 'utf8')).toBe(commented);
   });
 
+  it('brings a snippets file with comments byte for byte, and leaves a broken one (TYTO-277)', async () => {
+    // A person's snippets are theirs as their keys are; an update that left them behind would
+    // make "aula" stop inserting anything with nothing to say why.
+    const older = await seedOlder('0.3.3');
+    const commented =
+      '// mine\n{\n  "Aula": { "prefix": "aula", "body": ["::aula ${1:titulo}"] }, // aula\n}\n';
+    writeFileSync(join(older, 'snippets.json'), commented);
+
+    const outcome = await run('0.3.4', yes);
+
+    expect(outcome).toMatchObject({ kind: 'imported', diagnostics: [] });
+    if (outcome.kind !== 'imported') return;
+    expect(outcome.copied).toContain('snippets.json');
+    expect(readFileSync(join(root, '0.3.4', 'snippets.json'), 'utf8')).toBe(commented);
+
+    // A list is not a map of snippets: the same bar as keybindings, the other way round.
+    const elder = await seedOlder('0.4.0');
+    writeFileSync(join(elder, 'snippets.json'), '[]');
+    const refused = await run('0.4.1', yes);
+    expect(refused.kind).toBe('imported');
+    if (refused.kind !== 'imported') return;
+    expect(refused.copied).not.toContain('snippets.json');
+    expect(refused.diagnostics[0]?.message).toContain("'snippets.json'");
+  });
+
   it('brings the session, so an update keeps the drafts nobody saved (TYTO-113)', async () => {
     const older = await seedOlder('0.3.3');
     const kept = await fileSessionStore(join(older, 'session.json')).write({

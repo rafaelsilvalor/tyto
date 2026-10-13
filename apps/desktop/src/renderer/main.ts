@@ -1,4 +1,5 @@
 import {
+  type BriefSnippet,
   type CommandRegistry,
   type EditorHandle,
   type KeybindingContext,
@@ -9,6 +10,7 @@ import {
   type VimStatus,
   briefCompletion,
   briefLint,
+  briefSnippets,
   concreteKey,
   createEditor,
   cursorOf,
@@ -17,6 +19,8 @@ import {
   openSlashMenu,
   type SlashSource,
   slashCompletion,
+  snippetsSlashSource,
+  tabThroughCompletions,
   resolveKeybindings,
   shownBindingsOf,
   windowBindingsOf,
@@ -51,6 +55,7 @@ import {
   templateChoiceFor,
 } from './editor-chrome.js';
 import { readKeybindingsText } from './keybindings-file.js';
+import { readSnippetsText } from './snippets-file.js';
 import {
   type Diagnostic,
   type SourceRange,
@@ -375,6 +380,11 @@ let pluginKeybindings: readonly KeybindingLayer[] = [];
  * layer under them or the registry they name changes.
  */
 let userKeybindings: readonly KeybindingEntry[] = [];
+/**
+ * The person's snippets: those of the last `snippets.json` that read without a syntax error
+ * (TYTO-277, ADR 0082). The editor asks for them each time a list opens.
+ */
+let userSnippets: readonly BriefSnippet[] = [];
 
 const byId = <T extends HTMLElement>(id: string): T | null =>
   document.getElementById(id) as T | null;
@@ -904,6 +914,9 @@ const registry: CommandRegistry = withCommandGate(
     openKeybindings: () => {
       openAppFile('keybindings');
     },
+    openSnippets: () => {
+      openAppFile('snippets');
+    },
     reloadWindow: () => {
       // The session first, so every tab comes back; a reload that could not keep the drafts
       // does not happen while there are any (TYTO-113, ADR 0080).
@@ -1151,14 +1164,26 @@ function adopt(
   void refreshRecent();
 }
 
-/** The two files of the app's own a tab can hold (TYTO-206, TYTO-207). */
+/** The files of the app's own a tab can hold (TYTO-206, TYTO-207, TYTO-277). */
 type AppFile = NonNullable<DocumentState['kind']>;
+
+/** Asks main to open one of the app's files into the tab `documentId`. */
+const openAppFileIn = (bridge: TytoBridge, kind: AppFile, documentId: string) => {
+  switch (kind) {
+    case 'settings':
+      return bridge['settings:open']({ documentId });
+    case 'keybindings':
+      return bridge['keybindings:open']({ documentId });
+    case 'snippets':
+      return bridge['snippets:open']({ documentId });
+  }
+};
 
 const isSettings = (document_: DocumentState): boolean => document_.kind === 'settings';
 
 /**
- * Opens `settings.json` or `keybindings.json` in a tab. One tab each: asking again brings it
- * forward rather than opening a second buffer over the same file.
+ * Opens `settings.json`, `keybindings.json` or `snippets.json` in a tab. One tab each: asking
+ * again brings it forward rather than opening a second buffer over the same file.
  */
 function openAppFile(kind: AppFile): void {
   void withBridge(async (bridge) => {
@@ -1168,19 +1193,20 @@ function openAppFile(kind: AppFile): void {
       return;
     }
     const wanted = nextDocumentId();
-    const answer =
-      kind === 'settings'
-        ? await bridge['settings:open']({ documentId: wanted })
-        : await bridge['keybindings:open']({ documentId: wanted });
+    const answer = await openAppFileIn(bridge, kind, wanted);
     adopt(answer.document, answer.documentId, wanted, kind);
   });
 }
 
-/** Checks an app file's tab: settings by main, keybindings here. */
+/** Checks an app file's tab: settings by main, keybindings and snippets here. */
 function validateAppFile(bridge: TytoBridge, documentId: string): Promise<void> {
   const target = documentOf(workspace, documentId);
   if (target?.kind === 'keybindings') {
     validateKeybindings(documentId);
+    return Promise.resolve();
+  }
+  if (target?.kind === 'snippets') {
+    validateSnippets(documentId);
     return Promise.resolve();
   }
   return validateSettings(bridge, documentId);
@@ -1303,6 +1329,62 @@ function keybindingsChanged(bridge: TytoBridge, text: string): void {
     }));
   }
   validateKeybindings(tab.id);
+}
+
+/**
+ * The snippets tab's buffer, read as the file would be (TYTO-277, ADR 0082): its syntax, every
+ * entry left out or flattened, and each template filter against the window's template list.
+ * Shown as the tab's own problems at their ranges; only a save applies it, through the watcher.
+ */
+function validateSnippets(documentId: string): void {
+  const target = documentOf(workspace, documentId);
+  if (target === undefined) return;
+  const text = contentOf(target);
+  const read = readSnippetsText(text, state.templates);
+  setFileDiagnostics(
+    documentId,
+    text,
+    [...read.syntax, ...read.problems].map((item) => ({
+      severity: item.severity,
+      code: item.code,
+      message: item.message,
+      ...(item.range === undefined ? {} : { range: item.range }),
+      ...(item.hint === undefined ? {} : { hint: item.hint }),
+    })),
+  );
+}
+
+/**
+ * `snippets.json`'s text, at load and on every change on disk. A text with a syntax error
+ * changes nothing, as `keybindings.json`'s does not: the snippets that last read stay offered.
+ */
+function readUserSnippets(bridge: TytoBridge, text: string): void {
+  const read = readSnippetsText(text);
+  if (read.syntax.length > 0) {
+    for (const problem of read.syntax) {
+      void bridge['log:write']({
+        level: 'warn',
+        message: `snippets.json: ${problem.message}`.slice(0, 200),
+      });
+    }
+    return;
+  }
+  userSnippets = read.snippets;
+}
+
+/** `snippets:changed`: the file moved on disk; a clean tab follows it, as keybindings' does. */
+function snippetsChanged(bridge: TytoBridge, text: string): void {
+  readUserSnippets(bridge, text);
+  const tab = workspace.documents.find((document_) => document_.kind === 'snippets');
+  if (tab === undefined) return;
+  if (!isUnsaved(tab) && contentOf(tab) !== text) {
+    replaceSettingsText(tab.id, text, undefined);
+    workspace = updateDocument(workspace, tab.id, (document_) => ({
+      ...document_,
+      savedText: contentOf(document_),
+    }));
+  }
+  validateSnippets(tab.id);
 }
 
 /**
@@ -2016,10 +2098,7 @@ async function fileOf(
   tab: RestoredTab,
 ): Promise<{ document: { name: string; text: string } | null; documentId: string | null }> {
   if (tab.kind === 'brief') return { document: tab.document, documentId: tab.documentId };
-  const wanted = nextDocumentId();
-  return tab.kind === 'settings'
-    ? bridge['settings:open']({ documentId: wanted })
-    : bridge['keybindings:open']({ documentId: wanted });
+  return openAppFileIn(bridge, tab.kind, nextDocumentId());
 }
 
 /**
@@ -3089,6 +3168,12 @@ async function load(): Promise<void> {
     // Before the editor is made, so it is born with the person's keys and not reset after.
     readUserKeybindings(bridge, (await bridge['keybindings:read']({})).text);
 
+    // `snippets.json` the same way (TYTO-277): subscribed first, then read once.
+    bridge.on('snippets:changed', ({ text }) => {
+      snippetsChanged(bridge, text);
+    });
+    readUserSnippets(bridge, (await bridge['snippets:read']({})).text);
+
     // A newer version (TYTO-131, ADR 0069). Subscribed first and asked second: the check runs
     // from the moment main starts, and a push into a page that was not yet listening is
     // dropped without a trace (ADR 0039), so the question is what catches anything earlier.
@@ -3138,11 +3223,21 @@ async function load(): Promise<void> {
       // Slots, adjustments, enum values and plugin directives after `::`, and the
       // underline, both fed from the preview's answer. No delay of the linter's own: the
       // preview's debounce is the pause, and a second one would only add to it.
-      // The "/" menu beside them (TYTO-276): the templates, read at each opening.
+      // The "/" menu beside them (TYTO-276): the templates, read at each opening. The
+      // person's snippets in both lists (TYTO-277), and Tab and Shift+Tab stepping through any
+      // open list — first, so it is above the snippet's own field keys.
       extensions: [
+        tabThroughCompletions(),
         briefLint(analysis.analyzer, { delay: 0 }),
         briefCompletion(),
-        slashCompletion([templatesSlashSource()]),
+        briefSnippets(() => userSnippets),
+        slashCompletion([
+          templatesSlashSource(),
+          snippetsSlashSource(
+            () => translate(state.locale, 'slash.section.snippets'),
+            () => userSnippets,
+          ),
+        ]),
       ],
     });
     // Narrowed once, because `editor` is a module-level `let` and TypeScript widens it

@@ -41,12 +41,20 @@ describe('editorChromeFor (TYTO-256)', () => {
       previewNote: 'preview.note.keybindings',
       briefCommands: false,
     });
+    expect(editorChromeFor('snippets')).toEqual({
+      heading: 'status.kind.snippets',
+      templatePicker: false,
+      previewControls: false,
+      previewNote: 'preview.note.snippets',
+      briefCommands: false,
+    });
   });
 
   it('opens a brief in its own language and an app file in another', () => {
     expect(languageOf(undefined)).toBeUndefined();
     expect(languageOf('settings')).toBe('json');
     expect(languageOf('keybindings')).toBe('json');
+    expect(languageOf('snippets')).toBe('json');
   });
 });
 
@@ -56,7 +64,7 @@ describe('commandOffered (TYTO-283)', () => {
   });
 
   it('offers none of them with an app file in front', () => {
-    for (const kind of ['settings', 'keybindings'] as const) {
+    for (const kind of ['settings', 'keybindings', 'snippets'] as const) {
       for (const id of BRIEF_ONLY_COMMANDS) expect(commandOffered(kind, id), id).toBe(false);
     }
   });

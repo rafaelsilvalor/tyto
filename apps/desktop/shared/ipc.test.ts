@@ -61,6 +61,8 @@ describe('the IPC contract', () => {
       'session:write',
       'settings:open',
       'settings:validate',
+      'snippets:open',
+      'snippets:read',
       'template:new',
       'template:open',
       'template:preview',
@@ -113,6 +115,8 @@ describe('the event table', () => {
       'queue:changed',
       // TYTO-206. settings.json changed, or a screen's change to it was refused.
       'settings:changed',
+      // TYTO-277. snippets.json changed on disk; the push carries its text.
+      'snippets:changed',
       // TYTO-131. The update status changed; the window asks `update:status`.
       'update:changed',
     ]);
@@ -302,6 +306,8 @@ describe('what the contract does not promise', () => {
       'plugins:keymaps',
       // TYTO-207. Nor "what does keybindings.json say": there is one file, and main knows it.
       'keybindings:read',
+      // TYTO-277. Nor "what does snippets.json say", for the same reason.
+      'snippets:read',
       // TYTO-113. Nor "which tabs did the last session leave": there is one session file,
       // and only main knows where it is and which paths it names.
       'session:read',

@@ -24,7 +24,7 @@ import { type IconName, icon } from './icons.js';
 export const STATUS_BAR_TAG = 'tyto-status-bar';
 
 /** What the tab in front holds, from `DocumentState.kind`. */
-export type TabKind = 'brief' | 'settings' | 'keybindings';
+export type TabKind = 'brief' | 'settings' | 'keybindings' | 'snippets';
 
 export interface StatusBarState {
   readonly locale: Locale;
@@ -60,6 +60,7 @@ const KIND_LABELS: Readonly<Record<TabKind, CatalogueKey>> = {
   brief: 'panel.editor',
   settings: 'status.kind.settings',
   keybindings: 'status.kind.keybindings',
+  snippets: 'status.kind.snippets',
 };
 
 /** `Ln 4, Col 17 (7 selected)`, in the window's language. */

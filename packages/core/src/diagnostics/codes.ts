@@ -893,6 +893,50 @@ export const diagnosticCodes = {
     fatal: false,
     fatality: 'A warning never replaces a value (ADR 0013).',
   },
+  // The person's snippets file (TYTO-277, ADR 0082). Reading it never breaks the window: a
+  // syntax error keeps the last file that read, and each warning costs the one entry it names
+  // or, for a flattened choice, only the other options of that one field.
+  E_SNIPPETS_SYNTAX: {
+    severity: 'error',
+    summary: 'The snippets file is not valid JSON with comments, or not a map of snippets.',
+    template: 'The snippets file cannot be read here: {problem}.',
+    spec: 'docs/adr/0082-snippets-are-a-jsonc-map-in-vs-codes-shape.md',
+    fatal: false,
+    fatality: 'The last file that read without one stays in effect.',
+  },
+  W_SNIPPET_INVALID: {
+    severity: 'warning',
+    summary: 'A snippet is not shaped like { prefix, body, description?, template? }.',
+    template: "Snippet '{name}' is left out: {problem}.",
+    spec: 'docs/adr/0082-snippets-are-a-jsonc-map-in-vs-codes-shape.md',
+    fatal: false,
+    fatality: 'A warning never replaces a value (ADR 0013).',
+  },
+  W_SNIPPET_UNSUPPORTED_BODY: {
+    severity: 'warning',
+    summary: "A snippet's body uses VS Code syntax Tyto does not translate.",
+    template: "Snippet '{name}' is left out: its body uses {problem}, which Tyto does not support.",
+    spec: 'docs/adr/0082-snippets-are-a-jsonc-map-in-vs-codes-shape.md',
+    fatal: false,
+    fatality: 'A warning never replaces a value (ADR 0013).',
+  },
+  W_SNIPPET_CHOICE_FLATTENED: {
+    severity: 'warning',
+    summary: "A snippet's choice field is inserted as its first option.",
+    template:
+      "Snippet '{name}' offers field {field} as '{first}' only; the other options are dropped.",
+    spec: 'docs/adr/0082-snippets-are-a-jsonc-map-in-vs-codes-shape.md',
+    fatal: false,
+    fatality: 'A warning never replaces a value (ADR 0013).',
+  },
+  W_SNIPPET_UNKNOWN_TEMPLATE: {
+    severity: 'warning',
+    summary: 'A snippet is limited to a template that is not installed.',
+    template: "Snippet '{name}' is limited to template '{template}', which is not installed.",
+    spec: 'docs/adr/0082-snippets-are-a-jsonc-map-in-vs-codes-shape.md',
+    fatal: false,
+    fatality: 'A warning never replaces a value (ADR 0013).',
+  },
   // A colour theme a plugin ships (TYTO-208, ADR 0077). Reading one never breaks the window: a
   // file that cannot be used costs the whole theme and the base theme of its kind applies; a
   // token costs that token, which the base theme fills in.

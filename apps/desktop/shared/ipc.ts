@@ -119,8 +119,8 @@ const openDocument = z.object({
  */
 const documentId = z.string().min(1).max(100);
 
-/** What a session tab holds: a brief, or one of the app's own two files (TYTO-113). */
-const sessionTabKind = z.enum(['brief', 'settings', 'keybindings']);
+/** What a session tab holds: a brief, or one of the app's own files (TYTO-113, TYTO-277). */
+const sessionTabKind = z.enum(['brief', 'settings', 'keybindings', 'snippets']);
 
 /** The template mode's two files, by the name each buffer has in the window (TYTO-44). */
 const templateBuffer = z.enum(['manifest', 'markup']);
@@ -1152,6 +1152,22 @@ export const IPC_CHANNELS = {
   'keybindings:read': channel(z.object({}), z.object({ text: z.string() })),
 
   /**
+   * Opens the user's `snippets.json` in a tab (TYTO-277, ADR 0082), creating it with `{}` and a
+   * comment when there is none. `keybindings:open`'s shape and containment.
+   */
+  'snippets:open': channel(
+    z.object({ documentId }),
+    z.object({ document: openDocument.nullable(), documentId: documentId.nullable() }),
+  ),
+
+  /**
+   * The text of `snippets.json`, or `''` when there is none — read by the window at load. The
+   * window parses and checks it, because a snippet's template filter names templates the
+   * window's list holds.
+   */
+  'snippets:read': channel(z.object({}), z.object({ text: z.string() })),
+
+  /**
    * Something went wrong in the window, written down where a report can reach it (TYTO-132).
    *
    * An ordinary question and deliberately not a push: the renderer is the side that *has* the
@@ -1415,6 +1431,9 @@ export const IPC_EVENTS = {
    * writes the file after creating it, so every change is the person's.
    */
   'keybindings:changed': z.object({ text: z.string() }),
+
+  /** `snippets.json` changed on disk (TYTO-277), with its new text, as `keybindings:changed`. */
+  'snippets:changed': z.object({ text: z.string() }),
 } as const;
 
 export type IpcEvents = typeof IPC_EVENTS;

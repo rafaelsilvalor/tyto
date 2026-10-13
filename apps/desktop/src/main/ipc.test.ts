@@ -523,6 +523,10 @@ const dependencies = () => {
       open: () => Promise.resolve({ document: null, documentId: null }),
       read: () => Promise.resolve(''),
     },
+    snippets: {
+      open: () => Promise.resolve({ document: null, documentId: null }),
+      read: () => Promise.resolve(''),
+    },
     preview: preview(),
     project: projectFolder(),
     queue: queueDependency(),
