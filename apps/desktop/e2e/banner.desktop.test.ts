@@ -11,6 +11,7 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 
 import { closeApp } from './close-app.js';
 import { firstWindow } from './first-window.js';
+import { openPreviewBeside, previewSrcdoc } from './preview-pane.js';
 
 /**
  * A bundled code template's own backgrounds, in the window's preview and export, agreeing
@@ -129,8 +130,7 @@ async function run(commandId: string): Promise<void> {
   if (!ran) throw new Error(`the command bar refused '${commandId}'`);
 }
 
-const shown = async (): Promise<string> =>
-  window.evaluate(() => document.getElementById('preview-frame')?.getAttribute('srcdoc') ?? '');
+const shown = async (): Promise<string> => previewSrcdoc(window);
 
 /** The background PNG composited on white, the paper the template lays under it. */
 function onWhite(format: Format): PNG {
@@ -172,6 +172,7 @@ beforeAll(async () => {
   });
   window = await firstWindow(app);
   await window.waitForSelector('#editor .cm-content');
+  await openPreviewBeside(window);
   await window.waitForSelector('.tabs__tab');
 
   await answerPickers({ file: briefPath });

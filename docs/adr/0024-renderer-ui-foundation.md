@@ -100,6 +100,9 @@ Seven panels in four docks, plus a status bar and a command bar:
 > **Amended by ADR 0083 (TYTO-286).** The document tabs are no longer the window's strip across
 > the top: the editor panel holds a tree of editor groups, each with its own row of tabs over
 > its own pane, and the strip in the drawing above is now drawn by each group.
+>
+> **Amended by ADR 0084 (TYTO-287).** The PREVIEW panel is not in the right dock any more: the
+> preview is a kind of tab in the editor groups, and the right dock is empty by default.
 
 **No panel is bound to a dock.** The arrangement above is the default record, not a structure: a panel is `{ panel: 'tyto-problems', dock: 'bottom', open: true, size: 240 }`, and the dock creates the element from the tag. What a person can do with it in the next cards is **show, hide and resize**, with the arrangement and the sizes persisted. Dragging a panel from one dock to another is a later card and needs no change to the shape above — that is the whole reason the shape is a record.
 

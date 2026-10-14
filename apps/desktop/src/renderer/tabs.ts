@@ -2,6 +2,7 @@ import { LitElement, type TemplateResult, html } from 'lit';
 import { repeat } from 'lit/directives/repeat.js';
 
 import { type Locale, DEFAULT_LOCALE, translate } from '../../shared/i18n/index.js';
+import { icon } from './icons.js';
 
 /**
  * One editor group's tabs, over that group's pane (E9.11; TYTO-286, ADR 0083).
@@ -23,6 +24,10 @@ export interface TabEntry {
   /** The file's name, or the catalogue's word for a brief that has never been saved. */
   readonly label: string;
   readonly dirty: boolean;
+  /** TYTO-287: a preview tab, marked so a person and a suite can tell it from its brief's. */
+  readonly preview?: boolean;
+  /** TYTO-287: a preview locked on its brief, drawn with a lock after its name. */
+  readonly locked?: boolean;
 }
 
 export class DocumentTabs extends LitElement {
@@ -63,6 +68,7 @@ export class DocumentTabs extends LitElement {
     // HTML and which browsers resolve by dropping one of them.
     return html`<div
       class="tabs__tab ${on ? 'tabs__tab--on' : ''}"
+      data-tab-kind=${entry.preview === true ? 'preview' : 'editor'}
       @auxclick=${(event: MouseEvent) => {
         // The middle button, which is how every editor and every browser closes a tab.
         // `auxclick` and not `mousedown`, so a middle-click that started somewhere else
@@ -83,6 +89,16 @@ export class DocumentTabs extends LitElement {
         }}
       >
         <span class="tabs__label">${entry.label}</span>
+        ${
+          entry.locked === true
+            ? html`<span
+                class="tabs__lock"
+                title=${translate(this.locale, 'preview.locked')}
+                aria-label=${translate(this.locale, 'preview.locked')}
+                >${icon('lock')}</span
+              >`
+            : ''
+        }
         <!--
           The dot carries the shape and the label carries the meaning, the same split the
           problems panel makes about severity: a mark nobody has learned says nothing, and a

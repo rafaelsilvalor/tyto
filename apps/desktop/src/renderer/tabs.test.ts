@@ -43,6 +43,29 @@ async function open(
 const names = (strip: DocumentTabs): string[] =>
   [...strip.querySelectorAll('.tabs__label')].map((node) => node.textContent ?? '');
 
+describe('a preview tab (TYTO-287)', () => {
+  it('says it is a preview, and draws a lock with its words on a locked one', async () => {
+    const { strip } = await open([
+      { id: 'a', label: 'campanha.brief', dirty: false },
+      { id: 'p', label: 'Prévia campanha.brief', dirty: false, preview: true },
+      { id: 'l', label: 'Prévia promo.brief', dirty: false, preview: true, locked: true },
+    ]);
+    strip.locale = 'pt-BR';
+    await strip.updateComplete;
+
+    const kinds = [...strip.querySelectorAll('.tabs__tab')].map((tab) =>
+      tab.getAttribute('data-tab-kind'),
+    );
+    expect(kinds).toEqual(['editor', 'preview', 'preview']);
+    const locks = [...strip.querySelectorAll('.tabs__lock')];
+    expect(locks).toHaveLength(1);
+    expect(locks[0]?.getAttribute('title')).toBe('Prévia travada neste brief');
+    expect(locks[0]?.closest('.tabs__tab')?.querySelector('.tabs__label')?.textContent).toBe(
+      'Prévia promo.brief',
+    );
+  });
+});
+
 describe('what the strip shows', () => {
   it('one tab per open document, in the order it was given', async () => {
     const { strip } = await open();

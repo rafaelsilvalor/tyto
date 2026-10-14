@@ -10,6 +10,7 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 
 import { closeApp } from './close-app.js';
 import { firstWindow } from './first-window.js';
+import { openPreviewBeside, previewSrcdoc } from './preview-pane.js';
 
 /**
  * An installed code template's warning, in the window's Problems panel (TYTO-213, ADR 0058).
@@ -149,8 +150,7 @@ async function run(commandId: string): Promise<void> {
   if (!ran) throw new Error(`the command bar refused '${commandId}'`);
 }
 
-const shown = async (): Promise<string> =>
-  window.evaluate(() => document.getElementById('preview-frame')?.getAttribute('srcdoc') ?? '');
+const shown = async (): Promise<string> => previewSrcdoc(window);
 
 /**
  * Opens the brief for `template` from disk, and waits for its preview in the template's own
@@ -205,6 +205,7 @@ beforeAll(async () => {
   });
   window = await firstWindow(app);
   await window.waitForSelector('#editor .cm-content');
+  await openPreviewBeside(window);
   await window.waitForSelector('.tabs__tab');
   // The plugins start after the window opens (ADR 0044); both templates are in the picker once
   // they have.

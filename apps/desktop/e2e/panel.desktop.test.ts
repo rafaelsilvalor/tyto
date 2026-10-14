@@ -9,6 +9,7 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 
 import { closeApp } from './close-app.js';
 import { firstWindow } from './first-window.js';
+import { openPreviewBeside } from './preview-pane.js';
 
 /**
  * E9.3's two acceptance criteria, through a real window, plus the layout claim behind them.
@@ -126,6 +127,7 @@ beforeAll(async () => {
   });
   page = await firstWindow(app);
   await page.waitForFunction(() => document.querySelector('#editor .cm-content') !== null);
+  await openPreviewBeside(page);
   await page.setViewportSize({ width: 1360, height: 860 });
 });
 
@@ -252,12 +254,14 @@ describe('the artwork list', () => {
     // The last option, whatever the repeating slot happens to be called: the artwork id is
     // `${slot}-${n}` and the slot is the manifest's business, not this test's.
     const last = await page.evaluate(() => {
-      const picker = document.getElementById('slide') as HTMLSelectElement | null;
+      const picker = document.querySelector<HTMLSelectElement>(
+        'tyto-preview-pane:not([hidden]) [data-preview-slide]',
+      );
       return picker?.options[picker.options.length - 1]?.value ?? '';
     });
     expect(last).not.toBe('');
 
-    await page.selectOption('#slide', last);
+    await page.selectOption('tyto-preview-pane:not([hidden]) [data-preview-slide]', last);
     await waitForScroll();
 
     expect(await editorScrollTop()).toBeGreaterThan(0);

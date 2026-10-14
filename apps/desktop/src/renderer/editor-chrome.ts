@@ -1,7 +1,7 @@
 import { type LanguageName } from '@tyto/editor';
 
 import { type CatalogueKey } from '../../shared/i18n/index.js';
-import { BRIEF_ONLY_COMMANDS } from './commands.js';
+import { BRIEF_ONLY_COMMANDS, TEXT_COMMANDS } from './commands.js';
 import { type DocumentState } from './documents.js';
 import { planTemplateEdit, type TemplateEdit, templateOf } from './frontmatter.js';
 import { I18N_ATTRIBUTE } from './shell.js';
@@ -20,55 +20,50 @@ export interface EditorChrome {
   readonly heading: CatalogueKey;
   /** Whether the template picker is shown, and whether choosing in it may edit the text. */
   readonly templatePicker: boolean;
-  /** Whether the preview shows its format tabs, slide and zoom. */
-  readonly previewControls: boolean;
-  /** The one muted line the preview shows instead of a picture, for an app file. */
-  readonly previewNote: CatalogueKey | undefined;
   /**
    * Whether the commands that act on a brief (`BRIEF_ONLY_COMMANDS`) are offered and run
    * (TYTO-283). Read through {@link commandOffered}, never field by field at a call site.
    */
   readonly briefCommands: boolean;
+  /**
+   * Whether the commands that act on the text in front (`TEXT_COMMANDS`) are: not with a
+   * preview tab in front, whose group shows no text (TYTO-287).
+   */
+  readonly textCommands: boolean;
 }
 
-type Kind = DocumentState['kind'];
+/** What the tab in front holds: a document's kind, or a brief's preview (TYTO-287). */
+export type TabKind = DocumentState['kind'] | 'preview';
+type Kind = TabKind;
 
 const BRIEF: EditorChrome = {
   heading: 'editor.heading',
   templatePicker: true,
-  previewControls: true,
-  previewNote: undefined,
   briefCommands: true,
+  textCommands: true,
 };
+
+const appFile = (heading: CatalogueKey): EditorChrome => ({
+  heading,
+  templatePicker: false,
+  briefCommands: false,
+  textCommands: true,
+});
 
 export function editorChromeFor(kind: Kind): EditorChrome {
   switch (kind) {
     case undefined:
       return BRIEF;
+    case 'preview':
+      // A brief's art: every command on the brief still runs, on that brief; the picker and the
+      // text commands act on text, which is not in front.
+      return { ...BRIEF, templatePicker: false, textCommands: false };
     case 'settings':
-      return {
-        heading: 'status.kind.settings',
-        templatePicker: false,
-        previewControls: false,
-        previewNote: 'preview.note.settings',
-        briefCommands: false,
-      };
+      return appFile('status.kind.settings');
     case 'keybindings':
-      return {
-        heading: 'status.kind.keybindings',
-        templatePicker: false,
-        previewControls: false,
-        previewNote: 'preview.note.keybindings',
-        briefCommands: false,
-      };
+      return appFile('status.kind.keybindings');
     case 'snippets':
-      return {
-        heading: 'status.kind.snippets',
-        templatePicker: false,
-        previewControls: false,
-        previewNote: 'preview.note.snippets',
-        briefCommands: false,
-      };
+      return appFile('status.kind.snippets');
   }
 }
 
@@ -81,8 +76,11 @@ export function editorChromeFor(kind: Kind): EditorChrome {
  * opened the export dialog and the run wrote `editaveis/settings.json.brief` and a
  * `result.json` of syntax errors into the chosen folder — measured, not read.
  */
-export const commandOffered = (kind: Kind, id: string): boolean =>
-  editorChromeFor(kind).briefCommands || !BRIEF_ONLY_COMMANDS.has(id);
+export const commandOffered = (kind: Kind, id: string): boolean => {
+  const chrome = editorChromeFor(kind);
+  if (!chrome.briefCommands && BRIEF_ONLY_COMMANDS.has(id)) return false;
+  return chrome.textCommands || !TEXT_COMMANDS.has(id);
+};
 
 /**
  * The language a tab of this kind is opened in. One place for both ways a tab is born — opened
@@ -189,30 +187,15 @@ export function slashTemplateNote(
 }
 
 /**
- * Paints the answer into the window's panels, any of which may be closed.
+ * Paints the answer into the editor panel: its heading, and whether its template picker shows.
  *
  * The heading's key goes on its `data-i18n` attribute, so the window's translation pass — which
  * runs on every repaint and on a locale switch — writes the word, as it does for every other
- * heading. Run after `paintPreview`, which shows the brief's empty line whenever there is no
- * frame: on an app file there never is one, and the note takes its place.
+ * heading. The preview's controls and its notes for an app file went with the PREVIEW panel
+ * (TYTO-287): a preview tab only ever shows a brief.
  */
 export function paintEditorChrome(root: ParentNode, chrome: EditorChrome): void {
   root.querySelector('#editor-heading')?.setAttribute(I18N_ATTRIBUTE, chrome.heading);
   const picker = root.querySelector<HTMLElement>('.work__template');
   if (picker !== null) picker.hidden = !chrome.templatePicker;
-
-  for (const selector of ['#format-tabs', '.preview__slide', '.preview__zoom']) {
-    const control = root.querySelector<HTMLElement>(selector);
-    if (control !== null) control.hidden = !chrome.previewControls;
-  }
-
-  if (chrome.previewNote !== undefined) {
-    for (const id of ['preview-empty', 'preview-broken', 'preview-stale']) {
-      const line = root.querySelector<HTMLElement>(`#${id}`);
-      if (line !== null) line.hidden = true;
-    }
-  }
-  for (const note of root.querySelectorAll<HTMLElement>('[data-preview-note]')) {
-    note.hidden = note.getAttribute(I18N_ATTRIBUTE) !== chrome.previewNote;
-  }
 }

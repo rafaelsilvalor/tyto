@@ -26,7 +26,10 @@ import {
   GROUP_FOCUS_PREVIOUS,
   GROUP_MOVE_TAB_NEXT,
   PREVIEW_NEXT_FORMAT,
+  PREVIEW_OPEN,
+  PREVIEW_OPEN_TO_SIDE,
   PREVIEW_PREVIOUS_SLIDE,
+  PREVIEW_TOGGLE_LOCK,
   PREVIEW_ZOOM_FIT,
   PREVIEW_ZOOM_IN,
   PREVIEW_ZOOM_OUT,
@@ -83,6 +86,8 @@ const actions = () =>
     clearTemplateFolder: vi.fn<() => void>(),
     editTemplate: vi.fn<() => void>(),
     newTemplate: vi.fn<() => void>(),
+    openPreview: vi.fn<(side: boolean) => void>(),
+    togglePreviewLock: vi.fn<() => void>(),
   }) satisfies DesktopActions;
 
 /**
@@ -394,6 +399,9 @@ describe('the File menu table', () => {
       GROUP_FOCUS_PREVIOUS,
       GROUP_MOVE_TAB_NEXT,
       GROUP_CLOSE,
+      PREVIEW_OPEN_TO_SIDE,
+      PREVIEW_OPEN,
+      PREVIEW_TOGGLE_LOCK,
     ]);
     for (const command of VIEW_MENU_COMMANDS) {
       expect(COMMAND_LABELS[command.id]).toBe(command.label);
@@ -403,6 +411,9 @@ describe('the File menu table', () => {
     expect(spies.focusGroup.mock.calls).toEqual([[1], [-1]]);
     expect(spies.moveTabToNextGroup).toHaveBeenCalledTimes(1);
     expect(spies.closeGroup).toHaveBeenCalledTimes(1);
+    // TYTO-287: beside the brief, then in the focused group, then the lock.
+    expect(spies.openPreview.mock.calls).toEqual([[true], [false]]);
+    expect(spies.togglePreviewLock).toHaveBeenCalledTimes(1);
   });
 
   it('pins `editor.save` to the id `@tyto/editor` ships', () => {

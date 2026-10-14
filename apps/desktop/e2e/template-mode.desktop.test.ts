@@ -17,6 +17,7 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 
 import { closeApp } from './close-app.js';
 import { firstWindow } from './first-window.js';
+import { openPreviewBeside, previewSrcdoc } from './preview-pane.js';
 
 /**
  * The template mode (TYTO-44, E9.5) through a real window: a template folder open beside every
@@ -76,8 +77,7 @@ const gridFormats = (): Promise<readonly string[]> =>
     ),
   );
 
-const briefPreview = (): Promise<string> =>
-  page.evaluate(() => document.getElementById('preview-frame')?.getAttribute('srcdoc') ?? '');
+const briefPreview = (): Promise<string> => previewSrcdoc(page);
 
 /** Answers the next folder picker with `directory`, the way a person choosing it would. */
 const pickNext = (directory: string): Promise<void> =>
@@ -138,13 +138,18 @@ beforeAll(async () => {
   });
   page = await firstWindow(app);
   await page.waitForFunction(() => document.querySelector('#editor .cm-content') !== null);
+  await openPreviewBeside(page);
   await page.waitForSelector('.tabs__tab');
 
   // The brief in the tab behind the mode, naming the template the mode is about to edit.
   await page.click('#editor .cm-content');
   await page.keyboard.insertText(readFileSync(join(folder, 'examples', 'promo.brief'), 'utf8'));
   await page.waitForFunction(
-    () => document.getElementById('preview-frame')?.getAttribute('srcdoc')?.includes('Direito'),
+    () =>
+      document
+        .querySelector('tyto-preview-pane:not([hidden]) [data-preview-frame]')
+        ?.getAttribute('srcdoc')
+        ?.includes('Direito'),
     undefined,
     { timeout: 15_000 },
   );
@@ -178,7 +183,11 @@ describe('the template mode', () => {
     const grid = await gridHtml();
     for (const [index, format] of ['grid-1x1', 'story'].entries()) {
       await page.evaluate((wanted) => {
-        document.querySelector<HTMLElement>(`.preview__tab[data-format="${wanted}"]`)?.click();
+        document
+          .querySelector<HTMLElement>(
+            `tyto-preview-pane:not([hidden]) .preview__tab[data-format="${wanted}"]`,
+          )
+          ?.click();
       }, format);
       await expect.poll(briefPreview).toBe(grid[index]);
     }

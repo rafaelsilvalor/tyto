@@ -8,6 +8,7 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 
 import { closeApp } from './close-app.js';
 import { firstWindow } from './first-window.js';
+import { openPreviewBeside } from './preview-pane.js';
 
 /**
  * `settings.json` as a tab, in a running app (TYTO-206, ADR 0073).
@@ -49,6 +50,7 @@ async function launch(scratch: string, settings?: string): Promise<Launched> {
   const page = await firstWindow(app);
   // Something the script builds, never the markup it shipped with (TYTO-154).
   await page.waitForSelector('#editor .cm-content');
+  await openPreviewBeside(page);
   await page.waitForSelector('.tabs__tab');
   return { app, page, userData };
 }
@@ -223,27 +225,30 @@ describe('the settings tab', () => {
     );
   });
 
-  it("shows none of a brief's chrome", async () => {
+  it("shows none of a brief's chrome, and the preview beside it never draws the file", async () => {
+    // TYTO-287, ADR 0084: the preview is a tab that follows the last **brief** in front. The
+    // settings tab replaced the untitled brief the window opened on, so no brief is open and
+    // the preview shows its empty line — a settings file is never its picture.
     const { page } = launched;
     const chrome = await page.evaluate(() => {
       const shown = (selector: string): boolean => {
         const element = document.querySelector<HTMLElement>(selector);
         return element !== null && element.offsetParent !== null;
       };
+      const pane = 'tyto-preview-pane:not([hidden])';
       return {
         heading: document.querySelector('#editor-heading')?.textContent ?? '',
         picker: shown('.work__template'),
-        formats: shown('#format-tabs'),
-        slide: shown('.preview__slide'),
-        zoom: shown('.preview__zoom'),
-        text: document.body.innerText,
+        previewEmpty: shown(`${pane} [data-preview-empty]`),
+        previewPaper: shown(`${pane} [data-preview-paper]`),
+        previewTab:
+          document.querySelector('[data-tab-kind="preview"] .tabs__label')?.textContent ?? '',
       };
     });
 
     expect(chrome.heading).toBe('Settings');
-    expect(chrome).toMatchObject({ picker: false, formats: false, slide: false, zoom: false });
-    expect(chrome.text).not.toContain('Write a brief');
-    expect(chrome.text).toContain('Settings apply when you save');
+    expect(chrome).toMatchObject({ picker: false, previewEmpty: true, previewPaper: false });
+    expect(chrome.previewTab).toBe('Preview');
   });
 
   it('writes no template into the JSON when the picker is changed anyway', async () => {

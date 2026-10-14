@@ -8,6 +8,7 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 
 import { closeApp } from './close-app.js';
 import { firstWindow } from './first-window.js';
+import { openPreviewBeside } from './preview-pane.js';
 
 /**
  * "New brief from template…", through the real window (TYTO-275).
@@ -120,6 +121,7 @@ beforeAll(async () => {
   page = await firstWindow(app);
   // Something the script builds, never the markup it shipped with (TYTO-154, TYTO-175).
   await page.waitForSelector('#editor .cm-content');
+  await openPreviewBeside(page);
   await page.waitForSelector('.tabs__tab');
   await app.evaluate(({ BrowserWindow }) => {
     BrowserWindow.getAllWindows()[0]?.setSize(1200, 760);
@@ -181,7 +183,9 @@ describe('New brief from template…', () => {
     expect(await errorsOf(text)).toEqual([]);
     // And the window's own preview drew it.
     await page.waitForFunction(
-      () => document.querySelector('#preview-stage iframe') !== null,
+      () =>
+        document.querySelector('tyto-preview-pane:not([hidden]) [data-preview-stage] iframe') !==
+        null,
       undefined,
       { timeout: 15_000 },
     );

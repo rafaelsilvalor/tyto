@@ -52,14 +52,15 @@ const optionLabels = async (): Promise<string[]> =>
   );
 
 /**
- * The preview pane's heading, which is the cheapest visible proof that the locale moved.
+ * The problems panel's heading, which is the cheapest visible proof that the locale moved. It
+ * was the PREVIEW panel's until the preview became a tab (TYTO-287).
  *
- * `Prévia` or `Preview` — and which one the window starts in is the operating system's
+ * `Problemas` or `Problems` — and which one the window starts in is the operating system's
  * answer, not this suite's, so nothing here names a starting locale. `editor.heading` would
  * have been the obvious pick and is the wrong one: it is "Brief" in both catalogues.
  */
-const previewHeading = async (): Promise<string> =>
-  page.evaluate(() => document.getElementById('preview-heading')?.textContent ?? '');
+const problemsHeading = async (): Promise<string> =>
+  page.evaluate(() => document.getElementById('problems-heading')?.textContent ?? '');
 
 const editorText = async (): Promise<string> =>
   page.evaluate(() => document.querySelector('#editor .cm-content')?.textContent ?? '');
@@ -158,8 +159,8 @@ describe('opening the bar', () => {
 
 describe('running a command', () => {
   it('types, chooses and changes the window', async () => {
-    const before = await previewHeading();
-    expect(['Prévia', 'Preview']).toContain(before);
+    const before = await problemsHeading();
+    expect(['Problemas', 'Problems']).toContain(before);
 
     await openBar();
     await page.keyboard.type('shell.toggleLocale');
@@ -167,22 +168,22 @@ describe('running a command', () => {
     await page.waitForTimeout(250);
 
     expect(await barIsOpen()).toBe(false);
-    const after = await previewHeading();
+    const after = await problemsHeading();
     expect(after).not.toBe(before);
-    expect(['Prévia', 'Preview']).toContain(after);
+    expect(['Problemas', 'Problems']).toContain(after);
 
     // The document's language agrees, which is the half that would rot silently. The
     // footer's picker used to be checked here; since TYTO-248 this command is the only way
     // to switch, and `lang` is what a screen reader reads.
     const lang = await page.evaluate(() => document.documentElement.lang);
-    expect(lang).toBe(after === 'Prévia' ? 'pt-BR' : 'en');
+    expect(lang).toBe(after === 'Problemas' ? 'pt-BR' : 'en');
 
     // Put it back, so every test after this one sees the locale the window started in.
     await openBar();
     await page.keyboard.type('shell.toggleLocale');
     await page.keyboard.press('Enter');
     await page.waitForTimeout(250);
-    expect(await previewHeading()).toBe(before);
+    expect(await problemsHeading()).toBe(before);
   });
 });
 

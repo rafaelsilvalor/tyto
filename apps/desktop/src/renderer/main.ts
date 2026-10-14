@@ -1,6 +1,7 @@
 import {
   type BriefSnippet,
   type CommandRegistry,
+  EDITOR_CONTEXTS,
   type EditorHandle,
   type EditorPane,
   type KeybindingContext,
@@ -54,6 +55,7 @@ import {
   languageOf,
   paintEditorChrome,
   type SlashTemplateNote,
+  type TabKind,
   slashTemplateChoiceFor,
   slashTemplateNote,
   templateChoiceFor,
@@ -92,6 +94,8 @@ import {
   PREVIEW_ZOOM_FIT,
   PREVIEW_ZOOM_IN,
   PREVIEW_ZOOM_OUT,
+  PREVIEW_OPEN_TO_SIDE,
+  PREVIEW_TOGGLE_LOCK,
   FILE_EXPORT,
   PLUGINS_SHOW,
   SETTINGS_OPEN,
@@ -144,9 +148,11 @@ import {
 } from './problems-mark.js';
 import { SAVE_FAILED, saveFailureDiagnostic } from './save-failure.js';
 import { type EditorGroupElement, arrangeGroups } from './editor-group.js';
+import type { TabEntry } from './tabs.js';
 import {
   type EditorGroup,
   type EditorGroups,
+  type EditorTab,
   type GroupNode,
   activateTab,
   activeTabOf,
@@ -156,18 +162,26 @@ import {
   focusNeighbour,
   focusedDocumentId,
   focusedGroup,
+  followBrief,
+  followingPreview,
   groupById,
   groupList,
   groupOfTab,
   groupsFromLayout,
   groupsOf,
+  isPreview,
   layoutOf,
   moveTabToNextGroup,
   openDocument,
+  openPreviewHere,
+  openPreviewToSide,
   replaceDocument,
   shownDocumentIds,
   splitGroup,
+  toggleLock,
+  withoutPreviews,
 } from './editor-groups.js';
+import { type PreviewPane, previewElementsOf } from './preview-pane.js';
 import { type ProblemsPanel, PROBLEMS_TAG } from './problems-panel.js';
 import { arrange, wireSplitters } from './dock.js';
 import './panels.js';
@@ -178,6 +192,7 @@ import {
   PLUGIN_PANEL_ELEMENT,
   PROBLEMS_PANEL,
   QUEUE_PANEL,
+  dockHasPanels,
   dockIsHidden,
   dockIsShown,
   panelOf,
@@ -195,6 +210,7 @@ import { type ShellState, paint, paintTitle } from './shell.js';
 import { AltTap, MenuRow, altLettersTaken, isMenuLetterStroke } from './menu-row.js';
 import {
   type PreviewElements,
+  type PreviewState,
   type RequestGate,
   type Zoom,
   FORMAT_ATTRIBUTE,
@@ -308,6 +324,26 @@ let groups: EditorGroups = groupsOf([workspace.activeId], workspace.activeId);
  */
 const active = (): DocumentState =>
   documentOf(workspace, focusedDocumentId(groups) ?? workspace.activeId) ?? activeOf(workspace);
+
+/**
+ * The focused group's tab in front when it is a preview (TYTO-287, ADR 0084). {@link active} is
+ * then the brief it shows: export, the queue, the problems panel, the title and the status bar
+ * all answer about that brief, as they do from the brief's own tab.
+ */
+function focusedPreview(): EditorTab | undefined {
+  const tab = activeTabOf(focusedGroup(groups));
+  return tab !== undefined && isPreview(tab) ? tab : undefined;
+}
+
+/** What the tab in front holds, for every door that asks whether a command is offered. */
+const activeKind = (): TabKind => (focusedPreview() === undefined ? active().kind : 'preview');
+
+/**
+ * The brief the following preview shows: the last brief whose own tab was in front of the
+ * focused group (TYTO-287). An app file's tab or a preview coming to the front leaves it alone,
+ * as VS Code's Markdown preview keeps the last Markdown file. `''` while no brief is open.
+ */
+let followedBrief = '';
 
 /**
  * What the document in front says, read from the workspace and never from the editor.
@@ -445,7 +481,6 @@ const byId = <T extends HTMLElement>(id: string): T | null =>
  * and it is silent.
  */
 let elements = resolveElements();
-let pane: PreviewElements | undefined;
 /** What main last said about a newer version (TYTO-131). Asked for, never only pushed. */
 let updateStatus: UpdateStatus = { state: 'none' };
 
@@ -471,39 +506,6 @@ function resolveElements() {
     // TYTO-248. Outside the docks, like the command bar: the bar belongs to the window.
     statusBar: document.querySelector<StatusBar>(STATUS_BAR_TAG),
   };
-}
-
-/** Every element the preview pane writes into, or `undefined` if the panel is closed. */
-function previewElements(): PreviewElements | undefined {
-  const tabs = byId('format-tabs');
-  const slide = byId<HTMLSelectElement>('slide');
-  const slideLabel = byId('slide-label');
-  const stage = byId('preview-stage');
-  const paper = byId('preview-paper');
-  const frame = byId<HTMLIFrameElement>('preview-frame');
-  const empty = byId('preview-empty');
-  const broken = byId('preview-broken');
-  const stale = byId('preview-stale');
-  const zoomLevel = byId('zoom-level');
-
-  if (
-    tabs === null ||
-    slide === null ||
-    slideLabel === null ||
-    stage === null ||
-    paper === null ||
-    frame === null ||
-    empty === null ||
-    broken === null ||
-    stale === null ||
-    zoomLevel === null
-  ) {
-    // Not a failure any more, and that is the change: before the dock, a missing preview
-    // node meant a broken document. Now it means the preview panel is closed, which is a
-    // thing a person is allowed to do.
-    return undefined;
-  }
-  return { tabs, slide, slideLabel, stage, paper, frame, empty, broken, stale, zoomLevel };
 }
 
 /**
@@ -548,7 +550,7 @@ function ask(bridge: TytoBridge, documentId: string, brief: string): void {
 
 /** The card's acceptance criterion, in `panel.ts` where a test can drive it. */
 function reveal(range: SourceRange): void {
-  const target = focusedPane();
+  const target = commandPane();
   if (target !== undefined) revealRange(target.view, range);
 }
 
@@ -591,7 +593,18 @@ function paintTabs(): void {
     element.locale = state.locale;
     element.focused = group.id === groups.focusedGroupId;
     element.activeTabId = group.activeTabId ?? '';
+    const front = activeTabOf(group);
+    element.showing = front !== undefined && isPreview(front) ? 'preview' : 'editor';
+    // "Open preview to the side" at the end of the strip while a brief's own tab is in front.
+    element.offerPreview =
+      front !== undefined &&
+      !isPreview(front) &&
+      documentOf(workspace, front.documentId)?.kind === undefined;
+    element.openPreview = () => {
+      runCommand(PREVIEW_OPEN_TO_SIDE);
+    };
     element.tabs = group.tabs.flatMap((tab) => {
+      if (isPreview(tab)) return [previewEntry(tab)];
       const document_ = documentOf(workspace, tab.documentId);
       // Compared, never looked up: there is no field on a document that says it has been
       // typed in, and this is the only place a strip learns of one that has (TYTO-112).
@@ -606,6 +619,22 @@ function paintTabs(): void {
       void requestCloseTab(tabId);
     };
   }
+}
+
+/**
+ * A preview's tab: "Preview <name>" for the brief it shows now (TYTO-287) — for a following one,
+ * whichever brief was last in front — and the lock drawn after it when it is locked.
+ */
+function previewEntry(tab: EditorTab): TabEntry {
+  const heading = translate(state.locale, 'preview.heading');
+  const shown = documentOf(workspace, tab.documentId);
+  return {
+    id: tab.id,
+    label: shown === undefined ? heading : `${heading} ${labelOf(shown)}`,
+    dirty: false,
+    preview: true,
+    ...(tab.locked === true ? { locked: true } : {}),
+  };
 }
 
 /**
@@ -893,21 +922,31 @@ function openExportDialog(): void {
  * Whether `id` is offered with the tab in front: the one question every door asks (TYTO-283).
  * Lazy, so it reads the workspace at the moment a command is listed or run.
  */
-const offeredNow = (id: string): boolean => commandOffered(active().kind, id);
+const offeredNow = (id: string): boolean => commandOffered(activeKind(), id);
 
 const registry: CommandRegistry = withCommandGate(
   createDesktopRegistry({
     stepZoom: (direction) => {
-      if (pane === undefined) return;
       // A step from whatever is on screen, the same as the buttons: the first step after
-      // `fit` moves from the size the user is looking at.
-      const from = paintPreview(pane, {
-        ...active(),
-        stale: isStale(active()),
-        broken: isBroken(active()),
-      });
+      // `fit` moves from the size the user is looking at — in the preview showing this brief,
+      // the focused one first (TYTO-287).
+      const current = active();
+      const from = shownZoomOf(current.id) ?? (current.zoom === 'fit' ? 1 : current.zoom);
       updateActive((document_) => ({ ...document_, zoom: stepZoom(from, direction) }));
       repaint();
+    },
+
+    openPreview: (side) => {
+      openPreview(side, false);
+    },
+
+    togglePreviewLock: () => {
+      // The preview in front, or else the window's following one, as VS Code's command acts on
+      // the preview a person is looking at.
+      const target = focusedPreview() ?? followingPreview(groups);
+      if (target === undefined || !sessionRead) return;
+      groups = toggleLock(groups, target.id);
+      showGroups();
     },
 
     zoomToFit: () => {
@@ -1172,6 +1211,13 @@ function documentShownBy(view: object | undefined): string | undefined {
 /** The focused group's pane: where a command, a reveal or the caret goes. */
 const focusedPane = (): EditorPane | undefined => panes.get(groups.focusedGroupId);
 
+/**
+ * The pane a command runs in and a reveal scrolls: the focused one, or — with a preview focused,
+ * whose group's pane is hidden — the pane holding the brief it shows, if any shows it (TYTO-287).
+ */
+const commandPane = (): EditorPane | undefined =>
+  focusedPreview() === undefined ? focusedPane() : (primaryPaneOf(active().id) ?? focusedPane());
+
 /** The pane holding a document's record, if any pane shows it: the one to dispatch into. */
 function primaryPaneOf(documentId: string): EditorPane | undefined {
   for (const [groupId, shown] of shownIn) {
@@ -1214,8 +1260,9 @@ function arrangeEditorGroups(): void {
   // A view that was moved measures again: its box is another size now.
   for (const each of panes.values()) each.view.requestMeasure();
 
-  // Focus follows the person into a group: a click in its pane or on its tabs (ADR 0083). A
-  // click in the problems panel or the preview is outside every group and changes nothing.
+  // Focus follows the person into a group: a click in its pane, on its tabs or in a preview tab
+  // it shows (ADR 0083, changed by ADR 0084). A click in the problems panel is outside every
+  // group and changes nothing.
   once(container, 'focusin', (event) => {
     const target = event.target instanceof Element ? event.target : null;
     const groupId = target?.closest<HTMLElement>('[data-editor-group]')?.dataset['editorGroup'];
@@ -1307,6 +1354,12 @@ function present(): void {
   if (editor === undefined) return;
   for (const group of groupList(groups)) {
     const wanted = activeTabOf(group);
+    // A preview in front shows no text: the pane lets go of its document, so the record passes
+    // to another pane that shows it, and stays hidden until a text tab comes back (TYTO-287).
+    if (wanted !== undefined && isPreview(wanted)) {
+      leave(group.id);
+      continue;
+    }
     if (shownTab.get(group.id) === wanted?.id && shownIn.get(group.id) === wanted?.documentId) {
       continue;
     }
@@ -1322,6 +1375,32 @@ function present(): void {
 function syncActiveDocument(): void {
   const id = focusedDocumentId(groups);
   if (id !== undefined && id !== workspace.activeId) workspace = selectDocument(workspace, id);
+  followActiveBrief();
+}
+
+/**
+ * Points the following preview at the brief it should show (TYTO-287, ADR 0084): the brief
+ * whose own tab is in front of the focused group, else the one it showed while that is still
+ * open, else the first brief in front of any group, else any open brief, else none.
+ */
+function followActiveBrief(): void {
+  const isBrief = (id: string | undefined): id is string => {
+    const document_ = id === undefined ? undefined : documentOf(workspace, id);
+    return document_ !== undefined && document_.kind === undefined;
+  };
+  const textInFront = (group: EditorGroup): string | undefined => {
+    const tab = activeTabOf(group);
+    return tab === undefined || isPreview(tab) ? undefined : tab.documentId;
+  };
+  const focused = textInFront(focusedGroup(groups));
+  if (isBrief(focused)) followedBrief = focused;
+  else if (!isBrief(followedBrief)) {
+    followedBrief =
+      groupList(groups).map(textInFront).find(isBrief) ??
+      workspace.documents.find((document_) => document_.kind === undefined)?.id ??
+      '';
+  }
+  groups = followBrief(groups, followedBrief);
 }
 
 /**
@@ -1335,8 +1414,23 @@ function syncActiveDocument(): void {
 function showGroups(): void {
   syncActiveDocument();
   present();
-  focusedPane()?.view.focus();
+  // A preview in front takes the focus itself: its group's pane is hidden (TYTO-287).
+  if (focusedPreview() === undefined) focusedPane()?.view.focus();
+  else groupElements.get(groups.focusedGroupId)?.preview.focus();
   repaint();
+}
+
+/**
+ * Opens the following preview beside the brief in front (`side`) or in the focused group, or
+ * brings it forward when there is one (TYTO-287). Refused until the last session is read, as a
+ * split is: the groups the session brings back replace these.
+ */
+function openPreview(side: boolean, focus: boolean): void {
+  if (editor === undefined || !sessionRead) return;
+  const current = active();
+  const brief = current.kind === undefined ? current.id : followedBrief;
+  groups = side ? openPreviewToSide(groups, brief, focus) : openPreviewHere(groups, brief);
+  showGroups();
 }
 
 /**
@@ -1364,8 +1458,9 @@ function followWorkspace(): void {
  * goes there rather than making a second tab of it.
  */
 function revealDocument(current: EditorGroups, documentId: string): EditorGroups {
-  const tabs = [focusedGroup(current), ...groupList(current)].flatMap(
-    (group: EditorGroup) => group.tabs,
+  // A document's own tabs only: opening a file goes to its text, never to its preview.
+  const tabs = [focusedGroup(current), ...groupList(current)].flatMap((group: EditorGroup) =>
+    group.tabs.filter((tab) => !isPreview(tab)),
   );
   const existing = tabs.find((tab) => tab.documentId === documentId);
   return existing === undefined
@@ -2399,7 +2494,9 @@ function withLiveScroll(current: Workspace): Workspace {
  * let go of it, or, for one no pane has shown here, where its document says.
  */
 function groupsForSession(): SessionGroups {
-  return layoutOf(groups, (tab, group) => {
+  // Without the previews: keeping them is TYTO-287's second pull request, and a group that held
+  // only a preview collapses here as it would on a close.
+  return layoutOf(withoutPreviews(groups), (tab, group) => {
     const pane_ = panes.get(group.id);
     const remembered = tabPlaces.get(tab.id) ?? pendingPlaces.get(tab.id);
     if (pane_ !== undefined && shownTab.get(group.id) === tab.id) {
@@ -2680,9 +2777,15 @@ function closeTab(id: string): void {
 async function requestCloseTab(tabId: string): Promise<void> {
   const tab = groupOfTab(groups, tabId)?.tabs.find((each) => each.id === tabId);
   if (tab === undefined) return;
-  const elsewhere = groupList(groups).some((group) =>
-    group.tabs.some((each) => each.id !== tabId && each.documentId === tab.documentId),
-  );
+  // A preview holds nothing to lose, and its brief stays open whatever it shows (TYTO-287); a
+  // preview of a document is not another tab of it, so it never spares the question below.
+  const elsewhere =
+    isPreview(tab) ||
+    groupList(groups).some((group) =>
+      group.tabs.some(
+        (each) => each.id !== tabId && !isPreview(each) && each.documentId === tab.documentId,
+      ),
+    );
   if (!elsewhere) {
     await requestClose(tab.documentId);
     return;
@@ -2807,7 +2910,6 @@ function registerDocumentCommands(): void {
 /** The catalogue key a panel is named by in a list of panels. */
 const PANEL_NAMES: Readonly<Record<string, CatalogueKey>> = {
   editor: 'panel.editor',
-  preview: 'panel.preview',
   problems: 'panel.problems',
   queue: 'panel.queue',
 };
@@ -2904,7 +3006,7 @@ function paintStatusBar(): void {
     vim: editor?.isVimMode() === true ? vimStatus : null,
     // The focused pane's caret (TYTO-286): a follower's selection is its own, not the record's.
     cursor: shownState === undefined ? { line: 1, column: 1, selected: 0 } : cursorOf(shownState),
-    kind: current.kind ?? 'brief',
+    kind: activeKind() ?? 'brief',
     template: current.kind === undefined ? templateOf(activeText()) : undefined,
     problems: problems.length,
     errors: errorCount(problems),
@@ -2915,6 +3017,11 @@ function paintStatusBar(): void {
       bottom: dockIsShown(layout, 'bottom'),
       problems: problemsShown,
       queue: panelShown(QUEUE_PANEL),
+    },
+    areas: {
+      left: dockHasPanels(layout, 'left'),
+      right: dockHasPanels(layout, 'right'),
+      bottom: dockHasPanels(layout, 'bottom'),
     },
   };
 }
@@ -2957,8 +3064,6 @@ async function applyLayout(persist: boolean): Promise<void> {
   // The editor groups before the lookup: the first group's pane is `#editor` (TYTO-286).
   arrangeEditorGroups();
   elements = resolveElements();
-  pane = previewElements();
-  wirePreviewControls(window.tyto === undefined);
   wirePanelControls();
   wireQueuePanel();
   wireCommandBar();
@@ -3021,18 +3126,16 @@ function shellState(): ShellState {
 }
 
 function repaint(): void {
-  const current = active();
   // Every change to the strip ends in a repaint, so this is where the session is kept from.
   keepSessionSoon();
-  if (pane !== undefined) {
-    paintPreview(pane, { ...current, stale: isStale(current), broken: isBroken(current) });
-  }
-  // After the preview, whose empty line it replaces on an app file, and before the translation
-  // pass, which writes the heading it names (TYTO-256).
-  paintEditorChrome(document, editorChromeFor(current.kind));
+  // Before the strips: each group is told whether a preview is in front (`paintTabs`), and the
+  // panes it shows are painted here; before the translation pass too, which writes the heading
+  // the chrome names (TYTO-256).
+  paintTabs();
+  paintPreviews();
+  paintEditorChrome(document, editorChromeFor(activeKind()));
   paint(document, shellState());
   paintPanel();
-  paintTabs();
   paintCommandBar();
   paintStatusBar();
   tellMenuWhatIsOffered();
@@ -3127,7 +3230,9 @@ async function request(bridge: TytoBridge, documentId: string, brief: string): P
     };
   });
 
-  if (documentId === active().id) repaint();
+  // On screen in front of the panels, or in a preview tab anywhere (TYTO-287): a brief typed in
+  // one group redraws the preview beside it, focused or not.
+  if (documentId === active().id || previewedIn(documentId).length > 0) repaint();
 }
 
 /**
@@ -3152,61 +3257,157 @@ function once<K extends keyof HTMLElementEventMap>(
   target.addEventListener(type, listener);
 }
 
-function wirePreviewControls(bridgeless: boolean): void {
-  if (pane === undefined) return;
-  const active_ = pane;
+/** The groups with a preview of `documentId` in front (TYTO-287). */
+function previewedIn(documentId: string): readonly string[] {
+  return groupList(groups).flatMap((group) => {
+    const tab = activeTabOf(group);
+    return tab !== undefined && isPreview(tab) && tab.documentId === documentId ? [group.id] : [];
+  });
+}
+
+/** The zoom each preview pane was last drawn at, by group: `fit` resolved against its stage. */
+const paintedZoom = new Map<string, number>();
+
+/**
+ * The zoom a brief is drawn at on screen, from the preview showing it — the focused group's
+ * first — or `undefined` when no preview shows it (TYTO-287).
+ */
+function shownZoomOf(documentId: string): number | undefined {
+  const shown = previewedIn(documentId);
+  const group = shown.includes(groups.focusedGroupId) ? groups.focusedGroupId : shown[0];
+  return group === undefined ? undefined : paintedZoom.get(group);
+}
+
+/** What a preview with no brief to show draws: the empty line. */
+const NOTHING_TO_PREVIEW: PreviewState = {
+  frames: [],
+  artworks: [],
+  selection: { format: undefined, artwork: undefined },
+  zoom: 'fit',
+  stale: false,
+};
+
+/**
+ * Paints every preview tab in front of its group from the brief it shows (TYTO-287, ADR 0084).
+ * The document already holds everything the PREVIEW panel drew — frames, artworks, the chosen
+ * format and slide, the zoom, whether the art is stale or the brief broken — so two previews of
+ * two briefs are two reads of the workspace and no second request.
+ */
+function paintPreviews(): void {
+  for (const group of groupList(groups)) {
+    const tab = activeTabOf(group);
+    const element = groupElements.get(group.id);
+    if (tab === undefined || !isPreview(tab) || element === undefined) continue;
+    const pane_ = element.preview;
+    const nodes = previewElementsOf(pane_);
+    if (nodes === undefined) {
+      // Made a moment ago and not rendered yet: the whole window is repainted once it has
+      // been, so the translation pass reaches its strings too, not only its picture.
+      void pane_.updateComplete.then(() => {
+        if (previewElementsOf(pane_) !== undefined) repaint();
+      });
+      continue;
+    }
+    wirePreviewPane(pane_, nodes);
+    const lock = pane_.querySelector<HTMLElement>('[data-preview-lock]');
+    lock?.setAttribute('aria-pressed', String(tab.locked === true));
+    lock?.classList.toggle('preview__lock--on', tab.locked === true);
+    const shown = documentOf(workspace, tab.documentId);
+    const drawn =
+      shown === undefined
+        ? NOTHING_TO_PREVIEW
+        : { ...shown, stale: isStale(shown), broken: isBroken(shown) };
+    paintedZoom.set(group.id, paintPreview(nodes, drawn));
+  }
+}
+
+/** The document the preview in `pane_` shows now, read off its group at the moment it is asked. */
+function documentOfPane(pane_: PreviewPane): string | undefined {
+  for (const [groupId, element] of groupElements) {
+    if (element.previewIfMade !== pane_) continue;
+    const group = groupById(groups, groupId);
+    const tab = group === undefined ? undefined : activeTabOf(group);
+    return tab === undefined || tab.documentId === '' ? undefined : tab.documentId;
+  }
+  return undefined;
+}
+
+/** One stage observer for every preview: `fit` follows a split or a window resize (TYTO-287). */
+let stageObserver: ResizeObserver | undefined;
+
+/**
+ * A preview pane's own controls, once per pane: the pane is made with its group and kept, so
+ * this runs the first time it is painted. Each acts on the brief the pane shows when it is used.
+ */
+function wirePreviewPane(pane_: PreviewPane, nodes: PreviewElements): void {
+  if (wired.has(pane_)) return;
+  wired.add(pane_);
+  const change = (choose: (document_: DocumentState) => DocumentState): void => {
+    const documentId = documentOfPane(pane_);
+    if (documentId === undefined) return;
+    workspace = updateDocument(workspace, documentId, choose);
+    repaint();
+  };
 
   // **Nothing in here asks for a render**, which is the acceptance criterion rather than an
   // optimisation: every frame of every format is already in the document's own `frames`, so
   // switching is choosing one of them. The click handler that called the bridge would be
   // the bug.
-  once(active_.tabs, 'click', (event) => {
+  nodes.tabs.addEventListener('click', (event) => {
     const target = event.target;
     if (!(target instanceof HTMLElement)) return;
     const format = target.getAttribute(FORMAT_ATTRIBUTE);
     if (format === null) return;
-    updateActive((document_) => ({
-      ...document_,
-      selection: { ...document_.selection, format },
-    }));
-    repaint();
+    change((document_) => ({ ...document_, selection: { ...document_.selection, format } }));
   });
 
-  once(active_.slide, 'change', () => {
-    const artwork = active_.slide.value;
-    updateActive((document_) => ({
-      ...document_,
-      selection: { ...document_.selection, artwork },
-    }));
-    repaint();
+  nodes.slide.addEventListener('change', () => {
+    const artwork = nodes.slide.value;
+    change((document_) => ({ ...document_, selection: { ...document_.selection, artwork } }));
     // The card asks for both halves: the preview follows the choice, and so does the
     // editor. The range is the `::slide` directive that made this artwork, which only
     // `resolve` knew — a `Scene` carries no source position at all.
-    const at = rangeOfArtwork(active().artworks, artwork);
-    if (at !== undefined) reveal(at);
+    const documentId = documentOfPane(pane_);
+    const target = documentId === undefined ? undefined : primaryPaneOf(documentId);
+    const at = rangeOfArtwork(documentOf(workspace, documentId ?? '')?.artworks ?? [], artwork);
+    if (at !== undefined && target !== undefined) revealRange(target.view, at);
   });
 
-  // The three zoom buttons run commands rather than doing the work. That is the whole of
-  // what E9.12 asks for from the rest of the window: a button, a key and a bar entry are
-  // three ways to say one id, and a handler that did the work here would be a fourth
-  // definition of "zoom in" for the others to drift away from.
-  for (const [id, command] of [
-    ['zoom-fit', PREVIEW_ZOOM_FIT],
-    ['zoom-in', PREVIEW_ZOOM_IN],
-    ['zoom-out', PREVIEW_ZOOM_OUT],
-  ] as const) {
-    once(byId<HTMLButtonElement>(id), 'click', () => {
-      runCommand(command);
-    });
+  // The zoom buttons and the lock run commands rather than doing the work: a button, a key
+  // and a bar entry are three ways to say one id (E9.12). The click has already focused this
+  // pane's group, so the command acts on the brief this pane shows.
+  const commands: Readonly<Record<string, string>> = {
+    fit: PREVIEW_ZOOM_FIT,
+    in: PREVIEW_ZOOM_IN,
+    out: PREVIEW_ZOOM_OUT,
+  };
+  for (const button of pane_.querySelectorAll<HTMLElement>('[data-preview-zoom]')) {
+    const command = commands[button.dataset['previewZoom'] ?? ''];
+    if (command !== undefined) {
+      button.addEventListener('click', () => {
+        runCommand(command);
+      });
+    }
   }
-
-  // `fit` is a function of the stage, and the stage changes with the window without any
-  // state changing to notice it.
-  window.addEventListener('resize', () => {
-    if (active().zoom === 'fit') repaint();
+  pane_.querySelector('[data-preview-lock]')?.addEventListener('click', () => {
+    runCommand(PREVIEW_TOGGLE_LOCK);
   });
 
-  if (bridgeless) pane.empty.hidden = false;
+  // `fit` is a function of the stage, which a split or a window resize changes without any
+  // state changing to notice it. jsdom has no observer, and its stage has no size either.
+  if (typeof ResizeObserver === 'undefined') return;
+  stageObserver ??= new ResizeObserver(() => {
+    if (groupList(groups).some((group) => isFitPreview(group))) paintPreviews();
+  });
+  stageObserver.observe(nodes.stage);
+}
+
+/** Whether a group has a preview in front drawn at `fit`. */
+function isFitPreview(group: EditorGroup): boolean {
+  const tab = activeTabOf(group);
+  return (
+    tab !== undefined && isPreview(tab) && documentOf(workspace, tab.documentId)?.zoom === 'fit'
+  );
 }
 
 /**
@@ -3219,8 +3420,9 @@ function wirePreviewControls(bridgeless: boolean): void {
  * yet.
  */
 function runCommand(id: string): boolean {
-  // The focused group's view (TYTO-286): undo there, find there, save its document.
-  const target = focusedPane();
+  // The focused group's view (TYTO-286): undo there, find there, save its document. With a
+  // preview focused, its brief's pane (TYTO-287); the text commands are not offered there.
+  const target = commandPane();
   if (target === undefined) return false;
   return registry.run(id, { view: target.view });
 }
@@ -3272,6 +3474,16 @@ function wireKeybindingDispatcher(): void {
       event.preventDefault();
       return;
     }
+    // With a preview focused no CodeMirror view hears the keys, so the editor's own bindings —
+    // save, close, the tab keys — are run from here, on its brief (TYTO-287).
+    if (!event.defaultPrevented && inPreview(event.target)) {
+      for (const binding of previewBindings()) {
+        if (concreteKey(binding, state.platform) !== stroke) continue;
+        if (!runWindowCommand(binding.command)) continue;
+        event.preventDefault();
+        return;
+      }
+    }
     // F10 focuses the drawn menu row (TYTO-244, ADR 0078), **after** the table: a binding a
     // person or a plugin put on F10 wins, and a key the editor took stays the editor's. Not a
     // menu accelerator, which the browser process would answer before the page (TYTO-124).
@@ -3312,6 +3524,24 @@ function wireKeybindingDispatcher(): void {
     altTap.reset();
     menuRow?.showMnemonics(false);
   });
+}
+
+/** Whether a key went to a preview tab's pane rather than to a CodeMirror view. */
+const inPreview = (target: EventTarget | null): boolean =>
+  target instanceof Element && target.closest('tyto-preview-pane') !== null;
+
+/**
+ * The editor's bindings for the input mode in force, which a focused preview answers: `editor`
+ * always, and `mode.desktop` or vim's normal mode — a preview takes no text, so never insert.
+ */
+function previewBindings() {
+  const mode = editor?.isVimMode() === true ? 'vim.normal' : 'mode.desktop';
+  return keybindings.bindings.filter(
+    (binding) =>
+      binding.when !== undefined &&
+      EDITOR_CONTEXTS.has(binding.when) &&
+      (binding.when === 'editor' || binding.when === mode),
+  );
 }
 
 /** The letters the table holds with Alt, read at the keystroke as the table is (TYTO-264). */

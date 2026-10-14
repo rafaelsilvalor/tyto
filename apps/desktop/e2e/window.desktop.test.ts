@@ -9,6 +9,7 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 
 import { closeApp } from './close-app.js';
 import { firstWindow } from './first-window.js';
+import { openPreviewBeside } from './preview-pane.js';
 
 import { type CatalogueKey, CATALOGUE_KEYS, translate } from '../shared/i18n/index.js';
 import { en } from '../shared/i18n/en.js';
@@ -83,6 +84,9 @@ beforeAll(async () => {
   // strings and none of the panels': 7 of 15, measured on CI with the renderer slowed by 2.5 s.
   // The editor mounts after the layout, which makes it the wait TYTO-154 asks for.
   await page.waitForSelector('#editor .cm-content');
+  // The preview's strings are counted with the rest, and since TYTO-287 it is a tab a person
+  // opens (ADR 0084): open, the window paints every string the catalogue has on screen.
+  await openPreviewBeside(page);
 });
 
 afterAll(async () => {
@@ -445,7 +449,6 @@ describe('switching the language', () => {
     'command.layout.togglePanel',
     'command.layout.restore',
     'panel.editor',
-    'panel.preview',
     'panel.problems',
     // TYTO-45: a panel name, like the three above, read by the bar's toggle entry.
     'panel.queue',
@@ -519,6 +522,16 @@ describe('switching the language', () => {
     'command.group.focusPrevious',
     'command.group.moveTabToNext',
     'command.group.close',
+    // TYTO-287: the preview as a tab. Its commands are the bar's and the View menu's, and
+    // "Open preview to the side" is also the title of the group's button, set by script; the
+    // word a preview tab's name starts with is set by script in the strip and the status bar,
+    // and the lock's title is drawn only on a locked preview's tab. `tabs.test.ts` and
+    // `e2e/preview-tab.desktop.test.ts` read them on screen.
+    'command.preview.openToSide',
+    'command.preview.open',
+    'command.preview.toggleLock',
+    'preview.heading',
+    'preview.locked',
     // E8.5: the find-and-replace panel is `@codemirror/search`'s own DOM, reached through
     // `EditorState.phrases` rather than through this app's markup, and it is not in the
     // document at all until somebody presses `Ctrl+F`. So none of its seventeen strings can
@@ -666,8 +679,8 @@ describe('switching the language', () => {
   it('gives the glyph buttons their words where a screen reader can reach them', () =>
     Promise.all(
       [
-        ['#zoom-out', 'preview.zoom.out'],
-        ['#zoom-in', 'preview.zoom.in'],
+        ['tyto-preview-pane:not([hidden]) [data-preview-zoom="out"]', 'preview.zoom.out'],
+        ['tyto-preview-pane:not([hidden]) [data-preview-zoom="in"]', 'preview.zoom.in'],
       ].map(async ([selector, key]) => {
         const label = await page.getAttribute(selector!, 'aria-label');
         expect(label, selector).toBe(translate('en', key as CatalogueKey));

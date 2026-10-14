@@ -6,11 +6,11 @@ import {
   DOCKS,
   EDITOR_PANEL,
   ELASTIC_DOCK,
-  PREVIEW_PANEL,
   PLUGIN_PANEL_ELEMENT,
   PROBLEMS_PANEL,
   QUEUE_PANEL,
   clampSize,
+  dockHasPanels,
   dockIsOpen,
   dockIsShown,
   shownPanelsOf,
@@ -39,7 +39,10 @@ import {
 describe('the default arrangement', () => {
   it('is the one ADR 0024 draws', () => {
     expect(openPanelsOf(DEFAULT_LAYOUT, 'centre').map((panel) => panel.id)).toEqual([EDITOR_PANEL]);
-    expect(openPanelsOf(DEFAULT_LAYOUT, 'right').map((panel) => panel.id)).toEqual([PREVIEW_PANEL]);
+    // Empty since the preview became a tab (TYTO-287, ADR 0084), until a plugin docks there.
+    expect(openPanelsOf(DEFAULT_LAYOUT, 'right')).toEqual([]);
+    expect(dockHasPanels(DEFAULT_LAYOUT, 'right')).toBe(false);
+    expect(dockHasPanels(DEFAULT_LAYOUT, 'left')).toBe(true);
     expect(openPanelsOf(DEFAULT_LAYOUT, 'bottom').map((panel) => panel.id)).toEqual([
       PROBLEMS_PANEL,
     ]);
@@ -71,7 +74,7 @@ describe('opening and closing', () => {
     const next = withPanelOpen(DEFAULT_LAYOUT, PROBLEMS_PANEL, false);
 
     expect(panelOf(next, PROBLEMS_PANEL)?.open).toBe(false);
-    expect(panelOf(next, PREVIEW_PANEL)?.open).toBe(true);
+    expect(panelOf(next, EDITOR_PANEL)?.open).toBe(true);
     expect(dockIsOpen(next, 'bottom')).toBe(false);
   });
 
@@ -105,7 +108,9 @@ describe('resizing', () => {
   });
 
   it('clamps on the way into the record too', () => {
-    expect(panelOf(withPanelSize(DEFAULT_LAYOUT, PREVIEW_PANEL, 4), PREVIEW_PANEL)?.size).toBe(80);
+    expect(panelOf(withPanelSize(DEFAULT_LAYOUT, PROBLEMS_PANEL, 4), PROBLEMS_PANEL)?.size).toBe(
+      80,
+    );
   });
 });
 
@@ -123,8 +128,8 @@ describe('reading what was on the disk', () => {
   it('keeps what a person chose', () => {
     const layout = layoutFrom(saved({ open: false, size: 300 }));
 
-    expect(panelOf(layout, PREVIEW_PANEL)?.open).toBe(false);
-    expect(panelOf(layout, PREVIEW_PANEL)?.size).toBe(300);
+    expect(panelOf(layout, PROBLEMS_PANEL)?.open).toBe(false);
+    expect(panelOf(layout, PROBLEMS_PANEL)?.size).toBe(300);
   });
 
   it('adds a panel the saved file has never heard of', () => {
@@ -148,6 +153,26 @@ describe('reading what was on the disk', () => {
     });
 
     expect(panelOf(layout, 'logs')).toBeUndefined();
+  });
+
+  it('drops the PREVIEW panel a layout.json saved before TYTO-287 still names', () => {
+    // No migration: the preview is a tab now (ADR 0084), and its record reads like any other
+    // record for a panel this build does not have. Where it was is not carried anywhere.
+    const before = {
+      panels: [
+        ...DEFAULT_LAYOUT.panels,
+        {
+          id: 'preview',
+          element: 'tyto-preview-panel',
+          dock: 'right',
+          open: true,
+          size: 560,
+          fixed: false,
+        },
+      ],
+    };
+
+    expect(layoutFrom(before)).toEqual(DEFAULT_LAYOUT);
   });
 
   it('adds the queue, closed, to a layout saved before the queue existed', () => {
@@ -175,7 +200,7 @@ describe('reading what was on the disk', () => {
     // unknown tag and a panel that silently renders nothing. `element` is code.
     const layout = layoutFrom(saved({ element: 'tyto-something-else' }));
 
-    expect(panelOf(layout, PREVIEW_PANEL)?.element).toBe('tyto-preview-panel');
+    expect(panelOf(layout, PROBLEMS_PANEL)?.element).toBe('tyto-problems-panel');
   });
 
   it('takes `fixed` from this build too, so a file cannot close the editor', () => {
@@ -188,7 +213,7 @@ describe('reading what was on the disk', () => {
   });
 
   it('clamps a size a person hand-edited past the end of the world', () => {
-    expect(panelOf(layoutFrom(saved({ size: 99_999 })), PREVIEW_PANEL)?.size).toBe(4000);
+    expect(panelOf(layoutFrom(saved({ size: 99_999 })), PROBLEMS_PANEL)?.size).toBe(4000);
   });
 });
 
@@ -317,9 +342,9 @@ describe('hiding a whole area (TYTO-248, ADR 0076)', () => {
   });
 
   it('is remembered by layout.json and read back, and an older file still reads', () => {
-    const hidden = withDockToggled(DEFAULT_LAYOUT, 'right');
+    const hidden = withDockToggled(DEFAULT_LAYOUT, 'bottom');
 
-    expect(layoutFrom(JSON.parse(JSON.stringify(hidden))).hiddenDocks).toEqual(['right']);
+    expect(layoutFrom(JSON.parse(JSON.stringify(hidden))).hiddenDocks).toEqual(['bottom']);
     expect(layoutFrom({ panels: DEFAULT_LAYOUT.panels }).hiddenDocks).toBeUndefined();
     // A hand-edited `centre` is refused with the rest of the file rather than hiding the editor.
     expect(layoutFrom({ ...hidden, hiddenDocks: ['centre'] }).hiddenDocks).toBeUndefined();

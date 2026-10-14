@@ -17,7 +17,10 @@ export type IconName =
   | 'queue'
   | 'plugins'
   | 'export'
-  | 'settings';
+  | 'settings'
+  // TYTO-287: "Open preview to the side" at the end of a group's strip, and a locked preview.
+  | 'preview'
+  | 'lock';
 
 const FRAME = svg`<rect x="2" y="2.75" width="12" height="10.5" rx="2" />`;
 
@@ -40,6 +43,9 @@ const GEOMETRY: Readonly<Record<IconName, (lit: boolean) => SVGTemplateResult>> 
     svg`<path d="M2.75 9.5v2.25a1.5 1.5 0 0 0 1.5 1.5h7.5a1.5 1.5 0 0 0 1.5-1.5V9.5M8 10V2.75M5 5.5 8 2.5l3 3" />`,
   settings: () =>
     svg`<path d="M2.75 4.5h3M9 4.5h4.25M2.75 11.5h6M12 11.5h1.25" /><circle cx="7.5" cy="4.5" r="1.5" /><circle cx="10.5" cy="11.5" r="1.5" />`,
+  preview: () => svg`${FRAME}<path d="M8 2.75v10.5M9.75 10.5l1.5-2 1.25 1.5" />`,
+  lock: () =>
+    svg`<rect x="3.5" y="7" width="9" height="6.5" rx="1.5" /><path d="M5.5 7V5.25a2.5 2.5 0 0 1 5 0V7" />`,
 };
 
 /** One icon, decorative: the button it sits in carries the words (`aria-label`). */

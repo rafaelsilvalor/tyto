@@ -1,7 +1,16 @@
 // @vitest-environment jsdom
 import { describe, expect, it } from 'vitest';
 
-import { BRIEF_ONLY_COMMANDS, FILE_EXPORT, SETTINGS_OPEN, TEMPLATE_EDIT } from './commands.js';
+import { EDITOR_SAVE } from '@tyto/editor';
+
+import {
+  BRIEF_ONLY_COMMANDS,
+  FILE_EXPORT,
+  PREVIEW_OPEN_TO_SIDE,
+  SETTINGS_OPEN,
+  TEMPLATE_EDIT,
+  TEXT_COMMANDS,
+} from './commands.js';
 import {
   commandOffered,
   editorChromeFor,
@@ -13,40 +22,35 @@ import {
   templateEditFor,
 } from './editor-chrome.js';
 import { type TemplateEdit } from './frontmatter.js';
-import { EDITOR_PANEL_TAG, PREVIEW_PANEL_TAG } from './panels.js';
+import { EDITOR_PANEL_TAG } from './panels.js';
 
 describe('editorChromeFor (TYTO-256)', () => {
   it('keeps every brief control on a brief', () => {
     expect(editorChromeFor(undefined)).toEqual({
       heading: 'editor.heading',
       templatePicker: true,
-      previewControls: true,
-      previewNote: undefined,
       briefCommands: true,
+      textCommands: true,
     });
   });
 
   it("names an app file by the status bar's word and drops the brief's controls", () => {
-    expect(editorChromeFor('settings')).toEqual({
-      heading: 'status.kind.settings',
+    for (const kind of ['settings', 'keybindings', 'snippets'] as const) {
+      expect(editorChromeFor(kind)).toEqual({
+        heading: `status.kind.${kind}`,
+        templatePicker: false,
+        briefCommands: false,
+        textCommands: true,
+      });
+    }
+  });
+
+  it("keeps a brief's commands on its preview and drops the ones that act on text (TYTO-287)", () => {
+    expect(editorChromeFor('preview')).toEqual({
+      heading: 'editor.heading',
       templatePicker: false,
-      previewControls: false,
-      previewNote: 'preview.note.settings',
-      briefCommands: false,
-    });
-    expect(editorChromeFor('keybindings')).toEqual({
-      heading: 'status.kind.keybindings',
-      templatePicker: false,
-      previewControls: false,
-      previewNote: 'preview.note.keybindings',
-      briefCommands: false,
-    });
-    expect(editorChromeFor('snippets')).toEqual({
-      heading: 'status.kind.snippets',
-      templatePicker: false,
-      previewControls: false,
-      previewNote: 'preview.note.snippets',
-      briefCommands: false,
+      briefCommands: true,
+      textCommands: false,
     });
   });
 
@@ -77,6 +81,19 @@ describe('commandOffered (TYTO-283)', () => {
       expect(commandOffered(kind, 'a.plugin:command')).toBe(true);
     }
     expect(BRIEF_ONLY_COMMANDS.has(FILE_EXPORT)).toBe(true);
+  });
+
+  it('offers a brief’s commands with its preview in front, and none that act on text', () => {
+    // Export, the zoom and the lock act on the brief the preview shows; undo, find and the "/"
+    // menu would act on the hidden pane of its group, which shows nothing (TYTO-287).
+    for (const id of BRIEF_ONLY_COMMANDS) {
+      expect(commandOffered('preview', id), id).toBe(!TEXT_COMMANDS.has(id));
+    }
+    for (const id of TEXT_COMMANDS) expect(commandOffered('preview', id), id).toBe(false);
+    for (const id of TEXT_COMMANDS) expect(commandOffered(undefined, id), id).toBe(true);
+    expect(commandOffered('preview', EDITOR_SAVE)).toBe(true);
+    expect(commandOffered('preview', PREVIEW_OPEN_TO_SIDE)).toBe(true);
+    expect(commandOffered('settings', PREVIEW_OPEN_TO_SIDE)).toBe(false);
   });
 });
 
@@ -192,23 +209,17 @@ describe('the "/" menu choosing a template (TYTO-276)', () => {
 describe('paintEditorChrome', () => {
   const mount = async (): Promise<HTMLElement> => {
     const root = document.createElement('div');
-    root.append(
-      document.createElement(EDITOR_PANEL_TAG),
-      document.createElement(PREVIEW_PANEL_TAG),
-    );
+    const panel = document.createElement(EDITOR_PANEL_TAG);
+    root.append(panel);
     document.body.replaceChildren(root);
-    await Promise.all(
-      [...root.children].map(
-        (child) => (child as HTMLElement & { updateComplete: Promise<unknown> }).updateComplete,
-      ),
-    );
+    await panel.updateComplete;
     return root;
   };
 
   const hidden = (root: HTMLElement, selector: string): boolean | undefined =>
     root.querySelector<HTMLElement>(selector)?.hidden;
 
-  it('hides the brief controls and shows the note on the settings tab', async () => {
+  it('hides the template picker and names the file on the settings tab', async () => {
     const root = await mount();
     paintEditorChrome(root, editorChromeFor('settings'));
 
@@ -216,23 +227,17 @@ describe('paintEditorChrome', () => {
       'status.kind.settings',
     );
     expect(hidden(root, '.work__template')).toBe(true);
-    expect(hidden(root, '#format-tabs')).toBe(true);
-    expect(hidden(root, '.preview__slide')).toBe(true);
-    expect(hidden(root, '.preview__zoom')).toBe(true);
-    expect(hidden(root, '#preview-empty')).toBe(true);
-    expect(hidden(root, '[data-i18n="preview.note.settings"]')).toBe(false);
-    expect(hidden(root, '[data-i18n="preview.note.keybindings"]')).toBe(true);
   });
 
-  it('puts every brief control back on a brief', async () => {
+  it('puts the picker back on a brief, and hides it with a preview in front', async () => {
     const root = await mount();
     paintEditorChrome(root, editorChromeFor('keybindings'));
     paintEditorChrome(root, editorChromeFor(undefined));
 
     expect(root.querySelector('#editor-heading')?.getAttribute('data-i18n')).toBe('editor.heading');
     expect(hidden(root, '.work__template')).toBe(false);
-    expect(hidden(root, '#format-tabs')).toBe(false);
-    expect(hidden(root, '.preview__zoom')).toBe(false);
-    expect(root.querySelectorAll('[data-preview-note]:not([hidden])')).toHaveLength(0);
+
+    paintEditorChrome(root, editorChromeFor('preview'));
+    expect(hidden(root, '.work__template')).toBe(true);
   });
 });
