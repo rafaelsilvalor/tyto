@@ -238,7 +238,8 @@ describe('the keybindings tab', () => {
       async () => (await underlined()).some((text) => text.includes('no.such.command')),
       `an underline on no.such.command, the editor shows ${JSON.stringify(await underlined())}`,
     );
-    expect(await page.textContent('#editor-heading')).toBe('Keybindings');
+    // The status bar's kind names the file since the editor panel's heading went (TYTO-288).
+    expect(await page.textContent('tyto-status-bar .status-bar__kind')).toBe('Keybindings');
 
     await page.keyboard.press('Control+s');
     await page.waitForTimeout(800);

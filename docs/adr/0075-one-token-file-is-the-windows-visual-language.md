@@ -119,7 +119,9 @@ the editor changes. That is the whole reason the names are roles.
 - The layout is flatter: no padding or gap around the shell, panels without border or radius,
   splitters drawn as a hairline with a wider grab area, a raised strip for the header, the tabs,
   each panel's bar and the footer. Layout measurements (a column's width, a dot's size) stay
-  literal in `shell.css`, because they are about one rule and not about the look.
+  literal in `shell.css`, because they are about one rule and not about the look. _Changed by
+  ADR 0085 (TYTO-288): a `width` or `height` in pixels is a token too, and the guard refuses one
+  anywhere else._
 - `packages/editor/demo` borrows the desktop's token file to have colours at all; its picker now
   flips only the base flag, and the colours follow the system.
 - What is not decided: the theme file format, where a theme comes from and who may contribute

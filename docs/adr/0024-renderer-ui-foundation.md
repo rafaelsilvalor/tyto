@@ -103,6 +103,10 @@ Seven panels in four docks, plus a status bar and a command bar:
 >
 > **Amended by ADR 0084 (TYTO-287).** The PREVIEW panel is not in the right dock any more: the
 > preview is a kind of tab in the editor groups, and the right dock is empty by default.
+>
+> **Amended by ADR 0085 (TYTO-288).** No BRIEF header over the editor: every pane — each group,
+> each preview, each docked panel — is a tab strip and a header row of the same two heights. The
+> template picker sits in the focused group's header row, and "Brief" is the status bar's kind.
 
 **No panel is bound to a dock.** The arrangement above is the default record, not a structure: a panel is `{ panel: 'tyto-problems', dock: 'bottom', open: true, size: 240 }`, and the dock creates the element from the tag. What a person can do with it in the next cards is **show, hide and resize**, with the arrangement and the sizes persisted. Dragging a panel from one dock to another is a later card and needs no change to the shape above — that is the whole reason the shape is a record.
 

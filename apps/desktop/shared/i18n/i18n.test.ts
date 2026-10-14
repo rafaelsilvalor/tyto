@@ -36,9 +36,9 @@ describe('the catalogue', () => {
     // say "template", and translating the label to "Modelos" here would make the window
     // disagree with the vocabulary its users already have.
     //
-    // E9.2 added two of the same kind. `editor.heading` is "Brief", which is the name of the
-    // file format and of the language — a Portuguese speaker writing one calls it a brief,
-    // and "Resumo" would name something else. `preview.slide.label` is "Slide", which
+    // E9.2 added two of the same kind. `editor.heading` was "Brief", the title over the
+    // editor until each group became a pane of its own (TYTO-288). `preview.slide.label` is
+    // "Slide", which
     // Portuguese borrowed whole; "Lâmina" is what a projector manual says and not what
     // anybody making a carousel says.
     //
@@ -49,15 +49,13 @@ describe('the catalogue', () => {
 
     expect(shared).toEqual([
       'app.name',
-      'editor.heading',
       'preview.slide.label',
       // "Template" is the word in both languages, the same way "Slide" is: it is what the
       // frontmatter key is called and what a Portuguese speaker says out loud.
       'template.label',
-      // E9.10 names the same pane twice: `editor.heading` is the title over it and
-      // `panel.editor` is what a list of panels calls it. Both are "Brief" for the same
-      // reason — it is the name of the file format and of the language, and "Resumo" would
-      // name something else.
+      // E9.10's name for the editor panel in a list of panels: "Brief", the name of the file
+      // format and of the language — a Portuguese speaker writing one calls it a brief, and
+      // "Resumo" would name something else.
       'panel.editor',
       'shell.about.templates',
       // TYTO-44's slide picker, for `preview.slide.label`'s reason.

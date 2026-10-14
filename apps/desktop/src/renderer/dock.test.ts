@@ -10,6 +10,8 @@ import {
 } from '../../shared/layout.js';
 import { arrange } from './dock.js';
 import './panels.js';
+// For the side effect: the queue panel's element, so the pane shape can be read off it.
+import './queue-panel.js';
 
 /**
  * The dock, arranging a document from a record (E9.10).
@@ -65,7 +67,9 @@ describe('building the window from the record', () => {
 
     expect(document.querySelector('[data-editor-groups]')).not.toBeNull();
     expect(document.getElementById('problems-list')).not.toBeNull();
-    expect(document.getElementById('template')).not.toBeNull();
+    // The template picker is no panel's since TYTO-288: `main.ts` makes it once and moves it
+    // into the focused group's header row.
+    expect(document.getElementById('template')).toBeNull();
   });
 
   it('gives each dock its size, and the elastic one none', async () => {
@@ -131,6 +135,23 @@ describe('what survives a rearrangement', () => {
 
     expect(document.querySelector('[data-editor-groups]')).toBe(before);
     expect(before?.childElementCount).toBe(1);
+  });
+
+  it('draws every docked panel as a pane: a one-tab strip, then a header row (TYTO-288)', async () => {
+    await arrange(document, withPanelOpen(DEFAULT_LAYOUT, 'queue', true), host());
+
+    for (const id of [PROBLEMS_PANEL, 'queue']) {
+      const panel = document.querySelector(`[data-panel="${id}"]`);
+      const children = [...(panel?.children ?? [])].map((child) => child.className);
+      // The header row is drawn even with nothing in it: it is what lines the panes up.
+      expect(children.slice(0, 2), id).toEqual(['pane__strip', 'pane__header']);
+    }
+    // The problems heading keeps its id and its key, now as the tab's name.
+    const heading = document.querySelector('.pane__strip #problems-heading');
+    expect(heading?.getAttribute('data-i18n')).toBe('problems.heading');
+    // The editor panel has no bar of its own any more: each group is a pane (ADR 0085).
+    const editor = document.querySelector(`[data-panel="${EDITOR_PANEL}"]`);
+    expect(editor?.querySelector('.pane__strip, #editor-heading, #template')).toBeNull();
   });
 
   it('gives no close button to a fixed panel', async () => {

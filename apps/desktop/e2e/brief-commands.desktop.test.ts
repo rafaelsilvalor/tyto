@@ -127,11 +127,15 @@ const statusExportDisabled = (): Promise<boolean | undefined> =>
         ?.disabled,
   );
 
-/** The first tab, the brief's: settings.json opened beside it. By place, not by a translated name. */
+/**
+ * The first tab, the brief's: settings.json opened beside it. By place, not by a translated name;
+ * the status bar's kind says the brief is in front — "Brief" in both languages — since the
+ * editor panel's heading went (TYTO-288, ADR 0085).
+ */
 async function bringBriefForward(): Promise<void> {
   await page.locator('.tabs__tab').first().locator('.tabs__label').click();
   await page.waitForFunction(
-    () => document.querySelector('#editor-heading')?.getAttribute('data-i18n') === 'editor.heading',
+    () => document.querySelector('tyto-status-bar .status-bar__kind')?.textContent === 'Brief',
   );
 }
 

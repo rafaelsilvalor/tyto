@@ -67,37 +67,23 @@ export class PluginPanel extends DockedPanel {
 
   protected override render(): unknown {
     const offered = this.offered;
-    return html`<div class="work__bar">
-        <h2 class="work__title">${offered?.title ?? ''}</h2>
-        ${
-          this.fixed
-            ? nothing
-            : html`<button
-                type="button"
-                class="panel__close"
-                title=${this.say('panel.close')}
-                aria-label=${this.say('panel.close')}
-                @click=${() => {
-                  this.onClose(this.panelId);
-                }}
-              >
-                ×
-              </button>`
-        }
-      </div>
-      ${
-        offered === undefined
-          ? nothing
-          : html`<iframe
-              class="plugin-panel__frame"
-              sandbox=${PANEL_SANDBOX}
-              src=${offered.src}
-              title=${offered.title}
-              @load=${() => {
-                this.dispatchEvent(new CustomEvent('plugin-panel-load', { bubbles: true }));
-              }}
-            ></iframe>`
-      }`;
+    // The pane shape every panel has (TYTO-288, ADR 0085). The manifest's title goes in the tab
+    // as text, which Lit escapes: it is the plugin's string, never markup. The page is below,
+    // in its sandbox, unchanged (ADR 0045).
+    return html`${this.chrome(html`<h2 class="pane__title">${offered?.title ?? ''}</h2>`, nothing)}
+    ${
+      offered === undefined
+        ? nothing
+        : html`<iframe
+            class="plugin-panel__frame"
+            sandbox=${PANEL_SANDBOX}
+            src=${offered.src}
+            title=${offered.title}
+            @load=${() => {
+              this.dispatchEvent(new CustomEvent('plugin-panel-load', { bubbles: true }));
+            }}
+          ></iframe>`
+    }`;
   }
 }
 

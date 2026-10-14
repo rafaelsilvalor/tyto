@@ -12,8 +12,9 @@ import type { GroupNode, SplitDirection } from './editor-groups.js';
 
 /**
  * The smallest a group may be dragged to, along each axis, in CSS pixels. The same numbers as
- * `.editor-group`'s `min-width` and `min-height` in `shell.css`, which hold a group there while
- * the window shrinks; these hold it there while a person drags.
+ * `--tyto-group-min-width` and `--tyto-group-min-height` in `tokens.css` (`.editor-group`'s
+ * minimum), which hold a group there while the window shrinks; these hold it there while a
+ * person drags. `e2e/renderer-tokens.test.ts` holds the two equal (TYTO-288).
  */
 export const GROUP_MINIMUM: Readonly<Record<SplitDirection, number>> = { row: 160, column: 96 };
 

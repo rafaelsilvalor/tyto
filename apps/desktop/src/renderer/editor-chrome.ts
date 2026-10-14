@@ -1,10 +1,8 @@
 import { type LanguageName } from '@tyto/editor';
 
-import { type CatalogueKey } from '../../shared/i18n/index.js';
 import { BRIEF_ONLY_COMMANDS, TEXT_COMMANDS } from './commands.js';
 import { type DocumentState } from './documents.js';
 import { planTemplateEdit, type TemplateEdit, templateOf } from './frontmatter.js';
-import { I18N_ATTRIBUTE } from './shell.js';
 
 /**
  * What the panels around the editor show for the tab in front (TYTO-256).
@@ -16,8 +14,6 @@ import { I18N_ATTRIBUTE } from './shell.js';
  * so the decision is tested here and painted in one place.
  */
 export interface EditorChrome {
-  /** The editor panel's heading. An app file reuses the status bar's word for its kind. */
-  readonly heading: CatalogueKey;
   /** Whether the template picker is shown, and whether choosing in it may edit the text. */
   readonly templatePicker: boolean;
   /**
@@ -37,18 +33,20 @@ export type TabKind = DocumentState['kind'] | 'preview';
 type Kind = TabKind;
 
 const BRIEF: EditorChrome = {
-  heading: 'editor.heading',
   templatePicker: true,
   briefCommands: true,
   textCommands: true,
 };
 
-const appFile = (heading: CatalogueKey): EditorChrome => ({
-  heading,
+/**
+ * An app file's tab: no picker and no brief commands. The editor panel used to name the file in
+ * its heading too; that bar is gone (TYTO-288, ADR 0085) and the status bar's kind says it.
+ */
+const APP_FILE: EditorChrome = {
   templatePicker: false,
   briefCommands: false,
   textCommands: true,
-});
+};
 
 export function editorChromeFor(kind: Kind): EditorChrome {
   switch (kind) {
@@ -59,11 +57,9 @@ export function editorChromeFor(kind: Kind): EditorChrome {
       // text commands act on text, which is not in front.
       return { ...BRIEF, templatePicker: false, textCommands: false };
     case 'settings':
-      return appFile('status.kind.settings');
     case 'keybindings':
-      return appFile('status.kind.keybindings');
     case 'snippets':
-      return appFile('status.kind.snippets');
+      return APP_FILE;
   }
 }
 
@@ -187,15 +183,13 @@ export function slashTemplateNote(
 }
 
 /**
- * Paints the answer into the editor panel: its heading, and whether its template picker shows.
- *
- * The heading's key goes on its `data-i18n` attribute, so the window's translation pass — which
- * runs on every repaint and on a locale switch — writes the word, as it does for every other
- * heading. The preview's controls and its notes for an app file went with the PREVIEW panel
- * (TYTO-287): a preview tab only ever shows a brief.
+ * Paints the answer into the window: whether the template picker shows. The picker is the one
+ * node the focused group's header row holds (TYTO-288), so it is handed in rather than looked
+ * up — it is out of the document until that group has rendered. The editor panel's heading,
+ * which named an app file here, went with its bar (ADR 0085); the status bar's kind names it.
+ * The preview's controls and its notes for an app file went with the PREVIEW panel (TYTO-287):
+ * a preview tab only ever shows a brief.
  */
-export function paintEditorChrome(root: ParentNode, chrome: EditorChrome): void {
-  root.querySelector('#editor-heading')?.setAttribute(I18N_ATTRIBUTE, chrome.heading);
-  const picker = root.querySelector<HTMLElement>('.work__template');
-  if (picker !== null) picker.hidden = !chrome.templatePicker;
+export function paintEditorChrome(picker: HTMLElement, chrome: EditorChrome): void {
+  picker.hidden = !chrome.templatePicker;
 }

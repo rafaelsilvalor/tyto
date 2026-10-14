@@ -3,7 +3,6 @@ import { type Catalogue } from './catalogue.js';
 /** The fallback, used for any key a later locale has not translated yet. */
 export const en: Catalogue = {
   'app.name': 'Tyto',
-  'editor.heading': 'Brief',
   'preview.heading': 'Preview',
   'preview.slide.label': 'Slide',
   'preview.zoom.out': 'Zoom out',

@@ -40,6 +40,10 @@ is said where it applies.
    first group's mount carries `id="editor"`, so a window with one group is the window every
    earlier suite and stylesheet knows. A rearrange **moves** group elements and never rebuilds
    them, so no pane is unmounted under a person's text.
+
+   > **Changed by ADR 0085 (TYTO-288).** The pane is a strip and a header row, then the content,
+   > and the docks have the same shape; the editor panel's own bar over the groups is gone.
+
 4. **One editor, several panes.** `@tyto/editor`'s `createEditor` makes the first pane and
    `createPane` the others: one set of extensions — the input and theme compartments, the command
    registry and the listener that reports a transaction — and one view per group. A

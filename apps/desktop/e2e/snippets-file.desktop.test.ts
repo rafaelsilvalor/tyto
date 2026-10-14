@@ -249,7 +249,10 @@ describe('the snippets file', () => {
     await page.keyboard.press('Control+A');
     await page.keyboard.insertText(text);
     await expect.poll(problems, { timeout: 15_000 }).toContain('W_SNIPPET_UNSUPPORTED_BODY@3:41');
-    expect(await page.textContent('#editor-heading')).toMatch(/^(Snippets|Trechos)$/u);
+    // The status bar's kind names the file since the editor panel's heading went (TYTO-288).
+    expect(await page.textContent('tyto-status-bar .status-bar__kind')).toMatch(
+      /^(Snippets|Trechos)$/u,
+    );
     await shoot('snippets-tab-diagnostic-light');
 
     await page.keyboard.press('Control+s');

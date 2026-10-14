@@ -1,11 +1,15 @@
 import { type SVGTemplateResult, html, svg } from 'lit';
 
 /**
- * The status bar's nine icons, drawn for Tyto (TYTO-248, ADR 0076).
+ * The status bar's nine icons, drawn for Tyto (TYTO-248, ADR 0076), and two for the panes.
  *
- * **Copied from the sheet Rafael approved on 2026-10-08 (TYTO-96, comment 1291169) and not
- * redesigned.** Geometry on a 16 grid with a 1.5 stroke; no icon carries a colour of its own,
- * so each one is whatever `color` the button around it has, which is a token.
+ * **The nine are copied from the sheet Rafael approved on 2026-10-08 (TYTO-96, comment 1291169)
+ * and not redesigned.** Geometry on a 16 grid with a 1.5 stroke; no icon carries a colour of
+ * its own, so each one is whatever `color` the button around it has, which is a token.
+ *
+ * `preview` and `lock` are **not on that sheet**. TYTO-287 drew them provisionally; TYTO-288
+ * redrew both in the nine's manner — the same frame, the same stroke, the problems icon's dot —
+ * and put them on a sheet beside the nine for Rafael's approval, which is still pending.
  */
 
 export type IconName =
@@ -18,7 +22,7 @@ export type IconName =
   | 'plugins'
   | 'export'
   | 'settings'
-  // TYTO-287: "Open preview to the side" at the end of a group's strip, and a locked preview.
+  // TYTO-287: "Open preview to the side" in a group's header row, and a locked preview.
   | 'preview'
   | 'lock';
 
@@ -43,9 +47,12 @@ const GEOMETRY: Readonly<Record<IconName, (lit: boolean) => SVGTemplateResult>> 
     svg`<path d="M2.75 9.5v2.25a1.5 1.5 0 0 0 1.5 1.5h7.5a1.5 1.5 0 0 0 1.5-1.5V9.5M8 10V2.75M5 5.5 8 2.5l3 3" />`,
   settings: () =>
     svg`<path d="M2.75 4.5h3M9 4.5h4.25M2.75 11.5h6M12 11.5h1.25" /><circle cx="7.5" cy="4.5" r="1.5" /><circle cx="10.5" cy="11.5" r="1.5" />`,
-  preview: () => svg`${FRAME}<path d="M8 2.75v10.5M9.75 10.5l1.5-2 1.25 1.5" />`,
+  // The frame split down the middle: lines of text on the left, a picture's peak on the right.
+  preview: () =>
+    svg`${FRAME}<path d="M8 2.75v10.5M4.25 6.25h1.5M4.25 9h1.5M9.75 10.25 11 8.5l1.25 1.75" />`,
+  // A padlock on the frame's corner radius, with the problems icon's dot for the keyhole.
   lock: () =>
-    svg`<rect x="3.5" y="7" width="9" height="6.5" rx="1.5" /><path d="M5.5 7V5.25a2.5 2.5 0 0 1 5 0V7" />`,
+    svg`<rect x="3" y="7.25" width="10" height="6.25" rx="2" /><path d="M5.5 7.25V5.5a2.5 2.5 0 0 1 5 0v1.75" /><circle cx="8" cy="10.35" r=".6" fill="currentColor" stroke="none" />`,
 };
 
 /** One icon, decorative: the button it sits in carries the words (`aria-label`). */

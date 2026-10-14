@@ -78,7 +78,7 @@ describe('a group with a preview in front (TYTO-287)', () => {
     expect(group.preview.querySelector('[id]')).toBeNull();
   });
 
-  it('offers "Open preview to the side" at the end of its strip only while asked to', async () => {
+  it('offers "Open preview to the side" in its header row only while asked to', async () => {
     const made = new Map<string, EditorGroupElement>();
     const [group] = arrangeGroups(container(), groupsOf(['a'], 'a'), made).created;
     if (group === undefined) throw new Error('no group');
@@ -91,7 +91,58 @@ describe('a group with a preview in front (TYTO-287)', () => {
 
     group.offerPreview = true;
     await group.updateComplete;
+    expect(group.querySelector('.pane__header .editor-group__action')).not.toBeNull();
     group.querySelector<HTMLButtonElement>('.editor-group__action')?.click();
     expect(opened).toBe(1);
+  });
+});
+
+describe('the pane shape (TYTO-288, ADR 0085)', () => {
+  it('draws its strip, then a header row with an empty breadcrumb slot, then the mount', async () => {
+    const made = new Map<string, EditorGroupElement>();
+    const [group] = arrangeGroups(container(), groupsOf(['a'], 'a'), made).created;
+    if (group === undefined) throw new Error('no group');
+    await group.updateComplete;
+
+    const order = [...group.children].map((child) => child.className);
+    expect(order).toEqual(['pane__strip', 'pane__header', 'editor']);
+    expect(group.querySelector('.pane__strip tyto-tabs')).not.toBeNull();
+    expect(group.querySelector('.pane__header [data-breadcrumb]')?.childNodes).toHaveLength(0);
+  });
+
+  it('hides its header row while a preview is in front, so the preview bar is the only one', async () => {
+    const made = new Map<string, EditorGroupElement>();
+    const [group] = arrangeGroups(container(), groupsOf(['a'], 'a'), made).created;
+    if (group === undefined) throw new Error('no group');
+    group.showing = 'preview';
+    await group.updateComplete;
+    await group.preview.updateComplete;
+
+    expect(group.querySelector<HTMLElement>(':scope > .pane__header')?.hidden).toBe(true);
+    const shown = [...group.querySelectorAll<HTMLElement>('.pane__header')].filter(
+      (row) => !row.hidden && row.closest('[hidden]') === null,
+    );
+    expect(shown).toHaveLength(1);
+    expect(shown[0]?.classList.contains('preview__bar')).toBe(true);
+  });
+
+  it('holds the template picker only while it is handed one, and lets go of it', async () => {
+    const made = new Map<string, EditorGroupElement>();
+    const host = container();
+    const split = splitGroup(groupsOf(['a'], 'a'), 'row');
+    arrangeGroups(host, split, made);
+    const [first, second] = groupList(split).map((group) => made.get(group.id));
+    if (first === undefined || second === undefined) throw new Error('no groups');
+    const picker = document.createElement('label');
+
+    first.picker = picker;
+    await first.updateComplete;
+    expect(picker.parentElement?.closest('[data-editor-group]')).toBe(first);
+
+    first.picker = undefined;
+    second.picker = picker;
+    await Promise.all([first.updateComplete, second.updateComplete]);
+    expect(picker.parentElement?.closest('[data-editor-group]')).toBe(second);
+    expect(host.querySelectorAll('label')).toHaveLength(1);
   });
 });

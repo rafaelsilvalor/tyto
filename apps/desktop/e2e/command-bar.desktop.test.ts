@@ -56,8 +56,8 @@ const optionLabels = async (): Promise<string[]> =>
  * was the PREVIEW panel's until the preview became a tab (TYTO-287).
  *
  * `Problemas` or `Problems` — and which one the window starts in is the operating system's
- * answer, not this suite's, so nothing here names a starting locale. `editor.heading` would
- * have been the obvious pick and is the wrong one: it is "Brief" in both catalogues.
+ * answer, not this suite's, so nothing here names a starting locale. The editor's old heading
+ * would have been the obvious pick and was the wrong one: it was "Brief" in both catalogues.
  */
 const problemsHeading = async (): Promise<string> =>
   page.evaluate(() => document.getElementById('problems-heading')?.textContent ?? '');

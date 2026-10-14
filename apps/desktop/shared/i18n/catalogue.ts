@@ -15,7 +15,6 @@
 /** Every key the app can show. Adding one here makes every locale below fail to compile. */
 export interface Catalogue {
   readonly 'app.name': string;
-  readonly 'editor.heading': string;
   readonly 'preview.heading': string;
   readonly 'preview.slide.label': string;
   readonly 'preview.zoom.out': string;
@@ -276,7 +275,7 @@ export interface Catalogue {
    * The dock, its panels and the commands that show and hide them (E9.10).
    *
    * `panel.*` are the panel names a command bar entry reads — "Mostrar ou esconder:
-   * Problemas" — and they are separate from `editor.heading` and friends on purpose: a
+   * Problemas" — and they are separate from `problems.heading` and friends on purpose: a
    * heading sits over a pane and names what is in it, and this names the panel itself in a
    * list of panels. They happen to read the same today and will not once a panel's heading
    * carries a file name.
@@ -509,7 +508,6 @@ export type CatalogueKey = keyof Catalogue;
 
 export const CATALOGUE_KEYS = [
   'app.name',
-  'editor.heading',
   'preview.heading',
   'preview.slide.label',
   'preview.zoom.out',

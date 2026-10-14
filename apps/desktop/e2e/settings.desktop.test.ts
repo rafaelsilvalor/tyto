@@ -237,7 +237,8 @@ describe('the settings tab', () => {
       };
       const pane = 'tyto-preview-pane:not([hidden])';
       return {
-        heading: document.querySelector('#editor-heading')?.textContent ?? '',
+        // The status bar's kind, since the editor panel's heading went (TYTO-288).
+        heading: document.querySelector('tyto-status-bar .status-bar__kind')?.textContent ?? '',
         picker: shown('.work__template'),
         previewEmpty: shown(`${pane} [data-preview-empty]`),
         previewPaper: shown(`${pane} [data-preview-paper]`),

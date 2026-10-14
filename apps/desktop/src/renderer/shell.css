@@ -4,8 +4,9 @@
  *
  * **Every value here is a token** from `tokens.css`, which is the only file in the renderer
  * that writes a literal colour, size, radius or font (ADR 0075), and
- * `e2e/renderer-tokens.test.ts` fails on one written here. Layout measurements — a column's
- * width, a dot's size — are the exception, because they are about one rule and not the look.
+ * `e2e/renderer-tokens.test.ts` fails on one written here. Since TYTO-288 that includes a
+ * `width` or `height` in pixels: a dot's size or a group's minimum is a token too, because the
+ * pane shape's two heights are, and a guard that let sizes through could not hold those.
  */
 
 /*
@@ -86,7 +87,9 @@ textarea {
   flex-shrink: 0;
   /* One hairline taller than the overlay, so the line runs under the system's buttons too:
      inside the overlay's height they painted over its right end (TYTO-244, PR B). */
-  height: calc(env(titlebar-area-height, 32px) + var(--tyto-hairline-width));
+  height: calc(
+    env(titlebar-area-height, var(--tyto-title-bar-height)) + var(--tyto-hairline-width)
+  );
   border-bottom: var(--tyto-hairline-width) solid var(--tyto-hairline);
   background: var(--tyto-surface-raised);
   color: var(--tyto-text-muted);
@@ -249,8 +252,8 @@ textarea {
    accent and not the error colour: the count already turns red for an error, and the dot says
    "new", not "bad". The size is a layout measurement, like the panels' dots. */
 .status-bar__new {
-  width: 6px;
-  height: 6px;
+  width: var(--tyto-dot-size-sm);
+  height: var(--tyto-dot-size-sm);
   flex-shrink: 0;
   border-radius: 50%;
   background: var(--tyto-accent);
@@ -399,42 +402,107 @@ textarea {
   overflow: hidden;
 }
 
+/*
+ * The pane shape (TYTO-288, ADR 0085): every editor group, every preview and every docked panel
+ * is a tab strip and, under it, a header row, and nothing else above its content.
+ *
+ * The contract is the two heights, which are tokens and nothing else: a fixed `height`, one
+ * line (`nowrap`), and `overflow: hidden`, so whatever a pane puts in a line can never make it
+ * taller and every pane's lines end at the same y. `flex: none` so a short pane does not
+ * squeeze them either. In the header row the breadcrumb is what gives way, cut with an
+ * ellipsis; the actions keep their size. `e2e/pane-shape.desktop.test.ts` measures all of it.
+ */
+.pane__strip {
+  display: flex;
+  flex: none;
+  align-items: stretch;
+  height: var(--tyto-pane-strip-height);
+  min-width: 0;
+  overflow: hidden;
+  white-space: nowrap;
+  border-bottom: var(--tyto-hairline-width) solid var(--tyto-hairline);
+  background: var(--tyto-surface-raised);
+}
+
+.pane__header {
+  display: flex;
+  flex: none;
+  align-items: center;
+  gap: var(--tyto-space-4);
+  height: var(--tyto-pane-header-height);
+  min-width: 0;
+  overflow: hidden;
+  white-space: nowrap;
+  padding-inline: var(--tyto-space-4);
+  border-bottom: var(--tyto-hairline-width) solid var(--tyto-hairline);
+  background: var(--tyto-surface);
+  color: var(--tyto-text-muted);
+  font-size: var(--tyto-text-sm);
+}
+
+.pane__header[hidden] {
+  display: none;
+}
+
+/* Where TYTO-273's breadcrumb goes: it takes the room the actions leave, and gives it up first. */
+.pane__breadcrumb {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.pane__actions {
+  display: flex;
+  flex: none;
+  align-items: center;
+  gap: var(--tyto-space-4);
+  margin-inline-start: auto;
+}
+
+/*
+ * A docked panel's one tab: its name and its close button, drawn as a group's tab in front is,
+ * from the same tokens. Not a `.tabs__tab`, which the window counts and selects.
+ */
+.pane__tab {
+  display: flex;
+  align-items: center;
+  gap: var(--tyto-space-1);
+  padding-inline: var(--tyto-space-4) var(--tyto-space-1);
+  border-inline-end: var(--tyto-hairline-width) solid var(--tyto-hairline);
+  background: var(--tyto-surface);
+  color: var(--tyto-text);
+  font-size: var(--tyto-text-sm);
+}
+
+.pane__name {
+  display: flex;
+  align-items: center;
+}
+
+/* The panel's name, in sentence case like a file's, and as quiet as a tab's name in front. */
+.pane__title {
+  margin: 0;
+  font: inherit;
+  font-weight: normal;
+}
+
 .panel__close {
-  margin-left: auto;
-  padding: 0 var(--tyto-space-3);
-  border: 0;
+  border: none;
   border-radius: var(--tyto-radius-sm);
   background: none;
+  padding: 0 var(--tyto-space-2);
   color: var(--tyto-text-muted);
-  cursor: default;
+  cursor: pointer;
   font: inherit;
-  font-size: var(--tyto-text-lg);
-  line-height: 1;
+  font-size: var(--tyto-text-md);
+  line-height: 1.4;
 }
 
 .panel__close:hover,
 .panel__close:focus-visible {
   background: var(--tyto-hover);
-  color: inherit;
-}
-
-.work__bar {
-  display: flex;
-  align-items: center;
-  gap: var(--tyto-space-5);
-  flex-wrap: wrap;
-  padding: var(--tyto-space-2) var(--tyto-space-5);
-  border-bottom: var(--tyto-hairline-width) solid var(--tyto-hairline);
-  background: var(--tyto-surface-raised);
-}
-
-.work__title {
-  margin: 0;
-  font-size: var(--tyto-text-sm);
-  font-weight: var(--tyto-weight-strong);
-  color: var(--tyto-text-muted);
-  text-transform: uppercase;
-  letter-spacing: 0.04em;
+  color: var(--tyto-text);
 }
 
 .editor {
@@ -472,8 +540,8 @@ textarea {
 .editor-group {
   display: flex;
   flex-direction: column;
-  min-width: 160px;
-  min-height: 96px;
+  min-width: var(--tyto-group-min-width);
+  min-height: var(--tyto-group-min-height);
   overflow: hidden;
 }
 
@@ -525,34 +593,10 @@ textarea {
 
 /* With more than one group, the focused one's tab in front carries the accent. */
 .editor-split .editor-group--focused .tabs__tab--on {
-  box-shadow: inset 0 2px 0 var(--tyto-accent);
+  box-shadow: inset 0 var(--tyto-focus-width) 0 var(--tyto-accent);
 }
 
-/*
- * A group's head (TYTO-287): its tabs, and at the end of the row the group's actions — "Open
- * preview to the side" while a brief is in front. The strip's own border moves to the head, so
- * the actions sit on the same line. TYTO-288 restyles all of this.
- */
-.editor-group__head {
-  display: flex;
-  align-items: stretch;
-  min-width: 0;
-  border-bottom: var(--tyto-hairline-width) solid var(--tyto-hairline);
-  background: var(--tyto-surface-raised);
-}
-
-.editor-group__head .tabs {
-  flex: 1;
-  min-width: 0;
-  border-bottom: none;
-}
-
-.editor-group__actions {
-  display: flex;
-  align-items: center;
-  padding-inline: var(--tyto-space-2);
-}
-
+/* A group's action in its header row (TYTO-287, TYTO-288): "Open preview to the side". */
 .editor-group__action {
   display: inline-flex;
   align-items: center;
@@ -586,16 +630,6 @@ tyto-preview-pane[hidden] {
   display: none;
 }
 
-.preview__bar {
-  display: flex;
-  align-items: center;
-  gap: var(--tyto-space-5);
-  flex-wrap: wrap;
-  padding: var(--tyto-space-2) var(--tyto-space-5);
-  border-bottom: var(--tyto-hairline-width) solid var(--tyto-hairline);
-  background: var(--tyto-surface-raised);
-}
-
 .preview__lock {
   border: var(--tyto-hairline-width) solid var(--tyto-border);
   border-radius: var(--tyto-radius-sm);
@@ -623,10 +657,13 @@ tyto-preview-pane[hidden] {
   height: 100%;
 }
 
+/* The bar is a header row (TYTO-288): the formats take what the slide, zoom and lock leave. */
 .preview__tabs {
   display: flex;
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow: hidden;
   gap: var(--tyto-space-2);
-  margin-inline-end: auto;
 }
 
 .preview__tab {
@@ -871,8 +908,8 @@ button.problems__row:focus-visible {
 }
 
 .problems__dot {
-  width: 8px;
-  height: 8px;
+  width: var(--tyto-dot-size);
+  height: var(--tyto-dot-size);
   border-radius: 50%;
   /* The baseline of a bare box is its bottom edge, which would hang the dot below the text
      it belongs to. Inline-block with an explicit nudge puts it on the text's own line. */
@@ -935,7 +972,7 @@ tyto-command-bar[open] {
 
 .command-bar__panel {
   display: flex;
-  width: min(560px, calc(100vw - 32px));
+  width: min(var(--tyto-dialog-width-md), calc(100vw - 2 * var(--tyto-space-6)));
   max-height: 60vh;
   flex-direction: column;
   border: var(--tyto-hairline-width) solid var(--tyto-border);
@@ -1025,15 +1062,16 @@ tyto-command-bar[open] {
  */
 .tabs {
   display: block;
-  min-height: 0;
-  border-bottom: var(--tyto-hairline-width) solid var(--tyto-hairline);
-  background: var(--tyto-surface-raised);
+  flex: 1;
+  min-width: 0;
 }
 
 /* Zed's strip: the tabs sit edge to edge with a hairline between them, and the one in front
-   takes the editor's surface so it reads as the top of the buffer below it. */
+   takes the editor's surface so it reads as the top of the buffer below it. The pane's strip
+   holds the height and the line under it (TYTO-288); this fills it. */
 .tabs__strip {
   display: flex;
+  height: 100%;
   gap: 0;
   overflow-x: auto;
   scrollbar-width: thin;
@@ -1054,13 +1092,21 @@ tyto-command-bar[open] {
   color: var(--tyto-text);
 }
 
+/* A tab behind another lights up under the pointer; its muted name keeps 4.5:1 on `hover`. */
+.tabs__tab:not(.tabs__tab--on):hover {
+  background: var(--tyto-hover);
+}
+
+/* The name is quiet (TYTO-288): no strong weight in front, only the text colour against the
+   muted one, as Zed draws it. */
 .tabs__name {
   display: flex;
   align-items: center;
   gap: var(--tyto-space-3);
   border: none;
+  align-self: stretch;
   background: none;
-  padding: var(--tyto-space-2) var(--tyto-space-2) var(--tyto-space-2) var(--tyto-space-4);
+  padding: 0 var(--tyto-space-2) 0 var(--tyto-space-4);
   color: inherit;
   font: inherit;
   font-size: var(--tyto-text-sm);
@@ -1069,14 +1115,10 @@ tyto-command-bar[open] {
 
 /* A long file name is cut rather than allowed to push every other tab off the strip. */
 .tabs__label {
-  max-width: 220px;
+  max-width: var(--tyto-tab-label-max);
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-}
-
-.tabs__tab--on .tabs__name {
-  font-weight: var(--tyto-weight-strong);
 }
 
 .tabs__dirty {
@@ -1124,7 +1166,7 @@ tyto-export-dialog[open] {
 
 .export__panel {
   display: flex;
-  width: min(480px, calc(100vw - 32px));
+  width: min(var(--tyto-dialog-width-sm), calc(100vw - 2 * var(--tyto-space-6)));
   flex-direction: column;
   padding: var(--tyto-space-6);
   border: var(--tyto-hairline-width) solid var(--tyto-border);
@@ -1209,7 +1251,7 @@ tyto-export-dialog[open] {
 
 .export__bar {
   overflow: hidden;
-  height: 4px;
+  height: var(--tyto-progress-height);
   border-radius: var(--tyto-radius-sm);
   background: var(--tyto-hairline);
 }
@@ -1493,8 +1535,8 @@ tyto-plugins-dialog[open] {
 .plugins__panel {
   display: flex;
   overflow: auto;
-  width: min(820px, calc(100vw - 32px));
-  max-height: calc(100vh - 32px);
+  width: min(var(--tyto-dialog-width-lg), calc(100vw - 2 * var(--tyto-space-6)));
+  max-height: calc(100vh - 2 * var(--tyto-space-6));
   flex-direction: column;
   padding: var(--tyto-space-6);
   border: var(--tyto-hairline-width) solid var(--tyto-border);
@@ -1669,8 +1711,8 @@ tyto-plugins-dialog[open] {
 
 .queue__dot {
   display: inline-block;
-  width: 8px;
-  height: 8px;
+  width: var(--tyto-dot-size);
+  height: var(--tyto-dot-size);
   border-radius: 50%;
   transform: translateY(-1px);
   background: var(--tyto-text-muted);

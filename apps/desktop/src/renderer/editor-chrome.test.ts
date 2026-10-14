@@ -22,22 +22,20 @@ import {
   templateEditFor,
 } from './editor-chrome.js';
 import { type TemplateEdit } from './frontmatter.js';
-import { EDITOR_PANEL_TAG } from './panels.js';
+import { createTemplatePicker } from './panels.js';
 
 describe('editorChromeFor (TYTO-256)', () => {
   it('keeps every brief control on a brief', () => {
     expect(editorChromeFor(undefined)).toEqual({
-      heading: 'editor.heading',
       templatePicker: true,
       briefCommands: true,
       textCommands: true,
     });
   });
 
-  it("names an app file by the status bar's word and drops the brief's controls", () => {
+  it("drops the brief's controls on an app file", () => {
     for (const kind of ['settings', 'keybindings', 'snippets'] as const) {
       expect(editorChromeFor(kind)).toEqual({
-        heading: `status.kind.${kind}`,
         templatePicker: false,
         briefCommands: false,
         textCommands: true,
@@ -47,7 +45,6 @@ describe('editorChromeFor (TYTO-256)', () => {
 
   it("keeps a brief's commands on its preview and drops the ones that act on text (TYTO-287)", () => {
     expect(editorChromeFor('preview')).toEqual({
-      heading: 'editor.heading',
       templatePicker: false,
       briefCommands: true,
       textCommands: false,
@@ -207,37 +204,22 @@ describe('the "/" menu choosing a template (TYTO-276)', () => {
 });
 
 describe('paintEditorChrome', () => {
-  const mount = async (): Promise<HTMLElement> => {
-    const root = document.createElement('div');
-    const panel = document.createElement(EDITOR_PANEL_TAG);
-    root.append(panel);
-    document.body.replaceChildren(root);
-    await panel.updateComplete;
-    return root;
-  };
-
-  const hidden = (root: HTMLElement, selector: string): boolean | undefined =>
-    root.querySelector<HTMLElement>(selector)?.hidden;
-
-  it('hides the template picker and names the file on the settings tab', async () => {
-    const root = await mount();
-    paintEditorChrome(root, editorChromeFor('settings'));
-
-    expect(root.querySelector('#editor-heading')?.getAttribute('data-i18n')).toBe(
-      'status.kind.settings',
-    );
-    expect(hidden(root, '.work__template')).toBe(true);
+  // The one picker the focused group's header row holds (TYTO-288), made the way `main.ts`
+  // makes it; out of the document, as it is before that group has rendered.
+  it('hides the template picker on an app file', () => {
+    const picker = createTemplatePicker(document);
+    paintEditorChrome(picker, editorChromeFor('settings'));
+    expect(picker.hidden).toBe(true);
+    expect(picker.querySelector('select')?.id).toBe('template');
   });
 
-  it('puts the picker back on a brief, and hides it with a preview in front', async () => {
-    const root = await mount();
-    paintEditorChrome(root, editorChromeFor('keybindings'));
-    paintEditorChrome(root, editorChromeFor(undefined));
+  it('puts the picker back on a brief, and hides it with a preview in front', () => {
+    const picker = createTemplatePicker(document);
+    paintEditorChrome(picker, editorChromeFor('keybindings'));
+    paintEditorChrome(picker, editorChromeFor(undefined));
+    expect(picker.hidden).toBe(false);
 
-    expect(root.querySelector('#editor-heading')?.getAttribute('data-i18n')).toBe('editor.heading');
-    expect(hidden(root, '.work__template')).toBe(false);
-
-    paintEditorChrome(root, editorChromeFor('preview'));
-    expect(hidden(root, '.work__template')).toBe(true);
+    paintEditorChrome(picker, editorChromeFor('preview'));
+    expect(picker.hidden).toBe(true);
   });
 });

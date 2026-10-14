@@ -10,12 +10,15 @@ import { type PreviewPane, PREVIEW_PANE_TAG } from './preview-pane.js';
 import { type TabEntry, TABS_TAG } from './tabs.js';
 
 /**
- * One editor group on screen (TYTO-286, ADR 0083): its own row of tabs on top, and the node a
- * CodeMirror pane is mounted in under it.
+ * One editor group on screen (TYTO-286, ADR 0083): its own row of tabs on top, a header row
+ * under it, and the node a CodeMirror pane is mounted in under that.
  *
- * Shaped as a **pane** — a strip, then the content — and not as an editor, because that is the
- * shape TYTO-288 extends to the docks. It holds no state: which tabs it has and which is in
- * front are `editor-groups.ts`'s, handed down by `main.ts`, and a click reports back.
+ * Shaped as a **pane** (TYTO-288, ADR 0085) — a strip, a header row, then the content — the
+ * shape every docked panel and every preview has too, with the two lines the same heights
+ * across the window. The header row holds an empty breadcrumb slot (TYTO-273 fills it) and the
+ * group's actions; with a preview in front it is hidden, because the preview's own bar is that
+ * row. It holds no state: which tabs it has and which is in front are `editor-groups.ts`'s,
+ * handed down by `main.ts`, and a click reports back.
  *
  * The mount is rendered once and kept: Lit leaves a node it did not have to change, and the
  * group's own element is moved, never rebuilt, when the tree is rearranged
@@ -37,6 +40,7 @@ export class EditorGroupElement extends LitElement {
     showing: { attribute: false },
     offerPreview: { attribute: false },
     openPreview: { attribute: false },
+    picker: { attribute: false },
   };
 
   declare groupId: string;
@@ -51,6 +55,11 @@ export class EditorGroupElement extends LitElement {
   /** Whether the strip offers "Open preview to the side": a brief is in front. */
   declare offerPreview: boolean;
   declare openPreview: () => void;
+  /**
+   * The window's one template picker while this group is focused, else nothing (TYTO-288): the
+   * node moves into the focused group's header row, so there is one `#template` in the window.
+   */
+  declare picker: HTMLElement | undefined;
 
   constructor() {
     super();
@@ -64,6 +73,7 @@ export class EditorGroupElement extends LitElement {
     this.showing = 'editor';
     this.offerPreview = false;
     this.openPreview = () => undefined;
+    this.picker = undefined;
   }
 
   private ownMount: HTMLElement | undefined;
@@ -118,36 +128,41 @@ export class EditorGroupElement extends LitElement {
     const pane = this.showing === 'preview' ? this.preview : this.ownPreview;
     if (pane !== undefined) pane.hidden = this.showing !== 'preview';
     const open = translate(this.locale, 'command.preview.openToSide');
-    // A row of the tabs and, at its end, the group's actions (TYTO-287): the slot TYTO-288's
-    // pane shape fills with more. Only "Open preview to the side" for now, and only on a brief.
-    return html`<div class="editor-group__head">
-      <tyto-tabs
-        class="tabs"
-        .tabs=${this.tabs}
-        .activeId=${this.activeTabId}
-        .locale=${this.locale}
-        .select=${this.select}
-        .close=${this.close}
-      ></tyto-tabs>
-      <div class="editor-group__actions">
-        ${
-          this.offerPreview
-            ? html`<button
-                type="button"
-                class="editor-group__action"
-                data-action="preview.openToSide"
-                title=${open}
-                aria-label=${open}
-                @click=${() => {
-                  this.openPreview();
-                }}
-              >
-                ${icon('preview')}
-              </button>`
-            : nothing
-        }
+    // The pane shape (ADR 0085): the strip, then the header row — an empty breadcrumb slot for
+    // TYTO-273 and the group's actions. With a preview in front the row is hidden and the
+    // preview's bar, which is a header row of its own, takes its place: one row, never two.
+    return html`<div class="pane__strip">
+        <tyto-tabs
+          class="tabs"
+          .tabs=${this.tabs}
+          .activeId=${this.activeTabId}
+          .locale=${this.locale}
+          .select=${this.select}
+          .close=${this.close}
+        ></tyto-tabs>
       </div>
-    </div>`;
+      <div class="pane__header" ?hidden=${this.showing === 'preview'}>
+        <div class="pane__breadcrumb" data-breadcrumb></div>
+        <div class="pane__actions">
+          ${this.picker ?? nothing}
+          ${
+            this.offerPreview
+              ? html`<button
+                  type="button"
+                  class="editor-group__action"
+                  data-action="preview.openToSide"
+                  title=${open}
+                  aria-label=${open}
+                  @click=${() => {
+                    this.openPreview();
+                  }}
+                >
+                  ${icon('preview')}
+                </button>`
+              : nothing
+          }
+        </div>
+      </div>`;
   }
 }
 

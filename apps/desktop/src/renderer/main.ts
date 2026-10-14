@@ -185,7 +185,7 @@ import {
 import { type PreviewPane, previewElementsOf } from './preview-pane.js';
 import { type ProblemsPanel, PROBLEMS_TAG } from './problems-panel.js';
 import { arrange, wireSplitters } from './dock.js';
-import './panels.js';
+import { createTemplatePicker } from './panels.js';
 import {
   type Layout,
   DEFAULT_LAYOUT,
@@ -481,6 +481,12 @@ const byId = <T extends HTMLElement>(id: string): T | null =>
  * writing into a document nobody is looking at — which is the failure this shape prevents,
  * and it is silent.
  */
+/**
+ * The template picker, made once (TYTO-288): it sits in the focused group's header row and moves
+ * with the focus, so there is one `#template` and one listener however many groups there are.
+ */
+const templatePicker = createTemplatePicker(document);
+
 let elements = resolveElements();
 /** What main last said about a newer version (TYTO-131). Asked for, never only pushed. */
 let updateStatus: UpdateStatus = { state: 'none' };
@@ -488,7 +494,9 @@ let updateStatus: UpdateStatus = { state: 'none' };
 function resolveElements() {
   return {
     editor: byId('editor'),
-    template: byId<HTMLSelectElement>('template'),
+    // Held, not looked up: the picker moves between groups and is out of the document before
+    // the first group has rendered (TYTO-288).
+    template: templatePicker.querySelector('select'),
     // By tag and not by id: the element is the panel, so what identifies it is what it is.
     // Naming the tag here is also what keeps `problems-panel.js` a runtime import rather
     // than a type-only one that the bundler would drop — and dropping it would mean the
@@ -604,6 +612,9 @@ function paintTabs(): void {
     element.openPreview = () => {
       runCommand(PREVIEW_OPEN_TO_SIDE);
     };
+    // The one picker goes to the focused group's header row, and every other group is told it
+    // has none, so the node is in one place and Lit never holds it in two (TYTO-288).
+    element.picker = group.id === groups.focusedGroupId ? templatePicker : undefined;
     element.tabs = group.tabs.flatMap((tab) => {
       if (isPreview(tab)) return [previewEntry(tab)];
       const document_ = documentOf(workspace, tab.documentId);
@@ -3193,8 +3204,11 @@ function repaint(): void {
   // the chrome names (TYTO-256).
   paintTabs();
   paintPreviews();
-  paintEditorChrome(document, editorChromeFor(activeKind()));
+  paintEditorChrome(templatePicker, editorChromeFor(activeKind()));
   paint(document, shellState());
+  // The focused group renders the picker on its next update, after this pass: a picker not in
+  // the document yet gets its label here, so it never arrives empty (TYTO-288).
+  if (!templatePicker.isConnected) paint(templatePicker, shellState());
   paintPanel();
   paintCommandBar();
   paintStatusBar();
