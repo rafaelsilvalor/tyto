@@ -89,6 +89,37 @@
   --tyto-hairline-width: 1px;
   --tyto-focus-width: 2px;
 
+  /*
+   * Every pane has a tab strip of this height (TYTO-288, ADR 0085) — an editor group, a preview,
+   * a docked panel — so the strips' bottoms meet across the window, the hairline under each
+   * inside it (border-box). An editor group adds a discreet header row under its strip, VS
+   * Code's breadcrumb height; the groups' rows meet among themselves.
+   * `e2e/pane-shape.desktop.test.ts` measures both.
+   */
+  --tyto-pane-strip-height: 30px;
+  --tyto-pane-header-height: 22px;
+
+  /* The icons' stroke, in units of their 16-unit grid: the `iconStrokeWidth` setting's default
+     (TYTO-288). The theme sheet sets the person's value over it. */
+  --tyto-icon-stroke: 1.25;
+
+  /*
+   * Sizes that are about one rule and not about the look, here since TYTO-288 so that the
+   * renderer-tokens guard can refuse a `width` or `height` in pixels anywhere else.
+   */
+  --tyto-title-bar-height: 32px;
+  --tyto-dot-size: 8px;
+  --tyto-dot-size-sm: 6px;
+  --tyto-tab-label-max: 220px;
+  --tyto-progress-height: 4px;
+  --tyto-dialog-width-sm: 480px;
+  --tyto-dialog-width-md: 560px;
+  --tyto-dialog-width-lg: 820px;
+  /* The smallest an editor group gets, across and down: `GROUP_MINIMUM` in `group-resize.ts`,
+     which `e2e/renderer-tokens.test.ts` holds equal to these (TYTO-289). */
+  --tyto-group-min-width: 160px;
+  --tyto-group-min-height: 96px;
+
   /* One Light. */
   --tyto-surface: #fafafa;
   --tyto-surface-raised: #ebebec;

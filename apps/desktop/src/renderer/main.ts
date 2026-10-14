@@ -51,14 +51,11 @@ import { applyTheme, withThemeRows } from './theme.js';
 import { templateOf } from './frontmatter.js';
 import {
   commandOffered,
-  editorChromeFor,
   languageOf,
-  paintEditorChrome,
   type SlashTemplateNote,
   type TabKind,
   slashTemplateChoiceFor,
   slashTemplateNote,
-  templateChoiceFor,
 } from './editor-chrome.js';
 import { readKeybindingsText } from './keybindings-file.js';
 import { readSnippetsText } from './snippets-file.js';
@@ -66,7 +63,6 @@ import {
   type Diagnostic,
   type SourceRange,
   type Template,
-  paintTemplatePicker,
   rangeOfArtwork,
   revealRange,
 } from './panel.js';
@@ -488,7 +484,6 @@ let updateStatus: UpdateStatus = { state: 'none' };
 function resolveElements() {
   return {
     editor: byId('editor'),
-    template: byId<HTMLSelectElement>('template'),
     // By tag and not by id: the element is the panel, so what identifies it is what it is.
     // Naming the tag here is also what keeps `problems-panel.js` a runtime import rather
     // than a type-only one that the bundler would drop — and dropping it would mean the
@@ -569,14 +564,6 @@ function paintPanel(): void {
       brief: current.brief,
       locale: state.locale,
     };
-  }
-
-  if (elements.template !== null) {
-    paintTemplatePicker(elements.template, {
-      templates: panel.templates,
-      current: templateOf(activeText()),
-      locale: state.locale,
-    });
   }
 }
 
@@ -3193,7 +3180,6 @@ function repaint(): void {
   // the chrome names (TYTO-256).
   paintTabs();
   paintPreviews();
-  paintEditorChrome(document, editorChromeFor(activeKind()));
   paint(document, shellState());
   paintPanel();
   paintCommandBar();
@@ -3655,37 +3641,17 @@ function runWindowCommand(id: string): boolean {
   return true;
 }
 
-/** The panel's own two controls: a row that moves the cursor, and a picker that edits. */
+/**
+ * The problems panel's control: a row that moves the cursor. The template picker that was the
+ * second went with the BRIEF bar's last trace (TYTO-288, ADR 0085): a template is chosen with
+ * "New brief from template…", the "/" menu, completion or the `template:` line.
+ */
 function wirePanelControls(): void {
   // Handed to the element rather than delegated from it. The hand-written panel wrote each
   // range into two `data-` attributes so that one listener here could read them back with
   // `closest()`; the element calls this with the range object itself, and the round trip
   // through the DOM is gone (ADR 0024).
   if (elements.problems !== null) elements.problems.reveal = reveal;
-
-  once(elements.template, 'change', () => {
-    const picker = elements.template;
-    const target = focusedPane();
-    if (picker === null || target === undefined || picker.value === '') return;
-
-    // An edit dispatched into the document, not a `setValue`. That is what keeps the cursor
-    // where it was, puts the old template back under Ctrl+Z, and — the part that matters
-    // most — notifies `onChange`, so the preview refreshes through the same path typing
-    // uses. `setValue` deliberately notifies nobody.
-    // Refused on an app file even if the hidden picker is changed somehow: on `settings.json`
-    // the edit would be a YAML block written into the JSON (TYTO-256).
-    // On an empty brief the template's skeleton goes in instead, fields and all (TYTO-275).
-    const choice = templateChoiceFor(active().kind, activeText(), picker.value);
-    if (choice === undefined) return;
-    if (choice.kind === 'skeleton') {
-      insertSkeleton(picker.value);
-      return;
-    }
-    const { edit } = choice;
-    target.view.dispatch({
-      changes: { from: edit.from, to: edit.to, insert: edit.insert },
-    });
-  });
 }
 
 /**

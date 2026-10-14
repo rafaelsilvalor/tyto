@@ -17,7 +17,7 @@ import {
  * reads off a disk and the window is told what the answer was, so the shape has to be one
  * declaration both halves import. Linted pure — no Node, no DOM.
  *
- * **Five settings the built-in `desktop` plugin declares** through the `configuration`
+ * **Six settings the built-in `desktop` plugin declares** through the `configuration`
  * extension point (TYTO-206, ADR 0073), like any plugin's: built-in is a plugin. Their keys
  * stay unprefixed, exactly as every `settings.json` written before that card spells them.
  * Each one is validated alone, so a hand-broken value costs that key and nothing else.
@@ -80,7 +80,27 @@ const queueKinds = {
 } satisfies ConfigurationContribution<Readonly<Record<string, readonly string[]>>>;
 
 /**
- * The five, in the order the settings file is documented in. `theme` checks its ids against
+ * How thick the window's icons are drawn, in units of their 16-unit grid (TYTO-288, ADR 0085):
+ * the status bar's nine, "Open preview to the side" and the lock. Rafael chose a setting with
+ * 1.25 as the default after a sheet of the eleven at 1.5, 1.25 and 1.0.
+ *
+ * Bounded at 0.75 and 2. Below 0.75 a line at 16 px is under one device pixel at 100 % scaling
+ * and the browser paints it grey; above 2 the gaps the icons are drawn with — the settings
+ * icon's sliders, the gap between the plugins icon's squares — close up and the shapes run
+ * together. A value outside them is `W_SETTING_INVALID` at the value and the default applies,
+ * as every setting's does (ADR 0073).
+ */
+export const ICON_STROKE_WIDTH = { default: 1.25, minimum: 0.75, maximum: 2 } as const;
+
+const iconStrokeWidth = {
+  id: 'iconStrokeWidth',
+  schema: z.number().min(ICON_STROKE_WIDTH.minimum).max(ICON_STROKE_WIDTH.maximum),
+  default: ICON_STROKE_WIDTH.default,
+  description: 'How thick the icons are drawn, from 0.75 to 2 (default 1.25).',
+} satisfies ConfigurationContribution<number>;
+
+/**
+ * The six, in the order the settings file is documented in. `theme` checks its ids against
  * `lookup`, which main builds from every theme the plugins registered (TYTO-208); the default
  * knows the built-in two and lets any other id through.
  */
@@ -93,6 +113,7 @@ export function settingContributions(
     queueAutoRun,
     queueKinds,
     themeSettingContribution(lookup),
+    iconStrokeWidth,
   ] as readonly ConfigurationContribution[];
 }
 
@@ -102,6 +123,7 @@ export interface Settings {
   readonly queueAutoRun: boolean;
   readonly queueKinds: Readonly<Record<string, readonly string[]>>;
   readonly theme: ThemeSetting;
+  readonly iconStrokeWidth: number;
 }
 
 export const DEFAULT_SETTINGS: Settings = {
@@ -110,13 +132,14 @@ export const DEFAULT_SETTINGS: Settings = {
   queueAutoRun: queueAutoRun.default,
   queueKinds: queueKinds.default,
   theme: DEFAULT_THEME_SETTING,
+  iconStrokeWidth: iconStrokeWidth.default,
 };
 
 /** What a queue folder produces until a person chooses otherwise (ADR 0044). */
 export const DEFAULT_QUEUE_KINDS: readonly string[] = ['png'];
 
 /**
- * The five out of the resolved values, which already hold every declared key with a value
+ * The six out of the resolved values, which already hold every declared key with a value
  * its schema accepted or its default (`resolveSettings`).
  */
 export function settingsFrom(values: Readonly<Record<string, unknown>>): Settings {
@@ -128,5 +151,6 @@ export function settingsFrom(values: Readonly<Record<string, unknown>>): Setting
     queueAutoRun: pick('queueAutoRun'),
     queueKinds: pick('queueKinds'),
     theme: pick('theme'),
+    iconStrokeWidth: pick('iconStrokeWidth'),
   };
 }

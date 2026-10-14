@@ -37,11 +37,17 @@ export interface PanelChrome {
 }
 
 /**
- * What every panel shares: a bar with a title, whatever controls it has, and a close button.
+ * What every panel shares: the pane's tab strip (TYTO-288, ADR 0085) — one tab with the
+ * panel's name and its close button, the same height as every editor group's strip, so the
+ * strips' bottoms meet across the window. No header row: a panel has no actions to put in one,
+ * and VS Code's panels have none (Rafael's reference of 2026-10-14).
  *
  * A base class rather than three copies, and the one thing it insists on is that the close
- * button is the dock's and not the panel's. A panel that drew its own would be a panel that
+ * button is the dock's and not the panel's: a panel that drew its own would be a panel that
  * could get it wrong, and "can this be closed" is a property of the record.
+ *
+ * The tab is not a `.tabs__tab`: those are a group's tabs, which the window counts and selects,
+ * and a panel's name is neither. It is drawn in the same shape from the same tokens.
  */
 export abstract class DockedPanel extends LitElement {
   static override properties = {
@@ -73,36 +79,47 @@ export abstract class DockedPanel extends LitElement {
     return translate(this.locale, key);
   }
 
-  /** The bar every panel has: a heading, the panel's own controls, and the close button. */
-  protected bar(headingId: string, headingKey: CatalogueKey, controls: unknown): TemplateResult {
-    return html`<div class="work__bar">
-      <h2 class="work__title" id=${headingId} data-i18n=${headingKey}></h2>
-      ${controls}
-      ${
-        this.fixed
-          ? nothing
-          : html`<button
-              type="button"
-              class="panel__close"
-              title=${this.say('panel.close')}
-              aria-label=${this.say('panel.close')}
-              @click=${() => {
-                this.onClose(this.panelId);
-              }}
-            >
-              ×
-            </button>`
-      }
+  /**
+   * The strip, with `name` as its one tab's text. The name is a heading, since it is what the
+   * panel is called; the close button sits where a group's tab has its own.
+   */
+  protected chrome(name: TemplateResult): TemplateResult {
+    return html`<div class="pane__strip">
+      <div class="pane__tab">
+        <span class="pane__name">${name}</span>
+        ${
+          this.fixed
+            ? nothing
+            : html`<button
+                type="button"
+                class="panel__close"
+                title=${this.say('panel.close')}
+                aria-label=${this.say('panel.close')}
+                @click=${() => {
+                  this.onClose(this.panelId);
+                }}
+              >
+                ×
+              </button>`
+        }
+      </div>
     </div>`;
+  }
+
+  /** The strip for a panel named by the catalogue: the heading keeps its id and key. */
+  protected bar(headingId: string, headingKey: CatalogueKey): TemplateResult {
+    return this.chrome(html`<h2 class="pane__title" id=${headingId} data-i18n=${headingKey}></h2>`);
   }
 }
 
 /**
- * The editor and the template picker over it.
+ * The editor groups, and nothing above them.
  *
- * The picker stays here rather than moving to the preview, unchanged from E9.3: choosing a
- * template rewrites a line of the brief, so it is an edit, and the preview updating is the
- * consequence.
+ * The panel used to draw a BRIEF bar with the template picker over every group (E9.3, ADR
+ * 0024). Since TYTO-288 each group is a pane with its own strip and header row (ADR 0085), and a
+ * bar across all of them would be a line nobody else has: the picker left the window (a template
+ * is chosen with "New brief from template…", the "/" menu, completion or the `template:` line),
+ * and the word "Brief" is the status bar's tab kind (ADR 0076).
  *
  * The editor groups go in `[data-editor-groups]` (TYTO-286, ADR 0083): `main.ts` lays the
  * `<tyto-editor-group>` elements out there, each with its own tabs and a CodeMirror pane, and
@@ -112,15 +129,7 @@ export abstract class DockedPanel extends LitElement {
  */
 export class EditorPanel extends DockedPanel {
   protected override render(): unknown {
-    return html`${this.bar(
-        'editor-heading',
-        'editor.heading',
-        html`<label class="work__template">
-          <span data-i18n="template.label"></span>
-          <select id="template"></select>
-        </label>`,
-      )}
-      <div class="editor-groups" data-editor-groups></div>`;
+    return html`<div class="editor-groups" data-editor-groups></div>`;
   }
 }
 
@@ -133,7 +142,7 @@ export class EditorPanel extends DockedPanel {
  */
 export class ProblemsPanelFrame extends DockedPanel {
   protected override render(): unknown {
-    return html`${this.bar('problems-heading', 'problems.heading', nothing)}
+    return html`${this.bar('problems-heading', 'problems.heading')}
       <!--
       Written out and not interpolated: lit-html allows a binding anywhere except in a tag
       name, because the template is parsed once as HTML before any value is seen.

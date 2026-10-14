@@ -192,13 +192,28 @@ describe('picking a template', () => {
     // The second acceptance criterion, read as what it asserts: one action, three things
     // agreeing afterwards. The picker dispatches an edit into the document, so the preview
     // refreshes through the same path typing does — there is no second code path to keep.
+    // Ends on an empty line, column 0, where the "/" menu opens.
     await type(
-      ['---', 'template: carrossel-lista', 'formats: [grid-1x1]', '---', '::slide', '  Um'].join(
-        '\n',
-      ),
+      [
+        '---',
+        'template: carrossel-lista',
+        'formats: [grid-1x1]',
+        '---',
+        '::slide',
+        '  Um',
+        '',
+      ].join('\n'),
     );
 
-    await page.selectOption('#template', 'promo-curso');
+    // The "/" menu on a new line, the door left since the header picker went (TYTO-288): a
+    // template chosen on a brief with content is the same one-line edit to `template:`.
+    await page.click('#editor .cm-content');
+    await page.keyboard.press('Control+End');
+    await page.keyboard.type('/');
+    await page.waitForSelector('.cm-tooltip-autocomplete', { state: 'visible', timeout: 15_000 });
+    await page.keyboard.type('promo-c');
+    await page.waitForTimeout(150);
+    await page.keyboard.press('Enter');
     await page.waitForTimeout(900);
 
     const firstLines = await page.evaluate(() =>

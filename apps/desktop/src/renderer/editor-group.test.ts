@@ -78,7 +78,7 @@ describe('a group with a preview in front (TYTO-287)', () => {
     expect(group.preview.querySelector('[id]')).toBeNull();
   });
 
-  it('offers "Open preview to the side" at the end of its strip only while asked to', async () => {
+  it('offers "Open preview to the side" at the right end of its strip only while asked to', async () => {
     const made = new Map<string, EditorGroupElement>();
     const [group] = arrangeGroups(container(), groupsOf(['a'], 'a'), made).created;
     if (group === undefined) throw new Error('no group');
@@ -91,7 +91,47 @@ describe('a group with a preview in front (TYTO-287)', () => {
 
     group.offerPreview = true;
     await group.updateComplete;
+    // In the strip, after the tabs, as VS Code's editor actions sit (TYTO-288, ADR 0085).
+    expect(
+      group.querySelector('.pane__strip > .pane__actions .editor-group__action'),
+    ).not.toBeNull();
+    expect(group.querySelector('.pane__header .editor-group__action')).toBeNull();
     group.querySelector<HTMLButtonElement>('.editor-group__action')?.click();
     expect(opened).toBe(1);
+  });
+});
+
+describe('the pane shape (TYTO-288, ADR 0085)', () => {
+  it('draws its strip, then a header row with an empty breadcrumb slot, then the mount', async () => {
+    const made = new Map<string, EditorGroupElement>();
+    const [group] = arrangeGroups(container(), groupsOf(['a'], 'a'), made).created;
+    if (group === undefined) throw new Error('no group');
+    await group.updateComplete;
+
+    const order = [...group.children].map((child) => child.className);
+    expect(order).toEqual(['pane__strip', 'pane__header', 'editor']);
+    expect(group.querySelector('.pane__strip tyto-tabs')).not.toBeNull();
+    // The header row holds the breadcrumb slot and nothing else, empty until TYTO-273.
+    const header = group.querySelector(':scope > .pane__header');
+    expect([...(header?.children ?? [])].map((child) => child.className)).toEqual([
+      'pane__breadcrumb',
+    ]);
+    expect(header?.querySelector('[data-breadcrumb]')?.childNodes).toHaveLength(0);
+  });
+
+  it('hides its header row while a preview is in front, so the preview bar is the only one', async () => {
+    const made = new Map<string, EditorGroupElement>();
+    const [group] = arrangeGroups(container(), groupsOf(['a'], 'a'), made).created;
+    if (group === undefined) throw new Error('no group');
+    group.showing = 'preview';
+    await group.updateComplete;
+    await group.preview.updateComplete;
+
+    expect(group.querySelector<HTMLElement>(':scope > .pane__header')?.hidden).toBe(true);
+    const shown = [...group.querySelectorAll<HTMLElement>('.pane__header')].filter(
+      (row) => !row.hidden && row.closest('[hidden]') === null,
+    );
+    expect(shown).toHaveLength(1);
+    expect(shown[0]?.classList.contains('preview__bar')).toBe(true);
   });
 });

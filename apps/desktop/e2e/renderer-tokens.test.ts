@@ -5,6 +5,8 @@ import { fileURLToPath } from 'node:url';
 import { themeTokens } from '@tyto/editor';
 import { describe, expect, it } from 'vitest';
 
+import { GROUP_MINIMUM } from '../src/renderer/group-resize.js';
+
 /**
  * The window's visual language is one file, and these are the checks that keep it one
  * (TYTO-96, ADR 0075).
@@ -137,9 +139,12 @@ const literalsIn = (name: string): string[] => {
       if (property!.startsWith('--')) {
         findings.push(`custom property declared outside the token file  ${where}`);
       } else if (
-        /^(?:border-radius|font-size|gap|row-gap|column-gap|padding|margin|border)(?:-[a-z-]+)?$/.test(
+        // Sizes since TYTO-288: the pane shape's heights are tokens, and a guard that let a
+        // `height` in pixels through could not keep them the only heights a strip has.
+        (/^(?:border-radius|font-size|gap|row-gap|column-gap|padding|margin|border)(?:-[a-z-]+)?$/.test(
           property!,
-        ) &&
+        ) ||
+          /^(?:min-|max-)?(?:width|height)$/.test(property!)) &&
         /\b\d+(?:\.\d+)?px\b/.test(value!)
       ) {
         findings.push(`px literal  ${where}`);
@@ -166,6 +171,22 @@ const literalsIn = (name: string): string[] => {
   });
   return findings;
 };
+
+describe('the sizes a rule elsewhere repeats (TYTO-288)', () => {
+  // A group is held at its minimum twice: by `.editor-group` while the window shrinks, and by
+  // `GROUP_MINIMUM` while a splitter is dragged (TYTO-289). Two numbers that must agree.
+  it('gives a group the same minimum in the sheet and in the splitter', () => {
+    const { light } = themes();
+    expect(light.get('--tyto-group-min-width')).toBe(`${String(GROUP_MINIMUM.row)}px`);
+    expect(light.get('--tyto-group-min-height')).toBe(`${String(GROUP_MINIMUM.column)}px`);
+  });
+
+  it('declares both lines of the pane shape in pixels', () => {
+    const { light } = themes();
+    expect(light.get('--tyto-pane-strip-height')).toMatch(/^\d+px$/);
+    expect(light.get('--tyto-pane-header-height')).toMatch(/^\d+px$/);
+  });
+});
 
 describe('no literal outside tokens.css (the acceptance grep)', () => {
   it('finds the renderer files it is meant to read', () => {
@@ -280,6 +301,11 @@ describe.each(['light', 'dark'] as const)('the %s theme', (name) => {
     ['--tyto-error', '--tyto-surface', 4.5],
     ['--tyto-syntax-comment', '--tyto-surface', 3],
     ['--tyto-text', '--tyto-selection', 4.5],
+    // TYTO-288: an inactive tab's name is muted, and a hovered tab paints `hover` behind it.
+    ['--tyto-text-muted', '--tyto-hover', 4.5],
+    // The focused group's tab in front is marked by an accent line on the strip, which is a
+    // graphical object and not text: WCAG's 3:1 for one.
+    ['--tyto-accent', '--tyto-surface-raised', 3],
   ])('reads %s on %s at %s:1 or better', (text, ground, floor) => {
     expect(contrast(value(text), value(ground))).toBeGreaterThanOrEqual(floor);
   });

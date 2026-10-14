@@ -93,6 +93,7 @@ describe('fileSettingsStore', () => {
       queueAutoRun: false,
       queueKinds: {},
       theme: DEFAULT_SETTINGS.theme,
+      iconStrokeWidth: DEFAULT_SETTINGS.iconStrokeWidth,
     });
   });
 
@@ -111,6 +112,7 @@ describe('fileSettingsStore', () => {
       queueAutoRun: true,
       queueKinds: {},
       theme: DEFAULT_SETTINGS.theme,
+      iconStrokeWidth: DEFAULT_SETTINGS.iconStrokeWidth,
     });
   });
 
@@ -129,6 +131,7 @@ describe('fileSettingsStore', () => {
       queueAutoRun: false,
       queueKinds: {},
       theme: DEFAULT_SETTINGS.theme,
+      iconStrokeWidth: DEFAULT_SETTINGS.iconStrokeWidth,
     });
   });
 
@@ -146,6 +149,7 @@ describe('fileSettingsStore', () => {
       queueAutoRun: true,
       queueKinds: {},
       theme: DEFAULT_SETTINGS.theme,
+      iconStrokeWidth: DEFAULT_SETTINGS.iconStrokeWidth,
     });
   });
 

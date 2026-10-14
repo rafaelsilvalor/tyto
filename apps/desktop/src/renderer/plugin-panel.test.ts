@@ -49,7 +49,25 @@ describe('the plugin panel element', () => {
     expect(frame?.getAttribute('sandbox')).toBe('allow-scripts');
     expect(frame?.getAttribute('src')).toBe(OFFERED.src);
     expect(frame?.hasAttribute('allow')).toBe(false);
-    expect(panel.querySelector('.work__title')?.textContent).toBe('Contagem');
+    expect(panel.querySelector('.pane__title')?.textContent).toBe('Contagem');
+  });
+
+  it('is a pane like every other docked panel: its name in a one-tab strip, no header row', async () => {
+    const panel = await mounted();
+    const children = [...panel.children].map((child) => child.className);
+    expect(children[0]).toBe('pane__strip');
+    expect(panel.querySelector(':scope > .pane__header')).toBeNull();
+    expect(panel.querySelector('.pane__strip .pane__tab .panel__close')).not.toBeNull();
+  });
+
+  it("writes the manifest's title as text, never as markup (TYTO-288)", async () => {
+    const panel = document.createElement(PLUGIN_PANEL_ELEMENT);
+    panel.offered = { ...OFFERED, title: '<img src=x onerror=alert(1)>Contagem' };
+    document.body.append(panel);
+    await panel.updateComplete;
+    const title = panel.querySelector('.pane__title');
+    expect(title?.textContent).toBe('<img src=x onerror=alert(1)>Contagem');
+    expect(title?.querySelector('img')).toBeNull();
   });
 
   it('draws no frame before main has said what the panel is', async () => {

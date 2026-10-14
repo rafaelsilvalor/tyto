@@ -237,7 +237,8 @@ describe('the settings tab', () => {
       };
       const pane = 'tyto-preview-pane:not([hidden])';
       return {
-        heading: document.querySelector('#editor-heading')?.textContent ?? '',
+        // The status bar's kind, since the editor panel's heading went (TYTO-288).
+        heading: document.querySelector('tyto-status-bar .status-bar__kind')?.textContent ?? '',
         picker: shown('.work__template'),
         previewEmpty: shown(`${pane} [data-preview-empty]`),
         previewPaper: shown(`${pane} [data-preview-paper]`),
@@ -251,22 +252,28 @@ describe('the settings tab', () => {
     expect(chrome.previewTab).toBe('Preview');
   });
 
-  it('writes no template into the JSON when the picker is changed anyway', async () => {
+  it('writes no template into the JSON from the "/" menu, which it does not offer', async () => {
+    // The header picker this guarded left the window (TYTO-288); a template is chosen in a
+    // brief with the "/" menu, which must not reach `settings.json` either: a "/" typed at the
+    // start of a line in it is a "/" and nothing more.
     const { page } = launched;
+    const original = await buffer(page);
+    await page.click('#editor .cm-content');
+    await page.keyboard.press('Control+End');
+    await page.keyboard.press('Enter');
     const before = await buffer(page);
-
-    // The picker is hidden; this is the change event a stale or scripted one would send.
-    await page.evaluate(() => {
-      const picker = document.querySelector<HTMLSelectElement>('#template');
-      if (picker === null) throw new Error('no #template');
-      picker.add(new Option('promo-curso', 'promo-curso'));
-      picker.value = 'promo-curso';
-      picker.dispatchEvent(new Event('change'));
-    });
+    await page.keyboard.type('/');
     await new Promise((resolve) => setTimeout(resolve, 300));
 
-    expect(await buffer(page)).toBe(before);
+    expect(await page.$('.cm-tooltip-autocomplete')).toBeNull();
+    expect(await buffer(page)).toBe(`${before}/`);
     expect(await buffer(page)).not.toContain('template:');
+    // Left as it was found, for the tests after this one.
+    for (let step = 0; step < 4 && (await buffer(page)) !== original; step += 1) {
+      await page.keyboard.press('Control+z');
+      await new Promise((resolve) => setTimeout(resolve, 100));
+    }
+    expect(await buffer(page)).toBe(original);
   });
 });
 

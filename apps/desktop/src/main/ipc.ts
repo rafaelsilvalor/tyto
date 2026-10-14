@@ -40,16 +40,22 @@ import { type UpdateService } from './updates.js';
  */
 export interface WindowThemes extends Pick<ThemeService, 'list' | 'current' | 'preview'> {
   choose(id: string): Promise<{ readonly applied: AppliedThemes; readonly saved: boolean }>;
+  /** The `iconStrokeWidth` setting in force (TYTO-288), sent with every theme answer. */
+  iconStrokeWidth(): number;
 }
 
 /**
  * The applied themes as the window takes them. Each diagnostic loses its range, which is an
  * offset into the theme's file: the problems panel would count it as lines of the brief.
  */
-function appliedForWindow(applied: AppliedThemes): IpcResponse<'theme:current'> {
+function appliedForWindow(
+  applied: AppliedThemes,
+  iconStrokeWidth: number,
+): IpcResponse<'theme:current'> {
   const { light, dark } = applied;
   return {
     mode: applied.mode,
+    iconStrokeWidth,
     light: { id: light.id, colors: light.colors },
     dark: { id: dark.id, colors: dark.colors },
     diagnostics: [...light.diagnostics, ...dark.diagnostics]
@@ -472,7 +478,8 @@ export function createHandlers(dependencies: IpcDependencies): Handlers {
     'plugins:panels': async () => ({ panels: [...(await dependencies.panels.list())] }),
     'plugins:keymaps': async () => ({ keymaps: await dependencies.keymaps() }),
 
-    'theme:current': async () => appliedForWindow(await dependencies.themes.current()),
+    'theme:current': async () =>
+      appliedForWindow(await dependencies.themes.current(), dependencies.themes.iconStrokeWidth()),
     'theme:list': async () => ({
       themes: (await dependencies.themes.list()).map(({ id, label, kind }) => ({
         id,
@@ -481,10 +488,13 @@ export function createHandlers(dependencies: IpcDependencies): Handlers {
       })),
     }),
     'theme:preview': async ({ id }) =>
-      appliedForWindow(await dependencies.themes.preview(id ?? undefined)),
+      appliedForWindow(
+        await dependencies.themes.preview(id ?? undefined),
+        dependencies.themes.iconStrokeWidth(),
+      ),
     'theme:choose': async ({ id }) => {
       const { applied, saved } = await dependencies.themes.choose(id);
-      return { ...appliedForWindow(applied), saved };
+      return { ...appliedForWindow(applied, dependencies.themes.iconStrokeWidth()), saved };
     },
 
     'panel:request': ({ panelId, capability, args }) =>

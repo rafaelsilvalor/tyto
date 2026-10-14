@@ -399,7 +399,9 @@ describe('switching the language', () => {
     'problems.severity.info',
     'problems.location',
     'problems.nowhere',
-    'template.none',
+    // TYTO-288: the template picker left the window, and "Template" is the status bar's template
+    // item's tooltip, which the bar writes itself (`status-bar.test.ts`).
+    'template.label',
     // TYTO-122: three of the five are the picker's and the bar's, and the fourth is minted as
     // a diagnostic rather than painted. The fifth, `templates.folder.label`, was the footer's
     // and is listed below with Help > About since TYTO-248.

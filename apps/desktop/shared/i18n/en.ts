@@ -3,7 +3,6 @@ import { type Catalogue } from './catalogue.js';
 /** The fallback, used for any key a later locale has not translated yet. */
 export const en: Catalogue = {
   'app.name': 'Tyto',
-  'editor.heading': 'Brief',
   'preview.heading': 'Preview',
   'preview.slide.label': 'Slide',
   'preview.zoom.out': 'Zoom out',
@@ -27,7 +26,6 @@ export const en: Catalogue = {
   'templates.folder.empty': 'This folder has no templates',
   'command.templates.chooseFolder': 'Choose template folder…',
   'command.templates.clearFolder': 'Back to the built-in templates',
-  'template.none': 'None',
   'command.bar.placeholder': 'Type a command',
   'command.bar.empty': 'No command by that name',
   'command.undo': 'Undo',

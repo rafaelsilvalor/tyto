@@ -165,7 +165,7 @@ describe('a plugin panel in the window', () => {
     await waitForCommand(`layout.togglePanel:${PANEL_ID}`);
     await runFromBar(`layout.togglePanel:${PANEL_ID}`);
     await page.waitForSelector(`[data-panel="${PANEL_ID}"] iframe`, { timeout: 10_000 });
-    expect(await page.textContent(`[data-panel="${PANEL_ID}"] .work__title`)).toBe('Contagem');
+    expect(await page.textContent(`[data-panel="${PANEL_ID}"] .pane__title`)).toBe('Contagem');
   }, 60_000);
 
   it('frames it with sandbox="allow-scripts" and nothing else', async () => {

@@ -3,7 +3,6 @@ import { type Catalogue } from './catalogue.js';
 /** The first locale, and the one that is complete by construction. */
 export const ptBR: Catalogue = {
   'app.name': 'Tyto',
-  'editor.heading': 'Brief',
   'preview.heading': 'Prévia',
   'preview.slide.label': 'Slide',
   'preview.zoom.out': 'Diminuir',
@@ -27,7 +26,6 @@ export const ptBR: Catalogue = {
   'templates.folder.empty': 'Esta pasta não tem nenhum template',
   'command.templates.chooseFolder': 'Escolher pasta de templates…',
   'command.templates.clearFolder': 'Voltar aos templates internos',
-  'template.none': 'Nenhum',
   'command.bar.placeholder': 'Digite um comando',
   'command.bar.empty': 'Nenhum comando com esse nome',
   'command.undo': 'Desfazer',

@@ -75,7 +75,7 @@ export class QueuePanel extends DockedPanel {
   }
 
   protected override render(): unknown {
-    return html`${this.bar('queue-heading', 'queue.heading', nothing)}
+    return html`${this.bar('queue-heading', 'queue.heading')}
       <div class="queue__body">${this.body()}</div>`;
   }
 
