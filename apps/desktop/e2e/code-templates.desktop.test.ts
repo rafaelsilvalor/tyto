@@ -19,6 +19,7 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 
 import { closeApp } from './close-app.js';
 import { firstWindow } from './first-window.js';
+import { waitForWindowTemplates } from './window-templates.js';
 
 /**
  * Installed code templates in a running app, built in their plugin's own process
@@ -228,17 +229,10 @@ beforeAll(async () => {
   page = await firstWindow(app);
   await page.waitForSelector('#editor .cm-content');
   await page.waitForSelector('.tabs__tab');
-  // The plugins start after the window opens (ADR 0044); the picker is asked again once they
-  // have, and both installed code templates are in it then.
-  await page.waitForFunction(
-    () => {
-      const picker = document.getElementById('template') as HTMLSelectElement | null;
-      const values = picker === null ? [] : [...picker.options].map((option) => option.value);
-      return values.includes('agenda-plugin') && values.includes('cartaz');
-    },
-    undefined,
-    { timeout: 60_000, polling: 100 },
-  );
+  // The plugins start after the window opens (ADR 0044); the window's templates are asked
+  // again once they have, and both installed code templates are among them then. Read through
+  // "New brief from template…" since the header picker left the window (TYTO-288).
+  await waitForWindowTemplates(page, ['agenda-plugin', 'cartaz'], 60_000);
 }, 180_000);
 
 afterAll(async () => {

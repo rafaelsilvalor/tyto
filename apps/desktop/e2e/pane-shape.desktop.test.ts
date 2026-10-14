@@ -11,18 +11,17 @@ import { closeApp } from './close-app.js';
 import { firstWindow } from './first-window.js';
 
 /**
- * Every pane is a tab strip and a header row, and the lines meet across the window (TYTO-288,
- * ADR 0085).
+ * Every pane has a tab strip and the strips meet across the window; every editor group has a
+ * discreet header row under its strip and those meet among themselves (TYTO-288, ADR 0085, after
+ * Rafael's VS Code reference of 2026-10-14). A docked panel has a strip and no header row.
  *
- * The card's acceptance is a measurement, not a look: with a split and a preview open, the
- * strips' bottoms and the header rows' bottoms are at the same y in every pane. jsdom does no
- * layout, so only a real window can say it. The scene is the busiest the window draws today —
- * a row split whose right group has a locked preview in front, whose left group has a dirty
- * tab and is split down again, the queue in the left dock, a plugin's panel in the right one and
- * Problems at the bottom — and every visible `.pane__strip` and `.pane__header` is read with
- * `getBoundingClientRect`. The helper that judges them is proved able to fail, in the test, by
- * making one pane's header a pixel taller; and it is read again at 900x600, where nothing may
- * wrap onto a second line.
+ * The card's acceptance is a measurement, not a look. jsdom does no layout, so only a real window
+ * can say it. The scene is the busiest the window draws today — a row split whose right group
+ * has a locked preview in front, whose left group has a dirty tab and is split down again, the
+ * queue in the left dock, a plugin's panel in the right one and Problems at the bottom — and
+ * every visible `.pane__strip` and `.pane__header` is read with `getBoundingClientRect`. The
+ * helper that judges them is proved able to fail, in the test, by making one panel's strip a
+ * pixel taller; and it is read again at 900x600, where nothing may wrap onto a second line.
  *
  * Keys go through Playwright's page, never through the operating system. With
  * `TYTO_PANE_SHAPE_SHOTS` set to a folder, the suite leaves screenshots of the plain window and
@@ -81,36 +80,44 @@ interface Line {
   readonly height: number;
 }
 
-/** A pane on screen: what it is, and its two lines. */
+/** A pane on screen: what it is, its strip, and the header row an editor group has. */
 interface PaneBox {
   readonly name: string;
+  readonly kind: 'group' | 'panel';
   readonly strip: Line;
   readonly header: Line | undefined;
 }
 
 /**
  * What is wrong with the panes' shape, one sentence per fault; empty when every strip is the
- * same height, every header row is the same height and sits right under its strip, and panes
- * whose strips start at the same y end both lines at the same y.
+ * same height and panes whose strips start at the same y end them at the same y; when every
+ * editor group has a header row right under its strip, all of one height, the groups sharing a
+ * strip top ending it at the same y; and when no docked panel has a header row.
  */
 function misalignments(panes: readonly PaneBox[]): string[] {
   const faults: string[] = [];
   const near = (one: number, two: number): boolean => Math.abs(one - two) <= TOLERANCE;
   const [first] = panes;
   if (first === undefined) return ['no pane on screen'];
+  const firstGroup = panes.find((pane) => pane.kind === 'group');
   for (const pane of panes) {
-    if (pane.header === undefined) {
-      faults.push(`${pane.name} has no header row on screen`);
-      continue;
-    }
     if (!near(pane.strip.height, first.strip.height)) {
       faults.push(
         `${pane.name}'s strip is ${pane.strip.height}px, ${first.name}'s ${first.strip.height}px`,
       );
     }
-    if (first.header !== undefined && !near(pane.header.height, first.header.height)) {
+    if (pane.kind === 'panel') {
+      if (pane.header !== undefined) faults.push(`${pane.name} has a header row`);
+      continue;
+    }
+    if (pane.header === undefined) {
+      faults.push(`${pane.name} has no header row on screen`);
+      continue;
+    }
+    const reference = firstGroup?.header;
+    if (reference !== undefined && !near(pane.header.height, reference.height)) {
       faults.push(
-        `${pane.name}'s header is ${pane.header.height}px, ${first.name}'s ${first.header.height}px`,
+        `${pane.name}'s header is ${pane.header.height}px, the first group's ${reference.height}px`,
       );
     }
     if (!near(pane.header.top, pane.strip.bottom)) {
@@ -149,25 +156,31 @@ const measure = async (): Promise<{ panes: PaneBox[]; strips: number }> =>
       return { top: box.top, bottom: box.bottom, height: box.height };
     };
     const panes: PaneBox[] = [];
-    const add = (name: string, root: Element, headers: Element[]): void => {
+    const add = (
+      name: string,
+      kind: 'group' | 'panel',
+      root: Element,
+      headers: Element[],
+    ): void => {
       const strip = root.querySelector(':scope > .pane__strip');
       if (!shown(strip)) return;
       const header = headers.find(shown);
       panes.push({
         name,
+        kind,
         strip: line(strip),
         header: header === undefined ? undefined : line(header),
       });
     };
     document.querySelectorAll('[data-editor-group]').forEach((group, index) => {
-      add(`group ${String(index + 1)}`, group, [
+      add(`group ${String(index + 1)}`, 'group', group, [
         ...group.querySelectorAll(
           ':scope > .pane__header, :scope > tyto-preview-pane > .pane__header',
         ),
       ]);
     });
     document.querySelectorAll<HTMLElement>('[data-panel]').forEach((panel) => {
-      add(`panel ${panel.dataset['panel'] ?? '?'}`, panel, [
+      add(`panel ${panel.dataset['panel'] ?? '?'}`, 'panel', panel, [
         ...panel.querySelectorAll(':scope > .pane__header'),
       ]);
     });
@@ -175,15 +188,25 @@ const measure = async (): Promise<{ panes: PaneBox[]; strips: number }> =>
     return { panes, strips };
   });
 
-/** The lines whose content is taller than the line itself: a wrap, or a control too big. */
+/**
+ * The lines with something inside reaching above or below them: a wrap onto a second line, or a
+ * control taller than the line. Measured by boxes and not by `scrollHeight`, which a header row
+ * squeezed narrower than its actions reported two pixels over with nothing outside it.
+ */
 const overflowing = async (): Promise<string[]> =>
   page.evaluate(() =>
     [...document.querySelectorAll<HTMLElement>('.pane__strip, .pane__header')]
       .filter((line) => line.getClientRects().length > 0)
-      .filter((line) => line.scrollHeight > line.clientHeight)
-      .map(
-        (line) => `${line.className}: ${String(line.scrollHeight)} > ${String(line.clientHeight)}`,
-      ),
+      .flatMap((line) => {
+        const outer = line.getBoundingClientRect();
+        return [...line.querySelectorAll<HTMLElement>('*')]
+          .filter((inner) => inner.getClientRects().length > 0)
+          .filter((inner) => {
+            const box = inner.getBoundingClientRect();
+            return box.top < outer.top - 0.5 || box.bottom > outer.bottom + 0.5;
+          })
+          .map((inner) => `${line.className} > ${inner.tagName.toLowerCase()}.${inner.className}`);
+      }),
   );
 
 const tokenPixels = async (name: string): Promise<number> =>
@@ -278,12 +301,24 @@ afterAll(async () => {
 });
 
 describe('one group and the problems panel', () => {
-  it('draw the same two lines, at the token heights', async () => {
+  it('draw the same strip, the group a discreet header row under it, at the token heights', async () => {
     const { panes } = await measure();
     expect(panes.map((pane) => pane.name)).toEqual(['group 1', 'panel problems']);
     expect(misalignments(panes)).toEqual([]);
     expect(panes[0]?.strip.height).toBeCloseTo(await tokenPixels('--tyto-pane-strip-height'), 1);
     expect(panes[0]?.header?.height).toBeCloseTo(await tokenPixels('--tyto-pane-header-height'), 1);
+    // Discreet, as VS Code's breadcrumb row is: the editor's background and no line of its own.
+    const look = await page.evaluate(() => {
+      const header = document.querySelector('[data-editor-group] > .pane__header');
+      const editor = document.querySelector('#editor .cm-editor');
+      if (header === null || editor === null) throw new Error('no header row or no editor');
+      const style = getComputedStyle(header);
+      return {
+        background: style.backgroundColor === getComputedStyle(editor).backgroundColor,
+        borders: [style.borderTopWidth, style.borderBottomWidth],
+      };
+    });
+    expect(look).toEqual({ background: true, borders: ['0px', '0px'] });
     await shoot('plain');
     await resize(900, 600);
     expect(await overflowing()).toEqual([]);
@@ -327,12 +362,12 @@ describe('the busiest window', () => {
     expect(await page.locator('.tabs__dirty').count()).toBeGreaterThan(0);
   }, 180_000);
 
-  it('ends every strip and every header row at the same y across the panes', async () => {
+  it('ends every strip at the same y across the panes, and the groups’ header rows too', async () => {
     const { panes, strips } = await measure();
     expect(strips).toBe(panes.length);
     expect(misalignments(panes)).toEqual([]);
     // Four panes start at the top of the docks — two groups and the two side panels — and their
-    // lines are the ones a person sees continue across the window.
+    // strips are the line a person sees continue across the window.
     const top = Math.min(...panes.map((pane) => pane.strip.top));
     expect(panes.filter((pane) => Math.abs(pane.strip.top - top) <= TOLERANCE)).toHaveLength(4);
     process.stdout.write(`[TYTO-288] panes: ${JSON.stringify(panes)}\n`);
@@ -342,7 +377,7 @@ describe('the busiest window', () => {
   it('fails the helper when one pane is a pixel off (the negative control)', async () => {
     const style = await page.addStyleTag({
       content:
-        '[data-panel="queue"] > .pane__header { height: calc(var(--tyto-pane-header-height) + 1px) !important; }',
+        '[data-panel="queue"] > .pane__strip { height: calc(var(--tyto-pane-strip-height) + 1px) !important; }',
     });
     try {
       const faults = misalignments((await measure()).panes);

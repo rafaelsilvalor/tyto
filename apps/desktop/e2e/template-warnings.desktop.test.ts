@@ -10,6 +10,7 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 
 import { closeApp } from './close-app.js';
 import { firstWindow } from './first-window.js';
+import { waitForWindowTemplates } from './window-templates.js';
 import { openPreviewBeside, previewSrcdoc } from './preview-pane.js';
 
 /**
@@ -207,17 +208,9 @@ beforeAll(async () => {
   await window.waitForSelector('#editor .cm-content');
   await openPreviewBeside(window);
   await window.waitForSelector('.tabs__tab');
-  // The plugins start after the window opens (ADR 0044); both templates are in the picker once
-  // they have.
-  await window.waitForFunction(
-    () => {
-      const picker = document.getElementById('template') as HTMLSelectElement | null;
-      const values = picker === null ? [] : [...picker.options].map((option) => option.value);
-      return values.includes('transborda') && values.includes('cabe');
-    },
-    undefined,
-    { timeout: 60_000, polling: 100 },
-  );
+  // The plugins start after the window opens (ADR 0044); both templates are in the window's
+  // list once they have, read through "New brief from template…" (TYTO-288).
+  await waitForWindowTemplates(window, ['transborda', 'cabe'], 60_000);
 }, 180_000);
 
 afterAll(async () => {

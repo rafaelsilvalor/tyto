@@ -8,6 +8,7 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 
 import { closeApp } from './close-app.js';
 import { firstWindow } from './first-window.js';
+import { waitForWindowTemplates, windowTemplates } from './window-templates.js';
 
 /**
  * The template folder from the command to the reloaded picker, through a real window (TYTO-142).
@@ -74,14 +75,8 @@ let userData: string;
 let folder: string;
 let builtIn: readonly string[];
 
-/** The template picker's rows: every option the registry produced, by name. */
-const pickerRows = (): Promise<readonly string[]> =>
-  page.evaluate(() =>
-    [...document.querySelectorAll<HTMLOptionElement>('#template option')]
-      .map((option) => option.value)
-      // The "no template" row the picker adds when the brief names none: not a template.
-      .filter((value) => value !== ''),
-  );
+/** The window's template rows, by name: "New brief from template…"'s list (TYTO-288). */
+const pickerRows = (): Promise<readonly string[]> => windowTemplates(page);
 
 /** What the app wrote to the `settings.json` in its own user-data folder, or nothing. */
 const remembered = (): unknown => {
@@ -131,13 +126,9 @@ beforeAll(async () => {
   });
   page = await firstWindow(app);
   await page.waitForSelector('#editor .cm-content');
-  // The picker is filled by `templates:list` after the window paints; an empty list here would
+  // The rows are filled by `templates:list` after the window paints; an empty list here would
   // make "the rows come back" below vacuously true.
-  await page.waitForFunction(
-    () => document.querySelectorAll('#template option[value]:not([value=""])').length > 0,
-    undefined,
-    { timeout: 15_000 },
-  );
+  await waitForWindowTemplates(page, ['agenda-semana'], 15_000);
   builtIn = await pickerRows();
 });
 

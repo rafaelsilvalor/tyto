@@ -14,8 +14,11 @@ import { planTemplateEdit, type TemplateEdit, templateOf } from './frontmatter.j
  * so the decision is tested here and painted in one place.
  */
 export interface EditorChrome {
-  /** Whether the template picker is shown, and whether choosing in it may edit the text. */
-  readonly templatePicker: boolean;
+  /**
+   * Whether choosing a template may edit this tab's text — the "/" menu's rows. It was also
+   * whether the template picker showed, until the picker left the window (TYTO-288).
+   */
+  readonly templateEdits: boolean;
   /**
    * Whether the commands that act on a brief (`BRIEF_ONLY_COMMANDS`) are offered and run
    * (TYTO-283). Read through {@link commandOffered}, never field by field at a call site.
@@ -33,7 +36,7 @@ export type TabKind = DocumentState['kind'] | 'preview';
 type Kind = TabKind;
 
 const BRIEF: EditorChrome = {
-  templatePicker: true,
+  templateEdits: true,
   briefCommands: true,
   textCommands: true,
 };
@@ -43,7 +46,7 @@ const BRIEF: EditorChrome = {
  * its heading too; that bar is gone (TYTO-288, ADR 0085) and the status bar's kind says it.
  */
 const APP_FILE: EditorChrome = {
-  templatePicker: false,
+  templateEdits: false,
   briefCommands: false,
   textCommands: true,
 };
@@ -55,7 +58,7 @@ export function editorChromeFor(kind: Kind): EditorChrome {
     case 'preview':
       // A brief's art: every command on the brief still runs, on that brief; the picker and the
       // text commands act on text, which is not in front.
-      return { ...BRIEF, templatePicker: false, textCommands: false };
+      return { ...BRIEF, templateEdits: false, textCommands: false };
     case 'settings':
     case 'keybindings':
     case 'snippets':
@@ -99,7 +102,7 @@ export function templateEditFor(
   text: string,
   template: string,
 ): TemplateEdit | undefined {
-  if (!editorChromeFor(kind).templatePicker || template === '') return undefined;
+  if (!editorChromeFor(kind).templateEdits || template === '') return undefined;
   return planTemplateEdit(text, template);
 }
 
@@ -142,7 +145,7 @@ export function slashTemplateChoiceFor(
   to: number,
   template: string,
 ): SlashTemplateChoice | undefined {
-  if (!editorChromeFor(kind).templatePicker || template === '') return undefined;
+  if (!editorChromeFor(kind).templateEdits || template === '') return undefined;
   const removal: TemplateEdit = { from, to, insert: '' };
   const choice = templateChoiceFor(kind, text.slice(0, from) + text.slice(to), template);
   if (choice === undefined) return { kind: 'changes', changes: [removal] };
@@ -180,16 +183,4 @@ export function slashTemplateNote(
   return current === template
     ? { key: 'slash.template.current' }
     : { key: 'slash.template.switch', current };
-}
-
-/**
- * Paints the answer into the window: whether the template picker shows. The picker is the one
- * node the focused group's header row holds (TYTO-288), so it is handed in rather than looked
- * up — it is out of the document until that group has rendered. The editor panel's heading,
- * which named an app file here, went with its bar (ADR 0085); the status bar's kind names it.
- * The preview's controls and its notes for an app file went with the PREVIEW panel (TYTO-287):
- * a preview tab only ever shows a brief.
- */
-export function paintEditorChrome(picker: HTMLElement, chrome: EditorChrome): void {
-  picker.hidden = !chrome.templatePicker;
 }

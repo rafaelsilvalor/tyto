@@ -15,19 +15,17 @@ import {
   commandOffered,
   editorChromeFor,
   languageOf,
-  paintEditorChrome,
   slashTemplateChoiceFor,
   slashTemplateNote,
   templateChoiceFor,
   templateEditFor,
 } from './editor-chrome.js';
 import { type TemplateEdit } from './frontmatter.js';
-import { createTemplatePicker } from './panels.js';
 
 describe('editorChromeFor (TYTO-256)', () => {
   it('keeps every brief control on a brief', () => {
     expect(editorChromeFor(undefined)).toEqual({
-      templatePicker: true,
+      templateEdits: true,
       briefCommands: true,
       textCommands: true,
     });
@@ -36,7 +34,7 @@ describe('editorChromeFor (TYTO-256)', () => {
   it("drops the brief's controls on an app file", () => {
     for (const kind of ['settings', 'keybindings', 'snippets'] as const) {
       expect(editorChromeFor(kind)).toEqual({
-        templatePicker: false,
+        templateEdits: false,
         briefCommands: false,
         textCommands: true,
       });
@@ -45,7 +43,7 @@ describe('editorChromeFor (TYTO-256)', () => {
 
   it("keeps a brief's commands on its preview and drops the ones that act on text (TYTO-287)", () => {
     expect(editorChromeFor('preview')).toEqual({
-      templatePicker: false,
+      templateEdits: false,
       briefCommands: true,
       textCommands: false,
     });
@@ -200,26 +198,5 @@ describe('the "/" menu choosing a template (TYTO-276)', () => {
 
   it('answers nothing on an app file', () => {
     expect(slashTemplateChoiceFor('settings', '/a', 0, 2, 'agenda-semana')).toBeUndefined();
-  });
-});
-
-describe('paintEditorChrome', () => {
-  // The one picker the focused group's header row holds (TYTO-288), made the way `main.ts`
-  // makes it; out of the document, as it is before that group has rendered.
-  it('hides the template picker on an app file', () => {
-    const picker = createTemplatePicker(document);
-    paintEditorChrome(picker, editorChromeFor('settings'));
-    expect(picker.hidden).toBe(true);
-    expect(picker.querySelector('select')?.id).toBe('template');
-  });
-
-  it('puts the picker back on a brief, and hides it with a preview in front', () => {
-    const picker = createTemplatePicker(document);
-    paintEditorChrome(picker, editorChromeFor('keybindings'));
-    paintEditorChrome(picker, editorChromeFor(undefined));
-    expect(picker.hidden).toBe(false);
-
-    paintEditorChrome(picker, editorChromeFor('preview'));
-    expect(picker.hidden).toBe(true);
   });
 });

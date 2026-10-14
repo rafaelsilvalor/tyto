@@ -52,9 +52,9 @@ second is said where it applies.
    and a locked preview can be on screen at once — under a `.preview__bar` of formats, slide,
    zoom and Lock, which TYTO-288 restyles. Each `<tyto-editor-group>` keeps a pane beside its
    CodeMirror mount and shows one or the other by the kind of the tab in front. _Changed by ADR
-   0085 (TYTO-288): the bar is the pane's header row, of the token height, and with a preview in
-   front the group hides its own header row; "Open preview to the side" (decision 7) sits in that
-   row, not at the end of the strip._ A preview in front
+   0085 (TYTO-288): the bar is the group's discreet header row, of the token height, and with a
+   preview in front the group hides its own; "Open preview to the side" (decision 7) sits at the
+   right end of the strip._ A preview in front
    makes the group's pane let go of its document, so its record passes to another pane (ADR 0083
    decision 5). `fit` follows a `ResizeObserver` on each stage, since a split resizes no window.
    A preview paints from the document's own state — frames, artworks, chosen format and slide,

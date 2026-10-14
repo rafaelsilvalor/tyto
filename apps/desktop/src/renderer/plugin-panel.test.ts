@@ -52,10 +52,11 @@ describe('the plugin panel element', () => {
     expect(panel.querySelector('.pane__title')?.textContent).toBe('Contagem');
   });
 
-  it('is a pane like every other: its name in a one-tab strip, a header row under it', async () => {
+  it('is a pane like every other docked panel: its name in a one-tab strip, no header row', async () => {
     const panel = await mounted();
     const children = [...panel.children].map((child) => child.className);
-    expect(children.slice(0, 2)).toEqual(['pane__strip', 'pane__header']);
+    expect(children[0]).toBe('pane__strip');
+    expect(panel.querySelector(':scope > .pane__header')).toBeNull();
     expect(panel.querySelector('.pane__strip .pane__tab .panel__close')).not.toBeNull();
   });
 

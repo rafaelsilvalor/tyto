@@ -4,10 +4,8 @@ import { describe, expect, it } from 'vitest';
 
 import {
   type Artwork,
-  type Template,
   lineColumnAt,
   paintArtworkList,
-  paintTemplatePicker,
   rangeOfArtwork,
   revealRange,
 } from './panel.js';
@@ -106,65 +104,6 @@ describe('clicking a problem puts the cursor exactly where it said', () => {
     }).not.toThrow();
     expect(editor.view.state.selection.main.from).toBe(5);
     editor.destroy();
-  });
-});
-
-describe('the template picker', () => {
-  const templates: readonly Template[] = [
-    {
-      name: 'cartaz',
-      version: '1.0.0',
-      description: 'One poster',
-      formats: [{ id: 'grid-1x1', label: 'Grid 1:1' }],
-      slots: {},
-      root: null,
-    },
-    {
-      name: 'promo-curso',
-      version: '2.1.0',
-      formats: [
-        { id: 'grid', label: 'Grid' },
-        { id: 'story', label: 'Story' },
-      ],
-      slots: {},
-      root: null,
-    },
-  ];
-
-  it('lists the manifests and marks the one the brief names', () => {
-    const picker = select();
-    paintTemplatePicker(picker, { templates, current: 'promo-curso', locale: 'pt-BR' });
-
-    expect([...picker.options].map((option) => option.value)).toEqual(['cartaz', 'promo-curso']);
-    expect(picker.value).toBe('promo-curso');
-  });
-
-  it('puts the description and the formats where a reader can see them before choosing', () => {
-    const picker = select();
-    paintTemplatePicker(picker, { templates, current: 'cartaz', locale: 'pt-BR' });
-
-    // The label a person reads, not the id the brief carries (TYTO-196).
-    expect(picker.options[0]?.title).toBe('One poster — Grid 1:1');
-    // No description is not an empty one: the formats still answer "what will I get".
-    expect(picker.options[1]?.title).toBe('Grid, Story');
-  });
-
-  it('offers a placeholder while the brief names no template', () => {
-    const picker = select();
-    paintTemplatePicker(picker, { templates, current: undefined, locale: 'pt-BR' });
-
-    expect(picker.value).toBe('');
-    expect(picker.options[0]?.textContent).toBe('Nenhum');
-  });
-
-  it('keeps a template the registry does not have, rather than showing a different one', () => {
-    // The brief says what it says. Silently selecting `cartaz` would tell the author their
-    // brief uses a template it does not use.
-    const picker = select();
-    paintTemplatePicker(picker, { templates, current: 'missing-pack', locale: 'pt-BR' });
-
-    expect(picker.options[0]?.textContent).toBe('missing-pack');
-    expect(picker.options[0]?.selected).toBe(true);
   });
 });
 

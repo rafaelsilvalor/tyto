@@ -410,14 +410,15 @@ textarea {
 }
 
 /*
- * The pane shape (TYTO-288, ADR 0085): every editor group, every preview and every docked panel
- * is a tab strip and, under it, a header row, and nothing else above its content.
+ * The pane shape (TYTO-288, ADR 0085), in the manner of Rafael's VS Code reference of
+ * 2026-10-14: every editor group, every preview and every docked panel has a tab strip, and an
+ * editor group a discreet header row under it.
  *
- * The contract is the two heights, which are tokens and nothing else: a fixed `height`, one
- * line (`nowrap`), and `overflow: hidden`, so whatever a pane puts in a line can never make it
- * taller and every pane's lines end at the same y. `flex: none` so a short pane does not
- * squeeze them either. In the header row the breadcrumb is what gives way, cut with an
- * ellipsis; the actions keep their size. `e2e/pane-shape.desktop.test.ts` measures all of it.
+ * The contract is the heights, which are tokens and nothing else: a fixed `height`, `flex:
+ * none`, one line (`nowrap`) and `overflow: hidden`, so nothing in a line makes it taller. The
+ * strip carries the hairline and the raised fill; the header row carries neither — the editor's
+ * own background, no line above or below — and its small muted text is the breadcrumb's, which
+ * gives way first, cut with an ellipsis. `e2e/pane-shape.desktop.test.ts` measures all of it.
  */
 .pane__strip {
   display: flex;
@@ -441,10 +442,9 @@ textarea {
   overflow: hidden;
   white-space: nowrap;
   padding-inline: var(--tyto-space-4);
-  border-bottom: var(--tyto-hairline-width) solid var(--tyto-hairline);
   background: var(--tyto-surface);
   color: var(--tyto-text-muted);
-  font-size: var(--tyto-text-sm);
+  font-size: var(--tyto-text-xs);
 }
 
 .pane__header[hidden] {
@@ -465,6 +465,27 @@ textarea {
   align-items: center;
   gap: var(--tyto-space-4);
   margin-inline-start: auto;
+}
+
+/* In the strip, the group's actions sit at its right end as VS Code's editor actions do. */
+.pane__strip > .pane__actions {
+  gap: var(--tyto-space-1);
+  padding-inline: var(--tyto-space-2);
+}
+
+.pane__strip > .pane__actions:empty {
+  display: none;
+}
+
+/* The preview's controls, small enough for the discreet row they share: a select's own height
+   is the browser's, so it is held under the row's with a little room above and below. Two
+   classes, so the zoom's and the lock's own `font: inherit` and padding do not undo it. */
+.preview__bar.pane__header button,
+.preview__bar.pane__header select {
+  max-height: calc(var(--tyto-pane-header-height) - 2 * var(--tyto-space-1));
+  padding-block: 0;
+  font-size: var(--tyto-text-xs);
+  line-height: 1.2;
 }
 
 /*
@@ -603,7 +624,8 @@ textarea {
   box-shadow: inset 0 var(--tyto-focus-width) 0 var(--tyto-accent);
 }
 
-/* A group's action in its header row (TYTO-287, TYTO-288): "Open preview to the side". */
+/* A group's action at the right end of its strip (TYTO-287, TYTO-288): "Open preview to the
+   side", the size of a tab's close button. */
 .editor-group__action {
   display: inline-flex;
   align-items: center;
@@ -818,20 +840,10 @@ tyto-preview-pane[hidden] {
  * three colours are the severity tokens, which the queue's dots share.
  */
 
-.work__template {
-  display: flex;
-  gap: var(--tyto-space-4);
-  align-items: center;
-  margin-inline-start: auto;
-  font-size: var(--tyto-text-sm);
-  color: var(--tyto-text-muted);
-}
-
 /*
  * TYTO-256: a settings or keybindings tab hides the brief's controls with `hidden`, and a
  * `display` on a class outranks the attribute's own rule, so it is restated for each.
  */
-.work__template[hidden],
 .preview__tabs[hidden],
 .preview__slide[hidden],
 .preview__zoom[hidden] {

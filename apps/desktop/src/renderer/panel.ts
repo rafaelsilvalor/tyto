@@ -1,5 +1,4 @@
 import { type IpcResponse } from '../../shared/ipc.js';
-import { type Locale, translate } from '../../shared/i18n/index.js';
 
 /**
  * The template picker and the artwork list: what the brief compiled against, and what it
@@ -11,9 +10,9 @@ import { type Locale, translate } from '../../shared/i18n/index.js';
  *
  * **The problems panel used to live here and is now `problems-panel.ts`** — a Lit element
  * rather than a painter (ADR 0024). What stayed behind is what the element still needs
- * (`lineColumnAt`, the diagnostic types) and the two controls that write into a `<select>`,
- * which a component would not make shorter: an option list is already the shape the DOM
- * wants.
+ * (`lineColumnAt`, the diagnostic types) and the artwork list, which writes into a `<select>`
+ * a component would not make shorter: an option list is already the shape the DOM wants. The
+ * template picker, the other one, left the window with TYTO-288 (ADR 0085).
  */
 
 export type Diagnostic = IpcResponse<'brief:preview'>['diagnostics'][number];
@@ -62,62 +61,6 @@ export function lineColumnAt(text: string, offset: number): LineColumn {
   }
 
   return { line, column: upTo - lineStart + 1 };
-}
-
-export interface TemplatePickerState {
-  readonly templates: readonly Template[];
-  /** What the brief's frontmatter names right now, which may be none of them. */
-  readonly current: string | undefined;
-  readonly locale: Locale;
-}
-
-/**
- * Fills the template picker from the registry's manifests.
- *
- * The option's text is the manifest's `name` — the string the frontmatter has to contain —
- * and the description goes on `title` rather than into the option, because an option that
- * grew a sentence would make the control as wide as the longest description somebody
- * installed. The formats go there too: they are what the preview's tabs will become, and
- * seeing them before choosing is the difference between picking and guessing.
- *
- * A brief naming a template the registry does not have keeps an option of its own, selected.
- * Dropping it would silently show a different template as the current one, and the brief
- * would still say what it says.
- */
-export function paintTemplatePicker(picker: HTMLSelectElement, state: TemplatePickerState): void {
-  const document_ = picker.ownerDocument;
-  const known = state.templates.some((template) => template.name === state.current);
-
-  const options: HTMLOptionElement[] = [];
-
-  if (state.current === undefined || !known) {
-    const none = document_.createElement('option');
-    // The name it carries, not an empty value, for a template the registry does not have:
-    // the control's `value` is what a reader compares against the brief, and a blank there
-    // would say the brief names nothing while the option beside it says otherwise.
-    none.value = state.current ?? '';
-    none.textContent =
-      state.current === undefined ? translate(state.locale, 'template.none') : state.current;
-    none.selected = true;
-    options.push(none);
-  }
-
-  options.push(
-    ...state.templates.map((template) => {
-      const option = document_.createElement('option');
-      option.value = template.name;
-      option.textContent = template.name;
-      const detail = [
-        template.description,
-        template.formats.map((format) => format.label).join(', '),
-      ].filter((part) => part !== undefined && part !== '');
-      if (detail.length > 0) option.title = detail.join(' — ');
-      option.selected = template.name === state.current;
-      return option;
-    }),
-  );
-
-  picker.replaceChildren(...options);
 }
 
 /**

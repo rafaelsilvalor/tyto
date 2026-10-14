@@ -13,11 +13,12 @@ import { type TabEntry, TABS_TAG } from './tabs.js';
  * One editor group on screen (TYTO-286, ADR 0083): its own row of tabs on top, a header row
  * under it, and the node a CodeMirror pane is mounted in under that.
  *
- * Shaped as a **pane** (TYTO-288, ADR 0085) — a strip, a header row, then the content — the
- * shape every docked panel and every preview has too, with the two lines the same heights
- * across the window. The header row holds an empty breadcrumb slot (TYTO-273 fills it) and the
- * group's actions; with a preview in front it is hidden, because the preview's own bar is that
- * row. It holds no state: which tabs it has and which is in front are `editor-groups.ts`'s,
+ * Shaped as a **pane** (TYTO-288, ADR 0085) — a strip, a header row, then the content. The
+ * strip is every pane's height, a docked panel's too, and holds the tabs and, at its right end,
+ * the group's actions, as VS Code's editor actions sit (Rafael's reference of 2026-10-14). The
+ * header row is discreet, the editor's own background and no line, and holds the breadcrumb
+ * slot TYTO-273 fills; with a preview in front it is hidden, because the preview's own bar is
+ * that row. It holds no state: which tabs it has and which is in front are `editor-groups.ts`'s,
  * handed down by `main.ts`, and a click reports back.
  *
  * The mount is rendered once and kept: Lit leaves a node it did not have to change, and the
@@ -40,7 +41,6 @@ export class EditorGroupElement extends LitElement {
     showing: { attribute: false },
     offerPreview: { attribute: false },
     openPreview: { attribute: false },
-    picker: { attribute: false },
   };
 
   declare groupId: string;
@@ -55,11 +55,6 @@ export class EditorGroupElement extends LitElement {
   /** Whether the strip offers "Open preview to the side": a brief is in front. */
   declare offerPreview: boolean;
   declare openPreview: () => void;
-  /**
-   * The window's one template picker while this group is focused, else nothing (TYTO-288): the
-   * node moves into the focused group's header row, so there is one `#template` in the window.
-   */
-  declare picker: HTMLElement | undefined;
 
   constructor() {
     super();
@@ -73,7 +68,6 @@ export class EditorGroupElement extends LitElement {
     this.showing = 'editor';
     this.offerPreview = false;
     this.openPreview = () => undefined;
-    this.picker = undefined;
   }
 
   private ownMount: HTMLElement | undefined;
@@ -128,9 +122,9 @@ export class EditorGroupElement extends LitElement {
     const pane = this.showing === 'preview' ? this.preview : this.ownPreview;
     if (pane !== undefined) pane.hidden = this.showing !== 'preview';
     const open = translate(this.locale, 'command.preview.openToSide');
-    // The pane shape (ADR 0085): the strip, then the header row — an empty breadcrumb slot for
-    // TYTO-273 and the group's actions. With a preview in front the row is hidden and the
-    // preview's bar, which is a header row of its own, takes its place: one row, never two.
+    // The pane shape (ADR 0085): the strip — the tabs, then the group's actions at its right
+    // end — and the header row, which holds the breadcrumb slot alone. With a preview in front
+    // the row is hidden and the preview's bar, a header row of its own, takes its place.
     return html`<div class="pane__strip">
         <tyto-tabs
           class="tabs"
@@ -140,11 +134,7 @@ export class EditorGroupElement extends LitElement {
           .select=${this.select}
           .close=${this.close}
         ></tyto-tabs>
-      </div>
-      <div class="pane__header" ?hidden=${this.showing === 'preview'}>
-        <div class="pane__breadcrumb" data-breadcrumb></div>
         <div class="pane__actions">
-          ${this.picker ?? nothing}
           ${
             this.offerPreview
               ? html`<button
@@ -162,6 +152,9 @@ export class EditorGroupElement extends LitElement {
               : nothing
           }
         </div>
+      </div>
+      <div class="pane__header" ?hidden=${this.showing === 'preview'}>
+        <div class="pane__breadcrumb" data-breadcrumb></div>
       </div>`;
   }
 }

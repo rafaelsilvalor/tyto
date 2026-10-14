@@ -55,7 +55,6 @@ export interface Catalogue {
   readonly 'problems.nowhere': string;
   readonly 'template.label': string;
   /** The option standing for a brief whose frontmatter names no template yet. */
-  readonly 'template.none': string;
 
   /**
    * The folder of templates this app searches before the built-in pack (TYTO-122).
@@ -526,7 +525,6 @@ export const CATALOGUE_KEYS = [
   'problems.location',
   'problems.nowhere',
   'template.label',
-  'template.none',
   'templates.folder.label',
   'templates.folder.none',
   'templates.folder.empty',

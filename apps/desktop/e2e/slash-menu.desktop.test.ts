@@ -125,14 +125,21 @@ beforeAll(async () => {
   // Something the script builds, never the markup it shipped with (TYTO-154, TYTO-175).
   await page.waitForSelector('#editor .cm-content');
   await page.waitForSelector('.tabs__tab');
-  await page.waitForFunction(
-    () =>
-      [...document.querySelectorAll('#template option')].some(
-        (option) => (option as HTMLOptionElement).value === 'agenda-semana',
-      ),
-    undefined,
-    { timeout: 30_000 },
-  );
+  // The templates arrive from `templates:list` after the window paints. They were waited for in
+  // the header picker until it left the window (TYTO-288); the "/" menu lists the same rows.
+  await page.click('#editor .cm-content');
+  // A loop and not `expect.poll`, which Vitest allows only inside a test.
+  const deadline = Date.now() + 30_000;
+  for (;;) {
+    await page.keyboard.type('/');
+    await page.waitForTimeout(200);
+    const rows = (await listRows()) ?? [];
+    await page.keyboard.press('Escape');
+    await page.keyboard.press('Backspace');
+    if (rows.some((row) => row.startsWith('agenda-semana /'))) break;
+    if (Date.now() > deadline) throw new Error('the "/" menu never listed the templates');
+    await page.waitForTimeout(250);
+  }
   await app.evaluate(({ BrowserWindow }) => {
     BrowserWindow.getAllWindows()[0]?.setSize(1200, 760);
   });

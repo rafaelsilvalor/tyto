@@ -67,10 +67,10 @@ export class PluginPanel extends DockedPanel {
 
   protected override render(): unknown {
     const offered = this.offered;
-    // The pane shape every panel has (TYTO-288, ADR 0085). The manifest's title goes in the tab
+    // The tab strip every panel has (TYTO-288, ADR 0085). The manifest's title goes in the tab
     // as text, which Lit escapes: it is the plugin's string, never markup. The page is below,
     // in its sandbox, unchanged (ADR 0045).
-    return html`${this.chrome(html`<h2 class="pane__title">${offered?.title ?? ''}</h2>`, nothing)}
+    return html`${this.chrome(html`<h2 class="pane__title">${offered?.title ?? ''}</h2>`)}
     ${
       offered === undefined
         ? nothing

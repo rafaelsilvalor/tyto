@@ -78,7 +78,7 @@ describe('a group with a preview in front (TYTO-287)', () => {
     expect(group.preview.querySelector('[id]')).toBeNull();
   });
 
-  it('offers "Open preview to the side" in its header row only while asked to', async () => {
+  it('offers "Open preview to the side" at the right end of its strip only while asked to', async () => {
     const made = new Map<string, EditorGroupElement>();
     const [group] = arrangeGroups(container(), groupsOf(['a'], 'a'), made).created;
     if (group === undefined) throw new Error('no group');
@@ -91,7 +91,11 @@ describe('a group with a preview in front (TYTO-287)', () => {
 
     group.offerPreview = true;
     await group.updateComplete;
-    expect(group.querySelector('.pane__header .editor-group__action')).not.toBeNull();
+    // In the strip, after the tabs, as VS Code's editor actions sit (TYTO-288, ADR 0085).
+    expect(
+      group.querySelector('.pane__strip > .pane__actions .editor-group__action'),
+    ).not.toBeNull();
+    expect(group.querySelector('.pane__header .editor-group__action')).toBeNull();
     group.querySelector<HTMLButtonElement>('.editor-group__action')?.click();
     expect(opened).toBe(1);
   });
@@ -107,7 +111,12 @@ describe('the pane shape (TYTO-288, ADR 0085)', () => {
     const order = [...group.children].map((child) => child.className);
     expect(order).toEqual(['pane__strip', 'pane__header', 'editor']);
     expect(group.querySelector('.pane__strip tyto-tabs')).not.toBeNull();
-    expect(group.querySelector('.pane__header [data-breadcrumb]')?.childNodes).toHaveLength(0);
+    // The header row holds the breadcrumb slot and nothing else, empty until TYTO-273.
+    const header = group.querySelector(':scope > .pane__header');
+    expect([...(header?.children ?? [])].map((child) => child.className)).toEqual([
+      'pane__breadcrumb',
+    ]);
+    expect(header?.querySelector('[data-breadcrumb]')?.childNodes).toHaveLength(0);
   });
 
   it('hides its header row while a preview is in front, so the preview bar is the only one', async () => {
@@ -124,25 +133,5 @@ describe('the pane shape (TYTO-288, ADR 0085)', () => {
     );
     expect(shown).toHaveLength(1);
     expect(shown[0]?.classList.contains('preview__bar')).toBe(true);
-  });
-
-  it('holds the template picker only while it is handed one, and lets go of it', async () => {
-    const made = new Map<string, EditorGroupElement>();
-    const host = container();
-    const split = splitGroup(groupsOf(['a'], 'a'), 'row');
-    arrangeGroups(host, split, made);
-    const [first, second] = groupList(split).map((group) => made.get(group.id));
-    if (first === undefined || second === undefined) throw new Error('no groups');
-    const picker = document.createElement('label');
-
-    first.picker = picker;
-    await first.updateComplete;
-    expect(picker.parentElement?.closest('[data-editor-group]')).toBe(first);
-
-    first.picker = undefined;
-    second.picker = picker;
-    await Promise.all([first.updateComplete, second.updateComplete]);
-    expect(picker.parentElement?.closest('[data-editor-group]')).toBe(second);
-    expect(host.querySelectorAll('label')).toHaveLength(1);
   });
 });

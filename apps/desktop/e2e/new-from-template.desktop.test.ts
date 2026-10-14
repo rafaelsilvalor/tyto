@@ -16,7 +16,8 @@ import { openPreviewBeside } from './preview-pane.js';
  * Ctrl+K lists the templates with the folder each came from; choosing `agenda-semana` opens a
  * new tab holding its skeleton with the first field selected. Typing fills it, Tab moves to the
  * next field, and the brief that results compiles with no error. Then the second door: choosing
- * a template in the header's picker on an empty brief writes the same skeleton.
+ * a template in the "/" menu on an empty brief writes the same skeleton (the header's picker,
+ * which was that door, left the window with TYTO-288).
  *
  * Every key goes through Playwright's page, which is CDP input to this window and never an OS
  * keystroke that could land in another application.
@@ -192,7 +193,7 @@ describe('New brief from template…', () => {
     await shoot('filled-light');
   }, 90_000);
 
-  it('writes the skeleton when a template is chosen in the picker on an empty brief', async () => {
+  it('writes the skeleton when a template is chosen in the "/" menu on an empty brief', async () => {
     await page.keyboard.press('Control+k');
     await page.waitForSelector('.command-bar__input', { state: 'visible' });
     await page.keyboard.type('document.new');
@@ -200,7 +201,12 @@ describe('New brief from template…', () => {
     await page.keyboard.press('Enter');
     await expect.poll(editorText, { timeout: 10_000 }).toBe('');
 
-    await page.selectOption('#template', 'tabela-roxo');
+    await page.click('#editor .cm-content');
+    await page.keyboard.type('/');
+    await page.waitForSelector('.cm-tooltip-autocomplete', { state: 'visible', timeout: 15_000 });
+    await page.keyboard.type('tabela-r');
+    await page.waitForTimeout(150);
+    await page.keyboard.press('Enter');
 
     await expect.poll(editorText, { timeout: 10_000 }).toContain('template: tabela-roxo');
     expect(await editorText()).toContain('::titulo titulo\n\n::tabela tabela');

@@ -90,13 +90,14 @@
   --tyto-focus-width: 2px;
 
   /*
-   * Every pane is a tab strip and a header row under it (TYTO-288, ADR 0085): an editor group,
-   * a preview and every docked panel. The two lines are these heights and no other, so their
-   * bottoms meet across the window whatever each pane holds; `e2e/pane-shape.desktop.test.ts`
-   * measures it. Both are border-box: the hairline under each line is inside the height.
+   * Every pane has a tab strip of this height (TYTO-288, ADR 0085) — an editor group, a preview,
+   * a docked panel — so the strips' bottoms meet across the window, the hairline under each
+   * inside it (border-box). An editor group adds a discreet header row under its strip, VS
+   * Code's breadcrumb height; the groups' rows meet among themselves.
+   * `e2e/pane-shape.desktop.test.ts` measures both.
    */
   --tyto-pane-strip-height: 30px;
-  --tyto-pane-header-height: 28px;
+  --tyto-pane-header-height: 22px;
 
   /* The icons' stroke, in units of their 16-unit grid: the `iconStrokeWidth` setting's default
      (TYTO-288). The theme sheet sets the person's value over it. */

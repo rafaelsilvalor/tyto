@@ -137,14 +137,15 @@ describe('what survives a rearrangement', () => {
     expect(before?.childElementCount).toBe(1);
   });
 
-  it('draws every docked panel as a pane: a one-tab strip, then a header row (TYTO-288)', async () => {
+  it('draws every docked panel with a one-tab strip and no header row (TYTO-288)', async () => {
     await arrange(document, withPanelOpen(DEFAULT_LAYOUT, 'queue', true), host());
 
     for (const id of [PROBLEMS_PANEL, 'queue']) {
       const panel = document.querySelector(`[data-panel="${id}"]`);
       const children = [...(panel?.children ?? [])].map((child) => child.className);
-      // The header row is drawn even with nothing in it: it is what lines the panes up.
-      expect(children.slice(0, 2), id).toEqual(['pane__strip', 'pane__header']);
+      // A panel has no actions, so no header row, as VS Code's panels have none (ADR 0085).
+      expect(children[0], id).toBe('pane__strip');
+      expect(panel?.querySelector(':scope > .pane__header'), id).toBeNull();
     }
     // The problems heading keeps its id and its key, now as the tab's name.
     const heading = document.querySelector('.pane__strip #problems-heading');

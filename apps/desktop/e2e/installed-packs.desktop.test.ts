@@ -10,6 +10,7 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 
 import { closeApp } from './close-app.js';
 import { firstWindow } from './first-window.js';
+import { waitForWindowTemplates, windowTemplates } from './window-templates.js';
 
 /**
  * An installed template pack in the window (TYTO-50, ADR 0046).
@@ -99,13 +100,6 @@ function preview(page: Page, brief: string): Promise<PreviewAnswer> {
   );
 }
 
-function pickerOptions(page: Page): Promise<string[]> {
-  return page.evaluate(() => {
-    const picker = document.getElementById('template') as HTMLSelectElement | null;
-    return picker === null ? [] : [...picker.options].map((option) => option.value);
-  });
-}
-
 let app: ElectronApplication;
 let page: Page;
 let scratch: string;
@@ -133,19 +127,13 @@ afterAll(async () => {
 });
 
 describe('an installed template pack', () => {
-  it('reaches the picker once the plugins have started, after the built-in templates', async () => {
-    // The plugins start while the window opens and are not awaited (ADR 0044): the picker
-    // is asked again when they have, with no reload and nothing typed.
-    await page.waitForFunction(
-      () => {
-        const picker = document.getElementById('template') as HTMLSelectElement | null;
-        return picker !== null && [...picker.options].some((option) => option.value === 'aviso');
-      },
-      undefined,
-      { timeout: 30_000, polling: 100 },
-    );
+  it('reaches the window once the plugins have started, after the built-in templates', async () => {
+    // The plugins start while the window opens and are not awaited (ADR 0044): the window's
+    // templates are asked again when they have, with no reload and nothing typed. Read through
+    // "New brief from template…" since the header picker left the window (TYTO-288).
+    await waitForWindowTemplates(page, ['aviso'], 30_000);
 
-    const options = await pickerOptions(page);
+    const options = await windowTemplates(page);
     expect(options).toContain('promo-curso');
     expect(options).toContain('aviso');
   });
