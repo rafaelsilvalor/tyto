@@ -477,13 +477,50 @@ textarea {
   overflow: hidden;
 }
 
-/* A hairline between groups, drawn by the second and later child of a split. */
-.editor-split--row > * + * {
-  border-inline-start: var(--tyto-hairline-width) solid var(--tyto-hairline);
+/*
+ * The line between two groups is a splitter (TYTO-289): the hairline it draws, and a wider
+ * strip to grab, the `::after` reaching past the line over both neighbours — the docks'
+ * `.splitter` shape. A `row` split's line runs up and down, so it resizes columns. The accent
+ * marks it while it is hovered, dragged or focused from the keyboard.
+ */
+.group-splitter {
+  flex: 0 0 var(--tyto-hairline-width);
+  position: relative;
+  z-index: 1;
+  background: var(--tyto-hairline);
+  touch-action: none;
+  outline: none;
 }
 
-.editor-split--column > * + * {
-  border-top: var(--tyto-hairline-width) solid var(--tyto-hairline);
+.group-splitter--row {
+  cursor: col-resize;
+}
+
+.group-splitter--column {
+  cursor: row-resize;
+}
+
+.group-splitter::after {
+  content: '';
+  position: absolute;
+}
+
+.group-splitter--row::after {
+  inset: 0 calc(var(--tyto-space-2) * -1);
+}
+
+.group-splitter--column::after {
+  inset: calc(var(--tyto-space-2) * -1) 0;
+}
+
+.group-splitter:hover,
+.group-splitter--dragging,
+.group-splitter:focus-visible {
+  background: var(--tyto-accent);
+}
+
+.group-splitter:focus-visible {
+  box-shadow: 0 0 0 var(--tyto-hairline-width) var(--tyto-focus-ring);
 }
 
 /* With more than one group, the focused one's tab in front carries the accent. */

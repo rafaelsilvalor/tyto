@@ -223,7 +223,8 @@ describe('the lock', () => {
 describe('a document is found by its own tab, never by its preview', () => {
   it('opening a file the locked preview shows goes to its text', async () => {
     // Focus in the preview's group, where the locked preview of `inverno.brief` is.
-    await page.locator(`[data-editor-group]:nth-child(2) ${SHOWN_PREVIEW}`).click();
+    // The second group by order, not by `:nth-child`: a splitter sits between them (TYTO-289).
+    await page.locator('[data-editor-group]').nth(1).locator(SHOWN_PREVIEW).click();
     await expect.poll(focusedGroupIndex).toBe(1);
 
     await answerOpenWith(firstPath);

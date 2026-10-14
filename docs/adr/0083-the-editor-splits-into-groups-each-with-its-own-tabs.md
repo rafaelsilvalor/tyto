@@ -102,3 +102,7 @@ is said where it applies.
 - Moving a tab to another group, focusing the next group by order, closing a group and keeping
   the groups across a restart landed in the second pull request (decisions 8 and 9). The shares
   of a split are kept, though nothing changes them yet: there is no splitter between groups.
+- _Amended 2026-10-14, TYTO-289:_ a splitter between sibling groups changes them. A drag or an
+  arrow key moves only the line's two neighbours, never below `GROUP_MINIMUM` (160 px across,
+  96 px down, the same as `shell.css`'s); a double-click gives every child of that split an equal
+  share, not only the pair; the shares are written when the drag ends, like a dock's size.
