@@ -94,6 +94,8 @@ export const ptBR: Catalogue = {
   'command.group.splitDown': 'Dividir editor para baixo',
   'command.group.focusNext': 'Focar o próximo grupo de editores',
   'command.group.focusPrevious': 'Focar o grupo de editores anterior',
+  'command.group.moveTabToNext': 'Mover a aba para o próximo grupo de editores',
+  'command.group.close': 'Fechar o grupo de editores',
   'command.document.select': 'Aba',
   'panel.close': 'Fechar o painel',
   'command.layout.togglePanel': 'Mostrar ou esconder',

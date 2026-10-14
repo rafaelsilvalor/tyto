@@ -517,6 +517,8 @@ describe('switching the language', () => {
     'command.group.splitDown',
     'command.group.focusNext',
     'command.group.focusPrevious',
+    'command.group.moveTabToNext',
+    'command.group.close',
     // E8.5: the find-and-replace panel is `@codemirror/search`'s own DOM, reached through
     // `EditorState.phrases` rather than through this app's markup, and it is not in the
     // document at all until somebody presses `Ctrl+F`. So none of its seventeen strings can

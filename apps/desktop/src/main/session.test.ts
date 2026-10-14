@@ -532,3 +532,165 @@ describe('the template mode in the session (TYTO-266)', () => {
     expect((await session.read()).template).toBeNull();
   });
 });
+
+describe('the editor groups in the session (TYTO-286)', () => {
+  const place = (anchor: number) => ({ anchor, head: anchor, top: 0 });
+  /** Two briefs: `a` on the left, `a` and `b` on the right, which has the focus. */
+  const twoGroups = {
+    root: {
+      split: 'row' as const,
+      sizes: [0.5, 0.5],
+      children: [
+        { tabs: [{ documentId: 'document-1', place: place(1) }], active: 0 },
+        {
+          tabs: [
+            { documentId: 'document-1', place: place(5) },
+            { documentId: 'document-2', place: place(2) },
+          ],
+          active: 1,
+        },
+      ],
+    },
+    focused: 1,
+  };
+  const kept = {
+    root: {
+      split: 'row',
+      sizes: [0.5, 0.5],
+      children: [
+        { tabs: [{ tab: 0, place: place(1) }], active: 0 },
+        {
+          tabs: [
+            { tab: 0, place: place(5) },
+            { tab: 1, place: place(2) },
+          ],
+          active: 1,
+        },
+      ],
+    },
+    focused: 1,
+  };
+  const twoBriefs = async () => {
+    const built = setup({ '/b/a.brief': '::titulo A', '/b/b.brief': '::titulo B' });
+    await built.documents.openPath('document-1', '/b/a.brief');
+    await built.documents.openPath('document-2', '/b/b.brief');
+    return built;
+  };
+  const tabs = [
+    { documentId: 'document-1', kind: 'brief' as const, draft: null, place: place(1) },
+    { documentId: 'document-2', kind: 'brief' as const, draft: null, place: place(2) },
+  ];
+
+  it('keeps the tree with each tab as an index of the kept tabs, and a cursor per tab', async () => {
+    const { store, session } = await twoBriefs();
+    await session.write({ tabs, active: 1, template: null, groups: twoGroups, final: false });
+    expect(store.saved()).toMatchObject({ active: 1, groups: kept });
+  });
+
+  it('round-trips through the file, and hands the tree back by index', async () => {
+    const built = await twoBriefs();
+    await built.session.write({ tabs, active: 1, template: null, groups: twoGroups, final: false });
+    const store = fileSessionStore(join(scratch, 'session.json'));
+    expect(await store.write(built.store.saved() as never)).toBe(true);
+    expect(await store.read()).toEqual(built.store.saved());
+
+    expect((await built.session.read()).groups).toEqual(kept);
+  });
+
+  it('drops a tab that was not kept, and the group it leaves empty collapses', async () => {
+    const { store, session } = await twoBriefs();
+    await session.write({
+      tabs: [
+        ...tabs,
+        // An untitled tab nobody typed in: not kept, so its group goes and the split with it.
+        { documentId: 'document-9', kind: 'brief', draft: null, place: null },
+      ],
+      active: 0,
+      template: null,
+      groups: {
+        root: {
+          split: 'column',
+          sizes: [0.25, 0.75],
+          children: [
+            {
+              tabs: [
+                { documentId: 'document-1', place: null },
+                { documentId: 'document-2', place: null },
+              ],
+              active: 0,
+            },
+            { tabs: [{ documentId: 'document-9', place: null }], active: 0 },
+          ],
+        },
+        focused: 1,
+      },
+      final: false,
+    });
+
+    expect(store.saved()).toMatchObject({
+      groups: { root: { tabs: [{ tab: 0 }, { tab: 1 }], active: 0 }, focused: 0 },
+    });
+  });
+
+  it('keeps no groups for a window that sent none, and answers null for a file with none', async () => {
+    const { store, session } = await twoBriefs();
+    await session.write({ tabs, active: 0, template: null, final: false });
+    expect(store.saved()).not.toHaveProperty('groups');
+    expect((await session.read()).groups).toBeNull();
+  });
+
+  it('reads a version 1 file written before the groups were kept, which is one group', async () => {
+    // TYTO-265's shape, the one an update imports byte for byte (ADR 0036): no `groups`.
+    const file = join(scratch, 'session.json');
+    const before = {
+      version: 1,
+      tabs: [{ kind: 'brief', path: '/a.brief', place: place(3) }],
+      active: 0,
+    };
+    writeFileSync(file, JSON.stringify(before));
+    expect(await fileSessionStore(file).read()).toEqual(before);
+  });
+
+  it('drops only the tree when it does not parse: the tabs and their drafts survive', async () => {
+    const file = join(scratch, 'session.json');
+    const draft = { text: '::rascunho', savedHash: savedHashOf('') };
+    writeFileSync(
+      file,
+      JSON.stringify({
+        version: 1,
+        tabs: [{ kind: 'brief', draft }],
+        active: 0,
+        groups: { root: { split: 'diagonal', children: 'no' }, focused: -1 },
+      }),
+    );
+    expect(await fileSessionStore(file).read()).toEqual({
+      version: 1,
+      tabs: [{ kind: 'brief', draft }],
+      active: 0,
+    });
+  });
+
+  it('drops a tab index the file names but has no tab for', async () => {
+    const { store, session } = setup({});
+    await store.write({
+      version: 1,
+      tabs: [{ kind: 'brief', draft: { text: '::a', savedHash: savedHashOf('') } }],
+      active: 0,
+      groups: {
+        root: {
+          split: 'row',
+          sizes: [0.5, 0.5],
+          children: [
+            { tabs: [{ tab: 0 }], active: 0 },
+            { tabs: [{ tab: 7 }], active: 0 },
+          ],
+        },
+        focused: 1,
+      },
+    });
+    expect((await session.read()).groups).toEqual({
+      root: { tabs: [{ tab: 0, place: null }], active: 0 },
+      focused: 0,
+    });
+  });
+});

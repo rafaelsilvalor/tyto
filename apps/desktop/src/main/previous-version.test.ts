@@ -293,6 +293,27 @@ describe('saying yes', () => {
     ]);
   });
 
+  it('brings a session from before the editor groups byte for byte, read as one group (TYTO-286)', async () => {
+    // Version 1 with no `groups`: what every release before TYTO-286's second pull request
+    // wrote. The import copies the bytes, and the new version reads it as tabs with no tree,
+    // which the window shows as one group.
+    const older = await seedOlder('0.3.3');
+    const before = JSON.stringify({
+      version: 1,
+      tabs: [{ kind: 'brief', path: '/b/a.brief', place: { anchor: 2, head: 2, top: 0 } }],
+      active: 0,
+    });
+    writeFileSync(join(older, 'session.json'), before);
+
+    const outcome = await run('0.3.4', yes);
+
+    expect(outcome).toMatchObject({ kind: 'imported', diagnostics: [] });
+    expect(readFileSync(join(root, '0.3.4', 'session.json'), 'utf8')).toBe(before);
+    const read = await fileSessionStore(join(root, '0.3.4', 'session.json')).read();
+    expect(read.groups).toBeUndefined();
+    expect(read.tabs).toHaveLength(1);
+  });
+
   it('leaves a keybindings file that does not parse behind, as it does settings', async () => {
     // The same bar as `settings.json`: a text no reader could take is not copied into the new
     // folder. The older folder keeps it, so the person's text is not lost.

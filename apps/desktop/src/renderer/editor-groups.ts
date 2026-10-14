@@ -9,6 +9,8 @@
  * new kind of tab rather than a fake document.
  */
 
+import type { SessionGroupNode } from '../../shared/session-groups.js';
+
 /** One tab in one group. */
 export interface EditorTab {
   readonly id: string;
@@ -276,12 +278,144 @@ export function moveTab(groups: EditorGroups, tabId: string, toGroupId: string):
   return { ...added, focusedGroupId: toGroupId };
 }
 
-/** Focus moves to the group before (`-1`) or after (`1`) the focused one, in tree order. */
-export function focusNeighbour(groups: EditorGroups, direction: 1 | -1): EditorGroups {
+/**
+ * The group before (`-1`) or after (`1`) the focused one, in tree order, **wrapping** at the
+ * ends: the last group's next is the first, as a strip's next tab is (TYTO-286).
+ */
+function neighbourOf(groups: EditorGroups, direction: 1 | -1): EditorGroup {
   const list = groupList(groups);
   const at = list.findIndex((group) => group.id === groups.focusedGroupId);
-  const next = list[at + direction];
-  return next === undefined ? groups : { ...groups, focusedGroupId: next.id };
+  const next = list[(at + direction + list.length) % list.length];
+  return next ?? focusedGroup(groups);
+}
+
+/** Focus moves to the group before (`-1`) or after (`1`) the focused one, wrapping. */
+export function focusNeighbour(groups: EditorGroups, direction: 1 | -1): EditorGroups {
+  return { ...groups, focusedGroupId: neighbourOf(groups, direction).id };
+}
+
+/**
+ * The focused group's tab in front moves to the next group in tree order, wrapping (TYTO-286).
+ * With one group there is no next one, so a split to the right is made for it, as VS Code
+ * does: the tab leaves its group and shows in the new one. A group's only tab with nowhere but
+ * a new split to go stays where it is, since moving it would end where it started.
+ */
+export function moveTabToNextGroup(groups: EditorGroups): EditorGroups {
+  const source = focusedGroup(groups);
+  const tab = activeTabOf(source);
+  if (tab === undefined) return groups;
+  if (groupList(groups).length > 1) return moveTab(groups, tab.id, neighbourOf(groups, 1).id);
+  if (source.tabs.length < 2) return groups;
+  const split = splitGroup(groups, 'row');
+  const closed = closeTab(split, tab.id);
+  return { ...closed, focusedGroupId: split.focusedGroupId };
+}
+
+/**
+ * The groups as a session keeps them (TYTO-286, ADR 0080): the tree with no ids, each leaf its
+ * tabs in order and the index of the one in front, and the focused group as its index among
+ * the leaves in tree order (`shared/session-groups.ts`). `item` turns a tab into what the record
+ * holds for it.
+ */
+export function layoutOf<T>(
+  groups: EditorGroups,
+  item: (tab: EditorTab, group: EditorGroup) => T,
+): { readonly root: SessionGroupNode<T>; readonly focused: number } {
+  const walk = (node: GroupNode): SessionGroupNode<T> =>
+    node.kind === 'group'
+      ? {
+          tabs: node.tabs.map((tab) => item(tab, node)),
+          active: Math.max(
+            node.tabs.findIndex((tab) => tab.id === node.activeTabId),
+            0,
+          ),
+        }
+      : { split: node.direction, sizes: [...node.sizes], children: node.children.map(walk) };
+  const focused = groupList(groups).findIndex((group) => group.id === groups.focusedGroupId);
+  return { root: walk(groups.root), focused: Math.max(focused, 0) };
+}
+
+/**
+ * The groups a session left, rebuilt (TYTO-286): `documentOf` says which document each kept
+ * item shows, or `undefined` for one that did not come back (a file gone with no draft). A
+ * document is shown once per group; a group left with no tab collapses, and a split left with
+ * one child is that child, its shares spread over what stays. `undefined` when no group
+ * survives — the caller keeps the window it has.
+ *
+ * Ids are minted from `base`, and the first group in tree order takes `base`'s first group's
+ * id, so the group the window opened on — `#editor` and the pane CodeMirror was born in — is
+ * reused rather than torn down. `tabIds` says which tab each item became, for whatever the
+ * caller keeps per tab (its cursor, ADR 0080 decision 8).
+ */
+export function groupsFromLayout<T>(
+  base: EditorGroups,
+  layout: { readonly root: SessionGroupNode<T>; readonly focused: number },
+  documentOf: (item: T) => string | undefined,
+): { readonly groups: EditorGroups; readonly tabIds: ReadonlyMap<T, string> } | undefined {
+  let next: EditorGroups = { ...base };
+  const tabIds = new Map<T, string>();
+  const firstId = groupList(base)[0]?.id;
+  let leafIndex = -1;
+  let focusedGroupId: string | undefined;
+  let firstTaken = false;
+
+  const build = (node: SessionGroupNode<T>): GroupNode | undefined => {
+    if ('split' in node) {
+      const children: GroupNode[] = [];
+      const sizes: number[] = [];
+      node.children.forEach((child, index) => {
+        const built = build(child);
+        if (built === undefined) return;
+        children.push(built);
+        sizes.push(Math.max(node.sizes[index] ?? 0, 0));
+      });
+      if (children.length === 0) return undefined;
+      if (children.length === 1) return children[0];
+      const total = sizes.reduce((sum, size) => sum + size, 0);
+      const shares =
+        total > 0 ? sizes.map((size) => size / total) : sizes.map(() => 1 / sizes.length);
+      const [splitId, after] = mint(next, 'split');
+      next = after;
+      return { kind: 'split', id: splitId, direction: node.split, children, sizes: shares };
+    }
+    leafIndex += 1;
+    const tabs: EditorTab[] = [];
+    let activeTabId: string | undefined;
+    node.tabs.forEach((item, index) => {
+      const documentId = documentOf(item);
+      if (documentId === undefined) return;
+      const twin = tabs.find((tab) => tab.documentId === documentId);
+      if (twin !== undefined) {
+        if (index === node.active) activeTabId = twin.id;
+        return;
+      }
+      const [tabId, after] = mint(next, 'tab');
+      next = after;
+      tabs.push({ id: tabId, documentId });
+      tabIds.set(item, tabId);
+      if (index === node.active) activeTabId = tabId;
+    });
+    if (tabs.length === 0) return undefined;
+    let groupId: string;
+    if (!firstTaken && firstId !== undefined) {
+      groupId = firstId;
+    } else {
+      const [minted, after] = mint(next, 'group');
+      next = after;
+      groupId = minted;
+    }
+    firstTaken = true;
+    if (leafIndex === layout.focused) focusedGroupId = groupId;
+    return { kind: 'group', id: groupId, tabs, activeTabId: activeTabId ?? tabs[0]?.id };
+  };
+
+  const root = build(layout.root);
+  if (root === undefined) return undefined;
+  const built: EditorGroups = { ...next, root, focusedGroupId: focusedGroupId ?? '' };
+  return {
+    groups: { ...built, focusedGroupId: focusedGroup(built).id },
+    tabIds,
+  };
 }
 
 /** Every document some tab shows, once each. */

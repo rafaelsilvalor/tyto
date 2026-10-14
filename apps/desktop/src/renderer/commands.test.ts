@@ -21,6 +21,10 @@ import {
   EDITOR_OPEN,
   EDITOR_SAVE_AS,
   EDITOR_TOGGLE_VIM,
+  GROUP_CLOSE,
+  GROUP_FOCUS_NEXT,
+  GROUP_FOCUS_PREVIOUS,
+  GROUP_MOVE_TAB_NEXT,
   PREVIEW_NEXT_FORMAT,
   PREVIEW_PREVIOUS_SLIDE,
   PREVIEW_ZOOM_FIT,
@@ -65,6 +69,8 @@ const actions = () =>
     stepDocument: vi.fn<(direction: 1 | -1) => void>(),
     splitGroup: vi.fn<(direction: 'row' | 'column') => void>(),
     focusGroup: vi.fn<(direction: 1 | -1) => void>(),
+    moveTabToNextGroup: vi.fn<() => void>(),
+    closeGroup: vi.fn<() => void>(),
     openExport: vi.fn<() => void>(),
     showPlugins: vi.fn<() => void>(),
     showQueue: vi.fn<() => void>(),
@@ -378,18 +384,25 @@ describe('the File menu table', () => {
     expect(spies.reloadWindow).toHaveBeenCalledTimes(1);
   });
 
-  it('names, on View, the two splits under their labels, pinned to `@tyto/editor` (TYTO-286)', () => {
+  it('names, on View, the group commands under their labels, pinned to the constants (TYTO-286)', () => {
     const spies = actions();
     const registry = createDesktopRegistry(spies);
     expect(VIEW_MENU_COMMANDS.map((command) => command.id)).toEqual([
       EDITOR_SPLIT_RIGHT,
       EDITOR_SPLIT_DOWN,
+      GROUP_FOCUS_NEXT,
+      GROUP_FOCUS_PREVIOUS,
+      GROUP_MOVE_TAB_NEXT,
+      GROUP_CLOSE,
     ]);
     for (const command of VIEW_MENU_COMMANDS) {
       expect(COMMAND_LABELS[command.id]).toBe(command.label);
       registry.run(command.id, NO_VIEW);
     }
     expect(spies.splitGroup.mock.calls).toEqual([['row'], ['column']]);
+    expect(spies.focusGroup.mock.calls).toEqual([[1], [-1]]);
+    expect(spies.moveTabToNextGroup).toHaveBeenCalledTimes(1);
+    expect(spies.closeGroup).toHaveBeenCalledTimes(1);
   });
 
   it('pins `editor.save` to the id `@tyto/editor` ships', () => {

@@ -1,6 +1,7 @@
 import { hasBeenEdited, selectionOf } from '@tyto/editor';
 
 import type { IpcRequest } from '../../shared/ipc.js';
+import { prunedGroups } from '../../shared/session-groups.js';
 import { type DocumentState, type Workspace, contentOf, isUnsaved } from './documents.js';
 
 /**
@@ -23,10 +24,19 @@ import { type DocumentState, type Workspace, contentOf, isUnsaved } from './docu
 export function sessionOf(
   workspace: Workspace,
   template: TemplateSnapshot = null,
+  groups?: SessionGroups,
 ): Omit<IpcRequest<'session:write'>, 'final'> {
   const kept = workspace.documents.filter(isKept);
   const at = kept.findIndex((document_) => document_.id === workspace.activeId);
+  const keptIds = new Set(kept.map((document_) => document_.id));
+  // Only the kept documents' tabs (TYTO-286): main would drop the rest, and a tree that names
+  // nothing but kept tabs is one a reader can check against the list beside it.
+  const keptGroups =
+    groups === undefined
+      ? undefined
+      : prunedGroups(groups, (tab) => (keptIds.has(tab.documentId) ? tab : undefined));
   return {
+    ...(keptGroups === undefined ? {} : { groups: keptGroups }),
     tabs: kept.map((document_) => ({
       documentId: document_.id,
       kind: document_.kind ?? 'brief',
@@ -40,6 +50,12 @@ export function sessionOf(
     template,
   };
 }
+
+/**
+ * The editor groups as the window sends them (TYTO-286): each tab names its document and says
+ * where **that** tab was looking, since one document in two groups has a cursor in each.
+ */
+export type SessionGroups = NonNullable<IpcRequest<'session:write'>['groups']>;
 
 /** What the template mode hands the session: `TemplateMode.snapshot()`'s answer. */
 export type TemplateSnapshot = IpcRequest<'session:write'>['template'];
