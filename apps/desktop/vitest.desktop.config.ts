@@ -30,6 +30,9 @@ export default defineConfig({
     include: ['e2e/**/*.desktop.test.ts'],
     // Before any worker starts, so parallel files never race to download the binary.
     globalSetup: ['e2e/electron-binary.global-setup.ts'],
+    // Every window a second launch unless a suite asks for a first one (TYTO-287): the first
+    // opens the preview to the side, and every suite starts in a folder with no session.
+    setupFiles: ['e2e/not-a-first-launch.setup.ts'],
     // Launching Electron is seconds, not milliseconds, and the first run on a machine also
     // downloads the binary. The 5s default would read that as a hang.
     testTimeout: 120_000,

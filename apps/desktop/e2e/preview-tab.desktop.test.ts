@@ -125,8 +125,8 @@ afterAll(async () => {
 
 describe('a fresh window', () => {
   it('opens with no preview until a person asks for one', async () => {
-    // Opening it on a first launch is TYTO-287's second pull request, where the preview is
-    // kept in the session and "first launch" is measured against one.
+    // Not a first launch: the harness seeds a session (`not-a-first-launch.setup.ts`), as
+    // every launch after a person's first has one. The first launch is `preview-session`'s.
     await page.waitForTimeout(1500);
     expect(await strips()).toHaveLength(1);
     expect(await previewLabels()).toEqual([]);

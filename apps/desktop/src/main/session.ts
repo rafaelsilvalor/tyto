@@ -4,7 +4,13 @@ import { basename } from 'node:path';
 import type { IpcRequest, IpcResponse } from '../../shared/ipc.js';
 import { prunedGroups } from '../../shared/session-groups.js';
 import type { DocumentService } from './documents.js';
-import type { SessionStore, StoredGroups, StoredTab, StoredTemplate } from './session-store.js';
+import {
+  NO_GROUPS,
+  type SessionStore,
+  type StoredGroups,
+  type StoredTab,
+  type StoredTemplate,
+} from './session-store.js';
 import type { OpenedTemplate } from './template-editor.js';
 
 /**
@@ -86,6 +92,10 @@ type TemplateRequest = IpcRequest<'session:write'>['template'];
  */
 export const savedHashOf = (text: string): string =>
   createHash('sha256').update(text.replace(/\r\n?/gu, '\n')).digest('hex');
+
+/** A brief that came back with something to show: its file, or its draft in no file. */
+const isBriefBack = (tab: RestoredTab): boolean =>
+  tab.kind === 'brief' && (tab.document !== null || tab.draft !== null);
 
 export function createSessionService(options: SessionServiceOptions): SessionService {
   const { store, documents } = options;
@@ -202,14 +212,18 @@ export function createSessionService(options: SessionServiceOptions): SessionSer
       }
       const keptMode = keptTemplate(template);
       // The groups name the kept tabs by index (TYTO-286); a tab that was not kept — a brief in
-      // no file with nothing typed — leaves its groups, and a group left with none goes.
+      // no file with nothing typed — leaves its groups, and a group left with none goes. A
+      // following preview names no tab and stays; a locked one goes with its brief (TYTO-287).
       const keptGroups: StoredGroups | undefined =
         groups === undefined
           ? undefined
-          : prunedGroups(groups, ({ documentId, place }) => {
-              const at = keptIndex.get(documentId);
+          : prunedGroups(groups, (tab) => {
+              if (!('documentId' in tab)) return { view: 'preview' as const };
+              const at = keptIndex.get(tab.documentId);
               if (at === undefined) return undefined;
-              return { tab: at, ...(place === null ? {} : { place }) };
+              if ('locked' in tab)
+                return { tab: at, view: 'preview' as const, locked: true as const };
+              return { tab: at, ...(tab.place === null ? {} : { place: tab.place }) };
             });
       return {
         written: await store.write({
@@ -217,7 +231,8 @@ export function createSessionService(options: SessionServiceOptions): SessionSer
           tabs: kept,
           active: keptActive,
           ...(keptMode === undefined ? {} : { template: keptMode }),
-          ...(keptGroups === undefined ? {} : { groups: keptGroups }),
+          // Always: a session without groups reads as a first launch (TYTO-287, NO_GROUPS).
+          groups: keptGroups ?? NO_GROUPS,
         }),
       };
     },
@@ -232,13 +247,27 @@ export function createSessionService(options: SessionServiceOptions): SessionSer
       const template =
         stored.template === undefined ? null : await restoreTemplate(stored.template);
       // Indices checked against the tabs read: a hand-edited file may name one that is not.
+      // A locked preview whose brief did not come back goes with it (TYTO-287).
       const groups =
         stored.groups === undefined
           ? undefined
-          : prunedGroups(stored.groups, ({ tab, place }) =>
-              tab < tabs.length ? { tab, place: place ?? null } : undefined,
-            );
-      return { tabs, active: stored.active, template, groups: groups ?? null };
+          : prunedGroups(stored.groups, (tab) => {
+              if (!('tab' in tab)) return { view: 'preview' as const };
+              const restored = tabs[tab.tab];
+              if (restored === undefined) return undefined;
+              if ('locked' in tab) return isBriefBack(restored) ? tab : undefined;
+              return { tab: tab.tab, place: tab.place ?? null };
+            });
+      return {
+        tabs,
+        active: stored.active,
+        template,
+        groups: groups ?? null,
+        // No groups is no session from a build that keeps them: a first launch, or the first
+        // after the upgrade (ADR 0084 decision 8). A file that could not be read, or whose tree
+        // did not parse, has groups by then (`UNREADABLE_SESSION`): somebody used the app.
+        firstLaunch: stored.groups === undefined,
+      };
     },
   };
 }

@@ -7,7 +7,13 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { createDocumentService } from './documents.js';
 import { type RecentFiles } from './recent-files.js';
 import { createSessionService, createTemplateFolder, savedHashOf } from './session.js';
-import { EMPTY_SESSION, type SessionStore, fileSessionStore } from './session-store.js';
+import {
+  EMPTY_SESSION,
+  NO_GROUPS,
+  type SessionStore,
+  UNREADABLE_SESSION,
+  fileSessionStore,
+} from './session-store.js';
 import { type OpenedTemplate } from './template-editor.js';
 
 /**
@@ -31,10 +37,14 @@ describe('the session file', () => {
   it('reads an empty session when there is no file, and when the file is not JSON', async () => {
     const file = join(scratch, 'session.json');
     expect(await fileSessionStore(file).read()).toEqual(EMPTY_SESSION);
+    // A file that is there but unreadable is empty too, and not a first launch (TYTO-287).
     writeFileSync(file, '{ not json');
-    expect(await fileSessionStore(file).read()).toEqual(EMPTY_SESSION);
+    expect(await fileSessionStore(file).read()).toEqual(UNREADABLE_SESSION);
     writeFileSync(file, JSON.stringify({ version: 2, tabs: 'no' }));
-    expect(await fileSessionStore(file).read()).toEqual(EMPTY_SESSION);
+    expect(await fileSessionStore(file).read()).toEqual(UNREADABLE_SESSION);
+    const folder = join(scratch, 'folder', 'session.json');
+    mkdirSync(folder, { recursive: true });
+    expect(await fileSessionStore(folder).read()).toEqual(UNREADABLE_SESSION);
   });
 
   it('swallows a write the disk refuses, and says it did not write', async () => {
@@ -211,6 +221,7 @@ describe('writing the session', () => {
       version: 1,
       tabs: [{ kind: 'brief', path: '/b/a.brief' }],
       active: 0,
+      groups: NO_GROUPS,
     });
   });
 
@@ -229,6 +240,7 @@ describe('writing the session', () => {
       version: 1,
       tabs: [{ kind: 'brief', path: '/b/a.brief', place }],
       active: 0,
+      groups: NO_GROUPS,
     });
 
     // Unclamped: main does not hold the text the window opens, and the window clamps.
@@ -254,6 +266,7 @@ describe('writing the session', () => {
       version: 1,
       tabs: [{ kind: 'brief', draft: { text: '::novo', savedHash: savedHashOf('') } }],
       active: 0,
+      groups: NO_GROUPS,
     });
   });
 
@@ -273,6 +286,7 @@ describe('writing the session', () => {
       version: 1,
       tabs: [{ kind: 'brief', path: '/b/a.brief' }],
       active: 0,
+      groups: NO_GROUPS,
     });
   });
 
@@ -311,6 +325,7 @@ describe('writing the session', () => {
         },
       ],
       active: 0,
+      groups: NO_GROUPS,
     });
   });
 });
@@ -456,6 +471,7 @@ describe('the template mode in the session (TYTO-266)', () => {
         visible: 'markup',
         drafts: { markup: { text: mode.markup.text, savedHash: savedHashOf(MARKUP) } },
       },
+      groups: NO_GROUPS,
     });
   });
 
@@ -463,11 +479,11 @@ describe('the template mode in the session (TYTO-266)', () => {
     const { store, session, templateFolder } = setup(folder());
     templateFolder.set(FOLDER);
     await session.write({ tabs: [], active: 0, template: null, final: false });
-    expect(store.saved()).toEqual({ version: 1, tabs: [], active: 0 });
+    expect(store.saved()).toEqual({ version: 1, tabs: [], active: 0, groups: NO_GROUPS });
 
     templateFolder.set(undefined);
     await session.write({ tabs: [], active: 0, template: mode, final: false });
-    expect(store.saved()).toEqual({ version: 1, tabs: [], active: 0 });
+    expect(store.saved()).toEqual({ version: 1, tabs: [], active: 0, groups: NO_GROUPS });
   });
 
   it('reopens the folder as it reads now, with a fresh draft offered over its file', async () => {
@@ -632,11 +648,13 @@ describe('the editor groups in the session (TYTO-286)', () => {
     });
   });
 
-  it('keeps no groups for a window that sent none, and answers null for a file with none', async () => {
+  it('keeps one empty group for a window that sent none, and reads it back as none', async () => {
+    // Every session from a build that keeps groups carries them (TYTO-287): a session without
+    // them is how a launch knows it is the first one.
     const { store, session } = await twoBriefs();
     await session.write({ tabs, active: 0, template: null, final: false });
-    expect(store.saved()).not.toHaveProperty('groups');
-    expect((await session.read()).groups).toBeNull();
+    expect(store.saved()).toMatchObject({ groups: NO_GROUPS });
+    expect(await session.read()).toMatchObject({ groups: null, firstLaunch: false });
   });
 
   it('reads a version 1 file written before the groups were kept, which is one group', async () => {
@@ -667,6 +685,7 @@ describe('the editor groups in the session (TYTO-286)', () => {
       version: 1,
       tabs: [{ kind: 'brief', draft }],
       active: 0,
+      groups: NO_GROUPS,
     });
   });
 
@@ -692,5 +711,139 @@ describe('the editor groups in the session (TYTO-286)', () => {
       root: { tabs: [{ tab: 0, place: null }], active: 0 },
       focused: 0,
     });
+  });
+});
+
+describe('the previews in the session (TYTO-287, ADR 0084)', () => {
+  const place = (anchor: number) => ({ anchor, head: anchor, top: 0 });
+  const twoBriefs = async () => {
+    const built = setup({ '/b/a.brief': '::titulo A', '/b/b.brief': '::titulo B' });
+    await built.documents.openPath('document-1', '/b/a.brief');
+    await built.documents.openPath('document-2', '/b/b.brief');
+    return built;
+  };
+  const tabs = [
+    { documentId: 'document-1', kind: 'brief' as const, draft: null, place: place(1) },
+    { documentId: 'document-2', kind: 'brief' as const, draft: null, place: place(2) },
+  ];
+  /** `a` and `b` on the left; a preview locked on `a` and the following one on the right. */
+  const withPreviews = {
+    root: {
+      split: 'row' as const,
+      sizes: [0.5, 0.5],
+      children: [
+        {
+          tabs: [
+            { documentId: 'document-1', place: place(1) },
+            { documentId: 'document-2', place: place(2) },
+          ],
+          active: 1,
+        },
+        {
+          tabs: [
+            { documentId: 'document-1', view: 'preview' as const, locked: true as const },
+            { view: 'preview' as const },
+          ],
+          active: 1,
+        },
+      ],
+    },
+    focused: 0,
+  };
+  const keptPreviews = [{ tab: 0, view: 'preview', locked: true }, { view: 'preview' }];
+
+  it('keeps a following preview as a view and a locked one by its brief’s index, no path', async () => {
+    const { store, session } = await twoBriefs();
+    await session.write({ tabs, active: 1, template: null, groups: withPreviews, final: false });
+    expect(store.saved()).toMatchObject({
+      groups: { root: { children: [{ active: 1 }, { tabs: keptPreviews, active: 1 }] } },
+    });
+    expect(JSON.stringify((store.saved() as { groups: unknown }).groups)).not.toContain('/b/');
+  });
+
+  it('round-trips both previews through the file and hands them back', async () => {
+    const built = await twoBriefs();
+    await built.session.write({
+      tabs,
+      active: 1,
+      template: null,
+      groups: withPreviews,
+      final: false,
+    });
+    const store = fileSessionStore(join(scratch, 'session.json'));
+    expect(await store.write(built.store.saved() as never)).toBe(true);
+    expect(await store.read()).toEqual(built.store.saved());
+
+    const read = await built.session.read();
+    expect(read.firstLaunch).toBe(false);
+    expect(read.groups?.root).toMatchObject({ children: [{}, { tabs: keptPreviews }] });
+  });
+
+  it('drops a locked preview whose brief was not kept, and keeps the following one', async () => {
+    const { store, session } = await twoBriefs();
+    await session.write({
+      tabs: [...tabs, { documentId: 'document-9', kind: 'brief', draft: null, place: null }],
+      active: 0,
+      template: null,
+      groups: {
+        root: {
+          tabs: [
+            { documentId: 'document-1', place: null },
+            { documentId: 'document-9', view: 'preview', locked: true },
+            { view: 'preview' },
+          ],
+          active: 2,
+        },
+        focused: 0,
+      },
+      final: false,
+    });
+    expect(store.saved()).toMatchObject({
+      groups: { root: { tabs: [{ tab: 0 }, { view: 'preview' }], active: 1 } },
+    });
+  });
+
+  it('drops a locked preview whose brief did not come back, and a group it leaves empty', async () => {
+    const { store, session } = setup({ '/b/a.brief': '::titulo A' });
+    await store.write({
+      version: 1,
+      tabs: [
+        { kind: 'brief', path: '/b/a.brief' },
+        { kind: 'brief', path: '/b/gone.brief' },
+      ],
+      active: 0,
+      groups: {
+        root: {
+          split: 'row',
+          sizes: [0.5, 0.5],
+          children: [
+            { tabs: [{ tab: 0 }, { tab: 1 }], active: 0 },
+            { tabs: [{ tab: 1, view: 'preview', locked: true }], active: 0 },
+          ],
+        },
+        focused: 1,
+      },
+    });
+    expect((await session.read()).groups).toEqual({
+      root: {
+        tabs: [
+          { tab: 0, place: null },
+          { tab: 1, place: null },
+        ],
+        active: 0,
+      },
+      focused: 0,
+    });
+  });
+
+  it('is a first launch with no file, and with a version 1 file from before the groups', async () => {
+    // The memory store starts where `fileSessionStore` answers for a missing file.
+    const { store, session } = setup({ '/b/a.brief': '::titulo A' });
+    expect((await session.read()).firstLaunch).toBe(true);
+
+    await store.write({ version: 1, tabs: [{ kind: 'brief', path: '/b/a.brief' }], active: 0 });
+    const before = await session.read();
+    expect(before).toMatchObject({ firstLaunch: true, groups: null });
+    expect(before.tabs).toHaveLength(1);
   });
 });

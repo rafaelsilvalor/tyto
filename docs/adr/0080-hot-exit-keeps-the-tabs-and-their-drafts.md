@@ -42,7 +42,13 @@ leaf was focused, counted in tree order. `tabs` stays the list of documents, one
 (zod strips the key) still restores every tab, as one group, with the right one in front. The
 version stays 1, and a tree that does not parse is dropped alone (`.catch`): it costs the
 arrangement, never the drafts. On the wire the window names a group's tab by its document id;
-main turns it into an index of the tabs it keeps, and a group left with none goes. The
+main turns it into an index of the tabs it keeps, and a group left with none goes.
+_Amended by TYTO-287:_ a group's tab may be a preview (ADR 0084): `{ view: 'preview' }` for the
+following one, which names nothing, and `{ tab, view: 'preview', locked: true }` for one locked on
+the brief at that index; neither keeps a `place` or a path, and a locked preview whose brief was
+not kept or did not come back goes. **`groups` is now always written** — one empty group when
+nothing is kept — because a session without it is how a launch knows it is the first one, and
+`session:read` answers `firstLaunch` from that. The
 store copies `fileLayoutStore`: reading never fails (a missing or unparseable file is an empty
 session), writing swallows the error but **answers whether it wrote**, because the quit acts on
 that answer. Line endings are normalised before hashing, since CodeMirror reads CR LF as LF

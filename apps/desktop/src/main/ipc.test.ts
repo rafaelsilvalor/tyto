@@ -500,7 +500,8 @@ const dependencies = () => {
     // TYTO-113. Its decisions are `session.test.ts`'s; here it only has to be wired.
     session: {
       write: () => Promise.resolve({ written: true }),
-      read: () => Promise.resolve({ tabs: [], active: 0, template: null, groups: null }),
+      read: () =>
+        Promise.resolve({ tabs: [], active: 0, template: null, groups: null, firstLaunch: false }),
     },
     menu: menuRebuilds(),
     plugins: pluginList(keychain),

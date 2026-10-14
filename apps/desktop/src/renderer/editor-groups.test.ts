@@ -2,6 +2,8 @@ import { describe, expect, it } from 'vitest';
 
 import {
   type EditorGroups,
+  type EditorTab,
+  type RestoredPreview,
   activateTab,
   activeTabOf,
   closeDocumentTabs,
@@ -26,7 +28,6 @@ import {
   shownDocumentIds,
   splitGroup,
   toggleLock,
-  withoutPreviews,
 } from './editor-groups.js';
 
 /** What each group shows, in tree order: its documents, the one in front starred. */
@@ -359,8 +360,46 @@ describe('the preview as a tab (TYTO-287, ADR 0084)', () => {
     expect(withPreviews(closeDocumentTabs(both, 'b'))).toEqual(['*a', '*P(b)']);
   });
 
-  it('leaves the session nothing of itself (TYTO-287, first pull request)', () => {
+  /** A preview as the session names it: nothing while it follows, its brief once locked. */
+  const sessionItem = (tab: EditorTab): string =>
+    tab.view === 'preview' ? (tab.locked === true ? `L(${tab.documentId})` : 'P') : tab.documentId;
+  const fromSession = (item: string): string | RestoredPreview => {
+    if (item === 'P') return { view: 'preview', documentId: '' };
+    const locked = /^L\((?<brief>.+)\)$/u.exec(item)?.groups?.['brief'];
+    return locked === undefined ? item : { view: 'preview', documentId: locked, locked: true };
+  };
+
+  it('comes back from a session with a following and a locked preview (second pull request)', () => {
     const opened = openPreviewToSide(twoDocuments(), 'b', false);
-    expect(withPreviews(withoutPreviews(opened))).toEqual(['a *b']);
+    const both = openPreviewToSide(toggleLock(opened, following(opened)), 'b', false);
+    const layout = layoutOf(both, sessionItem);
+    expect(layout.root).toMatchObject({
+      children: [{ tabs: ['a', 'b'] }, { tabs: ['L(b)', 'P'] }],
+    });
+
+    const rebuilt = groupsFromLayout(groupsOf(['x'], 'x'), layout, fromSession);
+    // The following preview names no brief until the window points it at the one in front.
+    expect(withPreviews(rebuilt?.groups as EditorGroups)).toEqual(['a *b', 'L(b) *P()']);
+    expect(withPreviews(followBrief(rebuilt?.groups as EditorGroups, 'b'))).toEqual([
+      'a *b',
+      'L(b) *P(b)',
+    ]);
+  });
+
+  it('builds one following preview and one locked preview per brief, whatever the file says', () => {
+    const layout = {
+      root: { tabs: ['a', 'P', 'L(a)', 'P', 'L(a)'], active: 0 },
+      focused: 0,
+    };
+    const rebuilt = groupsFromLayout(groupsOf(['x'], 'x'), layout, fromSession);
+    expect(withPreviews(rebuilt?.groups as EditorGroups)).toEqual(['*a P() L(a)']);
+  });
+
+  it('points a locked preview of the untouched tab at the file that replaces it', () => {
+    // Measured for PR A's left-open row: the untouched tab becomes the opened file in every
+    // group, and a preview locked on it goes with it rather than pointing at nothing.
+    const opened = openPreviewToSide(groupsOf(['blank'], 'blank'), 'blank', false);
+    const locked = toggleLock(opened, following(opened));
+    expect(withPreviews(replaceDocument(locked, 'blank', 'file'))).toEqual(['*file', '*L(file)']);
   });
 });
