@@ -92,6 +92,10 @@ export const VIEW_MENU_COMMANDS: readonly MenuCommand[] = [
   { id: 'editor.focusPreviousGroup', label: 'command.group.focusPrevious' },
   { id: 'editor.moveTabToNextGroup', label: 'command.group.moveTabToNext' },
   { id: 'editor.closeGroup', label: 'command.group.close' },
+  // TYTO-287. The preview as a tab, after the groups it opens into.
+  { id: 'preview.openToSide', label: 'command.preview.openToSide' },
+  { id: 'preview.open', label: 'command.preview.open' },
+  { id: 'preview.toggleLock', label: 'command.preview.toggleLock' },
 ];
 
 /** Every command the File menu offers, flat, for the tests that count them. */

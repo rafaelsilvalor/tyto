@@ -56,3 +56,41 @@ describe('arrangeGroups', () => {
     expect(document.getElementById('editor')).toBe(made.get(second?.id ?? '')?.mount);
   });
 });
+
+describe('a group with a preview in front (TYTO-287)', () => {
+  it('shows its preview pane in place of the mount, and keeps both', async () => {
+    const made = new Map<string, EditorGroupElement>();
+    const [group] = arrangeGroups(container(), groupsOf(['a'], 'a'), made).created;
+    if (group === undefined) throw new Error('no group');
+    await group.updateComplete;
+    expect(group.mount.hidden).toBe(false);
+    expect(group.preview.hidden).toBe(true);
+
+    group.showing = 'preview';
+    await group.updateComplete;
+    await group.preview.updateComplete;
+    expect(group.mount.hidden).toBe(true);
+    expect(group.preview.hidden).toBe(false);
+    expect(group.mount.isConnected).toBe(true);
+    expect(group.preview.querySelector('[data-preview-frame]')?.getAttribute('sandbox')).toBe('');
+    // No ids: two previews can be on screen at once.
+    expect(group.preview.querySelector('[id]')).toBeNull();
+  });
+
+  it('offers "Open preview to the side" at the end of its strip only while asked to', async () => {
+    const made = new Map<string, EditorGroupElement>();
+    const [group] = arrangeGroups(container(), groupsOf(['a'], 'a'), made).created;
+    if (group === undefined) throw new Error('no group');
+    let opened = 0;
+    group.openPreview = () => {
+      opened += 1;
+    };
+    await group.updateComplete;
+    expect(group.querySelector('.editor-group__action')).toBeNull();
+
+    group.offerPreview = true;
+    await group.updateComplete;
+    group.querySelector<HTMLButtonElement>('.editor-group__action')?.click();
+    expect(opened).toBe(1);
+  });
+});

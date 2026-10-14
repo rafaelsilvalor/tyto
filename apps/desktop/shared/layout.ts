@@ -79,7 +79,6 @@ export const layoutSchema = z.object({
 export type Layout = z.infer<typeof layoutSchema>;
 
 export const EDITOR_PANEL = 'editor';
-export const PREVIEW_PANEL = 'preview';
 export const PROBLEMS_PANEL = 'problems';
 export const QUEUE_PANEL = 'queue';
 
@@ -98,10 +97,15 @@ const isPluginPanel = (id: string): boolean => id.startsWith(PLUGIN_PANEL_PREFIX
 /**
  * The arrangement ADR 0024 settled, as the record the app starts from.
  *
- * Four panels and not the seven the ADR draws: the templates list, the file tree and the
+ * Three panels and not the seven the ADR draws: the templates list, the file tree and the
  * logs do not exist yet. They join by being added here, which is the claim
  * this card is making — a new panel should be one entry and an element, with no change to
  * the dock, the CSS or the window.
+ *
+ * **The preview is not a panel since TYTO-287** (ADR 0084): it is a tab in the editor groups.
+ * A `layout.json` that still names it reads like any record for a panel this build does not
+ * have — `layoutFrom` drops it — so no file needs migrating, and the right dock is empty until
+ * a plugin's panel docks there.
  */
 export const DEFAULT_LAYOUT: Layout = {
   panels: [
@@ -112,14 +116,6 @@ export const DEFAULT_LAYOUT: Layout = {
       open: true,
       size: 600,
       fixed: true,
-    },
-    {
-      id: PREVIEW_PANEL,
-      element: 'tyto-preview-panel',
-      dock: 'right',
-      open: true,
-      size: 560,
-      fixed: false,
     },
     {
       id: PROBLEMS_PANEL,
@@ -199,6 +195,14 @@ export const dockIsHidden = (layout: Layout, dock: Dock): boolean =>
 /** The panels a dock shows: none while it is hidden, its open ones otherwise. */
 export const shownPanelsOf = (layout: Layout, dock: Dock): readonly PanelRecord[] =>
   dockIsHidden(layout, dock) ? [] : openPanelsOf(layout, dock);
+
+/**
+ * Whether any panel lives in a dock, open or not: an area with none has nothing a status-bar
+ * button could show, so the button is not drawn (TYTO-287 — the right area, once the preview
+ * left it, until a plugin's panel docks there).
+ */
+export const dockHasPanels = (layout: Layout, dock: Dock): boolean =>
+  layout.panels.some((panel) => panel.dock === dock);
 
 /** Whether a dock is on screen, which is what its status-bar button shows as on. */
 export const dockIsShown = (layout: Layout, dock: Dock): boolean =>

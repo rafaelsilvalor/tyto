@@ -10,11 +10,11 @@ import {
 import './problems-panel.js';
 
 /**
- * The three panels the window has, as elements the dock can create by name (E9.10).
+ * The window's own panels, as elements the dock can create by name (E9.10). The preview was
+ * the third until it became a tab (TYTO-287, `preview-pane.ts`).
  *
  * **Every id and class inside these is the one `index.html` used to declare**, deliberately
- * and to the character. `preview.ts` writes into `#preview-stage`, the `[data-i18n]` walk
- * finds the headings, `shell.css` styles all of it and the end-to-end suite queries it —
+ * and to the character. The `[data-i18n]` walk finds the headings, `shell.css` styles all of it and the end-to-end suite queries it —
  * none of that changes because a panel moved into a dock. What changed is who owns the
  * markup: a `<section>` in a file, or a tag a record names.
  *
@@ -24,7 +24,6 @@ import './problems-panel.js';
  */
 
 export const EDITOR_PANEL_TAG = 'tyto-editor-panel';
-export const PREVIEW_PANEL_TAG = 'tyto-preview-panel';
 export const PROBLEMS_PANEL_TAG = 'tyto-problems-panel';
 
 /** What the dock sets on every panel it creates. */
@@ -125,45 +124,6 @@ export class EditorPanel extends DockedPanel {
   }
 }
 
-/** The frames the brief produced, at one scale, with the tabs and the zoom over them. */
-export class PreviewPanel extends DockedPanel {
-  protected override render(): unknown {
-    return html`${this.bar(
-        'preview-heading',
-        'preview.heading',
-        html`<div class="preview__tabs" id="format-tabs" role="tablist"></div>
-          <label class="preview__slide">
-            <span id="slide-label" data-i18n="preview.slide.label"></span>
-            <select id="slide"></select>
-          </label>
-          <div class="preview__zoom">
-            <button type="button" id="zoom-out" data-i18n-title="preview.zoom.out">−</button>
-            <output id="zoom-level"></output>
-            <button type="button" id="zoom-in" data-i18n-title="preview.zoom.in">+</button>
-            <button type="button" id="zoom-fit" data-i18n="preview.zoom.fit"></button>
-          </div>`,
-      )}
-      <div class="preview__stage" id="preview-stage">
-        <div class="preview__paper" id="preview-paper" hidden>
-          <!--
-          \`sandbox\` with no tokens: unique origin, no scripts, no forms, no navigation. A
-          preview document is a picture. The exporter emits no script and this is what makes
-          that a property of the window rather than a habit of the exporter.
-        -->
-          <iframe id="preview-frame" sandbox="" title="Tyto"></iframe>
-        </div>
-        <p class="preview__empty" id="preview-empty" data-i18n="preview.empty"></p>
-        <!-- TYTO-268: in the empty line's place when the brief is written and cannot be drawn. -->
-        <p class="preview__empty" id="preview-broken" data-i18n="preview.broken" hidden></p>
-        <p class="preview__stale" id="preview-stale" data-i18n="preview.stale" hidden></p>
-        <!-- TYTO-256: what an app file's tab shows here instead (\`editor-chrome.ts\`). -->
-        <p class="preview__empty" data-preview-note data-i18n="preview.note.settings" hidden></p>
-        <p class="preview__empty" data-preview-note data-i18n="preview.note.keybindings" hidden></p>
-        <p class="preview__empty" data-preview-note data-i18n="preview.note.snippets" hidden></p>
-      </div>`;
-  }
-}
-
 /**
  * What the stages said about the brief.
  *
@@ -185,13 +145,11 @@ export class ProblemsPanelFrame extends DockedPanel {
 }
 
 customElements.define(EDITOR_PANEL_TAG, EditorPanel);
-customElements.define(PREVIEW_PANEL_TAG, PreviewPanel);
 customElements.define(PROBLEMS_PANEL_TAG, ProblemsPanelFrame);
 
 declare global {
   interface HTMLElementTagNameMap {
     [EDITOR_PANEL_TAG]: EditorPanel;
-    [PREVIEW_PANEL_TAG]: PreviewPanel;
     [PROBLEMS_PANEL_TAG]: ProblemsPanelFrame;
   }
 }

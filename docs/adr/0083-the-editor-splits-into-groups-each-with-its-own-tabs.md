@@ -68,6 +68,10 @@ is said where it applies.
    mode's way back. `Mod-1`…`Mod-9`, `Mod-PageUp`/`Mod-PageDown` and `Mod-w` act within the
    focused group. Opening a file another group already shows goes to that tab. A brief's preview
    answer reaches the gutter of every pane that shows it, keyed per document.
+
+   > **Changed by ADR 0084 (TYTO-287).** The preview is a tab now, and a click in a preview
+   > focuses its group; with a preview focused, the active document is the brief it shows.
+
 7. **Commands.** Through the ADR 0074 table, as built-in defaults (Rafael's decision): `Mod-\`
    splits right, `Mod-Shift-\` splits down, `Mod-Alt-ArrowLeft` and `Mod-Alt-ArrowRight` move
    focus to the group before and after. `Mod-\` is free in CodeMirror's keymap; `Mod-Shift-\` is

@@ -10,6 +10,7 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { translate } from '../shared/i18n/index.js';
 import { closeApp } from './close-app.js';
 import { firstWindow } from './first-window.js';
+import { openPreviewBeside, previewSrcdoc } from './preview-pane.js';
 
 /**
  * The preview's two empty lines, through a real window (TYTO-268).
@@ -43,14 +44,13 @@ let page: Page;
 /** Where the card's screenshots go when asked for; the suite takes none otherwise. */
 const shots = process.env['TYTO_PREVIEW_BROKEN_SHOTS'];
 
-const empty = () => page.locator('#preview-empty');
-const broken = () => page.locator('#preview-broken');
-const paper = () => page.locator('#preview-paper');
-const stale = () => page.locator('#preview-stale');
+const empty = () => page.locator('tyto-preview-pane:not([hidden]) [data-preview-empty]');
+const broken = () => page.locator('tyto-preview-pane:not([hidden]) [data-preview-broken]');
+const paper = () => page.locator('tyto-preview-pane:not([hidden]) [data-preview-paper]');
+const stale = () => page.locator('tyto-preview-pane:not([hidden]) [data-preview-stale]');
 
 /** The document the preview is showing, or `''` before it shows one. */
-const shown = async (): Promise<string> =>
-  page.evaluate(() => document.getElementById('preview-frame')?.getAttribute('srcdoc') ?? '');
+const shown = async (): Promise<string> => previewSrcdoc(page);
 
 const replaceText = async (text: string): Promise<void> => {
   await page.click('#editor .cm-content');
@@ -74,6 +74,7 @@ beforeAll(async () => {
   });
   page = await firstWindow(app);
   await page.waitForSelector('#editor .cm-content');
+  await openPreviewBeside(page);
 });
 
 afterAll(async () => {

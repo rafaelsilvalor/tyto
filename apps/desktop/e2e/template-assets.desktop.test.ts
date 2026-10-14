@@ -13,6 +13,7 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 
 import { closeApp } from './close-app.js';
 import { firstWindow } from './first-window.js';
+import { openPreviewBeside, previewSrcdoc } from './preview-pane.js';
 
 /**
  * A template that draws from its own folder agrees in the window and in `tyto render` (TYTO-176).
@@ -126,8 +127,7 @@ async function run(commandId: string): Promise<void> {
   if (!ran) throw new Error(`the command bar refused '${commandId}'`);
 }
 
-const shown = async (): Promise<string> =>
-  window.evaluate(() => document.getElementById('preview-frame')?.getAttribute('srcdoc') ?? '');
+const shown = async (): Promise<string> => previewSrcdoc(window);
 
 /**
  * The artwork `MARKUP` describes, pixel for pixel: black, the background over the top half,
@@ -183,6 +183,7 @@ beforeAll(async () => {
   });
   window = await firstWindow(app);
   await window.waitForSelector('#editor .cm-content');
+  await openPreviewBeside(window);
   await window.waitForSelector('.tabs__tab');
 
   await answerPickers({ file: briefPath });

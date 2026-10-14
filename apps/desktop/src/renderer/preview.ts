@@ -104,10 +104,21 @@ export function fitZoom(frame: Frame, stage: { width: number; height: number }):
 export function stageBox(stage: HTMLElement): { width: number; height: number } {
   const style = stage.ownerDocument.defaultView?.getComputedStyle(stage);
   const pixels = (value: string | undefined): number => Number.parseFloat(value ?? '0') || 0;
+  // `clientHeight` is rounded to a whole pixel, and up as often as down: a stage 574.7px tall
+  // answered 575, `fit` filled 575, and the 0.3px the paper overflowed by gave the stage a scroll
+  // bar 16px wide (TYTO-287, measured once a split made `fit` go by height). The box's own size,
+  // rounded down, where there is one — jsdom lays nothing out and answers zero.
+  const box = stage.getBoundingClientRect();
+  const down = (client: number, measured: number): number =>
+    measured > 0 ? Math.min(client, Math.floor(measured)) : client;
 
   return {
-    width: stage.clientWidth - pixels(style?.paddingLeft) - pixels(style?.paddingRight),
-    height: stage.clientHeight - pixels(style?.paddingTop) - pixels(style?.paddingBottom),
+    width:
+      down(stage.clientWidth, box.width) - pixels(style?.paddingLeft) - pixels(style?.paddingRight),
+    height:
+      down(stage.clientHeight, box.height) -
+      pixels(style?.paddingTop) -
+      pixels(style?.paddingBottom),
   };
 }
 
@@ -195,6 +206,23 @@ export const FORMAT_ATTRIBUTE = 'data-format';
 /** Rewrites the tab strip, marking the selected one. Returns nothing; the DOM is the state. */
 function paintTabs(tabs: HTMLElement, state: PreviewState): void {
   const document_ = tabs.ownerDocument;
+  const formats = formatsOf(state.frames);
+  const existing = [...tabs.children];
+
+  // The same formats keep their buttons, only the selection moves (TYTO-287). A click on a
+  // format in a preview tab focuses its group first, which repaints; buttons rebuilt between
+  // the press and the release took the click with them.
+  if (
+    existing.length === formats.length &&
+    existing.every((tab, at) => tab.getAttribute(FORMAT_ATTRIBUTE) === formats[at])
+  ) {
+    for (const tab of existing) {
+      const selected = tab.getAttribute(FORMAT_ATTRIBUTE) === state.selection.format;
+      tab.setAttribute('aria-selected', String(selected));
+      tab.classList.toggle('preview__tab--on', selected);
+    }
+    return;
+  }
 
   tabs.replaceChildren(
     ...formatsOf(state.frames).map((format) => {

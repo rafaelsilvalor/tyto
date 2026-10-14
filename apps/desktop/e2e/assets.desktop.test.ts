@@ -9,6 +9,7 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 
 import { closeApp } from './close-app.js';
 import { firstWindow } from './first-window.js';
+import { openPreviewBeside, previewSrcdoc } from './preview-pane.js';
 
 /**
  * Where the window finds a brief's images (TYTO-204, ADR 0056).
@@ -96,8 +97,7 @@ async function run(commandId: string): Promise<void> {
   if (!ran) throw new Error(`the command bar refused '${commandId}'`);
 }
 
-const shown = async (): Promise<string> =>
-  window.evaluate(() => document.getElementById('preview-frame')?.getAttribute('srcdoc') ?? '');
+const shown = async (): Promise<string> => previewSrcdoc(window);
 
 /** Opens a brief from disk and waits for a preview carrying `title`. */
 async function openBrief(path: string, title: string): Promise<string> {
@@ -130,6 +130,7 @@ beforeAll(async () => {
   });
   window = await firstWindow(app);
   await window.waitForSelector('#editor .cm-content');
+  await openPreviewBeside(window);
   await window.waitForSelector('.tabs__tab');
 });
 

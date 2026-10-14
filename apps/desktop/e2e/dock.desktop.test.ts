@@ -81,17 +81,23 @@ afterAll(async () => {
 });
 
 describe('the window the record describes', () => {
-  it('opens with the three panels ADR 0024 draws, and an empty left dock', async () => {
-    expect(await openPanels(page)).toEqual(['editor', 'preview', 'problems']);
+  it('opens with the editor and the problems, and empty side docks', async () => {
+    // The PREVIEW panel was the right dock's until it became a tab (TYTO-287, ADR 0084).
+    expect((await openPanels(page)).sort()).toEqual(['editor', 'problems']);
     expect(
-      await page.evaluate(() => document.querySelector<HTMLElement>('[data-dock="left"]')?.hidden),
-    ).toBe(true);
+      await page.evaluate(() =>
+        ['left', 'right'].map(
+          (dock) => document.querySelector<HTMLElement>(`[data-dock="${dock}"]`)?.hidden,
+        ),
+      ),
+    ).toEqual([true, true]);
   });
 
-  it('gives the side dock a real width and the centre the remainder', async () => {
-    // The half jsdom cannot answer. `560px` is in the record; that it becomes 560 pixels of
-    // window is what a layout engine decides.
-    expect(await dockWidth(page, 'right')).toBe(560);
+  it('gives a side dock a real width and the centre the remainder', async () => {
+    // The half jsdom cannot answer. `340px` is the queue's record; that it becomes 340 pixels
+    // of window is what a layout engine decides.
+    await runFromBar(page, 'layout.togglePanel:queue');
+    expect(await dockWidth(page, 'left')).toBe(340);
     expect(await dockWidth(page, 'centre')).toBeGreaterThan(0);
   });
 
@@ -105,9 +111,9 @@ describe('the window the record describes', () => {
 
 describe('dragging a splitter', () => {
   it('changes the dock it is the edge of, and leaves the window fitting', async () => {
-    const before = await dockWidth(page, 'right');
+    const before = await dockWidth(page, 'left');
     const box = await page.evaluate(() => {
-      const rect = document.querySelector('[data-splitter="right"]')?.getBoundingClientRect() ?? {
+      const rect = document.querySelector('[data-splitter="left"]')?.getBoundingClientRect() ?? {
         x: 0,
         y: 0,
         width: 0,
@@ -118,12 +124,12 @@ describe('dragging a splitter', () => {
 
     await page.mouse.move(box.x, box.y);
     await page.mouse.down();
-    // Left, which grows the right dock: the edge being dragged faces into the window.
-    await page.mouse.move(box.x - 120, box.y, { steps: 8 });
+    // Right, which grows the left dock: the edge being dragged faces into the window.
+    await page.mouse.move(box.x + 120, box.y, { steps: 8 });
     await page.mouse.up();
     await page.waitForTimeout(400);
 
-    expect(await dockWidth(page, 'right')).toBeGreaterThan(before + 80);
+    expect(await dockWidth(page, 'left')).toBeGreaterThan(before + 80);
     expect(
       await page.evaluate(() => document.documentElement.scrollWidth > window.innerWidth),
     ).toBe(false);
@@ -135,7 +141,7 @@ describe('closing a panel', () => {
     await page.click('[data-panel="problems"] .panel__close');
     await page.waitForTimeout(400);
 
-    expect(await openPanels(page)).toEqual(['editor', 'preview']);
+    expect((await openPanels(page)).sort()).toEqual(['editor', 'queue']);
     expect(await page.evaluate(() => document.getElementById('problems-list'))).toBeNull();
   });
 
@@ -152,33 +158,36 @@ describe('quitting and reopening', () => {
     // suite in the tests above, through the window rather than by writing the file.
     await page.click('[data-panel="problems"] .panel__close');
     await page.waitForTimeout(400);
-    const width = await dockWidth(page, 'right');
-    expect(width).toBeGreaterThan(560);
+    const width = await dockWidth(page, 'left');
+    expect(width).toBeGreaterThan(340);
 
     await closeApp(app);
     ({ app, page } = await launch());
 
-    expect(await openPanels(page)).toEqual(['editor', 'preview']);
-    expect(await dockWidth(page, 'right')).toBe(width);
+    expect((await openPanels(page)).sort()).toEqual(['editor', 'queue']);
+    expect(await dockWidth(page, 'left')).toBe(width);
   });
 });
 
 describe('restoring the default', () => {
   it('works with every closable panel shut, which is when it is most needed', async () => {
-    await page.click('[data-panel="preview"] .panel__close');
+    // Another panel than the PREVIEW one this used to close, which is a tab now (TYTO-287).
+    await page.click('[data-panel="queue"] .panel__close');
     await page.waitForTimeout(400);
     expect(await openPanels(page)).toEqual(['editor']);
 
     await runFromBar(page, 'layout.restore');
 
-    expect(await openPanels(page)).toEqual(['editor', 'preview', 'problems']);
-    expect(await dockWidth(page, 'right')).toBe(560);
+    expect((await openPanels(page)).sort()).toEqual(['editor', 'problems']);
+    expect(
+      await page.evaluate(() => document.querySelector<HTMLElement>('[data-dock="left"]')?.hidden),
+    ).toBe(true);
   });
 
   it('is remembered too, so the restore is not undone by the next launch', async () => {
     await closeApp(app);
     ({ app, page } = await launch());
 
-    expect(await openPanels(page)).toEqual(['editor', 'preview', 'problems']);
+    expect((await openPanels(page)).sort()).toEqual(['editor', 'problems']);
   });
 });

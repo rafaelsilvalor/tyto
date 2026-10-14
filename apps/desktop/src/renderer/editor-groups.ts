@@ -11,11 +11,24 @@
 
 import type { SessionGroupNode } from '../../shared/session-groups.js';
 
-/** One tab in one group. */
+/**
+ * One tab in one group. A tab with `view: 'preview'` shows a brief's art instead of its text
+ * (TYTO-287, ADR 0084): a **following** preview (`locked` absent) shows whichever brief was last
+ * in front, and the window keeps its `documentId` pointed there ({@link followBrief}); a
+ * **locked** one keeps the brief it was locked on. `documentId` is `''` for a following preview
+ * with no brief to show.
+ */
 export interface EditorTab {
   readonly id: string;
   readonly documentId: string;
+  readonly view?: 'preview';
+  readonly locked?: boolean;
 }
+
+export const isPreview = (tab: EditorTab): boolean => tab.view === 'preview';
+
+/** A tab that shows a document's text: what every lookup by document means (TYTO-287). */
+const isEditorTab = (tab: EditorTab): boolean => tab.view === undefined;
 
 /** A leaf of the tree: a group with its tabs and the one in front. */
 export interface EditorGroup {
@@ -90,7 +103,7 @@ export const activeTabOf = (group: EditorGroup): EditorTab | undefined =>
 
 /** The document the focused group has in front: what "the active document" means now. */
 export const focusedDocumentId = (groups: EditorGroups): string | undefined =>
-  activeTabOf(focusedGroup(groups))?.documentId;
+  activeTabOf(focusedGroup(groups))?.documentId || undefined;
 
 /** Which group holds a tab. */
 export const groupOfTab = (groups: EditorGroups, tabId: string): EditorGroup | undefined =>
@@ -133,7 +146,7 @@ export function activateTab(groups: EditorGroups, tabId: string): EditorGroups {
  */
 export function openDocument(groups: EditorGroups, documentId: string): EditorGroups {
   const group = focusedGroup(groups);
-  const existing = group.tabs.find((tab) => tab.documentId === documentId);
+  const existing = group.tabs.find((tab) => isEditorTab(tab) && tab.documentId === documentId);
   if (existing !== undefined) return activateTab(groups, existing.id);
   const [tabId, minted] = mint(groups, 'tab');
   const tabs = [...group.tabs, { id: tabId, documentId }];
@@ -147,16 +160,31 @@ export function openDocument(groups: EditorGroups, documentId: string): EditorGr
  */
 export function splitGroup(groups: EditorGroups, direction: SplitDirection): EditorGroups {
   const source = focusedGroup(groups);
-  const shown = activeTabOf(source);
+  // A preview in front splits into its brief's text, not into a second preview (TYTO-287).
+  const front = activeTabOf(source);
+  const shown = front?.documentId === '' ? undefined : front;
   const [groupId, afterGroup] = mint(groups, 'group');
   const [tabId, afterTab] = mint(afterGroup, 'tab');
   const tabs = shown === undefined ? [] : [{ id: tabId, documentId: shown.documentId }];
-  const created: EditorGroup = {
+  return withNewGroup(afterTab, source.id, direction, {
     kind: 'group',
     id: groupId,
     tabs,
     activeTabId: shown === undefined ? undefined : tabId,
-  };
+  });
+}
+
+/**
+ * `created` beside (`row`) or under (`column`) the group `sourceId`, and focused. A split in the
+ * direction the group's parent already runs adds a sibling and halves the source's share.
+ */
+function withNewGroup(
+  afterTab: EditorGroups,
+  sourceId: string,
+  direction: SplitDirection,
+  created: EditorGroup,
+): EditorGroups {
+  const source = { id: sourceId };
 
   const insert = (node: GroupNode, splitId: () => string): GroupNode => {
     if (node.kind === 'group') {
@@ -188,7 +216,7 @@ export function splitGroup(groups: EditorGroups, direction: SplitDirection): Edi
     return id;
   };
   const root = insert(afterTab.root, splitId);
-  return { ...next, root, focusedGroupId: groupId };
+  return { ...next, root, focusedGroupId: created.id };
 }
 
 /**
@@ -238,10 +266,15 @@ export function closeTab(groups: EditorGroups, tabId: string): EditorGroups {
   return withGroup(groups, group.id, (found) => ({ ...found, tabs, activeTabId }));
 }
 
-/** Every tab of a document closed, wherever it is: the document itself went away. */
+/**
+ * Every tab of a document closed, wherever it is: the document itself went away. Its locked
+ * previews go with it; a following preview stays, for the window to point at the next brief.
+ */
 export function closeDocumentTabs(groups: EditorGroups, documentId: string): EditorGroups {
   const tabs = groupList(groups).flatMap((group) =>
-    group.tabs.filter((tab) => tab.documentId === documentId),
+    group.tabs.filter(
+      (tab) => tab.documentId === documentId && (isEditorTab(tab) || tab.locked === true),
+    ),
   );
   return tabs.reduce((next, tab) => closeTab(next, tab.id), groups);
 }
@@ -267,7 +300,10 @@ export function moveTab(groups: EditorGroups, tabId: string, toGroupId: string):
   if (from === undefined || tab === undefined || from.id === toGroupId) return groups;
   if (groupById(groups, toGroupId) === undefined) return groups;
   const target = groupById(groups, toGroupId);
-  const twin = target?.tabs.find((each) => each.documentId === tab.documentId);
+  // Previews never merge: a locked one and a following one are two different things to keep.
+  const twin = isEditorTab(tab)
+    ? target?.tabs.find((each) => isEditorTab(each) && each.documentId === tab.documentId)
+    : undefined;
   const closed = closeTab(groups, tabId);
   if (twin !== undefined) return activateTab(closed, twin.id);
   const added = withGroup(closed, toGroupId, (found) => ({
@@ -418,6 +454,117 @@ export function groupsFromLayout<T>(
   };
 }
 
-/** Every document some tab shows, once each. */
+/** Every document some tab shows as text, once each. A preview is not a tab of its brief. */
 export const shownDocumentIds = (groups: EditorGroups): ReadonlySet<string> =>
-  new Set(groupList(groups).flatMap((group) => group.tabs.map((tab) => tab.documentId)));
+  new Set(
+    groupList(groups).flatMap((group) =>
+      group.tabs.filter(isEditorTab).map((tab) => tab.documentId),
+    ),
+  );
+
+/** Every preview tab, in tree order (TYTO-287). */
+export const previewTabs = (groups: EditorGroups): readonly EditorTab[] =>
+  groupList(groups).flatMap((group) => group.tabs.filter(isPreview));
+
+/** The window's following preview: there is at most one (TYTO-287). */
+export const followingPreview = (groups: EditorGroups): EditorTab | undefined =>
+  previewTabs(groups).find((tab) => tab.locked !== true);
+
+/** Every tab of the tree through `change`. */
+function mapTabs(groups: EditorGroups, change: (tab: EditorTab) => EditorTab): EditorGroups {
+  const walk = (node: GroupNode): GroupNode =>
+    node.kind === 'group'
+      ? { ...node, tabs: node.tabs.map(change) }
+      : { ...node, children: node.children.map(walk) };
+  return { ...groups, root: walk(groups.root) };
+}
+
+/**
+ * The following preview shows `documentId` now (TYTO-287): the brief last in front, or `''`
+ * when there is none. A locked preview stays on its own brief.
+ */
+export function followBrief(groups: EditorGroups, documentId: string): EditorGroups {
+  const following = followingPreview(groups);
+  if (following === undefined || following.documentId === documentId) return groups;
+  return mapTabs(groups, (tab) => (tab.id === following.id ? { ...tab, documentId } : tab));
+}
+
+/**
+ * "Open preview to the side" (TYTO-287). The following preview, when there is one, comes to the
+ * front of its group and is focused. Otherwise a new one showing `documentId` goes into the
+ * group after the focused one — a new group split to the right when the focused one is the last
+ * — and the focus stays where the person is typing, as VS Code's does, unless `focus` asks.
+ */
+export function openPreviewToSide(
+  groups: EditorGroups,
+  documentId: string,
+  focus: boolean,
+): EditorGroups {
+  const existing = followingPreview(groups);
+  if (existing !== undefined) return activateTab(groups, existing.id);
+  const source = focusedGroup(groups);
+  const list = groupList(groups);
+  const after = list[list.findIndex((group) => group.id === source.id) + 1];
+  const [tabId, minted] = mint(groups, 'tab');
+  const tab: EditorTab = { id: tabId, documentId, view: 'preview' };
+  let next: EditorGroups;
+  if (after === undefined) {
+    const [groupId, afterGroup] = mint(minted, 'group');
+    next = withNewGroup(afterGroup, source.id, 'row', {
+      kind: 'group',
+      id: groupId,
+      tabs: [tab],
+      activeTabId: tabId,
+    });
+  } else {
+    next = withGroup(minted, after.id, (found) => ({
+      ...found,
+      tabs: [...found.tabs, tab],
+      activeTabId: tabId,
+    }));
+  }
+  const shownIn = groupOfTab(next, tabId)?.id ?? source.id;
+  return { ...next, focusedGroupId: focus ? shownIn : source.id };
+}
+
+/** "Open preview" (TYTO-287): the following preview, or a new one in the focused group, in front. */
+export function openPreviewHere(groups: EditorGroups, documentId: string): EditorGroups {
+  const existing = followingPreview(groups);
+  if (existing !== undefined) return activateTab(groups, existing.id);
+  const group = focusedGroup(groups);
+  const [tabId, minted] = mint(groups, 'tab');
+  const tab: EditorTab = { id: tabId, documentId, view: 'preview' };
+  return withGroup(minted, group.id, (found) => ({
+    ...found,
+    tabs: [...found.tabs, tab],
+    activeTabId: tabId,
+  }));
+}
+
+/**
+ * Locks a following preview on the brief it shows, or lets a locked one follow again
+ * (TYTO-287). A brief has at most one locked preview and the window at most one following one,
+ * so the other preview the change would make a second of is closed.
+ */
+export function toggleLock(groups: EditorGroups, tabId: string): EditorGroups {
+  const tab = previewTabs(groups).find((each) => each.id === tabId);
+  if (tab === undefined) return groups;
+  const locking = tab.locked !== true;
+  if (locking && tab.documentId === '') return groups;
+  const duplicate = previewTabs(groups).find(
+    (each) =>
+      each.id !== tabId &&
+      (locking ? each.locked === true && each.documentId === tab.documentId : each.locked !== true),
+  );
+  const closed = duplicate === undefined ? groups : closeTab(groups, duplicate.id);
+  return mapTabs(closed, (each) => {
+    if (each.id !== tabId) return each;
+    return locking
+      ? { ...each, locked: true }
+      : { id: each.id, documentId: each.documentId, view: 'preview' };
+  });
+}
+
+/** The groups with every preview taken out, for what does not keep them yet (TYTO-287). */
+export const withoutPreviews = (groups: EditorGroups): EditorGroups =>
+  previewTabs(groups).reduce((next, tab) => closeTab(next, tab.id), groups);

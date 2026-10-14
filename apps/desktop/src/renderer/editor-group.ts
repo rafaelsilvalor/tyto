@@ -1,7 +1,10 @@
-import { LitElement, html } from 'lit';
+import { LitElement, html, nothing } from 'lit';
 
-import { type Locale, DEFAULT_LOCALE } from '../../shared/i18n/index.js';
+import { type Locale, DEFAULT_LOCALE, translate } from '../../shared/i18n/index.js';
 import { type EditorGroups, type GroupNode, groupList } from './editor-groups.js';
+import { icon } from './icons.js';
+// Imported for the side effect: the pane has to be defined before a group makes one.
+import { type PreviewPane, PREVIEW_PANE_TAG } from './preview-pane.js';
 // Imported for the side effect: the strip has to be defined before a group renders one.
 import { type TabEntry, TABS_TAG } from './tabs.js';
 
@@ -30,6 +33,9 @@ export class EditorGroupElement extends LitElement {
     locale: { attribute: false },
     select: { attribute: false },
     close: { attribute: false },
+    showing: { attribute: false },
+    offerPreview: { attribute: false },
+    openPreview: { attribute: false },
   };
 
   declare groupId: string;
@@ -39,6 +45,11 @@ export class EditorGroupElement extends LitElement {
   declare locale: Locale;
   declare select: (tabId: string) => void;
   declare close: (tabId: string) => void;
+  /** What the tab in front is (TYTO-287): text in the CodeMirror pane, or a brief's art. */
+  declare showing: 'editor' | 'preview';
+  /** Whether the strip offers "Open preview to the side": a brief is in front. */
+  declare offerPreview: boolean;
+  declare openPreview: () => void;
 
   constructor() {
     super();
@@ -49,9 +60,34 @@ export class EditorGroupElement extends LitElement {
     this.locale = DEFAULT_LOCALE;
     this.select = () => undefined;
     this.close = () => undefined;
+    this.showing = 'editor';
+    this.offerPreview = false;
+    this.openPreview = () => undefined;
   }
 
   private ownMount: HTMLElement | undefined;
+  private ownPreview: PreviewPane | undefined;
+
+  /**
+   * The preview pane a preview tab in front is drawn in (TYTO-287), made the first time this
+   * group shows a preview and kept beside the CodeMirror mount afterwards, so switching between a
+   * brief and its preview moves nothing. Not made before: a group that never showed a preview
+   * holds none of its nodes, as a closed panel holds none (ADR 0024).
+   */
+  get preview(): PreviewPane {
+    if (this.ownPreview === undefined) {
+      this.ownPreview = document.createElement(PREVIEW_PANE_TAG);
+      this.ownPreview.hidden = this.showing !== 'preview';
+      if (this.mount.parentNode === null) this.append(this.ownPreview);
+      else this.mount.after(this.ownPreview);
+    }
+    return this.ownPreview;
+  }
+
+  /** The preview pane if this group has made one. */
+  get previewIfMade(): PreviewPane | undefined {
+    return this.ownPreview;
+  }
 
   /**
    * The node CodeMirror is mounted in. Made by the element and not by its template, so it
@@ -69,7 +105,7 @@ export class EditorGroupElement extends LitElement {
   /** Light DOM, so `shell.css` reaches inside — the reasoning is in ADR 0024. */
   protected override createRenderRoot(): HTMLElement {
     this.append(this.mount);
-    // The strip renders in front of the mount, which stays the last child.
+    // The strip renders in front of the mount; the mount and a preview pane stay after it.
     this.renderOptions.renderBefore = this.mount;
     return this;
   }
@@ -77,14 +113,40 @@ export class EditorGroupElement extends LitElement {
   protected override render(): unknown {
     this.dataset['editorGroup'] = this.groupId;
     this.classList.toggle('editor-group--focused', this.focused);
-    return html`<tyto-tabs
-      class="tabs"
-      .tabs=${this.tabs}
-      .activeId=${this.activeTabId}
-      .locale=${this.locale}
-      .select=${this.select}
-      .close=${this.close}
-    ></tyto-tabs>`;
+    this.mount.hidden = this.showing === 'preview';
+    const pane = this.showing === 'preview' ? this.preview : this.ownPreview;
+    if (pane !== undefined) pane.hidden = this.showing !== 'preview';
+    const open = translate(this.locale, 'command.preview.openToSide');
+    // A row of the tabs and, at its end, the group's actions (TYTO-287): the slot TYTO-288's
+    // pane shape fills with more. Only "Open preview to the side" for now, and only on a brief.
+    return html`<div class="editor-group__head">
+      <tyto-tabs
+        class="tabs"
+        .tabs=${this.tabs}
+        .activeId=${this.activeTabId}
+        .locale=${this.locale}
+        .select=${this.select}
+        .close=${this.close}
+      ></tyto-tabs>
+      <div class="editor-group__actions">
+        ${
+          this.offerPreview
+            ? html`<button
+                type="button"
+                class="editor-group__action"
+                data-action="preview.openToSide"
+                title=${open}
+                aria-label=${open}
+                @click=${() => {
+                  this.openPreview();
+                }}
+              >
+                ${icon('preview')}
+              </button>`
+            : nothing
+        }
+      </div>
+    </div>`;
   }
 }
 

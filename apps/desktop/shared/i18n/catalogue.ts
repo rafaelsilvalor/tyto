@@ -38,13 +38,11 @@ export interface Catalogue {
    */
   readonly 'preview.stale': string;
   /**
-   * What the preview says on the settings, keybindings and snippets tabs, in place of a
-   * picture (TYTO-256, TYTO-277). Each file applies when it is saved, through the watcher;
-   * typing only checks.
+   * TYTO-287. The preview tab's lock: the button in its bar, and the title of the lock drawn
+   * on a locked preview's tab. `preview.heading` is the word a preview tab's name starts with.
    */
-  readonly 'preview.note.settings': string;
-  readonly 'preview.note.keybindings': string;
-  readonly 'preview.note.snippets': string;
+  readonly 'preview.lock': string;
+  readonly 'preview.locked': string;
   /** The bottom panel that lists what the stages had to say about the brief. */
   readonly 'problems.heading': string;
   readonly 'problems.empty': string;
@@ -267,6 +265,10 @@ export interface Catalogue {
   readonly 'command.group.focusPrevious': string;
   readonly 'command.group.moveTabToNext': string;
   readonly 'command.group.close': string;
+  /** TYTO-287. The preview as a tab: beside the brief, in its group, and its lock. */
+  readonly 'command.preview.openToSide': string;
+  readonly 'command.preview.open': string;
+  readonly 'command.preview.toggleLock': string;
   /** A prefix: the tab's own name follows it, the way a recent entry's does. */
   readonly 'command.document.select': string;
 
@@ -283,7 +285,6 @@ export interface Catalogue {
   readonly 'command.layout.togglePanel': string;
   readonly 'command.layout.restore': string;
   readonly 'panel.editor': string;
-  readonly 'panel.preview': string;
   readonly 'panel.problems': string;
   /** TYTO-45. Closed in the default layout, like the panel it names. */
   readonly 'panel.queue': string;
@@ -517,9 +518,8 @@ export const CATALOGUE_KEYS = [
   'preview.empty',
   'preview.broken',
   'preview.stale',
-  'preview.note.settings',
-  'preview.note.keybindings',
-  'preview.note.snippets',
+  'preview.lock',
+  'preview.locked',
   'problems.heading',
   'problems.empty',
   'problems.severity.error',
@@ -596,12 +596,14 @@ export const CATALOGUE_KEYS = [
   'command.group.focusPrevious',
   'command.group.moveTabToNext',
   'command.group.close',
+  'command.preview.openToSide',
+  'command.preview.open',
+  'command.preview.toggleLock',
   'command.document.select',
   'panel.close',
   'command.layout.togglePanel',
   'command.layout.restore',
   'panel.editor',
-  'panel.preview',
   'panel.problems',
   'panel.queue',
   'search.find',

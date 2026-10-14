@@ -9,6 +9,7 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 
 import { closeApp } from './close-app.js';
 import { firstWindow } from './first-window.js';
+import { openPreviewBeside } from './preview-pane.js';
 
 /**
  * A story in the preview panel is drawn at its full height (TYTO-177).
@@ -92,10 +93,14 @@ interface Drawn {
 /** What the panel has on screen right now: its layout box and its pixels. */
 async function drawn(): Promise<Drawn> {
   const geometry = await page.evaluate(() => {
-    const frame = document.getElementById('preview-frame') as HTMLIFrameElement;
+    const frame = document.querySelector(
+      'tyto-preview-pane:not([hidden]) [data-preview-frame]',
+    ) as HTMLIFrameElement;
     const stage = document.querySelector('.preview__stage')!;
     const outer = stage.getBoundingClientRect();
-    const paper = document.getElementById('preview-paper')!.getBoundingClientRect();
+    const paper = document
+      .querySelector('tyto-preview-pane:not([hidden]) [data-preview-paper]')!
+      .getBoundingClientRect();
     // The stage's client box and not its border box: at 50% it has scroll bars, and a column
     // read off its right edge was reading the vertical bar. That kept the check green over a
     // clipped frame until it was perturbed.
@@ -164,21 +169,25 @@ async function waitForDrawn(size: { width: number; height: number }): Promise<Dr
 }
 
 async function selectFormat(format: string): Promise<void> {
-  await page.click(`.preview__tab[data-format="${format}"]`);
+  await page.click(`tyto-preview-pane:not([hidden]) .preview__tab[data-format="${format}"]`);
   await page.waitForFunction(
     (name) =>
       document
-        .querySelector(`.preview__tab[data-format="${name}"]`)
+        .querySelector(`tyto-preview-pane:not([hidden]) .preview__tab[data-format="${name}"]`)
         ?.getAttribute('aria-selected') === 'true',
     format,
   );
 }
 
 async function setZoom(target: string): Promise<void> {
-  const level = page.locator('#zoom-level');
+  const level = page.locator('tyto-preview-pane:not([hidden]) [data-preview-zoom-level]');
   for (let step = 0; step < ZOOM_CLICKS && (await level.textContent()) !== target; step += 1) {
     const now = Number.parseFloat((await level.textContent()) ?? '0');
-    await page.click(now < Number.parseFloat(target) ? '#zoom-in' : '#zoom-out');
+    await page.click(
+      now < Number.parseFloat(target)
+        ? 'tyto-preview-pane:not([hidden]) [data-preview-zoom="in"]'
+        : 'tyto-preview-pane:not([hidden]) [data-preview-zoom="out"]',
+    );
   }
   expect(await level.textContent()).toBe(target);
 }
@@ -230,9 +239,13 @@ describe.each([
     });
     page = await firstWindow(app);
     await page.waitForFunction(() => document.querySelector('#editor .cm-content') !== null);
+    await openPreviewBeside(page);
     await page.click('#editor .cm-content');
     await page.keyboard.insertText(readFileSync(EXAMPLE, 'utf8'));
-    await page.waitForSelector('.preview__tab[data-format="story"]', { timeout: 15_000 });
+    await page.waitForSelector(
+      'tyto-preview-pane:not([hidden]) .preview__tab[data-format="story"]',
+      { timeout: 15_000 },
+    );
   });
 
   afterAll(async () => {
@@ -259,7 +272,10 @@ describe.each([
       // stage with nothing to scroll, and the check reads the top of the frame. That is how the
       // first draft of this test stayed green with the bottom 840 px clipped away.
       await page.waitForFunction(
-        (height) => document.getElementById('preview-paper')?.offsetHeight === height,
+        (height) =>
+          document.querySelector<HTMLElement>(
+            'tyto-preview-pane:not([hidden]) [data-preview-paper]',
+          )?.offsetHeight === height,
         Math.round(story.height * 0.5),
       );
       await page.evaluate(() => {
@@ -269,7 +285,9 @@ describe.each([
       await page.waitForFunction(() => {
         const stage = document.querySelector('.preview__stage')!;
         const outer = stage.getBoundingClientRect();
-        const paper = document.getElementById('preview-paper')!.getBoundingClientRect();
+        const paper = document
+          .querySelector('tyto-preview-pane:not([hidden]) [data-preview-paper]')!
+          .getBoundingClientRect();
         return (
           paper.top < outer.top && paper.bottom <= outer.top + stage.clientTop + stage.clientHeight
         );
@@ -283,7 +301,7 @@ describe.each([
     it('keeps its full height after a square frame was on screen', async () => {
       // One iframe serves every format, and it is resized in place. grid-1x1 first, so the
       // story arrives in an element that was 1080 px tall a moment ago.
-      await page.click('#zoom-fit');
+      await page.click('tyto-preview-pane:not([hidden]) [data-preview-zoom="fit"]');
       await selectFormat('grid-1x1');
       await waitForDrawn(formatSize('grid-1x1'));
 

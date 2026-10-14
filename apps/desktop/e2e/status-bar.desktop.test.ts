@@ -211,11 +211,12 @@ describe('each button runs its command', () => {
     expect(await isOn('layout.togglePanel:problems')).toBe(true);
   });
 
-  it('hides and shows the right area', async () => {
-    await click('layout.toggleDock:right');
-    expect(await panels()).not.toContain('preview');
-    await click('layout.toggleDock:right');
-    expect(await panels()).toContain('preview');
+  it('draws no right-area button while no panel lives there', async () => {
+    // The PREVIEW panel was the right area's until it became a tab (TYTO-287, ADR 0084); a
+    // plugin's panel docked there brings the button back.
+    expect(
+      await page.locator('tyto-status-bar [data-command="layout.toggleDock:right"]').count(),
+    ).toBe(0);
   });
 
   it('opens the empty left area on its first panel, the queue', async () => {
@@ -290,20 +291,21 @@ describe('Help > About', () => {
 
 describe('a hidden area after a restart', () => {
   it('is still hidden, because layout.json remembers it', async () => {
-    await click('layout.toggleDock:right');
-    expect(await panels()).not.toContain('preview');
+    // The bottom area: the right one has no panel since the preview became a tab (TYTO-287).
+    await click('layout.toggleDock:bottom');
+    expect(await panels()).not.toContain('problems');
     await closeApp(app);
 
     const saved = JSON.parse(readFileSync(join(scratch, 'user-data', 'layout.json'), 'utf8')) as {
       hiddenDocks?: string[];
     };
-    expect(saved.hiddenDocks).toEqual(['right']);
+    expect(saved.hiddenDocks).toEqual(['bottom']);
 
     await launch();
-    expect(await panels()).not.toContain('preview');
-    expect(await isOn('layout.toggleDock:right')).toBe(false);
+    expect(await panels()).not.toContain('problems');
+    expect(await isOn('layout.toggleDock:bottom')).toBe(false);
 
-    await click('layout.toggleDock:right');
-    expect(await panels()).toContain('preview');
+    await click('layout.toggleDock:bottom');
+    expect(await panels()).toContain('problems');
   });
 });

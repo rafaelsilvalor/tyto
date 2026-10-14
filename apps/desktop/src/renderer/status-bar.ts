@@ -24,7 +24,7 @@ import { type IconName, icon } from './icons.js';
 export const STATUS_BAR_TAG = 'tyto-status-bar';
 
 /** What the tab in front holds, from `DocumentState.kind`. */
-export type TabKind = 'brief' | 'settings' | 'keybindings' | 'snippets';
+export type TabKind = 'brief' | 'settings' | 'keybindings' | 'snippets' | 'preview';
 
 export interface StatusBarState {
   readonly locale: Locale;
@@ -44,6 +44,11 @@ export interface StatusBarState {
   readonly newProblems: boolean;
   /** Which areas are on screen, and which of the two toggled panels are open. */
   readonly shown: Readonly<Record<HideableDock | 'problems' | 'queue', boolean>>;
+  /**
+   * Which areas any panel lives in (TYTO-287): an area with none gets no button, which is the
+   * right one by default since the preview became a tab. Absent means every area has one.
+   */
+  readonly areas?: Readonly<Record<HideableDock, boolean>>;
 }
 
 /** The ids the buttons run, in `main.ts`'s registry. Exported so a test names the same ones. */
@@ -61,6 +66,7 @@ const KIND_LABELS: Readonly<Record<TabKind, CatalogueKey>> = {
   settings: 'status.kind.settings',
   keybindings: 'status.kind.keybindings',
   snippets: 'status.kind.snippets',
+  preview: 'preview.heading',
 };
 
 /** `Ln 4, Col 17 (7 selected)`, in the window's language. */
@@ -169,8 +175,10 @@ export class StatusBar extends LitElement {
     const say = (key: CatalogueKey): string => translate(state.locale, key);
     const toggle = (panel: CatalogueKey): string =>
       `${say('command.layout.togglePanel')}: ${say(panel)}`;
-    const dock = (area: HideableDock, name: IconName, key: CatalogueKey): TemplateResult =>
-      this.button(name, toggleDockCommandId(area), say(key), state.shown[area]);
+    const dock = (area: HideableDock, name: IconName, key: CatalogueKey): unknown =>
+      state.areas?.[area] === false
+        ? nothing
+        : this.button(name, toggleDockCommandId(area), say(key), state.shown[area]);
 
     return html`<div class="status-bar__side">
         ${dock('left', 'left', 'command.layout.toggleDock.left')}
@@ -183,7 +191,14 @@ export class StatusBar extends LitElement {
         }
       </div>
       <div class="status-bar__side status-bar__side--end">
-        <span class="status-bar__text status-bar__position">${positionText(state)}</span>
+        <!-- A preview has no caret, so no line and column (TYTO-287). -->
+        ${
+          state.kind === 'preview'
+            ? nothing
+            : html`<span class="status-bar__text status-bar__position"
+                >${positionText(state)}</span
+              >`
+        }
         <span class="status-bar__text status-bar__kind">${say(KIND_LABELS[state.kind])}</span>
         ${
           state.template === undefined

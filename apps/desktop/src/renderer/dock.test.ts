@@ -4,7 +4,6 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import {
   DEFAULT_LAYOUT,
   EDITOR_PANEL,
-  PREVIEW_PANEL,
   PROBLEMS_PANEL,
   withPanelOpen,
   withPanelSize,
@@ -52,19 +51,19 @@ describe('building the window from the record', () => {
     await arrange(document, DEFAULT_LAYOUT, host());
 
     expect(panelsIn('centre')).toEqual([EDITOR_PANEL]);
-    expect(panelsIn('right')).toEqual([PREVIEW_PANEL]);
+    // Empty since the preview became a tab (TYTO-287, ADR 0084).
+    expect(panelsIn('right')).toEqual([]);
     expect(panelsIn('bottom')).toEqual([PROBLEMS_PANEL]);
     expect(panelsIn('left')).toEqual([]);
   });
 
   it('renders what is inside each panel, which is what everything else looks up', async () => {
-    // `preview.ts` writes into `#preview-stage` and `main.ts` lays the editor groups out in
-    // `[data-editor-groups]`, whose first pane is `#editor` (TYTO-286). Those nodes used to be
-    // in `index.html`; they are in the panels now and nothing else changed.
+    // `main.ts` lays the editor groups out in `[data-editor-groups]`, whose first pane is
+    // `#editor` (TYTO-286), and the previews are tabs inside them (TYTO-287). Those nodes used
+    // to be in `index.html`; they are in the panels now and nothing else changed.
     await arrange(document, DEFAULT_LAYOUT, host());
 
     expect(document.querySelector('[data-editor-groups]')).not.toBeNull();
-    expect(document.getElementById('preview-stage')).not.toBeNull();
     expect(document.getElementById('problems-list')).not.toBeNull();
     expect(document.getElementById('template')).not.toBeNull();
   });
@@ -72,7 +71,6 @@ describe('building the window from the record', () => {
   it('gives each dock its size, and the elastic one none', async () => {
     await arrange(document, DEFAULT_LAYOUT, host());
 
-    expect(dockOf('right').style.width).toBe('560px');
     expect(dockOf('bottom').style.height).toBe('140px');
     // The centre is the remainder, which is the only answer that survives a window resize.
     expect(dockOf('centre').style.width).toBe('');
@@ -84,7 +82,8 @@ describe('building the window from the record', () => {
 
     expect(dockOf('left').hidden).toBe(true);
     expect(document.querySelector<HTMLElement>('[data-splitter="left"]')?.hidden).toBe(true);
-    expect(document.querySelector<HTMLElement>('[data-splitter="right"]')?.hidden).toBe(false);
+    expect(document.querySelector<HTMLElement>('[data-splitter="right"]')?.hidden).toBe(true);
+    expect(document.querySelector<HTMLElement>('[data-splitter="bottom"]')?.hidden).toBe(false);
   });
 });
 
@@ -93,20 +92,20 @@ describe('closing a panel', () => {
     // The claim ADR 0024's measurement rests on: a repaint walks the whole document, so a
     // panel nobody has open must not be in it.
     await arrange(document, DEFAULT_LAYOUT, host());
-    expect(document.getElementById('preview-stage')).not.toBeNull();
+    expect(document.getElementById('problems-list')).not.toBeNull();
 
-    await arrange(document, withPanelOpen(DEFAULT_LAYOUT, PREVIEW_PANEL, false), host());
+    await arrange(document, withPanelOpen(DEFAULT_LAYOUT, PROBLEMS_PANEL, false), host());
 
-    expect(panelsIn('right')).toEqual([]);
-    expect(document.getElementById('preview-stage')).toBeNull();
-    expect(dockOf('right').hidden).toBe(true);
+    expect(panelsIn('bottom')).toEqual([]);
+    expect(document.getElementById('problems-list')).toBeNull();
+    expect(dockOf('bottom').hidden).toBe(true);
   });
 
   it('never built the element of a panel that started closed', async () => {
     await arrange(document, withPanelOpen(DEFAULT_LAYOUT, PROBLEMS_PANEL, false), host());
 
     expect(document.getElementById('problems-list')).toBeNull();
-    expect(document.querySelectorAll('[data-panel]')).toHaveLength(2);
+    expect(document.querySelectorAll('[data-panel]')).toHaveLength(1);
   });
 
   it('builds it again when it reopens', async () => {
@@ -127,7 +126,7 @@ describe('what survives a rearrangement', () => {
     const before = document.querySelector('[data-editor-groups]');
     before?.append(document.createElement('tyto-editor-group'));
 
-    await arrange(document, withPanelSize(DEFAULT_LAYOUT, PREVIEW_PANEL, 300), host());
+    await arrange(document, withPanelSize(DEFAULT_LAYOUT, PROBLEMS_PANEL, 300), host());
     await arrange(document, withPanelOpen(DEFAULT_LAYOUT, PROBLEMS_PANEL, false), host());
 
     expect(document.querySelector('[data-editor-groups]')).toBe(before);
@@ -138,9 +137,9 @@ describe('what survives a rearrangement', () => {
     await arrange(document, DEFAULT_LAYOUT, host());
 
     const editor = document.querySelector(`[data-panel="${EDITOR_PANEL}"]`);
-    const preview = document.querySelector(`[data-panel="${PREVIEW_PANEL}"]`);
+    const problems = document.querySelector(`[data-panel="${PROBLEMS_PANEL}"]`);
     expect(editor?.querySelector('.panel__close')).toBeNull();
-    expect(preview?.querySelector('.panel__close')).not.toBeNull();
+    expect(problems?.querySelector('.panel__close')).not.toBeNull();
   });
 
   it('reports the panel a close button belongs to', async () => {

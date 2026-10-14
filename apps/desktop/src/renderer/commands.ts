@@ -50,6 +50,14 @@ export const PREVIEW_NEXT_FORMAT = 'preview.nextFormat';
 export const PREVIEW_PREVIOUS_FORMAT = 'preview.previousFormat';
 export const PREVIEW_NEXT_SLIDE = 'preview.nextSlide';
 export const PREVIEW_PREVIOUS_SLIDE = 'preview.previousSlide';
+/**
+ * The preview as a tab (TYTO-287, ADR 0084): beside the brief — `Mod-Shift-v`, VS Code's key,
+ * global so it answers from a preview too — or in the focused group, and the lock that pins a
+ * following preview to the brief it shows.
+ */
+export const PREVIEW_OPEN_TO_SIDE = 'preview.openToSide';
+export const PREVIEW_OPEN = 'preview.open';
+export const PREVIEW_TOGGLE_LOCK = 'preview.toggleLock';
 export const SHELL_TOGGLE_LOCALE = 'shell.toggleLocale';
 export const LAYOUT_RESTORE = 'layout.restore';
 /**
@@ -207,6 +215,9 @@ export const COMMAND_LABELS: Readonly<Record<string, CatalogueKey>> = {
   [PREVIEW_PREVIOUS_FORMAT]: 'command.preview.previousFormat',
   [PREVIEW_NEXT_SLIDE]: 'command.preview.nextSlide',
   [PREVIEW_PREVIOUS_SLIDE]: 'command.preview.previousSlide',
+  [PREVIEW_OPEN_TO_SIDE]: 'command.preview.openToSide',
+  [PREVIEW_OPEN]: 'command.preview.open',
+  [PREVIEW_TOGGLE_LOCK]: 'command.preview.toggleLock',
   [SHELL_TOGGLE_LOCALE]: 'command.shell.toggleLocale',
   [EDITOR_TOGGLE_VIM]: 'command.editor.toggleVim',
   [EDITOR_INSERT_MENU]: 'command.editor.insertMenu',
@@ -264,6 +275,10 @@ export interface DesktopActions {
   /** Wraps at the ends: a tab strip with two formats should cycle rather than stop. */
   stepFormat(direction: 1 | -1): void;
   stepSlide(direction: 1 | -1): void;
+  /** TYTO-287. The following preview beside the brief (`side`) or in the focused group. */
+  openPreview(side: boolean): void;
+  /** TYTO-287. Locks the preview in front on its brief, or lets it follow again. */
+  togglePreviewLock(): void;
   toggleLocale(): void;
   toggleVimMode(): void;
   /** TYTO-276. Opens the "/" menu at the cursor, with no "/" typed. */
@@ -360,6 +375,15 @@ export function createDesktopRegistry(actions: DesktopActions): CommandRegistry 
   });
   add(PREVIEW_PREVIOUS_SLIDE, () => {
     actions.stepSlide(-1);
+  });
+  add(PREVIEW_OPEN_TO_SIDE, () => {
+    actions.openPreview(true);
+  });
+  add(PREVIEW_OPEN, () => {
+    actions.openPreview(false);
+  });
+  add(PREVIEW_TOGGLE_LOCK, () => {
+    actions.togglePreviewLock();
   });
   add(SHELL_TOGGLE_LOCALE, () => {
     actions.toggleLocale();
@@ -492,7 +516,28 @@ export const BRIEF_ONLY_COMMANDS: ReadonlySet<string> = new Set([
   PREVIEW_PREVIOUS_FORMAT,
   PREVIEW_NEXT_SLIDE,
   PREVIEW_PREVIOUS_SLIDE,
+  PREVIEW_OPEN_TO_SIDE,
+  PREVIEW_OPEN,
+  PREVIEW_TOGGLE_LOCK,
   FILE_EXPORT,
+  EDITOR_INSERT_MENU,
+]);
+
+/**
+ * The commands that act on the text in front, which a preview tab has none of (TYTO-287): with
+ * a preview focused its group's CodeMirror pane is hidden and shows nothing, so undo, find or
+ * the "/" menu there would act on an empty view. Save and export are not here — a preview
+ * saves and exports its brief, as VS Code's does.
+ */
+export const TEXT_COMMANDS: ReadonlySet<string> = new Set([
+  EDITOR_UNDO,
+  EDITOR_REDO,
+  EDITOR_FIND,
+  EDITOR_FIND_NEXT,
+  EDITOR_FIND_PREVIOUS,
+  EDITOR_REPLACE_NEXT,
+  EDITOR_REPLACE_ALL,
+  EDITOR_GOTO_LINE,
   EDITOR_INSERT_MENU,
 ]);
 
@@ -583,6 +628,10 @@ export const builtInKeybindings: readonly Keybinding[] = [
       ),
   ),
   { key: COMMAND_BAR_KEY, command: COMMAND_BAR_TOGGLE, source: 'built-in' },
+  // TYTO-287. Global, like the bar's key: it answers with a preview focused, which no editor
+  // context reaches. Free in CodeMirror's keymaps and in this table; Chromium's "paste as plain
+  // text" on the same key is what VS Code gives up for it too.
+  { key: 'Mod-Shift-v', command: PREVIEW_OPEN_TO_SIDE, source: 'built-in' },
 ];
 
 export const builtInTable: KeybindingTable = { bindings: builtInKeybindings };

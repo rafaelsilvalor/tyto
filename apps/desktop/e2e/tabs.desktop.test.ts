@@ -8,6 +8,7 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 
 import { closeApp } from './close-app.js';
 import { firstWindow } from './first-window.js';
+import { openPreviewBeside } from './preview-pane.js';
 
 /**
  * More than one brief open at once, through a real window (E9.11).
@@ -138,12 +139,22 @@ const unsavedTabs = async (): Promise<string[]> =>
   );
 
 const selectedFormat = async (): Promise<string> =>
-  page.evaluate(() => document.querySelector('.preview__tab--on')?.textContent ?? '(none)');
+  page.evaluate(
+    () =>
+      document.querySelector('tyto-preview-pane:not([hidden]) .preview__tab--on')?.textContent ??
+      '(none)',
+  );
 
 const zoomLevel = async (): Promise<string> =>
-  page.evaluate(() => document.getElementById('zoom-level')?.textContent ?? '');
+  page.evaluate(
+    () =>
+      document.querySelector('tyto-preview-pane:not([hidden]) [data-preview-zoom-level]')
+        ?.textContent ?? '',
+  );
 
-const tab = (name: string) => page.locator('.tabs__tab').filter({ hasText: name });
+/** A brief's own tab by name; its preview's tab says the name too (TYTO-287). */
+const tab = (name: string) =>
+  page.locator('.tabs__tab[data-tab-kind="editor"]').filter({ hasText: name });
 
 const clickTab = async (name: string): Promise<void> => {
   await tab(name).locator('.tabs__name').click();
@@ -402,14 +413,18 @@ describe('switching between them', () => {
 
   it('keeps the selected format and the zoom with the document', async () => {
     await clickTab('campanha.brief');
+    // The preview is a tab a person opens since TYTO-287, and it follows the brief in front.
+    await openPreviewBeside(page);
     await page.waitForTimeout(500);
     const formats = await page.evaluate(() =>
-      [...document.querySelectorAll('.preview__tab')].map((node) => node.textContent ?? ''),
+      [...document.querySelectorAll('tyto-preview-pane:not([hidden]) .preview__tab')].map(
+        (node) => node.textContent ?? '',
+      ),
     );
     // The fixture renders more than one format, or this test is asserting nothing.
     expect(formats.length).toBeGreaterThan(1);
 
-    await page.click(`.preview__tab >> nth=1`);
+    await page.click(`tyto-preview-pane:not([hidden]) .preview__tab >> nth=1`);
     await runFromBar('preview.zoomIn');
     const chosenFormat = await selectedFormat();
     const chosenZoom = await zoomLevel();
@@ -423,6 +438,10 @@ describe('switching between them', () => {
     await page.waitForTimeout(400);
     expect(await selectedFormat()).toBe(chosenFormat);
     expect(await zoomLevel()).toBe(chosenZoom);
+
+    // Closed again: the tests below count the strip as one group's.
+    await page.click('[data-tab-kind="preview"] .tabs__close');
+    await page.waitForFunction(() => document.querySelectorAll('[data-editor-group]').length === 1);
   });
 
   it('never lets an undo reach into the other tab', async () => {

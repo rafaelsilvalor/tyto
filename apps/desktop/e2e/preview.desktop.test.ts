@@ -9,6 +9,7 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 
 import { closeApp } from './close-app.js';
 import { firstWindow } from './first-window.js';
+import { openPreviewBeside, previewSrcdoc } from './preview-pane.js';
 
 /**
  * *Open an example brief → preview visible → edit the title → preview changes* — E9.2's
@@ -50,8 +51,7 @@ let app: ElectronApplication;
 let page: Page;
 
 /** The document the preview is showing, or `''` before it shows one. */
-const shown = async (): Promise<string> =>
-  page.evaluate(() => document.getElementById('preview-frame')?.getAttribute('srcdoc') ?? '');
+const shown = async (): Promise<string> => previewSrcdoc(page);
 
 /** The status bar's problem count: since TYTO-259 the only one the window shows. */
 const problemCount = async (): Promise<number> =>
@@ -102,6 +102,7 @@ beforeAll(async () => {
   });
   page = await firstWindow(app);
   await page.waitForFunction(() => document.querySelector('#editor .cm-content') !== null);
+  await openPreviewBeside(page);
 });
 
 afterAll(async () => {
@@ -113,10 +114,12 @@ describe('the main screen', () => {
   it('shows nothing until there is a brief, and says so', async () => {
     // The state the window opens in. A blank panel would be indistinguishable from a
     // preview that failed, which is the one thing an empty state is for.
-    const empty = page.locator('#preview-empty');
+    const empty = page.locator('tyto-preview-pane:not([hidden]) [data-preview-empty]');
 
     await expect.poll(() => empty.isVisible()).toBe(true);
-    await expect.poll(() => page.locator('#preview-paper').isVisible()).toBe(false);
+    await expect
+      .poll(() => page.locator('tyto-preview-pane:not([hidden]) [data-preview-paper]').isVisible())
+      .toBe(false);
     expect(await empty.textContent()).not.toBe('');
   });
 
@@ -140,7 +143,7 @@ describe('the main screen', () => {
     // inherits the page's Content-Security-Policy. Both are real only in a real window, and
     // both are things that fail silently: a refused font is a frame that renders in the
     // wrong typeface and says nothing about it.
-    const frame = page.frameLocator('#preview-frame');
+    const frame = page.frameLocator('tyto-preview-pane:not([hidden]) [data-preview-frame]');
 
     // `document.fonts.check` and not a computed `font-family`, which was the first thing
     // this asked and measured nothing: the family is declared on the spans and reads back
@@ -160,12 +163,16 @@ describe('the main screen', () => {
   });
 
   it('offers one tab per format and a slide picker only when there are slides', async () => {
-    const tabs = await page.locator('.preview__tab').allTextContents();
+    const tabs = await page
+      .locator('tyto-preview-pane:not([hidden]) .preview__tab')
+      .allTextContents();
 
     expect(tabs.length).toBeGreaterThan(0);
-    expect(await page.locator('.preview__tab--on').count()).toBe(1);
+    expect(await page.locator('tyto-preview-pane:not([hidden]) .preview__tab--on').count()).toBe(1);
     // `promo-curso` is a single artwork, so the picker is furniture and stays hidden.
-    expect(await page.locator('#slide').isVisible()).toBe(false);
+    expect(
+      await page.locator('tyto-preview-pane:not([hidden]) [data-preview-slide]').isVisible(),
+    ).toBe(false);
   });
 
   it('changes the preview when the title changes', async () => {
@@ -198,7 +205,9 @@ describe('the main screen', () => {
     await expect.poll(() => shown(), { timeout: 10_000 }).toContain(marker);
 
     expect(await shown()).not.toBe(before);
-    expect(await page.locator('#preview-paper').isVisible()).toBe(true);
+    expect(
+      await page.locator('tyto-preview-pane:not([hidden]) [data-preview-paper]').isVisible(),
+    ).toBe(true);
   });
 
   it('reports a broken brief without losing the window', async () => {
@@ -236,8 +245,8 @@ describe('the main screen', () => {
 describe('a brief that stops compiling', () => {
   const GOOD = readFileSync(EXAMPLE, 'utf8');
 
-  const paper = () => page.locator('#preview-paper');
-  const stale = () => page.locator('#preview-stale');
+  const paper = () => page.locator('tyto-preview-pane:not([hidden]) [data-preview-paper]');
+  const stale = () => page.locator('tyto-preview-pane:not([hidden]) [data-preview-stale]');
 
   const type = async (text: string): Promise<void> => {
     await page.click('#editor .cm-content');
@@ -273,7 +282,9 @@ describe('a brief that stops compiling', () => {
     // if the frames were thrown away and something else filled the pane.
     expect(await paper().isVisible()).toBe(true);
     expect(await shown()).toBe(before);
-    expect(await page.locator('#preview-empty').isVisible()).toBe(false);
+    expect(
+      await page.locator('tyto-preview-pane:not([hidden]) [data-preview-empty]').isVisible(),
+    ).toBe(false);
   });
 
   it('shows the marker with the problems panel closed, which is where it has to work', async () => {
@@ -315,7 +326,9 @@ describe('a brief that stops compiling', () => {
 
     expect(await stale().isVisible()).toBe(false);
     expect(await paper().isVisible()).toBe(true);
-    expect(await page.locator('#preview-empty').isVisible()).toBe(false);
+    expect(
+      await page.locator('tyto-preview-pane:not([hidden]) [data-preview-empty]').isVisible(),
+    ).toBe(false);
     // And the problem is still reported, in the status bar's count.
     expect(await problemCount()).toBeGreaterThan(0);
   });
@@ -365,11 +378,13 @@ describe('a template whose body is code', () => {
   });
 
   it('offers the slide picker, because the brief made more than one artwork', async () => {
-    await expect.poll(() => page.locator('#slide').isVisible()).toBe(true);
+    await expect
+      .poll(() => page.locator('tyto-preview-pane:not([hidden]) [data-preview-slide]').isVisible())
+      .toBe(true);
   });
 
   it('paints the frame, and not only the markup of it', async () => {
-    const frame = page.frameLocator('#preview-frame');
+    const frame = page.frameLocator('tyto-preview-pane:not([hidden]) [data-preview-frame]');
 
     expect(await frame.locator('.tyto-frame .tyto-node').count()).toBeGreaterThan(0);
     expect(

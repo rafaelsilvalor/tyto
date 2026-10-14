@@ -8,6 +8,7 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 
 import { closeApp } from './close-app.js';
 import { firstWindow } from './first-window.js';
+import { openPreviewBeside, previewSrcdoc } from './preview-pane.js';
 
 /**
  * Opening, saving and reopening, through a real window (E9.8).
@@ -55,8 +56,7 @@ const messages = async (): Promise<string> =>
       .join(' | '),
   );
 
-const frameHtml = async (): Promise<string> =>
-  page.evaluate(() => document.getElementById('preview-frame')?.getAttribute('srcdoc') ?? '');
+const frameHtml = async (): Promise<string> => previewSrcdoc(page);
 
 const WITH_IMAGE = [
   '---',
@@ -121,6 +121,7 @@ beforeAll(async () => {
   });
   page = await firstWindow(app);
   await page.waitForSelector('#editor .cm-content');
+  await openPreviewBeside(page);
 });
 
 afterAll(async () => {
@@ -152,7 +153,9 @@ describe('opening a brief', () => {
 
     expect(await editorText()).toContain('Uma promoção');
     // The frames arrived, which is the round trip through main and back.
-    const tabs = await page.evaluate(() => document.querySelectorAll('.preview__tab').length);
+    const tabs = await page.evaluate(
+      () => document.querySelectorAll('tyto-preview-pane:not([hidden]) .preview__tab').length,
+    );
     expect(tabs).toBeGreaterThan(0);
   });
 

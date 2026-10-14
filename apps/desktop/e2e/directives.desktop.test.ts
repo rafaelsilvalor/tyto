@@ -9,6 +9,7 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 
 import { closeApp } from './close-app.js';
 import { firstWindow } from './first-window.js';
+import { openPreviewBeside } from './preview-pane.js';
 
 /**
  * A plugin directive in the window (TYTO-49, ADR 0043).
@@ -92,6 +93,7 @@ async function launch(withPlugin: boolean): Promise<Launched> {
   const page = await firstWindow(app);
   // Something the script builds, never the markup it shipped with (TYTO-154, TYTO-175).
   await page.waitForSelector('#editor .cm-content');
+  await openPreviewBeside(page);
   await page.waitForSelector('.tabs__tab');
   return { app, page, scratch };
 }
@@ -197,7 +199,9 @@ describe('with the demo plugin installed', () => {
     await setBrief(page, SHOUTED);
     // The squiggle is fed by the preview answer; wait for one pass over this text.
     await page.waitForFunction(
-      () => document.querySelector('#preview-stage iframe') !== null,
+      () =>
+        document.querySelector('tyto-preview-pane:not([hidden]) [data-preview-stage] iframe') !==
+        null,
       undefined,
       { timeout: 10_000 },
     );

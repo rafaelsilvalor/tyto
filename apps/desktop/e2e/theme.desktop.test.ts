@@ -8,6 +8,7 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 
 import { closeApp } from './close-app.js';
 import { firstWindow } from './first-window.js';
+import { openPreviewBeside } from './preview-pane.js';
 
 /**
  * TYTO-96's acceptance, through the real window: the face is the bundled one, the window and
@@ -127,6 +128,7 @@ beforeAll(async () => {
   });
   page = await firstWindow(app);
   await page.waitForSelector('#editor .cm-content');
+  await openPreviewBeside(page);
   // The smallest window the app allows, which is where a dense layout runs out of room first.
   await app.evaluate(({ BrowserWindow }) => {
     BrowserWindow.getAllWindows()[0]?.setSize(900, 600);

@@ -10,6 +10,8 @@ import {
   focusNeighbour,
   focusedDocumentId,
   focusedGroup,
+  followBrief,
+  followingPreview,
   groupList,
   groupsFromLayout,
   groupsOf,
@@ -17,8 +19,14 @@ import {
   moveTab,
   moveTabToNextGroup,
   openDocument,
+  openPreviewHere,
+  openPreviewToSide,
+  previewTabs,
   replaceDocument,
+  shownDocumentIds,
   splitGroup,
+  toggleLock,
+  withoutPreviews,
 } from './editor-groups.js';
 
 /** What each group shows, in tree order: its documents, the one in front starred. */
@@ -263,5 +271,96 @@ describe('the groups as a session keeps them', () => {
   it('answers nothing when no group survives', () => {
     const layout = layoutOf(three(), (tab) => tab.documentId);
     expect(groupsFromLayout(groupsOf(['x'], 'x'), layout, () => undefined)).toBeUndefined();
+  });
+});
+
+describe('the preview as a tab (TYTO-287, ADR 0084)', () => {
+  /** As {@link picture}, with a following preview written `P(doc)` and a locked one `L(doc)`. */
+  const withPreviews = (groups: EditorGroups): string[] =>
+    groupList(groups).map((group) =>
+      group.tabs
+        .map((tab) => {
+          const name =
+            tab.view === 'preview'
+              ? `${tab.locked === true ? 'L' : 'P'}(${tab.documentId})`
+              : tab.documentId;
+          return tab.id === group.activeTabId ? `*${name}` : name;
+        })
+        .join(' '),
+    );
+  const following = (groups: EditorGroups): string => followingPreview(groups)?.id ?? '';
+  const second = (groups: EditorGroups): string => groupList(groups)[1]?.id ?? '';
+
+  it('opens beside the brief in a new group, and leaves the focus where the person types', () => {
+    const opened = openPreviewToSide(twoDocuments(), 'b', false);
+    expect(withPreviews(opened)).toEqual(['a *b', '*P(b)']);
+    expect(focusedDocumentId(opened)).toBe('b');
+    expect(groupList(opened).indexOf(focusedGroup(opened))).toBe(0);
+  });
+
+  it('goes into the next group when there is one, and comes forward the second time', () => {
+    const split = focusGroup(splitGroup(twoDocuments(), 'row'), 'group-1');
+    const opened = openPreviewToSide(split, 'b', false);
+    expect(withPreviews(opened)).toEqual(['a *b', 'b *P(b)']);
+    const behind = activateTab(opened, groupList(opened)[1]?.tabs[0]?.id ?? '');
+    const again = openPreviewToSide(focusGroup(behind, 'group-1'), 'a', false);
+    expect(withPreviews(again)).toEqual(['a *b', 'b *P(b)']);
+    expect(groupList(again).indexOf(focusedGroup(again))).toBe(1);
+  });
+
+  it('opens in the focused group with "Open preview"', () => {
+    expect(withPreviews(openPreviewHere(twoDocuments(), 'b'))).toEqual(['a b *P(b)']);
+  });
+
+  it('follows the brief it is pointed at, and a locked one stays put', () => {
+    const opened = openPreviewToSide(twoDocuments(), 'b', false);
+    expect(withPreviews(followBrief(opened, 'a'))).toEqual(['a *b', '*P(a)']);
+    const locked = toggleLock(opened, following(opened));
+    expect(withPreviews(followBrief(locked, 'a'))).toEqual(['a *b', '*L(b)']);
+    expect(followingPreview(locked)).toBeUndefined();
+  });
+
+  it('keeps one locked preview per brief and one following one per window', () => {
+    const first = openPreviewToSide(twoDocuments(), 'b', false);
+    const locked = toggleLock(first, following(first));
+    const another = openPreviewHere(focusGroup(locked, second(locked)), 'b');
+    // Locking a second preview on the same brief closes the first.
+    const both = toggleLock(another, following(another));
+    expect(withPreviews(both)).toEqual(['a *b', '*L(b)']);
+    // Letting a locked one follow while another follows closes the other.
+    const third = openPreviewHere(both, 'a');
+    const lockedTab = previewTabs(third).find((tab) => tab.locked === true)?.id ?? '';
+    expect(previewTabs(toggleLock(third, lockedTab))).toHaveLength(1);
+    // A preview with no brief has nothing to lock on.
+    const empty = openPreviewHere(twoDocuments(), '');
+    expect(toggleLock(empty, following(empty))).toEqual(empty);
+  });
+
+  it('is never what a lookup by document finds', () => {
+    const opened = openPreviewToSide(twoDocuments(), 'b', false);
+    // Opening `b` with the preview's group focused makes a tab of its text there.
+    const inPreviewGroup = openDocument(focusGroup(opened, second(opened)), 'b');
+    expect(withPreviews(inPreviewGroup)).toEqual(['a *b', 'P(b) *b']);
+    expect([...shownDocumentIds(opened)].sort()).toEqual(['a', 'b']);
+    // A split of a preview opens its brief's text.
+    const split = splitGroup(focusGroup(opened, second(opened)), 'row');
+    expect(withPreviews(split).at(-1)).toBe('*b');
+    // A preview moved next to its brief's tab stays a preview of its own.
+    const moved = moveTab(opened, following(opened), 'group-1');
+    expect(withPreviews(moved)).toEqual(['a b *P(b)']);
+  });
+
+  it('closes a locked preview with its brief and keeps the following one for the next', () => {
+    const opened = openPreviewToSide(twoDocuments(), 'b', false);
+    expect(withPreviews(closeDocumentTabs(opened, 'b'))).toEqual(['*a', '*P(b)']);
+    const locked = toggleLock(opened, following(opened));
+    const both = openPreviewToSide(locked, 'b', false);
+    expect(withPreviews(both)).toEqual(['a *b', 'L(b) *P(b)']);
+    expect(withPreviews(closeDocumentTabs(both, 'b'))).toEqual(['*a', '*P(b)']);
+  });
+
+  it('leaves the session nothing of itself (TYTO-287, first pull request)', () => {
+    const opened = openPreviewToSide(twoDocuments(), 'b', false);
+    expect(withPreviews(withoutPreviews(opened))).toEqual(['a *b']);
   });
 });
