@@ -159,6 +159,8 @@ export const DOCUMENT_PREVIOUS = 'document.previous';
  */
 export const GROUP_FOCUS_NEXT = 'editor.focusNextGroup';
 export const GROUP_FOCUS_PREVIOUS = 'editor.focusPreviousGroup';
+export const GROUP_MOVE_TAB_NEXT = 'editor.moveTabToNextGroup';
+export const GROUP_CLOSE = 'editor.closeGroup';
 export { EDITOR_SPLIT_DOWN, EDITOR_SPLIT_RIGHT };
 
 /**
@@ -236,6 +238,8 @@ export const COMMAND_LABELS: Readonly<Record<string, CatalogueKey>> = {
   [EDITOR_SPLIT_DOWN]: 'command.group.splitDown',
   [GROUP_FOCUS_NEXT]: 'command.group.focusNext',
   [GROUP_FOCUS_PREVIOUS]: 'command.group.focusPrevious',
+  [GROUP_MOVE_TAB_NEXT]: 'command.group.moveTabToNext',
+  [GROUP_CLOSE]: 'command.group.close',
   // The six `@tyto/editor` brings with the search panel (E8.5). Their ids and their English
   // labels are the editor's, the same as undo and redo above; what this table adds is the
   // catalogue key, so the bar shows them in the window's language.
@@ -279,8 +283,12 @@ export interface DesktopActions {
   stepDocument(direction: 1 | -1): void;
   /** TYTO-286. A new group beside (`row`) or under (`column`) the focused one, same document. */
   splitGroup(direction: 'row' | 'column'): void;
-  /** TYTO-286. Focus to the group before or after the focused one. */
+  /** TYTO-286. Focus to the group before or after the focused one, wrapping at the ends. */
   focusGroup(direction: 1 | -1): void;
+  /** TYTO-286. The tab in front to the next group; with one group, into a new split right. */
+  moveTabToNextGroup(): void;
+  /** TYTO-286. Closes every tab of the focused group as `Mod-w` would, asking when unsaved. */
+  closeGroup(): void;
   /** E9.4. Shows the export dialog. Everything it then does is a round trip to main. */
   openExport(): void;
   /** TYTO-47. Shows the plugins screen; the list is a round trip to main. */
@@ -456,6 +464,12 @@ export function createDesktopRegistry(actions: DesktopActions): CommandRegistry 
   });
   add(GROUP_FOCUS_PREVIOUS, () => {
     actions.focusGroup(-1);
+  });
+  add(GROUP_MOVE_TAB_NEXT, () => {
+    actions.moveTabToNextGroup();
+  });
+  add(GROUP_CLOSE, () => {
+    actions.closeGroup();
   });
 
   return registry;

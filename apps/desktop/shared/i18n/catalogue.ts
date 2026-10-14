@@ -265,6 +265,8 @@ export interface Catalogue {
   readonly 'command.group.splitDown': string;
   readonly 'command.group.focusNext': string;
   readonly 'command.group.focusPrevious': string;
+  readonly 'command.group.moveTabToNext': string;
+  readonly 'command.group.close': string;
   /** A prefix: the tab's own name follows it, the way a recent entry's does. */
   readonly 'command.document.select': string;
 
@@ -592,6 +594,8 @@ export const CATALOGUE_KEYS = [
   'command.group.splitDown',
   'command.group.focusNext',
   'command.group.focusPrevious',
+  'command.group.moveTabToNext',
+  'command.group.close',
   'command.document.select',
   'panel.close',
   'command.layout.togglePanel',

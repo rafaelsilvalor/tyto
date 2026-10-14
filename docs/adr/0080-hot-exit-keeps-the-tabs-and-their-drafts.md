@@ -33,7 +33,16 @@ field is optional and the version stays 1, so a file written before it (and one 
 decision 9) reads as a session with no template mode rather than as an empty one.
 _Amended by TYTO-265:_ and, per tab, an optional `place` — the main selection's `anchor` and
 `head` and the `top` of the pane, all document offsets — under the same rule: optional, version
-still 1, and a `place` that does not parse is dropped alone rather than costing the session. The
+still 1, and a `place` that does not parse is dropped alone rather than costing the session.
+_Amended by TYTO-286:_ and an optional `groups` — the editor groups of ADR 0083: the tree of
+splits, each with its direction and its children's shares, each leaf a group whose tabs name a
+session tab **by index** with that tab's own `place`, the index of the tab in front, and which
+leaf was focused, counted in tree order. `tabs` stays the list of documents, one draft each, and
+`active` keeps naming the **focused group's** document, so a build that does not know `groups`
+(zod strips the key) still restores every tab, as one group, with the right one in front. The
+version stays 1, and a tree that does not parse is dropped alone (`.catch`): it costs the
+arrangement, never the drafts. On the wire the window names a group's tab by its document id;
+main turns it into an index of the tabs it keeps, and a group left with none goes. The
 store copies `fileLayoutStore`: reading never fails (a missing or unparseable file is an empty
 session), writing swallows the error but **answers whether it wrote**, because the quit acts on
 that answer. Line endings are normalised before hashing, since CodeMirror reads CR LF as LF
@@ -61,6 +70,9 @@ that already exists (ADR 0029, 0031, 0039 are untouched).
   is never imposed over a newer file, and never dropped either.
 - A file that is gone loses its tab and is named in an `E_FILE_NOT_FOUND` row, the notice
   `file:reopen` already gives; its draft, if it had one, comes back as an untitled tab.
+- _Amended by TYTO-286:_ with groups, a stale draft opens beside its file's first tab, in the
+  same group; a group whose tabs all failed to come back collapses, and a tab no group names
+  goes into the focused group.
 
 **5. The quit asks nothing about drafts.** `resolveExit` writes the session first; when it was
 written, the tabs' unsaved text is kept and the three-answer box of ADR 0034 is not drawn. The
@@ -104,7 +116,11 @@ or got shorter. A tab whose draft went stale gives its place to the disk's text,
 the draft beside it. An offset and not a pixel, because a pixel names another line in a window
 of another width: measured on a brief whose lines wrap, the same `scrollTop` of 3046 px was line
 41 at a 705 px pane and line 27 at 325 px. Only the main selection is kept, and the template
-mode's buffers keep neither. The undo history stays out. CodeMirror can write it down
+mode's buffers keep neither. _Amended by TYTO-286:_ a document shown in two groups looks at two
+places, so each group's tab carries its own `place` in `groups`; the tab-level `place` is the
+document's, which is its primary pane's. On the next launch each tab is put back where it was
+the first time a pane shows it, after the group elements have rendered, and a tab behind
+another in its group is written from where it was when its pane last let go of it. The undo history stays out. CodeMirror can write it down
 (`toJSON` with its `historyField`), but what it writes is valid only against the exact text it
 was recorded on, so every draft that went stale or file that changed would have to drop it, and
 it grows with every edit since the tab was opened, into a file that crosses the bridge each

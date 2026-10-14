@@ -134,4 +134,43 @@ describe('the tabs the window keeps', () => {
     expect(kept.template).toEqual(mode);
     expect(JSON.stringify(kept)).not.toContain('directory');
   });
+
+  it('carries the groups with only the kept tabs, a group left with none gone (TYTO-286)', () => {
+    const handle = open();
+    handle.restore(handle.blank(''));
+    const untouched = tab(handle, 'a');
+    const saved = tab(handle, 'b', { name: 'b.brief' });
+    const at = (anchor: number) => ({ anchor, head: anchor, top: 0 });
+
+    const kept = sessionOf({ documents: [untouched, saved], activeId: 'b' }, null, {
+      root: {
+        split: 'row',
+        sizes: [0.5, 0.5],
+        children: [
+          { tabs: [{ documentId: 'a', place: at(0) }], active: 0 },
+          {
+            tabs: [
+              { documentId: 'a', place: at(0) },
+              { documentId: 'b', place: at(3) },
+            ],
+            active: 1,
+          },
+        ],
+      },
+      focused: 1,
+    });
+
+    expect(kept.groups).toEqual({
+      root: { tabs: [{ documentId: 'b', place: at(3) }], active: 0 },
+      focused: 0,
+    });
+    expect(kept.tabs.map((entry) => entry.documentId)).toEqual(['b']);
+  });
+
+  it('sends no groups when it is given none', () => {
+    const handle = open();
+    expect(sessionOf({ documents: [tab(handle, 'a')], activeId: 'a' })).not.toHaveProperty(
+      'groups',
+    );
+  });
 });

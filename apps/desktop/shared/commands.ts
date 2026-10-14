@@ -81,12 +81,17 @@ export const FILE_MENU_GROUPS: readonly (readonly MenuCommand[])[] = [
 export const RELOAD_COMMAND: MenuCommand = { id: 'window.reload', label: 'command.window.reload' };
 
 /**
- * The editor's splits, at the top of the View menu (TYTO-286). `@tyto/editor`'s ids, written as
- * literals for the reason `editor.save` is, and pinned to the constants by the renderer's tests.
+ * The editor groups' commands, at the top of the View menu (TYTO-286). The splits are
+ * `@tyto/editor`'s ids, written as literals for the reason `editor.save` is, and every id here
+ * is pinned to the renderer's constants by its tests.
  */
 export const VIEW_MENU_COMMANDS: readonly MenuCommand[] = [
   { id: 'editor.splitRight', label: 'command.group.splitRight' },
   { id: 'editor.splitDown', label: 'command.group.splitDown' },
+  { id: 'editor.focusNextGroup', label: 'command.group.focusNext' },
+  { id: 'editor.focusPreviousGroup', label: 'command.group.focusPrevious' },
+  { id: 'editor.moveTabToNextGroup', label: 'command.group.moveTabToNext' },
+  { id: 'editor.closeGroup', label: 'command.group.close' },
 ];
 
 /** Every command the File menu offers, flat, for the tests that count them. */

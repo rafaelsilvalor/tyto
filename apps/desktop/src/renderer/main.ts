@@ -37,6 +37,7 @@ import {
   type TytoBridge,
   type UpdateStatus,
 } from '../../shared/ipc.js';
+import type { SessionGroupNode } from '../../shared/session-groups.js';
 import {
   type CatalogueKey,
   type Locale,
@@ -158,7 +159,10 @@ import {
   groupById,
   groupList,
   groupOfTab,
+  groupsFromLayout,
   groupsOf,
+  layoutOf,
+  moveTabToNextGroup,
   openDocument,
   replaceDocument,
   shownDocumentIds,
@@ -185,7 +189,7 @@ import {
 import { type SaveOutcome, holdPageClose, listenForExit, resolveExit } from './exit.js';
 import { installErrorReporting, reportToLog } from './report-errors.js';
 import { searchPhrasesFor } from './search-phrases.js';
-import { type TemplateSnapshot, sessionOf } from './session.js';
+import { type SessionGroups, type TemplateSnapshot, sessionOf } from './session.js';
 import { paintUpdateNotice } from './update-notice.js';
 import { type ShellState, paint, paintTitle } from './shell.js';
 import { AltTap, MenuRow, altLettersTaken, isMenuLetterStroke } from './menu-row.js';
@@ -1056,8 +1060,9 @@ const registry: CommandRegistry = withCommandGate(
     },
 
     splitGroup: (direction) => {
-      // The same document in the new group, which takes the focus (ADR 0083).
-      if (editor === undefined) return;
+      // The same document in the new group, which takes the focus (ADR 0083). Refused until
+      // the last session is read, as a write is: the groups it brings back replace these.
+      if (editor === undefined || !sessionRead) return;
       groups = splitGroup(groups, direction);
       showGroups();
     },
@@ -1065,6 +1070,17 @@ const registry: CommandRegistry = withCommandGate(
     focusGroup: (direction) => {
       groups = focusNeighbour(groups, direction);
       showGroups();
+    },
+
+    moveTabToNextGroup: () => {
+      if (editor === undefined || !sessionRead) return;
+      groups = moveTabToNextGroup(groups);
+      showGroups();
+    },
+
+    closeGroup: () => {
+      if (!sessionRead) return;
+      void closeFocusedGroup();
     },
 
     toggleVimMode: () => {
@@ -1115,6 +1131,24 @@ const groupElements = new Map<string, EditorGroupElement>();
 const panes = new Map<string, EditorPane>();
 /** Group id to the document its pane shows: the truth `onUpdate` writes by, never `active()`. */
 const shownIn = new Map<string, string>();
+/** Group id to the tab its pane shows, so a pane that lets go can say where that tab was. */
+const shownTab = new Map<string, string>();
+
+/** Where a tab was looking: its selection and the offset of the line at the top of its pane. */
+type TabPlace = NonNullable<RestoredTab['place']>;
+
+/**
+ * Where each tab was looking when its pane last let go of it (TYTO-286). A document has one
+ * selection, its primary's; a tab of it in another group has its own, and the session keeps
+ * each (ADR 0080 decision 8), so a tab behind another one in its group is written from here.
+ */
+const tabPlaces = new Map<string, TabPlace>();
+
+/**
+ * Where a restored tab goes the first time a pane shows it (TYTO-286): read from the session,
+ * used once, so the cursor of each occurrence comes back to its own pane.
+ */
+const pendingPlaces = new Map<string, TabPlace>();
 /** The tree's shape when it was last laid out, so a repaint that changed no split moves nothing. */
 let arrangedShape = '';
 
@@ -1201,8 +1235,17 @@ function arrangeEditorGroups(): void {
 function leave(groupId: string): void {
   const pane_ = panes.get(groupId);
   const documentId = shownIn.get(groupId);
+  const tabId = shownTab.get(groupId);
   shownIn.delete(groupId);
+  shownTab.delete(groupId);
   if (pane_ === undefined || documentId === undefined) return;
+  if (tabId !== undefined) {
+    const measured = pane_.view.scrollDOM.clientHeight > 0;
+    tabPlaces.set(tabId, {
+      ...selectionOf(pane_.state()),
+      top: measured ? pane_.scroll().top : (tabPlaces.get(tabId)?.top ?? 0),
+    });
+  }
   const current = documentOf(workspace, documentId);
   if (current === undefined || isFollower(pane_.state())) return;
   if (pane_.view.scrollDOM.clientHeight > 0) {
@@ -1218,16 +1261,39 @@ function leave(groupId: string): void {
     follower?.restore(editor?.followerOf(heir) ?? record, follower.scroll());
 }
 
-/** A pane starts showing a document: as its primary, or as a follower of the pane that is. */
-function enter(groupId: string, documentId: string): void {
+/**
+ * A pane starts showing a document: as its primary, or as a follower of the pane that is. A tab
+ * the session just brought back is put where it was looking (TYTO-286), primary or follower.
+ */
+function enter(groupId: string, tabId: string, documentId: string): void {
   const pane_ = panes.get(groupId);
   const target = documentOf(workspace, documentId);
   if (pane_ === undefined || editor === undefined || target?.state === undefined) return;
   const primary = primaryPaneOf(documentId);
+  const place = pendingPlaces.get(tabId);
+  pendingPlaces.delete(tabId);
   // Set before the restore: its reconfigure transactions reach `onUpdate`, which must already
   // know which document this pane holds.
   shownIn.set(groupId, documentId);
-  pane_.restore(primary === undefined ? target.state : editor.followerOf(primary), target.scroll);
+  shownTab.set(groupId, tabId);
+  if (primary === undefined) {
+    if (place === undefined) {
+      pane_.restore(target.state, target.scroll);
+      return;
+    }
+    const state = withSelection(target.state, place);
+    const scroll = { top: place.top };
+    workspace = updateDocument(workspace, documentId, (document_) => ({
+      ...document_,
+      state,
+      scroll,
+    }));
+    pane_.restore(state, scroll);
+    return;
+  }
+  const follower = editor.followerOf(primary);
+  if (place === undefined) pane_.restore(follower, target.scroll);
+  else pane_.restore(withSelection(follower, place), { top: place.top });
 }
 
 /**
@@ -1240,11 +1306,16 @@ function present(): void {
   arrangeEditorGroups();
   if (editor === undefined) return;
   for (const group of groupList(groups)) {
-    const wanted = activeTabOf(group)?.documentId;
-    if (shownIn.get(group.id) === wanted) continue;
+    const wanted = activeTabOf(group);
+    if (shownTab.get(group.id) === wanted?.id && shownIn.get(group.id) === wanted?.documentId) {
+      continue;
+    }
     leave(group.id);
-    if (wanted !== undefined) enter(group.id, wanted);
+    if (wanted !== undefined) enter(group.id, wanted.id, wanted.documentId);
   }
+  // A tab that closed has nowhere to be looking.
+  const live = new Set(groupList(groups).flatMap((group) => group.tabs.map((tab) => tab.id)));
+  for (const id of [...tabPlaces.keys()]) if (!live.has(id)) tabPlaces.delete(id);
 }
 
 /** `workspace.activeId` brought to the focused group's document, the one {@link active} reads. */
@@ -1331,6 +1402,8 @@ function adoptEditorState(handle: EditorHandle): void {
   if (first !== undefined) {
     panes.set(first.id, handle.firstPane);
     shownIn.set(first.id, active().id);
+    const tab = activeTabOf(first);
+    if (tab !== undefined) shownTab.set(first.id, tab.id);
   }
 }
 
@@ -2283,7 +2356,7 @@ async function keepSession(final: boolean): Promise<boolean> {
   if (sessionTimer !== undefined) clearTimeout(sessionTimer);
   sessionTimer = undefined;
   try {
-    const kept = sessionOf(withLiveScroll(workspace), templateSnapshot());
+    const kept = sessionOf(withLiveScroll(workspace), templateSnapshot(), groupsForSession());
     return (await bridge['session:write']({ ...kept, final })).written;
   } catch (cause) {
     reportToLog(bridge, cause, 'session not written');
@@ -2317,6 +2390,33 @@ function withLiveScroll(current: Workspace): Workspace {
       return scroll === undefined ? document_ : { ...document_, scroll };
     }),
   };
+}
+
+/**
+ * The editor groups for the session (TYTO-286): the tree, and per tab where **that** tab is
+ * looking. The tab in front of a group is read off its pane — the scroll only when the pane has
+ * a height, as {@link withLiveScroll} does — and a tab behind is where it was when its pane last
+ * let go of it, or, for one no pane has shown here, where its document says.
+ */
+function groupsForSession(): SessionGroups {
+  return layoutOf(groups, (tab, group) => {
+    const pane_ = panes.get(group.id);
+    const remembered = tabPlaces.get(tab.id) ?? pendingPlaces.get(tab.id);
+    if (pane_ !== undefined && shownTab.get(group.id) === tab.id) {
+      const measured = pane_.view.scrollDOM.clientHeight > 0;
+      const top = measured
+        ? pane_.scroll().top
+        : (remembered?.top ?? documentOf(workspace, tab.documentId)?.scroll?.top ?? 0);
+      return { documentId: tab.documentId, place: { ...selectionOf(pane_.state()), top } };
+    }
+    if (remembered !== undefined) return { documentId: tab.documentId, place: remembered };
+    const document_ = documentOf(workspace, tab.documentId);
+    const place =
+      document_?.state === undefined
+        ? null
+        : { ...selectionOf(document_.state), top: document_.scroll?.top ?? 0 };
+    return { documentId: tab.documentId, place };
+  });
 }
 
 /**
@@ -2379,6 +2479,9 @@ async function restoreSession(bridge: TytoBridge, handle: EditorHandle): Promise
   const restored: DocumentState[] = [];
   const rows: Diagnostic[] = [];
   let activeId: string | undefined;
+  /** Per session tab, by index: the document it became, and a stale draft's tab beside it. */
+  const builtAt = new Map<number, string>();
+  const staleAt = new Map<number, string>();
   const untitled = (text: string, place: RestoredTab['place']): DocumentState => {
     const born = placed(newDocument(nextDocumentId(), handle.blank(text)), place);
     restored.push(born);
@@ -2404,7 +2507,7 @@ async function restoreSession(bridge: TytoBridge, handle: EditorHandle): Promise
       );
       restored.push(built);
       if (tab.draft !== null && tab.stale) {
-        untitled(tab.draft, tab.place);
+        staleAt.set(index, untitled(tab.draft, tab.place).id);
         rows.push({
           severity: 'warning',
           code: SESSION_DRAFT_STALE,
@@ -2421,6 +2524,7 @@ async function restoreSession(bridge: TytoBridge, handle: EditorHandle): Promise
       }
       if (tab.draft !== null) built = untitled(tab.draft, tab.place);
     }
+    if (built !== undefined) builtAt.set(index, built.id);
     if (index === answer.active && built !== undefined) activeId = built.id;
   }
 
@@ -2461,8 +2565,10 @@ async function restoreSession(bridge: TytoBridge, handle: EditorHandle): Promise
       documents: [...restored, ...kept],
       activeId: activeId ?? (restored[0] as DocumentState).id,
     };
-    // Into the groups as they are; a session written with several comes back as one for now
-    // (TYTO-286 PR A — the session keeps no groups yet).
+    // The groups the session left (TYTO-286), laid out and drawn before any pane is pointed at
+    // a document: a scroll put back into a pane whose strip has not rendered yet lands against
+    // the wrong height. A session with none, or none that survived, is one group, as before.
+    if (answer.groups !== null) await restoreGroups(answer.groups, builtAt, staleAt);
     followWorkspace();
     for (const document_ of restored) {
       if (document_.kind === undefined) void request(bridge, document_.id, contentOf(document_));
@@ -2481,6 +2587,63 @@ async function restoreSession(bridge: TytoBridge, handle: EditorHandle): Promise
   }
   sessionRead = true;
   repaint();
+}
+
+/**
+ * The session's groups made the window's (TYTO-286). Each tab names a session tab by index and
+ * shows the document that tab became; a tab that came back as nothing — a file gone with no
+ * draft — is not shown, and a group left with none collapses. **A stale draft opens beside its
+ * file's first tab, in the same group**, as it opens beside the file in one strip. Every tab's
+ * own cursor waits in {@link pendingPlaces} for the first pane that shows it.
+ */
+async function restoreGroups(
+  layout: NonNullable<IpcResponse<'session:read'>['groups']>,
+  builtAt: ReadonlyMap<number, string>,
+  staleAt: ReadonlyMap<number, string>,
+): Promise<void> {
+  type Item = { readonly tab: number; readonly place: TabPlace | null; readonly stale: boolean };
+  const besideOnce = new Set<number>();
+  const withDrafts = (node: SessionGroupNode<Omit<Item, 'stale'>>): SessionGroupNode<Item> => {
+    if ('split' in node) return { ...node, children: node.children.map(withDrafts) };
+    const tabs: Item[] = [];
+    let active = 0;
+    node.tabs.forEach((tab, index) => {
+      if (index === node.active) active = tabs.length;
+      tabs.push({ ...tab, stale: false });
+      if (staleAt.has(tab.tab) && !besideOnce.has(tab.tab)) {
+        besideOnce.add(tab.tab);
+        tabs.push({ tab: tab.tab, place: tab.place, stale: true });
+      }
+    });
+    return { tabs, active };
+  };
+  const rebuilt = groupsFromLayout(
+    groups,
+    { root: withDrafts(layout.root), focused: layout.focused },
+    (item) => (item.stale ? staleAt : builtAt).get(item.tab),
+  );
+  if (rebuilt === undefined) return;
+  groups = rebuilt.groups;
+  for (const [item, tabId] of rebuilt.tabIds) {
+    if (item.place !== null) pendingPlaces.set(tabId, item.place);
+  }
+  arrangeEditorGroups();
+  await Promise.all([...groupElements.values()].map((element) => element.updateComplete));
+}
+
+/**
+ * Closes the focused group: each of its tabs as `Mod-w` closes it (TYTO-286), brought to the
+ * front first so a question about unsaved text is asked over the tab it is about. A tab whose
+ * question was answered _keep_ stays, and so does the group with it.
+ */
+async function closeFocusedGroup(): Promise<void> {
+  const group = focusedGroup(groups);
+  for (const tab of group.tabs) {
+    if (groupOfTab(groups, tab.id) === undefined) continue;
+    selectTab(tab.id);
+    await requestCloseTab(tab.id);
+    if (groupOfTab(groups, tab.id) !== undefined) return;
+  }
 }
 
 /** The file behind each template buffer, for the row that names a stale draft (TYTO-266). */

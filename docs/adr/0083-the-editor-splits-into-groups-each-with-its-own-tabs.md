@@ -75,10 +75,17 @@ is said where it applies.
    splits with `:vsplit` and `:split`. Both splits are on the View menu (ADR 0078) and in the
    command bar. A split opens the same document. "Restore layout" puts the docks back and leaves
    the groups as they are.
-8. **Persistence comes in the second pull request.** `session.json` (ADR 0080) gains an optional
-   `groups` field in its version 1, the tree with each tab naming a session tab by index, and
-   ADR 0080 is amended then. Until it lands, a window with several groups comes back after a
-   restart as one group holding every tab, with every draft; hot exit with one group is unchanged.
+8. **The groups are kept in `session.json`** (ADR 0080, amended in place by the second pull
+   request): an optional `groups` field in its version 1, the tree with each tab naming a session
+   tab by index and carrying its own cursor and scroll, and the focused group. A window with
+   several groups comes back after a restart with the same tree, the same tabs in each group,
+   the same one focused and each pane's cursor where that pane left it. A split, a move and a
+   group close are refused until the last session has been read, as a write is.
+9. **Three more commands**, through the same table and on the View menu, with no default keys:
+   focus the next or the previous group (tree order, wrapping at the ends — `Mod-Alt-ArrowLeft`
+   and `Mod-Alt-ArrowRight` wrap with them), move the tab in front to the next group (with one
+   group, a split to the right is made for it, as VS Code does), and close the focused group,
+   each tab as `Mod-w` closes it, so an unsaved one asks first and a _keep_ stops the close.
 
 ## Consequences
 
@@ -89,4 +96,5 @@ is said where it applies.
 - The PREVIEW panel still sits in the right dock and follows the focused group; becoming a tab is
   TYTO-287. Dragging a tab onto a group or a group's edge is TYTO-288.
 - Moving a tab to another group, focusing the next group by order, closing a group and keeping
-  the groups across a restart are the second pull request's.
+  the groups across a restart landed in the second pull request (decisions 8 and 9). The shares
+  of a split are kept, though nothing changes them yet: there is no splitter between groups.

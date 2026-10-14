@@ -2,8 +2,9 @@ import { createHash } from 'node:crypto';
 import { basename } from 'node:path';
 
 import type { IpcRequest, IpcResponse } from '../../shared/ipc.js';
+import { prunedGroups } from '../../shared/session-groups.js';
 import type { DocumentService } from './documents.js';
-import type { SessionStore, StoredTab, StoredTemplate } from './session-store.js';
+import type { SessionStore, StoredGroups, StoredTab, StoredTemplate } from './session-store.js';
 import type { OpenedTemplate } from './template-editor.js';
 
 /**
@@ -170,8 +171,10 @@ export function createSessionService(options: SessionServiceOptions): SessionSer
   };
 
   return {
-    async write({ tabs, active, template, final }) {
+    async write({ tabs, active, template, groups, final }) {
       const kept: StoredTab[] = [];
+      /** A window tab's id to its index among the kept tabs, for the groups to name it by. */
+      const keptIndex = new Map<string, number>();
       let keptActive = 0;
       for (const [index, tab] of tabs.entries()) {
         let savedText = tab.draft?.savedText;
@@ -189,6 +192,7 @@ export function createSessionService(options: SessionServiceOptions): SessionSer
         if (tab.kind === 'brief' && path === undefined && draft === undefined) continue;
 
         if (index === active) keptActive = kept.length;
+        keptIndex.set(tab.documentId, kept.length);
         kept.push({
           kind: tab.kind,
           ...(path === undefined ? {} : { path }),
@@ -197,12 +201,23 @@ export function createSessionService(options: SessionServiceOptions): SessionSer
         });
       }
       const keptMode = keptTemplate(template);
+      // The groups name the kept tabs by index (TYTO-286); a tab that was not kept — a brief in
+      // no file with nothing typed — leaves its groups, and a group left with none goes.
+      const keptGroups: StoredGroups | undefined =
+        groups === undefined
+          ? undefined
+          : prunedGroups(groups, ({ documentId, place }) => {
+              const at = keptIndex.get(documentId);
+              if (at === undefined) return undefined;
+              return { tab: at, ...(place === null ? {} : { place }) };
+            });
       return {
         written: await store.write({
           version: 1,
           tabs: kept,
           active: keptActive,
           ...(keptMode === undefined ? {} : { template: keptMode }),
+          ...(keptGroups === undefined ? {} : { groups: keptGroups }),
         }),
       };
     },
@@ -216,7 +231,14 @@ export function createSessionService(options: SessionServiceOptions): SessionSer
       for (const [index, tab] of stored.tabs.entries()) tabs.push(await restore(tab, index));
       const template =
         stored.template === undefined ? null : await restoreTemplate(stored.template);
-      return { tabs, active: stored.active, template };
+      // Indices checked against the tabs read: a hand-edited file may name one that is not.
+      const groups =
+        stored.groups === undefined
+          ? undefined
+          : prunedGroups(stored.groups, ({ tab, place }) =>
+              tab < tabs.length ? { tab, place: place ?? null } : undefined,
+            );
+      return { tabs, active: stored.active, template, groups: groups ?? null };
     },
   };
 }

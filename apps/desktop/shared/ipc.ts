@@ -3,6 +3,7 @@ import { THEME_KINDS, THEME_TOKEN_NAME, isThemeColor } from '@tyto/plugin-api';
 import { z } from 'zod';
 
 import { layoutSchema } from './layout.js';
+import type { SessionGroupNode } from './session-groups.js';
 import { THEME_MODES } from './theme-setting.js';
 
 /**
@@ -143,6 +144,32 @@ const sessionPlace = z.object({
   head: documentOffset,
   top: documentOffset,
 });
+
+/**
+ * The editor groups as the session carries them (TYTO-286, ADR 0083): a tree of splits whose
+ * leaves are groups, each with its tabs in order and the index of the one in front, and the
+ * focused group as its index among the leaves in tree order. Built once per tab shape, because
+ * the window names a tab by its `documentId` and main answers with an index into its `tabs`.
+ * Bounded like every list here, so a hostile renderer cannot send a tree nothing could lay out.
+ */
+function sessionGroups<T>(tab: z.ZodType<T>) {
+  const node: z.ZodType<SessionGroupNode<T>> = z.lazy(() =>
+    z.union([
+      z.object({
+        split: z.enum(['row', 'column']),
+        sizes: z.array(z.number().min(0).max(1)).max(64),
+        children: z.array(node).min(1).max(64),
+      }),
+      z.object({ tabs: z.array(tab).min(1).max(500), active: z.number().int().min(0) }),
+    ]),
+  );
+  return z.object({ root: node, focused: z.number().int().min(0) });
+}
+
+const writtenGroups = sessionGroups(z.object({ documentId, place: sessionPlace.nullable() }));
+const readGroups = sessionGroups(
+  z.object({ tab: z.number().int().min(0), place: sessionPlace.nullable() }),
+);
 
 /** A markup template folder as `template:open` reads it: both files and the samples. */
 const markupTemplate = z.object({
@@ -735,6 +762,13 @@ export const IPC_CHANNELS = {
           markup: sessionDraft.nullable(),
         })
         .nullable(),
+      /**
+       * The editor groups (TYTO-286): each tab names a document of `tabs` by its id, with its
+       * own cursor and scroll, since one document in two groups looks at two places. Optional,
+       * so a window that sends none keeps one group. Main turns the ids into indices of the tabs
+       * it keeps, and a group left with no kept tab goes.
+       */
+      groups: writtenGroups.optional(),
       final: z.boolean(),
     }),
     z.object({ written: z.boolean() }),
@@ -783,6 +817,12 @@ export const IPC_CHANNELS = {
           markup: restoredBuffer,
         })
         .nullable(),
+      /**
+       * The editor groups the last session left (TYTO-286), each tab an index into `tabs`
+       * above, or null for a session written with none — the window then shows every tab in
+       * one group, as it always has.
+       */
+      groups: readGroups.nullable(),
     }),
   ),
 

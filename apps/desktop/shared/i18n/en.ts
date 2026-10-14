@@ -93,6 +93,8 @@ export const en: Catalogue = {
   'command.group.splitDown': 'Split editor down',
   'command.group.focusNext': 'Focus next editor group',
   'command.group.focusPrevious': 'Focus previous editor group',
+  'command.group.moveTabToNext': 'Move tab to next editor group',
+  'command.group.close': 'Close editor group',
   'command.document.select': 'Tab',
   'panel.close': 'Close the panel',
   'command.layout.togglePanel': 'Show or hide',

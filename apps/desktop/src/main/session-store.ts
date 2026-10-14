@@ -21,6 +21,12 @@ import { z } from 'zod';
 
 const storedDraft = z.object({ text: z.string(), savedHash: z.string() });
 
+const storedPlace = z.object({
+  anchor: z.number().int().min(0),
+  head: z.number().int().min(0),
+  top: z.number().int().min(0),
+});
+
 const storedTab = z.object({
   kind: z.enum(['brief', 'settings', 'keybindings', 'snippets']),
   /** A brief's file. Absent for a brief that is in no file, and for the app's own files. */
@@ -39,14 +45,50 @@ const storedTab = z.object({
    * written before it reads as tabs that open at the top, which is what they did. One that
    * does not parse is dropped on its own: a cursor is not worth the tabs and their drafts.
    */
-  place: z
-    .object({
-      anchor: z.number().int().min(0),
-      head: z.number().int().min(0),
-      top: z.number().int().min(0),
-    })
-    .optional()
-    .catch(undefined),
+  place: storedPlace.optional().catch(undefined),
+});
+
+/** One tab of one group: which session tab it shows, by index, and where it was looking. */
+const storedGroupTab = z.object({
+  tab: z.number().int().min(0),
+  /** Per occurrence: one document in two groups has a cursor in each (TYTO-286). */
+  place: storedPlace.optional().catch(undefined),
+});
+
+export interface StoredGroupLeaf {
+  readonly tabs: readonly z.infer<typeof storedGroupTab>[];
+  readonly active: number;
+}
+export interface StoredGroupSplit {
+  readonly split: 'row' | 'column';
+  readonly sizes: readonly number[];
+  readonly children: readonly StoredGroupNode[];
+}
+export type StoredGroupNode = StoredGroupLeaf | StoredGroupSplit;
+
+const storedGroupNode: z.ZodType<StoredGroupNode> = z.lazy(() =>
+  z.union([
+    z.object({
+      split: z.enum(['row', 'column']),
+      sizes: z.array(z.number().min(0)),
+      children: z.array(storedGroupNode).min(1),
+    }),
+    z.object({ tabs: z.array(storedGroupTab).min(1), active: z.number().int().min(0) }),
+  ]),
+);
+
+/**
+ * The editor groups (TYTO-286, ADR 0083): the tree of splits, each leaf a group whose tabs name
+ * the session's `tabs` by index, and which leaf was focused, counted in tree order.
+ *
+ * `tabs` stays the list of documents, one draft each, and `active` the focused group's
+ * document, so a build that knows nothing of groups — zod strips the key — still restores
+ * every tab with the right one in front, as one group. **A tree that does not parse is dropped
+ * alone** (`.catch`): it costs the arrangement, never the drafts.
+ */
+const storedGroups = z.object({
+  root: storedGroupNode,
+  focused: z.number().int().min(0),
 });
 
 /**
@@ -69,8 +111,10 @@ const storedSession = z.object({
   tabs: z.array(storedTab),
   active: z.number().int().min(0),
   template: storedTemplate.optional(),
+  groups: storedGroups.optional().catch(undefined),
 });
 
+export type StoredGroups = z.infer<typeof storedGroups>;
 export type StoredTab = z.infer<typeof storedTab>;
 export type StoredTemplate = z.infer<typeof storedTemplate>;
 export type StoredSession = z.infer<typeof storedSession>;
