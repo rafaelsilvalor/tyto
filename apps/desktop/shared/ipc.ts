@@ -261,6 +261,11 @@ const appliedThemesSchema = z.object({
   mode: z.enum(THEME_MODES),
   light: appliedThemeSchema,
   dark: appliedThemeSchema,
+  /**
+   * The `iconStrokeWidth` setting in force (TYTO-288): the look the window applies with the
+   * colours, on the same answer and at the same moments, so a save moves both together.
+   */
+  iconStrokeWidth: z.number().min(0.75).max(2),
   diagnostics: z.array(diagnostic.omit({ range: true })).max(200),
 });
 

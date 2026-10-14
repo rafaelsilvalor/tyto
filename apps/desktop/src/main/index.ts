@@ -513,6 +513,8 @@ async function start(): Promise<void> {
   // Before the window exists, so a window told to be dark is never painted light first.
   themeSetting = saved.theme;
   nativeTheme.themeSource = modeOf(saved.theme, themes.lookup);
+  // The icons' stroke (TYTO-288): read with the colours by the window, so it moves with them.
+  let iconStrokeWidth = saved.iconStrokeWidth;
   // A screen's change: `false` when it was refused because the file does not parse.
   const remember = (changes: Partial<Settings>): Promise<boolean> =>
     late.live === undefined ? Promise.resolve(false) : late.live.remember(changes);
@@ -733,6 +735,8 @@ async function start(): Promise<void> {
         themeSetting = next.theme;
         void applying(themes.current());
       }
+      // The window asks `theme:current` on every change it hears, which carries the stroke.
+      if (keys.includes('iconStrokeWidth')) iconStrokeWidth = next.iconStrokeWidth;
     },
     configure: (config) => {
       host.configure(config);
@@ -1108,6 +1112,7 @@ async function start(): Promise<void> {
         }
         return { applied: await applying(themes.current()), saved };
       },
+      iconStrokeWidth: () => iconStrokeWidth,
     },
     // After `ready`, as the panels are, so the window's first answer is the whole list.
     keymaps: async () => {

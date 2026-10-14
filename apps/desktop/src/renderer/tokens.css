@@ -98,6 +98,10 @@
   --tyto-pane-strip-height: 30px;
   --tyto-pane-header-height: 28px;
 
+  /* The icons' stroke, in units of their 16-unit grid: the `iconStrokeWidth` setting's default
+     (TYTO-288). The theme sheet sets the person's value over it. */
+  --tyto-icon-stroke: 1.25;
+
   /*
    * Sizes that are about one rule and not about the look, here since TYTO-288 so that the
    * renderer-tokens guard can refuse a `width` or `height` in pixels anywhere else.

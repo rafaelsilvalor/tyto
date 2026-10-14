@@ -4,8 +4,14 @@ import { type SVGTemplateResult, html, svg } from 'lit';
  * The status bar's nine icons, drawn for Tyto (TYTO-248, ADR 0076), and two for the panes.
  *
  * **The nine are copied from the sheet Rafael approved on 2026-10-08 (TYTO-96, comment 1291169)
- * and not redesigned.** Geometry on a 16 grid with a 1.5 stroke; no icon carries a colour of
- * its own, so each one is whatever `color` the button around it has, which is a token.
+ * and not redesigned.** Geometry on a 16 grid; no icon carries a colour of its own, so each one
+ * is whatever `color` the button around it has, which is a token.
+ *
+ * **The stroke is a setting** (TYTO-288): `iconStrokeWidth` in `settings.json`, default 1.25
+ * since Rafael chose it over the sheet's 1.5 by looking at both. No icon writes a width: the
+ * sheet's `.icon` reads `--tyto-icon-stroke`, which `tokens.css` defaults and the theme sheet
+ * sets from the setting (`theme.ts`). The two dots (`.icon__dot`) are 0.4 of the stroke, the
+ * ratio they had at 1.5, so they stay in proportion at any width.
  *
  * `preview` and `lock` are **not on that sheet**. TYTO-287 drew them provisionally; TYTO-288
  * redrew both in the nine's manner — the same frame, the same stroke, the problems icon's dot —
@@ -38,7 +44,7 @@ const GEOMETRY: Readonly<Record<IconName, (lit: boolean) => SVGTemplateResult>> 
   bottom: (lit) => svg`${FRAME}<path d="M2 9.25h12" />${lit ? on(2.75, 10, 10.5, 2.5) : ''}`,
   commandBar: () => svg`${FRAME}<path d="M5 6.25 6.75 8 5 9.75M8.5 9.75h2.5" />`,
   problems: () =>
-    svg`<path d="M8 2.5 14 13H2Z" /><path d="M8 6.5V9" /><circle cx="8" cy="11" r=".6" fill="currentColor" stroke="none" />`,
+    svg`<path d="M8 2.5 14 13H2Z" /><path d="M8 6.5V9" /><circle class="icon__dot" cx="8" cy="11" r=".5" fill="currentColor" stroke="none" />`,
   queue: () =>
     svg`<path d="M2.75 4h10.5M2.75 7.5h10.5M2.75 11h5" /><path d="M10.5 9.5 14 11.5 10.5 13.5Z" />`,
   plugins: () =>
@@ -52,7 +58,7 @@ const GEOMETRY: Readonly<Record<IconName, (lit: boolean) => SVGTemplateResult>> 
     svg`${FRAME}<path d="M8 2.75v10.5M4.25 6.25h1.5M4.25 9h1.5M9.75 10.25 11 8.5l1.25 1.75" />`,
   // A padlock on the frame's corner radius, with the problems icon's dot for the keyhole.
   lock: () =>
-    svg`<rect x="3" y="7.25" width="10" height="6.25" rx="2" /><path d="M5.5 7.25V5.5a2.5 2.5 0 0 1 5 0v1.75" /><circle cx="8" cy="10.35" r=".6" fill="currentColor" stroke="none" />`,
+    svg`<rect x="3" y="7.25" width="10" height="6.25" rx="2" /><path d="M5.5 7.25V5.5a2.5 2.5 0 0 1 5 0v1.75" /><circle class="icon__dot" cx="8" cy="10.35" r=".5" fill="currentColor" stroke="none" />`,
 };
 
 /** One icon, decorative: the button it sits in carries the words (`aria-label`). */
@@ -64,7 +70,6 @@ export const icon = (name: IconName, lit = false): unknown =>
     viewBox="0 0 16 16"
     fill="none"
     stroke="currentColor"
-    stroke-width="1.5"
     stroke-linecap="round"
     stroke-linejoin="round"
     aria-hidden="true"

@@ -74,7 +74,11 @@ next two.
 9. **The two new icons are provisional.** `preview` and `lock` were drawn by TYTO-287 and are
    not on the sheet Rafael approved (TYTO-96, comment 1291169). They are redrawn here in the
    nine's manner — the frame, the 1.5 stroke on the 16 grid, the problems icon's dot — and put on
-   a sheet beside them for his approval, which this ADR does not presume.
+   a sheet beside them for his approval, which this ADR does not presume. _Amended the same day:_
+   Rafael chose a thinner stroke from a sheet of the eleven at 1.5, 1.25 and 1.0, as a setting —
+   `iconStrokeWidth` in `settings.json`, 0.75 to 2, default 1.25 — applied on save with the
+   colours (`theme:current` carries it, ADR 0077's path) through `--tyto-icon-stroke`; the two
+   dots are 0.4 of the stroke, their ratio at 1.5.
 
 ## What was measured
 

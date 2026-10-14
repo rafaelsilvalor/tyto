@@ -272,6 +272,13 @@ textarea {
 .icon {
   display: block;
   flex-shrink: 0;
+  /* The `iconStrokeWidth` setting (TYTO-288): a CSS width wins over any attribute on the svg. */
+  stroke-width: var(--tyto-icon-stroke);
+}
+
+/* A filled dot inside an icon stays 0.4 of the stroke, its ratio at the sheet's 1.5. */
+.icon__dot {
+  r: calc(var(--tyto-icon-stroke) * 0.4);
 }
 
 /* TYTO-131: the update notice, at the footer's size so it reads as part of the version line. */

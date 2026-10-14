@@ -36,6 +36,18 @@ describe('the theme sheet (TYTO-208)', () => {
   });
 });
 
+describe('the icon stroke on the theme sheet (TYTO-288)', () => {
+  it('sets the setting over the token default, once, for both modes', () => {
+    const sheet = themeSheet({ ...APPLIED, iconStrokeWidth: 1 });
+    expect(sheet.match(/--tyto-icon-stroke: 1;/g)).toHaveLength(1);
+    expect(sheet.indexOf('--tyto-icon-stroke')).toBeLessThan(sheet.indexOf('@media'));
+  });
+
+  it('leaves the token default alone when the answer carries none', () => {
+    expect(themeSheet(APPLIED)).not.toContain('--tyto-icon-stroke');
+  });
+});
+
 describe("the theme's rows in the problems panel (TYTO-208)", () => {
   const row = (code: string) => ({ code, message: code });
 

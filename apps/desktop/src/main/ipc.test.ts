@@ -482,6 +482,7 @@ const windowThemes = (): WindowThemes => {
     current: () => service.current(),
     preview: (id) => service.preview(id),
     choose: async () => ({ applied: await service.current(), saved: true }),
+    iconStrokeWidth: () => 1,
   };
 };
 
@@ -1267,6 +1268,8 @@ describe('the theme channels (TYTO-208)', () => {
       'tyto-dark',
     ]);
     expect(answer.diagnostics).toEqual([]);
+    // The icons' stroke rides on the same answer (TYTO-288), so a save moves it with the colours.
+    expect(answer.iconStrokeWidth).toBe(1);
   });
 
   it('lists every theme with its label and kind, and nothing else', async () => {

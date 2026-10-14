@@ -222,6 +222,7 @@ describe('the theme the window applies (TYTO-208)', () => {
     light: { id: 'tyto-light', colors },
     dark: { id: 'tyto-dark', colors: {} },
     diagnostics: [],
+    iconStrokeWidth: 1.25,
   });
 
   it('refuses a mode that is not one of the three', () => {
@@ -243,6 +244,13 @@ describe('the theme the window applies (TYTO-208)', () => {
     expect(() =>
       parseIpc('theme:current', 'response', theme({ surface: '#fafafa' })),
     ).not.toThrow();
+  });
+
+  // TYTO-288: the stroke is written into the theme sheet, so the bounds are checked here too.
+  it.each([0.5, 2.5])('refuses an icon stroke of %s', (iconStrokeWidth) => {
+    expect(() => parseIpc('theme:current', 'response', { ...theme({}), iconStrokeWidth })).toThrow(
+      IpcContractError,
+    );
   });
 
   it.each([

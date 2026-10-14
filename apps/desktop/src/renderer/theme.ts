@@ -22,18 +22,29 @@ import type { IpcResponse } from '../../shared/ipc.js';
 
 const SHEET_ID = 'tyto-theme';
 
-/** The colours alone: the mode is Electron's to answer, and the problems the panel's. */
-type Applied = Pick<IpcResponse<'theme:current'>, 'light' | 'dark'>;
+/**
+ * The colours, and the icons' stroke when the answer carries it (TYTO-288): the mode is
+ * Electron's to answer, and the problems the panel's.
+ */
+type Applied = Pick<IpcResponse<'theme:current'>, 'light' | 'dark'> &
+  Partial<Pick<IpcResponse<'theme:current'>, 'iconStrokeWidth'>>;
 
 const declarations = (colors: Readonly<Record<string, string>>): string =>
   Object.entries(colors)
     .map(([token, value]) => `  --tyto-${token}: ${value};`)
     .join('\n');
 
-/** The sheet's text: light under `:root`, dark under the system's dark mode. */
+/**
+ * The sheet's text: light under `:root`, dark under the system's dark mode. The icons' stroke
+ * is the `iconStrokeWidth` setting, the same in both (TYTO-288), over `tokens.css`'s default.
+ */
 export function themeSheet(applied: Applied): string {
+  const stroke =
+    applied.iconStrokeWidth === undefined
+      ? ''
+      : `\n  --tyto-icon-stroke: ${String(applied.iconStrokeWidth)};`;
   return [
-    `:root:root {\n${declarations(applied.light.colors)}\n}`,
+    `:root:root {\n${declarations(applied.light.colors)}${stroke}\n}`,
     `@media (prefers-color-scheme: dark) {\n:root:root {\n${declarations(applied.dark.colors)}\n}\n}`,
   ].join('\n');
 }
