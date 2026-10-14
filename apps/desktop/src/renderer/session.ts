@@ -30,11 +30,14 @@ export function sessionOf(
   const at = kept.findIndex((document_) => document_.id === workspace.activeId);
   const keptIds = new Set(kept.map((document_) => document_.id));
   // Only the kept documents' tabs (TYTO-286): main would drop the rest, and a tree that names
-  // nothing but kept tabs is one a reader can check against the list beside it.
+  // nothing but kept tabs is one a reader can check against the list beside it. A following
+  // preview names no document and is always kept; a locked one goes with its brief (TYTO-287).
   const keptGroups =
     groups === undefined
       ? undefined
-      : prunedGroups(groups, (tab) => (keptIds.has(tab.documentId) ? tab : undefined));
+      : prunedGroups(groups, (tab) =>
+          !('documentId' in tab) || keptIds.has(tab.documentId) ? tab : undefined,
+        );
   return {
     ...(keptGroups === undefined ? {} : { groups: keptGroups }),
     tabs: kept.map((document_) => ({

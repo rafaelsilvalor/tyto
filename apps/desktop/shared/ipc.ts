@@ -166,9 +166,28 @@ function sessionGroups<T>(tab: z.ZodType<T>) {
   return z.object({ root: node, focused: z.number().int().min(0) });
 }
 
-const writtenGroups = sessionGroups(z.object({ documentId, place: sessionPlace.nullable() }));
+/**
+ * A preview tab in the session (TYTO-287, ADR 0084): a **following** one names nothing, since it
+ * shows whichever brief is in front when the window opens; a **locked** one names its brief as
+ * every other tab does. Neither has a `place`, and neither ever carries a path. The locked shape
+ * comes first in each union below, because zod keeps the first branch that parses.
+ */
+const followingPreview = z.object({ view: z.literal('preview') });
+const sessionTabIndex = z.number().int().min(0);
+
+const writtenGroups = sessionGroups(
+  z.union([
+    z.object({ documentId, view: z.literal('preview'), locked: z.literal(true) }),
+    followingPreview,
+    z.object({ documentId, place: sessionPlace.nullable() }),
+  ]),
+);
 const readGroups = sessionGroups(
-  z.object({ tab: z.number().int().min(0), place: sessionPlace.nullable() }),
+  z.union([
+    z.object({ tab: sessionTabIndex, view: z.literal('preview'), locked: z.literal(true) }),
+    followingPreview,
+    z.object({ tab: sessionTabIndex, place: sessionPlace.nullable() }),
+  ]),
 );
 
 /** A markup template folder as `template:open` reads it: both files and the samples. */
@@ -766,7 +785,8 @@ export const IPC_CHANNELS = {
        * The editor groups (TYTO-286): each tab names a document of `tabs` by its id, with its
        * own cursor and scroll, since one document in two groups looks at two places. Optional,
        * so a window that sends none keeps one group. Main turns the ids into indices of the tabs
-       * it keeps, and a group left with no kept tab goes.
+       * it keeps, and a group left with no kept tab goes. A preview tab is `{ view: 'preview' }`
+       * while it follows and names its brief once locked (TYTO-287).
        */
       groups: writtenGroups.optional(),
       final: z.boolean(),
@@ -823,6 +843,12 @@ export const IPC_CHANNELS = {
        * one group, as it always has.
        */
       groups: readGroups.nullable(),
+      /**
+       * No session from a build that keeps the groups (TYTO-287, ADR 0084 decision 8): no file
+       * at all, or one written before TYTO-286. The window then opens the preview to the side,
+       * so a new person sees art before they know the key. Afterwards the session decides.
+       */
+      firstLaunch: z.boolean(),
     }),
   ),
 

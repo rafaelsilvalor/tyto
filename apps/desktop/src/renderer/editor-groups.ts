@@ -372,11 +372,19 @@ export function layoutOf<T>(
 }
 
 /**
+ * A preview tab a session brings back (TYTO-287): a following one, whose brief the window points
+ * it at once the groups are built (`documentId` `''` until then), or one locked on its brief.
+ */
+export type RestoredPreview =
+  | { readonly view: 'preview'; readonly documentId: '' }
+  | { readonly view: 'preview'; readonly documentId: string; readonly locked: true };
+
+/**
  * The groups a session left, rebuilt (TYTO-286): `documentOf` says which document each kept
- * item shows, or `undefined` for one that did not come back (a file gone with no draft). A
- * document is shown once per group; a group left with no tab collapses, and a split left with
- * one child is that child, its shares spread over what stays. `undefined` when no group
- * survives — the caller keeps the window it has.
+ * item shows, or `undefined` for one that did not come back (a file gone with no draft), or the
+ * preview it is (TYTO-287). A document is shown as text once per group; a group left with no
+ * tab collapses, and a split left with one child is that child, its shares spread over what
+ * stays. `undefined` when no group survives — the caller keeps the window it has.
  *
  * Ids are minted from `base`, and the first group in tree order takes `base`'s first group's
  * id, so the group the window opened on — `#editor` and the pane CodeMirror was born in — is
@@ -386,9 +394,16 @@ export function layoutOf<T>(
 export function groupsFromLayout<T>(
   base: EditorGroups,
   layout: { readonly root: SessionGroupNode<T>; readonly focused: number },
-  documentOf: (item: T) => string | undefined,
+  documentOf: (item: T) => string | RestoredPreview | undefined,
 ): { readonly groups: EditorGroups; readonly tabIds: ReadonlyMap<T, string> } | undefined {
   let next: EditorGroups = { ...base };
+  const builtPreviews: Omit<EditorTab, 'id'>[] = [];
+  const previewTaken = (preview: Omit<EditorTab, 'id'>): boolean =>
+    builtPreviews.some((each) =>
+      preview.locked === true
+        ? each.locked === true && each.documentId === preview.documentId
+        : each.locked !== true,
+    );
   const tabIds = new Map<T, string>();
   const firstId = groupList(base)[0]?.id;
   let leafIndex = -1;
@@ -418,16 +433,25 @@ export function groupsFromLayout<T>(
     const tabs: EditorTab[] = [];
     let activeTabId: string | undefined;
     node.tabs.forEach((item, index) => {
-      const documentId = documentOf(item);
-      if (documentId === undefined) return;
-      const twin = tabs.find((tab) => tab.documentId === documentId);
-      if (twin !== undefined) {
-        if (index === node.active) activeTabId = twin.id;
-        return;
+      const shown = documentOf(item);
+      if (shown === undefined) return;
+      const restored: Omit<EditorTab, 'id'> =
+        typeof shown === 'string' ? { documentId: shown } : shown;
+      if (restored.view === 'preview') {
+        // At most one following preview in a window and one locked preview per brief (ADR 0084),
+        // whatever a hand-edited file says: a second one is not built.
+        if (previewTaken(restored)) return;
+        builtPreviews.push(restored);
+      } else {
+        const twin = tabs.find((tab) => isEditorTab(tab) && tab.documentId === restored.documentId);
+        if (twin !== undefined) {
+          if (index === node.active) activeTabId = twin.id;
+          return;
+        }
       }
       const [tabId, after] = mint(next, 'tab');
       next = after;
-      tabs.push({ id: tabId, documentId });
+      tabs.push({ id: tabId, ...restored });
       tabIds.set(item, tabId);
       if (index === node.active) activeTabId = tabId;
     });
@@ -564,7 +588,3 @@ export function toggleLock(groups: EditorGroups, tabId: string): EditorGroups {
       : { id: each.id, documentId: each.documentId, view: 'preview' };
   });
 }
-
-/** The groups with every preview taken out, for what does not keep them yet (TYTO-287). */
-export const withoutPreviews = (groups: EditorGroups): EditorGroups =>
-  previewTabs(groups).reduce((next, tab) => closeTab(next, tab.id), groups);

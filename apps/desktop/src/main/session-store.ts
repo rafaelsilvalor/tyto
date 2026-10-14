@@ -11,7 +11,8 @@ import { z } from 'zod';
  * alone, because main is the only side that knows paths (ADR 0010).
  *
  * **Reading never fails.** A missing file is a first run, and a file that does not parse is a
- * hand edit or a write cut short: both open the window empty, as it opened before this card.
+ * hand edit or a write cut short: both open the window empty, as it opened before this card —
+ * though only the missing file is a first launch (TYTO-287, {@link UNREADABLE_SESSION}).
  * A window that would not open because of a remembered tab is worse than forgetting the tab.
  *
  * **Writing swallows the error, and says whether it wrote.** A disk that will not take the
@@ -48,12 +49,24 @@ const storedTab = z.object({
   place: storedPlace.optional().catch(undefined),
 });
 
-/** One tab of one group: which session tab it shows, by index, and where it was looking. */
-const storedGroupTab = z.object({
-  tab: z.number().int().min(0),
-  /** Per occurrence: one document in two groups has a cursor in each (TYTO-286). */
-  place: storedPlace.optional().catch(undefined),
-});
+const storedTabIndex = z.number().int().min(0);
+
+/**
+ * One tab of one group: which session tab it shows, by index, and where it was looking — or a
+ * preview (TYTO-287, ADR 0084). A **following** preview is `{ view: 'preview' }` and names no
+ * tab: it shows whichever brief is in front when the window opens. A **locked** one names its
+ * brief's tab by index, as a text tab does. Neither keeps a `place`, and no path is ever here.
+ * The locked shape is tried first, since zod keeps the first branch that parses.
+ */
+const storedGroupTab = z.union([
+  z.object({ tab: storedTabIndex, view: z.literal('preview'), locked: z.literal(true) }),
+  z.object({ view: z.literal('preview') }),
+  z.object({
+    tab: storedTabIndex,
+    /** Per occurrence: one document in two groups has a cursor in each (TYTO-286). */
+    place: storedPlace.optional().catch(undefined),
+  }),
+]);
 
 export interface StoredGroupLeaf {
   readonly tabs: readonly z.infer<typeof storedGroupTab>[];
@@ -73,7 +86,8 @@ const storedGroupNode: z.ZodType<StoredGroupNode> = z.lazy(() =>
       sizes: z.array(z.number().min(0)),
       children: z.array(storedGroupNode).min(1),
     }),
-    z.object({ tabs: z.array(storedGroupTab).min(1), active: z.number().int().min(0) }),
+    // No `.min(1)`: a window with nothing to keep writes one empty group, `NO_GROUPS` below.
+    z.object({ tabs: z.array(storedGroupTab), active: z.number().int().min(0) }),
   ]),
 );
 
@@ -84,7 +98,7 @@ const storedGroupNode: z.ZodType<StoredGroupNode> = z.lazy(() =>
  * `tabs` stays the list of documents, one draft each, and `active` the focused group's
  * document, so a build that knows nothing of groups — zod strips the key — still restores
  * every tab with the right one in front, as one group. **A tree that does not parse is dropped
- * alone** (`.catch`): it costs the arrangement, never the drafts.
+ * alone** (`.catch`): it costs the arrangement, never the drafts, and reads as one empty group.
  */
 const storedGroups = z.object({
   root: storedGroupNode,
@@ -111,7 +125,9 @@ const storedSession = z.object({
   tabs: z.array(storedTab),
   active: z.number().int().min(0),
   template: storedTemplate.optional(),
-  groups: storedGroups.optional().catch(undefined),
+  // A tree that does not parse costs the arrangement and nothing else: it reads as no group,
+  // and not as a session without groups, which would be a first launch (TYTO-287).
+  groups: storedGroups.optional().catch(() => ({ root: { tabs: [], active: 0 }, focused: 0 })),
 });
 
 export type StoredGroups = z.infer<typeof storedGroups>;
@@ -121,6 +137,26 @@ export type StoredSession = z.infer<typeof storedSession>;
 
 export const EMPTY_SESSION: StoredSession = { version: 1, tabs: [], active: 0 };
 
+/**
+ * The groups of a window that had nothing to keep (TYTO-287): one group with no tab. Written so
+ * every session from this build carries `groups`, because a session without them is how the
+ * next launch knows it is a first one (ADR 0084 decision 8). A window holding only the untouched
+ * tab it opened on, with its preview closed, would otherwise write no `groups` and get the
+ * preview back on every launch. It reads back as no groups: the empty group is pruned.
+ */
+export const NO_GROUPS: StoredGroups = { root: { tabs: [], active: 0 }, focused: 0 };
+
+/**
+ * What a `session.json` that is there but cannot be read reads as: empty, as before, but **not
+ * a first launch** (TYTO-287). Somebody used the app in this folder — a write cut short, a hand
+ * edit, a newer version's file, a folder where the file goes — so the preview does not open as
+ * if for a new person. Only a missing file is {@link EMPTY_SESSION}.
+ */
+export const UNREADABLE_SESSION: StoredSession = { ...EMPTY_SESSION, groups: NO_GROUPS };
+
+const isMissing = (cause: unknown): boolean =>
+  typeof cause === 'object' && cause !== null && 'code' in cause && cause.code === 'ENOENT';
+
 export interface SessionStore {
   read(): Promise<StoredSession>;
   write(session: StoredSession): Promise<boolean>;
@@ -129,11 +165,17 @@ export interface SessionStore {
 export function fileSessionStore(file: string): SessionStore {
   return {
     read: async () => {
+      let text: string;
       try {
-        const parsed = storedSession.safeParse(JSON.parse(await readFile(file, 'utf8')));
-        return parsed.success ? parsed.data : EMPTY_SESSION;
+        text = await readFile(file, 'utf8');
+      } catch (cause) {
+        return isMissing(cause) ? EMPTY_SESSION : UNREADABLE_SESSION;
+      }
+      try {
+        const parsed = storedSession.safeParse(JSON.parse(text));
+        return parsed.success ? parsed.data : UNREADABLE_SESSION;
       } catch {
-        return EMPTY_SESSION;
+        return UNREADABLE_SESSION;
       }
     },
 

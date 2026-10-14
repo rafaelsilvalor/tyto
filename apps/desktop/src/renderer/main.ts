@@ -179,7 +179,6 @@ import {
   shownDocumentIds,
   splitGroup,
   toggleLock,
-  withoutPreviews,
 } from './editor-groups.js';
 import { type PreviewPane, previewElementsOf } from './preview-pane.js';
 import { type ProblemsPanel, PROBLEMS_TAG } from './problems-panel.js';
@@ -2494,9 +2493,14 @@ function withLiveScroll(current: Workspace): Workspace {
  * let go of it, or, for one no pane has shown here, where its document says.
  */
 function groupsForSession(): SessionGroups {
-  // Without the previews: keeping them is TYTO-287's second pull request, and a group that held
-  // only a preview collapses here as it would on a close.
-  return layoutOf(withoutPreviews(groups), (tab, group) => {
+  return layoutOf(groups, (tab, group): SessionGroupItem => {
+    // A preview keeps no place (TYTO-287): a following one names nothing, since it shows the
+    // brief in front when the window opens again, and a locked one names its brief.
+    if (isPreview(tab)) {
+      return tab.locked === true
+        ? { documentId: tab.documentId, view: 'preview', locked: true }
+        : { view: 'preview' };
+    }
     const pane_ = panes.get(group.id);
     const remembered = tabPlaces.get(tab.id) ?? pendingPlaces.get(tab.id);
     if (pane_ !== undefined && shownTab.get(group.id) === tab.id) {
@@ -2515,6 +2519,9 @@ function groupsForSession(): SessionGroups {
     return { documentId: tab.documentId, place };
   });
 }
+
+/** One tab of {@link SessionGroups}, as the window sends it. */
+type SessionGroupItem = SessionGroups['root'] extends SessionGroupNode<infer Item> ? Item : never;
 
 /**
  * The template mode's part of the session (TYTO-266), or null before the mode was ever loaded:
@@ -2683,8 +2690,20 @@ async function restoreSession(bridge: TytoBridge, handle: EditorHandle): Promise
     mode?.restore(template.opened, fresh, template.visible);
   }
   sessionRead = true;
+  // A first launch opens the preview to the side, so a new person sees art before they know
+  // the key (TYTO-287, ADR 0084 decision 8); afterwards the session decides. A session whose
+  // only kept tab was a following preview beside the untouched tab brings it back the same way,
+  // since no tree is rebuilt for a window that had no document to keep.
+  const followingKept = answer.groups !== null && keepsFollowingPreview(answer.groups.root);
+  if (answer.firstLaunch || (restored.length === 0 && followingKept)) openPreview(true, false);
   repaint();
 }
+
+/** Whether a tree the session read back holds a following preview anywhere. */
+const keepsFollowingPreview = (node: SessionGroupNode<StoredGroupItem>): boolean =>
+  'split' in node
+    ? node.children.some(keepsFollowingPreview)
+    : node.tabs.some((tab) => 'view' in tab && !('locked' in tab));
 
 /**
  * The session's groups made the window's (TYTO-286). Each tab names a session tab by index and
@@ -2693,23 +2712,29 @@ async function restoreSession(bridge: TytoBridge, handle: EditorHandle): Promise
  * file's first tab, in the same group**, as it opens beside the file in one strip. Every tab's
  * own cursor waits in {@link pendingPlaces} for the first pane that shows it.
  */
+/** One tab of the groups the session read back: a text tab, or a preview (TYTO-287). */
+type StoredGroupItem =
+  NonNullable<IpcResponse<'session:read'>['groups']>['root'] extends SessionGroupNode<infer Item>
+    ? Item
+    : never;
+
 async function restoreGroups(
   layout: NonNullable<IpcResponse<'session:read'>['groups']>,
   builtAt: ReadonlyMap<number, string>,
   staleAt: ReadonlyMap<number, string>,
 ): Promise<void> {
-  type Item = { readonly tab: number; readonly place: TabPlace | null; readonly stale: boolean };
+  type Item = { readonly stored: StoredGroupItem; readonly stale: boolean };
   const besideOnce = new Set<number>();
-  const withDrafts = (node: SessionGroupNode<Omit<Item, 'stale'>>): SessionGroupNode<Item> => {
+  const withDrafts = (node: SessionGroupNode<StoredGroupItem>): SessionGroupNode<Item> => {
     if ('split' in node) return { ...node, children: node.children.map(withDrafts) };
     const tabs: Item[] = [];
     let active = 0;
     node.tabs.forEach((tab, index) => {
       if (index === node.active) active = tabs.length;
-      tabs.push({ ...tab, stale: false });
-      if (staleAt.has(tab.tab) && !besideOnce.has(tab.tab)) {
+      tabs.push({ stored: tab, stale: false });
+      if (!('view' in tab) && staleAt.has(tab.tab) && !besideOnce.has(tab.tab)) {
         besideOnce.add(tab.tab);
-        tabs.push({ tab: tab.tab, place: tab.place, stale: true });
+        tabs.push({ stored: tab, stale: true });
       }
     });
     return { tabs, active };
@@ -2717,12 +2742,19 @@ async function restoreGroups(
   const rebuilt = groupsFromLayout(
     groups,
     { root: withDrafts(layout.root), focused: layout.focused },
-    (item) => (item.stale ? staleAt : builtAt).get(item.tab),
+    ({ stored, stale }) => {
+      if (!('view' in stored)) return (stale ? staleAt : builtAt).get(stored.tab);
+      // A following preview is pointed at the brief in front once the groups are built; a
+      // locked one shows the document its brief became, and goes when that did not come back.
+      if (!('locked' in stored)) return { view: 'preview', documentId: '' };
+      const brief = builtAt.get(stored.tab);
+      return brief === undefined ? undefined : { view: 'preview', documentId: brief, locked: true };
+    },
   );
   if (rebuilt === undefined) return;
   groups = rebuilt.groups;
-  for (const [item, tabId] of rebuilt.tabIds) {
-    if (item.place !== null) pendingPlaces.set(tabId, item.place);
+  for (const [{ stored }, tabId] of rebuilt.tabIds) {
+    if (!('view' in stored) && stored.place !== null) pendingPlaces.set(tabId, stored.place);
   }
   arrangeEditorGroups();
   await Promise.all([...groupElements.values()].map((element) => element.updateComplete));

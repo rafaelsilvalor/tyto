@@ -75,16 +75,39 @@ second is said where it applies.
    one is the last — **and leaves the focus in the brief**, as VS Code does; when a following
    preview exists it comes forward and is focused. The button at the end of a group's strip, shown
    while a brief's own tab is in front, runs the same command.
-8. **The first launch opens the preview, from the second pull request.** A new person should see
-   art before they know the key, so a first launch opens the following preview to the side. It
-   lands with decision 9, where "first launch" is measured against a session that keeps previews,
-   and with a deliberate seam for the end-to-end suites, every one of which launches on a first
-   run (the coordinator's decision of 2026-10-14, after the first pull request measured twelve
-   unrelated suites going red with it). Until then a fresh window opens with no preview, and one
-   comes from `Mod-Shift-v`, the strip's button, the View menu or the command bar.
-9. **Keeping previews in `session.json`** is the second pull request (ADR 0080, amended then).
-   Until it lands, a session keeps the groups **without** their previews: a group that held only a
-   preview collapses, and a relaunch opens no preview.
+8. **The first launch opens the preview to the side.** A new person should see art before they
+   know the key. "First launch" is measured against the session: no `session.json`, or one with
+   no `groups` — a file a build before TYTO-286 wrote, so the first launch after that upgrade
+   counts too. A file that is there but cannot be read — cut short, edited by hand, a newer
+   version's, a folder in its place — or whose tree does not parse is not a first launch:
+   somebody used the app in that folder (`UNREADABLE_SESSION`). Every session this build writes carries
+   `groups`, one empty group when the window has nothing to keep (`NO_GROUPS`), because a window
+   holding only its untouched tab, preview closed, would otherwise write none and get the
+   preview back on every launch. Afterwards the session decides. The preview opens as
+   `Mod-Shift-v` opens it: following, in a new group to the right, the focus left in the brief.
+   **The end-to-end suites are second launches by a seam in the harness, not in the app**
+   (the coordinator's decision of 2026-10-14, after the first pull request measured twelve
+   unrelated suites going red with the preview opening in each): `e2e/not-a-first-launch.setup.ts`,
+   a `setupFiles` entry, wraps Playwright's `_electron.launch` and writes the empty session into a
+   launch's `--user-data-dir` unless the folder already has a `session.json` or the launch's
+   `env` says `TYTO_E2E_FIRST_LAUNCH=1`. Nothing in the app reads a variable or a switch to skip
+   the first launch, so a packaged app cannot be told to; the cost is that a suite which needs a
+   real first launch says so (`preview-session.desktop.test.ts`).
+9. **The previews are kept in `session.json`** (ADR 0080, amended). A following preview is
+   `{ view: 'preview' }` and names nothing: it shows the brief in front when the window opens.
+   A locked one is `{ tab, view: 'preview', locked: true }`, the index of its brief's session tab.
+   Neither keeps a `place`, and no path is ever written for one. Main turns the window's ids into
+   indices as for any tab, so a locked preview whose brief was not kept is dropped, and on the
+   way back one whose brief did not return is dropped too; a group left empty collapses. A
+   rebuilt tree holds at most one following preview and one locked preview per brief, whatever
+   the file says. A session whose only kept tab was a following preview beside the untouched tab
+   rebuilds no tree, so the window opens that preview to the side again. A restored brief is
+   compiled once it is built, as before, so a restored preview paints its art from that answer.
+10. **Replacing the untouched tab carries its locked preview.** When a file opened replaces the
+    tab nobody typed in, every tab of that tab's document — a preview locked on it included — now
+    shows the file, rather than a preview locked on a document that no longer exists, which no
+    close would ever reach. Measured in `editor-groups.test.ts` for the first pull request's open
+    question; the lock is kept because the tab it was locked beside became that file.
 
 ## Consequences
 
@@ -95,6 +118,5 @@ second is said where it applies.
 - `fit` measures the stage's own box rounded down rather than `clientHeight`, which Chromium
   rounds: a 574.7 px stage answered 575 and the 0.3 px overflow drew a 16 px scroll bar, seen
   once a split made `fit` go by height.
-- What is not done: previews in the session and the first-launch preview (decisions 8 and 9, the
-  second pull request); the strip's
-  and the bar's final look (TYTO-288); dragging a preview tab between groups (TYTO-288).
+- What is not done: the strip's and the bar's final look (TYTO-288); dragging a preview tab
+  between groups (TYTO-288).
