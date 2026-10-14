@@ -113,7 +113,11 @@ const shape = async (): Promise<string> =>
     const walk = (node: Element): string => {
       if (node.hasAttribute('data-editor-group')) return 'g';
       const direction = node.classList.contains('editor-split--row') ? 'row' : 'column';
-      return `${direction}(${[...node.children].map(walk).join(',')})`;
+      // The lines between groups (TYTO-289) are not part of the tree.
+      const children = [...node.children].filter(
+        (child) => !child.hasAttribute('data-group-splitter'),
+      );
+      return `${direction}(${children.map(walk).join(',')})`;
     };
     const root = document.querySelector('[data-editor-groups]')?.firstElementChild;
     return root === null || root === undefined ? '' : walk(root);

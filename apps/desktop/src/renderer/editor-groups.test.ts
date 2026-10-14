@@ -25,7 +25,9 @@ import {
   openPreviewToSide,
   previewTabs,
   replaceDocument,
+  resizeSplit,
   shownDocumentIds,
+  splitById,
   splitGroup,
   toggleLock,
 } from './editor-groups.js';
@@ -88,6 +90,54 @@ describe('splitting', () => {
     const tabs = groupList(split).flatMap((group) => group.tabs.map((tab) => tab.id));
     const ids = [...groupList(split).map((group) => group.id), ...tabs];
     expect(new Set(ids).size).toBe(ids.length);
+  });
+});
+
+describe('resizing a split (TYTO-289)', () => {
+  const rowOfThree = (): EditorGroups => splitGroup(splitGroup(twoDocuments(), 'row'), 'row');
+  const sharesOf = (groups: EditorGroups): readonly number[] =>
+    groups.root.kind === 'split' ? groups.root.sizes : [];
+
+  it('gives the split the shares it is handed, found by id', () => {
+    const groups = rowOfThree();
+    const id = groups.root.kind === 'split' ? groups.root.id : '';
+    const resized = resizeSplit(groups, id, [0.2, 0.3, 0.5]);
+    expect(sharesOf(resized)).toEqual([0.2, 0.3, 0.5]);
+    expect(splitById(resized, id)?.sizes).toEqual([0.2, 0.3, 0.5]);
+    expect(picture(resized)).toEqual(picture(groups));
+  });
+
+  it('makes the shares add up to one', () => {
+    const groups = rowOfThree();
+    const id = groups.root.kind === 'split' ? groups.root.id : '';
+    expect(sharesOf(resizeSplit(groups, id, [1, 1, 2]))).toEqual([0.25, 0.25, 0.5]);
+  });
+
+  it('refuses shares that do not fit the split, and a split that is not there', () => {
+    const groups = rowOfThree();
+    const id = groups.root.kind === 'split' ? groups.root.id : '';
+    expect(sharesOf(resizeSplit(groups, id, [0.5, 0.5]))).toEqual([0.5, 0.25, 0.25]);
+    expect(sharesOf(resizeSplit(groups, id, [-1, 1, 1]))).toEqual([0.5, 0.25, 0.25]);
+    expect(sharesOf(resizeSplit(groups, id, [0, 0, 0]))).toEqual([0.5, 0.25, 0.25]);
+    expect(sharesOf(resizeSplit(groups, 'split-nowhere', [0.2, 0.3, 0.5]))).toEqual([
+      0.5, 0.25, 0.25,
+    ]);
+  });
+
+  it('reaches a split nested inside another', () => {
+    const groups = splitGroup(splitGroup(twoDocuments(), 'row'), 'column');
+    const inner = groups.root.kind === 'split' ? groups.root.children[1] : undefined;
+    const id = inner?.kind === 'split' ? inner.id : '';
+    const resized = resizeSplit(groups, id, [0.7, 0.3]);
+    expect(splitById(resized, id)?.sizes).toEqual([0.7, 0.3]);
+    expect(sharesOf(resized)).toEqual([0.5, 0.5]);
+  });
+
+  it('keeps the shares through the layout a session writes', () => {
+    const groups = splitGroup(twoDocuments(), 'row');
+    const id = groups.root.kind === 'split' ? groups.root.id : '';
+    const layout = layoutOf(resizeSplit(groups, id, [1 / 3, 2 / 3]), (tab) => tab.documentId);
+    expect(layout.root).toMatchObject({ split: 'row', sizes: [1 / 3, 2 / 3] });
   });
 });
 

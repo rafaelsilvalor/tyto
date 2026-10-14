@@ -37,7 +37,8 @@ describe('arrangeGroups', () => {
     expect(created).toHaveLength(1);
     expect(document.getElementById('editor')).toBe(mount);
     expect(mount?.querySelector('p')).not.toBeNull();
-    expect(host.querySelector('.editor-split--row')?.childElementCount).toBe(2);
+    // Two groups and the line between them (TYTO-289).
+    expect(host.querySelectorAll('.editor-split--row > [data-editor-group]')).toHaveLength(2);
   });
 
   it('hands `#editor` to the next group when the first one closes, and reports the gone one', () => {

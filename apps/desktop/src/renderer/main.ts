@@ -148,6 +148,7 @@ import {
 } from './problems-mark.js';
 import { SAVE_FAILED, saveFailureDiagnostic } from './save-failure.js';
 import { type EditorGroupElement, arrangeGroups } from './editor-group.js';
+import { applyShares, showShares, wireGroupSplitters } from './group-splitter.js';
 import type { TabEntry } from './tabs.js';
 import {
   type EditorGroup,
@@ -176,6 +177,7 @@ import {
   openPreviewHere,
   openPreviewToSide,
   replaceDocument,
+  resizeSplit,
   shownDocumentIds,
   splitGroup,
   toggleLock,
@@ -1187,13 +1189,35 @@ const tabPlaces = new Map<string, TabPlace>();
  * used once, so the cursor of each occurrence comes back to its own pane.
  */
 const pendingPlaces = new Map<string, TabPlace>();
-/** The tree's shape when it was last laid out, so a repaint that changed no split moves nothing. */
+/**
+ * The tree's shape when it was last laid out, so a repaint that changed no split moves nothing.
+ * The shares are not part of it (TYTO-289): a resize only changes grow factors, so the splitter
+ * being dragged or focused stays the element it was.
+ */
 let arrangedShape = '';
 
 const shapeOf = (node: GroupNode): string =>
   node.kind === 'group'
     ? node.id
-    : `${node.direction}(${node.children.map(shapeOf).join(',')}:${node.sizes.join(',')})`;
+    : `${node.direction}:${node.id}(${node.children.map(shapeOf).join(',')})`;
+
+let groupSplittersWired = false;
+
+/**
+ * A splitter between groups moved (TYTO-289). While the pointer is down only the boxes change;
+ * the settled shares go into the groups, and from there into the session, like a dock's size.
+ */
+function resizeGroups(splitId: string, sizes: readonly number[], settled: boolean): void {
+  const container = document.querySelector<HTMLElement>('[data-editor-groups]');
+  if (container === null) return;
+  if (!settled) {
+    showShares(container, groups, splitId, sizes);
+    return;
+  }
+  groups = resizeSplit(groups, splitId, sizes);
+  applyShares(container, groups);
+  keepSessionSoon();
+}
 
 /** The group whose pane is `view`, with that pane. */
 function paneOfView(view: object | undefined): [string, EditorPane] | undefined {
@@ -1238,6 +1262,10 @@ function primaryPaneOf(documentId: string): EditorPane | undefined {
 function arrangeEditorGroups(): void {
   const container = document.querySelector<HTMLElement>('[data-editor-groups]');
   if (container === null) return;
+  if (!groupSplittersWired) {
+    groupSplittersWired = true;
+    wireGroupSplitters(container, { groups: () => groups, onResize: resizeGroups });
+  }
   const shape = shapeOf(groups.root);
   if (shape === arrangedShape && container.firstElementChild !== null) return;
   arrangedShape = shape;

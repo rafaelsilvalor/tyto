@@ -3,6 +3,7 @@ import { LitElement, html, nothing } from 'lit';
 import { type Locale, DEFAULT_LOCALE, translate } from '../../shared/i18n/index.js';
 import { type EditorGroups, type GroupNode, groupList } from './editor-groups.js';
 import { icon } from './icons.js';
+import { splitterFor } from './group-splitter.js';
 // Imported for the side effect: the pane has to be defined before a group makes one.
 import { type PreviewPane, PREVIEW_PANE_TAG } from './preview-pane.js';
 // Imported for the side effect: the strip has to be defined before a group renders one.
@@ -188,7 +189,10 @@ export function arrangeGroups(
     }
     const box = document.createElement('div');
     box.className = `editor-split editor-split--${node.direction}`;
+    box.dataset['groupSplit'] = node.id;
     node.children.forEach((child, index) => {
+      // The line between this child and the one before it (TYTO-289).
+      if (index > 0) box.append(splitterFor(node, index - 1));
       const built = build(child);
       // A share as a grow factor, so the shares hold whatever size the panel is.
       built.style.flex = `${String(node.sizes[index] ?? 1)} 1 0`;

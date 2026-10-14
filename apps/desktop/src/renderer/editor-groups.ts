@@ -125,6 +125,46 @@ const withGroup = (
   change: (group: EditorGroup) => GroupNode,
 ): EditorGroups => ({ ...groups, root: mapGroup(groups.root, id, change) });
 
+/** A split found by id wherever it is in the tree. */
+export function splitById(groups: EditorGroups, id: string): GroupSplit | undefined {
+  const walk = (node: GroupNode): GroupSplit | undefined => {
+    if (node.kind === 'group') return undefined;
+    if (node.id === id) return node;
+    for (const child of node.children) {
+      const found = walk(child);
+      if (found !== undefined) return found;
+    }
+    return undefined;
+  };
+  return walk(groups.root);
+}
+
+/**
+ * Gives a split new shares (TYTO-289): what a splitter's drag, key or double-click settles on.
+ * Shares that do not fit the split — another count, a negative or nothing at all — leave the
+ * tree as it is, and the rest are made to add up to one, the invariant every split keeps.
+ */
+export function resizeSplit(
+  groups: EditorGroups,
+  splitId: string,
+  sizes: readonly number[],
+): EditorGroups {
+  const total = sizes.reduce((sum, size) => sum + size, 0);
+  const fits = (node: GroupSplit): boolean =>
+    sizes.length === node.children.length &&
+    sizes.every((size) => Number.isFinite(size) && size >= 0) &&
+    total > 0;
+  const walk = (node: GroupNode): GroupNode => {
+    if (node.kind === 'group') return node;
+    if (node.id === splitId) {
+      return fits(node) ? { ...node, sizes: sizes.map((size) => size / total) } : node;
+    }
+    return { ...node, children: node.children.map(walk) };
+  };
+  const root = walk(groups.root);
+  return root === groups.root ? groups : { ...groups, root };
+}
+
 export function focusGroup(groups: EditorGroups, id: string): EditorGroups {
   return groupById(groups, id) === undefined ? groups : { ...groups, focusedGroupId: id };
 }
