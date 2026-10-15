@@ -35,11 +35,11 @@
     "syntax-comment": "#928374",
     "status-bar": "#ebdbb2",
     "status-bar-text": "#5b5149",
-    "status-bar-vim-normal": "#75700e",
+    "status-bar-vim-normal": "#076678",
     "status-bar-vim-normal-text": "#fbf1c7",
     "status-bar-vim-insert": "#75700e",
     "status-bar-vim-insert-text": "#fbf1c7",
-    "status-bar-vim-visual": "#9d0006",
+    "status-bar-vim-visual": "#8f3f71",
     "status-bar-vim-visual-text": "#fbf1c7",
     "status-bar-vim-replace": "#9d0006",
     "status-bar-vim-replace-text": "#fbf1c7"
@@ -62,14 +62,28 @@
     {
       "token": "status-bar-vim-normal",
       "role": "accent",
-      "value": "#75700e",
-      "reason": "accent #79740e reads 4.29:1 at best against surface, text and accent-text; HSL lightness moved from 26.5% to 25.7%, hue and saturation kept, to the first value reading 4.5:1 (4.54 on surface)"
+      "value": "#076678",
+      "from": {
+        "name": "info",
+        "value": "#076678"
+      },
+      "reason": "distinct from insert: accent #79740e would draw normal in insert's colour; Gruvbox's blue, info #076678, reads 5.82:1 against surface unmoved"
     },
     {
       "token": "status-bar-vim-insert",
       "role": "success",
       "value": "#75700e",
       "reason": "success #79740e reads 4.29:1 at best against surface, text and accent-text; HSL lightness moved from 26.5% to 25.7%, hue and saturation kept, to the first value reading 4.5:1 (4.54 on surface)"
+    },
+    {
+      "token": "status-bar-vim-visual",
+      "role": "syntax-keyword",
+      "value": "#8f3f71",
+      "from": {
+        "name": "syntax-constant",
+        "value": "#8f3f71"
+      },
+      "reason": "distinct from replace: syntax-keyword #9d0006 would draw visual in replace's colour; Gruvbox's purple, syntax-constant #8f3f71, reads 5.94:1 against surface unmoved"
     }
   ]
 }

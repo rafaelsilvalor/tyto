@@ -8,7 +8,8 @@ import {
 } from '@tyto/theme-pack';
 import { describe, expect, it } from 'vitest';
 
-import { UPSTREAM_COLOURS } from './theme-pack-upstream.js';
+import { closestPair, MINIMUM_MODE_DIFFERENCE } from './colour-difference.js';
+import { UPSTREAM_BADGE_COLOURS, UPSTREAM_COLOURS } from './theme-pack-upstream.js';
 import { BASE_COLORS, builtInThemeSource, loadTheme, themeVariant } from './themes.js';
 
 /**
@@ -96,6 +97,39 @@ const BADGES = [
   ['visual', 'syntax-keyword'],
   ['replace', 'error'],
 ] as const;
+
+/**
+ * HSL hue in degrees and saturation from 0 to 1 of a `#rrggbb` colour: what a lightness move
+ * keeps (ADR 0089 decision 4).
+ */
+const hueAndSaturation = (value: string): readonly [number, number] => {
+  const { red, green, blue } = parse(value);
+  const [r, g, b] = [red / 255, green / 255, blue / 255];
+  const max = Math.max(r, g, b);
+  const min = Math.min(r, g, b);
+  const lightness = (max + min) / 2;
+  const range = max - min;
+  if (range === 0) return [0, 0];
+  const saturation = lightness > 0.5 ? range / (2 - max - min) : range / (max + min);
+  const sector =
+    max === r
+      ? (g - b) / range + (g < b ? 6 : 0)
+      : max === g
+        ? (b - r) / range + 2
+        : (r - g) / range + 4;
+  return [sector * 60, saturation];
+};
+
+/**
+ * Whether `moved` is `source` with only its lightness changed, to what rounding to whole
+ * `#rrggbb` channels allows: 2 degrees of hue and 2 points of saturation.
+ */
+const keepsHueAndSaturation = (moved: string, source: string): boolean => {
+  const [hue, saturation] = hueAndSaturation(moved);
+  const [sourceHue, sourceSaturation] = hueAndSaturation(source);
+  const hueGap = Math.abs(hue - sourceHue);
+  return Math.min(hueGap, 360 - hueGap) <= 2 && Math.abs(saturation - sourceSaturation) <= 0.02;
+};
 
 /** The colours a badge's text is chosen from: the best-reading of the three. */
 const BADGE_TEXT_ROLES = ['surface', 'text', 'accent-text'] as const;
@@ -189,6 +223,40 @@ describe.each(themes.map(({ theme, file }) => [theme.label, theme, file] as cons
       expect(note.value).toBe(colour(token));
       expect(note.value).not.toBe(colour(role));
       expect(note.reason.length).toBeGreaterThan(0);
+    });
+
+    // A badge's colour is its role's, its role's with the lightness moved, or — where the role
+    // would draw two modes alike — another colour of the same palette, lightness moved at most.
+    it.each(BADGES)('draws the %s badge from its own palette', (mode, role) => {
+      const note = file.derived.find((entry) => entry.token === `status-bar-vim-${mode}`);
+      if (note === undefined) return;
+      if (note.from === undefined) {
+        const roleColours = sources.map((source) => source?.colors[role]);
+        expect(roleColours.some((value) => value && keepsHueAndSaturation(note.value, value))).toBe(
+          true,
+        );
+        return;
+      }
+      expect(note.reason).toMatch(/^distinct from (normal|insert|visual|replace):/);
+      const palette = [
+        ...sources.map((source) => source?.colors[note.from!.name]),
+        UPSTREAM_BADGE_COLOURS[file.variant === 'adjusted' ? originalId(theme.id) : theme.id]?.[
+          note.from.name
+        ],
+      ];
+      expect(palette).toContain(note.from.value);
+      expect(keepsHueAndSaturation(note.value, note.from.value)).toBe(true);
+    });
+
+    // Rafael, 2026-10-15: the badge's word changes with the mode, and so must its colour. Not
+    // just unequal — ΔE2000 of 10 is a difference seen at a glance (`colour-difference.ts`).
+    const modeColours = Object.fromEntries(
+      BADGES.map(([mode]) => [mode, colour(`status-bar-vim-${mode}`)]),
+    );
+    const closest = closestPair(modeColours);
+    it(`tells the four modes apart by colour (closest: ${closest.names.join(' and ')}, ΔE ${closest.difference.toFixed(1)})`, () => {
+      expect(new Set(Object.values(modeColours)).size).toBe(BADGES.length);
+      expect(closest.difference).toBeGreaterThanOrEqual(MINIMUM_MODE_DIFFERENCE);
     });
 
     it.each(BADGES)('writes the %s badge in surface, text or accent-text', (mode) => {

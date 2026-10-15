@@ -39,7 +39,7 @@
     "status-bar-vim-normal-text": "#002b36",
     "status-bar-vim-insert": "#859900",
     "status-bar-vim-insert-text": "#002b36",
-    "status-bar-vim-visual": "#859900",
+    "status-bar-vim-visual": "#dd629d",
     "status-bar-vim-visual-text": "#002b36",
     "status-bar-vim-replace": "#e56462",
     "status-bar-vim-replace-text": "#002b36"
@@ -51,6 +51,16 @@
       "role": "accent",
       "value": "#2f93d9",
       "reason": "accent #268bd2 reads 4.08:1 at best against surface, text and accent-text; HSL lightness moved from 48.6% to 51.7%, hue and saturation kept, to the first value reading 4.5:1 (4.50 on surface)"
+    },
+    {
+      "token": "status-bar-vim-visual",
+      "role": "syntax-keyword",
+      "value": "#dd629d",
+      "from": {
+        "name": "magenta",
+        "value": "#d33682"
+      },
+      "reason": "distinct from insert: syntax-keyword #859900 would draw visual in insert's colour; Solarized's magenta, which no token carries, #d33682 reads 3.30:1 at best against surface, text and accent-text; HSL lightness moved from 52.0% to 62.4%, hue and saturation kept, to the first value reading 4.5:1 (4.51 on surface)"
     },
     {
       "token": "status-bar-vim-replace",
