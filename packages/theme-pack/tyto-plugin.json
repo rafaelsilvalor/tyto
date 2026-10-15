@@ -1,0 +1,7 @@
+{
+  "name": "theme-pack",
+  "version": "0.1.0",
+  "engine": ">=0.1",
+  "contributes": ["theme"],
+  "permissions": []
+}

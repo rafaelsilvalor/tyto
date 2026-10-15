@@ -10,7 +10,7 @@ import {
 import { type Credentials } from './credentials.js';
 import { type WindowThemes, createHandlers, guard, registerIpcHandlers } from './ipc.js';
 import { createTemplateFolder } from './session.js';
-import { BUILT_IN_THEMES, builtInThemeReader, createThemeService } from './themes.js';
+import { BUILT_IN_THEMES, builtInThemeSource, createThemeService } from './themes.js';
 
 /**
  * The wiring, without Electron.
@@ -465,12 +465,7 @@ const updateNotice = (status: UpdateStatus = { state: 'none' }) => {
 /** The built-in two through the real service; a choice is always saved. */
 const windowThemes = (): WindowThemes => {
   const service = createThemeService({
-    sources: () =>
-      Object.values(BUILT_IN_THEMES).map((theme) => ({
-        plugin: 'desktop',
-        theme,
-        read: builtInThemeReader,
-      })),
+    sources: () => Object.values(BUILT_IN_THEMES).map(builtInThemeSource),
     ready: Promise.resolve(),
     setting: () => 'tyto-dark',
     setMode: () => undefined,

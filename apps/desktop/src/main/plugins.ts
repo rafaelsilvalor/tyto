@@ -5,6 +5,7 @@ import { type FileSystem, loadTemplateRegistry } from '@tyto/core';
 import { type InProcessHost, type Logger, type Plugin, createPluginHost } from '@tyto/plugin-api';
 import type { Rasterizer } from '@tyto/raster';
 import { BUILT_IN_TEMPLATES_DIRECTORY } from '@tyto/templates';
+import { themePack } from '@tyto/theme-pack';
 
 import manifest from './built-in-templates.tyto-plugin.json';
 import { settingContributions } from '../../shared/settings.js';
@@ -143,6 +144,10 @@ export async function activateBuiltIns(options: BuiltInsOptions): Promise<InProc
       host.registerTheme(BUILT_IN_THEMES.dark);
     },
   });
+
+  // Well-known themes, a plugin of their own after the app's two so the picker lists Tyto's
+  // first (TYTO-300, ADR 0089). Bundled like them: `themes.ts` reads its files by plugin.
+  host.activate(themePack);
 
   return host;
 }

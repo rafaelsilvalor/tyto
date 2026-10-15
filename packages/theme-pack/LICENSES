@@ -1,0 +1,94 @@
+Third-party colour palettes in @tyto/theme-pack
+================================================
+
+Each theme in src/themes/ maps an upstream palette onto Tyto's 30 theme tokens (ADR 0077).
+The colours are the upstream's; the mapping onto Tyto's roles is this package's. A colour
+changed to meet a contrast floor (ADR 0089) is listed in the theme file's "adjusted" field
+with the value it replaced. Names are the upstream's; no logo or other branding is shipped.
+
+Values read on 2026-10-15 from the sources below.
+
+
+Dracula (src/themes/dracula.json)
+---------------------------------
+
+Source:   https://github.com/dracula/visual-studio-code/blob/main/src/dracula.yml
+Version:  2.25.1 (package.json on main), commit a08a206f2c8420ba3c05f0e8d01d43b2f933fdf8
+Licence:  MIT
+
+Mapping:  surface = BG, surface-raised = BGLight, surface-sunken = BGDark, hairline =
+          BGDarker (tab.border), border and selection = SELECTION, text = FG, text-disabled
+          and focus-ring = COMMENT (focusBorder), accent = PINK (tab.activeBorderTop,
+          panelTitle.activeBorder), error = RED, warning = ORANGE (list.warningForeground),
+          info = CYAN, success = GREEN, hover = LineHighlight (#44475A75) composited over
+          BGLight, active-line = LineHighlight at 46 %, active-line-gutter = it composited
+          over BG. Syntax from tokenColors: keyword and tag PINK, function and attribute
+          GREEN, constant PURPLE, string YELLOW, punctuation FG, comment COMMENT. Upstream
+          has no scrim or shadow colour; those are Tyto Dark's.
+Adjusted: text-muted, #6272a4 -> #9fa9c7 (see the theme file).
+
+The MIT License (MIT)
+
+Copyright (c) 2016 Dracula Theme
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.
+
+
+Catppuccin Latte (src/themes/catppuccin-latte.json)
+---------------------------------------------------
+
+Source:   https://github.com/catppuccin/palette/blob/main/palette.json (colours) and
+          https://github.com/catppuccin/catppuccin/blob/main/docs/style-guide.md (roles)
+Version:  palette 1.8.0, commit 07d02aa110ef9eb7e7427afca5c73ba9cf7f8ebd; style guide at
+          commit d09787dd98ca6fba08af5ef2ae94a7e09f17daca
+Licence:  MIT
+
+Mapping:  by the style guide. surface = Base, surface-raised = Mantle, surface-sunken =
+          Crust, hairline = Surface 0, border = Overlay 0 (inactive border), text = Text,
+          text-muted = Subtext 1, text-disabled = Overlay 1 (subtle), accent = Blue (links,
+          tags), accent-text = Base (on accent), focus-ring = Lavender (active border),
+          selection = Overlay 2 at 25 % over Base, hover = Surface 0 at 50 % over Mantle,
+          active-line = Text at 10 % (cursor line), active-line-gutter = it composited over
+          Base, error = Red, warning = Yellow, info = Teal, success = Green. Syntax: keyword
+          Mauve, function Blue, constant Peach, attribute Yellow, string Green, tag Pink
+          (escape sequences share the role), punctuation and comment Overlay 2. Upstream has
+          no scrim or shadow colour; those are Tyto Light's.
+Adjusted: nothing.
+
+MIT License
+
+Copyright (c) 2021 Catppuccin
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.

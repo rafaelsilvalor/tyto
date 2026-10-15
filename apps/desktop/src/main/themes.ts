@@ -10,6 +10,7 @@ import {
   isThemePath,
   resolveThemeColors,
 } from '@tyto/plugin-api';
+import { THEME_PACK_FILES, THEME_PACK_ID, THEME_PACK_THEMES } from '@tyto/theme-pack';
 import { type Node, type ParseError, parseTree, printParseErrorCode } from 'jsonc-parser';
 
 import {
@@ -52,15 +53,42 @@ export const BASE_COLORS: Readonly<Record<ThemeKind, ThemeColors>> = {
 /** Reads a theme's file by its contributed path; throws with the reason when it cannot. */
 export type ThemeReader = (path: string) => Promise<string>;
 
-/** The built-in plugin's reader: its two files, bundled. */
-export const builtInThemeReader: ThemeReader = (path) => {
-  const file = { [BUILT_IN_THEMES.light.path]: tytoLight, [BUILT_IN_THEMES.dark.path]: tytoDark }[
-    path
-  ];
-  return file === undefined
-    ? Promise.reject(new Error(`the app ships no theme file '${path}'`))
-    : Promise.resolve(JSON.stringify(file));
+/** The plugin that registers Tyto Light and Tyto Dark. */
+export const DESKTOP_PLUGIN = 'desktop';
+
+/**
+ * Every theme file the app bundles, by the built-in plugin that contributes it and then by
+ * the path its contribution names: a path is only unique inside one plugin's folder.
+ */
+const BUILT_IN_THEME_FILES: Readonly<Record<string, Readonly<Record<string, unknown>>>> = {
+  [DESKTOP_PLUGIN]: {
+    [BUILT_IN_THEMES.light.path]: tytoLight,
+    [BUILT_IN_THEMES.dark.path]: tytoDark,
+  },
+  [THEME_PACK_ID]: THEME_PACK_FILES,
 };
+
+/** A built-in plugin's reader: its files, bundled. */
+export const builtInThemeReader =
+  (plugin: string): ThemeReader =>
+  (path) => {
+    const file = BUILT_IN_THEME_FILES[plugin]?.[path];
+    return file === undefined
+      ? Promise.reject(new Error(`the app ships no theme file '${path}' for '${plugin}'`))
+      : Promise.resolve(JSON.stringify(file));
+  };
+
+// Which built-in plugin registered a theme. The registry lists contributions without their
+// owner, and an id is unique across it.
+const BUILT_IN_THEME_PLUGIN: ReadonlyMap<string, string> = new Map(
+  THEME_PACK_THEMES.map((theme) => [theme.id, THEME_PACK_ID]),
+);
+
+/** A built-in theme with the plugin that registers it and the reader of that plugin's files. */
+export function builtInThemeSource(theme: ThemeContribution): ThemeSource {
+  const plugin = BUILT_IN_THEME_PLUGIN.get(theme.id) ?? DESKTOP_PLUGIN;
+  return { plugin, theme, read: builtInThemeReader(plugin) };
+}
 
 /**
  * An installed plugin's reader: a file inside `directory`, judged by name and then by where it
@@ -254,7 +282,7 @@ export function createThemeService(options: ThemeServiceOptions): ThemeService {
     const source = sourceOf(id);
     const loaded =
       source === undefined || source.theme.kind !== kind
-        ? await loadTheme(BUILT_IN_THEMES[kind], builtInThemeReader)
+        ? await loadTheme(BUILT_IN_THEMES[kind], builtInThemeReader(DESKTOP_PLUGIN))
         : await loadTheme(source.theme, source.read);
     if (report) for (const problem of loaded.diagnostics) options.report(problem);
     return loaded;

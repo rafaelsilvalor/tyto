@@ -1,0 +1,44 @@
+{
+  "name": "Dracula",
+  "kind": "dark",
+  "colors": {
+    "surface": "#282a36",
+    "surface-raised": "#343746",
+    "surface-sunken": "#21222c",
+    "border": "#44475a",
+    "hairline": "#191a21",
+    "text": "#f8f8f2",
+    "text-muted": "#9fa9c7",
+    "text-disabled": "#6272a4",
+    "accent": "#ff79c6",
+    "accent-text": "#282a36",
+    "focus-ring": "#6272a4",
+    "selection": "#44475a",
+    "hover": "#3b3e4f",
+    "error": "#ff5555",
+    "warning": "#ffb86c",
+    "info": "#8be9fd",
+    "success": "#50fa7b",
+    "scrim": "rgb(0 0 0 / 40%)",
+    "shadow-overlay-tint": "rgb(0 0 0 / 45%)",
+    "shadow-paper-tint": "rgb(0 0 0 / 50%)",
+    "active-line": "rgb(68 71 90 / 46%)",
+    "active-line-gutter": "#353747",
+    "syntax-keyword": "#ff79c6",
+    "syntax-function": "#50fa7b",
+    "syntax-constant": "#bd93f9",
+    "syntax-attribute": "#50fa7b",
+    "syntax-string": "#f1fa8c",
+    "syntax-tag": "#ff79c6",
+    "syntax-punctuation": "#f8f8f2",
+    "syntax-comment": "#6272a4"
+  },
+  "adjusted": [
+    {
+      "token": "text-muted",
+      "upstream": "#6272a4",
+      "value": "#9fa9c7",
+      "reason": "Dracula's comment colour reads 3.03:1 on the background; HSL lightness raised from 51.4% to 70.2%, hue and saturation kept, to the first value reading 4.5:1 on surface, surface-raised and hover (4.51 on hover, the lowest)"
+    }
+  ]
+}

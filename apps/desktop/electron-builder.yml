@@ -53,6 +53,9 @@ files:
   - node_modules/@tyto/fonts/package.json
   - node_modules/@tyto/fonts/dist/**
   - node_modules/@tyto/fonts/fonts/**
+  # `@tyto/theme-pack`'s code is bundled into main, but the MIT notices of the palettes it
+  # ports have to travel with the colours (TYTO-300). The app never reads this file.
+  - node_modules/@tyto/theme-pack/LICENSES
 
 # **Installed plugins run on a Node of their own, which the package carries** (TYTO-186,
 # ADR 0050). `pnpm build` puts Node's official binary for this platform, checked against the

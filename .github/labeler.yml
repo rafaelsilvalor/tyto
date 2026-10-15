@@ -26,6 +26,9 @@
 'pkg:templates':
   - changed-files:
       - any-glob-to-any-file: 'packages/templates/**'
+'pkg:theme-pack':
+  - changed-files:
+      - any-glob-to-any-file: 'packages/theme-pack/**'
 'pkg:fonts':
   - changed-files:
       - any-glob-to-any-file: 'packages/fonts/**'

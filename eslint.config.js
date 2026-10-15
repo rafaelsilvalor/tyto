@@ -23,6 +23,8 @@ const PURE_PACKAGES = [
   // Everything a template imports runs wherever the compiler runs (TYTO-185).
   'packages/template-kit',
   'packages/plugin-api',
+  // Data and one `registerTheme` loop: it is bundled into main and runs anywhere (TYTO-300).
+  'packages/theme-pack',
 ];
 
 const NODE_PACKAGES = [

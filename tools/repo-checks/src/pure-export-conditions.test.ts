@@ -329,6 +329,7 @@ describe('the pure packages', () => {
       'template-kit',
       'template-lang',
       'templates',
+      'theme-pack',
     ]);
   });
 
