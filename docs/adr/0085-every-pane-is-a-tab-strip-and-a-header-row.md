@@ -33,8 +33,10 @@ editor's actions at the right end of the tab strip, and panels with a tab strip 
 under it. What follows is the revised shape.
 
 1. **Every pane has a tab strip, and the strips meet.** An editor group, a preview and every
-   docked panel draw a `.pane__strip` of one height, `--tyto-pane-strip-height` (30 px), with its
-   hairline inside it (border-box); panes whose strips start at the same y end them at the same y.
+   docked panel draw a `.pane__strip` of one height, `--tyto-pane-strip-height` (30 px), in the
+   raised fill and with no line under it — the hairline it first carried went after Rafael
+   marked it on the queue's strip and a group's (2026-10-14); the height was border-box, so it
+   stays 30 px. Panes whose strips start at the same y end them at the same y.
    The contract in `shell.css` is a fixed `height`, `flex: none`, one line (`white-space:
 nowrap`) and `overflow: hidden`, so nothing in a line can make it taller.
 2. **An editor group adds a discreet header row, and those meet among themselves.** Under each
@@ -101,6 +103,11 @@ panel's strip a pixel taller fails the helper, in the test. At 900x600 nothing i
 reaches above or below it, measured by boxes. The header row is the editor's background with two
 zero-width borders, read from the computed style. Removing the strip token from `.pane__strip` and
 rebuilding turned the suite red ("expected 20.8 to be close to 30").
+
+After the hairline under the strips went (Rafael, 2026-10-14), the same scene read every strip
+30 px still and all six visible strips a computed `border-bottom-width` of `0px`; putting the
+border back and rebuilding turned that assertion red with all six named at 0.8 px, while the
+heights stayed 30 px — the border had been inside the height.
 
 The first version of this pull request had a 28 px header row on every pane, with a hairline and
 the template picker in it; it measured 30 and 28 px everywhere and was replaced, not amended.
