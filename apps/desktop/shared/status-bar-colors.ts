@@ -230,10 +230,20 @@ export interface ThemeInForce {
   readonly colors: Readonly<Record<string, string>>;
 }
 
+/** The ratio as a warning says it: rounded down, so it never reads as passing. */
+const ratioText = (ratio: number): string => (Math.floor(ratio * 100) / 100).toFixed(2);
+
 /**
- * `W_SETTING_LOW_CONTRAST` at each vim badge colour of `statusBarColors` on which no text
- * colour of a theme in force reads 4.5:1. The colour still applies — the person chose it — and
- * the warning says the ratio measured, rounded down so it never reads as passing.
+ * `W_SETTING_LOW_CONTRAST` where a colour of `statusBarColors` leaves text under 4.5:1 in a
+ * theme in force. The colour still applies — the person chose it — and the warning says the
+ * ratio measured and the theme. Two checks:
+ *
+ * - **each vim badge colour**, against the best-reading text the theme offers for it;
+ * - **the bar's own pair**, when `background` or `foreground` is set: the override where it is
+ *   set and the theme's `status-bar` / `status-bar-text` where it is not. The warning sits on
+ *   `foreground` when that is set, which is the colour a person reads, else on `background`.
+ *
+ * Per-item and hover/on colours are not measured: they are the person's to pair.
  */
 export function statusBarColorsContrast(
   entries: readonly SettingEntry[],
@@ -242,25 +252,51 @@ export function statusBarColorsContrast(
   const entry = [...entries].reverse().find((item) => item.key === statusBarColorsContribution.id);
   if (entry === undefined || typeof entry.value !== 'object' || entry.value === null) return [];
   const written = entry.value as Readonly<Record<string, unknown>>;
-  const diagnostics: Diagnostic[] = [];
-  for (const { key } of VIM_COLOUR_KEYS) {
+  const colour = (key: string): string | undefined => {
     const value = written[key];
-    if (typeof value !== 'string' || !statusBarColour.safeParse(value).success) continue;
+    return typeof value === 'string' && statusBarColour.safeParse(value).success
+      ? value
+      : undefined;
+  };
+  const diagnostics: Diagnostic[] = [];
+  const warn = (key: string, ratio: number, theme: ThemeInForce, what: string): void => {
+    const range = entry.memberRanges?.[key]?.valueRange ?? entry.valueRange ?? entry.keyRange;
+    diagnostics.push(
+      diagnostic(
+        'W_SETTING_LOW_CONTRAST',
+        {
+          key: `${statusBarColorsContribution.id}.${key}`,
+          what,
+          ratio: ratioText(ratio),
+          theme: theme.id,
+        },
+        range === undefined ? {} : { range },
+      ),
+    );
+  };
+
+  const background = colour('background');
+  const foreground = colour('foreground');
+  if (background !== undefined || foreground !== undefined) {
+    const at = foreground === undefined ? 'background' : 'foreground';
+    for (const theme of themes) {
+      const ratio = contrastRatio(
+        foreground ?? theme.colors['status-bar-text'] ?? '',
+        background ?? theme.colors['status-bar'] ?? '',
+      );
+      if (ratio !== undefined && ratio < BADGE_CONTRAST_FLOOR) {
+        warn(at, ratio, theme, "the bar's text on its background");
+      }
+    }
+  }
+
+  for (const { key } of VIM_COLOUR_KEYS) {
+    const value = colour(key);
+    if (value === undefined) continue;
     for (const theme of themes) {
       const text = badgeText(value, theme.colors);
       if (text === undefined || text.ratio >= BADGE_CONTRAST_FLOOR) continue;
-      const range = entry.memberRanges?.[key]?.valueRange ?? entry.valueRange ?? entry.keyRange;
-      diagnostics.push(
-        diagnostic(
-          'W_SETTING_LOW_CONTRAST',
-          {
-            key: `${statusBarColorsContribution.id}.${key}`,
-            ratio: (Math.floor(text.ratio * 100) / 100).toFixed(2),
-            theme: theme.id,
-          },
-          range === undefined ? {} : { range },
-        ),
-      );
+      warn(key, text.ratio, theme, 'the best text on it');
     }
   }
   return diagnostics;

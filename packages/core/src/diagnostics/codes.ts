@@ -850,13 +850,14 @@ export const diagnosticCodes = {
     fatal: false,
     fatality: 'A warning never replaces a value (ADR 0013).',
   },
-  // A colour a person chose, which applies, but no text colour the theme has reads on it
-  // (TYTO-301, ADR 0091): said with the number, never refused, because the choice is theirs.
+  // A colour a person chose, which applies, but leaves text under 4.5:1 — a vim badge nothing
+  // reads on, or the bar's own text on its background (TYTO-301, ADR 0091): said with the
+  // number, never refused, because the choice is theirs.
   W_SETTING_LOW_CONTRAST: {
     severity: 'warning',
-    summary: 'A colour setting applies, but no text colour of the theme reads 4.5:1 on it.',
+    summary: 'A colour setting applies, but the text it leaves reads under 4.5:1.',
     template:
-      "Setting '{key}' applies, but text on it reads {ratio}:1 at best in theme '{theme}', under 4.5:1.",
+      "Setting '{key}' applies, but {what} reads {ratio}:1 in theme '{theme}', under 4.5:1.",
     spec: 'docs/adr/0091-the-status-bars-content-is-a-setting.md',
     fatal: false,
     fatality: 'A warning never replaces a value (ADR 0013).',

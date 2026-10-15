@@ -9,5 +9,6 @@
 `#rgb` or `#rrggbb`; saving applies them with no restart, and removing one gives the theme's colour
 back. An unknown key or a bad colour is a warning at it and only that one falls back to the theme.
 A vim badge's text is the theme's best-reading colour on it, and a badge colour nothing reads
-4.5:1 on still applies, with a warning that says the ratio. A new `settings.json` carries the key
+4.5:1 on still applies, with a warning that says the ratio; so does a
+`background` or `foreground` that leaves the bar's own text under 4.5:1. A new `settings.json` carries the key
 commented out, with every key and an example colour.

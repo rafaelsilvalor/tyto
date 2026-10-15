@@ -100,7 +100,16 @@ light and dark alike. When none reaches 4.5:1 the colour **still applies** — t
 — and the settings tab says so at the value with the new warning `W_SETTING_LOW_CONTRAST`, which
 names the ratio measured (rounded down, so it never reads as passing) and the theme. It is
 measured against the themes the mode can show: the light one, the dark one, or both under
-`system`. Nothing else in the override is measured: the bar's own text is the person's to pair.
+`system`.
+
+**The bar's own pair is measured too** (Rafael, 2026-10-15, after the pictures showed
+`background` `#1e3a5f` alone leaving Tyto Light's bar text at **1.62:1**). When the override
+sets `background`, `foreground` or both, the pair in effect — the override where it is set,
+the theme's `status-bar` / `status-bar-text` where it is not — is held to 4.5:1 in the same
+themes as the badges. Under it the colours still apply, and `W_SETTING_LOW_CONTRAST` sits on
+`foreground` when that is set (the colour a person reads), else on `background`, with the
+ratio and the theme. The per-item and hover/on colours are not measured: they are the person's
+to pair.
 
 **Live on save, through the same answer.** The value travels on `theme:current` beside
 `statusBarItems`; the window writes it into the theme sheet after each mode's colours, on

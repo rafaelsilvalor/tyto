@@ -252,6 +252,28 @@ describe('the statusBarColors setting', () => {
       .toContain(`W_SETTING_LOW_CONTRAST@${whereOf(text, '"#808080"')}`);
   });
 
+  it("warns at a background the theme's bar text does not read on, and still paints it", async () => {
+    // Tyto Light's #58585a on #1e3a5f: 1.62:1, measured from the pictures (Rafael, 2026-10-15).
+    const text = settingsText({ background: '#1e3a5f' });
+    await saveSettings(text);
+
+    await expect
+      .poll(problems, { timeout: 15_000 })
+      .toContain(`W_SETTING_LOW_CONTRAST@${whereOf(text, '"#1e3a5f"')}`);
+    const message = await page.evaluate(
+      () =>
+        [...document.querySelectorAll('.problems__row')]
+          .map((row) => row.querySelector('.problems__message')?.textContent ?? '')
+          .find((line) => line.includes('statusBarColors.background')) ?? '',
+    );
+    expect(message).toContain("reads 1.62:1 in theme 'tyto-light'");
+    await expect.poll(bar, { timeout: 15_000 }).toMatchObject({ background: computed('#1e3a5f') });
+    if (shots !== undefined) {
+      mkdirSync(shots, { recursive: true });
+      await page.screenshot({ path: join(shots, 'settings-low-contrast.png') });
+    }
+  });
+
   it("gives the theme's colours back when the override is removed", async () => {
     await saveSettings(settingsText({ background: '#1e3a5f', 'item.tabKind': '#ffd866' }));
     await expect.poll(bar, { timeout: 15_000 }).toMatchObject({ background: computed('#1e3a5f') });

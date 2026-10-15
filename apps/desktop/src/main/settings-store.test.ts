@@ -439,7 +439,7 @@ describe('the vim badge colours of statusBarColors', () => {
       ['W_SETTING_LOW_CONTRAST', rangeOf(text, '"#808080"')],
     ]);
     expect(problems[0]?.message).toBe(
-      "Setting 'statusBarColors.vimMode.insert' applies, but text on it reads 3.94:1 at best " +
+      "Setting 'statusBarColors.vimMode.insert' applies, but the best text on it reads 3.94:1 " +
         "in theme 'tyto-light', under 4.5:1.",
     );
   });
@@ -448,4 +448,66 @@ describe('the vim badge colours of statusBarColors', () => {
     const start = text.indexOf(fragment);
     return { start, end: start + fragment.length };
   };
+});
+
+/** The bar's own text on its background, when the override sets either (TYTO-301). */
+describe("the bar's own colours of statusBarColors", () => {
+  // Tyto Light's and Tyto Dark's bar pair, as their theme files set it.
+  const light = {
+    id: 'tyto-light',
+    colors: { 'status-bar': '#ebebec', 'status-bar-text': '#58585a' },
+  };
+  const dark = {
+    id: 'tyto-dark',
+    colors: { 'status-bar': '#2f343e', 'status-bar-text': '#a9afbc' },
+  };
+  const check = (text: string, themes = [light]) =>
+    validateSettingsText(text, BUILT_IN_SETTINGS, (entries) =>
+      statusBarColorsContrast(entries, themes),
+    );
+  const rangeOf = (text: string, fragment: string) => {
+    const start = text.indexOf(fragment);
+    return { start, end: start + fragment.length };
+  };
+
+  it("warns at a background the theme's text does not read on, with the ratio", () => {
+    const text = '{ "statusBarColors": { "background": "#1e3a5f" } }';
+
+    const problems = check(text);
+
+    expect(problems.map((item) => [item.code, item.range])).toEqual([
+      ['W_SETTING_LOW_CONTRAST', rangeOf(text, '"#1e3a5f"')],
+    ]);
+    expect(problems[0]?.message).toBe(
+      "Setting 'statusBarColors.background' applies, but the bar's text on its background " +
+        "reads 1.62:1 in theme 'tyto-light', under 4.5:1.",
+    );
+  });
+
+  it("warns at a foreground that does not read on the theme's background", () => {
+    const text = '{ "statusBarColors": { "foreground": "#c8c8c8" } }';
+
+    expect(check(text).map((item) => [item.code, item.range])).toEqual([
+      ['W_SETTING_LOW_CONTRAST', rangeOf(text, '"#c8c8c8"')],
+    ]);
+  });
+
+  it('warns at the foreground when both are set and they do not read together', () => {
+    const text = '{ "statusBarColors": { "background": "#1e3a5f", "foreground": "#3a5f8a" } }';
+
+    expect(check(text).map((item) => [item.code, item.range])).toEqual([
+      ['W_SETTING_LOW_CONTRAST', rangeOf(text, '"#3a5f8a"')],
+    ]);
+  });
+
+  it('says nothing for a pair that reads, and measures each theme the mode can show', () => {
+    expect(
+      check('{ "statusBarColors": { "background": "#1e3a5f", "foreground": "#f0f0f0" } }'),
+    ).toEqual([]);
+    // A light background: fine under Tyto Light's dark text, unreadable under Tyto Dark's.
+    const problems = check('{ "statusBarColors": { "background": "#fafafa" } }', [light, dark]);
+    expect(problems.map((item) => item.message)).toEqual([
+      expect.stringContaining("in theme 'tyto-dark'"),
+    ]);
+  });
 });
