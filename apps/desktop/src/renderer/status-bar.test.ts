@@ -3,7 +3,13 @@ import { afterEach, describe, expect, it } from 'vitest';
 
 import { translate } from '../../shared/i18n/index.js';
 import { toggleDockCommandId } from './commands.js';
-import { type StatusBar, type StatusBarState, STATUS_BAR_TAG, positionText } from './status-bar.js';
+import {
+  type StatusBar,
+  type StatusBarState,
+  STATUS_BAR_TAG,
+  positionText,
+  vimBadgeMode,
+} from './status-bar.js';
 
 /**
  * The status bar's facts and buttons (TYTO-248, ADR 0076), drawn in jsdom.
@@ -161,6 +167,26 @@ describe('the status bar', () => {
 
     expect(bar.querySelector('.status-bar__vim')?.textContent).toBe('VISUAL LINE');
     expect(bar.querySelector('.status-bar__pending')?.textContent).toBe('2d');
+  });
+
+  // TYTO-301: the badge's colour is the theme's for the mode, picked in CSS by `data-mode`.
+  // Visual line and block are visual; the library reports no other mode.
+  it.each([
+    ['normal', 'normal'],
+    ['insert', 'insert'],
+    ['visual', 'visual'],
+    ['visual line', 'visual'],
+    ['visual block', 'visual'],
+    ['replace', 'replace'],
+  ])('marks vim’s %s mode as %s for the badge’s colour', async (mode, badge) => {
+    const { bar } = await mount({ ...base, vim: { mode, pending: '' } });
+    expect(bar.querySelector('.status-bar__vim')?.getAttribute('data-mode')).toBe(badge);
+    expect(vimBadgeMode(mode)).toBe(badge);
+  });
+
+  it('draws a mode it does not know as normal rather than with no colour', () => {
+    expect(vimBadgeMode('operator-pending')).toBe('normal');
+    expect(vimBadgeMode('')).toBe('normal');
   });
 
   it('says the tab kind and the template, and no template for a settings tab', async () => {

@@ -172,8 +172,8 @@ textarea {
   align-items: center;
   border-top: var(--tyto-hairline-width) solid var(--tyto-hairline);
   padding: 0 var(--tyto-space-3);
-  background: var(--tyto-surface-raised);
-  color: var(--tyto-text-muted);
+  background: var(--tyto-status-bar);
+  color: var(--tyto-status-bar-text);
   font-size: var(--tyto-text-sm);
   white-space: nowrap;
 }
@@ -259,14 +259,31 @@ textarea {
   background: var(--tyto-accent);
 }
 
-/* Vim's mode, highlighted the way the card's reference shows it. */
+/* Vim's mode as a badge in the mode's colour (TYTO-301): only the badge is coloured, the bar
+   stays the bar's (Rafael, 2026-10-15). `data-mode` is one of four; visual line and block
+   wear visual's. Each pair is held to 4.5:1 in every theme Tyto ships (ADR 0089). */
 .status-bar__vim {
   flex-shrink: 0;
   border-radius: var(--tyto-radius-sm);
   padding: 0 var(--tyto-space-3);
-  background: var(--tyto-accent);
-  color: var(--tyto-accent-text);
+  background: var(--tyto-status-bar-vim-normal);
+  color: var(--tyto-status-bar-vim-normal-text);
   font-weight: var(--tyto-weight-strong);
+}
+
+.status-bar__vim[data-mode='insert'] {
+  background: var(--tyto-status-bar-vim-insert);
+  color: var(--tyto-status-bar-vim-insert-text);
+}
+
+.status-bar__vim[data-mode='visual'] {
+  background: var(--tyto-status-bar-vim-visual);
+  color: var(--tyto-status-bar-vim-visual-text);
+}
+
+.status-bar__vim[data-mode='replace'] {
+  background: var(--tyto-status-bar-vim-replace);
+  color: var(--tyto-status-bar-vim-replace-text);
 }
 
 .icon {

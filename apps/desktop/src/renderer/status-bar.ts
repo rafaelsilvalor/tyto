@@ -80,10 +80,6 @@ export function positionText(state: StatusBarState): string {
 }
 
 /**
- * Vim's mode in vim's own word, `VISUAL LINE`, untranslated: it is the editor's vocabulary,
- * the way `:w` is, and the highlight around it does what the library's `--` did.
- */
-/**
  * The problems button's label, which says how many and, while the dot is lit, "new": the
  * dot is drawn and `aria-hidden`, so a screen reader hears it here or not at all.
  *
@@ -97,7 +93,25 @@ export function problemsLabel(state: StatusBarState, toggle: string): string {
   return `${toggle} (${state.problems}, ${translate(state.locale, 'status.problems.new')})`;
 }
 
+/**
+ * Vim's mode in vim's own word, `VISUAL LINE`, untranslated: it is the editor's vocabulary,
+ * the way `:w` is, and the badge around it does what the library's `--` did.
+ */
 export const vimModeText = (mode: string): string => mode.toUpperCase();
+
+/** The four modes the badge has a colour for, one token pair each in the theme (TYTO-301). */
+export const VIM_BADGE_MODES = ['normal', 'insert', 'visual', 'replace'] as const;
+export type VimBadgeMode = (typeof VIM_BADGE_MODES)[number];
+
+/**
+ * Which colour the badge wears for vim's mode: its first word, so `visual line` and `visual
+ * block` are visual. The library reports only these four, and a word it might add later is
+ * drawn as normal rather than with no colour at all.
+ */
+export function vimBadgeMode(mode: string): VimBadgeMode {
+  const word = mode.split(' ')[0] ?? '';
+  return (VIM_BADGE_MODES as readonly string[]).includes(word) ? (word as VimBadgeMode) : 'normal';
+}
 
 export class StatusBar extends LitElement {
   static override properties = {
@@ -186,7 +200,9 @@ export class StatusBar extends LitElement {
         ${
           state.vim === null
             ? nothing
-            : html`<span class="status-bar__vim">${vimModeText(state.vim.mode)}</span>
+            : html`<span class="status-bar__vim" data-mode=${vimBadgeMode(state.vim.mode)}
+                  >${vimModeText(state.vim.mode)}</span
+                >
                 <span class="status-bar__text status-bar__pending">${state.vim.pending}</span>`
         }
       </div>

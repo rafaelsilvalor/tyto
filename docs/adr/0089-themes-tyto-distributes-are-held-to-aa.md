@@ -1,7 +1,8 @@
 # 0089 — Themes Tyto distributes are held to AA
 
 Status: accepted · 2026-10-15 · TYTO-300 · extends ADR 0077 decision 7 · amended 2026-10-15
-(decision 7: originals ship beside adjusted versions, Rafael)
+(decision 7: originals ship beside adjusted versions, Rafael) · amended 2026-10-15 by TYTO-301
+(decision 8: vim's mode badge is Tyto's and held to AA everywhere; decision 3 counts 40)
 
 ## Context
 
@@ -25,14 +26,15 @@ built-in themes nobody would choose knowingly.
 except an original shipped beside its adjusted version (decision 7).
 Measured by `apps/desktop/src/main/theme-pack.test.ts`, per theme:
 
-| Text             | Ground                               | Floor |
-| ---------------- | ------------------------------------ | ----- |
-| `text`           | `surface`, `surface-raised`          | 4.5   |
-| `text-muted`     | `surface`, `surface-raised`, `hover` | 4.5   |
-| `error`          | `surface`                            | 4.5   |
-| `text`           | `selection`                          | 4.5   |
-| `syntax-comment` | `surface`                            | 3     |
-| `accent`         | `surface-raised`                     | 3     |
+| Text              | Ground                               | Floor |
+| ----------------- | ------------------------------------ | ----- |
+| `text`            | `surface`, `surface-raised`          | 4.5   |
+| `text-muted`      | `surface`, `surface-raised`, `hover` | 4.5   |
+| `error`           | `surface`                            | 4.5   |
+| `text`            | `selection`                          | 4.5   |
+| `syntax-comment`  | `surface`                            | 3     |
+| `accent`          | `surface-raised`                     | 3     |
+| `status-bar-text` | `status-bar`                         | 4.5   |
 
 These are the built-ins' pairs (`e2e/renderer-tokens.test.ts`) with body text at AA rather than
 AAA. A comment stays at 3, deliberately quiet as in the built-ins, and the accent at 3 because
@@ -42,7 +44,8 @@ the line that marks the tab in front is a graphical object.
 so a selection drawn behind it shows (TYTO-246), and composited over `surface` it equals
 `active-line-gutter` within 1 per channel.
 
-**3. Every distributed theme sets all 30 tokens.** No token leans on the base theme's
+**3. Every distributed theme sets all 40 tokens** (30 until TYTO-301 added the status bar's
+ten, decision 8). No token leans on the base theme's
 fallback: a fallback colour is Tyto's, measured against Tyto's surfaces, and nothing proves it
 reads on a ported theme's.
 
@@ -77,6 +80,28 @@ suffix in the name and says "original colors" or "adjusted for contrast" on the 
 original to the upstream values recorded in `apps/desktop/src/main/theme-pack-upstream.ts`,
 holds it to fail at least one floor (or it would ship once), and holds an original and its twin
 equal except in the colours the twin lists as adjusted.
+
+**8. Vim's mode badge is Tyto's colour, not upstream's, and is held to AA in every theme Tyto
+ships, originals included** (TYTO-301, 2026-10-15). The status bar gains ten tokens:
+`status-bar` and `status-bar-text`, which copy `surface-raised` and `text-muted` so the bar looks
+as before, and a background and a text for each mode vim reports — `status-bar-vim-normal`,
+`-insert`, `-visual`, `-replace`, each with `-text`; visual line and block wear visual's. Until
+then the badge was `accent-text` on `accent`, which Tyto Light drew at **4.01:1** — 8 of the 22
+themes under 4.5 — and no test paired the two. No upstream theme has such a badge, so its colours are a derivation: normal from
+`accent`, insert from `success`, visual from `syntax-keyword`, replace from `error`, with the
+text the best-reading of `surface`, `text` and `accent-text`. Where none reads 4.5, the role's
+colour moves as decision 4 moves a colour — hue and saturation kept, HSL lightness to the first
+value that reads 4.5 — and the theme's `derived` field names the token, the role and why.
+Measured before the move: **23 of 88** badge pairs across the 22 themes read under 4.5 at
+their role's colour (11 of 52 outside the originals); after it, none, the lowest at 4.50. Because the badge is not upstream's, moving it **does not
+make a theme a pair**: Catppuccin Latte, whose `success` reads 2.96 at best, still ships once
+with `adjusted` empty. An original and its adjusted twin draw the same badge, derived from the
+original's roles, so the twin's `derived` also lists a badge whose own role it adjusted. The
+two built-ins record their two moves in `tokens.css` (`#5c78e2` → `#506ee0`, `#4f8a43` →
+`#4b8340`). `theme-pack.test.ts` holds every pack theme's four badge pairs to 4.5 and each
+badge to its role or a note, and `e2e/renderer-tokens.test.ts` holds the built-ins' and which
+token each `data-mode` paints. `status-bar-text` on `status-bar` joins decision 1's table at
+4.5, for themes that are not originals.
 
 ## Consequences
 

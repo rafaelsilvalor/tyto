@@ -8,6 +8,12 @@ import { describe, expect, it } from 'vitest';
 import { GROUP_MINIMUM } from '../src/renderer/group-resize.js';
 
 /**
+ * The modes vim's badge has a colour for (TYTO-301), as `status-bar.ts` lists them. Written
+ * again rather than imported: that module defines a custom element, which needs a DOM.
+ */
+const VIM_BADGE_MODES = ['normal', 'insert', 'visual', 'replace'] as const;
+
+/**
  * The window's visual language is one file, and these are the checks that keep it one
  * (TYTO-96, ADR 0075).
  *
@@ -252,7 +258,7 @@ describe('the built-in theme files are the token file (ADR 0077)', () => {
   const { light, dark } = themes();
 
   it('theme exactly the colours the token file redefines for dark, no more and no fewer', () => {
-    expect(dark.size).toBe(30);
+    expect(dark.size).toBe(40);
     for (const kind of ['light', 'dark'] as const) {
       expect([...builtInTheme(kind).keys()].sort(), kind).toEqual([...dark.keys()].sort());
     }
@@ -293,7 +299,7 @@ describe.each(['light', 'dark'] as const)('the %s theme', (name) => {
   // AA asks 4.5 for body text; the body text is held to AAA's 7 because it is most of what is
   // on screen, and the secondary text, the errors and selected text to AA. A comment is
   // deliberately quiet and held to 3, the floor for large or non-essential text.
-  it.each([
+  it.each<readonly [string, string, number]>([
     ['--tyto-text', '--tyto-surface', 7],
     ['--tyto-text', '--tyto-surface-raised', 7],
     ['--tyto-text-muted', '--tyto-surface', 4.5],
@@ -306,7 +312,45 @@ describe.each(['light', 'dark'] as const)('the %s theme', (name) => {
     // The focused group's tab in front is marked by an accent line on the strip, which is a
     // graphical object and not text: WCAG's 3:1 for one.
     ['--tyto-accent', '--tyto-surface-raised', 3],
+    // TYTO-301: the bar's own text, and vim's mode on its badge, are text: AA.
+    ['--tyto-status-bar-text', '--tyto-status-bar', 4.5],
+    ...VIM_BADGE_MODES.map(
+      (mode) =>
+        [`--tyto-status-bar-vim-${mode}-text`, `--tyto-status-bar-vim-${mode}`, 4.5] as const,
+    ),
   ])('reads %s on %s at %s:1 or better', (text, ground, floor) => {
     expect(contrast(value(text), value(ground))).toBeGreaterThanOrEqual(floor);
+  });
+});
+
+/** The declarations of the one rule in `shell.css` whose selector is exactly `selector`. */
+const ruleOf = (selector: string): Map<string, string> => {
+  const css = withoutComments(read('shell.css'));
+  const rules = [...css.matchAll(/([^{}]+)\{([^{}]*)\}/g)].filter(
+    (match) => match[1]!.trim() === selector,
+  );
+  if (rules.length !== 1) throw new Error(`shell.css has ${String(rules.length)} '${selector}'`);
+  return new Map(
+    [...rules[0]![2]!.matchAll(/([a-z-]+)\s*:\s*([^;]+);/g)].map((match) => [
+      match[1]!,
+      match[2]!.trim(),
+    ]),
+  );
+};
+
+describe('the status bar wears its own tokens (TYTO-301)', () => {
+  it('paints the bar with the bar’s pair', () => {
+    const foot = ruleOf('.shell__foot');
+    expect(foot.get('background')).toBe('var(--tyto-status-bar)');
+    expect(foot.get('color')).toBe('var(--tyto-status-bar-text)');
+  });
+
+  // The badge was `accent-text` on `accent` until this card: 4.01:1 in Tyto Light, under AA.
+  it.each(VIM_BADGE_MODES)('paints the %s badge with that mode’s pair', (mode) => {
+    const rule = ruleOf(
+      mode === 'normal' ? '.status-bar__vim' : `.status-bar__vim[data-mode='${mode}']`,
+    );
+    expect(rule.get('background')).toBe(`var(--tyto-status-bar-vim-${mode})`);
+    expect(rule.get('color')).toBe(`var(--tyto-status-bar-vim-${mode}-text)`);
   });
 });

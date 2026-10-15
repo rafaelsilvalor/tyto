@@ -170,7 +170,7 @@ interface ThemeContribution {
 }
 ```
 
-A colour is named by the window's role without the `--tyto-` prefix — the 30 colours
+A colour is named by the window's role without the `--tyto-` prefix — the 40 colours
 `apps/desktop/src/main/themes/tyto-dark.json` lists — and its value is a hex colour, `rgb()`,
 `hsl()` or a `color-mix()` of those (`isThemeColor`, which also refuses anything that could
 close the declaration). **A token the theme leaves out is the base theme's of its kind**; an

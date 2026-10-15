@@ -31,6 +31,16 @@
     "syntax-string": "#4f8a43",
     "syntax-tag": "#c4473a",
     "syntax-punctuation": "#4d4f52",
-    "syntax-comment": "#7e8086"
+    "syntax-comment": "#7e8086",
+    "status-bar": "#ebebec",
+    "status-bar-text": "#58585a",
+    "status-bar-vim-normal": "#506ee0",
+    "status-bar-vim-normal-text": "#ffffff",
+    "status-bar-vim-insert": "#4b8340",
+    "status-bar-vim-insert-text": "#ffffff",
+    "status-bar-vim-visual": "#a449ab",
+    "status-bar-vim-visual-text": "#ffffff",
+    "status-bar-vim-replace": "#c4473a",
+    "status-bar-vim-replace-text": "#ffffff"
   }
 }

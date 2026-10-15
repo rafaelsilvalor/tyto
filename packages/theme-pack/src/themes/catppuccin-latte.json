@@ -31,7 +31,31 @@
     "syntax-string": "#40a02b",
     "syntax-tag": "#ea76cb",
     "syntax-punctuation": "#7c7f93",
-    "syntax-comment": "#7c7f93"
+    "syntax-comment": "#7c7f93",
+    "status-bar": "#e6e9ef",
+    "status-bar-text": "#5c5f77",
+    "status-bar-vim-normal": "#1962f5",
+    "status-bar-vim-normal-text": "#eff1f5",
+    "status-bar-vim-insert": "#327d22",
+    "status-bar-vim-insert-text": "#eff1f5",
+    "status-bar-vim-visual": "#8839ef",
+    "status-bar-vim-visual-text": "#eff1f5",
+    "status-bar-vim-replace": "#d20f39",
+    "status-bar-vim-replace-text": "#eff1f5"
   },
-  "adjusted": []
+  "adjusted": [],
+  "derived": [
+    {
+      "token": "status-bar-vim-normal",
+      "role": "accent",
+      "value": "#1962f5",
+      "reason": "accent #1e66f5 reads 4.34:1 at best against surface, text and accent-text; HSL lightness moved from 53.9% to 52.8%, hue and saturation kept, to the first value reading 4.5:1 (4.52 on surface)"
+    },
+    {
+      "token": "status-bar-vim-insert",
+      "role": "success",
+      "value": "#327d22",
+      "reason": "success #40a02b reads 2.96:1 at best against surface, text and accent-text; HSL lightness moved from 39.8% to 31.2%, hue and saturation kept, to the first value reading 4.5:1 (4.54 on surface)"
+    }
+  ]
 }

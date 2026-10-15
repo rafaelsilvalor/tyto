@@ -32,7 +32,17 @@
     "syntax-string": "#385f0d",
     "syntax-tag": "#8c4351",
     "syntax-punctuation": "#006c86",
-    "syntax-comment": "#81848e"
+    "syntax-comment": "#81848e",
+    "status-bar": "#d6d8df",
+    "status-bar-text": "#363c4d",
+    "status-bar-vim-normal": "#2959aa",
+    "status-bar-vim-normal-text": "#ffffff",
+    "status-bar-vim-insert": "#33635c",
+    "status-bar-vim-insert-text": "#ffffff",
+    "status-bar-vim-visual": "#65359d",
+    "status-bar-vim-visual-text": "#ffffff",
+    "status-bar-vim-replace": "#bd4040",
+    "status-bar-vim-replace-text": "#ffffff"
   },
   "adjusted": [
     {
@@ -46,6 +56,14 @@
       "upstream": "#888b94",
       "value": "#81848e",
       "reason": "#888b94 reads 2.76:1 on surface; HSL lightness lowered from 55.7% to 53.2%, hue and saturation kept, to the first value reading 3:1 on surface (3.03)"
+    }
+  ],
+  "derived": [
+    {
+      "token": "status-bar-vim-replace",
+      "role": "error",
+      "value": "#bd4040",
+      "reason": "the error of the original, #bd4040, as the original's badge: a badge is Tyto's derivation and both of a pair draw the same one"
     }
   ]
 }
