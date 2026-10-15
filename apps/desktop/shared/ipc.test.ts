@@ -224,6 +224,7 @@ describe('the theme the window applies (TYTO-208)', () => {
     diagnostics: [],
     iconStrokeWidth: 1.25,
     statusBarItems: ['problems', 'settings'],
+    statusBarColors: {},
   });
 
   it('refuses a mode that is not one of the three', () => {
@@ -260,6 +261,28 @@ describe('the theme the window applies (TYTO-208)', () => {
     expect(() =>
       parseIpc('theme:current', 'response', { ...theme({}), statusBarItems: ['clock'] }),
     ).toThrow(IpcContractError);
+  });
+
+  // TYTO-301: the override is written into the theme sheet, so only hex and known keys pass.
+  it('carries the status bar colours, and refuses what could close a rule', () => {
+    const colours = (statusBarColors: Record<string, string>) => ({
+      ...theme({}),
+      statusBarColors,
+    });
+    expect(() =>
+      parseIpc(
+        'theme:current',
+        'response',
+        colours({ 'item.problems': '#fd6', background: '#000000' }),
+      ),
+    ).not.toThrow();
+    for (const bad of [
+      { background: 'red; } body { display: none' },
+      { background: 'rgb(0 0 0)' },
+      { "item.problems'] { x: y } [a": '#000000' },
+    ]) {
+      expect(() => parseIpc('theme:current', 'response', colours(bad))).toThrow(IpcContractError);
+    }
   });
 
   it.each([

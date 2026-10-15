@@ -48,6 +48,62 @@ describe('the icon stroke on the theme sheet (TYTO-288)', () => {
   });
 });
 
+describe('the status bar colours on the theme sheet (TYTO-301, ADR 0091)', () => {
+  const COLOURED = {
+    light: {
+      id: 'tyto-light',
+      colors: { surface: '#fafafa', text: '#242529', 'accent-text': '#ffffff' },
+    },
+    dark: {
+      id: 'tyto-dark',
+      colors: { surface: '#282c33', text: '#dce0e5', 'accent-text': '#1c1f24' },
+    },
+  };
+  const sheetWith = (statusBarColors: Record<string, string>) =>
+    themeSheet({ ...COLOURED, statusBarColors });
+
+  it('writes nothing for the bar when the setting is empty or absent', () => {
+    expect(sheetWith({})).not.toContain('shell__foot');
+    expect(themeSheet(COLOURED)).not.toContain('shell__foot');
+  });
+
+  it('sets the bar’s colours on the bar, in both modes, over the theme', () => {
+    const sheet = sheetWith({
+      background: '#1e3a5f',
+      foreground: '#f0f0f0',
+      itemHoverBackground: '#2b4f7e',
+      itemActiveForeground: '#ffffff',
+    });
+    const [light = '', dark = ''] = sheet.split('@media');
+    for (const block of [light, dark]) {
+      expect(block).toContain('.shell__foot.shell__foot {');
+      expect(block).toContain('--tyto-status-bar: #1e3a5f;');
+      expect(block).toContain('--tyto-status-bar-text: #f0f0f0;');
+      expect(block).toContain('--status-bar-hover: #2b4f7e;');
+      expect(block).toContain('--status-bar-on-text: #ffffff;');
+    }
+  });
+
+  it('gives an item its own text colour on that item alone', () => {
+    expect(sheetWith({ 'item.problems': '#ffd866' })).toContain(
+      ".shell__foot [data-item='problems'] {\n  --status-bar-item-text: #ffd866;\n}",
+    );
+  });
+
+  it('colours a vim badge and picks, per theme, the text that reads best on it', () => {
+    // A light yellow badge: the dark text of each theme reads best on it, not white.
+    const [light = '', dark = ''] = sheetWith({ 'vimMode.insert': '#ffe066' }).split('@media');
+    expect(light).toContain('--tyto-status-bar-vim-insert: #ffe066;');
+    expect(light).toContain('--tyto-status-bar-vim-insert-text: #242529;');
+    expect(dark).toContain('--tyto-status-bar-vim-insert: #ffe066;');
+    expect(dark).toContain('--tyto-status-bar-vim-insert-text: #1c1f24;');
+    // And a dark badge takes the light candidate.
+    expect(sheetWith({ 'vimMode.normal': '#1d4ed8' })).toContain(
+      '--tyto-status-bar-vim-normal-text: #ffffff;',
+    );
+  });
+});
+
 describe("the theme's rows in the problems panel (TYTO-208)", () => {
   const row = (code: string) => ({ code, message: code });
 

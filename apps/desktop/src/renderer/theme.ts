@@ -1,4 +1,5 @@
 import type { IpcResponse } from '../../shared/ipc.js';
+import { type StatusBarColors, statusBarOverride } from '../../shared/status-bar-colors.js';
 
 /**
  * Applies the colours main resolved for each system mode (TYTO-208, ADR 0077): the themes the
@@ -27,7 +28,7 @@ const SHEET_ID = 'tyto-theme';
  * Electron's to answer, and the problems the panel's.
  */
 type Applied = Pick<IpcResponse<'theme:current'>, 'light' | 'dark'> &
-  Partial<Pick<IpcResponse<'theme:current'>, 'iconStrokeWidth'>>;
+  Partial<Pick<IpcResponse<'theme:current'>, 'iconStrokeWidth' | 'statusBarColors'>>;
 
 const declarations = (colors: Readonly<Record<string, string>>): string =>
   Object.entries(colors)
@@ -35,17 +36,44 @@ const declarations = (colors: Readonly<Record<string, string>>): string =>
     .join('\n');
 
 /**
+ * The `statusBarColors` override for one theme (TYTO-301, ADR 0091): the bar's properties on
+ * `.shell__foot` — doubled, so it wins over `shell.css` in any order — and each item's text
+ * colour on that item. Empty when the setting is. Per theme, because a vim badge's text is the
+ * best-reading colour of that theme. Keys and values are checked by the bridge's schema: an
+ * item id is one of thirteen words and a colour is hex, so neither can close a rule.
+ */
+function overrideRules(
+  colors: StatusBarColors | undefined,
+  theme: Readonly<Record<string, string>>,
+): string {
+  if (colors === undefined) return '';
+  const { bar, items } = statusBarOverride(colors, theme);
+  const rules: string[] = [];
+  const barDeclarations = Object.entries(bar).map(([name, value]) => `  ${name}: ${value};`);
+  if (barDeclarations.length > 0) {
+    rules.push(`.shell__foot.shell__foot {\n${barDeclarations.join('\n')}\n}`);
+  }
+  for (const [id, value] of Object.entries(items)) {
+    rules.push(`.shell__foot [data-item='${id}'] {\n  --status-bar-item-text: ${value};\n}`);
+  }
+  return rules.map((rule) => `\n${rule}`).join('');
+}
+
+/**
  * The sheet's text: light under `:root`, dark under the system's dark mode. The icons' stroke
  * is the `iconStrokeWidth` setting, the same in both (TYTO-288), over `tokens.css`'s default.
+ * The status bar's override follows each mode's colours (TYTO-301).
  */
 export function themeSheet(applied: Applied): string {
   const stroke =
     applied.iconStrokeWidth === undefined
       ? ''
       : `\n  --tyto-icon-stroke: ${String(applied.iconStrokeWidth)};`;
+  const light = overrideRules(applied.statusBarColors, applied.light.colors);
+  const dark = overrideRules(applied.statusBarColors, applied.dark.colors);
   return [
-    `:root:root {\n${declarations(applied.light.colors)}${stroke}\n}`,
-    `@media (prefers-color-scheme: dark) {\n:root:root {\n${declarations(applied.dark.colors)}\n}\n}`,
+    `:root:root {\n${declarations(applied.light.colors)}${stroke}\n}${light}`,
+    `@media (prefers-color-scheme: dark) {\n:root:root {\n${declarations(applied.dark.colors)}\n}${dark}\n}`,
   ].join('\n');
 }
 

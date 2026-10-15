@@ -2,7 +2,12 @@ import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import { dirname } from 'node:path';
 
 import { type Diagnostics, type Result, err, ok } from '@tyto/core';
-import { type DeclaredSetting, declaredSetting, resolveSettings } from '@tyto/plugin-api';
+import {
+  type DeclaredSetting,
+  type SettingEntry,
+  declaredSetting,
+  resolveSettings,
+} from '@tyto/plugin-api';
 
 import {
   DEFAULT_SETTINGS,
@@ -54,7 +59,7 @@ export interface SettingsStore {
   write(changes: Partial<Settings>): Promise<Result<void, Diagnostics>>;
 }
 
-/** The built-in `desktop` plugin's seven, for a store composed without a plugin host. */
+/** The built-in `desktop` plugin's eight, for a store composed without a plugin host. */
 export const BUILT_IN_SETTINGS: readonly DeclaredSetting[] = settingContributions().map(
   (contribution) => declaredSetting(desktopManifest.name, false, contribution),
 );
@@ -67,10 +72,18 @@ export const BUILT_IN_SETTINGS: readonly DeclaredSetting[] = settingContribution
 export function validateSettingsText(
   text: string,
   declared: readonly DeclaredSetting[],
+  advise: SettingsAdvice = () => [],
 ): Diagnostics {
   const { entries, syntax } = readSettingsText(text);
-  return [...syntax, ...resolveSettings(declared, entries).diagnostics];
+  return [...syntax, ...resolveSettings(declared, entries).diagnostics, ...advise(entries)];
 }
+
+/**
+ * What the app has to say about values it accepted, beyond what their schemas check: today the
+ * contrast of a vim badge colour in `statusBarColors` against the themes in force (TYTO-301),
+ * which a schema cannot measure because it does not know the theme.
+ */
+export type SettingsAdvice = (entries: readonly SettingEntry[]) => Diagnostics;
 
 /**
  * The text with a screen's changes applied in place, or the syntax errors that refuse it.

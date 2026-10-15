@@ -1,5 +1,5 @@
 import { type Diagnostic, diagnostic, sourceRange } from '@tyto/core';
-import type { SettingEntry } from '@tyto/plugin-api';
+import type { SettingEntry, SettingMemberRange } from '@tyto/plugin-api';
 import {
   type Node,
   type ParseError,
@@ -72,9 +72,26 @@ export function readSettingsText(text: string): SettingsText {
       ...(valueNode?.type === 'array'
         ? { entryRanges: (valueNode.children ?? []).map((item) => rangeOf(item)) }
         : {}),
+      // And an object's members, so one checked member by member can point at its name or its
+      // value (TYTO-301, `statusBarColors`).
+      ...(valueNode?.type === 'object' ? { memberRanges: memberRangesOf(valueNode) } : {}),
     });
   }
   return { entries, syntax };
+}
+
+/** Each member of an object node by name: where its name and its value were written. */
+function memberRangesOf(node: Node): Record<string, SettingMemberRange> {
+  const ranges: Record<string, SettingMemberRange> = {};
+  for (const property of node.children ?? []) {
+    const [keyNode, valueNode] = property.children ?? [];
+    if (keyNode === undefined || typeof keyNode.value !== 'string') continue;
+    ranges[keyNode.value] = {
+      keyRange: rangeOf(keyNode),
+      ...(valueNode === undefined ? {} : { valueRange: rangeOf(valueNode) }),
+    };
+  }
+  return ranges;
 }
 
 /**

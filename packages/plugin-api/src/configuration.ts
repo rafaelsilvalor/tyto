@@ -38,6 +38,20 @@ export interface ConfigurationContribution<T = unknown> extends Contribution {
     readonly schema: ZodType<unknown>;
     readonly unique: boolean;
   };
+  /**
+   * For an object setting, how each member is checked **on its own** (TYTO-301, ADR 0091).
+   *
+   * Without it an object is one value: a single bad member fails the schema and the whole
+   * object takes its default. With it, a member whose name `key` refuses is
+   * `W_SETTING_ENTRY_INVALID` at that name, and one whose value `schema` refuses is
+   * `W_SETTING_INVALID` at that value under the dotted key (`statusBarColors.background`);
+   * either is left out, and the members that remain are checked against the setting's
+   * `schema` as the value. A value that is not an object at all is still `W_SETTING_INVALID`.
+   */
+  readonly members?: {
+    readonly key: ZodType<string>;
+    readonly schema: ZodType<unknown>;
+  };
 }
 
 /** A setting as the registry hands it back: the key a file uses, and who declared it. */
@@ -93,6 +107,17 @@ export interface SettingEntry {
   readonly valueRange?: SourceRange;
   /** Where each entry of a list value was written, in order, when the value is a list. */
   readonly entryRanges?: readonly SourceRange[];
+  /**
+   * Where each member of an object value was written, by member name, when the value is an
+   * object (TYTO-301): the name's range and the value's.
+   */
+  readonly memberRanges?: Readonly<Record<string, SettingMemberRange>>;
+}
+
+/** Where one member of an object value was written. */
+export interface SettingMemberRange {
+  readonly keyRange: SourceRange;
+  readonly valueRange?: SourceRange;
 }
 
 export interface ResolvedSettings {
@@ -179,6 +204,7 @@ function keptEntries(
   entry: SettingEntry,
   diagnostics: Diagnostic[],
 ): unknown {
+  if (setting.contribution.members !== undefined) return keptMembers(setting, entry, diagnostics);
   const rule = setting.contribution.entries;
   if (rule === undefined || !Array.isArray(entry.value)) return entry.value;
   const kept: unknown[] = [];
@@ -205,6 +231,58 @@ function keptEntries(
       ),
     );
   });
+  return kept;
+}
+
+/**
+ * An object setting's value without the members it refuses, each refused one reported where it
+ * was written: a name at the name, a value at the value. Anything that is not a plain object is
+ * handed on as it is, for the schema to refuse whole.
+ */
+function keptMembers(
+  setting: DeclaredSetting,
+  entry: SettingEntry,
+  diagnostics: Diagnostic[],
+): unknown {
+  const rule = setting.contribution.members;
+  const value = entry.value;
+  if (rule === undefined || typeof value !== 'object' || value === null || Array.isArray(value)) {
+    return value;
+  }
+  const kept: Record<string, unknown> = {};
+  for (const [name, member] of Object.entries(value as Record<string, unknown>)) {
+    const where = entry.memberRanges?.[name];
+    const key = rule.key.safeParse(name);
+    if (!key.success) {
+      diagnostics.push(
+        diagnostic(
+          'W_SETTING_ENTRY_INVALID',
+          {
+            key: setting.key,
+            position: `'${name}'`,
+            problem: `is not accepted (${issuesOf(key.error.issues)})`,
+          },
+          rangeOption(where?.keyRange ?? entry.valueRange ?? entry.keyRange),
+        ),
+      );
+      continue;
+    }
+    const parsed = rule.schema.safeParse(member);
+    if (!parsed.success) {
+      diagnostics.push(
+        diagnostic(
+          'W_SETTING_INVALID',
+          {
+            key: `${setting.key}.${name}`,
+            problem: `is not accepted (${issuesOf(parsed.error.issues)})`,
+          },
+          rangeOption(where?.valueRange ?? where?.keyRange ?? entry.valueRange ?? entry.keyRange),
+        ),
+      );
+      continue;
+    }
+    kept[name] = parsed.data;
+  }
   return kept;
 }
 

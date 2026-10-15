@@ -272,3 +272,79 @@ describe('a list setting checked one entry at a time (TYTO-301, ADR 0091)', () =
     expect(resolved.diagnostics.map((item) => item.range)).toEqual([at(12, 20)]);
   });
 });
+
+describe('an object setting checked one member at a time (TYTO-301, ADR 0091)', () => {
+  const hex = z.string().regex(/^#[0-9a-f]{6}$/u, 'a colour is written #rrggbb');
+  const name = z.enum(['background', 'foreground'], { error: 'not a part of the bar' });
+  const colours = declaredSetting('desktop', false, {
+    id: 'barColours',
+    schema: z.partialRecord(name, hex),
+    default: {},
+    description: 'Colours that win over the theme.',
+    members: { key: name, schema: hex },
+  });
+
+  it('leaves out an unknown name at the name and a bad value at the value, keeping the rest', () => {
+    const resolved = resolveSettings(
+      [colours],
+      [
+        {
+          key: 'barColours',
+          value: { background: '#112233', clock: '#000000', foreground: 'red' },
+          valueRange: at(14, 80),
+          memberRanges: {
+            background: { keyRange: at(16, 28), valueRange: at(30, 39) },
+            clock: { keyRange: at(41, 48), valueRange: at(50, 59) },
+            foreground: { keyRange: at(61, 73), valueRange: at(75, 80) },
+          },
+        },
+      ],
+    );
+
+    expect(resolved.values['barColours']).toEqual({ background: '#112233' });
+    expect(resolved.diagnostics.map((item) => [item.code, item.range, item.message])).toEqual([
+      [
+        'W_SETTING_ENTRY_INVALID',
+        at(41, 48),
+        "Entry 'clock' of setting 'barColours' is not accepted (not a part of the bar); it is " +
+          'left out and the rest apply.',
+      ],
+      [
+        'W_SETTING_INVALID',
+        at(75, 80),
+        "Setting 'barColours.foreground' is not accepted (a colour is written #rrggbb); its " +
+          'default applies.',
+      ],
+    ]);
+  });
+
+  it('refuses a value that is not an object as a whole, and the default applies', () => {
+    const resolved = resolveSettings(
+      [colours],
+      [{ key: 'barColours', value: ['#112233'], valueRange: at(14, 25) }],
+    );
+
+    expect(resolved.values['barColours']).toEqual({});
+    expect(resolved.diagnostics.map((item) => [item.code, item.range])).toEqual([
+      ['W_SETTING_INVALID', at(14, 25)],
+    ]);
+  });
+
+  it('points at the value when the reader gave no member ranges', () => {
+    const resolved = resolveSettings(
+      [colours],
+      [
+        {
+          key: 'barColours',
+          value: { clock: '#000000', background: '#445566' },
+          valueRange: at(14, 30),
+        },
+      ],
+    );
+
+    expect(resolved.values['barColours']).toEqual({ background: '#445566' });
+    expect(resolved.diagnostics.map((item) => [item.code, item.range])).toEqual([
+      ['W_SETTING_ENTRY_INVALID', at(14, 30)],
+    ]);
+  });
+});

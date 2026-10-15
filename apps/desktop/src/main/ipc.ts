@@ -18,6 +18,7 @@ import {
   parseIpc,
   parseIpcEvent,
 } from '../../shared/ipc.js';
+import { type StatusBarColors } from '../../shared/status-bar-colors.js';
 import { type StatusBarItemId } from '../../shared/status-bar-items.js';
 import { type Credentials } from './credentials.js';
 import { credentialAccount } from './installed-plugins.js';
@@ -45,6 +46,8 @@ export interface WindowThemes extends Pick<ThemeService, 'list' | 'current' | 'p
   iconStrokeWidth(): number;
   /** The `statusBarItems` setting in force (TYTO-301), sent with every theme answer too. */
   statusBarItems(): readonly StatusBarItemId[];
+  /** The `statusBarColors` setting in force (TYTO-301), on the same answer. */
+  statusBarColors(): StatusBarColors;
 }
 
 /**
@@ -53,13 +56,14 @@ export interface WindowThemes extends Pick<ThemeService, 'list' | 'current' | 'p
  */
 function appliedForWindow(
   applied: AppliedThemes,
-  themes: Pick<WindowThemes, 'iconStrokeWidth' | 'statusBarItems'>,
+  themes: Pick<WindowThemes, 'iconStrokeWidth' | 'statusBarItems' | 'statusBarColors'>,
 ): IpcResponse<'theme:current'> {
   const { light, dark } = applied;
   return {
     mode: applied.mode,
     iconStrokeWidth: themes.iconStrokeWidth(),
     statusBarItems: [...themes.statusBarItems()],
+    statusBarColors: { ...themes.statusBarColors() },
     light: { id: light.id, colors: light.colors },
     dark: { id: dark.id, colors: dark.colors },
     diagnostics: [...light.diagnostics, ...dark.diagnostics]

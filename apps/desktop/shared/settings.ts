@@ -1,6 +1,7 @@
 import type { ConfigurationContribution } from '@tyto/plugin-api';
 import { z } from 'zod';
 
+import { type StatusBarColors, statusBarColorsContribution } from './status-bar-colors.js';
 import { type StatusBarItemId, statusBarItemsContribution } from './status-bar-items.js';
 import {
   DEFAULT_THEME_SETTING,
@@ -18,7 +19,7 @@ import {
  * reads off a disk and the window is told what the answer was, so the shape has to be one
  * declaration both halves import. Linted pure — no Node, no DOM.
  *
- * **Seven settings the built-in `desktop` plugin declares** through the `configuration`
+ * **Eight settings the built-in `desktop` plugin declares** through the `configuration`
  * extension point (TYTO-206, ADR 0073), like any plugin's: built-in is a plugin. Their keys
  * stay unprefixed, exactly as every `settings.json` written before that card spells them.
  * Each one is validated alone, so a hand-broken value costs that key and nothing else.
@@ -101,7 +102,7 @@ const iconStrokeWidth = {
 } satisfies ConfigurationContribution<number>;
 
 /**
- * The seven, in the order the settings file is documented in. `theme` checks its ids against
+ * The eight, in the order the settings file is documented in. `theme` checks its ids against
  * `lookup`, which main builds from every theme the plugins registered (TYTO-208); the default
  * knows the built-in two and lets any other id through.
  */
@@ -116,6 +117,7 @@ export function settingContributions(
     themeSettingContribution(lookup),
     iconStrokeWidth,
     statusBarItemsContribution,
+    statusBarColorsContribution,
   ] as readonly ConfigurationContribution[];
 }
 
@@ -128,6 +130,8 @@ export interface Settings {
   readonly iconStrokeWidth: number;
   /** Which status bar items show, in order inside their side (TYTO-301, ADR 0091). */
   readonly statusBarItems: readonly StatusBarItemId[];
+  /** Colours that win over the theme's for the status bar (TYTO-301, ADR 0091). */
+  readonly statusBarColors: StatusBarColors;
 }
 
 export const DEFAULT_SETTINGS: Settings = {
@@ -138,13 +142,14 @@ export const DEFAULT_SETTINGS: Settings = {
   theme: DEFAULT_THEME_SETTING,
   iconStrokeWidth: iconStrokeWidth.default,
   statusBarItems: statusBarItemsContribution.default,
+  statusBarColors: statusBarColorsContribution.default,
 };
 
 /** What a queue folder produces until a person chooses otherwise (ADR 0044). */
 export const DEFAULT_QUEUE_KINDS: readonly string[] = ['png'];
 
 /**
- * The seven out of the resolved values, which already hold every declared key with a value
+ * The eight out of the resolved values, which already hold every declared key with a value
  * its schema accepted or its default (`resolveSettings`).
  */
 export function settingsFrom(values: Readonly<Record<string, unknown>>): Settings {
@@ -158,5 +163,6 @@ export function settingsFrom(values: Readonly<Record<string, unknown>>): Setting
     theme: pick('theme'),
     iconStrokeWidth: pick('iconStrokeWidth'),
     statusBarItems: pick('statusBarItems'),
+    statusBarColors: pick('statusBarColors'),
   };
 }

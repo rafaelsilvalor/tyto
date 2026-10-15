@@ -4,6 +4,7 @@ import { z } from 'zod';
 
 import { layoutSchema } from './layout.js';
 import type { SessionGroupNode } from './session-groups.js';
+import { STATUS_BAR_COLOUR_KEYS, statusBarColour } from './status-bar-colors.js';
 import { STATUS_BAR_ITEM_IDS, type StatusBarItemId } from './status-bar-items.js';
 import { THEME_MODES } from './theme-setting.js';
 
@@ -274,6 +275,15 @@ const appliedThemesSchema = z.object({
   statusBarItems: z
     .array(z.enum(STATUS_BAR_ITEM_IDS as readonly [StatusBarItemId]))
     .max(STATUS_BAR_ITEM_IDS.length),
+  /**
+   * The `statusBarColors` setting in force (TYTO-301, ADR 0091): colours over the theme's for
+   * the bar, written into the window's sheet. Strict and hex-only, so a value can never close
+   * the declaration it lands in.
+   */
+  statusBarColors: z.partialRecord(
+    z.enum(STATUS_BAR_COLOUR_KEYS.map((entry) => entry.key) as [string, ...string[]]),
+    statusBarColour,
+  ),
   diagnostics: z.array(diagnostic.omit({ range: true })).max(200),
 });
 

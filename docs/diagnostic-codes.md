@@ -101,6 +101,7 @@ non-zero.
 | `W_SETTING_UNPREFIXED` | warning | no | The settings file names a plugin's setting without the plugin id in front of it. |
 | `W_SETTING_INVALID` | warning | no | A setting's value is not one its plugin accepts, so its default applies instead. |
 | `W_SETTING_ENTRY_INVALID` | warning | no | An entry of a list setting is not one its plugin accepts, so it is left out. |
+| `W_SETTING_LOW_CONTRAST` | warning | no | A colour setting applies, but the text it leaves reads under 4.5:1. |
 | `E_KEYBINDINGS_SYNTAX` | error | no | The keybindings file is not valid JSON with comments. |
 | `W_KEYBINDING_UNKNOWN_COMMAND` | warning | no | A keybinding names a command nothing registers. |
 | `W_KEYBINDING_INVALID_KEY` | warning | no | A keybinding is written with a key Tyto cannot bind. |
@@ -1427,6 +1428,20 @@ Entry {position} of setting '{key}' {problem}; it is left out and the rest apply
 ```
 
 Parameters: `position`, `key`, `problem`
+
+### `W_SETTING_LOW_CONTRAST`
+
+**Severity:** warning · **Fatal:** no · **Spec:** `docs/adr/0091-the-status-bars-content-is-a-setting.md`
+
+A colour setting applies, but the text it leaves reads under 4.5:1.
+
+A warning never replaces a value (ADR 0013).
+
+```
+Setting '{key}' applies, but {what} reads {ratio}:1 in theme '{theme}', under 4.5:1.
+```
+
+Parameters: `key`, `what`, `ratio`, `theme`
 
 ### `W_KEYBINDING_UNKNOWN_COMMAND`
 
