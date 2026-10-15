@@ -56,7 +56,7 @@ import {
   BASE_COLORS,
   BUILT_IN_THEMES,
   type ThemeSource,
-  builtInThemeReader,
+  builtInThemeSource,
   createThemeService,
   folderThemeReader,
 } from './themes.js';
@@ -425,12 +425,7 @@ async function start(): Promise<void> {
   let themeSetting: ThemeSetting = DEFAULT_THEME_SETTING;
   const themes = createThemeService({
     sources: () => [
-      ...(themeSources.builtIn?.() ??
-        Object.values(BUILT_IN_THEMES).map((theme) => ({
-          plugin: 'desktop',
-          theme,
-          read: builtInThemeReader,
-        }))),
+      ...(themeSources.builtIn?.() ?? Object.values(BUILT_IN_THEMES).map(builtInThemeSource)),
       ...(themeSources.installed?.() ?? []),
     ],
     ready: new Promise<void>((resolve) => {
@@ -477,8 +472,7 @@ async function start(): Promise<void> {
   };
   nativeTheme.on('updated', paintTitleBar);
   const host = await activateBuiltIns({ fileSystem, log, themes: themes.lookup });
-  themeSources.builtIn = () =>
-    host.registry.themes().map((theme) => ({ plugin: 'desktop', theme, read: builtInThemeReader }));
+  themeSources.builtIn = () => host.registry.themes().map(builtInThemeSource);
   // Composed here and nowhere else (ADR 0010): the store is `@tyto/io`'s adapter and the
   // renderer reaches it only through `plugins:list`.
   const pluginsHome = tytoHome();

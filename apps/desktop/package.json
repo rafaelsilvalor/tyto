@@ -28,6 +28,7 @@
     "@tyto/plugin-api": "workspace:*",
     "@tyto/template-lang": "workspace:*",
     "@tyto/templates": "workspace:*",
+    "@tyto/theme-pack": "workspace:*",
     "electron-updater": "^6.8.9",
     "jsonc-parser": "^3.3.1",
     "lit": "^3.3.3",

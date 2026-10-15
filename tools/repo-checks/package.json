@@ -24,6 +24,7 @@
     "@tyto/template-kit": "workspace:*",
     "@tyto/template-lang": "workspace:*",
     "@tyto/templates": "workspace:*",
+    "@tyto/theme-pack": "workspace:*",
     "eslint": "^10.11.0",
     "semver": "^7.8.5",
     "typescript": "^5.9.3",

@@ -85,6 +85,21 @@ describe('activateBuiltIns', () => {
       'built-in-templates',
       'chromium',
       'desktop',
+      'theme-pack',
+    ]);
+  });
+
+  it('registers the theme pack after the app’s own two themes (TYTO-300)', async () => {
+    const host = await activateBuiltIns({
+      fileSystem: fakeFileSystem(['promo-curso']),
+      directory: '/packs/built-in',
+    });
+
+    expect(host.registry.themes().map((theme) => theme.id)).toEqual([
+      'tyto-light',
+      'tyto-dark',
+      'dracula',
+      'catppuccin-latte',
     ]);
   });
 

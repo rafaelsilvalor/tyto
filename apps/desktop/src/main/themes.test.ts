@@ -10,6 +10,7 @@ import {
   BASE_COLORS,
   BUILT_IN_THEMES,
   builtInThemeReader,
+  builtInThemeSource,
   createThemeService,
   folderThemeReader,
   loadTheme,
@@ -46,7 +47,7 @@ afterAll(() => {
 
 describe('the built-in themes', () => {
   it.each(['light', 'dark'] as const)('load the %s file with nothing to say', async (kind) => {
-    const loaded = await loadTheme(BUILT_IN_THEMES[kind], builtInThemeReader);
+    const loaded = await loadTheme(BUILT_IN_THEMES[kind], builtInThemeReader('desktop'));
     expect(loaded.diagnostics).toEqual([]);
     expect(loaded.colors).toEqual(BASE_COLORS[kind]);
     expect(Object.keys(loaded.colors)).toHaveLength(30);
@@ -84,11 +85,7 @@ function serviceWith(options: {
   const setting: ThemeSetting = options.setting ?? DEFAULT_THEME_SETTING;
   const service = createThemeService({
     sources: () => [
-      ...Object.values(BUILT_IN_THEMES).map((theme) => ({
-        plugin: 'desktop',
-        theme,
-        read: builtInThemeReader,
-      })),
+      ...Object.values(BUILT_IN_THEMES).map(builtInThemeSource),
       { plugin: 'sepia', theme: SEPIA, read: fromText(options.sepia ?? SEPIA_TEXT) },
     ],
     ready: options.ready ?? Promise.resolve(),

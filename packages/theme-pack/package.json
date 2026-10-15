@@ -1,0 +1,29 @@
+{
+  "name": "@tyto/theme-pack",
+  "version": "0.0.0",
+  "type": "module",
+  "description": "Well-known colour themes for the window, shipped as a theme plugin.",
+  "license": "UNLICENSED",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
+  },
+  "files": [
+    "dist",
+    "LICENSES"
+  ],
+  "sideEffects": false,
+  "scripts": {
+    "build": "tsup",
+    "typecheck": "tsc --noEmit",
+    "lint": "eslint . --max-warnings 0",
+    "test": "vitest run --passWithNoTests"
+  },
+  "dependencies": {
+    "@tyto/plugin-api": "workspace:*"
+  }
+}
