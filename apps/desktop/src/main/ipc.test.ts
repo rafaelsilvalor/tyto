@@ -478,6 +478,7 @@ const windowThemes = (): WindowThemes => {
     preview: (id) => service.preview(id),
     choose: async () => ({ applied: await service.current(), saved: true }),
     iconStrokeWidth: () => 1,
+    statusBarItems: () => ['settings', 'problems'],
   };
 };
 
@@ -1265,6 +1266,8 @@ describe('the theme channels (TYTO-208)', () => {
     expect(answer.diagnostics).toEqual([]);
     // The icons' stroke rides on the same answer (TYTO-288), so a save moves it with the colours.
     expect(answer.iconStrokeWidth).toBe(1);
+    // And so do the status bar's items (TYTO-301), for the same reason.
+    expect(answer.statusBarItems).toEqual(['settings', 'problems']);
   });
 
   it('lists every theme with its label and kind, and nothing else', async () => {

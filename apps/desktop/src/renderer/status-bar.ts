@@ -7,6 +7,11 @@ import {
   translate,
 } from '../../shared/i18n/index.js';
 import { type HideableDock } from '../../shared/layout.js';
+import {
+  type StatusBarItemId,
+  STATUS_BAR_ITEM_IDS,
+  itemsOnSide,
+} from '../../shared/status-bar-items.js';
 import { toggleDockCommandId } from './commands.js';
 import { type IconName, icon } from './icons.js';
 
@@ -19,6 +24,10 @@ import { type IconName, icon } from './icons.js';
  *
  * It holds no state. `main.ts` builds a {@link StatusBarState} from the workspace, the layout
  * and the editor and hands it down; a click reports the command id back.
+ *
+ * **Which items show is a setting** (TYTO-301, ADR 0091): `items` is `statusBarItems` as main
+ * answered it, and each side draws the ids that live on it in that list's order. An item the
+ * list leaves out is not drawn at all; one it names is drawn when it has something to show.
  */
 
 export const STATUS_BAR_TAG = 'tyto-status-bar';
@@ -119,6 +128,7 @@ export class StatusBar extends LitElement {
     commands: { attribute: false },
     run: { attribute: false },
     offered: { attribute: false },
+    items: { attribute: false },
   };
 
   declare state: StatusBarState;
@@ -129,6 +139,8 @@ export class StatusBar extends LitElement {
    * with `settings.json` in front, as the File menu's item is. The window's predicate, handed in.
    */
   declare offered: (id: string) => boolean;
+  /** The `statusBarItems` setting: which items show, in order inside their side. */
+  declare items: readonly StatusBarItemId[];
 
   constructor() {
     super();
@@ -153,6 +165,7 @@ export class StatusBar extends LitElement {
     };
     this.run = () => undefined;
     this.offered = () => true;
+    this.items = STATUS_BAR_ITEM_IDS;
   }
 
   /** Light DOM, so `shell.css` reaches inside — the reasoning is in ADR 0024. */
@@ -161,6 +174,7 @@ export class StatusBar extends LitElement {
   }
 
   private button(
+    item: StatusBarItemId,
     name: IconName,
     command: string,
     label: string,
@@ -171,6 +185,7 @@ export class StatusBar extends LitElement {
     return html`<button
       type="button"
       class="status-bar__button ${on === true ? 'status-bar__button--on' : ''}"
+      data-item=${item}
       data-command=${command}
       title=${label}
       aria-label=${label}
@@ -185,6 +200,15 @@ export class StatusBar extends LitElement {
   }
 
   protected override render(): unknown {
+    const draw = (id: StatusBarItemId): unknown => this.item(id);
+    return html`<div class="status-bar__side">${itemsOnSide(this.items, 'start').map(draw)}</div>
+      <div class="status-bar__side status-bar__side--end">
+        ${itemsOnSide(this.items, 'end').map(draw)}
+      </div>`;
+  }
+
+  /** One item by its id, or nothing when it has nothing to show right now. */
+  private item(id: StatusBarItemId): unknown {
     const state = this.state;
     const say = (key: CatalogueKey): string => translate(state.locale, key);
     const toggle = (panel: CatalogueKey): string =>
@@ -192,41 +216,55 @@ export class StatusBar extends LitElement {
     const dock = (area: HideableDock, name: IconName, key: CatalogueKey): unknown =>
       state.areas?.[area] === false
         ? nothing
-        : this.button(name, toggleDockCommandId(area), say(key), state.shown[area]);
+        : this.button(id, name, toggleDockCommandId(area), say(key), state.shown[area]);
 
-    return html`<div class="status-bar__side">
-        ${dock('left', 'left', 'command.layout.toggleDock.left')}
-        ${this.button('commandBar', this.commands.commandBar, say('status.commandBar'), undefined)}
-        ${
-          state.vim === null
-            ? nothing
-            : html`<span class="status-bar__vim" data-mode=${vimBadgeMode(state.vim.mode)}
-                  >${vimModeText(state.vim.mode)}</span
-                >
-                <span class="status-bar__text status-bar__pending">${state.vim.pending}</span>`
-        }
-      </div>
-      <div class="status-bar__side status-bar__side--end">
-        <!-- A preview has no caret, so no line and column (TYTO-287). -->
-        ${
-          state.kind === 'preview'
-            ? nothing
-            : html`<span class="status-bar__text status-bar__position"
-                >${positionText(state)}</span
-              >`
-        }
-        <span class="status-bar__text status-bar__kind">${say(KIND_LABELS[state.kind])}</span>
-        ${
-          state.template === undefined
-            ? nothing
-            : html`<span
-                class="status-bar__text status-bar__template"
-                title=${say('template.label')}
-                >${state.template}</span
-              >`
-        }
-        <!-- The problems button holds its count and, beside it, TYTO-143's "new" dot. -->
-        ${this.button(
+    switch (id) {
+      case 'leftArea':
+        return dock('left', 'left', 'command.layout.toggleDock.left');
+      case 'commandBar':
+        return this.button(
+          id,
+          'commandBar',
+          this.commands.commandBar,
+          say('status.commandBar'),
+          undefined,
+        );
+      case 'vimMode':
+        return state.vim === null
+          ? nothing
+          : html`<span
+                class="status-bar__vim"
+                data-item=${id}
+                data-mode=${vimBadgeMode(state.vim.mode)}
+                >${vimModeText(state.vim.mode)}</span
+              >
+              <span class="status-bar__text status-bar__pending" data-item=${id}
+                >${state.vim.pending}</span
+              >`;
+      case 'cursorPosition':
+        // A preview has no caret, so no line and column (TYTO-287).
+        return state.kind === 'preview'
+          ? nothing
+          : html`<span class="status-bar__text status-bar__position" data-item=${id}
+              >${positionText(state)}</span
+            >`;
+      case 'tabKind':
+        return html`<span class="status-bar__text status-bar__kind" data-item=${id}
+          >${say(KIND_LABELS[state.kind])}</span
+        >`;
+      case 'template':
+        return state.template === undefined
+          ? nothing
+          : html`<span
+              class="status-bar__text status-bar__template"
+              data-item=${id}
+              title=${say('template.label')}
+              >${state.template}</span
+            >`;
+      case 'problems':
+        // The problems button holds its count and, beside it, TYTO-143's "new" dot.
+        return this.button(
+          id,
           'problems',
           this.commands.problems,
           problemsLabel(state, toggle('panel.problems')),
@@ -238,14 +276,44 @@ export class StatusBar extends LitElement {
                 ? html`<span class="status-bar__new" aria-hidden="true"></span>`
                 : nothing
             }`,
-        )}
-        ${this.button('queue', this.commands.queue, toggle('panel.queue'), state.shown.queue)}
-        ${this.button('plugins', this.commands.plugins, say('command.plugins.show'), undefined)}
-        ${this.button('export', this.commands.export, say('command.file.export'), undefined)}
-        ${this.button('settings', this.commands.settings, say('command.settings.open'), undefined)}
-        ${dock('bottom', 'bottom', 'command.layout.toggleDock.bottom')}
-        ${dock('right', 'right', 'command.layout.toggleDock.right')}
-      </div>`;
+        );
+      case 'queue':
+        return this.button(
+          id,
+          'queue',
+          this.commands.queue,
+          toggle('panel.queue'),
+          state.shown.queue,
+        );
+      case 'plugins':
+        return this.button(
+          id,
+          'plugins',
+          this.commands.plugins,
+          say('command.plugins.show'),
+          undefined,
+        );
+      case 'export':
+        return this.button(
+          id,
+          'export',
+          this.commands.export,
+          say('command.file.export'),
+          undefined,
+        );
+      case 'settings':
+        return this.button(
+          id,
+          'settings',
+          this.commands.settings,
+          say('command.settings.open'),
+          undefined,
+        );
+      case 'bottomArea':
+        return dock('bottom', 'bottom', 'command.layout.toggleDock.bottom');
+      case 'rightArea':
+        return dock('right', 'right', 'command.layout.toggleDock.right');
+    }
   }
 }
 

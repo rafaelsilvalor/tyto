@@ -2,7 +2,7 @@ import { isErr } from '@tyto/core';
 import { describe, expect, it } from 'vitest';
 import { z } from 'zod';
 
-import { type SettingEntry, resolveSettings } from './configuration.js';
+import { type SettingEntry, declaredSetting, resolveSettings } from './configuration.js';
 import { type Plugin, createPluginHost } from './host.js';
 
 /**
@@ -195,5 +195,80 @@ describe('resolving a file, one key at a time', () => {
       },
       diagnostics: [],
     });
+  });
+});
+
+describe('a list setting checked one entry at a time (TYTO-301, ADR 0091)', () => {
+  const colour = z.enum(['red', 'green', 'blue']);
+  const listOf = (unique: boolean) =>
+    declaredSetting('desktop', false, {
+      id: 'colours',
+      schema: z.array(colour),
+      default: ['red', 'green', 'blue'],
+      description: 'Which colours show, in order.',
+      entries: { schema: colour, unique },
+    });
+
+  it('leaves out an entry it refuses, at that entry, and keeps the others in order', () => {
+    const resolved = resolveSettings(
+      [listOf(true)],
+      [
+        {
+          key: 'colours',
+          value: ['blue', 'purple', 'red', 7],
+          valueRange: at(12, 40),
+          entryRanges: [at(13, 19), at(21, 29), at(31, 36), at(38, 39)],
+        },
+      ],
+    );
+
+    expect(resolved.values['colours']).toEqual(['blue', 'red']);
+    expect(resolved.diagnostics.map((item) => [item.code, item.range])).toEqual([
+      ['W_SETTING_ENTRY_INVALID', at(21, 29)],
+      ['W_SETTING_ENTRY_INVALID', at(38, 39)],
+    ]);
+    expect(resolved.diagnostics[0]?.message).toMatch(
+      /^Entry 2 of setting 'colours' is not accepted \(.+\); it is left out and the rest apply\.$/u,
+    );
+  });
+
+  it('leaves out a repeated entry when entries are unique, and keeps it when they are not', () => {
+    const written = { key: 'colours', value: ['red', 'red'], entryRanges: [at(1, 6), at(8, 13)] };
+
+    const unique = resolveSettings([listOf(true)], [written]);
+    expect(unique.values['colours']).toEqual(['red']);
+    expect(unique.diagnostics.map((item) => [item.code, item.range, item.message])).toEqual([
+      [
+        'W_SETTING_ENTRY_INVALID',
+        at(8, 13),
+        "Entry 2 of setting 'colours' repeats an earlier entry; it is left out and the rest apply.",
+      ],
+    ]);
+
+    const repeated = resolveSettings([listOf(false)], [written]);
+    expect(repeated.values['colours']).toEqual(['red', 'red']);
+    expect(repeated.diagnostics).toEqual([]);
+  });
+
+  it('refuses a value that is not a list as a whole, and the default applies', () => {
+    const resolved = resolveSettings(
+      [listOf(true)],
+      [{ key: 'colours', value: 'red', valueRange: at(12, 17) }],
+    );
+
+    expect(resolved.values['colours']).toEqual(['red', 'green', 'blue']);
+    expect(resolved.diagnostics.map((item) => [item.code, item.range])).toEqual([
+      ['W_SETTING_INVALID', at(12, 17)],
+    ]);
+  });
+
+  it('points at the value when the reader gave no entry ranges', () => {
+    const resolved = resolveSettings(
+      [listOf(true)],
+      [{ key: 'colours', value: ['pink'], valueRange: at(12, 20) }],
+    );
+
+    expect(resolved.values['colours']).toEqual([]);
+    expect(resolved.diagnostics.map((item) => item.range)).toEqual([at(12, 20)]);
   });
 });

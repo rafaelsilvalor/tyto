@@ -100,6 +100,7 @@ non-zero.
 | `W_SETTING_UNKNOWN` | warning | no | The settings file names a key no plugin declares. |
 | `W_SETTING_UNPREFIXED` | warning | no | The settings file names a plugin's setting without the plugin id in front of it. |
 | `W_SETTING_INVALID` | warning | no | A setting's value is not one its plugin accepts, so its default applies instead. |
+| `W_SETTING_ENTRY_INVALID` | warning | no | An entry of a list setting is not one its plugin accepts, so it is left out. |
 | `E_KEYBINDINGS_SYNTAX` | error | no | The keybindings file is not valid JSON with comments. |
 | `W_KEYBINDING_UNKNOWN_COMMAND` | warning | no | A keybinding names a command nothing registers. |
 | `W_KEYBINDING_INVALID_KEY` | warning | no | A keybinding is written with a key Tyto cannot bind. |
@@ -1412,6 +1413,20 @@ Setting '{key}' {problem}; its default applies.
 ```
 
 Parameters: `key`, `problem`
+
+### `W_SETTING_ENTRY_INVALID`
+
+**Severity:** warning · **Fatal:** no · **Spec:** `docs/adr/0091-the-status-bars-content-is-a-setting.md`
+
+An entry of a list setting is not one its plugin accepts, so it is left out.
+
+A warning never replaces a value (ADR 0013).
+
+```
+Entry {position} of setting '{key}' {problem}; it is left out and the rest apply.
+```
+
+Parameters: `position`, `key`, `problem`
 
 ### `W_KEYBINDING_UNKNOWN_COMMAND`
 
