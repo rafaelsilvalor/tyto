@@ -1,4 +1,4 @@
-import { existsSync, mkdtempSync, rmSync } from 'node:fs';
+import { existsSync, mkdtempSync, readFileSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -141,9 +141,9 @@ describe('the statusBarItems setting', () => {
 
   it('carries the key commented out, with every id, in a new settings.json', async () => {
     await openSettings();
-    const text = await page.evaluate(
-      () => document.querySelector('#editor .cm-content')?.textContent ?? '',
-    );
+    // From the disk, not from `.cm-content`, which holds only the lines in the viewport: on
+    // CI's smaller window the last ids are not rendered.
+    const text = readFileSync(join(scratch, 'user-data', 'settings.json'), 'utf8');
 
     expect(text).toContain('// "statusBarItems": [');
     for (const id of DEFAULT_ORDER) expect(text).toContain(`"${id}"`);
