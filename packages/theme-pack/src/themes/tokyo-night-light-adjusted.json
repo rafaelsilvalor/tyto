@@ -1,0 +1,51 @@
+{
+  "name": "Tokyo Night Light (adjusted)",
+  "kind": "light",
+  "variant": "adjusted",
+  "colors": {
+    "surface": "#e6e7ed",
+    "surface-raised": "#d6d8df",
+    "surface-sunken": "#e6e7ed",
+    "border": "#c1c2c7",
+    "hairline": "#c1c2c7",
+    "text": "#343b59",
+    "text-muted": "#363c4d",
+    "text-disabled": "#707280",
+    "accent": "#2959aa",
+    "accent-text": "#ffffff",
+    "focus-ring": "rgb(112 114 128 / 20%)",
+    "selection": "#d7d9e1",
+    "hover": "#e1e2e8",
+    "error": "#b73e3e",
+    "warning": "#8f5e15",
+    "info": "#0da0ba",
+    "success": "#33635c",
+    "scrim": "rgb(0 0 0 / 12%)",
+    "shadow-overlay-tint": "rgb(0 0 0 / 18%)",
+    "shadow-paper-tint": "rgb(0 0 0 / 18%)",
+    "active-line": "rgb(220 222 227 / 50%)",
+    "active-line-gutter": "#e1e2e8",
+    "syntax-keyword": "#65359d",
+    "syntax-function": "#2959aa",
+    "syntax-constant": "#965027",
+    "syntax-attribute": "#65359d",
+    "syntax-string": "#385f0d",
+    "syntax-tag": "#8c4351",
+    "syntax-punctuation": "#006c86",
+    "syntax-comment": "#81848e"
+  },
+  "adjusted": [
+    {
+      "token": "error",
+      "upstream": "#bd4040",
+      "value": "#b73e3e",
+      "reason": "#bd4040 reads 4.29:1 on surface; HSL lightness lowered from 49.6% to 48.1%, hue and saturation kept, to the first value reading 4.5:1 on surface (4.51)"
+    },
+    {
+      "token": "syntax-comment",
+      "upstream": "#888b94",
+      "value": "#81848e",
+      "reason": "#888b94 reads 2.76:1 on surface; HSL lightness lowered from 55.7% to 53.2%, hue and saturation kept, to the first value reading 3:1 on surface (3.03)"
+    }
+  ]
+}

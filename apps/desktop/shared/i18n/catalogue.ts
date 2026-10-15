@@ -466,6 +466,8 @@ export interface Catalogue {
   readonly 'theme.pick.placeholder': string;
   readonly 'theme.kind.light': string;
   readonly 'theme.kind.dark': string;
+  readonly 'theme.variant.original': string;
+  readonly 'theme.variant.adjusted': string;
   readonly 'command.document.newFromTemplate': string;
   readonly 'template.pick.placeholder': string;
   readonly 'template.root.builtIn': string;
@@ -726,6 +728,8 @@ export const CATALOGUE_KEYS = [
   'theme.pick.placeholder',
   'theme.kind.light',
   'theme.kind.dark',
+  'theme.variant.original',
+  'theme.variant.adjusted',
   'command.document.newFromTemplate',
   'template.pick.placeholder',
   'template.root.builtIn',

@@ -10,7 +10,13 @@ import {
   isThemePath,
   resolveThemeColors,
 } from '@tyto/plugin-api';
-import { THEME_PACK_FILES, THEME_PACK_ID, THEME_PACK_THEMES } from '@tyto/theme-pack';
+import {
+  THEME_PACK_FILES,
+  THEME_PACK_ID,
+  THEME_PACK_THEMES,
+  THEME_PACK_VARIANTS,
+  type ThemeVariant,
+} from '@tyto/theme-pack';
 import { type Node, type ParseError, parseTree, printParseErrorCode } from 'jsonc-parser';
 
 import {
@@ -89,6 +95,14 @@ export function builtInThemeSource(theme: ThemeContribution): ThemeSource {
   const plugin = BUILT_IN_THEME_PLUGIN.get(theme.id) ?? DESKTOP_PLUGIN;
   return { plugin, theme, read: builtInThemeReader(plugin) };
 }
+
+/**
+ * Which of the pack's original-and-adjusted pairs a theme is (ADR 0089), for the picker to say
+ * beside its name. Undefined for a theme that ships once and for every installed theme: an id is
+ * unique across the registry and the pack registers first, so an id the pack lists is the pack's.
+ */
+export const themeVariant = (theme: ThemeContribution): ThemeVariant | undefined =>
+  Object.hasOwn(THEME_PACK_VARIANTS, theme.id) ? THEME_PACK_VARIANTS[theme.id] : undefined;
 
 /**
  * An installed plugin's reader: a file inside `directory`, judged by name and then by where it

@@ -2020,6 +2020,10 @@ function showTheme(bridge: TytoBridge, ask: () => Promise<IpcResponse<'theme:cur
 }
 
 const THEME_KIND_LABEL = { light: 'theme.kind.light', dark: 'theme.kind.dark' } as const;
+const THEME_VARIANT_LABEL = {
+  original: 'theme.variant.original',
+  adjusted: 'theme.variant.adjusted',
+} as const;
 
 /**
  * "Preferences: Color Theme" (TYTO-208): every theme in the bar, the one on show highlighted.
@@ -2038,7 +2042,14 @@ async function pickTheme(): Promise<void> {
       entries: themes.map((theme) => ({
         id: theme.id,
         label: theme.label,
-        detail: translate(state.locale, THEME_KIND_LABEL[theme.kind]),
+        // ADR 0089: the pack's original and adjusted twins share a name but for the suffix,
+        // so the detail line says which colours each one is, beside its kind.
+        detail: [
+          translate(state.locale, THEME_KIND_LABEL[theme.kind]),
+          ...(theme.variant === undefined
+            ? []
+            : [translate(state.locale, THEME_VARIANT_LABEL[theme.variant])]),
+        ].join(' · '),
       })),
       placeholder: translate(state.locale, 'theme.pick.placeholder'),
       ...(selected === undefined ? {} : { selected }),

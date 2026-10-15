@@ -1,0 +1,63 @@
+{
+  "name": "Solarized Light (adjusted)",
+  "kind": "light",
+  "variant": "adjusted",
+  "colors": {
+    "surface": "#fdf6e3",
+    "surface-raised": "#eee8d5",
+    "surface-sunken": "#fdf6e3",
+    "border": "#93a1a1",
+    "hairline": "#93a1a1",
+    "text": "#586c73",
+    "text-muted": "#535f5f",
+    "text-disabled": "#93a1a1",
+    "accent": "#268bd2",
+    "accent-text": "#fdf6e3",
+    "focus-ring": "#268bd2",
+    "selection": "#eee8d5",
+    "hover": "#d7d6c8",
+    "error": "#da2925",
+    "warning": "#b58900",
+    "info": "#2aa198",
+    "success": "#859900",
+    "scrim": "rgb(0 0 0 / 12%)",
+    "shadow-overlay-tint": "rgb(0 0 0 / 18%)",
+    "shadow-paper-tint": "rgb(0 0 0 / 18%)",
+    "active-line": "rgb(238 232 213 / 50%)",
+    "active-line-gutter": "#f6efdc",
+    "syntax-keyword": "#859900",
+    "syntax-function": "#268bd2",
+    "syntax-constant": "#2aa198",
+    "syntax-attribute": "#839496",
+    "syntax-string": "#2aa198",
+    "syntax-tag": "#268bd2",
+    "syntax-punctuation": "#93a1a1",
+    "syntax-comment": "#829292"
+  },
+  "adjusted": [
+    {
+      "token": "text",
+      "upstream": "#657b83",
+      "value": "#586c73",
+      "reason": "#657b83 reads 3.64:1 on surface-raised; HSL lightness lowered from 45.5% to 39.8%, hue and saturation kept, to the first value reading 4.5:1 on surface, surface-raised and selection (4.50 on surface-raised, the lowest)"
+    },
+    {
+      "token": "text-muted",
+      "upstream": "#93a1a1",
+      "value": "#535f5f",
+      "reason": "#93a1a1 reads 1.83:1 on hover; HSL lightness lowered from 60.4% to 35.0%, hue and saturation kept, to the first value reading 4.5:1 on surface, surface-raised and hover (4.52 on hover, the lowest)"
+    },
+    {
+      "token": "error",
+      "upstream": "#dc322f",
+      "value": "#da2925",
+      "reason": "#dc322f reads 4.29:1 on surface; HSL lightness lowered from 52.4% to 50.2%, hue and saturation kept, to the first value reading 4.5:1 on surface (4.50)"
+    },
+    {
+      "token": "syntax-comment",
+      "upstream": "#93a1a1",
+      "value": "#829292",
+      "reason": "#93a1a1 reads 2.48:1 on surface; HSL lightness lowered from 60.4% to 54.2%, hue and saturation kept, to the first value reading 3:1 on surface (3.01)"
+    }
+  ]
+}

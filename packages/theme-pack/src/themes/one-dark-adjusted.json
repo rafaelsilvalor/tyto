@@ -1,0 +1,51 @@
+{
+  "name": "One Dark (adjusted)",
+  "kind": "dark",
+  "variant": "adjusted",
+  "colors": {
+    "surface": "#282c34",
+    "surface-raised": "#21252b",
+    "surface-sunken": "#1b1d23",
+    "border": "#181a1f",
+    "hairline": "#181a1f",
+    "text": "#abb2bf",
+    "text-muted": "#989ea9",
+    "text-disabled": "#5c6370",
+    "accent": "#528bff",
+    "accent-text": "#001133",
+    "focus-ring": "#528bff",
+    "selection": "#3e4451",
+    "hover": "#31363f",
+    "error": "#ff6347",
+    "warning": "#e2c08d",
+    "info": "#6494ed",
+    "success": "#73c990",
+    "scrim": "rgb(8 9 10 / 75%)",
+    "shadow-overlay-tint": "rgb(0 0 0 / 45%)",
+    "shadow-paper-tint": "rgb(0 0 0 / 50%)",
+    "active-line": "rgb(153 187 255 / 4%)",
+    "active-line-gutter": "#2d323c",
+    "syntax-keyword": "#c678dd",
+    "syntax-function": "#61afef",
+    "syntax-constant": "#d19a66",
+    "syntax-attribute": "#d19a66",
+    "syntax-string": "#98c379",
+    "syntax-tag": "#e06c75",
+    "syntax-punctuation": "#abb2bf",
+    "syntax-comment": "#6c7584"
+  },
+  "adjusted": [
+    {
+      "token": "text-muted",
+      "upstream": "#828997",
+      "value": "#989ea9",
+      "reason": "#828997 reads 3.45:1 on hover; HSL lightness raised from 55.1% to 63.0%, hue and saturation kept, to the first value reading 4.5:1 on surface, surface-raised and hover (4.51 on hover, the lowest)"
+    },
+    {
+      "token": "syntax-comment",
+      "upstream": "#5c6370",
+      "value": "#6c7584",
+      "reason": "#5c6370 reads 2.32:1 on surface; HSL lightness raised from 40.0% to 47.1%, hue and saturation kept, to the first value reading 3:1 on surface (3.01)"
+    }
+  ]
+}

@@ -1,13 +1,21 @@
 import { isThemeColor } from '@tyto/plugin-api';
-import { THEME_PACK_FILES, THEME_PACK_ID, THEME_PACK_THEMES } from '@tyto/theme-pack';
+import {
+  THEME_PACK_FILES,
+  THEME_PACK_ID,
+  THEME_PACK_THEMES,
+  THEME_PACK_VARIANTS,
+  type ThemePackFile,
+} from '@tyto/theme-pack';
 import { describe, expect, it } from 'vitest';
 
-import { BASE_COLORS, builtInThemeSource, loadTheme } from './themes.js';
+import { UPSTREAM_COLOURS } from './theme-pack-upstream.js';
+import { BASE_COLORS, builtInThemeSource, loadTheme, themeVariant } from './themes.js';
 
 /**
  * The themes Tyto distributes from `@tyto/theme-pack` (TYTO-300), held to ADR 0089: every one
- * sets all thirty tokens, every value is a colour, and every one meets AA on the pairs the
- * window draws text on.
+ * sets all thirty tokens and every value is a colour. A theme that ships once, and every
+ * adjusted twin, meets AA on the pairs the window draws text on; an original is exempt from the
+ * floors and is held instead to upstream's colours, recorded in `theme-pack-upstream.ts`.
  */
 
 interface Colour {
@@ -81,13 +89,45 @@ const themes = THEME_PACK_THEMES.map((theme) => {
   return { theme, file };
 });
 
+const ADJUSTED_SUFFIX = '-adjusted';
+
+const fileOf = (id: string): ThemePackFile | undefined =>
+  themes.find(({ theme }) => theme.id === id)?.file;
+
+const failedFloors = (file: ThemePackFile): readonly string[] =>
+  FLOORS.filter(
+    ([text, ground, floor]) => contrast(file.colors[text]!, file.colors[ground]!) < floor,
+  ).map(([text, ground]) => `${text} / ${ground}`);
+
 describe('the theme pack', () => {
-  it('ships a dark and a light theme', () => {
-    expect(themes.map(({ theme }) => theme.kind).sort()).toEqual(['dark', 'light']);
+  it('ships dark and light themes', () => {
+    expect(new Set(themes.map(({ theme }) => theme.kind))).toEqual(new Set(['dark', 'light']));
   });
 
   it('is read through its own plugin, not the desktop’s', () => {
     for (const { theme } of themes) expect(builtInThemeSource(theme).plugin).toBe(THEME_PACK_ID);
+  });
+
+  it('gives every theme an id of its own', () => {
+    const ids = themes.map(({ theme }) => theme.id);
+    expect(new Set(ids).size).toBe(ids.length);
+  });
+
+  it('records upstream’s colours for every original, and only for originals', () => {
+    const originals = themes.filter(({ file }) => file.variant === 'original');
+    expect(Object.keys(UPSTREAM_COLOURS).sort()).toEqual(
+      originals.map(({ theme }) => theme.id).sort(),
+    );
+  });
+
+  it('tells the picker which of a pair each theme is, and nothing for a theme that ships once', () => {
+    for (const { theme, file } of themes) {
+      expect(themeVariant(theme)).toBe(file.variant);
+      expect(THEME_PACK_VARIANTS[theme.id]).toBe(file.variant);
+    }
+    expect(themeVariant({ id: 'constructor', label: 'x', kind: 'dark', path: 'x.json' })).toBe(
+      undefined,
+    );
   });
 });
 
@@ -136,16 +176,69 @@ describe.each(themes.map(({ theme, file }) => [theme.label, theme, file] as cons
       expect(Math.max(...difference)).toBeLessThanOrEqual(1);
     });
 
-    it.each(FLOORS)('reads %s on %s at %s:1 or better (ADR 0089)', (text, ground, floor) => {
-      expect(contrast(colour(text), colour(ground))).toBeGreaterThanOrEqual(floor);
-    });
+    // An original is upstream's colours and exempt (ADR 0089, Rafael 2026-10-15); every other
+    // theme the pack ships is held to the floors.
+    if (file.variant !== 'original') {
+      it.each(FLOORS)('reads %s on %s at %s:1 or better (ADR 0089)', (text, ground, floor) => {
+        expect(contrast(colour(text), colour(ground))).toBeGreaterThanOrEqual(floor);
+      });
+    }
 
     it('names every colour it changed from upstream, with the value it replaced', () => {
       for (const change of file.adjusted) {
         expect(colour(change.token)).toBe(change.value);
         expect(change.upstream).not.toBe(change.value);
         expect(isThemeColor(change.upstream)).toBe(true);
+        expect(change.reason.length).toBeGreaterThan(0);
       }
     });
+
+    if (file.variant === undefined) {
+      // Rafael's rule: a theme that needs a change ships as a pair, so one that ships once is
+      // upstream's colours with nothing changed.
+      it('ships once because it changes nothing', () => {
+        expect(file.adjusted).toEqual([]);
+      });
+    }
+
+    if (file.variant === 'original') {
+      const twin = fileOf(`${theme.id}${ADJUSTED_SUFFIX}`);
+
+      it('is upstream’s colours exactly, as recorded from the source', () => {
+        const recorded = UPSTREAM_COLOURS[theme.id] ?? {};
+        expect(Object.keys(recorded).length).toBeGreaterThan(0);
+        for (const [token, value] of Object.entries(recorded)) {
+          expect({ token, value: colour(token) }).toEqual({ token, value });
+        }
+        expect(file.adjusted).toEqual([]);
+      });
+
+      it('fails a floor, which is why it ships beside an adjusted twin', () => {
+        expect(failedFloors(file)).not.toEqual([]);
+      });
+
+      it('has an adjusted twin of its kind, named for it', () => {
+        expect(twin?.variant).toBe('adjusted');
+        expect(twin?.kind).toBe(file.kind);
+        expect(twin?.name).toBe(`${file.name} (adjusted)`);
+      });
+
+      it('differs from its twin only in the colours the twin lists as adjusted', () => {
+        const reverted = { ...twin?.colors };
+        for (const change of twin?.adjusted ?? []) {
+          expect(change.upstream).toBe(colour(change.token));
+          reverted[change.token] = change.upstream;
+        }
+        expect(reverted).toEqual(file.colors);
+      });
+    }
+
+    if (file.variant === 'adjusted') {
+      it('has an original twin and says what it changed', () => {
+        expect(theme.id.endsWith(ADJUSTED_SUFFIX)).toBe(true);
+        expect(fileOf(theme.id.slice(0, -ADJUSTED_SUFFIX.length))?.variant).toBe('original');
+        expect(file.adjusted).not.toEqual([]);
+      });
+    }
   },
 );

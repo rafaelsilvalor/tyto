@@ -1,5 +1,6 @@
 import { type DirectoryEntry, type FileSystem } from '@tyto/core';
 import type { Rasterizer } from '@tyto/raster';
+import { THEME_PACK_THEMES } from '@tyto/theme-pack';
 import { describe, expect, it } from 'vitest';
 
 import { activateBuiltIns, builtInTemplatesDirectory } from './plugins.js';
@@ -98,8 +99,11 @@ describe('activateBuiltIns', () => {
     expect(host.registry.themes().map((theme) => theme.id)).toEqual([
       'tyto-light',
       'tyto-dark',
+      ...THEME_PACK_THEMES.map((theme) => theme.id),
+    ]);
+    expect(THEME_PACK_THEMES.map((theme) => theme.id).slice(0, 2)).toEqual([
       'dracula',
-      'catppuccin-latte',
+      'dracula-adjusted',
     ]);
   });
 

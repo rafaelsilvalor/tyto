@@ -236,6 +236,8 @@ export const ptBR: Catalogue = {
   'theme.pick.placeholder': 'Escolha um tema de cores',
   'theme.kind.light': 'claro',
   'theme.kind.dark': 'escuro',
+  'theme.variant.original': 'cores originais',
+  'theme.variant.adjusted': 'ajustado para contraste',
   'command.document.newFromTemplate': 'Novo brief a partir de template…',
   'template.pick.placeholder': 'Escolha um template',
   'template.root.builtIn': 'embutido',

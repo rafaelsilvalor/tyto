@@ -2,7 +2,25 @@ import type { Plugin, ThemeContribution } from '@tyto/plugin-api';
 
 import manifest from '../tyto-plugin.json';
 import catppuccinLatte from './themes/catppuccin-latte.json';
+import catppuccinMocha from './themes/catppuccin-mocha.json';
+import draculaAdjusted from './themes/dracula-adjusted.json';
 import dracula from './themes/dracula.json';
+import gruvboxDarkAdjusted from './themes/gruvbox-dark-adjusted.json';
+import gruvboxDark from './themes/gruvbox-dark.json';
+import gruvboxLightAdjusted from './themes/gruvbox-light-adjusted.json';
+import gruvboxLight from './themes/gruvbox-light.json';
+import nordAdjusted from './themes/nord-adjusted.json';
+import nord from './themes/nord.json';
+import oneDarkAdjusted from './themes/one-dark-adjusted.json';
+import oneDark from './themes/one-dark.json';
+import solarizedDarkAdjusted from './themes/solarized-dark-adjusted.json';
+import solarizedDark from './themes/solarized-dark.json';
+import solarizedLightAdjusted from './themes/solarized-light-adjusted.json';
+import solarizedLight from './themes/solarized-light.json';
+import tokyoNightAdjusted from './themes/tokyo-night-adjusted.json';
+import tokyoNightLightAdjusted from './themes/tokyo-night-light-adjusted.json';
+import tokyoNightLight from './themes/tokyo-night-light.json';
+import tokyoNight from './themes/tokyo-night.json';
 
 /**
  * Well-known colour themes, ported to Tyto's tokens and shipped as a plugin through the
@@ -14,9 +32,11 @@ import dracula from './themes/dracula.json';
  * the theme files travel as data in the bundle and the host's reader answers from
  * `THEME_PACK_FILES`, by the path each contribution names.
  *
- * Every theme here sets all thirty tokens rather than leaning on the base theme's fallback,
- * and is held to the contrast floors of ADR 0089. Where an upstream colour fails a floor the
- * file carries an `adjusted` entry naming the colour it replaced.
+ * Every theme here sets all thirty tokens rather than leaning on the base theme's fallback.
+ * A theme whose upstream colours meet the contrast floors of ADR 0089 ships once. One that
+ * does not ships twice, side by side in the picker: the original, upstream's colours exactly
+ * and exempt from the floors, and `<Name> (adjusted)`, which meets them and names each colour
+ * it changed in `adjusted` (Rafael, 2026-10-15).
  */
 
 /** The plugin's id, which is its manifest's name. */
@@ -26,10 +46,18 @@ export const THEME_PACK_ID = manifest.name;
 export interface ThemePackFile {
   readonly name: string;
   readonly kind: 'light' | 'dark';
+  /**
+   * Which of a pair this file is; absent for a theme that ships once. Its id is the twin's
+   * plus `-adjusted`, so a saved `theme` setting keeps meaning the same colours.
+   */
+  readonly variant?: ThemeVariant;
   readonly colors: Readonly<Record<string, string>>;
   /** Each colour changed from upstream to meet a floor, with the value it replaced. */
   readonly adjusted: readonly ThemeAdjustment[];
 }
+
+/** `original`: upstream's colours, exempt from the floors. `adjusted`: changed to meet them. */
+export type ThemeVariant = 'original' | 'adjusted';
 
 export interface ThemeAdjustment {
   readonly token: string;
@@ -46,9 +74,28 @@ const theme = (id: string, file: ThemePackFile): ThemeContribution & { file: The
   file,
 });
 
+// Each original right above its adjusted twin, so the two read as a pair in the picker.
 const THEMES = [
   theme('dracula', dracula as ThemePackFile),
+  theme('dracula-adjusted', draculaAdjusted as ThemePackFile),
   theme('catppuccin-latte', catppuccinLatte as ThemePackFile),
+  theme('catppuccin-mocha', catppuccinMocha as ThemePackFile),
+  theme('one-dark', oneDark as ThemePackFile),
+  theme('one-dark-adjusted', oneDarkAdjusted as ThemePackFile),
+  theme('nord', nord as ThemePackFile),
+  theme('nord-adjusted', nordAdjusted as ThemePackFile),
+  theme('solarized-dark', solarizedDark as ThemePackFile),
+  theme('solarized-dark-adjusted', solarizedDarkAdjusted as ThemePackFile),
+  theme('solarized-light', solarizedLight as ThemePackFile),
+  theme('solarized-light-adjusted', solarizedLightAdjusted as ThemePackFile),
+  theme('gruvbox-dark', gruvboxDark as ThemePackFile),
+  theme('gruvbox-dark-adjusted', gruvboxDarkAdjusted as ThemePackFile),
+  theme('gruvbox-light', gruvboxLight as ThemePackFile),
+  theme('gruvbox-light-adjusted', gruvboxLightAdjusted as ThemePackFile),
+  theme('tokyo-night', tokyoNight as ThemePackFile),
+  theme('tokyo-night-adjusted', tokyoNightAdjusted as ThemePackFile),
+  theme('tokyo-night-light', tokyoNightLight as ThemePackFile),
+  theme('tokyo-night-light-adjusted', tokyoNightLightAdjusted as ThemePackFile),
 ];
 
 /** Every theme the pack registers, in the order the picker lists them. */
@@ -59,6 +106,14 @@ export const THEME_PACK_THEMES: readonly ThemeContribution[] = THEMES.map(
 /** Each theme's file, by the path its contribution names. */
 export const THEME_PACK_FILES: Readonly<Record<string, ThemePackFile>> = Object.fromEntries(
   THEMES.map(({ path, file }) => [path, file]),
+);
+
+/**
+ * Which of a pair each theme is, by id, for a picker that tells the two apart. A theme that
+ * ships once is not listed.
+ */
+export const THEME_PACK_VARIANTS: Readonly<Record<string, ThemeVariant>> = Object.fromEntries(
+  THEMES.flatMap(({ id, file }) => (file.variant === undefined ? [] : [[id, file.variant]])),
 );
 
 /** The plugin: it registers its themes and does nothing else. */
