@@ -2,6 +2,7 @@
 import { afterEach, describe, expect, it } from 'vitest';
 
 import { translate } from '../../shared/i18n/index.js';
+import { STATUS_BAR_ITEM_IDS } from '../../shared/status-bar-items.js';
 import { toggleDockCommandId } from './commands.js';
 import {
   type StatusBar,
@@ -210,5 +211,79 @@ describe('positionText', () => {
       'Ln 4, Col 17 (7 selected)',
     );
     expect(positionText({ ...base, locale: 'pt-BR' })).toBe('Lin 4, Col 17');
+  });
+});
+
+describe('the statusBarItems setting (TYTO-301, ADR 0091)', () => {
+  /** The ids drawn on each side, in order, once per item (vim's two spans are one item). */
+  const drawn = (bar: StatusBar): { start: string[]; end: string[] } => {
+    const side = (selector: string): string[] => [
+      ...new Set(
+        [...bar.querySelectorAll<HTMLElement>(`${selector} [data-item]`)].map(
+          (element) => element.dataset['item'] ?? '',
+        ),
+      ),
+    ];
+    return {
+      start: side('.status-bar__side:not(.status-bar__side--end)'),
+      end: side('.status-bar__side--end'),
+    };
+  };
+
+  it('draws today’s bar, every item in ADR 0076’s order, when the setting says nothing', async () => {
+    const { bar } = await mount({ ...base, vim: { mode: 'normal', pending: '' } });
+
+    expect(drawn(bar)).toEqual({
+      start: ['leftArea', 'commandBar', 'vimMode'],
+      end: [
+        'cursorPosition',
+        'tabKind',
+        'template',
+        'problems',
+        'queue',
+        'plugins',
+        'export',
+        'settings',
+        'bottomArea',
+        'rightArea',
+      ],
+    });
+  });
+
+  it('leaves out an item the list does not name', async () => {
+    const { bar } = await mount();
+    bar.items = STATUS_BAR_ITEM_IDS.filter((id) => id !== 'template' && id !== 'queue');
+    await bar.updateComplete;
+
+    expect(bar.querySelector('.status-bar__template')).toBeNull();
+    expect(drawn(bar).end).not.toContain('queue');
+    expect(drawn(bar).end).toContain('problems');
+  });
+
+  it('orders each side by the list, and never moves an item to the other side', async () => {
+    const { bar } = await mount();
+    bar.items = ['settings', 'commandBar', 'cursorPosition', 'leftArea', 'problems'];
+    await bar.updateComplete;
+
+    expect(drawn(bar)).toEqual({
+      start: ['commandBar', 'leftArea'],
+      end: ['settings', 'cursorPosition', 'problems'],
+    });
+  });
+
+  it('draws an empty bar for an empty list', async () => {
+    const { bar } = await mount();
+    bar.items = [];
+    await bar.updateComplete;
+
+    expect(drawn(bar)).toEqual({ start: [], end: [] });
+  });
+
+  it('still draws a named item only when it has something to show', async () => {
+    const { bar } = await mount({ ...base, template: undefined, vim: null });
+    bar.items = ['vimMode', 'template', 'export'];
+    await bar.updateComplete;
+
+    expect(drawn(bar)).toEqual({ start: [], end: ['export'] });
   });
 });

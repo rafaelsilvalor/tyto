@@ -29,6 +29,7 @@ import type { Rasterizer } from '@tyto/raster';
 
 import { type Locale, localeFor, translate } from '../../shared/i18n/index.js';
 import { type Settings } from '../../shared/settings.js';
+import { statusBarItemsExample } from '../../shared/status-bar-items.js';
 import { DEFAULT_THEME_SETTING, type ThemeSetting, modeOf } from '../../shared/theme-setting.js';
 import { fileCredentialStore } from './credential-store.js';
 import { createCredentials } from './credentials.js';
@@ -102,9 +103,14 @@ const devServerUrl = process.env['ELECTRON_RENDERER_URL'];
 /** How long a burst of watcher events on `settings.json` has to go quiet (TYTO-206). */
 const SETTINGS_SETTLE_MS = 100;
 
-/** `settings.json` as "Open Settings (JSON)" creates it when there is none (TYTO-206). */
+/**
+ * `settings.json` as "Open Settings (JSON)" creates it when there is none (TYTO-206). It
+ * carries `statusBarItems` commented out with every id (TYTO-301), so the bar's options are
+ * in the file the person is looking at.
+ */
 const NEW_SETTINGS_FILE =
-  '// Tyto settings: JSON with comments. Saving this file applies it, with no restart.\n{\n}\n';
+  '// Tyto settings: JSON with comments. Saving this file applies it, with no restart.\n{\n' +
+  `${statusBarItemsExample()}\n}\n`;
 
 /** `keybindings.json` as "Open Keyboard Shortcuts (JSON)" creates it (TYTO-207, ADR 0074). */
 const NEW_KEYBINDINGS_FILE =
@@ -509,6 +515,8 @@ async function start(): Promise<void> {
   nativeTheme.themeSource = modeOf(saved.theme, themes.lookup);
   // The icons' stroke (TYTO-288): read with the colours by the window, so it moves with them.
   let iconStrokeWidth = saved.iconStrokeWidth;
+  // The status bar's items (TYTO-301), on the same answer and for the same reason.
+  let statusBarItems = saved.statusBarItems;
   // A screen's change: `false` when it was refused because the file does not parse.
   const remember = (changes: Partial<Settings>): Promise<boolean> =>
     late.live === undefined ? Promise.resolve(false) : late.live.remember(changes);
@@ -731,6 +739,7 @@ async function start(): Promise<void> {
       }
       // The window asks `theme:current` on every change it hears, which carries the stroke.
       if (keys.includes('iconStrokeWidth')) iconStrokeWidth = next.iconStrokeWidth;
+      if (keys.includes('statusBarItems')) statusBarItems = next.statusBarItems;
     },
     configure: (config) => {
       host.configure(config);
@@ -1107,6 +1116,7 @@ async function start(): Promise<void> {
         return { applied: await applying(themes.current()), saved };
       },
       iconStrokeWidth: () => iconStrokeWidth,
+      statusBarItems: () => statusBarItems,
     },
     // After `ready`, as the panels are, so the window's first answer is the whole list.
     keymaps: async () => {

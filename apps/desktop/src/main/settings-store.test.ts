@@ -6,6 +6,11 @@ import { ok } from '@tyto/core';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
 import { DEFAULT_SETTINGS } from '../../shared/settings.js';
+import {
+  STATUS_BAR_ITEMS,
+  STATUS_BAR_ITEM_IDS,
+  statusBarItemsExample,
+} from '../../shared/status-bar-items.js';
 import { fileSettingsStore } from './settings-store.js';
 
 /**
@@ -94,6 +99,7 @@ describe('fileSettingsStore', () => {
       queueKinds: {},
       theme: DEFAULT_SETTINGS.theme,
       iconStrokeWidth: DEFAULT_SETTINGS.iconStrokeWidth,
+      statusBarItems: DEFAULT_SETTINGS.statusBarItems,
     });
   });
 
@@ -113,6 +119,7 @@ describe('fileSettingsStore', () => {
       queueKinds: {},
       theme: DEFAULT_SETTINGS.theme,
       iconStrokeWidth: DEFAULT_SETTINGS.iconStrokeWidth,
+      statusBarItems: DEFAULT_SETTINGS.statusBarItems,
     });
   });
 
@@ -132,6 +139,7 @@ describe('fileSettingsStore', () => {
       queueKinds: {},
       theme: DEFAULT_SETTINGS.theme,
       iconStrokeWidth: DEFAULT_SETTINGS.iconStrokeWidth,
+      statusBarItems: DEFAULT_SETTINGS.statusBarItems,
     });
   });
 
@@ -150,6 +158,7 @@ describe('fileSettingsStore', () => {
       queueKinds: {},
       theme: DEFAULT_SETTINGS.theme,
       iconStrokeWidth: DEFAULT_SETTINGS.iconStrokeWidth,
+      statusBarItems: DEFAULT_SETTINGS.statusBarItems,
     });
   });
 
@@ -257,5 +266,71 @@ describe('a settings file somebody edits by hand', () => {
 
     expect(reading.settings.templatesFolder).toBe('/t');
     expect(reading.diagnostics.some((item) => item.code === 'E_SETTINGS_SYNTAX')).toBe(true);
+  });
+});
+
+/** `statusBarItems` (TYTO-301, ADR 0091): a list whose entries are checked one at a time. */
+describe('the statusBarItems setting in the file', () => {
+  const rangeOf = (text: string, fragment: string) => {
+    const start = text.indexOf(fragment);
+    return { start, end: start + fragment.length };
+  };
+
+  it('is today’s bar when the file does not name it', async () => {
+    expect((await fileSettingsStore(file).read()).statusBarItems).toEqual(STATUS_BAR_ITEM_IDS);
+  });
+
+  it('reads a filtered, reordered list as written', async () => {
+    writeFileSync(file, '{ "statusBarItems": ["settings", "problems", "leftArea"] }', 'utf8');
+
+    expect((await fileSettingsStore(file).read()).statusBarItems).toEqual([
+      'settings',
+      'problems',
+      'leftArea',
+    ]);
+  });
+
+  it('points at an unknown id and a repeated one, and applies the rest', async () => {
+    const text = '{\n  "statusBarItems": ["problems", "clock", 3, "problems", "queue"]\n}\n';
+    writeFileSync(file, text, 'utf8');
+
+    const reading = await fileSettingsStore(file).load();
+
+    expect(reading.settings.statusBarItems).toEqual(['problems', 'queue']);
+    // The repeat is the second "problems", not the first.
+    const repeat = text.lastIndexOf('"problems"');
+    expect(reading.diagnostics.map((item) => [item.code, item.range])).toEqual([
+      ['W_SETTING_ENTRY_INVALID', rangeOf(text, '"clock"')],
+      ['W_SETTING_ENTRY_INVALID', rangeOf(text, '3')],
+      ['W_SETTING_ENTRY_INVALID', { start: repeat, end: repeat + '"problems"'.length }],
+    ]);
+    expect(reading.diagnostics[0]?.message).toContain("'clock' is not a status bar item");
+  });
+
+  it('refuses a value that is not a list, and draws today’s bar', async () => {
+    const text = '{ "statusBarItems": "template" }';
+    writeFileSync(file, text, 'utf8');
+
+    const reading = await fileSettingsStore(file).load();
+
+    expect(reading.settings.statusBarItems).toEqual(STATUS_BAR_ITEM_IDS);
+    expect(reading.diagnostics.map((item) => [item.code, item.range])).toEqual([
+      ['W_SETTING_INVALID', rangeOf(text, '"template"')],
+    ]);
+  });
+
+  it('is in a new settings.json commented out, every id in today’s order', async () => {
+    // What "Open Settings (JSON)" writes holds the example; uncommented, it is the default.
+    const example = statusBarItemsExample();
+    const uncommented = example
+      .replace(/^ {2}\/\/ (?=\s*["\]])/gmu, '  ')
+      .replace(/ +\/\/ .*$/gmu, '');
+    writeFileSync(file, `{\n${uncommented}\n}\n`, 'utf8');
+
+    const reading = await fileSettingsStore(file).load();
+
+    expect(reading.diagnostics).toEqual([]);
+    expect(reading.settings.statusBarItems).toEqual(STATUS_BAR_ITEM_IDS);
+    for (const item of STATUS_BAR_ITEMS) expect(example).toContain(item.description);
   });
 });

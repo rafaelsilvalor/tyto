@@ -90,3 +90,9 @@ has no path — and a missing-file row raised by reopening a recent entry is tak
 path opens. The session's missing-file rows stay: the window is never told their path (ADR
 0080). A removal never lights the dot, and puts it out when no window-raised row is left, by the
 same reasoning as the template read: a lit dot must point at something.
+
+## Amendment — which items show is a setting (TYTO-301, 2026-10-15)
+
+The bar described above is now the **default** of the `statusBarItems` setting, which lists the
+items that show and their order inside their side. ADR 0091 has the ids, the rules and why an
+item never changes side.

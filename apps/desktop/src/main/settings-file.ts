@@ -67,6 +67,11 @@ export function readSettingsText(text: string): SettingsText {
       value: valueNode === undefined ? undefined : (getNodeValue(valueNode) as unknown),
       keyRange: rangeOf(keyNode),
       ...(valueNode === undefined ? {} : { valueRange: rangeOf(valueNode) }),
+      // A list's entries each have a place, so a setting checked entry by entry can point at
+      // the one it refuses (TYTO-301, ADR 0091).
+      ...(valueNode?.type === 'array'
+        ? { entryRanges: (valueNode.children ?? []).map((item) => rangeOf(item)) }
+        : {}),
     });
   }
   return { entries, syntax };

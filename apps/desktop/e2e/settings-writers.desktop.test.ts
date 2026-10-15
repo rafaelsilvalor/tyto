@@ -144,7 +144,8 @@ describe('a settings edit is never lost', () => {
     // Main hears the tab is dirty on the preview's pause.
     await new Promise((resolve) => setTimeout(resolve, 600));
 
-    const outside = onDisk(userData).replace('{\n}', '{\n  "queueAutoRun": true\n}');
+    // Before the closing brace: a new file holds a commented example inside it (TYTO-301).
+    const outside = onDisk(userData).replace(/\n\}\s*$/u, '\n  "queueAutoRun": true\n}\n');
     expect(outside).toContain('"queueAutoRun": true');
     writeFileSync(join(userData, 'settings.json'), outside, 'utf8');
     await waitFor(async () => autoRun(page), 'the outside save to apply');

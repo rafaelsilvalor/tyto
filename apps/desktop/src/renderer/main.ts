@@ -110,6 +110,7 @@ import {
 } from './commands.js';
 import { FILE_MENU_COMMANDS } from '../../shared/commands.js';
 import { type StatusBar, type StatusBarCommands, STATUS_BAR_TAG } from './status-bar.js';
+import { type StatusBarItemId, STATUS_BAR_ITEM_IDS } from '../../shared/status-bar-items.js';
 import {
   type DocumentState,
   type Workspace,
@@ -2005,6 +2006,8 @@ function showTheme(bridge: TytoBridge, ask: () => Promise<IpcResponse<'theme:cur
       if (turn !== themeTurn) return;
       themeShown = applied;
       applyTheme(applied);
+      // The bar's items ride on the theme answer, so a save of the setting repaints it live.
+      statusBarItems = applied.statusBarItems;
       panel.installation = withThemeRows(panel.installation, applied.diagnostics);
       repaint();
     },
@@ -3022,6 +3025,12 @@ function commandEntries(): readonly CommandEntry[] {
 /** What vim last said through `onVimStatus`; `null` while vim is off (TYTO-248). */
 let vimStatus: VimStatus | null = null;
 
+/**
+ * The `statusBarItems` setting, as main's last theme answer carried it (TYTO-301): today's bar
+ * until the first answer arrives, which is also the setting's default.
+ */
+let statusBarItems: readonly StatusBarItemId[] = STATUS_BAR_ITEM_IDS;
+
 /** The ids the status bar's buttons run; the area toggles are named by the bar itself. */
 const STATUS_COMMANDS: StatusBarCommands = {
   commandBar: COMMAND_BAR_TOGGLE,
@@ -3055,6 +3064,7 @@ function paintStatusBar(): void {
   if (problemsShown) problemsMark = seen(problemsMark);
   const shownState = focusedPane()?.state() ?? current.state;
   bar.commands = STATUS_COMMANDS;
+  bar.items = statusBarItems;
   bar.offered = offeredNow;
   bar.run = (id) => {
     runWindowCommand(id);

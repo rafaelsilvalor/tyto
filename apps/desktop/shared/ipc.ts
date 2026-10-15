@@ -4,6 +4,7 @@ import { z } from 'zod';
 
 import { layoutSchema } from './layout.js';
 import type { SessionGroupNode } from './session-groups.js';
+import { STATUS_BAR_ITEM_IDS, type StatusBarItemId } from './status-bar-items.js';
 import { THEME_MODES } from './theme-setting.js';
 
 /**
@@ -266,6 +267,13 @@ const appliedThemesSchema = z.object({
    * colours, on the same answer and at the same moments, so a save moves both together.
    */
   iconStrokeWidth: z.number().min(0.75).max(2),
+  /**
+   * The `statusBarItems` setting in force (TYTO-301, ADR 0091): which of the bar's items show
+   * and in what order, sent on the same answer so a save moves it with the rest of the look.
+   */
+  statusBarItems: z
+    .array(z.enum(STATUS_BAR_ITEM_IDS as readonly [StatusBarItemId]))
+    .max(STATUS_BAR_ITEM_IDS.length),
   diagnostics: z.array(diagnostic.omit({ range: true })).max(200),
 });
 

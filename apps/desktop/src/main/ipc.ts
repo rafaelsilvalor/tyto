@@ -18,6 +18,7 @@ import {
   parseIpc,
   parseIpcEvent,
 } from '../../shared/ipc.js';
+import { type StatusBarItemId } from '../../shared/status-bar-items.js';
 import { type Credentials } from './credentials.js';
 import { credentialAccount } from './installed-plugins.js';
 import { declaredCredentialKeys } from './plugin-list.js';
@@ -42,6 +43,8 @@ export interface WindowThemes extends Pick<ThemeService, 'list' | 'current' | 'p
   choose(id: string): Promise<{ readonly applied: AppliedThemes; readonly saved: boolean }>;
   /** The `iconStrokeWidth` setting in force (TYTO-288), sent with every theme answer. */
   iconStrokeWidth(): number;
+  /** The `statusBarItems` setting in force (TYTO-301), sent with every theme answer too. */
+  statusBarItems(): readonly StatusBarItemId[];
 }
 
 /**
@@ -50,12 +53,13 @@ export interface WindowThemes extends Pick<ThemeService, 'list' | 'current' | 'p
  */
 function appliedForWindow(
   applied: AppliedThemes,
-  iconStrokeWidth: number,
+  themes: Pick<WindowThemes, 'iconStrokeWidth' | 'statusBarItems'>,
 ): IpcResponse<'theme:current'> {
   const { light, dark } = applied;
   return {
     mode: applied.mode,
-    iconStrokeWidth,
+    iconStrokeWidth: themes.iconStrokeWidth(),
+    statusBarItems: [...themes.statusBarItems()],
     light: { id: light.id, colors: light.colors },
     dark: { id: dark.id, colors: dark.colors },
     diagnostics: [...light.diagnostics, ...dark.diagnostics]
@@ -479,7 +483,7 @@ export function createHandlers(dependencies: IpcDependencies): Handlers {
     'plugins:keymaps': async () => ({ keymaps: await dependencies.keymaps() }),
 
     'theme:current': async () =>
-      appliedForWindow(await dependencies.themes.current(), dependencies.themes.iconStrokeWidth()),
+      appliedForWindow(await dependencies.themes.current(), dependencies.themes),
     'theme:list': async () => ({
       themes: (await dependencies.themes.list()).map((theme) => {
         const variant = themeVariant(theme);
@@ -492,13 +496,10 @@ export function createHandlers(dependencies: IpcDependencies): Handlers {
       }),
     }),
     'theme:preview': async ({ id }) =>
-      appliedForWindow(
-        await dependencies.themes.preview(id ?? undefined),
-        dependencies.themes.iconStrokeWidth(),
-      ),
+      appliedForWindow(await dependencies.themes.preview(id ?? undefined), dependencies.themes),
     'theme:choose': async ({ id }) => {
       const { applied, saved } = await dependencies.themes.choose(id);
-      return { ...appliedForWindow(applied, dependencies.themes.iconStrokeWidth()), saved };
+      return { ...appliedForWindow(applied, dependencies.themes), saved };
     },
 
     'panel:request': ({ panelId, capability, args }) =>

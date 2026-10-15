@@ -223,6 +223,7 @@ describe('the theme the window applies (TYTO-208)', () => {
     dark: { id: 'tyto-dark', colors: {} },
     diagnostics: [],
     iconStrokeWidth: 1.25,
+    statusBarItems: ['problems', 'settings'],
   });
 
   it('refuses a mode that is not one of the three', () => {
@@ -251,6 +252,14 @@ describe('the theme the window applies (TYTO-208)', () => {
     expect(() => parseIpc('theme:current', 'response', { ...theme({}), iconStrokeWidth })).toThrow(
       IpcContractError,
     );
+  });
+
+  // TYTO-301: the bar draws only ids it knows, so main's answer is checked against them.
+  it('carries the status bar items, and refuses an id the bar does not know', () => {
+    expect(() => parseIpc('theme:current', 'response', theme({}))).not.toThrow();
+    expect(() =>
+      parseIpc('theme:current', 'response', { ...theme({}), statusBarItems: ['clock'] }),
+    ).toThrow(IpcContractError);
   });
 
   it.each([

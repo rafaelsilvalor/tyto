@@ -25,6 +25,19 @@ export interface ConfigurationContribution<T = unknown> extends Contribution {
   readonly default: T;
   /** One sentence for the person reading the settings, in English like the rest of the API. */
   readonly description: string;
+  /**
+   * For a list setting, how each entry is checked **on its own** (TYTO-301, ADR 0091).
+   *
+   * Without it a list is one value: a single bad entry fails the schema and the whole list
+   * takes its default. With it, an entry `schema` refuses — or, with `unique`, one that repeats
+   * an earlier entry — is `W_SETTING_ENTRY_INVALID` at that entry and is left out, and the
+   * entries that remain are checked against the setting's `schema` as the value. A value that
+   * is not a list at all is still `W_SETTING_INVALID`.
+   */
+  readonly entries?: {
+    readonly schema: ZodType<unknown>;
+    readonly unique: boolean;
+  };
 }
 
 /** A setting as the registry hands it back: the key a file uses, and who declared it. */
@@ -78,6 +91,8 @@ export interface SettingEntry {
   readonly value: unknown;
   readonly keyRange?: SourceRange;
   readonly valueRange?: SourceRange;
+  /** Where each entry of a list value was written, in order, when the value is a list. */
+  readonly entryRanges?: readonly SourceRange[];
 }
 
 export interface ResolvedSettings {
@@ -98,7 +113,8 @@ export interface ResolvedSettings {
  * `W_SETTING_INVALID` points at the value — so a typo in one setting cannot take the others
  * with it, which is exactly what validating the whole record as one object used to do. A key
  * no plugin declares is a `W_SETTING_UNKNOWN`; a plugin's key written without its prefix is a
- * `W_SETTING_UNPREFIXED`, and is not accepted under the short name.
+ * `W_SETTING_UNPREFIXED`, and is not accepted under the short name. A list setting that
+ * declares `entries` is tolerant one entry further down: a bad entry costs itself alone.
  */
 export function resolveSettings(
   declared: readonly DeclaredSetting[],
@@ -118,7 +134,8 @@ export function resolveSettings(
     const entry = written.get(setting.key);
     let value: unknown = setting.contribution.default;
     if (entry !== undefined) {
-      const parsed = setting.contribution.schema.safeParse(entry.value);
+      const written = keptEntries(setting, entry, diagnostics);
+      const parsed = setting.contribution.schema.safeParse(written);
       if (parsed.success) value = parsed.data;
       else
         diagnostics.push(
@@ -150,6 +167,45 @@ export function resolveSettings(
   }
 
   return { values, config, diagnostics };
+}
+
+/**
+ * The value to validate: the written one, or — for a list setting that checks its entries one
+ * at a time — the list without the entries it refuses, each refused one reported where it was
+ * written. Anything that is not a list is handed on as it is, for the schema to refuse whole.
+ */
+function keptEntries(
+  setting: DeclaredSetting,
+  entry: SettingEntry,
+  diagnostics: Diagnostic[],
+): unknown {
+  const rule = setting.contribution.entries;
+  if (rule === undefined || !Array.isArray(entry.value)) return entry.value;
+  const kept: unknown[] = [];
+  const seen = new Set<string>();
+  entry.value.forEach((item: unknown, index) => {
+    const parsed = rule.schema.safeParse(item);
+    const repeated = rule.unique && parsed.success && seen.has(JSON.stringify(parsed.data));
+    if (parsed.success && !repeated) {
+      seen.add(JSON.stringify(parsed.data));
+      kept.push(parsed.data);
+      return;
+    }
+    diagnostics.push(
+      diagnostic(
+        'W_SETTING_ENTRY_INVALID',
+        {
+          key: setting.key,
+          position: String(index + 1),
+          problem: parsed.success
+            ? 'repeats an earlier entry'
+            : `is not accepted (${issuesOf(parsed.error.issues)})`,
+        },
+        rangeOption(entry.entryRanges?.[index] ?? entry.valueRange ?? entry.keyRange),
+      ),
+    );
+  });
+  return kept;
 }
 
 function rangeOption(range: SourceRange | undefined): { range?: SourceRange } {

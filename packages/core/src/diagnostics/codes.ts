@@ -841,6 +841,15 @@ export const diagnosticCodes = {
     fatal: false,
     fatality: 'A warning never replaces a value (ADR 0013).',
   },
+  // A list setting checked one entry at a time (TYTO-301, ADR 0091): a bad entry costs itself.
+  W_SETTING_ENTRY_INVALID: {
+    severity: 'warning',
+    summary: 'An entry of a list setting is not one its plugin accepts, so it is left out.',
+    template: "Entry {position} of setting '{key}' {problem}; it is left out and the rest apply.",
+    spec: 'docs/adr/0091-the-status-bars-content-is-a-setting.md',
+    fatal: false,
+    fatality: 'A warning never replaces a value (ADR 0013).',
+  },
   // The keybinding table (TYTO-207, ADR 0074). Resolving it never fails: each of these costs
   // the one entry it names, and every other binding still applies. The syntax code is an
   // error for the reason `E_SETTINGS_SYNTAX` is one — it is also why the file is not trusted.
