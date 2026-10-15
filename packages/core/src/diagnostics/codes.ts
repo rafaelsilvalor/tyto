@@ -850,6 +850,17 @@ export const diagnosticCodes = {
     fatal: false,
     fatality: 'A warning never replaces a value (ADR 0013).',
   },
+  // A colour a person chose, which applies, but no text colour the theme has reads on it
+  // (TYTO-301, ADR 0091): said with the number, never refused, because the choice is theirs.
+  W_SETTING_LOW_CONTRAST: {
+    severity: 'warning',
+    summary: 'A colour setting applies, but no text colour of the theme reads 4.5:1 on it.',
+    template:
+      "Setting '{key}' applies, but text on it reads {ratio}:1 at best in theme '{theme}', under 4.5:1.",
+    spec: 'docs/adr/0091-the-status-bars-content-is-a-setting.md',
+    fatal: false,
+    fatality: 'A warning never replaces a value (ADR 0013).',
+  },
   // The keybinding table (TYTO-207, ADR 0074). Resolving it never fails: each of these costs
   // the one entry it names, and every other binding still applies. The syntax code is an
   // error for the reason `E_SETTINGS_SYNTAX` is one — it is also why the file is not trusted.

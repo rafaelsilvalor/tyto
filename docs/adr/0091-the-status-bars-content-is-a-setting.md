@@ -1,6 +1,7 @@
 # 0091 — The status bar's content is a setting, and today's bar is the default
 
-Status: accepted · 2026-10-15 · TYTO-301 · amends ADR 0076
+Status: accepted · 2026-10-15 · TYTO-301 · amends ADR 0076 · amended 2026-10-15 (the bar's
+colours, `statusBarColors`)
 
 ## Context
 
@@ -61,12 +62,62 @@ that version hides it. This needs the set of ids a list could have known, which 
 adds the first new item introduces with it — today every id is original, so the rule has no
 case yet and no code.
 
+## Amendment, 2026-10-15: the bar's colours are a setting too
+
+**`statusBarColors` is one object of colours that win over the theme**, like VS Code's
+`workbench.colorCustomizations`, and **one for every theme**: no section per theme, because a
+person who wants a navy bar wants it whichever theme is in front, and per-theme sections would
+be a second theme format. Twenty-three keys, camelCase with a dot for a group:
+
+- the bar's own: `background` and `foreground` (the theme's `status-bar` and `status-bar-text`),
+  `itemHoverBackground`, `itemHoverForeground`, `itemActiveBackground`, `itemActiveForeground`
+  (a button under the pointer and a toggle that is on; without the setting they read the
+  chrome's `hover`, `button-on` and `text`, as before);
+- vim's badges: `vimMode.normal`, `vimMode.insert`, `vimMode.visual`, `vimMode.replace` (visual
+  line and block wear visual's, as with the theme's tokens, ADR 0089 decision 8);
+- one text colour per item: `item.<id>` for each of the thirteen ids above. A per-item colour
+  exists only here; no theme token carries one, so no theme has to set thirteen more. `item.vimMode`
+  colours the pending keys; the badge is the `vimMode.*` keys'.
+
+The hover and on-state colours are properties of the bar (`--status-bar-hover` and the like)
+with the theme's tokens as their fallback in `shell.css`, not theme tokens: a theme token would
+oblige every distributed theme to set it (ADR 0089 decision 3).
+
+**A colour is `#rgb` or `#rrggbb`, opaque.** Only an opaque colour has a contrast to measure,
+and hex is the one spelling the window can write into its sheet with nothing to escape.
+
+**Each member costs itself.** The `configuration` point gains `members` beside `entries`: a
+schema for a member's name and one for its value. An unknown name is `W_SETTING_ENTRY_INVALID`
+at the name, and its message lists every key; a value that is not a colour is
+`W_SETTING_INVALID` at the value, under the dotted key (`statusBarColors.background`). Either is
+left out — the theme's colour applies there — and the rest apply. The JSONC reader records each
+member's ranges (`SettingEntry.memberRanges`). A value that is not an object is still
+`W_SETTING_INVALID` and no colour is overridden.
+
+**A vim badge's text is chosen as the theme's own is**: the best-reading of the theme's
+`surface`, `text` and `accent-text` on the person's colour, per theme, so one override reads in
+light and dark alike. When none reaches 4.5:1 the colour **still applies** — the person chose it
+— and the settings tab says so at the value with the new warning `W_SETTING_LOW_CONTRAST`, which
+names the ratio measured (rounded down, so it never reads as passing) and the theme. It is
+measured against the themes the mode can show: the light one, the dark one, or both under
+`system`. Nothing else in the override is measured: the bar's own text is the person's to pair.
+
+**Live on save, through the same answer.** The value travels on `theme:current` beside
+`statusBarItems`; the window writes it into the theme sheet after each mode's colours, on
+`.shell__foot` (and each item's colour on that item), so a save repaints the bar, and removing
+the key gives the theme's colours back. No channel is added.
+
+**The options are in the file.** A new `settings.json` carries `statusBarColors` commented out
+with every key, an example colour and what it paints; the setting's description lists them too.
+
 ## Consequences
 
 - `plugin-api`: `ConfigurationContribution.entries` and `SettingEntry.entryRanges`, both
   optional, so every existing contribution and reader is unchanged. A minor version.
 - `core`: one code, `W_SETTING_ENTRY_INVALID`, a warning, never fatal.
 - `apps/desktop`: the seventh built-in setting; `status-bar.ts` draws from the list.
-- Not done here: colours (`statusBarColors`), the vim badge's style, dragging items, a plugin's
+- `plugin-api`: `ConfigurationContribution.members` and `SettingEntry.memberRanges` (amendment),
+  both optional. `core`: `W_SETTING_LOW_CONTRAST`, a warning.
+- Not done here: the vim badge's style, dragging items, a plugin's
   own status items (when they arrive they get ids in the same list, prefixed by plugin id as
   their settings are), and completion or hover in the settings tab.

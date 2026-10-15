@@ -6,6 +6,7 @@ import type { DeclaredSetting } from '@tyto/plugin-api';
 import type { IpcEventPayload } from '../../shared/ipc.js';
 import type { Settings } from '../../shared/settings.js';
 import {
+  type SettingsAdvice,
   type SettingsReading,
   type SettingsStore,
   applySettingsChanges,
@@ -44,6 +45,8 @@ interface SettingsTab {
 export interface LiveSettingsOptions {
   readonly store: SettingsStore;
   readonly declared: () => readonly DeclaredSetting[];
+  /** What the tab is told about accepted values beyond their schemas (TYTO-301). */
+  readonly advise?: SettingsAdvice;
   /** The settings in effect when the app started. */
   readonly initial: Settings;
   /** The file's text as it is now, or `''` when there is none. */
@@ -166,7 +169,7 @@ export function createLiveSettings(options: LiveSettingsOptions): LiveSettings {
       // Clean means saved or reverted: either way the buffer no longer holds a screen's change
       // the file lacks, and writing one on close would undo the person's own choice.
       if (!dirty) pendingFromScreens = {};
-      return validateSettingsText(text, options.declared());
+      return validateSettingsText(text, options.declared(), options.advise);
     },
 
     async closed(documentId) {

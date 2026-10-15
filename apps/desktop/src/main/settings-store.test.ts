@@ -11,7 +11,12 @@ import {
   STATUS_BAR_ITEM_IDS,
   statusBarItemsExample,
 } from '../../shared/status-bar-items.js';
-import { fileSettingsStore } from './settings-store.js';
+import {
+  STATUS_BAR_COLOUR_KEYS,
+  statusBarColorsContrast,
+  statusBarColorsExample,
+} from '../../shared/status-bar-colors.js';
+import { BUILT_IN_SETTINGS, fileSettingsStore, validateSettingsText } from './settings-store.js';
 
 /**
  * The template folder surviving a restart, which is the card's third criterion (TYTO-122).
@@ -100,6 +105,7 @@ describe('fileSettingsStore', () => {
       theme: DEFAULT_SETTINGS.theme,
       iconStrokeWidth: DEFAULT_SETTINGS.iconStrokeWidth,
       statusBarItems: DEFAULT_SETTINGS.statusBarItems,
+      statusBarColors: DEFAULT_SETTINGS.statusBarColors,
     });
   });
 
@@ -120,6 +126,7 @@ describe('fileSettingsStore', () => {
       theme: DEFAULT_SETTINGS.theme,
       iconStrokeWidth: DEFAULT_SETTINGS.iconStrokeWidth,
       statusBarItems: DEFAULT_SETTINGS.statusBarItems,
+      statusBarColors: DEFAULT_SETTINGS.statusBarColors,
     });
   });
 
@@ -140,6 +147,7 @@ describe('fileSettingsStore', () => {
       theme: DEFAULT_SETTINGS.theme,
       iconStrokeWidth: DEFAULT_SETTINGS.iconStrokeWidth,
       statusBarItems: DEFAULT_SETTINGS.statusBarItems,
+      statusBarColors: DEFAULT_SETTINGS.statusBarColors,
     });
   });
 
@@ -159,6 +167,7 @@ describe('fileSettingsStore', () => {
       theme: DEFAULT_SETTINGS.theme,
       iconStrokeWidth: DEFAULT_SETTINGS.iconStrokeWidth,
       statusBarItems: DEFAULT_SETTINGS.statusBarItems,
+      statusBarColors: DEFAULT_SETTINGS.statusBarColors,
     });
   });
 
@@ -333,4 +342,110 @@ describe('the statusBarItems setting in the file', () => {
     expect(reading.settings.statusBarItems).toEqual(STATUS_BAR_ITEM_IDS);
     for (const item of STATUS_BAR_ITEMS) expect(example).toContain(item.description);
   });
+});
+
+/** `statusBarColors` (TYTO-301, ADR 0091): an object whose members are checked one at a time. */
+describe('the statusBarColors setting in the file', () => {
+  const rangeOf = (text: string, fragment: string) => {
+    const start = text.indexOf(fragment);
+    return { start, end: start + fragment.length };
+  };
+
+  it('is empty — the theme everywhere — when the file does not name it', async () => {
+    expect((await fileSettingsStore(file).read()).statusBarColors).toEqual({});
+  });
+
+  it('points at an unknown key and a bad colour, and applies the rest', async () => {
+    const text =
+      '{\n  "statusBarColors": {\n    "background": "#1e3a5f",\n    "clock": "#ffffff",\n' +
+      '    "vimMode.normal": "blue",\n    "item.problems": "#FD6"\n  }\n}\n';
+    writeFileSync(file, text, 'utf8');
+
+    const reading = await fileSettingsStore(file).load();
+
+    expect(reading.settings.statusBarColors).toEqual({
+      background: '#1e3a5f',
+      'item.problems': '#FD6',
+    });
+    expect(reading.diagnostics.map((item) => [item.code, item.range])).toEqual([
+      ['W_SETTING_ENTRY_INVALID', rangeOf(text, '"clock"')],
+      ['W_SETTING_INVALID', rangeOf(text, '"blue"')],
+    ]);
+    // The unknown key's message lists every key the setting takes.
+    for (const { key } of STATUS_BAR_COLOUR_KEYS) {
+      expect(reading.diagnostics[0]?.message).toContain(key);
+    }
+    expect(reading.diagnostics[1]?.message).toBe(
+      "Setting 'statusBarColors.vimMode.normal' is not accepted (a colour is written #rgb or " +
+        '#rrggbb, opaque); its default applies.',
+    );
+  });
+
+  it('refuses a value that is not an object, and the theme applies', async () => {
+    const text = '{ "statusBarColors": "#000000" }';
+    writeFileSync(file, text, 'utf8');
+
+    const reading = await fileSettingsStore(file).load();
+
+    expect(reading.settings.statusBarColors).toEqual({});
+    expect(reading.diagnostics.map((item) => [item.code, item.range])).toEqual([
+      ['W_SETTING_INVALID', rangeOf(text, '"#000000"')],
+    ]);
+  });
+
+  it('is in a new settings.json commented out, with every key and an example colour', async () => {
+    const example = statusBarColorsExample();
+    const uncommented = example
+      .replace(/^ {2}\/\/ (?=\s*["}])/gmu, '  ')
+      .replace(/ +\/\/ .*$/gmu, '');
+    writeFileSync(file, `{\n${uncommented}\n}\n`, 'utf8');
+
+    const reading = await fileSettingsStore(file).load();
+
+    expect(reading.diagnostics).toEqual([]);
+    expect(Object.keys(reading.settings.statusBarColors)).toEqual(
+      STATUS_BAR_COLOUR_KEYS.map((entry) => entry.key),
+    );
+    for (const entry of STATUS_BAR_COLOUR_KEYS) expect(example).toContain(entry.description);
+  });
+});
+
+/** The contrast of a vim badge colour, measured against the themes in force (TYTO-301). */
+describe('the vim badge colours of statusBarColors', () => {
+  // Tyto Light's three candidates for a badge's text.
+  const light = {
+    id: 'tyto-light',
+    colors: { surface: '#fafafa', text: '#242529', 'accent-text': '#ffffff' },
+  };
+
+  it('says nothing when a text colour of the theme reads 4.5:1 on the badge', () => {
+    const text = '{ "statusBarColors": { "vimMode.normal": "#1d4ed8" } }';
+    expect(
+      validateSettingsText(text, BUILT_IN_SETTINGS, (entries) =>
+        statusBarColorsContrast(entries, [light]),
+      ),
+    ).toEqual([]);
+  });
+
+  it('applies a colour no text reads on, and warns at the value with the ratio measured', () => {
+    // Mid grey: white reads 3.94:1 on it, the best of the three, and the dark text less.
+    const text = '{ "statusBarColors": { "vimMode.insert": "#808080" } }';
+
+    const problems = validateSettingsText(text, BUILT_IN_SETTINGS, (entries) =>
+      statusBarColorsContrast(entries, [light]),
+    );
+
+    expect(problems.map((item) => [item.code, item.range])).toEqual([
+      ['W_SETTING_LOW_CONTRAST', rangeOf(text, '"#808080"')],
+    ]);
+    expect(problems[0]?.message).toBe(
+      "Setting 'statusBarColors.vimMode.insert' applies, but text on it reads 3.94:1 at best " +
+        "in theme 'tyto-light', under 4.5:1.",
+    );
+  });
+
+  const rangeOf = (text: string, fragment: string) => {
+    const start = text.indexOf(fragment);
+    return { start, end: start + fragment.length };
+  };
 });

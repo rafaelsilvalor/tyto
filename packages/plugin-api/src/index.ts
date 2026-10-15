@@ -47,6 +47,7 @@ export {
   type DeclaredSetting,
   type ResolvedSettings,
   type SettingEntry,
+  type SettingMemberRange,
   declaredSetting,
   resolveSettings,
 } from './configuration.js';

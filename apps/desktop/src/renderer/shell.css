@@ -194,10 +194,13 @@ textarea {
   gap: var(--tyto-space-1);
 }
 
+/* An item's text is the bar's, unless `statusBarColors` gives that item its own (TYTO-301):
+   the theme sheet sets `--status-bar-item-text` on the item, and nothing else does. */
 .status-bar__text {
   overflow: hidden;
   min-width: 0;
   padding: 0 var(--tyto-space-3);
+  color: var(--status-bar-item-text, var(--tyto-status-bar-text));
   text-overflow: ellipsis;
 }
 
@@ -219,14 +222,16 @@ textarea {
   border-radius: var(--tyto-radius-sm);
   padding: var(--tyto-space-1) var(--tyto-space-2);
   background: transparent;
-  color: inherit;
+  color: var(--status-bar-item-text, var(--tyto-status-bar-text));
   font: inherit;
   line-height: 1;
 }
 
+/* The four `--status-bar-*` properties are `statusBarColors`' (TYTO-301), set on the bar alone;
+   without them a button reads the theme's chrome colours, as before. */
 .status-bar__button:hover {
-  background: var(--tyto-hover);
-  color: var(--tyto-text);
+  background: var(--status-bar-hover, var(--tyto-hover));
+  color: var(--status-bar-hover-text, var(--tyto-text));
 }
 
 /* TYTO-283: Export with an app file in front. No hover, so it does not look clickable. */
@@ -236,8 +241,8 @@ textarea {
 }
 
 .status-bar__button--on {
-  background: var(--tyto-button-on);
-  color: var(--tyto-text);
+  background: var(--status-bar-on, var(--tyto-button-on));
+  color: var(--status-bar-on-text, var(--tyto-text));
 }
 
 .status-bar__button:focus-visible {
