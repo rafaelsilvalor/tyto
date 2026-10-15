@@ -416,9 +416,10 @@ textarea {
  *
  * The contract is the heights, which are tokens and nothing else: a fixed `height`, `flex:
  * none`, one line (`nowrap`) and `overflow: hidden`, so nothing in a line makes it taller. The
- * strip carries the hairline and the raised fill; the header row carries neither — the editor's
- * own background, no line above or below — and its small muted text is the breadcrumb's, which
- * gives way first, cut with an ellipsis. `e2e/pane-shape.desktop.test.ts` measures all of it.
+ * strip carries the raised fill and no line under it (Rafael, 2026-10-14: the hairline under
+ * every strip went); the header row carries neither — the editor's own background, no line
+ * above or below — and its small muted text is the breadcrumb's, which gives way first, cut with
+ * an ellipsis. `e2e/pane-shape.desktop.test.ts` measures all of it.
  */
 .pane__strip {
   display: flex;
@@ -428,7 +429,6 @@ textarea {
   min-width: 0;
   overflow: hidden;
   white-space: nowrap;
-  border-bottom: var(--tyto-hairline-width) solid var(--tyto-hairline);
   background: var(--tyto-surface-raised);
 }
 
@@ -1087,7 +1087,7 @@ tyto-command-bar[open] {
 
 /* Zed's strip: the tabs sit edge to edge with a hairline between them, and the one in front
    takes the editor's surface so it reads as the top of the buffer below it. The pane's strip
-   holds the height and the line under it (TYTO-288); this fills it. */
+   holds the height, with no line under it (TYTO-288); this fills it. */
 .tabs__strip {
   display: flex;
   height: 100%;

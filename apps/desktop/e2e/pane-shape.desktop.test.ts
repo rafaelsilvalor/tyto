@@ -209,6 +209,20 @@ const overflowing = async (): Promise<string[]> =>
       }),
   );
 
+/** The visible strips that draw a line under themselves, by the pane holding them. */
+const linedStrips = async (): Promise<string[]> =>
+  page.evaluate(() =>
+    [...document.querySelectorAll<HTMLElement>('.pane__strip')]
+      .filter((strip) => strip.getClientRects().length > 0)
+      .filter((strip) => getComputedStyle(strip).borderBottomWidth !== '0px')
+      .map((strip) => {
+        const pane = strip.parentElement;
+        const name =
+          pane?.dataset['panel'] ?? (pane?.hasAttribute('data-editor-group') ? 'group' : '?');
+        return `${name}: ${getComputedStyle(strip).borderBottomWidth}`;
+      }),
+  );
+
 const tokenPixels = async (name: string): Promise<number> =>
   page.evaluate(
     (token) =>
@@ -370,6 +384,9 @@ describe('the busiest window', () => {
     // strips are the line a person sees continue across the window.
     const top = Math.min(...panes.map((pane) => pane.strip.top));
     expect(panes.filter((pane) => Math.abs(pane.strip.top - top) <= TOLERANCE)).toHaveLength(4);
+    // No line under any strip (Rafael, 2026-10-14): every visible one, groups, the preview's and
+    // the docked panels', reads a zero-width bottom border.
+    expect(await linedStrips()).toEqual([]);
     process.stdout.write(`[TYTO-288] panes: ${JSON.stringify(panes)}\n`);
     await shoot('scene');
   });
