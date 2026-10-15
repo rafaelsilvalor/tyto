@@ -5,6 +5,7 @@ import { fileURLToPath } from 'node:url';
 import { themeTokens } from '@tyto/editor';
 import { describe, expect, it } from 'vitest';
 
+import { closestPair, MINIMUM_MODE_DIFFERENCE } from '../src/main/colour-difference.js';
 import { GROUP_MINIMUM } from '../src/renderer/group-resize.js';
 
 /**
@@ -320,6 +321,17 @@ describe.each(['light', 'dark'] as const)('the %s theme', (name) => {
     ),
   ])('reads %s on %s at %s:1 or better', (text, ground, floor) => {
     expect(contrast(value(text), value(ground))).toBeGreaterThanOrEqual(floor);
+  });
+
+  // Rafael, 2026-10-15: no two of vim's modes share a colour, and the closest two are told
+  // apart at a glance — ΔE2000 of 10 (ADR 0089 decision 8, `colour-difference.ts`).
+  const modeColours = Object.fromEntries(
+    VIM_BADGE_MODES.map((mode) => [mode, value(`--tyto-status-bar-vim-${mode}`)]),
+  );
+  const closest = closestPair(modeColours);
+  it(`tells vim's four modes apart by colour (closest: ${closest.names.join(' and ')}, ΔE ${closest.difference.toFixed(1)})`, () => {
+    expect(new Set(Object.values(modeColours)).size).toBe(VIM_BADGE_MODES.length);
+    expect(closest.difference).toBeGreaterThanOrEqual(MINIMUM_MODE_DIFFERENCE);
   });
 });
 

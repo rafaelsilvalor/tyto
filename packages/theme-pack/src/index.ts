@@ -65,13 +65,27 @@ export interface ThemePackFile {
 
 /**
  * A badge colour moved off the role it derives from — `accent` for normal, `success` for
- * insert, `syntax-keyword` for visual, `error` for replace — to read 4.5:1.
+ * insert, `syntax-keyword` for visual, `error` for replace — to read 4.5:1, or replaced by
+ * another colour of the same palette where the role would draw two modes alike.
  */
 export interface ThemeDerivation {
   readonly token: string;
   readonly role: string;
   readonly value: string;
+  /**
+   * The palette colour used instead of the role's, when the role's colour is another mode's
+   * too (Dracula's pink is both `accent` and `syntax-keyword`). `name` is one of the theme's
+   * tokens or, for an upstream colour no token carries, upstream's name for it; `value` is
+   * that colour before any lightness move.
+   */
+  readonly from?: ThemeDerivationSource;
   readonly reason: string;
+}
+
+/** Where a badge colour that is not its role's comes from (ADR 0089 decision 8). */
+export interface ThemeDerivationSource {
+  readonly name: string;
+  readonly value: string;
 }
 
 /** `original`: upstream's colours, exempt from the floors. `adjusted`: changed to meet them. */

@@ -247,3 +247,15 @@ export const UPSTREAM_COLOURS: Readonly<Record<string, Readonly<Record<string, s
     'syntax-comment': '#888b94', // tok.comment
   },
 };
+
+/**
+ * Upstream colours that no token carries but a vim badge is drawn from (TYTO-301, ADR 0089
+ * decision 8), by the original's id and upstream's name for the colour. A badge whose role
+ * would repeat another mode's colour takes one from the same palette instead; Solarized maps
+ * neither magenta nor violet onto a token, and magenta is the colour vim themes give visual.
+ * A twin reads its original's entry.
+ */
+export const UPSTREAM_BADGE_COLOURS: Readonly<Record<string, Readonly<Record<string, string>>>> = {
+  'solarized-dark': { magenta: '#d33682' },
+  'solarized-light': { magenta: '#d33682' },
+};

@@ -6,7 +6,9 @@ The colours are the upstream's; the mapping onto Tyto's roles is this package's.
 changed to meet a contrast floor (ADR 0089) is listed in the adjusted version's "adjusted"
 field with the value it replaced; such a theme also ships as the original, upstream exactly.
 The status bar's vim mode badge (status-bar-vim-*) is Tyto's, derived from a role in each
-palette; a badge colour moved off its role to read 4.5:1 is listed in "derived".
+palette; a badge colour moved off its role to read 4.5:1, or taken from another colour of
+the same palette so that no two modes share one, is listed in "derived". Solarized's badge
+for visual is upstream's magenta, #d33682, which no token carries.
 Names are the upstream's; no logo or other branding is shipped.
 
 Values read on 2026-10-15 from the sources below.

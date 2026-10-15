@@ -101,7 +101,10 @@ two built-ins record their two moves in `tokens.css` (`#5c78e2` → `#506ee0`, `
 `#4b8340`). `theme-pack.test.ts` holds every pack theme's four badge pairs to 4.5 and each
 badge to its role or a note, and `e2e/renderer-tokens.test.ts` holds the built-ins' and which
 token each `data-mode` paints. `status-bar-text` on `status-bar` joins decision 1's table at
-4.5, for themes that are not originals.
+4.5, for themes that are not originals. **The four modes must be distinguishable by colour**
+(Rafael, 2026-10-15): where a role repeats another mode's colour (10 of 20 pack themes), one
+mode takes another colour of the same palette, named in its note's `from`, and both tests hold
+every theme's closest two badges at CIEDE2000 ΔE ≥ 10 (`colour-difference.ts`).
 
 ## Consequences
 
