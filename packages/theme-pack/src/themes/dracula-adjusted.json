@@ -32,7 +32,17 @@
     "syntax-string": "#f1fa8c",
     "syntax-tag": "#ff79c6",
     "syntax-punctuation": "#f8f8f2",
-    "syntax-comment": "#6272a4"
+    "syntax-comment": "#6272a4",
+    "status-bar": "#343746",
+    "status-bar-text": "#9fa9c7",
+    "status-bar-vim-normal": "#ff79c6",
+    "status-bar-vim-normal-text": "#282a36",
+    "status-bar-vim-insert": "#50fa7b",
+    "status-bar-vim-insert-text": "#282a36",
+    "status-bar-vim-visual": "#ff79c6",
+    "status-bar-vim-visual-text": "#282a36",
+    "status-bar-vim-replace": "#ff5555",
+    "status-bar-vim-replace-text": "#282a36"
   },
   "adjusted": [
     {
@@ -40,6 +50,13 @@
       "upstream": "#6272a4",
       "value": "#9fa9c7",
       "reason": "Dracula's comment colour reads 3.03:1 on the background; HSL lightness raised from 51.4% to 70.2%, hue and saturation kept, to the first value reading 4.5:1 on surface, surface-raised and hover (4.51 on hover, the lowest)"
+    },
+    {
+      "token": "status-bar-text",
+      "upstream": "#6272a4",
+      "value": "#9fa9c7",
+      "reason": "the status bar copies text-muted, adjusted above for the same floors"
     }
-  ]
+  ],
+  "derived": []
 }

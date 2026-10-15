@@ -32,7 +32,17 @@
     "syntax-string": "#a3be8c",
     "syntax-tag": "#81a1c1",
     "syntax-punctuation": "#eceff4",
-    "syntax-comment": "#6f7d98"
+    "syntax-comment": "#6f7d98",
+    "status-bar": "#3b4252",
+    "status-bar-text": "#b5bcca",
+    "status-bar-vim-normal": "#88c0d0",
+    "status-bar-vim-normal-text": "#2e3440",
+    "status-bar-vim-insert": "#a3be8c",
+    "status-bar-vim-insert-text": "#2e3440",
+    "status-bar-vim-visual": "#81a1c1",
+    "status-bar-vim-visual-text": "#2e3440",
+    "status-bar-vim-replace": "#cf888f",
+    "status-bar-vim-replace-text": "#2e3440"
   },
   "adjusted": [
     {
@@ -52,6 +62,13 @@
       "upstream": "#4c566a",
       "value": "#6f7d98",
       "reason": "#4c566a reads 1.69:1 on surface; HSL lightness raised from 35.7% to 51.6%, hue and saturation kept, to the first value reading 3:1 on surface (3.01)"
+    },
+    {
+      "token": "status-bar-text",
+      "upstream": "#4c566a",
+      "value": "#b5bcca",
+      "reason": "the status bar copies text-muted, adjusted above for the same floors"
     }
-  ]
+  ],
+  "derived": []
 }

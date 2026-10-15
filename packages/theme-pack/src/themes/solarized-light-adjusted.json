@@ -32,7 +32,17 @@
     "syntax-string": "#2aa198",
     "syntax-tag": "#268bd2",
     "syntax-punctuation": "#93a1a1",
-    "syntax-comment": "#829292"
+    "syntax-comment": "#829292",
+    "status-bar": "#eee8d5",
+    "status-bar-text": "#535f5f",
+    "status-bar-vim-normal": "#2076b3",
+    "status-bar-vim-normal-text": "#fdf6e3",
+    "status-bar-vim-insert": "#697800",
+    "status-bar-vim-insert-text": "#fdf6e3",
+    "status-bar-vim-visual": "#697800",
+    "status-bar-vim-visual-text": "#fdf6e3",
+    "status-bar-vim-replace": "#da2925",
+    "status-bar-vim-replace-text": "#fdf6e3"
   },
   "adjusted": [
     {
@@ -58,6 +68,32 @@
       "upstream": "#93a1a1",
       "value": "#829292",
       "reason": "#93a1a1 reads 2.48:1 on surface; HSL lightness lowered from 60.4% to 54.2%, hue and saturation kept, to the first value reading 3:1 on surface (3.01)"
+    },
+    {
+      "token": "status-bar-text",
+      "upstream": "#93a1a1",
+      "value": "#535f5f",
+      "reason": "the status bar copies text-muted, adjusted above for the same floors"
+    }
+  ],
+  "derived": [
+    {
+      "token": "status-bar-vim-normal",
+      "role": "accent",
+      "value": "#2076b3",
+      "reason": "accent #268bd2 reads 3.41:1 at best against surface, text and accent-text; HSL lightness moved from 48.6% to 41.4%, hue and saturation kept, to the first value reading 4.5:1 (4.52 on surface)"
+    },
+    {
+      "token": "status-bar-vim-insert",
+      "role": "success",
+      "value": "#697800",
+      "reason": "success #859900 reads 2.97:1 at best against surface, text and accent-text; HSL lightness moved from 30.0% to 23.6%, hue and saturation kept, to the first value reading 4.5:1 (4.54 on surface)"
+    },
+    {
+      "token": "status-bar-vim-visual",
+      "role": "syntax-keyword",
+      "value": "#697800",
+      "reason": "syntax-keyword #859900 reads 2.97:1 at best against surface, text and accent-text; HSL lightness moved from 30.0% to 23.6%, hue and saturation kept, to the first value reading 4.5:1 (4.54 on surface)"
     }
   ]
 }

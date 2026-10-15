@@ -168,6 +168,26 @@
   --tyto-syntax-punctuation: #4d4f52;
   --tyto-syntax-comment: #7e8086;
 
+  /*
+   * The status bar and vim's mode badge in it (TYTO-301, ADR 0089). The bar copies the
+   * chrome's raised surface and muted text, so naming it changes nothing on screen; a theme
+   * may now colour it apart. Each of vim's four modes has a badge colour and a text colour,
+   * derived from a role — normal the accent, insert success, visual a keyword, replace an
+   * error — with the text the best of surface, text and accent-text, and held to 4.5:1. Here
+   * normal and insert are the accent and success with HSL lightness lowered to the first
+   * value reading 4.5 under white (#5c78e2 4.01 -> #506ee0 4.52, #4f8a43 4.16 -> #4b8340 4.55).
+   */
+  --tyto-status-bar: #ebebec;
+  --tyto-status-bar-text: #58585a;
+  --tyto-status-bar-vim-normal: #506ee0;
+  --tyto-status-bar-vim-normal-text: #ffffff;
+  --tyto-status-bar-vim-insert: #4b8340;
+  --tyto-status-bar-vim-insert-text: #ffffff;
+  --tyto-status-bar-vim-visual: #a449ab;
+  --tyto-status-bar-vim-visual-text: #ffffff;
+  --tyto-status-bar-vim-replace: #c4473a;
+  --tyto-status-bar-vim-replace-text: #ffffff;
+
   /* What an artwork is shown on, which is about the artwork and not the theme: a frame with
      no background is transparent, and the squares are what make that visible. */
   --tyto-checker-light: #ffffff;
@@ -216,5 +236,15 @@
     --tyto-syntax-tag: #d07277;
     --tyto-syntax-punctuation: #acb2be;
     --tyto-syntax-comment: #808590;
+    --tyto-status-bar: #2f343e;
+    --tyto-status-bar-text: #a9afbc;
+    --tyto-status-bar-vim-normal: #74ade8;
+    --tyto-status-bar-vim-normal-text: #1c1f24;
+    --tyto-status-bar-vim-insert: #a1c181;
+    --tyto-status-bar-vim-insert-text: #1c1f24;
+    --tyto-status-bar-vim-visual: #b477cf;
+    --tyto-status-bar-vim-visual-text: #1c1f24;
+    --tyto-status-bar-vim-replace: #d87b80;
+    --tyto-status-bar-vim-replace-text: #1c1f24;
   }
 }

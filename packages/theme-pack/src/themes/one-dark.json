@@ -32,7 +32,18 @@
     "syntax-string": "#98c379",
     "syntax-tag": "#e06c75",
     "syntax-punctuation": "#abb2bf",
-    "syntax-comment": "#5c6370"
+    "syntax-comment": "#5c6370",
+    "status-bar": "#21252b",
+    "status-bar-text": "#828997",
+    "status-bar-vim-normal": "#528bff",
+    "status-bar-vim-normal-text": "#001133",
+    "status-bar-vim-insert": "#73c990",
+    "status-bar-vim-insert-text": "#001133",
+    "status-bar-vim-visual": "#c678dd",
+    "status-bar-vim-visual-text": "#001133",
+    "status-bar-vim-replace": "#ff6347",
+    "status-bar-vim-replace-text": "#001133"
   },
-  "adjusted": []
+  "adjusted": [],
+  "derived": []
 }

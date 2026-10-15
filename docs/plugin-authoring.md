@@ -304,7 +304,7 @@ export function activate(host) {
 }
 ```
 
-1. **Name only what you change.** The 30 names are the window's colour roles without the
+1. **Name only what you change.** The 40 names are the window's colour roles without the
    `--tyto-` prefix; `apps/desktop/src/main/themes/tyto-light.json` lists them with Tyto Light's
    values. Every name you leave out is the built-in theme of your `kind`. A name that is not a
    role is `W_THEME_TOKEN_UNKNOWN`; a value that is not a hex colour, `rgb()`, `hsl()` or a

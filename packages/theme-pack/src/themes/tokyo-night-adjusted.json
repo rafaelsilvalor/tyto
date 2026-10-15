@@ -32,7 +32,17 @@
     "syntax-string": "#9ece6a",
     "syntax-tag": "#f7768e",
     "syntax-punctuation": "#89ddff",
-    "syntax-comment": "#5c658d"
+    "syntax-comment": "#5c658d",
+    "status-bar": "#16161e",
+    "status-bar-text": "#7e829d",
+    "status-bar-vim-normal": "#3d59a1",
+    "status-bar-vim-normal-text": "#ffffff",
+    "status-bar-vim-insert": "#73daca",
+    "status-bar-vim-insert-text": "#1a1b26",
+    "status-bar-vim-visual": "#bb9af7",
+    "status-bar-vim-visual-text": "#1a1b26",
+    "status-bar-vim-replace": "#dd5656",
+    "status-bar-vim-replace-text": "#1a1b26"
   },
   "adjusted": [
     {
@@ -58,6 +68,20 @@
       "upstream": "#51597d",
       "value": "#5c658d",
       "reason": "#51597d reads 2.50:1 on surface; HSL lightness raised from 40.4% to 45.7%, hue and saturation kept, to the first value reading 3:1 on surface (3.01)"
+    },
+    {
+      "token": "status-bar-text",
+      "upstream": "#787c99",
+      "value": "#7e829d",
+      "reason": "the status bar copies text-muted, adjusted above for the same floors"
+    }
+  ],
+  "derived": [
+    {
+      "token": "status-bar-vim-normal",
+      "role": "accent",
+      "value": "#3d59a1",
+      "reason": "the accent of the original, #3d59a1, as the original's badge: a badge is Tyto's derivation and both of a pair draw the same one"
     }
   ]
 }

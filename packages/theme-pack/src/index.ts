@@ -32,11 +32,16 @@ import tokyoNight from './themes/tokyo-night.json';
  * the theme files travel as data in the bundle and the host's reader answers from
  * `THEME_PACK_FILES`, by the path each contribution names.
  *
- * Every theme here sets all thirty tokens rather than leaning on the base theme's fallback.
+ * Every theme here sets all forty tokens rather than leaning on the base theme's fallback.
  * A theme whose upstream colours meet the contrast floors of ADR 0089 ships once. One that
  * does not ships twice, side by side in the picker: the original, upstream's colours exactly
  * and exempt from the floors, and `<Name> (adjusted)`, which meets them and names each colour
  * it changed in `adjusted` (Rafael, 2026-10-15).
+ *
+ * Vim's mode badge is the exception to "upstream's colours exactly" (TYTO-301): no upstream
+ * has one, so its colours are Tyto's, derived from a role and held to 4.5:1 in every theme,
+ * originals included. Where a role's colour is moved to get there, `derived` says so; both of
+ * a pair draw the same badge, so the move never makes a theme a pair.
  */
 
 /** The plugin's id, which is its manifest's name. */
@@ -54,6 +59,19 @@ export interface ThemePackFile {
   readonly colors: Readonly<Record<string, string>>;
   /** Each colour changed from upstream to meet a floor, with the value it replaced. */
   readonly adjusted: readonly ThemeAdjustment[];
+  /** Each vim badge colour that is not its role's colour, with why (TYTO-301, ADR 0089). */
+  readonly derived: readonly ThemeDerivation[];
+}
+
+/**
+ * A badge colour moved off the role it derives from — `accent` for normal, `success` for
+ * insert, `syntax-keyword` for visual, `error` for replace — to read 4.5:1.
+ */
+export interface ThemeDerivation {
+  readonly token: string;
+  readonly role: string;
+  readonly value: string;
+  readonly reason: string;
 }
 
 /** `original`: upstream's colours, exempt from the floors. `adjusted`: changed to meet them. */

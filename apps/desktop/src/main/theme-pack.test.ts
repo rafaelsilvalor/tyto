@@ -13,9 +13,10 @@ import { BASE_COLORS, builtInThemeSource, loadTheme, themeVariant } from './them
 
 /**
  * The themes Tyto distributes from `@tyto/theme-pack` (TYTO-300), held to ADR 0089: every one
- * sets all thirty tokens and every value is a colour. A theme that ships once, and every
+ * sets all forty tokens and every value is a colour. A theme that ships once, and every
  * adjusted twin, meets AA on the pairs the window draws text on; an original is exempt from the
- * floors and is held instead to upstream's colours, recorded in `theme-pack-upstream.ts`.
+ * floors and is held instead to upstream's colours, recorded in `theme-pack-upstream.ts`. Vim's
+ * mode badge is held to AA in every theme, originals included (TYTO-301).
  */
 
 interface Colour {
@@ -81,7 +82,23 @@ const FLOORS = [
   ['text', 'selection', 4.5],
   ['syntax-comment', 'surface', 3],
   ['accent', 'surface-raised', 3],
+  // TYTO-301: the bar's text, which copies `text-muted` on `surface-raised`.
+  ['status-bar-text', 'status-bar', 4.5],
 ] as const;
+
+/**
+ * Vim's mode badge and the role each mode's colour derives from (TYTO-301). The badge is Tyto's
+ * and not upstream's, so it is held to 4.5 in every theme, originals included (ADR 0089).
+ */
+const BADGES = [
+  ['normal', 'accent'],
+  ['insert', 'success'],
+  ['visual', 'syntax-keyword'],
+  ['replace', 'error'],
+] as const;
+
+/** The colours a badge's text is chosen from: the best-reading of the three. */
+const BADGE_TEXT_ROLES = ['surface', 'text', 'accent-text'] as const;
 
 const themes = THEME_PACK_THEMES.map((theme) => {
   const file = THEME_PACK_FILES[theme.path];
@@ -93,6 +110,8 @@ const ADJUSTED_SUFFIX = '-adjusted';
 
 const fileOf = (id: string): ThemePackFile | undefined =>
   themes.find(({ theme }) => theme.id === id)?.file;
+
+const originalId = (id: string): string => id.slice(0, -ADJUSTED_SUFFIX.length);
 
 const failedFloors = (file: ThemePackFile): readonly string[] =>
   FLOORS.filter(
@@ -145,9 +164,46 @@ describe.each(themes.map(({ theme, file }) => [theme.label, theme, file] as cons
       expect(file.name).toBe(theme.label);
     });
 
-    it('sets exactly the thirty tokens of the base theme, leaning on no fallback', () => {
+    it('sets exactly the forty tokens of the base theme, leaning on no fallback', () => {
       expect(Object.keys(file.colors).sort()).toEqual(Object.keys(BASE_COLORS[theme.kind]).sort());
-      expect(Object.keys(file.colors)).toHaveLength(30);
+      expect(Object.keys(file.colors)).toHaveLength(40);
+    });
+
+    // The badge is Tyto's derivation, never upstream's, so an original is held here too.
+    it.each(BADGES)('reads vim’s %s badge at 4.5:1 or better (TYTO-301)', (mode) => {
+      const badge = `status-bar-vim-${mode}`;
+      expect(contrast(colour(`${badge}-text`), colour(badge))).toBeGreaterThanOrEqual(4.5);
+    });
+
+    // An adjusted twin draws its original's badge, so a role either file sets may be the source.
+    const sources = [file, ...(file.variant === 'adjusted' ? [fileOf(originalId(theme.id))] : [])];
+
+    it.each(BADGES)('colours the %s badge with %s, or says why not', (mode, role) => {
+      const token = `status-bar-vim-${mode}`;
+      const note = file.derived.find((entry) => entry.token === token);
+      if (note === undefined) {
+        expect(colour(token)).toBe(colour(role));
+        return;
+      }
+      expect(note.role).toBe(role);
+      expect(note.value).toBe(colour(token));
+      expect(note.value).not.toBe(colour(role));
+      expect(note.reason.length).toBeGreaterThan(0);
+    });
+
+    it.each(BADGES)('writes the %s badge in surface, text or accent-text', (mode) => {
+      const candidates = sources.flatMap((source) =>
+        BADGE_TEXT_ROLES.map((role) => source?.colors[role]),
+      );
+      expect(candidates).toContain(colour(`status-bar-vim-${mode}-text`));
+    });
+
+    it('notes only badge colours, each once', () => {
+      const tokens = file.derived.map((entry) => entry.token);
+      expect(new Set(tokens).size).toBe(tokens.length);
+      for (const token of tokens) {
+        expect(BADGES.map(([mode]) => `status-bar-vim-${mode}`)).toContain(token);
+      }
     });
 
     it('gives every token a colour', () => {

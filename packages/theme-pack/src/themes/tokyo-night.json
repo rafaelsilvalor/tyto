@@ -32,7 +32,25 @@
     "syntax-string": "#9ece6a",
     "syntax-tag": "#f7768e",
     "syntax-punctuation": "#89ddff",
-    "syntax-comment": "#51597d"
+    "syntax-comment": "#51597d",
+    "status-bar": "#16161e",
+    "status-bar-text": "#787c99",
+    "status-bar-vim-normal": "#3d59a1",
+    "status-bar-vim-normal-text": "#ffffff",
+    "status-bar-vim-insert": "#73daca",
+    "status-bar-vim-insert-text": "#1a1b26",
+    "status-bar-vim-visual": "#bb9af7",
+    "status-bar-vim-visual-text": "#1a1b26",
+    "status-bar-vim-replace": "#dd5656",
+    "status-bar-vim-replace-text": "#1a1b26"
   },
-  "adjusted": []
+  "adjusted": [],
+  "derived": [
+    {
+      "token": "status-bar-vim-replace",
+      "role": "error",
+      "value": "#dd5656",
+      "reason": "error #db4b4b reads 4.17:1 at best against surface, text and accent-text; HSL lightness moved from 57.6% to 60.1%, hue and saturation kept, to the first value reading 4.5:1 (4.51 on surface)"
+    }
+  ]
 }
