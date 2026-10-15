@@ -31,7 +31,7 @@ import { type PreviewService } from './preview.js';
 import { type QueueService, type QueueView } from './queue.js';
 import { type TemplateDiagnostic, type TemplateEditorService } from './template-editor.js';
 import { type TemplateCatalogue } from './templates.js';
-import type { AppliedThemes, ThemeService } from './themes.js';
+import { type AppliedThemes, type ThemeService, themeVariant } from './themes.js';
 import { type UpdateService } from './updates.js';
 
 /**
@@ -481,11 +481,15 @@ export function createHandlers(dependencies: IpcDependencies): Handlers {
     'theme:current': async () =>
       appliedForWindow(await dependencies.themes.current(), dependencies.themes.iconStrokeWidth()),
     'theme:list': async () => ({
-      themes: (await dependencies.themes.list()).map(({ id, label, kind }) => ({
-        id,
-        label,
-        kind,
-      })),
+      themes: (await dependencies.themes.list()).map((theme) => {
+        const variant = themeVariant(theme);
+        return {
+          id: theme.id,
+          label: theme.label,
+          kind: theme.kind,
+          ...(variant === undefined ? {} : { variant }),
+        };
+      }),
     }),
     'theme:preview': async ({ id }) =>
       appliedForWindow(

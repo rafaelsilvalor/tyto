@@ -1,0 +1,63 @@
+{
+  "name": "Solarized Dark (adjusted)",
+  "kind": "dark",
+  "variant": "adjusted",
+  "colors": {
+    "surface": "#002b36",
+    "surface-raised": "#073642",
+    "surface-sunken": "#002b36",
+    "border": "#586e75",
+    "hairline": "#586e75",
+    "text": "#8b9b9d",
+    "text-muted": "#99adb3",
+    "text-disabled": "#586e75",
+    "accent": "#268bd2",
+    "accent-text": "#002b36",
+    "focus-ring": "#268bd2",
+    "selection": "#073642",
+    "hover": "#1b444f",
+    "error": "#e56462",
+    "warning": "#b58900",
+    "info": "#2aa198",
+    "success": "#859900",
+    "scrim": "rgb(0 0 0 / 40%)",
+    "shadow-overlay-tint": "rgb(0 0 0 / 45%)",
+    "shadow-paper-tint": "rgb(0 0 0 / 50%)",
+    "active-line": "rgb(7 54 66 / 50%)",
+    "active-line-gutter": "#04303c",
+    "syntax-keyword": "#859900",
+    "syntax-function": "#268bd2",
+    "syntax-constant": "#2aa198",
+    "syntax-attribute": "#657b83",
+    "syntax-string": "#2aa198",
+    "syntax-tag": "#268bd2",
+    "syntax-punctuation": "#586e75",
+    "syntax-comment": "#5d747b"
+  },
+  "adjusted": [
+    {
+      "token": "text",
+      "upstream": "#839496",
+      "value": "#8b9b9d",
+      "reason": "#839496 reads 4.11:1 on surface-raised; HSL lightness raised from 55.1% to 57.9%, hue and saturation kept, to the first value reading 4.5:1 on surface, surface-raised and selection (4.50 on surface-raised, the lowest)"
+    },
+    {
+      "token": "text-muted",
+      "upstream": "#586e75",
+      "value": "#99adb3",
+      "reason": "#586e75 reads 1.96:1 on hover; HSL lightness raised from 40.2% to 65.1%, hue and saturation kept, to the first value reading 4.5:1 on surface, surface-raised and hover (4.52 on hover, the lowest)"
+    },
+    {
+      "token": "error",
+      "upstream": "#dc322f",
+      "value": "#e56462",
+      "reason": "#dc322f reads 3.25:1 on surface; HSL lightness raised from 52.4% to 64.0%, hue and saturation kept, to the first value reading 4.5:1 on surface (4.53)"
+    },
+    {
+      "token": "syntax-comment",
+      "upstream": "#586e75",
+      "value": "#5d747b",
+      "reason": "#586e75 reads 2.79:1 on surface; HSL lightness raised from 40.2% to 42.3%, hue and saturation kept, to the first value reading 3:1 on surface (3.04)"
+    }
+  ]
+}

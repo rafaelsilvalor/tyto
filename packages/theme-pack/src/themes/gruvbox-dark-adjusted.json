@@ -1,0 +1,51 @@
+{
+  "name": "Gruvbox Dark (adjusted)",
+  "kind": "dark",
+  "variant": "adjusted",
+  "colors": {
+    "surface": "#282828",
+    "surface-raised": "#3c3836",
+    "surface-sunken": "#1d2021",
+    "border": "#7c6f64",
+    "hairline": "#665c54",
+    "text": "#ebdbb2",
+    "text-muted": "#c2b8a9",
+    "text-disabled": "#7c6f64",
+    "accent": "#b8bb26",
+    "accent-text": "#282828",
+    "focus-ring": "#83a598",
+    "selection": "#665c54",
+    "hover": "#504945",
+    "error": "#fb533f",
+    "warning": "#fabd2f",
+    "info": "#83a598",
+    "success": "#b8bb26",
+    "scrim": "rgb(0 0 0 / 40%)",
+    "shadow-overlay-tint": "rgb(0 0 0 / 45%)",
+    "shadow-paper-tint": "rgb(0 0 0 / 50%)",
+    "active-line": "rgb(60 56 54 / 50%)",
+    "active-line-gutter": "#32302f",
+    "syntax-keyword": "#fb4934",
+    "syntax-function": "#b8bb26",
+    "syntax-constant": "#d3869b",
+    "syntax-attribute": "#8ec07c",
+    "syntax-string": "#b8bb26",
+    "syntax-tag": "#b8bb26",
+    "syntax-punctuation": "#83a598",
+    "syntax-comment": "#928374"
+  },
+  "adjusted": [
+    {
+      "token": "text-muted",
+      "upstream": "#a89984",
+      "value": "#c2b8a9",
+      "reason": "#a89984 reads 3.17:1 on hover; HSL lightness raised from 58.8% to 71.2%, hue and saturation kept, to the first value reading 4.5:1 on surface, surface-raised and hover (4.51 on hover, the lowest)"
+    },
+    {
+      "token": "error",
+      "upstream": "#fb4934",
+      "value": "#fb533f",
+      "reason": "#fb4934 reads 4.29:1 on surface; HSL lightness raised from 59.4% to 61.6%, hue and saturation kept, to the first value reading 4.5:1 on surface (4.50)"
+    }
+  ]
+}

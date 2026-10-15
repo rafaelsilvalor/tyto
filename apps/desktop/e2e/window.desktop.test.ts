@@ -634,6 +634,10 @@ describe('switching the language', () => {
     'theme.pick.placeholder',
     'theme.kind.light',
     'theme.kind.dark',
+    // TYTO-300: beside a theme pack's original or adjusted twin, inside the same bar.
+    // `e2e/theme-pack.desktop.test.ts` reads both.
+    'theme.variant.original',
+    'theme.variant.adjusted',
     // TYTO-275: "New brief from template…", the picker's placeholder and the built-in pack's
     // name beside each template, all inside the bar and the File menu.
     // `e2e/new-from-template.desktop.test.ts` opens it.

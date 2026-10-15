@@ -1087,6 +1087,9 @@ export const IPC_CHANNELS = {
             id: z.string().min(1).max(200),
             label: z.string().min(1).max(200),
             kind: z.enum(THEME_KINDS),
+            // ADR 0089: which of a built-in original-and-adjusted pair this is, for the
+            // picker's detail line. Absent for every other theme.
+            variant: z.enum(['original', 'adjusted']).optional(),
           }),
         )
         .max(500),

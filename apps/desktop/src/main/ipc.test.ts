@@ -1277,6 +1277,31 @@ describe('the theme channels (TYTO-208)', () => {
     });
   });
 
+  // ADR 0089: a pack theme that ships as a pair says which twin it is; one that ships once and
+  // an installed theme say nothing.
+  it('says which of a pair a theme pack theme is', async () => {
+    const pack = (id: string, label: string) =>
+      ({ id, label, kind: 'dark', path: `themes/${id}.json` }) as const;
+    const list = [
+      pack('nord', 'Nord'),
+      pack('nord-adjusted', 'Nord (adjusted)'),
+      pack('catppuccin-mocha', 'Catppuccin Mocha'),
+      pack('dusk', 'Dusk'),
+    ];
+    const handlers = createHandlers({
+      ...dependencies(),
+      themes: { ...windowThemes(), list: () => Promise.resolve(list) },
+    });
+    expect(await guard('theme:list', handlers['theme:list'])({})).toEqual({
+      themes: [
+        { id: 'nord', label: 'Nord', kind: 'dark', variant: 'original' },
+        { id: 'nord-adjusted', label: 'Nord (adjusted)', kind: 'dark', variant: 'adjusted' },
+        { id: 'catppuccin-mocha', label: 'Catppuccin Mocha', kind: 'dark' },
+        { id: 'dusk', label: 'Dusk', kind: 'dark' },
+      ],
+    });
+  });
+
   it('previews a theme and says whether a choice was saved', async () => {
     const handlers = createHandlers(dependencies());
     const previewed = await guard('theme:preview', handlers['theme:preview'])({ id: 'tyto-light' });

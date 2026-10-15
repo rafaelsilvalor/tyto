@@ -3,14 +3,15 @@ Third-party colour palettes in @tyto/theme-pack
 
 Each theme in src/themes/ maps an upstream palette onto Tyto's 30 theme tokens (ADR 0077).
 The colours are the upstream's; the mapping onto Tyto's roles is this package's. A colour
-changed to meet a contrast floor (ADR 0089) is listed in the theme file's "adjusted" field
-with the value it replaced. Names are the upstream's; no logo or other branding is shipped.
+changed to meet a contrast floor (ADR 0089) is listed in the adjusted version's "adjusted"
+field with the value it replaced; such a theme also ships as the original, upstream exactly.
+Names are the upstream's; no logo or other branding is shipped.
 
 Values read on 2026-10-15 from the sources below.
 
 
-Dracula (src/themes/dracula.json)
----------------------------------
+Dracula (src/themes/dracula.json, dracula-adjusted.json)
+--------------------------------------------------------
 
 Source:   https://github.com/dracula/visual-studio-code/blob/main/src/dracula.yml
 Version:  2.25.1 (package.json on main), commit a08a206f2c8420ba3c05f0e8d01d43b2f933fdf8
@@ -25,7 +26,9 @@ Mapping:  surface = BG, surface-raised = BGLight, surface-sunken = BGDark, hairl
           over BG. Syntax from tokenColors: keyword and tag PINK, function and attribute
           GREEN, constant PURPLE, string YELLOW, punctuation FG, comment COMMENT. Upstream
           has no scrim or shadow colour; those are Tyto Dark's.
-Adjusted: text-muted, #6272a4 -> #9fa9c7 (see the theme file).
+Adjusted: ships twice (ADR 0089 decision 7): Dracula, upstream exactly, and
+          Dracula (adjusted), which changes, in src/themes/dracula-adjusted.json:
+            text-muted      #6272a4 -> #9fa9c7
 
 The MIT License (MIT)
 
@@ -69,7 +72,7 @@ Mapping:  by the style guide. surface = Base, surface-raised = Mantle, surface-s
           Mauve, function Blue, constant Peach, attribute Yellow, string Green, tag Pink
           (escape sequences share the role), punctuation and comment Overlay 2. Upstream has
           no scrim or shadow colour; those are Tyto Light's.
-Adjusted: nothing.
+Adjusted: nothing; ships once.
 
 MIT License
 
@@ -92,3 +95,312 @@ AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
 LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
+
+
+Catppuccin Mocha (src/themes/catppuccin-mocha.json)
+---------------------------------------------------
+
+Files:     src/themes/catppuccin-mocha.json
+Source:    https://github.com/catppuccin/palette/blob/main/palette.json (colours) and
+          https://github.com/catppuccin/catppuccin/blob/main/docs/style-guide.md (roles)
+Version:   palette 1.8.0, commit 07d02aa110ef9eb7e7427afca5c73ba9cf7f8ebd
+Licence:  MIT
+
+Mapping:   As Catppuccin Latte above, with the Mocha flavour's colours. Upstream has no scrim
+          or shadow colour; those are Tyto Dark's.
+Adjusted: nothing; ships once.
+
+The MIT notice is the Catppuccin one above.
+
+
+One Dark (src/themes/one-dark.json, one-dark-adjusted.json)
+-----------------------------------------------------------
+
+Files:     src/themes/one-dark.json, src/themes/one-dark-adjusted.json
+Source:    https://github.com/atom/atom/tree/master/packages/one-dark-syntax
+          (styles/colors.less, styles/syntax-variables.less) and
+          https://github.com/atom/atom/tree/master/packages/one-dark-ui
+          (styles/ui-variables-custom.less, styles/ui-variables.less)
+Version:   one-dark-syntax 1.8.4 and one-dark-ui 1.12.5 (package.json), commit
+          1c3bd35ce238dc0491def9e1780d04748d8e18af
+Licence:  MIT
+
+Mapping:   Less's hsl(), darken() and lighten() worked out to hex. surface = @syntax-bg,
+          surface-raised = @level-3-color (tabs and tool panels), surface-sunken =
+          @input-background-color, border and hairline = @base-border-color, text = @mono-1,
+          text-muted = @mono-2, text-disabled and syntax-comment = @mono-3, accent and
+          focus-ring = @syntax-accent, accent-text = the dark side of @accent-text-color's
+          contrast(), selection = @syntax-selection-color, hover =
+          @background-color-highlight, error, warning, info and success =
+          @text-color-error/-warning/-info/-success, scrim = @overlay-backdrop-color at
+          @overlay-backdrop-opacity, active-line = @syntax-cursor-line, active-line-gutter =
+          it composited over surface. Syntax: keyword @hue-3, function @hue-2, constant and
+          attribute @hue-6, string @hue-4, tag @hue-5, punctuation @mono-1. Upstream has no
+          shadow colour; those are Tyto Dark's.
+Adjusted: ships twice (ADR 0089 decision 7): One Dark, upstream exactly, and
+          One Dark (adjusted), which changes, in src/themes/one-dark-adjusted.json:
+            text-muted      #828997 -> #989ea9
+            syntax-comment  #5c6370 -> #6c7584
+
+one-dark-syntax:
+
+Copyright (c) 2016 GitHub Inc.
+
+Permission is hereby granted, free of charge, to any person obtaining
+a copy of this software and associated documentation files (the
+"Software"), to deal in the Software without restriction, including
+without limitation the rights to use, copy, modify, merge, publish,
+distribute, sublicense, and/or sell copies of the Software, and to
+permit persons to whom the Software is furnished to do so, subject to
+the following conditions:
+
+The above copyright notice and this permission notice shall be
+included in all copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
+EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
+MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
+NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE
+LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION
+OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION
+WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+
+one-dark-ui:
+
+Copyright (c) 2014 GitHub Inc.
+
+Permission is hereby granted, free of charge, to any person obtaining
+a copy of this software and associated documentation files (the
+"Software"), to deal in the Software without restriction, including
+without limitation the rights to use, copy, modify, merge, publish,
+distribute, sublicense, and/or sell copies of the Software, and to
+permit persons to whom the Software is furnished to do so, subject to
+the following conditions:
+
+The above copyright notice and this permission notice shall be
+included in all copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
+EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
+MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
+NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE
+LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION
+OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION
+WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+
+
+Nord (src/themes/nord.json, nord-adjusted.json)
+-----------------------------------------------
+
+Files:     src/themes/nord.json, src/themes/nord-adjusted.json
+Source:    https://github.com/nordtheme/nord/blob/develop/src/nord.css (colours and the roles
+          in its comments)
+Version:   package.json 0.2.1, commit 1cef71605416a222e57225b544540ce0fcec18d4
+Licence:  MIT
+
+Mapping:   By the roles nord.css gives each colour. surface and surface-sunken = nord0,
+          surface-raised = nord1 (status bars), hairline = nord2, border = nord3, selection
+          and hover = nord2 (UI selection and highlight), text = nord4, text-muted,
+          text-disabled and syntax-comment = nord3 (comments, disabled elements), accent and
+          focus-ring = nord8 (primary UI elements), accent-text = nord0, error = nord11,
+          warning = nord13, info = nord8, success = nord14, active-line = nord2 (line
+          highlight) at 50 %, the translucency TYTO-246 needs, active-line-gutter = it
+          composited over nord0. Syntax: keyword and tag nord9, function nord8, constant
+          nord15 (numbers), attribute nord7, string nord14, punctuation nord6. Upstream has no
+          scrim or shadow colour; those are Tyto Dark's.
+Adjusted: ships twice (ADR 0089 decision 7): Nord, upstream exactly, and
+          Nord (adjusted), which changes, in src/themes/nord-adjusted.json:
+            text-muted      #4c566a -> #b5bcca
+            error           #bf616a -> #cf888f
+            syntax-comment  #4c566a -> #6f7d98
+
+MIT License (MIT)
+
+Copyright (c) 2016-present Sven Greb <development@svengreb.de> (https://www.svengreb.de)
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.
+
+
+Solarized Dark and Solarized Light (src/themes/solarized-*.json)
+----------------------------------------------------------------
+
+Files:     src/themes/solarized-dark.json, solarized-dark-adjusted.json, solarized-light.json,
+          solarized-light-adjusted.json
+Source:    https://github.com/altercation/solarized/blob/master/README.md (palette and roles)
+          and
+          https://github.com/altercation/solarized/blob/master/vim-colors-solarized/colors/solarized.vim
+          (syntax)
+Version:   commit 62f656a02f93c5190a8753159e34b385588d5ff3 (the repository has no release)
+Licence:  MIT
+
+Mapping:   By the README's roles: dark is base03 background, base02 background highlights,
+          base01 comments and secondary content, base0 body text; light swaps to base3, base2,
+          base1 and base00. surface and surface-sunken = background, surface-raised and
+          selection = background highlights, border, hairline, text-muted, text-disabled,
+          syntax-comment and syntax-punctuation (htmlTag) = comments, text = body, accent and
+          focus-ring = blue, accent-text = background, hover = comments at 25 % over
+          surface-raised, active-line = background highlights (CursorLine) at 50 %,
+          active-line-gutter = it composited over surface, error = red, warning = yellow, info
+          = cyan, success = green. Syntax from solarized.vim: keyword green (Statement),
+          function blue (Identifier), constant and string cyan (Constant), tag blue
+          (htmlTagName), attribute base00 / base0 (htmlArg). Upstream has no scrim or shadow
+          colour; those are Tyto Dark's and Tyto Light's.
+Adjusted: ships twice (ADR 0089 decision 7): Solarized Dark, upstream exactly, and
+          Solarized Dark (adjusted), which changes, in src/themes/solarized-dark-adjusted.json:
+            text            #839496 -> #8b9b9d
+            text-muted      #586e75 -> #99adb3
+            error           #dc322f -> #e56462
+            syntax-comment  #586e75 -> #5d747b
+Light:    ships twice (ADR 0089 decision 7): Solarized Light, upstream exactly, and
+          Solarized Light (adjusted), which changes, in src/themes/solarized-light-adjusted.json:
+            text            #657b83 -> #586c73
+            text-muted      #93a1a1 -> #535f5f
+            error           #dc322f -> #da2925
+            syntax-comment  #93a1a1 -> #829292
+
+Copyright (c) 2011 Ethan Schoonover
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in
+all copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
+THE SOFTWARE.
+
+
+Gruvbox Dark and Gruvbox Light (src/themes/gruvbox-*.json)
+----------------------------------------------------------
+
+Files:     src/themes/gruvbox-dark.json, gruvbox-dark-adjusted.json, gruvbox-light.json,
+          gruvbox-light-adjusted.json
+Source:    https://github.com/gruvbox-community/gruvbox/blob/master/colors/gruvbox.vim
+Version:   commit 180ad85971343df68be3422a5630fa84e45a9ab2 (the repository has no release),
+          contrast medium
+Licence:  MIT
+
+Mapping:   By gruvbox.vim's highlight groups; dark uses the bright accents, light the faded
+          ones. surface = bg0, surface-raised = bg1, surface-sunken = bg0 hard, hairline = bg3
+          (VertSplit), border and text-disabled = bg4, text = fg1 (Normal), text-muted = fg4,
+          selection = bg3 (Visual), hover = bg2 (Pmenu), accent = green (TabLineSel),
+          accent-text = bg0, focus-ring and info = blue, error = red, warning = yellow,
+          success = green, active-line = bg1 (CursorLine) at 50 %, active-line-gutter = it
+          composited over bg0. Syntax: keyword red, function green, constant purple, attribute
+          aqua (Field), string green, tag green, punctuation blue (Punctuation), comment gray.
+          Upstream has no scrim or shadow colour; those are Tyto Dark's and Tyto Light's.
+Adjusted: ships twice (ADR 0089 decision 7): Gruvbox Dark, upstream exactly, and
+          Gruvbox Dark (adjusted), which changes, in src/themes/gruvbox-dark-adjusted.json:
+            text-muted      #a89984 -> #c2b8a9
+            error           #fb4934 -> #fb533f
+Light:    ships twice (ADR 0089 decision 7): Gruvbox Light, upstream exactly, and
+          Gruvbox Light (adjusted), which changes, in src/themes/gruvbox-light-adjusted.json:
+            text-muted      #7c6f64 -> #5b5149
+
+MIT License
+
+Copyright (c) 2018 Pavel Pertsev
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.
+
+
+Tokyo Night and Tokyo Night Light (src/themes/tokyo-night*.json)
+----------------------------------------------------------------
+
+Files:     src/themes/tokyo-night.json, tokyo-night-adjusted.json, tokyo-night-light.json,
+          tokyo-night-light-adjusted.json
+Source:
+          https://github.com/enkia/tokyo-night-vscode-theme/blob/master/themes/tokyo-night-color-theme.json
+          and tokyo-night-light-color-theme.json
+Version:   package.json 1.1.2, commit 7c0f11eaef322f293621ca7befe462214b7ea468
+Licence:  MIT
+
+Mapping:   From the VS Code theme's workbench colours and tokenColors. surface =
+          editor.background, surface-raised = sideBar.background (tabs, title and status bar
+          share it), surface-sunken = input.background, border = input.border, hairline =
+          editorGroup.border, text = editor.foreground, text-muted = foreground (the UI's
+          text), text-disabled = disabledForeground, accent = tab.activeBorder, accent-text =
+          button.foreground, focus-ring = focusBorder, selection = editor.selectionBackground
+          composited over surface, hover = list.hoverBackground, error =
+          editorError.foreground, warning = editorWarning.foreground, info =
+          editorInfo.foreground, success = terminal.ansiGreen, active-line =
+          editor.lineHighlightBackground at 50 %, active-line-gutter = it composited over
+          surface. Syntax: keyword the 'Keyword' scope, function 'Function Definition',
+          constant 'Number, Boolean, Undefined, Null', attribute 'HTML Attributes', string
+          'String, Symbols', tag 'Tag', punctuation 'Operator, Misc', comment 'Comment'.
+          Upstream has no scrim or shadow colour; those are Tyto Dark's and Tyto Light's. The
+          repository's light theme is Tokyo Night Light; it has no 'Day'.
+Adjusted: ships twice (ADR 0089 decision 7): Tokyo Night, upstream exactly, and
+          Tokyo Night (adjusted), which changes, in src/themes/tokyo-night-adjusted.json:
+            text-muted      #787c99 -> #7e829d
+            error           #db4b4b -> #dd5656
+            syntax-comment  #51597d -> #5c658d
+            accent          #3d59a1 -> #4260ad
+Light:    ships twice (ADR 0089 decision 7): Tokyo Night Light, upstream exactly, and
+          Tokyo Night Light (adjusted), which changes, in src/themes/tokyo-night-light-adjusted.json:
+            error           #bd4040 -> #b73e3e
+            syntax-comment  #888b94 -> #81848e
+
+The MIT License (MIT)
+
+Copyright (c) 2018-present Enkia
+
+Permission is hereby granted, free of charge, to any person obtaining
+a copy of this software and associated documentation files (the
+"Software"), to deal in the Software without restriction, including
+without limitation the rights to use, copy, modify, merge, publish,
+distribute, sublicense, and/or sell copies of the Software, and to
+permit persons to whom the Software is furnished to do so, subject to
+the following conditions:
+
+The above copyright notice and this permission notice shall be
+included in all copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
+EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
+MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
+NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE
+LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION
+OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION
+WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.

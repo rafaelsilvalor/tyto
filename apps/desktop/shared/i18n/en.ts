@@ -234,6 +234,8 @@ export const en: Catalogue = {
   'theme.pick.placeholder': 'Select a color theme',
   'theme.kind.light': 'light',
   'theme.kind.dark': 'dark',
+  'theme.variant.original': 'original colors',
+  'theme.variant.adjusted': 'adjusted for contrast',
   'command.document.newFromTemplate': 'New brief from template…',
   'template.pick.placeholder': 'Select a template',
   'template.root.builtIn': 'built-in',
