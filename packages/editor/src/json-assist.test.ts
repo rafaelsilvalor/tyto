@@ -129,5 +129,25 @@ describe('the JSON tabs’ hover', () => {
     expect(dom.querySelector('b')).toBeNull();
     expect(dom.querySelector('.cm-json-hover-text')?.textContent).toBe('<b>not markup</b>');
     expect(dom.querySelector('.cm-json-hover-fact')?.textContent).toBe('Default: "badge"');
+    expect(dom.querySelector('.cm-json-hover-items')).toBeNull();
+  });
+
+  it('writes a list one line per item, name and sentence', () => {
+    const dom = hoverDom({
+      from: 0,
+      to: 1,
+      title: 'statusBarColors',
+      text: 'Colours.',
+      facts: [],
+      items: [
+        { name: 'background', description: "The bar's background." },
+        { name: 'bare', description: '' },
+      ],
+    });
+    const lines = [...dom.querySelectorAll('.cm-json-hover-items > li')].map(
+      (line) => line.textContent,
+    );
+    expect(lines).toEqual(["background — The bar's background.", 'bare']);
+    expect(dom.querySelector('.cm-json-hover-name')?.textContent).toBe('background');
   });
 });

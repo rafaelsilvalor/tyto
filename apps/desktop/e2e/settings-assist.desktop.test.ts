@@ -221,8 +221,16 @@ describe('the settings tab’s suggestions and hover', () => {
     await expect.poll(() => hoverText(page), { timeout: 15_000 }).toMatch(/win over the theme/u);
     const text = await hoverText(page);
     expect(text).toContain('Default: {}');
-    expect(text).toContain('"vimMode.normal"');
-    expect(text).toContain('"background"');
+    // Each key once, with its own sentence, and the description's prose list left out.
+    expect(text.split('vimMode.normal')).toHaveLength(2);
+    expect(text).toContain("background — The bar's background.");
+    // Shorter than the editor, so it never covers the whole window.
+    const heights = await page.evaluate(() => ({
+      tooltip: document.querySelector('.cm-tooltip-hover')?.getBoundingClientRect().height ?? 0,
+      editor: document.querySelector('#editor')?.getBoundingClientRect().height ?? 0,
+    }));
+    expect(heights.tooltip).toBeGreaterThan(0);
+    expect(heights.tooltip).toBeLessThan(heights.editor);
   });
 
   it('still lists a bad value in the problems panel', async () => {
@@ -268,13 +276,13 @@ describe.runIf(shots !== undefined)('pictures of the help, for the card', () => 
       const scratch = mkdtempSync(join(tmpdir(), 'tyto-settings-assist-shots-'));
       const { app, page } = await launch(
         scratch,
-        `{\n  "theme": "${theme}",\n  "statusBarColors": {},\n  \n}\n`,
+        `{\n  "theme": "${theme}",\n  "statusBarItems": ["leftArea"],\n  "statusBarColors": {},\n  \n}\n`,
       );
       try {
         mkdirSync(shots!, { recursive: true });
         await openSettings(page);
         await page.waitForTimeout(500);
-        await endOfLine(page, 3);
+        await endOfLine(page, 4);
         await page.keyboard.type('"');
         await waitForList(page, ['vimModeStyle'], true);
         await page.screenshot({ path: join(shots!, `${theme}-keys.png`) });
@@ -288,6 +296,13 @@ describe.runIf(shots !== undefined)('pictures of the help, for the card', () => 
         await hoverOver(page, 'statusBarColors');
         await expect.poll(() => hoverText(page), { timeout: 15_000 }).toMatch(/win over/u);
         await page.screenshot({ path: join(shots!, `${theme}-hover-status-bar-colors.png`) });
+        if (theme === 'tyto-light') {
+          await page.mouse.move(0, 0);
+          await expect.poll(() => hoverText(page)).toBe('');
+          await hoverOver(page, 'statusBarItems');
+          await expect.poll(() => hoverText(page), { timeout: 15_000 }).toMatch(/leftArea —/u);
+          await page.screenshot({ path: join(shots!, `${theme}-hover-status-bar-items.png`) });
+        }
       } finally {
         await closeApp(app);
         rmSync(scratch, { recursive: true, force: true });

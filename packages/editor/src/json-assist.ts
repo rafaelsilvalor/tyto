@@ -59,6 +59,8 @@ export interface JsonHoverAnswer {
   readonly text?: string;
   /** Labelled lines under the text: a type, a default, the accepted values. */
   readonly facts: readonly { readonly label: string; readonly value: string }[];
+  /** A list under the facts, one line each: `name — description` (TYTO-304). */
+  readonly items?: readonly { readonly name: string; readonly description: string }[];
 }
 
 export interface JsonAssistSource {
@@ -131,6 +133,18 @@ export function hoverDom(answer: JsonHoverAnswer): HTMLElement {
     label.className = 'cm-json-hover-label';
     label.textContent = `${fact.label}: `;
     line.appendChild(document.createTextNode(fact.value));
+  }
+  if (answer.items !== undefined && answer.items.length > 0) {
+    const list = root.appendChild(document.createElement('ul'));
+    list.className = 'cm-json-hover-items';
+    for (const item of answer.items) {
+      const entry = list.appendChild(document.createElement('li'));
+      const name = entry.appendChild(document.createElement('span'));
+      name.className = 'cm-json-hover-name';
+      name.textContent = item.name;
+      if (item.description !== '')
+        entry.appendChild(document.createTextNode(` — ${item.description}`));
+    }
   }
   return root;
 }

@@ -259,7 +259,18 @@ export const panelStyles = {
     padding: `${panels.paddingBlock} ${panels.paddingInline}`,
     fontSize: panels.textSize,
     maxWidth: '72ch',
+    // Never over the whole window: a long list scrolls inside the tooltip.
+    maxHeight: '60vh',
+    overflowY: 'auto',
+    // A long default such as statusBarItems' list is one JSON word; it wraps rather than scrolls.
+    overflowWrap: 'anywhere',
   },
+  '.cm-json-hover-items': {
+    margin: '0',
+    paddingInlineStart: panels.paddingInline,
+    listStyle: 'none',
+  },
+  '.cm-json-hover-name': { fontFamily: monoFont },
   '.cm-json-hover-title': { fontFamily: monoFont, fontWeight: panels.strong },
   '.cm-json-hover-label': { color: panels.muted },
   '.cm-completionIcon': { color: panels.muted },

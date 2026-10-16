@@ -34,6 +34,15 @@ export interface SettingsAssistLabels {
   readonly accepted: string;
 }
 
+/**
+ * The description up to its first full stop followed by a space, or all of it when it has none
+ * — a sentence that only ends at the end of the text is the whole text.
+ */
+export function firstSentence(description: string): string {
+  const stop = /[.!?](?=\s)/u.exec(description);
+  return stop === null ? description : description.slice(0, stop.index + 1);
+}
+
 /** A JSON value's text as the file writes it. */
 const jsonText = (value: SettingOption['value']): string => JSON.stringify(value);
 
@@ -222,6 +231,25 @@ export function settingsAssist(
         const setting = settingOf(node.value as string);
         if (setting === undefined) return null;
         const words = labels();
+        const parts = [...(setting.entries?.options ?? []), ...(setting.members?.options ?? [])];
+        // A list or an object whose entries are each described: those sentences once, one per
+        // line, under the description's first sentence. The setting's description lists them in
+        // prose too — it also writes the messages — and the two together ran to thirty lines.
+        if (parts.length > 0) {
+          return {
+            ...span,
+            title: setting.key,
+            text: firstSentence(setting.description),
+            facts: [
+              { label: words.type, value: setting.type },
+              { label: words.default, value: setting.default },
+            ],
+            items: parts.map((option) => ({
+              name: String(option.value),
+              description: option.description,
+            })),
+          };
+        }
         const accepted = [
           ...setting.options,
           ...(setting.entries?.options ?? []),

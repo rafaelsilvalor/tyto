@@ -62,7 +62,12 @@ key follows. A setting's values with their descriptions, booleans included. A `s
 id not already in the list. A `statusBarColors` member name not already in the object, with an
 empty colour and the caret between its quotes. A `theme` id from the registered themes. Hover on
 a key shows its description, type, default and accepted values; on a member name, what it
-paints. The descriptions stay English, one source; the hover's three labels go through the
+paints. For a setting whose entries or members carry options (`statusBarItems`,
+`statusBarColors`) the hover shows the description's first sentence, the type and the default,
+then each option once, `name — sentence`, one per line: those descriptions list the options in
+prose for the messages, and both together ran to thirty lines (Rafael's call, 2026-10-16). The
+descriptions themselves are untouched. The tooltip is capped at 60% of the window's height and
+scrolls. The descriptions stay English, one source; the hover's three labels go through the
 catalogue. The existing diagnostics are unchanged, and lint and hover tooltips coexist. With vim
 on, the list works in insert mode; no key is bound beyond CodeMirror's own completion keymap,
 which a brief tab already has.
