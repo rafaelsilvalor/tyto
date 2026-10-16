@@ -6,6 +6,8 @@ import {
   type KeybindingInput,
   COMMAND_BAR_KEY,
   COMMAND_BAR_TOGGLE,
+  KEYBINDING_CONTEXTS,
+  KEYBINDING_CONTEXT_DESCRIPTIONS,
   bindingsOf,
   concreteKey,
   keyOfStroke,
@@ -178,5 +180,16 @@ describe('reading the table', () => {
       bindingsOf({ id: 'x', bindings: [{ key: 'Ctrl-Meta-k', command: 'a' }] }, 'darwin'),
     ).toEqual({ a: 'Ctrl⌘k' });
     expect(shownBindingsOf(resolve([]).table, false, 'darwin')['editor.redo']).toBe('⌘⇧z');
+  });
+});
+
+describe('what each context means (TYTO-304)', () => {
+  it('has one sentence for every context and for no other name', () => {
+    expect(Object.keys(KEYBINDING_CONTEXT_DESCRIPTIONS).sort()).toEqual(
+      [...KEYBINDING_CONTEXTS].sort(),
+    );
+    for (const context of KEYBINDING_CONTEXTS) {
+      expect(KEYBINDING_CONTEXT_DESCRIPTIONS[context]).toMatch(/^[A-Z].+\.$/u);
+    }
   });
 });

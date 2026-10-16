@@ -43,6 +43,20 @@ export const KEYBINDING_CONTEXTS = [
 
 export type KeybindingContext = (typeof KEYBINDING_CONTEXTS)[number];
 
+/**
+ * What each context means, in one sentence a person reads beside the name: the keybindings tab
+ * suggests and explains `when` from this table (TYTO-304). A `Record` over the closed list, so a
+ * context added above without its sentence fails the typecheck.
+ */
+export const KEYBINDING_CONTEXT_DESCRIPTIONS: Readonly<Record<KeybindingContext, string>> = {
+  editor: 'The editor has focus, in either input mode.',
+  'vim.normal': 'Vim mode is on and the engine is in normal mode.',
+  'vim.insert': 'Vim mode is on and the engine is in insert mode.',
+  'mode.desktop': 'The editor has focus and vim mode is off.',
+  commandBar: 'The command bar is open.',
+  panel: 'Focus is in a panel other than the editor, and the command bar is closed.',
+};
+
 /** The contexts CodeMirror answers; the other two, and global keys, are the window's. */
 export const EDITOR_CONTEXTS: ReadonlySet<KeybindingContext> = new Set(
   KEYBINDING_CONTEXTS.slice(0, 4),

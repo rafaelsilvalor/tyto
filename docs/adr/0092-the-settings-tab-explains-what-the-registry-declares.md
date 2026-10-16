@@ -80,7 +80,27 @@ which a brief tab already has.
 - `apps/desktop`: `settings:outline`, `settings-outline.ts` in main, `settings-assist.ts` and
   `assistOf` in the renderer, three catalogue keys.
 - `keybindings.json` gets its own source through the same `jsonAssist` door in a second pull
-  request of TYTO-304: command ids with their titles, and the closed set of contexts.
+  request of TYTO-304: command ids with their titles, and the closed set of contexts. Done; see
+  the amendment below.
 - Not done here: suggestions inside `theme`'s `{ mode, light, dark }` form, and in `queueKinds`;
   a setting's description translated; a settings screen with controls (still a text file, with
   help).
+
+## Amendment — 2026-10-16, the keybindings tab (TYTO-304, second pull request)
+
+The `keybindings.json` tab gets the same help through the same door, with no new channel: the
+commands live in the window's own registry, the one the resolver checks every entry against.
+`src/renderer/keybindings-assist.ts` is a pure source beside `settings-assist.ts`, plugged in by
+`assistOf('keybindings')`, so a tab opened by its command, one restored by the session and a
+follower in another group are built alike; the two sources share `json-location.ts`. Inside an
+entry it suggests the fields `key`, `command` and `when` not yet written, each with an empty
+value and the caret between its quotes. A `command`'s value lists every registered id — the
+whole registry, not only what is offered with the tab in front, since a key bound to export is a
+fine entry — with the command bar's title as its detail, then `-<id>` for each command that has a
+default key to remove. A `when`'s value lists the closed set of contexts, each with its sentence
+from `KEYBINDING_CONTEXT_DESCRIPTIONS`, a table beside `KEYBINDING_CONTEXTS` in
+`@tyto/editor`'s `keybindings.ts` and typed over it, so a context cannot be added without one.
+Hover on a command's id shows its title and the key it is on before the person's file; on a
+context, its sentence; on a field name, what the field is. The sentences stay English; the one
+label, "Default key", goes through the catalogue. A `key`'s value gets no suggestions, and the
+resolver's diagnostics are unchanged.
