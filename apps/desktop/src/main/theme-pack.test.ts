@@ -8,16 +8,17 @@ import {
 } from '@tyto/theme-pack';
 import { describe, expect, it } from 'vitest';
 
-import { closestPair, MINIMUM_MODE_DIFFERENCE } from './colour-difference.js';
+import { closestPair, colourDifference, MINIMUM_MODE_DIFFERENCE } from './colour-difference.js';
 import { UPSTREAM_BADGE_COLOURS, UPSTREAM_COLOURS } from './theme-pack-upstream.js';
 import { BASE_COLORS, builtInThemeSource, loadTheme, themeVariant } from './themes.js';
 
 /**
  * The themes Tyto distributes from `@tyto/theme-pack` (TYTO-300), held to ADR 0089: every one
- * sets all forty tokens and every value is a colour. A theme that ships once, and every
+ * sets all forty-two tokens and every value is a colour. A theme that ships once, and every
  * adjusted twin, meets AA on the pairs the window draws text on; an original is exempt from the
  * floors and is held instead to upstream's colours, recorded in `theme-pack-upstream.ts`. Vim's
- * mode badge is held to AA in every theme, originals included (TYTO-301).
+ * mode badge is held to AA in every theme, originals included (TYTO-301), and so is the editor's
+ * active indent guide, to 3:1 (TYTO-293).
  */
 
 interface Colour {
@@ -131,6 +132,28 @@ const keepsHueAndSaturation = (moved: string, source: string): boolean => {
   return Math.min(hueGap, 360 - hueGap) <= 2 && Math.abs(saturation - sourceSaturation) <= 0.02;
 };
 
+/**
+ * The editor's indent guides (TYTO-293, ADR 0088). A guide is `border`'s colour and decorative,
+ * held to no floor. The guide of the block holding the cursor is Tyto's derivation, as the badge
+ * is, so it is held in every theme, originals included: 3:1 on the surface, WCAG's floor for a
+ * graphical object, and ΔE2000 10 from the guide beside it, a difference seen at a glance.
+ */
+const ACTIVE_GUIDE_FLOOR = 3;
+
+/** Why a theme's active guide is what it is: `text-disabled`, or that with the lightness moved. */
+const activeGuideProblems = (colors: Readonly<Record<string, string>>): readonly string[] => {
+  const problems: string[] = [];
+  const active = colors['indent-guide-active']!;
+  if (colors['indent-guide'] !== colors['border']) problems.push('the guide is not border');
+  const ratio = contrast(active, colors['surface']!);
+  if (ratio < ACTIVE_GUIDE_FLOOR) problems.push(`active ${ratio.toFixed(2)}:1 on surface`);
+  const difference = colourDifference(active, colors['indent-guide']!);
+  if (difference < MINIMUM_MODE_DIFFERENCE) {
+    problems.push(`active ΔE ${difference.toFixed(1)} from the guide`);
+  }
+  return problems;
+};
+
 /** The colours a badge's text is chosen from: the best-reading of the three. */
 const BADGE_TEXT_ROLES = ['surface', 'text', 'accent-text'] as const;
 
@@ -198,9 +221,29 @@ describe.each(themes.map(({ theme, file }) => [theme.label, theme, file] as cons
       expect(file.name).toBe(theme.label);
     });
 
-    it('sets exactly the forty tokens of the base theme, leaning on no fallback', () => {
+    it('sets exactly the forty-two tokens of the base theme, leaning on no fallback', () => {
       expect(Object.keys(file.colors).sort()).toEqual(Object.keys(BASE_COLORS[theme.kind]).sort());
-      expect(Object.keys(file.colors)).toHaveLength(40);
+      expect(Object.keys(file.colors)).toHaveLength(42);
+    });
+
+    // Held in originals too: the guide is Tyto's, never upstream's (TYTO-293).
+    it('draws the guide in border and the active guide 3:1 and ΔE 10 apart from it', () => {
+      expect(activeGuideProblems(file.colors)).toEqual([]);
+    });
+
+    it('draws the active guide in text-disabled, or moves only its lightness and says why', () => {
+      const note = file.derived.find((entry) => entry.token === 'indent-guide-active');
+      if (note === undefined) {
+        expect(colour('indent-guide-active')).toBe(colour('text-disabled'));
+        return;
+      }
+      expect(note.role).toBe('text-disabled');
+      expect(note.value).toBe(colour('indent-guide-active'));
+      expect(keepsHueAndSaturation(note.value, colour('text-disabled'))).toBe(true);
+      // Moved only because text-disabled itself fails the rule.
+      expect(
+        activeGuideProblems({ ...file.colors, 'indent-guide-active': colour('text-disabled') }),
+      ).not.toEqual([]);
     });
 
     // The badge is Tyto's derivation, never upstream's, so an original is held here too.
@@ -266,11 +309,14 @@ describe.each(themes.map(({ theme, file }) => [theme.label, theme, file] as cons
       expect(candidates).toContain(colour(`status-bar-vim-${mode}-text`));
     });
 
-    it('notes only badge colours, each once', () => {
+    it('notes only badge colours and the active guide, each once', () => {
       const tokens = file.derived.map((entry) => entry.token);
       expect(new Set(tokens).size).toBe(tokens.length);
       for (const token of tokens) {
-        expect(BADGES.map(([mode]) => `status-bar-vim-${mode}`)).toContain(token);
+        expect([
+          ...BADGES.map(([mode]) => `status-bar-vim-${mode}`),
+          'indent-guide-active',
+        ]).toContain(token);
       }
     });
 
@@ -366,3 +412,11 @@ describe.each(themes.map(({ theme, file }) => [theme.label, theme, file] as cons
     }
   },
 );
+
+// The built-in two are the token file's colours (ADR 0077) and draw the guides by the same rule.
+describe.each(['light', 'dark'] as const)('Tyto %s', (kind) => {
+  it('draws the guide in border and the active guide 3:1 and ΔE 10 apart from it', () => {
+    expect(activeGuideProblems(BASE_COLORS[kind])).toEqual([]);
+    expect(BASE_COLORS[kind]['indent-guide-active']).toBe(BASE_COLORS[kind]['text-disabled']);
+  });
+});

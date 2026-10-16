@@ -42,7 +42,9 @@
     "status-bar-vim-visual": "#cf2d7c",
     "status-bar-vim-visual-text": "#fdf6e3",
     "status-bar-vim-replace": "#da2925",
-    "status-bar-vim-replace-text": "#fdf6e3"
+    "status-bar-vim-replace-text": "#fdf6e3",
+    "indent-guide": "#93a1a1",
+    "indent-guide-active": "#738484"
   },
   "adjusted": [
     {
@@ -98,6 +100,12 @@
         "value": "#d33682"
       },
       "reason": "distinct from insert: syntax-keyword #859900 would draw visual in insert's colour; Solarized's magenta, which no token carries, #d33682 reads 4.21:1 at best against surface, text and accent-text; HSL lightness moved from 52.0% to 49.6%, hue and saturation kept, to the first value reading 4.5:1 (4.51 on surface)"
+    },
+    {
+      "token": "indent-guide-active",
+      "role": "text-disabled",
+      "value": "#738484",
+      "reason": "text-disabled #93a1a1 reads 2.48:1 on surface and ΔE 0.0 from the guide (border #93a1a1); HSL lightness moved from 60.4% to 48.4%, reading 3.63:1 and ΔE 10.1"
     }
   ]
 }

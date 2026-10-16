@@ -29,7 +29,15 @@ describe("the app's settings outline", () => {
       'statusBarItems',
       'statusBarColors',
       'vimModeStyle',
+      'indentGuides',
     ]);
+  });
+
+  it('offers indentGuides on and off, each with what it does (TYTO-293)', () => {
+    const guides = setting('indentGuides');
+    expect(guides?.options.map((option) => option.value)).toEqual([true, false]);
+    expect(guides?.options[0]?.description).toMatch(/indent level/u);
+    expect(guides?.default).toBe('true');
   });
 
   it("offers vimModeStyle's three styles with what each does", () => {

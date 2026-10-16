@@ -42,8 +42,17 @@
     "status-bar-vim-visual": "#c678dd",
     "status-bar-vim-visual-text": "#001133",
     "status-bar-vim-replace": "#ff6347",
-    "status-bar-vim-replace-text": "#001133"
+    "status-bar-vim-replace-text": "#001133",
+    "indent-guide": "#181a1f",
+    "indent-guide-active": "#6c7584"
   },
   "adjusted": [],
-  "derived": []
+  "derived": [
+    {
+      "token": "indent-guide-active",
+      "role": "text-disabled",
+      "value": "#6c7584",
+      "reason": "text-disabled #5c6370 reads 2.32:1 on surface and ΔE 24.2 from the guide (border #181a1f); HSL lightness moved from 40.0% to 47.1%, reading 3.01:1 and ΔE 30.7"
+    }
+  ]
 }

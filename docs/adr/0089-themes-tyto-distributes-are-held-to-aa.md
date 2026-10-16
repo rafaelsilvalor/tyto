@@ -44,8 +44,9 @@ the line that marks the tab in front is a graphical object.
 so a selection drawn behind it shows (TYTO-246), and composited over `surface` it equals
 `active-line-gutter` within 1 per channel.
 
-**3. Every distributed theme sets all 40 tokens** (30 until TYTO-301 added the status bar's
-ten, decision 8). No token leans on the base theme's
+**3. Every distributed theme sets all 42 tokens** (30 until TYTO-301 added the status bar's
+ten, decision 8; 40 until TYTO-293 added the editor's two indent guide colours, ADR 0088, whose
+active one is held to 3:1 in every theme, originals included). No token leans on the base theme's
 fallback: a fallback colour is Tyto's, measured against Tyto's surfaces, and nothing proves it
 reads on a ported theme's.
 

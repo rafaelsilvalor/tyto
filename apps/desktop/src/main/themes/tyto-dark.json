@@ -41,6 +41,8 @@
     "status-bar-vim-visual": "#b477cf",
     "status-bar-vim-visual-text": "#1c1f24",
     "status-bar-vim-replace": "#d87b80",
-    "status-bar-vim-replace-text": "#1c1f24"
+    "status-bar-vim-replace-text": "#1c1f24",
+    "indent-guide": "#464b57",
+    "indent-guide-active": "#878a98"
   }
 }
