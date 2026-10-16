@@ -565,6 +565,8 @@ async function start(): Promise<void> {
   const documents = createDocumentService({
     recent: fileRecentFiles(join(app.getPath('userData'), 'recent-files.json')),
     unlisted: [settingsFile, keybindingsFile, snippetsFile],
+    // What a tab's folder is shortened against on hover (ADR 0086), asked at each open.
+    home: () => app.getPath('home'),
     dialogs: {
       openBrief: async () => {
         const answer = await dialog.showOpenDialog({

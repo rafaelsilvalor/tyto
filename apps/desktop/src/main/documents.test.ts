@@ -61,7 +61,7 @@ const dialogs = (answers: { open?: string; save?: string }): FileDialogs => ({
 });
 
 describe('opening', () => {
-  it('hands back the text and the name, and never the folder', async () => {
+  it('hands back the text, the name and the folder to show, and nothing else', async () => {
     const service = createDocumentService({
       dialogs: dialogs({ open: BRIEF }),
       recent: recentFiles(),
@@ -71,7 +71,12 @@ describe('opening', () => {
     const answer = await service.open(TAB);
 
     expect(answer).toEqual({
-      document: { path: BRIEF, name: 'campanha.brief', text: '::titulo Olá' },
+      document: {
+        path: BRIEF,
+        name: 'campanha.brief',
+        pathLabel: BRIEF,
+        text: '::titulo Olá',
+      },
       documentId: TAB,
     });
   });
@@ -362,7 +367,12 @@ describe('opening a path main chose (TYTO-45)', () => {
     const answer = await service.openPath(TAB, TASK);
 
     expect(answer).toEqual({
-      document: { path: TASK, name: 'brief.brief', text: '::titulo Tarefa' },
+      document: {
+        path: TASK,
+        name: 'brief.brief',
+        pathLabel: TASK,
+        text: '::titulo Tarefa',
+      },
       documentId: TAB,
     });
     // The folder is what a save and the preview's assets resolve against, like any tab.
@@ -439,5 +449,75 @@ describe('opening a path main chose (TYTO-45)', () => {
     service.retarget(TASK, at('fila', 'done', 'tarefa-1', 'brief.brief'));
 
     expect(service.folderOf(TAB)).toBe(at('briefs'));
+  });
+});
+
+describe('the path a tab shows on hover (TYTO-288, ADR 0086)', () => {
+  const HOME = ['', 'home', 'rafael'].join(SEP).replace(/^\\/u, 'C:\\');
+  const IN_HOME = [HOME, 'Documentos', 'campanha.brief'].join(SEP);
+  const OUTSIDE = (process.platform === 'win32' ? ['D:', 'briefs'] : ['', 'srv', 'briefs'])
+    .concat('promo.brief')
+    .join(SEP);
+  const shown = (path: string): string => path.replace(HOME, '~');
+
+  it('writes the home directory as ~ on every door a file comes in by', async () => {
+    const recent = recentFiles([{ path: OUTSIDE, name: 'promo.brief' }]);
+    const service = createDocumentService({
+      dialogs: dialogs({ open: IN_HOME, save: OUTSIDE }),
+      recent,
+      home: () => HOME,
+      disk: disk({ [IN_HOME]: 'a', [OUTSIDE]: 'b' }),
+    });
+
+    const opened = await service.open(TAB);
+    const reopened = await service.reopen(OTHER_TAB, OUTSIDE);
+    const chosen = await service.openPath('document-3', IN_HOME);
+    const saved = await service.save('document-4', 'c', true);
+
+    expect(opened.document?.pathLabel).toBe(`~${SEP}Documentos${SEP}campanha.brief`);
+    expect(opened.document?.pathLabel).toBe(shown(IN_HOME));
+    // A path outside the home directory is shown whole.
+    expect(reopened.document?.pathLabel).toBe(OUTSIDE);
+    expect(chosen.document?.pathLabel).toBe(`~${SEP}Documentos${SEP}campanha.brief`);
+    expect(saved.document?.pathLabel).toBe(OUTSIDE);
+  });
+
+  it('follows a save-as into another folder', async () => {
+    const service = createDocumentService({
+      dialogs: dialogs({ open: IN_HOME, save: OUTSIDE }),
+      recent: recentFiles(),
+      home: () => HOME,
+      disk: disk({ [IN_HOME]: 'a' }),
+    });
+    await service.open(TAB);
+
+    const saved = await service.save(TAB, 'a', true);
+
+    expect(saved.document?.pathLabel).toBe(OUTSIDE);
+  });
+
+  it('is not a key: a reopen by the label is refused like any path nobody offered', async () => {
+    // The containment ADR 0010 states, unchanged: the label went to the window to be shown, and
+    // handing it back opens nothing, because it is not in the list main wrote.
+    const service = createDocumentService({
+      dialogs: dialogs({ open: IN_HOME }),
+      recent: recentFiles(),
+      home: () => HOME,
+      disk: disk({ [IN_HOME]: 'a' }),
+    });
+    const opened = await service.open(TAB);
+    const label = opened.document?.pathLabel ?? '';
+
+    await expect(service.reopen(OTHER_TAB, label)).resolves.toEqual({
+      document: null,
+      documentId: null,
+      missing: false,
+    });
+    // Nor is the folder part of it with another name, a path the window could make up from it.
+    const folder = label.slice(0, label.lastIndexOf(SEP));
+    await expect(service.reopen(OTHER_TAB, `${folder}${SEP}outro.brief`)).resolves.toMatchObject({
+      document: null,
+      missing: false,
+    });
   });
 });

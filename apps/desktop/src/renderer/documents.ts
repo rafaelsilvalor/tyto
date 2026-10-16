@@ -36,6 +36,12 @@ export interface DocumentState {
   /** The file's name, or nothing for a brief that has never been saved. */
   readonly name: string | undefined;
   /**
+   * Where the file is, as main wrote it for the tab's tooltip — its path with the home directory
+   * as `~` (TYTO-288, ADR 0086) — or nothing for a document in no file. **Shown, never sent**:
+   * nothing in the window hands it back to main, and nothing there would accept it.
+   */
+  readonly pathLabel?: string | undefined;
+  /**
    * `settings` for the app's own `settings.json` (TYTO-206): plain text, checked by main
    * against what the plugins declared instead of compiled. `keybindings` for
    * `keybindings.json` (TYTO-207): plain text, checked in the window against the command
@@ -195,6 +201,7 @@ export function newDocument(id: string, state?: EditorState): DocumentState {
   return {
     id,
     name: undefined,
+    pathLabel: undefined,
     // In no file, and holding nothing — so `isUnsaved` answers false and goes on answering
     // it until somebody types. The tab the window opens on is clean by comparison rather
     // than by a `dirty: false` anybody had to write here.
@@ -311,6 +318,8 @@ export function releaseDocument(workspace: Workspace, id: string): Workspace {
   return updateDocument(workspace, id, (document) => ({
     ...document,
     name: undefined,
+    // In no file any more, so nowhere either: the tooltip goes with the name.
+    pathLabel: undefined,
     savedText: '',
   }));
 }

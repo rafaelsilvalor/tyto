@@ -1,4 +1,5 @@
 import { LitElement, type TemplateResult, html } from 'lit';
+import { ifDefined } from 'lit/directives/if-defined.js';
 import { repeat } from 'lit/directives/repeat.js';
 
 import { type Locale, DEFAULT_LOCALE, translate } from '../../shared/i18n/index.js';
@@ -23,6 +24,12 @@ export interface TabEntry {
   readonly id: string;
   /** The file's name, or the catalogue's word for a brief that has never been saved. */
   readonly label: string;
+  /**
+   * Where the file is — its path, home as `~` — shown on hover as the tab's `title` (TYTO-288,
+   * ADR 0086); for a preview, its brief's. Absent for a document in no file, whose tab then has no tooltip: the
+   * name is already on the tab, and repeating it would say nothing.
+   */
+  readonly where?: string;
   readonly dirty: boolean;
   /** TYTO-287: a preview tab, marked so a person and a suite can tell it from its brief's. */
   readonly preview?: boolean;
@@ -83,7 +90,7 @@ export class DocumentTabs extends LitElement {
         role="tab"
         class="tabs__name"
         aria-selected=${on ? 'true' : 'false'}
-        title=${entry.label}
+        title=${ifDefined(entry.where)}
         @click=${() => {
           this.select(entry.id);
         }}

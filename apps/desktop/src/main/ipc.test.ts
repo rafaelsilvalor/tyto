@@ -113,24 +113,38 @@ const documents = () => {
     closed,
     open: (documentId: string) =>
       Promise.resolve({
-        document: { path: '/briefs/promo.brief', name: 'promo.brief', text: '::a' },
+        document: {
+          path: '/briefs/promo.brief',
+          name: 'promo.brief',
+          pathLabel: '/briefs/promo.brief',
+          text: '::a',
+        },
         documentId,
       }),
     openPath: (documentId: string, path: string, label?: string) =>
       Promise.resolve({
-        document: { path, name: label ?? 'brief.brief', text: '::t' },
+        document: { path, name: label ?? 'brief.brief', pathLabel: path, text: '::t' },
         documentId,
       }),
     retarget: () => undefined,
     reopen: (documentId: string, path: string) =>
       Promise.resolve(
         path === '/briefs/promo.brief'
-          ? { document: { path, name: 'promo.brief', text: '::a' }, documentId, missing: false }
+          ? {
+              document: { path, name: 'promo.brief', pathLabel: path, text: '::a' },
+              documentId,
+              missing: false,
+            }
           : { document: null, documentId: null, missing: true },
       ),
     save: (_documentId: string, text: string) =>
       Promise.resolve({
-        document: { path: '/briefs/promo.brief', name: 'promo.brief', text },
+        document: {
+          path: '/briefs/promo.brief',
+          name: 'promo.brief',
+          pathLabel: '/briefs/promo.brief',
+          text,
+        },
         released: null,
       }),
     close: (documentId: string) => {
