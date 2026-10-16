@@ -311,6 +311,13 @@ describe('letting go of a file another tab saved over', () => {
     expect(documentOf(after, 'a')?.savedText).toBe('');
   });
 
+  it('takes the folder shown on hover off with the name (TYTO-288, ADR 0086)', () => {
+    const before = { ...holding('a', FIRST, FIRST), name: 'campanha.brief', folderLabel: '~/b' };
+    const after = releaseDocument({ documents: [before], activeId: 'a' }, 'a');
+
+    expect(documentOf(after, 'a')?.folderLabel).toBeUndefined();
+  });
+
   it('keeps every character, the state and the brief it already had', () => {
     // The whole reason the path moves rather than the text: a released tab is somebody's
     // work, and the only thing that stopped being true about it is where it is stored.

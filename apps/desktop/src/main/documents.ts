@@ -1,7 +1,9 @@
 import { access, readFile, writeFile } from 'node:fs/promises';
+import { homedir } from 'node:os';
 import { basename, dirname } from 'node:path';
 
 import { type IpcResponse } from '../../shared/ipc.js';
+import { folderLabelOf } from './folder-label.js';
 import { type RecentEntry, type RecentFiles } from './recent-files.js';
 
 /**
@@ -41,6 +43,12 @@ export interface DocumentServiceOptions {
    * `settings.json` (TYTO-206), which has a command of its own and is not a document of work.
    */
   readonly unlisted?: readonly string[];
+  /**
+   * The home directory a tab's folder is shortened against (TYTO-288, ADR 0086), asked at every
+   * open and save. Electron's `app.getPath('home')` in the app; the operating system's when
+   * absent.
+   */
+  readonly home?: () => string;
   /** Injected so a test can drive the whole service without touching a disk. */
   readonly disk?: {
     read(path: string): Promise<string>;
@@ -144,6 +152,14 @@ export function createDocumentService(options: DocumentServiceOptions): Document
   /** A display name some files carry instead of their own (see `openPath`), keyed by path. */
   const labels = new Map<string, string>();
   const nameFor = (path: string): string => labels.get(path) ?? basename(path);
+  const home = options.home ?? homedir;
+  /** What a document crosses the bridge as: its name, its folder to show, and its text. */
+  const describe = (path: string, text: string): OpenDocument => ({
+    path,
+    name: nameFor(path),
+    folderLabel: folderLabelOf(path, home()),
+    text,
+  });
 
   /** The tab already holding `path`, if any. See `file:open` in `shared/ipc.ts`. */
   const holderOf = (path: string): string | undefined => {
@@ -161,9 +177,9 @@ export function createDocumentService(options: DocumentServiceOptions): Document
     const holder = holderOf(path) ?? documentId;
     paths.set(holder, path);
 
-    const entry: RecentEntry = { path, name: nameFor(path) };
-    await remember(entry);
-    return { document: { path, name: entry.name, text }, documentId: holder };
+    const document = describe(path, text);
+    await remember({ path, name: document.name });
+    return { document, documentId: holder };
   };
 
   const nothing: AdoptedDocument = { document: null, documentId: null };
@@ -232,9 +248,9 @@ export function createDocumentService(options: DocumentServiceOptions): Document
       const released = previous !== undefined && previous !== documentId ? previous : null;
       if (released !== null) paths.delete(released);
 
-      const entry: RecentEntry = { path, name: nameFor(path) };
-      await remember(entry);
-      return { document: { path, name: entry.name, text }, released };
+      const document = describe(path, text);
+      await remember({ path, name: document.name });
+      return { document, released };
     },
 
     retarget(from, to) {

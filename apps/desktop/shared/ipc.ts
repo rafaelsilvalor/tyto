@@ -116,12 +116,18 @@ const settingOutline = z.object({
  * A brief the window has open, as both sides agree to describe one.
  *
  * `text` is what goes in the editor; `name` is what the title bar shows; `path` is the key
- * the recent list reopens by. No folder, no extension games, nothing the renderer could
- * turn into a second way to reach a disk.
+ * the recent list reopens by. No extension games, nothing the renderer could turn into a
+ * second way to reach a disk.
+ *
+ * `folderLabel` is the folder the file is in **as a sentence for the tab's tooltip**, with the
+ * home directory written `~` (TYTO-288, ADR 0086). It is for display only: the window never
+ * sends it back, no channel that opens or writes a file accepts it, and `file:reopen` still
+ * checks its path against the recent list before reading anything (ADR 0010).
  */
 const openDocument = z.object({
   path: z.string().min(1),
   name: z.string().min(1),
+  folderLabel: z.string().min(1),
   text: z.string(),
 });
 
@@ -586,11 +592,11 @@ export const IPC_CHANNELS = {
   /**
    * A brief on disk, as the renderer is allowed to know it (E9.8).
    *
-   * `name` and never the folder. The renderer paints a window title and a recent list, and
-   * neither needs to know where the file is — main holds the path, resolves the brief's
-   * assets against it, and is the only side that touches a disk (ADR 0010). `path` is here
-   * for one purpose and it is not navigation: it is the key a recent entry is reopened by,
-   * and main refuses any path that is not already in its own list.
+   * `name`, and the folder only as `folderLabel`, a sentence to show on hover (ADR 0086). Main
+   * holds the path, resolves the brief's assets against it, and is the only side that touches
+   * a disk (ADR 0010). `path` is here for one purpose and it is not navigation: it is the key
+   * a recent entry is reopened by, and main refuses any path that is not already in its own
+   * list.
    */
   'file:open': channel(
     z.object({
