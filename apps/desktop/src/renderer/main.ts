@@ -109,8 +109,14 @@ import {
   withCommandGate,
 } from './commands.js';
 import { FILE_MENU_COMMANDS } from '../../shared/commands.js';
-import { type StatusBar, type StatusBarCommands, STATUS_BAR_TAG } from './status-bar.js';
+import {
+  type StatusBar,
+  type StatusBarCommands,
+  STATUS_BAR_TAG,
+  paintVimStyle,
+} from './status-bar.js';
 import { type StatusBarItemId, STATUS_BAR_ITEM_IDS } from '../../shared/status-bar-items.js';
+import { type VimModeStyle } from '../../shared/vim-mode-style.js';
 import {
   type DocumentState,
   type Workspace,
@@ -2008,6 +2014,8 @@ function showTheme(bridge: TytoBridge, ask: () => Promise<IpcResponse<'theme:cur
       applyTheme(applied);
       // The bar's items ride on the theme answer, so a save of the setting repaints it live.
       statusBarItems = applied.statusBarItems;
+      // And so does how vim's mode is drawn (TYTO-301).
+      vimModeStyle = applied.vimModeStyle;
       panel.installation = withThemeRows(panel.installation, applied.diagnostics);
       repaint();
     },
@@ -3031,6 +3039,9 @@ let vimStatus: VimStatus | null = null;
  */
 let statusBarItems: readonly StatusBarItemId[] = STATUS_BAR_ITEM_IDS;
 
+/** The `vimModeStyle` setting, from the same answer (TYTO-301): the badge until it arrives. */
+let vimModeStyle: VimModeStyle = 'badge';
+
 /** The ids the status bar's buttons run; the area toggles are named by the bar itself. */
 const STATUS_COMMANDS: StatusBarCommands = {
   commandBar: COMMAND_BAR_TOGGLE,
@@ -3069,9 +3080,13 @@ function paintStatusBar(): void {
   bar.run = (id) => {
     runWindowCommand(id);
   };
+  const vim = editor?.isVimMode() === true ? vimStatus : null;
+  // The border and the whole bar are the footer's, which holds the bar (TYTO-301).
+  const foot = bar.closest<HTMLElement>('.shell__foot');
+  if (foot !== null) paintVimStyle(foot, vimModeStyle, vim);
   bar.state = {
     locale: state.locale,
-    vim: editor?.isVimMode() === true ? vimStatus : null,
+    vim,
     // The focused pane's caret (TYTO-286): a follower's selection is its own, not the record's.
     cursor: shownState === undefined ? { line: 1, column: 1, selected: 0 } : cursorOf(shownState),
     kind: activeKind() ?? 'brief',

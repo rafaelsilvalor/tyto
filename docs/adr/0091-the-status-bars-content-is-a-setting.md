@@ -1,7 +1,7 @@
 # 0091 — The status bar's content is a setting, and today's bar is the default
 
 Status: accepted · 2026-10-15 · TYTO-301 · amends ADR 0076 · amended 2026-10-15 (the bar's
-colours, `statusBarColors`)
+colours, `statusBarColors`) · amended 2026-10-16 (vim's mode style, `vimModeStyle`)
 
 ## Context
 
@@ -119,6 +119,48 @@ the key gives the theme's colours back. No channel is added.
 **The options are in the file.** A new `settings.json` carries `statusBarColors` commented out
 with every key, an example colour and what it paints; the setting's description lists them too.
 
+## Amendment, 2026-10-16: how vim's mode is shown is a setting
+
+**`vimModeStyle` is one of three words**, each drawing vim's mode in the mode's colour — the
+theme's `status-bar-vim-<mode>`, or `statusBarColors`' `vimMode.<mode>` over it:
+
+- `badge`, **the default**, the look before the setting: only the mode's name is coloured;
+- `border`: the bar keeps its colours (the theme's, or `background`/`foreground` over them) and
+  a strip of 2 px (`--tyto-status-bar-vim-strip`) along its top edge takes the mode's colour;
+  the mode's name is plain text in the item's colour;
+- `bar`: the whole bar takes the mode's colour, **over `statusBarColors.background`**, and its
+  text and icons take a colour chosen for it as a badge's text is: the best-reading of the
+  theme's `surface`, `text` and `accent-text` on that colour, per theme. The mode's name is
+  plain text on the coloured bar. `item.<id>` colours still win over that text and are still
+  not measured.
+
+With vim off every style draws the plain bar: the window sets `data-vim-mode` on the bar only
+while vim is on, and the border and the bar are drawn from it and `data-vim-style`.
+
+**The bar's text reads 4.5:1 in every theme Tyto ships.** `src/main/vim-mode-style.test.ts`
+measures the text `bar` writes on each of the four mode colours of the 22 themes; the lowest of
+the 88 is **4.501:1**, Gruvbox Dark's REPLACE (`#282828` on `#fb533f`), the floor the
+badge already met. A `vimMode.*` override is chosen for and warned about as before: the badge's
+check is the bar's, because the text is chosen by the same rule, so `W_SETTING_LOW_CONTRAST`
+sits at the value under `badge` and `bar` alike. Under `border` no text sits on the mode's
+colour, only the strip, and **the warning is not given**.
+
+**Hover and on stay readable on a coloured bar**: a hovered button keeps the theme's opaque
+`hover` with `text`, and a toggle that is on takes `surface` with `text` (`itemHover*` and
+`itemActive*` still win over both). `button-on` is a translucent grey, which on a mode's colour
+would leave `text` on a tinted mode colour, so it is not used there. Both pairs are ones the
+theme's own floors already hold readable, and both stand apart from every mode colour: the
+closest of the 176 pairs in the 22 themes is ΔE2000 **27.1** (Tokyo Night's `surface` on its
+NORMAL). On the coloured bar the error count, the "new" dot and the
+focus ring take the bar's text, since the theme's error, accent and focus colours are the
+mode colours replace and normal wear.
+
+**Live on save, through the same answer**, as `statusBarItems` and `statusBarColors`: the value
+rides on `theme:current`, and the theme sheet writes the bar's text for each mode under `bar`.
+A new `settings.json` carries the key commented out with the three values and what each does,
+and the setting's description says the same, value by value; a word that is not one of the
+three is `W_SETTING_INVALID` at the value, naming them, and the badge applies.
+
 ## Consequences
 
 - `plugin-api`: `ConfigurationContribution.entries` and `SettingEntry.entryRanges`, both
@@ -127,6 +169,7 @@ with every key, an example colour and what it paints; the setting's description 
 - `apps/desktop`: the seventh built-in setting; `status-bar.ts` draws from the list.
 - `plugin-api`: `ConfigurationContribution.members` and `SettingEntry.memberRanges` (amendment),
   both optional. `core`: `W_SETTING_LOW_CONTRAST`, a warning.
-- Not done here: the vim badge's style, dragging items, a plugin's
+- `apps/desktop` (amendment of 2026-10-16): the ninth built-in setting, `vimModeStyle`.
+- Not done here: dragging items, a plugin's
   own status items (when they arrive they get ids in the same list, prefixed by plugin id as
   their settings are), and completion or hover in the settings tab.

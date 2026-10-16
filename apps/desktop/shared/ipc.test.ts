@@ -225,6 +225,7 @@ describe('the theme the window applies (TYTO-208)', () => {
     iconStrokeWidth: 1.25,
     statusBarItems: ['problems', 'settings'],
     statusBarColors: {},
+    vimModeStyle: 'badge',
   });
 
   it('refuses a mode that is not one of the three', () => {

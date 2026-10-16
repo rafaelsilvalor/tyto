@@ -106,6 +106,7 @@ describe('fileSettingsStore', () => {
       iconStrokeWidth: DEFAULT_SETTINGS.iconStrokeWidth,
       statusBarItems: DEFAULT_SETTINGS.statusBarItems,
       statusBarColors: DEFAULT_SETTINGS.statusBarColors,
+      vimModeStyle: DEFAULT_SETTINGS.vimModeStyle,
     });
   });
 
@@ -127,6 +128,7 @@ describe('fileSettingsStore', () => {
       iconStrokeWidth: DEFAULT_SETTINGS.iconStrokeWidth,
       statusBarItems: DEFAULT_SETTINGS.statusBarItems,
       statusBarColors: DEFAULT_SETTINGS.statusBarColors,
+      vimModeStyle: DEFAULT_SETTINGS.vimModeStyle,
     });
   });
 
@@ -148,6 +150,7 @@ describe('fileSettingsStore', () => {
       iconStrokeWidth: DEFAULT_SETTINGS.iconStrokeWidth,
       statusBarItems: DEFAULT_SETTINGS.statusBarItems,
       statusBarColors: DEFAULT_SETTINGS.statusBarColors,
+      vimModeStyle: DEFAULT_SETTINGS.vimModeStyle,
     });
   });
 
@@ -168,6 +171,7 @@ describe('fileSettingsStore', () => {
       iconStrokeWidth: DEFAULT_SETTINGS.iconStrokeWidth,
       statusBarItems: DEFAULT_SETTINGS.statusBarItems,
       statusBarColors: DEFAULT_SETTINGS.statusBarColors,
+      vimModeStyle: DEFAULT_SETTINGS.vimModeStyle,
     });
   });
 

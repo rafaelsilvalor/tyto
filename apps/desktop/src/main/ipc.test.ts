@@ -480,6 +480,7 @@ const windowThemes = (): WindowThemes => {
     iconStrokeWidth: () => 1,
     statusBarItems: () => ['settings', 'problems'],
     statusBarColors: () => ({ background: '#1e3a5f', 'vimMode.normal': '#3b6fd9' }),
+    vimModeStyle: () => 'bar',
   };
 };
 
@@ -1271,6 +1272,8 @@ describe('the theme channels (TYTO-208)', () => {
     expect(answer.statusBarItems).toEqual(['settings', 'problems']);
     // And its colours over the theme's.
     expect(answer.statusBarColors).toEqual({ background: '#1e3a5f', 'vimMode.normal': '#3b6fd9' });
+    // And how vim's mode is drawn.
+    expect(answer.vimModeStyle).toBe('bar');
   });
 
   it('lists every theme with its label and kind, and nothing else', async () => {

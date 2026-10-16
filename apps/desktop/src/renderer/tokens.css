@@ -88,6 +88,8 @@
   --tyto-radius-full: 999px;
   --tyto-hairline-width: 1px;
   --tyto-focus-width: 2px;
+  /* The strip along the status bar's top edge under `vimModeStyle: "border"` (TYTO-301). */
+  --tyto-status-bar-vim-strip: 2px;
 
   /*
    * Every pane has a tab strip of this height (TYTO-288, ADR 0085) — an editor group, a preview,

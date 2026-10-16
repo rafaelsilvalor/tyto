@@ -59,7 +59,7 @@ export interface SettingsStore {
   write(changes: Partial<Settings>): Promise<Result<void, Diagnostics>>;
 }
 
-/** The built-in `desktop` plugin's eight, for a store composed without a plugin host. */
+/** The built-in `desktop` plugin's nine, for a store composed without a plugin host. */
 export const BUILT_IN_SETTINGS: readonly DeclaredSetting[] = settingContributions().map(
   (contribution) => declaredSetting(desktopManifest.name, false, contribution),
 );

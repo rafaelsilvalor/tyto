@@ -36,6 +36,7 @@ import {
 } from '../../shared/status-bar-colors.js';
 import { statusBarItemsExample } from '../../shared/status-bar-items.js';
 import { DEFAULT_THEME_SETTING, type ThemeSetting, modeOf } from '../../shared/theme-setting.js';
+import { vimModeStyleExample } from '../../shared/vim-mode-style.js';
 import { fileCredentialStore } from './credential-store.js';
 import { createCredentials } from './credentials.js';
 import { createDocumentService } from './documents.js';
@@ -111,12 +112,12 @@ const SETTINGS_SETTLE_MS = 100;
 /**
  * `settings.json` as "Open Settings (JSON)" creates it when there is none (TYTO-206). It
  * carries `statusBarItems` commented out with every id, and `statusBarColors` with every key
- * and an example colour (TYTO-301), so the bar's options are in the file the person is looking
- * at.
+ * and an example colour, and `vimModeStyle` with its three values (TYTO-301), so the bar's
+ * options are in the file the person is looking at.
  */
 const NEW_SETTINGS_FILE =
   '// Tyto settings: JSON with comments. Saving this file applies it, with no restart.\n{\n' +
-  `${statusBarItemsExample()}\n${statusBarColorsExample()}\n}\n`;
+  `${statusBarItemsExample()}\n${statusBarColorsExample()}\n${vimModeStyleExample()}\n}\n`;
 
 /** `keybindings.json` as "Open Keyboard Shortcuts (JSON)" creates it (TYTO-207, ADR 0074). */
 const NEW_KEYBINDINGS_FILE =
@@ -525,6 +526,8 @@ async function start(): Promise<void> {
   let statusBarItems = saved.statusBarItems;
   // And its colours over the theme's (TYTO-301), on the same answer.
   let statusBarColors = saved.statusBarColors;
+  // And how vim's mode is shown (TYTO-301), on the same answer.
+  let vimModeStyle = saved.vimModeStyle;
   // The themes a vim badge colour is measured in: the one the mode shows, or both when the
   // system chooses, since either may be in front.
   const themesInForce = (): readonly ThemeInForce[] => {
@@ -762,6 +765,7 @@ async function start(): Promise<void> {
       if (keys.includes('iconStrokeWidth')) iconStrokeWidth = next.iconStrokeWidth;
       if (keys.includes('statusBarItems')) statusBarItems = next.statusBarItems;
       if (keys.includes('statusBarColors')) statusBarColors = next.statusBarColors;
+      if (keys.includes('vimModeStyle')) vimModeStyle = next.vimModeStyle;
     },
     configure: (config) => {
       host.configure(config);
@@ -1140,6 +1144,7 @@ async function start(): Promise<void> {
       iconStrokeWidth: () => iconStrokeWidth,
       statusBarItems: () => statusBarItems,
       statusBarColors: () => statusBarColors,
+      vimModeStyle: () => vimModeStyle,
     },
     // After `ready`, as the panels are, so the window's first answer is the whole list.
     keymaps: async () => {

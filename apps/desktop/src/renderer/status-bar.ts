@@ -12,6 +12,7 @@ import {
   STATUS_BAR_ITEM_IDS,
   itemsOnSide,
 } from '../../shared/status-bar-items.js';
+import { type VimModeStyle } from '../../shared/vim-mode-style.js';
 import { toggleDockCommandId } from './commands.js';
 import { type IconName, icon } from './icons.js';
 
@@ -120,6 +121,23 @@ export type VimBadgeMode = (typeof VIM_BADGE_MODES)[number];
 export function vimBadgeMode(mode: string): VimBadgeMode {
   const word = mode.split(' ')[0] ?? '';
   return (VIM_BADGE_MODES as readonly string[]).includes(word) ? (word as VimBadgeMode) : 'normal';
+}
+
+/**
+ * Tells the bar's element — `.shell__foot`, which holds this one and the update notice — how
+ * vim's mode is drawn (TYTO-301, ADR 0091): `data-vim-style` is the `vimModeStyle` setting, and
+ * `data-vim-mode` the mode's colour while vim is on and absent while it is off, so with vim off
+ * every style is the plain bar. `shell.css` draws the border and the bar from the two; the
+ * badge stays this element's own.
+ */
+export function paintVimStyle(
+  foot: HTMLElement,
+  style: VimModeStyle,
+  vim: StatusBarState['vim'],
+): void {
+  foot.dataset['vimStyle'] = style;
+  if (vim === null) delete foot.dataset['vimMode'];
+  else foot.dataset['vimMode'] = vimBadgeMode(vim.mode);
 }
 
 export class StatusBar extends LitElement {

@@ -1,5 +1,10 @@
 import type { IpcResponse } from '../../shared/ipc.js';
-import { type StatusBarColors, statusBarOverride } from '../../shared/status-bar-colors.js';
+import {
+  type StatusBarColors,
+  VIM_COLOUR_MODES,
+  statusBarOverride,
+} from '../../shared/status-bar-colors.js';
+import { type VimModeStyle, vimBarText } from '../../shared/vim-mode-style.js';
 
 /**
  * Applies the colours main resolved for each system mode (TYTO-208, ADR 0077): the themes the
@@ -28,7 +33,9 @@ const SHEET_ID = 'tyto-theme';
  * Electron's to answer, and the problems the panel's.
  */
 type Applied = Pick<IpcResponse<'theme:current'>, 'light' | 'dark'> &
-  Partial<Pick<IpcResponse<'theme:current'>, 'iconStrokeWidth' | 'statusBarColors'>>;
+  Partial<
+    Pick<IpcResponse<'theme:current'>, 'iconStrokeWidth' | 'statusBarColors' | 'vimModeStyle'>
+  >;
 
 const declarations = (colors: Readonly<Record<string, string>>): string =>
   Object.entries(colors)
@@ -60,17 +67,47 @@ function overrideRules(
 }
 
 /**
+ * The text of the whole bar in each of vim's modes under `vimModeStyle: "bar"` (TYTO-301, ADR
+ * 0091): `--status-bar-mode-text` on the bar while it shows that mode, which `shell.css` puts
+ * before the bar's own text. Chosen per theme, as a badge's text is (`vimBarText`), from the
+ * mode's colour the bar wears — the override's where `statusBarColors` names one. Nothing under
+ * the other two styles, which write no text on the mode's colour but the badge's own.
+ */
+function vimBarRules(
+  style: VimModeStyle | undefined,
+  theme: Readonly<Record<string, string>>,
+  colors: StatusBarColors | undefined,
+): string {
+  if (style !== 'bar') return '';
+  const text = vimBarText(theme, colors);
+  return VIM_COLOUR_MODES.flatMap((mode) => {
+    const colour = text[mode];
+    return colour === undefined
+      ? []
+      : [
+          `\n.shell__foot.shell__foot[data-vim-style='bar'][data-vim-mode='${mode}'] {\n` +
+            `  --status-bar-mode-text: ${colour};\n}`,
+        ];
+  }).join('');
+}
+
+/**
  * The sheet's text: light under `:root`, dark under the system's dark mode. The icons' stroke
  * is the `iconStrokeWidth` setting, the same in both (TYTO-288), over `tokens.css`'s default.
- * The status bar's override follows each mode's colours (TYTO-301).
+ * The status bar's override follows each mode's colours, and so does the text vim's `bar`
+ * style writes on the bar (TYTO-301).
  */
 export function themeSheet(applied: Applied): string {
   const stroke =
     applied.iconStrokeWidth === undefined
       ? ''
       : `\n  --tyto-icon-stroke: ${String(applied.iconStrokeWidth)};`;
-  const light = overrideRules(applied.statusBarColors, applied.light.colors);
-  const dark = overrideRules(applied.statusBarColors, applied.dark.colors);
+  const light =
+    overrideRules(applied.statusBarColors, applied.light.colors) +
+    vimBarRules(applied.vimModeStyle, applied.light.colors, applied.statusBarColors);
+  const dark =
+    overrideRules(applied.statusBarColors, applied.dark.colors) +
+    vimBarRules(applied.vimModeStyle, applied.dark.colors, applied.statusBarColors);
   return [
     `:root:root {\n${declarations(applied.light.colors)}${stroke}\n}${light}`,
     `@media (prefers-color-scheme: dark) {\n:root:root {\n${declarations(applied.dark.colors)}\n}${dark}\n}`,

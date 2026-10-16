@@ -20,6 +20,7 @@ import {
 } from '../../shared/ipc.js';
 import { type StatusBarColors } from '../../shared/status-bar-colors.js';
 import { type StatusBarItemId } from '../../shared/status-bar-items.js';
+import { type VimModeStyle } from '../../shared/vim-mode-style.js';
 import { type Credentials } from './credentials.js';
 import { credentialAccount } from './installed-plugins.js';
 import { declaredCredentialKeys } from './plugin-list.js';
@@ -48,6 +49,8 @@ export interface WindowThemes extends Pick<ThemeService, 'list' | 'current' | 'p
   statusBarItems(): readonly StatusBarItemId[];
   /** The `statusBarColors` setting in force (TYTO-301), on the same answer. */
   statusBarColors(): StatusBarColors;
+  /** The `vimModeStyle` setting in force (TYTO-301), on the same answer. */
+  vimModeStyle(): VimModeStyle;
 }
 
 /**
@@ -56,7 +59,10 @@ export interface WindowThemes extends Pick<ThemeService, 'list' | 'current' | 'p
  */
 function appliedForWindow(
   applied: AppliedThemes,
-  themes: Pick<WindowThemes, 'iconStrokeWidth' | 'statusBarItems' | 'statusBarColors'>,
+  themes: Pick<
+    WindowThemes,
+    'iconStrokeWidth' | 'statusBarItems' | 'statusBarColors' | 'vimModeStyle'
+  >,
 ): IpcResponse<'theme:current'> {
   const { light, dark } = applied;
   return {
@@ -64,6 +70,7 @@ function appliedForWindow(
     iconStrokeWidth: themes.iconStrokeWidth(),
     statusBarItems: [...themes.statusBarItems()],
     statusBarColors: { ...themes.statusBarColors() },
+    vimModeStyle: themes.vimModeStyle(),
     light: { id: light.id, colors: light.colors },
     dark: { id: dark.id, colors: dark.colors },
     diagnostics: [...light.diagnostics, ...dark.diagnostics]

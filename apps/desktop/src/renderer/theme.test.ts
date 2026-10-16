@@ -48,6 +48,56 @@ describe('the icon stroke on the theme sheet (TYTO-288)', () => {
   });
 });
 
+describe("vim's bar style on the theme sheet (TYTO-301, ADR 0091)", () => {
+  const MODES = {
+    surface: '#fafafa',
+    text: '#242529',
+    'accent-text': '#ffffff',
+    'status-bar-vim-normal': '#506ee0',
+    'status-bar-vim-insert': '#4b8340',
+    'status-bar-vim-visual': '#a449ab',
+    'status-bar-vim-replace': '#c4473a',
+  };
+  const APPLIED_MODES = {
+    light: { id: 'tyto-light', colors: MODES },
+    dark: { id: 'tyto-dark', colors: { ...MODES, 'status-bar-vim-insert': '#ffe066' } },
+  };
+
+  it('writes the bar’s text for each mode only under the bar style', () => {
+    expect(themeSheet({ ...APPLIED_MODES, vimModeStyle: 'badge' })).not.toContain('mode-text');
+    expect(themeSheet({ ...APPLIED_MODES, vimModeStyle: 'border' })).not.toContain('mode-text');
+    const sheet = themeSheet({ ...APPLIED_MODES, vimModeStyle: 'bar' });
+    expect(sheet.match(/--status-bar-mode-text/g)).toHaveLength(8);
+  });
+
+  it('chooses, per theme and mode, the candidate that reads best on the mode’s colour', () => {
+    const [light = '', dark = ''] = themeSheet({ ...APPLIED_MODES, vimModeStyle: 'bar' }).split(
+      '@media',
+    );
+    expect(light).toContain(
+      ".shell__foot.shell__foot[data-vim-style='bar'][data-vim-mode='insert'] {\n" +
+        '  --status-bar-mode-text: #ffffff;\n}',
+    );
+    // A pale INSERT in the dark block: the dark text reads best on it.
+    expect(dark).toContain(
+      ".shell__foot.shell__foot[data-vim-style='bar'][data-vim-mode='insert'] {\n" +
+        '  --status-bar-mode-text: #242529;\n}',
+    );
+  });
+
+  it('follows an override of the mode’s colour', () => {
+    const sheet = themeSheet({
+      ...APPLIED_MODES,
+      vimModeStyle: 'bar',
+      statusBarColors: { 'vimMode.normal': '#ffe066' },
+    });
+    expect(sheet).toContain(
+      ".shell__foot.shell__foot[data-vim-style='bar'][data-vim-mode='normal'] {\n" +
+        '  --status-bar-mode-text: #242529;\n}',
+    );
+  });
+});
+
 describe('the status bar colours on the theme sheet (TYTO-301, ADR 0091)', () => {
   const COLOURED = {
     light: {

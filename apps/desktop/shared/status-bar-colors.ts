@@ -238,7 +238,9 @@ const ratioText = (ratio: number): string => (Math.floor(ratio * 100) / 100).toF
  * theme in force. The colour still applies — the person chose it — and the warning says the
  * ratio measured and the theme. Two checks:
  *
- * - **each vim badge colour**, against the best-reading text the theme offers for it;
+ * - **each vim mode colour**, against the best-reading text the theme offers for it: the
+ *   badge's word under `vimModeStyle: "badge"`, the whole bar's text under `"bar"`, and not at
+ *   all under `"border"`, where only a strip wears it;
  * - **the bar's own pair**, when `background` or `foreground` is set: the override where it is
  *   set and the theme's `status-bar` / `status-bar-text` where it is not. The warning sits on
  *   `foreground` when that is set, which is the colour a person reads, else on `background`.
@@ -290,6 +292,11 @@ export function statusBarColorsContrast(
     }
   }
 
+  // Under `vimModeStyle: "border"` no text sits on a mode's colour, only a strip does, so there
+  // is no ratio to warn about; `badge` writes the word on it and `bar` the whole bar's text,
+  // both chosen by `badgeText` (TYTO-301).
+  const style = [...entries].reverse().find((item) => item.key === 'vimModeStyle')?.value;
+  if (style === 'border') return diagnostics;
   for (const { key } of VIM_COLOUR_KEYS) {
     const value = colour(key);
     if (value === undefined) continue;
