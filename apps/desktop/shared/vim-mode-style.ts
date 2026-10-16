@@ -52,6 +52,9 @@ export const vimModeStyleContribution = {
   }),
   default: 'badge',
   description: `How the status bar shows vim's mode: ${styleList()}`,
+  // The same table the commented example and the refusal read, so the tab's suggestions and
+  // hover can never offer a style the schema refuses (TYTO-304).
+  options: VIM_MODE_STYLES.map((style) => ({ value: style.id, description: style.description })),
 } satisfies ConfigurationContribution<VimModeStyle>;
 
 /**

@@ -251,6 +251,28 @@ export const panelStyles = {
     fontWeight: panels.strong,
   },
   '.cm-completionDetail': { color: panels.muted },
+  // The JSON tabs' hover help (TYTO-304): this package's own markup inside CodeMirror's
+  // tooltip, so its classes are new and mirror nothing.
+  // A line length a paragraph reads at: a setting's description can be long, and CodeMirror
+  // lets a tooltip run the width of the window.
+  '.cm-json-hover': {
+    padding: `${panels.paddingBlock} ${panels.paddingInline}`,
+    fontSize: panels.textSize,
+    maxWidth: '72ch',
+    // Never over the whole window: a long list scrolls inside the tooltip.
+    maxHeight: '60vh',
+    overflowY: 'auto',
+    // A long default such as statusBarItems' list is one JSON word; it wraps rather than scrolls.
+    overflowWrap: 'anywhere',
+  },
+  '.cm-json-hover-items': {
+    margin: '0',
+    paddingInlineStart: panels.paddingInline,
+    listStyle: 'none',
+  },
+  '.cm-json-hover-name': { fontFamily: monoFont },
+  '.cm-json-hover-title': { fontFamily: monoFont, fontWeight: panels.strong },
+  '.cm-json-hover-label': { color: panels.muted },
   '.cm-completionIcon': { color: panels.muted },
 
   // @codemirror/lint: the tooltip's diagnostics and the marks in the buffer. CodeMirror's

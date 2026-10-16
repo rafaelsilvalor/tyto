@@ -82,12 +82,17 @@ interface ConfigurationContribution<T> {
   schema: ZodType<T>; // validates this key alone
   default: T; // must pass `schema`, or activation is refused
   description: string;
+  options?: { value: string | number | boolean | null; description: string }[]; // help only
+  entries?: { schema: ZodType; unique: boolean; options?: SettingOption[] };
+  members?: { key: ZodType<string>; schema: ZodType; options?: SettingOption[] };
 }
 ```
 
 A setting is a key of the desktop app's `settings.json`, a JSON-with-comments file the person edits by hand (ADR 0073). **The host adds the plugin id**: a third party's `fontSize` is written `demo.fontSize`, and a built-in's keys are written as declared, which is how the app's own `templatesFolder`, `queueFolder`, `queueAutoRun` and `queueKinds` keep the names every existing file uses. A third party's key written without its prefix is `W_SETTING_UNPREFIXED` and is not accepted.
 
 **Resolved one key at a time, and never failing** (`resolveSettings`). The user file wins over the default; a value the schema refuses costs that key alone, which takes its default and is `W_SETTING_INVALID` at the value; a key nobody declared is `W_SETTING_UNKNOWN` at the key. A list setting may declare `entries` — a schema each entry is checked against alone, and whether entries must be unique — and then a refused or repeated entry is `W_SETTING_ENTRY_INVALID` at that entry and is left out while the rest apply (TYTO-301, ADR 0091). An object setting may declare `members` — a schema for a member's name and one for its value — and then an unknown name is `W_SETTING_ENTRY_INVALID` at the name and a refused value `W_SETTING_INVALID` at the value under the dotted key; either is left out while the rest apply. Every diagnostic carries the range the file reader found. The result's `config` is the record `PluginHost.config(schema)` reads, by plugin id, handed to the host with `InProcessHost.configure` — so a plugin reads its own settings with `host.config(z.object({ fontSize: z.number() }))`, every declared key present.
+
+**What the settings tab suggests and explains is derived from the declaration** (TYTO-304, ADR 0092). `outlineOf(declared)` reads each schema once with Zod's own `z.toJSONSchema` and answers plain data — the key, its description, its type in words (`list of string`, `number from 0.75 to 2`), its default as JSON, and the values it, one list entry or one object member may take. Those values are `options`, `entries.options` and `members.options` where the plugin wrote them, each with a sentence, and otherwise an enum's values or a boolean's two from the schema, with none. `options` are help and never a rule: the schema still decides, and an option the schema refuses makes the declaration throw, as a bad default does. The desktop sends the outline to the window on `settings:outline`, which is how a plugin's setting is suggested like a built-in's.
 
 **An isolated plugin cannot declare one yet**: the schema is Zod, which is code and does not cross to the plugin's process, so `registerConfiguration` is refused by name there, like `source`.
 

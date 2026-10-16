@@ -534,6 +534,17 @@ const dependencies = () => {
       open: () => Promise.resolve({ document: null, documentId: null }),
       validate: () => [],
       closed: () => Promise.resolve(false),
+      outline: () =>
+        Promise.resolve([
+          {
+            key: 'vimModeStyle',
+            plugin: 'desktop',
+            description: "How the status bar shows vim's mode.",
+            type: 'string',
+            default: '"badge"',
+            options: [{ value: 'bar', description: 'The whole bar.' }],
+          },
+        ]),
     },
     templates: catalogue(),
     templateEditor: templateEditor(),

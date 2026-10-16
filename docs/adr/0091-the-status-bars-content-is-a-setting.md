@@ -172,4 +172,5 @@ three is `W_SETTING_INVALID` at the value, naming them, and the badge applies.
 - `apps/desktop` (amendment of 2026-10-16): the ninth built-in setting, `vimModeStyle`.
 - Not done here: dragging items, a plugin's
   own status items (when they arrive they get ids in the same list, prefixed by plugin id as
-  their settings are), and completion or hover in the settings tab.
+  their settings are), and completion or hover in the settings tab — built since by TYTO-304
+  (ADR 0092), fed from the same three tables through the `configuration` point's `options`.

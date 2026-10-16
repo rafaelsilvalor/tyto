@@ -92,6 +92,26 @@ const diagnostic = z.object({
   hint: z.string().optional(),
 });
 
+/** One value a setting may take and what it does, as `settings:outline` sends it (TYTO-304). */
+const settingOption = z.object({
+  value: z.union([z.string().max(300), z.number(), z.boolean(), z.null()]),
+  description: z.string().max(1000),
+});
+
+const settingOptions = z.array(settingOption).max(500);
+
+/** One declared setting as the settings tab explains it: `SettingOutline` from the plugin API. */
+const settingOutline = z.object({
+  key: z.string().min(1).max(300),
+  plugin: z.string().min(1).max(300),
+  description: z.string().max(8000),
+  type: z.string().max(500),
+  default: z.string().max(8000),
+  options: settingOptions,
+  entries: z.object({ options: settingOptions }).optional(),
+  members: z.object({ options: settingOptions }).optional(),
+});
+
 /**
  * A brief the window has open, as both sides agree to describe one.
  *
@@ -1227,6 +1247,20 @@ export const IPC_CHANNELS = {
   'settings:validate': channel(
     z.object({ documentId, text: z.string(), dirty: z.boolean() }),
     z.object({ diagnostics: z.array(diagnostic) }),
+  ),
+
+  /**
+   * What every declared setting is, for the settings tab's suggestions and hover (TYTO-304,
+   * ADR 0092): each key with its description, its type in words, its default as JSON and the
+   * values it — or one list entry, or one object member — may take. `theme`'s values are the
+   * themes the plugins registered. Waits for the installed plugins, as `theme:list` does.
+   *
+   * **Derived data, not the schemas**: a Zod schema cannot cross, and the window needs to say
+   * what is accepted, not to decide it — `settings:validate` still does that, in main.
+   */
+  'settings:outline': channel(
+    z.object({}),
+    z.object({ settings: z.array(settingOutline).max(500) }),
   ),
 
   /**

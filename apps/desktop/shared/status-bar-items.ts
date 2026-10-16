@@ -83,7 +83,12 @@ export const statusBarItemsContribution = {
   schema: z.array(statusBarItemId).readonly(),
   default: STATUS_BAR_ITEM_IDS,
   description: `Which status bar items show, in order inside their side: ${STATUS_BAR_ITEM_IDS.join(', ')}.`,
-  entries: { schema: statusBarItemId, unique: true },
+  entries: {
+    schema: statusBarItemId,
+    unique: true,
+    // What the tab suggests for an entry, from the table the example is written from (TYTO-304).
+    options: STATUS_BAR_ITEMS.map((item) => ({ value: item.id, description: item.description })),
+  },
 } satisfies ConfigurationContribution<readonly StatusBarItemId[]>;
 
 /**

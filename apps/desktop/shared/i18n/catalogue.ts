@@ -452,6 +452,13 @@ export interface Catalogue {
    */
   /** TYTO-206. Opens `settings.json` in a tab; a command, so it is not on screen at load. */
   readonly 'command.settings.open': string;
+  /**
+   * TYTO-304. The labels of the settings tab's hover help, before a setting's type, its default
+   * and the values it accepts. The descriptions themselves are the plugins', in English.
+   */
+  readonly 'settings.assist.type': string;
+  readonly 'settings.assist.default': string;
+  readonly 'settings.assist.accepted': string;
   /** TYTO-207. Opens `keybindings.json` in a tab; a command, so it is not on screen at load. */
   readonly 'command.keybindings.open': string;
   /** TYTO-277. Opens `snippets.json` in a tab; a command, so it is not on screen at load. */
@@ -721,6 +728,9 @@ export const CATALOGUE_KEYS = [
   'plugins.credential.kept',
   'plugins.credential.failed',
   'command.settings.open',
+  'settings.assist.type',
+  'settings.assist.default',
+  'settings.assist.accepted',
   'command.keybindings.open',
   'command.snippets.open',
   'command.window.reload',

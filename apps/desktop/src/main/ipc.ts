@@ -5,6 +5,7 @@ import { basename } from 'node:path';
 
 import type { IpcMain, WebContents } from 'electron';
 import type { Diagnostics } from '@tyto/core';
+import type { SettingOption, SettingOutline } from '@tyto/plugin-api';
 
 import {
   type IpcChannelName,
@@ -224,6 +225,8 @@ export interface IpcDependencies {
     open: (documentId: string) => Promise<IpcResponse<'settings:open'>>;
     validate: (request: IpcRequest<'settings:validate'>) => Diagnostics;
     closed: (documentId: string) => Promise<boolean>;
+    /** What every declared setting is, for the tab's suggestions and hover (TYTO-304). */
+    outline: () => Promise<readonly SettingOutline[]>;
   };
   /**
    * The keybindings tab (TYTO-207): the one file it opens, and its text for the window to
@@ -254,6 +257,25 @@ export interface IpcDependencies {
     chooseTemplate: () => Promise<string | undefined>;
     /** Where a new template goes when no template folder is chosen. */
     chooseParent: () => Promise<string | undefined>;
+  };
+}
+
+/** A setting's outline as the contract writes it: the same fields, in arrays of its own. */
+function wireOutline(setting: SettingOutline): IpcResponse<'settings:outline'>['settings'][number] {
+  const copy = (options: readonly SettingOption[]) => options.map((option) => ({ ...option }));
+  return {
+    key: setting.key,
+    plugin: setting.plugin,
+    description: setting.description,
+    type: setting.type,
+    default: setting.default,
+    options: copy(setting.options),
+    ...(setting.entries === undefined
+      ? {}
+      : { entries: { options: copy(setting.entries.options) } }),
+    ...(setting.members === undefined
+      ? {}
+      : { members: { options: copy(setting.members.options) } }),
   };
 }
 
@@ -574,6 +596,8 @@ export function createHandlers(dependencies: IpcDependencies): Handlers {
     'snippets:open': ({ documentId }) => snippets.open(documentId),
 
     'snippets:read': async () => ({ text: await snippets.read() }),
+
+    'settings:outline': async () => ({ settings: (await settings.outline()).map(wireOutline) }),
 
     'settings:validate': (request) =>
       Promise.resolve({

@@ -12,6 +12,7 @@ import {
   TEXT_COMMANDS,
 } from './commands.js';
 import {
+  assistOf,
   commandOffered,
   editorChromeFor,
   languageOf,
@@ -54,6 +55,15 @@ describe('editorChromeFor (TYTO-256)', () => {
     expect(languageOf('settings')).toBe('json');
     expect(languageOf('keybindings')).toBe('json');
     expect(languageOf('snippets')).toBe('json');
+  });
+
+  it('gives a tab the help of its own kind, and a brief or a preview none (TYTO-304)', () => {
+    const help = [] as const;
+    const assists = { settings: help };
+    expect(assistOf('settings', assists)).toEqual([help]);
+    expect(assistOf('keybindings', assists)).toEqual([]);
+    expect(assistOf(undefined, assists)).toEqual([]);
+    expect(assistOf('preview', assists)).toEqual([]);
   });
 });
 

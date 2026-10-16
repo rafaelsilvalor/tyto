@@ -18,6 +18,7 @@ import {
   cursorOf,
   insertBriefSkeleton,
   isFollower,
+  jsonAssist,
   keyOfStroke,
   openSlashMenu,
   type SlashSource,
@@ -50,6 +51,8 @@ import { followScheme } from './color-scheme.js';
 import { applyTheme, withThemeRows } from './theme.js';
 import { templateOf } from './frontmatter.js';
 import {
+  type AppFileAssists,
+  assistOf,
   commandOffered,
   languageOf,
   type SlashTemplateNote,
@@ -58,6 +61,7 @@ import {
   slashTemplateNote,
 } from './editor-chrome.js';
 import { readKeybindingsText } from './keybindings-file.js';
+import { type SettingOutline, settingsAssist } from './settings-assist.js';
 import { readSnippetsText } from './snippets-file.js';
 import {
   type Diagnostic,
@@ -467,6 +471,34 @@ let userKeybindings: readonly KeybindingEntry[] = [];
  * (TYTO-277, ADR 0082). The editor asks for them each time a list opens.
  */
 let userSnippets: readonly BriefSnippet[] = [];
+
+/**
+ * What every declared setting is, from `settings:outline` (TYTO-304, ADR 0092): asked once the
+ * window has loaded, and read by the settings tab's suggestions and hover each time they open,
+ * so a tab opened before the answer arrived gets them too. Empty until then.
+ */
+let settingsOutline: readonly SettingOutline[] = [];
+
+/**
+ * The help each app file's tab is built with (`assistOf`): the settings tab's suggestions and
+ * hover, with Tab stepping through an open list as it does in a brief. The hover's labels are
+ * read at each hover, so they follow the window's language.
+ */
+const appFileAssists: AppFileAssists = {
+  settings: [
+    tabThroughCompletions(),
+    jsonAssist(
+      settingsAssist(
+        () => settingsOutline,
+        () => ({
+          type: translate(state.locale, 'settings.assist.type'),
+          default: translate(state.locale, 'settings.assist.default'),
+          accepted: translate(state.locale, 'settings.assist.accepted'),
+        }),
+      ),
+    ),
+  ],
+};
 
 const byId = <T extends HTMLElement>(id: string): T | null =>
   document.getElementById(id) as T | null;
@@ -1550,7 +1582,10 @@ function adopt(
 
   // The app's own files are not briefs: no brief colouring, and no brief lint reading JSON
   // (TYTO-206, TYTO-207). Their checks arrive as markers instead (`setFileDiagnostics`).
-  const born = newDocument(documentId, editor.blank(opened.text, languageOf(kind)));
+  const born = newDocument(
+    documentId,
+    editor.blank(opened.text, languageOf(kind), assistOf(kind, appFileAssists)),
+  );
   const created: DocumentState = {
     ...born,
     ...(kind === undefined ? {} : { kind }),
@@ -2635,14 +2670,21 @@ async function restoreSession(bridge: TytoBridge, handle: EditorHandle): Promise
     let built: DocumentState | undefined;
     if (opened.document !== null && opened.documentId !== null) {
       const language = languageOf(kind);
-      const born = newDocument(opened.documentId, handle.blank(opened.document.text, language));
+      const assist = assistOf(kind, appFileAssists);
+      const born = newDocument(
+        opened.documentId,
+        handle.blank(opened.document.text, language, assist),
+      );
       built = placed(
         {
           ...born,
           ...(kind === undefined ? {} : { kind }),
           name: opened.document.name,
           savedText: contentOf(born),
-          state: tab.draft !== null && !tab.stale ? handle.blank(tab.draft, language) : born.state,
+          state:
+            tab.draft !== null && !tab.stale
+              ? handle.blank(tab.draft, language, assist)
+              : born.state,
         },
         tab.place,
       );
@@ -2927,6 +2969,19 @@ async function loadPluginPanels(bridge: TytoBridge): Promise<void> {
   pluginKeybindings = keymaps.map(pluginKeybindingLayer);
   // The person's layer too: an entry naming a plugin panel's toggle resolves only now.
   if (pluginKeybindings.length > 0 || userKeybindings.length > 0) applyKeybindings(bridge);
+}
+
+/**
+ * Asks once what every declared setting is, for the settings tab (TYTO-304). Main answers after
+ * the installed plugins have started, so the answer holds their settings and themes; a refusal
+ * leaves the tab without suggestions and says so in the log, never in front of the person.
+ */
+async function loadSettingsOutline(bridge: TytoBridge): Promise<void> {
+  try {
+    settingsOutline = (await bridge['settings:outline']({})).settings;
+  } catch (cause) {
+    reportToLog(bridge, cause, 'settings outline not read');
+  }
 }
 
 /**
@@ -3856,6 +3911,7 @@ async function load(): Promise<void> {
   // `applyLayout` also lays out the editor groups, which is what makes `#editor` (TYTO-286).
   await applyLayout(false);
   if (bridge !== undefined) void loadPluginPanels(bridge);
+  if (bridge !== undefined) void loadSettingsOutline(bridge);
   wireKeybindingDispatcher();
   if (bridge !== undefined) await drawMenuRow(bridge);
   wireSplitters(document, () => layout, {

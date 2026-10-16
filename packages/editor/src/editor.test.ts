@@ -2,7 +2,7 @@
 import { insertNewlineAndIndent, undo as undoCommand } from '@codemirror/commands';
 import { forceParsing } from '@codemirror/language';
 import { forEachDiagnostic } from '@codemirror/lint';
-import { type StateEffect } from '@codemirror/state';
+import { Facet, type StateEffect } from '@codemirror/state';
 import { EditorView } from '@codemirror/view';
 import { afterEach, describe, expect, it } from 'vitest';
 
@@ -661,5 +661,22 @@ describe('diagnostics pushed onto a buffer with no lint of its own (TYTO-256)', 
     handle.restore(withDiagnostics(handle.blank(settings, 'plain'), [typo]));
     handle.showDiagnostics([]);
     expect(markers(handle.state())).toEqual([]);
+  });
+});
+
+describe('the extensions of one document', () => {
+  // A stand-in for `jsonAssist`: something one tab carries and the editor's others do not.
+  const marker = Facet.define<string>();
+
+  it('go into the document `blank` builds, and into its follower in another pane', () => {
+    handle = createEditor(open().parent, { doc: 'brief' });
+    const settings = handle.blank('{}', 'json', [marker.of('settings')]);
+    expect(settings.facet(marker)).toEqual(['settings']);
+    expect(handle.blank('{}', 'json').facet(marker)).toEqual([]);
+    expect(handle.state().facet(marker)).toEqual([]);
+
+    handle.restore(settings);
+    const follower = handle.followerOf(handle.firstPane);
+    expect(follower.facet(marker)).toEqual(['settings']);
   });
 });
