@@ -172,6 +172,7 @@ textarea {
   align-items: center;
   border-top: var(--tyto-hairline-width) solid var(--tyto-hairline);
   padding: 0 var(--tyto-space-3);
+  position: relative;
   background: var(--tyto-status-bar);
   color: var(--tyto-status-bar-text);
   font-size: var(--tyto-text-sm);
@@ -195,12 +196,14 @@ textarea {
 }
 
 /* An item's text is the bar's, unless `statusBarColors` gives that item its own (TYTO-301):
-   the theme sheet sets `--status-bar-item-text` on the item, and nothing else does. */
+   the theme sheet sets `--status-bar-item-text` on the item, and nothing else does. Under
+   `vimModeStyle: "bar"` the bar's text in a mode is `--status-bar-mode-text`, which the sheet
+   sets on the bar while it wears that mode's colour. */
 .status-bar__text {
   overflow: hidden;
   min-width: 0;
   padding: 0 var(--tyto-space-3);
-  color: var(--status-bar-item-text, var(--tyto-status-bar-text));
+  color: var(--status-bar-item-text, var(--status-bar-mode-text, var(--tyto-status-bar-text)));
   text-overflow: ellipsis;
 }
 
@@ -222,7 +225,7 @@ textarea {
   border-radius: var(--tyto-radius-sm);
   padding: var(--tyto-space-1) var(--tyto-space-2);
   background: transparent;
-  color: var(--status-bar-item-text, var(--tyto-status-bar-text));
+  color: var(--status-bar-item-text, var(--status-bar-mode-text, var(--tyto-status-bar-text)));
   font: inherit;
   line-height: 1;
 }
@@ -265,7 +268,7 @@ textarea {
 }
 
 /* Vim's mode as a badge in the mode's colour (TYTO-301): only the badge is coloured, the bar
-   stays the bar's (Rafael, 2026-10-15). `data-mode` is one of four; visual line and block
+   stays the bar's (Rafael, 2026-10-15) — the default `vimModeStyle`, whose other two follow. `data-mode` is one of four; visual line and block
    wear visual's. Each pair is held to 4.5:1 in every theme Tyto ships (ADR 0089). */
 .status-bar__vim {
   flex-shrink: 0;
@@ -289,6 +292,90 @@ textarea {
 .status-bar__vim[data-mode='replace'] {
   background: var(--tyto-status-bar-vim-replace);
   color: var(--tyto-status-bar-vim-replace-text);
+}
+
+/*
+ * `vimModeStyle` (TYTO-301, ADR 0091): `status-bar.ts` sets `data-vim-style` on the bar, and
+ * `data-vim-mode` only while vim is on, so with vim off every style is the plain bar. The mode's
+ * colour is the badge's token, which `statusBarColors`' `vimMode.*` overrides on the bar.
+ *
+ * Under `border` and `bar` the mode's name is plain text in the item's colour: under `border`
+ * that is the bar's text, under `bar` the text the sheet chose for the mode's colour.
+ */
+.shell__foot[data-vim-style='border'] .status-bar__vim,
+.shell__foot[data-vim-style='bar'] .status-bar__vim {
+  background: transparent;
+  color: var(--status-bar-item-text, var(--status-bar-mode-text, var(--tyto-status-bar-text)));
+}
+
+/* `border`: a strip along the top edge, over the hairline and over a hovered button. */
+.shell__foot[data-vim-style='border'][data-vim-mode]::before {
+  position: absolute;
+  inset: 0 0 auto;
+  height: var(--tyto-status-bar-vim-strip);
+  content: '';
+  pointer-events: none;
+}
+
+.shell__foot[data-vim-style='border'][data-vim-mode='normal']::before {
+  background: var(--tyto-status-bar-vim-normal);
+}
+
+.shell__foot[data-vim-style='border'][data-vim-mode='insert']::before {
+  background: var(--tyto-status-bar-vim-insert);
+}
+
+.shell__foot[data-vim-style='border'][data-vim-mode='visual']::before {
+  background: var(--tyto-status-bar-vim-visual);
+}
+
+.shell__foot[data-vim-style='border'][data-vim-mode='replace']::before {
+  background: var(--tyto-status-bar-vim-replace);
+}
+
+/* `bar`: the whole bar wears the mode's colour, over `statusBarColors.background` too. */
+
+.shell__foot[data-vim-style='bar'][data-vim-mode='normal'] {
+  background: var(--tyto-status-bar-vim-normal);
+}
+
+.shell__foot[data-vim-style='bar'][data-vim-mode='insert'] {
+  background: var(--tyto-status-bar-vim-insert);
+}
+
+.shell__foot[data-vim-style='bar'][data-vim-mode='visual'] {
+  background: var(--tyto-status-bar-vim-visual);
+}
+
+.shell__foot[data-vim-style='bar'][data-vim-mode='replace'] {
+  background: var(--tyto-status-bar-vim-replace);
+}
+
+.shell__foot[data-vim-style='bar'][data-vim-mode] {
+  color: var(--status-bar-mode-text, var(--tyto-status-bar-text));
+}
+
+/* On a bar in a mode's colour the theme's error, accent and focus colours may be that colour
+   (replace is the error's, normal the accent's), so the count, the "new" dot and the focus
+   ring take the bar's text instead. A hovered button keeps the theme's opaque `hover` with
+   `text` (or the override's); a toggle that is on takes `surface` with `text`, because
+   `button-on` is a translucent grey that would leave `text` on a tinted mode colour. Both are
+   pairs the theme's own floors hold readable, whatever the bar wears. */
+.shell__foot[data-vim-style='bar'][data-vim-mode] .status-bar__button--on:not(:hover) {
+  background: var(--status-bar-on, var(--tyto-surface));
+  color: var(--status-bar-on-text, var(--tyto-text));
+}
+
+.shell__foot[data-vim-style='bar'][data-vim-mode] .status-bar__count--bad {
+  color: inherit;
+}
+
+.shell__foot[data-vim-style='bar'][data-vim-mode] .status-bar__new {
+  background: currentcolor;
+}
+
+.shell__foot[data-vim-style='bar'][data-vim-mode] .status-bar__button:focus-visible {
+  outline-color: currentcolor;
 }
 
 .icon {

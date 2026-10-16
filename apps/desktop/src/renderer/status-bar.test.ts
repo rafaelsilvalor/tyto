@@ -8,6 +8,7 @@ import {
   type StatusBar,
   type StatusBarState,
   STATUS_BAR_TAG,
+  paintVimStyle,
   positionText,
   vimBadgeMode,
 } from './status-bar.js';
@@ -285,5 +286,21 @@ describe('the statusBarItems setting (TYTO-301, ADR 0091)', () => {
     await bar.updateComplete;
 
     expect(drawn(bar)).toEqual({ start: [], end: ['export'] });
+  });
+});
+
+describe('the vimModeStyle setting on the bar (TYTO-301, ADR 0091)', () => {
+  it('names the style on the footer, and the mode only while vim is on', () => {
+    const foot = document.createElement('footer');
+
+    paintVimStyle(foot, 'bar', { mode: 'visual line', pending: '' });
+    expect({ ...foot.dataset }).toEqual({ vimStyle: 'bar', vimMode: 'visual' });
+
+    paintVimStyle(foot, 'border', { mode: 'insert', pending: '' });
+    expect({ ...foot.dataset }).toEqual({ vimStyle: 'border', vimMode: 'insert' });
+
+    // Vim off: no mode, so every style is the plain bar.
+    paintVimStyle(foot, 'bar', null);
+    expect({ ...foot.dataset }).toEqual({ vimStyle: 'bar' });
   });
 });

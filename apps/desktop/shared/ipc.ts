@@ -7,6 +7,7 @@ import type { SessionGroupNode } from './session-groups.js';
 import { STATUS_BAR_COLOUR_KEYS, statusBarColour } from './status-bar-colors.js';
 import { STATUS_BAR_ITEM_IDS, type StatusBarItemId } from './status-bar-items.js';
 import { THEME_MODES } from './theme-setting.js';
+import { VIM_MODE_STYLES, type VimModeStyle } from './vim-mode-style.js';
 
 /**
  * The contract between the three processes, written once.
@@ -284,6 +285,8 @@ const appliedThemesSchema = z.object({
     z.enum(STATUS_BAR_COLOUR_KEYS.map((entry) => entry.key) as [string, ...string[]]),
     statusBarColour,
   ),
+  /** The `vimModeStyle` setting in force (TYTO-301, ADR 0091): badge, top border or bar. */
+  vimModeStyle: z.enum(VIM_MODE_STYLES.map((style) => style.id) as [VimModeStyle]),
   diagnostics: z.array(diagnostic.omit({ range: true })).max(200),
 });
 
