@@ -92,6 +92,8 @@ export const ptBR: Catalogue = {
   'command.group.focusNext': 'Focar o próximo grupo de editores',
   'command.group.focusPrevious': 'Focar o grupo de editores anterior',
   'command.group.moveTabToNext': 'Mover a aba para o próximo grupo de editores',
+  'command.group.moveTabLeft': 'Mover a aba para a esquerda',
+  'command.group.moveTabRight': 'Mover a aba para a direita',
   'command.group.close': 'Fechar o grupo de editores',
   'command.preview.openToSide': 'Abrir a prévia ao lado',
   'command.preview.open': 'Abrir a prévia',

@@ -526,6 +526,8 @@ describe('switching the language', () => {
     'command.group.focusNext',
     'command.group.focusPrevious',
     'command.group.moveTabToNext',
+    'command.group.moveTabLeft',
+    'command.group.moveTabRight',
     'command.group.close',
     // TYTO-287: the preview as a tab. Its commands are the bar's and the View menu's, and
     // "Open preview to the side" is also the title of the group's button, set by script; the

@@ -168,6 +168,9 @@ export const DOCUMENT_PREVIOUS = 'document.previous';
 export const GROUP_FOCUS_NEXT = 'editor.focusNextGroup';
 export const GROUP_FOCUS_PREVIOUS = 'editor.focusPreviousGroup';
 export const GROUP_MOVE_TAB_NEXT = 'editor.moveTabToNextGroup';
+/** TYTO-288. The tab in front one place along its own strip, as a drag would put it. */
+export const GROUP_MOVE_TAB_LEFT = 'editor.moveTabLeft';
+export const GROUP_MOVE_TAB_RIGHT = 'editor.moveTabRight';
 export const GROUP_CLOSE = 'editor.closeGroup';
 export { EDITOR_SPLIT_DOWN, EDITOR_SPLIT_RIGHT };
 
@@ -250,6 +253,8 @@ export const COMMAND_LABELS: Readonly<Record<string, CatalogueKey>> = {
   [GROUP_FOCUS_NEXT]: 'command.group.focusNext',
   [GROUP_FOCUS_PREVIOUS]: 'command.group.focusPrevious',
   [GROUP_MOVE_TAB_NEXT]: 'command.group.moveTabToNext',
+  [GROUP_MOVE_TAB_LEFT]: 'command.group.moveTabLeft',
+  [GROUP_MOVE_TAB_RIGHT]: 'command.group.moveTabRight',
   [GROUP_CLOSE]: 'command.group.close',
   // The six `@tyto/editor` brings with the search panel (E8.5). Their ids and their English
   // labels are the editor's, the same as undo and redo above; what this table adds is the
@@ -302,6 +307,8 @@ export interface DesktopActions {
   focusGroup(direction: 1 | -1): void;
   /** TYTO-286. The tab in front to the next group; with one group, into a new split right. */
   moveTabToNextGroup(): void;
+  /** TYTO-288. The tab in front one place left or right in its strip, stopping at the ends. */
+  stepTabInGroup(direction: 1 | -1): void;
   /** TYTO-286. Closes every tab of the focused group as `Mod-w` would, asking when unsaved. */
   closeGroup(): void;
   /** E9.4. Shows the export dialog. Everything it then does is a round trip to main. */
@@ -492,6 +499,12 @@ export function createDesktopRegistry(actions: DesktopActions): CommandRegistry 
   add(GROUP_MOVE_TAB_NEXT, () => {
     actions.moveTabToNextGroup();
   });
+  add(GROUP_MOVE_TAB_LEFT, () => {
+    actions.stepTabInGroup(-1);
+  });
+  add(GROUP_MOVE_TAB_RIGHT, () => {
+    actions.stepTabInGroup(1);
+  });
   add(GROUP_CLOSE, () => {
     actions.closeGroup();
   });
@@ -598,6 +611,10 @@ export const desktopKeymapSet: EditorKeymap = {
     { key: 'Mod-r', command: WINDOW_RELOAD },
     { key: 'Mod-PageDown', command: DOCUMENT_NEXT },
     { key: 'Mod-PageUp', command: DOCUMENT_PREVIOUS },
+    // TYTO-288. VS Code's keys for moving the tab in front along its strip; free in
+    // CodeMirror's keymaps, whose page keys take Shift alone.
+    { key: 'Mod-Shift-PageUp', command: GROUP_MOVE_TAB_LEFT },
+    { key: 'Mod-Shift-PageDown', command: GROUP_MOVE_TAB_RIGHT },
     // TYTO-286. VS Code's split key; `Mod-Shift-\` takes CodeMirror's "go to the matching
     // bracket" in this set, which a brief has little use for. Vim splits with `:vsplit`.
     { key: 'Mod-\\', command: EDITOR_SPLIT_RIGHT },

@@ -262,6 +262,9 @@ export interface Catalogue {
   readonly 'command.group.focusNext': string;
   readonly 'command.group.focusPrevious': string;
   readonly 'command.group.moveTabToNext': string;
+  /** TYTO-288. The tab in front one place along its strip. */
+  readonly 'command.group.moveTabLeft': string;
+  readonly 'command.group.moveTabRight': string;
   readonly 'command.group.close': string;
   /** TYTO-287. The preview as a tab: beside the brief, in its group, and its lock. */
   readonly 'command.preview.openToSide': string;
@@ -601,6 +604,8 @@ export const CATALOGUE_KEYS = [
   'command.group.focusNext',
   'command.group.focusPrevious',
   'command.group.moveTabToNext',
+  'command.group.moveTabLeft',
+  'command.group.moveTabRight',
   'command.group.close',
   'command.preview.openToSide',
   'command.preview.open',

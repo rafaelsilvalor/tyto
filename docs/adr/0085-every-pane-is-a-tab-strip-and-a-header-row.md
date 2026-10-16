@@ -130,6 +130,6 @@ and 10.57 dark; a muted name on the raised strip 5.96 and 5.68, on `hover` 5.33 
 - The suites that read `#editor-heading` read the status bar's kind (`.status-bar__kind`). The
   five that used `#template` choose or list templates through the "/" menu or "New brief from
   template…" now, asserting what they asserted before.
-- Not done here: the folder on hover (ADR 0086, the second pull request); dragging a tab to
-  reorder it or onto another group (the third); the breadcrumb itself (TYTO-273); the font and
-  size of each part (TYTO-272).
+- The folder on hover landed in the second pull request (ADR 0086) and dragging a tab to reorder
+  it or onto another group in the third (ADR 0083, amended 2026-10-16). Not done here: the
+  breadcrumb itself (TYTO-273); the font and size of each part (TYTO-272).

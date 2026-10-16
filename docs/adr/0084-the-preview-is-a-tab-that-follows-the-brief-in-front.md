@@ -121,5 +121,6 @@ second is said where it applies.
 - `fit` measures the stage's own box rounded down rather than `clientHeight`, which Chromium
   rounds: a 574.7 px stage answered 575 and the 0.3 px overflow drew a 16 px scroll bar, seen
   once a split made `fit` go by height.
-- What is not done: the strip's and the bar's final look (TYTO-288); dragging a preview tab
-  between groups (TYTO-288).
+- The strip's and the bar's final look landed with TYTO-288 (ADR 0085), and a preview tab is
+  dragged between groups like any other since its third pull request (ADR 0083, amended
+  2026-10-16): it keeps its id and its lock, and a following one keeps following.

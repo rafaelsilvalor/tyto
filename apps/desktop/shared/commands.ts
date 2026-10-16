@@ -91,6 +91,9 @@ export const VIEW_MENU_COMMANDS: readonly MenuCommand[] = [
   { id: 'editor.focusNextGroup', label: 'command.group.focusNext' },
   { id: 'editor.focusPreviousGroup', label: 'command.group.focusPrevious' },
   { id: 'editor.moveTabToNextGroup', label: 'command.group.moveTabToNext' },
+  // TYTO-288. Along the tab's own strip, as dragging it does.
+  { id: 'editor.moveTabLeft', label: 'command.group.moveTabLeft' },
+  { id: 'editor.moveTabRight', label: 'command.group.moveTabRight' },
   { id: 'editor.closeGroup', label: 'command.group.close' },
   // TYTO-287. The preview as a tab, after the groups it opens into.
   { id: 'preview.openToSide', label: 'command.preview.openToSide' },

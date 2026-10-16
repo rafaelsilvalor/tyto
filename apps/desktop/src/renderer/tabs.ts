@@ -76,6 +76,7 @@ export class DocumentTabs extends LitElement {
     return html`<div
       class="tabs__tab ${on ? 'tabs__tab--on' : ''}"
       data-tab-kind=${entry.preview === true ? 'preview' : 'editor'}
+      data-tab-id=${entry.id}
       @auxclick=${(event: MouseEvent) => {
         // The middle button, which is how every editor and every browser closes a tab.
         // `auxclick` and not `mousedown`, so a middle-click that started somewhere else

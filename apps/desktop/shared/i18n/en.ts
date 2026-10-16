@@ -91,6 +91,8 @@ export const en: Catalogue = {
   'command.group.focusNext': 'Focus next editor group',
   'command.group.focusPrevious': 'Focus previous editor group',
   'command.group.moveTabToNext': 'Move tab to next editor group',
+  'command.group.moveTabLeft': 'Move tab left',
+  'command.group.moveTabRight': 'Move tab right',
   'command.group.close': 'Close editor group',
   'command.preview.openToSide': 'Open preview to the side',
   'command.preview.open': 'Open preview',

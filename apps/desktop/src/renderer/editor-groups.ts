@@ -333,8 +333,16 @@ export function replaceDocument(groups: EditorGroups, from: string, to: string):
   return { ...groups, root: walk(groups.root) };
 }
 
-/** Moves a tab to another group, at its end, in front there and focused. */
-export function moveTab(groups: EditorGroups, tabId: string, toGroupId: string): EditorGroups {
+/**
+ * Moves a tab to another group, in front there and focused: at `at` among the target's tabs, or
+ * at its end, where "Move tab to next editor group" has always put it.
+ */
+export function moveTab(
+  groups: EditorGroups,
+  tabId: string,
+  toGroupId: string,
+  at?: number,
+): EditorGroups {
   const from = groupOfTab(groups, tabId);
   const tab = from?.tabs.find((each) => each.id === tabId);
   if (from === undefined || tab === undefined || from.id === toGroupId) return groups;
@@ -348,10 +356,60 @@ export function moveTab(groups: EditorGroups, tabId: string, toGroupId: string):
   if (twin !== undefined) return activateTab(closed, twin.id);
   const added = withGroup(closed, toGroupId, (found) => ({
     ...found,
-    tabs: [...found.tabs, tab],
+    tabs: withTabAt(found.tabs, tab, at ?? found.tabs.length),
     activeTabId: tab.id,
   }));
   return { ...added, focusedGroupId: toGroupId };
+}
+
+/** `tabs` with `tab` put at `at`, clamped to the strip. */
+const withTabAt = (tabs: readonly EditorTab[], tab: EditorTab, at: number): EditorTab[] => {
+  const next = [...tabs];
+  next.splice(Math.min(Math.max(at, 0), tabs.length), 0, tab);
+  return next;
+};
+
+/**
+ * A tab dropped on a strip (TYTO-288): `index` is the gap it was let go in, counted among the
+ * target group's tabs **as they are before the move** — `0` before the first, `tabs.length`
+ * after the last — which is what a person sees while dragging. In its own group it reorders;
+ * in another it moves there as {@link moveTab} does, with every rule that has (a text tab
+ * dropped where its document already is brings that twin forward, an emptied group closes).
+ * Either way the tab comes to the front and its group takes the focus.
+ */
+export function placeTab(
+  groups: EditorGroups,
+  tabId: string,
+  toGroupId: string,
+  index: number,
+): EditorGroups {
+  const from = groupOfTab(groups, tabId);
+  const tab = from?.tabs.find((each) => each.id === tabId);
+  if (from === undefined || tab === undefined) return groups;
+  if (from.id !== toGroupId) return moveTab(groups, tabId, toGroupId, index);
+  const at = from.tabs.findIndex((each) => each.id === tabId);
+  // The gaps right of the tab move one place left once it is taken out of the strip.
+  const landing = index > at ? index - 1 : index;
+  const tabs = withTabAt(
+    from.tabs.filter((each) => each.id !== tabId),
+    tab,
+    landing,
+  );
+  const reordered = withGroup(groups, from.id, (found) => ({ ...found, tabs }));
+  return activateTab(reordered, tabId);
+}
+
+/**
+ * The focused group's tab in front moves one place left (`-1`) or right (`1`) in its strip
+ * (TYTO-288), stopping at the ends as VS Code's "Move editor left/right in group" does.
+ */
+export function stepTabInGroup(groups: EditorGroups, direction: 1 | -1): EditorGroups {
+  const group = focusedGroup(groups);
+  const at = group.tabs.findIndex((tab) => tab.id === group.activeTabId);
+  const to = at + direction;
+  if (at === -1 || to < 0 || to >= group.tabs.length) return groups;
+  // A gap index, before the move: one step right is the gap after the right-hand neighbour.
+  return placeTab(groups, group.activeTabId ?? '', group.id, direction === 1 ? at + 2 : to);
 }
 
 /**

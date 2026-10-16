@@ -1278,6 +1278,29 @@ tyto-command-bar[open] {
   background: var(--tyto-hover);
 }
 
+/*
+ * Dragging a tab (TYTO-288): the tab stays where it is, dimmed, and an accent line stands in
+ * the gap where it will land — VS Code's look, with no tab sliding aside. Another group's strip
+ * takes the hover tint while the pointer is over it. The line is one element on the body,
+ * placed by `tab-drag.ts` from the strip it measured.
+ */
+.tabs__tab--dragging {
+  opacity: 0.5;
+}
+
+.tabs__strip--drop {
+  background: var(--tyto-hover);
+}
+
+.tabs__drop-line {
+  position: fixed;
+  z-index: 10;
+  width: var(--tyto-focus-width);
+  margin-inline-start: calc(var(--tyto-focus-width) / -2);
+  background: var(--tyto-accent);
+  pointer-events: none;
+}
+
 /* The export dialog (E9.4, TYTO-43).
 
    Positioned the way the command bar is, and for the same reason: it covers the window
