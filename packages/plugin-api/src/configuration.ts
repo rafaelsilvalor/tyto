@@ -26,6 +26,15 @@ export interface ConfigurationContribution<T = unknown> extends Contribution {
   /** One sentence for the person reading the settings, in English like the rest of the API. */
   readonly description: string;
   /**
+   * The values a person may write, each with one sentence on what it does (TYTO-304, ADR 0092).
+   *
+   * Help and not a rule: the settings tab suggests them and its hover lists them, and the
+   * `schema` is still what decides. Left out, an enum's values and a boolean's two are found in
+   * the schema itself (`outlineOf`), with no sentence. Every value must be one the schema
+   * accepts, or the declaration throws.
+   */
+  readonly options?: readonly SettingOption[];
+  /**
    * For a list setting, how each entry is checked **on its own** (TYTO-301, ADR 0091).
    *
    * Without it a list is one value: a single bad entry fails the schema and the whole list
@@ -37,6 +46,8 @@ export interface ConfigurationContribution<T = unknown> extends Contribution {
   readonly entries?: {
     readonly schema: ZodType<unknown>;
     readonly unique: boolean;
+    /** The values one entry may take, for suggestions and hover (TYTO-304), as `options`. */
+    readonly options?: readonly SettingOption[];
   };
   /**
    * For an object setting, how each member is checked **on its own** (TYTO-301, ADR 0091).
@@ -51,7 +62,16 @@ export interface ConfigurationContribution<T = unknown> extends Contribution {
   readonly members?: {
     readonly key: ZodType<string>;
     readonly schema: ZodType<unknown>;
+    /** The member names the object may hold, for suggestions and hover (TYTO-304). */
+    readonly options?: readonly SettingOption[];
   };
+}
+
+/** One value a setting, a list entry or an object member may take, and what it does. */
+export interface SettingOption {
+  /** A JSON value as the file writes it: a string, a number, `true`/`false` or `null`. */
+  readonly value: string | number | boolean | null;
+  readonly description: string;
 }
 
 /** A setting as the registry hands it back: the key a file uses, and who declared it. */
@@ -91,12 +111,49 @@ export function declaredSetting(
         `schema refuses: ${issuesOf(checked.error.issues)}.`,
     );
   }
+  checkOptions(plugin, contribution.id, 'value', contribution.options, contribution.schema);
+  checkOptions(
+    plugin,
+    contribution.id,
+    'entry',
+    contribution.entries?.options,
+    contribution.entries?.schema,
+  );
+  checkOptions(
+    plugin,
+    contribution.id,
+    'member name',
+    contribution.members?.options,
+    contribution.members?.key,
+  );
   return {
     key: prefixed ? `${plugin}.${contribution.id}` : contribution.id,
     plugin,
     prefixed,
     contribution,
   };
+}
+
+/**
+ * An option the schema it documents refuses would be a suggestion that writes a warning, which is
+ * the plugin's mistake like a bad default, so it throws too.
+ */
+function checkOptions(
+  plugin: string,
+  id: string,
+  what: string,
+  options: readonly SettingOption[] | undefined,
+  schema: ZodType<unknown> | undefined,
+): void {
+  if (options === undefined || schema === undefined) return;
+  for (const option of options) {
+    const checked = schema.safeParse(option.value);
+    if (checked.success) continue;
+    throw new TypeError(
+      `Plugin '${plugin}' offers ${JSON.stringify(option.value)} as a ${what} of the setting ` +
+        `'${id}', which its own schema refuses: ${issuesOf(checked.error.issues)}.`,
+    );
+  }
 }
 
 /** One key of a settings file, with where it was written when the reader knows. */

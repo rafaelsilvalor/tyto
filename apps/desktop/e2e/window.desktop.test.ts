@@ -319,6 +319,9 @@ describe('the bridge', () => {
       'session:write',
       // TYTO-206: the settings tab. Exercised by `e2e/settings.desktop.test.ts`.
       'settings:open',
+      // TYTO-304: what the settings tab suggests and explains. Exercised by
+      // `e2e/settings-assist.desktop.test.ts`.
+      'settings:outline',
       'settings:validate',
       // TYTO-277: the snippets tab and the file's text. Exercised by
       // `e2e/snippets-file.desktop.test.ts`.
@@ -620,6 +623,11 @@ describe('switching the language', () => {
     // TYTO-206: a command's label, shown only in the bar and the menu, like the two above.
     // `e2e/settings.desktop.test.ts` runs it from the bar.
     'command.settings.open',
+    // TYTO-304: the settings tab's hover labels, written into CodeMirror's tooltip by the
+    // editor, never into the shell. `e2e/settings-assist.desktop.test.ts` hovers a key.
+    'settings.assist.type',
+    'settings.assist.default',
+    'settings.assist.accepted',
     // TYTO-207: the same, for the keybindings file. `e2e/keybindings-file.desktop.test.ts`.
     'command.keybindings.open',
     // TYTO-277: the same, for the snippets file, and the heading over the snippets in the "/"

@@ -60,6 +60,7 @@ describe('the IPC contract', () => {
       'session:read',
       'session:write',
       'settings:open',
+      'settings:outline',
       'settings:validate',
       'snippets:open',
       'snippets:read',
@@ -349,6 +350,9 @@ describe('what the contract does not promise', () => {
       'keybindings:read',
       // TYTO-277. Nor "what does snippets.json say", for the same reason.
       'snippets:read',
+      // TYTO-304. Nor "what can settings.json say": the declared settings are the plugins',
+      // which main holds.
+      'settings:outline',
       // TYTO-113. Nor "which tabs did the last session leave": there is one session file,
       // and only main knows where it is and which paths it names.
       'session:read',

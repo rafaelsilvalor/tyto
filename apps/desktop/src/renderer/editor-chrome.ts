@@ -1,4 +1,4 @@
-import { type LanguageName } from '@tyto/editor';
+import { type LanguageName, type jsonAssist } from '@tyto/editor';
 
 import { BRIEF_ONLY_COMMANDS, TEXT_COMMANDS } from './commands.js';
 import { type DocumentState } from './documents.js';
@@ -88,6 +88,26 @@ export const commandOffered = (kind: Kind, id: string): boolean => {
  */
 export const languageOf = (kind: Kind): LanguageName | undefined =>
   kind === undefined ? undefined : 'json';
+
+/** One document's own editor extensions: CodeMirror's `Extension`, named through the editor. */
+export type DocumentExtension = ReturnType<typeof jsonAssist>;
+
+/** The app files whose tabs get help of their own, and the help each gets (TYTO-304). */
+export type AppFileAssists = Readonly<
+  Partial<Record<NonNullable<DocumentState['kind']>, DocumentExtension>>
+>;
+
+/**
+ * The extensions a tab of this kind is opened with beside its language — `settings.json`'s
+ * suggestions and hover (TYTO-304). Beside {@link languageOf} for its reason: a tab opened by its
+ * command and one brought back by the session are built by two call sites, and both ask here. A
+ * brief gets none, since the editor's own extensions are its language's help already.
+ */
+export const assistOf = (kind: Kind, assists: AppFileAssists): readonly DocumentExtension[] => {
+  if (kind === undefined || kind === 'preview') return [];
+  const assist = assists[kind];
+  return assist === undefined ? [] : [assist];
+};
 
 /**
  * The edit choosing `template` in the picker makes to this tab's text, or none.

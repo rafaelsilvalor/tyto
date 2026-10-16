@@ -1,0 +1,259 @@
+import type {
+  JsonAssistSource,
+  JsonCompletionAnswer,
+  JsonHoverAnswer,
+  JsonSuggestion,
+} from '@tyto/editor';
+import {
+  type Node,
+  findNodeAtLocation,
+  findNodeAtOffset,
+  getLocation,
+  parseTree,
+} from 'jsonc-parser';
+
+import type { SettingOption, SettingOutline } from '@tyto/plugin-api';
+
+/**
+ * What the `settings.json` tab suggests and explains (TYTO-304, ADR 0092): the path at the
+ * cursor read with `jsonc-parser`, answered from the outline main sends on `settings:outline`.
+ *
+ * Pure: a text and a position in, plain data out, so every case is a unit test and `@tyto/editor`
+ * stays ignorant of what a setting is. Five places get suggestions — a key not yet written, a
+ * setting's value, a list entry not yet in the list, an object member not yet in the object, and
+ * none elsewhere — and a key or a member name gets hover help.
+ */
+
+/** One setting as `settings:outline` describes it; the plugin API's `SettingOutline`. */
+export type { SettingOutline };
+
+/** The hover's labels, in the window's language; the descriptions stay English (one source). */
+export interface SettingsAssistLabels {
+  readonly type: string;
+  readonly default: string;
+  readonly accepted: string;
+}
+
+/** A JSON value's text as the file writes it. */
+const jsonText = (value: SettingOption['value']): string => JSON.stringify(value);
+
+/** The string token around `position`, when the cursor is inside one (its quotes excluded). */
+function stringAt(
+  previous: Node | undefined,
+  position: number,
+): { readonly from: number } | undefined {
+  // A key being typed comes back as `property`, a value as `string`; both are the string token.
+  if (previous === undefined || (previous.type !== 'string' && previous.type !== 'property')) {
+    return undefined;
+  }
+  const start = previous.offset + 1;
+  // An unclosed string runs to the cursor; a closed one ends before its closing quote.
+  if (position < start || position > previous.offset + previous.length) return undefined;
+  return { from: start };
+}
+
+/** The word right before the cursor, for a value written without quotes: `tr` of `true`. */
+const wordBefore = (text: string, position: number): number =>
+  position - (/[\w.-]*$/u.exec(text.slice(0, position))?.[0].length ?? 0);
+
+/** The first character after `position` that is not blank, skipping one closing quote. */
+function nextNonBlank(text: string, position: number): string {
+  const rest = text.slice(position).replace(/^[^\s"]*"?/u, '');
+  return rest.trimStart().charAt(0);
+}
+
+/** The keys of the object at `path`, apart from the one being typed. */
+function writtenKeys(tree: Node | undefined, path: readonly (string | number)[]): Set<string> {
+  const node = tree === undefined ? undefined : findNodeAtLocation(tree, [...path]);
+  const keys = new Set<string>();
+  if (node?.type !== 'object') return keys;
+  for (const property of node.children ?? []) {
+    const key = property.children?.[0];
+    if (key !== undefined && typeof key.value === 'string') keys.add(key.value);
+  }
+  return keys;
+}
+
+/** The values already in the list at `path`. */
+function writtenEntries(tree: Node | undefined, key: string): Set<unknown> {
+  const node = tree === undefined ? undefined : findNodeAtLocation(tree, [key]);
+  return new Set(node?.type === 'array' ? (node.children ?? []).map((entry) => entry.value) : []);
+}
+
+/** A key's or a member's suggestion: the name, and its value unless a colon already follows. */
+function keySuggestion(
+  name: string,
+  value: string,
+  text: string,
+  position: number,
+  info: string,
+  detail?: string,
+): JsonSuggestion {
+  const after = nextNonBlank(text, position);
+  if (after === ':') {
+    return { label: name, info, insert: JSON.stringify(name), kind: 'property' };
+  }
+  const head = `${JSON.stringify(name)}: `;
+  // The next key on a later line needs a comma between them; the closing brace does not.
+  const comma = after === '"' ? ',' : '';
+  return {
+    label: name,
+    info,
+    ...(detail === undefined ? {} : { detail }),
+    insert: `${head}${value}${comma}`,
+    select: [head.length, head.length + value.length],
+    kind: 'property',
+  };
+}
+
+/** Beside a key in the list: its default when that is short, else its type in words. */
+const DETAIL_LENGTH = 24;
+const shortDetail = (setting: SettingOutline): string =>
+  setting.default.length <= DETAIL_LENGTH ? setting.default : setting.type;
+
+const valueSuggestion = (option: SettingOption): JsonSuggestion => ({
+  label: String(option.value),
+  ...(option.description === '' ? {} : { info: option.description }),
+  insert: jsonText(option.value),
+  kind: 'value',
+});
+
+export function settingsAssist(
+  outline: () => readonly SettingOutline[],
+  labels: () => SettingsAssistLabels,
+): JsonAssistSource {
+  const settingOf = (key: string | number | undefined): SettingOutline | undefined =>
+    outline().find((setting) => setting.key === key);
+
+  return {
+    complete(text, position, explicit): JsonCompletionAnswer | null {
+      const location = getLocation(text, position);
+      const inString = stringAt(location.previousNode, position);
+      const from = inString?.from ?? wordBefore(text, position);
+      // Opened by typing, a list appears inside a string or after a letter, never on a comma.
+      if (inString === undefined && from === position && !explicit) return null;
+      const answer = (options: readonly JsonSuggestion[]): JsonCompletionAnswer => ({
+        from,
+        quoted: inString !== undefined,
+        options,
+      });
+      const path = location.path;
+      const tree = parseTree(text);
+
+      if (path.length === 1 && location.isAtPropertyKey) {
+        const written = writtenKeys(tree, []);
+        const typed = typeof path[0] === 'string' ? path[0] : '';
+        return answer(
+          outline()
+            .filter((setting) => setting.key === typed || !written.has(setting.key))
+            .map((setting) =>
+              keySuggestion(
+                setting.key,
+                setting.default,
+                text,
+                position,
+                setting.description,
+                shortDetail(setting),
+              ),
+            ),
+        );
+      }
+
+      const setting = settingOf(path[0]);
+      if (setting === undefined) return null;
+
+      if (path.length === 1) {
+        const options = setting.options.filter(
+          (option) => inString === undefined || typeof option.value === 'string',
+        );
+        return answer(options.map(valueSuggestion));
+      }
+
+      if (path.length === 2 && typeof path[1] === 'number' && setting.entries !== undefined) {
+        const written = writtenEntries(tree, setting.key);
+        const current = location.previousNode?.value as unknown;
+        return answer(
+          setting.entries.options
+            .filter((option) => option.value === current || !written.has(option.value))
+            .filter((option) => inString === undefined || typeof option.value === 'string')
+            .map(valueSuggestion),
+        );
+      }
+
+      if (
+        path.length === 2 &&
+        typeof path[1] === 'string' &&
+        location.isAtPropertyKey &&
+        setting.members !== undefined
+      ) {
+        const written = writtenKeys(tree, [setting.key]);
+        return answer(
+          setting.members.options
+            .filter((option) => option.value === path[1] || !written.has(String(option.value)))
+            .map((option) => {
+              const suggestion = keySuggestion(
+                String(option.value),
+                '""',
+                text,
+                position,
+                option.description,
+              );
+              // The caret between the empty colour's quotes, ready for the colour itself.
+              const inside = (suggestion.select?.[0] ?? -1) + 1;
+              return inside === 0 ? suggestion : { ...suggestion, select: [inside, inside] };
+            }),
+        );
+      }
+      return null;
+    },
+
+    hover(text, position): JsonHoverAnswer | null {
+      const tree = parseTree(text);
+      if (tree === undefined) return null;
+      const node = findNodeAtOffset(tree, position);
+      const property = node?.parent;
+      if (node?.type !== 'string' || property?.type !== 'property') return null;
+      if (property.children?.[0] !== node) return null;
+      const span = { from: node.offset, to: node.offset + node.length };
+      const owner = property.parent?.parent;
+
+      // A top-level key: the setting it names.
+      if (owner === undefined) {
+        const setting = settingOf(node.value as string);
+        if (setting === undefined) return null;
+        const words = labels();
+        const accepted = [
+          ...setting.options,
+          ...(setting.entries?.options ?? []),
+          ...(setting.members?.options ?? []),
+        ].map((option) => jsonText(option.value));
+        return {
+          ...span,
+          title: setting.key,
+          text: setting.description,
+          facts: [
+            { label: words.type, value: setting.type },
+            { label: words.default, value: setting.default },
+            ...(accepted.length === 0
+              ? []
+              : [{ label: words.accepted, value: accepted.join(', ') }]),
+          ],
+        };
+      }
+
+      // A member of a top-level object: what that member name paints.
+      const parentKey = owner.type === 'property' ? owner.children?.[0]?.value : undefined;
+      if (owner.parent?.parent !== undefined) return null;
+      const option = settingOf(parentKey as string)?.members?.options.find(
+        (each) => each.value === node.value,
+      );
+      if (option === undefined) return null;
+      return {
+        ...span,
+        title: `${String(parentKey)}.${String(option.value)}`,
+        text: option.description,
+        facts: [],
+      };
+    },
+  };
+}

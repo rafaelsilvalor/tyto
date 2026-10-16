@@ -338,8 +338,12 @@ export interface EditorHandle extends EditorPane {
    * tabs opens its `settings.json` as plain text (TYTO-206). Such a document gets the keys,
    * the commands, the theme and search, and **not the host's `extensions`**: those are the
    * editor's language's own lint and completion, and they would read the other text as one.
+   *
+   * `extensions` are this one document's own, ahead of the rest: a `settings.json` tab's
+   * suggestions and hover (`jsonAssist`, TYTO-304). A follower of the document (`followerOf`)
+   * is built from its state, so it carries them too.
    */
-  blank(doc: string, language?: LanguageName): EditorState;
+  blank(doc: string, language?: LanguageName, extensions?: readonly Extension[]): EditorState;
   /**
    * {@link withDiagnostics} for the document this view is showing: its markers replaced by
    * these. Notifies `onUpdate` listeners, which is how a store holding the state learns of
@@ -664,10 +668,10 @@ export function createEditor(parent: HTMLElement, options: EditorOptions = {}): 
 
     followerOf: (primary: EditorPane) => followerState(primary.view.state, primary.view),
 
-    blank: (doc: string, language: LanguageName = ownLanguage) =>
+    blank: (doc: string, language: LanguageName = ownLanguage, own: readonly Extension[] = []) =>
       CodeMirrorEditorState.create({
         doc,
-        extensions: language === ownLanguage ? extensions : shared(language),
+        extensions: [...own, ...(language === ownLanguage ? extensions : shared(language))],
       }),
 
     setValue: (value: string) => {

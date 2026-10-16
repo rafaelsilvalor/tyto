@@ -75,6 +75,7 @@ import { createTemplateEditor } from './template-editor.js';
 import { createExitGuard, mayUnload } from './quit.js';
 import { createLiveTextFile } from './live-text-file.js';
 import { type LiveSettings, createLiveSettings } from './settings-live.js';
+import { settingsOutline } from './settings-outline.js';
 import { fileSettingsStore } from './settings-store.js';
 import { createTemplateCatalogue } from './templates.js';
 import { shouldCheck, updateFeedFrom, updateRoute } from './update-feed.js';
@@ -1080,6 +1081,12 @@ async function start(): Promise<void> {
       },
       validate: ({ documentId, text, dirty }) => liveSettings.validate(documentId, text, dirty),
       closed: (documentId) => liveSettings.closed(documentId),
+      // Read off the registry's schemas once the installed plugins have started, with the
+      // themes they registered as the `theme` setting's values (TYTO-304, ADR 0092).
+      outline: async () => {
+        await contributed.ready;
+        return settingsOutline(host.registry.configurations(), await themes.list());
+      },
     },
     keybindings: {
       open: async (documentId) => {

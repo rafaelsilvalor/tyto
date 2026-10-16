@@ -130,6 +130,13 @@ export {
 export { template, templateLanguage } from './template-language.js';
 
 export { json, jsonLanguage } from './json-language.js';
+export {
+  type JsonAssistSource,
+  type JsonCompletionAnswer,
+  type JsonHoverAnswer,
+  type JsonSuggestion,
+  jsonAssist,
+} from './json-assist.js';
 
 export {
   type TemplateAnalysis,

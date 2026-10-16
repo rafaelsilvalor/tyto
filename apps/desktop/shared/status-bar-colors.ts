@@ -127,7 +127,15 @@ export const statusBarColorsContribution = {
   description:
     'Colours that win over the theme for the status bar, in every theme. ' +
     STATUS_BAR_COLOUR_KEYS.map((entry) => `${entry.key}: ${entry.description}`).join(' '),
-  members: { key: statusBarColourKey, schema: statusBarColour },
+  members: {
+    key: statusBarColourKey,
+    schema: statusBarColour,
+    // What the tab suggests for a member name, from the table the example is written from.
+    options: STATUS_BAR_COLOUR_KEYS.map((entry) => ({
+      value: entry.key,
+      description: entry.description,
+    })),
+  },
 } satisfies ConfigurationContribution<StatusBarColors>;
 
 /** Red, green and blue from 0 to 255, or `undefined` for anything but `#rgb`/`#rrggbb`. */

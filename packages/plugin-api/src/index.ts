@@ -48,9 +48,12 @@ export {
   type ResolvedSettings,
   type SettingEntry,
   type SettingMemberRange,
+  type SettingOption,
   declaredSetting,
   resolveSettings,
 } from './configuration.js';
+
+export { type SettingOutline, outlineOf } from './outline.js';
 
 export {
   type ContributionPoint,
