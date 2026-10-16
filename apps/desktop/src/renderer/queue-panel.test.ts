@@ -199,8 +199,48 @@ describe('the queue panel', () => {
     );
     expect(element.querySelector('.queue__auto-run')).toBeNull();
     expect(element.querySelector('.queue__kind')).toBeNull();
-    element.querySelector<HTMLButtonElement>('.queue__choose')?.click();
+    // The one way on is the header's folder button (TYTO-302); the body has no button at all.
+    expect(element.querySelector('.queue__body button')).toBeNull();
+    element.querySelector<HTMLButtonElement>('.pane__strip--tool .queue__choose')?.click();
     expect(actions.chooseFolder).toHaveBeenCalledTimes(1);
+  });
+
+  it('puts "Choose folder…" in the tool header as a folder icon, with its words (TYTO-302)', async () => {
+    const actions = spies();
+    const element = await panel(VIEW, actions);
+    const header = element.querySelector(':scope > .pane__strip--tool');
+    const choose = header?.querySelector<HTMLButtonElement>('.tool__actions .queue__choose');
+
+    expect(header?.querySelector('.tool__title')?.getAttribute('data-i18n')).toBe('queue.heading');
+    expect(choose?.getAttribute('aria-label')).toBe(translate('en', 'queue.folder.choose'));
+    expect(choose?.getAttribute('title')).toBe(translate('en', 'queue.folder.choose'));
+    expect(choose?.querySelector('svg.icon')).not.toBeNull();
+    // Before the close button: the tool's actions, then the hide.
+    expect(
+      [...(header?.querySelectorAll<HTMLButtonElement>('.tool__actions button') ?? [])].map(
+        (button) =>
+          button.classList.contains('panel__close') ? 'close' : button.dataset['action'],
+      ),
+    ).toEqual(['queue.chooseFolder', 'close']);
+    // It left the body: the body keeps its other controls and no second way to choose.
+    expect(element.querySelector('.queue__body .queue__choose')).toBeNull();
+    expect(element.querySelector('.queue__body .queue__clear')).not.toBeNull();
+
+    choose?.click();
+    expect(actions.chooseFolder).toHaveBeenCalledTimes(1);
+  });
+
+  it('offers no folder button before the queue answers or when it could not be read', async () => {
+    // `panel(undefined)` would take the default view, so the unanswered state is set after.
+    const asked = await panel();
+    asked.view = undefined;
+    await asked.updateComplete;
+    expect(asked.querySelector('.queue__choose')).toBeNull();
+    asked.view = 'failed';
+    await asked.updateComplete;
+    expect(asked.querySelector('.queue__choose')).toBeNull();
+    // The close button stays: hiding the tool never depends on its contents.
+    expect(asked.querySelector('.pane__strip--tool .panel__close')).not.toBeNull();
   });
 
   it('says the queue is empty rather than drawing an empty list', async () => {

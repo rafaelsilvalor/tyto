@@ -598,46 +598,53 @@ textarea {
 }
 
 /*
- * A docked panel's one tab: its name and its close button, drawn as a group's tab in front is,
- * from the same tokens. Not a `.tabs__tab`, which the window counts and selects.
+ * A docked panel's tool header (TYTO-302, ADR 0090): a tool is not a document, so its strip is
+ * not a tab. The same strip and height as a group's, so the strips still meet (ADR 0085), but on
+ * the panel's own background with no tab shape and no fill of a tab in front; the tool's name in
+ * small capitals, as VS Code titles its side bar's views, and its actions at the right end.
  */
-.pane__tab {
-  display: flex;
+.pane__strip--tool {
   align-items: center;
-  gap: var(--tyto-space-1);
-  padding-inline: var(--tyto-space-4) var(--tyto-space-1);
-  border-inline-end: var(--tyto-hairline-width) solid var(--tyto-hairline);
+  padding-inline-start: var(--tyto-space-4);
   background: var(--tyto-surface);
-  color: var(--tyto-text);
-  font-size: var(--tyto-text-sm);
 }
 
-.pane__name {
-  display: flex;
-  align-items: center;
-}
-
-/* The panel's name, in sentence case like a file's, and as quiet as a tab's name in front. */
-.pane__title {
+/* The hook a dock switcher takes over once a dock holds more than one tool. */
+.tool__title {
+  flex: 1 1 auto;
+  min-width: 0;
   margin: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  color: var(--tyto-text-muted);
   font: inherit;
+  font-size: var(--tyto-text-xs);
   font-weight: normal;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
 }
 
-.panel__close {
+/* A tool's action is an icon button like a group's action; the close button is a × in text. */
+.tool__action {
+  display: inline-flex;
+  align-items: center;
   border: none;
   border-radius: var(--tyto-radius-sm);
+  padding: var(--tyto-space-1);
   background: none;
-  padding: 0 var(--tyto-space-2);
   color: var(--tyto-text-muted);
   cursor: pointer;
+}
+
+.tool__action.panel__close {
+  padding: 0 var(--tyto-space-2);
   font: inherit;
   font-size: var(--tyto-text-md);
   line-height: 1.4;
 }
 
-.panel__close:hover,
-.panel__close:focus-visible {
+.tool__action:hover,
+.tool__action:focus-visible {
   background: var(--tyto-hover);
   color: var(--tyto-text);
 }

@@ -137,18 +137,21 @@ describe('what survives a rearrangement', () => {
     expect(before?.childElementCount).toBe(1);
   });
 
-  it('draws every docked panel with a one-tab strip and no header row (TYTO-288)', async () => {
+  it('draws every docked panel with a tool header, not a tab, and no header row (TYTO-302)', async () => {
     await arrange(document, withPanelOpen(DEFAULT_LAYOUT, 'queue', true), host());
 
     for (const id of [PROBLEMS_PANEL, 'queue']) {
       const panel = document.querySelector(`[data-panel="${id}"]`);
       const children = [...(panel?.children ?? [])].map((child) => child.className);
-      // A panel has no actions, so no header row, as VS Code's panels have none (ADR 0085).
-      expect(children[0], id).toBe('pane__strip');
+      // A tool is not a document: its strip is a tool header (ADR 0090), and it has no header
+      // row, since a tool has no breadcrumb (ADR 0085).
+      expect(children[0], id).toBe('pane__strip pane__strip--tool');
+      expect(panel?.querySelector(':scope > .pane__strip > .tool__title'), id).not.toBeNull();
+      expect(panel?.querySelector('.pane__tab, .tabs__tab'), id).toBeNull();
       expect(panel?.querySelector(':scope > .pane__header'), id).toBeNull();
     }
-    // The problems heading keeps its id and its key, now as the tab's name.
-    const heading = document.querySelector('.pane__strip #problems-heading');
+    // The problems heading keeps its id and its key, now as the tool's title.
+    const heading = document.querySelector('.pane__strip--tool > #problems-heading.tool__title');
     expect(heading?.getAttribute('data-i18n')).toBe('problems.heading');
     // The editor panel has no bar of its own any more: each group is a pane (ADR 0085).
     const editor = document.querySelector(`[data-panel="${EDITOR_PANEL}"]`);

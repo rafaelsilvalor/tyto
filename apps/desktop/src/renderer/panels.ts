@@ -37,17 +37,21 @@ export interface PanelChrome {
 }
 
 /**
- * What every panel shares: the pane's tab strip (TYTO-288, ADR 0085) — one tab with the
- * panel's name and its close button, the same height as every editor group's strip, so the
- * strips' bottoms meet across the window. No header row: a panel has no actions to put in one,
- * and VS Code's panels have none (Rafael's reference of 2026-10-14).
+ * What every panel shares: a **tool header** (TYTO-302, ADR 0090, amending ADR 0085 decision 6).
+ * A document is a tab; a tool has a header. The queue, Problems and a plugin's panel are tools —
+ * none of them reads the document in front — so their strip is not drawn as a tab: the tool's
+ * name in small capitals on the panel's own background, as VS Code titles its side bar's views
+ * ("EXPLORER"), and the tool's actions at the right end with the close button last. The strip
+ * keeps `.pane__strip` and its token height, so the strips' bottoms still meet across the window
+ * (ADR 0085); `.pane__strip--tool` is what changes its look. No header row: a tool has no
+ * breadcrumb to put in one.
  *
  * A base class rather than three copies, and the one thing it insists on is that the close
  * button is the dock's and not the panel's: a panel that drew its own would be a panel that
  * could get it wrong, and "can this be closed" is a property of the record.
  *
- * The tab is not a `.tabs__tab`: those are a group's tabs, which the window counts and selects,
- * and a panel's name is neither. It is drawn in the same shape from the same tokens.
+ * `.tool__title` is the hook a dock switcher takes over when one dock holds more than one tool
+ * (TYTO-279's Explorer beside the queue): the title becomes the switcher, the actions stay.
  */
 export abstract class DockedPanel extends LitElement {
   static override properties = {
@@ -80,19 +84,21 @@ export abstract class DockedPanel extends LitElement {
   }
 
   /**
-   * The strip, with `name` as its one tab's text. The name is a heading, since it is what the
-   * panel is called; the close button sits where a group's tab has its own.
+   * The tool header: `title`, a heading with the class `tool__title`, since it is what the panel
+   * is called; then the tool's own `actions`, each a button with its words on `title` and
+   * `aria-label`; then the close button, which hides the tool.
    */
-  protected chrome(name: TemplateResult): TemplateResult {
-    return html`<div class="pane__strip">
-      <div class="pane__tab">
-        <span class="pane__name">${name}</span>
+  protected chrome(title: TemplateResult, actions: unknown = nothing): TemplateResult {
+    return html`<div class="pane__strip pane__strip--tool">
+      ${title}
+      <div class="pane__actions tool__actions">
+        ${actions}
         ${
           this.fixed
             ? nothing
             : html`<button
                 type="button"
-                class="panel__close"
+                class="tool__action panel__close"
                 title=${this.say('panel.close')}
                 aria-label=${this.say('panel.close')}
                 @click=${() => {
@@ -106,9 +112,16 @@ export abstract class DockedPanel extends LitElement {
     </div>`;
   }
 
-  /** The strip for a panel named by the catalogue: the heading keeps its id and key. */
-  protected bar(headingId: string, headingKey: CatalogueKey): TemplateResult {
-    return this.chrome(html`<h2 class="pane__title" id=${headingId} data-i18n=${headingKey}></h2>`);
+  /** The header for a tool named by the catalogue: the heading keeps its id and key. */
+  protected bar(
+    headingId: string,
+    headingKey: CatalogueKey,
+    actions: unknown = nothing,
+  ): TemplateResult {
+    return this.chrome(
+      html`<h2 class="tool__title" id=${headingId} data-i18n=${headingKey}></h2>`,
+      actions,
+    );
   }
 }
 

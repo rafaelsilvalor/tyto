@@ -176,7 +176,7 @@ beforeAll(async () => {
   await app.evaluate(({ dialog }, chosen) => {
     dialog.showOpenDialog = () => Promise.resolve({ canceled: false, filePaths: [chosen] });
   }, queueFolder);
-  await page.click('tyto-queue-panel .queue__choose');
+  await page.click('tyto-queue-panel .pane__strip--tool .queue__choose');
   await page.waitForSelector('tyto-queue-panel .queue__path');
 });
 

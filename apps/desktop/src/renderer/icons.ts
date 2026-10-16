@@ -16,6 +16,7 @@ import { type SVGTemplateResult, html, svg } from 'lit';
  * `preview` and `lock` are **not on that sheet**. TYTO-287 drew them provisionally; TYTO-288
  * redrew both in the nine's manner — the same frame, the same stroke, the problems icon's dot —
  * and put them on a sheet beside the nine for Rafael's approval, which is still pending.
+ * `folder` (TYTO-302) is drawn the same way and waits on the same kind of sheet.
  */
 
 export type IconName =
@@ -30,7 +31,9 @@ export type IconName =
   | 'settings'
   // TYTO-287: "Open preview to the side" in a group's header row, and a locked preview.
   | 'preview'
-  | 'lock';
+  | 'lock'
+  // TYTO-302: "Choose folder…" in the queue's tool header.
+  | 'folder';
 
 const FRAME = svg`<rect x="2" y="2.75" width="12" height="10.5" rx="2" />`;
 
@@ -59,6 +62,10 @@ const GEOMETRY: Readonly<Record<IconName, (lit: boolean) => SVGTemplateResult>> 
   // A padlock on the frame's corner radius, with the problems icon's dot for the keyhole.
   lock: () =>
     svg`<rect x="3" y="7.25" width="10" height="6.25" rx="2" /><path d="M5.5 7.25V5.5a2.5 2.5 0 0 1 5 0v1.75" /><circle class="icon__dot" cx="8" cy="10.35" r=".5" fill="currentColor" stroke="none" />`,
+  // A folder on the frame's box and corner radius: the tab rises on the left, the flap's line
+  // runs across under it.
+  folder: () =>
+    svg`<path d="M2 5a2 2 0 0 1 2-2h2.25l1.5 1.75H12a2 2 0 0 1 2 2v4.5a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2Z" /><path d="M2 7h12" />`,
 };
 
 /** One icon, decorative: the button it sits in carries the words (`aria-label`). */

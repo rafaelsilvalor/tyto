@@ -2,6 +2,7 @@ import { type TemplateResult, html, nothing } from 'lit';
 
 import type { CatalogueKey } from '../../shared/i18n/index.js';
 import type { IpcResponse } from '../../shared/ipc.js';
+import { icon } from './icons.js';
 import { DockedPanel } from './panels.js';
 
 /**
@@ -75,7 +76,10 @@ export class QueuePanel extends DockedPanel {
   }
 
   protected override render(): unknown {
-    return html`${this.bar('queue-heading', 'queue.heading')}
+    // Choosing the folder is the tool's own action, so it is in the tool header (TYTO-302, ADR
+    // 0090), offered whenever the old body button was: once the queue has answered.
+    const answered = this.view !== undefined && this.view !== 'failed';
+    return html`${this.bar('queue-heading', 'queue.heading', answered ? this.chooseButton() : nothing)}
       <div class="queue__body">${this.body()}</div>`;
   }
 
@@ -86,8 +90,7 @@ export class QueuePanel extends DockedPanel {
       return html`<p class="queue__note queue__note--bad">${this.say('queue.unavailable')}</p>`;
     }
     if (view.folder === null) {
-      return html`<p class="queue__note">${this.say('queue.folder.none')}</p>
-        <div class="queue__controls">${this.chooseButton()}</div>`;
+      return html`<p class="queue__note">${this.say('queue.folder.none')}</p>`;
     }
 
     return html`<div class="queue__folder">
@@ -95,7 +98,6 @@ export class QueuePanel extends DockedPanel {
         <code class="queue__path" title=${view.inbox ?? ''}>${view.inbox}</code>
       </div>
       <div class="queue__controls">
-        ${this.chooseButton()}
         <button
           type="button"
           class="queue__button queue__clear"
@@ -165,15 +167,20 @@ export class QueuePanel extends DockedPanel {
     </div>`;
   }
 
+  /** The folder icon in the tool header; its words are on `title` and `aria-label`. */
   private chooseButton(): TemplateResult {
+    const label = this.say('queue.folder.choose');
     return html`<button
       type="button"
-      class="queue__button queue__choose"
+      class="tool__action queue__choose"
+      data-action="queue.chooseFolder"
+      title=${label}
+      aria-label=${label}
       @click=${() => {
         this.actions.chooseFolder();
       }}
     >
-      ${this.say('queue.folder.choose')}
+      ${icon('folder')}
     </button>`;
   }
 
