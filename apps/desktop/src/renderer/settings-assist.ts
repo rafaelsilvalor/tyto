@@ -14,6 +14,8 @@ import {
 
 import type { SettingOption, SettingOutline } from '@tyto/plugin-api';
 
+import { nextNonBlank, stringAt, wordBefore, writtenKeys } from './json-location.js';
+
 /**
  * What the `settings.json` tab suggests and explains (TYTO-304, ADR 0092): the path at the
  * cursor read with `jsonc-parser`, answered from the outline main sends on `settings:outline`.
@@ -45,43 +47,6 @@ export function firstSentence(description: string): string {
 
 /** A JSON value's text as the file writes it. */
 const jsonText = (value: SettingOption['value']): string => JSON.stringify(value);
-
-/** The string token around `position`, when the cursor is inside one (its quotes excluded). */
-function stringAt(
-  previous: Node | undefined,
-  position: number,
-): { readonly from: number } | undefined {
-  // A key being typed comes back as `property`, a value as `string`; both are the string token.
-  if (previous === undefined || (previous.type !== 'string' && previous.type !== 'property')) {
-    return undefined;
-  }
-  const start = previous.offset + 1;
-  // An unclosed string runs to the cursor; a closed one ends before its closing quote.
-  if (position < start || position > previous.offset + previous.length) return undefined;
-  return { from: start };
-}
-
-/** The word right before the cursor, for a value written without quotes: `tr` of `true`. */
-const wordBefore = (text: string, position: number): number =>
-  position - (/[\w.-]*$/u.exec(text.slice(0, position))?.[0].length ?? 0);
-
-/** The first character after `position` that is not blank, skipping one closing quote. */
-function nextNonBlank(text: string, position: number): string {
-  const rest = text.slice(position).replace(/^[^\s"]*"?/u, '');
-  return rest.trimStart().charAt(0);
-}
-
-/** The keys of the object at `path`, apart from the one being typed. */
-function writtenKeys(tree: Node | undefined, path: readonly (string | number)[]): Set<string> {
-  const node = tree === undefined ? undefined : findNodeAtLocation(tree, [...path]);
-  const keys = new Set<string>();
-  if (node?.type !== 'object') return keys;
-  for (const property of node.children ?? []) {
-    const key = property.children?.[0];
-    if (key !== undefined && typeof key.value === 'string') keys.add(key.value);
-  }
-  return keys;
-}
 
 /** The values already in the list at `path`. */
 function writtenEntries(tree: Node | undefined, key: string): Set<unknown> {

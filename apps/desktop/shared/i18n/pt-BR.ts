@@ -232,6 +232,7 @@ export const ptBR: Catalogue = {
   'settings.assist.type': 'Tipo',
   'settings.assist.default': 'Padrão',
   'settings.assist.accepted': 'Aceita',
+  'keybindings.assist.defaultKey': 'Atalho padrão',
   'command.keybindings.open': 'Preferências: Abrir atalhos de teclado (JSON)',
   'command.snippets.open': 'Preferências: Abrir trechos (JSON)',
   'command.window.reload': 'Recarregar a janela',

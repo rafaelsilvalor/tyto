@@ -61,6 +61,7 @@ import {
   slashTemplateNote,
 } from './editor-chrome.js';
 import { readKeybindingsText } from './keybindings-file.js';
+import { type KeybindingCommand, keybindingsAssist } from './keybindings-assist.js';
 import { type SettingOutline, settingsAssist } from './settings-assist.js';
 import { readSnippetsText } from './snippets-file.js';
 import {
@@ -495,6 +496,17 @@ const appFileAssists: AppFileAssists = {
           default: translate(state.locale, 'settings.assist.default'),
           accepted: translate(state.locale, 'settings.assist.accepted'),
         }),
+      ),
+    ),
+  ],
+  // The keybindings tab's (TYTO-304): every command the registry holds, read at each opening,
+  // so a plugin's command registered after the tab opened is offered too.
+  keybindings: [
+    tabThroughCompletions(),
+    jsonAssist(
+      keybindingsAssist(
+        () => keybindingCommands(),
+        () => ({ defaultKey: translate(state.locale, 'keybindings.assist.defaultKey') }),
       ),
     ),
   ],
@@ -3045,14 +3057,7 @@ function commandEntries(): readonly CommandEntry[] {
   return registry.list().flatMap((command) => {
     // Not offered with this tab in front (TYTO-283): the registry would refuse to run it.
     if (!offeredNow(command.id)) return [];
-    const key = COMMAND_LABELS[command.id];
     const binding = bindings[command.id];
-    // Three commands build their label from a word plus something that is not the
-    // catalogue's: a recent file's own name, a panel's name, and a tab's. All are resolved
-    // at display time so that switching language needs no re-registration.
-    const own = command.label ?? command.id;
-    const panelId = panelOfToggleCommand(command.id);
-    const panelName = panelId === undefined ? undefined : PANEL_NAMES[panelId];
     const slot = slotOfSelectCommand(command.id);
 
     // A slot past the last tab is left out rather than shown doing nothing. The command
@@ -3062,26 +3067,66 @@ function commandEntries(): readonly CommandEntry[] {
     const tab = slotTab === undefined ? undefined : documentOf(workspace, slotTab.documentId);
     if (slot !== undefined && tab === undefined) return [];
 
-    const label =
-      pathOfRecentCommand(command.id) !== undefined
-        ? `${translate(state.locale, 'command.file.recent')}: ${own}`
-        : tab !== undefined
-          ? `${translate(state.locale, 'command.document.select')}: ${labelOf(tab)}`
-          : panelId !== undefined
-            ? `${translate(state.locale, 'command.layout.togglePanel')}: ${
-                panelName === undefined ? own : translate(state.locale, panelName)
-              }`
-            : key === undefined
-              ? own
-              : translate(state.locale, key);
-
     return [
       {
         id: command.id,
-        label,
+        label: commandTitle(command, tab),
         ...(binding === undefined ? {} : { binding }),
       },
     ];
+  });
+}
+
+/**
+ * A command's title as the command bar shows it, in the window's language. Three commands
+ * build it from a word plus something that is not the catalogue's: a recent file's own name, a
+ * panel's name, and a tab's (`tab`, for a tab slot; its number without one). All are resolved
+ * at display time so that switching language needs no re-registration.
+ */
+function commandTitle(
+  command: { readonly id: string; readonly label?: string },
+  tab: DocumentState | undefined,
+): string {
+  const key = COMMAND_LABELS[command.id];
+  const own = command.label ?? command.id;
+  const panelId = panelOfToggleCommand(command.id);
+  const panelName = panelId === undefined ? undefined : PANEL_NAMES[panelId];
+  const slot = slotOfSelectCommand(command.id);
+  if (pathOfRecentCommand(command.id) !== undefined) {
+    return `${translate(state.locale, 'command.file.recent')}: ${own}`;
+  }
+  if (slot !== undefined) {
+    return `${translate(state.locale, 'command.document.select')}: ${
+      tab === undefined ? String(slot) : labelOf(tab)
+    }`;
+  }
+  if (panelId !== undefined) {
+    return `${translate(state.locale, 'command.layout.togglePanel')}: ${
+      panelName === undefined ? own : translate(state.locale, panelName)
+    }`;
+  }
+  return key === undefined ? own : translate(state.locale, key);
+}
+
+/**
+ * Every command the keybindings tab may name (TYTO-304): the whole registry, as the resolver
+ * checks entries against it — not only what is offered with the tab in front, since a key bound
+ * to export is a fine entry while `keybindings.json` is the tab — each with the key it is on
+ * before the person's file, read off the table built without the user layer.
+ */
+function keybindingCommands(): readonly KeybindingCommand[] {
+  const defaults = shownBindingsOf(
+    resolveWith([]).table,
+    editor?.isVimMode() ?? false,
+    state.platform,
+  );
+  return registry.list().map((command) => {
+    const key = defaults[command.id];
+    return {
+      id: command.id,
+      title: commandTitle(command, undefined),
+      ...(key === undefined ? {} : { key }),
+    };
   });
 }
 

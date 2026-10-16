@@ -628,6 +628,8 @@ describe('switching the language', () => {
     'settings.assist.type',
     'settings.assist.default',
     'settings.assist.accepted',
+    // The keybindings tab's hover (TYTO-304), likewise: `e2e/keybindings-assist.desktop.test.ts`.
+    'keybindings.assist.defaultKey',
     // TYTO-207: the same, for the keybindings file. `e2e/keybindings-file.desktop.test.ts`.
     'command.keybindings.open',
     // TYTO-277: the same, for the snippets file, and the heading over the snippets in the "/"

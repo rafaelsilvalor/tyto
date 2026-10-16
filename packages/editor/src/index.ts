@@ -96,6 +96,7 @@ export {
   COMMAND_BAR_TOGGLE,
   EDITOR_CONTEXTS,
   KEYBINDING_CONTEXTS,
+  KEYBINDING_CONTEXT_DESCRIPTIONS,
   bindingsOf,
   concreteKey,
   keyOfStroke,

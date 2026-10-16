@@ -230,6 +230,7 @@ export const en: Catalogue = {
   'settings.assist.type': 'Type',
   'settings.assist.default': 'Default',
   'settings.assist.accepted': 'Accepted',
+  'keybindings.assist.defaultKey': 'Default key',
   'command.keybindings.open': 'Preferences: Open Keyboard Shortcuts (JSON)',
   'command.snippets.open': 'Preferences: Open Snippets (JSON)',
   'command.window.reload': 'Reload the window',

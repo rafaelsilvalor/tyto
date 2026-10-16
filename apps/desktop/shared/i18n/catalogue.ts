@@ -459,6 +459,7 @@ export interface Catalogue {
   readonly 'settings.assist.type': string;
   readonly 'settings.assist.default': string;
   readonly 'settings.assist.accepted': string;
+  readonly 'keybindings.assist.defaultKey': string;
   /** TYTO-207. Opens `keybindings.json` in a tab; a command, so it is not on screen at load. */
   readonly 'command.keybindings.open': string;
   /** TYTO-277. Opens `snippets.json` in a tab; a command, so it is not on screen at load. */
@@ -731,6 +732,7 @@ export const CATALOGUE_KEYS = [
   'settings.assist.type',
   'settings.assist.default',
   'settings.assist.accepted',
+  'keybindings.assist.defaultKey',
   'command.keybindings.open',
   'command.snippets.open',
   'command.window.reload',
