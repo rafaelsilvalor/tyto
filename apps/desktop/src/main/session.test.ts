@@ -347,7 +347,7 @@ describe('reading the session back', () => {
         kind: 'brief',
         documentId: 'session-1',
         // The folder to show on hover comes back with it (TYTO-288, ADR 0086).
-        document: { path: '/b/a.brief', name: 'a.brief', folderLabel: '/b', text: '::a' },
+        document: { path: '/b/a.brief', name: 'a.brief', pathLabel: '/b/a.brief', text: '::a' },
         draft: null,
         stale: false,
         missing: null,

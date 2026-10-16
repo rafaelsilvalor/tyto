@@ -622,9 +622,9 @@ function paintPanel(): void {
 const labelOf = (document_: DocumentState): string =>
   document_.name ?? translate(state.locale, 'document.untitled');
 
-/** A tab's tooltip: the folder main said the file is in (ADR 0086), or none in no file. */
-const folderOf = (document_: DocumentState): { folder?: string } =>
-  document_.folderLabel === undefined ? {} : { folder: document_.folderLabel };
+/** A tab's tooltip: the path main wrote for the file (ADR 0086), or none in no file. */
+const whereOf = (document_: DocumentState): { where?: string } =>
+  document_.pathLabel === undefined ? {} : { where: document_.pathLabel };
 
 function paintTabs(): void {
   // One strip per group (TYTO-286). A fresh array every time, for the reason the problems
@@ -657,7 +657,7 @@ function paintTabs(): void {
             {
               id: tab.id,
               label: labelOf(document_),
-              ...folderOf(document_),
+              ...whereOf(document_),
               dirty: isUnsaved(document_),
             },
           ];
@@ -681,8 +681,8 @@ function previewEntry(tab: EditorTab): TabEntry {
   return {
     id: tab.id,
     label: shown === undefined ? heading : `${heading} ${labelOf(shown)}`,
-    // The folder of the brief it shows, which is the question a hover over it asks.
-    ...(shown === undefined ? {} : folderOf(shown)),
+    // The path of the brief it shows, which is the question a hover over it asks.
+    ...(shown === undefined ? {} : whereOf(shown)),
     dirty: false,
     preview: true,
     ...(tab.locked === true ? { locked: true } : {}),
@@ -1592,7 +1592,7 @@ function adoptEditorState(handle: EditorHandle): void {
  * rebuilding a state from a string is exactly what throws one away.
  */
 function adopt(
-  opened: { name: string; folderLabel: string; text: string } | null,
+  opened: { name: string; pathLabel: string; text: string } | null,
   documentId: string | null,
   wanted: string,
   kind?: AppFile,
@@ -1615,7 +1615,7 @@ function adopt(
     ...born,
     ...(kind === undefined ? {} : { kind }),
     name: opened.name,
-    folderLabel: opened.folderLabel,
+    pathLabel: opened.pathLabel,
     // Born saved, because it was just read: the buffer and the file say the same thing and
     // the comparison that paints the dot says so without anybody writing `dirty: false`.
     //
@@ -2400,12 +2400,12 @@ async function saveOneDocument(
   // when it was not.
   if (answer.document === null) return 'dismissed';
 
-  const { name, folderLabel, text: written } = answer.document;
+  const { name, pathLabel, text: written } = answer.document;
   workspace = updateDocument(workspace, documentId, (document_) => ({
     ...document_,
     name,
-    // A save-as can put the file in another folder, so the tooltip follows the answer.
-    folderLabel,
+    // A save-as can put the file somewhere else, so the tooltip follows the answer.
+    pathLabel,
     // **What main says it wrote**, and not the string sent up or the buffer as it now
     // stands. A save-as puts a dialog in front of somebody who can go on typing behind
     // it, so the text at the end of this round trip is not always the text at the start
@@ -2656,7 +2656,7 @@ async function fileOf(
   bridge: TytoBridge,
   tab: RestoredTab,
 ): Promise<{
-  document: { name: string; folderLabel: string; text: string } | null;
+  document: { name: string; pathLabel: string; text: string } | null;
   documentId: string | null;
 }> {
   if (tab.kind === 'brief') return { document: tab.document, documentId: tab.documentId };
@@ -2712,7 +2712,7 @@ async function restoreSession(bridge: TytoBridge, handle: EditorHandle): Promise
           ...(kind === undefined ? {} : { kind }),
           name: opened.document.name,
           // A restored tab is shown where its file is, as an opened one is (ADR 0086).
-          folderLabel: opened.document.folderLabel,
+          pathLabel: opened.document.pathLabel,
           savedText: contentOf(born),
           state:
             tab.draft !== null && !tab.stale

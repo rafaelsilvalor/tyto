@@ -1,6 +1,7 @@
 # 0086 — A folder reaches the window only to be shown
 
-Status: accepted · 2026-10-16 · TYTO-288 (absorbing TYTO-274) · beside ADR 0010
+Status: accepted · 2026-10-16 · TYTO-288 (absorbing TYTO-274) · beside ADR 0010 · decision 3
+amended the same day: the path, not the folder alone
 
 ## Context
 
@@ -20,20 +21,23 @@ read (ADR 0010). Before this ADR the tab's `title` was the file's name again.
 
 ## Decision
 
-1. **Main writes the folder as a sentence, and the window shows it.** `openDocument` gains
-   `folderLabel`: the folder the file is in, with the home directory written `~`
-   (`folderLabelOf` in `src/main/folder-label.ts`; Windows compares without case and keeps the
-   folder's own spelling; a root is never a home). Every door above carries it, because they all
+1. **Main writes where the file is as a sentence, and the window shows it.** `openDocument`
+   gains `pathLabel`: the file's path with the home directory written `~`
+   (`pathLabelOf` in `src/main/path-label.ts`; Windows compares without case and keeps the
+   path's own spelling and separators; a root is never a home). Every door above carries it, because they all
    answer through `adopt` or `save` in the document service. No new channel.
-2. **For display only.** The window keeps it on the document (`DocumentState.folderLabel`) and
+2. **For display only.** The window keeps it on the document (`DocumentState.pathLabel`) and
    puts it in one place, the tab's `title`. It never sends it back, and no channel that opens or
    writes a file accepts it: `file:reopen` still takes a path and still asks `knows()` first,
-   unchanged. Handed back as a path, the label opens nothing, which the unit and the end-to-end
-   suites both ask.
-3. **The tooltip is the folder, and nothing else**, as Zed and VS Code show it: the name is
-   already on the tab. A tab in no file — untitled, or released by a save-as elsewhere (TYTO-104)
-   — has no `title` at all. A preview tab shows the folder of the brief it shows. The app's own
-   files show theirs, the data folder.
+   unchanged. Handed back as a path, the label opens nothing — nor does its folder with another
+   file name — which the unit and the end-to-end suites both ask.
+3. **The tooltip is the path, VS Code's way**: `~\briefs\campanha.brief`, in the platform's own
+   separator. Rafael chose it on 2026-10-16 over the folder alone, which this ADR first said:
+   a tab label cut by its ellipsis then still has its full name on hover. It is main's path and
+   not the folder joined to the tab's label, because the label is not always the file's name —
+   a queue task's tab says `<id> · brief.brief`. A tab in no file — untitled, or released by a
+   save-as elsewhere (TYTO-104) — has no `title` at all. A preview tab shows the path of the
+   brief it shows. The app's own files show theirs, in the data folder.
 4. **Worked out at every open, never stored.** `session.json` keeps paths and kinds as before;
    a restored tab gets its label from main when the session is read back, so a label follows the
    machine's home directory rather than the one it was written under. A save-as moves it with the
@@ -43,7 +47,7 @@ read (ADR 0010). Before this ADR the tab's `title` was the file's name again.
 
 ## Consequences
 
-- The breadcrumb TYTO-273 builds can read the same field for its folder part, with no channel.
+- The breadcrumb TYTO-273 builds can read the same field for its path, with no channel.
 - A label that is ever made a key would reopen ADR 0010's question; it is named here so that it
   is not done by accident.
 - The native tooltip is drawn by the operating system, so a screenshot of the window does not

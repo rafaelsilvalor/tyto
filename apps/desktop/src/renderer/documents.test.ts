@@ -312,10 +312,10 @@ describe('letting go of a file another tab saved over', () => {
   });
 
   it('takes the folder shown on hover off with the name (TYTO-288, ADR 0086)', () => {
-    const before = { ...holding('a', FIRST, FIRST), name: 'campanha.brief', folderLabel: '~/b' };
+    const before = { ...holding('a', FIRST, FIRST), name: 'campanha.brief', pathLabel: '~/b' };
     const after = releaseDocument({ documents: [before], activeId: 'a' }, 'a');
 
-    expect(documentOf(after, 'a')?.folderLabel).toBeUndefined();
+    expect(documentOf(after, 'a')?.pathLabel).toBeUndefined();
   });
 
   it('keeps every character, the state and the brief it already had', () => {

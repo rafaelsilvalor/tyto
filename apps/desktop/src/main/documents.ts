@@ -3,7 +3,7 @@ import { homedir } from 'node:os';
 import { basename, dirname } from 'node:path';
 
 import { type IpcResponse } from '../../shared/ipc.js';
-import { folderLabelOf } from './folder-label.js';
+import { pathLabelOf } from './path-label.js';
 import { type RecentEntry, type RecentFiles } from './recent-files.js';
 
 /**
@@ -157,7 +157,7 @@ export function createDocumentService(options: DocumentServiceOptions): Document
   const describe = (path: string, text: string): OpenDocument => ({
     path,
     name: nameFor(path),
-    folderLabel: folderLabelOf(path, home()),
+    pathLabel: pathLabelOf(path, home()),
     text,
   });
 

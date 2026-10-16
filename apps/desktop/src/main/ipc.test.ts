@@ -116,14 +116,14 @@ const documents = () => {
         document: {
           path: '/briefs/promo.brief',
           name: 'promo.brief',
-          folderLabel: '/briefs',
+          pathLabel: '/briefs/promo.brief',
           text: '::a',
         },
         documentId,
       }),
     openPath: (documentId: string, path: string, label?: string) =>
       Promise.resolve({
-        document: { path, name: label ?? 'brief.brief', folderLabel: '/fila', text: '::t' },
+        document: { path, name: label ?? 'brief.brief', pathLabel: path, text: '::t' },
         documentId,
       }),
     retarget: () => undefined,
@@ -131,7 +131,7 @@ const documents = () => {
       Promise.resolve(
         path === '/briefs/promo.brief'
           ? {
-              document: { path, name: 'promo.brief', folderLabel: '/briefs', text: '::a' },
+              document: { path, name: 'promo.brief', pathLabel: path, text: '::a' },
               documentId,
               missing: false,
             }
@@ -142,7 +142,7 @@ const documents = () => {
         document: {
           path: '/briefs/promo.brief',
           name: 'promo.brief',
-          folderLabel: '/briefs',
+          pathLabel: '/briefs/promo.brief',
           text,
         },
         released: null,

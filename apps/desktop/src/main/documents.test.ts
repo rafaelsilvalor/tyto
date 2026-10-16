@@ -74,7 +74,7 @@ describe('opening', () => {
       document: {
         path: BRIEF,
         name: 'campanha.brief',
-        folderLabel: 'briefs',
+        pathLabel: BRIEF,
         text: '::titulo Olá',
       },
       documentId: TAB,
@@ -370,7 +370,7 @@ describe('opening a path main chose (TYTO-45)', () => {
       document: {
         path: TASK,
         name: 'brief.brief',
-        folderLabel: at('fila', 'inbox', 'tarefa-1'),
+        pathLabel: TASK,
         text: '::titulo Tarefa',
       },
       documentId: TAB,
@@ -452,13 +452,13 @@ describe('opening a path main chose (TYTO-45)', () => {
   });
 });
 
-describe('the folder a tab shows on hover (TYTO-288, ADR 0086)', () => {
+describe('the path a tab shows on hover (TYTO-288, ADR 0086)', () => {
   const HOME = ['', 'home', 'rafael'].join(SEP).replace(/^\\/u, 'C:\\');
   const IN_HOME = [HOME, 'Documentos', 'campanha.brief'].join(SEP);
   const OUTSIDE = (process.platform === 'win32' ? ['D:', 'briefs'] : ['', 'srv', 'briefs'])
     .concat('promo.brief')
     .join(SEP);
-  const shown = (path: string): string => path.slice(0, path.lastIndexOf(SEP)).replace(HOME, '~');
+  const shown = (path: string): string => path.replace(HOME, '~');
 
   it('writes the home directory as ~ on every door a file comes in by', async () => {
     const recent = recentFiles([{ path: OUTSIDE, name: 'promo.brief' }]);
@@ -474,12 +474,12 @@ describe('the folder a tab shows on hover (TYTO-288, ADR 0086)', () => {
     const chosen = await service.openPath('document-3', IN_HOME);
     const saved = await service.save('document-4', 'c', true);
 
-    expect(opened.document?.folderLabel).toBe(`~${SEP}Documentos`);
-    expect(opened.document?.folderLabel).toBe(shown(IN_HOME));
-    // A folder outside the home directory is shown whole.
-    expect(reopened.document?.folderLabel).toBe(OUTSIDE.slice(0, OUTSIDE.lastIndexOf(SEP)));
-    expect(chosen.document?.folderLabel).toBe(`~${SEP}Documentos`);
-    expect(saved.document?.folderLabel).toBe(OUTSIDE.slice(0, OUTSIDE.lastIndexOf(SEP)));
+    expect(opened.document?.pathLabel).toBe(`~${SEP}Documentos${SEP}campanha.brief`);
+    expect(opened.document?.pathLabel).toBe(shown(IN_HOME));
+    // A path outside the home directory is shown whole.
+    expect(reopened.document?.pathLabel).toBe(OUTSIDE);
+    expect(chosen.document?.pathLabel).toBe(`~${SEP}Documentos${SEP}campanha.brief`);
+    expect(saved.document?.pathLabel).toBe(OUTSIDE);
   });
 
   it('follows a save-as into another folder', async () => {
@@ -493,7 +493,7 @@ describe('the folder a tab shows on hover (TYTO-288, ADR 0086)', () => {
 
     const saved = await service.save(TAB, 'a', true);
 
-    expect(saved.document?.folderLabel).toBe(OUTSIDE.slice(0, OUTSIDE.lastIndexOf(SEP)));
+    expect(saved.document?.pathLabel).toBe(OUTSIDE);
   });
 
   it('is not a key: a reopen by the label is refused like any path nobody offered', async () => {
@@ -506,14 +506,16 @@ describe('the folder a tab shows on hover (TYTO-288, ADR 0086)', () => {
       disk: disk({ [IN_HOME]: 'a' }),
     });
     const opened = await service.open(TAB);
-    const label = opened.document?.folderLabel ?? '';
+    const label = opened.document?.pathLabel ?? '';
 
     await expect(service.reopen(OTHER_TAB, label)).resolves.toEqual({
       document: null,
       documentId: null,
       missing: false,
     });
-    await expect(service.reopen(OTHER_TAB, `${label}${SEP}campanha.brief`)).resolves.toMatchObject({
+    // Nor is the folder part of it with another name, a path the window could make up from it.
+    const folder = label.slice(0, label.lastIndexOf(SEP));
+    await expect(service.reopen(OTHER_TAB, `${folder}${SEP}outro.brief`)).resolves.toMatchObject({
       document: null,
       missing: false,
     });

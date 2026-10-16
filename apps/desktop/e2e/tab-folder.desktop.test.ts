@@ -6,20 +6,21 @@ import { fileURLToPath } from 'node:url';
 import { type ElectronApplication, type Page, _electron } from 'playwright';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 
-import { folderLabelOf } from '../src/main/folder-label.js';
+import { pathLabelOf } from '../src/main/path-label.js';
 import { closeApp } from './close-app.js';
 import { firstWindow } from './first-window.js';
 
 /**
- * A tab's folder on hover, through real launches of one data folder (TYTO-288, ADR 0086).
+ * A tab's path on hover, VS Code's way, through real launches of one data folder (TYTO-288,
+ * ADR 0086).
  *
- * The first launch points Electron's home directory at the scratch folder, so the folder a tab
+ * The first launch points Electron's home directory at the scratch folder, so the path a tab
  * shows is `~` plus a path this suite chose, on every runner. It opens a brief, a preview of it,
  * an untitled tab and `settings.json`, and reads each tab's `title` — the native tooltip, which
  * a screenshot does not draw, so the attribute is the instrument. The second launch keeps the
- * real home directory and finds the restored brief still showing its folder, worked out again
+ * real home directory and finds the restored brief still showing its path, worked out again
  * by main and not read back from `session.json`. And the window still cannot open a path it
- * made up, the folder it was shown included (ADR 0010).
+ * made up, the one it was shown included (ADR 0010).
  *
  * With `TYTO_TAB_FOLDER_SHOTS` set to a folder, the suite leaves a screenshot of each tab
  * hovered, in Tyto Light and Tyto Dark.
@@ -120,8 +121,8 @@ afterAll(async () => {
   rmSync(scratch, { recursive: true, force: true });
 });
 
-describe('the folder on hover', () => {
-  it('shows a saved brief’s folder, with the home directory as ~', async () => {
+describe('the path on hover', () => {
+  it('shows a saved brief’s path, with the home directory as ~', async () => {
     await launch();
     // Electron's own path table, the one main reads at every open: no hook in the app.
     await app?.evaluate(({ app: electronApp }, home) => {
@@ -137,11 +138,11 @@ describe('the folder on hover', () => {
       ),
     );
 
-    expect(await titleOf(/^campanha\.brief$/u)).toBe(`~${sep}briefs`);
+    expect(await titleOf(/^campanha\.brief$/u)).toBe(`~${sep}briefs${sep}campanha.brief`);
     await shoot(/^campanha\.brief$/u, 'brief-tab-hover');
   });
 
-  it('shows the folder of the brief a preview tab shows', async () => {
+  it('shows the path of the brief a preview tab shows', async () => {
     await runFromBar('preview.openToSide');
     await page.waitForFunction(() =>
       [...document.querySelectorAll('.tabs__label')].some((node) =>
@@ -149,7 +150,7 @@ describe('the folder on hover', () => {
       ),
     );
 
-    expect(await titleOf(PREVIEW)).toBe(`~${sep}briefs`);
+    expect(await titleOf(PREVIEW)).toBe(`~${sep}briefs${sep}campanha.brief`);
     await shoot(PREVIEW, 'preview-tab-hover');
   });
 
@@ -165,7 +166,7 @@ describe('the folder on hover', () => {
     expect(await titleOf(UNTITLED)).toBeNull();
   });
 
-  it('shows the folder of the app’s own files too', async () => {
+  it('shows the path of the app’s own files too', async () => {
     await runFromBar('settings.open');
     await page.waitForFunction(() =>
       [...document.querySelectorAll('.tabs__label')].some(
@@ -173,7 +174,7 @@ describe('the folder on hover', () => {
       ),
     );
 
-    expect(await titleOf(/^settings\.json$/u)).toBe(`~${sep}userData`);
+    expect(await titleOf(/^settings\.json$/u)).toBe(`~${sep}userData${sep}settings.json`);
     await shoot(/^settings\.json$/u, 'settings-tab-hover');
   });
 
@@ -192,16 +193,20 @@ describe('the folder on hover', () => {
         }
         return asked;
       },
-      [shown, `${shown}${sep}campanha.brief`, join(scratch, 'briefs', 'outro.brief')],
+      [
+        shown,
+        `${shown.slice(0, shown.lastIndexOf(sep))}${sep}outro.brief`,
+        join(scratch, 'briefs', 'outro.brief'),
+      ],
     );
 
     expect(answers).toEqual([null, null, null]);
   });
 
-  it('shows the folder again after a relaunch, worked out by main and not stored', async () => {
+  it('shows the path again after a relaunch, worked out by main and not stored', async () => {
     await quit();
     const session = readFileSync(join(scratch, 'userData', 'session.json'), 'utf8');
-    expect(session).not.toContain('folderLabel');
+    expect(session).not.toContain('pathLabel');
 
     // The second launch keeps the real home directory, so the label is the one main writes for
     // this path on this machine — which is not the one the first launch showed.
@@ -216,10 +221,10 @@ describe('the folder on hover', () => {
     );
     await page.waitForTimeout(500);
 
-    expect(await titleOf(/^campanha\.brief$/u)).toBe(folderLabelOf(briefPath, homedir()));
-    expect(await titleOf(PREVIEW)).toBe(folderLabelOf(briefPath, homedir()));
+    expect(await titleOf(/^campanha\.brief$/u)).toBe(pathLabelOf(briefPath, homedir()));
+    expect(await titleOf(PREVIEW)).toBe(pathLabelOf(briefPath, homedir()));
     expect(await titleOf(/^settings\.json$/u)).toBe(
-      folderLabelOf(join(scratch, 'userData', 'settings.json'), homedir()),
+      pathLabelOf(join(scratch, 'userData', 'settings.json'), homedir()),
     );
   });
 });

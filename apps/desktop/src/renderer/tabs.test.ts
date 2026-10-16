@@ -66,15 +66,20 @@ describe('a preview tab (TYTO-287)', () => {
   });
 });
 
-describe('the folder on hover (TYTO-288, ADR 0086)', () => {
+describe('the path on hover (TYTO-288, ADR 0086)', () => {
   it('is the title of a file tab and a preview tab, and an untitled tab has none', async () => {
     const { strip } = await open([
-      { id: 'a', label: 'campanha.brief', folder: '~/Documentos/campanhas', dirty: false },
+      {
+        id: 'a',
+        label: 'campanha.brief',
+        where: '~/Documentos/campanhas/campanha.brief',
+        dirty: false,
+      },
       { id: 'u', label: 'Sem título', dirty: true },
       {
         id: 'p',
         label: 'Prévia campanha.brief',
-        folder: '~/Documentos/campanhas',
+        where: '~/Documentos/campanhas/campanha.brief',
         dirty: false,
         preview: true,
       },
@@ -83,7 +88,11 @@ describe('the folder on hover (TYTO-288, ADR 0086)', () => {
     const titles = [...strip.querySelectorAll('.tabs__name')].map((node) =>
       node.getAttribute('title'),
     );
-    expect(titles).toEqual(['~/Documentos/campanhas', null, '~/Documentos/campanhas']);
+    expect(titles).toEqual([
+      '~/Documentos/campanhas/campanha.brief',
+      null,
+      '~/Documentos/campanhas/campanha.brief',
+    ]);
   });
 });
 
