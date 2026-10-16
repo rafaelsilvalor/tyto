@@ -102,7 +102,8 @@ is said where it applies.
 - `docs/architecture.md`'s description of one CodeMirror serving every tab now reads one editor,
   one pane per group.
 - The PREVIEW panel still sits in the right dock and follows the focused group; becoming a tab is
-  TYTO-287. Dragging a tab onto a group or a group's edge is TYTO-288.
+  TYTO-287. Dragging a tab onto another group's strip landed with TYTO-288 (amended below);
+  dropping one on a group's edge to split it is a card of its own.
 - Moving a tab to another group, focusing the next group by order, closing a group and keeping
   the groups across a restart landed in the second pull request (decisions 8 and 9). The shares
   of a split are kept, though nothing changes them yet: there is no splitter between groups.
@@ -110,3 +111,18 @@ is said where it applies.
   arrow key moves only the line's two neighbours, never below `GROUP_MINIMUM` (160 px across,
   96 px down, the same as `shell.css`'s); a double-click gives every child of that split an equal
   share, not only the pair; the shares are written when the drag ends, like a dock's size.
+- _Amended 2026-10-16, TYTO-288 (third pull request):_ a tab is dragged with **pointer events,
+  not HTML5 drag and drop** — a native drag draws the OS's ghost and hands the drop to whatever
+  is under it, CodeMirror's text drop included — on the splitter's pattern: one delegated
+  `pointerdown` on the editor panel, capture once the drag begins (`renderer/tab-drag.ts`). A
+  press is a drag only after 4 px, so a click selects and a middle click closes; the click a
+  drag ends in is swallowed. **Only a strip takes a drop**: let go on its own strip, the tab
+  reorders; on another group's, it moves there at that gap (`placeTab`, through `moveTab`'s
+  rules: in front, its group focused, an emptied group closes, a text tab dropped where its
+  document is shown brings that tab forward instead). Anywhere else, or Escape, cancels; a drop
+  on a group's body or edge would split it, which is a separate card. A preview moves like any
+  tab and keeps its id and its lock, and is never merged with another. The look is VS Code's:
+  the dragged tab stays, dimmed, a 2 px accent line marks the gap, and another group's strip
+  takes the hover tint. "Move tab left" and "Move tab right" (`Mod-Shift-PageUp`,
+  `Mod-Shift-PageDown`, VS Code's keys, free in CodeMirror's keymaps) do the same one place at
+  a time. Nothing new is kept: the session already writes each strip's order.

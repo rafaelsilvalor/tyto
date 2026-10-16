@@ -157,6 +157,7 @@ import {
 import { SAVE_FAILED, saveFailureDiagnostic } from './save-failure.js';
 import { type EditorGroupElement, arrangeGroups } from './editor-group.js';
 import { applyShares, showShares, wireGroupSplitters } from './group-splitter.js';
+import { wireTabDrag } from './tab-drag.js';
 import type { TabEntry } from './tabs.js';
 import {
   type EditorGroup,
@@ -181,6 +182,8 @@ import {
   isPreview,
   layoutOf,
   moveTabToNextGroup,
+  placeTab,
+  stepTabInGroup,
   openDocument,
   openPreviewHere,
   openPreviewToSide,
@@ -1169,6 +1172,12 @@ const registry: CommandRegistry = withCommandGate(
       showGroups();
     },
 
+    stepTabInGroup: (direction) => {
+      if (editor === undefined || !sessionRead) return;
+      groups = stepTabInGroup(groups, direction);
+      showGroups();
+    },
+
     closeGroup: () => {
       if (!sessionRead) return;
       void closeFocusedGroup();
@@ -1270,6 +1279,20 @@ function resizeGroups(splitId: string, sizes: readonly number[], settled: boolea
   keepSessionSoon();
 }
 
+/**
+ * A tab let go on a strip (TYTO-288): before `beforeTabId` there, or at the strip's end. Refused
+ * until the last session is read, as a move by command is: the groups it brings back replace
+ * these. The session follows from the repaint, as it does for every change of the groups.
+ */
+function dropTab(tabId: string, groupId: string, beforeTabId: string | undefined): void {
+  if (editor === undefined || !sessionRead) return;
+  const target = groupById(groups, groupId);
+  if (target === undefined) return;
+  const before = target.tabs.findIndex((tab) => tab.id === beforeTabId);
+  groups = placeTab(groups, tabId, groupId, before === -1 ? target.tabs.length : before);
+  showGroups();
+}
+
 /** The group whose pane is `view`, with that pane. */
 function paneOfView(view: object | undefined): [string, EditorPane] | undefined {
   for (const entry of panes) if (entry[1].view === view) return entry;
@@ -1316,6 +1339,7 @@ function arrangeEditorGroups(): void {
   if (!groupSplittersWired) {
     groupSplittersWired = true;
     wireGroupSplitters(container, { groups: () => groups, onResize: resizeGroups });
+    wireTabDrag(container, { onDrop: dropTab });
   }
   const shape = shapeOf(groups.root);
   if (shape === arrangedShape && container.firstElementChild !== null) return;
@@ -1493,9 +1517,18 @@ function showGroups(): void {
   syncActiveDocument();
   present();
   // A preview in front takes the focus itself: its group's pane is hidden (TYTO-287).
-  if (focusedPreview() === undefined) focusedPane()?.view.focus();
-  else groupElements.get(groups.focusedGroupId)?.preview.focus();
+  const focusFront = (): void => {
+    if (focusedPreview() === undefined) focusedPane()?.view.focus();
+    else groupElements.get(groups.focusedGroupId)?.preview.focus();
+  };
+  focusFront();
   repaint();
+  // And again once the group has drawn what the repaint handed it: when what is in front
+  // changed kind, the pane or the preview was still hidden, and a hidden element takes no
+  // focus. Measured in TYTO-288: a text tab chosen over a preview left the focus on the tab's
+  // button, so the editor's keys went nowhere, and a preview dropped into a group left it on
+  // the body.
+  void groupElements.get(groups.focusedGroupId)?.updateComplete.then(focusFront);
 }
 
 /**

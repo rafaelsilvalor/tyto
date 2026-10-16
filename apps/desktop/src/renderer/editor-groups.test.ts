@@ -23,12 +23,14 @@ import {
   openDocument,
   openPreviewHere,
   openPreviewToSide,
+  placeTab,
   previewTabs,
   replaceDocument,
   resizeSplit,
   shownDocumentIds,
   splitById,
   splitGroup,
+  stepTabInGroup,
   toggleLock,
 } from './editor-groups.js';
 
@@ -249,6 +251,89 @@ describe('moving the tab in front to the next group', () => {
   it('leaves a lone tab in a lone group where it is', () => {
     const one = groupsOf(['a'], 'a');
     expect(moveTabToNextGroup(one)).toBe(one);
+  });
+});
+
+describe('placing a dropped tab (TYTO-288)', () => {
+  const three = (): EditorGroups => groupsOf(['a', 'b', 'c'], 'a');
+  const idOf = (groups: EditorGroups, documentId: string): string =>
+    groupList(groups)
+      .flatMap((group) => group.tabs)
+      .find((tab) => tab.documentId === documentId)?.id ?? '';
+
+  it('reorders within its group, counting gaps as they were before the move', () => {
+    const groups = three();
+    // The gap after `c` is 3, and `a` lands last; the gap before `b` is 1, where `a` already is.
+    expect(picture(placeTab(groups, idOf(groups, 'a'), 'group-1', 3))).toEqual(['b c *a']);
+    expect(picture(placeTab(groups, idOf(groups, 'a'), 'group-1', 2))).toEqual(['b *a c']);
+    expect(picture(placeTab(groups, idOf(groups, 'a'), 'group-1', 1))).toEqual(['*a b c']);
+    expect(picture(placeTab(groups, idOf(groups, 'c'), 'group-1', 0))).toEqual(['*c a b']);
+    expect(picture(placeTab(groups, idOf(groups, 'c'), 'group-1', 1))).toEqual(['a *c b']);
+  });
+
+  it('brings the dropped tab to the front and focuses its group', () => {
+    const split = openDocument(splitGroup(three(), 'row'), 'd');
+    const [left] = groupList(split);
+    const placed = placeTab(split, idOf(split, 'b'), left?.id ?? '', 0);
+    expect(picture(placed)).toEqual(['*b a c', 'a *d']);
+    expect(focusedGroup(placed).id).toBe(left?.id);
+  });
+
+  it('moves onto another group at the gap it was let go in', () => {
+    const split = openDocument(splitGroup(three(), 'row'), 'd');
+    const [left, right] = groupList(split);
+    const placed = placeTab(split, idOf(split, 'c'), right?.id ?? '', 1);
+    expect(picture(placed)).toEqual(['*a b', 'a *c d']);
+    expect(focusedGroup(placed).id).toBe(right?.id);
+    expect(left).toBeDefined();
+  });
+
+  it('closes the group it emptied', () => {
+    const split = splitGroup(three(), 'row');
+    const [left, right] = groupList(split);
+    const lone = right?.tabs[0]?.id ?? '';
+    const placed = placeTab(split, lone, left?.id ?? '', 0);
+    expect(groupList(placed)).toHaveLength(1);
+    expect(picture(placed)).toEqual(['*a b c']);
+  });
+
+  it('brings forward the twin a text tab is dropped onto, rather than a second tab of it', () => {
+    const split = openDocument(splitGroup(three(), 'row'), 'd');
+    const [left, right] = groupList(split);
+    const twin = right?.tabs.find((tab) => tab.documentId === 'a')?.id ?? '';
+    const placed = placeTab(split, twin, left?.id ?? '', 3);
+    expect(picture(placed)).toEqual(['*a b c', '*d']);
+  });
+
+  it('moves a locked preview as it is, with its id and its lock', () => {
+    const following = openPreviewHere(three(), 'a');
+    const opened = toggleLock(following, previewTabs(following)[0]?.id ?? '');
+    const split = splitGroup(opened, 'row');
+    const preview = previewTabs(split)[0];
+    const right = groupList(split)[1];
+    const placed = placeTab(split, preview?.id ?? '', right?.id ?? '', 0);
+    expect(previewTabs(placed)).toEqual([preview]);
+    expect(groupList(placed)[1]?.tabs[0]).toEqual(preview);
+  });
+
+  it('leaves the groups alone for a tab that is not in them', () => {
+    const groups = three();
+    expect(placeTab(groups, 'tab-404', 'group-1', 0)).toBe(groups);
+  });
+});
+
+describe('stepping the tab in front along its strip (TYTO-288)', () => {
+  it('moves it one place left or right', () => {
+    const groups = groupsOf(['a', 'b', 'c'], 'b');
+    expect(picture(stepTabInGroup(groups, -1))).toEqual(['*b a c']);
+    expect(picture(stepTabInGroup(groups, 1))).toEqual(['a c *b']);
+  });
+
+  it('stops at the ends', () => {
+    const first = groupsOf(['a', 'b'], 'a');
+    const last = groupsOf(['a', 'b'], 'b');
+    expect(stepTabInGroup(first, -1)).toBe(first);
+    expect(stepTabInGroup(last, 1)).toBe(last);
   });
 });
 
