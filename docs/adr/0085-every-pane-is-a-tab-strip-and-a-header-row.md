@@ -1,7 +1,7 @@
 # 0085 — Every pane is a tab strip and a header row
 
 Status: accepted · 2026-10-14 · TYTO-288 (first of three pull requests) · amends ADR 0024 (the
-BRIEF header), decision 3 of ADR 0083 and decision 5 of ADR 0084
+BRIEF header), decision 3 of ADR 0083 and decision 5 of ADR 0084 · decision 6 amended by ADR 0090
 
 ## Context
 
@@ -71,6 +71,12 @@ nowrap`) and `overflow: hidden`, so nothing in a line can make it taller.
    unchanged (ADR 0045). The tab is a `.pane__tab`, not a `.tabs__tab`: a group's tabs are
    counted and selected by the window, and a panel's name is neither. The name is in sentence case
    like a file's ("Problems", "Problemas"), no longer upper case.
+
+   > **Amended by ADR 0090 (TYTO-302).** A docked panel is a tool, not a document, and its strip
+   > is a tool header rather than a tab: the same `.pane__strip` and height, with
+   > `.pane__strip--tool`, the name in small capitals in `.tool__title`, and the tool's actions
+   > before the close button. The queue's "Choose folder…" is a folder icon there.
+
 7. **A quieter name.** The tab in front loses the strong weight and is told apart by colour
    alone: `--tyto-text` in front, `--tyto-text-muted` behind, a behind tab painting `--tyto-hover`
    under the pointer. The accent line on the tab in front is drawn only with a split, as before,

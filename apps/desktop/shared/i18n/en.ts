@@ -248,7 +248,7 @@ export const en: Catalogue = {
   'slash.template.switch': 'switches the template (current: {current})',
   'command.queue.show': 'Show the local queue',
   'queue.heading': 'Local queue',
-  'queue.folder.none': 'No queue folder chosen yet.',
+  'queue.folder.none': 'No queue folder chosen yet. Choose one with the folder button above.',
   'queue.folder.choose': 'Choose folder…',
   'queue.folder.clear': 'Forget folder',
   'queue.inbox': 'Drop task folders into',

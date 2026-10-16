@@ -49,15 +49,18 @@ describe('the plugin panel element', () => {
     expect(frame?.getAttribute('sandbox')).toBe('allow-scripts');
     expect(frame?.getAttribute('src')).toBe(OFFERED.src);
     expect(frame?.hasAttribute('allow')).toBe(false);
-    expect(panel.querySelector('.pane__title')?.textContent).toBe('Contagem');
+    expect(panel.querySelector('.tool__title')?.textContent).toBe('Contagem');
   });
 
-  it('is a pane like every other docked panel: its name in a one-tab strip, no header row', async () => {
+  it('is a tool like every other docked panel: a tool header with its close, no header row', async () => {
     const panel = await mounted();
     const children = [...panel.children].map((child) => child.className);
-    expect(children[0]).toBe('pane__strip');
+    expect(children[0]).toBe('pane__strip pane__strip--tool');
     expect(panel.querySelector(':scope > .pane__header')).toBeNull();
-    expect(panel.querySelector('.pane__strip .pane__tab .panel__close')).not.toBeNull();
+    expect(panel.querySelector('.pane__tab')).toBeNull();
+    // A plugin's panel offers no actions of its own in the header: the close button alone.
+    const actions = [...panel.querySelectorAll('.pane__strip--tool .tool__actions button')];
+    expect(actions.map((button) => button.className)).toEqual(['tool__action panel__close']);
   });
 
   it("writes the manifest's title as text, never as markup (TYTO-288)", async () => {
@@ -65,7 +68,7 @@ describe('the plugin panel element', () => {
     panel.offered = { ...OFFERED, title: '<img src=x onerror=alert(1)>Contagem' };
     document.body.append(panel);
     await panel.updateComplete;
-    const title = panel.querySelector('.pane__title');
+    const title = panel.querySelector('.tool__title');
     expect(title?.textContent).toBe('<img src=x onerror=alert(1)>Contagem');
     expect(title?.querySelector('img')).toBeNull();
   });

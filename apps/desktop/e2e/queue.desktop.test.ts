@@ -140,7 +140,7 @@ describe('the local queue panel', () => {
     await app.evaluate(({ Menu }) => {
       Menu.getApplicationMenu()?.getMenuItemById('queue.show')?.click();
     });
-    await page.waitForSelector('tyto-queue-panel .queue__choose');
+    await page.waitForSelector('tyto-queue-panel .pane__strip--tool .queue__choose');
 
     // Inside the window and big enough to read. jsdom answers neither.
     const box = await page.locator('tyto-queue-panel').boundingBox();
@@ -158,7 +158,7 @@ describe('the local queue panel', () => {
 
   it('points at a folder chosen in the picker, and makes its inbox', async () => {
     await answerPickerWith(queueFolder);
-    await page.click('tyto-queue-panel .queue__choose');
+    await page.click('tyto-queue-panel .pane__strip--tool .queue__choose');
     await page.waitForSelector('tyto-queue-panel .queue__path');
 
     expect(await page.textContent('tyto-queue-panel .queue__path')).toBe(

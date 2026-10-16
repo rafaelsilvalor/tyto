@@ -223,6 +223,32 @@ const linedStrips = async (): Promise<string[]> =>
       }),
   );
 
+/**
+ * Each visible docked panel's strip as `id: tool CASE`, where `tool` says it is a tool header
+ * with a title and no tab in it (`tab` otherwise), and CASE is the title's `text-transform`;
+ * and how many editor groups' strips are drawn as a tool header, which must be none.
+ */
+const toolHeaders = async (): Promise<{ panels: string[]; groups: number }> =>
+  page.evaluate(() => {
+    const panels = [...document.querySelectorAll<HTMLElement>('[data-panel]')]
+      .map((panel) => ({ panel, strip: panel.querySelector(':scope > .pane__strip') }))
+      .filter(({ strip }) => strip instanceof HTMLElement && strip.getClientRects().length > 0)
+      .map(({ panel, strip }) => {
+        const title = strip!.querySelector<HTMLElement>(':scope > .tool__title');
+        const tool =
+          strip!.classList.contains('pane__strip--tool') &&
+          title !== null &&
+          strip!.querySelector('.pane__tab, .tabs__tab') === null;
+        const casing = title === null ? 'none' : getComputedStyle(title).textTransform;
+        return `${panel.dataset['panel'] ?? '?'}: ${tool ? 'tool' : 'tab'} ${casing.toUpperCase()}`;
+      })
+      .sort();
+    const groups = document.querySelectorAll(
+      '[data-editor-group] > .pane__strip.pane__strip--tool',
+    ).length;
+    return { panels, groups };
+  });
+
 const tokenPixels = async (name: string): Promise<number> =>
   page.evaluate(
     (token) =>
@@ -387,6 +413,12 @@ describe('the busiest window', () => {
     // No line under any strip (Rafael, 2026-10-14): every visible one, groups, the preview's and
     // the docked panels', reads a zero-width bottom border.
     expect(await linedStrips()).toEqual([]);
+    // A document is a tab, a tool has a header (TYTO-302, ADR 0090): every docked panel's strip
+    // is a tool header with its title in small capitals and no tab in it; no group's strip is.
+    expect(await toolHeaders()).toEqual({
+      panels: [`${PANEL_ID}: tool UPPERCASE`, 'problems: tool UPPERCASE', 'queue: tool UPPERCASE'],
+      groups: 0,
+    });
     process.stdout.write(`[TYTO-288] panes: ${JSON.stringify(panes)}\n`);
     await shoot('scene');
   });

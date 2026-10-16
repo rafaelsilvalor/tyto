@@ -138,7 +138,7 @@ describe('dragging a splitter', () => {
 
 describe('closing a panel', () => {
   it('takes it out of the document when the close button is used', async () => {
-    await page.click('[data-panel="problems"] .panel__close');
+    await page.click('[data-panel="problems"] .pane__strip--tool .panel__close');
     await page.waitForTimeout(400);
 
     expect((await openPanels(page)).sort()).toEqual(['editor', 'queue']);

@@ -250,7 +250,8 @@ export const ptBR: Catalogue = {
   'slash.template.switch': 'troca o template (atual: {current})',
   'command.queue.show': 'Mostrar a fila local',
   'queue.heading': 'Fila local',
-  'queue.folder.none': 'Nenhuma pasta de fila escolhida ainda.',
+  'queue.folder.none':
+    'Nenhuma pasta de fila escolhida ainda. Escolha uma no botão de pasta acima.',
   'queue.folder.choose': 'Escolher pasta…',
   'queue.folder.clear': 'Esquecer pasta',
   'queue.inbox': 'Coloque as pastas de tarefa em',
