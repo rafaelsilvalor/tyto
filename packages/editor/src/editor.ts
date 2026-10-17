@@ -29,6 +29,7 @@ import {
 import { brief } from './brief-language.js';
 import { type MarkedDiagnostic, diagnosticsSpec } from './diagnostic-markers.js';
 import { indentGuides } from './indent-guides.js';
+import { stickyScroll } from './sticky-scroll.js';
 import { type CommandRegistry, commandRegistryFacet } from './commands.js';
 import { type SearchPhrases, searchSupport, setSearchPhrases } from './search.js';
 import { type EditorKeymap, defaultKeymapSet, keymapExtension } from './keymap.js';
@@ -131,6 +132,12 @@ export interface EditorOptions {
    * `indentGuides` setting turns it off, live, through {@link EditorHandle.setIndentGuides}.
    */
   readonly indentGuides?: boolean;
+  /**
+   * Pins the head line of every block the pane's top is inside (TYTO-295, ADR 0094). On by
+   * default; the desktop's `stickyScroll` setting turns it off, live, through
+   * {@link EditorHandle.setStickyScroll}.
+   */
+  readonly stickyScroll?: boolean;
 }
 
 /**
@@ -388,6 +395,11 @@ export interface EditorHandle extends EditorPane {
    */
   setIndentGuides(enabled: boolean): void;
   /**
+   * Shows or hides the pinned head lines in every pane and every tab, in place, each pane
+   * keeping its own scroll (TYTO-295).
+   */
+  setStickyScroll(enabled: boolean): void;
+  /**
    * Vim's mode and pending keys as they change, and `null` when vim is off (TYTO-248).
    * Called at once with the current answer. Returns the function that stops the listener.
    */
@@ -464,6 +476,9 @@ export function createEditor(parent: HTMLElement, options: EditorOptions = {}): 
   const guidesCompartment = new Compartment();
   /** Made once, so a tab's compartment can be compared with what the editor holds now. */
   const guidesOn = indentGuides();
+  /** The pinned head lines or nothing, swapped by `setStickyScroll` (TYTO-295). */
+  const stickyCompartment = new Compartment();
+  const stickyOn = stickyScroll();
 
   /**
    * The phrases as a mutable holder rather than a value baked into the extension list.
@@ -500,6 +515,8 @@ export function createEditor(parent: HTMLElement, options: EditorOptions = {}): 
   let theme: Extension = themes[options.theme ?? 'light'];
   /** What the guides compartment holds now, which `restore` brings every tab up to. */
   let guides: Extension = (options.indentGuides ?? true) ? guidesOn : [];
+  /** What the sticky compartment holds now, for the same reason. */
+  let sticky: Extension = (options.stickyScroll ?? true) ? stickyOn : [];
 
   /**
    * One listener for both directions, and the order inside it carries weight.
@@ -579,6 +596,7 @@ export function createEditor(parent: HTMLElement, options: EditorOptions = {}): 
     ...(readOnly ? [CodeMirrorEditorState.readOnly.of(true), EditorView.editable.of(false)] : []),
     themeCompartment.of(theme),
     guidesCompartment.of(guides),
+    stickyCompartment.of(sticky),
     searchSupport(() => searchPhrases),
     languages[language](),
     ...baseExtensions(),
@@ -632,6 +650,9 @@ export function createEditor(parent: HTMLElement, options: EditorOptions = {}): 
         }
         if (guidesCompartment.get(view.state) !== guides) {
           view.dispatch({ effects: guidesCompartment.reconfigure(guides) });
+        }
+        if (stickyCompartment.get(view.state) !== sticky) {
+          view.dispatch({ effects: stickyCompartment.reconfigure(sticky) });
         }
         // Dispatched after, because a scroll effect is a property of the view and the view
         // has just been given a different state to measure. The phrases ride along: a state
@@ -733,6 +754,12 @@ export function createEditor(parent: HTMLElement, options: EditorOptions = {}): 
       if ((guides === guidesOn) === enabled) return;
       guides = enabled ? guidesOn : [];
       everyView(guidesCompartment.reconfigure(guides));
+    },
+
+    setStickyScroll: (enabled: boolean) => {
+      if ((sticky === stickyOn) === enabled) return;
+      sticky = enabled ? stickyOn : [];
+      everyView(stickyCompartment.reconfigure(sticky));
     },
 
     onVimStatus: (listener: (status: VimStatus | null) => void) => {

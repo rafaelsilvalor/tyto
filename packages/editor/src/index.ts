@@ -43,6 +43,16 @@ export {
   indentLevels,
 } from './indent-guides.js';
 
+export {
+  STICKY_MAX_ROWS,
+  type StickyBlock,
+  type StickyMeasure,
+  type StickyRow,
+  stickyChain,
+  stickyRows,
+  stickyScroll,
+} from './sticky-scroll.js';
+
 export { briefDarkTheme, briefLightTheme, type ThemeName, themes, themeTokens } from './theme.js';
 
 export {

@@ -2113,9 +2113,13 @@ function showTheme(bridge: TytoBridge, ask: () => Promise<IpcResponse<'theme:cur
       // And whether the editors draw indent guides (TYTO-293): every tab, and the template mode.
       indentGuides = applied.indentGuides;
       editor?.setIndentGuides(indentGuides);
+      // And whether they pin the head line of the block at the top (TYTO-295), the same way.
+      stickyScroll = applied.stickyScroll;
+      editor?.setStickyScroll(stickyScroll);
       // Only once it is loaded, as with the locale: `loadTemplateMode` hands it the value then.
       if (customElements.get(TEMPLATE_MODE_TAG) !== undefined && elements.templateMode) {
         elements.templateMode.showIndentGuides(indentGuides);
+        elements.templateMode.showStickyScroll(stickyScroll);
       }
       panel.installation = withThemeRows(panel.installation, applied.diagnostics);
       repaint();
@@ -3206,6 +3210,9 @@ let vimModeStyle: VimModeStyle = 'badge';
 /** The `indentGuides` setting, from the same answer (TYTO-293): on until it arrives. */
 let indentGuides = true;
 
+/** The `stickyScroll` setting, from the same answer (TYTO-295): on until it arrives. */
+let stickyScroll = true;
+
 /** The ids the status bar's buttons run; the area toggles are named by the bar itself. */
 const STATUS_COMMANDS: StatusBarCommands = {
   commandBar: COMMAND_BAR_TOGGLE,
@@ -3888,6 +3895,7 @@ async function loadTemplateMode(): Promise<TemplateMode | undefined> {
   if (mode.ports === undefined) wireTemplateMode(mode, bridge);
   mode.locale = state.locale;
   mode.showIndentGuides(indentGuides);
+  mode.showStickyScroll(stickyScroll);
   return mode;
 }
 

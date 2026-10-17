@@ -113,7 +113,7 @@ export const palette: Palette = {
   bracket: token('syntax-punctuation'),
 };
 
-const monoFont = token('font-mono');
+export const monoFont = token('font-mono');
 
 /**
  * The roles CodeMirror's own furniture reads: the search panel, the completion list, the lint

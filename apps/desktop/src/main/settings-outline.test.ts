@@ -30,7 +30,15 @@ describe("the app's settings outline", () => {
       'statusBarColors',
       'vimModeStyle',
       'indentGuides',
+      'stickyScroll',
     ]);
+  });
+
+  it('offers stickyScroll on and off, each with what it does (TYTO-295)', () => {
+    const sticky = setting('stickyScroll');
+    expect(sticky?.options.map((option) => option.value)).toEqual([true, false]);
+    expect(sticky?.options[0]?.description).toMatch(/pinned/u);
+    expect(sticky?.default).toBe('true');
   });
 
   it('offers indentGuides on and off, each with what it does (TYTO-293)', () => {

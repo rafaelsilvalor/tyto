@@ -228,6 +228,7 @@ describe('the theme the window applies (TYTO-208)', () => {
     statusBarColors: {},
     vimModeStyle: 'badge',
     indentGuides: true,
+    stickyScroll: true,
   });
 
   it('refuses a mode that is not one of the three', () => {
