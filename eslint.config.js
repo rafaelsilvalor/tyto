@@ -293,8 +293,13 @@ export default tseslint.config(
     name: 'editor/one-reader-of-the-syntax-tree',
     // Tests are exempt so a case can still reach for the truncated tree deliberately — that
     // is how the defect was measured, and a test that cannot reproduce it cannot pin it.
+    // `test-parse.ts` is the tests' helper that checks `syntaxTree` covers the document (TYTO-306).
     files: ['packages/editor/src/**/*.ts'],
-    ignores: ['packages/editor/src/syntax.ts', 'packages/editor/src/**/*.test.ts'],
+    ignores: [
+      'packages/editor/src/syntax.ts',
+      'packages/editor/src/test-parse.ts',
+      'packages/editor/src/**/*.test.ts',
+    ],
     // `NO_NODE_IN_DOM` is repeated rather than inherited: this block sets the same rule as
     // `boundary/dom` for a subset of its files, and flat config replaces rather than merges.
     rules: restrictedImports(NO_NODE_IN_DOM, [

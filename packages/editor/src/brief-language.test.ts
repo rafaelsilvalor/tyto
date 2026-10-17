@@ -4,6 +4,7 @@ import { highlightTree, tagHighlighter, tags } from '@lezer/highlight';
 import { describe, expect, it } from 'vitest';
 
 import { briefLanguage } from './brief-language.js';
+import { fullyParsed } from './test-parse.js';
 
 import lista from '../../templates/templates/carrossel-lista/examples/lista.brief?raw';
 import promo from '../../templates/templates/promo-curso/examples/promo.brief?raw';
@@ -38,7 +39,7 @@ describe('the colours come from the grammar', () => {
 
 describe('folding', () => {
   const stateOf = (doc: string): EditorState =>
-    EditorState.create({ doc, extensions: [briefLanguage] });
+    fullyParsed(EditorState.create({ doc, extensions: [briefLanguage] }));
 
   it('folds a directive to its first line', () => {
     const doc = '::titulo\n  Direito\n  Constitucional\n::subtitulo Oi\n';
@@ -116,7 +117,7 @@ describe('the example briefs', () => {
   });
 
   it('folds every block directive in the four-slide example', () => {
-    const state = EditorState.create({ doc: lista, extensions: [briefLanguage] });
+    const state = fullyParsed(EditorState.create({ doc: lista, extensions: [briefLanguage] }));
     const foldedHeads: string[] = [];
 
     for (let line = 1; line <= state.doc.lines; line += 1) {
