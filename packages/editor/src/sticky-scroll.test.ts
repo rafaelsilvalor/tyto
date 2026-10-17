@@ -1,4 +1,4 @@
-import { codeFolding, ensureSyntaxTree, foldEffect, foldable } from '@codemirror/language';
+import { codeFolding, foldEffect, foldable } from '@codemirror/language';
 import { EditorState, type Extension } from '@codemirror/state';
 import { describe, expect, it } from 'vitest';
 
@@ -12,12 +12,10 @@ import {
   stickyRows,
 } from './sticky-scroll.js';
 import { templateLanguage } from './template-language.js';
+import { fullyParsed } from './test-parse.js';
 
-const stateOf = (doc: string, language: Extension = briefLanguage): EditorState => {
-  const state = EditorState.create({ doc, extensions: [language, codeFolding()] });
-  ensureSyntaxTree(state, state.doc.length, 5_000);
-  return state;
-};
+const stateOf = (doc: string, language: Extension = briefLanguage): EditorState =>
+  fullyParsed(EditorState.create({ doc, extensions: [language, codeFolding()] }));
 
 /** The head lines of the chain at the start of line `line`, as text. */
 const headsAt = (state: EditorState, line: number): readonly string[] =>
