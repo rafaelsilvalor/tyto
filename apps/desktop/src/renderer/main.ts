@@ -11,8 +11,10 @@ import {
   type KeybindingTable,
   COMMAND_BAR_TOGGLE,
   type VimStatus,
+  DEFAULT_TAB_SIZE,
   blockAt,
   blocksOf,
+  formatBriefInView,
   previewBlock,
   briefCompletion,
   briefLint,
@@ -557,6 +559,8 @@ function resolveElements() {
     templateMode: document.querySelector<TemplateMode>(TEMPLATE_MODE_TAG),
     // TYTO-131. At the end of the status bar; hidden while there is nothing newer.
     updateNotice: byId<HTMLButtonElement>('update-notice'),
+    // TYTO-297. A line the window says for a few seconds; hidden the rest of the time.
+    statusNotice: byId<HTMLOutputElement>('status-notice'),
     // TYTO-248. Outside the docks, like the command bar: the bar belongs to the window.
     statusBar: document.querySelector<StatusBar>(STATUS_BAR_TAG),
   };
@@ -1112,6 +1116,14 @@ const registry: CommandRegistry = withCommandGate(
       pickBlock();
     },
 
+    formatBrief: () => {
+      const target = focusedPane();
+      if (target === undefined) return;
+      // Focus back on the text: the command may have come from the bar, which held it.
+      target.view.focus();
+      formatPane(target);
+    },
+
     newDocument: () => {
       // **Added and never substituted, which is the whole of the card's second criterion.**
       // `adopt` replaces the tab in front when `isDisposable` says it holds nothing — right for
@@ -1136,6 +1148,13 @@ const registry: CommandRegistry = withCommandGate(
         // where the text comes from. A save fired in the paint before CodeMirror is mounted
         // would write the empty string over a file.
         if (editor === undefined) return;
+        // Format on save (TYTO-297): a brief only, in the pane holding its record, before the
+        // text is read — `onUpdate` writes the workspace in the same transaction, so the save
+        // below sends the formatted text. A brief that refuses is saved as it is, and says so.
+        if (formatBriefOnSave && active().kind === undefined) {
+          const pane = primaryPaneOf(active().id);
+          if (pane !== undefined) formatPane(pane);
+        }
         await saveOneDocument(bridge, active().id, saveAs);
       });
     },
@@ -2124,10 +2143,16 @@ function showTheme(bridge: TytoBridge, ask: () => Promise<IpcResponse<'theme:cur
       // And whether they pin the head line of the block at the top (TYTO-295), the same way.
       stickyScroll = applied.stickyScroll;
       editor?.setStickyScroll(stickyScroll);
+      // And the indent width (TYTO-297): what Tab inserts, the guides' step and Format Brief's
+      // indent, in every tab and the template mode. Format-on-save is read at the next save.
+      tabSize = applied.tabSize;
+      editor?.setTabSize(tabSize);
+      formatBriefOnSave = applied.formatBriefOnSave;
       // Only once it is loaded, as with the locale: `loadTemplateMode` hands it the value then.
       if (customElements.get(TEMPLATE_MODE_TAG) !== undefined && elements.templateMode) {
         elements.templateMode.showIndentGuides(indentGuides);
         elements.templateMode.showStickyScroll(stickyScroll);
+        elements.templateMode.showTabSize(tabSize);
       }
       panel.installation = withThemeRows(panel.installation, applied.diagnostics);
       repaint();
@@ -2220,6 +2245,39 @@ function pickTemplate(): void {
     },
     cancel: () => undefined,
   });
+}
+
+/**
+ * Format Brief in one pane (TYTO-297, ADR 0096): one undoable change, the caret kept on its
+ * text. A brief with a syntax error is left as it is and the status bar says why for a few
+ * seconds — the problems panel already lists where. `false` when it refused.
+ */
+function formatPane(pane: EditorPane): boolean {
+  const result = formatBriefInView(pane.view);
+  if (result.ok) return true;
+  showNotice('formatBrief.refused');
+  return false;
+}
+
+/** How long a notice stays in the status bar (TYTO-297). */
+const NOTICE_MS = 6000;
+let noticeTimer: ReturnType<typeof setTimeout> | undefined;
+
+/**
+ * A sentence in the status bar for a few seconds (TYTO-297): what a command that did nothing
+ * has to say. `role="status"`, so a screen reader hears it without the focus moving.
+ */
+function showNotice(key: CatalogueKey): void {
+  const notice = elements.statusNotice;
+  if (notice === null) return;
+  notice.textContent = translate(state.locale, key);
+  notice.hidden = false;
+  if (noticeTimer !== undefined) clearTimeout(noticeTimer);
+  noticeTimer = setTimeout(() => {
+    notice.hidden = true;
+    notice.textContent = '';
+    noticeTimer = undefined;
+  }, NOTICE_MS);
 }
 
 /**
@@ -3275,6 +3333,12 @@ let indentGuides = true;
 /** The `stickyScroll` setting, from the same answer (TYTO-295): on until it arrives. */
 let stickyScroll = true;
 
+/** The `tabSize` setting, from the same answer (TYTO-297): two until it arrives. */
+let tabSize = DEFAULT_TAB_SIZE;
+
+/** The `formatBriefOnSave` setting, from the same answer (TYTO-297): off until it arrives. */
+let formatBriefOnSave = false;
+
 /** The ids the status bar's buttons run; the area toggles are named by the bar itself. */
 const STATUS_COMMANDS: StatusBarCommands = {
   commandBar: COMMAND_BAR_TOGGLE,
@@ -3960,6 +4024,7 @@ async function loadTemplateMode(): Promise<TemplateMode | undefined> {
   mode.locale = state.locale;
   mode.showIndentGuides(indentGuides);
   mode.showStickyScroll(stickyScroll);
+  mode.showTabSize(tabSize);
   return mode;
 }
 
@@ -4190,6 +4255,8 @@ async function load(): Promise<void> {
       // The status bar shows vim's mode (TYTO-248), so the library's own line would say it
       // twice. Its `:` prompt and its notifications still open in its own panel.
       vimStatus: false,
+      // Spaces per indent level (TYTO-297); the theme's answer brings the saved one.
+      tabSize,
       // Slots, adjustments, enum values and plugin directives after `::`, and the
       // underline, both fed from the preview's answer. No delay of the linter's own: the
       // preview's debounce is the pause, and a second one would only add to it.

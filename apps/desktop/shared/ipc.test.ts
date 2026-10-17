@@ -229,6 +229,8 @@ describe('the theme the window applies (TYTO-208)', () => {
     vimModeStyle: 'badge',
     indentGuides: true,
     stickyScroll: true,
+    tabSize: 2,
+    formatBriefOnSave: false,
   });
 
   it('refuses a mode that is not one of the three', () => {

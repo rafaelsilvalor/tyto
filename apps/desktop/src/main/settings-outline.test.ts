@@ -31,7 +31,19 @@ describe("the app's settings outline", () => {
       'vimModeStyle',
       'indentGuides',
       'stickyScroll',
+      'formatBriefOnSave',
+      'tabSize',
     ]);
+  });
+
+  it('offers formatBriefOnSave and tabSize with what each value does (TYTO-297)', () => {
+    const onSave = setting('formatBriefOnSave');
+    expect(onSave?.options.map((option) => option.value)).toEqual([true, false]);
+    expect(onSave?.options[0]?.description).toMatch(/blank lines/u);
+    expect(onSave?.default).toBe('false');
+    const tabSize = setting('tabSize');
+    expect(tabSize?.options.map((option) => option.value)).toEqual([2, 4]);
+    expect(tabSize?.default).toBe('2');
   });
 
   it('offers stickyScroll on and off, each with what it does (TYTO-295)', () => {

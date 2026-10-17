@@ -9,3 +9,14 @@ declare module '*.brief?raw' {
   const content: string;
   export default content;
 }
+
+/**
+ * Every fixture as text, through Vite's `import.meta.glob`, for the formatter's guarantee that
+ * no fixture changes meaning (`format-brief.test.ts`, TYTO-297).
+ */
+interface ImportMeta {
+  glob(
+    pattern: string,
+    options: { readonly query: '?raw'; readonly import: 'default'; readonly eager: true },
+  ): Record<string, string>;
+}

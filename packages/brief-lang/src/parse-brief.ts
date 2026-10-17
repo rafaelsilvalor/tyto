@@ -205,6 +205,32 @@ function inlinesOf(nodes: Iterable<SyntaxNode>, text: string): RichText {
  * is emitted before the first line, where the boundary separates the body from the
  * directive name rather than one line of text from the next.
  */
+/**
+ * Spaces and tabs at the end of a line of text say nothing (TYTO-297, ADR 0096).
+ *
+ * A person cannot see them, so they cannot mean anything — the reasoning ADR 0087 applied to
+ * a blank line, carried to the end of a line with text. Until this, `Mara Rebeiro  ` reached
+ * the Scene with its two spaces and a centred line sat a little left of the centre. Only the
+ * text the line ends with is trimmed: a line that ends in a mark, bold or a `\` break ends in
+ * markup, and the spaces before a `\` are inside the line.
+ */
+function trimLineEnd(body: Inline[]): void {
+  const last = body[body.length - 1];
+  if (last === undefined || last.kind !== 'text') return;
+  const value = last.value.replace(/[ \t]+$/u, '');
+  if (value === last.value) return;
+  if (value === '') {
+    body.pop();
+    return;
+  }
+  const removed = last.value.length - value.length;
+  body[body.length - 1] = {
+    kind: 'text',
+    value,
+    range: sourceRange(last.range.start, last.range.end - removed),
+  };
+}
+
 function bodyOf(node: SyntaxNode, text: string): RichText {
   const body: Inline[] = [];
 
@@ -215,6 +241,7 @@ function bodyOf(node: SyntaxNode, text: string): RichText {
       // both readings start with the same token and only a `{` tells them apart.
       if (parts[0]?.name === 'Space') parts.shift();
       appendInlines(body, parts, text);
+      trimLineEnd(body);
     } else if (child.name === 'BodyLine') {
       // A line holding only spaces is a `BodyLine` with no text (ADR 0087). It says
       // nothing, and a break for it would be a blank line in the artwork.
@@ -234,6 +261,7 @@ function bodyOf(node: SyntaxNode, text: string): RichText {
         });
       }
       appendInlines(body, children(blockText), text);
+      trimLineEnd(body);
     }
   }
 

@@ -497,6 +497,8 @@ const windowThemes = (): WindowThemes => {
     vimModeStyle: () => 'bar',
     indentGuides: () => false,
     stickyScroll: () => false,
+    tabSize: () => 4,
+    formatBriefOnSave: () => true,
   };
 };
 
@@ -1305,6 +1307,9 @@ describe('the theme channels (TYTO-208)', () => {
     expect(answer.indentGuides).toBe(false);
     // And whether it pins the head line of the block at the top (TYTO-295).
     expect(answer.stickyScroll).toBe(false);
+    // And the indent width and format-on-save (TYTO-297).
+    expect(answer.tabSize).toBe(4);
+    expect(answer.formatBriefOnSave).toBe(true);
   });
 
   it('lists every theme with its label and kind, and nothing else', async () => {

@@ -6,7 +6,7 @@ import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { promisify } from 'node:util';
 
-import { parseBrief } from '@tyto/brief-lang';
+import { formatBrief, parseBrief } from '@tyto/brief-lang';
 import {
   type Diagnostic,
   type Scene,
@@ -517,6 +517,110 @@ describe.each(EXAMPLES.map((example) => [example.template, example] as const))(
     }, 60_000);
   },
 );
+
+/**
+ * The example brief written the way a paste or another editor leaves it (TYTO-297): every body
+ * line re-indented by six spaces, a tab or three spaces in turn; two spaces or a tab at the end
+ * of every other line, frontmatter excluded; each blank line made three, the last a line of
+ * spaces; and CRLF. Nothing in it means anything, so it compiles to the example's Scene.
+ */
+function writtenMessily(source: string): string {
+  const lines = source.split('\n');
+  const fenceEnd = lines[0] === '---' ? lines.indexOf('---', 1) : -1;
+  const indents = ['      ', '\t', '   '];
+  const out: string[] = [];
+  for (const [index, line] of lines.entries()) {
+    if (index <= fenceEnd) {
+      out.push(line);
+      continue;
+    }
+    if (line === '') {
+      out.push(...(index === lines.length - 1 ? [''] : ['', '', '   ']));
+      continue;
+    }
+    let written = /^[ \t]+\S/u.test(line)
+      ? line.replace(/^[ \t]+/u, indents[index % indents.length]!)
+      : line;
+    if (index % 2 === 0) written += index % 4 === 0 ? '\t' : '  ';
+    out.push(written);
+  }
+  return out.join('\n').replaceAll('\n', '\r\n');
+}
+
+/**
+ * Format Brief changes nothing a brief says (TYTO-297, ADR 0096).
+ *
+ * The guarantee the command makes, held where a Scene can be built: every built-in example and
+ * the messy version of it, formatted at an indent of 2 and of 4, compile to the Scene the
+ * example compiles to — deep-equal, and the Scene carries no ranges, so equal Scenes are equal
+ * HTML, SVG and pixels. Formatting twice gives the text formatting once gave.
+ */
+describe.each(EXAMPLES.map((example) => [example.template, example] as const))(
+  '%s, through Format Brief (TYTO-297)',
+  (name, example) => {
+    const formattedOrThrow = (text: string, indentUnit: number): string => {
+      const result = formatBrief(text, { indentUnit });
+      if (!result.ok) throw new Error(result.error.map((item) => item.message).join('; '));
+      return result.value;
+    };
+
+    it('compiles, messy or formatted, to the Scene its example compiles to', async () => {
+      const directory = join(PACK, example.template);
+      const source = await readFile(join(directory, example.brief), 'utf8');
+      const messy = writtenMessily(source);
+      expect(messy, `${name}: the messy brief is the same text`).not.toEqual(source);
+
+      const sceneOf = async (text: string) =>
+        (await buildSource(text, example.template, directory)).scene;
+      const control = await sceneOf(source);
+      expect(await sceneOf(messy), `${name}: messy`).toEqual(control);
+      for (const indentUnit of [2, 4]) {
+        for (const [label, text] of [
+          ['example', source],
+          ['messy', messy],
+        ] as const) {
+          const once = formattedOrThrow(text, indentUnit);
+          expect(await sceneOf(once), `${name}: ${label} formatted at ${indentUnit}`).toEqual(
+            control,
+          );
+          expect(formattedOrThrow(once, indentUnit), `${name}: idempotent`).toBe(once);
+        }
+      }
+    }, 60_000);
+  },
+);
+
+describe('the contract fixtures, through Format Brief (TYTO-297)', () => {
+  const AGENDA = join(PACK, 'agenda-semana');
+
+  it.each(['blank-lines/with-blank-lines.brief', 'blank-lines/without-blank-lines.brief'])(
+    '%s compiles to the same Scene formatted',
+    async (file) => {
+      const source = await readFile(join(HERE, 'fixture', file), 'utf8');
+      const formatted = formatBrief(source);
+      expect(formatted.ok).toBe(true);
+      if (!formatted.ok) return;
+      const sceneOf = async (text: string) =>
+        (await buildSource(text, 'agenda-semana', AGENDA)).scene;
+      expect(await sceneOf(formatted.value)).toEqual(await sceneOf(source));
+    },
+    60_000,
+  );
+
+  it('a name ending in spaces draws as the name without them', async () => {
+    const source = await readFile(
+      join(HERE, 'fixture/blank-lines/without-blank-lines.brief'),
+      'utf8',
+    );
+    const spaced = source
+      .replaceAll('Mara Rebeiro\n', 'Mara Rebeiro  \n')
+      .replace('AGENDA DA SEMANA\n', 'AGENDA DA SEMANA \t\n');
+    expect(spaced).not.toEqual(source);
+    const sceneOf = async (text: string) =>
+      (await buildSource(text, 'agenda-semana', AGENDA)).scene;
+    expect(await sceneOf(spaced)).toEqual(await sceneOf(source));
+  }, 60_000);
+});
 
 /**
  * The pill that grows with its copy (TYTO-184, ADR 0038).

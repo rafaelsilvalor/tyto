@@ -28,7 +28,13 @@ import { NO_PLUGINS, type ThemeKind, createPluginHost } from '@tyto/plugin-api';
 import type { Rasterizer } from '@tyto/raster';
 
 import { type Locale, localeFor, translate } from '../../shared/i18n/index.js';
-import { indentGuidesExample, type Settings, stickyScrollExample } from '../../shared/settings.js';
+import {
+  formatBriefOnSaveExample,
+  indentGuidesExample,
+  type Settings,
+  stickyScrollExample,
+  tabSizeExample,
+} from '../../shared/settings.js';
 import {
   type ThemeInForce,
   statusBarColorsContrast,
@@ -114,13 +120,14 @@ const SETTINGS_SETTLE_MS = 100;
  * `settings.json` as "Open Settings (JSON)" creates it when there is none (TYTO-206). It
  * carries `statusBarItems` commented out with every id, and `statusBarColors` with every key
  * and an example colour, and `vimModeStyle` with its three values (TYTO-301), so the bar's
- * options are in the file the person is looking at; and `indentGuides` (TYTO-293) and
- * `stickyScroll` (TYTO-295).
+ * options are in the file the person is looking at; and `indentGuides` (TYTO-293),
+ * `stickyScroll` (TYTO-295), `formatBriefOnSave` and `tabSize` (TYTO-297).
  */
 const NEW_SETTINGS_FILE =
   '// Tyto settings: JSON with comments. Saving this file applies it, with no restart.\n{\n' +
   `${statusBarItemsExample()}\n${statusBarColorsExample()}\n${vimModeStyleExample()}\n` +
-  `${indentGuidesExample()}\n${stickyScrollExample()}\n}\n`;
+  `${indentGuidesExample()}\n${stickyScrollExample()}\n` +
+  `${formatBriefOnSaveExample()}\n${tabSizeExample()}\n}\n`;
 
 /** `keybindings.json` as "Open Keyboard Shortcuts (JSON)" creates it (TYTO-207, ADR 0074). */
 const NEW_KEYBINDINGS_FILE =
@@ -535,6 +542,9 @@ async function start(): Promise<void> {
   let indentGuides = saved.indentGuides;
   // And whether it pins the head line of the block at the top (TYTO-295), on the same answer.
   let stickyScroll = saved.stickyScroll;
+  // And the indent width and format-on-save (TYTO-297), on the same answer.
+  let tabSize = saved.tabSize;
+  let formatBriefOnSave = saved.formatBriefOnSave;
   // The themes a vim badge colour is measured in: the one the mode shows, or both when the
   // system chooses, since either may be in front.
   const themesInForce = (): readonly ThemeInForce[] => {
@@ -777,6 +787,8 @@ async function start(): Promise<void> {
       if (keys.includes('vimModeStyle')) vimModeStyle = next.vimModeStyle;
       if (keys.includes('indentGuides')) indentGuides = next.indentGuides;
       if (keys.includes('stickyScroll')) stickyScroll = next.stickyScroll;
+      if (keys.includes('tabSize')) tabSize = next.tabSize;
+      if (keys.includes('formatBriefOnSave')) formatBriefOnSave = next.formatBriefOnSave;
     },
     configure: (config) => {
       host.configure(config);
@@ -1164,6 +1176,8 @@ async function start(): Promise<void> {
       vimModeStyle: () => vimModeStyle,
       indentGuides: () => indentGuides,
       stickyScroll: () => stickyScroll,
+      tabSize: () => tabSize,
+      formatBriefOnSave: () => formatBriefOnSave,
     },
     // After `ready`, as the panels are, so the window's first answer is the whole list.
     keymaps: async () => {

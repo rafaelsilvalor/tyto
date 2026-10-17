@@ -172,6 +172,8 @@ const KEYS = [
   'vimModeStyle',
   'indentGuides',
   'stickyScroll',
+  'formatBriefOnSave',
+  'tabSize',
 ];
 
 describe('the settings tab’s suggestions and hover', () => {

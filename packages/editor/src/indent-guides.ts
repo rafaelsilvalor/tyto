@@ -221,8 +221,24 @@ const guideLayer = layer({
   class: 'cm-indent-guides',
   markers,
   update: (update: ViewUpdate) =>
-    update.docChanged || update.selectionSet || update.viewportChanged || update.geometryChanged,
+    update.docChanged ||
+    update.selectionSet ||
+    update.viewportChanged ||
+    update.geometryChanged ||
+    unitChanged(update),
 });
+
+/**
+ * Whether the indent unit or the tab width moved (TYTO-297): the `tabSize` setting reconfigures
+ * both in place, and with no edit to go with it the guides would keep the old step until the
+ * next keystroke. Measured in the window: `tabSize` 4 to 2 left the guides at one level each.
+ */
+export function unitChanged(update: ViewUpdate): boolean {
+  return (
+    getIndentUnit(update.startState) !== getIndentUnit(update.state) ||
+    update.startState.tabSize !== update.state.tabSize
+  );
+}
 
 /**
  * The shape only: one pixel wide, like VS Code's. The colours are the host's tokens, which

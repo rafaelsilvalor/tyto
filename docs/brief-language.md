@@ -93,6 +93,16 @@ had to answer them.
   line before it along; at the top level a run of blank lines is one token of its own, so a
   line of spaces between two directives is as blank as an empty one. A directive's range
   ends at its last line with text, never on the blank lines its block absorbed.
+- **Spaces and tabs at the end of a line of text have no meaning** (ADR 0096). Nobody can see
+  them, so `Profª. Mara Rebeiro  ` means `Profª. Mara Rebeiro`, in an inline body and on every
+  line of a block. Only the text a line ends with is trimmed: spaces before a trailing `\`,
+  between words, or inside bold or a mark stay where they are.
+- **How far a body line is indented has no meaning either**: two spaces, six or a tab all
+  make a body line. **Format Brief** (`formatBrief` in `brief-lang`, Alt+Shift+F in the
+  window) rewrites exactly what the language ignores — the indent of each body line to
+  `tabSize` spaces, the spaces at the end of a line, a run of blank lines to one, a blank line
+  between a head and its first body line, a final line ending — and nothing inside a line, so
+  the brief compiles to the same Scene. It refuses a brief with a syntax error.
 - **Frontmatter is taken whole and its YAML is left alone.** The grammar marks the block
   from `---` to `---`; a real YAML parser reads it in `parseBrief`. A grammar that tried
   would be a second, worse YAML. Without a closing fence there is no frontmatter, and every

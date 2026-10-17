@@ -317,6 +317,13 @@ const appliedThemesSchema = z.object({
   indentGuides: z.boolean(),
   /** The `stickyScroll` setting in force (TYTO-295): the editor's pinned head lines, on or off. */
   stickyScroll: z.boolean(),
+  /**
+   * The `tabSize` setting in force (TYTO-297): spaces per indent level, for Tab, the guides and
+   * Format Brief.
+   */
+  tabSize: z.number().int().min(1).max(8),
+  /** The `formatBriefOnSave` setting in force (TYTO-297): whether Save formats a brief first. */
+  formatBriefOnSave: z.boolean(),
   diagnostics: z.array(diagnostic.omit({ range: true })).max(200),
 });
 

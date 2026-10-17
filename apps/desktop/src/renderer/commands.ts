@@ -147,6 +147,12 @@ export const EDITOR_INSERT_MENU = 'editor.insertMenu';
  * the brief in the focused pane.
  */
 export const EDITOR_GO_TO_BLOCK = 'editor.goToBlock';
+/**
+ * "Format Brief" (TYTO-297, ADR 0096): indentation, trailing spaces and repeated blank lines put
+ * right in the focused pane's brief, as one undoable change. `Alt-Shift-f`, VS Code's "Format
+ * Document" key; brief-only and a text command, like Go to Block.
+ */
+export const EDITOR_FORMAT_BRIEF = 'editor.formatBrief';
 
 /**
  * A new, empty tab (TYTO-124).
@@ -231,6 +237,7 @@ export const COMMAND_LABELS: Readonly<Record<string, CatalogueKey>> = {
   [EDITOR_TOGGLE_VIM]: 'command.editor.toggleVim',
   [EDITOR_INSERT_MENU]: 'command.editor.insertMenu',
   [EDITOR_GO_TO_BLOCK]: 'command.editor.goToBlock',
+  [EDITOR_FORMAT_BRIEF]: 'command.editor.formatBrief',
   [DOCUMENT_NEW]: 'command.document.new',
   [DOCUMENT_NEW_FROM_TEMPLATE]: 'command.document.newFromTemplate',
   [EDITOR_OPEN]: 'command.file.open',
@@ -297,6 +304,8 @@ export interface DesktopActions {
   openInsertMenu(): void;
   /** TYTO-296. The focused pane's blocks in the bar; the highlighted one is previewed. */
   goToBlock(): void;
+  /** TYTO-297. Formats the focused pane's brief, or says why it cannot. */
+  formatBrief(): void;
   /** E9.8. Each of these ends in a round trip to main, which owns every path. */
   newDocument(): void;
   /** TYTO-275. Lists the templates in the bar; the chosen one's skeleton opens in a new tab. */
@@ -412,6 +421,9 @@ export function createDesktopRegistry(actions: DesktopActions): CommandRegistry 
   });
   add(EDITOR_GO_TO_BLOCK, () => {
     actions.goToBlock();
+  });
+  add(EDITOR_FORMAT_BRIEF, () => {
+    actions.formatBrief();
   });
 
   // `editor.save` is `@tyto/editor`'s id and not one invented here, which is the whole
@@ -547,6 +559,7 @@ export const BRIEF_ONLY_COMMANDS: ReadonlySet<string> = new Set([
   FILE_EXPORT,
   EDITOR_INSERT_MENU,
   EDITOR_GO_TO_BLOCK,
+  EDITOR_FORMAT_BRIEF,
 ]);
 
 /**
@@ -566,6 +579,7 @@ export const TEXT_COMMANDS: ReadonlySet<string> = new Set([
   EDITOR_GOTO_LINE,
   EDITOR_INSERT_MENU,
   EDITOR_GO_TO_BLOCK,
+  EDITOR_FORMAT_BRIEF,
 ]);
 
 /**
@@ -666,6 +680,10 @@ export const builtInKeybindings: readonly Keybinding[] = [
   // TYTO-296. VS Code's "Go to Symbol in Editor" key, in both input modes. Free in this table,
   // in CodeMirror's keymaps and in vim, whose engine leaves Ctrl+Shift+O alone.
   { key: 'Mod-Shift-o', command: EDITOR_GO_TO_BLOCK, when: 'editor', source: 'built-in' },
+  // TYTO-297. VS Code's "Format Document" key on Windows and Linux, in both input modes. Free in
+  // this table, in CodeMirror's keymaps (which take Shift-Alt only with the arrows, `a` and,
+  // on macOS, `m`) and in vim, whose engine binds no Alt key.
+  { key: 'Alt-Shift-f', command: EDITOR_FORMAT_BRIEF, when: 'editor', source: 'built-in' },
 ];
 
 export const builtInTable: KeybindingTable = { bindings: builtInKeybindings };

@@ -1,5 +1,5 @@
 import { defaultKeymap, historyKeymap, indentWithTab, undoDepth } from '@codemirror/commands';
-import { foldGutter, foldKeymap, indentOnInput, indentUnit } from '@codemirror/language';
+import { foldGutter, foldKeymap, indentOnInput } from '@codemirror/language';
 import {
   type Extension,
   type StateEffect,
@@ -28,6 +28,7 @@ import {
 
 import { brief } from './brief-language.js';
 import { type MarkedDiagnostic, diagnosticsSpec } from './diagnostic-markers.js';
+import { DEFAULT_TAB_SIZE, indentExtension } from './format-brief.js';
 import { indentGuides } from './indent-guides.js';
 import { stickyScroll } from './sticky-scroll.js';
 import { type CommandRegistry, commandRegistryFacet } from './commands.js';
@@ -138,6 +139,12 @@ export interface EditorOptions {
    * {@link EditorHandle.setStickyScroll}.
    */
   readonly stickyScroll?: boolean;
+  /**
+   * Spaces per indent level (TYTO-297): what Tab inserts, how wide a tab is drawn, the indent
+   * guides' step and the indent Format Brief writes. 2 by default; the desktop's `tabSize`
+   * setting changes it, live, through {@link EditorHandle.setTabSize}.
+   */
+  readonly tabSize?: number;
 }
 
 /**
@@ -400,6 +407,11 @@ export interface EditorHandle extends EditorPane {
    */
   setStickyScroll(enabled: boolean): void;
   /**
+   * Changes the spaces per indent level in every pane and every tab, in place — a compartment,
+   * so the text, the selection and the undo history stay (TYTO-297).
+   */
+  setTabSize(size: number): void;
+  /**
    * Vim's mode and pending keys as they change, and `null` when vim is off (TYTO-248).
    * Called at once with the current answer. Returns the function that stops the listener.
    */
@@ -445,9 +457,6 @@ const baseExtensions = (): Extension[] => [
   // whole of it. Where the line actually breaks in the artwork is the IR's answer, not
   // this one (ADR 0016).
   EditorView.lineWrapping,
-  // Two spaces, stated rather than left to CodeMirror's default, because it is what a brief's
-  // block content is indented by (`::slide` and the lines under it).
-  indentUnit.of('  '),
   // Tab indents and Shift+Tab outdents (TYTO-183). CodeMirror binds nothing to Tab on
   // purpose, so a keyboard user can leave the editor with it; binding it takes that away,
   // and CodeMirror's own way back is Escape then Tab, which moves focus on.
@@ -479,6 +488,11 @@ export function createEditor(parent: HTMLElement, options: EditorOptions = {}): 
   /** The pinned head lines or nothing, swapped by `setStickyScroll` (TYTO-295). */
   const stickyCompartment = new Compartment();
   const stickyOn = stickyScroll();
+  /**
+   * The indent unit and tab width, swapped by `setTabSize` (TYTO-297). Two spaces unless the
+   * host says otherwise: what a brief's block content is indented by.
+   */
+  const indentCompartment = new Compartment();
 
   /**
    * The phrases as a mutable holder rather than a value baked into the extension list.
@@ -517,6 +531,9 @@ export function createEditor(parent: HTMLElement, options: EditorOptions = {}): 
   let guides: Extension = (options.indentGuides ?? true) ? guidesOn : [];
   /** What the sticky compartment holds now, for the same reason. */
   let sticky: Extension = (options.stickyScroll ?? true) ? stickyOn : [];
+  /** The size the indent compartment holds now, and the extension it holds for it. */
+  let tabSize = options.tabSize ?? DEFAULT_TAB_SIZE;
+  let indent: Extension = indentExtension(tabSize);
 
   /**
    * One listener for both directions, and the order inside it carries weight.
@@ -597,6 +614,7 @@ export function createEditor(parent: HTMLElement, options: EditorOptions = {}): 
     themeCompartment.of(theme),
     guidesCompartment.of(guides),
     stickyCompartment.of(sticky),
+    indentCompartment.of(indent),
     searchSupport(() => searchPhrases),
     languages[language](),
     ...baseExtensions(),
@@ -653,6 +671,9 @@ export function createEditor(parent: HTMLElement, options: EditorOptions = {}): 
         }
         if (stickyCompartment.get(view.state) !== sticky) {
           view.dispatch({ effects: stickyCompartment.reconfigure(sticky) });
+        }
+        if (indentCompartment.get(view.state) !== indent) {
+          view.dispatch({ effects: indentCompartment.reconfigure(indent) });
         }
         // Dispatched after, because a scroll effect is a property of the view and the view
         // has just been given a different state to measure. The phrases ride along: a state
@@ -760,6 +781,13 @@ export function createEditor(parent: HTMLElement, options: EditorOptions = {}): 
       if ((sticky === stickyOn) === enabled) return;
       sticky = enabled ? stickyOn : [];
       everyView(stickyCompartment.reconfigure(sticky));
+    },
+
+    setTabSize: (size: number) => {
+      if (size === tabSize) return;
+      tabSize = size;
+      indent = indentExtension(size);
+      everyView(indentCompartment.reconfigure(indent));
     },
 
     onVimStatus: (listener: (status: VimStatus | null) => void) => {

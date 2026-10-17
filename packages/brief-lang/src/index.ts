@@ -33,3 +33,13 @@ export { parser } from './brief.parser.js';
 export { briefHighlighting } from './highlight.js';
 
 export { parseBrief } from './parse-brief.js';
+
+export {
+  DEFAULT_INDENT_UNIT,
+  type FormatOptions,
+  type TextEdit,
+  applyEdits,
+  formatBrief,
+  formatBriefEdits,
+  lineEndingOf,
+} from './format-brief.js';
