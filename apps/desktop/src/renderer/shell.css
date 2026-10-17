@@ -409,7 +409,9 @@ textarea {
  *
  * `centre` takes the remainder and the side docks are given a width in pixels from the
  * record. `min-width: 0` on the elastic one is load-bearing: without it a 1080px preview
- * floors the flex item at its content's width and pushes the editor off the window.
+ * floors the flex item at its content's width and pushes the editor off the window. Since
+ * TYTO-299 that width is where a side dock starts, not what it is held at: it gives way to the
+ * editor groups' minimum (ADR 0093, below).
  */
 /*
  * Everything between the header and the footer, with **no gap of its own**: a splitter *is*
@@ -424,11 +426,23 @@ textarea {
   gap: 0;
 }
 
+/*
+ * The docks' row is never shorter than the editor groups at their minimum, so the bottom dock
+ * gives way first (TYTO-299, ADR 0093) — but never past its own minimum: what is left over is
+ * clipped inside `.editor-groups`, and the bottom dock is never pushed under the status bar.
+ */
 .work {
   flex: 1;
   display: flex;
-  min-height: 0;
+  min-height: min(
+    var(--tyto-groups-min-height),
+    100% - var(--tyto-dock-min-height) - var(--tyto-hairline-width)
+  );
   gap: 0;
+}
+
+.workspace:has(> .dock--bottom[hidden]) > .work {
+  min-height: min(var(--tyto-groups-min-height), 100%);
 }
 
 /*
@@ -444,18 +458,42 @@ textarea {
   background: var(--tyto-hairline);
 }
 
+/*
+ * The docks give way before the editor groups (TYTO-299, ADR 0093). The centre is never narrower
+ * than the groups at their minimum, which `arrangeGroups` publishes; the side docks shrink from
+ * their size in the record to make that room, each down to the smaller of that size and
+ * `--tyto-dock-min-width` (`dock.ts` writes it). The record is not touched, so a wider window
+ * gives them their size back. Past that the centre stops asking — the room an open side dock
+ * keeps at its minimum comes off its floor — and the groups are clipped at its edge instead of
+ * pushing the right dock out of the window. A group was painted over its neighbour before this.
+ */
 .dock--centre {
   flex: 1;
+  min-width: min(
+    var(--tyto-groups-min-width),
+    100% - 2 * (var(--tyto-dock-min-width) + var(--tyto-hairline-width))
+  );
+}
+
+.work:has(> .dock--left[hidden]) > .dock--centre,
+.work:has(> .dock--right[hidden]) > .dock--centre {
+  min-width: min(
+    var(--tyto-groups-min-width),
+    100% - var(--tyto-dock-min-width) - var(--tyto-hairline-width)
+  );
+}
+
+.work:has(> .dock--left[hidden]):has(> .dock--right[hidden]) > .dock--centre {
+  min-width: min(var(--tyto-groups-min-width), 100%);
 }
 
 .dock--left,
 .dock--right {
-  flex: 0 0 auto;
+  flex: 0 1 auto;
 }
 
 .dock--bottom {
-  flex: 0 0 auto;
-  min-height: 0;
+  flex: 0 1 auto;
   /*
    * Side by side, not stacked (TYTO-49). The bottom dock is one short strip — the problems
    * panel's 140px — and two panels stacked in it left each a line of height; a plugin panel
@@ -659,12 +697,21 @@ textarea {
  * The editor groups (TYTO-286, ADR 0083): a split is a flex box in its direction, a group is a
  * column of its tabs over its pane. The shares are grow factors set by `arrangeGroups`. The
  * minimum size is the one limit on how many groups there can be.
+ *
+ * `arrangeGroups` also writes each split's `min-width` and `min-height` — its groups' minimums
+ * and the lines between them — over the zeros here, so a split never shrinks below what it holds
+ * and the next sibling is never painted over it (TYTO-299, ADR 0093). When the window cannot give
+ * the groups that room even with the docks at their minimum, the last ones are clipped at the
+ * edge, as VS Code does, rather than run under a dock. `clip` and not `hidden`: a hidden box can
+ * still be scrolled, and a pane brought into view — CodeMirror does it for its caret — slid the
+ * first groups' strips out at the top (measured: group 1 at y -193 under a dock top at 33).
  */
 .editor-groups {
   display: flex;
   flex: 1;
   min-height: 0;
   min-width: 0;
+  overflow: clip;
 }
 
 .editor-split {

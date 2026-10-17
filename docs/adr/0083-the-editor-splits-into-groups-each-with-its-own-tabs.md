@@ -31,6 +31,12 @@ is said where it applies.
    leaves with one child collapses into that child. The last group stays, and the window puts a
    new untitled document in it, as closing the last tab always has. There is no limit on groups,
    only a minimum size in `shell.css`.
+
+   > **Amended by ADR 0093 (TYTO-299, 2026-10-17).** The minimum is honoured by the layout too:
+   > each split is held at its groups' minimum, the docks give way first, and past that the last
+   > groups are clipped at the centre dock's edge. A split narrower than its groups let the next
+   > one be painted 80.4 px over them at 900x600.
+
 2. **A tab is not a document.** A tab has an id of its own and names the document it shows, so one
    document can be a tab in two groups, and a tab that shows something other than a document —
    the preview, TYTO-287 — is a new kind of tab rather than a fake document.

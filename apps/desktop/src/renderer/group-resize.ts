@@ -42,6 +42,28 @@ export function minimumOf(node: GroupNode, direction: SplitDirection): number {
 }
 
 /**
+ * How wide the line between two groups is, in CSS pixels: `--tyto-hairline-width`, which
+ * `.group-splitter` is laid out at. `e2e/renderer-tokens.test.ts` holds the two equal (TYTO-299).
+ */
+export const SPLITTER_THICKNESS = 1;
+
+/**
+ * The room `node` takes along `direction` with every group at its minimum: {@link minimumOf} and
+ * the lines between children laid end to end. What a split is held at while the window shrinks
+ * (TYTO-299, ADR 0093) — without it a split shrank below its groups and the next one was painted
+ * over them. A drag keeps to {@link minimumOf}: it moves one line between two neighbours and
+ * never the lines themselves.
+ */
+export function footprintOf(node: GroupNode, direction: SplitDirection): number {
+  if (node.kind === 'group') return GROUP_MINIMUM[direction];
+  const each = node.children.map((child) => footprintOf(child, direction));
+  if (each.length === 0) return GROUP_MINIMUM[direction];
+  return node.direction === direction
+    ? each.reduce((sum, size) => sum + size, 0) + (each.length - 1) * SPLITTER_THICKNESS
+    : Math.max(...each);
+}
+
+/**
  * The shares after the line between `index` and `index + 1` moved by `delta` pixels from where
  * it was when `pair` was measured. Each neighbour keeps at least its minimum; a pair too small
  * to give both theirs is left as it is, since any move would only take one below it.

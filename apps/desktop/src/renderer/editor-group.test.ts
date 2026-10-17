@@ -2,7 +2,14 @@
 import { afterEach, describe, expect, it } from 'vitest';
 
 import { type EditorGroupElement, arrangeGroups } from './editor-group.js';
-import { closeTab, focusedGroup, groupList, groupsOf, splitGroup } from './editor-groups.js';
+import {
+  closeTab,
+  focusGroup,
+  focusedGroup,
+  groupList,
+  groupsOf,
+  splitGroup,
+} from './editor-groups.js';
 
 afterEach(() => {
   document.body.replaceChildren();
@@ -55,6 +62,31 @@ describe('arrangeGroups', () => {
     expect(removed).toEqual([first?.id]);
     expect(focusedGroup(closed).id).toBe(second?.id);
     expect(document.getElementById('editor')).toBe(made.get(second?.id ?? '')?.mount);
+  });
+});
+
+describe('the room the groups take (TYTO-299, ADR 0093)', () => {
+  it('holds each split at its groups’ minimum and tells the workspace the whole', () => {
+    const workspace = document.createElement('div');
+    workspace.className = 'workspace';
+    const host = document.createElement('div');
+    workspace.append(host);
+    document.body.append(workspace);
+
+    const right = splitGroup(groupsOf(['a'], 'a'), 'row');
+    const scene = splitGroup(focusGroup(right, groupList(right)[0]?.id ?? ''), 'column');
+    arrangeGroups(host, scene, new Map());
+
+    const row = host.querySelector<HTMLElement>('.editor-split--row');
+    const column = host.querySelector<HTMLElement>('.editor-split--column');
+    expect([row?.style.minWidth, row?.style.minHeight]).toEqual(['321px', '193px']);
+    expect([column?.style.minWidth, column?.style.minHeight]).toEqual(['160px', '193px']);
+    expect(workspace.style.getPropertyValue('--tyto-groups-min-width')).toBe('321px');
+    expect(workspace.style.getPropertyValue('--tyto-groups-min-height')).toBe('193px');
+
+    // Back to one group: the floor goes back to a group's own.
+    arrangeGroups(host, groupsOf(['a'], 'a'), new Map());
+    expect(workspace.style.getPropertyValue('--tyto-groups-min-width')).toBe('160px');
   });
 });
 

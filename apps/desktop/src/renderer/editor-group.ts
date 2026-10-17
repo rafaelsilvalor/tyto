@@ -2,6 +2,7 @@ import { LitElement, html, nothing } from 'lit';
 
 import { type Locale, DEFAULT_LOCALE, translate } from '../../shared/i18n/index.js';
 import { type EditorGroups, type GroupNode, groupList } from './editor-groups.js';
+import { footprintOf } from './group-resize.js';
 import { icon } from './icons.js';
 import { splitterFor } from './group-splitter.js';
 // Imported for the side effect: the pane has to be defined before a group makes one.
@@ -171,6 +172,22 @@ declare global {
 void TABS_TAG;
 
 /**
+ * Tells the window how much room the groups take at their minimum, as `--tyto-groups-min-width`
+ * and `--tyto-groups-min-height` on `.workspace`: the centre dock is held at that width and the
+ * docks' row at that height, so the side and bottom docks give way before a group is squeezed
+ * (TYTO-299, ADR 0093). The workspace and not the container, because the docks are above it.
+ */
+function publishFootprint(container: HTMLElement, root: GroupNode): void {
+  const workspace = container.closest<HTMLElement>('.workspace');
+  if (workspace === null) return;
+  workspace.style.setProperty('--tyto-groups-min-width', `${String(footprintOf(root, 'row'))}px`);
+  workspace.style.setProperty(
+    '--tyto-groups-min-height',
+    `${String(footprintOf(root, 'column'))}px`,
+  );
+}
+
+/**
  * Lays the groups out in `container`: a box per split, children in its direction at their
  * shares, and each group's element — made the first time its id is seen, **moved** afterwards —
  * at its leaf. An element whose group is gone is removed and reported, so its pane can go.
@@ -198,6 +215,10 @@ export function arrangeGroups(
     const box = document.createElement('div');
     box.className = `editor-split editor-split--${node.direction}`;
     box.dataset['groupSplit'] = node.id;
+    // Never narrower or shorter than its groups at their minimum, or the next sibling is painted
+    // over the ones that spill out of it (TYTO-299, ADR 0093).
+    box.style.minWidth = `${String(footprintOf(node, 'row'))}px`;
+    box.style.minHeight = `${String(footprintOf(node, 'column'))}px`;
     node.children.forEach((child, index) => {
       // The line between this child and the one before it (TYTO-289).
       if (index > 0) box.append(splitterFor(node, index - 1));
@@ -218,6 +239,7 @@ export function arrangeGroups(
     else mount.removeAttribute('id');
   });
   root.style.flex = '1 1 0';
+  publishFootprint(container, groups.root);
   // `replaceChildren` moves the group elements, and a moved node is not re-rendered by Lit:
   // the strip and the CodeMirror inside it come along as they are.
   container.replaceChildren(root);

@@ -121,6 +121,14 @@
      which `e2e/renderer-tokens.test.ts` holds equal to these (TYTO-289). */
   --tyto-group-min-width: 160px;
   --tyto-group-min-height: 96px;
+  /* How far a side dock and the bottom dock give way when the editor groups need the room, the
+     same as a group's minimum (TYTO-299, ADR 0093). A dock already smaller keeps its own size. */
+  --tyto-dock-min-width: 160px;
+  --tyto-dock-min-height: 96px;
+  /* The room the editor groups take at their minimum. `arrangeGroups` writes the real numbers on
+     `.workspace` each time the groups change shape; these are a window with none yet. */
+  --tyto-groups-min-width: 0px;
+  --tyto-groups-min-height: 0px;
 
   /* One Light. */
   --tyto-surface: #fafafa;
