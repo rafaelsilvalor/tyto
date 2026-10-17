@@ -32,7 +32,7 @@ import tokyoNight from './themes/tokyo-night.json';
  * the theme files travel as data in the bundle and the host's reader answers from
  * `THEME_PACK_FILES`, by the path each contribution names.
  *
- * Every theme here sets all forty tokens rather than leaning on the base theme's fallback.
+ * Every theme here sets all forty-two tokens rather than leaning on the base theme's fallback.
  * A theme whose upstream colours meet the contrast floors of ADR 0089 ships once. One that
  * does not ships twice, side by side in the picker: the original, upstream's colours exactly
  * and exempt from the floors, and `<Name> (adjusted)`, which meets them and names each colour
@@ -42,6 +42,10 @@ import tokyoNight from './themes/tokyo-night.json';
  * has one, so its colours are Tyto's, derived from a role and held to 4.5:1 in every theme,
  * originals included. Where a role's colour is moved to get there, `derived` says so; both of
  * a pair draw the same badge, so the move never makes a theme a pair.
+ *
+ * The editor's indent guides are Tyto's too (TYTO-293, ADR 0088): `indent-guide` is the theme's
+ * `border`, and `indent-guide-active` its `text-disabled`, with the lightness moved — and noted
+ * in `derived` — where that reads under 3:1 on the surface or too close to the guide to tell.
  */
 
 /** The plugin's id, which is its manifest's name. */
@@ -59,7 +63,10 @@ export interface ThemePackFile {
   readonly colors: Readonly<Record<string, string>>;
   /** Each colour changed from upstream to meet a floor, with the value it replaced. */
   readonly adjusted: readonly ThemeAdjustment[];
-  /** Each vim badge colour that is not its role's colour, with why (TYTO-301, ADR 0089). */
+  /**
+   * Each vim badge colour that is not its role's colour (TYTO-301, ADR 0089), and the active
+   * indent guide where it is not `text-disabled` (TYTO-293), with why.
+   */
   readonly derived: readonly ThemeDerivation[];
 }
 

@@ -2110,6 +2110,13 @@ function showTheme(bridge: TytoBridge, ask: () => Promise<IpcResponse<'theme:cur
       statusBarItems = applied.statusBarItems;
       // And so does how vim's mode is drawn (TYTO-301).
       vimModeStyle = applied.vimModeStyle;
+      // And whether the editors draw indent guides (TYTO-293): every tab, and the template mode.
+      indentGuides = applied.indentGuides;
+      editor?.setIndentGuides(indentGuides);
+      // Only once it is loaded, as with the locale: `loadTemplateMode` hands it the value then.
+      if (customElements.get(TEMPLATE_MODE_TAG) !== undefined && elements.templateMode) {
+        elements.templateMode.showIndentGuides(indentGuides);
+      }
       panel.installation = withThemeRows(panel.installation, applied.diagnostics);
       repaint();
     },
@@ -3196,6 +3203,9 @@ let statusBarItems: readonly StatusBarItemId[] = STATUS_BAR_ITEM_IDS;
 /** The `vimModeStyle` setting, from the same answer (TYTO-301): the badge until it arrives. */
 let vimModeStyle: VimModeStyle = 'badge';
 
+/** The `indentGuides` setting, from the same answer (TYTO-293): on until it arrives. */
+let indentGuides = true;
+
 /** The ids the status bar's buttons run; the area toggles are named by the bar itself. */
 const STATUS_COMMANDS: StatusBarCommands = {
   commandBar: COMMAND_BAR_TOGGLE,
@@ -3877,6 +3887,7 @@ async function loadTemplateMode(): Promise<TemplateMode | undefined> {
   await customElements.whenDefined(TEMPLATE_MODE_TAG);
   if (mode.ports === undefined) wireTemplateMode(mode, bridge);
   mode.locale = state.locale;
+  mode.showIndentGuides(indentGuides);
   return mode;
 }
 

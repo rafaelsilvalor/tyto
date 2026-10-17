@@ -42,7 +42,9 @@
     "status-bar-vim-visual": "#8f3f71",
     "status-bar-vim-visual-text": "#fbf1c7",
     "status-bar-vim-replace": "#9d0006",
-    "status-bar-vim-replace-text": "#fbf1c7"
+    "status-bar-vim-replace-text": "#fbf1c7",
+    "indent-guide": "#a89984",
+    "indent-guide-active": "#8d7c64"
   },
   "adjusted": [],
   "derived": [
@@ -71,6 +73,12 @@
         "value": "#8f3f71"
       },
       "reason": "distinct from replace: syntax-keyword #9d0006 would draw visual in replace's colour; Gruvbox's purple, syntax-constant #8f3f71, reads 5.94:1 against surface unmoved"
+    },
+    {
+      "token": "indent-guide-active",
+      "role": "text-disabled",
+      "value": "#8d7c64",
+      "reason": "text-disabled #a89984 reads 2.45:1 on surface and ΔE 0.0 from the guide (border #a89984); HSL lightness moved from 58.8% to 47.3%, reading 3.56:1 and ΔE 10.0"
     }
   ]
 }

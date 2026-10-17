@@ -313,6 +313,8 @@ const appliedThemesSchema = z.object({
   ),
   /** The `vimModeStyle` setting in force (TYTO-301, ADR 0091): badge, top border or bar. */
   vimModeStyle: z.enum(VIM_MODE_STYLES.map((style) => style.id) as [VimModeStyle]),
+  /** The `indentGuides` setting in force (TYTO-293): the editor's guides, on or off. */
+  indentGuides: z.boolean(),
   diagnostics: z.array(diagnostic.omit({ range: true })).max(200),
 });
 

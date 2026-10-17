@@ -170,6 +170,7 @@ const KEYS = [
   'iconStrokeWidth',
   'statusBarItems',
   'vimModeStyle',
+  'indentGuides',
 ];
 
 describe('the settings tab’s suggestions and hover', () => {

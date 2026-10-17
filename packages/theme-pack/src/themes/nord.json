@@ -42,7 +42,9 @@
     "status-bar-vim-visual": "#81a1c1",
     "status-bar-vim-visual-text": "#2e3440",
     "status-bar-vim-replace": "#cf888f",
-    "status-bar-vim-replace-text": "#2e3440"
+    "status-bar-vim-replace-text": "#2e3440",
+    "indent-guide": "#4c566a",
+    "indent-guide-active": "#6f7d98"
   },
   "adjusted": [],
   "derived": [
@@ -51,6 +53,12 @@
       "role": "error",
       "value": "#cf888f",
       "reason": "error #bf616a reads 3.05:1 at best against surface, text and accent-text; HSL lightness moved from 56.5% to 67.2%, hue and saturation kept, to the first value reading 4.5:1 (4.50 on surface)"
+    },
+    {
+      "token": "indent-guide-active",
+      "role": "text-disabled",
+      "value": "#6f7d98",
+      "reason": "text-disabled #4c566a reads 1.69:1 on surface and ΔE 0.0 from the guide (border #4c566a); HSL lightness moved from 35.7% to 51.6%, reading 3.01:1 and ΔE 14.9"
     }
   ]
 }

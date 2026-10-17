@@ -34,6 +34,15 @@ export {
 
 export { isFollower } from './mirror.js';
 
+export {
+  activeGuide,
+  type GuideRun,
+  guideRuns,
+  indentColumns,
+  indentGuides,
+  indentLevels,
+} from './indent-guides.js';
+
 export { briefDarkTheme, briefLightTheme, type ThemeName, themes, themeTokens } from './theme.js';
 
 export {

@@ -103,7 +103,37 @@ const iconStrokeWidth = {
 } satisfies ConfigurationContribution<number>;
 
 /**
- * The nine, in the order the settings file is documented in. `theme` checks its ids against
+ * Whether the editor draws a guide per indent level (TYTO-293, ADR 0088). On by default, as
+ * VS Code's are; it reaches the window on `theme:current`'s answer, and the editor swaps the
+ * guides in or out in place, so a save shows or hides them in every tab with no restart.
+ */
+export const indentGuidesContribution = {
+  id: 'indentGuides',
+  schema: z.boolean(),
+  default: true,
+  description: 'Draw a vertical guide at each indent level in the editor (default true).',
+  // Spelled out so the settings tab's hover says what each does, not only that it is a boolean.
+  options: [
+    { value: true, description: 'A guide per indent level; the block holding the cursor darker.' },
+    { value: false, description: 'No guides.' },
+  ],
+} satisfies ConfigurationContribution<boolean>;
+
+/**
+ * The key as a newly created `settings.json` shows it: commented out, with its two values, so
+ * the option is in the file (TYTO-293).
+ */
+export function indentGuidesExample(): string {
+  return [
+    '// Draw a vertical guide at each indent level in the editor: true (the default) or false.',
+    '// "indentGuides": true,',
+  ]
+    .map((line) => `  ${line}`)
+    .join('\n');
+}
+
+/**
+ * The ten, in the order the settings file is documented in. `theme` checks its ids against
  * `lookup`, which main builds from every theme the plugins registered (TYTO-208); the default
  * knows the built-in two and lets any other id through.
  */
@@ -120,6 +150,7 @@ export function settingContributions(
     statusBarItemsContribution,
     statusBarColorsContribution,
     vimModeStyleContribution,
+    indentGuidesContribution,
   ] as readonly ConfigurationContribution[];
 }
 
@@ -136,6 +167,8 @@ export interface Settings {
   readonly statusBarColors: StatusBarColors;
   /** How the status bar shows vim's mode: badge, top border or whole bar (TYTO-301). */
   readonly vimModeStyle: VimModeStyle;
+  /** Whether the editor draws indent guides (TYTO-293). */
+  readonly indentGuides: boolean;
 }
 
 export const DEFAULT_SETTINGS: Settings = {
@@ -148,13 +181,14 @@ export const DEFAULT_SETTINGS: Settings = {
   statusBarItems: statusBarItemsContribution.default,
   statusBarColors: statusBarColorsContribution.default,
   vimModeStyle: vimModeStyleContribution.default,
+  indentGuides: indentGuidesContribution.default,
 };
 
 /** What a queue folder produces until a person chooses otherwise (ADR 0044). */
 export const DEFAULT_QUEUE_KINDS: readonly string[] = ['png'];
 
 /**
- * The nine out of the resolved values, which already hold every declared key with a value
+ * The ten out of the resolved values, which already hold every declared key with a value
  * its schema accepted or its default (`resolveSettings`).
  */
 export function settingsFrom(values: Readonly<Record<string, unknown>>): Settings {
@@ -170,5 +204,6 @@ export function settingsFrom(values: Readonly<Record<string, unknown>>): Setting
     statusBarItems: pick('statusBarItems'),
     statusBarColors: pick('statusBarColors'),
     vimModeStyle: pick('vimModeStyle'),
+    indentGuides: pick('indentGuides'),
   };
 }

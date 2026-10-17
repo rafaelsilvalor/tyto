@@ -145,6 +145,28 @@ describe('<tyto-template-mode>', () => {
     expect(element.unsaved).toBe(true);
   });
 
+  it('draws indent guides in both buffers, and follows the indentGuides setting (TYTO-293)', async () => {
+    const layers = (element: TemplateMode): readonly boolean[] =>
+      (['manifest', 'markup'] as const).map(
+        (buffer) =>
+          (element.editorOf(buffer)?.view.dom.querySelector('.cm-indent-guides') ?? null) !== null,
+      );
+    const element = await mode(ports());
+    expect(layers(element)).toEqual([true, true]);
+    element.showIndentGuides(false);
+    expect(layers(element)).toEqual([false, false]);
+
+    // A mode told before its buffers exist makes them without.
+    const later = document.createElement(TEMPLATE_MODE_TAG);
+    later.ports = ports();
+    later.showIndentGuides(false);
+    document.body.append(later);
+    await later.updateComplete;
+    await later.openFolder('/t/cartaz');
+    await later.updateComplete;
+    expect(layers(later)).toEqual([false, false]);
+  });
+
   it('is clean again after a save, and hands the answer on', async () => {
     const given = ports();
     const element = await mode(given);

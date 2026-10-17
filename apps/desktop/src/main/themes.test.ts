@@ -50,7 +50,7 @@ describe('the built-in themes', () => {
     const loaded = await loadTheme(BUILT_IN_THEMES[kind], builtInThemeReader('desktop'));
     expect(loaded.diagnostics).toEqual([]);
     expect(loaded.colors).toEqual(BASE_COLORS[kind]);
-    expect(Object.keys(loaded.colors)).toHaveLength(40);
+    expect(Object.keys(loaded.colors)).toHaveLength(42);
   });
 
   it('are what the service answers for each mode by default', async () => {

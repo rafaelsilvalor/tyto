@@ -259,7 +259,7 @@ describe('the built-in theme files are the token file (ADR 0077)', () => {
   const { light, dark } = themes();
 
   it('theme exactly the colours the token file redefines for dark, no more and no fewer', () => {
-    expect(dark.size).toBe(40);
+    expect(dark.size).toBe(42);
     for (const kind of ['light', 'dark'] as const) {
       expect([...builtInTheme(kind).keys()].sort(), kind).toEqual([...dark.keys()].sort());
     }
