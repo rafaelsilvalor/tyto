@@ -1,5 +1,66 @@
 # @tyto/editor
 
+## 0.8.0
+
+### Minor Changes
+
+- 7cf6a11: TYTO-120: `hasBeenEdited(state)` says whether a document's undo history holds anything. A document `blank()` built answers `false`, and so does one undone all the way back; one typed into and then emptied answers `true`, which `textOf(state) === ''` cannot tell apart from a fresh one.
+- c141ec9: TYTO-206, PR B: "Preferences: Open Settings (JSON)" opens `settings.json` in a tab. Its problems
+  show in the problems panel while you type, a save from the tab or any editor applies with no
+  restart, and a screen's change goes into the tab's unsaved buffer instead of the disk. A screen's
+  change to a file that does not parse is refused, undone and shown. `@tyto/editor`'s `blank`
+  takes an optional language for one document, without the host's language extensions.
+- 7342c02: TYTO-207 (ADR 0074): every key the window answers now comes from one keybinding table. `@tyto/editor` gains a pure resolver (`parseKey`, `resolveKeybindings`, `keymapSetFor`, `windowBindingsOf`, `shownBindingsOf`) over six closed contexts, `vimMode` and `createEditor` take their vim set as an option, and `setKeymaps` swaps both modes' bindings in place. `plugin-api`'s `editor.keymap` gains an optional `when` and is consumed by the desktop for the first time. `core` gains six codes (`E_KEYBINDINGS_SYNTAX`, `W_KEYBINDING_UNKNOWN_COMMAND`, `W_KEYBINDING_INVALID_KEY`, `W_KEYBINDING_UNKNOWN_CONTEXT`, `W_KEYBINDING_DUPLICATE`, `W_KEYBINDING_LOCKED`). The desktop's `Mod-K` listener becomes a window dispatcher for global keys, registered once. No default key changes.
+- 752ddd2: TYTO-248: `EditorHandle.onVimStatus` reports vim's mode and pending keys from the library's public events, and `null` while vim is off, for a host that draws its own status bar; `EditorOptions.vimStatus: false` turns the library's own status line off. `cursorOf(state)` reads the line, the column and the selected character count off a state the host holds.
+- 0dd0e56: TYTO-256: a fourth `LanguageName`, `json` — JSON with comments, coloured with the highlight tags the brief and template languages already use: keys, string values, numbers, `true`/`false`/`null` and both kinds of comment. A stream tokenizer, with no new dependency; `json()` and `jsonLanguage` are exported beside `brief()` and `template()`.
+- 0dd0e56: TYTO-256: `withDiagnostics(state, diagnostics)` and `EditorHandle.showDiagnostics(diagnostics)` put a host's diagnostics on a document as lint markers, in any language — a `plain` buffer with no linter of its own included — replacing the ones it had; they map through later edits and stay off the undo history. They take `MarkedDiagnostic`, the five fields a marker needs, which a Tyto `Diagnostic` satisfies.
+- 9bd7527: TYTO-258: CodeMirror's own search panel, completion list, lint tooltip and diagnostic underlines are painted from the host's tokens, like the buffer. `themeTokens` grows by the roles they read — `surface-raised`, `hairline`, `border`, `focus-ring`, `hover`, `button-on`, `error`, `warning`, `info`, the type size, radius and widths among them — so a host must define those too. The underline under a diagnostic is a wavy text decoration in the severity's token instead of CodeMirror's drawn image, and a search match is outlined rather than filled.
+- 99f185d: TYTO-265: `ScrollPosition` is plain data now — `{ top }`, the document offset of the line at the top of the pane — so a host can write it down and hand it back after a restart; `restore` puts that line at the top, clamped to the text. Within one run `restore` still puts the pane back to the pixel. `selectionOf(state)` reads the main selection as `{ anchor, head }`, and `withSelection(state, selection)` puts one back, clamped to the text and off the undo history.
+- 922caa8: TYTO-273: `breadcrumbOf(state)` and `breadcrumbAt(blocks, pos, slice)` name the block the caret is in — a directive's label, or the frontmatter with the key on or above the caret's line — read off the list of `blocksOf`; nothing between blocks, after a block's last text line or on a comment. `directiveLabel` names a directive block as `::lamina 2` wherever it is listed.
+- 2d32db1: TYTO-275: a new brief from a template, built from its manifest. `@tyto/editor` exports `briefSkeleton`, which turns a manifest's required slots — and a repeated slot with a minimum of one — into a CodeMirror snippet whose fields Tab walks, `skeletonText` and `insertBriefSkeleton`; an enum value that is selected now completes to every value. The desktop's "New brief from template…" (Ctrl+K and the File menu) lists every template with its folder and description and opens the chosen one's skeleton in a new tab, and choosing a template in the picker on an empty brief writes the same skeleton. `templates:list` carries each template's slots and its folder.
+- c9c17a3: TYTO-276: a "/" at the start of a line lists templates. `@tyto/editor` exports `slashCompletion(sources)`, `completeSlash`, `openSlashMenu` and the `slashRequested` effect: a "/" in column 0 of a brief, outside the frontmatter and with nothing after the cursor, opens a list of the rows each `SlashSource` hands it; typing filters, Enter replaces the "/" and the query, Escape leaves the "/", and `//` stays a comment. The desktop lists its templates there — the skeleton into a brief holding only the "/", or a switch of `template:` in one undoable edit on a brief with content, the row saying which — and registers `editor.insertMenu`, brief-only and with no default key, to open the same list from a binding in `keybindings.json`.
+- 2495d0d: TYTO-277: snippets in the brief editor. `snippetTemplate(body)` translates a VS Code snippet body into a CodeMirror `snippet()` template — `$1`, `${1:default}`, `$0`, escapes, every literal brace escaped — and refuses what it cannot say (variables, transforms, nested fields) by name; a choice becomes its first option. `briefSnippets(get)` offers them in completion on a word that starts its line, outside the frontmatter, and `snippetsSlashSource` lists them in the "/" menu; a snippet with `forTemplate` is offered only while the brief names that template. `tabThroughCompletions()` makes Tab and Shift+Tab step through an open completion list, falling through to a snippet's fields or to indenting when none is open. The "/" menu's sections now keep the order the host gave its sources.
+- d755180: TYTO-286: the editor splits. Ctrl+\ opens the brief in front in a second group to the right, Ctrl+Shift+\ below (also on the View menu, in the command bar, and as `:vsplit` and `:split` in vim), and Ctrl+Alt+Left/Right moves between groups. Each group has its own row of tabs on top; the strip across the whole window is gone. The same brief can be open in two groups and typed into in either, with one undo history. The status bar, the problems panel, the preview and the title follow the group you are in. For now a window with several groups reopens after a restart as one group with every tab and draft. `@tyto/editor` makes several panes over one editor (`createPane`, `followerOf`, `isFollower`) and names the view in `onUpdate` and `onChange`.
+- 3b9ca57: TYTO-293: the editor draws a thin vertical guide at each indent level, as VS Code does, and the
+  guide of the block holding the cursor in a stronger colour. A blank line inside a block keeps
+  the guide; one between two blocks breaks it. The guides appear in brief tabs, the JSON tabs
+  (settings, keybindings, snippets) and both buffers of the template mode. `"indentGuides": false`
+  in `settings.json` hides them on save, with no restart. Two theme tokens are new,
+  `indent-guide` and `indent-guide-active`, set by every built-in and pack theme (42 tokens).
+- 0255852: TYTO-295: while the top of the editor is inside a block, the block's head line stays pinned
+  there — `::lamina` while scrolling its body, and in the template mode each element the top is
+  inside, stacked. The row slides away with the block's last line, a click on it goes to the
+  directive, and the caret is never left under it. `"stickyScroll": false` in `settings.json`
+  turns it off on save. A directive's fold now ends at its last line with text.
+- 49e985f: TYTO-296 (ADR 0095): "Go to Block…" (Ctrl+Shift+O, in both input modes) lists the brief's blocks in the command bar — the frontmatter as "cabeçalho"/"header", every directive as `::lamina 2` with its first words beside it — and moving through the list previews each one; Enter leaves the caret on it and Escape puts the caret and scroll back. Brief-only and on the View menu, which now greys what the tab in front cannot use. `@tyto/editor` exports `briefBlocks`, `blocksOf` and `blockAt`: the blocks read from the syntax tree, numbered only for a slot the manifest says repeats, and remembered per tree.
+- 74d7b28: TYTO-297: `formatBriefInView` applies Format Brief as one undoable change that keeps the caret on its text, and refuses a brief with a syntax error without touching it. New `tabSize` option and `setTabSize`: spaces per indent level, for what Tab inserts, the tab width, the indent guides' step and the indent Format Brief writes, changed live in every pane. The indent guides now redraw when the indent unit changes with no edit.
+- d61d96f: TYTO-298: the columns of a brief's `|` lines are told apart, read as a table template reads them: a `|` inside bold, italic or a mark does not split, columns restart on each line and at a `\` break, and emphasis keeps its own colour. New `briefColumns` option and `setBriefColumns` with four looks — `off`, `separator` (the default), `alternate` and `perColumn` — changed live in every pane, plus `columnMarks` for reading where a line splits.
+- bf3fd0e: TYTO-304: `jsonAssist(source)` gives a JSON-with-comments tab a completion list and hover help
+  from a host's plain answers — what can go at this position, and what the text under the pointer
+  is — with a pick replacing the whole string being typed and leaving what the host asks for
+  selected. The editor still knows nothing of what a file means. `EditorHandle.blank` takes a
+  third argument, one document's own extensions, which a follower in another pane carries too.
+- f244b75: TYTO-304: `KEYBINDING_CONTEXT_DESCRIPTIONS`, one sentence for each of the six keybinding
+  contexts beside `KEYBINDING_CONTEXTS`, typed over the closed list so a context added without its
+  sentence fails the typecheck. The keybindings tab suggests and explains `when` from it.
+- e39f1d7: TYTO-305: Enter in a brief keeps the indent of the line it leaves, so a block is typed with one Tab and then Enter only. On a blank line after a line with text the blank line stays and the next line keeps the block's indent; on a second blank line in a row no line is added and the cursor goes back to column 0, where the next directive starts; from an empty line at column 0, Enter adds a plain new line. Shift+Enter, Tab, an open completion list and the frontmatter are unchanged, and JSON tabs and template buffers keep CodeMirror's Enter.
+- ed73f34: TYTO-96 (ADR 0075): the window gets one visual language, Zed's One Light and One Dark, in one token file. `@tyto/editor`'s palette is now a list of `var(--tyto-…)` custom properties the host defines instead of two sets of literal colours, exported as `themeTokens`; a host that defines none gets an uncoloured editor. Its selection colour now wins over CodeMirror's base rule while the editor is focused, and `restore` brings a stored tab up to the theme the editor is in now. The desktop defines every token in `src/renderer/tokens.css`, draws in the bundled Source Sans 3, follows the system's light or dark live in the window and in every editor, and fails `pnpm check` on a literal colour, radius, size or font anywhere else in the renderer.
+
+### Patch Changes
+
+- Updated dependencies [d4a6939]
+- Updated dependencies [08b936d]
+- Updated dependencies [7342c02]
+- Updated dependencies [15997e9]
+- Updated dependencies [2495d0d]
+- Updated dependencies [3b261d1]
+- Updated dependencies [74d7b28]
+- Updated dependencies [fe85505]
+- Updated dependencies [5a0c7c5]
+  - @tyto/core@0.29.0
+  - @tyto/brief-lang@0.7.0
+  - @tyto/template-lang@0.8.1
+
 ## 0.7.1
 
 ### Patch Changes
