@@ -106,10 +106,19 @@ describe('Enter in a brief', () => {
     expect(enter('::lamina\n      ORTOPEDISTA\n\n      |')).toBe(
       '::lamina\n      ORTOPEDISTA\n\n|',
     );
-    // And a third Enter there changes nothing: it is already at column 0.
-    expect(enter('::lamina\n      ORTOPEDISTA\n\n|')).toBe('::lamina\n      ORTOPEDISTA\n\n|');
     // A line of spaces counts as blank, as the grammar reads it.
     expect(enter('::lamina\n      X\n   \t\n      |')).toBe('::lamina\n      X\n   \t\n|');
+  });
+
+  it('after the reset, adds a plain line at column 0: Enter never does nothing', () => {
+    expect(enter('::lamina\n      ORTOPEDISTA\n\n|')).toBe('::lamina\n      ORTOPEDISTA\n\n\n|');
+    // Out of the block with Enter only, then one more Enter for one more blank line.
+    expect(enter('::lamina\n      ORTOPEDISTA|', 4)).toBe('::lamina\n      ORTOPEDISTA\n\n\n|');
+  });
+
+  it('at the top level, Enter twice between two directives adds two blank lines', () => {
+    expect(enter('::titulo A|\n::lamina\n  X', 2)).toBe('::titulo A\n\n|\n::lamina\n  X');
+    expect(enter('::titulo A|\n::lamina\n  X', 3)).toBe('::titulo A\n\n\n|\n::lamina\n  X');
   });
 
   it('types a block with Enter only: text, a blank line, text, and out', () => {

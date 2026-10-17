@@ -191,12 +191,16 @@ describe('Enter in a brief', () => {
     await page.keyboard.press('Enter');
     expect(await caret()).toEqual({ line: 4 + LAMINA.length + 1, column: 0 });
     await shoot('column-0-tyto-light');
+    // There is no indent left to take away, so one more Enter is a plain new line: Enter is
+    // never a key that does nothing.
+    await page.keyboard.press('Enter');
+    expect(await caret()).toEqual({ line: 4 + LAMINA.length + 2, column: 0 });
     await typeLine('::titulo AGENDA');
 
     await page.keyboard.press('Control+s');
     await expect
       .poll(() => readFileSync(briefPath, 'utf8'), { timeout: 15_000 })
-      .toBe(`${FRONTMATTER}${LAMINA.join('\n')}\n\n::titulo AGENDA`);
+      .toBe(`${FRONTMATTER}${LAMINA.join('\n')}\n\n\n::titulo AGENDA`);
   });
 
   it.runIf(shots !== undefined)('leaves a picture in Tyto Dark', async () => {

@@ -63,7 +63,9 @@ Rafael chose it on 2026-10-16 (option "c"). In a brief, outside the frontmatter:
 with text opens a line at that line's indent; Enter on a blank line after a line with text keeps
 the blank line, emptied, and the new line takes that line's indent, so one blank line separates
 two groups and typing goes on aligned; Enter on a blank line after a blank line adds no line and
-puts the current one back at column 0, where the next directive starts. Blank is what this ADR
+puts the current one back at column 0, where the next directive starts — the second blank line
+resets the indent, and when there is none to reset (the line is already empty at column 0) Enter
+adds a plain new line, so it is never a key that does nothing. Blank is what this ADR
 says it is: empty, or spaces and tabs only. Measured before the change, in jsdom: CodeMirror's
 default Enter put every new line of a brief at column 0, because the syntax tree has no indent
 rule and answers 0. Shift+Enter, Tab and Shift+Tab are unchanged, an open completion list still

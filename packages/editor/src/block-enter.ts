@@ -14,7 +14,9 @@ import { type Command, type KeyBinding } from '@codemirror/view';
  *   spaces mean nothing) and the new line takes the previous line's indent, so one blank line
  *   separates two groups and typing goes on aligned;
  * - on a blank line whose previous line is blank too, no line is added: the current one goes
- *   back to column 0, which is where the next directive starts.
+ *   back to column 0, which is where the next directive starts;
+ * - and when that line is already empty at column 0 there is no indent to take away, so Enter
+ *   adds a plain new line. Enter is never a key that does nothing.
  *
  * Blank is empty or spaces and tabs only, as the grammar's `blankLines` reads it.
  *
@@ -60,8 +62,10 @@ export const blockEnterTransaction = (state: EditorState): Transaction | null =>
     const previous = line.number > 1 ? doc.line(line.number - 1) : null;
 
     if (range.empty && isBlank(line)) {
-      // The second blank line in a row: back to column 0, on the same line.
-      if (previous !== null && isBlank(previous)) {
+      // The second blank line in a row: back to column 0, on the same line. Only when there is
+      // an indent to take away — an empty line at column 0 gets a plain new line, so Enter is
+      // never a key that does nothing (spacing between two directives, a third blank line).
+      if (previous !== null && isBlank(previous) && line.length > 0) {
         return {
           changes: { from: line.from, to: line.to, insert: '' },
           range: EditorSelection.cursor(line.from),
