@@ -42,7 +42,9 @@
     "status-bar-vim-visual": "#bb9af7",
     "status-bar-vim-visual-text": "#1a1b26",
     "status-bar-vim-replace": "#dd5656",
-    "status-bar-vim-replace-text": "#1a1b26"
+    "status-bar-vim-replace-text": "#1a1b26",
+    "indent-guide": "#0f0f14",
+    "indent-guide-active": "#5c658b"
   },
   "adjusted": [
     {
@@ -82,6 +84,12 @@
       "role": "accent",
       "value": "#3d59a1",
       "reason": "the accent of the original, #3d59a1, as the original's badge: a badge is Tyto's derivation and both of a pair draw the same one"
+    },
+    {
+      "token": "indent-guide-active",
+      "role": "text-disabled",
+      "value": "#5c658b",
+      "reason": "text-disabled #545c7e reads 2.61:1 on surface and ΔE 27.6 from the guide (border #0f0f14); HSL lightness moved from 41.2% to 45.3%, reading 3.00:1 and ΔE 31.0"
     }
   ]
 }

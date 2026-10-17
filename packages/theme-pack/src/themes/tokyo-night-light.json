@@ -42,7 +42,9 @@
     "status-bar-vim-visual": "#65359d",
     "status-bar-vim-visual-text": "#ffffff",
     "status-bar-vim-replace": "#bd4040",
-    "status-bar-vim-replace-text": "#ffffff"
+    "status-bar-vim-replace-text": "#ffffff",
+    "indent-guide": "#c1c2c7",
+    "indent-guide-active": "#707280"
   },
   "adjusted": [],
   "derived": []

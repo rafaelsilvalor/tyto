@@ -160,6 +160,15 @@
   --tyto-active-line: rgb(221 221 224 / 35%);
   --tyto-active-line-gutter: #f0f0f1;
 
+  /*
+   * The editor's indent guides (TYTO-293, ADR 0088): one line per indent level, `border`'s
+   * colour, and the guide of the block holding the cursor in `text-disabled`'s. The guide is
+   * decorative and held to no floor; the active one reads 3:1 on the surface or better, and
+   * a theme where `text-disabled` does not moves its lightness until it does.
+   */
+  --tyto-indent-guide: #c9c9ca;
+  --tyto-indent-guide-active: #8e8f94;
+
   /* Syntax, by role. Both languages' grammars map their tags onto these eight. */
   --tyto-syntax-keyword: #a449ab;
   --tyto-syntax-function: #4f6fd8;
@@ -229,6 +238,8 @@
 
     --tyto-active-line: rgb(60 67 82 / 35%);
     --tyto-active-line-gutter: #2f343e;
+    --tyto-indent-guide: #464b57;
+    --tyto-indent-guide-active: #878a98;
 
     --tyto-syntax-keyword: #b477cf;
     --tyto-syntax-function: #73ade9;

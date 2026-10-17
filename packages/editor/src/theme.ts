@@ -45,6 +45,9 @@ interface Palette {
   readonly activeLineGutter: string;
   readonly gutterBackground: string;
   readonly gutterForeground: string;
+  /** A guide per indent level, and the one of the block holding the cursor (TYTO-293). */
+  readonly indentGuide: string;
+  readonly indentGuideActive: string;
   readonly frontmatter: string;
   readonly comment: string;
   readonly directiveName: string;
@@ -89,6 +92,8 @@ export const palette: Palette = {
   activeLineGutter: token('active-line-gutter'),
   gutterBackground: token('surface'),
   gutterForeground: token('text-disabled'),
+  indentGuide: token('indent-guide'),
+  indentGuideActive: token('indent-guide-active'),
   frontmatter: token('syntax-keyword'),
   comment: token('syntax-comment'),
   directiveName: token('syntax-function'),
@@ -336,6 +341,9 @@ const chrome = (colours: Palette, isDark: boolean): Extension =>
         color: colours.gutterForeground,
         border: 'none',
       },
+      // The guides' shape is `indent-guides.ts`'s; their colours are the host's, here.
+      '.cm-indent-guide': { borderLeftColor: colours.indentGuide },
+      '.cm-indent-guide.cm-indent-guide-active': { borderLeftColor: colours.indentGuideActive },
       '.cm-foldPlaceholder': {
         backgroundColor: 'transparent',
         border: 'none',

@@ -190,6 +190,8 @@ export class TemplateMode extends LitElement {
   declare revision: number;
 
   private editors: Partial<Record<BufferName, EditorHandle>> = {};
+  /** The `indentGuides` setting, for the editors made later and the ones already made. */
+  private indentGuides = true;
   /** The text each buffer had when it was last read from or written to the disk. */
   private savedText: Record<BufferName, string> = { manifest: '', markup: '' };
   private gate: RequestGate = createRequestGate();
@@ -520,6 +522,7 @@ export class TemplateMode extends LitElement {
         language: buffer === 'markup' ? 'template' : 'plain',
         commands: registry,
         keymap: defaultKeymapSet,
+        indentGuides: this.indentGuides,
         extensions:
           buffer === 'markup' ? [templateLint(this.analyzer()), templateCompletion()] : [],
       });
@@ -537,6 +540,15 @@ export class TemplateMode extends LitElement {
       });
       this.editors[buffer] = editor;
     }
+  }
+
+  /**
+   * Shows or hides the indent guides in both buffers (TYTO-293), as the window's editor does
+   * when the `indentGuides` setting changes. Kept for buffers the mode has not made yet.
+   */
+  showIndentGuides(enabled: boolean): void {
+    this.indentGuides = enabled;
+    for (const editor of Object.values(this.editors)) editor?.setIndentGuides(enabled);
   }
 
   override disconnectedCallback(): void {

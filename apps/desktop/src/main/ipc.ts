@@ -52,6 +52,8 @@ export interface WindowThemes extends Pick<ThemeService, 'list' | 'current' | 'p
   statusBarColors(): StatusBarColors;
   /** The `vimModeStyle` setting in force (TYTO-301), on the same answer. */
   vimModeStyle(): VimModeStyle;
+  /** The `indentGuides` setting in force (TYTO-293), on the same answer. */
+  indentGuides(): boolean;
 }
 
 /**
@@ -62,7 +64,7 @@ function appliedForWindow(
   applied: AppliedThemes,
   themes: Pick<
     WindowThemes,
-    'iconStrokeWidth' | 'statusBarItems' | 'statusBarColors' | 'vimModeStyle'
+    'iconStrokeWidth' | 'statusBarItems' | 'statusBarColors' | 'vimModeStyle' | 'indentGuides'
   >,
 ): IpcResponse<'theme:current'> {
   const { light, dark } = applied;
@@ -72,6 +74,7 @@ function appliedForWindow(
     statusBarItems: [...themes.statusBarItems()],
     statusBarColors: { ...themes.statusBarColors() },
     vimModeStyle: themes.vimModeStyle(),
+    indentGuides: themes.indentGuides(),
     light: { id: light.id, colors: light.colors },
     dark: { id: dark.id, colors: dark.colors },
     diagnostics: [...light.diagnostics, ...dark.diagnostics]

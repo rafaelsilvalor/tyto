@@ -28,6 +28,7 @@ import {
 
 import { brief } from './brief-language.js';
 import { type MarkedDiagnostic, diagnosticsSpec } from './diagnostic-markers.js';
+import { indentGuides } from './indent-guides.js';
 import { type CommandRegistry, commandRegistryFacet } from './commands.js';
 import { type SearchPhrases, searchSupport, setSearchPhrases } from './search.js';
 import { type EditorKeymap, defaultKeymapSet, keymapExtension } from './keymap.js';
@@ -125,6 +126,11 @@ export interface EditorOptions {
    * is CodeMirror's own DOM. A key left out shows CodeMirror's English rather than nothing.
    */
   readonly searchPhrases?: SearchPhrases;
+  /**
+   * Draws a guide per indent level (TYTO-293, ADR 0088). On by default; the desktop's
+   * `indentGuides` setting turns it off, live, through {@link EditorHandle.setIndentGuides}.
+   */
+  readonly indentGuides?: boolean;
 }
 
 /**
@@ -377,6 +383,11 @@ export interface EditorHandle extends EditorPane {
   setVimMode(enabled: boolean): void;
   isVimMode(): boolean;
   /**
+   * Shows or hides the indent guides in every pane and every tab, in place — a compartment, as
+   * `setVimMode` is, so nothing about the documents changes (TYTO-293).
+   */
+  setIndentGuides(enabled: boolean): void;
+  /**
    * Vim's mode and pending keys as they change, and `null` when vim is off (TYTO-248).
    * Called at once with the current answer. Returns the function that stops the listener.
    */
@@ -449,6 +460,11 @@ export function createEditor(parent: HTMLElement, options: EditorOptions = {}): 
    */
   const inputCompartment = new Compartment();
 
+  /** The indent guides or nothing, swapped by `setIndentGuides` (TYTO-293). */
+  const guidesCompartment = new Compartment();
+  /** Made once, so a tab's compartment can be compared with what the editor holds now. */
+  const guidesOn = indentGuides();
+
   /**
    * The phrases as a mutable holder rather than a value baked into the extension list.
    *
@@ -482,6 +498,8 @@ export function createEditor(parent: HTMLElement, options: EditorOptions = {}): 
    * (TYTO-96). The desktop switches it whenever the system does.
    */
   let theme: Extension = themes[options.theme ?? 'light'];
+  /** What the guides compartment holds now, which `restore` brings every tab up to. */
+  let guides: Extension = (options.indentGuides ?? true) ? guidesOn : [];
 
   /**
    * One listener for both directions, and the order inside it carries weight.
@@ -560,6 +578,7 @@ export function createEditor(parent: HTMLElement, options: EditorOptions = {}): 
     // element so the caret and the input method never arrive in the first place.
     ...(readOnly ? [CodeMirrorEditorState.readOnly.of(true), EditorView.editable.of(false)] : []),
     themeCompartment.of(theme),
+    guidesCompartment.of(guides),
     searchSupport(() => searchPhrases),
     languages[language](),
     ...baseExtensions(),
@@ -610,6 +629,9 @@ export function createEditor(parent: HTMLElement, options: EditorOptions = {}): 
         }
         if (themeCompartment.get(view.state) !== theme) {
           view.dispatch({ effects: themeCompartment.reconfigure(theme) });
+        }
+        if (guidesCompartment.get(view.state) !== guides) {
+          view.dispatch({ effects: guidesCompartment.reconfigure(guides) });
         }
         // Dispatched after, because a scroll effect is a property of the view and the view
         // has just been given a different state to measure. The phrases ride along: a state
@@ -706,6 +728,12 @@ export function createEditor(parent: HTMLElement, options: EditorOptions = {}): 
     },
 
     isVimMode: () => vimEnabled,
+
+    setIndentGuides: (enabled: boolean) => {
+      if ((guides === guidesOn) === enabled) return;
+      guides = enabled ? guidesOn : [];
+      everyView(guidesCompartment.reconfigure(guides));
+    },
 
     onVimStatus: (listener: (status: VimStatus | null) => void) => {
       vimListeners.add(listener);

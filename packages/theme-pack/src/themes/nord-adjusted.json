@@ -42,7 +42,9 @@
     "status-bar-vim-visual": "#81a1c1",
     "status-bar-vim-visual-text": "#2e3440",
     "status-bar-vim-replace": "#cf888f",
-    "status-bar-vim-replace-text": "#2e3440"
+    "status-bar-vim-replace-text": "#2e3440",
+    "indent-guide": "#4c566a",
+    "indent-guide-active": "#6f7d98"
   },
   "adjusted": [
     {
@@ -70,5 +72,12 @@
       "reason": "the status bar copies text-muted, adjusted above for the same floors"
     }
   ],
-  "derived": []
+  "derived": [
+    {
+      "token": "indent-guide-active",
+      "role": "text-disabled",
+      "value": "#6f7d98",
+      "reason": "text-disabled #4c566a reads 1.69:1 on surface and ΔE 0.0 from the guide (border #4c566a); HSL lightness moved from 35.7% to 51.6%, reading 3.01:1 and ΔE 14.9"
+    }
+  ]
 }
