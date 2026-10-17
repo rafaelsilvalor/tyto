@@ -8,8 +8,8 @@ import { treeAt } from './syntax.js';
 
 /**
  * A brief's blocks as one flat list (TYTO-296, ADR 0095): the frontmatter and every top-level
- * directive, in document order. "Go to Block" lists it; the breadcrumb (TYTO-273) will name the
- * block the cursor is in from it.
+ * directive, in document order. "Go to Block" lists it; the breadcrumb (TYTO-273, ADR 0098)
+ * names the block the cursor is in from it.
  *
  * **It reads the Lezer tree and not `parseBrief`**, because `parseBrief` hands back no AST at all
  * for a brief with one syntax error, which is every brief halfway through a keystroke. The tree

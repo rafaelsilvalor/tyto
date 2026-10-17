@@ -134,7 +134,7 @@ describe('a group with a preview in front (TYTO-287)', () => {
 });
 
 describe('the pane shape (TYTO-288, ADR 0085)', () => {
-  it('draws its strip, then a header row with an empty breadcrumb slot, then the mount', async () => {
+  it('draws its strip, then a header row holding the breadcrumb alone, then the mount', async () => {
     const made = new Map<string, EditorGroupElement>();
     const [group] = arrangeGroups(container(), groupsOf(['a'], 'a'), made).created;
     if (group === undefined) throw new Error('no group');
@@ -143,12 +143,29 @@ describe('the pane shape (TYTO-288, ADR 0085)', () => {
     const order = [...group.children].map((child) => child.className);
     expect(order).toEqual(['pane__strip', 'pane__header', 'editor']);
     expect(group.querySelector('.pane__strip tyto-tabs')).not.toBeNull();
-    // The header row holds the breadcrumb slot and nothing else, empty until TYTO-273.
+    // The header row holds the breadcrumb and nothing else, empty until main.ts writes it.
     const header = group.querySelector(':scope > .pane__header');
     expect([...(header?.children ?? [])].map((child) => child.className)).toEqual([
       'pane__breadcrumb',
     ]);
-    expect(header?.querySelector('[data-breadcrumb]')?.childNodes).toHaveLength(0);
+    expect(header?.querySelector('[data-breadcrumb]')?.textContent).toBe('');
+  });
+
+  it('writes the breadcrumb it is handed as plain text, and empties it again (TYTO-273)', async () => {
+    const made = new Map<string, EditorGroupElement>();
+    const [group] = arrangeGroups(container(), groupsOf(['a'], 'a'), made).created;
+    if (group === undefined) throw new Error('no group');
+    const slot = (): HTMLElement | null => group.querySelector('[data-breadcrumb]');
+
+    group.breadcrumb = 'cabeçalho › template';
+    await group.updateComplete;
+    expect(slot()?.textContent).toBe('cabeçalho › template');
+    // Plain text: no part is a link or a button (a sibling picker is a card of its own).
+    expect(slot()?.children).toHaveLength(0);
+
+    group.breadcrumb = '';
+    await group.updateComplete;
+    expect(slot()?.textContent).toBe('');
   });
 
   it('hides its header row while a preview is in front, so the preview bar is the only one', async () => {

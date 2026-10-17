@@ -497,6 +497,12 @@ export interface Catalogue {
   readonly 'goToBlock.placeholder': string;
   readonly 'goToBlock.header': string;
   /**
+   * TYTO-273. The frontmatter's name in an editor group's breadcrumb, before the key the caret
+   * is on: `cabeçalho › template`. Written by `main.ts` into the header row, not by the
+   * `data-i18n` pass, and only while the caret is in a frontmatter.
+   */
+  readonly 'breadcrumb.frontmatter': string;
+  /**
    * TYTO-297. "Format Brief" in the bar, and the line the status bar shows for a few seconds
    * when a brief with a syntax error refuses it. Both set by script, so neither is on screen
    * at load.
@@ -769,6 +775,7 @@ export const CATALOGUE_KEYS = [
   'command.editor.goToBlock',
   'goToBlock.placeholder',
   'goToBlock.header',
+  'breadcrumb.frontmatter',
   'command.editor.formatBrief',
   'formatBrief.refused',
   'slash.section.templates',
