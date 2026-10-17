@@ -611,7 +611,10 @@ textarea {
   display: none;
 }
 
-/* Where TYTO-273's breadcrumb goes: it takes the room the actions leave, and gives it up first. */
+/*
+ * TYTO-273's breadcrumb (ADR 0098), plain text in the row's muted colour: it takes the room the
+ * actions leave, and gives it up first.
+ */
 .pane__breadcrumb {
   flex: 1 1 auto;
   min-width: 0;

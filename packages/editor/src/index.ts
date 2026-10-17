@@ -73,6 +73,8 @@ export {
   previewBlock,
 } from './brief-blocks.js';
 
+export { type Breadcrumb, breadcrumbAt, breadcrumbOf, directiveLabel } from './breadcrumb.js';
+
 export {
   DEFAULT_TAB_SIZE,
   MAX_TAB_SIZE,

@@ -664,6 +664,10 @@ describe('switching the language', () => {
     'command.editor.goToBlock',
     'goToBlock.placeholder',
     'goToBlock.header',
+    // TYTO-273: the frontmatter's word in a group's breadcrumb, which `main.ts` writes into the
+    // header row itself — not the `data-i18n` pass — and only with the caret in a frontmatter.
+    // `e2e/breadcrumb.desktop.test.ts` reads it in both languages.
+    'breadcrumb.frontmatter',
     // TYTO-297: "Format Brief" in the bar, and the refusal the status bar shows for a few
     // seconds. `e2e/format-brief.desktop.test.ts` runs it.
     'command.editor.formatBrief',

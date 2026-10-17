@@ -249,6 +249,7 @@ export const en: Catalogue = {
   'command.editor.goToBlock': 'Go to Block…',
   'goToBlock.placeholder': 'Go to a block of the brief',
   'goToBlock.header': 'header',
+  'breadcrumb.frontmatter': 'header',
   'command.editor.formatBrief': 'Format Brief',
   'formatBrief.refused':
     'Format Brief: not formatted, the brief has a syntax error. Fix it (see the problems) and try again.',

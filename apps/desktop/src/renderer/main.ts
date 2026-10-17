@@ -14,6 +14,8 @@ import {
   DEFAULT_TAB_SIZE,
   blockAt,
   blocksOf,
+  breadcrumbOf,
+  directiveLabel,
   formatBriefInView,
   previewBlock,
   briefCompletion,
@@ -658,6 +660,7 @@ function paintTabs(): void {
     element.openPreview = () => {
       runCommand(PREVIEW_OPEN_TO_SIDE);
     };
+    paintBreadcrumb(group.id);
     element.tabs = group.tabs.flatMap((tab) => {
       if (isPreview(tab)) return [previewEntry(tab)];
       const document_ = documentOf(workspace, tab.documentId);
@@ -2335,8 +2338,42 @@ function pickBlock(): void {
 /** `::lamina 2`, `::ai/caption`, or the frontmatter's word in the window's language. */
 function blockLabel(block: BriefBlock): string {
   if (block.kind === 'frontmatter') return translate(state.locale, 'goToBlock.header');
-  const ordinal = block.ordinal === undefined ? '' : ` ${String(block.ordinal)}`;
-  return `::${block.name ?? ''}${ordinal}`;
+  return directiveLabel(block);
+}
+
+/** Between the parts of a breadcrumb, as VS Code's: `cabeçalho › template`. */
+const BREADCRUMB_SEPARATOR = ' › ';
+
+/**
+ * What a group's header row says (TYTO-273, ADR 0098): the block the caret of **that group's
+ * pane** is in — each group its own, a follower's caret too, as VS Code does. Empty for a
+ * preview in front, for the app's own files (a JSON tab is no brief) and with the caret outside
+ * every block. Template mode has its own editors and no groups, so it never asks.
+ */
+function breadcrumbText(groupId: string): string {
+  const group = groupById(groups, groupId);
+  const front = group === undefined ? undefined : activeTabOf(group);
+  if (front === undefined || isPreview(front)) return '';
+  if (documentOf(workspace, front.documentId)?.kind !== undefined) return '';
+  const pane_ = panes.get(groupId);
+  // A pane that has not taken the tab in front yet still holds the last one's state.
+  if (pane_ === undefined || shownIn.get(groupId) !== front.documentId) return '';
+  const crumb = breadcrumbOf(pane_.state());
+  if (crumb === undefined) return '';
+  if (crumb.kind === 'directive') return crumb.label;
+  const word = translate(state.locale, 'breadcrumb.frontmatter');
+  return crumb.key === undefined ? word : `${word}${BREADCRUMB_SEPARATOR}${crumb.key}`;
+}
+
+/**
+ * Writes a group's breadcrumb, only when its text changed: this runs on every transaction of
+ * every pane, and a caret move inside one block changes nothing on screen.
+ */
+function paintBreadcrumb(groupId: string): void {
+  const element = groupElements.get(groupId);
+  if (element === undefined) return;
+  const text = breadcrumbText(groupId);
+  if (element.breadcrumb !== text) element.breadcrumb = text;
 }
 
 /**
@@ -4307,8 +4344,12 @@ async function load(): Promise<void> {
       // (TYTO-286). With groups a transaction can come from a pane nobody is looking at: a
       // lint answer, a copy from the pane beside it. A follower's state is not the record:
       // its change was copied into the primary, whose own update lands here.
-      const documentId = documentShownBy(view);
-      if (documentId === undefined) return;
+      const shown = paneOfView(view);
+      const documentId = shown === undefined ? undefined : shownIn.get(shown[0]);
+      if (shown === undefined || documentId === undefined) return;
+      // The header row of the group the transaction happened in, with the status bar: each
+      // group shows its own caret (TYTO-273).
+      paintBreadcrumb(shown[0]);
       if (isFollower(next)) {
         // Its caret moved, which the status bar shows; its text reaches the record by the copy.
         paintStatusBar();

@@ -18,7 +18,7 @@ import { type TabEntry, TABS_TAG } from './tabs.js';
  * strip is every pane's height, a docked panel's too, and holds the tabs and, at its right end,
  * the group's actions, as VS Code's editor actions sit (Rafael's reference of 2026-10-14). The
  * header row is discreet, the editor's own background and no line, and holds the breadcrumb
- * slot TYTO-273 fills; with a preview in front it is hidden, because the preview's own bar is
+ * (TYTO-273): the block the caret of this group's pane is in; with a preview in front it is hidden, because the preview's own bar is
  * that row. It holds no state: which tabs it has and which is in front are `editor-groups.ts`'s,
  * handed down by `main.ts`, and a click reports back.
  *
@@ -42,6 +42,7 @@ export class EditorGroupElement extends LitElement {
     showing: { attribute: false },
     offerPreview: { attribute: false },
     openPreview: { attribute: false },
+    breadcrumb: { attribute: false },
   };
 
   declare groupId: string;
@@ -56,6 +57,11 @@ export class EditorGroupElement extends LitElement {
   /** Whether the strip offers "Open preview to the side": a brief is in front. */
   declare offerPreview: boolean;
   declare openPreview: () => void;
+  /**
+   * Where the caret of this group's pane is in its brief (TYTO-273, ADR 0098): `::lamina 2`,
+   * `cabeçalho › template`, or empty. Text the window writes, worded already; plain, not a link.
+   */
+  declare breadcrumb: string;
 
   constructor() {
     super();
@@ -69,6 +75,7 @@ export class EditorGroupElement extends LitElement {
     this.showing = 'editor';
     this.offerPreview = false;
     this.openPreview = () => undefined;
+    this.breadcrumb = '';
   }
 
   private ownMount: HTMLElement | undefined;
@@ -124,7 +131,7 @@ export class EditorGroupElement extends LitElement {
     if (pane !== undefined) pane.hidden = this.showing !== 'preview';
     const open = translate(this.locale, 'command.preview.openToSide');
     // The pane shape (ADR 0085): the strip — the tabs, then the group's actions at its right
-    // end — and the header row, which holds the breadcrumb slot alone. With a preview in front
+    // end — and the header row, which holds the breadcrumb alone. With a preview in front
     // the row is hidden and the preview's bar, a header row of its own, takes its place.
     return html`<div class="pane__strip">
         <tyto-tabs
@@ -155,7 +162,7 @@ export class EditorGroupElement extends LitElement {
         </div>
       </div>
       <div class="pane__header" ?hidden=${this.showing === 'preview'}>
-        <div class="pane__breadcrumb" data-breadcrumb></div>
+        <div class="pane__breadcrumb" data-breadcrumb>${this.breadcrumb}</div>
       </div>`;
   }
 }

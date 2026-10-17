@@ -45,6 +45,8 @@ nowrap`) and `overflow: hidden`, so nothing in a line can make it taller.
    muted text (`--tyto-text-xs`, `--tyto-text-muted`). It holds the breadcrumb slot
    `[data-breadcrumb]` and nothing else; it is empty until TYTO-273 fills it, and when it has
    content the slot gives way first, cut with an ellipsis.
+   > **Filled by ADR 0098 (TYTO-273).** The slot names the block the caret of that group's pane is
+   > in — `::lamina 2`, `cabeçalho › template` — and not the file, in the row's muted text.
 3. **The group's actions are at the right end of its strip,** as VS Code's editor actions are:
    "Open preview to the side" is an icon button there, the size of a tab's close button, with a
    tooltip and an `aria-label` (changing ADR 0084 decision 7's "at the end of a group's strip"

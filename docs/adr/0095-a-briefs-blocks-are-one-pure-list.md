@@ -54,7 +54,8 @@ labels alone (`CommandBarPick.matchIds: false`), because its ids are offsets.
 
 ## Consequences
 
-- TYTO-273's breadcrumb reads `blocksOf` and `blockAt` with no new parsing. TYTO-295's sticky
+- TYTO-273's breadcrumb reads `blocksOf` and `blockAt` with no new parsing (ADR 0098), and
+  names a directive with the same `directiveLabel` "Go to Block" does. TYTO-295's sticky
   scroll still reads the fold ranges; moving it onto this list is possible and not done here.
 - Nested blocks, should a brief ever have them, need this function to read below the top level.
 - An `@` prefix in the bar (VS Code's `@` in Quick Open) is not built.
