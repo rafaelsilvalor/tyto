@@ -55,3 +55,17 @@ indented block. They exist only to help a person read.
   text, and a top-level `BlankLine` may cover several lines. Nothing in `parseBrief` or the
   exporters reads those positions; the editor's fold range does, and is left as it is in this
   change (TYTO-294's Left open).
+
+## Note, 2026-10-16 — Enter in the editor (TYTO-305)
+
+The typing side of this decision, in `@tyto/editor` only; nothing the language decides changes.
+Rafael chose it on 2026-10-16 (option "c"). In a brief, outside the frontmatter: Enter on a line
+with text opens a line at that line's indent; Enter on a blank line after a line with text keeps
+the blank line, emptied, and the new line takes that line's indent, so one blank line separates
+two groups and typing goes on aligned; Enter on a blank line after a blank line adds no line and
+puts the current one back at column 0, where the next directive starts. Blank is what this ADR
+says it is: empty, or spaces and tabs only. Measured before the change, in jsdom: CodeMirror's
+default Enter put every new line of a brief at column 0, because the syntax tree has no indent
+rule and answers 0. Shift+Enter, Tab and Shift+Tab are unchanged, an open completion list still
+takes Enter, and JSON tabs and template buffers keep CodeMirror's Enter: a template is markup
+and CSS, whose nesting the second-blank-line rule does not describe.

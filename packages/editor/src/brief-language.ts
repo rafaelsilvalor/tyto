@@ -1,6 +1,9 @@
 import { LRLanguage, LanguageSupport, foldNodeProp } from '@codemirror/language';
 import { briefHighlighting, parser } from '@tyto/brief-lang';
+import { keymap } from '@codemirror/view';
 import { type SyntaxNode } from '@lezer/common';
+
+import { blockEnterKeymap } from './block-enter.js';
 
 /**
  * The brief language as CodeMirror sees it.
@@ -49,8 +52,12 @@ export const briefLanguage = LRLanguage.define({
 /**
  * What a host adds to an `EditorState` to get the brief language.
  *
- * It carries no companion extensions yet. Completion and the lint source (E8.2) attach
- * here when they land, which is why this is a `LanguageSupport` rather than the bare
- * language: the host's import does not change when they do.
+ * Its one companion is Enter as an indented block wants it (TYTO-305): a key that belongs to
+ * the language, not to an input mode, so it travels with the language and a JSON tab keeps
+ * CodeMirror's own Enter. It is not an entry of the keybinding table (ADR 0074) for the same
+ * reason — the table is per input mode and per window, and this is per language. Ahead of
+ * `baseExtensions` in the editor's list, so it is reached before `defaultKeymap`'s Enter; an
+ * open completion list still takes Enter first, from its higher precedence.
  */
-export const brief = (): LanguageSupport => new LanguageSupport(briefLanguage);
+export const brief = (): LanguageSupport =>
+  new LanguageSupport(briefLanguage, [keymap.of(blockEnterKeymap)]);
