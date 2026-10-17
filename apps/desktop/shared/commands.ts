@@ -99,6 +99,8 @@ export const VIEW_MENU_COMMANDS: readonly MenuCommand[] = [
   { id: 'preview.openToSide', label: 'command.preview.openToSide' },
   { id: 'preview.open', label: 'command.preview.open' },
   { id: 'preview.toggleLock', label: 'command.preview.toggleLock' },
+  // TYTO-296. Moving inside the brief in front; greyed with an app file or a preview in front.
+  { id: 'editor.goToBlock', label: 'command.editor.goToBlock' },
 ];
 
 /** Every command the File menu offers, flat, for the tests that count them. */

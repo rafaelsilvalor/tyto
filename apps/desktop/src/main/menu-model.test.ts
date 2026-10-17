@@ -106,8 +106,8 @@ describe("the menu row's model", () => {
     const model = projectMenu(installed('linux'), 'linux');
     const view = model.find((menu) => menu.id === 'viewmenu');
     // The group commands first (TYTO-286, TYTO-288) and the preview's three (TYTO-287), then
-    // Reload as the window's command and by its id (TYTO-113, ADR 0080).
-    expect(view?.items.slice(0, 11).map((item) => item.id)).toEqual([
+    // Go to Block (TYTO-296), then Reload as the window's command and by its id (TYTO-113, ADR 0080).
+    expect(view?.items.slice(0, 12).map((item) => item.id)).toEqual([
       'editor.splitRight',
       'editor.splitDown',
       'editor.focusNextGroup',
@@ -119,9 +119,10 @@ describe("the menu row's model", () => {
       'preview.openToSide',
       'preview.open',
       'preview.toggleLock',
+      'editor.goToBlock',
     ]);
-    expect(view?.items[12]).toMatchObject({ id: 'window.reload', label: 'command.window.reload' });
-    expect(view?.items.slice(13).map((item) => item.role ?? item.type)).toEqual([
+    expect(view?.items[13]).toMatchObject({ id: 'window.reload', label: 'command.window.reload' });
+    expect(view?.items.slice(14).map((item) => item.role ?? item.type)).toEqual([
       'toggledevtools',
       'separator',
       'resetzoom',
@@ -130,8 +131,8 @@ describe("the menu row's model", () => {
       'separator',
       'togglefullscreen',
     ]);
-    const separator = view?.items[14];
-    expect(separator).toEqual({ id: 'item-14', label: '', type: 'separator', enabled: true });
+    const separator = view?.items[15];
+    expect(separator).toEqual({ id: 'item-15', label: '', type: 'separator', enabled: true });
 
     const help = model.find((menu) => menu.id === 'help');
     expect(help?.items.map((item) => item.id)).toEqual(['item-0', 'about']);
@@ -144,10 +145,10 @@ describe("the menu row's model", () => {
   it("shows a role's default key as a label for the platform, and none where there is none", () => {
     const model = projectMenu(installed('win32'), 'win32');
     const view = model.find((menu) => menu.id === 'viewmenu');
-    expect(view?.items[13]).toMatchObject({ role: 'toggledevtools', accelerator: 'Ctrl+Shift+I' });
-    expect(view?.items[12]).not.toHaveProperty('accelerator');
+    expect(view?.items[14]).toMatchObject({ role: 'toggledevtools', accelerator: 'Ctrl+Shift+I' });
+    expect(view?.items[13]).not.toHaveProperty('accelerator');
     expect(view?.items[0]).not.toHaveProperty('accelerator');
-    expect(view?.items[15]).not.toHaveProperty('accelerator');
+    expect(view?.items[16]).not.toHaveProperty('accelerator');
 
     const mac = projectMenu(installed('darwin'), 'darwin');
     const edit = mac.find((menu) => menu.id === 'editmenu');

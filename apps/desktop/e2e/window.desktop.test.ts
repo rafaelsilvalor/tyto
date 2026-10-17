@@ -659,6 +659,11 @@ describe('switching the language', () => {
     // TYTO-276: the "/" menu's command, section heading and the line beside each template, all
     // inside CodeMirror's list or the bar. `e2e/slash-menu.desktop.test.ts` opens it.
     'command.editor.insertMenu',
+    // TYTO-296: "Go to Block…", its placeholder and the frontmatter's row, all inside the bar.
+    // `e2e/go-to-block.desktop.test.ts` opens it.
+    'command.editor.goToBlock',
+    'goToBlock.placeholder',
+    'goToBlock.header',
     'slash.section.templates',
     'slash.template.new',
     'slash.template.set',

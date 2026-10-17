@@ -5,6 +5,7 @@ import { EDITOR_SAVE } from '@tyto/editor';
 
 import {
   BRIEF_ONLY_COMMANDS,
+  EDITOR_GO_TO_BLOCK,
   FILE_EXPORT,
   PREVIEW_OPEN_TO_SIDE,
   SETTINGS_OPEN,
@@ -99,6 +100,13 @@ describe('commandOffered (TYTO-283)', () => {
     expect(commandOffered('preview', EDITOR_SAVE)).toBe(true);
     expect(commandOffered('preview', PREVIEW_OPEN_TO_SIDE)).toBe(true);
     expect(commandOffered('settings', PREVIEW_OPEN_TO_SIDE)).toBe(false);
+  });
+
+  it('offers Go to Block only with a brief’s text in front (TYTO-296)', () => {
+    expect(commandOffered(undefined, EDITOR_GO_TO_BLOCK)).toBe(true);
+    for (const kind of ['settings', 'keybindings', 'snippets', 'preview'] as const) {
+      expect(commandOffered(kind, EDITOR_GO_TO_BLOCK), kind).toBe(false);
+    }
   });
 });
 

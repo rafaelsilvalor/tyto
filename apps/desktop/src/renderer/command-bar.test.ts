@@ -301,4 +301,25 @@ describe('the bar as a picker (TYTO-208)', () => {
     await bar.updateComplete;
     expect(labels(bar)).toEqual(ENTRIES.map((entry) => entry.label));
   });
+  it('matches the labels alone when the picker says its ids are not words (TYTO-296)', async () => {
+    const BLOCKS: readonly CommandEntry[] = [
+      { id: '1234', label: '::lamina 1' },
+      { id: '1300', label: '::lamina 2' },
+    ];
+    expect(filterCommands(BLOCKS, '2').map((entry) => entry.id)).toEqual(['1234', '1300']);
+    expect(filterCommands(BLOCKS, '2', false).map((entry) => entry.id)).toEqual(['1300']);
+
+    const { bar } = mount();
+    bar.pick({
+      entries: BLOCKS,
+      placeholder: 'Ir para bloco',
+      matchIds: false,
+      highlight: () => undefined,
+      choose: () => undefined,
+      cancel: () => undefined,
+    });
+    await bar.updateComplete;
+    await type(bar, '2');
+    expect(labels(bar)).toEqual(['::lamina 2']);
+  });
 });
