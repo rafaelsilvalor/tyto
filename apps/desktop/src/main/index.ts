@@ -43,6 +43,7 @@ import {
 import { statusBarItemsExample } from '../../shared/status-bar-items.js';
 import { DEFAULT_THEME_SETTING, type ThemeSetting, modeOf } from '../../shared/theme-setting.js';
 import { vimModeStyleExample } from '../../shared/vim-mode-style.js';
+import { briefColumnsExample } from '../../shared/brief-columns.js';
 import { fileCredentialStore } from './credential-store.js';
 import { createCredentials } from './credentials.js';
 import { createDocumentService } from './documents.js';
@@ -121,13 +122,14 @@ const SETTINGS_SETTLE_MS = 100;
  * carries `statusBarItems` commented out with every id, and `statusBarColors` with every key
  * and an example colour, and `vimModeStyle` with its three values (TYTO-301), so the bar's
  * options are in the file the person is looking at; and `indentGuides` (TYTO-293),
- * `stickyScroll` (TYTO-295), `formatBriefOnSave` and `tabSize` (TYTO-297).
+ * `stickyScroll` (TYTO-295), `formatBriefOnSave` and `tabSize` (TYTO-297), and `briefColumns`
+ * with its four looks (TYTO-298).
  */
 const NEW_SETTINGS_FILE =
   '// Tyto settings: JSON with comments. Saving this file applies it, with no restart.\n{\n' +
   `${statusBarItemsExample()}\n${statusBarColorsExample()}\n${vimModeStyleExample()}\n` +
   `${indentGuidesExample()}\n${stickyScrollExample()}\n` +
-  `${formatBriefOnSaveExample()}\n${tabSizeExample()}\n}\n`;
+  `${formatBriefOnSaveExample()}\n${tabSizeExample()}\n${briefColumnsExample()}\n}\n`;
 
 /** `keybindings.json` as "Open Keyboard Shortcuts (JSON)" creates it (TYTO-207, ADR 0074). */
 const NEW_KEYBINDINGS_FILE =
@@ -545,6 +547,8 @@ async function start(): Promise<void> {
   // And the indent width and format-on-save (TYTO-297), on the same answer.
   let tabSize = saved.tabSize;
   let formatBriefOnSave = saved.formatBriefOnSave;
+  // And how the columns of a `|` line are drawn (TYTO-298), on the same answer.
+  let briefColumns = saved.briefColumns;
   // The themes a vim badge colour is measured in: the one the mode shows, or both when the
   // system chooses, since either may be in front.
   const themesInForce = (): readonly ThemeInForce[] => {
@@ -789,6 +793,7 @@ async function start(): Promise<void> {
       if (keys.includes('stickyScroll')) stickyScroll = next.stickyScroll;
       if (keys.includes('tabSize')) tabSize = next.tabSize;
       if (keys.includes('formatBriefOnSave')) formatBriefOnSave = next.formatBriefOnSave;
+      if (keys.includes('briefColumns')) briefColumns = next.briefColumns;
     },
     configure: (config) => {
       host.configure(config);
@@ -1178,6 +1183,7 @@ async function start(): Promise<void> {
       stickyScroll: () => stickyScroll,
       tabSize: () => tabSize,
       formatBriefOnSave: () => formatBriefOnSave,
+      briefColumns: () => briefColumns,
     },
     // After `ready`, as the panels are, so the window's first answer is the whole list.
     keymaps: async () => {

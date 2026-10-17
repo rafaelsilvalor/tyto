@@ -499,6 +499,7 @@ const windowThemes = (): WindowThemes => {
     stickyScroll: () => false,
     tabSize: () => 4,
     formatBriefOnSave: () => true,
+    briefColumns: () => 'perColumn',
   };
 };
 
@@ -1310,6 +1311,8 @@ describe('the theme channels (TYTO-208)', () => {
     // And the indent width and format-on-save (TYTO-297).
     expect(answer.tabSize).toBe(4);
     expect(answer.formatBriefOnSave).toBe(true);
+    // And how a brief's `|` columns are drawn (TYTO-298).
+    expect(answer.briefColumns).toBe('perColumn');
   });
 
   it('lists every theme with its label and kind, and nothing else', async () => {

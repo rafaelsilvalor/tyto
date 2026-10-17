@@ -33,6 +33,7 @@ describe("the app's settings outline", () => {
       'stickyScroll',
       'formatBriefOnSave',
       'tabSize',
+      'briefColumns',
     ]);
   });
 
@@ -44,6 +45,19 @@ describe("the app's settings outline", () => {
     const tabSize = setting('tabSize');
     expect(tabSize?.options.map((option) => option.value)).toEqual([2, 4]);
     expect(tabSize?.default).toBe('2');
+  });
+
+  it('offers the four briefColumns looks, each saying what it does (TYTO-298)', () => {
+    const columns = setting('briefColumns');
+    expect(columns?.options.map((option) => option.value)).toEqual([
+      'off',
+      'separator',
+      'alternate',
+      'perColumn',
+    ]);
+    expect(columns?.options[2]?.description).toMatch(/barely differs/u);
+    expect(columns?.options[3]?.description).toMatch(/below comfortable reading contrast/u);
+    expect(columns?.default).toBe('"separator"');
   });
 
   it('offers stickyScroll on and off, each with what it does (TYTO-295)', () => {

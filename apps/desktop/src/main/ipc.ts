@@ -22,6 +22,7 @@ import {
 import { type StatusBarColors } from '../../shared/status-bar-colors.js';
 import { type StatusBarItemId } from '../../shared/status-bar-items.js';
 import { type VimModeStyle } from '../../shared/vim-mode-style.js';
+import { type BriefColumnLook } from '../../shared/brief-columns.js';
 import { type Credentials } from './credentials.js';
 import { credentialAccount } from './installed-plugins.js';
 import { declaredCredentialKeys } from './plugin-list.js';
@@ -60,6 +61,8 @@ export interface WindowThemes extends Pick<ThemeService, 'list' | 'current' | 'p
   tabSize(): number;
   /** The `formatBriefOnSave` setting in force (TYTO-297), on the same answer. */
   formatBriefOnSave(): boolean;
+  /** The `briefColumns` setting in force (TYTO-298), on the same answer. */
+  briefColumns(): BriefColumnLook;
 }
 
 /**
@@ -78,6 +81,7 @@ function appliedForWindow(
     | 'stickyScroll'
     | 'tabSize'
     | 'formatBriefOnSave'
+    | 'briefColumns'
   >,
 ): IpcResponse<'theme:current'> {
   const { light, dark } = applied;
@@ -91,6 +95,7 @@ function appliedForWindow(
     stickyScroll: themes.stickyScroll(),
     tabSize: themes.tabSize(),
     formatBriefOnSave: themes.formatBriefOnSave(),
+    briefColumns: themes.briefColumns(),
     light: { id: light.id, colors: light.colors },
     dark: { id: dark.id, colors: dark.colors },
     diagnostics: [...light.diagnostics, ...dark.diagnostics]

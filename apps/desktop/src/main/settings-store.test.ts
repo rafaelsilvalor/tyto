@@ -111,6 +111,7 @@ describe('fileSettingsStore', () => {
       stickyScroll: DEFAULT_SETTINGS.stickyScroll,
       formatBriefOnSave: DEFAULT_SETTINGS.formatBriefOnSave,
       tabSize: DEFAULT_SETTINGS.tabSize,
+      briefColumns: DEFAULT_SETTINGS.briefColumns,
     });
   });
 
@@ -137,6 +138,7 @@ describe('fileSettingsStore', () => {
       stickyScroll: DEFAULT_SETTINGS.stickyScroll,
       formatBriefOnSave: DEFAULT_SETTINGS.formatBriefOnSave,
       tabSize: DEFAULT_SETTINGS.tabSize,
+      briefColumns: DEFAULT_SETTINGS.briefColumns,
     });
   });
 
@@ -163,6 +165,7 @@ describe('fileSettingsStore', () => {
       stickyScroll: DEFAULT_SETTINGS.stickyScroll,
       formatBriefOnSave: DEFAULT_SETTINGS.formatBriefOnSave,
       tabSize: DEFAULT_SETTINGS.tabSize,
+      briefColumns: DEFAULT_SETTINGS.briefColumns,
     });
   });
 
@@ -188,6 +191,7 @@ describe('fileSettingsStore', () => {
       stickyScroll: DEFAULT_SETTINGS.stickyScroll,
       formatBriefOnSave: DEFAULT_SETTINGS.formatBriefOnSave,
       tabSize: DEFAULT_SETTINGS.tabSize,
+      briefColumns: DEFAULT_SETTINGS.briefColumns,
     });
   });
 

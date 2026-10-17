@@ -44,6 +44,16 @@ export {
 } from './indent-guides.js';
 
 export {
+  BRIEF_COLUMN_STYLES,
+  type BriefColumnStyle,
+  type Column,
+  type ColumnMarks,
+  DEFAULT_BRIEF_COLUMNS,
+  briefColumns,
+  columnMarks,
+} from './columns.js';
+
+export {
   STICKY_MAX_ROWS,
   type StickyBlock,
   type StickyMeasure,

@@ -1,6 +1,7 @@
 import type { ConfigurationContribution } from '@tyto/plugin-api';
 import { z } from 'zod';
 
+import { type BriefColumnLook, briefColumnsContribution } from './brief-columns.js';
 import { type StatusBarColors, statusBarColorsContribution } from './status-bar-colors.js';
 import { type StatusBarItemId, statusBarItemsContribution } from './status-bar-items.js';
 import {
@@ -20,7 +21,7 @@ import { type VimModeStyle, vimModeStyleContribution } from './vim-mode-style.js
  * reads off a disk and the window is told what the answer was, so the shape has to be one
  * declaration both halves import. Linted pure — no Node, no DOM.
  *
- * **Thirteen settings the built-in `desktop` plugin declares** through the `configuration`
+ * **Fourteen settings the built-in `desktop` plugin declares** through the `configuration`
  * extension point (TYTO-206, ADR 0073), like any plugin's: built-in is a plugin. Their keys
  * stay unprefixed, exactly as every `settings.json` written before that card spells them.
  * Each one is validated alone, so a hand-broken value costs that key and nothing else.
@@ -226,7 +227,7 @@ export function tabSizeExample(): string {
 }
 
 /**
- * The thirteen, in the order the settings file is documented in. `theme` checks its ids against
+ * The fourteen, in the order the settings file is documented in. `theme` checks its ids against
  * `lookup`, which main builds from every theme the plugins registered (TYTO-208); the default
  * knows the built-in two and lets any other id through.
  */
@@ -247,6 +248,7 @@ export function settingContributions(
     stickyScrollContribution,
     formatBriefOnSaveContribution,
     tabSizeContribution,
+    briefColumnsContribution,
   ] as readonly ConfigurationContribution[];
 }
 
@@ -271,6 +273,8 @@ export interface Settings {
   readonly formatBriefOnSave: boolean;
   /** Spaces per indent level in the editor (TYTO-297). */
   readonly tabSize: number;
+  /** How the editor tells the columns of a `|` line apart (TYTO-298). */
+  readonly briefColumns: BriefColumnLook;
 }
 
 export const DEFAULT_SETTINGS: Settings = {
@@ -287,13 +291,14 @@ export const DEFAULT_SETTINGS: Settings = {
   stickyScroll: stickyScrollContribution.default,
   formatBriefOnSave: formatBriefOnSaveContribution.default,
   tabSize: tabSizeContribution.default,
+  briefColumns: briefColumnsContribution.default,
 };
 
 /** What a queue folder produces until a person chooses otherwise (ADR 0044). */
 export const DEFAULT_QUEUE_KINDS: readonly string[] = ['png'];
 
 /**
- * The thirteen out of the resolved values, which already hold every declared key with a value
+ * The fourteen out of the resolved values, which already hold every declared key with a value
  * its schema accepted or its default (`resolveSettings`).
  */
 export function settingsFrom(values: Readonly<Record<string, unknown>>): Settings {
@@ -313,5 +318,6 @@ export function settingsFrom(values: Readonly<Record<string, unknown>>): Setting
     stickyScroll: pick('stickyScroll'),
     formatBriefOnSave: pick('formatBriefOnSave'),
     tabSize: pick('tabSize'),
+    briefColumns: pick('briefColumns'),
   };
 }

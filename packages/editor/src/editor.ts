@@ -31,6 +31,7 @@ import { type MarkedDiagnostic, diagnosticsSpec } from './diagnostic-markers.js'
 import { DEFAULT_TAB_SIZE, indentExtension } from './format-brief.js';
 import { indentGuides } from './indent-guides.js';
 import { stickyScroll } from './sticky-scroll.js';
+import { type BriefColumnStyle, DEFAULT_BRIEF_COLUMNS, briefColumns } from './columns.js';
 import { type CommandRegistry, commandRegistryFacet } from './commands.js';
 import { type SearchPhrases, searchSupport, setSearchPhrases } from './search.js';
 import { type EditorKeymap, defaultKeymapSet, keymapExtension } from './keymap.js';
@@ -145,6 +146,13 @@ export interface EditorOptions {
    * setting changes it, live, through {@link EditorHandle.setTabSize}.
    */
   readonly tabSize?: number;
+  /**
+   * How the columns of a `|` line are told apart in a brief (TYTO-298, ADR 0097): `off`, the
+   * `|` alone (`separator`, the default), even columns muted too (`alternate`), or a colour
+   * per column (`perColumn`). The desktop's `briefColumns` setting changes it, live, through
+   * {@link EditorHandle.setBriefColumns}.
+   */
+  readonly briefColumns?: BriefColumnStyle;
 }
 
 /**
@@ -412,6 +420,11 @@ export interface EditorHandle extends EditorPane {
    */
   setTabSize(size: number): void;
   /**
+   * Changes how the columns of a `|` line are drawn in every pane and every tab, in place — a
+   * compartment, so nothing about the documents changes (TYTO-298).
+   */
+  setBriefColumns(style: BriefColumnStyle): void;
+  /**
    * Vim's mode and pending keys as they change, and `null` when vim is off (TYTO-248).
    * Called at once with the current answer. Returns the function that stops the listener.
    */
@@ -493,6 +506,8 @@ export function createEditor(parent: HTMLElement, options: EditorOptions = {}): 
    * host says otherwise: what a brief's block content is indented by.
    */
   const indentCompartment = new Compartment();
+  /** The look of a `|` line's columns, swapped by `setBriefColumns` (TYTO-298). */
+  const columnsCompartment = new Compartment();
 
   /**
    * The phrases as a mutable holder rather than a value baked into the extension list.
@@ -534,6 +549,8 @@ export function createEditor(parent: HTMLElement, options: EditorOptions = {}): 
   /** The size the indent compartment holds now, and the extension it holds for it. */
   let tabSize = options.tabSize ?? DEFAULT_TAB_SIZE;
   let indent: Extension = indentExtension(tabSize);
+  /** What the columns compartment holds now, which `restore` brings every tab up to. */
+  let columns: Extension = briefColumns(options.briefColumns ?? DEFAULT_BRIEF_COLUMNS);
 
   /**
    * One listener for both directions, and the order inside it carries weight.
@@ -615,6 +632,7 @@ export function createEditor(parent: HTMLElement, options: EditorOptions = {}): 
     guidesCompartment.of(guides),
     stickyCompartment.of(sticky),
     indentCompartment.of(indent),
+    columnsCompartment.of(columns),
     searchSupport(() => searchPhrases),
     languages[language](),
     ...baseExtensions(),
@@ -674,6 +692,9 @@ export function createEditor(parent: HTMLElement, options: EditorOptions = {}): 
         }
         if (indentCompartment.get(view.state) !== indent) {
           view.dispatch({ effects: indentCompartment.reconfigure(indent) });
+        }
+        if (columnsCompartment.get(view.state) !== columns) {
+          view.dispatch({ effects: columnsCompartment.reconfigure(columns) });
         }
         // Dispatched after, because a scroll effect is a property of the view and the view
         // has just been given a different state to measure. The phrases ride along: a state
@@ -788,6 +809,13 @@ export function createEditor(parent: HTMLElement, options: EditorOptions = {}): 
       tabSize = size;
       indent = indentExtension(size);
       everyView(indentCompartment.reconfigure(indent));
+    },
+
+    setBriefColumns: (style: BriefColumnStyle) => {
+      const next = briefColumns(style);
+      if (next === columns) return;
+      columns = next;
+      everyView(columnsCompartment.reconfigure(columns));
     },
 
     onVimStatus: (listener: (status: VimStatus | null) => void) => {
