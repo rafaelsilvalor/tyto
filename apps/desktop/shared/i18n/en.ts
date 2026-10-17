@@ -249,6 +249,9 @@ export const en: Catalogue = {
   'command.editor.goToBlock': 'Go to Block…',
   'goToBlock.placeholder': 'Go to a block of the brief',
   'goToBlock.header': 'header',
+  'command.editor.formatBrief': 'Format Brief',
+  'formatBrief.refused':
+    'Format Brief: not formatted, the brief has a syntax error. Fix it (see the problems) and try again.',
   'slash.section.templates': 'Templates',
   'slash.section.snippets': 'Snippets',
   'slash.template.new': 'new brief from its skeleton',

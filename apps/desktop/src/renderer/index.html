@@ -99,6 +99,8 @@
       -->
       <footer class="shell__foot">
         <tyto-status-bar class="status-bar"></tyto-status-bar>
+        <!-- TYTO-297. A sentence for a few seconds, e.g. why Format Brief did nothing. -->
+        <output class="shell__notice" id="status-notice" role="status" hidden></output>
         <!-- TYTO-131. Hidden until main says a newer version exists; `update-notice.ts` paints it. -->
         <button type="button" class="shell__update" id="update-notice" hidden></button>
       </footer>

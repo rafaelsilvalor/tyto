@@ -251,6 +251,9 @@ export const ptBR: Catalogue = {
   'command.editor.goToBlock': 'Ir para bloco…',
   'goToBlock.placeholder': 'Ir para um bloco do brief',
   'goToBlock.header': 'cabeçalho',
+  'command.editor.formatBrief': 'Arrumar brief',
+  'formatBrief.refused':
+    'Arrumar brief: nada mudou, o brief tem um erro de sintaxe. Corrija (veja os problemas) e tente de novo.',
   'slash.section.templates': 'Templates',
   'slash.section.snippets': 'Trechos',
   'slash.template.new': 'novo brief com o esqueleto',

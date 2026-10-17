@@ -63,6 +63,14 @@ export {
   previewBlock,
 } from './brief-blocks.js';
 
+export {
+  DEFAULT_TAB_SIZE,
+  MAX_TAB_SIZE,
+  MIN_TAB_SIZE,
+  formatBriefInView,
+  indentExtension,
+} from './format-brief.js';
+
 export { briefDarkTheme, briefLightTheme, type ThemeName, themes, themeTokens } from './theme.js';
 
 export {

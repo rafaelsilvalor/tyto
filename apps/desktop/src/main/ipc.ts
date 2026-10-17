@@ -56,6 +56,10 @@ export interface WindowThemes extends Pick<ThemeService, 'list' | 'current' | 'p
   indentGuides(): boolean;
   /** The `stickyScroll` setting in force (TYTO-295), on the same answer. */
   stickyScroll(): boolean;
+  /** The `tabSize` setting in force (TYTO-297), on the same answer. */
+  tabSize(): number;
+  /** The `formatBriefOnSave` setting in force (TYTO-297), on the same answer. */
+  formatBriefOnSave(): boolean;
 }
 
 /**
@@ -72,6 +76,8 @@ function appliedForWindow(
     | 'vimModeStyle'
     | 'indentGuides'
     | 'stickyScroll'
+    | 'tabSize'
+    | 'formatBriefOnSave'
   >,
 ): IpcResponse<'theme:current'> {
   const { light, dark } = applied;
@@ -83,6 +89,8 @@ function appliedForWindow(
     vimModeStyle: themes.vimModeStyle(),
     indentGuides: themes.indentGuides(),
     stickyScroll: themes.stickyScroll(),
+    tabSize: themes.tabSize(),
+    formatBriefOnSave: themes.formatBriefOnSave(),
     light: { id: light.id, colors: light.colors },
     dark: { id: dark.id, colors: dark.colors },
     diagnostics: [...light.diagnostics, ...dark.diagnostics]

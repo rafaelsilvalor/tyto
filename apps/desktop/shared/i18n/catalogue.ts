@@ -496,6 +496,13 @@ export interface Catalogue {
   readonly 'command.editor.goToBlock': string;
   readonly 'goToBlock.placeholder': string;
   readonly 'goToBlock.header': string;
+  /**
+   * TYTO-297. "Format Brief" in the bar, and the line the status bar shows for a few seconds
+   * when a brief with a syntax error refuses it. Both set by script, so neither is on screen
+   * at load.
+   */
+  readonly 'command.editor.formatBrief': string;
+  readonly 'formatBrief.refused': string;
   readonly 'slash.section.templates': string;
   /** TYTO-277. The heading over the person's snippets in the same menu. */
   readonly 'slash.section.snippets': string;
@@ -762,6 +769,8 @@ export const CATALOGUE_KEYS = [
   'command.editor.goToBlock',
   'goToBlock.placeholder',
   'goToBlock.header',
+  'command.editor.formatBrief',
+  'formatBrief.refused',
   'slash.section.templates',
   'slash.section.snippets',
   'slash.template.new',

@@ -664,6 +664,10 @@ describe('switching the language', () => {
     'command.editor.goToBlock',
     'goToBlock.placeholder',
     'goToBlock.header',
+    // TYTO-297: "Format Brief" in the bar, and the refusal the status bar shows for a few
+    // seconds. `e2e/format-brief.desktop.test.ts` runs it.
+    'command.editor.formatBrief',
+    'formatBrief.refused',
     'slash.section.templates',
     'slash.template.new',
     'slash.template.set',

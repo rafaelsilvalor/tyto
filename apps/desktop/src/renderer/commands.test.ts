@@ -19,6 +19,7 @@ import {
   FILE_EXPORT,
   EDITOR_INSERT_MENU,
   EDITOR_GO_TO_BLOCK,
+  EDITOR_FORMAT_BRIEF,
   EDITOR_OPEN,
   EDITOR_SAVE_AS,
   EDITOR_TOGGLE_VIM,
@@ -68,6 +69,7 @@ const actions = () =>
     toggleVimMode: vi.fn<() => void>(),
     openInsertMenu: vi.fn<() => void>(),
     goToBlock: vi.fn<() => void>(),
+    formatBrief: vi.fn<() => void>(),
     newDocument: vi.fn<() => void>(),
     newDocumentFromTemplate: vi.fn<() => void>(),
     openDocument: vi.fn<() => void>(),
@@ -263,6 +265,30 @@ describe('the ids the window registers', () => {
     expect(others).toEqual([]);
   });
 
+  it('offers Format Brief on a brief only, with text in front, on Alt-Shift-f in both modes (TYTO-297)', () => {
+    const spies = actions();
+    let brief = true;
+    const registry = withCommandGate(
+      createDesktopRegistry(spies),
+      (id) => brief || !BRIEF_ONLY_COMMANDS.has(id),
+    );
+    expect(registry.run(EDITOR_FORMAT_BRIEF, NO_VIEW)).toBe(true);
+    brief = false;
+    expect(registry.run(EDITOR_FORMAT_BRIEF, NO_VIEW)).toBe(false);
+    expect(spies.formatBrief).toHaveBeenCalledOnce();
+    expect(TEXT_COMMANDS.has(EDITOR_FORMAT_BRIEF)).toBe(true);
+    expect(COMMAND_LABELS[EDITOR_FORMAT_BRIEF]).toBe('command.editor.formatBrief');
+    expect(bindingsOf(keymapSetFor(false), 'linux')[EDITOR_FORMAT_BRIEF]).toBe('Alt+Shift+f');
+    expect(bindingsOf(keymapSetFor(true), 'linux')[EDITOR_FORMAT_BRIEF]).toBe('Alt+Shift+f');
+    // The key is nobody else's in the built-in table, in either spelling of its modifiers.
+    const others = builtInKeybindings.filter(
+      (binding) =>
+        ['Alt-Shift-f', 'Shift-Alt-f', 'Alt-Shift-F'].includes(binding.key) &&
+        binding.command !== EDITOR_FORMAT_BRIEF,
+    );
+    expect(others).toEqual([]);
+  });
+
   it('gives the template folder commands no keystroke', () => {
     // A setting somebody changes once, not a key anybody presses. A binding here would be one
     // more accelerator competing with the editor's for no one's benefit.
@@ -337,10 +363,11 @@ describe('the keystroke shown beside a command', () => {
     expect(bindings[EDITOR_UNDO]).toBeUndefined();
     expect(bindings[EDITOR_SAVE]).toBe('Ctrl+s');
     // The same bindings as the editor's vim set, now read off the table (TYTO-207), and the
-    // window's one key for both modes, Go to Block (TYTO-296).
+    // window's keys for both modes, Go to Block (TYTO-296) and Format Brief (TYTO-297).
     expect(keymapSetFor(true).bindings).toEqual([
       ...vimKeymapSet.bindings,
       { key: 'Mod-Shift-o', command: EDITOR_GO_TO_BLOCK },
+      { key: 'Alt-Shift-f', command: EDITOR_FORMAT_BRIEF },
     ]);
   });
 

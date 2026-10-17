@@ -20,7 +20,7 @@ import { type VimModeStyle, vimModeStyleContribution } from './vim-mode-style.js
  * reads off a disk and the window is told what the answer was, so the shape has to be one
  * declaration both halves import. Linted pure — no Node, no DOM.
  *
- * **Nine settings the built-in `desktop` plugin declares** through the `configuration`
+ * **Thirteen settings the built-in `desktop` plugin declares** through the `configuration`
  * extension point (TYTO-206, ADR 0073), like any plugin's: built-in is a plugin. Their keys
  * stay unprefixed, exactly as every `settings.json` written before that card spells them.
  * Each one is validated alone, so a hand-broken value costs that key and nothing else.
@@ -163,7 +163,70 @@ export function stickyScrollExample(): string {
 }
 
 /**
- * The eleven, in the order the settings file is documented in. `theme` checks its ids against
+ * Whether Save formats a brief first (TYTO-297, ADR 0096), as VS Code's `editor.formatOnSave`.
+ * Off by default: a save writes what the person sees. Read at the moment of saving, so a change
+ * to it applies to the next save with no restart.
+ */
+export const formatBriefOnSaveContribution = {
+  id: 'formatBriefOnSave',
+  schema: z.boolean(),
+  default: false,
+  description: 'Format a brief (Format Brief) every time it is saved (default false).',
+  options: [
+    {
+      value: true,
+      description:
+        'Save fixes the indentation, trailing spaces and repeated blank lines first. A brief with a syntax error is saved as it is.',
+    },
+    { value: false, description: 'Save writes the brief exactly as it is.' },
+  ],
+} satisfies ConfigurationContribution<boolean>;
+
+/** The key as a newly created `settings.json` shows it, commented out (TYTO-297). */
+export function formatBriefOnSaveExample(): string {
+  return [
+    '// Format a brief (fix indentation, trailing spaces and repeated blank lines) every time it is saved: true or false (the default).',
+    '// "formatBriefOnSave": false,',
+  ]
+    .map((line) => `  ${line}`)
+    .join('\n');
+}
+
+/**
+ * Spaces per indent level in the editor (TYTO-297, ADR 0096): what Tab inserts and Shift+Tab
+ * removes, how wide a tab character is drawn, the step of the indent guides, and the indent
+ * Format Brief writes a body line with. Spaces only — Tab never inserts a tab character. On
+ * `theme:current`'s answer like `indentGuides`, applied in place with no restart.
+ *
+ * Bounded at 1 and 8, `MIN_TAB_SIZE` and `MAX_TAB_SIZE` in `@tyto/editor`; an integer, since a
+ * column is.
+ */
+export const TAB_SIZE = { default: 2, minimum: 1, maximum: 8 } as const;
+
+export const tabSizeContribution = {
+  id: 'tabSize',
+  schema: z.number().int().min(TAB_SIZE.minimum).max(TAB_SIZE.maximum),
+  default: TAB_SIZE.default,
+  description:
+    'Spaces per indent level: what Tab inserts, the indent guides’ step and the indent Format Brief writes, from 1 to 8 (default 2).',
+  options: [
+    { value: 2, description: 'Two spaces per level, the indent the built-in examples use.' },
+    { value: 4, description: 'Four spaces per level.' },
+  ],
+} satisfies ConfigurationContribution<number>;
+
+/** The key as a newly created `settings.json` shows it, commented out (TYTO-297). */
+export function tabSizeExample(): string {
+  return [
+    '// Spaces per indent level: what Tab inserts, the indent guides’ step and the indent Format Brief writes, 1 to 8 (default 2).',
+    '// "tabSize": 2,',
+  ]
+    .map((line) => `  ${line}`)
+    .join('\n');
+}
+
+/**
+ * The thirteen, in the order the settings file is documented in. `theme` checks its ids against
  * `lookup`, which main builds from every theme the plugins registered (TYTO-208); the default
  * knows the built-in two and lets any other id through.
  */
@@ -182,6 +245,8 @@ export function settingContributions(
     vimModeStyleContribution,
     indentGuidesContribution,
     stickyScrollContribution,
+    formatBriefOnSaveContribution,
+    tabSizeContribution,
   ] as readonly ConfigurationContribution[];
 }
 
@@ -202,6 +267,10 @@ export interface Settings {
   readonly indentGuides: boolean;
   /** Whether the editor pins the head line of the block at the top (TYTO-295). */
   readonly stickyScroll: boolean;
+  /** Whether Save formats a brief first (TYTO-297). */
+  readonly formatBriefOnSave: boolean;
+  /** Spaces per indent level in the editor (TYTO-297). */
+  readonly tabSize: number;
 }
 
 export const DEFAULT_SETTINGS: Settings = {
@@ -216,13 +285,15 @@ export const DEFAULT_SETTINGS: Settings = {
   vimModeStyle: vimModeStyleContribution.default,
   indentGuides: indentGuidesContribution.default,
   stickyScroll: stickyScrollContribution.default,
+  formatBriefOnSave: formatBriefOnSaveContribution.default,
+  tabSize: tabSizeContribution.default,
 };
 
 /** What a queue folder produces until a person chooses otherwise (ADR 0044). */
 export const DEFAULT_QUEUE_KINDS: readonly string[] = ['png'];
 
 /**
- * The eleven out of the resolved values, which already hold every declared key with a value
+ * The thirteen out of the resolved values, which already hold every declared key with a value
  * its schema accepted or its default (`resolveSettings`).
  */
 export function settingsFrom(values: Readonly<Record<string, unknown>>): Settings {
@@ -240,5 +311,7 @@ export function settingsFrom(values: Readonly<Record<string, unknown>>): Setting
     vimModeStyle: pick('vimModeStyle'),
     indentGuides: pick('indentGuides'),
     stickyScroll: pick('stickyScroll'),
+    formatBriefOnSave: pick('formatBriefOnSave'),
+    tabSize: pick('tabSize'),
   };
 }

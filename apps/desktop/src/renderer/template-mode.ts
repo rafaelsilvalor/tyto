@@ -194,6 +194,8 @@ export class TemplateMode extends LitElement {
   private indentGuides = true;
   /** The `stickyScroll` setting, kept the same way (TYTO-295). */
   private stickyScroll = true;
+  /** The `tabSize` setting, kept the same way (TYTO-297). */
+  private tabSize = 2;
   /** The text each buffer had when it was last read from or written to the disk. */
   private savedText: Record<BufferName, string> = { manifest: '', markup: '' };
   private gate: RequestGate = createRequestGate();
@@ -526,6 +528,7 @@ export class TemplateMode extends LitElement {
         keymap: defaultKeymapSet,
         indentGuides: this.indentGuides,
         stickyScroll: this.stickyScroll,
+        tabSize: this.tabSize,
         extensions:
           buffer === 'markup' ? [templateLint(this.analyzer()), templateCompletion()] : [],
       });
@@ -558,6 +561,12 @@ export class TemplateMode extends LitElement {
   showStickyScroll(enabled: boolean): void {
     this.stickyScroll = enabled;
     for (const editor of Object.values(this.editors)) editor?.setStickyScroll(enabled);
+  }
+
+  /** Spaces per indent level in both buffers (TYTO-297), as above. */
+  showTabSize(size: number): void {
+    this.tabSize = size;
+    for (const editor of Object.values(this.editors)) editor?.setTabSize(size);
   }
 
   override disconnectedCallback(): void {

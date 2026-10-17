@@ -399,6 +399,19 @@ textarea {
   display: none;
 }
 
+/* TYTO-297. A notice for a few seconds; it gives way before the bar's own items do. */
+.shell__notice {
+  flex: 0 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  font-size: var(--tyto-text-sm);
+}
+
+.shell__notice[hidden] {
+  display: none;
+}
+
 /*
  * The docks (E9.10, ADR 0024).
  *
