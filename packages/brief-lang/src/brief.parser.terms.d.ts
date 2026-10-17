@@ -7,3 +7,4 @@
  */
 export declare const Frontmatter: number;
 export declare const virtualNewline: number;
+export declare const blankRun: number;

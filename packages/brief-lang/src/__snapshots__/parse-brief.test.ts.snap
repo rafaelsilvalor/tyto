@@ -241,6 +241,208 @@ exports[`the corpus, one level up from the tree > matches the recorded AST of ev
 }
 `;
 
+exports[`the corpus, one level up from the tree > matches the recorded AST of every fixture > block-with-blank-line.brief 1`] = `
+{
+  "diagnostics": [],
+  "ok": true,
+  "value": {
+    "directives": [
+      {
+        "adjustments": [],
+        "body": [
+          {
+            "kind": "text",
+            "range": {
+              "end": 26,
+              "start": 15,
+            },
+            "value": "ORTOPEDISTA",
+          },
+          {
+            "kind": "break",
+            "range": {
+              "end": 27,
+              "start": 26,
+            },
+          },
+          {
+            "kind": "text",
+            "range": {
+              "end": 87,
+              "start": 33,
+            },
+            "value": "10-09 - 20h | Cuidado dos pés 1. | Profª. Mara Rebeiro",
+          },
+          {
+            "kind": "break",
+            "range": {
+              "end": 88,
+              "start": 87,
+            },
+          },
+          {
+            "kind": "text",
+            "range": {
+              "end": 148,
+              "start": 94,
+            },
+            "value": "10-09 - 21h | Cuidado dos pés 2. | Profª. Mara Rebeiro",
+          },
+          {
+            "kind": "break",
+            "range": {
+              "end": 149,
+              "start": 148,
+            },
+          },
+          {
+            "kind": "text",
+            "range": {
+              "end": 167,
+              "start": 156,
+            },
+            "value": "ORTOPEDISTA",
+          },
+          {
+            "kind": "break",
+            "range": {
+              "end": 168,
+              "start": 167,
+            },
+          },
+          {
+            "kind": "text",
+            "range": {
+              "end": 233,
+              "start": 174,
+            },
+            "value": "11-09 - 20h | Cuidado com a coluna 1. | Profª. Mara Rebeiro",
+          },
+        ],
+        "name": "lamina",
+        "nameRange": {
+          "end": 8,
+          "start": 2,
+        },
+        "range": {
+          "end": 233,
+          "start": 0,
+        },
+      },
+    ],
+    "frontmatter": {
+      "data": {},
+      "ranges": {},
+    },
+    "range": {
+      "end": 234,
+      "start": 0,
+    },
+  },
+}
+`;
+
+exports[`the corpus, one level up from the tree > matches the recorded AST of every fixture > block-without-blank-lines.brief 1`] = `
+{
+  "diagnostics": [],
+  "ok": true,
+  "value": {
+    "directives": [
+      {
+        "adjustments": [],
+        "body": [
+          {
+            "kind": "text",
+            "range": {
+              "end": 26,
+              "start": 15,
+            },
+            "value": "ORTOPEDISTA",
+          },
+          {
+            "kind": "break",
+            "range": {
+              "end": 27,
+              "start": 26,
+            },
+          },
+          {
+            "kind": "text",
+            "range": {
+              "end": 87,
+              "start": 33,
+            },
+            "value": "10-09 - 20h | Cuidado dos pés 1. | Profª. Mara Rebeiro",
+          },
+          {
+            "kind": "break",
+            "range": {
+              "end": 88,
+              "start": 87,
+            },
+          },
+          {
+            "kind": "text",
+            "range": {
+              "end": 148,
+              "start": 94,
+            },
+            "value": "10-09 - 21h | Cuidado dos pés 2. | Profª. Mara Rebeiro",
+          },
+          {
+            "kind": "break",
+            "range": {
+              "end": 149,
+              "start": 148,
+            },
+          },
+          {
+            "kind": "text",
+            "range": {
+              "end": 166,
+              "start": 155,
+            },
+            "value": "ORTOPEDISTA",
+          },
+          {
+            "kind": "break",
+            "range": {
+              "end": 167,
+              "start": 166,
+            },
+          },
+          {
+            "kind": "text",
+            "range": {
+              "end": 232,
+              "start": 173,
+            },
+            "value": "11-09 - 20h | Cuidado com a coluna 1. | Profª. Mara Rebeiro",
+          },
+        ],
+        "name": "lamina",
+        "nameRange": {
+          "end": 8,
+          "start": 2,
+        },
+        "range": {
+          "end": 232,
+          "start": 0,
+        },
+      },
+    ],
+    "frontmatter": {
+      "data": {},
+      "ranges": {},
+    },
+    "range": {
+      "end": 233,
+      "start": 0,
+    },
+  },
+}
+`;
+
 exports[`the corpus, one level up from the tree > matches the recorded AST of every fixture > broken-adjacent-emphasis.brief 1`] = `
 {
   "diagnostics": [

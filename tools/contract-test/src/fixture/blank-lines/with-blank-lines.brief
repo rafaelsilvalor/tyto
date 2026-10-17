@@ -1,0 +1,30 @@
+---
+template: agenda-semana
+formats: [grid]
+---
+
+::titulo
+  AGENDA DA SEMANA
+
+::lamina
+      ORTOPEDISTA
+      10-09 - 20h | Cuidado dos pés 1. | Profª. Mara Rebeiro
+      10-09 - 21h | Cuidado dos pés 2. | Profª. Mara Rebeiro
+
+      ORTOPEDISTA
+      11-09 - 20h | Cuidado com a coluna 1. | Profª. Mara Rebeiro
+
+
+::lamina
+
+      CARDIOLOGIA
+      12-09 - 20h | Arritmias. | Prof. João Lima
+
+
+
+      PEDIATRIA
+      13-09 - 19h | Febre na infância. | Profª. Ana Souza
+    	
+      13-09 - 20h | Vacinação. | Profª. Ana Souza
+  
+

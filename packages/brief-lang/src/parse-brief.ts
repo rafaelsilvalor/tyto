@@ -216,20 +216,24 @@ function bodyOf(node: SyntaxNode, text: string): RichText {
       if (parts[0]?.name === 'Space') parts.shift();
       appendInlines(body, parts, text);
     } else if (child.name === 'BodyLine') {
+      // A line holding only spaces is a `BodyLine` with no text (ADR 0087). It says
+      // nothing, and a break for it would be a blank line in the artwork.
+      const blockText = child.getChild('BlockText');
+      if (blockText === null) continue;
       if (body.length > 0) {
         // A `BodyLine` opens with `blockIndent`, which is the line ending plus the indent,
         // so the break starts where the line does. Its length is not always one: `\r\n` is
         // two units, and a hardcoded `+ 1` left the `Break` node covering half of it —
         // which reads as a stray carriage return and puts the next node a column out
-        // (TYTO-64).
+        // (TYTO-64). With blank lines in front of the indent the token covers them too,
+        // and the break stays on the first line break: the one the previous line ends with.
         const isCrLf = text[child.from] === '\r' && text[child.from + 1] === '\n';
         body.push({
           kind: 'break',
           range: sourceRange(child.from, child.from + (isCrLf ? 2 : 1)),
         });
       }
-      const blockText = child.getChild('BlockText');
-      if (blockText !== null) appendInlines(body, children(blockText), text);
+      appendInlines(body, children(blockText), text);
     }
   }
 
@@ -253,12 +257,25 @@ function adjustmentsOf(node: SyntaxNode, text: string): readonly BriefAdjustment
   });
 }
 
-/** The line break that ends a directive is punctuation, not part of what it says. */
-function withoutTrailingBreak(text: string, from: number, to: number): SourceRange {
+/**
+ * The line break that ends a directive is punctuation, not part of what it says — and so
+ * are the blank lines its block absorbed (ADR 0087). Whole blank lines come off, so a
+ * diagnostic on the directive never underlines blank padding. Spaces at the end of the last
+ * line with text stay: they are inside its `Text`, and the directive must still contain it.
+ */
+function withoutTrailingBlank(text: string, from: number, to: number): SourceRange {
   let end = to;
-  if (text[end - 1] === '\n') end -= 1;
-  if (text[end - 1] === '\r') end -= 1;
-  return sourceRange(from, Math.max(from, end));
+  for (;;) {
+    let lineEnd = end;
+    while (lineEnd > from && (text[lineEnd - 1] === ' ' || text[lineEnd - 1] === '\t')) {
+      lineEnd -= 1;
+    }
+    const last = text[lineEnd - 1];
+    if (lineEnd <= from || (last !== '\n' && last !== '\r')) break;
+    end = lineEnd - 1;
+    if (last === '\n' && text[end - 1] === '\r') end -= 1;
+  }
+  return sourceRange(from, end);
 }
 
 /** `::` — the two characters a directive opens with, which `nameRange` starts after. */
@@ -281,7 +298,7 @@ function directiveOf(node: SyntaxNode, text: string): Directive {
     ...(namespace === null ? {} : { namespace: sliceOf(text, namespace).slice(0, -1) }),
     adjustments: adjustmentsOf(node, text),
     body: bodyOf(node, text),
-    range: withoutTrailingBreak(text, node.from, node.to),
+    range: withoutTrailingBlank(text, node.from, node.to),
     nameRange: sourceRange(nameStart, nameEnd),
   };
 }

@@ -6,6 +6,8 @@ import adjustmentsFlag from './__fixtures__/adjustments-flag.brief?raw';
 import adjustmentsMany from './__fixtures__/adjustments-many.brief?raw';
 import adjustmentsPair from './__fixtures__/adjustments-pair.brief?raw';
 import blankLines from './__fixtures__/blank-lines.brief?raw';
+import blockWithBlankLine from './__fixtures__/block-with-blank-line.brief?raw';
+import blockWithoutBlankLines from './__fixtures__/block-without-blank-lines.brief?raw';
 import brokenAdjacentEmphasis from './__fixtures__/broken-adjacent-emphasis.brief?raw';
 import brokenFrontmatter from './__fixtures__/broken-frontmatter.brief?raw';
 import brokenNamelessDirective from './__fixtures__/broken-nameless-directive.brief?raw';
@@ -54,6 +56,8 @@ const valid = {
   'plugin-directive.brief': pluginDirective,
   'indented-block.brief': indentedBlock,
   'blank-lines.brief': blankLines,
+  'block-without-blank-lines.brief': blockWithoutBlankLines,
+  'block-with-blank-line.brief': blockWithBlankLine,
   'no-trailing-newline.brief': noTrailingNewline,
   'full.brief': full,
 };
