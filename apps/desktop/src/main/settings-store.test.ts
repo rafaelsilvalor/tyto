@@ -108,6 +108,7 @@ describe('fileSettingsStore', () => {
       statusBarColors: DEFAULT_SETTINGS.statusBarColors,
       vimModeStyle: DEFAULT_SETTINGS.vimModeStyle,
       indentGuides: DEFAULT_SETTINGS.indentGuides,
+      stickyScroll: DEFAULT_SETTINGS.stickyScroll,
     });
   });
 
@@ -131,6 +132,7 @@ describe('fileSettingsStore', () => {
       statusBarColors: DEFAULT_SETTINGS.statusBarColors,
       vimModeStyle: DEFAULT_SETTINGS.vimModeStyle,
       indentGuides: DEFAULT_SETTINGS.indentGuides,
+      stickyScroll: DEFAULT_SETTINGS.stickyScroll,
     });
   });
 
@@ -154,6 +156,7 @@ describe('fileSettingsStore', () => {
       statusBarColors: DEFAULT_SETTINGS.statusBarColors,
       vimModeStyle: DEFAULT_SETTINGS.vimModeStyle,
       indentGuides: DEFAULT_SETTINGS.indentGuides,
+      stickyScroll: DEFAULT_SETTINGS.stickyScroll,
     });
   });
 
@@ -176,6 +179,7 @@ describe('fileSettingsStore', () => {
       statusBarColors: DEFAULT_SETTINGS.statusBarColors,
       vimModeStyle: DEFAULT_SETTINGS.vimModeStyle,
       indentGuides: DEFAULT_SETTINGS.indentGuides,
+      stickyScroll: DEFAULT_SETTINGS.stickyScroll,
     });
   });
 

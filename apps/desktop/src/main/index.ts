@@ -28,7 +28,7 @@ import { NO_PLUGINS, type ThemeKind, createPluginHost } from '@tyto/plugin-api';
 import type { Rasterizer } from '@tyto/raster';
 
 import { type Locale, localeFor, translate } from '../../shared/i18n/index.js';
-import { indentGuidesExample, type Settings } from '../../shared/settings.js';
+import { indentGuidesExample, type Settings, stickyScrollExample } from '../../shared/settings.js';
 import {
   type ThemeInForce,
   statusBarColorsContrast,
@@ -114,12 +114,13 @@ const SETTINGS_SETTLE_MS = 100;
  * `settings.json` as "Open Settings (JSON)" creates it when there is none (TYTO-206). It
  * carries `statusBarItems` commented out with every id, and `statusBarColors` with every key
  * and an example colour, and `vimModeStyle` with its three values (TYTO-301), so the bar's
- * options are in the file the person is looking at; and `indentGuides` (TYTO-293).
+ * options are in the file the person is looking at; and `indentGuides` (TYTO-293) and
+ * `stickyScroll` (TYTO-295).
  */
 const NEW_SETTINGS_FILE =
   '// Tyto settings: JSON with comments. Saving this file applies it, with no restart.\n{\n' +
   `${statusBarItemsExample()}\n${statusBarColorsExample()}\n${vimModeStyleExample()}\n` +
-  `${indentGuidesExample()}\n}\n`;
+  `${indentGuidesExample()}\n${stickyScrollExample()}\n}\n`;
 
 /** `keybindings.json` as "Open Keyboard Shortcuts (JSON)" creates it (TYTO-207, ADR 0074). */
 const NEW_KEYBINDINGS_FILE =
@@ -532,6 +533,8 @@ async function start(): Promise<void> {
   let vimModeStyle = saved.vimModeStyle;
   // And whether the editor draws indent guides (TYTO-293), on the same answer.
   let indentGuides = saved.indentGuides;
+  // And whether it pins the head line of the block at the top (TYTO-295), on the same answer.
+  let stickyScroll = saved.stickyScroll;
   // The themes a vim badge colour is measured in: the one the mode shows, or both when the
   // system chooses, since either may be in front.
   const themesInForce = (): readonly ThemeInForce[] => {
@@ -773,6 +776,7 @@ async function start(): Promise<void> {
       if (keys.includes('statusBarColors')) statusBarColors = next.statusBarColors;
       if (keys.includes('vimModeStyle')) vimModeStyle = next.vimModeStyle;
       if (keys.includes('indentGuides')) indentGuides = next.indentGuides;
+      if (keys.includes('stickyScroll')) stickyScroll = next.stickyScroll;
     },
     configure: (config) => {
       host.configure(config);
@@ -1159,6 +1163,7 @@ async function start(): Promise<void> {
       statusBarColors: () => statusBarColors,
       vimModeStyle: () => vimModeStyle,
       indentGuides: () => indentGuides,
+      stickyScroll: () => stickyScroll,
     },
     // After `ready`, as the panels are, so the window's first answer is the whole list.
     keymaps: async () => {

@@ -171,6 +171,7 @@ const KEYS = [
   'statusBarItems',
   'vimModeStyle',
   'indentGuides',
+  'stickyScroll',
 ];
 
 describe('the settings tab’s suggestions and hover', () => {

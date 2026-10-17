@@ -133,7 +133,37 @@ export function indentGuidesExample(): string {
 }
 
 /**
- * The ten, in the order the settings file is documented in. `theme` checks its ids against
+ * Whether the editor pins the head line of the block the top of the pane is inside (TYTO-295,
+ * ADR 0094): `::lamina` while scrolling its body, a template's elements stacked. On by default,
+ * as VS Code's is; on `theme:current`'s answer like `indentGuides`, applied in place.
+ */
+export const stickyScrollContribution = {
+  id: 'stickyScroll',
+  schema: z.boolean(),
+  default: true,
+  description:
+    "Keep a block's head line pinned at the top of the editor while scrolling inside it (default true).",
+  options: [
+    {
+      value: true,
+      description: 'The head line of the block at the top stays pinned; a click goes to it.',
+    },
+    { value: false, description: 'Nothing pinned.' },
+  ],
+} satisfies ConfigurationContribution<boolean>;
+
+/** The key as a newly created `settings.json` shows it, commented out (TYTO-295). */
+export function stickyScrollExample(): string {
+  return [
+    "// Pin a block's head line at the top of the editor while scrolling inside it: true (the default) or false.",
+    '// "stickyScroll": true,',
+  ]
+    .map((line) => `  ${line}`)
+    .join('\n');
+}
+
+/**
+ * The eleven, in the order the settings file is documented in. `theme` checks its ids against
  * `lookup`, which main builds from every theme the plugins registered (TYTO-208); the default
  * knows the built-in two and lets any other id through.
  */
@@ -151,6 +181,7 @@ export function settingContributions(
     statusBarColorsContribution,
     vimModeStyleContribution,
     indentGuidesContribution,
+    stickyScrollContribution,
   ] as readonly ConfigurationContribution[];
 }
 
@@ -169,6 +200,8 @@ export interface Settings {
   readonly vimModeStyle: VimModeStyle;
   /** Whether the editor draws indent guides (TYTO-293). */
   readonly indentGuides: boolean;
+  /** Whether the editor pins the head line of the block at the top (TYTO-295). */
+  readonly stickyScroll: boolean;
 }
 
 export const DEFAULT_SETTINGS: Settings = {
@@ -182,13 +215,14 @@ export const DEFAULT_SETTINGS: Settings = {
   statusBarColors: statusBarColorsContribution.default,
   vimModeStyle: vimModeStyleContribution.default,
   indentGuides: indentGuidesContribution.default,
+  stickyScroll: stickyScrollContribution.default,
 };
 
 /** What a queue folder produces until a person chooses otherwise (ADR 0044). */
 export const DEFAULT_QUEUE_KINDS: readonly string[] = ['png'];
 
 /**
- * The ten out of the resolved values, which already hold every declared key with a value
+ * The eleven out of the resolved values, which already hold every declared key with a value
  * its schema accepted or its default (`resolveSettings`).
  */
 export function settingsFrom(values: Readonly<Record<string, unknown>>): Settings {
@@ -205,5 +239,6 @@ export function settingsFrom(values: Readonly<Record<string, unknown>>): Setting
     statusBarColors: pick('statusBarColors'),
     vimModeStyle: pick('vimModeStyle'),
     indentGuides: pick('indentGuides'),
+    stickyScroll: pick('stickyScroll'),
   };
 }

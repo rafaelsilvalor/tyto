@@ -315,6 +315,8 @@ const appliedThemesSchema = z.object({
   vimModeStyle: z.enum(VIM_MODE_STYLES.map((style) => style.id) as [VimModeStyle]),
   /** The `indentGuides` setting in force (TYTO-293): the editor's guides, on or off. */
   indentGuides: z.boolean(),
+  /** The `stickyScroll` setting in force (TYTO-295): the editor's pinned head lines, on or off. */
+  stickyScroll: z.boolean(),
   diagnostics: z.array(diagnostic.omit({ range: true })).max(200),
 });
 

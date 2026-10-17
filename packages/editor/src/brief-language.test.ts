@@ -66,6 +66,31 @@ describe('folding', () => {
 
     expect(foldable(state, head.from, head.to)).toBeNull();
   });
+
+  it('ends at the last line with text, leaving trailing blank lines out (TYTO-295)', () => {
+    const doc = '::a\n  um\n  dois\n\n   \n::b\n';
+    const state = stateOf(doc);
+
+    const range = foldable(state, state.doc.line(1).from, state.doc.line(1).to);
+
+    expect(doc.slice(range?.from, range?.to)).toBe('\n  um\n  dois');
+  });
+
+  it('keeps a blank line between two lines with text inside the fold', () => {
+    const doc = '::a\n  um\n\n  dois\n::b\n';
+    const state = stateOf(doc);
+
+    const range = foldable(state, state.doc.line(1).from, state.doc.line(1).to);
+
+    expect(doc.slice(range?.from, range?.to)).toBe('\n  um\n\n  dois');
+  });
+
+  it('does not fold a directive whose body is only whitespace', () => {
+    const state = stateOf('::a um\n   \n::b\n');
+    const head = state.doc.line(1);
+
+    expect(foldable(state, head.from, head.to)).toBeNull();
+  });
 });
 
 describe('the example briefs', () => {

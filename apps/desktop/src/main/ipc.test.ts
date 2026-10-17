@@ -496,6 +496,7 @@ const windowThemes = (): WindowThemes => {
     statusBarColors: () => ({ background: '#1e3a5f', 'vimMode.normal': '#3b6fd9' }),
     vimModeStyle: () => 'bar',
     indentGuides: () => false,
+    stickyScroll: () => false,
   };
 };
 
@@ -1302,6 +1303,8 @@ describe('the theme channels (TYTO-208)', () => {
     expect(answer.vimModeStyle).toBe('bar');
     // And whether the editor draws indent guides (TYTO-293).
     expect(answer.indentGuides).toBe(false);
+    // And whether it pins the head line of the block at the top (TYTO-295).
+    expect(answer.stickyScroll).toBe(false);
   });
 
   it('lists every theme with its label and kind, and nothing else', async () => {

@@ -54,6 +54,8 @@ export interface WindowThemes extends Pick<ThemeService, 'list' | 'current' | 'p
   vimModeStyle(): VimModeStyle;
   /** The `indentGuides` setting in force (TYTO-293), on the same answer. */
   indentGuides(): boolean;
+  /** The `stickyScroll` setting in force (TYTO-295), on the same answer. */
+  stickyScroll(): boolean;
 }
 
 /**
@@ -64,7 +66,12 @@ function appliedForWindow(
   applied: AppliedThemes,
   themes: Pick<
     WindowThemes,
-    'iconStrokeWidth' | 'statusBarItems' | 'statusBarColors' | 'vimModeStyle' | 'indentGuides'
+    | 'iconStrokeWidth'
+    | 'statusBarItems'
+    | 'statusBarColors'
+    | 'vimModeStyle'
+    | 'indentGuides'
+    | 'stickyScroll'
   >,
 ): IpcResponse<'theme:current'> {
   const { light, dark } = applied;
@@ -75,6 +82,7 @@ function appliedForWindow(
     statusBarColors: { ...themes.statusBarColors() },
     vimModeStyle: themes.vimModeStyle(),
     indentGuides: themes.indentGuides(),
+    stickyScroll: themes.stickyScroll(),
     light: { id: light.id, colors: light.colors },
     dark: { id: dark.id, colors: dark.colors },
     diagnostics: [...light.diagnostics, ...dark.diagnostics]

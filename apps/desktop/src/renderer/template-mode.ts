@@ -192,6 +192,8 @@ export class TemplateMode extends LitElement {
   private editors: Partial<Record<BufferName, EditorHandle>> = {};
   /** The `indentGuides` setting, for the editors made later and the ones already made. */
   private indentGuides = true;
+  /** The `stickyScroll` setting, kept the same way (TYTO-295). */
+  private stickyScroll = true;
   /** The text each buffer had when it was last read from or written to the disk. */
   private savedText: Record<BufferName, string> = { manifest: '', markup: '' };
   private gate: RequestGate = createRequestGate();
@@ -523,6 +525,7 @@ export class TemplateMode extends LitElement {
         commands: registry,
         keymap: defaultKeymapSet,
         indentGuides: this.indentGuides,
+        stickyScroll: this.stickyScroll,
         extensions:
           buffer === 'markup' ? [templateLint(this.analyzer()), templateCompletion()] : [],
       });
@@ -549,6 +552,12 @@ export class TemplateMode extends LitElement {
   showIndentGuides(enabled: boolean): void {
     this.indentGuides = enabled;
     for (const editor of Object.values(this.editors)) editor?.setIndentGuides(enabled);
+  }
+
+  /** Pins or stops pinning block head lines in both buffers (TYTO-295), as above. */
+  showStickyScroll(enabled: boolean): void {
+    this.stickyScroll = enabled;
+    for (const editor of Object.values(this.editors)) editor?.setStickyScroll(enabled);
   }
 
   override disconnectedCallback(): void {

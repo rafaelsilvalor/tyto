@@ -29,11 +29,17 @@ import { blockEnterKeymap } from './block-enter.js';
  *
  * A directive with an inline body has no `BodyLine` at all and does not fold: there would
  * be nothing left to show.
+ *
+ * **The fold ends at the last line with text** (TYTO-295). Since TYTO-294 a blank line inside
+ * a block is a `BodyLine` with no `BlockText`, and one at the end of a block — whitespace
+ * before the next directive — would otherwise be folded into it, and a directive whose only
+ * body is such a line would fold over nothing anybody wrote. The sticky header reads these
+ * ranges too, so a block that ends at its last word stops pinning there.
  */
 const foldDirectiveBody = (node: SyntaxNode): { from: number; to: number } | null => {
   const bodyLines = node.getChildren('BodyLine');
   const first = bodyLines[0];
-  const last = bodyLines.at(-1);
+  const last = bodyLines.filter((line) => line.getChild('BlockText') !== null).at(-1);
   if (!first || !last) return null;
   return { from: first.from, to: last.to };
 };
