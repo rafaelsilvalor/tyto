@@ -126,15 +126,23 @@ function ensurePanel(container: HTMLElement, panel: PanelRecord, index: number):
  */
 function applySize(container: HTMLElement, dock: Dock, panel: PanelRecord | undefined): void {
   container.hidden = panel === undefined;
-  if (dock === ELASTIC_DOCK || panel === undefined) {
-    container.style.removeProperty('width');
-    container.style.removeProperty('height');
-    return;
+  for (const property of ['width', 'height', 'min-width', 'min-height']) {
+    container.style.removeProperty(property);
   }
+  if (dock === ELASTIC_DOCK || panel === undefined) return;
 
   const size = `${String(clampSize(panel.size))}px`;
-  if (dock === 'bottom') container.style.height = size;
-  else container.style.width = size;
+  // The size is where the dock starts; it gives way to the editor groups down to the smaller of
+  // it and the floor token, so a dock dragged narrower than the floor keeps its own size
+  // (TYTO-299, ADR 0093). The record is not changed: a wider window gives the size back.
+  const floor = (token: string): string => `min(${size}, var(${token}))`;
+  if (dock === 'bottom') {
+    container.style.height = size;
+    container.style.minHeight = floor('--tyto-dock-min-height');
+  } else {
+    container.style.width = size;
+    container.style.minWidth = floor('--tyto-dock-min-width');
+  }
 }
 
 /**

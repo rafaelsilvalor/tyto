@@ -249,6 +249,131 @@ const toolHeaders = async (): Promise<{ panels: string[]; groups: number }> =>
     return { panels, groups };
   });
 
+/** A box as `getBoundingClientRect` read it, and what it is. */
+interface Box {
+  readonly name: string;
+  readonly left: number;
+  readonly top: number;
+  readonly right: number;
+  readonly bottom: number;
+  /** For a group: the split it sits in, by `data-group-split`; the root has none. */
+  readonly split?: string | undefined;
+}
+
+/** Every visible editor group, split, group line and dock, and the window's real inner size. */
+interface Geometry {
+  readonly groups: readonly Box[];
+  readonly splits: readonly Box[];
+  readonly lines: readonly Box[];
+  readonly docks: readonly Box[];
+  readonly width: number;
+  readonly height: number;
+}
+
+const geometry = async (): Promise<Geometry> =>
+  page.evaluate(() => {
+    const box = (name: string, element: Element, split?: string): Box => {
+      const rect = element.getBoundingClientRect();
+      return {
+        name,
+        left: rect.left,
+        top: rect.top,
+        right: rect.right,
+        bottom: rect.bottom,
+        split,
+      };
+    };
+    const shown = (selector: string): HTMLElement[] =>
+      [...document.querySelectorAll<HTMLElement>(selector)].filter(
+        (element) => element.getClientRects().length > 0 && !element.hidden,
+      );
+    return {
+      groups: shown('[data-editor-group]').map((group, index) =>
+        box(
+          `group ${String(index + 1)}`,
+          group,
+          group.parentElement?.closest<HTMLElement>('[data-group-split]')?.dataset['groupSplit'],
+        ),
+      ),
+      splits: shown('[data-group-split]').map((split) =>
+        box(`split ${split.dataset['groupSplit'] ?? '?'}`, split),
+      ),
+      lines: shown('.group-splitter').map((line, index) => box(`line ${String(index + 1)}`, line)),
+      docks: shown('[data-dock]').map((dock) => box(`dock ${dock.dataset['dock'] ?? '?'}`, dock)),
+      width: window.innerWidth,
+      height: window.innerHeight,
+    };
+  });
+
+const inside = (inner: Box, outer: Box): boolean =>
+  inner.left >= outer.left - TOLERANCE &&
+  inner.top >= outer.top - TOLERANCE &&
+  inner.right <= outer.right + TOLERANCE &&
+  inner.bottom <= outer.bottom + TOLERANCE;
+
+/**
+ * What is wrong with the groups' room, one sentence per fault; empty when no two groups cover
+ * each other by more than half a pixel, no two docks do, each group sits inside its split and is
+ * at least its minimum, and every dock ends inside the window (TYTO-299). With `fits`, every
+ * group is inside the centre dock too: a window too small for the groups clips the last ones at
+ * the dock's edge instead (ADR 0093), so that one is asked only of a window they fit in.
+ */
+function crowding(
+  scene: Geometry,
+  minimum: { readonly width: number; readonly height: number },
+  fits: boolean,
+): string[] {
+  const faults: string[] = [];
+  const pairs = (list: readonly Box[]): [Box, Box][] =>
+    list.flatMap((one, index) => list.slice(index + 1).map((two): [Box, Box] => [one, two]));
+  for (const [one, two] of [...pairs(scene.groups), ...pairs(scene.docks)]) {
+    const across = Math.min(one.right, two.right) - Math.max(one.left, two.left);
+    const down = Math.min(one.bottom, two.bottom) - Math.max(one.top, two.top);
+    if (across > TOLERANCE && down > TOLERANCE) {
+      faults.push(`${one.name} and ${two.name} overlap by ${across.toFixed(1)}x${down.toFixed(1)}`);
+    }
+  }
+  const centre = scene.docks.find((dock) => dock.name === 'dock centre');
+  for (const group of scene.groups) {
+    const width = group.right - group.left;
+    const height = group.bottom - group.top;
+    if (width < minimum.width - TOLERANCE) faults.push(`${group.name} is ${String(width)}px wide`);
+    if (height < minimum.height - TOLERANCE) {
+      faults.push(`${group.name} is ${String(height)}px tall`);
+    }
+    const split = scene.splits.find((each) => each.name === `split ${group.split ?? ''}`);
+    if (split !== undefined && !inside(group, split)) {
+      faults.push(`${group.name} spills out of ${split.name}`);
+    }
+    if (fits && centre !== undefined && !inside(group, centre)) {
+      faults.push(`${group.name} spills out of the centre dock`);
+    }
+    // Clipped only at the far edges: a group above or left of the centre dock means the clipping
+    // box was scrolled — to bring a focused pane into view — and the first tab strip went missing.
+    if (
+      centre !== undefined &&
+      (group.left < centre.left - TOLERANCE || group.top < centre.top - TOLERANCE)
+    ) {
+      faults.push(
+        `${group.name} starts at ${String(group.left)}x${String(group.top)}, before the centre dock`,
+      );
+    }
+  }
+  for (const dock of scene.docks) {
+    if (dock.right > scene.width + TOLERANCE || dock.bottom > scene.height + TOLERANCE) {
+      faults.push(
+        `${dock.name} ends at ${String(dock.right)}x${String(dock.bottom)}, past the window`,
+      );
+    }
+  }
+  return faults;
+}
+
+const groupMinimum = async (): Promise<{ width: number; height: number }> => ({
+  width: await tokenPixels('--tyto-group-min-width'),
+  height: await tokenPixels('--tyto-group-min-height'),
+});
+
 const tokenPixels = async (name: string): Promise<number> =>
   page.evaluate(
     (token) =>
@@ -445,6 +570,102 @@ describe('the busiest window', () => {
     expect(await overflowing()).toEqual([]);
     expect(misalignments((await measure()).panes)).toEqual([]);
     await shoot('scene-900x600');
+    await resize(defaultSize.width, defaultSize.height);
+  });
+});
+
+/*
+ * TYTO-299, ADR 0093: at 900x600 with both side docks open, a split held narrower than its groups
+ * let the next group be painted over them (80.4 px at origin/main 1cc9e8e). The docks now give
+ * way first, down to their own minimum, and only past that are the groups clipped at the centre
+ * dock's edge — never drawn over one another, and never pushing a dock out of the window.
+ */
+describe('a window too narrow for every pane', () => {
+  it('lets the side docks give way so no group is drawn over another at 900x600', async () => {
+    await resize(900, 600);
+    const scene = await geometry();
+    process.stdout.write(`[TYTO-299] fit: ${JSON.stringify(scene)}\n`);
+    // Before the verdict, so a red run leaves the picture of what it measured.
+    await shoot('narrow-fit-900x600');
+    expect(scene.groups).toHaveLength(3);
+    expect(crowding(scene, await groupMinimum(), true)).toEqual([]);
+    // The panes still meet in one line across the window (TYTO-288's helper).
+    expect(misalignments((await measure()).panes)).toEqual([]);
+  });
+
+  it('fails the helper when a split may shrink below its groups (the negative control)', async () => {
+    // Every floor off: the split's own, and the centre dock's with the docks' give, which is what
+    // makes room for it. Any one alone is covered by the others; together they are origin/main.
+    const style = await page.addStyleTag({
+      content:
+        '.editor-split, .dock--centre { min-width: 0 !important; } .dock--left, .dock--right { flex-shrink: 0 !important; }',
+    });
+    try {
+      const faults = crowding(await geometry(), await groupMinimum(), true);
+      process.stdout.write(`[TYTO-299] negative control: ${JSON.stringify(faults)}\n`);
+      expect(faults.join('\n')).toMatch(/overlap by/);
+    } finally {
+      await style.evaluate((node) => {
+        node.parentNode?.removeChild(node);
+      });
+    }
+    expect(crowding(await geometry(), await groupMinimum(), true)).toEqual([]);
+  });
+
+  it('clips the groups at the centre dock when the docks at their minimum still leave too little', async () => {
+    const centreOf = (scene: Geometry): Box | undefined =>
+      scene.docks.find((dock) => dock.name === 'dock centre');
+    // A focused pane asks to be scrolled into view — CodeMirror does it for its caret — and a
+    // clipping box that can scroll obeys, sliding the first groups out at the top or left. It
+    // happened on the first run of this case (group 1 at y 17.8 under a dock top at 33), only
+    // some of the time, so it is asked for here every time.
+    const bringLastIntoView = (): Promise<void> =>
+      page.evaluate(() => {
+        const groups = [...document.querySelectorAll('[data-editor-group]')];
+        const far = (group: Element): number => {
+          const box = group.getBoundingClientRect();
+          return box.right + box.bottom;
+        };
+        groups
+          .sort((one, two) => far(two) - far(one))[0]
+          ?.scrollIntoView({ block: 'end', inline: 'end' });
+      });
+    // Split down five times: six groups stacked on the left, more than 600 px can hold.
+    await page.locator('[data-editor-group] .cm-content').first().click();
+    for (let split = 0; split < 5; split += 1) {
+      await page.keyboard.press('Control+Shift+Backslash');
+      await page.waitForTimeout(300);
+    }
+    await bringLastIntoView();
+    let scene = await geometry();
+    process.stdout.write(`[TYTO-299] down: ${JSON.stringify(scene)}\n`);
+    await shoot('narrow-overflow-down-900x600');
+    expect(scene.groups.length).toBeGreaterThanOrEqual(8);
+    expect(crowding(scene, await groupMinimum(), false)).toEqual([]);
+    expect(Math.max(...scene.groups.map((group) => group.bottom))).toBeGreaterThan(
+      (centreOf(scene)?.bottom ?? 0) + TOLERANCE,
+    );
+
+    // Then split right until the row cannot fit beside the docks at their minimum.
+    await page.locator('[data-editor-group] .cm-content').first().click();
+    for (let split = 0; split < 3; split += 1) {
+      await page.keyboard.press('Control+Backslash');
+      await page.waitForTimeout(300);
+    }
+    await bringLastIntoView();
+    scene = await geometry();
+    process.stdout.write(`[TYTO-299] right: ${JSON.stringify(scene)}\n`);
+    await shoot('narrow-overflow-right-900x600');
+    expect(crowding(scene, await groupMinimum(), false)).toEqual([]);
+    expect(Math.max(...scene.groups.map((group) => group.right))).toBeGreaterThan(
+      (centreOf(scene)?.right ?? 0) + TOLERANCE,
+    );
+    // The right dock stays whole on screen, at least its own minimum wide.
+    const right = scene.docks.find((dock) => dock.name === 'dock right');
+    expect(right?.right ?? Infinity).toBeLessThanOrEqual(scene.width + TOLERANCE);
+    expect((right?.right ?? 0) - (right?.left ?? 0)).toBeGreaterThanOrEqual(
+      (await tokenPixels('--tyto-dock-min-width')) - TOLERANCE,
+    );
     await resize(defaultSize.width, defaultSize.height);
   });
 });

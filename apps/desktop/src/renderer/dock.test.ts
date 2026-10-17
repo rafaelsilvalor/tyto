@@ -81,6 +81,16 @@ describe('building the window from the record', () => {
     expect(dockOf('centre').style.height).toBe('');
   });
 
+  it('lets a dock give way down to the smaller of its size and the floor (TYTO-299)', async () => {
+    await arrange(document, DEFAULT_LAYOUT, host());
+
+    expect(dockOf('bottom').style.minHeight).toBe('min(140px, var(--tyto-dock-min-height))');
+    expect(dockOf('centre').style.minWidth).toBe('');
+    // A dock that empties forgets its floor along with its size.
+    await arrange(document, withPanelOpen(DEFAULT_LAYOUT, PROBLEMS_PANEL, false), host());
+    expect(dockOf('bottom').style.minHeight).toBe('');
+  });
+
   it('hides a dock with nothing in it, and its splitter with it', async () => {
     await arrange(document, DEFAULT_LAYOUT, host());
 

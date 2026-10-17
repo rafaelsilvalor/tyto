@@ -1,10 +1,12 @@
 import { describe, expect, it } from 'vitest';
 
-import { groupsOf, splitGroup } from './editor-groups.js';
+import { focusGroup, groupList, groupsOf, splitGroup } from './editor-groups.js';
 import {
   GROUP_MINIMUM,
   KEYBOARD_STEP,
+  SPLITTER_THICKNESS,
   equalShares,
+  footprintOf,
   keyboardDelta,
   minimumOf,
   resizedShares,
@@ -63,6 +65,31 @@ describe('minimumOf', () => {
     const column = splitGroup(groupsOf(['a'], 'a'), 'column').root;
     expect(minimumOf(column, 'column')).toBe(2 * GROUP_MINIMUM.column);
     expect(minimumOf(column, 'row')).toBe(GROUP_MINIMUM.row);
+  });
+});
+
+describe('footprintOf (TYTO-299)', () => {
+  it('is a group’s minimum, with no line, for a lone group', () => {
+    const group = groupsOf(['a'], 'a').root;
+    expect(footprintOf(group, 'row')).toBe(GROUP_MINIMUM.row);
+    expect(footprintOf(group, 'column')).toBe(GROUP_MINIMUM.column);
+  });
+
+  it('adds a line between each pair along the split’s axis, and none across it', () => {
+    const three = splitGroup(splitGroup(groupsOf(['a'], 'a'), 'row'), 'row').root;
+    expect(footprintOf(three, 'row')).toBe(3 * GROUP_MINIMUM.row + 2 * SPLITTER_THICKNESS);
+    expect(footprintOf(three, 'column')).toBe(GROUP_MINIMUM.column);
+  });
+
+  it('measures the card’s scene: a column of two beside one group, 321 by 193', () => {
+    // Split right, then the left group down: row [column [a, a], a].
+    const right = splitGroup(groupsOf(['a'], 'a'), 'row');
+    const scene = splitGroup(focusGroup(right, groupList(right)[0]?.id ?? ''), 'column');
+    expect(scene.root.kind === 'split' && scene.root.children[0]?.kind).toBe('split');
+    expect(footprintOf(scene.root, 'row')).toBe(2 * GROUP_MINIMUM.row + SPLITTER_THICKNESS);
+    expect(footprintOf(scene.root, 'column')).toBe(2 * GROUP_MINIMUM.column + SPLITTER_THICKNESS);
+    // The drag's minimum has no lines in it: one line apart from the footprint per axis.
+    expect(minimumOf(scene.root, 'row')).toBe(2 * GROUP_MINIMUM.row);
   });
 });
 

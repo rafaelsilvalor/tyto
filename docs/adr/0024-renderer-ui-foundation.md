@@ -110,6 +110,11 @@ Seven panels in four docks, plus a status bar and a command bar:
 
 **No panel is bound to a dock.** The arrangement above is the default record, not a structure: a panel is `{ panel: 'tyto-problems', dock: 'bottom', open: true, size: 240 }`, and the dock creates the element from the tag. What a person can do with it in the next cards is **show, hide and resize**, with the arrangement and the sizes persisted. Dragging a panel from one dock to another is a later card and needs no change to the shape above — that is the whole reason the shape is a record.
 
+> **Amended by ADR 0093 (TYTO-299, 2026-10-17).** A side or bottom dock's `size` is where it
+> starts, not what it is held at: when the editor groups need the room it gives way, down to the
+> smaller of its size and `--tyto-dock-min-width` / `--tyto-dock-min-height`. The record is not
+> changed, so a wider window gives the size back.
+
 **No docking library, and its cost is therefore not measured.** The card asked what one would cost in bytes and in what it assumes about its host; none was installed, so that number does not exist and this ADR does not invent it. The reason is that the thing a docking library is for — dragging a panel from one dock to another — is explicitly not in the next card, and a dependency bought for an interaction nobody is building yet is a second framework decision made on no evidence. Show, hide and resize is a splitter and a record. When dragging does get a card, that card measures the libraries against a dock that already exists, which is a far better comparison than this one could have been.
 
 ### The browser-tab premise, replaced

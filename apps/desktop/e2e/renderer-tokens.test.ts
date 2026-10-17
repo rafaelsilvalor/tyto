@@ -6,7 +6,7 @@ import { themeTokens } from '@tyto/editor';
 import { describe, expect, it } from 'vitest';
 
 import { closestPair, MINIMUM_MODE_DIFFERENCE } from '../src/main/colour-difference.js';
-import { GROUP_MINIMUM } from '../src/renderer/group-resize.js';
+import { GROUP_MINIMUM, SPLITTER_THICKNESS } from '../src/renderer/group-resize.js';
 
 /**
  * The modes vim's badge has a colour for (TYTO-301), as `status-bar.ts` lists them. Written
@@ -186,6 +186,15 @@ describe('the sizes a rule elsewhere repeats (TYTO-288)', () => {
     const { light } = themes();
     expect(light.get('--tyto-group-min-width')).toBe(`${String(GROUP_MINIMUM.row)}px`);
     expect(light.get('--tyto-group-min-height')).toBe(`${String(GROUP_MINIMUM.column)}px`);
+  });
+
+  // A split is held at its groups' minimum plus the lines between them, counted in TypeScript
+  // (`footprintOf`) and drawn at the hairline's width (TYTO-299). Two numbers that must agree.
+  it('counts the line between two groups at the hairline’s width', () => {
+    const { light } = themes();
+    expect(light.get('--tyto-hairline-width')).toBe(`${String(SPLITTER_THICKNESS)}px`);
+    expect(light.get('--tyto-dock-min-width')).toMatch(/^\d+px$/);
+    expect(light.get('--tyto-dock-min-height')).toMatch(/^\d+px$/);
   });
 
   it('declares both lines of the pane shape in pixels', () => {
