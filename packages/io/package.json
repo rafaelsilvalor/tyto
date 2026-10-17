@@ -29,7 +29,7 @@
     "@tyto/pipeline": "workspace:*",
     "@tyto/plugin-api": "workspace:*",
     "@tyto/template-lang": "workspace:*",
-    "zod": "^4.6.5"
+    "zod": "^4.6.6"
   },
   "devDependencies": {
     "@tyto/brief-lang": "workspace:*",

@@ -27,7 +27,7 @@
     "@tyto/template-lang": "workspace:*",
     "@tyto/templates": "workspace:*",
     "commander": "^15.0.0",
-    "playwright": "^1.63.0"
+    "playwright": "^1.64.0"
   },
   "devDependencies": {
     "esbuild": "0.27.7",
