@@ -18,6 +18,7 @@ import {
   DOCUMENT_NEW_FROM_TEMPLATE,
   FILE_EXPORT,
   EDITOR_INSERT_MENU,
+  EDITOR_GO_TO_BLOCK,
   EDITOR_OPEN,
   EDITOR_SAVE_AS,
   EDITOR_TOGGLE_VIM,
@@ -40,7 +41,9 @@ import {
   TEMPLATE_EDIT,
   TEMPLATE_NEW,
   SHELL_TOGGLE_LOCALE,
+  TEXT_COMMANDS,
   bindingsOf,
+  builtInKeybindings,
   createDesktopRegistry,
   keymapSetFor,
   withCommandGate,
@@ -64,6 +67,7 @@ const actions = () =>
     toggleLocale: vi.fn<() => void>(),
     toggleVimMode: vi.fn<() => void>(),
     openInsertMenu: vi.fn<() => void>(),
+    goToBlock: vi.fn<() => void>(),
     newDocument: vi.fn<() => void>(),
     newDocumentFromTemplate: vi.fn<() => void>(),
     openDocument: vi.fn<() => void>(),
@@ -237,6 +241,28 @@ describe('the ids the window registers', () => {
     expect(bindingsOf(keymapSetFor(true), 'linux')[EDITOR_INSERT_MENU]).toBeUndefined();
   });
 
+  it('offers Go to Block on a brief only, with text in front, on Mod-Shift-o in both modes (TYTO-296)', () => {
+    const spies = actions();
+    let brief = true;
+    const registry = withCommandGate(
+      createDesktopRegistry(spies),
+      (id) => brief || !BRIEF_ONLY_COMMANDS.has(id),
+    );
+    expect(registry.run(EDITOR_GO_TO_BLOCK, NO_VIEW)).toBe(true);
+    brief = false;
+    expect(registry.run(EDITOR_GO_TO_BLOCK, NO_VIEW)).toBe(false);
+    expect(spies.goToBlock).toHaveBeenCalledOnce();
+    expect(TEXT_COMMANDS.has(EDITOR_GO_TO_BLOCK)).toBe(true);
+    expect(COMMAND_LABELS[EDITOR_GO_TO_BLOCK]).toBe('command.editor.goToBlock');
+    expect(bindingsOf(keymapSetFor(false), 'linux')[EDITOR_GO_TO_BLOCK]).toBe('Ctrl+Shift+o');
+    expect(bindingsOf(keymapSetFor(true), 'linux')[EDITOR_GO_TO_BLOCK]).toBe('Ctrl+Shift+o');
+    // The key is nobody else's in the built-in table.
+    const others = builtInKeybindings.filter(
+      (binding) => binding.key === 'Mod-Shift-o' && binding.command !== EDITOR_GO_TO_BLOCK,
+    );
+    expect(others).toEqual([]);
+  });
+
   it('gives the template folder commands no keystroke', () => {
     // A setting somebody changes once, not a key anybody presses. A binding here would be one
     // more accelerator competing with the editor's for no one's benefit.
@@ -310,8 +336,12 @@ describe('the keystroke shown beside a command', () => {
 
     expect(bindings[EDITOR_UNDO]).toBeUndefined();
     expect(bindings[EDITOR_SAVE]).toBe('Ctrl+s');
-    // The same bindings as the editor's vim set, now read off the table (TYTO-207).
-    expect(keymapSetFor(true).bindings).toEqual(vimKeymapSet.bindings);
+    // The same bindings as the editor's vim set, now read off the table (TYTO-207), and the
+    // window's one key for both modes, Go to Block (TYTO-296).
+    expect(keymapSetFor(true).bindings).toEqual([
+      ...vimKeymapSet.bindings,
+      { key: 'Mod-Shift-o', command: EDITOR_GO_TO_BLOCK },
+    ]);
   });
 
   it('gives vim none of the desktop keys, because vim mode replaces the whole layer', () => {
@@ -407,6 +437,7 @@ describe('the File menu table', () => {
       PREVIEW_OPEN_TO_SIDE,
       PREVIEW_OPEN,
       PREVIEW_TOGGLE_LOCK,
+      EDITOR_GO_TO_BLOCK,
     ]);
     for (const command of VIEW_MENU_COMMANDS) {
       expect(COMMAND_LABELS[command.id]).toBe(command.label);

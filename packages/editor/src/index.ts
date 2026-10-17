@@ -53,6 +53,16 @@ export {
   stickyScroll,
 } from './sticky-scroll.js';
 
+export {
+  BLOCK_TEXT_LENGTH,
+  type BlockManifest,
+  type BriefBlock,
+  blockAt,
+  blocksOf,
+  briefBlocks,
+  previewBlock,
+} from './brief-blocks.js';
+
 export { briefDarkTheme, briefLightTheme, type ThemeName, themes, themeTokens } from './theme.js';
 
 export {

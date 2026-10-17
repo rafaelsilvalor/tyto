@@ -44,6 +44,11 @@ export interface CommandBarPick {
   readonly choose: (id: string) => void;
   /** The bar closed with nothing chosen: Escape, the bar's own key. */
   readonly cancel: () => void;
+  /**
+   * Whether typing matches the ids as well as the labels; yes unless said otherwise. "Go to
+   * Block" says no (TYTO-296): its ids are offsets, and "2" would find the block at 1234.
+   */
+  readonly matchIds?: boolean;
 }
 
 /**
@@ -62,11 +67,12 @@ const fold = (value: string): string =>
 export function filterCommands(
   entries: readonly CommandEntry[],
   query: string,
+  matchIds = true,
 ): readonly CommandEntry[] {
   const needle = fold(query.trim());
   if (needle === '') return entries;
   return entries.filter(
-    (entry) => fold(entry.label).includes(needle) || fold(entry.id).includes(needle),
+    (entry) => fold(entry.label).includes(needle) || (matchIds && fold(entry.id).includes(needle)),
   );
 }
 
@@ -129,7 +135,11 @@ export class CommandBar extends LitElement {
   }
 
   get visible(): readonly CommandEntry[] {
-    return filterCommands(this.picking?.entries ?? this.commands, this.query);
+    return filterCommands(
+      this.picking?.entries ?? this.commands,
+      this.query,
+      this.picking?.matchIds ?? true,
+    );
   }
 
   /**

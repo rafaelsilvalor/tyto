@@ -488,6 +488,14 @@ export interface Catalogue {
    * the brief names now. All of it is CodeMirror's list or the bar, so none is on screen at load.
    */
   readonly 'command.editor.insertMenu': string;
+  /**
+   * TYTO-296. "Go to Block…", its placeholder and the frontmatter's row, whose name is the
+   * window's because `@tyto/editor` owns no words. All three are the bar's, so none is on
+   * screen at load.
+   */
+  readonly 'command.editor.goToBlock': string;
+  readonly 'goToBlock.placeholder': string;
+  readonly 'goToBlock.header': string;
   readonly 'slash.section.templates': string;
   /** TYTO-277. The heading over the person's snippets in the same menu. */
   readonly 'slash.section.snippets': string;
@@ -751,6 +759,9 @@ export const CATALOGUE_KEYS = [
   'template.pick.placeholder',
   'template.root.builtIn',
   'command.editor.insertMenu',
+  'command.editor.goToBlock',
+  'goToBlock.placeholder',
+  'goToBlock.header',
   'slash.section.templates',
   'slash.section.snippets',
   'slash.template.new',

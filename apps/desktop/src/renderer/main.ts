@@ -1,4 +1,5 @@
 import {
+  type BriefBlock,
   type BriefSnippet,
   type CommandRegistry,
   EDITOR_CONTEXTS,
@@ -10,6 +11,9 @@ import {
   type KeybindingTable,
   COMMAND_BAR_TOGGLE,
   type VimStatus,
+  blockAt,
+  blocksOf,
+  previewBlock,
   briefCompletion,
   briefLint,
   briefSnippets,
@@ -113,7 +117,7 @@ import {
   togglePanelCommandId,
   withCommandGate,
 } from './commands.js';
-import { FILE_MENU_COMMANDS } from '../../shared/commands.js';
+import { FILE_MENU_COMMANDS, VIEW_MENU_COMMANDS } from '../../shared/commands.js';
 import {
   type StatusBar,
   type StatusBarCommands,
@@ -1102,6 +1106,10 @@ const registry: CommandRegistry = withCommandGate(
       // come from the bar, which held it.
       target.view.focus();
       openSlashMenu(target.view);
+    },
+
+    goToBlock: () => {
+      pickBlock();
     },
 
     newDocument: () => {
@@ -2212,6 +2220,60 @@ function pickTemplate(): void {
     },
     cancel: () => undefined,
   });
+}
+
+/**
+ * "Go to Block…" (TYTO-296): the focused pane's blocks in the bar, in document order, VS Code's
+ * "Go to Symbol in Editor". The highlighted block is shown as the selection moves, Enter leaves
+ * the caret on its `::`, and Escape puts back the selection and the scroll the pane had.
+ *
+ * The ids are offsets, so the bar matches the labels alone (`matchIds: false`): "2" finds
+ * `::lamina 2` and not the block at 1234. The list opens on the block the caret is in, or the
+ * last one above it, which is already on screen and is not previewed again.
+ */
+function pickBlock(): void {
+  const bar = elements.commandBar;
+  const target = focusedPane();
+  if (bar === null || target === undefined) return;
+  const view = target.view;
+  const blocks = blocksOf(view.state);
+  const before = view.state.selection;
+  const scroll = view.scrollSnapshot();
+  const caret = before.main.head;
+  const current =
+    blockAt(blocks, caret) ?? [...blocks].reverse().find((block) => block.from <= caret);
+  const show = (id: string, focus: boolean): void => {
+    const from = Number(id);
+    if (focus) revealRange(view, { start: from, end: from });
+    else previewBlock(view, from);
+  };
+  bar.pick({
+    entries: blocks.map((block) => ({
+      id: String(block.from),
+      label: blockLabel(block),
+      ...(block.firstText === undefined ? {} : { detail: block.firstText }),
+    })),
+    placeholder: translate(state.locale, 'goToBlock.placeholder'),
+    ...(current === undefined ? {} : { selected: String(current.from) }),
+    matchIds: false,
+    highlight: (id) => {
+      show(id, false);
+    },
+    choose: (id) => {
+      show(id, true);
+    },
+    cancel: () => {
+      view.dispatch({ selection: before, effects: scroll });
+      view.focus();
+    },
+  });
+}
+
+/** `::lamina 2`, `::ai/caption`, or the frontmatter's word in the window's language. */
+function blockLabel(block: BriefBlock): string {
+  if (block.kind === 'frontmatter') return translate(state.locale, 'goToBlock.header');
+  const ordinal = block.ordinal === undefined ? '' : ` ${String(block.ordinal)}`;
+  return `::${block.name ?? ''}${ordinal}`;
 }
 
 /**
@@ -3397,16 +3459,18 @@ function repaint(): void {
   }
 }
 
-/** The File menu ids main was last told to disable, joined; `undefined` before the first. */
+/** The File and View ids main was last told to disable, joined; `undefined` before the first. */
 let menuDisabledSent: string | undefined;
 
 /**
- * Tells main which File menu items do nothing with this tab in front, so it greys them
+ * Tells main which File and View items do nothing with this tab in front, so it greys them
  * (TYTO-283). The same predicate the bar and the registry ask; sent only when the answer
  * changes, because this runs on every repaint and main rebuilds the menu on each message.
  */
 function tellMenuWhatIsOffered(): void {
-  const ids = FILE_MENU_COMMANDS.map((command) => command.id).filter((id) => !offeredNow(id));
+  const ids = [...FILE_MENU_COMMANDS, ...VIEW_MENU_COMMANDS]
+    .map((command) => command.id)
+    .filter((id) => !offeredNow(id));
   const joined = ids.join(' ');
   if (joined === menuDisabledSent) return;
   menuDisabledSent = joined;
