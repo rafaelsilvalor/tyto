@@ -84,8 +84,15 @@ had to answer them.
   the mark, or put it in an indented body, where a mark may lead the line.
 - **No space before the colon**: `{cor: laranja}`, never `{cor : laranja}`. One token of
   lookahead cannot see past a space to tell `:` from `}`.
-- **A blank line ends an indented block.** An indented line is recognised by the break in
-  front of it, and a blank line puts a break there instead of an indent.
+- **A blank line has no meaning and does not end an indented block** (ADR 0087). One blank
+  line or several in a row, empty or holding only spaces, anywhere inside a block — between
+  two groups of a `::lamina`, or between the directive and its first body line — is there for
+  whoever reads the brief, and the brief means what it would mean without it. A block ends
+  only at the next line that is not blank and starts back at column 0. An indented line is
+  recognised by the break in front of it, and the token for that indent takes every blank
+  line before it along; at the top level a run of blank lines is one token of its own, so a
+  line of spaces between two directives is as blank as an empty one. A directive's range
+  ends at its last line with text, never on the blank lines its block absorbed.
 - **Frontmatter is taken whole and its YAML is left alone.** The grammar marks the block
   from `---` to `---`; a real YAML parser reads it in `parseBrief`. A grammar that tried
   would be a second, worse YAML. Without a closing fence there is no frontmatter, and every

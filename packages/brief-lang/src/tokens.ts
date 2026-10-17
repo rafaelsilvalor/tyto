@@ -1,6 +1,6 @@
 import { ExternalTokenizer } from '@lezer/lr';
 
-import { Frontmatter, virtualNewline } from './brief.parser.terms.js';
+import { Frontmatter, blankRun, virtualNewline } from './brief.parser.terms.js';
 
 /**
  * The two tokens a regular expression cannot recognise, because both depend on where in
@@ -88,4 +88,43 @@ export const frontmatterBlock = new ExternalTokenizer((input) => {
  */
 export const endOfInput = new ExternalTokenizer((input) => {
   if (input.next < 0) input.acceptToken(virtualNewline);
+});
+
+function isBlank(code: number): boolean {
+  return code === SPACE || code === TAB;
+}
+
+/**
+ * A run of blank lines at the top level, empty or holding only spaces and tabs (ADR 0087).
+ *
+ * A blank line has no meaning, and a line of spaces is a blank line nobody can see. The
+ * grammar's own tokens cannot say so. `$[ \t]+` would also match the indent of a line with
+ * text and no directive above it, which must stay an error at that indent; and the break in
+ * front of a blank line is the start of a `blockIndent` that takes the blank lines with it,
+ * which is right inside a block and invalid after a comment or the frontmatter. Only the end
+ * of each line tells them apart, and a Lezer token has no lookahead.
+ *
+ * So this scans by hand: the break the current line ends with, if the run starts on one,
+ * then every following line that is blank, and it stops at the start of the first line that
+ * is not — so an orphan indent after the run is still the error it was. At end of input the
+ * last line needs no break. Inside a directive the token is not valid, and Lezer hands the
+ * same characters to the grammar's own tokens.
+ */
+export const blankLines = new ExternalTokenizer((input) => {
+  let end = 0;
+  if (isLineEnd(input.peek(0))) end = afterLineEnd(input, 0);
+
+  for (;;) {
+    let offset = end;
+    while (isBlank(input.peek(offset))) offset += 1;
+    const next = input.peek(offset);
+    if (next < 0) {
+      end = offset;
+      break;
+    }
+    if (!isLineEnd(next)) break;
+    end = afterLineEnd(input, offset);
+  }
+
+  if (end > 0) input.acceptToken(blankRun, end);
 });

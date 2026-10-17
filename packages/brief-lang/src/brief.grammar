@@ -42,10 +42,14 @@ Adjustment { AdjustmentName (valueSep space? AdjustmentValue)? }
 // A block body is a run of indented lines, and `blockIndent` is the line break plus the
 // indent as one token. That is what makes the indent recognisable at all: on its own it
 // is the same two spaces as any space inside text, and only the newline in front of it
-// says otherwise. A blank line therefore ends the block — the character after its break
-// is another break, not an indent — which is also how the spec's example separates one
-// directive from the next.
-BodyLine { blockIndent BlockText }
+// says otherwise.
+//
+// A blank line has no meaning and does not end the block (TYTO-294, ADR 0087): the token
+// takes every blank line in front of the indent with it, so a block ends only at the next
+// line that is not blank and starts back at column 0. A line holding only spaces is the
+// one case where nothing follows the indent, which is why the text is optional; an empty
+// `BodyLine` says nothing and `parseBrief` drops it.
+BodyLine { blockIndent BlockText? }
 
 InlineBody { headInline bodyInline* }
 
@@ -77,7 +81,16 @@ Mark { braceOpen MarkName valueSep MarkValue braceClose headInline+ markClose }
 // — so the space between `*Legenda*` and the word after it needs a node of its own.
 Space { space }
 
-BlankLine { newline }
+// At the top level, a run of blank lines — empty or holding only spaces — is one token
+// (ADR 0087). `tokens.ts` recognises it, because only looking to the end of each line tells
+// a line of spaces from an indent with no directive above it, which is still an error and
+// still reported at the indent.
+BlankLine { newline | blankRun }
+
+// Ahead of `@tokens`, so it is asked first. Declared after, it never fired (measured): the
+// built-in tokenizer reads the same characters as `space` or `blockIndent`, neither valid
+// at the top level, and a line of spaces stayed an orphan indent.
+@external tokens blankLines from "./tokens.js" { blankRun }
 
 @tokens {
   directiveMark { "::" }
@@ -141,7 +154,9 @@ BlankLine { newline }
   lineBreak { "\n" | "\r" "\n"? }
 
   newline { lineBreak }
-  blockIndent { lineBreak $[ \t]+ }
+  // Every blank line in front of the indent — empty or holding only spaces — is part of
+  // the token. Longest match is what keeps a run of them from ending the block.
+  blockIndent { lineBreak ($[ \t]* lineBreak)* $[ \t]+ }
   space { $[ \t]+ }
 
   @precedence { adjustmentsStart, space }

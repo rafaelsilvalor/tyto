@@ -426,6 +426,99 @@ describe('a mark the template never declared', () => {
 });
 
 /**
+ * Blank lines inside a `::lamina` (TYTO-294, ADR 0087).
+ *
+ * The maintainer's rule: a blank line — one or several in a row, empty or holding only
+ * spaces — has no meaning and does not end an indented block. Until TYTO-294 the second
+ * group below a blank line left the lamina and became a directive of its own, named after
+ * its first line. The fixture with blank lines has them everywhere a person puts them: after
+ * the frontmatter, between directives, between a head and its body, between groups (one and
+ * three in a row) and at the end of the file.
+ *
+ * Deep-equal on the whole `Scene`, which carries no source ranges: whatever an exporter
+ * draws is a function of this value alone, so equal Scenes are equal HTML, SVG and pixels.
+ */
+describe('blank lines inside an agenda-semana lamina', () => {
+  const AGENDA = join(PACK, 'agenda-semana');
+  const FIXTURES = join(HERE, 'fixture/blank-lines');
+
+  const sceneOf = async (source: string): Promise<Scene> =>
+    (await buildSource(source, 'agenda-semana', AGENDA)).scene;
+
+  it('compiles to the same Scene as the brief written without them', async () => {
+    const without = await readFile(join(FIXTURES, 'without-blank-lines.brief'), 'utf8');
+    const spaced = await readFile(join(FIXTURES, 'with-blank-lines.brief'), 'utf8');
+
+    expect(spaced).not.toEqual(without);
+    const control = await sceneOf(without);
+    expect(control.artworks).toHaveLength(2);
+    expect(await sceneOf(spaced)).toEqual(control);
+  }, 60_000);
+
+  it.each([1, 2, 3])(
+    'compiles %i blank lines between two groups to the same Scene',
+    async (count) => {
+      const without = await readFile(join(FIXTURES, 'without-blank-lines.brief'), 'utf8');
+      const spaced = without.replace(
+        '\n      ORTOPEDISTA\n      11-09',
+        `\n${'\n'.repeat(count)}      ORTOPEDISTA\n      11-09`,
+      );
+
+      expect(spaced).not.toEqual(without);
+      expect(await sceneOf(spaced)).toEqual(await sceneOf(without));
+    },
+    60_000,
+  );
+});
+
+/**
+ * The example brief with blank lines in front of every body line — between a directive and
+ * its first line, and between every two lines of a block: one, two, three in turn, and a line
+ * of spaces every fourth time. Several examples have one-line blocks only, so the gap after
+ * the head is what reaches them. The frontmatter is left alone —
+ * its indented lines are YAML, where a blank line is YAML's business.
+ */
+function spacedOut(source: string): string {
+  const lines = source.split('\n');
+  const fenceEnd = lines[0] === '---' ? lines.indexOf('---', 1) : -1;
+  const out: string[] = [];
+  let inserted = 0;
+  for (const [index, line] of lines.entries()) {
+    const previous = lines[index - 1] ?? '';
+    const indented = (text: string) => /^[ \t]+\S/u.test(text);
+    if (
+      index > fenceEnd + 1 &&
+      indented(line) &&
+      (indented(previous) || previous.startsWith('::'))
+    ) {
+      inserted += 1;
+      if (inserted % 4 === 0) out.push(' \t ');
+      else out.push(...Array.from({ length: inserted % 4 }, () => ''));
+    }
+    out.push(line);
+  }
+  return out.join('\n');
+}
+
+describe.each(EXAMPLES.map((example) => [example.template, example] as const))(
+  '%s, with blank lines inside its blocks (TYTO-294)',
+  (name, example) => {
+    it('compiles to the same Scene as its example brief', async () => {
+      const directory = join(PACK, example.template);
+      const source = await readFile(join(directory, example.brief), 'utf8');
+      const spaced = spacedOut(source);
+
+      expect(spaced, `${name}: the example has no block to put a blank line in`).not.toEqual(
+        source,
+      );
+      const { scene: control } = await buildSource(source, example.template, directory);
+      const { scene } = await buildSource(spaced, example.template, directory);
+      expect(scene).toEqual(control);
+    }, 60_000);
+  },
+);
+
+/**
  * The pill that grows with its copy (TYTO-184, ADR 0038).
  *
  * `agenda-semana` measures a session's title and professor before it places them, so a
