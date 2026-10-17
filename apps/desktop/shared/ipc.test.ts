@@ -231,6 +231,7 @@ describe('the theme the window applies (TYTO-208)', () => {
     stickyScroll: true,
     tabSize: 2,
     formatBriefOnSave: false,
+    briefColumns: 'separator',
   });
 
   it('refuses a mode that is not one of the three', () => {

@@ -128,6 +128,7 @@ import {
 } from './status-bar.js';
 import { type StatusBarItemId, STATUS_BAR_ITEM_IDS } from '../../shared/status-bar-items.js';
 import { type VimModeStyle } from '../../shared/vim-mode-style.js';
+import { type BriefColumnLook } from '../../shared/brief-columns.js';
 import {
   type DocumentState,
   type Workspace,
@@ -2148,6 +2149,10 @@ function showTheme(bridge: TytoBridge, ask: () => Promise<IpcResponse<'theme:cur
       tabSize = applied.tabSize;
       editor?.setTabSize(tabSize);
       formatBriefOnSave = applied.formatBriefOnSave;
+      // And how a brief's `|` columns are drawn (TYTO-298), in every tab. The template mode holds
+      // no brief buffer, so it is not told.
+      briefColumns = applied.briefColumns;
+      editor?.setBriefColumns(briefColumns);
       // Only once it is loaded, as with the locale: `loadTemplateMode` hands it the value then.
       if (customElements.get(TEMPLATE_MODE_TAG) !== undefined && elements.templateMode) {
         elements.templateMode.showIndentGuides(indentGuides);
@@ -3339,6 +3344,9 @@ let tabSize = DEFAULT_TAB_SIZE;
 /** The `formatBriefOnSave` setting, from the same answer (TYTO-297): off until it arrives. */
 let formatBriefOnSave = false;
 
+/** The `briefColumns` setting, from the same answer (TYTO-298): the separator until it arrives. */
+let briefColumns: BriefColumnLook = 'separator';
+
 /** The ids the status bar's buttons run; the area toggles are named by the bar itself. */
 const STATUS_COMMANDS: StatusBarCommands = {
   commandBar: COMMAND_BAR_TOGGLE,
@@ -4257,6 +4265,8 @@ async function load(): Promise<void> {
       vimStatus: false,
       // Spaces per indent level (TYTO-297); the theme's answer brings the saved one.
       tabSize,
+      // How a `|` line's columns are drawn (TYTO-298); the theme's answer brings the saved one.
+      briefColumns,
       // Slots, adjustments, enum values and plugin directives after `::`, and the
       // underline, both fed from the preview's answer. No delay of the linter's own: the
       // preview's debounce is the pause, and a second one would only add to it.

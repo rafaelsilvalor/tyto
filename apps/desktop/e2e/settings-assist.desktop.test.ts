@@ -174,6 +174,7 @@ const KEYS = [
   'stickyScroll',
   'formatBriefOnSave',
   'tabSize',
+  'briefColumns',
 ];
 
 describe('the settings tab’s suggestions and hover', () => {

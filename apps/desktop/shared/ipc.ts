@@ -2,6 +2,7 @@ import { slotSchema, templateManifestSchema } from '@tyto/core';
 import { THEME_KINDS, THEME_TOKEN_NAME, isThemeColor } from '@tyto/plugin-api';
 import { z } from 'zod';
 
+import { BRIEF_COLUMN_LOOK_IDS } from './brief-columns.js';
 import { layoutSchema } from './layout.js';
 import type { SessionGroupNode } from './session-groups.js';
 import { STATUS_BAR_COLOUR_KEYS, statusBarColour } from './status-bar-colors.js';
@@ -324,6 +325,8 @@ const appliedThemesSchema = z.object({
   tabSize: z.number().int().min(1).max(8),
   /** The `formatBriefOnSave` setting in force (TYTO-297): whether Save formats a brief first. */
   formatBriefOnSave: z.boolean(),
+  /** The `briefColumns` setting in force (TYTO-298): how a `|` line's columns are drawn. */
+  briefColumns: z.enum(BRIEF_COLUMN_LOOK_IDS),
   diagnostics: z.array(diagnostic.omit({ range: true })).max(200),
 });
 
