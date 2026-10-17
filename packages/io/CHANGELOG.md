@@ -1,5 +1,26 @@
 # @tyto/io
 
+## 3.0.1
+
+### Patch Changes
+
+- 49c1569: TYTO-239: the comment on `fsInbox`'s ack retry says what it is still for — locks held from outside the desktop queue, which no longer races itself.
+- Updated dependencies [d4a6939]
+- Updated dependencies [08b936d]
+- Updated dependencies [7342c02]
+- Updated dependencies [15997e9]
+- Updated dependencies [15997e9]
+- Updated dependencies [2495d0d]
+- Updated dependencies [fe85505]
+- Updated dependencies [5a0c7c5]
+- Updated dependencies [bf3fd0e]
+  - @tyto/plugin-api@0.5.0
+  - @tyto/core@0.29.0
+  - @tyto/export-html@0.7.1
+  - @tyto/export-svg@2.0.1
+  - @tyto/pipeline@0.10.2
+  - @tyto/template-lang@0.8.1
+
 ## 3.0.0
 
 ### Major Changes

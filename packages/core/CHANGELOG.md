@@ -1,5 +1,31 @@
 # @tyto/core
 
+## 0.29.0
+
+### Minor Changes
+
+- d4a6939: TYTO-206 (ADR 0073): `settings.json` becomes a JSON-with-comments file the person owns. `plugin-api` gains the `configuration` extension point (`registerConfiguration`, `registry.configurations()`, `InProcessHost.configure`, `resolveSettings`), and the desktop app's four settings are declared through it by a built-in `desktop` plugin, under their existing names. Reading is tolerant one key at a time; a bad value costs that key alone and is a diagnostic with a range (`E_SETTINGS_SYNTAX`, `W_SETTING_UNKNOWN`, `W_SETTING_UNPREFIXED`, `W_SETTING_INVALID`, new in `core`). The app's screens edit the file in place, keeping comments and writing only keys that differ from their defaults, and never write a file that does not parse. The previous-version import accepts a commented `settings.json`.
+- 7342c02: TYTO-207 (ADR 0074): every key the window answers now comes from one keybinding table. `@tyto/editor` gains a pure resolver (`parseKey`, `resolveKeybindings`, `keymapSetFor`, `windowBindingsOf`, `shownBindingsOf`) over six closed contexts, `vimMode` and `createEditor` take their vim set as an option, and `setKeymaps` swaps both modes' bindings in place. `plugin-api`'s `editor.keymap` gains an optional `when` and is consumed by the desktop for the first time. `core` gains six codes (`E_KEYBINDINGS_SYNTAX`, `W_KEYBINDING_UNKNOWN_COMMAND`, `W_KEYBINDING_INVALID_KEY`, `W_KEYBINDING_UNKNOWN_CONTEXT`, `W_KEYBINDING_DUPLICATE`, `W_KEYBINDING_LOCKED`). The desktop's `Mod-K` listener becomes a window dispatcher for global keys, registered once. No default key changes.
+- 15997e9: TYTO-208 (ADR 0077): three codes for colour themes — `E_THEME_INVALID` (the file cannot be used; the base theme of its kind applies), `W_THEME_TOKEN_UNKNOWN` and `W_THEME_COLOR_INVALID`. None is fatal.
+- 2495d0d: TYTO-277: five diagnostic codes for the person's snippets file (ADR 0082). `E_SNIPPETS_SYNTAX` when the file is not JSON with comments or not a map of snippets, which keeps the last file that read; `W_SNIPPET_INVALID` for an entry not shaped like `{ prefix, body, description?, template? }`; `W_SNIPPET_UNSUPPORTED_BODY` for a body using VS Code syntax Tyto does not translate (variables, transforms, nested fields); `W_SNIPPET_CHOICE_FLATTENED` when a choice field is inserted as its first option; and `W_SNIPPET_UNKNOWN_TEMPLATE` for a snippet limited to a template that is not installed.
+- fe85505: A list setting can be checked one entry at a time (TYTO-301, ADR 0091). A `configuration`
+  contribution may declare `entries: { schema, unique }`; then an entry the schema refuses, or one
+  that repeats an earlier entry when `unique` is set, is left out and reported as the new warning
+  `W_SETTING_ENTRY_INVALID` at that entry, and the rest of the list still applies. `SettingEntry`
+  gains `entryRanges`, so a reader can say where each entry of a list was written. Both are
+  optional: every existing setting and reader behaves as before.
+- 5a0c7c5: An object setting can be checked one member at a time (TYTO-301, ADR 0091). A `configuration`
+  contribution may declare `members: { key, schema }`; then a member whose name `key` refuses is
+  `W_SETTING_ENTRY_INVALID` at the name, one whose value `schema` refuses is `W_SETTING_INVALID` at
+  the value under the dotted key, either is left out, and the rest still apply. `SettingEntry` gains
+  `memberRanges`. Both are optional. `@tyto/core` adds the warning `W_SETTING_LOW_CONTRAST`, for a
+  colour setting that applies although the text it leaves reads under 4.5:1.
+
+### Patch Changes
+
+- 08b936d: TYTO-207: `E_KEYBINDINGS_SYNTAX` now says what the desktop does with it — the last keybindings
+  file that read without one stays in effect — instead of applying every entry that parsed.
+
 ## 0.28.0
 
 ### Minor Changes

@@ -1,5 +1,23 @@
 # @tyto/brief-lang
 
+## 0.7.0
+
+### Minor Changes
+
+- 3b261d1: TYTO-294: a blank line has no meaning and does not end an indented block (ADR 0087). One or several blank lines in a row, empty or holding only spaces, inside a block — between two groups of a `::lamina`, or between the directive and its first body line — parse to the AST the brief has without them, and a block ends only at the next non-blank line back at column 0. A line of spaces at the top level is blank too, and a directive's range ends at its last line with text.
+- 74d7b28: TYTO-297 (ADR 0096): spaces and tabs at the end of a line of text no longer mean anything. `parseBrief` trims them from the inline body and every line of a block, so **a brief that had trailing spaces renders slightly differently: a centred line such as `Profª. Mara Rebeiro  ` goes back to the centre.** New `formatBrief` and `formatBriefEdits`: the brief rewritten into its canonical shape — body lines indented by `indentUnit` spaces, no trailing spaces, one blank line where there were several, none between a head and its first body line, a final line ending in the file's own style — changing nothing inside a line and nothing the brief compiles to. A brief with a syntax error is refused with its `E_SYNTAX` diagnostics.
+
+### Patch Changes
+
+- Updated dependencies [d4a6939]
+- Updated dependencies [08b936d]
+- Updated dependencies [7342c02]
+- Updated dependencies [15997e9]
+- Updated dependencies [2495d0d]
+- Updated dependencies [fe85505]
+- Updated dependencies [5a0c7c5]
+  - @tyto/core@0.29.0
+
 ## 0.6.8
 
 ### Patch Changes
