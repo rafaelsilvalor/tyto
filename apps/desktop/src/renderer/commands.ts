@@ -106,6 +106,11 @@ export const WINDOW_ZOOM_IN = 'window.zoomIn';
 export const WINDOW_ZOOM_OUT = 'window.zoomOut';
 export const WINDOW_ZOOM_RESET = 'window.zoomReset';
 /**
+ * TYTO-318. Help > Documentation: the user manual in the system browser, in the window's
+ * language. On Help in `shared/commands.ts` and pinned there by `commands.test.ts`.
+ */
+export const HELP_OPEN_DOCUMENTATION = 'help.openDocumentation';
+/**
  * TYTO-208. "Preferences: Color Theme": the themes in the bar, previewed as the selection
  * moves, written to the `theme` setting on Enter. No key by default (ADR 0074): a person
  * binds one in `keybindings.json` if they switch often.
@@ -260,6 +265,7 @@ export const COMMAND_LABELS: Readonly<Record<string, CatalogueKey>> = {
   [WINDOW_ZOOM_IN]: 'command.window.zoomIn',
   [WINDOW_ZOOM_OUT]: 'command.window.zoomOut',
   [WINDOW_ZOOM_RESET]: 'command.window.zoomReset',
+  [HELP_OPEN_DOCUMENTATION]: 'command.help.openDocumentation',
   [THEME_PICK]: 'command.theme.pick',
   [TEMPLATES_CHOOSE_FOLDER]: 'command.templates.chooseFolder',
   [TEMPLATES_CLEAR_FOLDER]: 'command.templates.clearFolder',
@@ -356,6 +362,8 @@ export interface DesktopActions {
   reloadWindow(): void;
   /** TYTO-272. Steps the window's zoom; main applies it and writes the `zoom` setting. */
   zoomWindow(step: 'in' | 'out' | 'reset'): void;
+  /** TYTO-318. Asks main to open the manual; which edition, and its address, are main's. */
+  openDocumentation(): void;
   /** TYTO-208. Lists the colour themes in the bar; the list and the choice are main's. */
   pickTheme(): void;
   /**
@@ -486,6 +494,9 @@ export function createDesktopRegistry(actions: DesktopActions): CommandRegistry 
   });
   add(WINDOW_ZOOM_RESET, () => {
     actions.zoomWindow('reset');
+  });
+  add(HELP_OPEN_DOCUMENTATION, () => {
+    actions.openDocumentation();
   });
   add(THEME_PICK, () => {
     actions.pickTheme();

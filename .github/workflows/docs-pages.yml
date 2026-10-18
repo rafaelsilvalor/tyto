@@ -1,0 +1,67 @@
+name: docs-pages
+# The user manual on GitHub Pages (TYTO-318, ADR 0101 amended): built from `apps/docs` and
+# published when a desktop release is tagged, so the manual online is the released app's.
+# Latest only — each release replaces the site, and an older app opens the newest manual.
+#
+# Three ways in, and only two of them publish:
+# - a `desktop-v*` tag, the one that starts `desktop.yml`'s build of the release: build and deploy;
+# - `workflow_dispatch`, a dry run by default (build and upload the artifact), deploying only when
+#   `deploy` is ticked — for republishing after a fix to the site without a release;
+# - a pull request that edits this file: build only, so a change here is proven before it is the
+#   path every release takes. The deploy job is skipped there, never failed.
+#
+# It is not a required check and runs no turbo: the site is already built and tested on every
+# pull request by `ci.yml` (`@tyto/docs#build`, TYTO-312). What this file adds is the one thing
+# `ci.yml` cannot do, which is building under the project path Pages serves the site from.
+on:
+  push:
+    tags: ['desktop-v*']
+  workflow_dispatch:
+    inputs:
+      deploy:
+        description: 'Publish the site (unticked: build the artifact only)'
+        type: boolean
+        default: false
+  pull_request:
+    paths: ['.github/workflows/docs-pages.yml']
+# One publish at a time, and a newer one never cancels a deploy half done: Pages keeps the last
+# site that finished, so a cancelled deploy would leave the release before it online.
+concurrency: { group: 'docs-pages-${{ github.ref }}', cancel-in-progress: false }
+permissions:
+  contents: read
+jobs:
+  docs-pages-build:
+    runs-on: ubuntu-latest
+    steps:
+      # `lfs: true`: the manual's pictures of the window are LFS objects (ADR 0102), and a
+      # default checkout publishes 130-byte pointer files in their place.
+      - uses: actions/checkout@v7
+        with: { lfs: true }
+      - uses: pnpm/action-setup@v6
+      - uses: actions/setup-node@v7
+        with: { node-version: 22, cache: pnpm }
+      - run: pnpm install --frozen-lockfile
+      # **The base is set here and nowhere in the site**: Pages serves a project repository
+      # under `/<repository>/`, so every asset and link in the build must start with `/tyto/`,
+      # while `pnpm dev`, `ci.yml`'s build and the search suite keep `/`. The flag is
+      # VitePress's own and overrides the config's `base`, which the config leaves unset.
+      - run: pnpm --filter @tyto/docs exec vitepress build --base /tyto/
+      # A build that ignored the flag would deploy a site whose every stylesheet 404s and still
+      # go green, so the page is read for the prefix before it is uploaded.
+      - run: grep -q 'href="/tyto/assets/' apps/docs/dist/index.html
+      - uses: actions/upload-pages-artifact@v5
+        with: { path: apps/docs/dist }
+  docs-pages-deploy:
+    needs: docs-pages-build
+    # A tag, or a dispatch that asked for it. Never a pull request: there the job is skipped.
+    if: github.event_name == 'push' || (github.event_name == 'workflow_dispatch' && inputs.deploy)
+    runs-on: ubuntu-latest
+    permissions:
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v5

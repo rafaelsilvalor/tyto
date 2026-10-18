@@ -709,7 +709,10 @@ describe('git attributes', () => {
     // `desktop-e2e.yml` joined the list in TYTO-133: `raster.desktop.test.ts` compares the
     // debugger-captured adapter against the same reference corpus, so it needs the real
     // bytes for exactly the same reason the other two do.
-    for (const file of ['ci.yml', 'visual.yml', 'desktop-e2e.yml']) {
+    //
+    // `docs-pages.yml` joined in TYTO-318: it publishes the manual's screenshots, and a pointer
+    // file published in place of a PNG is a broken picture on the live site.
+    for (const file of ['ci.yml', 'visual.yml', 'desktop-e2e.yml', 'docs-pages.yml']) {
       expect(readRepoFile(`${WORKFLOWS_DIR}/${file}`), `${file} checks out without LFS`).toMatch(
         /lfs:\s*true/,
       );

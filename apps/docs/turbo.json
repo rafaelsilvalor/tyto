@@ -2,17 +2,19 @@
   "$schema": "https://turbo.build/schema.json",
   "extends": ["//"],
   "tasks": {
-    // The site reads four files outside this package: the three author guides the Extend
-    // pages include, and the desktop app's manifest for the header's version. Without them
-    // as inputs an edit to a guide or a version bump changed no task hash, and the cache
-    // would replay a site built from the old text (the TYTO-52 class, ADR 0072).
+    // The site reads files outside this package: the three author guides the Extend pages
+    // include, the desktop app's manifest for the header's version, and the release notes the
+    // Release notes pages include (TYTO-318). Without them as inputs an edit to a guide or a
+    // version bump changed no task hash, and the cache would replay a site built from the old
+    // text (the TYTO-52 class, ADR 0072).
     "build": {
       "inputs": [
         "$TURBO_DEFAULT$",
         "$TURBO_ROOT$/docs/template-authoring.md",
         "$TURBO_ROOT$/docs/plugin-authoring.md",
         "$TURBO_ROOT$/docs/plugin-api.md",
-        "$TURBO_ROOT$/apps/desktop/package.json"
+        "$TURBO_ROOT$/apps/desktop/package.json",
+        "$TURBO_ROOT$/docs/releases/*.md"
       ]
     },
     // The search suite reads the built site's index, so it runs after this package's own
@@ -24,7 +26,8 @@
         "$TURBO_ROOT$/docs/template-authoring.md",
         "$TURBO_ROOT$/docs/plugin-authoring.md",
         "$TURBO_ROOT$/docs/plugin-api.md",
-        "$TURBO_ROOT$/apps/desktop/package.json"
+        "$TURBO_ROOT$/apps/desktop/package.json",
+        "$TURBO_ROOT$/docs/releases/*.md"
       ]
     }
   }

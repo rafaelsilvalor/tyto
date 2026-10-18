@@ -241,6 +241,7 @@ export const ptBR: Catalogue = {
   'command.window.zoomReset': 'Redefinir zoom',
   'command.window.zoomIn': 'Aumentar zoom',
   'command.window.zoomOut': 'Diminuir zoom',
+  'command.help.openDocumentation': 'Documentação',
   'typography.familyMissing': 'Esta fonte não está instalada; a fonte embutida é usada no lugar',
   'command.theme.pick': 'Preferências: Tema de cores',
   'theme.pick.placeholder': 'Escolha um tema de cores',

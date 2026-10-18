@@ -1351,6 +1351,16 @@ export const IPC_CHANNELS = {
   'log:reveal': channel(z.object({}), z.object({})),
 
   /**
+   * Help > Documentation and its command (TYTO-318): opens the user manual in the system
+   * browser, in the edition matching the window's language.
+   *
+   * It names nothing, and that is the allowlist: main picks the URL out of its own two
+   * literals (`src/main/documentation.ts`) by the locale `app:locale` last told it, so no page
+   * can use this channel to send the browser anywhere else.
+   */
+  'help:open-documentation': channel(z.object({}), z.object({})),
+
+  /**
    * The window telling main which language it is now in, so the menu can be rebuilt (TYTO-124).
    *
    * Main learns the locale once, at startup, off `app.getLocale()` — and until this card the

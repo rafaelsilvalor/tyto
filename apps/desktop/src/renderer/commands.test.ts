@@ -10,6 +10,7 @@ import {
 import { describe, expect, it, vi } from 'vitest';
 
 import {
+  DOCUMENTATION_COMMAND,
   FILE_MENU_COMMANDS,
   RELOAD_COMMAND,
   VIEW_MENU_COMMANDS,
@@ -34,6 +35,7 @@ import {
   GROUP_MOVE_TAB_LEFT,
   GROUP_MOVE_TAB_NEXT,
   GROUP_MOVE_TAB_RIGHT,
+  HELP_OPEN_DOCUMENTATION,
   PREVIEW_NEXT_FORMAT,
   PREVIEW_OPEN,
   PREVIEW_OPEN_TO_SIDE,
@@ -106,6 +108,7 @@ const actions = () =>
     openPreview: vi.fn<(side: boolean) => void>(),
     togglePreviewLock: vi.fn<() => void>(),
     zoomWindow: vi.fn<(step: 'in' | 'out' | 'reset') => void>(),
+    openDocumentation: vi.fn<() => void>(),
   }) satisfies DesktopActions;
 
 /**
@@ -456,6 +459,18 @@ describe('the File menu table', () => {
     expect(COMMAND_LABELS[RELOAD_COMMAND.id]).toBe(RELOAD_COMMAND.label);
     registry.run(RELOAD_COMMAND.id, NO_VIEW);
     expect(spies.reloadWindow).toHaveBeenCalledTimes(1);
+  });
+
+  it('names, on Help, the Documentation this window registers under the same label (TYTO-318)', () => {
+    const spies = actions();
+    const registry = createDesktopRegistry(spies);
+    expect(DOCUMENTATION_COMMAND.id).toBe(HELP_OPEN_DOCUMENTATION);
+    expect(COMMAND_LABELS[DOCUMENTATION_COMMAND.id]).toBe(DOCUMENTATION_COMMAND.label);
+    expect(registry.run(DOCUMENTATION_COMMAND.id, NO_VIEW)).toBe(true);
+    expect(spies.openDocumentation).toHaveBeenCalledTimes(1);
+    // About the app, not a brief or its text: the bar offers it with any tab in front.
+    expect(BRIEF_ONLY_COMMANDS.has(HELP_OPEN_DOCUMENTATION)).toBe(false);
+    expect(TEXT_COMMANDS.has(HELP_OPEN_DOCUMENTATION)).toBe(false);
   });
 
   it('names, on View, the zoom this window registers, on keys nobody else has (TYTO-272)', () => {

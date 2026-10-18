@@ -37,6 +37,7 @@ describe('the IPC contract', () => {
       'file:reopen',
       'file:save',
       'files:recent',
+      'help:open-documentation',
       'keybindings:open',
       'keybindings:read',
       'layout:get',
@@ -348,6 +349,9 @@ describe('what the contract does not promise', () => {
       // is, is main's — a renderer that named the folder would be naming a path it has no
       // business holding.
       'log:reveal',
+      // TYTO-318. "Open the manual" has no subject either: which page opens is main's choice
+      // between two literals, and a renderer that named a URL would be choosing for it.
+      'help:open-documentation',
       // TYTO-122. "Which folder is searched" has no subject either: there is one setting, and
       // where it points is main's.
       'templates:folder',

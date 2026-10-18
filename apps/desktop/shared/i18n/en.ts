@@ -239,6 +239,7 @@ export const en: Catalogue = {
   'command.window.zoomReset': 'Reset zoom',
   'command.window.zoomIn': 'Zoom in',
   'command.window.zoomOut': 'Zoom out',
+  'command.help.openDocumentation': 'Documentation',
   'typography.familyMissing': 'This font is not installed; the bundled one is drawn instead',
   'command.theme.pick': 'Preferences: Color Theme',
   'theme.pick.placeholder': 'Select a color theme',

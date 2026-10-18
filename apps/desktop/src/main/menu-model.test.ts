@@ -136,8 +136,14 @@ describe("the menu row's model", () => {
     expect(separator).toEqual({ id: 'item-15', label: '', type: 'separator', enabled: true });
 
     const help = model.find((menu) => menu.id === 'help');
-    expect(help?.items.map((item) => item.id)).toEqual(['item-0', 'about']);
-    expect(help?.items[0]?.label).toBe('menu.revealLogs');
+    // TYTO-318: Documentation first, by its command id, then a separator and the log folder.
+    expect(help?.items.map((item) => item.id)).toEqual([
+      'help.openDocumentation',
+      'item-1',
+      'item-2',
+      'about',
+    ]);
+    expect(help?.items[2]?.label).toBe('menu.revealLogs');
 
     const file = model.find((menu) => menu.id === 'file');
     expect(file?.items.at(-1)).toMatchObject({ role: 'quit', label: 'Exit' });
@@ -208,7 +214,12 @@ describe('finding a menu again by its id', () => {
   it('finds the Help submenu by the id the model gave it', () => {
     const menu = installed('win32');
     const help = findTopLevel(menu, 'help');
-    expect(help?.submenu?.items.map((item) => item.id)).toEqual([null, 'about']);
+    expect(help?.submenu?.items.map((item) => item.id)).toEqual([
+      'help.openDocumentation',
+      null,
+      null,
+      'about',
+    ]);
     expect(findTopLevel(menu, 'menu-9')).toBeUndefined();
     expect(findTopLevel(null, 'help')).toBeUndefined();
   });

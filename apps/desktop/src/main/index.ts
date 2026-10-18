@@ -53,6 +53,7 @@ import {
 } from '../../shared/typography.js';
 import { fileCredentialStore } from './credential-store.js';
 import { createCredentials } from './credentials.js';
+import { openDocumentation } from './documentation.js';
 import { createDocumentService } from './documents.js';
 import { createExportService } from './export.js';
 import { desktopCapabilities, startDesktopPlugins } from './installed-plugins.js';
@@ -943,6 +944,11 @@ async function start(): Promise<void> {
   // A feed this build names and cannot use is not a reason to fall back to GitHub: the build
   // that names one is a suite's, and a suite must not reach the real releases.
   if (!feed.ok) log.warn(`Update feed ignored: ${feed.reason}`);
+  // The one way this app hands the system browser a page: a release page from the update notice,
+  // or the manual from Help (TYTO-318). Neither is a request Tyto makes (ADR 0011).
+  const openExternal = (url: string): void => {
+    void shell.openExternal(url);
+  };
   const updates = createUpdateService({
     route: updateRoute({
       packaged: app.isPackaged,
@@ -991,9 +997,7 @@ async function start(): Promise<void> {
     quit: () => {
       app.quit();
     },
-    openExternal: (url) => {
-      void shell.openExternal(url);
-    },
+    openExternal,
   });
   // `quit` and not `before-quit`: it fires only once the guard above let the app go, so a
   // person who chose to stay for an unsaved tab keeps the version they are typing in.
@@ -1243,6 +1247,13 @@ async function start(): Promise<void> {
       applyZoom(next);
       const written = await remember({ zoom: next });
       return { zoom: written ? next : before, saved: written };
+    },
+    // Help > Documentation (TYTO-318): the edition of the language the menu is in, which is the
+    // one `app:locale` last set. A locale with no edition opens nothing, and the log says so.
+    openDocumentation: () => {
+      if (!openDocumentation(uiLocale, openExternal)) {
+        log.warn(`No manual edition for locale ${uiLocale}`);
+      }
     },
     // After `ready`, as the panels are, so the window's first answer is the whole list.
     keymaps: async () => {
