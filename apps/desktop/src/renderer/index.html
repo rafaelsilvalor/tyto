@@ -39,7 +39,7 @@
         application menu's top-level names into it, and each opens that menu's native list.
         `shell.ts` writes the title; macOS keeps its native frame and hides this bar.
       -->
-      <header class="title-bar">
+      <header class="title-bar" data-font-area="titleBar">
         <div class="title-bar__area">
           <div class="title-bar__menu"></div>
           <span class="title-bar__title"></span>
@@ -97,7 +97,7 @@
         draws, and the update notice at its end. The version, the platform and the template
         folder moved to Help > About; the language is a command in the bar.
       -->
-      <footer class="shell__foot">
+      <footer class="shell__foot" data-font-area="statusBar">
         <tyto-status-bar class="status-bar"></tyto-status-bar>
         <!-- TYTO-297. A sentence for a few seconds, e.g. why Format Brief did nothing. -->
         <output class="shell__notice" id="status-notice" role="status" hidden></output>

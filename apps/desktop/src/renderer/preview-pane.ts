@@ -33,7 +33,7 @@ export class PreviewPane extends LitElement {
     // Focusable, so a click anywhere in it focuses its group (ADR 0084 changes ADR 0083's
     // decision 6): a preview is a tab like any other now, and the person is looking at it.
     this.tabIndex = -1;
-    return html`<div class="preview__bar pane__header">
+    return html`<div class="preview__bar pane__header" data-font-area="paneHeaders">
         <div class="preview__tabs" data-preview-formats role="tablist"></div>
         <div class="pane__actions">
           <label class="preview__slide">

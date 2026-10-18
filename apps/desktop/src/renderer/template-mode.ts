@@ -841,11 +841,13 @@ export class TemplateMode extends LitElement {
           ${this.tabs()}
           <div
             class="template-mode__buffer"
+            data-font-area="editor"
             data-buffer="manifest"
             ?hidden=${this.visible !== 'manifest'}
           ></div>
           <div
             class="template-mode__buffer"
+            data-font-area="editor"
             data-buffer="markup"
             ?hidden=${this.visible !== 'markup'}
           ></div>

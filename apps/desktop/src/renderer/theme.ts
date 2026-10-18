@@ -5,7 +5,7 @@ import {
   statusBarOverride,
 } from '../../shared/status-bar-colors.js';
 import { type VimModeStyle, vimBarText } from '../../shared/vim-mode-style.js';
-import { typographyDeclarations } from './typography.js';
+import { fontAreaRules, typographyDeclarations } from './typography.js';
 
 /**
  * Applies the colours main resolved for each system mode (TYTO-208, ADR 0077): the themes the
@@ -108,6 +108,8 @@ export function themeSheet(applied: Applied): string {
       : `\n  --tyto-icon-stroke: ${String(applied.iconStrokeWidth)};`;
   // The person's faces and sizes (TYTO-272), the same in both modes: fonts are not theme data.
   const type = applied.typography === undefined ? '' : typographyDeclarations(applied.typography);
+  // And each area's over its base (TYTO-272 PR B), outside the media query for the same reason.
+  const areas = applied.typography === undefined ? '' : fontAreaRules(applied.typography);
   const light =
     overrideRules(applied.statusBarColors, applied.light.colors) +
     vimBarRules(applied.vimModeStyle, applied.light.colors, applied.statusBarColors);
@@ -115,7 +117,7 @@ export function themeSheet(applied: Applied): string {
     overrideRules(applied.statusBarColors, applied.dark.colors) +
     vimBarRules(applied.vimModeStyle, applied.dark.colors, applied.statusBarColors);
   return [
-    `:root:root {\n${declarations(applied.light.colors)}${stroke}${type}\n}${light}`,
+    `:root:root {\n${declarations(applied.light.colors)}${stroke}${type}\n}${areas}${light}`,
     `@media (prefers-color-scheme: dark) {\n:root:root {\n${declarations(applied.dark.colors)}\n}${dark}\n}`,
   ].join('\n');
 }

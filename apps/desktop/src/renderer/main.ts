@@ -642,6 +642,22 @@ const labelOf = (document_: DocumentState): string =>
 const whereOf = (document_: DocumentState): { where?: string } =>
   document_.pathLabel === undefined ? {} : { where: document_.pathLabel };
 
+/**
+ * Which area a group's pane is drawn in (TYTO-272 PR B): `json` while a settings, keybindings or
+ * snippets tab is in front, `editor` otherwise. One CodeMirror view shows both kinds, so its
+ * root changes area with the tab. No remeasure here: the area only changes when another
+ * document comes to the front, and `restore` gives the view a new state, which CodeMirror
+ * measures afresh — measured with a JSON tab in Consolas and a brief in IBM Plex Mono at 14,
+ * the brief's guides on their columns with and without a remeasure at this point.
+ */
+function showFontArea(mount: HTMLElement, front: EditorTab | undefined): void {
+  const kind =
+    front === undefined || isPreview(front)
+      ? undefined
+      : documentOf(workspace, front.documentId)?.kind;
+  mount.dataset['fontArea'] = kind === undefined ? 'editor' : 'json';
+}
+
 function paintTabs(): void {
   // One strip per group (TYTO-286). A fresh array every time, for the reason the problems
   // panel's state object is fresh: Lit compares by identity and `repeat` keyed by tab id is
@@ -654,6 +670,7 @@ function paintTabs(): void {
     element.activeTabId = group.activeTabId ?? '';
     const front = activeTabOf(group);
     element.showing = front !== undefined && isPreview(front) ? 'preview' : 'editor';
+    showFontArea(element.mount, front);
     // "Open preview to the side" at the end of the strip while a brief's own tab is in front.
     element.offerPreview =
       front !== undefined &&

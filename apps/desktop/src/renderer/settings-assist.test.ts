@@ -38,7 +38,7 @@ describe('suggesting in settings.json', () => {
     const answer = complete('{\n  "|\n}');
     expect(answer?.quoted).toBe(true);
     expect(answer?.from).toBe(5);
-    expect(answer?.options).toHaveLength(19);
+    expect(answer?.options).toHaveLength(21);
     expect(labels('{\n  "queueAutoRun": true,\n  "|\n}')).not.toContain('queueAutoRun');
   });
 
@@ -97,6 +97,15 @@ describe('suggesting in settings.json', () => {
     expect(answer?.options.map((option) => option.label)).not.toContain('background');
     const insert = answer?.options.find((option) => option.label === 'vimMode.insert');
     expect(insert).toMatchObject({ insert: '"vimMode.insert": ""', select: [19, 19] });
+  });
+
+  it('offers the font areas inside fontSizes and fontFamilies (TYTO-272 PR B)', () => {
+    for (const key of ['fontSizes', 'fontFamilies']) {
+      const names = labels(`{ "${key}": { "tabs": 18, "|" } }`);
+      expect(names).toContain('titleBar');
+      expect(names).toContain('completion');
+      expect(names).not.toContain('tabs');
+    }
   });
 
   it('offers nothing after a comma, for an unknown key, or with no outline yet', () => {

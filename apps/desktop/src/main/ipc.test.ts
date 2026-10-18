@@ -505,6 +505,8 @@ const windowThemes = (): WindowThemes => {
       uiFontSize: 18,
       codeFontFamily: 'IBM Plex Mono',
       codeFontSize: 20,
+      fontSizes: { tabs: 18, editor: 22 },
+      fontFamilies: { problems: 'Segoe UI' },
     }),
   };
 };
@@ -1326,6 +1328,9 @@ describe('the theme channels (TYTO-208)', () => {
       uiFontSize: 18,
       codeFontFamily: 'IBM Plex Mono',
       codeFontSize: 20,
+      // And the areas over the bases (TYTO-272 PR B), on the same object.
+      fontSizes: { tabs: 18, editor: 22 },
+      fontFamilies: { problems: 'Segoe UI' },
     });
     expect('zoom' in answer).toBe(false);
   });

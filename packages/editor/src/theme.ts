@@ -248,7 +248,9 @@ export const panelStyles = {
   },
   '.cm-tooltip-section:not(:first-child)': { borderTop: hairline },
 
-  // @codemirror/autocomplete.
+  // @codemirror/autocomplete. The list reads the code size itself rather than inheriting the
+  // editor's, so a host can give it a size of its own (TYTO-272's `completion` area).
+  '.cm-tooltip.cm-tooltip-autocomplete': { fontSize: codeSize },
   '.cm-tooltip.cm-tooltip-autocomplete > ul': { fontFamily: monoFont },
   '.cm-tooltip.cm-tooltip-autocomplete > ul > li': {
     padding: `${panels.paddingBlock} ${panels.paddingInline}`,

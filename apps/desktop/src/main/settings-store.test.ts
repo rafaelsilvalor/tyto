@@ -117,6 +117,8 @@ describe('fileSettingsStore', () => {
       uiFontSize: DEFAULT_SETTINGS.uiFontSize,
       codeFontFamily: DEFAULT_SETTINGS.codeFontFamily,
       codeFontSize: DEFAULT_SETTINGS.codeFontSize,
+      fontSizes: DEFAULT_SETTINGS.fontSizes,
+      fontFamilies: DEFAULT_SETTINGS.fontFamilies,
     });
   });
 
@@ -149,6 +151,8 @@ describe('fileSettingsStore', () => {
       uiFontSize: DEFAULT_SETTINGS.uiFontSize,
       codeFontFamily: DEFAULT_SETTINGS.codeFontFamily,
       codeFontSize: DEFAULT_SETTINGS.codeFontSize,
+      fontSizes: DEFAULT_SETTINGS.fontSizes,
+      fontFamilies: DEFAULT_SETTINGS.fontFamilies,
     });
   });
 
@@ -181,6 +185,8 @@ describe('fileSettingsStore', () => {
       uiFontSize: DEFAULT_SETTINGS.uiFontSize,
       codeFontFamily: DEFAULT_SETTINGS.codeFontFamily,
       codeFontSize: DEFAULT_SETTINGS.codeFontSize,
+      fontSizes: DEFAULT_SETTINGS.fontSizes,
+      fontFamilies: DEFAULT_SETTINGS.fontFamilies,
     });
   });
 
@@ -212,6 +218,8 @@ describe('fileSettingsStore', () => {
       uiFontSize: DEFAULT_SETTINGS.uiFontSize,
       codeFontFamily: DEFAULT_SETTINGS.codeFontFamily,
       codeFontSize: DEFAULT_SETTINGS.codeFontSize,
+      fontSizes: DEFAULT_SETTINGS.fontSizes,
+      fontFamilies: DEFAULT_SETTINGS.fontFamilies,
     });
   });
 

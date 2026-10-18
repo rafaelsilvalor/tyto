@@ -73,16 +73,11 @@
   --tyto-font-mono: 'IBM Plex Mono', monospace;
   /*
    * Two bases (TYTO-272, ADR 0099): the window's text outside the editor and the editor's. The
-   * theme sheet sets them from `uiFontSize` and `codeFontSize`. Every other size is the UI base
-   * times its old ratio to 14, rounded to a pixel, so at the default 14 each is the pixel it was
-   * before the card — 12, 13, 14 and 16 — and at any other base the ramp keeps its shape.
+   * theme sheet sets them from `uiFontSize` and `codeFontSize`, and again on an area's root
+   * from `fontSizes`. The ramp derived from the UI base is the block after this one.
    */
   --tyto-ui-size: 14px;
   --tyto-code-size: 14px;
-  --tyto-text-xs: round(calc(var(--tyto-ui-size) * 12 / 14), 1px);
-  --tyto-text-sm: round(calc(var(--tyto-ui-size) * 13 / 14), 1px);
-  --tyto-text-md: var(--tyto-ui-size);
-  --tyto-text-lg: round(calc(var(--tyto-ui-size) * 16 / 14), 1px);
   --tyto-line-height: 1.45;
   --tyto-weight-strong: 700;
 
@@ -110,19 +105,6 @@
    */
   --tyto-pane-strip-height: 30px;
   --tyto-pane-header-height: 22px;
-  /*
-   * Those two are floors since TYTO-272 (ADR 0099): with larger text a strip grows to its
-   * label's line and the padding around it, so nothing is cut. At the default sizes the line is
-   * shorter than the floor (26.85 under 30, 21.4 under 22) and the strips are what they were.
-   */
-  --tyto-pane-strip-block: max(
-    var(--tyto-pane-strip-height),
-    calc(var(--tyto-text-sm) * var(--tyto-line-height) + 2 * var(--tyto-space-2))
-  );
-  --tyto-pane-header-block: max(
-    var(--tyto-pane-header-height),
-    calc(var(--tyto-text-xs) * var(--tyto-line-height) + 2 * var(--tyto-space-1))
-  );
 
   /* The icons' stroke, in units of their 16-unit grid: the `iconStrokeWidth` setting's default
      (TYTO-288). The theme sheet sets the person's value over it. */
@@ -237,6 +219,36 @@
   --tyto-checker-square: 8px;
   /* Behind a plugin's page, which may assume a background it does not paint. */
   --tyto-plugin-page: #ffffff;
+}
+
+/*
+ * The sizes derived from the UI base, declared on the root and again on every area's root
+ * (TYTO-272, ADR 0099). A custom property is substituted where it is declared, so a ramp
+ * declared only here would stay the root's inside an area that sets its own `--tyto-ui-size`;
+ * declared on the area too, it is computed there from the area's size. While no area sets one
+ * the area inherits the root's base and every size is the root's.
+ */
+:root,
+[data-font-area] {
+  /* Every other size is the UI base times its old ratio to 14, rounded to a pixel, so at the
+     default 14 each is the pixel it was before the card — 12, 13, 14 and 16. */
+  --tyto-text-xs: round(calc(var(--tyto-ui-size) * 12 / 14), 1px);
+  --tyto-text-sm: round(calc(var(--tyto-ui-size) * 13 / 14), 1px);
+  --tyto-text-md: var(--tyto-ui-size);
+  --tyto-text-lg: round(calc(var(--tyto-ui-size) * 16 / 14), 1px);
+  /*
+   * The strip heights are floors since TYTO-272 (ADR 0099): with larger text a strip grows to
+   * its label's line and the padding around it, so nothing is cut. At the default sizes the line
+   * is shorter than the floor (26.85 under 30, 21.4 under 22) and the strips are what they were.
+   */
+  --tyto-pane-strip-block: max(
+    var(--tyto-pane-strip-height),
+    calc(var(--tyto-text-sm) * var(--tyto-line-height) + 2 * var(--tyto-space-2))
+  );
+  --tyto-pane-header-block: max(
+    var(--tyto-pane-header-height),
+    calc(var(--tyto-text-xs) * var(--tyto-line-height) + 2 * var(--tyto-space-1))
+  );
 }
 
 @media (prefers-color-scheme: dark) {

@@ -89,7 +89,7 @@ export abstract class DockedPanel extends LitElement {
    * `aria-label`; then the close button, which hides the tool.
    */
   protected chrome(title: TemplateResult, actions: unknown = nothing): TemplateResult {
-    return html`<div class="pane__strip pane__strip--tool">
+    return html`<div class="pane__strip pane__strip--tool" data-font-area="paneHeaders">
       ${title}
       <div class="pane__actions tool__actions">
         ${actions}
@@ -162,7 +162,11 @@ export class ProblemsPanelFrame extends DockedPanel {
       \`problems-panel.test.ts\` pins the literal against \`PROBLEMS_TAG\`, so the two cannot
       drift without a test saying so.
     -->
-      <tyto-problems class="problems__list" id="problems-list"></tyto-problems>`;
+      <tyto-problems
+        class="problems__list"
+        id="problems-list"
+        data-font-area="problems"
+      ></tyto-problems>`;
   }
 }
 

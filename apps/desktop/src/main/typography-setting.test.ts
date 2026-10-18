@@ -6,6 +6,7 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
 import { DEFAULT_SETTINGS } from '../../shared/settings.js';
 import {
+  FONT_AREAS,
   ZOOM,
   steppedZoom,
   typographyExample,
@@ -14,7 +15,7 @@ import {
 } from '../../shared/typography.js';
 import { fileSettingsStore } from './settings-store.js';
 
-/** `zoom`, `uiFontFamily`, `uiFontSize`, `codeFontFamily` and `codeFontSize` (TYTO-272). */
+/** `zoom`, the two faces and sizes, and `fontSizes`/`fontFamilies` over them (TYTO-272). */
 
 let scratch: string;
 let file: string;
@@ -104,18 +105,80 @@ describe('the typography settings', () => {
 
   it('are in a new settings.json commented out, and parse uncommented', async () => {
     const example = typographyExample();
-    for (const key of ['zoom', 'uiFontFamily', 'uiFontSize', 'codeFontFamily', 'codeFontSize']) {
+    for (const key of [
+      'zoom',
+      'uiFontFamily',
+      'uiFontSize',
+      'codeFontFamily',
+      'codeFontSize',
+      'fontSizes',
+      'fontFamilies',
+    ]) {
       expect(example).toContain(`// "${key}": `);
+    }
+    // Every area is listed under both objects, so the file shows every key a person may write.
+    for (const area of FONT_AREAS) {
+      expect(example.split(`//   "${area.id}": `)).toHaveLength(3);
     }
     const uncommented = example
       .split('\n')
-      .filter((line) => line.trim().startsWith('// "'))
+      .filter((line) => /^\/\/ +["}]/u.test(line.trim()))
       .map((line) => line.replace('// ', ''))
       .join('\n')
       .replace(/,$/u, '');
     const reading = await read(`{\n${uncommented}\n}\n`);
     expect(reading.diagnostics).toEqual([]);
     expect(reading.settings.uiFontFamily).toBe('Source Sans 3');
+    expect(reading.settings.fontSizes.titleBar).toBe(14);
+    expect(reading.settings.fontFamilies.editor).toBe('IBM Plex Mono');
+  });
+});
+
+describe('the areas over the bases (TYTO-272 PR B)', () => {
+  it('reads a size and a face per area, and leaves the unset ones to their base', async () => {
+    const reading = await read(
+      '{\n  "fontSizes": { "tabs": 18, "statusBar": 16, "editor": 20 },\n' +
+        '  "fontFamilies": { "problems": "Segoe UI" }\n}\n',
+    );
+    expect(reading.diagnostics).toEqual([]);
+    expect(reading.settings.fontSizes).toEqual({ tabs: 18, statusBar: 16, editor: 20 });
+    expect(reading.settings.fontFamilies).toEqual({ problems: 'Segoe UI' });
+  });
+
+  it('says an unknown area at its name and a size out of that area’s bounds at the value', async () => {
+    const reading = await read(
+      '{\n  "fontSizes": { "sidebar": 16, "titleBar": 19, "tabs": 25, "editor": 30, "queue": 16 }\n}\n',
+    );
+    // The title bar stops at 18 and a UI area at 24, where a code area goes on to 32.
+    expect(reading.settings.fontSizes).toEqual({ editor: 30, queue: 16 });
+    expect(reading.diagnostics.map((item) => [item.code, item.message])).toEqual([
+      [
+        'W_SETTING_ENTRY_INVALID',
+        expect.stringMatching(/^Entry 'sidebar' of setting 'fontSizes' .*not an area/u),
+      ],
+      ['W_SETTING_INVALID', expect.stringMatching(/^Setting 'fontSizes\.titleBar' .*over 18/u)],
+      ['W_SETTING_INVALID', expect.stringMatching(/^Setting 'fontSizes\.tabs' .*over 24/u)],
+    ]);
+    expect(reading.diagnostics.every((item) => item.range !== undefined)).toBe(true);
+  });
+
+  it('refuses a face that could close the CSS string, at that area alone', async () => {
+    const reading = await read(
+      '{\n  "fontFamilies": { "tabs": "a;b", "statusBar": "Segoe UI" }\n}\n',
+    );
+    expect(reading.settings.fontFamilies).toEqual({ statusBar: 'Segoe UI' });
+    expect(reading.diagnostics.map((item) => item.code)).toEqual(['W_SETTING_INVALID']);
+  });
+
+  it('declares every area once, each over one of the two bases', () => {
+    const ids = FONT_AREAS.map((area) => area.id);
+    expect(new Set(ids).size).toBe(ids.length);
+    expect(FONT_AREAS.filter((area) => area.base === 'code').map((area) => area.id)).toEqual([
+      'editor',
+      'json',
+      'completion',
+    ]);
+    expect(FONT_AREAS.find((area) => area.id === 'titleBar')?.maximum).toBe(18);
   });
 });
 
@@ -142,8 +205,17 @@ describe('typography on the bridge', () => {
       uiFontSize: 14,
       codeFontFamily: 'Cascadia Code',
       codeFontSize: 14,
+      fontSizes: { tabs: 18 },
+      fontFamilies: { tabs: 'Segoe UI' },
     };
     expect(typographySchema.safeParse(good).success).toBe(true);
+    // And an area's size outside that area's bounds, which main never sends.
+    expect(typographySchema.safeParse({ ...good, fontSizes: { titleBar: 19 } }).success).toBe(
+      false,
+    );
+    expect(typographySchema.safeParse({ ...good, fontFamilies: { tabs: 'a"b' } }).success).toBe(
+      false,
+    );
     for (const family of ['a"b', "a'b", 'a;b', 'a}b', 'a\\b', 'a<b', 'a\nb', '']) {
       expect(typographySchema.safeParse({ ...good, codeFontFamily: family }).success, family).toBe(
         false,

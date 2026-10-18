@@ -111,6 +111,8 @@ export class EditorGroupElement extends LitElement {
     if (this.ownMount === undefined) {
       this.ownMount = document.createElement('div');
       this.ownMount.className = 'editor';
+      // A brief's area until a JSON tab comes to the front (TYTO-272 PR B; `paintTabs`).
+      this.ownMount.dataset['fontArea'] = 'editor';
     }
     return this.ownMount;
   }
@@ -133,7 +135,7 @@ export class EditorGroupElement extends LitElement {
     // The pane shape (ADR 0085): the strip — the tabs, then the group's actions at its right
     // end — and the header row, which holds the breadcrumb alone. With a preview in front
     // the row is hidden and the preview's bar, a header row of its own, takes its place.
-    return html`<div class="pane__strip">
+    return html`<div class="pane__strip" data-font-area="tabs">
         <tyto-tabs
           class="tabs"
           .tabs=${this.tabs}
@@ -161,7 +163,7 @@ export class EditorGroupElement extends LitElement {
           }
         </div>
       </div>
-      <div class="pane__header" ?hidden=${this.showing === 'preview'}>
+      <div class="pane__header" data-font-area="paneHeaders" ?hidden=${this.showing === 'preview'}>
         <div class="pane__breadcrumb" data-breadcrumb>${this.breadcrumb}</div>
       </div>`;
   }

@@ -11,6 +11,7 @@ import {
   BUNDLED_CODE_FAMILY,
   BUNDLED_UI_FAMILY,
   DEFAULT_TYPOGRAPHY,
+  FONT_AREAS,
 } from '../shared/typography.js';
 
 /**
@@ -248,6 +249,39 @@ describe('the type ramp derives from two bases (TYTO-272, ADR 0099)', () => {
     );
     const shell = withoutComments(read('shell.css'));
     expect(shell).not.toMatch(/height:\s*var\(--tyto-pane-(?:strip|header)-height\)/);
+  });
+
+  it('declares the ramp and the strip heights on every area’s root too (TYTO-272 PR B)', () => {
+    // A custom property is substituted where it is declared: a ramp declared on the root alone
+    // would stay the root's inside an area that sets its own base.
+    const css = withoutComments(read(TOKEN_FILE));
+    const block = /:root,\s*\[data-font-area\]\s*\{([^}]*)\}/u.exec(css)?.[1] ?? '';
+    expect([...declarations(block).keys()].sort()).toEqual([
+      '--tyto-pane-header-block',
+      '--tyto-pane-strip-block',
+      '--tyto-text-lg',
+      '--tyto-text-md',
+      '--tyto-text-sm',
+      '--tyto-text-xs',
+    ]);
+  });
+
+  it('puts every area but the explorer on a root in the renderer’s markup', () => {
+    // The explorer has no root until TYTO-279 builds one; the completion list is reached by
+    // CodeMirror's class (`areaSelector`); `json` is the editor mount's area while a JSON tab is
+    // in front (`showFontArea`), which `typography.desktop.test.ts` measures in the window.
+    const sources = rendererFiles()
+      .map((name) => read(name))
+      .join('\n');
+    const rooted = new Set(
+      [...sources.matchAll(/(?:data-font-area="|dataset\['fontArea'\] = ')([A-Za-z]+)/gu)].map(
+        (match) => match[1],
+      ),
+    );
+    const expected = FONT_AREAS.map((area) => area.id).filter(
+      (id) => id !== 'explorer' && id !== 'completion' && id !== 'json',
+    );
+    expect(expected.filter((id) => !rooted.has(id))).toEqual([]);
   });
 });
 

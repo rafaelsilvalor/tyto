@@ -14,8 +14,8 @@ import { z } from 'zod';
  * **The zoom is Electron's and not a size**: `webContents.setZoomLevel`, a factor of 1.2 per
  * step, which scales the window and the preview's art alike, as a browser's Ctrl and + does.
  *
- * PR B of the card adds a closed set of areas (`fontSizes`, `fontFamilies`) over these bases;
- * that is why the window is told one `typography` object and not four loose values.
+ * PR B of the card adds a closed set of areas (`fontSizes`, `fontFamilies`) over these bases,
+ * which is why the window is told one `typography` object and not loose values.
  *
  * In `shared/` because both halves read it: main validates the settings and the window turns
  * them into custom properties. Linted pure.
@@ -46,7 +46,7 @@ export function steppedZoom(level: number, step: ZoomStep): number {
  * backslash and the characters that end a declaration or a rule are refused, so a name can never
  * close the string it is written into; every real family name passes.
  */
-const familyName = z
+export const familyName = z
   .string()
   .trim()
   .min(1, { error: 'is an empty family name' })
@@ -55,7 +55,7 @@ const familyName = z
     error: 'is not a family name: quotes, backslashes and ; { } < > are not allowed',
   });
 
-const size = (bounds: { readonly minimum: number; readonly maximum: number }) =>
+export const size = (bounds: { readonly minimum: number; readonly maximum: number }) =>
   z
     .number()
     .int({ error: 'is not a whole number of pixels' })
@@ -127,13 +127,186 @@ export const codeFontSizeContribution = {
   ],
 } satisfies ConfigurationContribution<number>;
 
-/** The five, in the order the settings file documents them. */
+/** What an area's size or face falls back to while it is not set: one of the two bases. */
+export type FontBase = 'ui' | 'code';
+
+/**
+ * One part of the window with a size and a face of its own (TYTO-272 PR B, ADR 0099 decision
+ * 2): the base it follows while unset, the largest size it takes, and what it covers.
+ */
+export interface FontArea {
+  readonly id: string;
+  readonly base: FontBase;
+  readonly maximum: number;
+  readonly description: string;
+}
+
+/**
+ * **The areas are a closed list the app declares**, not selectors a person writes: a selector
+ * is a contract with the markup, and the markup is free to change. Each area's root carries
+ * `data-font-area="<id>"`, where the window redeclares the base's custom properties, so the
+ * ramp inside the area follows (`tokens.css`). The title bar is capped at 18, under the
+ * system buttons' 32 px. The explorer has no root until TYTO-279 builds one.
+ */
+export const FONT_AREAS = [
+  {
+    id: 'editor',
+    base: 'code',
+    maximum: CODE_FONT_SIZE.maximum,
+    description: 'The brief editor and the template buffers.',
+  },
+  {
+    id: 'json',
+    base: 'code',
+    maximum: CODE_FONT_SIZE.maximum,
+    description: 'The settings, keybindings and snippets tabs.',
+  },
+  {
+    id: 'completion',
+    base: 'code',
+    maximum: CODE_FONT_SIZE.maximum,
+    description: "The editor's suggestion list.",
+  },
+  {
+    id: 'problems',
+    base: 'ui',
+    maximum: UI_FONT_SIZE.maximum,
+    description: "The problems panel's rows.",
+  },
+  {
+    id: 'commandBar',
+    base: 'ui',
+    maximum: UI_FONT_SIZE.maximum,
+    description: 'The command bar (Ctrl+K) and its lists.',
+  },
+  {
+    id: 'titleBar',
+    base: 'ui',
+    maximum: 18,
+    description: "The window's title bar, up to 18; the native menus keep the system's text.",
+  },
+  {
+    id: 'tabs',
+    base: 'ui',
+    maximum: UI_FONT_SIZE.maximum,
+    description: "The editor groups' tab strips, which grow to fit.",
+  },
+  {
+    id: 'paneHeaders',
+    base: 'ui',
+    maximum: UI_FONT_SIZE.maximum,
+    description: "The breadcrumb row, a preview's bar and the panels' headers.",
+  },
+  {
+    id: 'statusBar',
+    base: 'ui',
+    maximum: UI_FONT_SIZE.maximum,
+    description: 'The status bar.',
+  },
+  {
+    id: 'queue',
+    base: 'ui',
+    maximum: UI_FONT_SIZE.maximum,
+    description: "The queue panel's body.",
+  },
+  {
+    id: 'explorer',
+    base: 'ui',
+    maximum: UI_FONT_SIZE.maximum,
+    description: 'The file explorer, once the window has one (TYTO-279); nothing yet.',
+  },
+] as const satisfies readonly FontArea[];
+
+export type FontAreaId = (typeof FONT_AREAS)[number]['id'];
+
+const AREA_IDS = FONT_AREAS.map((area) => area.id) as [FontAreaId, ...FontAreaId[]];
+
+const fontArea = z.enum(AREA_IDS, {
+  error: (issue) => `'${String(issue.input)}' is not an area; the areas are ${AREA_IDS.join(', ')}`,
+});
+
+/** An area's own bounds: its base's minimum, and its own maximum. */
+const areaSize = (area: FontArea) =>
+  size({
+    minimum: area.base === 'code' ? CODE_FONT_SIZE.minimum : UI_FONT_SIZE.minimum,
+    maximum: area.maximum,
+  });
+
+const baseKeys = (base: FontBase): string =>
+  base === 'code' ? 'codeFontSize and codeFontFamily' : 'uiFontSize and uiFontFamily';
+
+const areaOptions = FONT_AREAS.map((area) => ({
+  value: area.id,
+  description: `${area.description} Follows ${baseKeys(area.base)} while unset.`,
+}));
+
+export type FontSizes = Readonly<Partial<Record<FontAreaId, number>>>;
+export type FontFamilies = Readonly<Partial<Record<FontAreaId, string>>>;
+
+/** Each area's own bounds, which the bridge checks again and the `members` rule by name. */
+const AREA_SIZES = Object.fromEntries(FONT_AREAS.map((area) => [area.id, areaSize(area)]));
+
+const fontSizesSchema = z
+  .partialRecord(fontArea, z.number())
+  .superRefine((sizes, context) => {
+    for (const [area, value] of Object.entries(sizes)) {
+      const checked = AREA_SIZES[area]?.safeParse(value);
+      if (checked?.success === false) {
+        context.addIssue({
+          code: 'custom',
+          path: [area],
+          message: checked.error.issues.map((issue) => issue.message).join('; '),
+        });
+      }
+    }
+  })
+  .readonly();
+
+const fontFamiliesSchema = z.partialRecord(fontArea, familyName).readonly();
+
+/**
+ * `fontSizes`: a size in pixels per area, over its base. Each member is checked on its own
+ * (`members`), so an unknown area is `W_SETTING_ENTRY_INVALID` at its name and a size outside
+ * that area's own bounds `W_SETTING_INVALID` at the value, and only that area follows its base.
+ */
+export const fontSizesContribution = {
+  id: 'fontSizes',
+  schema: fontSizesSchema,
+  default: {},
+  description:
+    'A text size in pixels for one part of the window, over its base (uiFontSize or codeFontSize). An area left out follows its base. ' +
+    FONT_AREAS.map((area) => `${area.id}: ${area.description}`).join(' '),
+  members: {
+    key: fontArea,
+    schema: size({ minimum: UI_FONT_SIZE.minimum, maximum: CODE_FONT_SIZE.maximum }),
+    schemaByName: AREA_SIZES,
+    options: areaOptions,
+  },
+} satisfies ConfigurationContribution<FontSizes>;
+
+/**
+ * `fontFamilies`: a face per area, over its base's face and with the bundled face behind it; a
+ * face this machine lacks is `W_FONT_FAMILY_MISSING`, as for the bases.
+ */
+export const fontFamiliesContribution = {
+  id: 'fontFamilies',
+  schema: fontFamiliesSchema,
+  default: {},
+  description:
+    'A face for one part of the window, over its base (uiFontFamily or codeFontFamily). An area left out follows its base. ' +
+    FONT_AREAS.map((area) => `${area.id}: ${area.description}`).join(' '),
+  members: { key: fontArea, schema: familyName, options: areaOptions },
+} satisfies ConfigurationContribution<FontFamilies>;
+
+/** The seven, in the order the settings file documents them. */
 export const typographyContributions = [
   zoomContribution,
   uiFontFamilyContribution,
   uiFontSizeContribution,
   codeFontFamilyContribution,
   codeFontSizeContribution,
+  fontSizesContribution,
+  fontFamiliesContribution,
 ] as const;
 
 /** The type the window applies, on `theme:current`'s answer. Zoom is main's alone. */
@@ -142,6 +315,10 @@ export interface Typography {
   readonly uiFontSize: number;
   readonly codeFontFamily: string;
   readonly codeFontSize: number;
+  /** A size per area that has one (TYTO-272 PR B); the rest follow their base. */
+  readonly fontSizes: FontSizes;
+  /** A face per area that has one; the rest follow their base. */
+  readonly fontFamilies: FontFamilies;
 }
 
 export const DEFAULT_TYPOGRAPHY: Typography = {
@@ -149,6 +326,8 @@ export const DEFAULT_TYPOGRAPHY: Typography = {
   uiFontSize: UI_FONT_SIZE.default,
   codeFontFamily: BUNDLED_CODE_FAMILY,
   codeFontSize: CODE_FONT_SIZE.default,
+  fontSizes: {},
+  fontFamilies: {},
 };
 
 /** `typography` as the bridge checks it: the settings' own schemas, so both sides agree. */
@@ -157,9 +336,36 @@ export const typographySchema = z.object({
   uiFontSize: uiFontSizeContribution.schema,
   codeFontFamily: familyName,
   codeFontSize: codeFontSizeContribution.schema,
+  fontSizes: fontSizesSchema,
+  fontFamilies: fontFamiliesSchema,
 });
 
-/** The five keys as a newly created `settings.json` shows them, commented out. */
+type DeclaredArea = (typeof FONT_AREAS)[number];
+
+/** The size an area is drawn at: its own, or its base's. */
+export function areaFontSize(typography: Typography, area: DeclaredArea): number {
+  return (
+    typography.fontSizes[area.id] ??
+    (area.base === 'code' ? typography.codeFontSize : typography.uiFontSize)
+  );
+}
+
+/** The face an area is drawn in: its own, or its base's. */
+export function areaFontFamily(typography: Typography, area: DeclaredArea): string {
+  return (
+    typography.fontFamilies[area.id] ??
+    (area.base === 'code' ? typography.codeFontFamily : typography.uiFontFamily)
+  );
+}
+
+/** One commented line per area, inside an object the example opens and closes. */
+const areaLines = (value: (area: DeclaredArea) => string): string[] =>
+  FONT_AREAS.map(
+    (area, index) =>
+      `//   "${area.id}": ${value(area)}${index === FONT_AREAS.length - 1 ? '' : ','}`,
+  );
+
+/** The seven keys as a newly created `settings.json` shows them, commented out. */
 export function typographyExample(): string {
   return [
     '// How far the whole window is zoomed, in steps of 20%, -5 to 5 (default 0). Ctrl and =, Ctrl and - and Ctrl and 0 write it here.',
@@ -170,6 +376,19 @@ export function typographyExample(): string {
     '// The face and size (9 to 32) of the editor. A face this machine lacks is drawn in IBM Plex Mono.',
     '// "codeFontFamily": "IBM Plex Mono",',
     '// "codeFontSize": 14,',
+    '// A size per part of the window. Write only the parts to change: a part left out follows its',
+    '// base. editor, json and completion follow codeFontSize (9 to 32), the rest uiFontSize (9 to 24; titleBar up to 18).',
+    '// "fontSizes": {',
+    ...areaLines((area) =>
+      String(area.base === 'code' ? CODE_FONT_SIZE.default : UI_FONT_SIZE.default),
+    ),
+    '// },',
+    '// A face per part of the window, the same way, over codeFontFamily or uiFontFamily.',
+    '// "fontFamilies": {',
+    ...areaLines((area) =>
+      JSON.stringify(area.base === 'code' ? BUNDLED_CODE_FAMILY : BUNDLED_UI_FAMILY),
+    ),
+    '// },',
   ]
     .map((line) => `  ${line}`)
     .join('\n');

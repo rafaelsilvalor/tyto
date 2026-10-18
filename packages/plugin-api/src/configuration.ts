@@ -62,6 +62,11 @@ export interface ConfigurationContribution<T = unknown> extends Contribution {
   readonly members?: {
     readonly key: ZodType<string>;
     readonly schema: ZodType<unknown>;
+    /**
+     * A schema per member name, used instead of `schema` for that name (TYTO-272): one object
+     * whose members take different values, such as a size per area with an area's own bounds.
+     */
+    readonly schemaByName?: Readonly<Record<string, ZodType<unknown>>>;
     /** The member names the object may hold, for suggestions and hover (TYTO-304). */
     readonly options?: readonly SettingOption[];
   };
@@ -324,7 +329,7 @@ function keptMembers(
       );
       continue;
     }
-    const parsed = rule.schema.safeParse(member);
+    const parsed = (rule.schemaByName?.[key.data] ?? rule.schema).safeParse(member);
     if (!parsed.success) {
       diagnostics.push(
         diagnostic(

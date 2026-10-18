@@ -566,6 +566,8 @@ async function start(): Promise<void> {
     uiFontSize: saved.uiFontSize,
     codeFontFamily: saved.codeFontFamily,
     codeFontSize: saved.codeFontSize,
+    fontSizes: saved.fontSizes,
+    fontFamilies: saved.fontFamilies,
   };
   windowZoom = saved.zoom;
   // Electron's zoom on the window's page, and the system's buttons sized to match. Applied at
@@ -827,13 +829,17 @@ async function start(): Promise<void> {
         keys.includes('uiFontFamily') ||
         keys.includes('uiFontSize') ||
         keys.includes('codeFontFamily') ||
-        keys.includes('codeFontSize')
+        keys.includes('codeFontSize') ||
+        keys.includes('fontSizes') ||
+        keys.includes('fontFamilies')
       ) {
         typography = {
           uiFontFamily: next.uiFontFamily,
           uiFontSize: next.uiFontSize,
           codeFontFamily: next.codeFontFamily,
           codeFontSize: next.codeFontSize,
+          fontSizes: next.fontSizes,
+          fontFamilies: next.fontFamilies,
         };
       }
     },
