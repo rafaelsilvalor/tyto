@@ -53,7 +53,18 @@ export const SECTIONS: readonly Section[] = [
     slug: 'troubleshooting',
     title: { en: 'Troubleshooting', 'pt-BR': 'Solução de problemas' },
   },
-  { slug: 'release-notes', title: { en: 'Release notes', 'pt-BR': 'Notas de versão' } },
+  {
+    slug: 'release-notes',
+    title: { en: 'Release notes', 'pt-BR': 'Notas de versão' },
+    // One page per file in the repository's `docs/releases/`, newest first, each including that
+    // file rather than copying it (TYTO-318). `test/release-notes.test.ts` holds this list to the
+    // folder, so a release whose notes were written and not listed fails the suite.
+    pages: [
+      { slug: 'desktop-v0.7.0', title: { en: 'Tyto 0.7.0', 'pt-BR': 'Tyto 0.7.0' } },
+      { slug: 'desktop-v0.6.0', title: { en: 'Tyto 0.6.0', 'pt-BR': 'Tyto 0.6.0' } },
+      { slug: 'desktop-v0.3.0', title: { en: 'Tyto 0.3.0', 'pt-BR': 'Tyto 0.3.0' } },
+    ],
+  },
 ];
 
 /**

@@ -1,7 +1,12 @@
 # Release notes
 
-What changed in each version of Tyto.
+What changed in each version of the desktop app, newest first. Each page is the text published
+with that release, written in Brazilian Portuguese.
 
-::: info Not written yet
-No card writes this section yet. Until one does, this page is a placeholder.
-:::
+- [Tyto 0.7.0](./desktop-v0.7.0) — the app updates itself
+- [Tyto 0.6.0](./desktop-v0.6.0)
+- [Tyto 0.3.0](./desktop-v0.3.0) — the first beta
+
+The manual online always describes the newest version. If your app is older, some of what it
+describes may not be in your version yet: Help ▸ Documentation opens this site, and the app
+offers the update when one is out.

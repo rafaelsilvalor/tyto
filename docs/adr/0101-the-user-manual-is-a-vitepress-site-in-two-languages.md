@@ -1,7 +1,7 @@
 # 0101 — The user manual is a VitePress site in `apps/docs`, in English and Brazilian Portuguese
 
 Status: accepted · 2026-10-18 · TYTO-312 (epic TYTO-311) · amended in place by TYTO-318
-(decisions 8 and 9: how the site is published and how the app reaches it)
+(decisions 8 to 10: how the site is published, how the app reaches it, and the release notes)
 
 ## Context
 
@@ -96,6 +96,15 @@ two literals in `apps/desktop/src/main/documentation.ts` by the locale the windo
 choose the URL, so those two literals are the allowlist. Opening a public page in the person's
 own browser is not a network client inside Tyto (ADR 0011): the app sends no request and reads
 no answer.
+
+**10. The Release notes section includes `docs/releases/*.md`, in Portuguese in both editions**
+(TYTO-318). Those files are the text published with each desktop release, and they are written
+in Brazilian Portuguese for the people who install the app. Each one is a page in each edition,
+one `<!--@include:-->` line as decision 6 does for the guides, newest version first; the English
+page says above the include that the notes are in Portuguese. Translating them would be a second
+copy of a text that is already published and never edited after its release.
+`apps/docs/test/release-notes.test.ts` holds the section's list to the folder, so notes written
+for a release and not listed fail the suite.
 
 ## Consequences
 
