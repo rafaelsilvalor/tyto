@@ -1,6 +1,6 @@
 # 0067 — The packaged app switches off RunAsNode, and starts plugins with `spawn`
 
-Status: accepted · 2026-10-07 · TYTO-193 · amended 2026-10-08 by TYTO-241 and TYTO-249 · amends ADR 0050 (the launcher's mechanism, not its
+Status: accepted · 2026-10-07 · TYTO-193 · amended 2026-10-08 by TYTO-241 and TYTO-249 · its proof's "still running at a 15 s deadline" amended 2026-10-18 by ADR 0103 · amends ADR 0050 (the launcher's mechanism, not its
 decision)
 
 ## Context

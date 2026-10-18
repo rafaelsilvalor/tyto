@@ -2,10 +2,10 @@ import { type ChildProcess, spawn } from 'node:child_process';
 import { readFileSync, readdirSync } from 'node:fs';
 import { join } from 'node:path';
 
-import { type Browser, type Page, chromium } from 'playwright';
+import type { Browser, Page } from 'playwright';
 
 import { FIRST_WINDOW_TIMEOUT_MS } from './first-window.js';
-import { readPortFile } from './port-file.js';
+import { DEBUGGING_PORT_SWITCH, waitForBoot } from './boot-signal.js';
 import { appSwitches, killTree } from './run-as-node-probe.js';
 
 /**
@@ -45,6 +45,8 @@ const sleep = (ms: number): Promise<void> =>
     setTimeout(resolve, ms);
   });
 
+export { windowPages } from './boot-signal.js';
+
 /**
  * Start `executable` as the app with a debugging port, and connect to its window.
  *
@@ -72,7 +74,7 @@ export async function launchOverCdp(
 
   const child = spawn(
     executable,
-    [...appSwitches(options.userData), '--remote-debugging-port=0', ...(options.arguments ?? [])],
+    [...appSwitches(options.userData), DEBUGGING_PORT_SWITCH, ...(options.arguments ?? [])],
     {
       env: environment,
       stdio: ['ignore', 'ignore', 'pipe'],
@@ -96,42 +98,17 @@ export async function launchOverCdp(
   });
 
   try {
-    const portFile = join(options.userData, 'DevToolsActivePort');
-    const started = Date.now();
-    const deadline = (what: string): void => {
-      if (gone) throw new Error(`the app exited before ${what}: ${stderr.slice(-400)}`);
-      if (Date.now() - started > FIRST_WINDOW_TIMEOUT_MS) {
-        throw new Error(`no ${what} within ${String(FIRST_WINDOW_TIMEOUT_MS)} ms`);
-      }
-    };
-    // Two lines, port and path: Chromium writes the file in one go, but a read can land
-    // between the create and the write.
-    let lines: string[] | undefined;
-    while ((lines = readPortFile(portFile)) === undefined) {
-      deadline('DevToolsActivePort');
-      await sleep(50);
-    }
-    const port = lines[0]!;
-    const browser = await chromium.connectOverCDP(`http://127.0.0.1:${port}`);
-
-    let page: Page | undefined;
-    while ((page = windowPages(browser)[0]) === undefined) {
-      deadline('window');
-      await sleep(50);
-    }
-    // The editor and not the bridge (TYTO-175): see the packaged suite's `beforeAll`.
-    await page.waitForSelector('#editor .cm-content', { timeout: FIRST_WINDOW_TIMEOUT_MS });
-
+    const { browser, page } = await waitForBoot({
+      userData: options.userData,
+      gone: () => gone,
+      stderrTail: () => stderr,
+      deadlineMs: FIRST_WINDOW_TIMEOUT_MS,
+    });
     return { browser, page, child, exited, stderrTail: () => stderr };
   } catch (cause) {
     killTree(child.pid);
     throw cause;
   }
-}
-
-/** Every page target the browser has, which is every window's page. */
-export function windowPages(browser: Browser): Page[] {
-  return browser.contexts().flatMap((context) => context.pages());
 }
 
 /**

@@ -29,6 +29,7 @@ import {
   waitForExit,
   windowPages,
 } from './cdp-app.js';
+import { FIRST_WINDOW_TIMEOUT_MS } from './first-window.js';
 import { probeLaunch } from './launch-probe.js';
 import { killTree, probeRunAsNode } from './run-as-node-probe.js';
 
@@ -490,7 +491,7 @@ describe('the packaged app', () => {
     const control = await probeRunAsNode(createRequire(import.meta.url)('electron') as string, {
       userData: undefined,
       home: join(scratch, 'tyto-home'),
-      deadlineMs: 15_000,
+      deadlineMs: FIRST_WINDOW_TIMEOUT_MS,
     });
     process.stdout.write(
       `[TYTO-193] control: unfused node_modules Electron run as Node printed 1 → ` +
@@ -516,13 +517,13 @@ describe('the packaged app', () => {
     // isolating switches (see `appSwitches`). A wire that still says `on` gets none, so the
     // probe can print `1` and the assertion below says so, instead of a Node refusing a switch.
     //
-    // A booted app never exits on its own, so the deadline is the whole cost of this line: short,
-    // and the tree is killed at it.
+    // A booted app never exits on its own, so the probe ends it once the editor is up over CDP
+    // (TYTO-308). The deadline is only the upper bound for one that never gets there.
     const packaged = await probeRunAsNode(packagedExecutable(), {
       userData:
         state(FuseV1Options.RunAsNode) === 'off' ? join(scratch, 'probe-packaged-data') : undefined,
       home: join(scratch, 'tyto-home'),
-      deadlineMs: 15_000,
+      deadlineMs: FIRST_WINDOW_TIMEOUT_MS,
     });
     process.stdout.write(
       `[TYTO-193] ELECTRON_RUN_AS_NODE=1 <packaged exe> -e "console.log(1)" printed 1 → ` +
@@ -537,10 +538,11 @@ describe('the packaged app', () => {
     // the switch it gated is ignored.
     expect(state(FuseV1Options.EnableNodeCliInspectArguments)).toBe('off');
     expect(packaged.printedOne).toBe(false);
-    // Still running at the deadline means it booted as the app. A Node exits at once, with or
-    // without its `1`, so this is what tells "ignored the variable" from "never got to answer".
-    expect(packaged.ended).toBe('killed');
-  }, 60_000);
+    // A window with the editor means it booted as the app (ADR 0103). A Node exits at once, with
+    // or without its `1`, so this is what tells "ignored the variable" from "never got to answer".
+    expect(packaged.ended).toBe('booted');
+    // Two probes, each bounded by the first-window deadline (TYTO-308).
+  }, 150_000);
 
   it('carries the GitHub update feed and no local one (TYTO-131, ADR 0069)', () => {
     // **What `desktop.yml` packs is what this packs**: the same CLI over the same `out/`, with
@@ -599,7 +601,7 @@ describe('the packaged app', () => {
     const intact = await probeLaunch(executable, {
       userData: join(scratch, 'integrity-intact-data'),
       home: join(scratch, 'tyto-home'),
-      deadlineMs: 15_000,
+      deadlineMs: FIRST_WINDOW_TIMEOUT_MS,
     });
 
     const unpatched = readFileSync(archive);
@@ -608,7 +610,7 @@ describe('the packaged app', () => {
     const patched = await probeLaunch(executable, {
       userData: join(scratch, 'integrity-patched-data'),
       home: join(scratch, 'tyto-home'),
-      deadlineMs: 15_000,
+      deadlineMs: FIRST_WINDOW_TIMEOUT_MS,
     });
 
     // Said rather than assumed: the archive the other tests launched is still byte for byte the
@@ -628,7 +630,7 @@ describe('the packaged app', () => {
     expect(integrity).toBe('on');
     expect(asarOnly).toBe('on');
     expect(untouched).toBe(true);
-    expect(intact.ended).toBe('killed');
+    expect(intact.ended).toBe('booted');
     // **Linux is measured and printed, not asserted.** electron-builder 26 writes the hash
     // into the Windows executable's resources and the macOS `Info.plist`, and nowhere on
     // Linux, so there is nothing for Electron to check the archive against (ADR 0067).
@@ -636,7 +638,8 @@ describe('the packaged app', () => {
       expect(patched.ended).toBe('exited');
       expect(patched.code).not.toBe(0);
     }
-  }, 120_000);
+    // Two probes, each bounded by the first-window deadline (TYTO-308).
+  }, 150_000);
 
   it('quits through the quit guard when the harness closes it over CDP (TYTO-249)', async () => {
     // **The harness's own quit, held by a dirty tab.** `afterAll` quits with this same
@@ -689,14 +692,14 @@ describe('the packaged app', () => {
     const control = await probeLaunch(createRequire(import.meta.url)('electron') as string, {
       userData: join(scratch, 'inspect-control-data'),
       home: join(scratch, 'tyto-home'),
-      deadlineMs: 15_000,
+      deadlineMs: FIRST_WINDOW_TIMEOUT_MS,
       before: ['--inspect=0'],
       after: [projectDirectory],
     });
     const packaged = await probeLaunch(packagedExecutable(), {
       userData: join(scratch, 'inspect-packaged-data'),
       home: join(scratch, 'tyto-home'),
-      deadlineMs: 15_000,
+      deadlineMs: FIRST_WINDOW_TIMEOUT_MS,
       before: ['--inspect=0'],
     });
 
@@ -716,8 +719,9 @@ describe('the packaged app', () => {
     expect(control.debuggerListening).toBe(true);
     expect(inspect).toBe('off');
     expect(packaged.debuggerListening).toBe(false);
-    // Still running at the deadline: it booted as the app and ignored the switch, rather than
+    // A window with the editor: it booted as the app and ignored the switch, rather than
     // refusing to start, which would also print no line.
-    expect(packaged.ended).toBe('killed');
-  }, 120_000);
+    expect(packaged.ended).toBe('booted');
+    // Two probes, each bounded by the first-window deadline (TYTO-308).
+  }, 150_000);
 });
