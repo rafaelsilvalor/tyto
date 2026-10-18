@@ -1,11 +1,13 @@
-import { execFileSync, spawn } from 'node:child_process';
+import { type ChildProcess, execFileSync, spawn } from 'node:child_process';
+
+import { DEBUGGING_PORT_SWITCH, waitForBoot } from './boot-signal.js';
 
 /** What one `ELECTRON_RUN_AS_NODE=1 <executable> -e "console.log(1)"` produced. */
 export interface RunAsNodeProbe {
   /** Whether a line of stdout was exactly `1`, which only a Node evaluating `-e` prints. */
   readonly printedOne: boolean;
-  /** `exited` on its own, or `killed` by the deadline — what a booted app ends as. */
-  readonly ended: 'exited' | 'killed';
+  /** How it ended: see {@link ProbeEnding}. */
+  readonly ended: ProbeEnding;
   readonly code: number | null;
   readonly stdoutBytes: number;
 }
@@ -47,8 +49,7 @@ export function appSwitches(userData: string): string[] {
  *
  * With the RunAsNode fuse off the variable is ignored and the executable boots as the app, so
  * the probe isolates it like any e2e launch — its own `--user-data-dir` and `TYTO_HOME`, hidden
- * — and kills the **whole process tree** at the deadline: a GPU or utility child left behind
- * would hold the CI job open long after the test said it was done.
+ * — and ends as soon as it has booted (see {@link watchLaunch}).
  */
 export function probeRunAsNode(
   executable: string,
@@ -64,8 +65,12 @@ export function probeRunAsNode(
   // part of the question, and in the control it would be read by the Node being asked.
   delete environment['NODE_OPTIONS'];
 
+  // The debugging port only beside the isolating switches, for the same reason: a Node exits 9
+  // on it, and an app needs it to say it booted.
   const args = ['-e', 'console.log(1)'];
-  if (options.userData !== undefined) args.push(...appSwitches(options.userData));
+  if (options.userData !== undefined) {
+    args.push(...appSwitches(options.userData), DEBUGGING_PORT_SWITCH);
+  }
 
   const child = spawn(executable, args, {
     env: environment,
@@ -82,26 +87,101 @@ export function probeRunAsNode(
   // Drained so a chatty boot cannot fill the pipe and stall the process it is measuring.
   child.stderr.resume();
 
+  return watchLaunch(child, {
+    userData: options.userData,
+    deadlineMs: options.deadlineMs,
+    stderrTail: () => '',
+  }).then(({ ended, code }) => ({
+    printedOne: stdout.split(/\r?\n/u).some((line) => line.trim() === '1'),
+    ended,
+    code,
+    stdoutBytes: Buffer.byteLength(stdout),
+  }));
+}
+
+/**
+ * How a probe ended (TYTO-308, ADR 0103).
+ *
+ * - `exited`: on its own, before the deadline. A Node does, at once; so does an app that
+ *   refuses to start.
+ * - `booted`: a window with the editor was reached over CDP, and the probe then ended it.
+ * - `killed`: neither, by the deadline. Not a boot: something that sat there without a window.
+ */
+export type ProbeEnding = 'exited' | 'booted' | 'killed';
+
+export interface LaunchWatch {
+  /** The app's data folder, or `undefined` for a launch that cannot boot as the app. */
+  readonly userData: string | undefined;
+  readonly deadlineMs: number;
+  readonly stderrTail: () => string;
+}
+
+/**
+ * Wait for a launched executable to exit, boot or reach the deadline, and end it in the last
+ * two cases (TYTO-308).
+ *
+ * **It used to wait out the deadline for an app that boots**, and read "still running" as the
+ * boot: 4 probes of 6 in the packaged suite spent 15 s each that way. Now the boot is seen, over
+ * CDP, the moment the editor is up, and the deadline is only the upper bound for what never
+ * boots — set long, so a slow runner cannot pass for a refusal.
+ *
+ * The **whole process tree** is killed, and `close` awaited, so whatever the caller reads off
+ * stdout or stderr is complete: a GPU or utility child left behind would also hold the CI job
+ * open long after the test said it was done.
+ */
+export function watchLaunch(
+  child: ChildProcess,
+  watch: LaunchWatch,
+): Promise<{ ended: ProbeEnding; code: number | null; signal: NodeJS.Signals | null }> {
   return new Promise((resolve, reject) => {
-    let killed = false;
+    let ending: 'booted' | 'killed' | undefined;
+    let gone = false;
+    // Where the time goes, printed per probe: the boot is the app's cost, and anything between it
+    // and the close is the probe's.
+    const started = Date.now();
+    const at: { booted?: number } = {};
     const deadline = setTimeout(() => {
-      killed = true;
+      ending ??= 'killed';
       killTree(child.pid);
-    }, options.deadlineMs);
+    }, watch.deadlineMs);
 
     child.once('error', (cause) => {
       clearTimeout(deadline);
       reject(cause);
     });
-    child.once('close', (code) => {
+    child.once('close', (code, signal) => {
+      gone = true;
       clearTimeout(deadline);
-      resolve({
-        printedOne: stdout.split(/\r?\n/u).some((line) => line.trim() === '1'),
-        ended: killed ? 'killed' : 'exited',
-        code,
-        stdoutBytes: Buffer.byteLength(stdout),
-      });
+      const ended = ending ?? 'exited';
+      process.stdout.write(
+        `[TYTO-308] probe ${ended}: booted at ${String(at.booted ?? '-')} ms, ` +
+          `process closed at ${String(Date.now() - started)} ms\n`,
+      );
+      resolve({ ended, code, signal });
     });
+
+    const userData = watch.userData;
+    if (userData === undefined) return;
+    waitForBoot({
+      userData,
+      gone: () => gone,
+      stderrTail: watch.stderrTail,
+      deadlineMs: watch.deadlineMs,
+    }).then(
+      async ({ browser }) => {
+        ending ??= 'booted';
+        at.booted = Date.now() - started;
+        // **Killed first, then disconnected**, as the quit-guard test does. The other order was
+        // measured on Linux CI: `browser.close()` on the live app took 30 s every time (booted at
+        // ~0.6 s, disconnected at ~30.6 s, in all 5 probes of run 39174295738), and with the
+        // process gone it returns at once.
+        killTree(child.pid);
+        await browser.close().catch(() => {});
+      },
+      () => {
+        // It exited, or the deadline is about to end it: `close` says which.
+      },
+    );
   });
 }
 
