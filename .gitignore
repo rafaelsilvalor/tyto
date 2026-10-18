@@ -62,3 +62,9 @@ logs/
 # Visual test output: the render and the pixel diff for a reference that did not match.
 # `visual.yml` uploads it as an artifact; it is never committed.
 __diff__/
+
+# VitePress's build scratch (the server bundle, the bundled config) and its default cache
+# folder; the build deletes the first two on the way out (TYTO-314).
+.vitepress/.temp/
+.vitepress/cache/
+*.timestamp-*.mjs
