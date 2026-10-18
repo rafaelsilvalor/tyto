@@ -128,16 +128,23 @@ describe('changesets', () => {
     expect(changesetsConfig.privatePackages).toEqual({ version: true, tag: false });
   });
 
-  it('give both apps a version, because an installer is named after one', () => {
-    // `app.getVersion()` and electron-builder both read `apps/desktop/package.json`. With no
-    // version field the window reported Electron's own `44.3.0` as if it were Tyto's, and the
-    // installer would be named for it (TYTO-40).
+  it('version the apps that ship, and leave the manual out by the absence of a field', () => {
+    // Both sets are pinned, so a new app cannot join either side silently. The CLI and the
+    // desktop app ship binaries named after their version: `app.getVersion()` and
+    // electron-builder both read `apps/desktop/package.json`, and with no version field the
+    // window reported Electron's own `44.3.0` as if it were Tyto's, and the installer would
+    // be named for it (TYTO-40). The manual has no version of its own: it is built from the
+    // desktop app's (ADR 0101), so a field here would only put docs bumps in the version PR
+    // and a changeset in every docs pull request.
     const apps = versionsUnder('apps');
+    const versioned = [...apps].filter(([, version]) => version !== undefined);
+    const unversioned = [...apps].filter(([, version]) => version === undefined);
 
-    expect([...apps.keys()].sort()).toEqual(['@tyto/cli', '@tyto/desktop']);
-    for (const [name, version] of apps) {
+    expect(versioned.map(([name]) => name).sort()).toEqual(['@tyto/cli', '@tyto/desktop']);
+    for (const [name, version] of versioned) {
       expect(version, `${name} carries a version`).toMatch(/^\d+\.\d+\.\d+$/u);
     }
+    expect(unversioned.map(([name]) => name).sort()).toEqual(['@tyto/docs']);
   });
 
   it('keep tools/* out by the absence of a version field, not by the config', () => {

@@ -5,6 +5,7 @@ Read `docs/architecture.md` before any task. Decisions in `docs/adr/` are closed
 ## Language
 
 - Code, identifiers, comments, docs, commit messages, PR titles/bodies, Jira cards: **English**.
+- One exception (ADR 0101): the user manual in `apps/docs` has two editions, English at `/` and Brazilian Portuguese at `/pt-BR/`. English is the source; a page added to one edition is added to the other in the same PR (a parity test fails otherwise). The author guides it includes from `docs/` stay English-only. Contributor docs, ADRs, code, commits and cards stay English.
 - The maintainer (Rafael) reads English fine but writes in **Portuguese**. He will talk to you in Portuguese; reply in Portuguese in chat. Everything you _produce_ in the repo stays in English — code, docs, commits, PRs. Quoting English code or docs to him needs no translation.
 - Jira cards: title and body in English, followed by a `---` and a Portuguese half. That half is **not a translation** — he reads English fine, so translating the technical body twice buys nothing. It explains, for somebody who does not write code, **what the card adds to Tyto**: one concrete example of what a person can do afterwards that they could not do before, and one sentence on what still does not work. Three sentences to a short paragraph.
 - Cards written before 2026-09-11 carry a compressed Portuguese translation instead. They are not retrofitted on sight: a closed card is history, and an open one gets the new half when somebody picks it up.
@@ -35,7 +36,7 @@ Compiler: brief → Scene IR → exporters (HTML→raster, SVG), plus an Electro
 
 ## Stack (do not change without an ADR)
 
-pnpm workspaces + Turborepo · TypeScript strict · Zod · Vitest · Playwright · ESLint flat + Prettier · tsup (libs) · electron-vite (desktop) · CodeMirror 6 + Lezer · commander (CLI) · Changesets.
+pnpm workspaces + Turborepo · TypeScript strict · Zod · Vitest · Playwright · ESLint flat + Prettier · tsup (libs) · electron-vite (desktop) · CodeMirror 6 + Lezer · commander (CLI) · VitePress (user manual) · Changesets.
 
 ## Style
 
