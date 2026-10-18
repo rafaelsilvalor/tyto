@@ -33,6 +33,9 @@ interface Workflow {
     string,
     {
       name?: string;
+      needs?: string | string[];
+      if?: string;
+      outputs?: Record<string, string>;
       env?: Record<string, string | number>;
       steps?: {
         id?: string;
@@ -79,11 +82,17 @@ const REQUIRED_CHECKS = [
   { context: 'visual', workflow: 'visual.yml' },
 ];
 
-/** The required checks that scope themselves, and the suite name each passes the script. */
+/**
+ * The required checks that scope themselves, the suite name each passes the script, and
+ * where the decision lives. `in-job`: the first step after checkout decides and every later
+ * step of the same job is gated on it. `scope-job` (ADR 0100): a job named `scope` decides,
+ * every other job is gated on its output, and the required context is a job that rolls the
+ * others up.
+ */
 const SCOPED_CHECKS = [
-  { context: 'desktop', workflow: 'desktop-e2e.yml', suite: 'desktop' },
-  { context: 'visual', workflow: 'visual.yml', suite: 'visual' },
-];
+  { context: 'desktop', workflow: 'desktop-e2e.yml', suite: 'desktop', shape: 'scope-job' },
+  { context: 'visual', workflow: 'visual.yml', suite: 'visual', shape: 'in-job' },
+] as const;
 
 interface ChangesetsActionMajor {
   /** Every input name that major declares, read off its own `action.yml`. */
@@ -763,21 +772,88 @@ describe('required checks', () => {
     },
   );
 
-  it.each(SCOPED_CHECKS)(
+  /** The first two steps of the job that decides: checkout two commits deep, then the script. */
+  const expectDecidingSteps = (
+    steps: NonNullable<NonNullable<Workflow['jobs']>[string]['steps']>,
+    suite: string,
+  ) => {
+    expect(steps[0]?.uses).toMatch(/^actions\/checkout@/u);
+    // Two commits, because the diff is read between the merge commit and its first parent.
+    expect(steps[0]?.with?.['fetch-depth']).toBe(2);
+    expect(steps[1]?.id).toBe('scope');
+    expect(steps[1]?.run).toBe(`node tools/repo-checks/src/ci-scope.mjs ${suite}`);
+  };
+
+  it.each(SCOPED_CHECKS.filter((check) => check.shape === 'in-job'))(
     'decide "$context" in its first step after checkout, and gate every later step on it',
     ({ context, workflow, suite }) => {
       const steps = readYaml<Workflow>(`${WORKFLOWS_DIR}/${workflow}`).jobs?.[context]?.steps ?? [];
-      expect(steps[0]?.uses).toMatch(/^actions\/checkout@/u);
-      // Two commits, because the diff is read between the merge commit and its first parent.
-      expect(steps[0]?.with?.['fetch-depth']).toBe(2);
-      expect(steps[1]?.id).toBe('scope');
-      expect(steps[1]?.run).toBe(`node tools/repo-checks/src/ci-scope.mjs ${suite}`);
+      expectDecidingSteps(steps, suite);
       for (const [index, step] of steps.slice(2).entries()) {
         expect(
           step.if ?? '(no condition)',
           `${workflow} step ${index + 2} (${step.run ?? step.uses}) runs even when the scope skipped`,
         ).toContain("steps.scope.outputs.run == 'true'");
       }
+    },
+  );
+
+  /**
+   * The shape ADR 0100 gave `desktop-e2e.yml` (TYTO-307): the suite runs as several jobs in
+   * parallel, so the decision moved into a job of its own and the required context became
+   * a roll-up. Three ways it breaks without failing anything: a job that forgets the scope
+   * (it runs on a skip, or worse, is skipped on a run and reads as green), a roll-up that
+   * does not wait for a job (the context is green before the job has said anything), and a
+   * roll-up whose condition lets a failure or a cancellation through. The last one matters
+   * most, because a job whose dependency failed is *skipped* by default, and branch
+   * protection reads a skipped required check as passing.
+   */
+  it.each(SCOPED_CHECKS.filter((check) => check.shape === 'scope-job'))(
+    'decide "$context" in a scope job, gate every job on it, and roll every result up',
+    ({ context, workflow, suite }) => {
+      const jobs = readYaml<Workflow>(`${WORKFLOWS_DIR}/${workflow}`).jobs ?? {};
+      const scope = jobs['scope'];
+      expect(scope, `${workflow} has no scope job`).toBeDefined();
+      expectDecidingSteps(scope?.steps ?? [], suite);
+      expect(scope?.outputs?.['run']).toBe('${{ steps.scope.outputs.run }}');
+
+      const needsOf = (job: { needs?: string | string[] }) =>
+        typeof job.needs === 'string' ? [job.needs] : (job.needs ?? []);
+
+      const gated = Object.entries(jobs).filter(([key]) => key !== 'scope' && key !== context);
+      expect(gated.length, `${workflow} runs the suite in no job`).toBeGreaterThan(0);
+      for (const [key, job] of gated) {
+        expect(needsOf(job), `${workflow} job ${key} does not wait for the scope`).toContain(
+          'scope',
+        );
+        expect(job.if ?? '(no condition)', `${workflow} job ${key} runs on a skip`).toContain(
+          "needs.scope.outputs.run == 'true'",
+        );
+      }
+
+      const rollUp = jobs[context];
+      expect(rollUp?.if, `${context} is skipped when a job it needs fails`).toBe('always()');
+      expect([...needsOf(rollUp ?? {})].sort()).toEqual(
+        Object.keys(jobs)
+          .filter((key) => key !== context)
+          .sort(),
+      );
+      const verdicts = (rollUp?.steps ?? []).filter((step) => /\bexit 1\b/u.test(step.run ?? ''));
+      expect(verdicts, `${context} has no step that fails`).toHaveLength(1);
+      const verdict = verdicts[0];
+      expect(verdict?.['continue-on-error']).toBeUndefined();
+      const condition = (verdict?.if ?? '').replace(/\s+/gu, ' ');
+      for (const clause of [
+        "needs.scope.result != 'success'",
+        "contains(needs.*.result, 'failure')",
+        "contains(needs.*.result, 'cancelled')",
+        "(needs.scope.outputs.run == 'true' && contains(needs.*.result, 'skipped'))",
+      ]) {
+        expect(condition, `${context} goes green past: ${clause}`).toContain(clause);
+      }
+      // Every clause is OR-ed: one `&&` between two of them would need both to fail at once.
+      expect(condition.replace(/\(needs\.scope\.outputs\.run[^)]*\)\)/u, '')).not.toContain('&&');
+      expect(condition).not.toMatch(/!\s*contains/u);
     },
   );
 });

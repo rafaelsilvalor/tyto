@@ -39,6 +39,8 @@ coverage/
 .nyc_output/
 playwright-report/
 test-results/
+# What a `test:desktop` shard writes for the merge step in `desktop-e2e.yml` (TYTO-307).
+blob-reports/
 
 # Environment and local config
 .env
