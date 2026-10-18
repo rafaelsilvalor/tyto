@@ -7,6 +7,11 @@ import { describe, expect, it } from 'vitest';
 
 import { closestPair, MINIMUM_MODE_DIFFERENCE } from '../src/main/colour-difference.js';
 import { GROUP_MINIMUM, SPLITTER_THICKNESS } from '../src/renderer/group-resize.js';
+import {
+  BUNDLED_CODE_FAMILY,
+  BUNDLED_UI_FAMILY,
+  DEFAULT_TYPOGRAPHY,
+} from '../shared/typography.js';
 
 /**
  * The modes vim's badge has a colour for (TYTO-301), as `status-bar.ts` lists them. Written
@@ -201,6 +206,48 @@ describe('the sizes a rule elsewhere repeats (TYTO-288)', () => {
     const { light } = themes();
     expect(light.get('--tyto-pane-strip-height')).toMatch(/^\d+px$/);
     expect(light.get('--tyto-pane-header-height')).toMatch(/^\d+px$/);
+  });
+});
+
+describe('the type ramp derives from two bases (TYTO-272, ADR 0099)', () => {
+  const { light, dark } = themes();
+
+  it('names the bundled faces the typography settings fall back to', () => {
+    expect(light.get('--tyto-font-ui')).toBe(`'${BUNDLED_UI_FAMILY}'`);
+    expect(light.get('--tyto-font-mono')).toBe(`'${BUNDLED_CODE_FAMILY}', monospace`);
+  });
+
+  it('puts the two bases at the settings’ defaults', () => {
+    expect(light.get('--tyto-ui-size')).toBe(`${String(DEFAULT_TYPOGRAPHY.uiFontSize)}px`);
+    expect(light.get('--tyto-code-size')).toBe(`${String(DEFAULT_TYPOGRAPHY.codeFontSize)}px`);
+  });
+
+  it('writes every text size as the UI base times its old ratio to 14', () => {
+    // A size written in pixels would stay put when `uiFontSize` moves; each is the base scaled
+    // and rounded to a pixel, so at 14 they are the 12, 13, 14 and 16 they always were.
+    const ratio = (size: number): string =>
+      `round(calc(var(--tyto-ui-size) * ${String(size)} / 14), 1px)`;
+    expect(light.get('--tyto-text-xs')).toBe(ratio(12));
+    expect(light.get('--tyto-text-sm')).toBe(ratio(13));
+    expect(light.get('--tyto-text-md')).toBe('var(--tyto-ui-size)');
+    expect(light.get('--tyto-text-lg')).toBe(ratio(16));
+    // And no theme or mode redefines them: fonts are not theme data (ADR 0077).
+    expect(
+      [...dark.keys()].filter((name) =>
+        /^--tyto-(?:text-(?:xs|sm|md|lg)|ui-size|code-size|font-)/.test(name),
+      ),
+    ).toEqual([]);
+  });
+
+  it('floors the strips at their pixel heights and grows them with the text', () => {
+    expect(light.get('--tyto-pane-strip-block')).toMatch(
+      /^max\( ?var\(--tyto-pane-strip-height\),/,
+    );
+    expect(light.get('--tyto-pane-header-block')).toMatch(
+      /^max\( ?var\(--tyto-pane-header-height\),/,
+    );
+    const shell = withoutComments(read('shell.css'));
+    expect(shell).not.toMatch(/height:\s*var\(--tyto-pane-(?:strip|header)-height\)/);
   });
 });
 

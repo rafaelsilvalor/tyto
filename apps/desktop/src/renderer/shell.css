@@ -585,7 +585,7 @@ textarea {
   display: flex;
   flex: none;
   align-items: stretch;
-  height: var(--tyto-pane-strip-height);
+  height: var(--tyto-pane-strip-block);
   min-width: 0;
   overflow: hidden;
   white-space: nowrap;
@@ -597,7 +597,7 @@ textarea {
   flex: none;
   align-items: center;
   gap: var(--tyto-space-4);
-  height: var(--tyto-pane-header-height);
+  height: var(--tyto-pane-header-block);
   min-width: 0;
   overflow: hidden;
   white-space: nowrap;
@@ -645,7 +645,7 @@ textarea {
    classes, so the zoom's and the lock's own `font: inherit` and padding do not undo it. */
 .preview__bar.pane__header button,
 .preview__bar.pane__header select {
-  max-height: calc(var(--tyto-pane-header-height) - 2 * var(--tyto-space-1));
+  max-height: calc(var(--tyto-pane-header-block) - 2 * var(--tyto-space-1));
   padding-block: 0;
   font-size: var(--tyto-text-xs);
   line-height: 1.2;

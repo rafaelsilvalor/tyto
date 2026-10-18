@@ -280,8 +280,18 @@ describe('the window a person opens', () => {
     expect(found).not.toContain('CommandOrControl+R');
     expect(found).not.toContain('Shift+CommandOrControl+R');
     // The rest of the View menu survived, so the removal is about reloading rather than
-    // about the submenu.
-    expect(found).toContain('CommandOrControl+0');
+    // about the submenu: full screen keeps its role's accelerator.
+    expect(found).toContain('F11');
+  });
+
+  it('leaves the zoom keys to the window, which writes the zoom it sets (TYTO-272)', async () => {
+    // The three zoom roles carried Mod-0, Mod-+ and Mod--; they are the window's commands now,
+    // bound in its own table, and `e2e/typography.desktop.test.ts` presses them.
+    const found = await accelerators();
+
+    expect(found).not.toContain('CommandOrControl+0');
+    expect(found).not.toContain('CommandOrControl+Plus');
+    expect(found).not.toContain('CommandOrControl+-');
   });
 });
 

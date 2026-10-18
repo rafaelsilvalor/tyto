@@ -9,7 +9,12 @@ import {
 } from '@tyto/editor';
 import { describe, expect, it, vi } from 'vitest';
 
-import { FILE_MENU_COMMANDS, RELOAD_COMMAND, VIEW_MENU_COMMANDS } from '../../shared/commands.js';
+import {
+  FILE_MENU_COMMANDS,
+  RELOAD_COMMAND,
+  VIEW_MENU_COMMANDS,
+  ZOOM_MENU_COMMANDS,
+} from '../../shared/commands.js';
 import {
   type DesktopActions,
   BRIEF_ONLY_COMMANDS,
@@ -43,6 +48,9 @@ import {
   TEMPLATE_NEW,
   SHELL_TOGGLE_LOCALE,
   TEXT_COMMANDS,
+  WINDOW_ZOOM_IN,
+  WINDOW_ZOOM_OUT,
+  WINDOW_ZOOM_RESET,
   bindingsOf,
   builtInKeybindings,
   createDesktopRegistry,
@@ -97,6 +105,7 @@ const actions = () =>
     newTemplate: vi.fn<() => void>(),
     openPreview: vi.fn<(side: boolean) => void>(),
     togglePreviewLock: vi.fn<() => void>(),
+    zoomWindow: vi.fn<(step: 'in' | 'out' | 'reset') => void>(),
   }) satisfies DesktopActions;
 
 /**
@@ -447,6 +456,46 @@ describe('the File menu table', () => {
     expect(COMMAND_LABELS[RELOAD_COMMAND.id]).toBe(RELOAD_COMMAND.label);
     registry.run(RELOAD_COMMAND.id, NO_VIEW);
     expect(spies.reloadWindow).toHaveBeenCalledTimes(1);
+  });
+
+  it('names, on View, the zoom this window registers, on keys nobody else has (TYTO-272)', () => {
+    const spies = actions();
+    const registry = createDesktopRegistry(spies);
+    expect(ZOOM_MENU_COMMANDS.map((command) => command.id)).toEqual([
+      WINDOW_ZOOM_RESET,
+      WINDOW_ZOOM_IN,
+      WINDOW_ZOOM_OUT,
+    ]);
+    for (const command of ZOOM_MENU_COMMANDS) {
+      expect(COMMAND_LABELS[command.id]).toBe(command.label);
+      expect(registry.run(command.id, NO_VIEW)).toBe(true);
+    }
+    expect(spies.zoomWindow.mock.calls).toEqual([['reset'], ['in'], ['out']]);
+    // Not about a brief and not about text: it answers with any tab in front.
+    for (const id of [WINDOW_ZOOM_IN, WINDOW_ZOOM_OUT, WINDOW_ZOOM_RESET]) {
+      expect(BRIEF_ONLY_COMMANDS.has(id)).toBe(false);
+      expect(TEXT_COMMANDS.has(id)).toBe(false);
+    }
+    // Global, as the bar's key is, so vim, a preview and the settings tab all hear it.
+    const zoomKeys = builtInKeybindings.filter((binding) =>
+      [WINDOW_ZOOM_IN, WINDOW_ZOOM_OUT, WINDOW_ZOOM_RESET].includes(binding.command),
+    );
+    expect(zoomKeys.map(({ key, command, when }) => [key, command, when])).toEqual([
+      ['Mod-=', WINDOW_ZOOM_IN, undefined],
+      ['Mod--', WINDOW_ZOOM_OUT, undefined],
+      ['Mod-0', WINDOW_ZOOM_RESET, undefined],
+    ]);
+    // And the three keys are nobody else's in the built-in table, in either input mode's set.
+    const taken = builtInKeybindings.filter(
+      (binding) =>
+        ['Mod-=', 'Mod--', 'Mod-0', 'Ctrl-=', 'Ctrl--', 'Ctrl-0'].includes(binding.key) &&
+        !zoomKeys.includes(binding),
+    );
+    expect(taken).toEqual([]);
+    for (const set of [keymapSetFor(false), keymapSetFor(true)]) {
+      const keys = set.bindings.map((binding) => binding.key);
+      expect(keys.filter((key) => ['Mod-=', 'Mod--', 'Mod-0'].includes(key))).toEqual([]);
+    }
   });
 
   it('names, on View, the group commands under their labels, pinned to the constants (TYTO-286)', () => {

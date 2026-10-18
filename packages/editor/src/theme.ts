@@ -116,6 +116,14 @@ export const palette: Palette = {
 export const monoFont = token('font-mono');
 
 /**
+ * The editor's text size (TYTO-272, ADR 0099): the host's code base, the `codeFontSize` setting
+ * in the desktop. Every buffer reads it — briefs, JSON tabs, the template buffers — and so does
+ * what CodeMirror draws inside the editor without a size of its own: the gutter, the pinned head
+ * lines and the completion list.
+ */
+export const codeSize = token('code-size');
+
+/**
  * The roles CodeMirror's own furniture reads: the search panel, the completion list, the lint
  * tooltip and the underlines under a diagnostic (TYTO-258, ADR 0081). Named by the part they
  * paint, like `palette`, and every value one custom property — sizes and widths included, so
@@ -162,7 +170,9 @@ const propertyOf = (value: string): string => value.replace(/^var\((--[a-z0-9-]+
  * editor alone could notice.
  */
 export const themeTokens: readonly string[] = [
-  ...new Set([...Object.values(palette), ...Object.values(panels), monoFont].map(propertyOf)),
+  ...new Set(
+    [...Object.values(palette), ...Object.values(panels), monoFont, codeSize].map(propertyOf),
+  ),
 ];
 
 const border = (width: string, colour: string): string => `${width} solid ${colour}`;
@@ -316,6 +326,7 @@ const chrome = (colours: Palette, isDark: boolean): Extension =>
       '&': {
         color: colours.foreground,
         backgroundColor: colours.background,
+        fontSize: codeSize,
       },
       '.cm-content': {
         caretColor: colours.caret,

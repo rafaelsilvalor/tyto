@@ -122,13 +122,14 @@ describe("the menu row's model", () => {
       'editor.goToBlock',
     ]);
     expect(view?.items[13]).toMatchObject({ id: 'window.reload', label: 'command.window.reload' });
-    expect(view?.items.slice(14).map((item) => item.role ?? item.type)).toEqual([
+    expect(view?.items.slice(14).map((item) => item.role ?? item.id)).toEqual([
       'toggledevtools',
-      'separator',
-      'resetzoom',
-      'zoomin',
-      'zoomout',
-      'separator',
+      'item-15',
+      // The window's zoom commands since TYTO-272, which write the `zoom` setting.
+      'window.zoomReset',
+      'window.zoomIn',
+      'window.zoomOut',
+      'item-19',
       'togglefullscreen',
     ]);
     const separator = view?.items[15];

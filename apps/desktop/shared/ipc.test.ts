@@ -77,6 +77,7 @@ describe('the IPC contract', () => {
       'theme:preview',
       'update:act',
       'update:status',
+      'window:zoom',
     ]);
     expect(new Set(IPC_CHANNEL_NAMES).size).toBe(IPC_CHANNEL_NAMES.length);
   });
@@ -232,6 +233,12 @@ describe('the theme the window applies (TYTO-208)', () => {
     tabSize: 2,
     formatBriefOnSave: false,
     briefColumns: 'separator',
+    typography: {
+      uiFontFamily: 'Source Sans 3',
+      uiFontSize: 14,
+      codeFontFamily: 'IBM Plex Mono',
+      codeFontSize: 14,
+    },
   });
 
   it('refuses a mode that is not one of the three', () => {

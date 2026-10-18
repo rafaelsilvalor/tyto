@@ -1,6 +1,11 @@
 import type { MenuItemConstructorOptions } from 'electron';
 
-import { FILE_MENU_GROUPS, RELOAD_COMMAND, VIEW_MENU_COMMANDS } from '../../shared/commands.js';
+import {
+  FILE_MENU_GROUPS,
+  RELOAD_COMMAND,
+  VIEW_MENU_COMMANDS,
+  ZOOM_MENU_COMMANDS,
+} from '../../shared/commands.js';
 import type { CatalogueKey } from '../../shared/i18n/index.js';
 import { withoutMnemonic } from './menu-model.js';
 
@@ -163,9 +168,9 @@ export function menuTemplate(platform: string, options: MenuOptions): MenuItemCo
     // Written out because the default carries Reload and Force Reload as roles, which tear the
     // page down before it can keep its tabs. Reload is the window's command instead (TYTO-113).
     // Originally: a reload discarded every open buffer. Everything else the role would have built is kept, item
-    // for item: the developer tools, the three zoom levels and full screen are all
-    // harmless, and dropping the submenu wholesale would take them along with the two
-    // entries that are the problem.
+    // for item: the developer tools and full screen are harmless, and dropping the submenu
+    // wholesale would take them along with the two entries that are the problem. The three
+    // zoom items are the window's commands since TYTO-272, so that each one writes `zoom`.
     {
       role: 'viewMenu',
       ...title('menu.view'),
@@ -189,9 +194,15 @@ export function menuTemplate(platform: string, options: MenuOptions): MenuItemCo
         },
         { role: 'toggleDevTools' },
         { type: 'separator' },
-        { role: 'resetZoom' },
-        { role: 'zoomIn' },
-        { role: 'zoomOut' },
+        // TYTO-272 (ADR 0099). The window's commands and not the roles: each writes the `zoom`
+        // setting, and the keys (`Mod-0`, `Mod-=`, `Mod--`) are the page's like every other.
+        ...ZOOM_MENU_COMMANDS.map((command) => ({
+          id: command.id,
+          label: options.t(command.label),
+          click: () => {
+            options.onCommand(command.id);
+          },
+        })),
         { type: 'separator' },
         { role: 'togglefullscreen' },
       ],
