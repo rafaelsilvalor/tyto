@@ -6,6 +6,7 @@ import { fileURLToPath } from 'node:url';
 import { type ElectronApplication, type Page, _electron } from 'playwright';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 
+import { DOCUMENTATION_URLS } from '../src/main/documentation.js';
 import { closeApp } from './close-app.js';
 import { firstWindow } from './first-window.js';
 
@@ -276,9 +277,18 @@ describe('the drawn menu row', () => {
     expect(await editorFocused()).toBe(true);
   });
 
-  it("runs the popped list's own items: About and the log folder", async () => {
+  it("runs the popped list's own items: Documentation, the log folder and About", async () => {
     const ran = await app.evaluate(({ Menu, dialog, shell }) => {
       const seen: string[] = [];
+      // TYTO-318. Documentation hands the system browser a URL. Replaced for the rest of the
+      // suite: the real one under xvfb ran `xdg-open`, and the app then never quit (afterAll's
+      // closeApp timed out at 300 s, twice in a row on CI).
+      const opened: string[] = [];
+      (globalThis as unknown as { tytoOpened: string[] }).tytoOpened = opened;
+      shell.openExternal = (url: string) => {
+        opened.push(url);
+        return Promise.resolve();
+      };
       dialog.showMessageBox = ((...args: unknown[]) => {
         const box = args.at(-1) as { message?: string };
         seen.push(`about:${box.message ?? ''}`);
@@ -297,6 +307,17 @@ describe('the drawn menu row', () => {
       return seen;
     });
     expect(ran).toEqual(['open:a folder', 'about:Tyto']);
+    // Documentation runs the window's command, which answers over IPC, so it lands a moment
+    // later; one of the two editions, by the language the window is in.
+    await expect
+      .poll(() =>
+        app.evaluate(() => (globalThis as unknown as { tytoOpened: string[] }).tytoOpened),
+      )
+      .toHaveLength(1);
+    const [url] = await app.evaluate(
+      () => (globalThis as unknown as { tytoOpened: string[] }).tytoOpened,
+    );
+    expect(Object.values(DOCUMENTATION_URLS)).toContain(url);
   });
 
   it('installs Reload as the window’s command, and still no Close (TYTO-113)', async () => {
