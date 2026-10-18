@@ -3,7 +3,12 @@ import {
   BUNDLED_CODE_FAMILY,
   BUNDLED_UI_FAMILY,
   DEFAULT_TYPOGRAPHY,
+  FONT_AREAS,
+  type FontAreaId,
+  type FontBase,
   type Typography,
+  areaFontFamily,
+  areaFontSize,
 } from '../../shared/typography.js';
 
 /**
@@ -29,14 +34,66 @@ export function typographyDeclarations(typography: Typography): string {
     lines.push(`  --tyto-code-size: ${String(typography.codeFontSize)}px;`);
   }
   if (typography.uiFontFamily !== BUNDLED_UI_FAMILY) {
-    lines.push(`  --tyto-font-ui: "${typography.uiFontFamily}", '${BUNDLED_UI_FAMILY}';`);
+    lines.push(`  --tyto-font-ui: ${familyValue('ui', typography.uiFontFamily)};`);
   }
   if (typography.codeFontFamily !== BUNDLED_CODE_FAMILY) {
-    lines.push(
-      `  --tyto-font-mono: "${typography.codeFontFamily}", '${BUNDLED_CODE_FAMILY}', monospace;`,
-    );
+    lines.push(`  --tyto-font-mono: ${familyValue('code', typography.codeFontFamily)};`);
   }
   return lines.map((line) => `\n${line}`).join('');
+}
+
+/** The value of a base's face property: `tokens.css`'s own for the bundled face. */
+function familyValue(base: FontBase, family: string): string {
+  if (base === 'ui') {
+    return family === BUNDLED_UI_FAMILY
+      ? `'${BUNDLED_UI_FAMILY}'`
+      : `"${family}", '${BUNDLED_UI_FAMILY}'`;
+  }
+  return family === BUNDLED_CODE_FAMILY
+    ? `'${BUNDLED_CODE_FAMILY}', monospace`
+    : `"${family}", '${BUNDLED_CODE_FAMILY}', monospace`;
+}
+
+/**
+ * Where an area's root is. Every area is an element carrying `data-font-area`; the completion
+ * list is also CodeMirror's own tooltip, which this window cannot give an attribute, so its
+ * class is named beside it.
+ */
+export function areaSelector(id: FontAreaId): string {
+  const attribute = `[data-font-area='${id}']`;
+  return id === 'completion' ? `${attribute}, .cm-tooltip.cm-tooltip-autocomplete` : attribute;
+}
+
+/**
+ * The areas' rules (TYTO-272 PR B, ADR 0099): on each area's root, the base's size and face
+ * properties redeclared, so the ramp `tokens.css` declares on `[data-font-area]` is computed
+ * there from the area's own size.
+ *
+ * **Nothing while no area is set**, so a window without `fontSizes` and `fontFamilies` is the
+ * window PR A left. **Every area once one is**, an unset one at its base's value: areas nest —
+ * the completion list sits inside the editor, a panel's header inside the panel — and an area
+ * that wrote nothing would read the size of the area around it instead of its base.
+ *
+ * A UI area's root re-reads the face and the base size itself (`shell.css`, at no specificity),
+ * because text there with no rule of its own inherits a size and a face resolved further up.
+ * The code areas' text is CodeMirror's, which reads both properties where it draws.
+ */
+export function fontAreaRules(typography: Typography): string {
+  const sizes = Object.keys(typography.fontSizes).length > 0;
+  const faces = Object.keys(typography.fontFamilies).length > 0;
+  if (!sizes && !faces) return '';
+  return FONT_AREAS.map((area) => {
+    const lines: string[] = [];
+    if (sizes) {
+      const property = area.base === 'ui' ? '--tyto-ui-size' : '--tyto-code-size';
+      lines.push(`  ${property}: ${String(areaFontSize(typography, area))}px;`);
+    }
+    if (faces) {
+      const property = area.base === 'ui' ? '--tyto-font-ui' : '--tyto-font-mono';
+      lines.push(`  ${property}: ${familyValue(area.base, areaFontFamily(typography, area))};`);
+    }
+    return `\n${areaSelector(area.id)} {\n${lines.join('\n')}\n}`;
+  }).join('');
 }
 
 /** How wide `text` is drawn in the CSS `font`; `undefined` where nothing can measure. */
@@ -79,10 +136,13 @@ export function missingFamilyRows(
   measure: MeasureText,
   message: string,
 ): Diagnostic[] {
-  const settings = [
+  const settings: readonly (readonly [string, string])[] = [
     ['uiFontFamily', typography.uiFontFamily],
     ['codeFontFamily', typography.codeFontFamily],
-  ] as const;
+    ...Object.entries(typography.fontFamilies).map(
+      ([area, family]) => [`fontFamilies.${area}`, family ?? ''] as const,
+    ),
+  ];
   return settings
     .filter(([, family]) => familyIsInstalled(family, measure) === false)
     .map(([key, family]) => ({

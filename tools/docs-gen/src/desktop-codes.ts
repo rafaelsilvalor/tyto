@@ -72,7 +72,7 @@ export const desktopCodes: readonly DesktopCode[] = [
     severity: 'warning',
     mintedIn: 'renderer/typography.ts',
     summary:
-      'A `uiFontFamily` or `codeFontFamily` in settings.json names a face this machine does not draw; the bundled face is drawn instead (TYTO-272, ADR 0099). Measured in the window, so it has no range in the file.',
+      'A `uiFontFamily`, `codeFontFamily` or `fontFamilies` area in settings.json names a face this machine does not draw; the bundled face is drawn instead (TYTO-272, ADR 0099). Measured in the window, so it has no range in the file.',
     messageKey: 'typography.familyMissing',
     english: 'This font is not installed; the bundled one is drawn instead',
     suffix: 'the setting, then the face it names',

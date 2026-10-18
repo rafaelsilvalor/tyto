@@ -1,11 +1,13 @@
 import { describe, expect, it } from 'vitest';
 
-import { DEFAULT_TYPOGRAPHY } from '../../shared/typography.js';
+import { DEFAULT_TYPOGRAPHY, FONT_AREAS } from '../../shared/typography.js';
 import { themeSheet } from './theme.js';
 import {
   FONT_FAMILY_MISSING,
   type MeasureText,
+  areaSelector,
   familyIsInstalled,
+  fontAreaRules,
   missingFamilyRows,
   typographyDeclarations,
   withFontRows,
@@ -51,6 +53,75 @@ describe('typographyDeclarations', () => {
     const [light, dark] = sheet.split('@media (prefers-color-scheme: dark)');
     expect(light).toContain('--tyto-ui-size: 16px;');
     expect(dark).not.toContain('--tyto-ui-size');
+  });
+});
+
+/** The declarations of the rule `fontAreaRules` writes for one area's selector. */
+const ruleFor = (rules: string, area: string): string => {
+  const start = rules.indexOf(`\n${areaSelector(area as never)} {\n`);
+  if (start < 0) return '';
+  return rules.slice(start, rules.indexOf('}', start));
+};
+
+describe('fontAreaRules (TYTO-272 PR B)', () => {
+  it('writes nothing while no area is set, even with moved bases', () => {
+    expect(fontAreaRules(DEFAULT_TYPOGRAPHY)).toBe('');
+    expect(fontAreaRules({ ...DEFAULT_TYPOGRAPHY, uiFontSize: 18, codeFontSize: 20 })).toBe('');
+  });
+
+  it('gives a set area its size, and every other area its own base’s', () => {
+    const rules = fontAreaRules({
+      ...DEFAULT_TYPOGRAPHY,
+      uiFontSize: 15,
+      codeFontSize: 13,
+      fontSizes: { tabs: 18, editor: 20 },
+    });
+    expect(ruleFor(rules, 'tabs')).toContain('--tyto-ui-size: 18px;');
+    expect(ruleFor(rules, 'editor')).toContain('--tyto-code-size: 20px;');
+    // Unset areas follow their base, the code base for json and the list, the UI base for
+    // the rest — written out, since the list sits inside the editor and would read its 20.
+    expect(ruleFor(rules, 'json')).toContain('--tyto-code-size: 13px;');
+    expect(ruleFor(rules, 'completion')).toContain('--tyto-code-size: 13px;');
+    expect(ruleFor(rules, 'statusBar')).toContain('--tyto-ui-size: 15px;');
+    expect(ruleFor(rules, 'problems')).toContain('--tyto-ui-size: 15px;');
+    expect(rules).not.toMatch(/--tyto-font-(?:ui|mono):/u);
+  });
+
+  it('writes a rule for every declared area, the list by its CodeMirror class too', () => {
+    const rules = fontAreaRules({ ...DEFAULT_TYPOGRAPHY, fontSizes: { queue: 16 } });
+    for (const area of FONT_AREAS) {
+      expect(rules, area.id).toContain(`[data-font-area='${area.id}']`);
+    }
+    expect(areaSelector('completion')).toContain('.cm-tooltip.cm-tooltip-autocomplete');
+  });
+
+  it('puts an area’s face in front of its base’s bundled face, and the rest on their base', () => {
+    const rules = fontAreaRules({
+      ...DEFAULT_TYPOGRAPHY,
+      codeFontFamily: 'Cascadia Code',
+      fontFamilies: { problems: 'Segoe UI', json: 'Consolas' },
+    });
+    expect(ruleFor(rules, 'problems')).toContain(`--tyto-font-ui: "Segoe UI", 'Source Sans 3';`);
+    expect(ruleFor(rules, 'json')).toContain(
+      `--tyto-font-mono: "Consolas", 'IBM Plex Mono', monospace;`,
+    );
+    expect(ruleFor(rules, 'editor')).toContain(
+      `--tyto-font-mono: "Cascadia Code", 'IBM Plex Mono', monospace;`,
+    );
+    expect(ruleFor(rules, 'tabs')).toContain(`--tyto-font-ui: 'Source Sans 3';`);
+    expect(rules).not.toMatch(/--tyto-(?:ui|code)-size:/u);
+  });
+
+  it('lands in the theme sheet outside the dark block', () => {
+    const colors = { surface: '#ffffff' };
+    const sheet = themeSheet({
+      light: { id: 'tyto-light', colors },
+      dark: { id: 'tyto-dark', colors },
+      typography: { ...DEFAULT_TYPOGRAPHY, fontSizes: { statusBar: 16 } },
+    });
+    const [light, dark] = sheet.split('@media (prefers-color-scheme: dark)');
+    expect(light).toContain(`[data-font-area='statusBar'] {\n  --tyto-ui-size: 16px;`);
+    expect(dark).not.toContain('data-font-area');
   });
 });
 
@@ -104,6 +175,17 @@ describe('missingFamilyRows', () => {
         code: FONT_FAMILY_MISSING,
         message: 'This font is not installed: uiFontFamily "Gone Sans"',
       },
+    ]);
+  });
+
+  it('raises one for an area’s face too, naming the area (TYTO-272 PR B)', () => {
+    const rows = missingFamilyRows(
+      { ...DEFAULT_TYPOGRAPHY, fontFamilies: { problems: 'Gone Sans', tabs: 'Consolas' } },
+      machine('Consolas'),
+      'This font is not installed',
+    );
+    expect(rows.map((row) => row.message)).toEqual([
+      'This font is not installed: fontFamilies.problems "Gone Sans"',
     ]);
   });
 

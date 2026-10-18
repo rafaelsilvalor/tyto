@@ -31,6 +31,17 @@ body {
   accent-color: var(--tyto-accent);
 }
 
+/*
+ * A UI area's root (TYTO-272 PR B, ADR 0099) re-reads the face and the base size, so text in it
+ * with no rule of its own follows the area's `fontSizes`/`fontFamilies` and not what body
+ * resolved. No specificity: an area root's own rule still wins. The editor's and the JSON
+ * tabs' text is CodeMirror's, which reads the code base where it draws.
+ */
+:where([data-font-area]:not([data-font-area='editor'], [data-font-area='json'])) {
+  font-family: var(--tyto-font-ui);
+  font-size: var(--tyto-text-md);
+}
+
 /* Form controls take the window's face; Chromium otherwise gives them the system's. */
 button,
 input,

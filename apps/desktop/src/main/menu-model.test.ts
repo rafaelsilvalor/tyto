@@ -244,5 +244,7 @@ describe('labels and keys', () => {
     expect(acceleratorLabel('CommandOrControl+Plus', 'darwin')).toBe('Cmd++');
     expect(acceleratorLabel('Alt+F4', 'darwin')).toBe('Option+F4');
     expect(acceleratorLabel('F11', 'linux')).toBe('F11');
+    // Electron separates with `+`, so a minus key needs no care here (TYTO-272).
+    expect(acceleratorLabel('CommandOrControl+-', 'win32')).toBe('Ctrl+-');
   });
 });

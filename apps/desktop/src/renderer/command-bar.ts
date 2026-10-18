@@ -131,6 +131,8 @@ export class CommandBar extends LitElement {
 
   /** Light DOM, so `shell.css` styles it — the reasoning is in ADR 0024. */
   protected override createRenderRoot(): HTMLElement {
+    // The command bar's own text size and face (TYTO-272 PR B): the area's root is the element.
+    this.dataset['fontArea'] = 'commandBar';
     return this;
   }
 

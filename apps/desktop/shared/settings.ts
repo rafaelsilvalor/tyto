@@ -12,8 +12,12 @@ import {
   themeSettingContribution,
 } from './theme-setting.js';
 import {
+  type FontFamilies,
+  type FontSizes,
   codeFontFamilyContribution,
   codeFontSizeContribution,
+  fontFamiliesContribution,
+  fontSizesContribution,
   uiFontFamilyContribution,
   uiFontSizeContribution,
   zoomContribution,
@@ -28,7 +32,7 @@ import { type VimModeStyle, vimModeStyleContribution } from './vim-mode-style.js
  * reads off a disk and the window is told what the answer was, so the shape has to be one
  * declaration both halves import. Linted pure — no Node, no DOM.
  *
- * **Nineteen settings the built-in `desktop` plugin declares** through the `configuration`
+ * **Twenty-one settings the built-in `desktop` plugin declares** through the `configuration`
  * extension point (TYTO-206, ADR 0073), like any plugin's: built-in is a plugin. Their keys
  * stay unprefixed, exactly as every `settings.json` written before that card spells them.
  * Each one is validated alone, so a hand-broken value costs that key and nothing else.
@@ -234,7 +238,7 @@ export function tabSizeExample(): string {
 }
 
 /**
- * The nineteen, in the order the settings file is documented in. `theme` checks its ids against
+ * The twenty-one, in the order the settings file is documented in. `theme` checks its ids against
  * `lookup`, which main builds from every theme the plugins registered (TYTO-208); the default
  * knows the built-in two and lets any other id through.
  */
@@ -261,6 +265,8 @@ export function settingContributions(
     uiFontSizeContribution,
     codeFontFamilyContribution,
     codeFontSizeContribution,
+    fontSizesContribution,
+    fontFamiliesContribution,
   ] as readonly ConfigurationContribution[];
 }
 
@@ -295,6 +301,9 @@ export interface Settings {
   /** The face and size of every editor buffer (TYTO-272). */
   readonly codeFontFamily: string;
   readonly codeFontSize: number;
+  /** A size and a face per area of the window, over the two bases (TYTO-272 PR B). */
+  readonly fontSizes: FontSizes;
+  readonly fontFamilies: FontFamilies;
 }
 
 export const DEFAULT_SETTINGS: Settings = {
@@ -317,13 +326,15 @@ export const DEFAULT_SETTINGS: Settings = {
   uiFontSize: uiFontSizeContribution.default,
   codeFontFamily: codeFontFamilyContribution.default,
   codeFontSize: codeFontSizeContribution.default,
+  fontSizes: fontSizesContribution.default,
+  fontFamilies: fontFamiliesContribution.default,
 };
 
 /** What a queue folder produces until a person chooses otherwise (ADR 0044). */
 export const DEFAULT_QUEUE_KINDS: readonly string[] = ['png'];
 
 /**
- * The nineteen out of the resolved values, which already hold every declared key with a value
+ * The twenty-one out of the resolved values, which already hold every declared key with a value
  * its schema accepted or its default (`resolveSettings`).
  */
 export function settingsFrom(values: Readonly<Record<string, unknown>>): Settings {
@@ -349,5 +360,7 @@ export function settingsFrom(values: Readonly<Record<string, unknown>>): Setting
     uiFontSize: pick('uiFontSize'),
     codeFontFamily: pick('codeFontFamily'),
     codeFontSize: pick('codeFontSize'),
+    fontSizes: pick('fontSizes'),
+    fontFamilies: pick('fontFamilies'),
   };
 }

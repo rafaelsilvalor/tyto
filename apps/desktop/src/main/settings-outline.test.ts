@@ -39,6 +39,8 @@ describe("the app's settings outline", () => {
       'uiFontSize',
       'codeFontFamily',
       'codeFontSize',
+      'fontSizes',
+      'fontFamilies',
     ]);
   });
 

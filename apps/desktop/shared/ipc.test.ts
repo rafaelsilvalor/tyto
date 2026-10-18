@@ -238,6 +238,8 @@ describe('the theme the window applies (TYTO-208)', () => {
       uiFontSize: 14,
       codeFontFamily: 'IBM Plex Mono',
       codeFontSize: 14,
+      fontSizes: {},
+      fontFamilies: {},
     },
   });
 

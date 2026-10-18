@@ -1702,6 +1702,6 @@ Message: the `session.draftStale` sentence in the window's language ("This file 
 
 **Severity:** warning · **Minted in:** `apps/desktop/src/renderer/typography.ts`
 
-A `uiFontFamily` or `codeFontFamily` in settings.json names a face this machine does not draw; the bundled face is drawn instead (TYTO-272, ADR 0099). Measured in the window, so it has no range in the file.
+A `uiFontFamily`, `codeFontFamily` or `fontFamilies` area in settings.json names a face this machine does not draw; the bundled face is drawn instead (TYTO-272, ADR 0099). Measured in the window, so it has no range in the file.
 
 Message: the `typography.familyMissing` sentence in the window's language ("This font is not installed; the bundled one is drawn instead" in English), then the setting, then the face it names.

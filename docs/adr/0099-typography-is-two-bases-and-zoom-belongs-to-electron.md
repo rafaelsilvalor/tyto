@@ -1,7 +1,7 @@
 # 0099 — Typography is two bases and a closed set of areas; the zoom belongs to Electron
 
-Status: accepted · 2026-10-17 · TYTO-272 (PR A) · builds on ADR 0073 (settings), ADR 0075 (the
-token file) and ADR 0077 decision 10 (fonts are not theme data)
+Status: accepted · 2026-10-17 · TYTO-272 (PR A; amended 2026-10-18, PR B) · builds on ADR 0073
+(settings), ADR 0075 (the token file) and ADR 0077 decision 10 (fonts are not theme data)
 
 ## Context
 
@@ -93,3 +93,52 @@ preview's art is not typography — it is the template's — and only the zoom s
 - Ctrl and the mouse wheel do not zoom; Electron reports it (`zoom-changed`) and nothing listens.
   VS Code makes it a setting; it can be one here when somebody asks.
 - `Mod-+` (Ctrl, Shift and =) is not bound: `Mod-=` is.
+
+## Amendment of 2026-10-18 — the areas (TYTO-272 PR B)
+
+Decision 2 named the areas and left them for PR B. This is what PR B built.
+
+**1. Eleven areas, each over one base.** `editor` (briefs and the template buffers), `json`
+(the settings, keybindings and snippets tabs) and `completion` (the suggestion list) follow
+the code base; `problems`, `commandBar`, `titleBar`, `tabs`, `paneHeaders` (the breadcrumb
+row, a preview's bar and every tool header), `statusBar`, `queue` and `explorer` follow the UI
+base. The list is `FONT_AREAS` in `shared/typography.ts`. `explorer` is declared for
+TYTO-279 and has no root yet, so it changes nothing today.
+
+**2. Two object settings with a closed set of keys**, through the configuration point's
+`members` rule like `statusBarColors` (ADR 0091): `fontSizes` (`{ area: px }`, absolute
+pixels) and `fontFamilies` (`{ area: face }`). A size is checked by its area's own bounds —
+9 to 32 over the code base, 9 to 24 over the UI base, and 9 to 18 for `titleBar`, so its text
+stays inside the system buttons' 32 px. That needed one change to `plugin-api`:
+`members.schemaByName`, a schema per member name. An unknown area is
+`W_SETTING_ENTRY_INVALID` at its name and a size or face out of bounds `W_SETTING_INVALID` at
+the value, and the rest apply. A face the machine lacks is `W_FONT_FAMILY_MISSING` naming
+`fontFamilies.<area>`. Both ride on `theme:current` inside the same `typography` object, so
+there is no new channel.
+
+**3. An unset area follows its base, and setting the base still moves it.** The theme sheet
+writes nothing while neither setting has a member. Once one does, it writes a rule for
+**every** area, an unset one at its base's value. Areas nest — the completion list sits
+inside the editor, a panel's header inside the panel — and an area that wrote nothing would
+read the area around it instead of its base.
+
+**4. The mechanism is an attribute and redeclared properties.** Each area's root carries
+`data-font-area="<id>"`, and the rule there sets the base's properties (`--tyto-ui-size` or
+`--tyto-code-size`, `--tyto-font-ui` or `--tyto-font-mono`). A custom property is substituted
+where it is declared, so the ramp (`--tyto-text-xs`…`-lg`) and the strip heights
+(`--tyto-pane-strip-block`, `-header-block`) are declared on `:root, [data-font-area]` in
+`tokens.css`: inside an area they are computed from the area's own size. A UI area's root
+re-reads the face and `--tyto-text-md` at no specificity (`shell.css`), for text with no rule
+of its own. The completion list is CodeMirror's tooltip and cannot be given an attribute, so
+its rule also names `.cm-tooltip.cm-tooltip-autocomplete`, and `@tyto/editor` makes the list
+read `--tyto-code-size` itself. One CodeMirror view shows briefs and JSON tabs alike, so a
+group's mount changes area with the tab in front, and measures its text again when it does
+(decision 6).
+
+**5. The strips keep their floors, per area.** With `tabs` at 18 an editor group's strip is
+32.65 px and a tool header beside it stays 30, so their bottoms no longer meet across the
+window. That is the price of sizing the two apart; setting the UI base moves both together.
+
+**6. At the defaults the window is the window PR A left.** 210 of 210 elements had the same
+computed size, line height, face and box before and after, in a window with a brief, its
+preview, a settings tab, the queue and problems panels and the command bar open.

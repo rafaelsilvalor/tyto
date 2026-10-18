@@ -80,7 +80,7 @@ export class QueuePanel extends DockedPanel {
     // 0090), offered whenever the old body button was: once the queue has answered.
     const answered = this.view !== undefined && this.view !== 'failed';
     return html`${this.bar('queue-heading', 'queue.heading', answered ? this.chooseButton() : nothing)}
-      <div class="queue__body">${this.body()}</div>`;
+      <div class="queue__body" data-font-area="queue">${this.body()}</div>`;
   }
 
   private body(): unknown {

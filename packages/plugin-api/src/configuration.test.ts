@@ -330,6 +330,31 @@ describe('an object setting checked one member at a time (TYTO-301, ADR 0091)', 
     ]);
   });
 
+  it('checks a member by its own schema when the rule names one for it (TYTO-272)', () => {
+    const area = z.enum(['tabs', 'titleBar']);
+    const pixels = (maximum: number) => z.number().int().min(9).max(maximum);
+    const sizes = declaredSetting('desktop', false, {
+      id: 'sizes',
+      schema: z.partialRecord(area, pixels(24)),
+      default: {},
+      description: 'A size per area.',
+      members: { key: area, schema: pixels(24), schemaByName: { titleBar: pixels(18) } },
+    });
+    const resolved = resolveSettings(
+      [sizes],
+      [{ key: 'sizes', value: { tabs: 20, titleBar: 20 }, valueRange: at(10, 40) }],
+    );
+
+    expect(resolved.values['sizes']).toEqual({ tabs: 20 });
+    expect(resolved.diagnostics.map((item) => [item.code, item.message])).toEqual([
+      [
+        'W_SETTING_INVALID',
+        "Setting 'sizes.titleBar' is not accepted (Too big: expected number to be <=18); its " +
+          'default applies.',
+      ],
+    ]);
+  });
+
   it('points at the value when the reader gave no member ranges', () => {
     const resolved = resolveSettings(
       [colours],
