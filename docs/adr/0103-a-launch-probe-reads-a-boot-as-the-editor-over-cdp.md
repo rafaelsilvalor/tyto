@@ -21,9 +21,14 @@ as a boot.
 ## Decision
 
 **A probe that expects a boot ends when the app has a window whose page has `#editor .cm-content`,
-reached over the Chrome DevTools Protocol.** That is `ended: 'booted'`. The probe then closes the
-CDP connection, kills the process tree, and waits for `close`, so stdout and stderr are complete
+reached over the Chrome DevTools Protocol.** That is `ended: 'booted'`. The probe then kills the
+process tree, closes the CDP connection, and waits for `close`, so stdout and stderr are complete
 before anything reads them (`printedOne`, `debuggerListening`).
+
+The kill comes before the disconnect because the other order was measured to cost 30 s on Linux:
+on CI run 39174295738 all 5 booting probes reached the editor at 585–669 ms and returned from
+`browser.close()` at 30,598–30,683 ms. With the process gone, the disconnect is immediate. Each
+probe prints `[TYTO-308] probe <ending>: booted at … ms, process closed at … ms`.
 
 - **The signal is the one the CDP harness already waits for.** `waitForBoot` in
   `e2e/boot-signal.ts` reads `DevToolsActivePort` from the launch's own data folder, connects and

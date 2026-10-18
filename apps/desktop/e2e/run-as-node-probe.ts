@@ -136,10 +136,10 @@ export function watchLaunch(
   return new Promise((resolve, reject) => {
     let ending: 'booted' | 'killed' | undefined;
     let gone = false;
-    // Where the time goes, printed per probe: the boot, the disconnect and the kill are three
-    // different costs, and only the first is the app's.
+    // Where the time goes, printed per probe: the boot is the app's cost, and anything between it
+    // and the close is the probe's.
     const started = Date.now();
-    const at: { booted?: number; disconnected?: number } = {};
+    const at: { booted?: number } = {};
     const deadline = setTimeout(() => {
       ending ??= 'killed';
       killTree(child.pid);
@@ -154,9 +154,8 @@ export function watchLaunch(
       clearTimeout(deadline);
       const ended = ending ?? 'exited';
       process.stdout.write(
-        `[TYTO-308] probe ${ended}: booted at ${String(at.booted ?? '-')} ms, CDP disconnected ` +
-          `at ${String(at.disconnected ?? '-')} ms, process closed at ${String(Date.now() - started)} ms
-`,
+        `[TYTO-308] probe ${ended}: booted at ${String(at.booted ?? '-')} ms, ` +
+          `process closed at ${String(Date.now() - started)} ms\n`,
       );
       resolve({ ended, code, signal });
     });
@@ -172,10 +171,12 @@ export function watchLaunch(
       async ({ browser }) => {
         ending ??= 'booted';
         at.booted = Date.now() - started;
-        // Disconnected before the kill, so the connection does not outlive what it spoke to.
-        await browser.close().catch(() => {});
-        at.disconnected = Date.now() - started;
+        // **Killed first, then disconnected**, as the quit-guard test does. The other order was
+        // measured on Linux CI: `browser.close()` on the live app took 30 s every time (booted at
+        // ~0.6 s, disconnected at ~30.6 s, in all 5 probes of run 39174295738), and with the
+        // process gone it returns at once.
         killTree(child.pid);
+        await browser.close().catch(() => {});
       },
       () => {
         // It exited, or the deadline is about to end it: `close` says which.
