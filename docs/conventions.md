@@ -4,9 +4,11 @@
 
 English everywhere in the repo: code, comments, docs, commits, PRs, Jira cards (cards also carry a Portuguese translation — see `CLAUDE.md`). User-facing UI strings live in `i18n/` with `pt-BR` as the first locale and `en` as fallback.
 
+The one exception is the user manual (`apps/docs`, ADR 0101): it has an English edition at `/`, which is the source, and a Brazilian Portuguese edition at `/pt-BR/`. A page in one edition exists in the other — `apps/docs/test/parity.test.ts` fails otherwise — and a pt-BR page may lag in wording but never in structure. The author guides the manual includes from `docs/` (`template-authoring.md`, `plugin-authoring.md`, `plugin-api.md`) stay English-only, and so does everything else: code, contributor docs, ADRs, commits, PRs and cards.
+
 ## Stack
 
-pnpm workspaces + Turborepo · TS 5 `strict`, `noUncheckedIndexedAccess`, `exactOptionalPropertyTypes` · Zod · Vitest · Playwright · ESLint flat + Prettier · tsup (libs, ESM) · electron-vite · CodeMirror 6 + Lezer · commander · Changesets.
+pnpm workspaces + Turborepo · TS 5 `strict`, `noUncheckedIndexedAccess`, `exactOptionalPropertyTypes` · Zod · Vitest · Playwright · ESLint flat + Prettier · tsup (libs, ESM) · electron-vite · CodeMirror 6 + Lezer · commander · VitePress 1.6 (the user manual, ADR 0101) · Changesets.
 
 ### `engines.node`
 
