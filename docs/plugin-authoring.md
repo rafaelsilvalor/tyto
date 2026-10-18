@@ -41,8 +41,8 @@ meu-pack/templates/meu-pack/examples/meu-pack.brief
 Next: run 'tyto plugin install meu-pack', then render meu-pack/templates/meu-pack/examples/meu-pack.brief.
 ```
 
-It writes a **template pack** with one template, and it installs and renders unedited. `--out
-<dir>` puts the folder somewhere other than the current one. It never overwrites a file. The
+It writes a **template pack** with one template, and it installs and renders unedited.
+`--out <dir>` puts the folder somewhere other than the current one. It never overwrites a file. The
 name has to be one the manifest accepts (lowercase letters, digits and hyphens) and one a
 template accepts, because the template inside is named after the plugin. So it starts with a
 letter.

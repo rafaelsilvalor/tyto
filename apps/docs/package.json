@@ -1,0 +1,21 @@
+{
+  "name": "@tyto/docs",
+  "private": true,
+  "type": "module",
+  "description": "The user manual: a VitePress site with an English source and a pt-BR edition (ADR 0101).",
+  "license": "UNLICENSED",
+  "scripts": {
+    "dev": "vitepress dev",
+    "build": "vitepress build",
+    "preview": "vitepress preview",
+    "typecheck": "tsc --noEmit",
+    "lint": "eslint . --max-warnings 0",
+    "test": "vitest run"
+  },
+  "devDependencies": {
+    "minisearch": "^7.2.0",
+    "vitepress": "1.6.4",
+    "vitest": "^5.0.1",
+    "vue": "^3.5.13"
+  }
+}

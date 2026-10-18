@@ -41,6 +41,7 @@ packages/
 apps/
   cli            commander: render, watch, template new|check, plugin new|install|list|remove|disable|enable
   desktop        electron-vite: main (pipeline, plugins, credentials) / preload / renderer (editor, preview, panels)
+  docs           VitePress: the user manual, English at / and pt-BR at /pt-BR/ (ADR 0101)
 ```
 
 Runtime boundary — **pure** (no Node/DOM): core, brief-lang, template-lang, export-*, templates, template-kit, theme-pack, plugin-api (types). **Node**: raster, pipeline, io, fonts, sources, cli. **DOM**: editor, desktop/renderer.

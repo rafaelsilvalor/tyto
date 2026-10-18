@@ -21,7 +21,7 @@
     "test:visual": "turbo run test:visual",
     "build": "turbo run build",
     "template:preview": "turbo run build --filter=@tyto/cli && pnpm --filter @tyto/template-preview start",
-    "docs:gen": "turbo run build --filter=@tyto/core && pnpm --filter @tyto/docs-gen run generate",
+    "docs:gen": "turbo run build --filter=@tyto/docs-gen... && pnpm --filter @tyto/docs-gen run generate",
     "lint": "turbo run lint",
     "typecheck": "turbo run typecheck",
     "format": "prettier --write .",
