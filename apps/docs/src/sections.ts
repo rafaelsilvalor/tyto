@@ -6,11 +6,41 @@
 export interface Section {
   /** The folder under `pages/` and under `pages/pt-BR/`. */
   readonly slug: string;
-  readonly title: { readonly en: string; readonly 'pt-BR': string };
+  readonly title: Title;
+  /**
+   * The section's pages after its index, in reading order, when the sidebar should list
+   * them. A section without the list shows as one link and its index page links the rest.
+   */
+  readonly pages?: readonly Page[];
+}
+
+export interface Title {
+  readonly en: string;
+  readonly 'pt-BR': string;
+}
+
+export interface Page {
+  /** The file name without `.md`, the same in both editions. */
+  readonly slug: string;
+  readonly title: Title;
 }
 
 export const SECTIONS: readonly Section[] = [
-  { slug: 'get-started', title: { en: 'Get started', 'pt-BR': 'Primeiros passos' } },
+  {
+    slug: 'get-started',
+    title: { en: 'Get started', 'pt-BR': 'Primeiros passos' },
+    pages: [
+      { slug: 'install', title: { en: 'Install', 'pt-BR': 'Instalar' } },
+      {
+        slug: 'first-artwork',
+        title: { en: 'Your first artwork', 'pt-BR': 'Sua primeira arte' },
+      },
+      {
+        slug: 'window-tour',
+        title: { en: 'Tour of the window', 'pt-BR': 'Conheça a janela' },
+      },
+    ],
+  },
   { slug: 'briefs', title: { en: 'Briefs', 'pt-BR': 'Briefs' } },
   { slug: 'templates', title: { en: 'Templates', 'pt-BR': 'Templates' } },
   { slug: 'editor', title: { en: 'The editor', 'pt-BR': 'O editor' } },
