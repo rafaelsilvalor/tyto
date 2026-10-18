@@ -11,6 +11,7 @@ export default defineConfig({
     // reason (TYTO-241). So is `port-file`, the CDP harness reading Chromium's port (TYTO-95).
     // And `renderer-tokens`, which reads the renderer's sheets for literals and for token
     // names nothing defines (TYTO-96).
+    // And the manual's scene list, which is data and launches nothing (TYTO-315).
     include: [
       'shared/**/*.test.ts',
       'src/**/*.test.ts',
@@ -18,6 +19,7 @@ export default defineConfig({
       'e2e/renderer-tokens.test.ts',
       'e2e/asar-patch.test.ts',
       'e2e/port-file.test.ts',
+      'e2e/docs-shots/**/*.test.ts',
     ],
   },
 });

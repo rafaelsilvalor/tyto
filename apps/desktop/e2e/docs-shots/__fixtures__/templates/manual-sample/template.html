@@ -1,0 +1,57 @@
+<!-- manual-sample — the art the user manual's screenshots show (TYTO-315).
+
+     Text only in "Source Sans 3", the bundled face, Regular and Bold: a face the machine
+     happens to have would make the picture depend on the machine that took it, and the
+     bundled pack has no italic. -->
+
+<frame format="grid-1x1" bg="#f4f1ea">
+  <rect class="band" />
+  <text slot="title" class="title" />
+  <text slot="item" class="item" />
+  <rect class="rule" />
+</frame>
+
+<frame format="story" extends="grid-1x1" />
+
+<style>
+  .band {
+    x: 0;
+    y: 0;
+    w: 1080;
+    h: 72;
+    fill: #2a6f6b;
+  }
+  .title {
+    x: 96;
+    y: 176;
+    w: 888;
+    font: 700 72px/1.1 "Source Sans 3";
+    color: #1f2a2e;
+  }
+  .item {
+    x: 96;
+    y: 480;
+    w: 888;
+    font: 400 48px/1.25 "Source Sans 3";
+    color: #3b4a50;
+  }
+  .rule {
+    x: 96;
+    y: 960;
+    w: 200;
+    h: 10;
+    fill: #d9822b;
+  }
+
+  @format story {
+    .title {
+      y: 360;
+    }
+    .item {
+      y: 820;
+    }
+    .rule {
+      y: 1760;
+    }
+  }
+</style>

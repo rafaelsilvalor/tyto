@@ -14,7 +14,8 @@
     "lint": "eslint . --max-warnings 0",
     "test": "vitest run --passWithNoTests",
     "test:desktop": "vitest run --config vitest.desktop.config.ts",
-    "test:package": "vitest run --config vitest.package.config.ts"
+    "test:package": "vitest run --config vitest.package.config.ts",
+    "shots": "vitest run --config vitest.shots.config.ts"
   },
   "dependencies": {
     "@tyto/brief-lang": "workspace:*",

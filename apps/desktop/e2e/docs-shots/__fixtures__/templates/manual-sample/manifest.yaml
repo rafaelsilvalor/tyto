@@ -1,0 +1,10 @@
+name: manual-sample
+version: 1.0.0
+description: >-
+  The template the user manual's screenshots open (TYTO-315), not one anybody uses. Neutral on
+  purpose: the repository is public and the pictures are the manual's, so nothing in them is a
+  brand's art. A title and a list item that repeats, in two formats so the preview has a choice.
+formats: [grid-1x1, story]
+slots:
+  title: { type: rich-text, required: true }
+  item: { type: rich-text, repeat: true, min: 1 }
