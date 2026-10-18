@@ -486,7 +486,11 @@ describe('the File menu table', () => {
       ['Mod-0', WINDOW_ZOOM_RESET, undefined],
     ]);
     // And the command bar spells Zoom out with its minus, not as a second plus.
-    expect(bindingsOf({ id: 'zoom', bindings: zoomKeys }, 'win32')).toEqual({
+    const zoomSet = {
+      id: 'zoom',
+      bindings: zoomKeys.map(({ key, command }) => ({ key, command })),
+    };
+    expect(bindingsOf(zoomSet, 'win32')).toEqual({
       [WINDOW_ZOOM_IN]: 'Ctrl+=',
       [WINDOW_ZOOM_OUT]: 'Ctrl+-',
       [WINDOW_ZOOM_RESET]: 'Ctrl+0',
