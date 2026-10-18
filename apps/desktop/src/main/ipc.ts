@@ -23,6 +23,7 @@ import { type StatusBarColors } from '../../shared/status-bar-colors.js';
 import { type StatusBarItemId } from '../../shared/status-bar-items.js';
 import { type VimModeStyle } from '../../shared/vim-mode-style.js';
 import { type BriefColumnLook } from '../../shared/brief-columns.js';
+import { type Typography, type ZoomStep } from '../../shared/typography.js';
 import { type Credentials } from './credentials.js';
 import { credentialAccount } from './installed-plugins.js';
 import { declaredCredentialKeys } from './plugin-list.js';
@@ -63,6 +64,8 @@ export interface WindowThemes extends Pick<ThemeService, 'list' | 'current' | 'p
   formatBriefOnSave(): boolean;
   /** The `briefColumns` setting in force (TYTO-298), on the same answer. */
   briefColumns(): BriefColumnLook;
+  /** The faces and sizes in force (TYTO-272), on the same answer. */
+  typography(): Typography;
 }
 
 /**
@@ -82,6 +85,7 @@ function appliedForWindow(
     | 'tabSize'
     | 'formatBriefOnSave'
     | 'briefColumns'
+    | 'typography'
   >,
 ): IpcResponse<'theme:current'> {
   const { light, dark } = applied;
@@ -96,6 +100,7 @@ function appliedForWindow(
     tabSize: themes.tabSize(),
     formatBriefOnSave: themes.formatBriefOnSave(),
     briefColumns: themes.briefColumns(),
+    typography: { ...themes.typography() },
     light: { id: light.id, colors: light.colors },
     dark: { id: dark.id, colors: dark.colors },
     diagnostics: [...light.diagnostics, ...dark.diagnostics]
@@ -276,6 +281,11 @@ export interface IpcDependencies {
   keymaps(): Promise<IpcResponse<'plugins:keymaps'>['keymaps']>;
   /** The colours the window applies in each system mode, and the theme picker (TYTO-208). */
   readonly themes: WindowThemes;
+  /**
+   * Steps the `zoom` setting, applies it and writes it (TYTO-272): the zoom in effect after,
+   * and whether `settings.json` took it.
+   */
+  readonly zoom: (step: ZoomStep) => Promise<{ readonly zoom: number; readonly saved: boolean }>;
   readonly templateDialogs: {
     /** A template folder to edit, or nothing when the picker is dismissed. */
     chooseTemplate: () => Promise<string | undefined>;
@@ -642,6 +652,11 @@ export function createHandlers(dependencies: IpcDependencies): Handlers {
     'app:locale': ({ locale }) => {
       menu.setLocale(locale);
       return Promise.resolve({});
+    },
+
+    'window:zoom': async ({ step }) => {
+      const { zoom, saved } = await dependencies.zoom(step);
+      return { zoom, saved };
     },
 
     'menu:disabled': ({ ids }) => {

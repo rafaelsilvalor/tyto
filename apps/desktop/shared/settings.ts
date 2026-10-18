@@ -11,6 +11,13 @@ import {
   builtInThemeLookup,
   themeSettingContribution,
 } from './theme-setting.js';
+import {
+  codeFontFamilyContribution,
+  codeFontSizeContribution,
+  uiFontFamilyContribution,
+  uiFontSizeContribution,
+  zoomContribution,
+} from './typography.js';
 import { type VimModeStyle, vimModeStyleContribution } from './vim-mode-style.js';
 
 /**
@@ -21,7 +28,7 @@ import { type VimModeStyle, vimModeStyleContribution } from './vim-mode-style.js
  * reads off a disk and the window is told what the answer was, so the shape has to be one
  * declaration both halves import. Linted pure — no Node, no DOM.
  *
- * **Fourteen settings the built-in `desktop` plugin declares** through the `configuration`
+ * **Nineteen settings the built-in `desktop` plugin declares** through the `configuration`
  * extension point (TYTO-206, ADR 0073), like any plugin's: built-in is a plugin. Their keys
  * stay unprefixed, exactly as every `settings.json` written before that card spells them.
  * Each one is validated alone, so a hand-broken value costs that key and nothing else.
@@ -227,7 +234,7 @@ export function tabSizeExample(): string {
 }
 
 /**
- * The fourteen, in the order the settings file is documented in. `theme` checks its ids against
+ * The nineteen, in the order the settings file is documented in. `theme` checks its ids against
  * `lookup`, which main builds from every theme the plugins registered (TYTO-208); the default
  * knows the built-in two and lets any other id through.
  */
@@ -249,6 +256,11 @@ export function settingContributions(
     formatBriefOnSaveContribution,
     tabSizeContribution,
     briefColumnsContribution,
+    zoomContribution,
+    uiFontFamilyContribution,
+    uiFontSizeContribution,
+    codeFontFamilyContribution,
+    codeFontSizeContribution,
   ] as readonly ConfigurationContribution[];
 }
 
@@ -275,6 +287,14 @@ export interface Settings {
   readonly tabSize: number;
   /** How the editor tells the columns of a `|` line apart (TYTO-298). */
   readonly briefColumns: BriefColumnLook;
+  /** How far the window is zoomed, in Electron's steps of 1.2 (TYTO-272, ADR 0099). */
+  readonly zoom: number;
+  /** The face and size of the window's text outside the editor (TYTO-272). */
+  readonly uiFontFamily: string;
+  readonly uiFontSize: number;
+  /** The face and size of every editor buffer (TYTO-272). */
+  readonly codeFontFamily: string;
+  readonly codeFontSize: number;
 }
 
 export const DEFAULT_SETTINGS: Settings = {
@@ -292,13 +312,18 @@ export const DEFAULT_SETTINGS: Settings = {
   formatBriefOnSave: formatBriefOnSaveContribution.default,
   tabSize: tabSizeContribution.default,
   briefColumns: briefColumnsContribution.default,
+  zoom: zoomContribution.default,
+  uiFontFamily: uiFontFamilyContribution.default,
+  uiFontSize: uiFontSizeContribution.default,
+  codeFontFamily: codeFontFamilyContribution.default,
+  codeFontSize: codeFontSizeContribution.default,
 };
 
 /** What a queue folder produces until a person chooses otherwise (ADR 0044). */
 export const DEFAULT_QUEUE_KINDS: readonly string[] = ['png'];
 
 /**
- * The fourteen out of the resolved values, which already hold every declared key with a value
+ * The nineteen out of the resolved values, which already hold every declared key with a value
  * its schema accepted or its default (`resolveSettings`).
  */
 export function settingsFrom(values: Readonly<Record<string, unknown>>): Settings {
@@ -319,5 +344,10 @@ export function settingsFrom(values: Readonly<Record<string, unknown>>): Setting
     formatBriefOnSave: pick('formatBriefOnSave'),
     tabSize: pick('tabSize'),
     briefColumns: pick('briefColumns'),
+    zoom: pick('zoom'),
+    uiFontFamily: pick('uiFontFamily'),
+    uiFontSize: pick('uiFontSize'),
+    codeFontFamily: pick('codeFontFamily'),
+    codeFontSize: pick('codeFontSize'),
   };
 }

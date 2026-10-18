@@ -34,7 +34,23 @@ describe("the app's settings outline", () => {
       'formatBriefOnSave',
       'tabSize',
       'briefColumns',
+      'zoom',
+      'uiFontFamily',
+      'uiFontSize',
+      'codeFontFamily',
+      'codeFontSize',
     ]);
+  });
+
+  it('explains the zoom, the two faces and the two sizes (TYTO-272)', () => {
+    expect(setting('zoom')?.default).toBe('0');
+    expect(setting('zoom')?.options.map((option) => option.value)).toEqual([0, 1, 2, -1]);
+    expect(setting('zoom')?.description).toMatch(/steps of 20%/u);
+    expect(setting('uiFontFamily')?.default).toBe('"Source Sans 3"');
+    expect(setting('codeFontFamily')?.default).toBe('"IBM Plex Mono"');
+    expect(setting('uiFontSize')?.description).toMatch(/9 to 24/u);
+    expect(setting('codeFontSize')?.description).toMatch(/9 to 32/u);
+    expect(setting('codeFontFamily')?.description).toMatch(/does not have/u);
   });
 
   it('offers formatBriefOnSave and tabSize with what each value does (TYTO-297)', () => {

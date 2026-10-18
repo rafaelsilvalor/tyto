@@ -1,6 +1,7 @@
 import type { Diagnostic } from './panel.js';
 import { SAVE_FAILED } from './save-failure.js';
 import { THEME_CODES } from './theme.js';
+import { FONT_FAMILY_MISSING } from './typography.js';
 
 /**
  * The "new problems" mark on the status bar's problems button (TYTO-143, ADR 0076).
@@ -64,6 +65,8 @@ export const carriedAcrossTemplateRead = (
       item.code === SAVE_FAILED ||
       item.code === FILE_NOT_FOUND ||
       item.code === SESSION_DRAFT_STALE ||
+      // A face the machine lacks (TYTO-272) is the theme answer's, like a theme's own rows.
+      item.code === FONT_FAMILY_MISSING ||
       THEME_CODES.has(item.code),
   );
 

@@ -67,4 +67,14 @@ export const desktopCodes: readonly DesktopCode[] = [
     english: 'This file changed while Tyto was closed; your unsaved text is in a new tab beside it',
     suffix: 'the file name',
   },
+  {
+    code: 'W_FONT_FAMILY_MISSING',
+    severity: 'warning',
+    mintedIn: 'renderer/typography.ts',
+    summary:
+      'A `uiFontFamily` or `codeFontFamily` in settings.json names a face this machine does not draw; the bundled face is drawn instead (TYTO-272, ADR 0099). Measured in the window, so it has no range in the file.',
+    messageKey: 'typography.familyMissing',
+    english: 'This font is not installed; the bundled one is drawn instead',
+    suffix: 'the setting, then the face it names',
+  },
 ];

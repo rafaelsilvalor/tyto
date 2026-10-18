@@ -83,12 +83,34 @@ describe('the View menu', () => {
   it('keeps everything else the default submenu had', () => {
     // Removed item by item rather than by dropping the submenu, so what is left is a
     // statement about the two entries and not about the View menu as a whole.
+    // The three zoom roles are the window's commands since TYTO-272, tested below.
     expect(roles(submenuOf(template('linux'), 'viewMenu') ?? [])).toEqual([
       'toggleDevTools',
-      'resetZoom',
-      'zoomIn',
-      'zoomOut',
       'togglefullscreen',
+    ]);
+  });
+
+  it('offers the zoom as the window’s commands, with no accelerator (TYTO-272)', () => {
+    // A role zooms without writing the `zoom` setting, and its accelerator would be the
+    // browser process's; the commands write it and the keys stay the page's (ADR 0099).
+    const onCommand = vi.fn();
+    const submenu =
+      submenuOf(
+        template('win32', () => {}, onCommand),
+        'viewMenu',
+      ) ?? [];
+    const zoom = submenu.filter((item) => item.id?.startsWith('window.zoom') === true);
+
+    expect(zoom.map((item) => [item.id, item.label, item.accelerator])).toEqual([
+      ['window.zoomReset', 'command.window.zoomReset', undefined],
+      ['window.zoomIn', 'command.window.zoomIn', undefined],
+      ['window.zoomOut', 'command.window.zoomOut', undefined],
+    ]);
+    for (const item of zoom) (item.click as (() => void) | undefined)?.();
+    expect(onCommand.mock.calls).toEqual([
+      ['window.zoomReset'],
+      ['window.zoomIn'],
+      ['window.zoomOut'],
     ]);
   });
 

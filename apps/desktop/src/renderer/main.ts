@@ -57,6 +57,8 @@ import {
 } from '../../shared/i18n/index.js';
 import { followScheme } from './color-scheme.js';
 import { applyTheme, withThemeRows } from './theme.js';
+import { canvasMeasure, missingFamilyRows, withFontRows } from './typography.js';
+import { DEFAULT_TYPOGRAPHY, type Typography } from '../../shared/typography.js';
 import { templateOf } from './frontmatter.js';
 import {
   type AppFileAssists,
@@ -1082,6 +1084,13 @@ const registry: CommandRegistry = withCommandGate(
     },
     pickTheme: () => {
       void pickTheme();
+    },
+    zoomWindow: (step) => {
+      // Main steps, applies and writes the `zoom` setting (TYTO-272). A file that does not parse
+      // refuses the write, and main's `settings:changed` push opens it where the error is.
+      void withBridge(async (bridge) => {
+        await bridge['window:zoom']({ step });
+      });
     },
     showQueue: () => {
       void changeLayout(withPanelOpen(layout, QUEUE_PANEL, true)).then(() => {
@@ -2119,6 +2128,30 @@ async function reopen(path: string, name: string): Promise<void> {
   });
 }
 
+/** The faces and sizes the window last applied (TYTO-272); the defaults until main answers. */
+let typography: Typography = DEFAULT_TYPOGRAPHY;
+
+/**
+ * After the sheet carries a new `typography`: every editor pane, and the template mode's two
+ * once it is loaded, re-reads its line height and character width — the indent guides and the
+ * pinned head lines are drawn from them — and the problems panel gets a row per family the
+ * machine lacks. Nothing happens when the answer did not move them, which is most answers.
+ */
+function showTypography(next: Typography): void {
+  const moved = JSON.stringify(next) !== JSON.stringify(typography);
+  typography = next;
+  if (moved) {
+    editor?.remeasure();
+    if (customElements.get(TEMPLATE_MODE_TAG) !== undefined && elements.templateMode) {
+      elements.templateMode.remeasureText();
+    }
+  }
+  panel.installation = withFontRows(
+    panel.installation,
+    missingFamilyRows(next, canvasMeasure(), translate(state.locale, 'typography.familyMissing')),
+  );
+}
+
 /** Theme answers apply in the order they were asked: one that arrives late is dropped. */
 let themeTurn = 0;
 /** The themes on show, as main last answered: what the theme picker highlights first. */
@@ -2156,6 +2189,10 @@ function showTheme(bridge: TytoBridge, ask: () => Promise<IpcResponse<'theme:cur
       // no brief buffer, so it is not told.
       briefColumns = applied.briefColumns;
       editor?.setBriefColumns(briefColumns);
+      // And the faces and sizes (TYTO-272), which the sheet above already holds: CodeMirror
+      // watches no custom property, so every pane re-reads its text's size, and a face this
+      // machine does not have is said in the problems panel.
+      showTypography(applied.typography);
       // Only once it is loaded, as with the locale: `loadTemplateMode` hands it the value then.
       if (customElements.get(TEMPLATE_MODE_TAG) !== undefined && elements.templateMode) {
         elements.templateMode.showIndentGuides(indentGuides);

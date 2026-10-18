@@ -53,6 +53,8 @@ export {
   columnMarks,
 } from './columns.js';
 
+export { remeasureText } from './remeasure.js';
+
 export {
   STICKY_MAX_ROWS,
   type StickyBlock,

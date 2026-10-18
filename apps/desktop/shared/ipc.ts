@@ -3,6 +3,7 @@ import { THEME_KINDS, THEME_TOKEN_NAME, isThemeColor } from '@tyto/plugin-api';
 import { z } from 'zod';
 
 import { BRIEF_COLUMN_LOOK_IDS } from './brief-columns.js';
+import { typographySchema } from './typography.js';
 import { layoutSchema } from './layout.js';
 import type { SessionGroupNode } from './session-groups.js';
 import { STATUS_BAR_COLOUR_KEYS, statusBarColour } from './status-bar-colors.js';
@@ -327,6 +328,12 @@ const appliedThemesSchema = z.object({
   formatBriefOnSave: z.boolean(),
   /** The `briefColumns` setting in force (TYTO-298): how a `|` line's columns are drawn. */
   briefColumns: z.enum(BRIEF_COLUMN_LOOK_IDS),
+  /**
+   * The faces and sizes in force (TYTO-272, ADR 0099): the window's two bases, which it writes
+   * into its sheet as custom properties. Checked with the settings' own schemas, so a family
+   * name can never close the CSS string it lands in. The zoom is main's and is not here.
+   */
+  typography: typographySchema,
   diagnostics: z.array(diagnostic.omit({ range: true })).max(200),
 });
 
@@ -1356,6 +1363,18 @@ export const IPC_CHANNELS = {
    * effect in the browser process and there is nothing for the window to do with the outcome.
    */
   'app:locale': channel(z.object({ locale: z.string().min(1) }), z.object({})),
+
+  /**
+   * View > Zoom In, Zoom Out and Reset Zoom, and their keys (TYTO-272, ADR 0099): main steps
+   * the `zoom` setting inside its bounds, applies it to the window and writes it to
+   * `settings.json` as a screen's change, so every zoom a person makes is in the file. `saved`
+   * is false when the file does not parse; the zoom in effect is then the one before, which is
+   * what `zoom` answers.
+   */
+  'window:zoom': channel(
+    z.object({ step: z.enum(['in', 'out', 'reset']) }),
+    z.object({ zoom: z.number().int(), saved: z.boolean() }),
+  ),
 
   /**
    * The application menu as the window draws it: its top-level names, and what each holds
