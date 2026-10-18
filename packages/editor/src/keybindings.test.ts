@@ -181,6 +181,23 @@ describe('reading the table', () => {
     ).toEqual({ a: 'Ctrl⌘k' });
     expect(shownBindingsOf(resolve([]).table, false, 'darwin')['editor.redo']).toBe('⌘⇧z');
   });
+
+  it('keeps a minus key that ends the binding, which is not a separator (TYTO-272)', () => {
+    const minus = {
+      id: 'x',
+      bindings: [
+        { key: 'Mod--', command: 'zoomOut' },
+        { key: 'Mod-Shift--', command: 'shifted' },
+        { key: '-', command: 'bare' },
+      ],
+    };
+    expect(bindingsOf(minus, 'win32')).toEqual({
+      zoomOut: 'Ctrl+-',
+      shifted: 'Ctrl+Shift+-',
+      bare: '-',
+    });
+    expect(bindingsOf(minus, 'darwin')).toEqual({ zoomOut: '⌘-', shifted: '⌘⇧-', bare: '-' });
+  });
 });
 
 describe('what each context means (TYTO-304)', () => {

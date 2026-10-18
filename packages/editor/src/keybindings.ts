@@ -385,7 +385,9 @@ export function bindingsOf(
       .replace(/\bMeta\b/gu, mac ? '⌘' : 'Meta')
       .replace(/\bShift\b/gu, mac ? '⇧' : 'Shift')
       .replace(/\bAlt\b/gu, mac ? '⌥' : 'Alt')
-      .replaceAll('-', mac ? '' : '+');
+      // Only a `-` with something after it separates; the last one is the minus key itself,
+      // so `Mod--` reads `Ctrl+-` and not `Ctrl++` (TYTO-272).
+      .replace(/-(?=.)/gu, mac ? '' : '+');
     // The first binding wins. A set may bind two keys to one command — redo has three —
     // and a person looking for the shortcut wants one of them, not a list.
     bindings[binding.command] ??= key;
