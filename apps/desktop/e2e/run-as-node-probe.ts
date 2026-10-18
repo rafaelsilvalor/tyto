@@ -136,6 +136,10 @@ export function watchLaunch(
   return new Promise((resolve, reject) => {
     let ending: 'booted' | 'killed' | undefined;
     let gone = false;
+    // Where the time goes, printed per probe: the boot, the disconnect and the kill are three
+    // different costs, and only the first is the app's.
+    const started = Date.now();
+    const at: { booted?: number; disconnected?: number } = {};
     const deadline = setTimeout(() => {
       ending ??= 'killed';
       killTree(child.pid);
@@ -148,7 +152,13 @@ export function watchLaunch(
     child.once('close', (code, signal) => {
       gone = true;
       clearTimeout(deadline);
-      resolve({ ended: ending ?? 'exited', code, signal });
+      const ended = ending ?? 'exited';
+      process.stdout.write(
+        `[TYTO-308] probe ${ended}: booted at ${String(at.booted ?? '-')} ms, CDP disconnected ` +
+          `at ${String(at.disconnected ?? '-')} ms, process closed at ${String(Date.now() - started)} ms
+`,
+      );
+      resolve({ ended, code, signal });
     });
 
     const userData = watch.userData;
@@ -161,8 +171,10 @@ export function watchLaunch(
     }).then(
       async ({ browser }) => {
         ending ??= 'booted';
+        at.booted = Date.now() - started;
         // Disconnected before the kill, so the connection does not outlive what it spoke to.
         await browser.close().catch(() => {});
+        at.disconnected = Date.now() - started;
         killTree(child.pid);
       },
       () => {
