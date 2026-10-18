@@ -684,16 +684,22 @@ describe('labeler', () => {
 });
 
 describe('git attributes', () => {
-  it('route fixture PNGs through LFS, and only those', () => {
+  it("route fixture PNGs and the manual's screenshots through LFS, and only those", () => {
     const rules = readRepoFile('.gitattributes')
       .split('\n')
       .filter((line) => line.includes('filter=lfs'));
 
-    expect(rules).toHaveLength(1);
-    expect(rules[0]).toMatch(/^\*\*\/__fixtures__\/\*\*\/\*\.png\s/);
-    expect(rules[0]).toContain('diff=lfs');
-    expect(rules[0]).toContain('merge=lfs');
-    expect(rules[0]).toContain('-text');
+    // The manual's pictures joined in TYTO-315 (ADR 0102): generated, and rewritten with the
+    // window, from the one folder the shots script writes.
+    expect(rules.map((rule) => rule.split(/\s/)[0])).toEqual([
+      '**/__fixtures__/**/*.png',
+      'apps/docs/pages/public/screenshots/**/*.png',
+    ]);
+    for (const rule of rules) {
+      expect(rule).toContain('diff=lfs');
+      expect(rule).toContain('merge=lfs');
+      expect(rule).toContain('-text');
+    }
   });
 
   it('are honoured by the workflows that need the real bytes', () => {

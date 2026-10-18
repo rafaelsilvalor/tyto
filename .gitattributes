@@ -17,6 +17,11 @@
 # Checkouts that need the real bytes (ci.yml, visual.yml) pass `lfs: true`.
 **/__fixtures__/**/*.png filter=lfs diff=lfs merge=lfs -text
 
+# The user manual's pictures of the window (ADR 0102). Generated, and rewritten whenever the
+# window changes, which is the case LFS is for and an icon is not. Anchored on the one folder
+# the shots script writes, so the manual's other images stay plain files.
+apps/docs/pages/public/screenshots/**/*.png filter=lfs diff=lfs merge=lfs -text
+
 # The one place in the repository where a line ending is the subject rather than the
 # medium. `* text=auto eol=lf` above would hand every checkout an LF copy of these, which
 # would leave the test that reads them asserting nothing (TYTO-68). `-text` keeps the bytes
