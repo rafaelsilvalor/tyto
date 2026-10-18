@@ -1,0 +1,13 @@
+---
+template: manual-sample
+formats: [grid-1x1, story]
+---
+// A comment, so the window shows every colour a brief has.
+::title
+  A reading list for **autumn**
+
+::item
+  Three short novels and one long one.
+
+::item
+  One chapter a night, no more.

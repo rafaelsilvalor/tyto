@@ -1,0 +1,12 @@
+---
+template: manual-sample
+formats: [grid-1x1]
+---
+::title
+  A reading list for **autumn**
+
+::item
+  Three short novels and one long one.
+
+::subtitle
+  This block is not one the template has.

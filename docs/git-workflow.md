@@ -251,7 +251,7 @@ Nothing else belongs there. A fixture that does not care about its bytes is bett
 
 ## Visual snapshots in Git
 
-Reference PNGs live in Git LFS, matched by `**/__fixtures__/**/*.png` in `.gitattributes` — only the snapshot corpus, so icons and doc images stay readable in a clone without the LFS client. Any workflow that compares pixels must check out with `lfs: true`, or it diffs against a pointer file. Updating a snapshot requires an explicit commit `test(export-html): TYTO-… update snapshots` with justification in the PR.
+Reference PNGs live in Git LFS, matched by `**/__fixtures__/**/*.png` in `.gitattributes` — only the snapshot corpus, so icons and doc images stay readable in a clone without the LFS client. The one other LFS folder is the user manual's pictures of the window, `apps/docs/pages/public/screenshots/**/*.png`, which `pnpm --filter @tyto/desktop shots` regenerates whenever the window changes (ADR 0102); a clone without the LFS client builds the site with pointer files where those pictures go. Any workflow that compares pixels must check out with `lfs: true`, or it diffs against a pointer file. Updating a snapshot requires an explicit commit `test(export-html): TYTO-… update snapshots` with justification in the PR.
 
 They live under `packages/raster/src/__fixtures__/reference/`. The shape fixtures are `<artwork>.<format>.png`, one file each and not one per platform. That is measured, not assumed: the Windows and Linux renders of `shapes.feed` and `alpha.square` are identical at `threshold: 0`, 0 differing pixels, because `DETERMINISM_ARGS` in the Playwright adapter takes the host's opinions out of Skia's software rasterizer.
 

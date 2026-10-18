@@ -3,7 +3,7 @@ import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 import ts from 'typescript';
-import { describe, expect, it } from 'vitest';
+import { beforeAll, describe, expect, it, vi } from 'vitest';
 
 import { MINIMUM_LAUNCH_HOOK_TIMEOUT_MS } from './first-window.js';
 
@@ -47,6 +47,44 @@ const here = dirname(fileURLToPath(import.meta.url));
 
 const USER_DATA_SWITCH = '--user-data-dir=';
 const HOME_VARIABLE = 'TYTO_HOME';
+
+function parse(fileName: string, source: string): ts.SourceFile {
+  return ts.createSourceFile(fileName, source, ts.ScriptTarget.Latest, true);
+}
+
+/**
+ * Each suite is read and parsed once, and every rule walks the same tree (TYTO-321). Each rule
+ * used to parse every suite again: seven passes over ~80 files under vitest's 5 s default, and
+ * the first rule ran out of it on CI under load (5,583 ms) while taking ~380 ms here.
+ */
+const parsedSuites = new Map<string, ts.SourceFile>();
+
+function suite(name: string): ts.SourceFile {
+  const cached = parsedSuites.get(name);
+  if (cached !== undefined) return cached;
+  const file = parse(name, readFileSync(join(here, name), 'utf8'));
+  parsedSuites.set(name, file);
+  return file;
+}
+
+/**
+ * Budgets sized from local medians of 5 runs over 83 suites: the parse pass took 258 ms and the
+ * slowest rule 138 ms. CI, where `check` runs every package at once, took ~14 times the local
+ * time (5,583 against 377 ms), so about 3.6 s and 2 s there; each budget leaves several times
+ * that. Both costs grow with the number of suites, one file per card: when a budget runs out,
+ * measure again before raising it.
+ */
+const PARSE_BUDGET_MS = 30_000;
+const SCAN_BUDGET_MS = 15_000;
+
+// A file-wide test timeout keeps every rule's `it` on one line; the inline fixtures are far
+// below it either way.
+vi.setConfig({ testTimeout: SCAN_BUDGET_MS });
+
+// Parsing is paid here, once, so no rule's test carries it and each one only walks trees.
+beforeAll(() => {
+  for (const name of suiteFiles()) suite(name);
+}, PARSE_BUDGET_MS);
 
 /** Why one `_electron.launch` call is not isolated, located so the message can be clicked. */
 interface LaunchProblem {
@@ -141,7 +179,10 @@ function isElectronLaunch(node: ts.Node): node is ts.CallExpression {
 
 /** Every `_electron.launch(…)` in one source file, and what keeps each from being isolated. */
 function scanLaunches(fileName: string, source: string): LaunchScan {
-  const file = ts.createSourceFile(fileName, source, ts.ScriptTarget.Latest, true);
+  return launchesIn(parse(fileName, source));
+}
+
+function launchesIn(file: ts.SourceFile): LaunchScan {
   const problems: LaunchProblem[] = [];
   let launches = 0;
   let importsElectron = false;
@@ -238,7 +279,10 @@ function callName(call: ts.CallExpression): string | undefined {
 
 /** Every child process that runs the CLI in one source file, and what keeps it from being isolated. */
 function scanCliRuns(fileName: string, source: string): CliScan {
-  const file = ts.createSourceFile(fileName, source, ts.ScriptTarget.Latest, true);
+  return cliRunsIn(parse(fileName, source));
+}
+
+function cliRunsIn(file: ts.SourceFile): CliScan {
   const entries = new Set<string>();
   const collect = (node: ts.Node): void => {
     if (
@@ -281,7 +325,7 @@ function scanCliRuns(fileName: string, source: string): CliScan {
 describe('every end-to-end suite runs the CLI with its own TYTO_HOME', () => {
   it('finds no CLI child process without a TYTO_HOME in its env', () => {
     const messages = suiteFiles().flatMap((name) =>
-      scanCliRuns(name, readFileSync(join(here, name), 'utf8')).problems.map(
+      cliRunsIn(suite(name)).problems.map(
         (problem) =>
           `e2e/${name}:${problem.line}: runs the CLI but ${problem.reason} — ${HOW_TO_ISOLATE_CLI}`,
       ),
@@ -294,7 +338,7 @@ describe('every end-to-end suite runs the CLI with its own TYTO_HOME', () => {
   it('recognises a run in every suite that names the CLI entry', () => {
     const unseen = suiteFiles()
       .filter((name) => {
-        const scan = scanCliRuns(name, readFileSync(join(here, name), 'utf8'));
+        const scan = cliRunsIn(suite(name));
         return scan.resolvesCli && scan.runs === 0;
       })
       .map(
@@ -360,7 +404,10 @@ const HOW_TO_WAIT =
 
 /** Every `<anything>.firstWindow(…)` call, by line: each one bypasses the shared deadline. */
 function scanDirectWindowWaits(fileName: string, source: string): number[] {
-  const file = ts.createSourceFile(fileName, source, ts.ScriptTarget.Latest, true);
+  return directWindowWaitsIn(parse(fileName, source));
+}
+
+function directWindowWaitsIn(file: ts.SourceFile): number[] {
   const lines: number[] = [];
   const visit = (node: ts.Node): void => {
     if (
@@ -392,7 +439,10 @@ function callsFirstWindow(node: ts.Node): boolean {
 
 /** Every setup hook that waits for the first window on a budget below the minimum, by line. */
 function scanShortLaunchHooks(fileName: string, source: string): LaunchProblem[] {
-  const file = ts.createSourceFile(fileName, source, ts.ScriptTarget.Latest, true);
+  return shortLaunchHooksIn(parse(fileName, source));
+}
+
+function shortLaunchHooksIn(file: ts.SourceFile): LaunchProblem[] {
   const problems: LaunchProblem[] = [];
   const visit = (node: ts.Node): void => {
     if (
@@ -425,7 +475,7 @@ function suiteFiles(): string[] {
 describe('every end-to-end suite launches Electron in its own data folders', () => {
   it('finds no launch without its own --user-data-dir and TYTO_HOME', () => {
     const messages = suiteFiles().flatMap((name) =>
-      scanLaunches(name, readFileSync(join(here, name), 'utf8')).problems.map(
+      launchesIn(suite(name)).problems.map(
         (problem) => `e2e/${name}:${problem.line}: ${problem.reason} — ${HOW_TO_FIX}`,
       ),
     );
@@ -438,7 +488,7 @@ describe('every end-to-end suite launches Electron in its own data folders', () 
   it('recognises a launch in every suite that imports _electron', () => {
     const unseen = suiteFiles()
       .filter((name) => {
-        const scan = scanLaunches(name, readFileSync(join(here, name), 'utf8'));
+        const scan = launchesIn(suite(name));
         return scan.importsElectron && scan.launches === 0;
       })
       .map(
@@ -453,7 +503,7 @@ describe('every end-to-end suite launches Electron in its own data folders', () 
 describe('every end-to-end suite waits for the first window through first-window.ts', () => {
   it('finds no direct .firstWindow( call in a suite', () => {
     const messages = suiteFiles().flatMap((name) =>
-      scanDirectWindowWaits(name, readFileSync(join(here, name), 'utf8')).map(
+      directWindowWaitsIn(suite(name)).map(
         (line) => `e2e/${name}:${line}: waits for the first window itself — ${HOW_TO_WAIT}`,
       ),
     );
@@ -470,7 +520,7 @@ describe('every end-to-end suite waits for the first window through first-window
 describe('every hook that waits for the first window has room for it', () => {
   it(`finds no setup hook calling firstWindow( with less than ${MINIMUM_LAUNCH_HOOK_TIMEOUT_MS} ms`, () => {
     const messages = suiteFiles().flatMap((name) =>
-      scanShortLaunchHooks(name, readFileSync(join(here, name), 'utf8')).map(
+      shortLaunchHooksIn(suite(name)).map(
         (problem) =>
           `e2e/${name}:${problem.line}: waits for the first window but ${problem.reason} — ` +
           `drop the timeout to use the config's hookTimeout, or pass at least ` +
@@ -572,7 +622,11 @@ function enclosingStatement(node: ts.Node): ts.Node {
 
 /** Every `emulateMedia` call that forces a colour scheme without a `// scheme:` reason, by line. */
 function scanForcedSchemes(fileName: string, source: string): number[] {
-  const file = ts.createSourceFile(fileName, source, ts.ScriptTarget.Latest, true);
+  return forcedSchemesIn(parse(fileName, source));
+}
+
+function forcedSchemesIn(file: ts.SourceFile): number[] {
+  const source = file.text;
   const lines: number[] = [];
   const visit = (node: ts.Node): void => {
     if (isEmulateMediaCall(node) && !leavesSchemeToElectron(node)) {
@@ -592,7 +646,7 @@ function scanForcedSchemes(fileName: string, source: string): number[] {
 describe('every end-to-end suite leaves the colour scheme to Electron unless it says why', () => {
   it('finds no emulateMedia forcing a colour scheme without a // scheme: comment', () => {
     const messages = suiteFiles().flatMap((name) =>
-      scanForcedSchemes(name, readFileSync(join(here, name), 'utf8')).map(
+      forcedSchemesIn(suite(name)).map(
         (line) =>
           `e2e/${name}:${line}: forces a colour scheme the main process does not see — ` +
           `drop it (firstWindow already hands the scheme to Electron), or write a ` +
