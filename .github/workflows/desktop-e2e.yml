@@ -22,50 +22,72 @@ name: desktop-e2e
 #
 # **A required status check on `main` since TYTO-138 (ADR 0064), so there is no `paths:`
 # filter.** A path-filtered workflow reports on most pull requests never, and a required
-# context that never reports leaves them pending for good. Instead the first step reads the
+# context that never reports leaves them pending for good. Instead the first job reads the
 # pull request's diff and decides: `tools/repo-checks/src/ci-scope.mjs` computes this
 # suite's scope from the dependency graph of `@tyto/desktop` — every workspace package the
 # app bundles, `apps/cli` that three suites compare against, and the root files every
-# build reads. When nothing in it changed, every later step is skipped and the job summary
-# says `skipped: no change under …` with the list, so a green that measured nothing says
-# so. When the diff cannot be read, it runs. The old filter, `apps/desktop/**`, missed 13
-# of the last 40 merged pull requests that changed something the app bundles.
+# build reads. When nothing in it changed, every job after it is skipped, the `scope` job's
+# summary says `skipped: no change under …` with the list, and `desktop` goes green — so a
+# green that measured nothing says so. When the diff cannot be read, it runs. The old
+# filter, `apps/desktop/**`, missed 13 of the last 40 merged pull requests that changed
+# something the app bundles.
 #
 # **`push` to `main` always runs the whole suite**: the script scopes pull requests only,
 # and anything that reaches `main` is checked whatever it touched.
+#
+# **Five jobs since TYTO-307 (ADR 0100), where there was one.** `test:desktop` and
+# `test:package` ran one after the other on one runner, and by 18/10 that was 724 s median:
+# 490 s of `test:desktop` and 156 s of `test:package`, the rest setup. Now `scope` decides,
+# `test:desktop` runs as two `shard` jobs, `test:package` as a `package` job beside them,
+# `merge` joins the two shards' reports into one list, and `desktop` — the name `main`'s
+# protection stores — runs last and rolls the others up. The jobs in between are not
+# required contexts, and they do not need to be: `desktop` is red whenever one of them is.
 on:
   pull_request:
   push: { branches: [main] }
 concurrency: { group: 'desktop-e2e-${{ github.ref }}', cancel-in-progress: true }
 jobs:
-  # The job name is the required context `main`'s protection stores; `github-config.test.ts`
-  # pins it, and holds it unique among the jobs a pull request runs.
-  desktop:
+  # The decision, alone in a job, so the jobs after it can be skipped whole instead of step
+  # by step.
+  scope:
     runs-on: ubuntu-latest
+    outputs: { run: '${{ steps.scope.outputs.run }}' }
+    steps:
+      # `fetch-depth: 2` is what the scope needs: `pull_request` checks out a merge commit,
+      # and its first parent is the base the diff is read against. `lfs: true` is carried
+      # here as in every checkout of this workflow; it is 6 files and 0.15 MB.
+      - uses: actions/checkout@v7
+        with: { lfs: true, fetch-depth: 2 }
+      # On the runner's own Node: the script imports nothing, and the point of a skip is not
+      # paying for the install.
+      - id: scope
+        run: node tools/repo-checks/src/ci-scope.mjs desktop
+
+  # `test:desktop`, split in two by vitest's `--shard`, which divides the files over a hash
+  # of their paths rather than by duration. Two and not more because each shard pays the
+  # setup again (~70 s: install, Chromium's libraries, Xvfb, `pnpm build`), and at two the
+  # two slowest files, `tab-drag` and `sticky-scroll`, land in different shards.
+  # `fail-fast: false` so one red shard does not cancel the other: a run should say
+  # everything that is broken, not the first thing.
+  shard:
+    needs: scope
+    if: needs.scope.outputs.run == 'true'
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix: { shard: [1, 2] }
     steps:
       # `lfs: true` because `raster.desktop.test.ts` compares against reference PNGs, and
       # `.gitattributes` routes `**/__fixtures__/**/*.png` through Git LFS. Without it those
       # files arrive as 130-byte pointers, `PNG.sync.read` fails on the first one, and the
       # comparison that was supposed to guard the rasterizer never runs — `ci.yml` has
-      # carried the same flag since the visual suite existed (TYTO-133). It is fetched even
-      # on a skip because it is 6 files and 0.15 MB.
-      #
-      # `fetch-depth: 2` is what the scope needs: `pull_request` checks out a merge commit,
-      # and its first parent is the base the diff is read against.
+      # carried the same flag since the visual suite existed (TYTO-133).
       - uses: actions/checkout@v7
-        with: { lfs: true, fetch-depth: 2 }
-      # Before `setup-node`, on the runner's own Node: the script imports nothing, and the
-      # point of a skip is not paying for the install.
-      - id: scope
-        run: node tools/repo-checks/src/ci-scope.mjs desktop
-      - if: steps.scope.outputs.run == 'true'
-        uses: pnpm/action-setup@v6
-      - if: steps.scope.outputs.run == 'true'
-        uses: actions/setup-node@v7
+        with: { lfs: true }
+      - uses: pnpm/action-setup@v6
+      - uses: actions/setup-node@v7
         with: { node-version: 22, cache: pnpm }
-
-      - if: steps.scope.outputs.run == 'true'
-        run: pnpm install --frozen-lockfile
+      - run: pnpm install --frozen-lockfile
 
       # **There is no Electron cache here, and that is a measurement rather than an
       # omission.** The card asked for one. It was built — `actions/cache` on
@@ -83,14 +105,14 @@ jobs:
       # one: Electron's CDN and GitHub's cache are the same few seconds apart, and the 58 s
       # is the 17 tests in that file, not the fetch. So the step bought nothing measurable
       # and spent 116.85 MiB of a 10 GB repository quota that evicts by least-recent-use —
-      # against the pnpm store, which does save real time.
+      # against the pnpm store, which does save real time. Three jobs now download it
+      # instead of one; that is three times the same few seconds.
       #
       # Two things learned on the way that would otherwise have to be learned again. A
       # second entry for `~/.cache/electron-builder` cached nothing at all and said so once
       # per run (`Path Validation Error: Path(s) specified in the action for caching do(es)
-      # not exist`): electron-builder repacks the zip out of `~/.cache/electron`, which is
-      # why `test:package` costs 6 s here against ~70 s on a machine that fetches its own.
-      # And `actions/cache` declares `post-if: success()`, so a red job saves nothing — the
+      # not exist`): electron-builder repacks the zip out of `~/.cache/electron`. And
+      # `actions/cache` declares `post-if: success()`, so a red job saves nothing — the
       # first green run is always the one that would pay a download forward.
       #
       # Reinstating it is `actions/cache@v4` and two lines. Do that against a number, not
@@ -102,40 +124,41 @@ jobs:
       # would be ~170 MB nothing opens. Xvfb on top, because `show: false` is not headless
       # on Linux: Electron still opens a display connection at startup and dies with
       # `Missing X server or $DISPLAY` without one.
-      - if: steps.scope.outputs.run == 'true'
-        run: pnpm exec playwright install-deps chromium
-      - if: steps.scope.outputs.run == 'true'
-        run: sudo apt-get install -y --no-install-recommends xvfb
+      - run: pnpm exec playwright install-deps chromium
+      - run: sudo apt-get install -y --no-install-recommends xvfb
 
       # `pnpm build`, not `pnpm --filter @tyto/desktop build` — the same rule `desktop.yml`
       # carries and for the same reason: on a fresh checkout the workspace packages have no
       # `dist/`, and the filtered form runs the package's script and nothing before it.
-      - if: steps.scope.outputs.run == 'true'
-        run: pnpm build
+      - run: pnpm build
 
-      # **3 min 13 s for the job when TYTO-111 measured it; 455–487 s by TYTO-138**, as the
-      # suites grew. `test:package` was 6.4 s of it, measured on this workflow's own runs. `test:package` is that cheap because
-      # `electron-builder` repacks the Electron `test:desktop` has already fetched, so the
-      # two suites share one download whatever caching is or is not in front of them.
-      #
-      # **Three files at a time here, one everywhere else** (TYTO-235). The variable is read
-      # by `vitest.desktop.config.ts`, whose default is serial because a maintainer's
+      # **Three files at a time per shard, one everywhere else** (TYTO-235). The variable is
+      # read by `vitest.desktop.config.ts`, whose default is serial because a maintainer's
       # machine has the memory this runner does not need to share.
-      - if: steps.scope.outputs.run == 'true'
-        env: { TYTO_E2E_WORKERS: 3 }
-        run: xvfb-run -a pnpm --filter @tyto/desktop test:desktop
-      # `!cancelled()` rather than nothing, so a red `test:desktop` does not hide whether
-      # the package is also broken. They answer different questions and one run should
-      # answer both.
-      - if: ${{ !cancelled() && steps.scope.outputs.run == 'true' }}
-        run: xvfb-run -a pnpm --filter @tyto/desktop test:package
+      #
+      # `blob` writes this shard's results for `merge`; `default` keeps the log readable on
+      # its own, which is where `[TYTO-186]` is grepped for. The blob gets a path of its own
+      # because vitest 5's default, `.vitest/blob/`, is hidden, and `upload-artifact` leaves
+      # hidden files out unless told otherwise.
+      - env: { TYTO_E2E_WORKERS: 3 }
+        run: >-
+          xvfb-run -a pnpm --filter @tyto/desktop test:desktop
+          --shard=${{ matrix.shard }}/2 --reporter=blob --reporter=default
+          --outputFile.blob=blob-reports/blob-${{ matrix.shard }}.json
 
-      # **One artifact, and only since there is finally something in it.** The note this
-      # replaces was right when it was written: these suites wrote nothing to disk, and a
-      # step pointed at a path that never exists warns on every red run in a way that reads
-      # like a second failure. `raster.desktop.test.ts` changed that — it writes into
-      # `e2e/__diff__/` in exactly two cases, and both are cases where the file is the
-      # answer:
+      # `!cancelled()` so a red shard still hands its results to `merge`. One artifact per
+      # shard, because `upload-artifact` refuses a second upload under a name already taken
+      # in the run.
+      - if: ${{ !cancelled() }}
+        uses: actions/upload-artifact@v7
+        with:
+          name: desktop-blob-${{ matrix.shard }}
+          path: apps/desktop/blob-reports/
+          retention-days: 1
+
+      # **The raster diffs, one artifact per job that can write them.**
+      # `raster.desktop.test.ts` writes into `e2e/__diff__/` in exactly two cases, and both
+      # are cases where the file is the answer:
       #
       #   * a pixel comparison went past tolerance, and the render and the diff are what a
       #     reviewer needs to tell a real regression from a re-record;
@@ -144,12 +167,96 @@ jobs:
       #     Windows machine, so downloading it from a run is the only way one ever exists
       #     (ADR 0028).
       #
-      # `if-no-files-found: ignore` keeps the green path silent, which is the whole of what
-      # the old note was protecting.
-      - if: ${{ !cancelled() && steps.scope.outputs.run == 'true' }}
+      # `if-no-files-found: ignore` keeps the green path silent.
+      - if: ${{ !cancelled() }}
         uses: actions/upload-artifact@v7
         with:
-          name: desktop-raster-diffs
+          name: desktop-raster-diffs-${{ matrix.shard }}
           path: apps/desktop/e2e/__diff__/
           if-no-files-found: ignore
           retention-days: 14
+
+  # `test:package`: `electron-builder --dir`, then the app that came out. It answers a
+  # different question from `test:desktop` — whether the package opens, not whether the
+  # window behaves — so it runs beside the shards rather than after them, and a red shard
+  # no longer hides whether the package is broken too. `[TYTO-48]`, `[TYTO-189]` and the
+  # packaged `[TYTO-186]` print in this job's log.
+  package:
+    needs: scope
+    if: needs.scope.outputs.run == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+        with: { lfs: true }
+      - uses: pnpm/action-setup@v6
+      - uses: actions/setup-node@v7
+        with: { node-version: 22, cache: pnpm }
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm exec playwright install-deps chromium
+      - run: sudo apt-get install -y --no-install-recommends xvfb
+      - run: pnpm build
+      - run: xvfb-run -a pnpm --filter @tyto/desktop test:package
+      # `update.package.test.ts` writes a picture of the real window into `e2e/__diff__/`
+      # for the PR.
+      - if: ${{ !cancelled() }}
+        uses: actions/upload-artifact@v7
+        with:
+          name: desktop-raster-diffs-package
+          path: apps/desktop/e2e/__diff__/
+          if-no-files-found: ignore
+          retention-days: 14
+
+  # The two shards' results as one list, so a reader looks in one log for the whole of
+  # `test:desktop` instead of adding two up. `--merge-reports` runs no test and launches no
+  # Electron: it reads the blobs and replays them through the reporter, and exits non-zero
+  # when a test in them failed. `!cancelled()` so a red shard's failures are listed here
+  # too.
+  merge:
+    needs: [scope, shard]
+    if: ${{ !cancelled() && needs.scope.outputs.run == 'true' }}
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: pnpm/action-setup@v6
+      - uses: actions/setup-node@v7
+        with: { node-version: 22, cache: pnpm }
+      - run: pnpm install --frozen-lockfile
+      - uses: actions/download-artifact@v8
+        with:
+          pattern: desktop-blob-*
+          path: apps/desktop/blob-reports/
+          merge-multiple: true
+      - run: >-
+          pnpm --filter @tyto/desktop exec vitest run --config vitest.desktop.config.ts
+          --merge-reports=blob-reports --reporter=default
+
+  # **The required context, and nothing but a verdict** (ADR 0100, amending ADR 0064). The
+  # job name is the one `main`'s protection stores; `github-config.test.ts` pins it, holds
+  # it unique among the jobs a pull request runs, and pins the condition below.
+  #
+  # `always()` because a job whose dependency failed is otherwise *skipped*, and branch
+  # protection reads a skipped required check as passing. So it always runs and fails
+  # itself: when `scope` did not succeed, when any job failed or was cancelled, and when a
+  # job was skipped although `scope` said to run. A skip is green only when `scope` said
+  # there was nothing to measure — and then every job after `scope` is skipped, and the
+  # `scope` summary says why.
+  desktop:
+    needs: [scope, shard, package, merge]
+    if: always()
+    runs-on: ubuntu-latest
+    steps:
+      - env:
+          SCOPE: ${{ needs.scope.result }}
+          RUN: ${{ needs.scope.outputs.run }}
+          SHARD: ${{ needs.shard.result }}
+          PACKAGE: ${{ needs.package.result }}
+          MERGE: ${{ needs.merge.result }}
+        run: echo "scope=$SCOPE (run=$RUN) shard=$SHARD package=$PACKAGE merge=$MERGE"
+      - if: >-
+          needs.scope.result != 'success'
+          || contains(needs.*.result, 'failure')
+          || contains(needs.*.result, 'cancelled')
+          || (needs.scope.outputs.run == 'true' && contains(needs.*.result, 'skipped'))
+        run: |
+          echo "::error::desktop-e2e is red: a job it rolls up failed, was cancelled, or was skipped although the scope said to run"
+          exit 1
