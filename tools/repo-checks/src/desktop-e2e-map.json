@@ -134,6 +134,11 @@
       "why": "reviewed: the built-in plugin manifest every window loads"
     },
     {
+      "paths": ["apps/desktop/src/main/documentation.ts"],
+      "e2e": ["menu-row.desktop.test.ts", "menu.desktop.test.ts", "window.desktop.test.ts"],
+      "why": "reviewed: Help > Documentation's address, behind the menu item and its channel"
+    },
+    {
       "paths": ["apps/desktop/src/main/documents.ts"],
       "e2e": "all",
       "why": "reviewed: opening a document, which nearly every file does"
