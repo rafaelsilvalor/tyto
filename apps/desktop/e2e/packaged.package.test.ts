@@ -573,6 +573,27 @@ describe('the packaged app', () => {
     expect(bundle).toContain(feed);
   });
 
+  it('names both editions of the manual whole in the shipped bundle (TYTO-318)', () => {
+    // Help > Documentation opens one of these two and nothing else. Written whole in
+    // `documentation.ts` because a template literal stays a template in the bundle; this reads
+    // the shipped bytes for the exact strings, as the feed test above does.
+    const executable = packagedExecutable();
+    const archive = readFileSync(
+      process.platform === 'darwin'
+        ? join(dirname(executable), '..', 'Resources', 'app.asar')
+        : join(dirname(executable), 'resources', 'app.asar'),
+    );
+    const bundle = readPackedFile(archive, 'out/main/index.js').toString('utf8');
+    for (const url of [
+      'https://rafaelsilvalor.github.io/tyto/',
+      'https://rafaelsilvalor.github.io/tyto/pt-BR/',
+    ]) {
+      // Quoted, of either kind: the English address is a prefix of the Portuguese one, so a
+      // bare `toContain` would pass on the second alone.
+      expect(bundle.includes(`"${url}"`) || bundle.includes(`'${url}'`), url).toBe(true);
+    }
+  });
+
   it('refuses a modified app.asar wherever electron-builder wrote its hash (TYTO-241)', async () => {
     // **The two fuses this card switched on, read off the wire first.** `OnlyLoadAppFromAsar`
     // has no test of its own: every test above ran with it on, and the TYTO-48, TYTO-189 and
