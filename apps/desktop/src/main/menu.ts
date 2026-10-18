@@ -1,6 +1,7 @@
 import type { MenuItemConstructorOptions } from 'electron';
 
 import {
+  DOCUMENTATION_COMMAND,
   FILE_MENU_GROUPS,
   RELOAD_COMMAND,
   VIEW_MENU_COMMANDS,
@@ -228,6 +229,16 @@ export function menuTemplate(platform: string, options: MenuOptions): MenuItemCo
       role: 'help',
       ...title('menu.help'),
       submenu: [
+        // TYTO-318. First, as the manual is in VS Code's and Blender's Help: it is what the
+        // menu is for. It runs the registry's command, which asks main to open the manual.
+        {
+          id: DOCUMENTATION_COMMAND.id,
+          label: options.t(DOCUMENTATION_COMMAND.label),
+          click: () => {
+            options.onCommand(DOCUMENTATION_COMMAND.id);
+          },
+        },
+        { type: 'separator' },
         { label: options.t('menu.revealLogs'), click: options.onRevealLogs },
         // A label and a click rather than `role: 'about'`, so the facts are read when it is
         // opened (the template folder can change while the app runs), and because the role's

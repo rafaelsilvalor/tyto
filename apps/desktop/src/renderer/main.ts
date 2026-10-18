@@ -1109,6 +1109,12 @@ const registry: CommandRegistry = withCommandGate(
         await bridge['window:zoom']({ step });
       });
     },
+    openDocumentation: () => {
+      // TYTO-318. Names nothing: main opens one of its two literals, by the menu's language.
+      void withBridge(async (bridge) => {
+        await bridge['help:open-documentation']({});
+      });
+    },
     showQueue: () => {
       void changeLayout(withPanelOpen(layout, QUEUE_PANEL, true)).then(() => {
         // Brought forward: the panel may have been open all along, behind the editor's focus.

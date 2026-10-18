@@ -547,6 +547,7 @@ const dependencies = () => {
     keymaps: () => Promise.resolve([]),
     themes: windowThemes(),
     zoom: (step: string) => Promise.resolve({ zoom: step === 'in' ? 1 : 0, saved: true }),
+    openDocumentation: () => {},
     keybindings: {
       open: () => Promise.resolve({ document: null, documentId: null }),
       read: () => Promise.resolve(''),
@@ -1124,6 +1125,15 @@ describe('log:write', () => {
     await handlers['log:reveal']({});
 
     expect(folders.revealed).toEqual([log.directory]);
+  });
+
+  it('opens the manual through the composition root, with nothing from the window (TYTO-318)', async () => {
+    const openDocumentation = vi.fn();
+    const handlers = createHandlers({ ...dependencies(), openDocumentation });
+
+    await handlers['help:open-documentation']({});
+
+    expect(openDocumentation).toHaveBeenCalledTimes(1);
   });
 });
 

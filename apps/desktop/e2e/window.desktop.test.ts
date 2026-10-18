@@ -283,6 +283,9 @@ describe('the bridge', () => {
       'file:reopen',
       'file:save',
       'files:recent',
+      // TYTO-318: Help > Documentation. Opens the system browser, which no suite should do;
+      // `src/main/ipc.test.ts` and `src/main/documentation.test.ts` hold what it does.
+      'help:open-documentation',
       // TYTO-207: the keybindings tab and the file's text. Exercised by
       // `e2e/keybindings-file.desktop.test.ts`.
       'keybindings:open',
@@ -649,6 +652,8 @@ describe('switching the language', () => {
     'command.window.zoomIn',
     'command.window.zoomOut',
     'typography.familyMissing',
+    // TYTO-318: Help > Documentation, in the bar and the menu only.
+    'command.help.openDocumentation',
     // TYTO-208: the theme picker's command, placeholder and the two kinds beside each theme,
     // all inside the bar. `e2e/theme-pick.desktop.test.ts` opens it.
     'command.theme.pick',

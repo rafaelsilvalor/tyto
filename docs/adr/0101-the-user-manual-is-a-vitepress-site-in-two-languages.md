@@ -1,6 +1,7 @@
 # 0101 — The user manual is a VitePress site in `apps/docs`, in English and Brazilian Portuguese
 
-Status: accepted · 2026-10-18 · TYTO-312 (epic TYTO-311)
+Status: accepted · 2026-10-18 · TYTO-312 (epic TYTO-311) · amended in place by TYTO-318
+(decisions 8 and 9: how the site is published and how the app reaches it)
 
 ## Context
 
@@ -69,6 +70,33 @@ links to the English pages.
 **7. Contributor docs stay out of the user site.** `architecture.md`, the ADRs,
 `git-workflow.md` and the rest of `docs/` are not pages of the manual.
 
+**8. The manual is published to GitHub Pages on each desktop release, latest only** (TYTO-318).
+`.github/workflows/docs-pages.yml` builds `apps/docs` and deploys it when a `desktop-v*` tag is
+pushed — the same tag that starts `desktop.yml` — so the manual online describes the app that was
+just released. Both editions are one site: English at `https://rafaelsilvalor.github.io/tyto/`,
+pt-BR at `…/tyto/pt-BR/`. The project path is given at build time, `vitepress build --base
+/tyto/`, and not in the config, so `pnpm dev`, `ci.yml`'s build and the search suite keep `/`; a
+page that links an image therefore builds its URL with `withBase()`. A `workflow_dispatch` is a
+dry run unless `deploy` is ticked, and a pull request that edits the workflow builds without
+deploying.
+
+Each release **replaces** the site. Versioned copies (`/v0.7/`, VS Code's and Blender's shape)
+were weighed and set aside for now: Pages publishes one artifact per deploy, so keeping old
+versions means rebuilding every past tag on each release or committing built sites to a
+`gh-pages` branch, and both cost more than the problem is worth while the app has had three
+desktop releases and an auto-updater (TYTO-131) that moves people to the newest one. The cost is
+stated rather than hidden: somebody on an older app reads the newest manual, which may describe
+a menu item their version lacks. Reopening this is a new decision when that cost is measured.
+
+**9. Help ▸ Documentation opens the edition of the app's language, from a list of two.**
+`help.openDocumentation` is a command in the registry and an item on the Help menu, which runs
+it. It asks main over `help:open-documentation`, which carries nothing; main picks between the
+two literals in `apps/desktop/src/main/documentation.ts` by the locale the window last reported
+(`/pt-BR/` in Portuguese, `/` otherwise) and hands it to `shell.openExternal`. No page can
+choose the URL, so those two literals are the allowlist. Opening a public page in the person's
+own browser is not a network client inside Tyto (ADR 0011): the app sends no request and reads
+no answer.
+
 ## Consequences
 
 - A guide under `docs/` that gains a relative link to another file in `docs/` breaks the docs
@@ -83,4 +111,9 @@ links to the English pages.
   the other construct to avoid.
 - `pnpm check` now builds the site, because `test` depends on `build` in `apps/docs`.
 - Every later card of the epic adds a page in both editions or the parity suite stops it.
-- The site is built on every pull request and published nowhere yet; publishing is TYTO-318.
+- The site is built on every pull request by `ci.yml` and published on every desktop release by
+  `docs-pages.yml` (decision 8). A pull request can no longer break the published manual, only
+  the next one; a fix to the site between releases is published by a dispatch with `deploy`.
+- The site's URL is written twice — the app's two literals and the workflow's `--base` — and
+  renaming the repository moves the site without moving the literals. `documentation.test.ts`
+  pins the literals; nothing pins them to the repository's name.

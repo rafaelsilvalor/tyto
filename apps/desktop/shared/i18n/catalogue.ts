@@ -473,6 +473,8 @@ export interface Catalogue {
   readonly 'command.window.zoomReset': string;
   readonly 'command.window.zoomIn': string;
   readonly 'command.window.zoomOut': string;
+  /** TYTO-318. Help > Documentation, and the bar's row; opens the manual in the browser. */
+  readonly 'command.help.openDocumentation': string;
   /**
    * TYTO-272. The problems row for a `uiFontFamily` or `codeFontFamily` this machine does not
    * have; the setting and the name follow it. Set from code, so not on screen at load.
@@ -774,6 +776,7 @@ export const CATALOGUE_KEYS = [
   'command.window.zoomReset',
   'command.window.zoomIn',
   'command.window.zoomOut',
+  'command.help.openDocumentation',
   'typography.familyMissing',
   'command.theme.pick',
   'theme.pick.placeholder',

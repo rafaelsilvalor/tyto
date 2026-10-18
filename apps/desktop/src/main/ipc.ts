@@ -286,6 +286,12 @@ export interface IpcDependencies {
    * and whether `settings.json` took it.
    */
   readonly zoom: (step: ZoomStep) => Promise<{ readonly zoom: number; readonly saved: boolean }>;
+  /**
+   * Opens the user manual in the system browser, in the window's language (TYTO-318). The
+   * composition root holds the locale and `shell.openExternal`; the URL is one of the two
+   * literals in `documentation.ts`, never something the window sent.
+   */
+  readonly openDocumentation: () => void;
   readonly templateDialogs: {
     /** A template folder to edit, or nothing when the picker is dismissed. */
     chooseTemplate: () => Promise<string | undefined>;
@@ -647,6 +653,11 @@ export function createHandlers(dependencies: IpcDependencies): Handlers {
     'log:reveal': async () => {
       await folders.reveal(log.directory);
       return {};
+    },
+
+    'help:open-documentation': () => {
+      dependencies.openDocumentation();
+      return Promise.resolve({});
     },
 
     'app:locale': ({ locale }) => {

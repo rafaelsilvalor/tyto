@@ -115,5 +115,15 @@ export const VIEW_MENU_COMMANDS: readonly MenuCommand[] = [
   { id: 'editor.goToBlock', label: 'command.editor.goToBlock' },
 ];
 
+/**
+ * Help > Documentation (TYTO-318). A command and not a click main handles alone, so the menu
+ * item and the command bar's row are one command, as the File items are: the renderer's
+ * registry runs it, and it asks main over `help:open-documentation`, which names no URL.
+ */
+export const DOCUMENTATION_COMMAND: MenuCommand = {
+  id: 'help.openDocumentation',
+  label: 'command.help.openDocumentation',
+};
+
 /** Every command the File menu offers, flat, for the tests that count them. */
 export const FILE_MENU_COMMANDS: readonly MenuCommand[] = FILE_MENU_GROUPS.flat();

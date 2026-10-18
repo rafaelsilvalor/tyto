@@ -1,7 +1,7 @@
 import type { MenuItemConstructorOptions } from 'electron';
 import { describe, expect, it, vi } from 'vitest';
 
-import { FILE_MENU_COMMANDS } from '../../shared/commands.js';
+import { DOCUMENTATION_COMMAND, FILE_MENU_COMMANDS } from '../../shared/commands.js';
 import { aboutText, menuTemplate } from './menu.js';
 
 /**
@@ -159,14 +159,28 @@ describe('the rest of the menu', () => {
  * file does not need the catalogue". That stopped being true here, so it is asserted here.
  */
 describe('the Help submenu', () => {
-  it('carries the log folder and About, on every platform', () => {
+  it('carries the manual, then the log folder and About, on every platform', () => {
     for (const platform of ['win32', 'darwin', 'linux']) {
       const help = submenuOf(template(platform), 'help');
       expect(
-        help?.map((item) => item.label),
+        help?.map((item) => item.label ?? item.type),
         platform,
-      ).toEqual(['menu.revealLogs', 'menu.about']);
+      ).toEqual(['command.help.openDocumentation', 'separator', 'menu.revealLogs', 'menu.about']);
     }
+  });
+
+  it('runs the documentation command through the registry, not a URL of its own (TYTO-318)', () => {
+    const onCommand = vi.fn();
+    const help = submenuOf(
+      template('linux', () => {}, onCommand),
+      'help',
+    );
+
+    expect(help?.[0]?.id).toBe(DOCUMENTATION_COMMAND.id);
+    (help?.[0]?.click as (() => void) | undefined)?.();
+
+    // The same id the command bar runs; which edition opens is main's, by the window's locale.
+    expect(onCommand.mock.calls).toEqual([['help.openDocumentation']]);
   });
 
   it('opens About through the callback it was given (TYTO-248)', () => {
@@ -181,7 +195,7 @@ describe('the Help submenu', () => {
       'help',
     );
 
-    (help?.[1]?.click as (() => void) | undefined)?.();
+    (help?.[3]?.click as (() => void) | undefined)?.();
 
     expect(onAbout).toHaveBeenCalledTimes(1);
   });
@@ -205,7 +219,7 @@ describe('the Help submenu', () => {
     const onRevealLogs = vi.fn();
     const help = submenuOf(template('linux', onRevealLogs), 'help');
 
-    (help?.[0]?.click as (() => void) | undefined)?.();
+    (help?.[2]?.click as (() => void) | undefined)?.();
 
     // The item does the opening and nothing else: what folder that is, is the composition
     // root's, because the log is the only thing that knows where it put itself.
