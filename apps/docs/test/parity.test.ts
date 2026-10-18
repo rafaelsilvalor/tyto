@@ -44,4 +44,15 @@ describe('the two editions have the same pages', () => {
       expect(portuguese).toContain(`${section.slug}/index.md`);
     }
   });
+
+  it('every page a section lists in the sidebar exists in each edition', () => {
+    const listed = SECTIONS.flatMap((section) =>
+      (section.pages ?? []).map((page) => `${section.slug}/${page.slug}.md`),
+    );
+    expect(listed.length).toBeGreaterThan(0);
+    for (const path of listed) {
+      expect(english).toContain(path);
+      expect(portuguese).toContain(path);
+    }
+  });
 });

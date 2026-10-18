@@ -50,3 +50,17 @@ describe('the header version', () => {
     expect(readFileSync(`${DIST}${page}`, 'utf8')).toContain(`v${desktop.version}`);
   });
 });
+
+describe('the tour picture', () => {
+  // Server-rendered: the page carries both themes' pictures before any script runs, and
+  // CSS on `html.dark` picks one. A page with only one would show a broken or wrong-theme
+  // window to half its readers.
+  it.each([
+    { page: 'get-started/window-tour.html', locale: 'en' },
+    { page: 'pt-BR/get-started/window-tour.html', locale: 'pt-BR' },
+  ])('$page carries the light and the dark $locale picture', ({ page, locale }) => {
+    const html = readFileSync(`${DIST}${page}`, 'utf8');
+    expect(html).toContain(`src="/screenshots/${locale}/window-tour-tyto-light.png"`);
+    expect(html).toContain(`src="/screenshots/${locale}/window-tour-tyto-dark.png"`);
+  });
+});

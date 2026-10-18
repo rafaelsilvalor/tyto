@@ -11,6 +11,14 @@ const sidebar = (locale: Locale): DefaultTheme.SidebarItem[] =>
   SECTIONS.map((section) => ({
     text: section.title[locale],
     link: `${prefix(locale)}${section.slug}/`,
+    ...(section.pages === undefined
+      ? {}
+      : {
+          items: section.pages.map((page) => ({
+            text: page.title[locale],
+            link: `${prefix(locale)}${section.slug}/${page.slug}`,
+          })),
+        }),
   }));
 
 /** The header's version item. A link because VitePress draws a nav item, not free text. */
