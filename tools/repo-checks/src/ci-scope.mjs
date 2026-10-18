@@ -151,6 +151,17 @@ export function scopeOf(repoRoot, suite) {
 }
 
 /**
+ * Whether `file` is under a scope entry: directories end in `/` and match by prefix, files
+ * match exactly. Exported for `e2e-select.mjs`, which asks the same question per file.
+ *
+ * @param {string} file
+ * @param {string[]} scope
+ */
+export function matchesScope(file, scope) {
+  return scope.some((entry) => (entry.endsWith('/') ? file.startsWith(entry) : file === entry));
+}
+
+/**
  * @param {{ changed: string[] | null, scope: string[], failure?: string }} input
  *   `changed` is `null` when the diff could not be read; `failure` says why.
  * @returns {{ run: boolean, message: string }}
@@ -162,9 +173,7 @@ export function decide({ changed, scope, failure }) {
       message: `running: no pull-request diff to scope by (${failure ?? 'no reason given'}), so nothing is skipped`,
     };
   }
-  const inScope = changed.filter((file) =>
-    scope.some((entry) => (entry.endsWith('/') ? file.startsWith(entry) : file === entry)),
-  );
+  const inScope = changed.filter((file) => matchesScope(file, scope));
   if (inScope.length > 0) {
     const shown = inScope.slice(0, 10).join(', ');
     const more = inScope.length > 10 ? ` and ${inScope.length - 10} more` : '';

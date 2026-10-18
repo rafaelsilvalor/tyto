@@ -1,0 +1,1593 @@
+{
+  "$comment": [
+    "Which desktop e2e files a change reaches (TYTO-309). Read by e2e-select.mjs; guarded by desktop-e2e-map.test.mjs.",
+    "paths: globs over the repository (* within a segment, ** across, {a,b} alternatives). e2e: file names under apps/desktop/e2e, or \"all\".",
+    "A changed path in the desktop scope that no entry covers runs everything, so a missing entry costs minutes, never a skipped file."
+  ],
+  "entries": [
+    {
+      "paths": ["apps/desktop/shared/brief-columns.ts"],
+      "e2e": ["columns.desktop.test.ts", "settings-assist.desktop.test.ts"],
+      "why": "generated: name, prefix, static import or text of the stem in the e2e file"
+    },
+    {
+      "paths": ["apps/desktop/shared/layout.ts"],
+      "e2e": "all",
+      "why": "reviewed: the layout every window opens with"
+    },
+    {
+      "paths": ["apps/desktop/shared/session-groups.ts"],
+      "e2e": [
+        "groups-session.desktop.test.ts",
+        "groups.desktop.test.ts",
+        "preview-session.desktop.test.ts",
+        "session-place.desktop.test.ts",
+        "session.desktop.test.ts",
+        "tab-drag.desktop.test.ts",
+        "template-session.desktop.test.ts"
+      ],
+      "why": "reviewed: the groups part of the saved session"
+    },
+    {
+      "paths": ["apps/desktop/shared/status-bar-colors.ts"],
+      "e2e": [
+        "settings-assist.desktop.test.ts",
+        "status-bar-colors.desktop.test.ts",
+        "status-bar.desktop.test.ts",
+        "vim-mode-style.desktop.test.ts"
+      ],
+      "why": "generated: name, prefix, static import or text of the stem in the e2e file"
+    },
+    {
+      "paths": ["apps/desktop/shared/status-bar-items.ts"],
+      "e2e": [
+        "settings-assist.desktop.test.ts",
+        "status-bar-items.desktop.test.ts",
+        "status-bar.desktop.test.ts"
+      ],
+      "why": "generated: name, prefix, static import or text of the stem in the e2e file"
+    },
+    {
+      "paths": ["apps/desktop/shared/theme-setting.ts"],
+      "e2e": [
+        "columns.desktop.test.ts",
+        "icon-stroke.desktop.test.ts",
+        "indent-guides.desktop.test.ts",
+        "preview-broken.desktop.test.ts",
+        "status-bar-colors.desktop.test.ts",
+        "tab-folder.desktop.test.ts",
+        "theme-pack.desktop.test.ts",
+        "theme-pick.desktop.test.ts",
+        "theme.desktop.test.ts",
+        "title-bar.desktop.test.ts",
+        "vim-badge.desktop.test.ts",
+        "vim-mode-style.desktop.test.ts"
+      ],
+      "why": "reviewed: the theme setting"
+    },
+    {
+      "paths": ["apps/desktop/shared/typography.ts"],
+      "e2e": [
+        "font-areas.desktop.test.ts",
+        "tabs.desktop.test.ts",
+        "typography.desktop.test.ts",
+        "window.desktop.test.ts"
+      ],
+      "why": "generated: name, prefix, static import or text of the stem in the e2e file"
+    },
+    {
+      "paths": ["apps/desktop/shared/vim-mode-style.ts"],
+      "e2e": ["settings-assist.desktop.test.ts", "vim-mode-style.desktop.test.ts"],
+      "why": "generated: name, prefix, static import or text of the stem in the e2e file"
+    },
+    {
+      "paths": ["apps/desktop/src/index.ts"],
+      "e2e": "all",
+      "why": "reviewed: placeholder entry of the package; rare, so the cheap answer is the safe one"
+    },
+    {
+      "paths": ["apps/desktop/src/main/built-in-templates.tyto-plugin.json"],
+      "e2e": ["installed-packs.desktop.test.ts", "template-folder.desktop.test.ts"],
+      "why": "generated: name, prefix, static import or text of the stem in the e2e file"
+    },
+    {
+      "paths": ["apps/desktop/src/main/chromium.tyto-plugin.json"],
+      "e2e": [
+        "icon-stroke.desktop.test.ts",
+        "offscreen-raster.desktop.test.ts",
+        "panel-plugin.desktop.test.ts",
+        "preview.desktop.test.ts",
+        "raster.desktop.test.ts",
+        "theme.desktop.test.ts"
+      ],
+      "why": "generated: name, prefix, static import or text of the stem in the e2e file"
+    },
+    {
+      "paths": ["apps/desktop/src/main/colour-difference.ts"],
+      "e2e": [],
+      "why": "reviewed: read only by the renderer-tokens unit test; no e2e file reaches it"
+    },
+    {
+      "paths": ["apps/desktop/src/main/credential-store.ts"],
+      "e2e": [
+        "installed-plugins.desktop.test.ts",
+        "log.desktop.test.ts",
+        "plugins.desktop.test.ts",
+        "window.desktop.test.ts"
+      ],
+      "why": "reviewed: credentials reach plugins through installed-plugins"
+    },
+    {
+      "paths": ["apps/desktop/src/main/credentials.ts"],
+      "e2e": [
+        "installed-plugins.desktop.test.ts",
+        "log.desktop.test.ts",
+        "plugins.desktop.test.ts",
+        "window.desktop.test.ts"
+      ],
+      "why": "reviewed: credentials reach plugins through installed-plugins"
+    },
+    {
+      "paths": ["apps/desktop/src/main/desktop.tyto-plugin.json"],
+      "e2e": "all",
+      "why": "reviewed: the built-in plugin manifest every window loads"
+    },
+    {
+      "paths": ["apps/desktop/src/main/documents.ts"],
+      "e2e": "all",
+      "why": "reviewed: opening a document, which nearly every file does"
+    },
+    {
+      "paths": ["apps/desktop/src/main/export.ts"],
+      "e2e": [
+        "assets.desktop.test.ts",
+        "banner.desktop.test.ts",
+        "brand-kit.desktop.test.ts",
+        "brief-commands.desktop.test.ts",
+        "code-templates.desktop.test.ts",
+        "directives.desktop.test.ts",
+        "export.desktop.test.ts",
+        "installed-packs.desktop.test.ts",
+        "installed-plugins.desktop.test.ts",
+        "keybindings.desktop.test.ts",
+        "leftovers.desktop.test.ts",
+        "offscreen-raster.desktop.test.ts",
+        "packaged.package.test.ts",
+        "pane-shape.desktop.test.ts",
+        "panel-plugin.desktop.test.ts",
+        "plugins.desktop.test.ts",
+        "queue-kinds.desktop.test.ts",
+        "queue.desktop.test.ts",
+        "raster.desktop.test.ts",
+        "status-bar-items.desktop.test.ts",
+        "status-bar.desktop.test.ts",
+        "template-assets.desktop.test.ts",
+        "template-warnings.desktop.test.ts",
+        "theme-pick.desktop.test.ts",
+        "window.desktop.test.ts"
+      ],
+      "why": "generated: name, prefix, static import or text of the stem in the e2e file"
+    },
+    {
+      "paths": ["apps/desktop/src/main/fonts.ts"],
+      "e2e": [
+        "export.desktop.test.ts",
+        "font-areas.desktop.test.ts",
+        "offscreen-raster.desktop.test.ts",
+        "preview.desktop.test.ts",
+        "raster.desktop.test.ts",
+        "theme.desktop.test.ts",
+        "typography.desktop.test.ts"
+      ],
+      "why": "reviewed: generated hits plus the type settings"
+    },
+    {
+      "paths": ["apps/desktop/src/main/installed-plugins.ts"],
+      "e2e": [
+        "assets.desktop.test.ts",
+        "banner.desktop.test.ts",
+        "brand-kit.desktop.test.ts",
+        "code-templates.desktop.test.ts",
+        "directives.desktop.test.ts",
+        "export.desktop.test.ts",
+        "installed-packs.desktop.test.ts",
+        "installed-plugins.desktop.test.ts",
+        "keybindings.desktop.test.ts",
+        "leftovers.desktop.test.ts",
+        "packaged.package.test.ts",
+        "pane-shape.desktop.test.ts",
+        "panel-plugin.desktop.test.ts",
+        "plugins.desktop.test.ts",
+        "queue-kinds.desktop.test.ts",
+        "queue.desktop.test.ts",
+        "status-bar-items.desktop.test.ts",
+        "status-bar.desktop.test.ts",
+        "template-assets.desktop.test.ts",
+        "template-warnings.desktop.test.ts",
+        "theme-pack.desktop.test.ts",
+        "theme-pick.desktop.test.ts",
+        "window.desktop.test.ts"
+      ],
+      "why": "reviewed: every file that installs or reads a plugin"
+    },
+    {
+      "paths": ["apps/desktop/src/main/layout-store.ts"],
+      "e2e": "all",
+      "why": "reviewed: reads and writes the layout on every launch"
+    },
+    {
+      "paths": ["apps/desktop/src/main/live-text-file.ts"],
+      "e2e": [
+        "keybindings-assist.desktop.test.ts",
+        "keybindings-file.desktop.test.ts",
+        "settings-writers.desktop.test.ts",
+        "snippets-file.desktop.test.ts"
+      ],
+      "why": "reviewed: watches keybindings.json and snippets.json"
+    },
+    {
+      "paths": ["apps/desktop/src/main/log.ts"],
+      "e2e": [
+        "crash.desktop.test.ts",
+        "log.desktop.test.ts",
+        "menu-row.desktop.test.ts",
+        "offscreen-raster.desktop.test.ts",
+        "packaged.package.test.ts",
+        "preview-height.desktop.test.ts",
+        "settings.desktop.test.ts",
+        "window.desktop.test.ts"
+      ],
+      "why": "generated: name, prefix, static import or text of the stem in the e2e file"
+    },
+    {
+      "paths": ["apps/desktop/src/main/menu-arrows.ts"],
+      "e2e": ["menu-row.desktop.test.ts", "menu.desktop.test.ts", "title-bar.desktop.test.ts"],
+      "why": "reviewed: the menu model, drawn by the menu row too"
+    },
+    {
+      "paths": ["apps/desktop/src/main/menu-model.ts"],
+      "e2e": ["menu-row.desktop.test.ts", "menu.desktop.test.ts", "title-bar.desktop.test.ts"],
+      "why": "reviewed: the menu model, drawn by the menu row too"
+    },
+    {
+      "paths": ["apps/desktop/src/main/menu.ts"],
+      "e2e": [
+        "brief-commands.desktop.test.ts",
+        "crash.desktop.test.ts",
+        "installed-plugins.desktop.test.ts",
+        "log.desktop.test.ts",
+        "menu-row.desktop.test.ts",
+        "menu.desktop.test.ts",
+        "new-from-template.desktop.test.ts",
+        "panel.desktop.test.ts",
+        "plugins.desktop.test.ts",
+        "queue-kinds.desktop.test.ts",
+        "queue.desktop.test.ts",
+        "settings.desktop.test.ts",
+        "slash-menu.desktop.test.ts",
+        "snippets-file.desktop.test.ts",
+        "status-bar.desktop.test.ts",
+        "tabs.desktop.test.ts",
+        "template-mode.desktop.test.ts",
+        "template-session.desktop.test.ts",
+        "title-bar.desktop.test.ts",
+        "window.desktop.test.ts"
+      ],
+      "why": "generated: name, prefix, static import or text of the stem in the e2e file"
+    },
+    {
+      "paths": ["apps/desktop/src/main/panels.ts"],
+      "e2e": [
+        "pane-shape.desktop.test.ts",
+        "panel-plugin.desktop.test.ts",
+        "preview-height.desktop.test.ts",
+        "quit.desktop.test.ts",
+        "status-bar.desktop.test.ts",
+        "sticky-scroll.desktop.test.ts",
+        "theme.desktop.test.ts",
+        "window.desktop.test.ts"
+      ],
+      "why": "generated: name, prefix, static import or text of the stem in the e2e file"
+    },
+    {
+      "paths": ["apps/desktop/src/main/path-label.ts"],
+      "e2e": ["tab-folder.desktop.test.ts", "tabs.desktop.test.ts", "title-bar.desktop.test.ts"],
+      "why": "reviewed: the path shown on tabs and the title"
+    },
+    {
+      "paths": ["apps/desktop/src/main/plugin-guest.ts"],
+      "e2e": [
+        "assets.desktop.test.ts",
+        "banner.desktop.test.ts",
+        "brand-kit.desktop.test.ts",
+        "code-templates.desktop.test.ts",
+        "directives.desktop.test.ts",
+        "export.desktop.test.ts",
+        "installed-packs.desktop.test.ts",
+        "installed-plugins.desktop.test.ts",
+        "keybindings.desktop.test.ts",
+        "leftovers.desktop.test.ts",
+        "packaged.package.test.ts",
+        "pane-shape.desktop.test.ts",
+        "panel-plugin.desktop.test.ts",
+        "plugins.desktop.test.ts",
+        "queue-kinds.desktop.test.ts",
+        "queue.desktop.test.ts",
+        "status-bar-items.desktop.test.ts",
+        "status-bar.desktop.test.ts",
+        "template-assets.desktop.test.ts",
+        "template-warnings.desktop.test.ts",
+        "theme-pack.desktop.test.ts",
+        "theme-pick.desktop.test.ts",
+        "window.desktop.test.ts"
+      ],
+      "why": "reviewed: plugin processes: every file that installs or reads a plugin"
+    },
+    {
+      "paths": ["apps/desktop/src/main/plugin-list.ts"],
+      "e2e": [
+        "assets.desktop.test.ts",
+        "banner.desktop.test.ts",
+        "brand-kit.desktop.test.ts",
+        "code-templates.desktop.test.ts",
+        "directives.desktop.test.ts",
+        "export.desktop.test.ts",
+        "installed-packs.desktop.test.ts",
+        "installed-plugins.desktop.test.ts",
+        "keybindings.desktop.test.ts",
+        "leftovers.desktop.test.ts",
+        "pane-shape.desktop.test.ts",
+        "panel-plugin.desktop.test.ts",
+        "plugins.desktop.test.ts",
+        "queue-kinds.desktop.test.ts",
+        "queue.desktop.test.ts",
+        "status-bar-items.desktop.test.ts",
+        "status-bar.desktop.test.ts",
+        "template-assets.desktop.test.ts",
+        "template-warnings.desktop.test.ts",
+        "theme-pack.desktop.test.ts",
+        "theme-pick.desktop.test.ts",
+        "window.desktop.test.ts"
+      ],
+      "why": "reviewed: every file that installs or reads a plugin"
+    },
+    {
+      "paths": ["apps/desktop/src/main/plugin-process.ts"],
+      "e2e": [
+        "assets.desktop.test.ts",
+        "banner.desktop.test.ts",
+        "brand-kit.desktop.test.ts",
+        "code-templates.desktop.test.ts",
+        "directives.desktop.test.ts",
+        "export.desktop.test.ts",
+        "installed-packs.desktop.test.ts",
+        "installed-plugins.desktop.test.ts",
+        "keybindings.desktop.test.ts",
+        "leftovers.desktop.test.ts",
+        "packaged.package.test.ts",
+        "pane-shape.desktop.test.ts",
+        "panel-plugin.desktop.test.ts",
+        "plugins.desktop.test.ts",
+        "queue-kinds.desktop.test.ts",
+        "queue.desktop.test.ts",
+        "status-bar-items.desktop.test.ts",
+        "status-bar.desktop.test.ts",
+        "template-assets.desktop.test.ts",
+        "template-warnings.desktop.test.ts",
+        "theme-pack.desktop.test.ts",
+        "theme-pick.desktop.test.ts",
+        "window.desktop.test.ts"
+      ],
+      "why": "reviewed: plugin processes: every file that installs or reads a plugin"
+    },
+    {
+      "paths": ["apps/desktop/src/main/plugin-protocol.ts"],
+      "e2e": "all",
+      "why": "reviewed: the protocol themes, panels and the window load through"
+    },
+    {
+      "paths": ["apps/desktop/src/main/plugin-wire.ts"],
+      "e2e": [
+        "assets.desktop.test.ts",
+        "banner.desktop.test.ts",
+        "brand-kit.desktop.test.ts",
+        "code-templates.desktop.test.ts",
+        "directives.desktop.test.ts",
+        "export.desktop.test.ts",
+        "installed-packs.desktop.test.ts",
+        "installed-plugins.desktop.test.ts",
+        "keybindings.desktop.test.ts",
+        "leftovers.desktop.test.ts",
+        "packaged.package.test.ts",
+        "pane-shape.desktop.test.ts",
+        "panel-plugin.desktop.test.ts",
+        "plugins.desktop.test.ts",
+        "queue-kinds.desktop.test.ts",
+        "queue.desktop.test.ts",
+        "status-bar-items.desktop.test.ts",
+        "status-bar.desktop.test.ts",
+        "template-assets.desktop.test.ts",
+        "template-warnings.desktop.test.ts",
+        "theme-pack.desktop.test.ts",
+        "theme-pick.desktop.test.ts",
+        "window.desktop.test.ts"
+      ],
+      "why": "reviewed: plugin processes: every file that installs or reads a plugin"
+    },
+    {
+      "paths": ["apps/desktop/src/main/plugins.ts"],
+      "e2e": [
+        "assets.desktop.test.ts",
+        "banner.desktop.test.ts",
+        "brand-kit.desktop.test.ts",
+        "code-templates.desktop.test.ts",
+        "directives.desktop.test.ts",
+        "export.desktop.test.ts",
+        "installed-packs.desktop.test.ts",
+        "installed-plugins.desktop.test.ts",
+        "keybindings.desktop.test.ts",
+        "leftovers.desktop.test.ts",
+        "packaged.package.test.ts",
+        "pane-shape.desktop.test.ts",
+        "panel-plugin.desktop.test.ts",
+        "plugins.desktop.test.ts",
+        "queue-kinds.desktop.test.ts",
+        "queue.desktop.test.ts",
+        "status-bar-items.desktop.test.ts",
+        "status-bar.desktop.test.ts",
+        "template-assets.desktop.test.ts",
+        "template-warnings.desktop.test.ts",
+        "theme-pack.desktop.test.ts",
+        "theme-pick.desktop.test.ts",
+        "window.desktop.test.ts"
+      ],
+      "why": "reviewed: every file that installs or reads a plugin"
+    },
+    {
+      "paths": ["apps/desktop/src/main/preview.ts"],
+      "e2e": [
+        "assets.desktop.test.ts",
+        "banner.desktop.test.ts",
+        "brand-kit.desktop.test.ts",
+        "breadcrumb.desktop.test.ts",
+        "brief-commands.desktop.test.ts",
+        "code-templates.desktop.test.ts",
+        "command-bar.desktop.test.ts",
+        "directives.desktop.test.ts",
+        "dock.desktop.test.ts",
+        "documents.desktop.test.ts",
+        "font-areas.desktop.test.ts",
+        "installed-packs.desktop.test.ts",
+        "new-from-template.desktop.test.ts",
+        "packaged.package.test.ts",
+        "pane-shape.desktop.test.ts",
+        "panel.desktop.test.ts",
+        "preview-broken.desktop.test.ts",
+        "preview-height.desktop.test.ts",
+        "preview-session.desktop.test.ts",
+        "preview-tab.desktop.test.ts",
+        "preview.desktop.test.ts",
+        "settings-writers.desktop.test.ts",
+        "settings.desktop.test.ts",
+        "status-bar.desktop.test.ts",
+        "tab-drag.desktop.test.ts",
+        "tab-folder.desktop.test.ts",
+        "tabs.desktop.test.ts",
+        "template-assets.desktop.test.ts",
+        "template-mode.desktop.test.ts",
+        "template-warnings.desktop.test.ts",
+        "theme-pack.desktop.test.ts",
+        "theme-pick.desktop.test.ts",
+        "theme.desktop.test.ts",
+        "typography.desktop.test.ts",
+        "window.desktop.test.ts"
+      ],
+      "why": "generated: name, prefix, static import or text of the stem in the e2e file"
+    },
+    {
+      "paths": ["apps/desktop/src/main/previous-version.ts"],
+      "e2e": ["packaged.package.test.ts", "update.package.test.ts", "window.desktop.test.ts"],
+      "why": "reviewed: version bookkeeping for the update feed"
+    },
+    {
+      "paths": ["apps/desktop/src/main/project.ts"],
+      "e2e": [
+        "assets.desktop.test.ts",
+        "export.desktop.test.ts",
+        "leftovers.desktop.test.ts",
+        "offscreen-raster.desktop.test.ts",
+        "template-folder.desktop.test.ts"
+      ],
+      "why": "reviewed: the project folder exports write into"
+    },
+    {
+      "paths": ["apps/desktop/src/main/queue-gate.ts"],
+      "e2e": ["queue-kinds.desktop.test.ts", "queue.desktop.test.ts"],
+      "why": "reviewed: the queue"
+    },
+    {
+      "paths": ["apps/desktop/src/main/queue.ts"],
+      "e2e": [
+        "code-templates.desktop.test.ts",
+        "dock.desktop.test.ts",
+        "font-areas.desktop.test.ts",
+        "installed-plugins.desktop.test.ts",
+        "page-close.desktop.test.ts",
+        "pane-shape.desktop.test.ts",
+        "queue-kinds.desktop.test.ts",
+        "queue.desktop.test.ts",
+        "raster.desktop.test.ts",
+        "settings-writers.desktop.test.ts",
+        "settings.desktop.test.ts",
+        "status-bar-items.desktop.test.ts",
+        "status-bar.desktop.test.ts",
+        "window.desktop.test.ts"
+      ],
+      "why": "generated: name, prefix, static import or text of the stem in the e2e file"
+    },
+    {
+      "paths": ["apps/desktop/src/main/quit.ts"],
+      "e2e": [
+        "banner.desktop.test.ts",
+        "code-templates.desktop.test.ts",
+        "crash.desktop.test.ts",
+        "group-splitter.desktop.test.ts",
+        "groups-session.desktop.test.ts",
+        "packaged.package.test.ts",
+        "page-close.desktop.test.ts",
+        "preview-session.desktop.test.ts",
+        "quit.desktop.test.ts",
+        "session-place.desktop.test.ts",
+        "session.desktop.test.ts",
+        "snippets-file.desktop.test.ts",
+        "tab-drag.desktop.test.ts",
+        "tab-folder.desktop.test.ts",
+        "template-session.desktop.test.ts",
+        "template-warnings.desktop.test.ts",
+        "title-bar.desktop.test.ts",
+        "update.package.test.ts",
+        "window.desktop.test.ts"
+      ],
+      "why": "generated: name, prefix, static import or text of the stem in the e2e file"
+    },
+    {
+      "paths": ["apps/desktop/src/main/rasterizer.ts"],
+      "e2e": [
+        "assets.desktop.test.ts",
+        "export.desktop.test.ts",
+        "leftovers.desktop.test.ts",
+        "offscreen-raster.desktop.test.ts",
+        "preview-height.desktop.test.ts",
+        "raster.desktop.test.ts"
+      ],
+      "why": "reviewed: every file that exports or rasterizes"
+    },
+    {
+      "paths": ["apps/desktop/src/main/recent-files.ts"],
+      "e2e": ["documents.desktop.test.ts", "menu.desktop.test.ts", "quit.desktop.test.ts"],
+      "why": "reviewed: recent files, in the File menu"
+    },
+    {
+      "paths": ["apps/desktop/src/main/session-store.ts"],
+      "e2e": "all",
+      "why": "reviewed: session restore runs on every launch"
+    },
+    {
+      "paths": ["apps/desktop/src/main/session.ts"],
+      "e2e": "all",
+      "why": "reviewed: session restore runs on every launch"
+    },
+    {
+      "paths": ["apps/desktop/src/main/settings-file.ts"],
+      "e2e": [
+        "block-enter.desktop.test.ts",
+        "breadcrumb.desktop.test.ts",
+        "columns.desktop.test.ts",
+        "font-areas.desktop.test.ts",
+        "format-brief.desktop.test.ts",
+        "go-to-block.desktop.test.ts",
+        "indent-guides.desktop.test.ts",
+        "menu.desktop.test.ts",
+        "page-close.desktop.test.ts",
+        "settings-assist.desktop.test.ts",
+        "settings-writers.desktop.test.ts",
+        "settings.desktop.test.ts",
+        "status-bar-colors.desktop.test.ts",
+        "sticky-scroll.desktop.test.ts",
+        "theme-pick.desktop.test.ts",
+        "typography.desktop.test.ts",
+        "vim-mode-style.desktop.test.ts"
+      ],
+      "why": "generated: name, prefix, static import or text of the stem in the e2e file"
+    },
+    {
+      "paths": ["apps/desktop/src/main/settings-live.ts"],
+      "e2e": [
+        "block-enter.desktop.test.ts",
+        "breadcrumb.desktop.test.ts",
+        "brief-commands.desktop.test.ts",
+        "code-templates.desktop.test.ts",
+        "columns.desktop.test.ts",
+        "export.desktop.test.ts",
+        "font-areas.desktop.test.ts",
+        "format-brief.desktop.test.ts",
+        "go-to-block.desktop.test.ts",
+        "icon-stroke.desktop.test.ts",
+        "indent-guides.desktop.test.ts",
+        "installed-plugins.desktop.test.ts",
+        "keybindings-assist.desktop.test.ts",
+        "menu.desktop.test.ts",
+        "new-from-template.desktop.test.ts",
+        "page-close.desktop.test.ts",
+        "preview-height.desktop.test.ts",
+        "preview-tab.desktop.test.ts",
+        "queue-kinds.desktop.test.ts",
+        "queue.desktop.test.ts",
+        "session.desktop.test.ts",
+        "settings-assist.desktop.test.ts",
+        "settings-writers.desktop.test.ts",
+        "settings.desktop.test.ts",
+        "slash-menu.desktop.test.ts",
+        "snippets-file.desktop.test.ts",
+        "status-bar-colors.desktop.test.ts",
+        "status-bar-items.desktop.test.ts",
+        "status-bar.desktop.test.ts",
+        "sticky-scroll.desktop.test.ts",
+        "tab-folder.desktop.test.ts",
+        "template-assets.desktop.test.ts",
+        "template-folder.desktop.test.ts",
+        "template-mode.desktop.test.ts",
+        "template-warnings.desktop.test.ts",
+        "theme-pick.desktop.test.ts",
+        "title-bar.desktop.test.ts",
+        "typography.desktop.test.ts",
+        "vim-badge.desktop.test.ts",
+        "vim-mode-style.desktop.test.ts",
+        "window.desktop.test.ts"
+      ],
+      "why": "reviewed: pushes every setting to the window: the files that mention settings"
+    },
+    {
+      "paths": ["apps/desktop/src/main/settings-outline.ts"],
+      "e2e": [
+        "settings-assist.desktop.test.ts",
+        "settings-writers.desktop.test.ts",
+        "settings.desktop.test.ts"
+      ],
+      "why": "reviewed: the settings tab"
+    },
+    {
+      "paths": ["apps/desktop/src/main/settings-store.ts"],
+      "e2e": [
+        "settings-assist.desktop.test.ts",
+        "settings-writers.desktop.test.ts",
+        "settings.desktop.test.ts",
+        "template-folder.desktop.test.ts"
+      ],
+      "why": "reviewed: the settings file on disk"
+    },
+    {
+      "paths": ["apps/desktop/src/main/template-editor.ts"],
+      "e2e": [
+        "sticky-scroll.desktop.test.ts",
+        "template-mode.desktop.test.ts",
+        "template-session.desktop.test.ts",
+        "template-warnings.desktop.test.ts",
+        "window.desktop.test.ts"
+      ],
+      "why": "reviewed: the template mode"
+    },
+    {
+      "paths": ["apps/desktop/src/main/template-source.ts"],
+      "e2e": [
+        "banner.desktop.test.ts",
+        "brand-kit.desktop.test.ts",
+        "code-templates.desktop.test.ts",
+        "export.desktop.test.ts",
+        "installed-packs.desktop.test.ts",
+        "new-from-template.desktop.test.ts",
+        "packaged.package.test.ts",
+        "panel.desktop.test.ts",
+        "preview-broken.desktop.test.ts",
+        "preview-height.desktop.test.ts",
+        "preview.desktop.test.ts",
+        "problems-mark.desktop.test.ts",
+        "slash-menu.desktop.test.ts",
+        "snippets-file.desktop.test.ts",
+        "sticky-scroll.desktop.test.ts",
+        "template-assets.desktop.test.ts",
+        "template-folder.desktop.test.ts",
+        "template-mode.desktop.test.ts",
+        "template-session.desktop.test.ts",
+        "template-warnings.desktop.test.ts",
+        "window.desktop.test.ts"
+      ],
+      "why": "reviewed: read by export and preview: the templates hits plus export"
+    },
+    {
+      "paths": ["apps/desktop/src/main/templates.ts"],
+      "e2e": [
+        "banner.desktop.test.ts",
+        "brand-kit.desktop.test.ts",
+        "code-templates.desktop.test.ts",
+        "export.desktop.test.ts",
+        "installed-packs.desktop.test.ts",
+        "new-from-template.desktop.test.ts",
+        "packaged.package.test.ts",
+        "panel.desktop.test.ts",
+        "preview-broken.desktop.test.ts",
+        "preview-height.desktop.test.ts",
+        "preview.desktop.test.ts",
+        "problems-mark.desktop.test.ts",
+        "slash-menu.desktop.test.ts",
+        "snippets-file.desktop.test.ts",
+        "sticky-scroll.desktop.test.ts",
+        "template-assets.desktop.test.ts",
+        "template-folder.desktop.test.ts",
+        "template-mode.desktop.test.ts",
+        "template-session.desktop.test.ts",
+        "template-warnings.desktop.test.ts",
+        "window.desktop.test.ts"
+      ],
+      "why": "generated: name, prefix, static import or text of the stem in the e2e file"
+    },
+    {
+      "paths": ["apps/desktop/src/main/theme-pack-upstream.ts"],
+      "e2e": [
+        "columns.desktop.test.ts",
+        "icon-stroke.desktop.test.ts",
+        "indent-guides.desktop.test.ts",
+        "preview-broken.desktop.test.ts",
+        "status-bar-colors.desktop.test.ts",
+        "tab-folder.desktop.test.ts",
+        "theme-pack.desktop.test.ts",
+        "theme-pick.desktop.test.ts",
+        "theme.desktop.test.ts",
+        "title-bar.desktop.test.ts",
+        "vim-badge.desktop.test.ts",
+        "vim-mode-style.desktop.test.ts"
+      ],
+      "why": "reviewed: the theme pack"
+    },
+    {
+      "paths": ["apps/desktop/src/main/themes.ts"],
+      "e2e": [
+        "columns.desktop.test.ts",
+        "icon-stroke.desktop.test.ts",
+        "indent-guides.desktop.test.ts",
+        "preview-broken.desktop.test.ts",
+        "status-bar-colors.desktop.test.ts",
+        "tab-folder.desktop.test.ts",
+        "theme-pack.desktop.test.ts",
+        "theme-pick.desktop.test.ts",
+        "theme.desktop.test.ts",
+        "title-bar.desktop.test.ts",
+        "vim-badge.desktop.test.ts",
+        "vim-mode-style.desktop.test.ts"
+      ],
+      "why": "reviewed: theme files plus the generated hits"
+    },
+    {
+      "paths": ["apps/desktop/src/main/themes/tyto-dark.json"],
+      "e2e": [
+        "block-enter.desktop.test.ts",
+        "breadcrumb.desktop.test.ts",
+        "columns.desktop.test.ts",
+        "font-areas.desktop.test.ts",
+        "go-to-block.desktop.test.ts",
+        "icon-stroke.desktop.test.ts",
+        "indent-guides.desktop.test.ts",
+        "keybindings-assist.desktop.test.ts",
+        "new-from-template.desktop.test.ts",
+        "preview-broken.desktop.test.ts",
+        "settings-assist.desktop.test.ts",
+        "slash-menu.desktop.test.ts",
+        "snippets-file.desktop.test.ts",
+        "status-bar-colors.desktop.test.ts",
+        "sticky-scroll.desktop.test.ts",
+        "tab-folder.desktop.test.ts",
+        "theme-pack.desktop.test.ts",
+        "theme-pick.desktop.test.ts",
+        "theme.desktop.test.ts",
+        "title-bar.desktop.test.ts",
+        "typography.desktop.test.ts",
+        "vim-badge.desktop.test.ts",
+        "vim-mode-style.desktop.test.ts"
+      ],
+      "why": "reviewed: theme files plus the generated hits"
+    },
+    {
+      "paths": ["apps/desktop/src/main/themes/tyto-light.json"],
+      "e2e": [
+        "block-enter.desktop.test.ts",
+        "breadcrumb.desktop.test.ts",
+        "columns.desktop.test.ts",
+        "font-areas.desktop.test.ts",
+        "format-brief.desktop.test.ts",
+        "go-to-block.desktop.test.ts",
+        "icon-stroke.desktop.test.ts",
+        "indent-guides.desktop.test.ts",
+        "keybindings-assist.desktop.test.ts",
+        "new-from-template.desktop.test.ts",
+        "preview-broken.desktop.test.ts",
+        "settings-assist.desktop.test.ts",
+        "slash-menu.desktop.test.ts",
+        "snippets-file.desktop.test.ts",
+        "status-bar-colors.desktop.test.ts",
+        "sticky-scroll.desktop.test.ts",
+        "tab-folder.desktop.test.ts",
+        "theme-pack.desktop.test.ts",
+        "theme-pick.desktop.test.ts",
+        "theme.desktop.test.ts",
+        "title-bar.desktop.test.ts",
+        "typography.desktop.test.ts",
+        "vim-badge.desktop.test.ts",
+        "vim-mode-style.desktop.test.ts"
+      ],
+      "why": "reviewed: theme files plus the generated hits"
+    },
+    {
+      "paths": ["apps/desktop/src/main/title-bar.ts"],
+      "e2e": [
+        "font-areas.desktop.test.ts",
+        "menu-row.desktop.test.ts",
+        "status-bar.desktop.test.ts",
+        "title-bar.desktop.test.ts",
+        "typography.desktop.test.ts",
+        "window.desktop.test.ts"
+      ],
+      "why": "generated: name, prefix, static import or text of the stem in the e2e file"
+    },
+    {
+      "paths": ["apps/desktop/src/main/update-feed.ts"],
+      "e2e": [
+        "packaged.package.test.ts",
+        "status-bar.desktop.test.ts",
+        "update.package.test.ts",
+        "window.desktop.test.ts"
+      ],
+      "why": "reviewed: the update feed"
+    },
+    {
+      "paths": ["apps/desktop/src/main/updates.ts"],
+      "e2e": [
+        "packaged.package.test.ts",
+        "status-bar.desktop.test.ts",
+        "update.package.test.ts",
+        "window.desktop.test.ts"
+      ],
+      "why": "reviewed: the update feed"
+    },
+    {
+      "paths": ["apps/desktop/src/main/user-data.ts"],
+      "e2e": "all",
+      "why": "reviewed: the user-data folder every launch resolves"
+    },
+    {
+      "paths": ["apps/desktop/src/main/window-plugins.ts"],
+      "e2e": [
+        "assets.desktop.test.ts",
+        "banner.desktop.test.ts",
+        "brand-kit.desktop.test.ts",
+        "code-templates.desktop.test.ts",
+        "directives.desktop.test.ts",
+        "export.desktop.test.ts",
+        "installed-packs.desktop.test.ts",
+        "installed-plugins.desktop.test.ts",
+        "keybindings.desktop.test.ts",
+        "leftovers.desktop.test.ts",
+        "pane-shape.desktop.test.ts",
+        "panel-plugin.desktop.test.ts",
+        "plugins.desktop.test.ts",
+        "queue-kinds.desktop.test.ts",
+        "queue.desktop.test.ts",
+        "status-bar-items.desktop.test.ts",
+        "status-bar.desktop.test.ts",
+        "template-assets.desktop.test.ts",
+        "template-warnings.desktop.test.ts",
+        "theme-pack.desktop.test.ts",
+        "theme-pick.desktop.test.ts",
+        "window.desktop.test.ts"
+      ],
+      "why": "reviewed: every file that installs or reads a plugin"
+    },
+    {
+      "paths": ["apps/desktop/src/renderer/brief-analysis.ts"],
+      "e2e": [
+        "breadcrumb.desktop.test.ts",
+        "directives.desktop.test.ts",
+        "go-to-block.desktop.test.ts",
+        "panel.desktop.test.ts",
+        "preview-broken.desktop.test.ts",
+        "problems-mark.desktop.test.ts",
+        "save-failure-cleared.desktop.test.ts",
+        "slash-menu.desktop.test.ts",
+        "status-bar.desktop.test.ts",
+        "template-warnings.desktop.test.ts"
+      ],
+      "why": "reviewed: diagnostics and completion answered by the preview"
+    },
+    {
+      "paths": ["apps/desktop/src/renderer/color-scheme.ts"],
+      "e2e": [
+        "columns.desktop.test.ts",
+        "icon-stroke.desktop.test.ts",
+        "indent-guides.desktop.test.ts",
+        "pane-shape.desktop.test.ts",
+        "preview-broken.desktop.test.ts",
+        "status-bar-colors.desktop.test.ts",
+        "tab-folder.desktop.test.ts",
+        "theme-pack.desktop.test.ts",
+        "theme-pick.desktop.test.ts",
+        "theme.desktop.test.ts",
+        "title-bar.desktop.test.ts",
+        "vim-badge.desktop.test.ts",
+        "vim-mode-style.desktop.test.ts",
+        "window.desktop.test.ts"
+      ],
+      "why": "reviewed: theme files plus the generated hits"
+    },
+    {
+      "paths": ["apps/desktop/src/renderer/command-bar.ts"],
+      "e2e": [
+        "assets.desktop.test.ts",
+        "banner.desktop.test.ts",
+        "brief-commands.desktop.test.ts",
+        "command-bar.desktop.test.ts",
+        "dock.desktop.test.ts",
+        "export.desktop.test.ts",
+        "font-areas.desktop.test.ts",
+        "format-brief.desktop.test.ts",
+        "keybindings-assist.desktop.test.ts",
+        "keybindings-file.desktop.test.ts",
+        "keybindings.desktop.test.ts",
+        "leftovers.desktop.test.ts",
+        "menu-row.desktop.test.ts",
+        "pane-shape.desktop.test.ts",
+        "panel-plugin.desktop.test.ts",
+        "problems-mark.desktop.test.ts",
+        "queue.desktop.test.ts",
+        "save-failure-cleared.desktop.test.ts",
+        "search.desktop.test.ts",
+        "settings-assist.desktop.test.ts",
+        "settings.desktop.test.ts",
+        "status-bar-items.desktop.test.ts",
+        "status-bar.desktop.test.ts",
+        "tabs.desktop.test.ts",
+        "template-assets.desktop.test.ts",
+        "template-folder.desktop.test.ts",
+        "template-warnings.desktop.test.ts",
+        "theme.desktop.test.ts",
+        "window.desktop.test.ts"
+      ],
+      "why": "generated: name, prefix, static import or text of the stem in the e2e file"
+    },
+    {
+      "paths": ["apps/desktop/src/renderer/commands.ts"],
+      "e2e": [
+        "brief-commands.desktop.test.ts",
+        "command-bar.desktop.test.ts",
+        "groups-session.desktop.test.ts",
+        "keybindings-assist.desktop.test.ts",
+        "keybindings-file.desktop.test.ts",
+        "menu.desktop.test.ts",
+        "search.desktop.test.ts",
+        "tab-drag.desktop.test.ts",
+        "tabs.desktop.test.ts",
+        "template-folder.desktop.test.ts",
+        "window.desktop.test.ts"
+      ],
+      "why": "generated: name, prefix, static import or text of the stem in the e2e file"
+    },
+    {
+      "paths": ["apps/desktop/src/renderer/dock.ts"],
+      "e2e": [
+        "dock.desktop.test.ts",
+        "pane-shape.desktop.test.ts",
+        "panel-plugin.desktop.test.ts",
+        "panel.desktop.test.ts",
+        "preview.desktop.test.ts",
+        "queue.desktop.test.ts"
+      ],
+      "why": "generated: name, prefix, static import or text of the stem in the e2e file"
+    },
+    {
+      "paths": ["apps/desktop/src/renderer/documents.ts"],
+      "e2e": "all",
+      "why": "reviewed: opening a document, which nearly every file does"
+    },
+    {
+      "paths": ["apps/desktop/src/renderer/editor-chrome.ts"],
+      "e2e": [
+        "block-enter.desktop.test.ts",
+        "breadcrumb.desktop.test.ts",
+        "columns.desktop.test.ts",
+        "command-bar.desktop.test.ts",
+        "directives.desktop.test.ts",
+        "documents.desktop.test.ts",
+        "export.desktop.test.ts",
+        "font-areas.desktop.test.ts",
+        "format-brief.desktop.test.ts",
+        "go-to-block.desktop.test.ts",
+        "groups.desktop.test.ts",
+        "indent-guides.desktop.test.ts",
+        "keybindings-assist.desktop.test.ts",
+        "keybindings-file.desktop.test.ts",
+        "keybindings.desktop.test.ts",
+        "page-close.desktop.test.ts",
+        "pane-shape.desktop.test.ts",
+        "panel.desktop.test.ts",
+        "preview-tab.desktop.test.ts",
+        "preview.desktop.test.ts",
+        "problems-mark.desktop.test.ts",
+        "quit.desktop.test.ts",
+        "search.desktop.test.ts",
+        "session-place.desktop.test.ts",
+        "settings-assist.desktop.test.ts",
+        "settings.desktop.test.ts",
+        "slash-menu.desktop.test.ts",
+        "snippets-file.desktop.test.ts",
+        "status-bar-colors.desktop.test.ts",
+        "status-bar.desktop.test.ts",
+        "sticky-scroll.desktop.test.ts",
+        "tabs.desktop.test.ts",
+        "theme.desktop.test.ts",
+        "typography.desktop.test.ts",
+        "vim-badge.desktop.test.ts",
+        "vim-mode-style.desktop.test.ts"
+      ],
+      "why": "reviewed: the editor chrome: the curated editor set"
+    },
+    {
+      "paths": ["apps/desktop/src/renderer/editor-group.ts"],
+      "e2e": "all",
+      "why": "reviewed: every editor lives in a group"
+    },
+    {
+      "paths": ["apps/desktop/src/renderer/editor-groups.ts"],
+      "e2e": "all",
+      "why": "reviewed: every editor lives in a group"
+    },
+    {
+      "paths": ["apps/desktop/src/renderer/exit.ts"],
+      "e2e": [
+        "installed-plugins.desktop.test.ts",
+        "packaged.package.test.ts",
+        "page-close.desktop.test.ts",
+        "quit.desktop.test.ts",
+        "session.desktop.test.ts",
+        "template-session.desktop.test.ts",
+        "window.desktop.test.ts"
+      ],
+      "why": "generated: name, prefix, static import or text of the stem in the e2e file"
+    },
+    {
+      "paths": ["apps/desktop/src/renderer/export-dialog.ts"],
+      "e2e": [
+        "brief-commands.desktop.test.ts",
+        "export.desktop.test.ts",
+        "status-bar.desktop.test.ts",
+        "window.desktop.test.ts"
+      ],
+      "why": "generated: name, prefix, static import or text of the stem in the e2e file"
+    },
+    {
+      "paths": ["apps/desktop/src/renderer/frontmatter.ts"],
+      "e2e": [
+        "block-enter.desktop.test.ts",
+        "breadcrumb.desktop.test.ts",
+        "columns.desktop.test.ts",
+        "go-to-block.desktop.test.ts",
+        "panel.desktop.test.ts",
+        "preview.desktop.test.ts",
+        "tabs.desktop.test.ts",
+        "window.desktop.test.ts"
+      ],
+      "why": "generated: name, prefix, static import or text of the stem in the e2e file"
+    },
+    {
+      "paths": ["apps/desktop/src/renderer/group-resize.ts"],
+      "e2e": [
+        "font-areas.desktop.test.ts",
+        "group-splitter.desktop.test.ts",
+        "groups-session.desktop.test.ts",
+        "groups.desktop.test.ts",
+        "pane-shape.desktop.test.ts"
+      ],
+      "why": "reviewed: imported by editor-group and group-splitter; the files that resize groups"
+    },
+    {
+      "paths": ["apps/desktop/src/renderer/group-splitter.ts"],
+      "e2e": [
+        "group-splitter.desktop.test.ts",
+        "groups-session.desktop.test.ts",
+        "pane-shape.desktop.test.ts"
+      ],
+      "why": "generated: name, prefix, static import or text of the stem in the e2e file"
+    },
+    {
+      "paths": ["apps/desktop/src/renderer/icons.ts"],
+      "e2e": [
+        "groups.desktop.test.ts",
+        "icon-stroke.desktop.test.ts",
+        "queue.desktop.test.ts",
+        "status-bar.desktop.test.ts",
+        "tabs.desktop.test.ts",
+        "theme.desktop.test.ts"
+      ],
+      "why": "reviewed: imported by tabs, status bar, queue panel and editor group"
+    },
+    {
+      "paths": ["apps/desktop/src/renderer/json-location.ts"],
+      "e2e": ["keybindings-assist.desktop.test.ts", "settings-assist.desktop.test.ts"],
+      "why": "reviewed: imported by the two assist modules only"
+    },
+    {
+      "paths": ["apps/desktop/src/renderer/keybindings-assist.ts"],
+      "e2e": [
+        "keybindings-assist.desktop.test.ts",
+        "keybindings.desktop.test.ts",
+        "window.desktop.test.ts"
+      ],
+      "why": "generated: name, prefix, static import or text of the stem in the e2e file"
+    },
+    {
+      "paths": ["apps/desktop/src/renderer/keybindings-file.ts"],
+      "e2e": [
+        "keybindings-assist.desktop.test.ts",
+        "keybindings-file.desktop.test.ts",
+        "keybindings.desktop.test.ts",
+        "window.desktop.test.ts"
+      ],
+      "why": "generated: name, prefix, static import or text of the stem in the e2e file"
+    },
+    {
+      "paths": ["apps/desktop/src/renderer/menu-row.ts"],
+      "e2e": ["menu-row.desktop.test.ts", "menu.desktop.test.ts", "window.desktop.test.ts"],
+      "why": "generated: name, prefix, static import or text of the stem in the e2e file"
+    },
+    {
+      "paths": ["apps/desktop/src/renderer/panel.ts"],
+      "e2e": [
+        "brief-commands.desktop.test.ts",
+        "command-bar.desktop.test.ts",
+        "dock.desktop.test.ts",
+        "documents.desktop.test.ts",
+        "export.desktop.test.ts",
+        "font-areas.desktop.test.ts",
+        "installed-packs.desktop.test.ts",
+        "keybindings-assist.desktop.test.ts",
+        "keybindings-file.desktop.test.ts",
+        "keybindings.desktop.test.ts",
+        "pane-shape.desktop.test.ts",
+        "panel-plugin.desktop.test.ts",
+        "panel.desktop.test.ts",
+        "preview-height.desktop.test.ts",
+        "preview-tab.desktop.test.ts",
+        "preview.desktop.test.ts",
+        "problems-mark.desktop.test.ts",
+        "queue-kinds.desktop.test.ts",
+        "queue.desktop.test.ts",
+        "quit.desktop.test.ts",
+        "save-failure-cleared.desktop.test.ts",
+        "search.desktop.test.ts",
+        "settings-assist.desktop.test.ts",
+        "settings-writers.desktop.test.ts",
+        "settings.desktop.test.ts",
+        "snippets-file.desktop.test.ts",
+        "status-bar-colors.desktop.test.ts",
+        "status-bar.desktop.test.ts",
+        "sticky-scroll.desktop.test.ts",
+        "template-warnings.desktop.test.ts",
+        "theme-pack.desktop.test.ts",
+        "theme-pick.desktop.test.ts",
+        "theme.desktop.test.ts",
+        "typography.desktop.test.ts",
+        "window.desktop.test.ts"
+      ],
+      "why": "generated: name, prefix, static import or text of the stem in the e2e file"
+    },
+    {
+      "paths": ["apps/desktop/src/renderer/panels.ts"],
+      "e2e": [
+        "pane-shape.desktop.test.ts",
+        "panel-plugin.desktop.test.ts",
+        "preview-height.desktop.test.ts",
+        "quit.desktop.test.ts",
+        "status-bar.desktop.test.ts",
+        "sticky-scroll.desktop.test.ts",
+        "theme.desktop.test.ts",
+        "window.desktop.test.ts"
+      ],
+      "why": "generated: name, prefix, static import or text of the stem in the e2e file"
+    },
+    {
+      "paths": ["apps/desktop/src/renderer/plugin-panel.ts"],
+      "e2e": [
+        "pane-shape.desktop.test.ts",
+        "panel-plugin.desktop.test.ts",
+        "window.desktop.test.ts"
+      ],
+      "why": "reviewed: plugin panels"
+    },
+    {
+      "paths": ["apps/desktop/src/renderer/plugins-dialog.ts"],
+      "e2e": [
+        "installed-plugins.desktop.test.ts",
+        "plugins.desktop.test.ts",
+        "status-bar.desktop.test.ts",
+        "window.desktop.test.ts"
+      ],
+      "why": "reviewed: the plugins screen"
+    },
+    {
+      "paths": ["apps/desktop/src/renderer/preview-pane.ts"],
+      "e2e": [
+        "assets.desktop.test.ts",
+        "banner.desktop.test.ts",
+        "directives.desktop.test.ts",
+        "documents.desktop.test.ts",
+        "new-from-template.desktop.test.ts",
+        "pane-shape.desktop.test.ts",
+        "panel.desktop.test.ts",
+        "preview-broken.desktop.test.ts",
+        "preview-height.desktop.test.ts",
+        "preview-session.desktop.test.ts",
+        "preview-tab.desktop.test.ts",
+        "preview.desktop.test.ts",
+        "settings.desktop.test.ts",
+        "tabs.desktop.test.ts",
+        "template-assets.desktop.test.ts",
+        "template-mode.desktop.test.ts",
+        "template-warnings.desktop.test.ts",
+        "theme.desktop.test.ts",
+        "window.desktop.test.ts"
+      ],
+      "why": "reviewed: files that use the e2e preview-pane helper plus the generated hits"
+    },
+    {
+      "paths": ["apps/desktop/src/renderer/preview.ts"],
+      "e2e": [
+        "assets.desktop.test.ts",
+        "banner.desktop.test.ts",
+        "brand-kit.desktop.test.ts",
+        "breadcrumb.desktop.test.ts",
+        "brief-commands.desktop.test.ts",
+        "code-templates.desktop.test.ts",
+        "command-bar.desktop.test.ts",
+        "directives.desktop.test.ts",
+        "dock.desktop.test.ts",
+        "documents.desktop.test.ts",
+        "font-areas.desktop.test.ts",
+        "installed-packs.desktop.test.ts",
+        "new-from-template.desktop.test.ts",
+        "packaged.package.test.ts",
+        "pane-shape.desktop.test.ts",
+        "panel.desktop.test.ts",
+        "preview-broken.desktop.test.ts",
+        "preview-height.desktop.test.ts",
+        "preview-session.desktop.test.ts",
+        "preview-tab.desktop.test.ts",
+        "preview.desktop.test.ts",
+        "settings-writers.desktop.test.ts",
+        "settings.desktop.test.ts",
+        "status-bar.desktop.test.ts",
+        "tab-drag.desktop.test.ts",
+        "tab-folder.desktop.test.ts",
+        "tabs.desktop.test.ts",
+        "template-assets.desktop.test.ts",
+        "template-mode.desktop.test.ts",
+        "template-warnings.desktop.test.ts",
+        "theme-pack.desktop.test.ts",
+        "theme-pick.desktop.test.ts",
+        "theme.desktop.test.ts",
+        "typography.desktop.test.ts",
+        "window.desktop.test.ts"
+      ],
+      "why": "generated: name, prefix, static import or text of the stem in the e2e file"
+    },
+    {
+      "paths": ["apps/desktop/src/renderer/problems-mark.ts"],
+      "e2e": ["problems-mark.desktop.test.ts", "save-failure-cleared.desktop.test.ts"],
+      "why": "generated: name, prefix, static import or text of the stem in the e2e file"
+    },
+    {
+      "paths": ["apps/desktop/src/renderer/problems-panel.ts"],
+      "e2e": [
+        "command-bar.desktop.test.ts",
+        "documents.desktop.test.ts",
+        "font-areas.desktop.test.ts",
+        "installed-packs.desktop.test.ts",
+        "keybindings-file.desktop.test.ts",
+        "pane-shape.desktop.test.ts",
+        "panel.desktop.test.ts",
+        "preview.desktop.test.ts",
+        "problems-mark.desktop.test.ts",
+        "save-failure-cleared.desktop.test.ts",
+        "settings-assist.desktop.test.ts",
+        "settings.desktop.test.ts",
+        "snippets-file.desktop.test.ts",
+        "status-bar-colors.desktop.test.ts",
+        "status-bar.desktop.test.ts",
+        "template-warnings.desktop.test.ts",
+        "theme-pack.desktop.test.ts",
+        "theme-pick.desktop.test.ts",
+        "typography.desktop.test.ts",
+        "window.desktop.test.ts"
+      ],
+      "why": "generated: name, prefix, static import or text of the stem in the e2e file"
+    },
+    {
+      "paths": ["apps/desktop/src/renderer/queue-panel.ts"],
+      "e2e": [
+        "queue-kinds.desktop.test.ts",
+        "queue.desktop.test.ts",
+        "settings-writers.desktop.test.ts",
+        "window.desktop.test.ts"
+      ],
+      "why": "generated: name, prefix, static import or text of the stem in the e2e file"
+    },
+    {
+      "paths": ["apps/desktop/src/renderer/report-errors.ts"],
+      "e2e": ["crash.desktop.test.ts", "log.desktop.test.ts"],
+      "why": "reviewed: renderer errors reach the log"
+    },
+    {
+      "paths": ["apps/desktop/src/renderer/save-failure.ts"],
+      "e2e": [
+        "problems-mark.desktop.test.ts",
+        "save-failure-cleared.desktop.test.ts",
+        "window.desktop.test.ts"
+      ],
+      "why": "generated: name, prefix, static import or text of the stem in the e2e file"
+    },
+    {
+      "paths": ["apps/desktop/src/renderer/search-phrases.ts"],
+      "e2e": ["command-bar.desktop.test.ts", "search.desktop.test.ts", "window.desktop.test.ts"],
+      "why": "reviewed: phrases of the find panel"
+    },
+    {
+      "paths": ["apps/desktop/src/renderer/session.ts"],
+      "e2e": "all",
+      "why": "reviewed: session restore runs on every launch"
+    },
+    {
+      "paths": ["apps/desktop/src/renderer/settings-assist.ts"],
+      "e2e": [
+        "settings-assist.desktop.test.ts",
+        "settings.desktop.test.ts",
+        "window.desktop.test.ts"
+      ],
+      "why": "generated: name, prefix, static import or text of the stem in the e2e file"
+    },
+    {
+      "paths": ["apps/desktop/src/renderer/show-document.ts"],
+      "e2e": [
+        "assets.desktop.test.ts",
+        "banner.desktop.test.ts",
+        "directives.desktop.test.ts",
+        "documents.desktop.test.ts",
+        "new-from-template.desktop.test.ts",
+        "panel.desktop.test.ts",
+        "preview-broken.desktop.test.ts",
+        "preview-height.desktop.test.ts",
+        "preview-session.desktop.test.ts",
+        "preview-tab.desktop.test.ts",
+        "preview.desktop.test.ts",
+        "settings.desktop.test.ts",
+        "tabs.desktop.test.ts",
+        "template-assets.desktop.test.ts",
+        "template-mode.desktop.test.ts",
+        "template-warnings.desktop.test.ts",
+        "theme.desktop.test.ts",
+        "window.desktop.test.ts"
+      ],
+      "why": "reviewed: imported by preview and template mode"
+    },
+    {
+      "paths": ["apps/desktop/src/renderer/snippets-file.ts"],
+      "e2e": ["snippets-file.desktop.test.ts", "window.desktop.test.ts"],
+      "why": "generated: name, prefix, static import or text of the stem in the e2e file"
+    },
+    {
+      "paths": ["apps/desktop/src/renderer/status-bar.ts"],
+      "e2e": [
+        "breadcrumb.desktop.test.ts",
+        "brief-commands.desktop.test.ts",
+        "font-areas.desktop.test.ts",
+        "format-brief.desktop.test.ts",
+        "go-to-block.desktop.test.ts",
+        "groups.desktop.test.ts",
+        "icon-stroke.desktop.test.ts",
+        "keybindings-assist.desktop.test.ts",
+        "keybindings-file.desktop.test.ts",
+        "menu-row.desktop.test.ts",
+        "pane-shape.desktop.test.ts",
+        "preview-tab.desktop.test.ts",
+        "preview.desktop.test.ts",
+        "problems-mark.desktop.test.ts",
+        "save-failure-cleared.desktop.test.ts",
+        "session-place.desktop.test.ts",
+        "settings-assist.desktop.test.ts",
+        "settings.desktop.test.ts",
+        "snippets-file.desktop.test.ts",
+        "status-bar-colors.desktop.test.ts",
+        "status-bar-items.desktop.test.ts",
+        "status-bar.desktop.test.ts",
+        "sticky-scroll.desktop.test.ts",
+        "typography.desktop.test.ts",
+        "vim-badge.desktop.test.ts",
+        "vim-mode-style.desktop.test.ts",
+        "window.desktop.test.ts"
+      ],
+      "why": "generated: name, prefix, static import or text of the stem in the e2e file"
+    },
+    {
+      "paths": ["apps/desktop/src/renderer/tab-drag.ts"],
+      "e2e": ["tab-drag.desktop.test.ts"],
+      "why": "generated: name, prefix, static import or text of the stem in the e2e file"
+    },
+    {
+      "paths": ["apps/desktop/src/renderer/tabs.ts"],
+      "e2e": [
+        "documents.desktop.test.ts",
+        "export.desktop.test.ts",
+        "font-areas.desktop.test.ts",
+        "format-brief.desktop.test.ts",
+        "groups-session.desktop.test.ts",
+        "groups.desktop.test.ts",
+        "keybindings.desktop.test.ts",
+        "menu-row.desktop.test.ts",
+        "preview-session.desktop.test.ts",
+        "preview.desktop.test.ts",
+        "quit.desktop.test.ts",
+        "session.desktop.test.ts",
+        "status-bar-colors.desktop.test.ts",
+        "status-bar-items.desktop.test.ts",
+        "tab-drag.desktop.test.ts",
+        "tabs.desktop.test.ts",
+        "template-mode.desktop.test.ts",
+        "title-bar.desktop.test.ts",
+        "window.desktop.test.ts"
+      ],
+      "why": "generated: name, prefix, static import or text of the stem in the e2e file"
+    },
+    {
+      "paths": ["apps/desktop/src/renderer/template-mode-tag.ts"],
+      "e2e": ["template-mode.desktop.test.ts", "template-session.desktop.test.ts"],
+      "why": "reviewed: the template mode"
+    },
+    {
+      "paths": ["apps/desktop/src/renderer/template-mode.ts"],
+      "e2e": [
+        "sticky-scroll.desktop.test.ts",
+        "template-mode.desktop.test.ts",
+        "template-session.desktop.test.ts",
+        "window.desktop.test.ts"
+      ],
+      "why": "generated: name, prefix, static import or text of the stem in the e2e file"
+    },
+    {
+      "paths": ["apps/desktop/src/renderer/theme.ts"],
+      "e2e": [
+        "block-enter.desktop.test.ts",
+        "breadcrumb.desktop.test.ts",
+        "columns.desktop.test.ts",
+        "font-areas.desktop.test.ts",
+        "format-brief.desktop.test.ts",
+        "go-to-block.desktop.test.ts",
+        "icon-stroke.desktop.test.ts",
+        "indent-guides.desktop.test.ts",
+        "keybindings-assist.desktop.test.ts",
+        "new-from-template.desktop.test.ts",
+        "pane-shape.desktop.test.ts",
+        "preview-broken.desktop.test.ts",
+        "settings-assist.desktop.test.ts",
+        "slash-menu.desktop.test.ts",
+        "snippets-file.desktop.test.ts",
+        "status-bar-colors.desktop.test.ts",
+        "status-bar-items.desktop.test.ts",
+        "sticky-scroll.desktop.test.ts",
+        "tab-folder.desktop.test.ts",
+        "theme-pack.desktop.test.ts",
+        "theme-pick.desktop.test.ts",
+        "theme.desktop.test.ts",
+        "title-bar.desktop.test.ts",
+        "typography.desktop.test.ts",
+        "vim-badge.desktop.test.ts",
+        "vim-mode-style.desktop.test.ts",
+        "window.desktop.test.ts"
+      ],
+      "why": "reviewed: theme files plus the generated hits"
+    },
+    {
+      "paths": ["apps/desktop/src/renderer/typography.ts"],
+      "e2e": [
+        "font-areas.desktop.test.ts",
+        "tabs.desktop.test.ts",
+        "typography.desktop.test.ts",
+        "window.desktop.test.ts"
+      ],
+      "why": "generated: name, prefix, static import or text of the stem in the e2e file"
+    },
+    {
+      "paths": ["apps/desktop/src/renderer/update-notice.ts"],
+      "e2e": [
+        "packaged.package.test.ts",
+        "status-bar.desktop.test.ts",
+        "update.package.test.ts",
+        "window.desktop.test.ts"
+      ],
+      "why": "reviewed: the update notice in the status bar"
+    },
+    {
+      "paths": ["packages/editor/**"],
+      "e2e": [
+        "block-enter.desktop.test.ts",
+        "breadcrumb.desktop.test.ts",
+        "columns.desktop.test.ts",
+        "command-bar.desktop.test.ts",
+        "directives.desktop.test.ts",
+        "documents.desktop.test.ts",
+        "export.desktop.test.ts",
+        "font-areas.desktop.test.ts",
+        "format-brief.desktop.test.ts",
+        "go-to-block.desktop.test.ts",
+        "groups.desktop.test.ts",
+        "indent-guides.desktop.test.ts",
+        "keybindings-assist.desktop.test.ts",
+        "keybindings-file.desktop.test.ts",
+        "keybindings.desktop.test.ts",
+        "page-close.desktop.test.ts",
+        "pane-shape.desktop.test.ts",
+        "panel.desktop.test.ts",
+        "preview-tab.desktop.test.ts",
+        "preview.desktop.test.ts",
+        "problems-mark.desktop.test.ts",
+        "quit.desktop.test.ts",
+        "search.desktop.test.ts",
+        "session-place.desktop.test.ts",
+        "settings-assist.desktop.test.ts",
+        "settings.desktop.test.ts",
+        "slash-menu.desktop.test.ts",
+        "snippets-file.desktop.test.ts",
+        "status-bar-colors.desktop.test.ts",
+        "status-bar.desktop.test.ts",
+        "sticky-scroll.desktop.test.ts",
+        "tabs.desktop.test.ts",
+        "theme.desktop.test.ts",
+        "typography.desktop.test.ts",
+        "vim-badge.desktop.test.ts",
+        "vim-mode-style.desktop.test.ts"
+      ],
+      "why": "reviewed: the curated editor set, files with five or more CodeMirror class references plus vim-badge and problems-mark"
+    },
+    {
+      "paths": ["packages/theme-pack/**"],
+      "e2e": [
+        "columns.desktop.test.ts",
+        "icon-stroke.desktop.test.ts",
+        "indent-guides.desktop.test.ts",
+        "preview-broken.desktop.test.ts",
+        "status-bar-colors.desktop.test.ts",
+        "tab-folder.desktop.test.ts",
+        "theme-pack.desktop.test.ts",
+        "theme-pick.desktop.test.ts",
+        "theme.desktop.test.ts",
+        "title-bar.desktop.test.ts",
+        "vim-badge.desktop.test.ts",
+        "vim-mode-style.desktop.test.ts"
+      ],
+      "why": "reviewed: the theme files"
+    },
+    {
+      "paths": [
+        "packages/{core,pipeline,templates,template-kit,raster,template-lang,brief-lang,io,fonts,plugin-api}/**",
+        "packages/export-*/**",
+        "apps/cli/**"
+      ],
+      "e2e": "all",
+      "why": "reviewed: compiler, exporters, CLI and plugin API reach every preview and export; no per-file map yet"
+    }
+  ]
+}
