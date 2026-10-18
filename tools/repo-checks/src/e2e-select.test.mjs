@@ -9,13 +9,15 @@ import {
   globToRegExp,
   readMap,
   select,
+  summarize,
   threeDotDiff,
 } from './e2e-select.mjs';
 
 /**
- * The selector may only ever add e2e files, never drop one (TYTO-309). So most cases here are
- * the ways it must fall back to the full suite; the selected cases pin that the fallback is
- * not the only thing it does.
+ * The local e2e selector (TYTO-309). CI runs the whole suite on every push, so the selector
+ * may leave the shared wiring to it; what it may not do is drop a file a narrow change reaches.
+ * So the cases here are the ways it must fall back to the full suite, the paths it leaves to
+ * CI, and the selections in between.
  */
 const repoRoot = fileURLToPath(new URL('../../../', import.meta.url));
 const real = {
@@ -28,13 +30,11 @@ const choose = (changed) => select({ ...real, changed });
 describe('falling back to the full suite', () => {
   it.each([
     ['the preload', 'apps/desktop/src/preload/bridge.ts'],
-    ['an IPC contract', 'apps/desktop/shared/ipc.ts'],
-    ['a translation', 'apps/desktop/shared/i18n/pt-BR.ts'],
-    ['the main entry', 'apps/desktop/src/main/index.ts'],
-    ['the window', 'apps/desktop/src/main/window.ts'],
-    ['the renderer entry', 'apps/desktop/src/renderer/main.ts'],
-    ['the shell sheet', 'apps/desktop/src/renderer/shell.css'],
     ['the build config', 'apps/desktop/electron.vite.config.ts'],
+    ['the desktop package', 'apps/desktop/package.json'],
+    ['a packaging script', 'apps/desktop/scripts/fetch-node.ts'],
+    ['the desktop e2e vitest config', 'apps/desktop/vitest.desktop.config.ts'],
+    ['the e2e close helper', 'apps/desktop/e2e/close-app.ts'],
     ['an e2e helper', 'apps/desktop/e2e/first-window.ts'],
     ['an e2e fixture', 'apps/desktop/e2e/__fixtures__/offscreen.scene.json'],
     ['the lockfile', 'pnpm-lock.yaml'],
@@ -43,9 +43,6 @@ describe('falling back to the full suite', () => {
     ['the selector', 'tools/repo-checks/src/e2e-select.mjs'],
     ['ci-scope', 'tools/repo-checks/src/ci-scope.mjs'],
     ['the workflow', '.github/workflows/desktop-e2e.yml'],
-    ['packages/core, mapped to all', 'packages/core/src/index.ts'],
-    ['the CLI, mapped to all', 'apps/cli/src/main.ts'],
-    ['a document module, mapped to all', 'apps/desktop/src/main/documents.ts'],
     ['a new source file no entry covers', 'apps/desktop/src/renderer/brand-new.ts'],
   ])('%s', (_case, path) => {
     const selection = choose(['docs/architecture.md', path]);
@@ -58,12 +55,76 @@ describe('falling back to the full suite', () => {
     expect(select({ ...real, changed: null, failure: 'shallow' }).mode).toBe('full');
   });
 
-  it('when one path of many is shared, whatever the others select', () => {
+  it('when one path of many is on the run-everything list, whatever the others select', () => {
     const selection = choose([
       'apps/desktop/src/renderer/tab-drag.ts',
-      'apps/desktop/shared/ipc.ts',
+      'apps/desktop/src/preload/index.ts',
     ]);
     expect(selection.mode).toBe('full');
+  });
+});
+
+describe('reaching nothing locally, since CI runs everything on every push', () => {
+  it.each([
+    ['an IPC contract', 'apps/desktop/shared/ipc.ts'],
+    ['the command list', 'apps/desktop/shared/commands.ts'],
+    ['the settings contract', 'apps/desktop/shared/settings.ts'],
+    ['a translation', 'apps/desktop/shared/i18n/en.ts'],
+    ['the main entry', 'apps/desktop/src/main/index.ts'],
+    ['the main IPC handlers', 'apps/desktop/src/main/ipc.ts'],
+    ['the window', 'apps/desktop/src/main/window.ts'],
+    ['the renderer entry', 'apps/desktop/src/renderer/main.ts'],
+    ['the renderer shell', 'apps/desktop/src/renderer/shell.ts'],
+    ['the shell sheet', 'apps/desktop/src/renderer/shell.css'],
+    ['the tokens sheet', 'apps/desktop/src/renderer/tokens.css'],
+    ['the renderer page', 'apps/desktop/src/renderer/index.html'],
+    ['packages/core, mapped to all', 'packages/core/src/index.ts'],
+    ['the CLI, mapped to all', 'apps/cli/src/main.ts'],
+    ['a document module, mapped to all', 'apps/desktop/src/main/documents.ts'],
+  ])('%s', (_case, path) => {
+    expect(choose([path])).toMatchObject({
+      mode: 'selected',
+      files: [],
+      count: 0,
+      packageSuite: false,
+      ignored: [path],
+    });
+  });
+
+  it('adds nothing to what the other paths select', () => {
+    const selection = choose([
+      'apps/desktop/shared/i18n/en.ts',
+      'apps/desktop/src/renderer/tab-drag.ts',
+      'apps/desktop/src/main/session.ts',
+    ]);
+    expect(selection).toMatchObject({
+      mode: 'selected',
+      files: ['e2e/tab-drag.desktop.test.ts'],
+      ignored: ['apps/desktop/shared/i18n/en.ts', 'apps/desktop/src/main/session.ts'],
+    });
+  });
+
+  it('names the ignored paths on one line of the summary', () => {
+    const lines = summarize(
+      choose(['apps/desktop/shared/i18n/en.ts', 'apps/desktop/shared/commands.ts']),
+    ).split('\n');
+    expect(lines).toContain(
+      'ignored locally, CI runs everything: apps/desktop/shared/i18n/en.ts, apps/desktop/shared/commands.ts',
+    );
+    expect(lines.at(-1)).toBe('nothing to run');
+  });
+
+  it('prints no ignored line when nothing was ignored', () => {
+    expect(summarize(choose(['apps/desktop/src/renderer/tab-drag.ts']))).not.toContain(
+      'ignored locally',
+    );
+  });
+
+  it('still names them when something else runs everything', () => {
+    expect(choose(['apps/desktop/shared/ipc.ts', 'pnpm-lock.yaml'])).toMatchObject({
+      mode: 'full',
+      ignored: ['apps/desktop/shared/ipc.ts'],
+    });
   });
 });
 
@@ -83,6 +144,32 @@ describe('selecting', () => {
     expect(choose(['apps/desktop/e2e/theme.desktop.test.ts']).files).toEqual([
       'e2e/theme.desktop.test.ts',
     ]);
+  });
+
+  it('a new e2e file selects itself, even beside wiring that reaches nothing', () => {
+    const onDisk = {
+      ...real.onDisk,
+      desktop: [...real.onDisk.desktop, 'brand-new.desktop.test.ts'].sort(),
+    };
+    const selection = select({
+      ...real,
+      onDisk,
+      changed: ['apps/desktop/e2e/brand-new.desktop.test.ts', 'apps/desktop/shared/i18n/en.ts'],
+    });
+    expect(selection).toMatchObject({
+      mode: 'selected',
+      files: ['e2e/brand-new.desktop.test.ts'],
+      count: 1,
+      total: real.onDisk.desktop.length + 1,
+    });
+  });
+
+  it('a deleted e2e file is not handed to the runner', () => {
+    expect(choose(['apps/desktop/e2e/gone.desktop.test.ts'])).toMatchObject({
+      mode: 'selected',
+      files: [],
+      count: 0,
+    });
   });
 
   it('a changed package test turns the package suite on and selects no desktop file', () => {

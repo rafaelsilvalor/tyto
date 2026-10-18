@@ -2,7 +2,8 @@
   "$comment": [
     "Which desktop e2e files a change reaches (TYTO-309). Read by e2e-select.mjs; guarded by desktop-e2e-map.test.mjs.",
     "paths: globs over the repository (* within a segment, ** across, {a,b} alternatives). e2e: file names under apps/desktop/e2e, or \"all\".",
-    "A changed path in the desktop scope that no entry covers runs everything, so a missing entry costs minutes, never a skipped file."
+    "A changed path in the desktop scope that no entry covers runs everything, so a missing entry costs minutes, never a skipped file.",
+    "The selector is a local tool: CI runs the whole suite on every push, so an \"all\" entry reaches nothing locally and is only named in the summary."
   ],
   "entries": [
     {

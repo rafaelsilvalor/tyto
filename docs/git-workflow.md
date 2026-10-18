@@ -171,6 +171,22 @@ One file is fine again, and the repo-check that enforced the split went with the
 | `desktop.yml`     | tag `desktop-v*`; PR touching the release            | tag/version guard → OS matrix → `test:package` gate → electron-builder → GitHub Release; on a PR, the gate only                                |
 | `labeler.yml`     | PR (`pull_request_target`)                           | applies `pkg:*`/`app:*`/`docs`/`repo` labels from `.github/labeler.yml`                                                                        |
 
+### Running only the desktop e2e a change reaches, locally
+
+**CI runs the whole desktop e2e suite on every push; this is a local shortcut, not a gate** (TYTO-309). Before pushing, run:
+
+```sh
+node tools/repo-checks/src/e2e-select.mjs --local        # origin/main...HEAD plus the working tree
+node tools/repo-checks/src/e2e-select.mjs --base A --head B   # a past diff, e.g. <merge sha>^ and <merge sha>
+```
+
+It prints how many of the desktop e2e files the diff reaches, why, and the `pnpm --filter @tyto/desktop test:desktop <files>` (and `test:package`) command to run. It reads `tools/repo-checks/src/desktop-e2e-map.json`, which maps each app source and workspace package to the e2e files that exercise it. Every e2e test file the diff adds or changes selects itself.
+
+- **It ignores the shared wiring** — `apps/desktop/shared/{ipc,commands,settings}.ts`, `shared/i18n/**`, `src/main/{index,ipc,window}.ts`, `src/renderer/{main,shell}.ts`, `src/renderer/{shell,tokens}.css`, `src/renderer/index.html` — and the map's `"all"` entries (the compiler packages, the CLI, documents, sessions, editor groups). They reach every file in principle, a feature card touches them almost every time, and CI covers them. It names them on one `ignored locally, CI runs everything:` line.
+- **It still prints the whole suite** for the preload, the build config, `apps/desktop/package.json`, `electron-builder.yml`, `bundled-node.json`, `scripts/`, the vitest configs, the desktop tsconfig, any non-test file under `apps/desktop/e2e/`, the root lockfile, workspace, `turbo.json`, `.npmrc` and tsconfigs, the map, the selector, `ci-scope.mjs` and `desktop-e2e.yml`; for a path in the desktop scope no map entry covers; and when the diff cannot be read.
+
+**A new renderer or main source file needs a map entry.** `desktop-e2e-map.test.mjs` fails until it has one (or is on one of the selector's two lists), and also fails for an e2e file no entry lists, an entry naming a file that is gone, and a glob that matches nothing.
+
 ## Protections and labels
 
 Branch protection on `main`: require PR, dismiss stale reviews, linear history, no force pushes, no deletions, and the rule applies to administrators too.

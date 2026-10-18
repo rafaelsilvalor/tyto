@@ -7,6 +7,7 @@ import {
   e2eFilesOnDisk,
   globToRegExp,
   matchesAny,
+  REACHES_NOTHING_LOCALLY,
   readMap,
   RUN_EVERYTHING,
 } from './e2e-select.mjs';
@@ -25,6 +26,9 @@ const tracked = execFileSync('git', ['ls-files'], { cwd: repoRoot, encoding: 'ut
   .split('\n')
   .filter((line) => line !== '');
 
+// Both lists take a path out of the map: one runs everything, the other leaves it to CI.
+const LISTS = [...RUN_EVERYTHING, ...REACHES_NOTHING_LOCALLY];
+
 const listed = new Set(map.entries.flatMap((entry) => (entry.e2e === 'all' ? [] : entry.e2e)));
 
 describe('the desktop e2e map', () => {
@@ -38,7 +42,7 @@ describe('the desktop e2e map', () => {
   });
 
   it('has globs that each match at least one tracked path', () => {
-    const globs = [...map.entries.flatMap((entry) => entry.paths), ...RUN_EVERYTHING];
+    const globs = [...map.entries.flatMap((entry) => entry.paths), ...LISTS];
     const unmatched = globs.filter(
       (glob) => !tracked.some((path) => globToRegExp(glob).test(path)),
     );
@@ -51,23 +55,22 @@ describe('the desktop e2e map', () => {
     ).toEqual([]);
   });
 
-  it('covers every non-test source file of the app, or puts it on the run-everything list', () => {
+  it('covers every non-test source file of the app, or puts it on one of the two lists', () => {
     const sources = tracked.filter(
       (path) => /^apps\/desktop\/(src|shared)\//u.test(path) && !path.endsWith('.test.ts'),
     );
     const unmapped = sources.filter(
       (path) =>
-        !matchesAny(path, RUN_EVERYTHING) &&
-        !map.entries.some((entry) => matchesAny(path, entry.paths)),
+        !matchesAny(path, LISTS) && !map.entries.some((entry) => matchesAny(path, entry.paths)),
     );
     expect(unmapped).toEqual([]);
   });
 
-  it('keeps run-everything paths out of the map, where an entry would only mislead', () => {
+  it('keeps the two lists out of the map, where an entry would only mislead', () => {
     const shadowed = map.entries
       .flatMap((entry) => entry.paths)
       .filter((glob) =>
-        tracked.some((path) => globToRegExp(glob).test(path) && matchesAny(path, RUN_EVERYTHING)),
+        tracked.some((path) => globToRegExp(glob).test(path) && matchesAny(path, LISTS)),
       );
     expect(shadowed).toEqual([]);
   });

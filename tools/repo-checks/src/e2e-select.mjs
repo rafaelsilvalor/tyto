@@ -1,27 +1,30 @@
 #!/usr/bin/env node
 /**
- * Says which desktop e2e files a change reaches (TYTO-309), so a draft push or an executor's
- * machine can run those instead of all of them. The full suite still runs before merge and
- * on `main`; this script only decides what runs in between.
+ * Says which desktop e2e files a local change reaches (TYTO-309), so an executor can run those
+ * on its machine instead of the whole `test:desktop`. It is a local tool only: CI is the gate
+ * and runs the whole suite on every push, so nothing here decides what CI runs.
  *
- * **It is biased to run more.** A miss may only ever add files, never drop one:
+ * That is why the rule has two lists, not one:
  *
- * - a changed path in `RUN_EVERYTHING` — the preload, the IPC contracts, the main entry, the
- *   build config, the e2e harness, the lockfile, the map and this script — runs everything;
- * - a changed path in the desktop scope (`ci-scope.mjs`) that no entry of
- *   `desktop-e2e-map.json` covers runs everything;
- * - a map entry may say `"all"`, which runs everything;
- * - a diff that cannot be read runs everything.
+ * - `RUN_EVERYTHING`: a change to the preload, the build config, the desktop package, the e2e
+ *   harness, the lockfile and workspace config, the map, this script or the workflow can break
+ *   any e2e file in a way no per-file map predicts, so it still prints the whole suite. So does
+ *   a changed path in the desktop scope (`ci-scope.mjs`) that no entry of
+ *   `desktop-e2e-map.json` covers, and a diff that cannot be read.
+ * - `REACHES_NOTHING_LOCALLY`: the shared wiring (IPC and command contracts, settings, i18n,
+ *   the main and renderer entries, the shell sheets) and the map's `"all"` entries. Feature
+ *   cards touch them almost every time (measured on 10 merged PRs on 2026-10-18), so treating
+ *   them as "run everything" would make the tool answer "everything" nine times in ten. They
+ *   add no files here, are named on one line of the summary, and are left to CI.
  *
- * What is left out of the decision is only what cannot change an e2e result: Markdown, the
- * `.changeset/` folder, and unit tests (`*.test.ts` that are neither `*.desktop.test.ts` nor
- * `*.package.test.ts`). A changed e2e file selects itself.
+ * Markdown, the `.changeset/` folder and unit tests (`*.test.ts` that are neither
+ * `*.desktop.test.ts` nor `*.package.test.ts`) cannot change an e2e result and are left out.
+ * A changed or added e2e file always selects itself.
  *
  * Plain JavaScript and Node only, like `ci-scope.mjs`: it runs before `pnpm install`.
  *
  *     node tools/repo-checks/src/e2e-select.mjs --local             # origin/main + working tree
  *     node tools/repo-checks/src/e2e-select.mjs --base A --head B   # three-dot diff A...B
- *     node tools/repo-checks/src/e2e-select.mjs                     # the pull_request merge commit
  *
  * `--json` prints the decision as JSON instead of the summary and the command.
  */
@@ -29,7 +32,7 @@ import { execFileSync } from 'node:child_process';
 import { readdirSync, readFileSync } from 'node:fs';
 import { pathToFileURL } from 'node:url';
 
-import { changedFiles, matchesScope, scopeOf } from './ci-scope.mjs';
+import { matchesScope, scopeOf } from './ci-scope.mjs';
 
 export const MAP_PATH = 'tools/repo-checks/src/desktop-e2e-map.json';
 const DESKTOP = 'apps/desktop';
@@ -44,12 +47,6 @@ const E2E_DIRECTORY = `${DESKTOP}/e2e`;
  */
 export const RUN_EVERYTHING = [
   `${DESKTOP}/src/preload/**`,
-  `${DESKTOP}/shared/{ipc,commands,settings}.ts`,
-  `${DESKTOP}/shared/i18n/**`,
-  `${DESKTOP}/src/main/{index,ipc,window}.ts`,
-  `${DESKTOP}/src/renderer/{main,shell}.ts`,
-  `${DESKTOP}/src/renderer/{shell,tokens}.css`,
-  `${DESKTOP}/src/renderer/index.html`,
   `${DESKTOP}/electron.vite.config.ts`,
   `${DESKTOP}/vite.guest.config.ts`,
   `${DESKTOP}/package.json`,
@@ -68,6 +65,20 @@ export const RUN_EVERYTHING = [
   'tools/repo-checks/src/e2e-select.mjs',
   'tools/repo-checks/src/ci-scope.mjs',
   '.github/workflows/desktop-e2e.yml',
+];
+
+/**
+ * The shared wiring every window goes through. It reaches every e2e file in principle, and a
+ * feature card changes some of it almost every time, so locally it reaches nothing: CI is the
+ * gate and runs the whole suite on every push. The map's `"all"` entries are treated the same.
+ */
+export const REACHES_NOTHING_LOCALLY = [
+  `${DESKTOP}/shared/{ipc,commands,settings}.ts`,
+  `${DESKTOP}/shared/i18n/**`,
+  `${DESKTOP}/src/main/{index,ipc,window}.ts`,
+  `${DESKTOP}/src/renderer/{main,shell}.ts`,
+  `${DESKTOP}/src/renderer/{shell,tokens}.css`,
+  `${DESKTOP}/src/renderer/index.html`,
 ];
 
 /**
@@ -141,7 +152,11 @@ export function readMap(repoRoot) {
  *   total: number,
  *   packageSuite: boolean,
  *   reasons: string[],
+ *   ignored: string[],
  * }} Selection
+ *
+ * `ignored` holds the changed paths that reach nothing locally (the wiring and the map's
+ * `"all"` entries), so the summary can name them.
  */
 
 /**
@@ -156,22 +171,28 @@ export function readMap(repoRoot) {
  */
 export function select({ changed, failure, scope, map, onDisk }) {
   const total = onDisk.desktop.length;
-  const full = (reasons) => ({
+  const full = (reasons, ignored = []) => ({
     mode: /** @type {const} */ ('full'),
     files: onDisk.desktop.map((name) => `e2e/${name}`),
     count: total,
     total,
     packageSuite: true,
     reasons,
+    ignored,
   });
   if (changed === null) return full([`no diff to select by (${failure ?? 'no reason given'})`]);
 
   const fullReasons = [];
   const selected = new Set();
   const reasons = [];
+  const ignored = [];
   for (const path of changed) {
     if (matchesAny(path, RUN_EVERYTHING)) {
       fullReasons.push(`${path}: on the run-everything list`);
+      continue;
+    }
+    if (matchesAny(path, REACHES_NOTHING_LOCALLY)) {
+      ignored.push(path);
       continue;
     }
     if (matchesAny(path, IGNORED)) continue;
@@ -191,15 +212,22 @@ export function select({ changed, failure, scope, map, onDisk }) {
       fullReasons.push(`${path}: in the desktop scope and on no map entry`);
       continue;
     }
-    for (const entry of entries) {
-      if (entry.e2e === 'all') fullReasons.push(`${path}: mapped to all (${entry.why})`);
-      else for (const name of entry.e2e) selected.add(name);
+    // An `"all"` entry reaches nothing locally, like the wiring; a specific entry beside it
+    // still selects its files.
+    const specific = entries.filter((entry) => entry.e2e !== 'all');
+    if (specific.length === 0) {
+      ignored.push(path);
+      continue;
     }
-    reasons.push(`${path}: ${entries.map((entry) => entry.why).join('; ')}`);
+    for (const entry of specific) for (const name of entry.e2e) selected.add(name);
+    reasons.push(`${path}: ${specific.map((entry) => entry.why).join('; ')}`);
   }
-  if (fullReasons.length > 0) return full(fullReasons);
+  if (fullReasons.length > 0) return full(fullReasons, ignored);
 
-  const files = [...selected]
+  // A deleted e2e file is in the diff but cannot be run.
+  const exists = new Set([...onDisk.desktop, ...onDisk.package]);
+  const runnable = [...selected].filter((name) => exists.has(name));
+  const files = runnable
     .filter((name) => name.endsWith('.desktop.test.ts'))
     .sort()
     .map((name) => `e2e/${name}`);
@@ -208,8 +236,9 @@ export function select({ changed, failure, scope, map, onDisk }) {
     files,
     count: files.length,
     total,
-    packageSuite: [...selected].some((name) => name.endsWith('.package.test.ts')),
+    packageSuite: runnable.some((name) => name.endsWith('.package.test.ts')),
     reasons,
+    ignored,
   };
 }
 
@@ -262,6 +291,9 @@ export function summarize(selection) {
   return [
     `${head}; package suite ${selection.packageSuite ? 'runs' : 'skipped'}`,
     ...selection.reasons.map((reason) => `  ${reason}`),
+    ...(selection.ignored.length === 0
+      ? []
+      : [`ignored locally, CI runs everything: ${selection.ignored.join(', ')}`]),
     ...(commands.length === 0 ? ['nothing to run'] : commands),
   ].join('\n');
 }
@@ -274,11 +306,17 @@ function argument(name) {
 function main() {
   const repoRoot = process.cwd();
   const base = argument('--base');
-  const diff = process.argv.includes('--local')
+  const local = process.argv.includes('--local');
+  if (!local && base === undefined) {
+    console.error(
+      'usage: e2e-select.mjs --local [--base origin/main] | --base A [--head B]   [--json]',
+    );
+    process.exitCode = 2;
+    return;
+  }
+  const diff = local
     ? threeDotDiff({ base: base ?? 'origin/main', workingTree: true })
-    : base !== undefined
-      ? threeDotDiff({ base, head: argument('--head') ?? 'HEAD' })
-      : changedFiles(process.env.GITHUB_EVENT_NAME ?? '');
+    : threeDotDiff({ base, head: argument('--head') ?? 'HEAD' });
   const selection = select({
     ...diff,
     scope: scopeOf(repoRoot, 'desktop'),
