@@ -3,15 +3,26 @@
   "extends": ["//"],
   "tasks": {
     "test": {
-      // Both suites compare what this package generates with the committed copy under
-      // `docs/` (`src/paths.ts`), which is outside the package. Without these inputs an edit
-      // to one of the three files changed no task hash, and the cache replayed the last green
-      // against a document that no longer matches (TYTO-52, ADR 0072).
+      // The suites compare what this package generates with the committed copies under
+      // `docs/` and `apps/docs/pages/` (`src/paths.ts`, `src/reference/pages.ts`), which are
+      // outside the package. Without these inputs an edit to one of those files changed no
+      // task hash, and the cache replayed the last green against a document that no longer
+      // matches (TYTO-52, ADR 0072). The Reference pages are also rendered from app sources
+      // that are not a dependency of this package — the desktop's shared modules, its
+      // command table and its two theme files, and the CLI's program (TYTO-313) — so those
+      // are inputs for the same reason.
       "inputs": [
         "$TURBO_DEFAULT$",
         "$TURBO_ROOT$/docs/diagnostic-codes.md",
         "$TURBO_ROOT$/docs/render-contract.md",
-        "$TURBO_ROOT$/docs/render-result.schema.json"
+        "$TURBO_ROOT$/docs/render-result.schema.json",
+        "$TURBO_ROOT$/apps/docs/pages/reference/*.md",
+        "$TURBO_ROOT$/apps/docs/pages/pt-BR/reference/*.md",
+        "$TURBO_ROOT$/apps/desktop/shared/**/*.ts",
+        "$TURBO_ROOT$/apps/desktop/src/renderer/commands.ts",
+        "$TURBO_ROOT$/apps/desktop/src/main/desktop.tyto-plugin.json",
+        "$TURBO_ROOT$/apps/desktop/src/main/themes/*.json",
+        "$TURBO_ROOT$/apps/cli/src/**/*.ts"
       ]
     }
   }

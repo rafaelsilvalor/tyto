@@ -71,7 +71,7 @@ The last five are named `<id>.tyto-plugin.json` and that is the one place a buil
 | `editor.command`  | `{ id, title }`, data only: nothing runs it yet (TYTO-261, ADR 0079)          | —                                                     |
 | `editor.keymap`   | binding → command id (normal and vim)                                         | default-keymap, vim                                   |
 | `panel`           | a page in the desktop window, `sandbox="allow-scripts"` (ADR 0045)            | —                                                     |
-| `configuration`   | a key of `settings.json`: `{ id, schema, default, description }` (ADR 0073)   | desktop (the four app settings)                       |
+| `configuration`   | a key of `settings.json`: `{ id, schema, default, description }` (ADR 0073)   | desktop (the app's settings)                          |
 | `theme`           | a colour theme, a JSON file in the plugin: `{ id, label, kind, path }` (0077) | desktop (Tyto Light, Tyto Dark)                       |
 
 ### `configuration`, in full
