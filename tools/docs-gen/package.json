@@ -2,20 +2,24 @@
   "name": "@tyto/docs-gen",
   "private": true,
   "type": "module",
-  "description": "Generates the reference docs that are derived from code, such as the diagnostic catalog.",
+  "description": "Generates the reference docs that are derived from code, such as the diagnostic catalog and the manual's Reference pages.",
   "license": "UNLICENSED",
   "scripts": {
-    "generate": "node --experimental-strip-types src/generate.ts",
+    "generate": "node --experimental-strip-types src/generate.ts && vitest run --update src/reference",
     "typecheck": "tsc --noEmit",
     "lint": "eslint . --max-warnings 0",
     "test": "vitest run --passWithNoTests"
   },
   "dependencies": {
     "@tyto/core": "workspace:*",
+    "@tyto/editor": "workspace:*",
     "@tyto/io": "workspace:*",
+    "@tyto/plugin-api": "workspace:*",
+    "@tyto/theme-pack": "workspace:*",
     "zod": "^4.6.5"
   },
   "devDependencies": {
+    "@tyto/cli": "workspace:*",
     "vitest": "^5.0.1"
   }
 }
