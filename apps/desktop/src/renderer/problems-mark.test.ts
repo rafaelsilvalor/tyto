@@ -69,6 +69,15 @@ describe('carriedAcrossTemplateRead', () => {
     const before = [row('E_THEME_INVALID'), row('E_TEMPLATE_MANIFEST_INVALID')];
     expect(carriedAcrossTemplateRead(before).map((item) => item.code)).toEqual(['E_THEME_INVALID']);
   });
+
+  it('keeps the row for a face the machine lacks, which the theme answer remakes (TYTO-272)', () => {
+    // A save of settings.json reads the templates again too: without this the row was gone
+    // before it was ever drawn, measured in the window.
+    const before = [row('W_FONT_FAMILY_MISSING'), row('E_TEMPLATE_MANIFEST_INVALID')];
+    expect(carriedAcrossTemplateRead(before).map((item) => item.code)).toEqual([
+      'W_FONT_FAMILY_MISSING',
+    ]);
+  });
 });
 
 describe('withoutRowsAbout (TYTO-260)', () => {

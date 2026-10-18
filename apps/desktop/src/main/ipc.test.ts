@@ -500,6 +500,12 @@ const windowThemes = (): WindowThemes => {
     tabSize: () => 4,
     formatBriefOnSave: () => true,
     briefColumns: () => 'perColumn',
+    typography: () => ({
+      uiFontFamily: 'Segoe UI',
+      uiFontSize: 18,
+      codeFontFamily: 'IBM Plex Mono',
+      codeFontSize: 20,
+    }),
   };
 };
 
@@ -538,6 +544,7 @@ const dependencies = () => {
     },
     keymaps: () => Promise.resolve([]),
     themes: windowThemes(),
+    zoom: (step: string) => Promise.resolve({ zoom: step === 'in' ? 1 : 0, saved: true }),
     keybindings: {
       open: () => Promise.resolve({ document: null, documentId: null }),
       read: () => Promise.resolve(''),
@@ -1313,6 +1320,20 @@ describe('the theme channels (TYTO-208)', () => {
     expect(answer.formatBriefOnSave).toBe(true);
     // And how a brief's `|` columns are drawn (TYTO-298).
     expect(answer.briefColumns).toBe('perColumn');
+    // And the faces and sizes (TYTO-272); the zoom is main's and is not on the answer.
+    expect(answer.typography).toEqual({
+      uiFontFamily: 'Segoe UI',
+      uiFontSize: 18,
+      codeFontFamily: 'IBM Plex Mono',
+      codeFontSize: 20,
+    });
+    expect('zoom' in answer).toBe(false);
+  });
+
+  it('steps the zoom through main and answers what is in effect (TYTO-272)', async () => {
+    const guarded = guard('window:zoom', createHandlers(dependencies())['window:zoom']);
+    expect(await guarded({ step: 'in' })).toEqual({ zoom: 1, saved: true });
+    await expect(guarded({ step: 'sideways' } as never)).rejects.toThrow();
   });
 
   it('lists every theme with its label and kind, and nothing else', async () => {

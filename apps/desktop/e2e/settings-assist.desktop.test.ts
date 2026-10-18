@@ -175,6 +175,11 @@ const KEYS = [
   'formatBriefOnSave',
   'tabSize',
   'briefColumns',
+  'zoom',
+  'uiFontFamily',
+  'uiFontSize',
+  'codeFontFamily',
+  'codeFontSize',
 ];
 
 describe('the settings tab’s suggestions and hover', () => {

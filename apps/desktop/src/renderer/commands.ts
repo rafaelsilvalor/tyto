@@ -99,6 +99,13 @@ export const SNIPPETS_OPEN = 'snippets.open';
  */
 export const WINDOW_RELOAD = 'window.reload';
 /**
+ * TYTO-272 (ADR 0099). The window's zoom, a step at a time, each step written to the `zoom`
+ * setting by main. On View in `shared/commands.ts` and pinned there by `commands.test.ts`.
+ */
+export const WINDOW_ZOOM_IN = 'window.zoomIn';
+export const WINDOW_ZOOM_OUT = 'window.zoomOut';
+export const WINDOW_ZOOM_RESET = 'window.zoomReset';
+/**
  * TYTO-208. "Preferences: Color Theme": the themes in the bar, previewed as the selection
  * moves, written to the `theme` setting on Enter. No key by default (ADR 0074): a person
  * binds one in `keybindings.json` if they switch often.
@@ -250,6 +257,9 @@ export const COMMAND_LABELS: Readonly<Record<string, CatalogueKey>> = {
   [KEYBINDINGS_OPEN]: 'command.keybindings.open',
   [SNIPPETS_OPEN]: 'command.snippets.open',
   [WINDOW_RELOAD]: 'command.window.reload',
+  [WINDOW_ZOOM_IN]: 'command.window.zoomIn',
+  [WINDOW_ZOOM_OUT]: 'command.window.zoomOut',
+  [WINDOW_ZOOM_RESET]: 'command.window.zoomReset',
   [THEME_PICK]: 'command.theme.pick',
   [TEMPLATES_CHOOSE_FOLDER]: 'command.templates.chooseFolder',
   [TEMPLATES_CLEAR_FOLDER]: 'command.templates.clearFolder',
@@ -344,6 +354,8 @@ export interface DesktopActions {
   openSnippets(): void;
   /** TYTO-113. Keeps the session, then reloads: nothing open is lost (ADR 0080). */
   reloadWindow(): void;
+  /** TYTO-272. Steps the window's zoom; main applies it and writes the `zoom` setting. */
+  zoomWindow(step: 'in' | 'out' | 'reset'): void;
   /** TYTO-208. Lists the colour themes in the bar; the list and the choice are main's. */
   pickTheme(): void;
   /**
@@ -465,6 +477,15 @@ export function createDesktopRegistry(actions: DesktopActions): CommandRegistry 
   });
   add(WINDOW_RELOAD, () => {
     actions.reloadWindow();
+  });
+  add(WINDOW_ZOOM_IN, () => {
+    actions.zoomWindow('in');
+  });
+  add(WINDOW_ZOOM_OUT, () => {
+    actions.zoomWindow('out');
+  });
+  add(WINDOW_ZOOM_RESET, () => {
+    actions.zoomWindow('reset');
   });
   add(THEME_PICK, () => {
     actions.pickTheme();
@@ -677,6 +698,13 @@ export const builtInKeybindings: readonly Keybinding[] = [
   // context reaches. Free in CodeMirror's keymaps and in this table; Chromium's "paste as plain
   // text" on the same key is what VS Code gives up for it too.
   { key: 'Mod-Shift-v', command: PREVIEW_OPEN_TO_SIDE, source: 'built-in' },
+  // TYTO-272 (ADR 0099). The keys every browser and VS Code zoom with, global like the two
+  // above so they answer in vim, in a preview and in the settings tab alike. Electron's roles
+  // held them before, from the browser process; the window's table holds them now. Free in
+  // this table (the tab slots are 1 to 9), in CodeMirror's keymaps and in vim's engine.
+  { key: 'Mod-=', command: WINDOW_ZOOM_IN, source: 'built-in' },
+  { key: 'Mod--', command: WINDOW_ZOOM_OUT, source: 'built-in' },
+  { key: 'Mod-0', command: WINDOW_ZOOM_RESET, source: 'built-in' },
   // TYTO-296. VS Code's "Go to Symbol in Editor" key, in both input modes. Free in this table,
   // in CodeMirror's keymaps and in vim, whose engine leaves Ctrl+Shift+O alone.
   { key: 'Mod-Shift-o', command: EDITOR_GO_TO_BLOCK, when: 'editor', source: 'built-in' },

@@ -81,6 +81,18 @@ export const FILE_MENU_GROUPS: readonly (readonly MenuCommand[])[] = [
 export const RELOAD_COMMAND: MenuCommand = { id: 'window.reload', label: 'command.window.reload' };
 
 /**
+ * View > Reset Zoom, Zoom In and Zoom Out (TYTO-272, ADR 0099). Commands and not Electron's
+ * roles: a role's accelerator is the browser process's and fires before the page, and a role
+ * changes the zoom without writing it down. The window binds `Mod-0`, `Mod-=` and `Mod--`, and
+ * each one writes the `zoom` setting, so the zoom a person chose is in `settings.json`.
+ */
+export const ZOOM_MENU_COMMANDS: readonly MenuCommand[] = [
+  { id: 'window.zoomReset', label: 'command.window.zoomReset' },
+  { id: 'window.zoomIn', label: 'command.window.zoomIn' },
+  { id: 'window.zoomOut', label: 'command.window.zoomOut' },
+];
+
+/**
  * The editor groups' commands, at the top of the View menu (TYTO-286). The splits are
  * `@tyto/editor`'s ids, written as literals for the reason `editor.save` is, and every id here
  * is pinned to the renderer's constants by its tests.

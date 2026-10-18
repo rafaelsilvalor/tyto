@@ -31,6 +31,7 @@ import { type MarkedDiagnostic, diagnosticsSpec } from './diagnostic-markers.js'
 import { DEFAULT_TAB_SIZE, indentExtension } from './format-brief.js';
 import { indentGuides } from './indent-guides.js';
 import { stickyScroll } from './sticky-scroll.js';
+import { remeasureText } from './remeasure.js';
 import { type BriefColumnStyle, DEFAULT_BRIEF_COLUMNS, briefColumns } from './columns.js';
 import { type CommandRegistry, commandRegistryFacet } from './commands.js';
 import { type SearchPhrases, searchSupport, setSearchPhrases } from './search.js';
@@ -425,6 +426,12 @@ export interface EditorHandle extends EditorPane {
    */
   setBriefColumns(style: BriefColumnStyle): void;
   /**
+   * Makes every pane read its text's size again, after the host changed the face or the size
+   * it gives the editor (TYTO-272): the line height, the character width, and everything drawn
+   * from them — the indent guides and the pinned head lines.
+   */
+  remeasure(): void;
+  /**
    * Vim's mode and pending keys as they change, and `null` when vim is off (TYTO-248).
    * Called at once with the current answer. Returns the function that stops the listener.
    */
@@ -816,6 +823,10 @@ export function createEditor(parent: HTMLElement, options: EditorOptions = {}): 
       if (next === columns) return;
       columns = next;
       everyView(columnsCompartment.reconfigure(columns));
+    },
+
+    remeasure: () => {
+      for (const each of views) remeasureText(each);
     },
 
     onVimStatus: (listener: (status: VimStatus | null) => void) => {

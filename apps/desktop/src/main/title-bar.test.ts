@@ -79,6 +79,13 @@ describe('overlayFor', () => {
     expect(overlayFor(applied, BASE_COLORS, 'light').color).toBe('#111111');
     expect(overlayFor(applied, BASE_COLORS, 'dark').color).toBe('#222222');
   });
+
+  it("grows the buttons with the page's zoom, a factor of 1.2 per step (TYTO-272)", () => {
+    // The page's bar is 32 of its own pixels at every zoom, so in the window's it is 32 × 1.2ⁿ.
+    expect(
+      [-2, -1, 0, 1, 2, 5].map((zoom) => overlayFor(applied, BASE_COLORS, 'light', zoom).height),
+    ).toEqual([22, 27, 32, 38, 46, 80]);
+  });
 });
 
 describe('frameOptions', () => {

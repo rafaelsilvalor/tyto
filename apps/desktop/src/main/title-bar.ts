@@ -1,5 +1,7 @@
 import type { ThemeColors, ThemeKind } from '@tyto/plugin-api';
 
+import { zoomFactor } from '../../shared/typography.js';
+
 /**
  * The window's frame on Windows and Linux: no system title bar, the app's own drawn in the
  * page, and the system's minimise, maximise and close buttons kept as an overlay on top of it
@@ -65,11 +67,14 @@ export function overlayColour(value: string | undefined): string | undefined {
  * — and never the window. The built-in themes are hex throughout, so on them the buttons and
  * the drawn bar are the same colour exactly.
  */
-export function titleBarOverlay(colors: ThemeColors, base: ThemeColors): TitleBarOverlay {
+export function titleBarOverlay(colors: ThemeColors, base: ThemeColors, zoom = 0): TitleBarOverlay {
   return {
     color: overlayColour(colors[BAR]) ?? overlayColour(base[BAR]) ?? '#000000',
     symbolColor: overlayColour(colors[SYMBOL]) ?? overlayColour(base[SYMBOL]) ?? '#ffffff',
-    height: TITLE_BAR_HEIGHT,
+    // The overlay is measured in the window's pixels and the page's bar in its own, which the
+    // zoom scales (TYTO-272, ADR 0099): the buttons grow with the page so the bar under them
+    // stays one height, the 32 the page reads back through `env(titlebar-area-height)`.
+    height: Math.round(TITLE_BAR_HEIGHT * zoomFactor(zoom)),
   };
 }
 
@@ -95,6 +100,7 @@ export function overlayFor(
   applied: Readonly<Record<ThemeKind, { readonly colors: ThemeColors }>>,
   base: Readonly<Record<ThemeKind, ThemeColors>>,
   shown: ThemeKind,
+  zoom = 0,
 ): TitleBarOverlay {
-  return titleBarOverlay(applied[shown].colors, base[shown]);
+  return titleBarOverlay(applied[shown].colors, base[shown], zoom);
 }

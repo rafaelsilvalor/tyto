@@ -112,6 +112,11 @@ describe('fileSettingsStore', () => {
       formatBriefOnSave: DEFAULT_SETTINGS.formatBriefOnSave,
       tabSize: DEFAULT_SETTINGS.tabSize,
       briefColumns: DEFAULT_SETTINGS.briefColumns,
+      zoom: DEFAULT_SETTINGS.zoom,
+      uiFontFamily: DEFAULT_SETTINGS.uiFontFamily,
+      uiFontSize: DEFAULT_SETTINGS.uiFontSize,
+      codeFontFamily: DEFAULT_SETTINGS.codeFontFamily,
+      codeFontSize: DEFAULT_SETTINGS.codeFontSize,
     });
   });
 
@@ -139,6 +144,11 @@ describe('fileSettingsStore', () => {
       formatBriefOnSave: DEFAULT_SETTINGS.formatBriefOnSave,
       tabSize: DEFAULT_SETTINGS.tabSize,
       briefColumns: DEFAULT_SETTINGS.briefColumns,
+      zoom: DEFAULT_SETTINGS.zoom,
+      uiFontFamily: DEFAULT_SETTINGS.uiFontFamily,
+      uiFontSize: DEFAULT_SETTINGS.uiFontSize,
+      codeFontFamily: DEFAULT_SETTINGS.codeFontFamily,
+      codeFontSize: DEFAULT_SETTINGS.codeFontSize,
     });
   });
 
@@ -166,6 +176,11 @@ describe('fileSettingsStore', () => {
       formatBriefOnSave: DEFAULT_SETTINGS.formatBriefOnSave,
       tabSize: DEFAULT_SETTINGS.tabSize,
       briefColumns: DEFAULT_SETTINGS.briefColumns,
+      zoom: DEFAULT_SETTINGS.zoom,
+      uiFontFamily: DEFAULT_SETTINGS.uiFontFamily,
+      uiFontSize: DEFAULT_SETTINGS.uiFontSize,
+      codeFontFamily: DEFAULT_SETTINGS.codeFontFamily,
+      codeFontSize: DEFAULT_SETTINGS.codeFontSize,
     });
   });
 
@@ -192,6 +207,11 @@ describe('fileSettingsStore', () => {
       formatBriefOnSave: DEFAULT_SETTINGS.formatBriefOnSave,
       tabSize: DEFAULT_SETTINGS.tabSize,
       briefColumns: DEFAULT_SETTINGS.briefColumns,
+      zoom: DEFAULT_SETTINGS.zoom,
+      uiFontFamily: DEFAULT_SETTINGS.uiFontFamily,
+      uiFontSize: DEFAULT_SETTINGS.uiFontSize,
+      codeFontFamily: DEFAULT_SETTINGS.codeFontFamily,
+      codeFontSize: DEFAULT_SETTINGS.codeFontSize,
     });
   });
 

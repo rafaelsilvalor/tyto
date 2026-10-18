@@ -2,6 +2,8 @@ import { getIndentUnit } from '@codemirror/language';
 import { type EditorState, type Extension } from '@codemirror/state';
 import { EditorView, layer, type LayerMarker, type ViewUpdate } from '@codemirror/view';
 
+import { wasRemeasured } from './remeasure.js';
+
 /**
  * Indent guides: one thin vertical line per indent level, VS Code's look (TYTO-293, ADR 0088).
  *
@@ -225,6 +227,8 @@ const guideLayer = layer({
     update.selectionSet ||
     update.viewportChanged ||
     update.geometryChanged ||
+    // A new face or size the host gave the editor (TYTO-272): the column width moved.
+    wasRemeasured(update) ||
     unitChanged(update),
 });
 

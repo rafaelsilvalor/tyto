@@ -469,6 +469,15 @@ export interface Catalogue {
   readonly 'command.snippets.open': string;
   /** TYTO-113. View > Reload, and the bar's row for `Mod-r`; not on screen at load. */
   readonly 'command.window.reload': string;
+  /** TYTO-272. View > Zoom, and the bar's rows for `Mod-0`, `Mod-=` and `Mod--`. */
+  readonly 'command.window.zoomReset': string;
+  readonly 'command.window.zoomIn': string;
+  readonly 'command.window.zoomOut': string;
+  /**
+   * TYTO-272. The problems row for a `uiFontFamily` or `codeFontFamily` this machine does not
+   * have; the setting and the name follow it. Set from code, so not on screen at load.
+   */
+  readonly 'typography.familyMissing': string;
   /**
    * TYTO-208. "Preferences: Color Theme", the picker's placeholder and the two kinds shown
    * beside each theme. All four are the bar's, so none is on screen at load.
@@ -762,6 +771,10 @@ export const CATALOGUE_KEYS = [
   'command.keybindings.open',
   'command.snippets.open',
   'command.window.reload',
+  'command.window.zoomReset',
+  'command.window.zoomIn',
+  'command.window.zoomOut',
+  'typography.familyMissing',
   'command.theme.pick',
   'theme.pick.placeholder',
   'theme.kind.light',

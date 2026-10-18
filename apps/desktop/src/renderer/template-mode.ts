@@ -569,6 +569,11 @@ export class TemplateMode extends LitElement {
     for (const editor of Object.values(this.editors)) editor?.setTabSize(size);
   }
 
+  /** Both buffers re-read their text's size after the code face or size changed (TYTO-272). */
+  remeasureText(): void {
+    for (const editor of Object.values(this.editors)) editor?.remeasure();
+  }
+
   override disconnectedCallback(): void {
     super.disconnectedCallback();
     if (this.pending !== undefined) clearTimeout(this.pending);

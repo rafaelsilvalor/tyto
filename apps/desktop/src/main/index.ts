@@ -44,6 +44,13 @@ import { statusBarItemsExample } from '../../shared/status-bar-items.js';
 import { DEFAULT_THEME_SETTING, type ThemeSetting, modeOf } from '../../shared/theme-setting.js';
 import { vimModeStyleExample } from '../../shared/vim-mode-style.js';
 import { briefColumnsExample } from '../../shared/brief-columns.js';
+import {
+  type Typography,
+  type ZoomStep,
+  ZOOM,
+  steppedZoom,
+  typographyExample,
+} from '../../shared/typography.js';
 import { fileCredentialStore } from './credential-store.js';
 import { createCredentials } from './credentials.js';
 import { createDocumentService } from './documents.js';
@@ -122,14 +129,15 @@ const SETTINGS_SETTLE_MS = 100;
  * carries `statusBarItems` commented out with every id, and `statusBarColors` with every key
  * and an example colour, and `vimModeStyle` with its three values (TYTO-301), so the bar's
  * options are in the file the person is looking at; and `indentGuides` (TYTO-293),
- * `stickyScroll` (TYTO-295), `formatBriefOnSave` and `tabSize` (TYTO-297), and `briefColumns`
+ * `stickyScroll` (TYTO-295), `formatBriefOnSave` and `tabSize` (TYTO-297), `briefColumns`
  * with its four looks (TYTO-298).
  */
 const NEW_SETTINGS_FILE =
   '// Tyto settings: JSON with comments. Saving this file applies it, with no restart.\n{\n' +
   `${statusBarItemsExample()}\n${statusBarColorsExample()}\n${vimModeStyleExample()}\n` +
   `${indentGuidesExample()}\n${stickyScrollExample()}\n` +
-  `${formatBriefOnSaveExample()}\n${tabSizeExample()}\n${briefColumnsExample()}\n}\n`;
+  `${formatBriefOnSaveExample()}\n${tabSizeExample()}\n${briefColumnsExample()}\n` +
+  `${typographyExample()}\n}\n`;
 
 /** `keybindings.json` as "Open Keyboard Shortcuts (JSON)" creates it (TYTO-207, ADR 0074). */
 const NEW_KEYBINDINGS_FILE =
@@ -483,7 +491,10 @@ async function start(): Promise<void> {
     dark: { id: BUILT_IN_THEMES.dark.id, kind: 'dark', colors: BASE_COLORS.dark, diagnostics: [] },
   };
   const shownKind = (): ThemeKind => (nativeTheme.shouldUseDarkColors ? 'dark' : 'light');
-  const titleBarColours = () => overlayFor(appliedThemes, BASE_COLORS, shownKind());
+  // The page's zoom (TYTO-272, ADR 0099): the `zoom` setting, read below with the others. The
+  // system's buttons are sized in the window's pixels, so they grow with it.
+  let windowZoom: number = ZOOM.default;
+  const titleBarColours = () => overlayFor(appliedThemes, BASE_COLORS, shownKind(), windowZoom);
   const paintTitleBar = (): void => {
     if (!drawsTitleBar(process.platform)) return;
     if (mainWindow === undefined || mainWindow.isDestroyed()) return;
@@ -549,6 +560,23 @@ async function start(): Promise<void> {
   let formatBriefOnSave = saved.formatBriefOnSave;
   // And how the columns of a `|` line are drawn (TYTO-298), on the same answer.
   let briefColumns = saved.briefColumns;
+  // And the faces and sizes (TYTO-272), on the same answer. The zoom is applied here, in main.
+  let typography: Typography = {
+    uiFontFamily: saved.uiFontFamily,
+    uiFontSize: saved.uiFontSize,
+    codeFontFamily: saved.codeFontFamily,
+    codeFontSize: saved.codeFontSize,
+  };
+  windowZoom = saved.zoom;
+  // Electron's zoom on the window's page, and the system's buttons sized to match. Applied at
+  // every load too, because a reload is a new page.
+  const applyZoom = (level: number): void => {
+    windowZoom = level;
+    const contents = mainWindow?.webContents;
+    if (contents === undefined || contents.isDestroyed()) return;
+    contents.setZoomLevel(level);
+    paintTitleBar();
+  };
   // The themes a vim badge colour is measured in: the one the mode shows, or both when the
   // system chooses, since either may be in front.
   const themesInForce = (): readonly ThemeInForce[] => {
@@ -794,6 +822,20 @@ async function start(): Promise<void> {
       if (keys.includes('tabSize')) tabSize = next.tabSize;
       if (keys.includes('formatBriefOnSave')) formatBriefOnSave = next.formatBriefOnSave;
       if (keys.includes('briefColumns')) briefColumns = next.briefColumns;
+      if (keys.includes('zoom')) applyZoom(next.zoom);
+      if (
+        keys.includes('uiFontFamily') ||
+        keys.includes('uiFontSize') ||
+        keys.includes('codeFontFamily') ||
+        keys.includes('codeFontSize')
+      ) {
+        typography = {
+          uiFontFamily: next.uiFontFamily,
+          uiFontSize: next.uiFontSize,
+          codeFontFamily: next.codeFontFamily,
+          codeFontSize: next.codeFontSize,
+        };
+      }
     },
     configure: (config) => {
       host.configure(config);
@@ -1184,6 +1226,17 @@ async function start(): Promise<void> {
       tabSize: () => tabSize,
       formatBriefOnSave: () => formatBriefOnSave,
       briefColumns: () => briefColumns,
+      typography: () => typography,
+    },
+    // View > Zoom and its keys (TYTO-272): applied at once and written as a screen's change, so
+    // a refused write (a file that does not parse) puts the zoom before back through `apply`.
+    zoom: async (step: ZoomStep) => {
+      const before = windowZoom;
+      const next = steppedZoom(before, step);
+      if (next === before) return { zoom: before, saved: true };
+      applyZoom(next);
+      const written = await remember({ zoom: next });
+      return { zoom: written ? next : before, saved: written };
     },
     // After `ready`, as the panels are, so the window's first answer is the whole list.
     keymaps: async () => {
@@ -1263,6 +1316,13 @@ async function start(): Promise<void> {
   // got instead of putting a second dialog in front of one click.
   mainWindow.on('close', (event) => {
     if (!exit.mayExit(() => mainWindow?.close())) event.preventDefault();
+  });
+
+  // The `zoom` setting on every page the window loads (TYTO-272): set once here and again at
+  // each load, since a reload is a new page and nothing promises Electron keeps the level.
+  applyZoom(windowZoom);
+  mainWindow.webContents.on('did-finish-load', () => {
+    applyZoom(windowZoom);
   });
 
   // The arrow that moved an open menu to its neighbour reaches the page once the list is

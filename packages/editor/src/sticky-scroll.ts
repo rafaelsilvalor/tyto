@@ -4,6 +4,7 @@ import { EditorView, ViewPlugin, type ViewUpdate } from '@codemirror/view';
 import { type SyntaxNode } from '@lezer/common';
 import { highlightTree } from '@lezer/highlight';
 
+import { wasRemeasured } from './remeasure.js';
 import { treeAt } from './syntax.js';
 import { monoFont, palette, panels } from './theme.js';
 
@@ -209,6 +210,8 @@ class StickyScroll {
       update.geometryChanged ||
       update.heightChanged ||
       update.selectionSet ||
+      // A new face or size the host gave the editor (TYTO-272).
+      wasRemeasured(update) ||
       foldedRanges(update.startState) !== foldedRanges(update.state)
     ) {
       this.schedule();

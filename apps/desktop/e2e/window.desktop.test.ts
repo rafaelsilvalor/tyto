@@ -343,6 +343,9 @@ describe('the bridge', () => {
       // TYTO-131, ADR 0069: the update notice. Exercised by `e2e/update.package.test.ts`.
       'update:act',
       'update:status',
+      // TYTO-272: View > Zoom and its keys, which write the `zoom` setting. Exercised by
+      // `e2e/typography.desktop.test.ts`.
+      'window:zoom',
     ]);
   });
 });
@@ -640,6 +643,12 @@ describe('switching the language', () => {
     'slash.section.snippets',
     // TYTO-113: View > Reload's label, in the bar and the menu only.
     'command.window.reload',
+    // TYTO-272: View > Zoom's three, in the bar and the menu only, and the problems row for a
+    // face the machine lacks, which the window builds. `e2e/typography.desktop.test.ts`.
+    'command.window.zoomReset',
+    'command.window.zoomIn',
+    'command.window.zoomOut',
+    'typography.familyMissing',
     // TYTO-208: the theme picker's command, placeholder and the two kinds beside each theme,
     // all inside the bar. `e2e/theme-pick.desktop.test.ts` opens it.
     'command.theme.pick',

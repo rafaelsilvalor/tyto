@@ -1697,3 +1697,11 @@ Message: the `file.saveFailed` sentence in the window's language ("This file was
 A draft kept when the app closed was not put back over its file, which changed on disk in the meantime; the draft is in a new tab beside it (TYTO-113).
 
 Message: the `session.draftStale` sentence in the window's language ("This file changed while Tyto was closed; your unsaved text is in a new tab beside it" in English), then the file name.
+
+### `W_FONT_FAMILY_MISSING`
+
+**Severity:** warning · **Minted in:** `apps/desktop/src/renderer/typography.ts`
+
+A `uiFontFamily` or `codeFontFamily` in settings.json names a face this machine does not draw; the bundled face is drawn instead (TYTO-272, ADR 0099). Measured in the window, so it has no range in the file.
+
+Message: the `typography.familyMissing` sentence in the window's language ("This font is not installed; the bundled one is drawn instead" in English), then the setting, then the face it names.
