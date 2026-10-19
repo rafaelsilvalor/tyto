@@ -10,7 +10,8 @@
       // matches (TYTO-52, ADR 0072). The Reference pages are also rendered from app sources
       // that are not a dependency of this package — the desktop's shared modules, its
       // command table and its two theme files, and the CLI's program (TYTO-313) — so those
-      // are inputs for the same reason.
+      // are inputs for the same reason, and so is the built-in pack the template gallery is
+      // read from (TYTO-316).
       "inputs": [
         "$TURBO_DEFAULT$",
         "$TURBO_ROOT$/docs/diagnostic-codes.md",
@@ -18,6 +19,11 @@
         "$TURBO_ROOT$/docs/render-result.schema.json",
         "$TURBO_ROOT$/apps/docs/pages/reference/*.md",
         "$TURBO_ROOT$/apps/docs/pages/pt-BR/reference/*.md",
+        "$TURBO_ROOT$/apps/docs/pages/templates/gallery.md",
+        "$TURBO_ROOT$/apps/docs/pages/pt-BR/templates/gallery.md",
+        "$TURBO_ROOT$/packages/templates/templates/**/manifest.yaml",
+        "$TURBO_ROOT$/packages/templates/templates/**/examples/*.brief",
+        "$TURBO_ROOT$/packages/templates/templates/formats.yaml",
         "$TURBO_ROOT$/apps/desktop/shared/**/*.ts",
         "$TURBO_ROOT$/apps/desktop/src/renderer/commands.ts",
         "$TURBO_ROOT$/apps/desktop/src/main/desktop.tyto-plugin.json",

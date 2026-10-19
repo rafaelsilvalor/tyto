@@ -13,6 +13,11 @@
     "test": "vitest run"
   },
   "devDependencies": {
+    "@tyto/brief-lang": "workspace:*",
+    "@tyto/core": "workspace:*",
+    "@tyto/fonts": "workspace:*",
+    "@tyto/io": "workspace:*",
+    "@tyto/pipeline": "workspace:*",
     "minisearch": "^7.2.0",
     "vitepress": "1.6.4",
     "vitest": "^5.0.1",

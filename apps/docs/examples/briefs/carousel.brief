@@ -1,0 +1,17 @@
+---
+template: notice
+formats: [grid, story]
+---
+::titulo Open day at the library
+
+::lamina
+  Guided tours every hour
+
+::lamina {destaque}
+  Free entry
+
+::lamina {tom: laranja}
+  Reading corner for children
+
+::lamina {destaque, tom: verde}
+  Coffee on the terrace

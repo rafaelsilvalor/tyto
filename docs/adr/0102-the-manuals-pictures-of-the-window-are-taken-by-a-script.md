@@ -81,3 +81,36 @@ rewritten whenever the window changes, which is what LFS is for.
 - The page screenshot is the page: the system's minimise, maximise and close buttons, which
   Windows draws over the title bar (ADR 0078), are not in the pictures.
 - 20 pictures are 937,357 bytes, which every checkout with `lfs: true` downloads.
+
+## Amendment — the template gallery's pictures (TYTO-316, 2026-10-19)
+
+The manual's template gallery (`apps/docs/pages/templates/gallery.md`) shows one picture per
+built-in template. They follow this decision, with three differences that come from what they are
+pictures of.
+
+- **The command is `pnpm docs:template-shots`**, `tools/docs-gen/src/gallery/template-shots.ts`.
+  It runs the built CLI, `tyto render --types png`, on the first example brief in each template's
+  `examples/` folder, in the first format its manifest lists, and keeps the first artwork as
+  `apps/docs/pages/public/template-gallery/<name>.png`. It drives the binary rather than importing
+  the raster adapter, because composing adapters is `apps/*`'s job. Like the window's, it runs when
+  somebody asks for it and in no workflow, and the pictures are in LFS
+  (`apps/docs/pages/public/template-gallery/*.png`).
+- **They need the brand fonts, so any diagnostic fails the run.** A built-in template draws in its
+  brand's typeface, which the Linux runner does not have and which a machine without it replaces
+  silently but for a `W_FONT_SUBSTITUTED`. The script refuses to write a picture whose render
+  reported anything at all, so a machine without the fonts cannot quietly publish a picture in the
+  wrong typeface. This is also why they cannot be a check in CI.
+- **They show a template's design, never a brand's marks.** A brand's logo and signature stay
+  out of the public repository (E15) and reach a render only from a brand kit installed on the
+  machine (ADR 0063). The script runs every render with a `TYTO_HOME` of its own, created empty,
+  so the templates draw their stand-ins (ADR 0065): the placeholder shape where the logo goes and
+  `@assinatura` where the signature goes. Before rendering it asks that same environment for its
+  plugins and stops if any contributes a `brand-kit`, so a machine where the isolation leaked
+  cannot publish a brand's mark. The layout, colours and typefaces are the template's own, and the
+  briefs drawn are the templates' example briefs.
+
+What is checked in CI is the gallery's text: names, descriptions, formats, slots and values are
+generated from the manifests and `formats.yaml` and compared on every run, like the Reference
+pages, and `apps/docs/test/template-gallery.test.ts` holds every picture the page names to a file
+that exists. A template whose look changes needs its picture retaken by hand, which nothing
+enforces.
