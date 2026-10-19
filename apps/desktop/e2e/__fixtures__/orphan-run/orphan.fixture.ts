@@ -34,5 +34,7 @@ it('leaves an app behind when its worker dies', async () => {
     JSON.stringify({ pid: app.process().pid, userData }),
     'utf8',
   );
-  process.kill(process.pid);
+  // SIGKILL, not the default SIGTERM: on Linux the worker survives a SIGTERM long enough to finish
+  // the test and pass (measured on CI, run 39276529710), which is not a crash.
+  process.kill(process.pid, 'SIGKILL');
 });
