@@ -76,7 +76,14 @@ See `docs/git-workflow.md`.
   jsdom costs seconds per file, so a package never makes it the default (TYTO-236).
 - Exporters: `.brief` fixture → committed `.html`/`.svg` snapshot.
 - Raster: reference PNG + tolerant diff (`pixelmatch`), runs in CI with Playwright.
-- Desktop: Playwright for critical flows (open brief, see preview, export).
+- **End-to-end tests are for what needs the real window** (TYTO-310, ADR 0105). A desktop
+  e2e test asserts only what needs the real window: layout and pixels, focus, keys reaching
+  the app, IPC between processes, and the packaged app. Ordering, parsing, state transitions
+  and other logic are tested at unit level in `packages/*` or in the renderer's jsdom tests,
+  and the e2e test checks once that the wiring reaches them. A file has a 60 s budget on CI
+  (`tools/repo-checks/src/e2e-budget.json`); going over it needs a waiver with a reason and
+  an owner card, not a bigger number. The `merge` job of `desktop-e2e.yml` enforces the
+  budget and lists the ten slowest files in its summary.
 - Fonts bundled with Tyto (determinism). They live in **`packages/fonts/fonts/<family>/`**,
   never in a package's `__fixtures__`: `export-html`, `export-svg`, `raster` and — once
   E4.5 lands — `core` all want the same bytes and none of them owns them. `.woff2` for the

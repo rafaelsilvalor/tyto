@@ -168,6 +168,9 @@ Protocol (non-negotiable):
    `TURBO_FORCE=1 pnpm build` first; run the WHOLE test:desktop and look at the
    real window. With no Electron binary in the worktree, use
    ELECTRON_OVERRIDE_DIST_PATH="D:/Projects/tyto/apps/desktop/node_modules/electron/dist".
+   An e2e test asserts only what needs the real window (layout, focus, keys,
+   IPC, the package); logic is tested in packages/* or jsdom, and a file has a
+   60 s budget on CI (ADR 0105, docs/conventions.md).
 4. Known local reds that are not defects: command-bar and search, raster (LFS),
    vitest workers under load, queue.test.ts. CI is the gate.
 5. Conventional Commit with the key, subject of at most 72 characters, one -m
