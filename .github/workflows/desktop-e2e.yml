@@ -226,9 +226,19 @@ jobs:
           pattern: desktop-blob-*
           path: apps/desktop/blob-reports/
           merge-multiple: true
+      # `durations-reporter.ts` writes each file's time, `beforeAll` and `afterAll` included,
+      # to `blob-reports/durations.json` for the budget below (TYTO-310, ADR 0105).
       - run: >-
           pnpm --filter @tyto/desktop exec vitest run --config vitest.desktop.config.ts
           --merge-reports=blob-reports --reporter=default
+          --reporter=./e2e/durations-reporter.ts
+      # **The time budget**: a file over the ceiling in `e2e-budget.json` turns this job red,
+      # by name and seconds, unless it has a waiver with a reason and an owner card; the job
+      # summary lists the slowest files. A step here and not a job of its own, because the
+      # durations are already in this job and `github-config.test.ts` pins the job graph.
+      # `!cancelled()` so a red test above still gets its files timed.
+      - if: ${{ !cancelled() }}
+        run: node tools/repo-checks/src/e2e-budget.mjs apps/desktop/blob-reports/durations.json
 
   # **The required context, and nothing but a verdict** (ADR 0100, amending ADR 0064). The
   # job name is the one `main`'s protection stores; `github-config.test.ts` pins it, holds
