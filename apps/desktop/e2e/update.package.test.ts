@@ -1,4 +1,4 @@
-import { execFileSync } from 'node:child_process';
+import { spawn } from 'node:child_process';
 import { createHash } from 'node:crypto';
 import {
   chmodSync,
@@ -62,27 +62,80 @@ let installed: string;
 let app: CdpApp | undefined;
 let before: string;
 
-/** Packages one AppImage of `version` into its own folder, and returns that file. */
-function packageAppImage(version: string, output: string, extra: string[] = []): string {
+/**
+ * How long one build may take before its whole process group is killed. Under the 600 s hook
+ * budget, so a hung build fails naming its version instead of timing the hook out and outliving
+ * the file — which is what an output folder under `/proc` did on CI: electron-builder never
+ * exited, and was still running after afterAll (TYTO-326).
+ */
+const BUILD_DEADLINE_MS = 420_000;
+
+/**
+ * Packages one AppImage of `version` into its own folder, and resolves to that file. Async so
+ * the two builds can run side by side; a failed build rejects naming its version and exit code.
+ * It settles only once electron-builder has exited, so nothing is still writing afterwards.
+ */
+function packageAppImage(version: string, output: string, extra: string[] = []): Promise<string> {
   const cli = createRequire(import.meta.url).resolve('electron-builder/cli.js');
-  execFileSync(
-    process.execPath,
-    [
-      cli,
-      '--linux',
-      'AppImage',
-      '--publish',
-      'never',
-      `-c.extraMetadata.version=${version}`,
-      `-c.directories.output=${output}`,
-      ...extra,
-    ],
-    { cwd: projectDirectory, stdio: 'inherit' },
-  );
-  const image = readdirSync(output).find((entry) => entry.endsWith('.AppImage'));
-  if (image === undefined)
-    throw new Error(`no AppImage in ${output}: ${readdirSync(output).join(', ')}`);
-  return join(output, image);
+  return new Promise((resolve, reject) => {
+    let overran = false;
+    // `detached` makes the build its own process group, so the deadline's kill reaches
+    // app-builder and mksquashfs under it too.
+    const child = spawn(
+      process.execPath,
+      [
+        cli,
+        '--linux',
+        'AppImage',
+        '--publish',
+        'never',
+        `-c.extraMetadata.version=${version}`,
+        `-c.directories.output=${output}`,
+        ...extra,
+      ],
+      { cwd: projectDirectory, stdio: 'inherit', detached: true },
+    );
+    const deadline = setTimeout(() => {
+      overran = true;
+      killTree(child.pid);
+    }, BUILD_DEADLINE_MS);
+    child.once('error', (cause) => {
+      clearTimeout(deadline);
+      reject(new Error(`electron-builder for ${version} did not start: ${String(cause)}`));
+    });
+    child.once('exit', (code, signal) => {
+      clearTimeout(deadline);
+      if (overran) {
+        reject(
+          new Error(
+            `electron-builder for ${version} did not finish within ${String(BUILD_DEADLINE_MS)} ms and was killed`,
+          ),
+        );
+        return;
+      }
+      if (code !== 0) {
+        reject(
+          new Error(
+            `electron-builder for ${version} exited with code ${String(code)}, signal ${String(signal)}`,
+          ),
+        );
+        return;
+      }
+      const image = readdirSync(output).find((entry) => entry.endsWith('.AppImage'));
+      if (image === undefined) {
+        reject(new Error(`no AppImage in ${output}: ${readdirSync(output).join(', ')}`));
+        return;
+      }
+      resolve(join(output, image));
+    });
+  });
+}
+
+/** Resolves to what `build` resolves to, and how many milliseconds it took. */
+async function timed(build: () => Promise<string>): Promise<{ file: string; ms: number }> {
+  const start = performance.now();
+  const file = await build();
+  return { file, ms: Math.round(performance.now() - start) };
 }
 
 const launch = (name: string): Promise<CdpApp> =>
@@ -103,6 +156,13 @@ const version = async (running: CdpApp): Promise<string> =>
   ).version;
 
 describe.runIf(process.platform === 'linux')('an installed AppImage updating itself', () => {
+  // **The two AppImages are built at the same time** (TYTO-326). The feed URL is known before
+  // either starts, and they share nothing they write: each unzips Electron into its own
+  // output's `linux-unpacked`, and app-builder-lib locks the download cache it extracts from.
+  // What they do share is the CPU — `mksquashfs` takes all 4 vCPU — so this saves less than one
+  // build. Measured on CI, 5 `package` runs each, this file's time: one after the other
+  // 42.3/62.8/62.8/63.2/65.6 s (median 62.8, builds 24–27 s each on 4 of 5 runners), together
+  // 50.9/51.1/51.2/51.7/51.8 s (median 51.2, both builds ~37.5 s), no lock or extract error.
   beforeAll(async () => {
     if (!existsSync(built)) {
       throw new Error(`${built} is missing — run \`pnpm build\` before \`test:package\``);
@@ -128,18 +188,35 @@ describe.runIf(process.platform === 'linux')('an installed AppImage updating its
     if (address === null || typeof address === 'string') throw new Error('no port');
     feedUrl = `http://127.0.0.1:${String(address.port)}/`;
 
-    // The newer build is the feed: electron-builder writes `latest-linux.yml` beside it.
-    packageAppImage(NEW, feed);
+    // The newer build is the feed: electron-builder writes `latest-linux.yml` beside it. The
+    // older build is the "installed" copy, and further down it gets a name with no version in
+    // it, so electron-updater replaces that file rather than writing a second one beside it.
+    // Both start together (see the note above `beforeAll`). `allSettled`, so a failed build
+    // never leaves the other one still writing into `scratch` while afterAll removes it.
+    const bothStart = performance.now();
+    const builds = await Promise.allSettled([
+      timed(() => packageAppImage(NEW, feed)),
+      timed(() =>
+        packageAppImage(OLD, join(scratch, 'old'), [`-c.extraMetadata.tytoUpdateFeed=${feedUrl}`]),
+      ),
+    ]);
+    const bothMs = Math.round(performance.now() - bothStart);
+    const msOf = (index: number): string => {
+      const settled = builds[index];
+      return settled?.status === 'fulfilled' ? `${String(settled.value.ms)} ms` : 'failed';
+    };
+    process.stdout.write(
+      `[TYTO-326] build ${NEW} ${msOf(0)}, ${OLD} ${msOf(1)}, both ${String(bothMs)} ms\n`,
+    );
+    for (const settled of builds) {
+      if (settled.status === 'rejected') throw settled.reason;
+    }
+    const old = (builds[1] as PromiseFulfilledResult<{ file: string; ms: number }>).value.file;
     process.stdout.write(
       `[TYTO-131] feed ${feedUrl} serves: ${readdirSync(feed).join(', ')}\n` +
         `[TYTO-131] latest-linux.yml:\n${readFileSync(join(feed, 'latest-linux.yml'), 'utf8')}`,
     );
 
-    // The older build, which is the "installed" copy. A name with no version in it, so
-    // electron-updater replaces this file rather than writing a second one beside it.
-    const old = packageAppImage(OLD, join(scratch, 'old'), [
-      `-c.extraMetadata.tytoUpdateFeed=${feedUrl}`,
-    ]);
     mkdirSync(join(scratch, 'installed'));
     installed = join(scratch, 'installed', 'Tyto.AppImage');
     copyFileSync(old, installed);
