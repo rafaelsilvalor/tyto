@@ -12,6 +12,7 @@ export default defineConfig({
     // And `renderer-tokens`, which reads the renderer's sheets for literals and for token
     // names nothing defines (TYTO-96).
     // And the manual's scene list, which is data and launches nothing (TYTO-315).
+    // And where the global setup finds the Electron binary, which only reads paths (TYTO-327).
     include: [
       'shared/**/*.test.ts',
       'src/**/*.test.ts',
@@ -19,6 +20,7 @@ export default defineConfig({
       'e2e/renderer-tokens.test.ts',
       'e2e/asar-patch.test.ts',
       'e2e/port-file.test.ts',
+      'e2e/electron-binary.test.ts',
       'e2e/docs-shots/**/*.test.ts',
     ],
   },
