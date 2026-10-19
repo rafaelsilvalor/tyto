@@ -13,7 +13,8 @@ import { inject } from 'vitest';
  * on 2026-10-14 — nothing closes the app, and it runs for hours. The main vitest process outlives
  * the worker and runs the global setup's teardown even after a worker crash, so the record lives
  * where that teardown can read it: a folder the global setup makes per run, one JSON line per
- * launch, appended synchronously the moment the process exists.
+ * launch, appended synchronously — an app before it starts (TYTO-338), a spawned probe the
+ * moment its PID exists.
  *
  * **An app is found by its data folder, not by its PID.** On Windows `_electron.launch` starts
  * Electron through `cmd.exe` (`shell: true` in Playwright 1.63), so `app.process().pid` is the
@@ -31,11 +32,18 @@ import { inject } from 'vitest';
 
 /** One launch, as a JSON line in the run's ledger. */
 export interface LaunchRecord {
-  /** The PID the launch returned: Electron's own, or on Windows the shell Playwright started it in. */
-  readonly pid: number;
+  /**
+   * The PID the spawn returned, or `undefined` for an app written down before it started. An app
+   * is matched by its folder, so it needs no PID, and `_electron.launch` gives one only once it
+   * resolves — seconds later on a loaded machine, a window a dying worker can fall into.
+   */
+  readonly pid: number | undefined;
   /** The scratch `--user-data-dir`, or `undefined` for a launch that runs as Node. */
   readonly userData: string | undefined;
-  /** Epoch milliseconds: just before the launch started, and just after the PID was known. */
+  /**
+   * Epoch milliseconds: just before the launch started, and just after the PID was known (the
+   * same instant for an app written down before it started; only a probe's is ever read).
+   */
   readonly notBefore: number;
   readonly notAfter: number;
 }
@@ -88,6 +96,18 @@ export function recordSpawn(
 ): void {
   if (pid === undefined) return;
   recordLaunch({ pid, userData, notBefore, notAfter: Date.now() });
+}
+
+/**
+ * Write down an app that is about to start in `userData`, before anything awaits (TYTO-338). The
+ * teardown finds it by that folder whether or not the launch ever resolved, so a worker that dies
+ * while Playwright is still launching leaves a record too — and so can a test that hands the
+ * folder to a process the ledger would not otherwise see, such as a nested run that may die
+ * before its own teardown.
+ */
+export function recordAppBeforeItStarts(userData: string): void {
+  const now = Date.now();
+  recordLaunch({ pid: undefined, userData, notBefore: now, notAfter: now });
 }
 
 /** The launches a ledger folder holds; a torn last line (a crash mid-write) is skipped. */
@@ -146,10 +166,20 @@ function windowsProcesses(filter: string): ProcessFacts[] {
 
 /** When a POSIX process was created, from its elapsed seconds. */
 function posixStartedAt(pid: number): number | undefined {
-  const elapsedSeconds = Number(
-    execFileSync('ps', ['-o', 'etimes=', '-p', String(pid)], { encoding: 'utf8' }).trim(),
-  );
-  return Number.isFinite(elapsedSeconds) ? Date.now() - elapsedSeconds * 1_000 : undefined;
+  try {
+    const elapsedSeconds = Number(
+      execFileSync('ps', ['-o', 'etimes=', '-p', String(pid)], {
+        encoding: 'utf8',
+        stdio: ['ignore', 'pipe', 'ignore'],
+      }).trim(),
+    );
+    return Number.isFinite(elapsedSeconds) ? Date.now() - elapsedSeconds * 1_000 : undefined;
+  } catch {
+    // `ps` exits 1 for a process that ended after `/proc` was listed. On a runner where other
+    // files' apps start and end all the time this is routine, and when it threw, the whole
+    // candidate list was dropped and nothing was ended (TYTO-338, measured on CI).
+    return undefined;
+  }
 }
 
 /** The command line and creation time of `pid`, or `undefined` if it is gone or unreadable. */
@@ -263,7 +293,7 @@ function liveProcessesOf(records: readonly LaunchRecord[]): ProcessFacts[] {
     }
   }
   for (const record of probes) {
-    if (!isAlive(record.pid)) continue;
+    if (record.pid === undefined || !isAlive(record.pid)) continue;
     const facts = processFacts(record.pid);
     if (facts !== undefined && belongsTo(record, facts)) found.set(facts.pid, facts);
   }

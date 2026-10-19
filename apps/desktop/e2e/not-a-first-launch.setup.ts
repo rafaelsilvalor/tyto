@@ -3,7 +3,7 @@ import { join } from 'node:path';
 
 import { _electron } from 'playwright';
 
-import { recordLaunch } from './launch-ledger.js';
+import { recordAppBeforeItStarts, recordLaunch } from './launch-ledger.js';
 
 /**
  * Every suite's window is a second launch unless the suite asks for a first one (TYTO-287).
@@ -68,13 +68,18 @@ if (target[WRAPPED] !== true) {
   const launch = _electron.launch.bind(_electron);
   target.launch = async (options) => {
     seedSecondLaunch(options);
+    const userData = userDataOf(options);
+    // Written down before Playwright starts it, so a worker that dies from here on — while the
+    // launch is still resolving included (TYTO-338) — leaves the run's teardown a record to end
+    // it by (TYTO-292, ADR 0106). An app is matched by its folder and needs no PID.
+    if (userData !== undefined) recordAppBeforeItStarts(userData);
     const notBefore = Date.now();
     const app = await launch(options);
-    // Written down before the suite gets the app, so a worker that dies from here on leaves the
-    // run's teardown a record to end it by (TYTO-292, ADR 0106).
+    // A launch with no folder of its own, which `launch-isolation.test.ts` refuses, can only be
+    // matched by PID, and that is known once the launch resolves.
     const pid = app.process().pid;
-    if (pid !== undefined) {
-      recordLaunch({ pid, userData: userDataOf(options), notBefore, notAfter: Date.now() });
+    if (userData === undefined && pid !== undefined) {
+      recordLaunch({ pid, userData, notBefore, notAfter: Date.now() });
     }
     return app;
   };

@@ -5,11 +5,11 @@ import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 import { type ElectronApplication, _electron } from 'playwright';
-import { afterAll, beforeAll, describe, expect, it } from 'vitest';
+import { afterAll, beforeAll, describe, expect, inject, it } from 'vitest';
 
 import { closeApp } from './close-app.js';
 import { firstWindow } from './first-window.js';
-import { isAlive } from './launch-ledger.js';
+import { isAlive, readLaunches, recordAppBeforeItStarts } from './launch-ledger.js';
 
 /**
  * A worker that dies with its app open leaves no app behind, and nobody else's app is touched
@@ -21,6 +21,13 @@ import { isAlive } from './launch-ledger.js';
  * file asserts is what the machine looks like once that run has ended: the orphan's PID gone and
  * no process anywhere still carrying its data folder, while an app this file launched on its own
  * — standing for Rafael's Tyto, or another worktree's run — is still alive.
+ *
+ * **Nothing this file starts outlives it either** (TYTO-338). The bystander is in this run's
+ * ledger, through the launch wrapper, and the nested run's folder is written into it before the
+ * nested run starts: if this worker dies, the nested run's main process loses its parent and
+ * died with it in the one measurement (its teardown never ran, four `electron.exe` left), so this
+ * run's teardown is what ends both. The nested run never sees this ledger, and its sweep skips a
+ * ledger whose owner is alive, so it cannot end the bystander.
  */
 
 const here = dirname(fileURLToPath(import.meta.url));
@@ -129,8 +136,17 @@ afterAll(async () => {
 
 describe('a worker that dies with its app open', () => {
   it('leaves no app of its run alive, and the app outside the run untouched', async () => {
+    // Written down by this run's launch wrapper, so a crash of this worker still ends it.
+    const outerLedger = readLaunches(inject('launchLedger')).map((record) => record.userData);
+    expect(outerLedger).toContain(bystanderUserData);
+
     const marker = join(scratch, 'orphan.json');
-    const run = await runFixture(join(scratch, 'orphan'), marker);
+    const orphanScratch = join(scratch, 'orphan');
+    // The folder `orphan.fixture.ts` launches into, in this run's ledger as well as the nested
+    // one's. The assertions below run before this run's teardown, so they still measure the
+    // nested teardown alone.
+    recordAppBeforeItStarts(join(orphanScratch, 'userData'));
+    const run = await runFixture(orphanScratch, marker);
 
     expect(run.code, run.output).not.toBe(0);
     expect(run.output).toContain('Worker exited unexpectedly');
