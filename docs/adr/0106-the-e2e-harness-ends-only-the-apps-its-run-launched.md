@@ -1,6 +1,6 @@
 # 0106 — The e2e harness ends only the apps its run launched
 
-Status: accepted · 2026-10-19 · TYTO-292
+Status: accepted · 2026-10-19 · TYTO-292 · amended 2026-10-19 · TYTO-338
 
 ## Context
 
@@ -22,9 +22,9 @@ a process is its own.
 - `e2e/launch-ledger.global-setup.ts` runs in the main vitest process of `test:desktop`,
   `test:package` and `shots`. It makes `<tmp>/tyto-e2e-run-*`, writes `owner.json` (its own PID
   and start time) and provides the folder to the workers as `launchLedger`.
-- Every launch the harness makes appends one JSON line to that folder with `appendFileSync`, the
-  moment the PID is known: `_electron.launch` through the wrapper in
-  `e2e/not-a-first-launch.setup.ts`, after the launch resolves, and the three `spawn`s in
+- Every launch the harness makes appends one JSON line to that folder with `appendFileSync`:
+  `_electron.launch` through the wrapper in `e2e/not-a-first-launch.setup.ts`, **before** the
+  launch starts (amended by TYTO-338, below), and the three `spawn`s in
   `cdp-app.ts` (`launchOverCdp`), `run-as-node-probe.ts` (`probeRunAsNode`) and `launch-probe.ts`
   (`probeLaunch`), right after `spawn`. The line holds the PID, the `--user-data-dir` (none for a
   Node-mode probe) and the window of time in which the process was created. `recordLaunch` throws
@@ -77,11 +77,33 @@ the shipped binary. The seam stays test-side, like the second-launch seed beside
 - **Not covered: the main vitest process dying.** Ctrl+C, a closed terminal or a killed `pnpm`
   never reach the teardown. The next run's sweep ends those apps, so the cost is bounded by "until
   the next run on this machine", not by hours.
-- **Not covered: the window between `spawn` and Playwright resolving.** `_electron.launch` gives
-  the PID only when it resolves; a worker that dies while it is still launching leaves an app
-  that was never written down. The three `spawn` paths record before anything awaits.
+- ~~Not covered: the window between `spawn` and Playwright resolving.~~ Covered since TYTO-338:
+  an app is written down by its folder before `_electron.launch` starts it.
 - **Not covered: synchronous CLI children** (`execFileSync`/`spawnSync`, `electron-builder`, the
   bundled `node --version`). They are not recorded: each runs to an end of its own and exits,
   where an app waits for input forever.
 - A folder whose owner could not be read but is alive is treated as in use: a leftover folder
   costs disk, and ending a live run's apps is the bug this ADR exists to prevent.
+
+## Amendment — TYTO-338 (2026-10-19)
+
+**On Linux a single vanished process emptied the whole candidate list.** `orphan-guard` failed in
+3 of 6 shard-2 attempts on 2026-10-19 with the orphan alive and the nested teardown printing
+nothing. With the teardown's candidates logged on CI (8 copies of shard 2 side by side), the red
+copy said `processesNamingAUserDataFolder threw: Error: Command failed: ps -o etimes= -p 8763`
+and `0 candidate(s)`: `/proc` was listed, another file's app ended before `ps` asked about it,
+`ps` exited 1, and the one `try` around the whole scan returned no candidates at all. With three
+files at a time per runner that is routine. Now a process that is gone by the time it is asked
+about is left out on its own; the rest of the list stands.
+
+**An app is written down before it starts.** The record of an app needs no PID — it is matched by
+its folder — so the wrapper appends it before calling `_electron.launch` (`recordAppBeforeItStarts`,
+`pid` left out), and a worker that dies while Playwright is still launching leaves a record too.
+A launch with no folder is still recorded by PID once it resolves.
+
+**A test may write down a folder it hands to a process the ledger does not otherwise see.**
+`orphan-guard` writes the nested run's folder into its own run's ledger before starting it.
+Measured locally: with the outer worker killed while the nested run was running, the nested run's
+main process died too, its teardown never ran, and four `electron.exe` were left (the next run's
+sweep ended them). Since the amendment the outer run's teardown ends both the bystander and the
+nested app — 8 processes, 0 left, at 2.7 s and 3.2 s into the nested run.
