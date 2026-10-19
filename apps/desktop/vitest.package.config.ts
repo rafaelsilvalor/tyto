@@ -9,6 +9,8 @@ export default defineConfig({
     //
     // The hook budget is what `electron-builder --dir` needs on a machine that has never run
     // it: a ~100 MB Electron zip, then the pack itself. 23 s once both are cached.
+    // Every app and probe it starts is written down, and ended if a worker dies (TYTO-292).
+    globalSetup: ['e2e/launch-ledger.global-setup.ts'],
     testTimeout: 120_000,
     hookTimeout: 600_000,
     fileParallelism: false,

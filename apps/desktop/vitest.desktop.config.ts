@@ -28,8 +28,10 @@ const workers = fileWorkers();
 export default defineConfig({
   test: {
     include: ['e2e/**/*.desktop.test.ts'],
-    // Before any worker starts, so parallel files never race to download the binary.
-    globalSetup: ['e2e/electron-binary.global-setup.ts'],
+    // Before any worker starts, so parallel files never race to download the binary. The
+    // ledger ends every app the run launched that is still running at its end, a worker that
+    // crashed included (TYTO-292, ADR 0106).
+    globalSetup: ['e2e/electron-binary.global-setup.ts', 'e2e/launch-ledger.global-setup.ts'],
     // Every window a second launch unless a suite asks for a first one (TYTO-287): the first
     // opens the preview to the side, and every suite starts in a folder with no session.
     setupFiles: ['e2e/not-a-first-launch.setup.ts'],

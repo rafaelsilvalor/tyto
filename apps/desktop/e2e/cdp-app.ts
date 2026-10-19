@@ -6,6 +6,7 @@ import type { Browser, Page } from 'playwright';
 
 import { FIRST_WINDOW_TIMEOUT_MS } from './first-window.js';
 import { DEBUGGING_PORT_SWITCH, waitForBoot } from './boot-signal.js';
+import { recordSpawn } from './launch-ledger.js';
 import { appSwitches, killTree } from './run-as-node-probe.js';
 
 /**
@@ -72,6 +73,7 @@ export async function launchOverCdp(
   delete environment['NODE_OPTIONS'];
   delete environment['ELECTRON_RUN_AS_NODE'];
 
+  const notBefore = Date.now();
   const child = spawn(
     executable,
     [...appSwitches(options.userData), DEBUGGING_PORT_SWITCH, ...(options.arguments ?? [])],
@@ -82,6 +84,7 @@ export async function launchOverCdp(
       detached: process.platform !== 'win32',
     },
   );
+  recordSpawn(child.pid, options.userData, notBefore);
   let stderr = '';
   child.stderr?.setEncoding('utf8');
   child.stderr?.on('data', (chunk: string) => {

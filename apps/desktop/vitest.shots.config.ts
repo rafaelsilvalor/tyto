@@ -12,7 +12,8 @@ import { defineConfig } from 'vitest/config';
 export default defineConfig({
   test: {
     include: ['e2e/**/*.shots.test.ts'],
-    globalSetup: ['e2e/electron-binary.global-setup.ts'],
+    // The ledger as in the suite: no picture's app outlives a crashed worker (TYTO-292).
+    globalSetup: ['e2e/electron-binary.global-setup.ts', 'e2e/launch-ledger.global-setup.ts'],
     setupFiles: ['e2e/not-a-first-launch.setup.ts'],
     testTimeout: 180_000,
     hookTimeout: 300_000,

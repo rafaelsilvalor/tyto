@@ -1594,6 +1594,11 @@
       ],
       "e2e": "all",
       "why": "reviewed: compiler, exporters, CLI and plugin API reach every preview and export; no per-file map yet"
+    },
+    {
+      "paths": ["apps/desktop/e2e/__fixtures__/orphan-run/**"],
+      "e2e": ["orphan-guard.desktop.test.ts"],
+      "why": "reviewed: the nested run it kills a worker in (TYTO-292); it reaches only the launch harness, and a harness change already runs everything"
     }
   ]
 }
