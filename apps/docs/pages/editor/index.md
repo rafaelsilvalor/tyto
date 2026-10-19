@@ -1,7 +1,14 @@
 # The editor
 
-The window: tabs, the preview, the problems panel and the command bar.
+The editor is where a brief is written: tabs and editor groups in the middle, panels around them, and a preview that draws the brief as you type. [Tour of the window](../get-started/window-tour.md) names every part; the pages here say how to work with each.
 
-::: info Not written yet
-This section is written in TYTO-317. Until then, this page is a placeholder.
-:::
+Everything the window does is a command, run from the command bar with **Ctrl+K** (**Cmd+K** on macOS). The keys below are the defaults on Windows and Linux; [Commands](../reference/commands.md) lists every command with its key on each system, and [Customize](../customize/) says how to change them.
+
+## In this section
+
+- [Tabs and editor groups](./tabs-and-groups.md) — open, split, move and close.
+- [Panels](./panels.md) — Problems, the local queue and the preview.
+- [The command bar and search](./command-bar-and-search.md) — run a command, find text, go to a block.
+- [Format Brief](./format-brief.md) — tidy a brief's spacing in one key.
+- [Vim mode](./vim-mode.md) — edit with vim's keys.
+- [Template mode](./template-mode.md) — edit a template beside the formats it draws.

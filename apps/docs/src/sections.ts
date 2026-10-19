@@ -70,8 +70,33 @@ export const SECTIONS: readonly Section[] = [
       { slug: 'gallery', title: { en: 'Template gallery', 'pt-BR': 'Galeria de templates' } },
     ],
   },
-  { slug: 'editor', title: { en: 'The editor', 'pt-BR': 'O editor' } },
-  { slug: 'export', title: { en: 'Export', 'pt-BR': 'Exportar' } },
+  {
+    slug: 'editor',
+    title: { en: 'The editor', 'pt-BR': 'O editor' },
+    pages: [
+      {
+        slug: 'tabs-and-groups',
+        title: { en: 'Tabs and editor groups', 'pt-BR': 'Abas e grupos de editores' },
+      },
+      { slug: 'panels', title: { en: 'Panels', 'pt-BR': 'Painéis' } },
+      {
+        slug: 'command-bar-and-search',
+        title: { en: 'The command bar and search', 'pt-BR': 'A barra de comandos e a busca' },
+      },
+      { slug: 'format-brief', title: { en: 'Format Brief', 'pt-BR': 'Arrumar brief' } },
+      { slug: 'vim-mode', title: { en: 'Vim mode', 'pt-BR': 'Modo vim' } },
+      { slug: 'template-mode', title: { en: 'Template mode', 'pt-BR': 'Modo template' } },
+    ],
+  },
+  {
+    slug: 'export',
+    title: { en: 'Export', 'pt-BR': 'Exportar' },
+    pages: [
+      { slug: 'images', title: { en: 'Images', 'pt-BR': 'Imagens' } },
+      { slug: 'svg', title: { en: 'SVG', 'pt-BR': 'SVG' } },
+      { slug: 'queue-folder', title: { en: 'The queue folder', 'pt-BR': 'A pasta da fila' } },
+    ],
+  },
   { slug: 'command-line', title: { en: 'Command line', 'pt-BR': 'Linha de comando' } },
   { slug: 'customize', title: { en: 'Customize', 'pt-BR': 'Personalizar' } },
   { slug: 'reference', title: { en: 'Reference', 'pt-BR': 'Referência' } },
