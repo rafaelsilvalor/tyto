@@ -1,0 +1,44 @@
+# Panels
+
+::: info How this page was checked
+Every step was followed on 2026-10-19 on a development build of Tyto 0.7.0 (commit `e3d32e9`) on Windows 11, once with the window in English and once in Brazilian Portuguese. Menus and labels below are the English window's.
+:::
+
+Panels sit in three **areas** around the editor groups: left, right and bottom. Two come with Tyto — **Problems** and the **local queue** — and a plugin can add its own. The preview is not a panel: it is a tab, and has its own section below.
+
+## Show and hide
+
+- The buttons at the two ends of the status bar show and hide a whole area: **Show or hide the left area** on the left, **Show or hide the bottom area** on the right. The same commands are in the command bar, with one for the right area.
+- The problems count in the status bar shows and hides **Problems**; the queue button beside it does the same for the **local queue**, as does **Show the local queue** in the command bar.
+- The **×** at the right of a panel's header hides it.
+- **Restore the default layout** puts every panel back where Tyto first had it: Problems open in the bottom area, the queue closed.
+
+## Problems
+
+<Screenshot
+  scene="problems-panel"
+  alt="A brief with an unknown block, underlined in the editor, and the Problems panel below naming it with its code and line."
+/>
+
+Problems lists what is wrong with the brief in front: each line has a **code** such as `E_UNKNOWN_SLOT`, a sentence saying what is wrong, and the line and column. **Click a line** to go there: the cursor lands on the text the problem is about, already selected. The same text is underlined in the editor, and the status bar counts the problems.
+
+A brief with no problems says so instead of leaving the panel empty. The codes you meet most while writing are explained in [Briefs](../briefs/index.md#when-something-is-wrong).
+
+<!-- TYTO-322: with settings.json in front the panel still says "about this brief"; it means the file in front. -->
+
+## The local queue
+
+The queue renders briefs that other programs drop into a folder. It opens in the left area; [The queue folder](../export/queue-folder.md) explains how to set it up and what it writes.
+
+## Preview
+
+The preview draws the brief as you type. **Open preview to the side** (**Ctrl+Shift+V**, or the button at the right end of a group's tab row) opens it in a group of its own; **Open preview** opens it as a tab in the group you are in.
+
+Its toolbar has:
+
+- one chip for each format the brief asks for — click one to see that size;
+- **Slide** and a number for each artwork of a carousel;
+- **−**, the zoom, **+** and **Fit**, which fits the artwork to the space;
+- **Lock**. The preview normally follows the brief in front; locked, it stays on the brief it shows while you switch tabs, and its tab says so. **Toggle preview lock** does the same from the command bar.
+
+While the brief has an error the preview keeps the last drawing that worked, and the Problems panel says what to fix.
