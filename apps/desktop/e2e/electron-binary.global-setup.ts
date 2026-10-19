@@ -1,6 +1,8 @@
 import { accessSync, constants } from 'node:fs';
 import { createRequire } from 'node:module';
 
+import { resolveElectronBinary } from './electron-binary.js';
+
 /**
  * Puts the Electron binary on disk once, before any suite launches it (TYTO-235).
  *
@@ -16,13 +18,17 @@ import { createRequire } from 'node:module';
  * `install.js` through `spawnSync`, and that child exits only after the unzip — and the
  * check below is what makes that a measured fact rather than a read one: the setup fails,
  * with its own message, unless the path it was handed is an executable file.
+ *
+ * `ELECTRON_OVERRIDE_DIST_PATH` (a worktree reusing the main checkout's binary) is resolved by
+ * `electron-binary.ts`, since Electron's own resolution names no `.exe` without `path.txt`
+ * (TYTO-327). The same executable check applies to what it returns.
  */
 export default function ensureElectronBinary(): void {
   const require = createRequire(import.meta.url);
-  const binary = require('electron') as unknown;
+  const binary = resolveElectronBinary(process.env, process.platform, () => require('electron'));
   if (typeof binary !== 'string') {
     throw new Error(
-      `electron-binary.global-setup: require('electron') returned ${typeof binary}, not a path`,
+      `electron-binary.global-setup: the Electron binary resolved to ${typeof binary}, not a path`,
     );
   }
   try {
