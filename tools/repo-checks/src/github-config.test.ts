@@ -409,6 +409,24 @@ describe('desktop end-to-end suites', () => {
     ).not.toHaveLength(0);
   });
 
+  it('hand merge the blob of the attempt that ran, so a rerun shard is read (TYTO-340)', () => {
+    // Under one name per shard, a rerun's blob and attempt 1's both exist and the download
+    // keeps the higher artifact id, which is not the later one: on run 39311187189 the
+    // rerun shard went green and `merge` replayed attempt 1's failure. The attempt has to be
+    // in the artifact name, and in the file name too, or `merge-multiple` writes one
+    // attempt over the other before the newest can be picked.
+    const jobs = readYaml<Workflow>(`${WORKFLOWS_DIR}/desktop-e2e.yml`).jobs ?? {};
+    const steps = jobs['shard']?.steps ?? [];
+    const blobUpload = steps.find(
+      (step) =>
+        step.uses?.startsWith('actions/upload-artifact@') === true &&
+        String(step.with?.['name']).startsWith('desktop-blob-'),
+    );
+    expect(blobUpload?.with?.['name']).toContain('${{ github.run_attempt }}');
+    const blobRun = steps.find((step) => step.run?.includes('--reporter=blob') === true);
+    expect(blobRun?.run).toMatch(/--outputFile\.blob=.*\$\{\{ github\.run_attempt \}\}\.json/u);
+  });
+
   it('say no for a script nothing runs', () => {
     // The three assertions above are only as good as their predicate, and a predicate that
     // matched everything would read green on the very file that has the defect.

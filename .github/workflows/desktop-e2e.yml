@@ -144,15 +144,31 @@ jobs:
         run: >-
           xvfb-run -a pnpm --filter @tyto/desktop test:desktop
           --shard=${{ matrix.shard }}/2 --reporter=blob --reporter=default
-          --outputFile.blob=blob-reports/blob-${{ matrix.shard }}.json
+          --outputFile.blob=blob-reports/blob-${{ matrix.shard }}-attempt-${{ github.run_attempt }}.json
 
       # `!cancelled()` so a red shard still hands its results to `merge`. One artifact per
-      # shard, because `upload-artifact` refuses a second upload under a name already taken
-      # in the run.
+      # shard **and per attempt** (TYTO-340), because of what a rerun did to the old names,
+      # measured on run 39311187189 (PR #118), where `shard (2)` failed, `gh run rerun
+      # --failed` reran it green, and `merge` stayed red with the attempt-1 failure:
+      #
+      #   * attempt 2's upload of `desktop-blob-2` did not fail and did not replace
+      #     anything: attempt 1 had finalized artifact 12216591693, attempt 2 finalized
+      #     12215717655 under the same name, both in the run;
+      #   * attempt 2's `merge` saw both and downloaded 12216591693, attempt 1's. The
+      #     download lists with `latest: true`, which keeps the **highest id** per name
+      #     (`filterLatest` in `@actions/artifact`), and ids are not issued in time order —
+      #     the later upload got the lower one. Which blob a rerun reads was a coin.
+      #
+      # `overwrite: true` was the other fix and is not this one: it deletes the old artifact
+      # before the upload, but the delete is best effort and a failure of it is logged at
+      # debug level only, so it can go back to the coin without a line in the log. With
+      # the attempt in the name every blob of the run stays visible, and `merge` picks the
+      # newest attempt per shard by the number it can read — a shard that passed in
+      # attempt 1 and was not rerun keeps its attempt-1 blob.
       - if: ${{ !cancelled() }}
         uses: actions/upload-artifact@v7
         with:
-          name: desktop-blob-${{ matrix.shard }}
+          name: desktop-blob-${{ matrix.shard }}-attempt-${{ github.run_attempt }}
           path: apps/desktop/blob-reports/
           retention-days: 1
 
@@ -221,11 +237,24 @@ jobs:
       - uses: actions/setup-node@v7
         with: { node-version: 22, cache: pnpm }
       - run: pnpm install --frozen-lockfile
+      # Every attempt's blob of every shard, side by side: the file names carry the attempt
+      # too, so `merge-multiple` overwrites nothing.
       - uses: actions/download-artifact@v8
         with:
           pattern: desktop-blob-*
           path: apps/desktop/blob-reports/
           merge-multiple: true
+      # Then only the newest attempt of each shard stays, because `--merge-reports` replays
+      # every file in the folder — two attempts of one shard would list the failure the
+      # rerun fixed beside the pass. The log says which attempt each shard is read from.
+      - working-directory: apps/desktop/blob-reports
+        run: |
+          for shard in $(ls blob-*-attempt-*.json | sed -E 's/^blob-([0-9]+)-attempt-[0-9]+\.json$/\1/' | sort -un); do
+            attempts=$(ls blob-"$shard"-attempt-*.json | sort -V)
+            newest=$(echo "$attempts" | tail -n 1)
+            echo "shard $shard: reading $newest, of $(echo "$attempts" | wc -l) uploaded"
+            echo "$attempts" | head -n -1 | xargs -r rm --
+          done
       # `durations-reporter.ts` writes each file's time, `beforeAll` and `afterAll` included,
       # to `blob-reports/durations.json` for the budget below (TYTO-310, ADR 0105).
       - run: >-
