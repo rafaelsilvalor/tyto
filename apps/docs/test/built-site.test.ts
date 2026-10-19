@@ -26,11 +26,12 @@ const loadIndex = async (locale: 'root' | 'pt-BR'): Promise<MiniSearch> => {
 };
 
 describe('local search', () => {
-  // Each word appears in one stub page only, so a hit proves the stub was indexed and
-  // the hit points at it, in each edition's own index.
+  // Each word appears in one page only, so a hit proves the page was indexed and the hit
+  // points at it, in each edition's own index. The troubleshooting pages were stubs when this
+  // was written; TYTO-317 wrote them, and the words moved to their "report a problem" section.
   it.each([
-    { locale: 'root', word: 'freezes', page: '/troubleshooting/' },
-    { locale: 'pt-BR', word: 'trava', page: '/pt-BR/troubleshooting/' },
+    { locale: 'root', word: 'issue', page: '/troubleshooting/' },
+    { locale: 'pt-BR', word: 'relatar', page: '/pt-BR/troubleshooting/' },
   ] as const)(
     'finds "$word" in the $locale index, on $page only',
     async ({ locale, word, page }) => {

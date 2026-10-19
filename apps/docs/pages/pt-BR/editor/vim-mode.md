@@ -11,7 +11,7 @@ O editor do Tyto aceita as teclas do vim: os modos normal, de inserção, visual
 1. Aperte **Ctrl+K** para abrir a barra de comandos.
 2. Digite `vim` e execute **Editor: ligar ou desligar o modo vim**.
 
-O mesmo comando desliga. Ele não tem tecla própria; [Atalhos de teclado](../customize/) explica como dar uma a ele.
+O mesmo comando desliga. Ele não tem tecla própria; [Atalhos de teclado](../customize/keybindings-json.md) explica como dar uma a ele.
 
 Com o vim ligado, a barra de status mostra o modo em que você está — **NORMAL**, **INSERT**, **VISUAL** ou **REPLACE**, em inglês como no vim — e as teclas de um comando que você começou a digitar. A aparência desse selo é a configuração [`vimModeStyle`](../reference/settings.md#vimmodestyle), e as cores dele estão em [`statusBarColors`](../reference/settings.md#statusbarcolors).
 
@@ -19,7 +19,7 @@ Com o vim ligado, a barra de status mostra o modo em que você está — **NORMA
 Nada liga o vim na abertura: não há configuração para isso, e a janela sempre abre com o vim desligado. Execute o comando de novo depois de cada reinício.
 :::
 
-<!-- O estado do vim fica só na memória (editor.toggleVim o inverte); uma configuração para ele é candidata a carta levantada na TYTO-317. -->
+<!-- TYTO-333: o estado do vim fica só na memória (editor.toggleVim o inverte). -->
 
 ## O que muda com ele ligado
 
