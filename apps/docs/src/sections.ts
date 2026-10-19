@@ -97,8 +97,31 @@ export const SECTIONS: readonly Section[] = [
       { slug: 'queue-folder', title: { en: 'The queue folder', 'pt-BR': 'A pasta da fila' } },
     ],
   },
-  { slug: 'command-line', title: { en: 'Command line', 'pt-BR': 'Linha de comando' } },
-  { slug: 'customize', title: { en: 'Customize', 'pt-BR': 'Personalizar' } },
+  {
+    slug: 'command-line',
+    title: { en: 'Command line', 'pt-BR': 'Linha de comando' },
+    pages: [
+      { slug: 'render', title: { en: 'Render a brief', 'pt-BR': 'Renderizar um brief' } },
+      { slug: 'watch', title: { en: 'Watch a folder', 'pt-BR': 'Vigiar uma pasta' } },
+      { slug: 'templates', title: { en: 'Templates', 'pt-BR': 'Templates' } },
+      { slug: 'plugins', title: { en: 'Plugins', 'pt-BR': 'Plugins' } },
+    ],
+  },
+  {
+    slug: 'customize',
+    title: { en: 'Customize', 'pt-BR': 'Personalizar' },
+    pages: [
+      { slug: 'settings-json', title: { en: 'settings.json', 'pt-BR': 'settings.json' } },
+      {
+        slug: 'keybindings-json',
+        title: { en: 'Keyboard shortcuts', 'pt-BR': 'Atalhos de teclado' },
+      },
+      { slug: 'themes', title: { en: 'Themes', 'pt-BR': 'Temas' } },
+      { slug: 'fonts-and-zoom', title: { en: 'Fonts and zoom', 'pt-BR': 'Fontes e zoom' } },
+      { slug: 'status-bar', title: { en: 'The status bar', 'pt-BR': 'A barra de status' } },
+      { slug: 'plugins', title: { en: 'Plugins', 'pt-BR': 'Plugins' } },
+    ],
+  },
   { slug: 'reference', title: { en: 'Reference', 'pt-BR': 'Referência' } },
   { slug: 'extend', title: { en: 'Extend', 'pt-BR': 'Estender' } },
   {

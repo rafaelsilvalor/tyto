@@ -11,7 +11,7 @@ Tyto's editor can take vim's keys: normal, insert, visual and replace modes, mot
 1. Press **Ctrl+K** to open the command bar.
 2. Type `vim` and run **Editor: turn vim mode on or off**.
 
-The same command turns it off again. It has no key of its own; [Keyboard shortcuts](../customize/) says how to give it one.
+The same command turns it off again. It has no key of its own; [Keyboard shortcuts](../customize/keybindings-json.md) says how to give it one.
 
 While vim is on, the status bar shows the mode you are in — **NORMAL**, **INSERT**, **VISUAL** or **REPLACE** — and the keys of a command you have started to type. How that badge looks is the [`vimModeStyle`](../reference/settings.md#vimmodestyle) setting, and its colours are in [`statusBarColors`](../reference/settings.md#statusbarcolors).
 
@@ -19,7 +19,7 @@ While vim is on, the status bar shows the mode you are in — **NORMAL**, **INSE
 Nothing turns vim on at start: there is no setting for it, and the window always opens with vim off. Run the command again after each restart.
 :::
 
-<!-- Vim's state is held in memory only (editor.toggleVim flips it); a setting for it is a card candidate raised in TYTO-317. -->
+<!-- TYTO-333: vim's state is held in memory only (editor.toggleVim flips it). -->
 
 ## What changes while it is on
 
