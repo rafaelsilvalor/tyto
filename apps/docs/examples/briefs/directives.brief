@@ -1,0 +1,13 @@
+---
+template: notice
+formats: [grid]
+---
+// A line that starts with // is a note to yourself. Tyto ignores it.
+
+// The value on the same line as the directive:
+::titulo Open day at the library
+
+// Or on the lines below it, indented:
+::subtitulo
+  Saturday, 10 am to 4 pm.
+  \::free entry is not a directive, because of the backslash.

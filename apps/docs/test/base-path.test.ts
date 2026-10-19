@@ -41,4 +41,18 @@ describe('the site built under a base path', () => {
     expect(sources).toContain(`${BASE}screenshots/${locale}/window-tour-tyto-dark.png`);
     for (const src of sources) expect(src.startsWith(`${BASE}screenshots/`), src).toBe(true);
   });
+
+  // The gallery's pictures are plain Markdown images from a generated page (TYTO-316).
+  it.each(['templates/gallery.html', 'pt-BR/templates/gallery.html'])(
+    '%s points its pictures inside the base',
+    (page) => {
+      const html = readFileSync(join(out, page), 'utf8');
+      const sources = [...html.matchAll(/<img[^>]*?\ssrc="([^"]+)"/gu)]
+        .map((match) => match[1] ?? '')
+        .filter((src) => src.includes('template-gallery/'));
+
+      expect(sources.length).toBeGreaterThan(0);
+      for (const src of sources) expect(src.startsWith(`${BASE}template-gallery/`), src).toBe(true);
+    },
+  );
 });

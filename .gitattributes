@@ -22,6 +22,10 @@
 # the shots script writes, so the manual's other images stay plain files.
 apps/docs/pages/public/screenshots/**/*.png filter=lfs diff=lfs merge=lfs -text
 
+# The template gallery's pictures (TYTO-316, ADR 0102): one per built-in template, generated
+# by `pnpm docs:template-shots` and rewritten whenever a template's look changes.
+apps/docs/pages/public/template-gallery/*.png filter=lfs diff=lfs merge=lfs -text
+
 # The one place in the repository where a line ending is the subject rather than the
 # medium. `* text=auto eol=lf` above would hand every checkout an LF copy of these, which
 # would leave the test that reads them asserting nothing (TYTO-68). `-text` keeps the bytes

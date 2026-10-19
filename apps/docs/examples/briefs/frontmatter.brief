@@ -1,0 +1,8 @@
+---
+template: notice
+formats: [grid, story]
+tom: verde
+imagem: ./photo.png
+subtitulo: Saturday, 10 am to 4 pm
+---
+::titulo Open day at the library
