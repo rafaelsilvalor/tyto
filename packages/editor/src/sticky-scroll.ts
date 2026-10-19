@@ -5,7 +5,7 @@ import { type SyntaxNode } from '@lezer/common';
 import { highlightTree } from '@lezer/highlight';
 
 import { wasRemeasured } from './remeasure.js';
-import { treeAt } from './syntax.js';
+import { treeAt, treeChanged } from './syntax.js';
 import { monoFont, palette, panels } from './theme.js';
 
 /**
@@ -212,7 +212,13 @@ class StickyScroll {
       update.selectionSet ||
       // A new face or size the host gave the editor (TYTO-272).
       wasRemeasured(update) ||
-      foldedRanges(update.startState) !== foldedRanges(update.state)
+      foldedRanges(update.startState) !== foldedRanges(update.state) ||
+      // The parse moved on with nothing else changing (TYTO-339). An element folds only once
+      // its close tag is parsed, so on a tree the parser has not finished the chain is empty,
+      // and when the background parse lands the transaction carries the new tree alone: no
+      // text, viewport, geometry or selection change. Without this the rows stay missing until
+      // the next scroll.
+      treeChanged(update.startState, update.state)
     ) {
       this.schedule();
     }
