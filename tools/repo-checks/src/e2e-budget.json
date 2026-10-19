@@ -1,0 +1,5 @@
+{
+  "ceilingMs": 60000,
+  "reason": "Measured on 3 green CI runs after TYTO-291 (main e30d6c8, run 39254557507, and PR #111's runs 39253784784 and 39251162930), each file's time with beforeAll and afterAll, 77 files a run: median 12.5 s, p90 26.1 s, slowest 43.8 s (keybindings). 60 s is 37% over the slowest file, so ordinary CI noise does not trip it, and still under half of what tab-drag took before TYTO-291 (141 s), so a file that waits on frames or launches Electron per test is caught. Going over needs a waiver with a reason and an owner card, not a bigger number (ADR 0105).",
+  "waivers": {}
+}

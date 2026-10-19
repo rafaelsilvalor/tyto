@@ -28,7 +28,7 @@ Compiler: brief → Scene IR → exporters (HTML→raster, SVG), plus an Electro
 
 1. Take the highest-priority TYTO card in To Do (Jira). Read the spec it references in `docs/`.
 2. Branch `feat/TYTO-123-slug` (or `fix/`, `chore/`, `docs/`).
-3. Implement with tests (Vitest). Exporters require fixture + snapshot (`__fixtures__/*.brief` → `*.html`/`*.svg`; raster uses PNG diff with tolerance).
+3. Implement with tests (Vitest). Exporters require fixture + snapshot (`__fixtures__/*.brief` → `*.html`/`*.svg`; raster uses PNG diff with tolerance). Desktop e2e only for what needs the real window; logic goes to unit or jsdom tests, and an e2e file has a 60 s budget on CI (`docs/conventions.md` › Tests, ADR 0105).
 4. `pnpm check` (typecheck + lint + test) must pass.
 5. Conventional Commit with the key: `feat(core): TYTO-123 add Frame schema`.
 6. If the task changed a decision or created a convention, update the doc or add an ADR in the same PR.
