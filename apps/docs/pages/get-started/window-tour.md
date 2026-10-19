@@ -26,7 +26,7 @@ The names on this page are the ones the rest of the manual uses. The picture sho
 1. **Title bar** — the menus (**File**, **Edit**, **View**, **Window**, **Help**) and the name of the file in front. On macOS the menus and the title are the system's, at the top of the screen.
 2. **Tab** — one for each open file. A tab with changes not yet saved says so; closing it asks first.
 3. **Breadcrumb** — where the cursor is in the brief: `header` in the lines between the two `---`, or the block it is in.
-4. **Editor group** — a row of tabs and the file in front. The button at the right end of the tab row splits the group in two; the picture has two groups side by side.
+4. **Editor group** — a row of tabs and the file in front. **Split editor right** (**Ctrl+\\**) divides a group in two, and the button at the right end of the tab row opens the preview in a group of its own; the picture has two groups side by side.
 5. **Preview** — a tab like any other, in the second group. It draws the brief beside it as you type, and while the brief has an error it keeps the last drawing that worked.
 6. **Preview toolbar** — the formats the brief asks for (one chip each), the **Slide** of a carousel, zoom, **Fit**, and **Lock**, which keeps the preview on this brief when you switch tabs.
 7. **Problems panel** — what is wrong with the brief in front, each with its line and column; click one to go there.
