@@ -44,7 +44,10 @@ const quit = async (): Promise<void> => {
 const launch = async (): Promise<void> => {
   await quit();
   app = await _electron.launch({
-    args: ['.', `--user-data-dir=${join(scratch, 'userData')}`],
+    // A `show: false` window paints about one frame a second, and Playwright waits a frame for
+    // every mouse step taken with the button held: 12 s a drag. Unlimited frames make it
+    // 0.2 s (the file: 33 s → 9 s on CI). Test side only; the app ships unchanged (ADR 0104).
+    args: ['.', `--user-data-dir=${join(scratch, 'userData')}`, '--disable-frame-rate-limit'],
     cwd: join(here, '..'),
     env: { ...process.env, TYTO_HEADLESS: '1', TYTO_HOME: join(scratch, 'tyto-home') },
   });
