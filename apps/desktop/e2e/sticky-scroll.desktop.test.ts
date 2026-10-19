@@ -223,7 +223,11 @@ beforeAll(async () => {
   settingsFile = join(userData, 'settings.json');
   saveSettings({ theme: 'tyto-light' });
   app = await _electron.launch({
-    args: ['.', `--user-data-dir=${userData}`],
+    // A `show: false` window paints about one frame a second, and Playwright waits two frames
+    // for every wheel: 3 s a wheel, up to 24 s to bring a line to the top. Unlimited frames make
+    // that well under a second (the file: 130 s → 7.5 s on CI). Test side only; the app ships
+    // unchanged (ADR 0104).
+    args: ['.', `--user-data-dir=${userData}`, '--disable-frame-rate-limit'],
     cwd: join(here, '..'),
     env: { ...process.env, TYTO_HEADLESS: '1', TYTO_HOME: join(scratch, 'tyto-home') },
   });
