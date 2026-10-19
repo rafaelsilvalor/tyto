@@ -5,7 +5,8 @@
   "description": "Generates the reference docs that are derived from code, such as the diagnostic catalog and the manual's Reference pages.",
   "license": "UNLICENSED",
   "scripts": {
-    "generate": "node --experimental-strip-types src/generate.ts && vitest run --update src/reference",
+    "generate": "node --experimental-strip-types src/generate.ts && vitest run --update src/reference src/gallery",
+    "template-shots": "node --experimental-strip-types src/gallery/template-shots.ts",
     "typecheck": "tsc --noEmit",
     "lint": "eslint . --max-warnings 0",
     "test": "vitest run --passWithNoTests"

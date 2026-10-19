@@ -20,6 +20,8 @@ apps/docs/pages/reference/*.md
 !apps/docs/pages/reference/index.md
 apps/docs/pages/pt-BR/reference/*.md
 !apps/docs/pages/pt-BR/reference/index.md
+apps/docs/pages/templates/gallery.md
+apps/docs/pages/pt-BR/templates/gallery.md
 
 # Upstream licence text, redistributed verbatim (packages/fonts/README.md). Reflowing a
 # licence is not a formatting decision this repository gets to make.
@@ -30,3 +32,4 @@ packages/fonts/fonts/*/LICENSE.md
 # (docs/template-authoring.md says so about its own code block).
 packages/templates/templates/**/*.html
 examples/plugins/**/templates/**/*.html
+apps/docs/examples/templates/**/*.html

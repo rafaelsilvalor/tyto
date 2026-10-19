@@ -684,16 +684,18 @@ describe('labeler', () => {
 });
 
 describe('git attributes', () => {
-  it("route fixture PNGs and the manual's screenshots through LFS, and only those", () => {
+  it("route fixture PNGs and the manual's generated pictures through LFS, and only those", () => {
     const rules = readRepoFile('.gitattributes')
       .split('\n')
       .filter((line) => line.includes('filter=lfs'));
 
     // The manual's pictures joined in TYTO-315 (ADR 0102): generated, and rewritten with the
-    // window, from the one folder the shots script writes.
+    // window, from the one folder the shots script writes. The template gallery's pictures
+    // joined in TYTO-316 under the same rule: rewritten with every template, by one command.
     expect(rules.map((rule) => rule.split(/\s/)[0])).toEqual([
       '**/__fixtures__/**/*.png',
       'apps/docs/pages/public/screenshots/**/*.png',
+      'apps/docs/pages/public/template-gallery/*.png',
     ]);
     for (const rule of rules) {
       expect(rule).toContain('diff=lfs');

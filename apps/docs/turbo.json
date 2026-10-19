@@ -18,11 +18,14 @@
       ]
     },
     // The search suite reads the built site's index, so it runs after this package's own
-    // build and never against a `dist/` left by an earlier one.
+    // build and never against a `dist/` left by an earlier one. The examples suite compiles
+    // the contributor doc's brief and measures against the built-in formats (TYTO-316).
     "test": {
       "dependsOn": ["^build", "generate:parser", "build"],
       "inputs": [
         "$TURBO_DEFAULT$",
+        "$TURBO_ROOT$/docs/brief-language.md",
+        "$TURBO_ROOT$/packages/templates/templates/formats.yaml",
         "$TURBO_ROOT$/docs/template-authoring.md",
         "$TURBO_ROOT$/docs/plugin-authoring.md",
         "$TURBO_ROOT$/docs/plugin-api.md",

@@ -6,10 +6,10 @@ Slot names and enum values are defined by each template's manifest, so they may 
 
 ```brief
 ---
-template: promo-curso
-formats: [grid-1x1, story]
-tom: azul-escuro
-imagem: ./prof-ana.png
+template: notice
+formats: [grid, story]
+tom: azul
+imagem: ./photo.png
 ---
 ::titulo Direito **Constitucional**
 ::subtitulo Aulas ao vivo toda semana
@@ -21,6 +21,12 @@ imagem: ./prof-ana.png
 ::lamina {destaque, tom: laranja}
   Garanta sua vaga
 ```
+
+The example is written for `notice`, the user manual's example template
+(`apps/docs/examples/templates/notice`), and `apps/docs/test/brief-examples.test.ts` compiles
+it, with `./photo.png` read from `apps/docs/examples/briefs/`. A change to the grammar that
+breaks it fails that suite. The manual's Briefs pages teach the same language to people who
+write briefs; this document is the grammar for people who change it.
 
 ## Rules
 

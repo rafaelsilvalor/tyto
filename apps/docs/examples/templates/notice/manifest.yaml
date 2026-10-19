@@ -1,0 +1,22 @@
+# The manual's own template (TYTO-316). Every brief the Briefs pages show is written for it and
+# compiled against it by `apps/docs/test/brief-examples.test.ts`, so the pages teach the language
+# without tying the manual to a brand template that may change or go away. A reader who copies
+# this folder into their templates folder can run every example in the app.
+#
+# The slot names are the reserved ones in docs/slot-vocabulary.md, the names the built-in
+# templates use, so what the examples teach carries over to them.
+name: notice
+version: 1.0.0
+brand: tyto-demo
+description: The user manual's example template — a title, an optional subtitle and photo, a colour, and optional slides.
+formats: [grid, story]
+slots:
+  titulo: { type: rich-text, required: true, max: 80 }
+  subtitulo: { type: rich-text, max: 140 }
+  imagem: { type: image }
+  tom: { type: enum, values: [azul, laranja, verde], default: azul }
+  # Optional: a brief with no `::lamina` is one artwork, and each `::lamina` is one more.
+  lamina: { type: rich-text, repeat: true, max: 10 }
+adjustments:
+  destaque: { type: flag, applies: [lamina] }
+  tom: { type: enum, values: [azul, laranja, verde], applies: [lamina] }

@@ -1,0 +1,10 @@
+---
+template: notice
+formats: [grid]
+---
+::titulo
+  Open day at the **library**
+  {cor:laranja}this Saturday{/}
+
+::subtitulo
+  Guided tours, a reading corner for children, and **free** coffee.
