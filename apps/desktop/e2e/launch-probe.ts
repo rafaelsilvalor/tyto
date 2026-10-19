@@ -1,6 +1,7 @@
 import { spawn } from 'node:child_process';
 
 import { DEBUGGING_PORT_SWITCH } from './boot-signal.js';
+import { recordSpawn } from './launch-ledger.js';
 import { type ProbeEnding, appSwitches, watchLaunch } from './run-as-node-probe.js';
 
 /** How one isolated launch of an executable ended. */
@@ -46,6 +47,7 @@ export function probeLaunch(executable: string, options: LaunchProbeOptions): Pr
   delete environment['NODE_OPTIONS'];
   delete environment['ELECTRON_RUN_AS_NODE'];
 
+  const notBefore = Date.now();
   const child = spawn(
     executable,
     [
@@ -61,6 +63,7 @@ export function probeLaunch(executable: string, options: LaunchProbeOptions): Pr
     },
   );
 
+  recordSpawn(child.pid, options.userData, notBefore);
   let stderr = '';
   // Read off the whole stream, not the tail: the line comes first and a chatty GPU on a
   // runner can push it out of 2,000 characters long before the probe ends.

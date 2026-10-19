@@ -1,6 +1,10 @@
-import { type ChildProcess, execFileSync, spawn } from 'node:child_process';
+import { type ChildProcess, spawn } from 'node:child_process';
 
 import { DEBUGGING_PORT_SWITCH, waitForBoot } from './boot-signal.js';
+import { killTree, recordSpawn } from './launch-ledger.js';
+
+// Where it always was for its callers; it lives beside the ledger, whose teardown needs it too.
+export { killTree } from './launch-ledger.js';
 
 /** What one `ELECTRON_RUN_AS_NODE=1 <executable> -e "console.log(1)"` produced. */
 export interface RunAsNodeProbe {
@@ -72,6 +76,7 @@ export function probeRunAsNode(
     args.push(...appSwitches(options.userData), DEBUGGING_PORT_SWITCH);
   }
 
+  const notBefore = Date.now();
   const child = spawn(executable, args, {
     env: environment,
     stdio: ['ignore', 'pipe', 'pipe'],
@@ -79,6 +84,7 @@ export function probeRunAsNode(
     detached: process.platform !== 'win32',
   });
 
+  recordSpawn(child.pid, options.userData, notBefore);
   let stdout = '';
   child.stdout.setEncoding('utf8');
   child.stdout.on('data', (chunk: string) => {
@@ -183,17 +189,4 @@ export function watchLaunch(
       },
     );
   });
-}
-
-export function killTree(pid: number | undefined): void {
-  if (pid === undefined) return;
-  try {
-    if (process.platform === 'win32') {
-      execFileSync('taskkill', ['/pid', String(pid), '/T', '/F'], { stdio: 'ignore' });
-    } else {
-      process.kill(-pid, 'SIGKILL');
-    }
-  } catch {
-    // Already gone between the deadline and the kill: the `close` event still resolves.
-  }
 }

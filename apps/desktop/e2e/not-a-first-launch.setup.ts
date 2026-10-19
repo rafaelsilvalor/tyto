@@ -3,6 +3,8 @@ import { join } from 'node:path';
 
 import { _electron } from 'playwright';
 
+import { recordLaunch } from './launch-ledger.js';
+
 /**
  * Every suite's window is a second launch unless the suite asks for a first one (TYTO-287).
  *
@@ -66,7 +68,15 @@ if (target[WRAPPED] !== true) {
   const launch = _electron.launch.bind(_electron);
   target.launch = async (options) => {
     seedSecondLaunch(options);
-    return launch(options);
+    const notBefore = Date.now();
+    const app = await launch(options);
+    // Written down before the suite gets the app, so a worker that dies from here on leaves the
+    // run's teardown a record to end it by (TYTO-292, ADR 0106).
+    const pid = app.process().pid;
+    if (pid !== undefined) {
+      recordLaunch({ pid, userData: userDataOf(options), notBefore, notAfter: Date.now() });
+    }
+    return app;
   };
   target[WRAPPED] = true;
 }
