@@ -172,10 +172,55 @@ describe('what a brief resolves to', () => {
     expect((await accepted(valid(), { formats: ['story'] })).formats).toEqual(['story']);
   });
 
-  it('lets the frontmatter win over the caller, exactly as it does for the template', async () => {
-    // One rule for a reader: what the brief says about itself beats what this run says
-    // about the brief. `--template` has worked this way since E3.3.
-    const resolved = await accepted(valid({ data: { formats: ['feed'] } }), { formats: ['story'] });
+  it("lets the caller's formats narrow the frontmatter's list (ADR 0107)", async () => {
+    // The Export dialog with Story unticked on a brief that lists both: what is ticked is
+    // what is rendered. Before TYTO-332 the brief's list won and both were drawn.
+    const resolved = await accepted(valid({ data: { formats: ['feed', 'story'] } }), {
+      formats: ['feed'],
+    });
+    expect(resolved.formats).toEqual(['feed']);
+  });
+
+  it("keeps the brief's order when the caller names its formats in another", async () => {
+    const resolved = await accepted(valid({ data: { formats: ['story', 'feed'] } }), {
+      formats: ['feed', 'story'],
+    });
+    expect(resolved.formats).toEqual(['story', 'feed']);
+  });
+
+  it('reads a scalar `formats:` as a list of one before narrowing it', async () => {
+    const resolved = await accepted(valid({ data: { formats: 'story' } }), { formats: ['story'] });
+    expect(resolved.formats).toEqual(['story']);
+  });
+
+  it('E_FORMAT_NOT_IN_BRIEF — the caller asks for a format the brief does not list', async () => {
+    // A run narrows the brief; it never widens it. `story` is a format the template draws,
+    // so this is not E_UNKNOWN_FORMAT: the brief is the one that left it out.
+    const at = sourceRange(20, 34);
+    const ast = brief(
+      frontmatter({ template: 'promo-curso', formats: ['feed'] }, { formats: at }),
+      [directive('titulo', 'Direito'), directive('slide', 'Um')],
+    );
+    const result = await resolve(ast, optionsFor({ formats: ['story'] }));
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect(result.value.formats).toEqual([]);
+    const [problem] = result.diagnostics.filter((item) => item.code === 'E_FORMAT_NOT_IN_BRIEF');
+    expect(problem?.severity).toBe('error');
+    expect(problem?.message).toContain(
+      "Format 'story' was requested, but the brief lists only: feed",
+    );
+    // The frontmatter's line is where the fix goes, so that is what an editor underlines.
+    expect(problem?.range).toEqual(at);
+  });
+
+  it('names a caller format the template does not render E_UNKNOWN_FORMAT only', async () => {
+    expect(await codes(valid({ data: { formats: ['feed'] } }), { formats: ['banner'] })).toEqual([
+      'E_UNKNOWN_FORMAT',
+    ]);
+    const resolved = await accepted(valid({ data: { formats: ['feed'] } }), {
+      formats: ['feed', 'banner'],
+    });
     expect(resolved.formats).toEqual(['feed']);
   });
 

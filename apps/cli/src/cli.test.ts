@@ -367,6 +367,38 @@ describe('tyto render', () => {
     expect(await outFiles('task', 'plain')).toEqual(['result.json', 'story-01.svg']);
   });
 
+  it("narrows the brief's own formats to --formats (ADR 0107)", async () => {
+    await writeFile(
+      join(workspace, 'task', 'both.brief'),
+      '---\ntemplate: cartaz\nformats: [feed, story]\n---\n::slide\n  Um\n',
+    );
+
+    const code = await run(
+      ['render', 'task/both.brief', '--out', 'task/both', '--types', 'svg', '--formats', 'story'],
+      environment(),
+    );
+
+    expect(code, stderr()).toBe(EXIT_OK);
+    expect(await outFiles('task', 'both')).toEqual(['result.json', 'story-01.svg']);
+  });
+
+  it('refuses --formats naming a format the brief does not list', async () => {
+    // `story` is a format `cartaz` draws, but the brief asked for `feed` only: a run may
+    // narrow the brief's list and never widen it.
+    await writeFile(
+      join(workspace, 'task', 'feed.brief'),
+      '---\ntemplate: cartaz\nformats: [feed]\n---\n::slide\n  Um\n',
+    );
+
+    const code = await run(
+      ['render', 'task/feed.brief', '--out', 'task/feed', '--types', 'svg', '--formats', 'story'],
+      environment(),
+    );
+
+    expect(code).toBe(EXIT_DIAGNOSTICS);
+    expect(stderr()).toContain('E_FORMAT_NOT_IN_BRIEF');
+  });
+
   it('reports a format the template does not render, rather than rendering nothing', async () => {
     await writeFile(
       join(workspace, 'task', 'plain.brief'),

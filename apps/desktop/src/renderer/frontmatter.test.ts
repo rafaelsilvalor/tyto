@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { planTemplateEdit, templateOf } from './frontmatter.js';
+import { offeredFormats, planTemplateEdit, templateOf } from './frontmatter.js';
 
 /**
  * The picker's one edit, checked by applying it.
@@ -101,5 +101,34 @@ describe('reading the template a brief names', () => {
 
   it('does not read a key from outside the fences', () => {
     expect(templateOf('---\nformats: [feed]\n---\ntemplate: nope\n')).toBeUndefined();
+  });
+});
+
+describe("offering the brief's formats in the Export dialog (ADR 0107)", () => {
+  const template = [{ id: 'feed' }, { id: 'grid' }, { id: 'story' }] as const;
+  const ids = (brief: string): string[] =>
+    offeredFormats(brief, template).map((format) => format.id);
+
+  it("narrows to a flow list, in the template's order", () => {
+    expect(ids('---\ntemplate: notice\nformats: [story, grid]\n---\n')).toEqual(['grid', 'story']);
+  });
+
+  it('reads a block list the same way', () => {
+    expect(ids('---\ntemplate: notice\nformats:\n  - story\n  - feed\n---\n')).toEqual([
+      'feed',
+      'story',
+    ]);
+  });
+
+  it('reads a scalar as a list of one, as resolve does', () => {
+    expect(ids('---\ntemplate: notice\nformats: grid\n---\n')).toEqual(['grid']);
+  });
+
+  it('offers every format when the brief lists none', () => {
+    expect(ids('---\ntemplate: notice\n---\n')).toEqual(['feed', 'grid', 'story']);
+  });
+
+  it('offers every format when the frontmatter does not parse', () => {
+    expect(ids('---\ntemplate: notice\nformats: [story\n---\n')).toEqual(['feed', 'grid', 'story']);
   });
 });

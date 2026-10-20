@@ -30,7 +30,7 @@ write briefs; this document is the grammar for people who change it.
 
 ## Rules
 
-- **Frontmatter**: metadata and scalar slots. `template` is required (or `--template` on the CLI). `formats` defaults come from the manifest. A scalar on a rich-text slot is one run of plain text, and inline markup in it is `W_MARKUP_IN_FRONTMATTER` — see below.
+- **Frontmatter**: metadata and scalar slots. `template` is required (or `--template` on the CLI). `formats` defaults come from the manifest; a run's requested formats (`--formats`, the Export dialog) narrow the brief's list and never widen it (ADR 0107). A scalar on a rich-text slot is one run of plain text, and inline markup in it is `W_MARKUP_IN_FRONTMATTER` — see below.
 - **Slot directive** `::name value` — inline value to end of line, or an indented block on the following lines. The name must exist in the template manifest (`E_UNKNOWN_SLOT`).
 - **Repeatable directive** (`::lamina`) — each occurrence becomes an `Artwork`. The manifest declares which slot is `repeat`.
 - **Adjustments** `{a, b: value}` — only those declared in `manifest.adjustments`. They apply to the slot; on a repeatable slot, to that slide.
@@ -174,7 +174,7 @@ is where they showed.
 
 ## Diagnostics
 
-`E_SYNTAX` (from parse); `E_NO_TEMPLATE`, `E_UNKNOWN_TEMPLATE`, `E_UNKNOWN_FORMAT`, `E_UNKNOWN_SLOT`, `E_UNKNOWN_DIRECTIVE`, `E_MISSING_REQUIRED_SLOT`, `E_BAD_SLOT_VALUE`, `E_BAD_ADJUSTMENT`, `E_ASSET_NOT_FOUND`, `W_UNUSED_SLOT` (from resolve); `W_TEXT_OVERFLOW` (from compile). All carry a `range` for the editor. Messages are English; the editor may localize them later via the code.
+`E_SYNTAX` (from parse); `E_NO_TEMPLATE`, `E_UNKNOWN_TEMPLATE`, `E_UNKNOWN_FORMAT`, `E_FORMAT_NOT_IN_BRIEF`, `E_UNKNOWN_SLOT`, `E_UNKNOWN_DIRECTIVE`, `E_MISSING_REQUIRED_SLOT`, `E_BAD_SLOT_VALUE`, `E_BAD_ADJUSTMENT`, `E_ASSET_NOT_FOUND`, `W_UNUSED_SLOT` (from resolve); `W_TEXT_OVERFLOW` (from compile). All carry a `range` for the editor. Messages are English; the editor may localize them later via the code.
 
 ### What the editor shows, and what it cannot
 

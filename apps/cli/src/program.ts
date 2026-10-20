@@ -41,7 +41,7 @@ function withProjectOptions(command: Command): Command {
     .option('-t, --template <name>', "template to use when the brief's frontmatter names none")
     .option(
       '-f, --formats <ids>',
-      "comma-separated format ids, when the brief's frontmatter lists none",
+      "comma-separated format ids; narrows the brief's own list when it has one",
       parseFormatList,
     );
 }

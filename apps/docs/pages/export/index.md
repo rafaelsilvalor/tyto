@@ -16,15 +16,9 @@ Exporting turns the brief in front into files: PNG, JPEG or WebP images, SVG dra
 1. With the brief in front, run **Export…**: from the **File** menu, the export button in the status bar, or the command bar.
 2. Under **Destination folder**, click **Choose…** and pick where the files go. The dialog remembers the folder until the window closes.
 3. Under **File types**, tick the kinds you want; the first export starts with **PNG** alone. Each one ticked is a file per artwork and size.
-4. Under **Formats**, untick the sizes you do not want. See the warning below.
+4. Under **Formats**, untick the sizes you do not want. When the brief has a `formats:` line, the list shows only the sizes on it.
 5. Click **Export**. A bar counts the files as they are written — **9 / 24** — and **Cancel** stops the run; the files already written stay.
 6. When it says **Export finished**, **Open folder** shows the files.
-
-::: warning A brief that lists its formats gets all of them
-When the brief's frontmatter has a `formats:` line, the export makes every size on that line, whatever is ticked under **Formats**. Unticking a size only takes effect for a brief without that line. To leave a size out, take it off the brief's `formats:` line before exporting.
-:::
-
-<!-- Measured on e3d32e9: a brief with `formats: [grid, story]` and Story unticked still wrote story files. TYTO-332. -->
 
 **Scale** and **Quality** appear once an image type is ticked; [Images](./images.md) explains them.
 

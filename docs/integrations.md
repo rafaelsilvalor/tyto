@@ -129,11 +129,14 @@ that is: it is read by whoever receives the folder rather than by a program (`do
 keeps everything else English), and it is spelled without the accent because a folder name
 travels through zip tools and browsers that still disagree about one.
 
-**`--template` and `--formats` are fallbacks, not overrides.** Each is used only when the
-brief's frontmatter says nothing on that subject, so what a brief says about itself always
-wins over what one run says about the brief. A format either of them names that the chosen
-template does not render is `E_UNKNOWN_FORMAT`, with the frontmatter's range when the
-frontmatter asked and no range when the flag did — a flag is not a position in a file.
+**`--template` is a fallback, not an override; `--formats` narrows** (ADR 0107).
+`--template` is used only when the brief's frontmatter names no template. `--formats` picks
+some of the formats the brief's frontmatter lists, in the brief's order, or is the list when
+the brief has none; a format it names that the brief does not list is
+`E_FORMAT_NOT_IN_BRIEF`, on the frontmatter's `formats` line. A format either of them names
+that the chosen template does not render is `E_UNKNOWN_FORMAT`, with the frontmatter's range
+when the frontmatter asked and no range when the flag did — a flag is not a position in a
+file.
 
 Diagnostics go to stderr as `path:line:col: severity CODE message`, and artifact names go to
 stdout one per line. `--json` replaces both with one document on stdout; it carries a line

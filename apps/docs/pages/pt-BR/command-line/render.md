@@ -66,7 +66,8 @@ O que ainda deu para desenhar é gravado, como o `grid-01.png` aqui; então conf
 
 ## Outras opções
 
-- `--template` e `--formats` dizem qual template e quais tamanhos usar num brief cujo frontmatter não diz; um brief que diz ganha.
+- `--template` diz qual template usar num brief cujo frontmatter não cita nenhum; um brief que cita ganha.
+- `--formats` diz quais tamanhos fazer. Num brief com linha `formats:`, escolhe alguns dos tamanhos dessa linha; um tamanho que a linha não tem dá `E_FORMAT_NOT_IN_BRIEF`. Num brief sem a linha, é a lista de tamanhos.
 - `--assets` diz onde procurar os caminhos de imagem do brief; por padrão, numa pasta `assets/` ao lado do brief, senão na própria pasta do brief.
 
 O [`tyto render`](../reference/command-line.md#tyto-render) da Referência lista cada opção com o valor padrão.
