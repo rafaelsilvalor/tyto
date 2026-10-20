@@ -1,5 +1,6 @@
-import { type Extension } from '@codemirror/state';
-import { type EditorView, ViewPlugin } from '@codemirror/view';
+import { closeCompletion, completionStatus, currentCompletions } from '@codemirror/autocomplete';
+import { type Extension, Prec } from '@codemirror/state';
+import { EditorView, ViewPlugin } from '@codemirror/view';
 import { CodeMirror, Vim, getCM, vim } from '@replit/codemirror-vim';
 
 import { commandRegistryOf } from './commands.js';
@@ -162,6 +163,28 @@ const vimStatusPlugin = (report: (status: VimStatus | null) => void): Extension 
     };
   });
 
+/**
+ * Escape belongs to vim unless a completion popup is on screen (TYTO-331).
+ *
+ * Typing wakes completion, which stays _pending_ until its source answers, and CodeMirror's
+ * completion keymap answers Escape for anything that is not inactive — a query nobody can see
+ * included — and keeps the key. Its keymap runs before vim's keydown handler, so an Escape
+ * typed right after a word never reached vim: measured 10 of 10 in a visible window, with no
+ * popup drawn. This runs first, and when no popup is shown it cancels the unseen query and lets
+ * the key go on, so the completion keymap finds nothing to close and vim gets it. A popup that
+ * is on screen is left to the completion keymap, which closes it and keeps the key, as before.
+ */
+const escapeReachesVim: Extension = Prec.highest(
+  EditorView.domEventHandlers({
+    keydown: (event, view) => {
+      const unseen =
+        completionStatus(view.state) !== null && currentCompletions(view.state).length === 0;
+      if (event.key === 'Escape' && unseen) closeCompletion(view);
+      return false;
+    },
+  }),
+);
+
 export interface VimModeOptions {
   /**
    * Called with vim's mode and pending keys whenever they change, and with `null` when vim
@@ -189,6 +212,7 @@ export interface VimModeOptions {
 export function vimMode(options: VimModeOptions = {}): Extension {
   install(options.exCommands ?? defaultExCommands);
   return [
+    escapeReachesVim,
     vim({ status: options.status ?? true }),
     // After `vim()`, so the adapter it builds exists when this plugin is constructed.
     ...(options.onStatus === undefined ? [] : [vimStatusPlugin(options.onStatus)]),

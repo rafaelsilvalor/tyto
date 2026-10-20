@@ -160,8 +160,11 @@ beforeAll(async () => {
   scratch = mkdtempSync(join(tmpdir(), 'tyto-keybindings-e2e-'));
   const home = join(scratch, 'tyto-home');
   writeHome(home);
+  // Unlimited frames (ADR 0104): at the hidden window's one frame a second the typing was slow
+  // enough to hide that vim's Escape was taken by a completion nobody could see (TYTO-331), so
+  // this suite runs at full speed to keep that fix pinned.
   app = await _electron.launch({
-    args: ['.', `--user-data-dir=${join(scratch, 'user-data')}`],
+    args: ['.', `--user-data-dir=${join(scratch, 'user-data')}`, '--disable-frame-rate-limit'],
     cwd: join(here, '..'),
     env: { ...process.env, TYTO_HEADLESS: '1', TYTO_HOME: home },
   });
