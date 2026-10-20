@@ -36,9 +36,30 @@ export interface ProblemsState {
   /** The brief the diagnostics were computed against, for turning an offset into a line. */
   readonly brief: string;
   readonly locale: Locale;
+  /**
+   * What the document in front is, so the empty state can name it (TYTO-322): "this brief"
+   * is wrong with `settings.json` in front. Absent means a brief.
+   */
+  readonly kind?: ProblemsKind;
 }
 
-const EMPTY_STATE: ProblemsState = { diagnostics: [], brief: '', locale: DEFAULT_LOCALE };
+/** A brief, or one of the app's own files (`DocumentState.kind`). */
+export type ProblemsKind = 'brief' | 'settings' | 'keybindings' | 'snippets';
+
+/** The sentence the empty panel says, by what it is about. */
+const EMPTY_KEYS: Readonly<Record<ProblemsKind, CatalogueKey>> = {
+  brief: 'problems.empty',
+  settings: 'problems.empty.settings',
+  keybindings: 'problems.empty.keybindings',
+  snippets: 'problems.empty.snippets',
+};
+
+const EMPTY_STATE: ProblemsState = {
+  diagnostics: [],
+  brief: '',
+  locale: DEFAULT_LOCALE,
+  kind: 'brief',
+};
 
 const SEVERITY_KEY = {
   error: 'problems.severity.error',
@@ -172,7 +193,8 @@ export class ProblemsPanel extends LitElement {
     if (this.state.diagnostics.length === 0) {
       // On one line, and it has to stay on one line: `textContent` would otherwise carry the
       // indentation of this file, and the panel's empty state is a string a test compares.
-      return html`<p class="problems__empty">${translate(this.state.locale, 'problems.empty')}</p>`;
+      const key = EMPTY_KEYS[this.state.kind ?? 'brief'];
+      return html`<p class="problems__empty">${translate(this.state.locale, key)}</p>`;
     }
 
     return repeat(this.state.diagnostics, rowKeys(), (item) => this.row(item));
