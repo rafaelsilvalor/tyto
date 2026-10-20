@@ -4,7 +4,7 @@
 Cada passo foi seguido em 2026-10-19 numa versão de desenvolvimento do Tyto 0.7.0 (commit `b039537`) no Windows 11, uma vez com a janela em inglês e outra em português do Brasil. Os menus e rótulos abaixo são os da janela em português.
 :::
 
-Cada tecla executa um comando, e o `keybindings.json` muda qual. Abra-o com **Preferências: Abrir atalhos de teclado (JSON)**. Ele começa como uma lista vazia com três linhas de anotação, em inglês, explicando como preenchê-la.
+Cada tecla executa um comando, e o `keybindings.json` muda qual. Abra-o com **Preferências: Abrir atalhos de teclado (JSON)**. Ele começa como uma lista vazia com três linhas de anotação explicando como preenchê-la.
 
 ## Dar uma tecla a um comando
 

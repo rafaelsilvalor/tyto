@@ -64,6 +64,7 @@ import { crashSummary, fileLog, installCrashHandlers } from './log.js';
 import { type AboutFacts, aboutText, menuTemplate } from './menu.js';
 import { LeakedArrow, popupWithArrows } from './menu-arrows.js';
 import { findTopLevel, projectMenu } from './menu-model.js';
+import { newKeybindingsFile, newSnippetsFile } from './seed-files.js';
 import { fileRecentFiles } from './recent-files.js';
 import { registerIpcHandlers, sendIpcEvent } from './ipc.js';
 import { exporterBuiltIns, listPlugins, tytoHome } from './plugin-list.js';
@@ -139,21 +140,6 @@ const NEW_SETTINGS_FILE =
   `${indentGuidesExample()}\n${stickyScrollExample()}\n` +
   `${formatBriefOnSaveExample()}\n${tabSizeExample()}\n${briefColumnsExample()}\n` +
   `${typographyExample()}\n}\n`;
-
-/** `keybindings.json` as "Open Keyboard Shortcuts (JSON)" creates it (TYTO-207, ADR 0074). */
-const NEW_KEYBINDINGS_FILE =
-  '// Tyto keybindings: JSON with comments. Saving this file applies it, with no restart.\n' +
-  '// Each entry is { "key": "ctrl+shift+e", "command": "<id>", "when": "<context>" };\n' +
-  '// "command": "-<id>" removes a default binding. The command bar lists every id.\n' +
-  '[\n]\n';
-
-/** `snippets.json` as "Open Snippets (JSON)" creates it (TYTO-277, ADR 0082). */
-const NEW_SNIPPETS_FILE =
-  "// Tyto snippets: JSON with comments, in VS Code's shape. Saving this file applies it.\n" +
-  '// Each entry is "Name": { "prefix": "aula", "body": ["::aula ${1:titulo}", "::prof ${2:nome}"],\n' +
-  '// "description": "...", "template": "<only while a brief names this template>" }.\n' +
-  '// Type the prefix at the start of a line, or "/" there, and Tab moves between its fields.\n' +
-  '{\n}\n';
 
 /**
  * Puts a crash on screen (TYTO-140).
@@ -1175,8 +1161,10 @@ async function start(): Promise<void> {
           () => true,
         );
         if (missing) {
-          liveKeybindings.wrote(NEW_KEYBINDINGS_FILE);
-          await writeFile(keybindingsFile, NEW_KEYBINDINGS_FILE, 'utf8').catch(() => undefined);
+          // In the window's language when it is created (TYTO-334); never rewritten after.
+          const seed = newKeybindingsFile(uiLocale);
+          liveKeybindings.wrote(seed);
+          await writeFile(keybindingsFile, seed, 'utf8').catch(() => undefined);
         }
         return documents.openPath(documentId, keybindingsFile, 'keybindings.json');
       },
@@ -1190,8 +1178,9 @@ async function start(): Promise<void> {
           () => true,
         );
         if (missing) {
-          liveSnippets.wrote(NEW_SNIPPETS_FILE);
-          await writeFile(snippetsFile, NEW_SNIPPETS_FILE, 'utf8').catch(() => undefined);
+          const seed = newSnippetsFile(uiLocale);
+          liveSnippets.wrote(seed);
+          await writeFile(snippetsFile, seed, 'utf8').catch(() => undefined);
         }
         return documents.openPath(documentId, snippetsFile, 'snippets.json');
       },

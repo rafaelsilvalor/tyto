@@ -40,15 +40,22 @@ let page: Page;
 
 /** Every item in the application menu, flattened, with the fields this suite asks about. */
 const menuItems = async (): Promise<
-  { id: string; label: string; accelerator: string | null; enabled: boolean }[]
+  { id: string; label: string; role: string; accelerator: string | null; enabled: boolean }[]
 > =>
   app.evaluate(({ Menu }) => {
-    const found: { id: string; label: string; accelerator: string | null; enabled: boolean }[] = [];
+    const found: {
+      id: string;
+      label: string;
+      role: string;
+      accelerator: string | null;
+      enabled: boolean;
+    }[] = [];
     const walk = (items: Electron.MenuItem[]): void => {
       for (const item of items) {
         found.push({
           id: item.id,
           label: item.label,
+          role: item.role ?? '',
           accelerator: item.accelerator ?? null,
           enabled: item.enabled,
         });
@@ -102,6 +109,20 @@ describe('the File menu Electron built', () => {
       translate('pt-BR', 'command.file.open'),
       translate('en', 'command.file.open'),
     ]).toContain(open?.label);
+  });
+
+  it('labels the role items in that language too, not in Electron’s English (TYTO-334)', async () => {
+    const items = await menuItems();
+    const locale =
+      items.find((item) => item.id === 'editor.open')?.label ===
+      translate('en', 'command.file.open')
+        ? 'en'
+        : 'pt-BR';
+    const labelOf = (role: string) => items.find((item) => item.role === role)?.label;
+
+    // Read off what Electron built: a label the template wrote survives `buildFromTemplate`.
+    expect(labelOf('undo')).toBe(translate(locale, 'menu.role.undo'));
+    expect(labelOf('minimize')).toBe(translate(locale, 'menu.role.minimize'));
   });
 
   it('takes no accelerator from the page', async () => {

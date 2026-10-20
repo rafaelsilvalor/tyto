@@ -8,7 +8,7 @@ Cada passo e cada mensagem desta página foram vistos em 2026-10-19 numa versão
 
 Quase tudo o que dá errado no Tyto aparece no painel de Problemas — num brief, num template, no `settings.json`, no `keybindings.json`, num plugin ou numa fonte. Cada linha tem um **código**: a primeira letra diz a gravidade, `E_` para um erro que impede alguma coisa e `W_` para um aviso que não impede. Clique numa linha para ir aonde aconteceu. Cada código está na lista de [códigos de diagnóstico](https://github.com/rafaelsilvalor/tyto/blob/main/docs/diagnostic-codes.md), em inglês, com o que quer dizer. As frases dos problemas também ainda aparecem em inglês com a janela em português.
 
-<!-- TYTO-334: mensagens de problema em inglês na janela em português. -->
+<!-- TYTO-342: mensagens de problema em inglês na janela em português. -->
 
 ## Situações comuns
 

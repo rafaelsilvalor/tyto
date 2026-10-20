@@ -27,9 +27,9 @@ const ROLE_LABELS: Record<string, string> = {
   viewmenu: 'View',
   windowmenu: 'Window',
   help: 'Help',
-  quit: 'Exit',
-  toggledevtools: 'Toggle Developer Tools',
-  copy: 'Copy',
+  // macOS's application menu, whose title stays the role's (ADR 0078 §2). The items inside every
+  // list carry the catalogue's label since TYTO-334, so none of theirs is needed here.
+  appmenu: 'Tyto',
 };
 
 const ROLE_KEYS: Record<string, string> = {
@@ -42,11 +42,10 @@ type TemplateItem = ReturnType<typeof menuTemplate>[number];
 /** What `Menu.buildFromTemplate` does to an item, as far as the model can see it. */
 function build(item: TemplateItem): MenuItemLike {
   const role = typeof item.role === 'string' ? item.role.toLowerCase() : undefined;
+  // Every role that would fill a list has it written out since TYTO-334, so no stand-in list.
   const submenu = Array.isArray(item.submenu)
     ? { items: item.submenu.map((child) => build(child)) }
-    : role === 'editmenu'
-      ? { items: [build({ role: 'copy' })] }
-      : undefined;
+    : undefined;
   return {
     id: item.id ?? null,
     label: item.label ?? (role === undefined ? '' : (ROLE_LABELS[role] ?? role)),
@@ -146,7 +145,8 @@ describe("the menu row's model", () => {
     expect(help?.items[2]?.label).toBe('menu.revealLogs');
 
     const file = model.find((menu) => menu.id === 'file');
-    expect(file?.items.at(-1)).toMatchObject({ role: 'quit', label: 'Exit' });
+    // The catalogue's word over the role's English since TYTO-334.
+    expect(file?.items.at(-1)).toMatchObject({ role: 'quit', label: 'menu.role.quit' });
   });
 
   it("shows a role's default key as a label for the platform, and none where there is none", () => {
@@ -159,7 +159,10 @@ describe("the menu row's model", () => {
 
     const mac = projectMenu(installed('darwin'), 'darwin');
     const edit = mac.find((menu) => menu.id === 'editmenu');
-    expect(edit?.items[0]).toMatchObject({ role: 'copy', accelerator: 'Cmd+C' });
+    expect(edit?.items.find((item) => item.role === 'copy')).toMatchObject({
+      label: 'menu.role.copy',
+      accelerator: 'Cmd+C',
+    });
   });
 
   it('leaves the File menu without keys, as TYTO-124 decided', () => {

@@ -24,7 +24,7 @@ Problemas lista o que está errado no brief da frente: cada linha tem um **códi
 
 Um brief sem problemas diz isso, em vez de deixar o painel vazio. As frases dos problemas ainda aparecem em inglês com a janela em português. Os códigos mais comuns ao escrever estão explicados em [Briefs](../briefs/index.md#quando-algo-esta-errado).
 
-<!-- TYTO-334: mensagens de problema, papéis dos menus e o "Slide" da prévia ainda em inglês na janela em português. -->
+<!-- TYTO-342: mensagens de problema ainda em inglês na janela em português. -->
 
 <!-- TYTO-322: com o settings.json na frente o painel ainda diz "sobre este brief"; quer dizer o arquivo da frente. -->
 

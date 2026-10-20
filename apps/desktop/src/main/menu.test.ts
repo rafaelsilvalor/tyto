@@ -150,6 +150,108 @@ describe('the rest of the menu', () => {
       expect(roles(submenu ?? [])).not.toContain('close');
     }
   });
+
+  it('keeps the clipboard roles inside the Edit list it writes out (TYTO-334)', () => {
+    expect(roles(submenuOf(template('win32'), 'editMenu') ?? [])).toEqual([
+      'undo',
+      'redo',
+      'cut',
+      'copy',
+      'paste',
+      'delete',
+      'selectAll',
+    ]);
+    expect(roles(submenuOf(template('darwin'), 'editMenu') ?? [])).toContain('pasteAndMatchStyle');
+  });
+});
+
+/**
+ * Electron's own label for a role is fixed English on Windows and Linux, whatever the system's
+ * language (TYTO-264, TYTO-334). So the window is in Portuguese only if every role item carries
+ * this app's word for it, and every role that fills a list of its own has that list written out
+ * — Electron would fill it with English items the template never names.
+ */
+
+/** The roles that bring a list of their own when the template gives them none. */
+const ROLES_THAT_FILL_A_LIST = new Set([
+  'appMenu',
+  'fileMenu',
+  'editMenu',
+  'viewMenu',
+  'windowMenu',
+  'shareMenu',
+]);
+
+/** A translator that marks what it answers, so a label can be told from one written by hand. */
+const marked = (platform: string): MenuItemConstructorOptions[] =>
+  menuTemplate(platform, {
+    t: (key) => `<${key}>`,
+    onRevealLogs: () => {},
+    onCommand: () => {},
+    onAbout: () => {},
+  });
+
+/** Each role item, with its path, that `test` says is wrong; top-level titles on macOS exempt. */
+function offending(
+  platform: string,
+  test: (item: MenuItemConstructorOptions) => boolean,
+): string[] {
+  const found: string[] = [];
+  const walk = (items: readonly MenuItemConstructorOptions[], path: string): void => {
+    for (const item of items) {
+      const here = `${path}/${item.role ?? item.id ?? item.label ?? item.type ?? '?'}`;
+      // macOS keeps the roles' own top-level titles, in the system's language (ADR 0078 §2).
+      const macTitle = platform === 'darwin' && path === '';
+      if (item.role !== undefined && !macTitle && test(item)) found.push(here);
+      if (Array.isArray(item.submenu)) walk(item.submenu, here);
+    }
+  };
+  walk(marked(platform), '');
+  return found;
+}
+
+describe('the role items, in the window’s language (TYTO-334)', () => {
+  it.each(['win32', 'linux', 'darwin'])(
+    'labels every role item from the catalogue on %s',
+    (platform) => {
+      const unlabelled = offending(
+        platform,
+        (item) => typeof item.label !== 'string' || !/^<[^>]+>$/u.test(item.label),
+      );
+      expect(unlabelled).toEqual([]);
+    },
+  );
+
+  it.each(['win32', 'linux', 'darwin'])(
+    'writes out every list a role would fill in English on %s',
+    (platform) => {
+      const delegated: string[] = [];
+      const walk = (items: readonly MenuItemConstructorOptions[]): void => {
+        for (const item of items) {
+          if (item.role !== undefined && ROLES_THAT_FILL_A_LIST.has(item.role)) {
+            if (!Array.isArray(item.submenu)) delegated.push(item.role);
+          }
+          if (Array.isArray(item.submenu)) walk(item.submenu);
+        }
+      };
+      walk(marked(platform));
+      expect(delegated).toEqual([]);
+    },
+  );
+
+  it('says Exit on Windows and Quit on Linux, as Electron did', () => {
+    const quit = (platform: string) =>
+      fileSubmenu(
+        menuTemplate(platform, {
+          t: (key) => key,
+          onRevealLogs: () => {},
+          onCommand: () => {},
+          onAbout: () => {},
+        }),
+      ).find((item) => item.role === 'quit')?.label;
+    expect(quit('win32')).toBe('menu.role.exit');
+    expect(quit('linux')).toBe('menu.role.quit');
+  });
 });
 
 /**

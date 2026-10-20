@@ -260,6 +260,31 @@ export interface Catalogue {
   readonly 'menu.view': string;
   readonly 'menu.window': string;
   readonly 'menu.help': string;
+  /**
+   * The items inside the Edit, View and Window lists, and inside macOS's application menu, that
+   * are Electron roles (TYTO-334). A role's own label is Electron's fixed English on Windows and
+   * Linux, so the template writes these over it and keeps the role for what the item does.
+   * `exit` is the Windows word and `quit` the macOS and Linux one, as Electron has them.
+   */
+  readonly 'menu.role.undo': string;
+  readonly 'menu.role.redo': string;
+  readonly 'menu.role.cut': string;
+  readonly 'menu.role.copy': string;
+  readonly 'menu.role.paste': string;
+  readonly 'menu.role.pasteAndMatchStyle': string;
+  readonly 'menu.role.delete': string;
+  readonly 'menu.role.selectAll': string;
+  readonly 'menu.role.exit': string;
+  readonly 'menu.role.quit': string;
+  readonly 'menu.role.toggleDevTools': string;
+  readonly 'menu.role.togglefullscreen': string;
+  readonly 'menu.role.minimize': string;
+  readonly 'menu.role.zoom': string;
+  readonly 'menu.role.front': string;
+  readonly 'menu.role.services': string;
+  readonly 'menu.role.hide': string;
+  readonly 'menu.role.hideOthers': string;
+  readonly 'menu.role.unhide': string;
   readonly 'command.document.new': string;
   readonly 'command.document.close': string;
   readonly 'command.document.next': string;
@@ -470,6 +495,15 @@ export interface Catalogue {
   readonly 'settings.assist.default': string;
   readonly 'settings.assist.accepted': string;
   readonly 'keybindings.assist.defaultKey': string;
+  /**
+   * TYTO-334. What the keybindings tab says about an entry's three fields, and beside a
+   * removal; `{title}` is the command's title and `{key}` its default key.
+   */
+  readonly 'keybindings.assist.field.key': string;
+  readonly 'keybindings.assist.field.command': string;
+  readonly 'keybindings.assist.field.when': string;
+  readonly 'keybindings.assist.removes': string;
+  readonly 'keybindings.assist.removesWithKey': string;
   /** TYTO-207. Opens `keybindings.json` in a tab; a command, so it is not on screen at load. */
   readonly 'command.keybindings.open': string;
   /** TYTO-277. Opens `snippets.json` in a tab; a command, so it is not on screen at load. */
@@ -637,6 +671,25 @@ export const CATALOGUE_KEYS = [
   'menu.view',
   'menu.window',
   'menu.help',
+  'menu.role.undo',
+  'menu.role.redo',
+  'menu.role.cut',
+  'menu.role.copy',
+  'menu.role.paste',
+  'menu.role.pasteAndMatchStyle',
+  'menu.role.delete',
+  'menu.role.selectAll',
+  'menu.role.exit',
+  'menu.role.quit',
+  'menu.role.toggleDevTools',
+  'menu.role.togglefullscreen',
+  'menu.role.minimize',
+  'menu.role.zoom',
+  'menu.role.front',
+  'menu.role.services',
+  'menu.role.hide',
+  'menu.role.hideOthers',
+  'menu.role.unhide',
   'command.document.new',
   'command.document.close',
   'command.document.next',
@@ -780,6 +833,11 @@ export const CATALOGUE_KEYS = [
   'settings.assist.default',
   'settings.assist.accepted',
   'keybindings.assist.defaultKey',
+  'keybindings.assist.field.key',
+  'keybindings.assist.field.command',
+  'keybindings.assist.field.when',
+  'keybindings.assist.removes',
+  'keybindings.assist.removesWithKey',
   'command.keybindings.open',
   'command.snippets.open',
   'command.window.reload',
