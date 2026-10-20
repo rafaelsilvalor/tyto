@@ -1,8 +1,10 @@
 import { KEYBINDING_CONTEXTS } from '@tyto/editor';
 import { describe, expect, it } from 'vitest';
 
+import { type Locale, translate } from '../../shared/i18n/index.js';
 import {
   type KeybindingCommand,
+  type KeybindingsAssistLabels,
   KEYBINDING_FIELDS,
   keybindingsAssist,
 } from './keybindings-assist.js';
@@ -17,9 +19,20 @@ const COMMANDS: readonly KeybindingCommand[] = [
   { id: 'file.export', title: 'Export', key: 'Ctrl+E' },
   { id: 'plugin.thing', title: 'plugin.thing' },
 ];
+/** The labels `main.ts` hands over, from the catalogue in one language (TYTO-334). */
+const labelsIn = (locale: Locale): KeybindingsAssistLabels => ({
+  defaultKey: translate(locale, 'keybindings.assist.defaultKey'),
+  fields: {
+    key: translate(locale, 'keybindings.assist.field.key'),
+    command: translate(locale, 'keybindings.assist.field.command'),
+    when: translate(locale, 'keybindings.assist.field.when'),
+  },
+  removes: translate(locale, 'keybindings.assist.removes'),
+  removesWithKey: translate(locale, 'keybindings.assist.removesWithKey'),
+});
 const assist = keybindingsAssist(
   () => COMMANDS,
-  () => ({ defaultKey: 'Default key' }),
+  () => labelsIn('en'),
 );
 
 const at = (marked: string): { text: string; position: number } => ({
@@ -136,8 +149,26 @@ describe('hover in keybindings.json', () => {
 
   it('says what each field is on its name', () => {
     for (const field of KEYBINDING_FIELDS) {
-      expect(on(`"${field.name}"`)).toMatchObject({ title: field.name, text: field.description });
+      expect(on(`"${field}"`)).toMatchObject({
+        title: field,
+        text: translate('en', `keybindings.assist.field.${field}`),
+      });
     }
+  });
+
+  it("says it in the window's language, with the title and the key filled in (TYTO-334)", () => {
+    const portuguese = keybindingsAssist(
+      () => COMMANDS,
+      () => labelsIn('pt-BR'),
+    );
+    const removal = at('[\n  { "key": "ctrl+e", "command": "-file.ex|port" }\n]');
+    expect(portuguese.hover(removal.text, removal.position)?.text).toBe(
+      'Tira desta tecla o atalho padrão de "Export" (Ctrl+E).',
+    );
+    const field = at('[\n  { "wh|en": "panel" }\n]');
+    expect(portuguese.hover(field.text, field.position)?.text).toBe(
+      'Onde a tecla funciona: um de seis contextos. Sem ele, a tecla funciona em qualquer lugar.',
+    );
   });
 
   it('says nothing over an unknown command, an unknown context, the key or a nested object', () => {

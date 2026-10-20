@@ -36,7 +36,7 @@ W_SETTING_INVALID  Setting 'uiFontSize' is not accepted (Invalid input: expected
 
 A mensagem ainda aparece em inglês com a janela em português.
 
-<!-- TYTO-334: mensagens de problema em inglês na janela em português. -->
+<!-- TYTO-342: mensagens de problema em inglês na janela em português. -->
 
 Se o próprio arquivo não pode ser lido — uma vírgula faltando, uma chave sobrando —, o painel mostra `E_SETTINGS_SYNTAX` com o ponto onde a leitura parou, e a janela mantém as configurações que tinha até o arquivo ser corrigido. O arquivo é salvo como você escreveu mesmo assim, então nada do que você digitou se perde.
 

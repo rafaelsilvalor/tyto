@@ -520,7 +520,16 @@ const appFileAssists: AppFileAssists = {
     jsonAssist(
       keybindingsAssist(
         () => keybindingCommands(),
-        () => ({ defaultKey: translate(state.locale, 'keybindings.assist.defaultKey') }),
+        () => ({
+          defaultKey: translate(state.locale, 'keybindings.assist.defaultKey'),
+          fields: {
+            key: translate(state.locale, 'keybindings.assist.field.key'),
+            command: translate(state.locale, 'keybindings.assist.field.command'),
+            when: translate(state.locale, 'keybindings.assist.field.when'),
+          },
+          removes: translate(state.locale, 'keybindings.assist.removes'),
+          removesWithKey: translate(state.locale, 'keybindings.assist.removesWithKey'),
+        }),
       ),
     ),
   ],

@@ -1,5 +1,8 @@
 import type { MenuItemConstructorOptions } from 'electron';
 
+/** Every role Electron accepts on a menu item. */
+type MenuRole = NonNullable<MenuItemConstructorOptions['role']>;
+
 import {
   DOCUMENTATION_COMMAND,
   FILE_MENU_GROUPS,
@@ -48,9 +51,11 @@ import { withoutMnemonic } from './menu-model.js';
  * Roles and not labels, **where the label is Electron's to write**. A role's label is
  * Electron's own — and on Windows that is **fixed English**, not the system's language:
  * measured on a pt-BR machine, the row read "Arquivo, Edit, View, Window, Help" (TYTO-264).
- * That is accepted for the items inside the lists (*Minimize*, *Exit*) and is a gap, not a
- * decision. TYTO-132 added the first label of this app's own, the Help submenu's one item;
- * TYTO-124 added the File submenu, which is this app's verbs and so this app's words.
+ * TYTO-132 added the first label of this app's own, the Help submenu's one item; TYTO-124 added
+ * the File submenu, which is this app's verbs and so this app's words. **Since TYTO-334 every role
+ * item inside a list carries the catalogue's label too** (*Minimizar*, *Sair*), and every role
+ * that would fill its own list — `editMenu`, macOS's `appMenu` — has it written out, because
+ * Electron fills one in English. `menu.test.ts` walks the template on all three platforms for it.
  *
  * **The five top-level titles are this app's off macOS** (TYTO-264, ADR 0078): each carries a
  * mnemonic — `&File`, `E&xibir` — so Alt and that letter open it, and a role's label has none.
@@ -121,10 +126,35 @@ export function menuTemplate(platform: string, options: MenuOptions): MenuItemCo
   const mac = platform === 'darwin';
   // A top-level title off macOS, with its mnemonic; nothing on macOS, where the role's stays.
   const title = (key: CatalogueKey): { label?: string } => (mac ? {} : { label: options.t(key) });
+  // A role inside a list, under this app's word for it: the role keeps what the item does and
+  // its key, the label is the window's language rather than Electron's English (TYTO-334).
+  const role = <R extends MenuRole>(name: R, key: CatalogueKey): { role: R; label: string } => ({
+    role: name,
+    label: options.t(key),
+  });
 
   return [
     // On macOS the app menu is where Quit lives and the first submenu is always the app's.
-    ...(mac ? [{ role: 'appMenu' } as const] : []),
+    // Its title stays the role's, which is the app's name (ADR 0078 §2); its list is written out,
+    // because a role left to fill its own list fills it in Electron's English (TYTO-334).
+    ...(mac
+      ? [
+          {
+            role: 'appMenu' as const,
+            submenu: [
+              role('about', 'menu.about'),
+              { type: 'separator' as const },
+              role('services', 'menu.role.services'),
+              { type: 'separator' as const },
+              role('hide', 'menu.role.hide'),
+              role('hideOthers', 'menu.role.hideOthers'),
+              role('unhide', 'menu.role.unhide'),
+              { type: 'separator' as const },
+              role('quit', 'menu.role.quit'),
+            ],
+          },
+        ]
+      : []),
     // **The File menu, written out rather than `role: 'fileMenu'`** (TYTO-124). That role is
     // Quit alone on Windows and Linux, and on macOS it is *Close Window* on `Mod-W` — the one
     // accelerator this file exists to keep away from the page. So neither platform got a File
@@ -160,12 +190,35 @@ export function menuTemplate(platform: string, options: MenuOptions): MenuItemCo
         // `Ctrl-O` belongs to the vim engine. The menu's job in this card is to *teach the
         // verbs*; the keystrokes stay the page's, and `e2e/tabs.desktop.test.ts`'s accelerator
         // table staying green unchanged is the evidence nothing was taken.
-        ...(mac ? [] : [{ type: 'separator' } as const, { role: 'quit' } as const]),
+        // Exit on Windows and Quit on Linux, the words Electron's own label used there.
+        ...(mac
+          ? []
+          : [
+              { type: 'separator' } as const,
+              role('quit', platform === 'win32' ? 'menu.role.exit' : 'menu.role.quit'),
+            ]),
       ],
     },
-    // Left as Electron built them. `editMenu` is what makes copy and paste work on macOS,
-    // where the clipboard shortcuts are the menu's rather than the page's.
-    { role: 'editMenu', ...title('menu.edit') },
+    // `editMenu` is what makes copy and paste work on macOS, where the clipboard shortcuts are
+    // the menu's rather than the page's. Its list is written out item for item as Electron would
+    // build it — minus macOS's Speech submenu — so each item is labelled in the window's language
+    // (TYTO-334); the roles, and so what each item does and its key, are unchanged.
+    {
+      role: 'editMenu',
+      ...title('menu.edit'),
+      submenu: [
+        role('undo', 'menu.role.undo'),
+        role('redo', 'menu.role.redo'),
+        { type: 'separator' },
+        role('cut', 'menu.role.cut'),
+        role('copy', 'menu.role.copy'),
+        role('paste', 'menu.role.paste'),
+        ...(mac ? [role('pasteAndMatchStyle', 'menu.role.pasteAndMatchStyle')] : []),
+        role('delete', 'menu.role.delete'),
+        ...(mac ? [] : [{ type: 'separator' } as const]),
+        role('selectAll', 'menu.role.selectAll'),
+      ],
+    },
     // Written out because the default carries Reload and Force Reload as roles, which tear the
     // page down before it can keep its tabs. Reload is the window's command instead (TYTO-113).
     // Originally: a reload discarded every open buffer. Everything else the role would have built is kept, item
@@ -193,7 +246,7 @@ export function menuTemplate(platform: string, options: MenuOptions): MenuItemCo
             options.onCommand(RELOAD_COMMAND.id);
           },
         },
-        { role: 'toggleDevTools' },
+        role('toggleDevTools', 'menu.role.toggleDevTools'),
         { type: 'separator' },
         // TYTO-272 (ADR 0099). The window's commands and not the roles: each writes the `zoom`
         // setting, and the keys (`Mod-0`, `Mod-=`, `Mod--`) are the page's like every other.
@@ -205,7 +258,7 @@ export function menuTemplate(platform: string, options: MenuOptions): MenuItemCo
           },
         })),
         { type: 'separator' },
-        { role: 'togglefullscreen' },
+        role('togglefullscreen', 'menu.role.togglefullscreen'),
       ],
     },
     // The one other submenu written out: the default carries Close, and its accelerator is
@@ -214,9 +267,9 @@ export function menuTemplate(platform: string, options: MenuOptions): MenuItemCo
       role: 'windowMenu',
       ...title('menu.window'),
       submenu: [
-        { role: 'minimize' },
-        { role: 'zoom' },
-        ...(mac ? [{ role: 'front' } as const] : []),
+        role('minimize', 'menu.role.minimize'),
+        role('zoom', 'menu.role.zoom'),
+        ...(mac ? [role('front', 'menu.role.front')] : []),
       ],
     },
     // TYTO-132. `role: 'help'` rather than a plain top-level item, so the role keeps what it

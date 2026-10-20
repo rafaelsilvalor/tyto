@@ -154,7 +154,9 @@ describe('the keybindings tab', () => {
         (tab.textContent ?? '').includes('keybindings.json'),
       ),
     );
-    expect(readFileSync(join(userData, 'keybindings.json'), 'utf8')).toContain('Tyto keybindings');
+    // Its notes in the window's language (TYTO-334): main writes them in the one it was told.
+    const notes = (await lang()) === 'pt-BR' ? 'Atalhos de teclado do Tyto' : 'Tyto keybindings';
+    expect(readFileSync(join(userData, 'keybindings.json'), 'utf8')).toContain(notes);
   });
 
   it('applies a saved binding with no restart, and the bar shows the key', async () => {

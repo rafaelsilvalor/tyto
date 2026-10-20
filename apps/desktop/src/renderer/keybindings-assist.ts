@@ -31,34 +31,31 @@ export interface KeybindingCommand {
   readonly key?: string;
 }
 
-/** The hover's one label, in the window's language; the sentences stay English (one source). */
+/** The three fields of an entry, in the order a person writes them. */
+export const KEYBINDING_FIELDS = ['key', 'command', 'when'] as const;
+
+export type KeybindingField = (typeof KEYBINDING_FIELDS)[number];
+
+/**
+ * What the tab says, in the window's language (TYTO-334): the hover's label, what each field
+ * is, and the sentence beside a removal. The commands' titles come translated from the registry;
+ * the six contexts' sentences are `@tyto/editor`'s and still English.
+ */
 export interface KeybindingsAssistLabels {
   readonly defaultKey: string;
+  readonly fields: Readonly<Record<KeybindingField, string>>;
+  /** `{title}` is the command's title. */
+  readonly removes: string;
+  /** The same with `{key}`, the default key being removed. */
+  readonly removesWithKey: string;
 }
 
-/** The three fields of an entry, each with what it is, in the order a person writes them. */
-export const KEYBINDING_FIELDS = [
-  {
-    name: 'key',
-    description:
-      'The keystroke, lowercase and joined by "+": "ctrl+shift+e". "mod" is Ctrl, or Cmd on macOS.',
-  },
-  {
-    name: 'command',
-    description:
-      'The command the key runs, by id. "-<id>" removes that command\'s default binding on this key.',
-  },
-  {
-    name: 'when',
-    description: 'Where the key works: one of six contexts. Left out, the key works everywhere.',
-  },
-] as const;
-
 /** Beside a removal in the list and on its hover. */
-const removes = (command: KeybindingCommand): string =>
-  `Removes the default binding of "${command.title}"${
-    command.key === undefined ? '' : ` (${command.key})`
-  } on this key.`;
+const removes = (command: KeybindingCommand, labels: KeybindingsAssistLabels): string =>
+  (command.key === undefined ? labels.removes : labels.removesWithKey)
+    // Functions, so a `$` in a plugin's command title is not read as a replacement pattern.
+    .replace('{title}', () => command.title)
+    .replace('{key}', () => command.key ?? '');
 
 /** A field's suggestion: `"command": ""` with the caret between the empty value's quotes. */
 function fieldSuggestion(
@@ -114,8 +111,8 @@ export function keybindingsAssist(
       if (location.path.length === 2 && location.isAtPropertyKey) {
         const written = writtenKeys(parseTree(text), [index]);
         return answer(
-          KEYBINDING_FIELDS.filter((each) => each.name === field || !written.has(each.name)).map(
-            (each) => fieldSuggestion(each.name, each.description, text, position),
+          KEYBINDING_FIELDS.filter((each) => each === field || !written.has(each)).map((each) =>
+            fieldSuggestion(each, labels().fields[each], text, position),
           ),
         );
       }
@@ -137,7 +134,7 @@ export function keybindingsAssist(
             .map((command) => ({
               label: `-${command.id}`,
               detail: command.title,
-              info: removes(command),
+              info: removes(command, labels()),
               insert: JSON.stringify(`-${command.id}`),
               kind: 'value' as const,
             })),
@@ -169,10 +166,10 @@ export function keybindingsAssist(
 
       // A field's name: what that field is.
       if (keyNode === node) {
-        const field = KEYBINDING_FIELDS.find((each) => each.name === node.value);
+        const field = KEYBINDING_FIELDS.find((each) => each === node.value);
         return field === undefined
           ? null
-          : { ...span, title: field.name, text: field.description, facts: [] };
+          : { ...span, title: field, text: labels().fields[field], facts: [] };
       }
       if (valueNode !== node || typeof node.value !== 'string') return null;
 
@@ -183,7 +180,7 @@ export function keybindingsAssist(
         return {
           ...span,
           title: command.title,
-          text: removal ? removes(command) : command.id,
+          text: removal ? removes(command, labels()) : command.id,
           facts:
             command.key === undefined ? [] : [{ label: labels().defaultKey, value: command.key }],
         };
