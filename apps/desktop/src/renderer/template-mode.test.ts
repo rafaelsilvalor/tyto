@@ -42,14 +42,17 @@ interface Recorded {
   confirms: number;
   savedAnswers: IpcResponse<'template:save'>[];
   changes: number;
+  /** Each folder New reported as made, in order. */
+  created: string[];
 }
 
 function ports(
   answer: Partial<IpcResponse<'template:save'>> = {},
   confirm = false,
   template: OpenedTemplate = opened(),
+  made: IpcResponse<'template:new'> = { directory: null },
 ): TemplateModePorts & { recorded: Recorded } {
-  const recorded: Recorded = { saves: [], confirms: 0, savedAnswers: [], changes: 0 };
+  const recorded: Recorded = { saves: [], confirms: 0, savedAnswers: [], changes: 0, created: [] };
   return {
     recorded,
     open: () => Promise.resolve(template),
@@ -59,13 +62,16 @@ function ports(
       recorded.saves.push(request);
       return Promise.resolve({ saved: true, registered: true, diagnostics: [], ...answer });
     },
-    create: () => Promise.resolve({ directory: null }),
+    create: () => Promise.resolve(made),
     confirmDiscard: () => {
       recorded.confirms += 1;
       return Promise.resolve(confirm);
     },
     saved: (saved) => {
       recorded.savedAnswers.push(saved);
+    },
+    created: (directory) => {
+      recorded.created.push(directory);
     },
     changed: () => {
       recorded.changes += 1;
@@ -242,6 +248,37 @@ describe('<tyto-template-mode>', () => {
     );
     expect(element.querySelector('.template-mode__work')?.hasAttribute('hidden')).toBe(true);
     expect(element.unsaved).toBe(false);
+  });
+});
+
+describe('New tells the window the folder changed (TYTO-324)', () => {
+  it('reports the folder it made before opening it, so the list need not wait for a Save', async () => {
+    const given = ports({}, false, opened({ directory: '/t/first-card' }), {
+      directory: '/t/first-card',
+    });
+    const element = document.createElement(TEMPLATE_MODE_TAG);
+    element.ports = given;
+    document.body.append(element);
+    await element.updateComplete;
+
+    expect(await element.create(' first-card ')).toBe(true);
+
+    expect(given.recorded.created).toEqual(['/t/first-card']);
+    expect(given.recorded.savedAnswers).toEqual([]);
+    expect(element.open).toBe(true);
+  });
+
+  it('reports nothing when the scaffold was refused', async () => {
+    const given = ports({}, false, opened(), { directory: null, problem: 'exists' });
+    const element = document.createElement(TEMPLATE_MODE_TAG);
+    element.ports = given;
+    document.body.append(element);
+    await element.updateComplete;
+
+    expect(await element.create('cartaz')).toBe(false);
+
+    expect(given.recorded.created).toEqual([]);
+    expect(element.problem?.key).toBe('templateMode.new.problem.exists');
   });
 });
 

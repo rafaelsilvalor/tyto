@@ -26,9 +26,7 @@ Run **New template…**. The window turns into **Editing template**, with a box 
 
 Tyto writes a small starter template into `Tyto templates\first-card` and shows it: `manifest.yaml` and `template.html` on the left, and on the right its sample brief drawn in every format the template has — `grid`, `grid-1x1`, `story`, `banner` and two more. The starter's names are short Portuguese words: a slot called `titulo` (title), an image slot called `imagem`, and a colour choice called `tom` that takes `azul` (blue) or `laranja` (orange).
 
-<!-- TYTO-324: New template… does not refresh the window's template list; Save does. Remove this paragraph's workaround when that card lands. -->
-
-Click **Save**, then **Close**. Saving is what makes the rest of the window see the new template: closing without it leaves `first-card` out of the next step's list until you save it or choose the folder again.
+Click **Close**. The template is already in the folder: `E_TEMPLATE_FOLDER_EMPTY` is gone from the problems panel, and `first-card` is in the next step's list.
 
 ## 3. Write a brief
 

@@ -76,6 +76,12 @@ export interface TemplateModePorts {
   confirmDiscard(): Promise<boolean>;
   /** A save went through: whatever else renders with templates has to be told. */
   saved(answer: IpcResponse<'template:save'>): void;
+  /**
+   * New wrote a template into the folder: the window's list of templates is one short until
+   * it reads the folder again (TYTO-324). Told before the folder is opened, because the
+   * template is on disk whether or not the open that follows goes through.
+   */
+  created(directory: string): void;
   /** What the session keeps of the mode changed: a keystroke, an open, a save, a close. */
   changed(): void;
   /** The mode closed: the window puts the caret back in the focused editor group (TYTO-286). */
@@ -321,6 +327,7 @@ export class TemplateMode extends LitElement {
     }
 
     this.problem = undefined;
+    ports.created(answer.directory);
     const opened = await ports.open(answer.directory);
     if (opened === null) return false;
     this.load(opened);

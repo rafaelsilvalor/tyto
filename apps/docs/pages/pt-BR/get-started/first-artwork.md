@@ -26,9 +26,7 @@ Rode **Novo template…**. A janela vira **Editando template**, com uma caixa no
 
 O Tyto grava um template inicial pequeno em `Templates do Tyto\first-card` e o mostra: `manifest.yaml` e `template.html` à esquerda e, à direita, o brief de exemplo desenhado em todos os formatos do template — `grid`, `grid-1x1`, `story`, `banner` e mais dois. O template inicial tem um campo chamado `titulo`, um campo de imagem chamado `imagem` e uma escolha de cor chamada `tom`, que aceita `azul` ou `laranja`.
 
-<!-- TYTO-324: Novo template… não atualiza a lista de templates da janela; Salvar atualiza. Tire este contorno quando essa carta entrar. -->
-
-Clique em **Salvar** e depois em **Fechar**. É o salvar que faz o resto da janela enxergar o template novo: fechando sem salvar, o `first-card` fica fora da lista do próximo passo até você salvá-lo ou escolher a pasta de novo.
+Clique em **Fechar**. O template já está na pasta: o `E_TEMPLATE_FOLDER_EMPTY` some do painel de problemas, e o `first-card` aparece na lista do próximo passo.
 
 ## 3. Escreva um brief
 
