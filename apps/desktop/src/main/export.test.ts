@@ -180,6 +180,8 @@ describe('the export service', () => {
     ['template.txt', ['editaveis', 'template.txt']],
     ['an image in assets/', ['assets', 'calendario.png']],
     ['result.json', ['editaveis', 'result.json']],
+    // Was `E_OUTPUT_WRITE Could not write 'grid-01.svg': …` until ADR 0108.
+    ['an artwork file', ['grid-01.svg']],
   ])(
     'answers a folder holding %s with a diagnostic, not a failure',
     async (_, segments) => {
@@ -212,6 +214,28 @@ describe('the export service', () => {
     },
     60_000,
   );
+
+  // ADR 0108: what the sink cannot explain ends the run, as a lock does, and is the dialog's
+  // failure rather than a diagnostic. A folder at the scratch name stands in for the lock,
+  // which Node cannot take; the real one was measured by hand for the PR.
+  it('answers an artwork write nobody explained with a failure, not a diagnostic', async () => {
+    mkdirSync(join(out, 'grid-01.svg.part', 'dentro'), { recursive: true });
+    const { exportId } = await service.start({
+      brief: exampleBrief('agenda-semana', 'agenda.brief'),
+      directory: out,
+      briefDirectory: join(packDirectory, 'agenda-semana', 'examples'),
+      label: 'agenda',
+      outputs: [{ kind: 'svg' }],
+      delivery: true,
+    });
+
+    const progress = await settled(exportId);
+
+    expect(progress.status).toBe('finished');
+    expect(progress.failure).toBeDefined();
+    expect(progress.diagnostics.map((item) => item.code)).not.toContain('E_OUTPUT_WRITE');
+    expect(readdirSync(join(out, 'editaveis'))).not.toContain('result.json');
+  }, 60_000);
 
   it('answers with a plan before it answers with files', async () => {
     // The whole reason progress is pollable. `total` arrives from the job's `planned` event,

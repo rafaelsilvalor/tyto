@@ -192,16 +192,6 @@ export async function placeAtomic(
   }
 }
 
-/**
- * {@link writeAtomic} behind a port that can only reject: the blocked answer becomes the
- * rejection's text, so the `E_OUTPUT_WRITE` the job turns it into still names the folder and
- * what to do. Its full stop is dropped, because that code's own sentence ends with one.
- */
-async function writeOrReject(path: string, bytes: Uint8Array): Promise<void> {
-  const blocked = await writeAtomic(path, bytes);
-  if (blocked !== undefined) throw new Error(blocked.message.replace(/\.$/, ''));
-}
-
 export interface FsTaskOutputOptions {
   /** See {@link FsOutboxOptions.validate}. On by default. */
   readonly validate?: boolean;
@@ -277,10 +267,11 @@ async function taskOutput(directories: TaskOutputDirectories): Promise<ReusableT
       });
     },
 
-    async write(artifact: Artifact): Promise<void> {
-      // The pipeline's `ArtifactSink` rejects by contract and the job turns the rejection into
-      // `E_OUTPUT_WRITE`, already an error; only the text is this adapter's to choose.
-      await writeOrReject(join(directories.artifacts, artifact.name), artifact.bytes);
+    async write(artifact: Artifact): Promise<Diagnostics> {
+      // ADR 0108: a folder in the way is answered and fails that one frame (exit 1); a file
+      // another program holds open stays a throw, which the job rethrows (exit 2, retry).
+      const blocked = await writeAtomic(join(directories.artifacts, artifact.name), artifact.bytes);
+      return blocked === undefined ? [] : [blocked];
     },
 
     async finish(result: RenderResult): Promise<Diagnostics> {

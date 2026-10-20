@@ -21,6 +21,7 @@ import {
   diagnostic,
   err,
   fromPartial,
+  hasErrors,
   isDeferredTemplate,
   ok,
   resolve,
@@ -506,6 +507,14 @@ export async function runJob(
   let done = 0;
   let failed = 0;
   let cancelled = false;
+  /**
+   * The first rejection out of the sink, kept to be rethrown once the frames in flight settle.
+   *
+   * Wrapped, because a sink may reject with `undefined` and that is still a rejection. Read
+   * through {@link sinkRefused} for the reason {@link aborted} is a call (ADR 0108).
+   */
+  let sinkRejection: { readonly cause: unknown } | undefined;
+  const sinkRefused = (): boolean => sinkRejection !== undefined;
 
   /** Defined for every requested kind: the loop above refused the job otherwise. */
   function exporterOf(task: Task): Exporter {
@@ -584,6 +593,9 @@ export async function runJob(
   }
 
   async function run(task: Task, index: number): Promise<void> {
+    // A sink that rejected will be rethrown, so a frame started now would only be bytes nobody
+    // keeps — and one more attempt at whatever held the first file.
+    if (sinkRefused()) return;
     if (aborted()) {
       cancelled = true;
       return;
@@ -626,14 +638,22 @@ export async function runJob(
       cancelled = true;
       return;
     }
+    if (sinkRefused()) return;
 
+    // ADR 0108: what the sink explains is this frame's failure, and the other frames go on;
+    // what it rejects with is nobody's to fix by editing the brief, so it is not turned into a
+    // diagnostic here. It used to be, as `E_OUTPUT_WRITE`, and a file another program held open
+    // exited 1 — "change something first" — for a lock a retry would have outlasted.
+    let unwritten: Diagnostics;
     try {
-      await ports.sink?.write(artifact);
+      unwritten = (await ports.sink?.write(artifact)) ?? [];
     } catch (cause) {
-      const collected = [
-        ...carried,
-        diagnostic('E_OUTPUT_WRITE', { artifact: artifact.name, problem: messageOf(cause) }),
-      ];
+      sinkRejection ??= { cause };
+      return;
+    }
+
+    if (hasErrors(unwritten)) {
+      const collected = [...carried, ...unwritten];
       failures[index] = collected;
       done += 1;
       failed += 1;
@@ -647,7 +667,7 @@ export async function runJob(
       return;
     }
 
-    failures[index] = [...carried];
+    failures[index] = [...carried, ...unwritten];
     artifacts[index] = artifact;
     done += 1;
     notify(onEvent, {
@@ -660,6 +680,10 @@ export async function runJob(
   }
 
   await Promise.all(tasks.map(async (task, index) => gate.run(async () => run(task, index))));
+  // Rethrown as it came, after every frame in flight settled, so nothing is still writing
+  // into the folder when the caller hears about it — and no report is built: the run is an
+  // internal failure, and `result.json` is absent rather than wrong (render-contract).
+  if (sinkRejection !== undefined) throw sinkRejection.cause;
 
   notify(onEvent, { kind: 'stage-finished', stage: 'render' });
   if (cancelled) notify(onEvent, { kind: 'cancelled', done, total });
@@ -685,9 +709,9 @@ export async function runJob(
   //
   // A frame that failed used to make the whole job an `Err`, and the report went with it —
   // so `result.json` said `artifacts: []` while eleven of twelve files sat in the output
-  // folder it had already written. `E_RENDER_FAILED` and `E_OUTPUT_WRITE` are one frame
-  // each and the other eleven are drawn, so neither is fatal, and the report that names
-  // them survives. What does not change is the exit code: `hasErrors` is what `tyto
-  // render` reads (ADR 0011), and a run with one broken frame still fails.
+  // folder it had already written. `E_RENDER_FAILED` and `E_OUTPUT_FILE_BLOCKED` on an
+  // artwork are one frame each and the other eleven are drawn, so neither ends the run, and
+  // the report that names them survives. What does not change is the exit code: `hasErrors`
+  // is what `tyto render` reads (ADR 0011), and a run with one broken frame still fails.
   return fromPartial(report, problems);
 }

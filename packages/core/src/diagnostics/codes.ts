@@ -683,13 +683,21 @@ export const diagnosticCodes = {
     fatality:
       'One frame of twelve. The others are already written, and a file that is missing from `result.json` is visible in a way a hole inside an artwork is not.',
   },
+  // No longer produced since ADR 0108, and kept rather than deleted: the code is public, a
+  // `result.json` written before 0108 can carry it, and a reader that meets it in one should
+  // find what it meant. The catalogue has deleted no code before this one, so there was no
+  // convention to follow; this is the one ADR 0108 sets.
   E_OUTPUT_WRITE: {
     severity: 'error',
-    summary: 'An artifact was rendered but could not be written to the output.',
+    summary:
+      'No longer produced since ADR 0108. An artifact was rendered but could not be written to the output.',
     template: "Could not write '{artifact}': {problem}.",
-    spec: 'docs/architecture.md',
+    spec: 'docs/adr/0108-a-locked-artwork-is-worth-retrying.md',
     fatal: false,
-    fatality: 'The same: one artifact that did not reach the output, counted against `planned`.',
+    fatality:
+      'One artifact that did not reach the output, counted against `planned`. Since ADR 0108 a ' +
+      'folder in the way is `E_OUTPUT_FILE_BLOCKED` and anything else the sink rejects with ' +
+      'ends the run as an internal failure (exit 2).',
   },
   // An error and not an internal failure: the file stays where it is until somebody moves
   // it, so retrying the same invocation fails the same way every time (TYTO-129).
@@ -714,12 +722,15 @@ export const diagnosticCodes = {
     template:
       "'{path}' is a folder, and Tyto needs to write a file with that name. Rename or move the folder, or write somewhere else.",
     spec: 'docs/adr/0057-a-delivery-carries-its-brief-and-its-images.md',
-    fatal: true,
+    // Not fatal since ADR 0108: the one stage that weighs it, the job, meets it on an artwork
+    // file, and there it costs that frame and no other. The copied brief stops the run by
+    // refusing to open the delivery, which never asks the catalogue.
+    fatal: false,
     fatality:
-      'Depends on the file. The copied brief: nothing is rendered. An artwork file: that one ' +
-      'artifact is missing, reported as `E_OUTPUT_WRITE` with this sentence. `template.txt` or ' +
-      'an image in `assets/`: the artwork is written and that file is not. `result.json`: the ' +
-      'artwork is written and no report is.',
+      'Depends on the file, and nothing that is drawn is lost. The copied brief: the delivery ' +
+      'is not opened, so nothing is rendered. An artwork file: that one artifact is missing ' +
+      'and the others are written. `template.txt` or an image in `assets/`: the artwork is ' +
+      'written and that file is not. `result.json`: the artwork is written and no report is.',
   },
   W_TEXT_OVERFLOW: {
     severity: 'warning',

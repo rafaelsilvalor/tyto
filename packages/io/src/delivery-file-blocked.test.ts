@@ -120,13 +120,13 @@ describe('a folder where the delivery writes a file', () => {
     expect(answered.map((item) => item.code)).toEqual(['E_OUTPUT_FILE_BLOCKED']);
   });
 
-  it('rejects an artwork write with the sentence, which the job turns into E_OUTPUT_WRITE', async () => {
+  it('answers an artwork write with the sentence, which fails that one frame (ADR 0108)', async () => {
     const picked = join(workspace, 'escolhida');
     const held = join(picked, 'grid-01.svg');
     await holdWithFolder(held);
     const output = await openDelivery(picked);
 
-    const write = output.write({
+    const answered = await output.write({
       name: 'grid-01.svg',
       artwork: 'a',
       format: 'grid',
@@ -135,8 +135,11 @@ describe('a folder where the delivery writes a file', () => {
       bytes: new TextEncoder().encode('<svg/>'),
     });
 
-    // Without its full stop: E_OUTPUT_WRITE's own sentence ends with one.
-    await expect(write).rejects.toThrow(sentence(held).replace(/\.$/, ''));
+    // Answered, not thrown: a throw is what the job rethrows as exit 2, and this folder is
+    // there on every attempt until somebody moves it.
+    expect(answered.map((item) => [item.code, item.severity, item.message])).toEqual([
+      ['E_OUTPUT_FILE_BLOCKED', 'error', sentence(held)],
+    ]);
     await expectUntouched(held);
   });
 

@@ -312,7 +312,7 @@ slots:
         sink: {
           write: (artifact) => {
             written.push(artifact);
-            return Promise.resolve();
+            return Promise.resolve([]);
           },
         },
       },

@@ -1,3 +1,4 @@
+import type { Diagnostics } from '@tyto/core';
 import type { Exporter } from '@tyto/plugin-api';
 import { type RasterFormat, rasterExtension, rasterMimeType } from '@tyto/raster';
 
@@ -72,11 +73,16 @@ export interface ArtifactSink {
    * mean holding finished bytes back to wait for an earlier frame, and no consumer of
    * ADR 0011's folder contract reads the order files appeared in.
    *
-   * Rejects rather than returning a `Result`: a full disk is the operating system's
-   * answer, the same category `core`'s `FileSystem` port deliberately rejects on. The job
-   * catches at its own edge and turns it into a diagnostic.
+   * **Answers what it can explain, rejects what it cannot** (ADR 0108). A failure the sink
+   * can name and whose fix is somebody's — a folder where the file has to go — comes back
+   * as diagnostics: that frame fails, the others are written, and the run exits 1. A
+   * rejection is the operating system's answer nobody explained — a file another program
+   * holds open, a full disk — and the job does not turn it into a diagnostic any more: it
+   * starts no further frame, lets the ones in flight settle and rejects with the same
+   * cause, which `tyto render` reports as an internal failure (exit 2, worth retrying).
+   * An empty list means the file is written.
    */
-  write(artifact: Artifact): Promise<void>;
+  write(artifact: Artifact): Promise<Diagnostics>;
 }
 
 /**
