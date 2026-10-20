@@ -403,6 +403,9 @@ describe('switching the language', () => {
     // this counts. They are a locale's strings all the same — `panel.test.ts` is what holds
     // them to it.
     'problems.empty',
+    'problems.empty.settings',
+    'problems.empty.keybindings',
+    'problems.empty.snippets',
     'problems.severity.error',
     'problems.severity.warning',
     'problems.severity.info',

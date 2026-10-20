@@ -630,6 +630,8 @@ function paintPanel(): void {
       diagnostics: problems,
       brief: current.brief,
       locale: state.locale,
+      // A preview tab's `active()` is the brief it follows, so "this brief" is right there.
+      kind: current.kind ?? 'brief',
     };
   }
 }

@@ -45,6 +45,13 @@ export interface Catalogue {
   /** The bottom panel that lists what the stages had to say about the brief. */
   readonly 'problems.heading': string;
   readonly 'problems.empty': string;
+  /**
+   * The empty state with one of the app's own files in front (TYTO-322): the panel names the
+   * file, because "this brief" is wrong there. `problems.empty` stays the brief's.
+   */
+  readonly 'problems.empty.settings': string;
+  readonly 'problems.empty.keybindings': string;
+  readonly 'problems.empty.snippets': string;
   /** Read out for the coloured dot in front of a diagnostic, which says nothing on its own. */
   readonly 'problems.severity.error': string;
   readonly 'problems.severity.warning': string;
@@ -564,6 +571,9 @@ export const CATALOGUE_KEYS = [
   'preview.locked',
   'problems.heading',
   'problems.empty',
+  'problems.empty.settings',
+  'problems.empty.keybindings',
+  'problems.empty.snippets',
   'problems.severity.error',
   'problems.severity.warning',
   'problems.severity.info',

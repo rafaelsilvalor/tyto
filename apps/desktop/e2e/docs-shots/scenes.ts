@@ -145,7 +145,9 @@ export const SCENES: readonly Scene[] = [
   {
     name: 'settings-tab',
     size: LAPTOP,
-    proof: { selector: 'tyto-status-bar .status-bar__kind', key: 'status.kind.settings' },
+    // The empty Problems panel names the file (TYTO-322), so this proof also fails if the
+    // window never tells the panel what is in front.
+    proof: { selector: '.problems__empty', key: 'problems.empty.settings' },
     arrange: async ({ page, run }) => {
       await run('settings.open');
       await page.waitForFunction(() =>

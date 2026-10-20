@@ -91,6 +91,37 @@ describe('the problems panel', () => {
     expect(panel.querySelector('.problems__row')).toBeNull();
   });
 
+  // TYTO-322: "this brief" was wrong with `settings.json` in front, and in the manual.
+  it.each([
+    ['brief', 'pt-BR', 'Nada a relatar sobre este brief'],
+    ['settings', 'pt-BR', 'Nada a relatar sobre o settings.json'],
+    ['keybindings', 'pt-BR', 'Nada a relatar sobre o keybindings.json'],
+    ['snippets', 'pt-BR', 'Nada a relatar sobre o snippets.json'],
+    ['settings', 'en', 'Nothing to report about settings.json'],
+  ] as const)(
+    'names the %s document when there is nothing to say (%s)',
+    async (kind, locale, text) => {
+      const panel = mount({ kind, locale });
+      await panel.updateComplete;
+
+      expect(panel.querySelector('.problems__empty')?.textContent).toBe(text);
+    },
+  );
+
+  it('follows the document in front when it changes', async () => {
+    const panel = mount({ kind: 'settings' });
+    await panel.updateComplete;
+    expect(panel.querySelector('.problems__empty')?.textContent).toBe(
+      'Nada a relatar sobre o settings.json',
+    );
+
+    panel.state = { ...panel.state, kind: 'brief' };
+    await panel.updateComplete;
+    expect(panel.querySelector('.problems__empty')?.textContent).toBe(
+      'Nada a relatar sobre este brief',
+    );
+  });
+
   it('repaints every string when the locale changes, without a second pass over the document', async () => {
     // What the `[data-i18n]` walk did for this panel, the panel now does for itself: the
     // locale is a property, and changing it is an update rather than a sweep of the window.
