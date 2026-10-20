@@ -5,6 +5,7 @@ import {
   type ExportDialog,
   type ExportProgressView,
   type ExportStartRequest,
+  DEFAULT_KIND,
   EXPORT_DIALOG_TAG,
   completion,
 } from './export-dialog.js';
@@ -79,10 +80,10 @@ describe('the export dialog', () => {
     element.directory = '/out';
     await element.updateComplete;
 
-    const svg = element.querySelector<HTMLInputElement>('input[value="svg"]');
-    expect(svg?.checked).toBe(true);
+    const png = element.querySelector<HTMLInputElement>('input[value="png"]');
+    expect(png?.checked).toBe(true);
 
-    svg?.click();
+    png?.click();
     await element.updateComplete;
 
     expect(element.querySelector<HTMLButtonElement>('.export__start')?.disabled).toBe(true);
@@ -97,9 +98,9 @@ describe('the export dialog', () => {
     element.start = (request) => requests.push(request);
     await element.updateComplete;
 
-    element.querySelector<HTMLInputElement>('input[value="webp"]')?.click();
+    element.querySelector<HTMLInputElement>('input[value="svg"]')?.click();
     await element.updateComplete;
-    element.querySelector<HTMLInputElement>('input[value="png"]')?.click();
+    element.querySelector<HTMLInputElement>('input[value="webp"]')?.click();
     await element.updateComplete;
 
     element.querySelector<HTMLButtonElement>('.export__start')?.click();
@@ -117,7 +118,7 @@ describe('the export dialog', () => {
     element.start = (request) => requests.push(request);
     await element.updateComplete;
 
-    element.querySelector<HTMLInputElement>('input[value="png"]')?.click();
+    element.querySelector<HTMLInputElement>('input[value="svg"]')?.click();
     element.querySelector<HTMLInputElement>('input[value="jpeg"]')?.click();
     await element.updateComplete;
     element.querySelector<HTMLButtonElement>('.export__start')?.click();
@@ -215,6 +216,60 @@ describe('the export dialog', () => {
  * clicks Export has to keep getting exactly that — so `formats` is absent when all of them are
  * ticked and `scale` is absent at 1×, rather than being sent as a full list and a 1.
  */
+describe('the export dialog, which file types start ticked (TYTO-325)', () => {
+  const ticked = (element: ExportDialog): string[] =>
+    [...element.querySelectorAll<HTMLInputElement>('.export__types input')]
+      .filter((box) => box.checked)
+      .map((box) => box.value);
+
+  it('ticks PNG alone for somebody who has never exported', async () => {
+    const element = dialog();
+    await element.updateComplete;
+
+    expect(DEFAULT_KIND).toBe('png');
+    expect(element.kinds).toEqual(['png']);
+    expect(ticked(element)).toEqual(['png']);
+  });
+
+  it('ticks the first kind offered when the build has no PNG', async () => {
+    // A build without the raster exporter: a ticked box nobody can see would either send a
+    // kind nothing renders or grey out Export for no visible reason.
+    const element = dialog();
+    element.directory = '/out';
+    element.available = ['jpeg', 'svg', 'pdf'];
+    await element.updateComplete;
+
+    expect(element.kinds).toEqual(['jpeg']);
+    expect(ticked(element)).toEqual(['jpeg']);
+    expect(element.querySelector<HTMLButtonElement>('.export__start')?.disabled).toBe(false);
+  });
+
+  it('keeps a choice made earlier when main answers again on the next opening', async () => {
+    const element = dialog();
+    await element.updateComplete;
+    element.querySelector<HTMLInputElement>('input[value="svg"]')?.click();
+    element.querySelector<HTMLInputElement>('input[value="png"]')?.click();
+    await element.updateComplete;
+
+    element.available = ['png', 'jpeg', 'webp', 'svg', 'pdf'];
+    await element.updateComplete;
+
+    expect(element.kinds).toEqual(['svg']);
+  });
+
+  it('leaves a selection somebody emptied on purpose empty', async () => {
+    const element = dialog();
+    await element.updateComplete;
+    element.querySelector<HTMLInputElement>('input[value="png"]')?.click();
+    await element.updateComplete;
+
+    element.available = ['svg'];
+    await element.updateComplete;
+
+    expect(element.kinds).toEqual([]);
+  });
+});
+
 describe('the export dialog, choosing what to render', () => {
   /** Ids in, each labelled by its id upper-cased, so a test can tell the two apart. */
   const withFormats = async (ids: readonly string[]): Promise<ExportDialog> => {
@@ -318,7 +373,7 @@ describe('the export dialog, choosing what to render', () => {
     const element = dialog();
     element.directory = '/out';
     await element.updateComplete;
-    element.querySelector<HTMLInputElement>('input[value="png"]')?.click();
+    element.querySelector<HTMLInputElement>('input[value="svg"]')?.click();
     element.querySelector<HTMLInputElement>('input[value="jpeg"]')?.click();
     await element.updateComplete;
 
@@ -339,8 +394,6 @@ describe('the export dialog, choosing what to render', () => {
   it('leaves scale off entirely at 1x, which is what shipped', async () => {
     const element = dialog();
     element.directory = '/out';
-    await element.updateComplete;
-    element.querySelector<HTMLInputElement>('input[value="png"]')?.click();
 
     const outputs = (await startAndCapture(element))?.outputs ?? [];
 
@@ -351,6 +404,9 @@ describe('the export dialog, choosing what to render', () => {
     const element = dialog();
     element.directory = '/out';
     await element.updateComplete;
+    element.querySelector<HTMLInputElement>('input[value="svg"]')?.click();
+    element.querySelector<HTMLInputElement>('input[value="png"]')?.click();
+    await element.updateComplete;
 
     expect(element.querySelector('[data-testid="export-scale"]')).toBeNull();
   });
@@ -360,11 +416,11 @@ describe('the export dialog, choosing what to render', () => {
     element.directory = '/out';
     await element.updateComplete;
 
-    // SVG alone, then PNG: neither can be compressed, so the control is not on screen. That
+    // PNG alone, then SVG: neither can be compressed, so the control is not on screen. That
     // is the card's criterion in its literal form — impossible from the form rather than
     // refused afterwards by the raster port's `TypeError`.
     expect(element.querySelector('[data-testid="export-quality"]')).toBeNull();
-    element.querySelector<HTMLInputElement>('input[value="png"]')?.click();
+    element.querySelector<HTMLInputElement>('input[value="svg"]')?.click();
     await element.updateComplete;
     expect(element.querySelector('[data-testid="export-quality"]')).toBeNull();
 
@@ -377,7 +433,6 @@ describe('the export dialog, choosing what to render', () => {
     const element = dialog();
     element.directory = '/out';
     await element.updateComplete;
-    element.querySelector<HTMLInputElement>('input[value="png"]')?.click();
     element.querySelector<HTMLInputElement>('input[value="jpeg"]')?.click();
     await element.updateComplete;
 

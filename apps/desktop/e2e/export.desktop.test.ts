@@ -213,6 +213,20 @@ async function run(commandId: string): Promise<void> {
   }
 }
 
+/**
+ * Ticks exactly the file types named, whatever was ticked before.
+ *
+ * The dialog opens with PNG ticked since TYTO-325, so a test that wants SVG says so rather
+ * than inheriting it — the docstring at the top says why this suite stays on SVG.
+ */
+async function tickTypes(wanted: readonly string[]): Promise<void> {
+  for (const kind of ['png', 'jpeg', 'webp', 'svg']) {
+    const box = window.locator(`.export__type input[value="${kind}"]`);
+    const on = await box.isChecked();
+    if (on !== wanted.includes(kind)) await box.click();
+  }
+}
+
 describe('exporting from the window (E9.4)', () => {
   it('opens a dialog that is actually on screen', async () => {
     await run('file.export');
@@ -235,6 +249,18 @@ describe('exporting from the window (E9.4)', () => {
     // not exist here. Waiting is done with `waitFor`/`waitForSelector` and asserted with
     // plain values.
     expect(await window.locator('.export__start').isDisabled()).toBe(true);
+
+    // A fresh profile opens on PNG alone (TYTO-325): the picture a person posts. Read once
+    // main has answered `export:kinds`, which is when the dialog settles what it offers.
+    await window.waitForSelector('.export__type input[value="svg"]');
+    const ticked = await window
+      .locator('.export__type input')
+      .evaluateAll((boxes) =>
+        boxes
+          .filter((box) => (box as HTMLInputElement).checked)
+          .map((box) => (box as HTMLInputElement).value),
+      );
+    expect(ticked).toEqual(['png']);
   });
 
   it('writes the files, and says so', async () => {
@@ -251,6 +277,7 @@ describe('exporting from the window (E9.4)', () => {
       out,
     );
 
+    await tickTypes(['svg']);
     await window.locator('.export__start').click();
 
     // Waited for by condition and never by a fixed timeout: a render takes as long as it
@@ -359,6 +386,7 @@ describe('exporting from the window (E9.4)', () => {
     await run('file.export');
     await window.locator('.export__panel').waitFor({ state: 'visible' });
     await window.locator('.export__choose').click();
+    await tickTypes(['svg']);
     await window.locator('.export__start').click();
 
     // **This clicks Cancel and accepts either outcome, and the reason is a measurement
@@ -417,15 +445,6 @@ describe('exporting from the window (E9.4)', () => {
  * of the two can be unticked, and the frame that lands says which one stayed by its size.
  */
 describe('choosing formats and scale (TYTO-137)', () => {
-  /** Ticks exactly the file types named, whatever was ticked before. */
-  const tickTypes = async (wanted: readonly string[]): Promise<void> => {
-    for (const kind of ['png', 'jpeg', 'webp', 'svg']) {
-      const box = window.locator(`.export__type input[value="${kind}"]`);
-      const on = await box.isChecked();
-      if (on !== wanted.includes(kind)) await box.click();
-    }
-  };
-
   const exportInto = async (
     out: string,
     options: { formats?: readonly string[]; scale?: 1 | 2 } = {},

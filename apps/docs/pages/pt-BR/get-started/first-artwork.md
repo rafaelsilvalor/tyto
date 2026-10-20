@@ -74,9 +74,8 @@ Aperte **Ctrl+S** (**Cmd+S**) e salve o brief como `lista-de-leitura.brief`, em 
 Rode **Exportar…** (ou clique no botão de exportar da barra de status). Na caixa:
 
 1. **Pasta de destino ▸ Escolher…** — escolha uma pasta vazia para as imagens.
-2. **Tipos de arquivo** — marque **PNG**. Desmarque **SVG** se estiver marcado; na primeira exportação ele era o único.
-3. **Formatos** — deixe todos marcados.
-4. Clique em **Exportar**.
+2. **Formatos** — deixe todos marcados.
+3. Clique em **Exportar**.
 
 A caixa conta `6 / 6` e diz **Exportação concluída**; **Abrir pasta** abre o destino. Nele:
 
