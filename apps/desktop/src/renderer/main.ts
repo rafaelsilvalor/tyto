@@ -4137,8 +4137,8 @@ async function loadTemplateMode(): Promise<TemplateMode | undefined> {
 }
 
 /**
- * Hands the template mode its ports. Every one is a round trip to main except the last, which
- * is what saving means to the rest of the window.
+ * Hands the template mode its ports. Most are a round trip to main; `saved` and `created` are
+ * what a save or a New means to the rest of the window.
  */
 function wireTemplateMode(mode: TemplateMode, bridge: TytoBridge): void {
   mode.ports = {
@@ -4156,6 +4156,10 @@ function wireTemplateMode(mode: TemplateMode, bridge: TytoBridge): void {
         })
       ).confirmed,
     saved: () => {
+      void afterTemplatesReread(bridge);
+    },
+    // The scaffold is a template more in the folder, read again exactly as a save is (TYTO-324).
+    created: () => {
       void afterTemplatesReread(bridge);
     },
     // The mode is part of the session (TYTO-266), kept on the same pause as the tabs.

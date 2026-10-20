@@ -18,6 +18,7 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { closeApp } from './close-app.js';
 import { firstWindow } from './first-window.js';
 import { openPreviewBeside, previewSrcdoc } from './preview-pane.js';
+import { waitForWindowTemplates } from './window-templates.js';
 
 /**
  * The template mode (TYTO-44, E9.5) through a real window: a template folder open beside every
@@ -290,6 +291,10 @@ describe('the template mode', () => {
       await page.locator('.template-mode__problem-row--error').count(),
       await page.locator('[data-testid="template-problems"]').innerText(),
     ).toBe(0);
+
+    // And the window knows it, with no Save in between (TYTO-324): what New brief from
+    // template... lists is the window's own read of the folder, which only a save used to refresh.
+    await waitForWindowTemplates(page, ['novo'], 10_000);
   });
 
   it('closes back onto the briefs, which were there all along', async () => {
