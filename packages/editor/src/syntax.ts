@@ -47,3 +47,14 @@ const PARSE_BUDGET_MS = 100;
 export function treeAt(state: EditorState, upto: number): Tree {
   return ensureSyntaxTree(state, upto, PARSE_BUDGET_MS) ?? syntaxTree(state);
 }
+
+/**
+ * Whether the parse moved on between two states — a new tree, whatever else changed.
+ *
+ * The one question here that wants `syntaxTree` and not `treeAt`: it compares the snapshots the
+ * two states hold, which is what changes when CodeMirror's background parse lands. A reader
+ * that drew from a partial tree asks this to know it must read again (TYTO-339).
+ */
+export function treeChanged(before: EditorState, after: EditorState): boolean {
+  return syntaxTree(before) !== syntaxTree(after);
+}
