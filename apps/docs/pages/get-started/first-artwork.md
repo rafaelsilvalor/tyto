@@ -74,9 +74,8 @@ Press **Ctrl+S** (**Cmd+S**) and save the brief as `reading-list.brief`, in any 
 Run **Export…** (or click the export button in the status bar). In the dialog:
 
 1. **Destination folder ▸ Choose…** — pick an empty folder for the images.
-2. **File types** — tick **PNG**. Untick **SVG** if it is ticked; on the first export it was the only one.
-3. **Formats** — leave every format ticked.
-4. Click **Export**.
+2. **Formats** — leave every format ticked.
+3. Click **Export**.
 
 The dialog counts `6 / 6` and says **Export finished**; **Open folder** opens the destination. In it:
 

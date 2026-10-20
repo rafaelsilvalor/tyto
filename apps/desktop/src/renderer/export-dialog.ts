@@ -32,6 +32,12 @@ export const EXPORT_KINDS = ['png', 'jpeg', 'webp', 'svg'] as const;
  */
 export type ExportKind = string;
 
+/**
+ * What is ticked the first time the dialog opens (TYTO-325): the picture a person posts,
+ * rather than SVG. A build that does not offer it falls back to the first kind it does.
+ */
+export const DEFAULT_KIND: ExportKind = 'png';
+
 /** A format a template renders, as `templates:list` names it: sent by `id`, shown by `label`. */
 export type FormatOption = IpcResponse<'templates:list'>['templates'][number]['formats'][number];
 
@@ -162,7 +168,14 @@ export class ExportDialog extends LitElement {
    */
   declare formats: readonly FormatOption[];
 
-  /** Which file types are ticked. SVG alone by default — it is the one that always works. */
+  /**
+   * Which file types are ticked. {@link DEFAULT_KIND} alone for somebody who has never
+   * exported (TYTO-325).
+   *
+   * **Remembered for as long as the window lives, and no longer.** The window mounts one
+   * dialog and reopens that same element, so a choice survives closing and reopening it; it
+   * is in neither the settings nor the session, so a restart starts from the default again.
+   */
   declare kinds: readonly ExportKind[];
 
   /**
@@ -198,7 +211,7 @@ export class ExportDialog extends LitElement {
     this.reveal = () => undefined;
     this.close = () => undefined;
     this.formats = [];
-    this.kinds = ['svg'];
+    this.kinds = [DEFAULT_KIND];
     this.available = [...EXPORT_KINDS];
     this.chosenFormats = undefined;
     this.scale = 1;
@@ -214,9 +227,27 @@ export class ExportDialog extends LitElement {
    * names formats the new template does not have.
    */
   protected override willUpdate(changed: Map<string, unknown>): void {
+    if (changed.has('available')) this.keepKindsOffered();
     if (!changed.has('formats')) return;
     this.chosenFormats =
       this.formats.length === 0 ? undefined : this.formats.map((format) => format.id);
+  }
+
+  /**
+   * Drops a ticked type main does not offer, and ticks the first one it does if that left
+   * nothing (TYTO-325).
+   *
+   * **The default is a guess made before main answers**: a build without the raster exporter
+   * has no `png`, and a dialog that opened with an invisible box ticked would either send a
+   * kind nobody can render or open with Export greyed out for no reason a person could see.
+   * A selection that is already empty is left alone — that is somebody who unticked every
+   * box, and the refusal to start is the answer they are owed.
+   */
+  private keepKindsOffered(): void {
+    const kept = this.kinds.filter((kind) => this.available.includes(kind));
+    if (kept.length === this.kinds.length) return;
+    const first = this.available[0];
+    this.kinds = kept.length > 0 || first === undefined ? kept : [first];
   }
 
   /** Light DOM, so `shell.css` reaches inside — the arrangement ADR 0024 settled. */
