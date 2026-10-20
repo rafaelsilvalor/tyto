@@ -574,6 +574,11 @@
       "why": "reviewed: recent files, in the File menu"
     },
     {
+      "paths": ["apps/desktop/src/main/seed-files.ts"],
+      "e2e": ["keybindings-file.desktop.test.ts", "snippets-file.desktop.test.ts"],
+      "why": "reviewed: what a new keybindings.json and snippets.json start with"
+    },
+    {
       "paths": ["apps/desktop/src/main/session-store.ts"],
       "e2e": "all",
       "why": "reviewed: session restore runs on every launch"
