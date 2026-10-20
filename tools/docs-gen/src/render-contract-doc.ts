@@ -100,10 +100,15 @@ it if it is not there. Useful flags for a caller: \`--types png,jpeg,webp,svg\` 
 \`png\`), \`--scale\`, \`--quality\`, \`--template\`, \`--formats\`, \`--json\`. \`tyto render --help\`
 is authoritative.
 
-**\`--template\` and \`--formats\` are fallbacks, not overrides.** Each applies only when the
-brief's frontmatter says nothing on that subject, so what the brief says about itself always
-wins over what one invocation says about the brief. A caller that needs to force a template
-writes it into the frontmatter.
+**\`--template\` is a fallback, not an override.** It applies only when the brief's
+frontmatter names no template, so what the brief says about itself wins over what one
+invocation says about the brief. A caller that needs to force a template writes it into the
+frontmatter.
+
+**\`--formats\` narrows the brief's list** (ADR 0107). On a brief whose frontmatter lists
+formats, the run renders the listed ones the flag also names, in the brief's order; a format
+the flag names that the brief does not list is \`E_FORMAT_NOT_IN_BRIEF\`, so a caller can
+leave sizes out but never add one. On a brief that lists none, the flag is the list.
 
 ## Exit codes
 

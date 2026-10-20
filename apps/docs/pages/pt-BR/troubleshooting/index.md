@@ -18,10 +18,6 @@ Quase tudo o que dá errado no Tyto aparece no painel de Problemas — num brief
 
 <!-- TYTO-329: itálico falha na exportação. -->
 
-**A exportação fez tamanhos que eu desmarquei.** A linha `formats:` do brief vale mais que a lista **Formatos** da caixa; veja o aviso em [Exportar](../export/).
-
-<!-- TYTO-332: a lista Formatos é ignorada quando o brief lista formatos. -->
-
 **Uma configuração não faz nada.** Procure `W_SETTING_INVALID` (o valor não é um que a configuração aceita, então vale o padrão) ou `E_SETTINGS_SYNTAX` (o arquivo não pode ser lido, então a janela mantém as configurações que tinha). [settings.json](../customize/settings-json.md#quando-um-valor-esta-errado) explica os dois. E lembre de salvar: nada vale antes.
 
 **Uma tecla não faz nada.** Ela pode ter sido tirada no `keybindings.json`, ou o modo vim pode estar ligado e ter ficado com ela — a barra de comandos mostra a tecla de cada comando como está agora. Veja [Atalhos de teclado](../customize/keybindings-json.md) e [Modo vim](../editor/vim-mode.md).

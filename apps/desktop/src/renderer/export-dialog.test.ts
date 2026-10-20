@@ -9,6 +9,7 @@ import {
   EXPORT_DIALOG_TAG,
   completion,
 } from './export-dialog.js';
+import { offeredFormats } from './frontmatter.js';
 
 /**
  * The dialog's arithmetic and its states.
@@ -300,6 +301,24 @@ describe('the export dialog, choosing what to render', () => {
     // **Absent, not the full list.** The channel reads an absent `formats` as every format the
     // *manifest* declares; sending the list this window is holding would quietly narrow the
     // export to what it happened to know about.
+    expect(await startAndCapture(element)).not.toHaveProperty('formats');
+  });
+
+  it("offers only the brief's formats, and sends none when all of them stay ticked", async () => {
+    // ADR 0107: a brief listing two of a template's three formats is offered those two.
+    // Ticking both is "the brief's list", which the channel reads from an absent `formats`
+    // exactly as before, so the subset never has to travel.
+    const brief = '---\ntemplate: notice\nformats: [grid, story]\n---\n';
+    const offered = offeredFormats(brief, [
+      { id: 'feed', label: 'FEED' },
+      { id: 'grid', label: 'GRID' },
+      { id: 'story', label: 'STORY' },
+    ]);
+    const element = await withFormats(offered.map((format) => format.id));
+
+    const boxes = [...element.querySelectorAll<HTMLInputElement>('.export__format input')];
+    expect(boxes.map((input) => input.value)).toEqual(['grid', 'story']);
+    expect(boxes.every((input) => input.checked)).toBe(true);
     expect(await startAndCapture(element)).not.toHaveProperty('formats');
   });
 

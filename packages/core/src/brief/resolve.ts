@@ -82,13 +82,16 @@ export interface ResolveOptions {
   /** `--template` on the CLI, for a brief whose frontmatter names none. */
   readonly template?: string;
   /**
-   * `--formats` on the CLI, for a brief whose frontmatter lists none.
+   * `--formats` on the CLI, or the Export dialog's ticks: the formats this run wants.
    *
-   * A fallback and not an override, which is `template`'s rule above and therefore the
-   * one rule a reader has to learn: what the brief says about itself wins over what the
-   * command line says about this run. Each entry is checked against the manifest the same
-   * way the frontmatter's are, so a format the template does not render is
-   * `E_UNKNOWN_FORMAT` whichever of the two named it.
+   * Not `template`'s rule, on purpose (ADR 0107). A template is one choice, so a flag can
+   * only stand in for a brief that made none. A brief's `formats` is a set, and a run may
+   * want part of it: with a list in the frontmatter, these narrow it — the brief's formats
+   * that are also named here, in the brief's order. A format named here that the template
+   * renders but the brief does not list is `E_FORMAT_NOT_IN_BRIEF`, so a run never widens
+   * what the brief asked for. With no list in the frontmatter these are used as they are.
+   * Each entry is checked against the manifest the way the frontmatter's are, so a format
+   * the template does not render is `E_UNKNOWN_FORMAT` whichever of the two named it.
    */
   readonly formats?: readonly string[];
   /**
@@ -515,10 +518,25 @@ class Resolver {
 }
 
 /**
- * The formats to render: the frontmatter's, else the caller's, else the manifest's own.
+ * The formats a brief's frontmatter lists, as strings; `undefined` when it has no
+ * `formats` key.
  *
- * The range goes on the diagnostic only when the frontmatter asked, because a `--formats`
- * flag has nowhere in the file for an editor to underline.
+ * YAML lets an author write `formats: story` for a list of one, so a scalar becomes a
+ * list of one here. Exported because the desktop renderer offers the brief's formats in
+ * its Export dialog, and reading the line twice two ways is how the two would drift.
+ */
+export function listedFormats(data: Readonly<Record<string, unknown>>): string[] | undefined {
+  const written = data.formats;
+  if (written === undefined || written === null) return undefined;
+  return (Array.isArray(written) ? written : [written]).map((entry) => String(entry));
+}
+
+/**
+ * The formats to render: the frontmatter's, narrowed by the caller's when both list some;
+ * else the caller's; else the manifest's own (ADR 0107).
+ *
+ * The range goes on a diagnostic only when the frontmatter is involved, because a
+ * `--formats` flag has nowhere in the file for an editor to underline.
  */
 function formatsOf(
   ast: BriefAst,
@@ -526,31 +544,43 @@ function formatsOf(
   override: readonly string[] | undefined,
   report: (problem: Diagnostic) => void,
 ): readonly string[] {
-  const written = ast.frontmatter.data.formats;
-  const requested =
-    written ?? (override !== undefined && override.length > 0 ? override : undefined);
-  if (requested === undefined) return manifest.formats;
-
-  const range = written === undefined ? undefined : ast.frontmatter.ranges.formats;
-  const listed = Array.isArray(requested) ? requested : [requested];
-  const kept: string[] = [];
-
-  for (const entry of listed) {
-    const format = String(entry);
-    if (manifest.formats.includes(format)) {
-      kept.push(format);
-      continue;
-    }
+  const written = listedFormats(ast.frontmatter.data);
+  const requested = override !== undefined && override.length > 0 ? override : undefined;
+  const range = ast.frontmatter.ranges.formats;
+  const unknown = (format: string, at: SourceRange | undefined): void => {
     report(
       diagnostic(
         'E_UNKNOWN_FORMAT',
         { format, template: manifest.name, declared: manifest.formats.join(', ') },
+        at === undefined ? {} : { range: at },
+      ),
+    );
+  };
+  const rendered = (formats: readonly string[], at: SourceRange | undefined): string[] =>
+    formats.filter((format) => {
+      if (manifest.formats.includes(format)) return true;
+      unknown(format, at);
+      return false;
+    });
+
+  if (written === undefined) {
+    return requested === undefined ? manifest.formats : rendered(requested, undefined);
+  }
+
+  const listed = rendered(written, range);
+  if (requested === undefined) return listed;
+
+  for (const format of rendered(requested, undefined)) {
+    if (listed.includes(format)) continue;
+    report(
+      diagnostic(
+        'E_FORMAT_NOT_IN_BRIEF',
+        { format, listed: listed.length === 0 ? 'none' : listed.join(', ') },
         range === undefined ? {} : { range },
       ),
     );
   }
-
-  return kept;
+  return listed.filter((format) => requested.includes(format));
 }
 
 /**

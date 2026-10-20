@@ -147,10 +147,12 @@ export interface JobRequest {
    */
   readonly template?: string;
   /**
-   * `--formats`, used only when the brief's frontmatter lists none.
+   * `--formats` or the Export dialog's ticks: the formats this run wants.
    *
-   * Passed straight to `resolve`, which owns the precedence and the `E_UNKNOWN_FORMAT` it
-   * writes for a format the template does not render. The job does not filter frames
+   * Passed straight to `resolve`, which owns the rule (ADR 0107): they narrow a list the
+   * brief's frontmatter has, and stand in for one it lacks. `resolve` also writes the
+   * `E_UNKNOWN_FORMAT` for a format the template does not render and the
+   * `E_FORMAT_NOT_IN_BRIEF` for one the brief does not list. The job does not filter frames
    * itself: a frame the caller did not ask for should never be built, and building one to
    * drop it afterwards would run the template for nothing.
    */

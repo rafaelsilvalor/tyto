@@ -16,10 +16,6 @@ Almost everything that goes wrong in Tyto is said in the Problems panel — a br
 
 <!-- TYTO-329: italic fails at export. -->
 
-**Export made sizes I unticked.** The brief's `formats:` line wins over the dialog's **Formats** list; see the warning in [Export](../export/).
-
-<!-- TYTO-332: the Formats checklist is ignored when the brief lists formats. -->
-
 **A setting does nothing.** Look for `W_SETTING_INVALID` (the value is not one the setting takes, so its default applies) or `E_SETTINGS_SYNTAX` (the file cannot be read, so the window keeps the settings it had). [settings.json](../customize/settings-json.md#when-a-value-is-wrong) explains both. Remember to save: nothing applies before.
 
 **A key does nothing.** It may have been taken away in `keybindings.json`, or vim mode may be on and own it — the command bar shows each command's key as it is right now. See [Keyboard shortcuts](../customize/keybindings-json.md) and [Vim mode](../editor/vim-mode.md).

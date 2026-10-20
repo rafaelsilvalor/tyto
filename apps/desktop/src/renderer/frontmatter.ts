@@ -1,3 +1,6 @@
+import { parseBrief } from '@tyto/brief-lang';
+import { listedFormats } from '@tyto/core';
+
 /**
  * Changing which template a brief uses, as the smallest edit that does it (E9.3).
  *
@@ -128,4 +131,27 @@ export function templateOf(brief: string): string | undefined {
     return value === '' ? undefined : value;
   }
   return undefined;
+}
+
+/**
+ * The formats the Export dialog offers: the template's, narrowed to the brief's own list.
+ *
+ * The pipeline renders only formats the brief lists (ADR 0107), so a checkbox for one it
+ * does not list would be a box whose tick can only end in `E_FORMAT_NOT_IN_BRIEF`. A brief
+ * that lists none, or whose frontmatter does not parse, is offered everything the template
+ * draws: the first is what the export renders, and the second is an export that will stop
+ * on the brief's own error, which the dialog is not the place to report. The list is read
+ * by `parseBrief` and `listedFormats`, the same two steps `resolve` takes, so a scalar
+ * `formats: story` and a block list answer here exactly as they do in the export.
+ * The template's order is kept, so the checklist does not reshuffle as the brief changes.
+ */
+export function offeredFormats<Format extends { readonly id: string }>(
+  brief: string,
+  templateFormats: readonly Format[],
+): readonly Format[] {
+  const parsed = parseBrief(brief);
+  if (!parsed.ok) return templateFormats;
+  const listed = listedFormats(parsed.value.frontmatter.data);
+  if (listed === undefined) return templateFormats;
+  return templateFormats.filter((format) => listed.includes(format.id));
 }

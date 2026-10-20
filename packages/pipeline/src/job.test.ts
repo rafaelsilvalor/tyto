@@ -957,6 +957,22 @@ describe('the stages before the render', () => {
     ]);
   });
 
+  it("narrows the brief's formats to request.formats, building only those frames", async () => {
+    // The Export dialog with Story unticked on a brief that lists feed and story (TYTO-332):
+    // before ADR 0107 the brief's list won and all six artworks were built.
+    const result = await runJob(
+      { brief: briefSource, formats: ['feed'], outputs: [{ kind: 'svg' }] },
+      await portsOf(),
+    );
+
+    if (!result.ok) throw new Error(result.error.map((item) => item.message).join('; '));
+    expect(result.value.artifacts.map((artifact) => artifact.name)).toEqual([
+      'feed-01.svg',
+      'feed-02.svg',
+      'feed-03.svg',
+    ]);
+  });
+
   it('carries what every stage said onto the success branch, errors included', async () => {
     // `subtitulo` is not a slot this manifest declares, so `resolve` reports it — as an
     // error, since an unknown slot is a typo. It is not a *fatal* one: the slot the brief

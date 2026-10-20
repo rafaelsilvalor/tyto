@@ -59,7 +59,7 @@ import { followScheme } from './color-scheme.js';
 import { applyTheme, withThemeRows } from './theme.js';
 import { canvasMeasure, missingFamilyRows, withFontRows } from './typography.js';
 import { DEFAULT_TYPOGRAPHY, type Typography } from '../../shared/typography.js';
-import { templateOf } from './frontmatter.js';
+import { offeredFormats, templateOf } from './frontmatter.js';
 import {
   type AppFileAssists,
   assistOf,
@@ -759,7 +759,10 @@ const EXPORT_POLL_MS = 150;
 function formatsOfActiveBrief(): readonly FormatOption[] {
   const wanted = templateOf(activeText());
   if (wanted === undefined) return [];
-  return panel.templates.find((template) => template.name === wanted)?.formats ?? [];
+  const formats = panel.templates.find((template) => template.name === wanted)?.formats ?? [];
+  // Only the brief's own formats when it lists some, because those are all an export of
+  // it can write (ADR 0107): the ticks then narrow that list and never ask for more.
+  return offeredFormats(activeText(), formats);
 }
 
 function paintExport(progress: ExportProgressView | undefined): void {

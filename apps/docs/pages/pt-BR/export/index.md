@@ -16,15 +16,9 @@ Exportar transforma o brief da frente em arquivos: imagens PNG, JPEG ou WebP, de
 1. Com o brief na frente, execute **Exportar…**: pelo menu **Arquivo**, pelo botão de exportar na barra de status ou pela barra de comandos.
 2. Em **Pasta de destino**, clique em **Escolher…** e escolha para onde vão os arquivos. A caixa lembra a pasta enquanto a janela estiver aberta.
 3. Em **Tipos de arquivo**, marque os tipos que você quer; a primeira exportação começa só com **PNG**. Cada tipo marcado é um arquivo por arte e por tamanho.
-4. Em **Formatos**, desmarque os tamanhos que você não quer. Veja o aviso abaixo.
+4. Em **Formatos**, desmarque os tamanhos que você não quer. Quando o brief tem uma linha `formats:`, a lista mostra só os tamanhos dela.
 5. Clique em **Exportar**. Uma barra conta os arquivos enquanto são gravados — **7 / 8** — e **Cancelar** interrompe; os arquivos já gravados ficam.
 6. Quando aparecer **Exportação concluída**, **Abrir pasta** mostra os arquivos.
-
-::: warning Um brief que lista os formatos recebe todos eles
-Quando o frontmatter do brief tem uma linha `formats:`, a exportação faz todos os tamanhos dessa linha, não importa o que esteja marcado em **Formatos**. Desmarcar um tamanho só tem efeito num brief sem essa linha. Para deixar um tamanho de fora, tire-o da linha `formats:` do brief antes de exportar.
-:::
-
-<!-- Medido no e3d32e9: um brief com `formats: [grid, story]` e Story desmarcado ainda gravou os arquivos story. TYTO-332. -->
 
 **Escala** e **Qualidade** aparecem quando um tipo de imagem está marcado; [Imagens](./images.md) explica os dois.
 

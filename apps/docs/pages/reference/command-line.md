@@ -28,7 +28,7 @@ tyto render [options] <brief>
 | `--templates <dir>` | folder holding one subfolder per template | `"templates"` |
 | `--formats-file <path>` | the project's formats.yaml, the one place a size is written | `"formats.yaml"` |
 | `-t, --template <name>` | template to use when the brief's frontmatter names none |  |
-| `-f, --formats <ids>` | comma-separated format ids, when the brief's frontmatter lists none |  |
+| `-f, --formats <ids>` | comma-separated format ids; narrows the brief's own list when it has one |  |
 | `--types <kinds>` | comma-separated: png, jpeg, webp, svg, or a kind an installed exporter adds | `["png"]` |
 | `--scale <n>` | device pixels per CSS pixel; 2 is the retina export |  |
 | `--quality <n>` | encoder quality 1-100, for jpeg and webp only |  |
@@ -58,7 +58,7 @@ tyto watch [options] <folder>
 | `--templates <dir>` | folder holding one subfolder per template | `"templates"` |
 | `--formats-file <path>` | the project's formats.yaml, the one place a size is written | `"formats.yaml"` |
 | `-t, --template <name>` | template to use when the brief's frontmatter names none |  |
-| `-f, --formats <ids>` | comma-separated format ids, when the brief's frontmatter lists none |  |
+| `-f, --formats <ids>` | comma-separated format ids; narrows the brief's own list when it has one |  |
 | `--types <kinds>` | comma-separated: png, jpeg, webp, svg, or a kind an installed exporter adds | `["png"]` |
 | `--scale <n>` | device pixels per CSS pixel; 2 is the retina export |  |
 | `--quality <n>` | encoder quality 1-100, for jpeg and webp only |  |

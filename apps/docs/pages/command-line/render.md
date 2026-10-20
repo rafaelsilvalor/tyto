@@ -66,7 +66,8 @@ What could still be drawn is written, as `grid-01.png` was here, so check the ex
 
 ## Other options
 
-- `--template` and `--formats` say which template and sizes to use for a brief whose frontmatter does not; a brief that names them wins.
+- `--template` says which template to use for a brief whose frontmatter names none; a brief that names one wins.
+- `--formats` says which sizes to make. For a brief with a `formats:` line it picks some of the sizes on that line; a size the line does not have is `E_FORMAT_NOT_IN_BRIEF`. For a brief without the line it is the list of sizes.
 - `--assets` says where image paths in the brief are looked for; by default an `assets/` folder beside the brief, else the brief's own folder.
 
 The Reference's [`tyto render`](../reference/command-line.md#tyto-render) lists every option with its default.

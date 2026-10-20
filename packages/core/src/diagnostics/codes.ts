@@ -86,6 +86,16 @@ export const diagnosticCodes = {
     fatal: false,
     fatality: 'The formats the template does render are unaffected.',
   },
+  E_FORMAT_NOT_IN_BRIEF: {
+    severity: 'error',
+    summary: 'A run asks for a format the template renders but the brief does not list.',
+    template:
+      "Format '{format}' was requested, but the brief lists only: {listed}. " +
+      "Add it to the brief's 'formats' to render it.",
+    spec: 'docs/brief-language.md',
+    fatal: false,
+    fatality: "The brief's own formats that were also requested still render.",
+  },
   E_BAD_SLOT_VALUE: {
     severity: 'error',
     summary: 'A slot is set to something the manifest does not allow for it.',
