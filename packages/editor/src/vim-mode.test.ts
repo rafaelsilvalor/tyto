@@ -1,10 +1,19 @@
 // @vitest-environment jsdom
-import { EditorSelection } from '@codemirror/state';
+import {
+  type CompletionContext,
+  type CompletionResult,
+  autocompletion,
+  completionStatus,
+  currentCompletions,
+} from '@codemirror/autocomplete';
+import { EditorSelection, type Extension } from '@codemirror/state';
 import { type EditorView, runScopeHandlers } from '@codemirror/view';
 import { Vim, getCM } from '@replit/codemirror-vim';
-import { afterEach, describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 
+import { briefLanguage } from './brief-language.js';
 import { type CommandRegistry, createCommandRegistry } from './commands.js';
+import { briefCompletion } from './completion.js';
 import { createEditor, cursorOf, type EditorHandle } from './editor.js';
 import { EDITOR_RENDER, EDITOR_SAVE, EDITOR_SPLIT_DOWN, EDITOR_SPLIT_RIGHT } from './keymap.js';
 import { defaultExCommands } from './vim-mode.js';
@@ -262,6 +271,82 @@ describe('the vim status a host draws itself (TYTO-248)', () => {
     press(handle.view, 'd');
 
     expect(pending).toBe('d');
+  });
+});
+
+/**
+ * Vim's Escape against a completion nobody can see (TYTO-331).
+ *
+ * Typing wakes completion, which is _pending_ until its source answers. CodeMirror's completion
+ * keymap closes anything that is not inactive on Escape and keeps the key, so an Escape pressed
+ * in that window never reached vim: the mode stayed insert with no popup on screen. The keys go
+ * through the content element, the path a real keystroke takes — the keymap and vim's own
+ * keydown handler in the order the view runs them.
+ */
+describe("vim's Escape and completion (TYTO-331)", () => {
+  const press = (view: EditorView, key: string): void => {
+    view.contentDOM.dispatchEvent(
+      new KeyboardEvent('keydown', { key, bubbles: true, cancelable: true }),
+    );
+  };
+
+  /** Types at the cursor the way a keystroke does: `input.type` is what wakes completion. */
+  const type = (view: EditorView, text: string): void => {
+    for (const character of text) {
+      const at = view.state.selection.main.head;
+      view.dispatch({
+        changes: { from: at, insert: character },
+        selection: { anchor: at + 1 },
+        userEvent: 'input.type',
+      });
+    }
+  };
+
+  const insertMode = (view: EditorView): boolean => getCM(view)?.state.vim?.insertMode === true;
+
+  /** In vim, in insert mode at the end of the brief. */
+  const typing = (extensions: readonly Extension[]): EditorView => {
+    const parent = document.createElement('div');
+    document.body.append(parent);
+    handle = createEditor(parent, { doc: `${BRIEF}\n`, vim: true, vimStatus: false, extensions });
+    const view = handle.view;
+    view.dispatch({ selection: { anchor: view.state.doc.length } });
+    press(view, 'i');
+    expect(insertMode(view)).toBe(true);
+    return view;
+  };
+
+  it('reaches vim while a completion is pending and no popup is drawn', async () => {
+    const view = typing([briefCompletion()]);
+
+    type(view, 'xyz');
+    expect(completionStatus(view.state)).toBe('pending');
+    expect(currentCompletions(view.state)).toEqual([]);
+    press(view, 'Escape');
+
+    expect(insertMode(view)).toBe(false);
+    // And the query it cancelled does not come back as a popup once vim is in normal mode.
+    await new Promise((resolve) => setTimeout(resolve, 200));
+    expect(currentCompletions(view.state)).toEqual([]);
+  });
+
+  it('still closes a popup that is on screen, and stays in insert mode', async () => {
+    const source = (context: CompletionContext): CompletionResult | null => {
+      const word = context.matchBefore(/\w+/);
+      return word === null ? null : { from: word.from, options: [{ label: 'xyzzy' }] };
+    };
+    const view = typing([autocompletion(), briefLanguage.data.of({ autocomplete: source })]);
+
+    type(view, 'xyz');
+    await vi.waitFor(() => {
+      expect(currentCompletions(view.state).length).toBeGreaterThan(0);
+    });
+    press(view, 'Escape');
+
+    expect(completionStatus(view.state)).toBeNull();
+    expect(insertMode(view)).toBe(true);
+    press(view, 'Escape');
+    expect(insertMode(view)).toBe(false);
   });
 });
 
