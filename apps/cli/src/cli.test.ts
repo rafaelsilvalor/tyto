@@ -891,16 +891,34 @@ describe('tyto render --folder with a folder where a file goes', () => {
     expect(parsed.value.diagnostics.map((item) => item.code)).toEqual(['E_OUTPUT_FILE_BLOCKED']);
   });
 
-  it('exits 1 for a folder holding an artwork file, with E_OUTPUT_WRITE naming the folder', async () => {
+  it('exits 1 for a folder holding an artwork file, naming the folder, and writes the rest', async () => {
     await mkdir(delivery('feed-01.svg'), { recursive: true });
 
     expect(await render()).toBe(EXIT_DIAGNOSTICS);
 
-    expect(stderr()).toContain(
-      `error E_OUTPUT_WRITE Could not write 'feed-01.svg': ${sentence(delivery('feed-01.svg'))}.`,
-    );
+    expect(stderr()).toContain(`error E_OUTPUT_FILE_BLOCKED ${sentence(delivery('feed-01.svg'))}.`);
+    expect(stderr()).not.toContain('E_OUTPUT_WRITE');
     expect(stderr()).not.toContain('EPERM');
     expect(stderr()).not.toContain('EISDIR');
+    // One frame of two: the other artwork and the report that names the missing one.
+    const parsed = parseRenderResult(await resultAt('entregas', NAME, 'editaveis'));
+    if (!parsed.ok) throw new Error(parsed.error.join('; '));
+    expect(parsed.value.artifacts.map((artifact) => artifact.name)).toEqual(['feed-02.svg']);
+  });
+
+  it('exits 2 for an artwork write nobody explained, and writes no result.json', async () => {
+    // ADR 0108. A stand-in for a file another program holds open, which Node cannot cause: it
+    // opens files sharing delete. A folder at the scratch name makes the artwork's own write
+    // fail before the rename, with nothing at the artwork's name to explain it — the same
+    // path a lock takes (the real lock was measured by hand for the PR).
+    await mkdir(delivery('feed-01.svg.part', 'dentro'), { recursive: true });
+
+    expect(await render()).toBe(EXIT_INTERNAL);
+
+    expect(stderr()).toContain('internal failure');
+    expect(stderr()).not.toContain('E_OUTPUT_WRITE');
+    // Absent rather than wrong: a caller that retries reads the next run's report.
+    await expect(resultAt('entregas', NAME, 'editaveis')).rejects.toThrow(/ENOENT/u);
   });
 });
 

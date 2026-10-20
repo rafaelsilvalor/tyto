@@ -21,8 +21,8 @@ export const EXIT_DIAGNOSTICS = 1;
 /**
  * Something threw that nobody turned into a diagnostic.
  *
- * A browser that will not launch, an unwritable output folder, a `result.json` that does
- * not match its own schema. **This is the only code worth retrying**, and that is the whole
+ * A browser that will not launch, an unwritable output folder, an artwork file another
+ * program holds open (ADR 0108), a `result.json` that does not match its own schema. **This is the only code worth retrying**, and that is the whole
  * reason ADR 0011 fixes two non-zero codes instead of one.
  */
 export const EXIT_INTERNAL = 2;
@@ -61,7 +61,8 @@ export const EXIT_CODES: readonly {
     name: 'internal failure',
     meaning:
       'Something threw that is not about this brief: a browser that will not launch, an ' +
-      'unwritable output folder. `result.json` may be absent.',
+      'unwritable output folder, an output file another program holds open (ADR 0108). ' +
+      '`result.json` may be absent.',
     retry: true,
   },
 ];

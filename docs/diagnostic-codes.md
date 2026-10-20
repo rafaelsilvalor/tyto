@@ -85,9 +85,9 @@ non-zero.
 | `W_PLUGIN_FONT_WITHHELD` | warning | no | A face installed on this machine was not sent to a plugin's template, which did not ask for it. |
 | `W_FONT_SUBSTITUTED` | warning | no | A face the scene asks this machine for is not installed, so a bundled one drew it. |
 | `E_RENDER_FAILED` | error | no | A frame could not be turned into bytes by the exporter or the rasterizer. |
-| `E_OUTPUT_WRITE` | error | no | An artifact was rendered but could not be written to the output. |
+| `E_OUTPUT_WRITE` | error | no | No longer produced since ADR 0108. An artifact was rendered but could not be written to the output. |
 | `E_DELIVERY_FOLDER_BLOCKED` | error | yes | A delivery needs a folder at a path where a file already is. |
-| `E_OUTPUT_FILE_BLOCKED` | error | yes | Tyto needs to write a file at a path where a folder already is. |
+| `E_OUTPUT_FILE_BLOCKED` | error | no | Tyto needs to write a file at a path where a folder already is. |
 | `W_TEXT_OVERFLOW` | warning | no | Compiled text does not fit its frame in one of the requested formats. |
 | `W_TEMPLATE_OVERFLOW` | warning | no | An artwork's content runs past the room its template has for it in one format. |
 | `W_UNUSED_SLOT` | warning | no | The brief sets a slot the chosen template never renders. |
@@ -201,9 +201,9 @@ incomplete brief, and a crossed box where a picture the exporter could not load 
 | `E_EXPORT_FONT_UNRESOLVED` | yes | Text drawn in whatever the viewer has is a different artwork, and the substitution is invisible in the output. |
 | `E_EXPORT_UNSUPPORTED` | no | Every producer of this code now leaves the node visible rather than leaving it out (ADR 0035): a mask that cannot be built is dropped instead of hiding what it was applied to, and text that cannot be drawn as outlines is drawn as text. Inline SVG markup outside the subset is the one exception: the node keeps its box and draws nothing, because drawing that markup is the harm (ADR 0068). |
 | `E_RENDER_FAILED` | no | One frame of twelve. The others are already written, and a file that is missing from `result.json` is visible in a way a hole inside an artwork is not. |
-| `E_OUTPUT_WRITE` | no | The same: one artifact that did not reach the output, counted against `planned`. |
+| `E_OUTPUT_WRITE` | no | One artifact that did not reach the output, counted against `planned`. Since ADR 0108 a folder in the way is `E_OUTPUT_FILE_BLOCKED` and anything else the sink rejects with ends the run as an internal failure (exit 2). |
 | `E_DELIVERY_FOLDER_BLOCKED` | yes | Fatal when the delivery folder or `editaveis/` is held: there is nowhere to write the artwork or `result.json`, so nothing is. When only `assets/` is held, the artwork is already written and the images are not copied beside it. |
-| `E_OUTPUT_FILE_BLOCKED` | yes | Depends on the file. The copied brief: nothing is rendered. An artwork file: that one artifact is missing, reported as `E_OUTPUT_WRITE` with this sentence. `template.txt` or an image in `assets/`: the artwork is written and that file is not. `result.json`: the artwork is written and no report is. |
+| `E_OUTPUT_FILE_BLOCKED` | no | Depends on the file, and nothing that is drawn is lost. The copied brief: the delivery is not opened, so nothing is rendered. An artwork file: that one artifact is missing and the others are written. `template.txt` or an image in `assets/`: the artwork is written and that file is not. `result.json`: the artwork is written and no report is. |
 | `E_SETTINGS_SYNTAX` | no | Every key that parsed still applies and the rest fall back to their defaults. |
 | `E_KEYBINDINGS_SYNTAX` | no | The last file that read without one stays in effect, and the built-in keys stay bound. |
 | `E_SNIPPETS_SYNTAX` | no | The last file that read without one stays in effect. |
@@ -1109,11 +1109,11 @@ Parameters: `frame`, `kind`, `problem`
 
 ### `E_OUTPUT_WRITE`
 
-**Severity:** error · **Fatal:** no · **Spec:** `docs/architecture.md`
+**Severity:** error · **Fatal:** no · **Spec:** `docs/adr/0108-a-locked-artwork-is-worth-retrying.md`
 
-An artifact was rendered but could not be written to the output.
+No longer produced since ADR 0108. An artifact was rendered but could not be written to the output.
 
-The same: one artifact that did not reach the output, counted against `planned`.
+One artifact that did not reach the output, counted against `planned`. Since ADR 0108 a folder in the way is `E_OUTPUT_FILE_BLOCKED` and anything else the sink rejects with ends the run as an internal failure (exit 2).
 
 ```
 Could not write '{artifact}': {problem}.
@@ -1137,11 +1137,11 @@ Parameters: `path`
 
 ### `E_OUTPUT_FILE_BLOCKED`
 
-**Severity:** error · **Fatal:** yes · **Spec:** `docs/adr/0057-a-delivery-carries-its-brief-and-its-images.md`
+**Severity:** error · **Fatal:** no · **Spec:** `docs/adr/0057-a-delivery-carries-its-brief-and-its-images.md`
 
 Tyto needs to write a file at a path where a folder already is.
 
-Depends on the file. The copied brief: nothing is rendered. An artwork file: that one artifact is missing, reported as `E_OUTPUT_WRITE` with this sentence. `template.txt` or an image in `assets/`: the artwork is written and that file is not. `result.json`: the artwork is written and no report is.
+Depends on the file, and nothing that is drawn is lost. The copied brief: the delivery is not opened, so nothing is rendered. An artwork file: that one artifact is missing and the others are written. `template.txt` or an image in `assets/`: the artwork is written and that file is not. `result.json`: the artwork is written and no report is.
 
 ```
 '{path}' is a folder, and Tyto needs to write a file with that name. Rename or move the folder, or write somewhere else.

@@ -2,13 +2,21 @@ import type {
   AssetRef,
   AssetResolver,
   Diagnostic,
+  Diagnostics,
   DirectoryEntry,
   FileSystem,
   SceneResources,
   TemplateRegistry,
 } from '@tyto/core';
 import type { TemplateBuild } from '@tyto/core';
-import { fontFaceKey, formatCatalogue, isError, loadTemplateRegistry, ok } from '@tyto/core';
+import {
+  diagnostic,
+  fontFaceKey,
+  formatCatalogue,
+  isError,
+  loadTemplateRegistry,
+  ok,
+} from '@tyto/core';
 import { frame, rect, solid } from '@tyto/core/template';
 import { type HtmlResources, htmlExporterPlugin } from '@tyto/export-html';
 import { type SvgResources, svgExporterPlugin } from '@tyto/export-svg';
@@ -202,15 +210,23 @@ interface RecordingSink extends ArtifactSink {
   readonly written: readonly Artifact[];
 }
 
-function recordingSink(failOn?: (artifact: Artifact) => string | undefined): RecordingSink {
+interface SinkBehaviour {
+  /** What the sink rejects with for this artifact — the operating system's answer. */
+  readonly reject?: (artifact: Artifact) => unknown;
+  /** What it answers instead of writing — a failure it can explain (ADR 0108). */
+  readonly answer?: (artifact: Artifact) => Diagnostics;
+}
+
+function recordingSink(behaviour: SinkBehaviour = {}): RecordingSink {
   const written: Artifact[] = [];
   return {
     written,
     write(artifact) {
-      const failure = failOn?.(artifact);
-      if (failure !== undefined) return Promise.reject(new Error(failure));
-      written.push(artifact);
-      return Promise.resolve();
+      const rejection = behaviour.reject?.(artifact);
+      if (rejection !== undefined) return Promise.reject(rejection);
+      const answered = behaviour.answer?.(artifact) ?? [];
+      if (answered.length === 0) written.push(artifact);
+      return Promise.resolve(answered);
     },
   };
 }
@@ -472,18 +488,50 @@ describe('one broken frame', () => {
     expect(failed.every((event) => event.kind === 'frame-failed' && event.total === 12)).toBe(true);
   });
 
-  it('reports a sink that refuses one file without losing the rest', async () => {
-    const sink = recordingSink((artifact) =>
-      artifact.name === 'feed-02.svg' ? 'EACCES' : undefined,
-    );
+  it('fails the one frame a sink answers for, and keeps the other eleven', async () => {
+    // ADR 0108: a folder where the artwork goes is the sink's to explain, and the same folder
+    // is there on every attempt — one frame of twelve, exit 1, and the report survives.
+    const blocked = diagnostic('E_OUTPUT_FILE_BLOCKED', { path: 'out/feed-02.svg' });
+    const sink = recordingSink({
+      answer: (artifact) => (artifact.name === 'feed-02.svg' ? [blocked] : []),
+    });
+    const events: JobEvent[] = [];
 
-    const result = await runJob({ brief: briefSource, outputs: BOTH }, await portsOf({ sink }));
+    const result = await runJob(
+      { brief: briefSource, outputs: BOTH },
+      await portsOf({ sink, onEvent: (event) => events.push(event) }),
+    );
 
     if (!result.ok) throw new Error('eleven files were written, so the report survives');
 
-    expect(result.diagnostics.filter((item) => item.code === 'E_OUTPUT_WRITE')).toHaveLength(1);
+    expect(result.diagnostics.filter((item) => item.severity === 'error')).toEqual([blocked]);
     expect(sink.written).toHaveLength(11);
-    expect(result.value.artifacts).toHaveLength(11);
+    expect(result.value.artifacts.map((artifact) => artifact.name)).not.toContain('feed-02.svg');
+    expect(result.value.failed).toBe(1);
+    expect(events.filter((event) => event.kind === 'frame-failed')).toHaveLength(1);
+  });
+
+  it('rejects with what the sink rejected with, and starts no frame after it', async () => {
+    // A file another program holds open: nobody explained it, so it is not a diagnostic about
+    // the brief (exit 1) but an internal failure worth retrying (exit 2, render-contract).
+    const locked = Object.assign(new Error('EPERM: operation not permitted, rename'), {
+      code: 'EPERM',
+    });
+    const sink = recordingSink({
+      reject: (artifact) => (artifact.name === 'feed-02.svg' ? locked : undefined),
+    });
+    const events: JobEvent[] = [];
+
+    const run = runJob(
+      { brief: briefSource, outputs: BOTH },
+      await portsOf({ sink, concurrency: 1, onEvent: (event) => events.push(event) }),
+    );
+
+    await expect(run).rejects.toBe(locked);
+    // One at a time, in scene order: slide 1's four files, slide 2's feed PNG, then the
+    // refused SVG. Nothing after it was started, so nothing after it reached the folder.
+    expect(events.filter((event) => event.kind === 'frame-started')).toHaveLength(6);
+    expect(sink.written).toHaveLength(5);
   });
 });
 

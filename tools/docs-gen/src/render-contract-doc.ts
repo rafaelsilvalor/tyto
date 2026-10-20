@@ -120,6 +120,13 @@ ${exitRows}
 brief that does not compile will not compile on the second attempt either, and a caller that
 retried both would either loop forever or give up on a transient failure.
 
+**A name held by the wrong kind of entry is \`1\`; a file Tyto could not replace is \`2\`**
+(ADR 0108). A folder where an artwork, the copied brief or \`${RESULT_FILE}\` goes fails the
+same way until somebody moves it. A file another program holds open — an artwork open in an
+editor — is let go by itself, so it ends the run with no \`${RESULT_FILE}\`, and the retry
+writes one. A read-only file at one of those names also exits \`2\` on Windows, and retrying
+does not fix it.
+
 ## \`${RESULT_FILE}\`
 
 The only file a caller has to read. It is written **last**, after every artifact it lists,
