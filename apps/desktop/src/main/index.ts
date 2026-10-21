@@ -90,6 +90,7 @@ import { createPreviewService } from './preview.js';
 import { createProjectSources } from './project.js';
 import { createTemplateEditor } from './template-editor.js';
 import { createWorkspaceService } from './workspace.js';
+import { createExplorerService } from './explorer.js';
 import { createExitGuard, mayUnload } from './quit.js';
 import { createLiveTextFile } from './live-text-file.js';
 import { type LiveSettings, createLiveSettings } from './settings-live.js';
@@ -592,12 +593,29 @@ async function start(): Promise<void> {
 
   // **The workspace folder** (TYTO-278, ADR 0113): its trust answer from the same `TYTO_HOME` the
   // plugins live in, and its template folders handed to the same `sources` the folder above is.
+  // **The explorer** (TYTO-279, ADR 0115): the open folder's files by id, watched while it is
+  // open. A notice and not a question, as the queue's: the panel lists again when it hears it.
+  const explorer = createExplorerService({
+    onChange: () => {
+      const contents = mainWindow?.webContents;
+      if (contents === undefined || contents.isDestroyed()) return;
+      sendIpcEvent(contents, 'explorer:changed', {});
+    },
+    onError: (message, cause) => {
+      log.error(message, cause);
+    },
+  });
+  app.on('will-quit', () => {
+    explorer.close();
+  });
+
   const workspace = createWorkspaceService({
     trustStore: fsTrustStore({ home: pluginsHome }),
     home: pluginsHome,
     setTemplateFolders: async (folders) => {
       await sources.setWorkspaceFolders(folders);
     },
+    onFolder: (folder) => explorer.setRoot(folder),
   });
 
   aboutFacts = () => ({
@@ -1165,6 +1183,7 @@ async function start(): Promise<void> {
         return { ...state, problems: [...state.problems, ...failures] };
       },
     },
+    explorer,
     queue: {
       service: queue,
       // `createDirectory`, for the export's reason: a queue folder may not exist yet.

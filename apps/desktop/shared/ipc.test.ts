@@ -26,6 +26,8 @@ describe('the IPC contract', () => {
       'credentials:set',
       'dialog:confirm',
       'dialog:save-changes',
+      'explorer:list',
+      'explorer:open',
       'export:cancel',
       'export:choose-directory',
       'export:kinds',
@@ -115,6 +117,8 @@ describe('the event table', () => {
     expect([...IPC_EVENT_NAMES].sort()).toEqual([
       'app:exit-requested',
       'command:run',
+      // TYTO-279. The open folder changed on disk; the explorer lists again.
+      'explorer:changed',
       // TYTO-207. keybindings.json changed on disk; the push carries its text.
       'keybindings:changed',
       // TYTO-45. The queue changed; the panel asks `queue:list` when it hears it.
