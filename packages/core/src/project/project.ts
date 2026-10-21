@@ -12,9 +12,10 @@ import { isInsidePath, resolvePath } from './paths.js';
  * Drive folder is). Reading the text is I/O and lives in `@tyto/io`; this is the pure rule
  * that turns what was written into folders, one key at a time like the settings (ADR 0073).
  *
- * **Layers, so a work profile slots in without a new signature** (TYTO-347). A project is a
- * list of sheets read in order — today the folder's own, later a profile before it — each
- * with the folder its relative paths resolve against and its own trust answer (ADR 0111).
+ * **Layers** (ADR 0112, ADR 0114). A project is a list of sheets read in order — a work
+ * profile, then the folder's own — each with the folder its relative paths resolve against and
+ * its own trust answer (ADR 0111). Which profile a folder names is read by
+ * {@link profileReferenceOf}; loading it is I/O.
  * Settings are not one of the layers: the file names places, and ADR 0073's per-folder
  * settings layer stays out.
  */
@@ -70,8 +71,22 @@ export interface ResolvedProject {
    * withheld, as if it had none (ADR 0111).
    */
   readonly sections: Readonly<Record<string, unknown>>;
+  /**
+   * Which kind of sheet each value came from, so the window can say "from the profile" or
+   * "from this folder" (TYTO-347). A key no sheet set has no origin.
+   */
+  readonly origins: ProjectOrigins;
   /** What each sheet had to say, by layer index, so each is printed against its own text. */
   readonly diagnostics: readonly (readonly Diagnostic[])[];
+}
+
+export interface ProjectOrigins {
+  readonly assets?: ProjectLayer['kind'];
+  readonly templates?: ProjectLayer['kind'];
+  readonly fonts?: ProjectLayer['kind'];
+  readonly output?: ProjectLayer['kind'];
+  /** By plugin id, as sections merge. */
+  readonly sections: Readonly<Record<string, ProjectLayer['kind']>>;
 }
 
 type ListKey = 'assets' | 'templates' | 'fonts';
@@ -102,15 +117,25 @@ export function resolveProject(
 ): ResolvedProject {
   const merged: LayerValues = {};
   let sections: Record<string, unknown> = {};
+  const origins: { -readonly [Key in ListKey | 'output']?: ProjectLayer['kind'] } = {};
+  const sectionOrigins: Record<string, ProjectLayer['kind']> = {};
   const diagnostics = layers.map((layer, index) => {
     const found: Diagnostic[] = [];
     const values = readLayer(layer, index, options, found);
     for (const key of LIST_KEYS) {
       const value = values[key];
-      if (value !== undefined) merged[key] = value;
+      if (value === undefined) continue;
+      merged[key] = value;
+      origins[key] = layer.kind;
     }
-    if (values.output !== undefined) merged.output = values.output;
-    if (values.sections !== undefined) sections = { ...sections, ...values.sections };
+    if (values.output !== undefined) {
+      merged.output = values.output;
+      origins.output = layer.kind;
+    }
+    if (values.sections !== undefined) {
+      sections = { ...sections, ...values.sections };
+      for (const id of Object.keys(values.sections)) sectionOrigins[id] = layer.kind;
+    }
     return found;
   });
   return {
@@ -119,6 +144,7 @@ export function resolveProject(
     fonts: merged.fonts ?? [],
     output: merged.output,
     sections,
+    origins: { ...origins, sections: sectionOrigins },
     diagnostics,
   };
 }
@@ -171,15 +197,20 @@ function readLayer(
       const output = folderOf(layer, index, options, entry, entry.value, entry.valueRange, found);
       if (output !== undefined) values.output = output;
     } else if (entry.key === 'profile') {
-      // Read so the key is not "unknown" the day profiles land, and so a file written for
-      // TYTO-347 says plainly why it is not obeyed yet.
-      found.push(
-        diagnostic(
-          'W_PROJECT_PROFILE_UNSUPPORTED',
-          { profile: typeof entry.value === 'string' ? entry.value : JSON.stringify(entry.value) },
-          at(entry.valueRange ?? entry.keyRange),
-        ),
-      );
+      // A folder's is read by `profileReferenceOf`, because following it is I/O. A profile's
+      // is ignored: one level only (ADR 0114), so no chain of sheets has to be walked,
+      // cycle-checked and explained.
+      if (layer.kind === 'profile') {
+        found.push(
+          diagnostic(
+            'W_PROFILE_NESTED',
+            {
+              profile: typeof entry.value === 'string' ? entry.value : JSON.stringify(entry.value),
+            },
+            at(entry.valueRange ?? entry.keyRange),
+          ),
+        );
+      }
     } else if (entry.key === 'plugins') {
       const sections = sectionsOf(layer, entry, found);
       if (sections !== undefined) values.sections = sections;

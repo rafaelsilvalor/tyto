@@ -128,7 +128,9 @@ non-zero.
 | `W_PROJECT_KEY_INVALID` | warning | no | A project key's value, or one entry of it, is not accepted, so it is left out. |
 | `W_PROJECT_PATH_OUTSIDE` | warning | no | A restricted source's folder key leads outside the source, directly or through a link, so it is left out. |
 | `W_PROJECT_SECTIONS_WITHHELD` | warning | no | A restricted source's plugin sections are withheld from the plugins that would read them. |
-| `W_PROJECT_PROFILE_UNSUPPORTED` | warning | no | The project file names a work profile, which this version does not read yet. |
+| `W_PROJECT_PROFILE_INVALID` | warning | no | The project file names a work profile in a form Tyto does not accept, so no profile is read. |
+| `W_PROJECT_PROFILE_MISSING` | warning | no | The work profile the project file names is not there, so no profile is read. |
+| `W_PROFILE_NESTED` | warning | no | A work profile names another profile, which is ignored: profiles are one level deep. |
 | `E_TRUST_FILE` | error | no | TYTO_HOME/trust.json cannot be read or written. |
 
 ## What is fatal, and why
@@ -1793,16 +1795,44 @@ The sections for {plugins} are withheld because this folder is not trusted.
 
 Parameters: `plugins`
 
-### `W_PROJECT_PROFILE_UNSUPPORTED`
+### `W_PROJECT_PROFILE_INVALID`
 
-**Severity:** warning · **Fatal:** no · **Spec:** `docs/adr/0112-a-workspace-folder-names-its-places-in-one-file.md`
+**Severity:** warning · **Fatal:** no · **Spec:** `docs/adr/0114-a-work-profile-is-one-sheet-many-folders-name.md`
 
-The project file names a work profile, which this version does not read yet.
+The project file names a work profile in a form Tyto does not accept, so no profile is read.
 
 A warning never replaces a value (ADR 0013).
 
 ```
-The work profile '{profile}' is not read: work profiles are not supported yet.
+The work profile '{profile}' {problem}; the folder opens with its own keys alone.
+```
+
+Parameters: `profile`, `problem`
+
+### `W_PROJECT_PROFILE_MISSING`
+
+**Severity:** warning · **Fatal:** no · **Spec:** `docs/adr/0114-a-work-profile-is-one-sheet-many-folders-name.md`
+
+The work profile the project file names is not there, so no profile is read.
+
+A warning never replaces a value (ADR 0013).
+
+```
+The work profile '{profile}' was not found at '{path}'; the folder opens with its own keys alone.
+```
+
+Parameters: `profile`, `path`
+
+### `W_PROFILE_NESTED`
+
+**Severity:** warning · **Fatal:** no · **Spec:** `docs/adr/0114-a-work-profile-is-one-sheet-many-folders-name.md`
+
+A work profile names another profile, which is ignored: profiles are one level deep.
+
+A warning never replaces a value (ADR 0013).
+
+```
+A work profile cannot name another ('{profile}'): profiles are one level deep, so it is ignored.
 ```
 
 Parameters: `profile`

@@ -1123,11 +1123,31 @@ export const diagnosticCodes = {
     fatal: false,
     fatality: 'A warning never replaces a value (ADR 0013).',
   },
-  W_PROJECT_PROFILE_UNSUPPORTED: {
+  // ADR 0114: a missing or refused profile costs the profile alone; the folder opens with its own.
+  W_PROJECT_PROFILE_INVALID: {
     severity: 'warning',
-    summary: 'The project file names a work profile, which this version does not read yet.',
-    template: "The work profile '{profile}' is not read: work profiles are not supported yet.",
-    spec: 'docs/adr/0112-a-workspace-folder-names-its-places-in-one-file.md',
+    summary:
+      'The project file names a work profile in a form Tyto does not accept, so no profile is read.',
+    template: "The work profile '{profile}' {problem}; the folder opens with its own keys alone.",
+    spec: 'docs/adr/0114-a-work-profile-is-one-sheet-many-folders-name.md',
+    fatal: false,
+    fatality: 'A warning never replaces a value (ADR 0013).',
+  },
+  W_PROJECT_PROFILE_MISSING: {
+    severity: 'warning',
+    summary: 'The work profile the project file names is not there, so no profile is read.',
+    template:
+      "The work profile '{profile}' was not found at '{path}'; the folder opens with its own keys alone.",
+    spec: 'docs/adr/0114-a-work-profile-is-one-sheet-many-folders-name.md',
+    fatal: false,
+    fatality: 'A warning never replaces a value (ADR 0013).',
+  },
+  W_PROFILE_NESTED: {
+    severity: 'warning',
+    summary: 'A work profile names another profile, which is ignored: profiles are one level deep.',
+    template:
+      "A work profile cannot name another ('{profile}'): profiles are one level deep, so it is ignored.",
+    spec: 'docs/adr/0114-a-work-profile-is-one-sheet-many-folders-name.md',
     fatal: false,
     fatality: 'A warning never replaces a value (ADR 0013).',
   },

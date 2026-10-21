@@ -1,4 +1,4 @@
-import { copyFile, mkdir, mkdtemp, readFile, readdir, rm, writeFile } from 'node:fs/promises';
+import { copyFile, cp, mkdir, mkdtemp, readFile, readdir, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
@@ -165,6 +165,106 @@ describe('tyto render inside a workspace', () => {
     const code = await run(['render', 'loose.brief', '--types', 'svg'], environment());
     expect(code).toBe(EXIT_DIAGNOSTICS);
     expect(stderr()).toContain("required option '-o, --out <dir>' not specified");
+  });
+});
+
+describe('tyto render with a work profile (TYTO-347, ADR 0114)', () => {
+  /** The template and the image move into `TYTO_HOME/profiles/saude/`; the folders keep none. */
+  async function saude(extra: Record<string, unknown> = {}): Promise<string> {
+    const profile = join(home, 'profiles', 'saude');
+    await mkdir(profile, { recursive: true });
+    await cp(join(work, 'tpl'), join(profile, 'tpl'), { recursive: true });
+    await cp(join(work, 'art'), join(profile, 'art'), { recursive: true });
+    await rm(join(work, 'tpl'), { recursive: true });
+    await rm(join(work, 'art'), { recursive: true });
+    const sheet = {
+      templates: ['tpl'],
+      assets: ['art'],
+      output: join(scratch, 'shared'),
+      ...extra,
+    };
+    await writeFile(join(profile, 'profile.json'), JSON.stringify(sheet));
+    return profile;
+  }
+
+  /** A second campaign folder beside `work`, with the same brief and its own project file. */
+  async function campaign(name: string, text: string): Promise<string> {
+    const folder = join(scratch, name);
+    await mkdir(join(folder, 'briefs'), { recursive: true });
+    await mkdir(join(folder, '.tyto'), { recursive: true });
+    await writeFile(join(folder, 'briefs', 'cartaz.brief'), briefSource);
+    await writeFile(join(folder, '.tyto', 'project.json'), text);
+    return folder;
+  }
+
+  it("renders two folders from one profile, and one folder's own output wins for it alone", async () => {
+    await saude();
+    await project('{ "profile": "saude" }');
+    const other = await campaign('other', '{ "profile": "saude", "output": "out" }');
+
+    const first = await run(['render', BRIEF, '--types', 'svg'], environment());
+    expect(first, stderr()).toBe(EXIT_OK);
+    const second = await run(
+      ['render', join('other', 'briefs', 'cartaz.brief'), '--types', 'svg'],
+      environment(),
+    );
+    expect(second, stderr()).toBe(EXIT_OK);
+
+    expect(await listed(scratch, 'shared')).toEqual(['feed-01.svg', 'feed-02.svg', 'result.json']);
+    expect(await listed(other, 'out')).toEqual(['feed-01.svg', 'feed-02.svg', 'result.json']);
+    const svg = await readFile(join(other, 'out', 'feed-01.svg'), 'utf8');
+    expect(svg).toContain(LOGO_PNG.toString('base64'));
+    expect(stderr()).toBe('');
+  }, 60_000);
+
+  it("prints a profile's problems against the profile's own file", async () => {
+    await saude({ profile: 'other' });
+    await project('{ "profile": "saude" }');
+    const code = await run(['render', BRIEF, '--types', 'svg'], environment());
+    expect(code, stderr()).toBe(EXIT_OK);
+    expect(stderr()).toMatch(/profile\.json:1:\d+: warning W_PROFILE_NESTED/u);
+  }, 60_000);
+
+  it('says a missing profile at the key, and renders with the folder alone', async () => {
+    await project(`{ "profile": "missing", ${PROJECT.slice(1)}`);
+    const code = await run(['render', BRIEF, '--types', 'svg'], environment());
+    expect(code, stderr()).toBe(EXIT_OK);
+    expect(stderr()).toMatch(/project\.json:1:\d+: warning W_PROJECT_PROFILE_MISSING/u);
+    expect(await listed(work, 'exports')).toContain('feed-01.svg');
+  }, 60_000);
+
+  it('refuses a restricted folder a profile file outside it, and --trust lifts it for one run', async () => {
+    const team = join(scratch, 'team');
+    await mkdir(team, { recursive: true });
+    await writeFile(
+      join(team, 'saude.json'),
+      `{ "output": ${JSON.stringify(join(scratch, 'team-out'))} }`,
+    );
+    await project(`{ "profile": "../team/saude.json", ${PROJECT.slice(1)}`);
+
+    expect(await run(['render', BRIEF, '--types', 'svg'], environment()), stderr()).toBe(EXIT_OK);
+    expect(stderr()).toMatch(/project\.json:1:\d+: warning W_PROJECT_PATH_OUTSIDE/u);
+    expect(await listed(work, 'exports')).toContain('feed-01.svg');
+
+    errors = [];
+    await rm(join(work, '.tyto', 'project.json'));
+    await project(`{ "profile": "../team/saude.json", "templates": ["tpl"], "assets": ["art"] }`);
+    expect(await run(['render', BRIEF, '--types', 'svg', '--trust'], environment()), stderr()).toBe(
+      EXIT_OK,
+    );
+    expect(await listed(scratch, 'team-out')).toContain('feed-01.svg');
+    expect(await listed(home)).toEqual([]);
+  }, 60_000);
+
+  it('takes back the approval of a profile file with tyto trust remove', async () => {
+    const team = join(scratch, 'team');
+    await mkdir(team, { recursive: true });
+    await writeFile(join(team, 'saude.json'), '{}');
+    await fsTrustStore({ home }).grant(join(team, 'saude.json'));
+    expect(await run(['trust', 'remove', join('team', 'saude.json')], environment())).toBe(EXIT_OK);
+    expect((await fsTrustStore({ home }).trustOf(join(team, 'saude.json'))).trust).toBe(
+      'restricted',
+    );
   });
 });
 

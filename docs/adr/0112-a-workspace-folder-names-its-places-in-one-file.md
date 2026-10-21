@@ -1,7 +1,8 @@
 # 0112 — A workspace folder names its places in one file
 
 Status: accepted · 2026-10-21 · TYTO-278 · builds what ADR 0111 asks of the first card, beside
-ADR 0011, ADR 0056, ADR 0057 and ADR 0073; leaves the slot TYTO-347 fills
+ADR 0011, ADR 0056, ADR 0057 and ADR 0073; leaves the slot TYTO-347 fills; amended by ADR 0114,
+which replaces the `profile` row of the table below
 
 ## Context
 

@@ -129,7 +129,7 @@ export function createProgram(environment: CliEnvironment, captured: Captured): 
     )
     .option(
       '--trust',
-      "trust the brief's workspace folder for this run only; never written to trust.json",
+      "trust the brief's workspace folder and its work profile for this run only; never written to trust.json",
       false,
     );
 
@@ -253,8 +253,8 @@ export function createProgram(environment: CliEnvironment, captured: Captured): 
 
   trust
     .command('remove')
-    .description('take back the trust given to a workspace folder')
-    .argument('<folder>', 'the workspace folder, as it was trusted')
+    .description('take back the trust given to a workspace folder or a work profile file')
+    .argument('<folder>', 'the workspace folder or profile file, as it was trusted')
     .action(async (folder: string) => {
       captured.code = await trustRemoveCommand(folder, environment);
     });

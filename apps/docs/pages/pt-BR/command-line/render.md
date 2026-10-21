@@ -85,6 +85,55 @@ error: --out is required: .tyto\project.json declares no output folder this run 
 
 `--trust` confia na pasta só naquela execução e não anota nada. `tyto trust remove <pasta>` desfaz uma confiança dada antes; as pastas em que você confia ficam listadas no `trust.json` da sua pasta do Tyto (`~/.tyto`).
 
+### Uma ficha para várias pastas: perfis de trabalho
+
+Quando várias pastas de projeto guardam suas coisas nos mesmos lugares — os templates, as imagens, as fontes e a pasta de saída de uma vertical — escreva esses lugares uma vez num **perfil de trabalho** e deixe cada pasta citá-lo. Guarde o perfil na sua pasta do Tyto, uma pasta por perfil:
+
+```jsonc
+// ~/.tyto/profiles/saude/profile.json
+{
+  "templates": ["tpl"],
+  "assets": ["art"],
+  "output": "../../../exports",
+}
+```
+
+Um perfil aceita as mesmas chaves de um arquivo de projeto, e as pastas relativas dele são lidas a partir da pasta do próprio perfil, então o `tpl` acima é `~/.tyto/profiles/saude/tpl` para todo projeto que o usa. O arquivo do projeto cita o perfil e escreve só o que muda:
+
+```jsonc
+// campanha-a/.tyto/project.json
+{ "profile": "saude" }
+```
+
+```jsonc
+// campanha-b/.tyto/project.json
+{
+  "profile": "saude",
+  "output": "out",
+}
+```
+
+Executado em 2026-10-21, sem template nem imagem em nenhuma das duas pastas:
+
+```
+$ tyto render briefs/cartaz.brief --types svg
+feed-01.svg
+feed-02.svg
+```
+
+De `campanha-a` os arquivos foram para o `exports/` do perfil; de `campanha-b` foram para o `out/` dela. Uma chave que a pasta escreve substitui a do perfil por inteiro — uma pasta que escreve `fonts` usa aquelas fontes e nenhuma do perfil — e uma chave que ela não escreve vem do perfil.
+
+O nome de um perfil é um nome de pasta comum: letras, números, espaços e acentos podem, mas barra, ponto no começo ou `..` não. Um nome que não está em `~/.tyto/profiles/` sai como `W_PROJECT_PROFILE_MISSING`, e a pasta renderiza com as chaves dela.
+
+**Um perfil compartilhado pela equipe** é um arquivo citado pelo caminho, como `"profile": "../team/saude.json"`, ou uma pasta com um `profile.json` dentro. Como outra pessoa pode editá-lo, ele recebe confiança por conta própria, nunca porque a pasta que o cita recebeu: até você confiar nesse arquivo, as pastas dele precisam ficar dentro da pasta dele, e `tyto trust remove <arquivo>` desfaz essa confiança. Uma pasta em que você ainda não confiou só pode citar um arquivo de perfil que esteja dentro dela:
+
+```
+$ tyto render briefs/cartaz.brief --types svg
+.tyto\project.json:2:14: warning W_PROJECT_PATH_OUTSIDE Project key 'profile' leads outside this folder ('../team/saude.json'), which an untrusted folder may not do; it is left out.
+```
+
+O `--trust` vale para a pasta e para o perfil que ela cita, só naquela execução.
+
 ## Quando o brief tem erros
 
 Cada problema sai com o arquivo, a linha e a coluna, o código e o que está errado, e o comando termina com código de saída `1`:

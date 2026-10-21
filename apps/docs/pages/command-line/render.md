@@ -85,6 +85,55 @@ error: --out is required: .tyto\project.json declares no output folder this run 
 
 `--trust` trusts the folder for that one run and writes nothing down. `tyto trust remove <folder>` takes back a trust given earlier; the folders you trust are listed in `trust.json` in your Tyto home folder (`~/.tyto`).
 
+### Share one sheet across folders: work profiles
+
+When many project folders keep their things in the same places — one vertical's templates, images, fonts and output folder — write those places once in a **work profile** and let each folder name it. Keep the profile in your Tyto home folder, one folder per profile:
+
+```jsonc
+// ~/.tyto/profiles/saude/profile.json
+{
+  "templates": ["tpl"],
+  "assets": ["art"],
+  "output": "../../../exports",
+}
+```
+
+A profile takes the same keys as a project file, and its relative folders are read from the profile's own folder, so `tpl` above is `~/.tyto/profiles/saude/tpl` for every project that uses it. A project file names the profile and writes only what differs:
+
+```jsonc
+// campanha-a/.tyto/project.json
+{ "profile": "saude" }
+```
+
+```jsonc
+// campanha-b/.tyto/project.json
+{
+  "profile": "saude",
+  "output": "out",
+}
+```
+
+Run on 2026-10-21, with no template or image in either folder:
+
+```
+$ tyto render briefs/cartaz.brief --types svg
+feed-01.svg
+feed-02.svg
+```
+
+From `campanha-a` the files went to the profile's `exports/`; from `campanha-b` they went to its own `out/`. A key the folder writes replaces the profile's whole — a folder that writes `fonts` uses those fonts and none of the profile's — and a key it leaves out comes from the profile.
+
+A profile's name is a plain folder name: letters, digits, spaces and accents are fine, but not a slash, a leading dot or `..`. A name that is not in `~/.tyto/profiles/` is printed as `W_PROJECT_PROFILE_MISSING`, and the folder renders with its own keys.
+
+**A profile shared by a team** is a file you name by its path instead, such as `"profile": "../team/saude.json"`, or a folder holding a `profile.json`. Because somebody else may edit it, it is trusted on its own, never because the folder that names it is: until you trust that file, its folders must stay inside its own folder, and `tyto trust remove <file>` takes its trust back. A folder you have not trusted may only name a profile file inside itself:
+
+```
+$ tyto render briefs/cartaz.brief --types svg
+.tyto\project.json:2:14: warning W_PROJECT_PATH_OUTSIDE Project key 'profile' leads outside this folder ('../team/saude.json'), which an untrusted folder may not do; it is left out.
+```
+
+`--trust` covers the folder and the profile it names, for that run only.
+
 ## When the brief has errors
 
 Each problem is printed with the file, the line and the column, the code and what is wrong, and the command ends with exit code `1`:
