@@ -81,6 +81,7 @@ export type Layout = z.infer<typeof layoutSchema>;
 export const EDITOR_PANEL = 'editor';
 export const PROBLEMS_PANEL = 'problems';
 export const QUEUE_PANEL = 'queue';
+export const PROJECT_PANEL = 'project';
 
 /**
  * A plugin's panel (TYTO-49, ADR 0045): an id under this prefix, drawn by one element.
@@ -140,6 +141,17 @@ export const DEFAULT_LAYOUT: Layout = {
       dock: 'left',
       open: false,
       size: 340,
+      fixed: false,
+    },
+    {
+      // TYTO-347. Beside Problems, closed until asked for: most windows have no folder open,
+      // and the places of one that does change only when its project file or profile does.
+      // `layoutFrom` adds it, closed, to a saved layout that predates it.
+      id: PROJECT_PANEL,
+      element: 'tyto-project-panel',
+      dock: 'bottom',
+      open: false,
+      size: 140,
       fixed: false,
     },
   ],

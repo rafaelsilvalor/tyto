@@ -261,3 +261,96 @@ describe('trusting a folder from the window (TYTO-278, ADR 0111)', () => {
     await window.locator('.trust__close').click();
   }, 30_000);
 });
+
+describe('a work profile in the window (TYTO-347, ADR 0114)', () => {
+  const PROFILE_ART = solidPng([20, 160, 90]);
+  const TEAM_ART = solidPng([160, 20, 120]);
+  const profileLineShown = async (): Promise<boolean> =>
+    window.evaluate(
+      () =>
+        document.getElementById('workspace-banner')?.hidden === false &&
+        document.querySelector<HTMLElement>('.workspace-banner__line[data-source="profile"]')
+          ?.hidden === false,
+    );
+  const projectLine = async (key: string): Promise<string> =>
+    window.evaluate(
+      (wanted) =>
+        document
+          .querySelector(
+            `tyto-project-panel .project__place[data-key="${wanted}"] .project__origin`,
+          )
+          ?.textContent?.trim() ?? '',
+      key,
+    );
+
+  function brief(folder: string, image: string, title: string): string {
+    mkdirSync(join(folder, 'briefs'), { recursive: true });
+    const path = join(folder, 'briefs', `${image}.brief`);
+    writeFileSync(
+      path,
+      [
+        '---',
+        'template: promo-curso',
+        'formats: [grid-1x1]',
+        `imagem: ${image}.png`,
+        '---',
+        '::titulo',
+        `  ${title}`,
+      ].join('\n'),
+    );
+    return path;
+  }
+
+  it('draws from a named profile, and the Project panel says where each place came from', async () => {
+    const profile = join(scratch, 'tyto-home', 'profiles', 'saude');
+    mkdirSync(join(profile, 'art'), { recursive: true });
+    writeFileSync(join(profile, 'art', 'perfil.png'), PROFILE_ART);
+    writeFileSync(join(profile, 'profile.json'), '{ "assets": ["art"], "output": "exports" }');
+    const campaign = join(scratch, 'campanha');
+    mkdirSync(join(campaign, '.tyto'), { recursive: true });
+    writeFileSync(
+      join(campaign, '.tyto', 'project.json'),
+      '{ "profile": "saude", "output": "out" }',
+    );
+    const path = brief(campaign, 'perfil', 'Do perfil');
+
+    await answerPickers({ directory: campaign });
+    await run('workspace.openFolder');
+    await openBrief(path, 'Do perfil');
+    expect(await previewSrcdoc(window)).toContain(PROFILE_ART.toString('base64'));
+
+    await run('workspace.showProject');
+    await window.locator('tyto-project-panel .project__places').waitFor({ state: 'visible' });
+    expect(await projectLine('assets')).toBe('profile saude');
+    expect(await projectLine('output')).toBe('this folder');
+    expect(await projectLine('fonts')).toBe('not set');
+  }, 60_000);
+
+  it('names a restricted shared profile on its own line, and Trust this profile applies it', async () => {
+    mkdirSync(join(scratch, 'team-art'), { recursive: true });
+    writeFileSync(join(scratch, 'team-art', 'equipe.png'), TEAM_ART);
+    const shop = join(scratch, 'loja');
+    mkdirSync(join(shop, '.tyto'), { recursive: true });
+    mkdirSync(join(shop, 'team'), { recursive: true });
+    writeFileSync(join(shop, 'team', 'saude.json'), '{ "assets": ["../../team-art"] }');
+    writeFileSync(join(shop, '.tyto', 'project.json'), '{ "profile": "team/saude.json" }');
+    const path = brief(shop, 'equipe', 'Da equipe');
+
+    await answerPickers({ directory: shop });
+    await run('workspace.openFolder');
+    await expect.poll(profileLineShown, { timeout: 10_000 }).toBe(true);
+    await openBrief(path, 'Da equipe');
+    expect(await previewSrcdoc(window)).not.toContain(TEAM_ART.toString('base64'));
+    expect(await problemsText()).toContain(`${join('team', 'saude.json')}:1:`);
+
+    await window.locator('.workspace-banner__trust-profile').click();
+    await expect.poll(profileLineShown, { timeout: 10_000 }).toBe(false);
+    await expect
+      .poll(() => previewSrcdoc(window), { timeout: 15_000 })
+      .toContain(TEAM_ART.toString('base64'));
+    const trusted = readFileSync(join(scratch, 'tyto-home', 'trust.json'), 'utf8');
+    expect(trusted).toContain('saude.json');
+    // The folder itself was not trusted along with it (ADR 0111).
+    expect(trusted).not.toContain('"path": ' + JSON.stringify(shop));
+  }, 60_000);
+});

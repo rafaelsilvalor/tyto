@@ -118,11 +118,11 @@ describe('trusting the open folder (ADR 0111)', () => {
     expect(workspace.state()).toMatchObject({ trust: 'restricted', leftOut: 1 });
     expect(workspace.placesFor(inside).assets).toEqual([]);
 
-    expect((await workspace.grant()).ok).toBe(true);
+    expect((await workspace.grant('folder')).ok).toBe(true);
     expect(workspace.state()).toMatchObject({ trust: 'trusted', leftOut: 0 });
     expect(workspace.placesFor(inside).assets).toEqual([join(scratch, 'shared')]);
 
-    expect((await workspace.revoke()).ok).toBe(true);
+    expect((await workspace.revoke('folder')).ok).toBe(true);
     expect(workspace.state().trust).toBe('revoked');
     expect(workspace.placesFor(inside).assets).toEqual([join(scratch, 'shared')]);
 
@@ -139,9 +139,100 @@ describe('trusting the open folder (ADR 0111)', () => {
       setTemplateFolders: () => Promise.resolve(),
     });
     await workspace.open(work);
-    const granted = await workspace.grant();
+    const granted = await workspace.grant('folder');
     expect(granted.ok).toBe(false);
     expect(workspace.state().trust).toBe('restricted');
+  });
+});
+
+describe('a work profile in the window (TYTO-347, ADR 0114)', () => {
+  async function named(text: string): Promise<string> {
+    const folder = join(home, 'profiles', 'saude');
+    await mkdir(folder, { recursive: true });
+    await writeFile(join(folder, 'profile.json'), text);
+    return folder;
+  }
+
+  async function sharedProfile(text: string): Promise<string> {
+    const team = join(work, 'team');
+    await mkdir(team, { recursive: true });
+    await writeFile(join(team, 'saude.json'), text);
+    return team;
+  }
+
+  it('names a profile kept in TYTO_HOME, trusted where it lives, and says where each place came from', async () => {
+    const profile = await named('{ "assets": ["art"], "fonts": ["fonts"], "output": "exports" }');
+    await writeFile(join(work, '.tyto', 'project.json'), '{ "profile": "saude", "output": "out" }');
+    const { workspace } = service();
+    await workspace.open(work);
+
+    expect(workspace.state()).toMatchObject({
+      profile: { label: 'saude', trust: 'trusted', byLocation: true, leftOut: 0 },
+      places: [
+        { key: 'assets', folders: [join(profile, 'art')], origin: 'profile' },
+        { key: 'fonts', folders: [join(profile, 'fonts')], origin: 'profile' },
+        { key: 'output', folders: [join(work, 'out')], origin: 'folder' },
+      ],
+    });
+    expect(workspace.placesFor(join(work, 'briefs')).assets).toEqual([join(profile, 'art')]);
+  });
+
+  it("names the profile's own file in front of its problems", async () => {
+    await named('{\n  "profile": "other"\n}');
+    await writeFile(join(work, '.tyto', 'project.json'), '{ "profile": "saude" }');
+    const { workspace } = service();
+    await workspace.open(work);
+
+    const [problem] = workspace.state().problems;
+    expect(problem?.code).toBe('W_PROFILE_NESTED');
+    expect(problem?.message.startsWith(`${join('profiles', 'saude', 'profile.json')}:2:14: `)).toBe(
+      true,
+    );
+  });
+
+  it('trusts a shared profile on its own, leaving the folder as it was, and takes it back on the next open', async () => {
+    await sharedProfile('{ "assets": ["../../shared"] }');
+    await writeFile(join(work, '.tyto', 'project.json'), '{ "profile": "team/saude.json" }');
+    const store = fsTrustStore({ home });
+    const workspace = createWorkspaceService({
+      trustStore: store,
+      home,
+      setTemplateFolders: () => Promise.resolve(),
+    });
+    await workspace.open(work);
+    expect(workspace.state()).toMatchObject({
+      trust: 'restricted',
+      leftOut: 0,
+      profile: { label: 'saude', trust: 'restricted', byLocation: false, leftOut: 1 },
+    });
+
+    expect((await workspace.grant('profile')).ok).toBe(true);
+    expect(workspace.state()).toMatchObject({ trust: 'restricted', profile: { trust: 'trusted' } });
+    expect((await store.trustOf(work)).trust).toBe('restricted');
+    expect((await store.trustOf(join(work, 'team', 'saude.json'))).trust).toBe('trusted');
+    expect(workspace.placesFor(join(work, 'briefs')).assets).toEqual([join(scratch, 'shared')]);
+
+    expect((await workspace.revoke('profile')).ok).toBe(true);
+    expect(workspace.state().profile?.trust).toBe('revoked');
+    await workspace.open(work);
+    expect(workspace.state().profile?.trust).toBe('restricted');
+  });
+
+  it('writes no approval for a profile trusted where it lives', async () => {
+    await named('{}');
+    await writeFile(join(work, '.tyto', 'project.json'), '{ "profile": "saude" }');
+    const granted: string[] = [];
+    const workspace = createWorkspaceService({
+      trustStore: {
+        ...restricted,
+        grant: (path) => (granted.push(path), Promise.resolve(ok(true))),
+      },
+      home,
+      setTemplateFolders: () => Promise.resolve(),
+    });
+    await workspace.open(work);
+    expect((await workspace.grant('profile')).ok).toBe(true);
+    expect(granted).toEqual([]);
   });
 });
 

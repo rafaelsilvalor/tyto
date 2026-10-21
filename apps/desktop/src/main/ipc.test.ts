@@ -103,7 +103,7 @@ const projectFolder = () => {
 /** The workspace folder, as main would answer it, recording each question (TYTO-278). */
 const workspaceFolder = () => {
   const asked: unknown[] = [];
-  const trustAsked: boolean[] = [];
+  const trustAsked: [boolean, 'folder' | 'profile'][] = [];
   let folder: string | null = null;
   let trust: 'trusted' | 'restricted' | 'revoked' = 'restricted';
   const state = () => ({
@@ -112,6 +112,8 @@ const workspaceFolder = () => {
     trust,
     leftOut: trust === 'restricted' && folder !== null ? 1 : 0,
     output: folder === null ? null : '/work/promo/exports',
+    profile: null,
+    places: [],
     problems: [],
   });
   return {
@@ -123,8 +125,8 @@ const workspaceFolder = () => {
       folder = choose ? '/work/promo' : null;
       return Promise.resolve(state());
     },
-    setTrust: (trusted: boolean) => {
-      trustAsked.push(trusted);
+    setTrust: (trusted: boolean, source: 'folder' | 'profile') => {
+      trustAsked.push([trusted, source]);
       trust = trusted ? 'trusted' : 'revoked';
       return Promise.resolve(state());
     },
@@ -1253,12 +1255,19 @@ describe('the workspace folder channels (TYTO-278)', () => {
     const handlers = createHandlers({ ...dependencies(), workspace });
     await handlers['workspace:set-folder']({ choose: true });
 
-    expect(await handlers['workspace:trust']({ trusted: true })).toMatchObject({
+    expect(await handlers['workspace:trust']({ trusted: true, source: 'folder' })).toMatchObject({
       trust: 'trusted',
       leftOut: 0,
     });
-    expect((await handlers['workspace:trust']({ trusted: false })).trust).toBe('revoked');
-    expect(workspace.trustAsked).toEqual([true, false]);
+    expect((await handlers['workspace:trust']({ trusted: false, source: 'folder' })).trust).toBe(
+      'revoked',
+    );
+    await handlers['workspace:trust']({ trusted: true, source: 'profile' });
+    expect(workspace.trustAsked).toEqual([
+      [true, 'folder'],
+      [false, 'folder'],
+      [true, 'profile'],
+    ]);
   });
 
   it('refuses a trust request that names a folder, so no window can approve one of its choosing', async () => {
@@ -1268,9 +1277,14 @@ describe('the workspace folder channels (TYTO-278)', () => {
       createHandlers({ ...dependencies(), workspace })['workspace:trust'],
     );
 
-    await expect(guarded({ trusted: true, folder: '/home/someone' })).rejects.toBeInstanceOf(
+    await expect(
+      guarded({ trusted: true, source: 'folder', folder: '/home/someone' }),
+    ).rejects.toBeInstanceOf(IpcContractError);
+    // TYTO-347: a source is one of the two main has open, never a path.
+    await expect(guarded({ trusted: true, source: '/team/saude.json' })).rejects.toBeInstanceOf(
       IpcContractError,
     );
+    await expect(guarded({ trusted: true })).rejects.toBeInstanceOf(IpcContractError);
     expect(workspace.trustAsked).toEqual([]);
   });
 });

@@ -443,11 +443,23 @@ describe('switching the language', () => {
     'workspace.trust.grant',
     'workspace.trust.revoke',
     'workspace.trust.close',
+    'workspace.banner.profile',
+    'workspace.banner.trustProfile',
+    'workspace.trust.profile',
+    'workspace.trust.profileByLocation',
+    'workspace.trust.profileTrusted',
+    'workspace.trust.profileRestricted',
+    'workspace.trust.profileRevoked',
+    'workspace.trust.revokeProfile',
     // E9.12: the command bar renders its own strings and renders nothing at all while it is
     // closed, which is most of the time — so none of these is in the document on load, and
     // the two that are only reachable *inside* the bar never will be by this route. The
     // element is what holds them to a locale (`src/renderer/command-bar.test.ts`), and
     // `commands.test.ts` is what holds every registered command to having a key here at all.
+    'workspace.banner.project',
+    'command.workspace.showProject',
+    'panel.project',
+    ...CATALOGUE_KEYS.filter((key) => key.startsWith('project.')),
     'command.bar.placeholder',
     'command.bar.empty',
     'command.undo',

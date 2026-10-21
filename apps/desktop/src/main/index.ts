@@ -1156,8 +1156,8 @@ async function start(): Promise<void> {
         if (chosen !== undefined) await workspace.open(chosen);
         return workspace.state();
       },
-      setTrust: async (trusted) => {
-        const done = trusted ? await workspace.grant() : await workspace.revoke();
+      setTrust: async (trusted, source) => {
+        const done = trusted ? await workspace.grant(source) : await workspace.revoke(source);
         const state = workspace.state();
         if (done.ok) return state;
         // A trust.json that cannot be written: said in the problems panel, nothing changed.

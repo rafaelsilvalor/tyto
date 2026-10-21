@@ -50,6 +50,7 @@ import {
   TEMPLATES_CLEAR_FOLDER,
   WORKSPACE_CLOSE_FOLDER,
   WORKSPACE_MANAGE_TRUST,
+  WORKSPACE_SHOW_PROJECT,
   WORKSPACE_OPEN_FOLDER,
   TEMPLATE_EDIT,
   TEMPLATE_NEW,
@@ -112,6 +113,7 @@ const actions = () =>
     openWorkspaceFolder: vi.fn<() => void>(),
     closeWorkspaceFolder: vi.fn<() => void>(),
     manageTrust: vi.fn<() => void>(),
+    showProject: vi.fn<() => void>(),
     editTemplate: vi.fn<() => void>(),
     newTemplate: vi.fn<() => void>(),
     openPreview: vi.fn<(side: boolean) => void>(),
@@ -251,6 +253,9 @@ describe('the ids the window registers', () => {
     expect(spies.closeWorkspaceFolder).toHaveBeenCalledOnce();
     expect(registry.run(WORKSPACE_MANAGE_TRUST, NO_VIEW)).toBe(true);
     expect(spies.manageTrust).toHaveBeenCalledOnce();
+    // TYTO-347.
+    expect(registry.run(WORKSPACE_SHOW_PROJECT, NO_VIEW)).toBe(true);
+    expect(spies.showProject).toHaveBeenCalledOnce();
   });
 
   it('runs the two template mode commands, each to its own action (TYTO-44)', () => {

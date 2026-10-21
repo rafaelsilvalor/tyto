@@ -208,7 +208,10 @@ export interface IpcDependencies {
   readonly workspace: {
     state: () => IpcResponse<'workspace:folder'>;
     setFolder: (choose: boolean) => Promise<IpcResponse<'workspace:set-folder'>>;
-    setTrust: (trusted: boolean) => Promise<IpcResponse<'workspace:trust'>>;
+    setTrust: (
+      trusted: boolean,
+      source: IpcRequest<'workspace:trust'>['source'],
+    ) => Promise<IpcResponse<'workspace:trust'>>;
   };
   /**
    * Rebuilds the application menu in a language (TYTO-124).
@@ -430,7 +433,7 @@ export function createHandlers(dependencies: IpcDependencies): Handlers {
 
     'workspace:set-folder': ({ choose }) => workspace.setFolder(choose),
 
-    'workspace:trust': ({ trusted }) => workspace.setTrust(trusted),
+    'workspace:trust': ({ trusted, source }) => workspace.setTrust(trusted, source),
 
     'file:open': ({ documentId }) => documents.open(documentId),
 

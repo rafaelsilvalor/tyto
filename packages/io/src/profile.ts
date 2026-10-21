@@ -37,6 +37,11 @@ export interface LoadedProfile {
   readonly text: string;
   readonly entries: readonly ProjectEntry[];
   readonly trust: Trust;
+  /**
+   * Trusted because it lives in `TYTO_HOME` (ADR 0111), so there is no approval to grant or
+   * take back: the window offers no button for it.
+   */
+  readonly byLocation: boolean;
   /** About the file, indexing {@link text}: its syntax and its read. */
   readonly diagnostics: readonly Diagnostic[];
   /** About the trust answer, which no text holds. */
@@ -101,7 +106,11 @@ export async function loadProfile(
   }
 
   const file = await realOrResolved(located);
-  const answer = await trustOf(file, options);
+  const byLocation =
+    options.home !== undefined && isInside(await realOrResolved(options.home), file);
+  const answer = byLocation
+    ? { trust: 'trusted' as const, diagnostics: [] }
+    : await trustOf(file, options);
   const text = readProjectText(read.text);
   return {
     profile: {
@@ -111,6 +120,7 @@ export async function loadProfile(
       text: read.text,
       entries: text.entries,
       trust: answer.trust,
+      byLocation,
       diagnostics: [...read.diagnostics, ...text.syntax],
       trustDiagnostics: answer.diagnostics,
     },
@@ -147,17 +157,14 @@ async function locate(
 }
 
 /**
- * The profile's own answer (ADR 0111): trusted by location inside `TYTO_HOME`, which only the
- * person writes to; trusted for this run when the person typed `--trust`; otherwise whatever
- * `trust.json` says about the profile file itself.
+ * The answer of a profile outside `TYTO_HOME` (one inside is trusted by where it lives, ADR
+ * 0111): trusted for this run when the person typed `--trust`; otherwise whatever `trust.json`
+ * says about the profile file itself.
  */
 async function trustOf(
   file: string,
   options: LoadProfileOptions,
 ): Promise<{ readonly trust: Trust; readonly diagnostics: readonly Diagnostic[] }> {
-  if (options.home !== undefined && isInside(await realOrResolved(options.home), file)) {
-    return { trust: 'trusted', diagnostics: [] };
-  }
   if (options.trustForThisRun === true) return { trust: 'trusted', diagnostics: [] };
   return options.trustStore.trustOf(file);
 }

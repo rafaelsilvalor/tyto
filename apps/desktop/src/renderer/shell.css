@@ -1860,9 +1860,79 @@ tyto-plugins-dialog[open] {
   display: none;
 }
 
-.workspace-banner__text {
+/* One line per source that left something out (TYTO-347): the folder, then its profile. */
+.workspace-banner__lines {
+  display: flex;
   flex: 1;
   min-width: 0;
+  flex-direction: column;
+  gap: var(--tyto-space-1);
+}
+
+.workspace-banner__line {
+  display: flex;
+  align-items: center;
+  gap: var(--tyto-space-3);
+}
+
+.workspace-banner__line[hidden] {
+  display: none;
+}
+
+.workspace-banner__text,
+.workspace-banner__profile-text {
+  flex: 1;
+  min-width: 0;
+}
+
+/*
+ * The Project panel (TYTO-347): one line per place, the key, its folders, and where it came
+ * from. A grid so the four keys and the four tags line up however long a folder's path is.
+ */
+.project__body {
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+  padding: var(--tyto-space-3) var(--tyto-space-5);
+  font-size: var(--tyto-text-sm);
+}
+
+.project__none {
+  margin: 0;
+  color: var(--tyto-text-muted);
+}
+
+.project__places {
+  display: grid;
+  margin: 0;
+  padding: 0;
+  grid-template-columns: max-content minmax(0, 1fr) max-content;
+  gap: var(--tyto-space-1) var(--tyto-space-4);
+  list-style: none;
+}
+
+.project__place {
+  display: contents;
+}
+
+.project__key {
+  font-family: var(--tyto-font-mono);
+}
+
+/* A path is one long word; broken anywhere rather than pushing the panel wider. */
+.project__value {
+  min-width: 0;
+  overflow-wrap: anywhere;
+  font-family: var(--tyto-font-mono);
+  font-size: var(--tyto-text-xs);
+}
+
+.project__origin {
+  color: var(--tyto-text-muted);
+}
+
+.project__origin[data-origin='profile'] {
+  color: var(--tyto-accent);
 }
 
 /* Workspace: Manage Trust (TYTO-278): the plugins screen's frame, at the small width. */

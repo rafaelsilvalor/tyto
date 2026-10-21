@@ -63,13 +63,23 @@
       -->
       <div class="workspace">
         <!--
-          TYTO-278, ADR 0111. Above the editor groups, and only when an untrusted folder left
-          something out: `workspace-banner.ts` paints it from main's answer.
+          TYTO-278, ADR 0111. Above the editor groups, and only when an untrusted folder or
+          the untrusted work profile it names (TYTO-347) left something out, one line each:
+          `workspace-banner.ts` paints it from main's answer.
         -->
         <div class="workspace-banner" id="workspace-banner" role="region" hidden>
-          <span class="workspace-banner__text"></span>
-          <button type="button" class="workspace-banner__trust"></button>
+          <div class="workspace-banner__lines">
+            <div class="workspace-banner__line" data-source="folder">
+              <span class="workspace-banner__text"></span>
+              <button type="button" class="workspace-banner__trust"></button>
+            </div>
+            <div class="workspace-banner__line" data-source="profile" hidden>
+              <span class="workspace-banner__profile-text"></span>
+              <button type="button" class="workspace-banner__trust-profile"></button>
+            </div>
+          </div>
           <button type="button" class="workspace-banner__problems"></button>
+          <button type="button" class="workspace-banner__project"></button>
         </div>
         <div class="work" id="work">
           <div class="dock dock--left" data-dock="left" hidden></div>

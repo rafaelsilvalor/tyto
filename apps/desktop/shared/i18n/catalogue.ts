@@ -82,9 +82,11 @@ export interface Catalogue {
   readonly 'command.workspace.openFolder': string;
   readonly 'command.workspace.closeFolder': string;
   readonly 'command.workspace.manageTrust': string;
+  readonly 'command.workspace.showProject': string;
   readonly 'workspace.banner.text': string;
   readonly 'workspace.banner.trust': string;
   readonly 'workspace.banner.problems': string;
+  readonly 'workspace.banner.project': string;
   readonly 'workspace.trust.heading': string;
   readonly 'workspace.trust.none': string;
   readonly 'workspace.trust.trusted': string;
@@ -93,6 +95,14 @@ export interface Catalogue {
   readonly 'workspace.trust.grant': string;
   readonly 'workspace.trust.revoke': string;
   readonly 'workspace.trust.close': string;
+  readonly 'workspace.banner.profile': string;
+  readonly 'workspace.banner.trustProfile': string;
+  readonly 'workspace.trust.profile': string;
+  readonly 'workspace.trust.profileByLocation': string;
+  readonly 'workspace.trust.profileTrusted': string;
+  readonly 'workspace.trust.profileRestricted': string;
+  readonly 'workspace.trust.profileRevoked': string;
+  readonly 'workspace.trust.revokeProfile': string;
   /**
    * The command bar (E9.12), and the labels of everything it lists.
    *
@@ -335,6 +345,7 @@ export interface Catalogue {
   readonly 'panel.problems': string;
   /** TYTO-45. Closed in the default layout, like the panel it names. */
   readonly 'panel.queue': string;
+  readonly 'panel.project': string;
 
   /**
    * The find-and-replace panel (E8.5), which is CodeMirror's own DOM.
@@ -584,6 +595,11 @@ export interface Catalogue {
   readonly 'slash.template.switch': string;
   readonly 'command.queue.show': string;
   readonly 'queue.heading': string;
+  readonly 'project.heading': string;
+  readonly 'project.none': string;
+  readonly 'project.unset': string;
+  readonly 'project.origin.folder': string;
+  readonly 'project.origin.profile': string;
   readonly 'queue.folder.none': string;
   readonly 'queue.folder.choose': string;
   readonly 'queue.folder.clear': string;
@@ -636,9 +652,11 @@ export const CATALOGUE_KEYS = [
   'command.workspace.openFolder',
   'command.workspace.closeFolder',
   'command.workspace.manageTrust',
+  'command.workspace.showProject',
   'workspace.banner.text',
   'workspace.banner.trust',
   'workspace.banner.problems',
+  'workspace.banner.project',
   'workspace.trust.heading',
   'workspace.trust.none',
   'workspace.trust.trusted',
@@ -647,6 +665,14 @@ export const CATALOGUE_KEYS = [
   'workspace.trust.grant',
   'workspace.trust.revoke',
   'workspace.trust.close',
+  'workspace.banner.profile',
+  'workspace.banner.trustProfile',
+  'workspace.trust.profile',
+  'workspace.trust.profileByLocation',
+  'workspace.trust.profileTrusted',
+  'workspace.trust.profileRestricted',
+  'workspace.trust.profileRevoked',
+  'workspace.trust.revokeProfile',
   'command.bar.placeholder',
   'command.bar.empty',
   'command.undo',
@@ -740,6 +766,7 @@ export const CATALOGUE_KEYS = [
   'panel.editor',
   'panel.problems',
   'panel.queue',
+  'panel.project',
   'search.find',
   'search.replace',
   'search.next',
@@ -898,6 +925,11 @@ export const CATALOGUE_KEYS = [
   'slash.template.switch',
   'command.queue.show',
   'queue.heading',
+  'project.heading',
+  'project.none',
+  'project.unset',
+  'project.origin.folder',
+  'project.origin.profile',
   'queue.folder.none',
   'queue.folder.choose',
   'queue.folder.clear',
