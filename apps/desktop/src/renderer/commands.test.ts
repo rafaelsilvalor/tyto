@@ -1,4 +1,5 @@
 import {
+  COMMAND_BAR_TOGGLE,
   EDITOR_REDO,
   EDITOR_SAVE,
   EDITOR_SPLIT_DOWN,
@@ -22,6 +23,7 @@ import {
   COMMAND_LABELS,
   DOCUMENT_NEW,
   DOCUMENT_NEW_FROM_TEMPLATE,
+  DOCUMENT_SLOTS,
   FILE_EXPORT,
   EDITOR_INSERT_MENU,
   EDITOR_GO_TO_BLOCK,
@@ -57,6 +59,7 @@ import {
   builtInKeybindings,
   createDesktopRegistry,
   keymapSetFor,
+  selectDocumentCommandId,
   withCommandGate,
 } from './commands.js';
 import { CATALOGUE_KEYS } from '../../shared/i18n/index.js';
@@ -179,9 +182,30 @@ describe('the ids the window registers', () => {
 
   it('answers false for an id nobody registered, rather than throwing', () => {
     // What a binding to an uninstalled command relies on: the keystroke keeps travelling.
-    // `editor.render` is the remaining one — `@tyto/editor` binds `Mod-Enter` to it and no
-    // host has registered it yet, which is exactly the case this behaviour exists for.
-    expect(createDesktopRegistry(actions()).run('editor.render', NO_VIEW)).toBe(false);
+    // No built-in binding needs it any more (the next test), but a plugin's or the person's
+    // binding can still name an id nothing registers, so the made-up one stands in for it.
+    expect(createDesktopRegistry(actions()).run('nobody.registered.this', NO_VIEW)).toBe(false);
+  });
+
+  it('binds every built-in key to a command the window registers', () => {
+    // TYTO-285: `Mod-Enter` was bound to `editor.render` from TYTO-38 until this card, and
+    // nothing ever registered it, so the key did nothing and the keyboard reference had to
+    // hide it. The ids beside the registry's are the ones `main.ts` registers on its own:
+    // the bar's toggle and the nine tab slots. This mirrors `WINDOW_REGISTERED` in
+    // `tools/docs-gen/src/reference/window-commands.ts`, which an app cannot import.
+    const registered = new Set([
+      ...createDesktopRegistry(actions())
+        .list()
+        .map((command) => command.id),
+      COMMAND_BAR_TOGGLE,
+      ...DOCUMENT_SLOTS.map(selectDocumentCommandId),
+    ]);
+
+    const unanswered = builtInKeybindings
+      .filter((binding) => !registered.has(binding.command))
+      .map((binding) => `${binding.key} → ${binding.command}`);
+
+    expect(unanswered).toEqual([]);
   });
 
   it('registers the save id the editor has been binding all along', () => {

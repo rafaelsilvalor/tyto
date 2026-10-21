@@ -575,7 +575,7 @@ export function createDesktopRegistry(actions: DesktopActions): CommandRegistry 
  * its dialog and wrote the JSON out as `<name>.json.brief` beside a `result.json` of syntax
  * errors; the zoom, format and slide steps moved state the hidden preview controls hold. The
  * template mode's two verbs are not here: they open a template folder, whatever tab is in
- * front. `editor.render` is not here either, because the window registers no such command.
+ * front.
  */
 export const BRIEF_ONLY_COMMANDS: ReadonlySet<string> = new Set([
   PREVIEW_ZOOM_IN,
@@ -692,7 +692,7 @@ export const desktopKeymapSet: EditorKeymap = {
  * The built-in layer of the window's one keybinding table (TYTO-207, ADR 0074).
  *
  * The same three sets as before, now with the context each one was always in. `vimKeymapSet`
- * is `editor`, because save and render are bound in both input modes; the rest of the desktop
+ * is `editor`, because save is bound in both input modes; the rest of the desktop
  * set is `mode.desktop`, because vim mode replaces it; and `Mod-K` is global, because the bar
  * opens wherever focus is. Plugins and, once the file exists, the person override this.
  */
