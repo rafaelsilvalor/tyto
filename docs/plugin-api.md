@@ -363,7 +363,7 @@ through to whatever else wants it — which is what makes `Mod-s` open the brows
 dialog in a host that has not implemented saving yet, rather than being swallowed by a menu
 item that does not exist.
 
-**Vim mode is the same registry, reached through the engine.** `:w` and `:render` are
+**Vim mode is the same registry, reached through the engine.** `:w`, `:vsplit` and `:split` are
 `Vim.defineEx` registrations that look the registry up from the view they are handed, and
 the engine's own `u` and `Ctrl-r` are pointed at `registry.undo`/`registry.redo` so that vim
 does not get a second, shallower undo that skips app-level commands. Both registrations are

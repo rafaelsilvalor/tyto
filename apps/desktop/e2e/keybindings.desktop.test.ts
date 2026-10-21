@@ -217,7 +217,7 @@ describe('every key the window answered before, with vim off', () => {
     await page.click('#editor .cm-goto-line .cm-dialog-close');
   });
 
-  it('asks main for the open and save dialogs, and leaves render unbound as it was', async () => {
+  it('asks main for the open and save dialogs, and leaves Ctrl+Enter to CodeMirror', async () => {
     await focusEditor();
     const start = await dialogs();
 
@@ -227,8 +227,8 @@ describe('every key the window answered before, with vim off', () => {
     await page.waitForTimeout(300);
 
     expect(await dialogs()).toEqual({ open: start.open + 1, save: start.save + 2 });
-    // `editor.render` is bound and the desktop registers no such command, so the key falls
-    // through to CodeMirror's own `insertBlankLine` — the behaviour since E8.3, kept.
+    // Ctrl+Enter is CodeMirror's: no built-in binding claims it since TYTO-285 removed the
+    // never-registered `editor.render`, so it reaches `insertBlankLine` as it always did.
     await focusEditor();
     const lines = await page.locator('#editor .cm-line').count();
     await page.keyboard.press('Control+Enter');

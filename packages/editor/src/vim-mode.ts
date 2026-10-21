@@ -7,7 +7,6 @@ import { commandRegistryOf } from './commands.js';
 import {
   type EditorKeymap,
   keymapExtension,
-  EDITOR_RENDER,
   EDITOR_SPLIT_DOWN,
   EDITOR_SPLIT_RIGHT,
   EDITOR_SAVE,
@@ -34,7 +33,6 @@ export interface VimExCommand {
 
 export const defaultExCommands: readonly VimExCommand[] = [
   { name: 'write', shortName: 'w', command: EDITOR_SAVE },
-  { name: 'render', command: EDITOR_RENDER },
   // TYTO-286: vim's own names for a split beside and a split below.
   { name: 'vsplit', shortName: 'vs', command: EDITOR_SPLIT_RIGHT },
   { name: 'split', shortName: 'sp', command: EDITOR_SPLIT_DOWN },
