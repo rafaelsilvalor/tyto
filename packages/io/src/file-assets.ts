@@ -123,10 +123,17 @@ export function fileAssetResolver(options: FileAssetResolverOptions): AssetResol
  * all of them. Before this, the CLI and the inbox read `assets/` only and the desktop read
  * the brief's folder only, and a delivery-shaped folder worked in one and lost its images
  * in the other.
+ *
+ * **A workspace's asset folders come last** (TYTO-278, ADR 0112): what `project.json` names
+ * is the project's shared stock, so an image beside the brief still overrides it. Each is a
+ * containment root of its own like the others, and the folders arrive already confined by
+ * the workspace's trust (ADR 0111).
  */
 export function briefAssetResolver(options: {
   readonly briefDirectory: string;
   readonly confine?: boolean;
+  /** The workspace's asset folders, absolute, in the order `project.json` lists them. */
+  readonly projectAssets?: readonly string[];
 }): AssetResolver {
   const delivery = basename(resolve(options.briefDirectory)) === EDITABLE_DIR;
   return fileAssetResolver({
@@ -134,6 +141,7 @@ export function briefAssetResolver(options: {
     fallbacks: [
       join(options.briefDirectory, ASSETS_DIR),
       ...(delivery ? [join(options.briefDirectory, '..', ASSETS_DIR)] : []),
+      ...(options.projectAssets ?? []),
     ],
     ...(options.confine === undefined ? {} : { confine: options.confine }),
   });

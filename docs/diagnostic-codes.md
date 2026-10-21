@@ -123,6 +123,13 @@ non-zero.
 | `W_LEFTOVER_KEPT` | warning | no | A file the previous export listed, and this one did not produce, was left in the folder. |
 | `W_QUEUE_KIND_UNAVAILABLE` | warning | no | A file type chosen for the queue folder has no exporter on this machine, so the task was rendered without it. |
 | `W_PREVIOUS_RESULT_UNREADABLE` | warning | no | The folder's previous result.json could not be read, so nothing in the folder was removed. |
+| `E_PROJECT_SYNTAX` | error | no | A workspace's .tyto/project.json is not valid JSON with comments, or cannot be read. |
+| `W_PROJECT_KEY_UNKNOWN` | warning | no | The project file names a key Tyto does not know. |
+| `W_PROJECT_KEY_INVALID` | warning | no | A project key's value, or one entry of it, is not accepted, so it is left out. |
+| `W_PROJECT_PATH_OUTSIDE` | warning | no | A restricted source's folder key leads outside the source, directly or through a link, so it is left out. |
+| `W_PROJECT_SECTIONS_WITHHELD` | warning | no | A restricted source's plugin sections are withheld from the plugins that would read them. |
+| `W_PROJECT_PROFILE_UNSUPPORTED` | warning | no | The project file names a work profile, which this version does not read yet. |
+| `E_TRUST_FILE` | error | no | TYTO_HOME/trust.json cannot be read or written. |
 
 ## What is fatal, and why
 
@@ -211,6 +218,8 @@ incomplete brief, and a crossed box where a picture the exporter could not load 
 | `E_KEYBINDINGS_SYNTAX` | no | The last file that read without one stays in effect, and the built-in keys stay bound. |
 | `E_SNIPPETS_SYNTAX` | no | The last file that read without one stays in effect. |
 | `E_THEME_INVALID` | no | The base theme of the same kind replaces it, so the window keeps every colour. |
+| `E_PROJECT_SYNTAX` | no | Every key that parsed still applies, and the brief renders without the rest. |
+| `E_TRUST_FILE` | no | Every source opens restricted instead, which is what an absent approval means. |
 
 ## Errors
 
@@ -1222,6 +1231,34 @@ Theme '{theme}' cannot be used: {problem}. The base {kind} theme applies.
 
 Parameters: `theme`, `problem`, `kind`
 
+### `E_PROJECT_SYNTAX`
+
+**Severity:** error · **Fatal:** no · **Spec:** `docs/adr/0112-a-workspace-folder-names-its-places-in-one-file.md`
+
+A workspace's .tyto/project.json is not valid JSON with comments, or cannot be read.
+
+Every key that parsed still applies, and the brief renders without the rest.
+
+```
+The project file cannot be read here: {problem}.
+```
+
+Parameters: `problem`
+
+### `E_TRUST_FILE`
+
+**Severity:** error · **Fatal:** no · **Spec:** `docs/adr/0111-nothing-a-source-ships-runs-before-the-person-trusts-it.md`
+
+TYTO_HOME/trust.json cannot be read or written.
+
+Every source opens restricted instead, which is what an absent approval means.
+
+```
+The trust file cannot be used: {problem}.
+```
+
+Parameters: `problem`
+
 ## Warnings
 
 ### `W_PLUGIN_CRASHED`
@@ -1699,6 +1736,76 @@ Removed nothing: the previous result.json could not be read ({reason}), so this 
 ```
 
 Parameters: `reason`
+
+### `W_PROJECT_KEY_UNKNOWN`
+
+**Severity:** warning · **Fatal:** no · **Spec:** `docs/adr/0112-a-workspace-folder-names-its-places-in-one-file.md`
+
+The project file names a key Tyto does not know.
+
+A warning never replaces a value (ADR 0013).
+
+```
+Unknown project key '{key}'.
+```
+
+Parameters: `key`
+
+### `W_PROJECT_KEY_INVALID`
+
+**Severity:** warning · **Fatal:** no · **Spec:** `docs/adr/0112-a-workspace-folder-names-its-places-in-one-file.md`
+
+A project key's value, or one entry of it, is not accepted, so it is left out.
+
+A warning never replaces a value (ADR 0013).
+
+```
+Project key '{key}' {problem}; it is left out.
+```
+
+Parameters: `key`, `problem`
+
+### `W_PROJECT_PATH_OUTSIDE`
+
+**Severity:** warning · **Fatal:** no · **Spec:** `docs/adr/0111-nothing-a-source-ships-runs-before-the-person-trusts-it.md`
+
+A restricted source's folder key leads outside the source, directly or through a link, so it is left out.
+
+A warning never replaces a value (ADR 0013).
+
+```
+Project key '{key}' leads outside this folder ('{path}'), which an untrusted folder may not do; it is left out.
+```
+
+Parameters: `key`, `path`
+
+### `W_PROJECT_SECTIONS_WITHHELD`
+
+**Severity:** warning · **Fatal:** no · **Spec:** `docs/adr/0111-nothing-a-source-ships-runs-before-the-person-trusts-it.md`
+
+A restricted source's plugin sections are withheld from the plugins that would read them.
+
+A warning never replaces a value (ADR 0013).
+
+```
+The sections for {plugins} are withheld because this folder is not trusted.
+```
+
+Parameters: `plugins`
+
+### `W_PROJECT_PROFILE_UNSUPPORTED`
+
+**Severity:** warning · **Fatal:** no · **Spec:** `docs/adr/0112-a-workspace-folder-names-its-places-in-one-file.md`
+
+The project file names a work profile, which this version does not read yet.
+
+A warning never replaces a value (ADR 0013).
+
+```
+The work profile '{profile}' is not read: work profiles are not supported yet.
+```
+
+Parameters: `profile`
 
 ## Codes the desktop window mints
 
