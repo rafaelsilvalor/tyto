@@ -25,9 +25,10 @@ import type { FileIconName } from '../../shared/file-icons.js';
  * foot sits where theirs does, and the tree rows' chevron, drawn once and turned.
  *
  * **The file icons are on a sheet Rafael approved on 2026-10-21** (TYTO-282, ADR 0116), which
- * also approved `folder` as TYTO-302 drew it. The brief's icon came from a second sheet the same
- * day: he asked for a shape that cannot be mistaken for a text file at 16 px and chose the
- * four-point spark from three. Which file gets which icon is `shared/file-icons.ts`.
+ * also approved `folder` as TYTO-302 drew it. The brief's icon came from two more sheets the
+ * same day: he asked for a shape that cannot be mistaken for a text file at 16 px, then for one
+ * that is not the sparkle other apps use for AI, and chose the stamp. Which file gets which icon
+ * is `shared/file-icons.ts`.
  */
 
 export type IconName =
@@ -99,9 +100,9 @@ const GEOMETRY: Readonly<Record<IconName, (lit: boolean) => SVGTemplateResult>> 
     svg`<rect x="2.5" y="2.75" width="5" height="3" rx="1" /><path d="M4.5 5.75v5.375a.75.75 0 0 0 .75.75H8.5M4.5 7.875h4" /><rect x="8.5" y="6.5" width="5" height="2.75" rx="1" /><rect x="8.5" y="10.5" width="5" height="2.75" rx="1" />`,
   chevronRight: () => svg`<path d="M6.5 4 10.5 8 6.5 12" />`,
   chevronDown: () => svg`<path d="M4 6.5 8 10.5 12 6.5" />`,
-  // A four-point spark: what Tyto compiles. No outline in common with any page in the set.
+  // A rubber stamp on its base line: a brief prints the same artwork every time.
   brief: () =>
-    svg`<path d="M8 2.5c.45 3 2.5 5.05 5.5 5.5-3 .45-5.05 2.5-5.5 5.5-.45-3-2.5-5.05-5.5-5.5 3-.45 5.05-2.5 5.5-5.5Z" />`,
+    svg`<circle cx="8" cy="4.25" r="1.75" /><path d="M7 6v2.25H4.25A1.25 1.25 0 0 0 3 9.5v1.5h10V9.5a1.25 1.25 0 0 0-1.25-1.25H9V6M3 13.25h10" />`,
   // The flap line and a split down the folder: a layout.
   templateFolder: () => svg`${FOLDER}<path d="M2 7h12M7.5 7v6.25" />`,
   // Markup: angle brackets and a slash.

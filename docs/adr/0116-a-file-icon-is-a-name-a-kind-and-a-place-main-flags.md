@@ -40,10 +40,10 @@ place?, expanded? })`.** It never sees a path. It works in this order: main's pl
    approved the sheet on 2026-10-21, and that approval covers TYTO-302's `folder`. Special
    folders keep their one glyph when open, because the chevron already says open. Only a plain
    folder swaps between closed and open. A templates folder and a template folder share one
-   icon. **The brief's icon came from a second sheet**: he asked for a shape of its own that
-   cannot be mistaken for a text file at 16 px, and chose the four-point spark from three. He has
-   asked to see more candidates that do not look like the sparkles other apps use for AI. A new
-   pick only swaps that one glyph.
+   icon. **The brief's icon came from two more sheets**: he asked for a shape of its own that
+   cannot be mistaken for a text file at 16 px, chose a four-point spark, then asked for shapes
+   that are not the sparkle other apps use for AI and chose **a rubber stamp**. A brief prints
+   the same artwork every time.
 6. **Tabs reuse the icons, by document and not by name.** A document is a brief (saved,
    untitled, or a queue task's) or the app's own settings, keybindings or snippets file, so its
    kind is enough. A preview tab keeps the preview icon. The recent list in Ctrl+K gets no icons

@@ -64,7 +64,9 @@ logs/
 __diff__/
 
 # VitePress's build scratch (the server bundle, the bundled config) and its default cache
-# folder; the build deletes the first two on the way out (TYTO-314).
-.vitepress/.temp/
-.vitepress/cache/
+# folder; the build deletes the first two on the way out (TYTO-314). Matched at any depth: a
+# pattern with a slash in it is anchored to this folder, and the site is apps/docs, so a build
+# stopped half-way left apps/docs/.vitepress/.temp for `git add -A` to pick up (TYTO-282).
+**/.vitepress/.temp/
+**/.vitepress/cache/
 *.timestamp-*.mjs
