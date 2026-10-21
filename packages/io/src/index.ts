@@ -109,4 +109,6 @@ export {
   projectFileOf,
 } from './workspace.js';
 
+export type { LoadedProfile } from './profile.js';
+
 export { type FsTrustStoreOptions, TRUST_FILE, fsTrustStore } from './fs-trust-store.js';

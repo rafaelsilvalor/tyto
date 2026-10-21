@@ -157,6 +157,7 @@ export {
   PROJECT_FILE_NAME,
   type ProjectEntry,
   type ProjectLayer,
+  type ProjectOrigins,
   type ProjectResolveOptions,
   type ResolvedProject,
   projectPaths,
@@ -164,6 +165,16 @@ export {
 } from './project/project.js';
 
 export { isAbsolutePath, isInsidePath, resolvePath } from './project/paths.js';
+
+export {
+  PROFILES_DIRECTORY,
+  PROFILE_FILE_NAME,
+  type ProfileReference,
+  type ProfileReferenceRead,
+  isPathShaped,
+  problemWithName,
+  profileReferenceOf,
+} from './project/profile.js';
 
 export { type Face, type FaceCache, createFaceCache, describeFace } from './text/face.js';
 

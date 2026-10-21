@@ -12,6 +12,16 @@ function folder(
   return { kind: 'folder', root, trust, entries: entriesOf(entries) };
 }
 
+/** A work profile kept in `TYTO_HOME/profiles/saude/`, trusted by where it lives (ADR 0111). */
+function profileSheet(entries: Record<string, unknown>): ProjectLayer {
+  return {
+    kind: 'profile',
+    root: '/home/me/.tyto/profiles/saude',
+    trust: 'trusted',
+    entries: entriesOf(entries),
+  };
+}
+
 function entriesOf(record: Record<string, unknown>): ProjectEntry[] {
   return Object.entries(record).map(([key, value], index) => ({
     key,
@@ -180,10 +190,46 @@ describe('resolveProject', () => {
     ]);
   });
 
-  it('reads a profile key and says it is not obeyed yet', () => {
+  it("leaves a folder's profile key to profileReferenceOf, and says nothing about it", () => {
     const project = resolveProject([folder({ profile: 'team/brand.json', output: 'out' })]);
     expect(project.output).toBe('/work/promo/out');
-    expect(codes(project.diagnostics[0])).toEqual(['W_PROJECT_PROFILE_UNSUPPORTED']);
+    expect(codes(project.diagnostics[0])).toEqual([]);
+  });
+
+  it("ignores a profile's own profile key: one level only", () => {
+    const project = resolveProject([
+      profileSheet({ profile: 'other', output: 'exports' }),
+      folder({}),
+    ]);
+    expect(project.output).toBe('/home/me/.tyto/profiles/saude/exports');
+    expect(codes(project.diagnostics[0])).toEqual(['W_PROFILE_NESTED']);
+  });
+
+  it('says which kind of sheet each value came from', () => {
+    const project = resolveProject([
+      profileSheet({
+        assets: ['brand'],
+        fonts: ['fonts'],
+        output: 'exports',
+        plugins: { drive: 1, jira: 1 },
+      }),
+      folder({ output: 'out', plugins: { jira: 2 } }),
+    ]);
+    expect(project.origins).toEqual({
+      assets: 'profile',
+      fonts: 'profile',
+      output: 'folder',
+      sections: { drive: 'profile', jira: 'folder' },
+    });
+  });
+
+  it('gives a key the folder refused the origin of the sheet that still sets it', () => {
+    const project = resolveProject([
+      profileSheet({ output: 'exports' }),
+      folder({ output: '../../x' }, 'restricted'),
+    ]);
+    expect(project.origins.output).toBe('profile');
+    expect(project.origins.templates).toBeUndefined();
   });
 
   it('points each diagnostic at where its key was written', () => {

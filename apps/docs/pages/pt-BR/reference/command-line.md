@@ -29,7 +29,7 @@ tyto render [options] <brief>
 | `-o, --out <dir>` | folder for the artifacts and result.json (default: the workspace's output folder) |  |
 | `--folder` | deliver into &lt;out>/&lt;brief-name>/ — artwork at the top, brief and result.json in editaveis/ |  |
 | `--assets <dir>` | what relative asset paths resolve against (default: assets/ beside the brief, else the brief's folder) |  |
-| `--trust` | trust the brief's workspace folder for this run only; never written to trust.json |  |
+| `--trust` | trust the brief's workspace folder and its work profile for this run only; never written to trust.json |  |
 | `--templates <dir>` | folder holding one subfolder per template | `"templates"` |
 | `--formats-file <path>` | the project's formats.yaml; the built-in sizes when the default is not there | `"formats.yaml"` |
 | `-t, --template <name>` | template to use when the brief's frontmatter names none |  |
@@ -211,7 +211,7 @@ tyto plugin enable [options] <name>
 
 ## tyto trust remove
 
-take back the trust given to a workspace folder
+take back the trust given to a workspace folder or a work profile file
 
 ```sh
 tyto trust remove [options] <folder>
@@ -221,4 +221,4 @@ tyto trust remove [options] <folder>
 
 | Argumento | O que faz |
 | --- | --- |
-| `<folder>` | the workspace folder, as it was trusted |
+| `<folder>` | the workspace folder or profile file, as it was trusted |

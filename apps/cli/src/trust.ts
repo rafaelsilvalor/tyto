@@ -7,7 +7,8 @@ import { EXIT_DIAGNOSTICS, EXIT_OK, type ExitCode } from './exit.js';
 import { formatDiagnostics } from './report.js';
 
 /**
- * `tyto trust remove <folder>` — take back an approval (ADR 0111).
+ * `tyto trust remove <folder>` — take back an approval (ADR 0111): a workspace folder's, or a
+ * work profile file's, which is its own source (ADR 0114).
  *
  * Only the removing half lives on the command line in this card. Granting is the window's
  * (the banner on an open folder) or a hand edit of `trust.json`; a run that needs a folder

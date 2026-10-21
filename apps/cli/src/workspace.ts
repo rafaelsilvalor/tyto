@@ -18,7 +18,8 @@ import { registerOrigin } from './report.js';
  * Found by walking up from the brief's folder, as `git` finds a repository, so `tyto render
  * briefs/promo.brief` inside a project needs nothing typed to use its folders. The walk and
  * what stops it are `@tyto/io`'s; this composes the trust store the window composes too
- * (ADR 0111: the CLI follows the same rule), and registers where each diagnostic points.
+ * (ADR 0111: the CLI follows the same rule), and registers where each diagnostic points —
+ * into the project file, or into the work profile it names (ADR 0114).
  */
 export interface BriefWorkspace {
   readonly loaded: LoadedWorkspace;
@@ -51,8 +52,17 @@ export async function workspaceOfBrief(
   if (loaded === undefined) return undefined;
 
   registerOrigin(loaded.diagnostics, { path: shown(loaded.file), source: loaded.text });
-  if (home !== undefined) {
-    registerOrigin(loaded.trustDiagnostics, { path: shown(join(home, TRUST_FILE)), source: '' });
+  // A work profile's problems point into the profile's own file (ADR 0114).
+  const profile = loaded.profile;
+  if (profile !== undefined) {
+    registerOrigin(profile.diagnostics, { path: shown(profile.file), source: profile.text });
   }
-  return { loaded, diagnostics: [...loaded.trustDiagnostics, ...loaded.diagnostics] };
+  const trustDiagnostics = [...loaded.trustDiagnostics, ...(profile?.trustDiagnostics ?? [])];
+  if (home !== undefined) {
+    registerOrigin(trustDiagnostics, { path: shown(join(home, TRUST_FILE)), source: '' });
+  }
+  return {
+    loaded,
+    diagnostics: [...trustDiagnostics, ...(profile?.diagnostics ?? []), ...loaded.diagnostics],
+  };
 }
