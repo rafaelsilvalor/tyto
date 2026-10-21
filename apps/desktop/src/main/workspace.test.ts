@@ -8,7 +8,7 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
 import { fontsFor } from './fonts.js';
 import { fileSessionStore } from './session-store.js';
-import { createWorkspaceService } from './workspace.js';
+import { type FolderPlaces, createWorkspaceService } from './workspace.js';
 
 /**
  * The window's workspace folder, on a real disk (TYTO-278, ADR 0113): what opening one hands
@@ -41,6 +41,7 @@ const restricted: TrustStore = {
 function service() {
   const handed: (readonly string[])[] = [];
   const listed: (string | undefined)[] = [];
+  const placed: FolderPlaces[] = [];
   const workspace = createWorkspaceService({
     trustStore: restricted,
     home,
@@ -48,15 +49,45 @@ function service() {
       handed.push(folders);
       return Promise.resolve();
     },
-    onFolder: (folder) => {
+    onFolder: (folder, places) => {
       listed.push(folder);
+      placed.push(places);
       return Promise.resolve();
     },
   });
-  return { workspace, handed, listed };
+  return { workspace, handed, listed, placed };
 }
 
 describe('the window workspace service', () => {
+  it("hands the explorer the resolved project's places, and none on close", async () => {
+    await writeFile(
+      join(work, '.tyto', 'project.json'),
+      '{ "assets": ["art"], "templates": ["modelos"], "output": "saida" }',
+    );
+    const { workspace, placed } = service();
+
+    await workspace.open(work);
+    await workspace.close();
+
+    expect(placed).toEqual([
+      {
+        output: join(work, 'saida'),
+        assets: [join(work, 'art')],
+        templates: [join(work, 'modelos')],
+      },
+      { output: undefined, assets: [], templates: [] },
+    ]);
+  });
+
+  it('flags nothing for a key a restricted folder refused', async () => {
+    await writeFile(join(work, '.tyto', 'project.json'), '{ "output": "../outside" }');
+    const { workspace, placed } = service();
+
+    await workspace.open(work);
+
+    expect(placed[0]?.output).toBeUndefined();
+  });
+
   it('tells the explorer the folder it opened, the same one again, and nothing on close', async () => {
     const { workspace, listed } = service();
 

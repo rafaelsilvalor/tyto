@@ -13,7 +13,9 @@ import { firstWindow } from './first-window.js';
  * The explorer in the real window (TYTO-279, ADR 0115): File ▸ Open Folder opens it in the left
  * area above the queue, a folder opens under its row, a brief opens in a tab and a picture opens
  * nothing, a file made and a folder deleted outside the app show within the watcher's settle,
- * and a relaunch that brings the folder back leaves the panel as the person left it.
+ * and a relaunch that brings the folder back leaves the panel as the person left it. Each row
+ * and tab draws the icon of its type, and the folder the project's `output` names draws the
+ * output folder's (TYTO-282, ADR 0116).
  *
  * Its own `--user-data-dir` and `TYTO_HOME`, and a folder of its own; the picker is answered
  * from main. One launch and one relaunch, inside the 60 s budget (ADR 0105).
@@ -76,7 +78,18 @@ beforeAll(async () => {
   mkdirSync(join(work, '.tyto'), { recursive: true });
   mkdirSync(join(work, 'briefs'), { recursive: true });
   mkdirSync(join(work, 'old', 'inside'), { recursive: true });
-  writeFileSync(join(work, '.tyto', 'project.json'), '{}\n');
+  mkdirSync(join(work, 'saida'), { recursive: true });
+  mkdirSync(join(work, 'tipos'), { recursive: true });
+  writeFileSync(join(work, '.tyto', 'project.json'), '{ "output": "saida" }\n');
+  for (const name of [
+    'LEIA-ME.md',
+    'dados.json',
+    'Inter.woff2',
+    'planilha.xlsx',
+    'template.html',
+  ]) {
+    writeFileSync(join(work, 'tipos', name), '');
+  }
   writeFileSync(
     join(work, 'briefs', 'capa.brief'),
     '---\ntemplate: promo-curso\n---\n::titulo Capa\n',
@@ -98,7 +111,9 @@ describe('the explorer (TYTO-279)', () => {
     await answerFolderPicker(work);
     await run('workspace.openFolder');
 
-    await expect.poll(rows, { timeout: 10_000 }).toEqual(['.tyto', 'briefs', 'old', 'logo.png']);
+    await expect
+      .poll(rows, { timeout: 10_000 })
+      .toEqual(['.tyto', 'briefs', 'old', 'saida', 'tipos', 'logo.png']);
     const order = await window.evaluate(() =>
       [...(document.querySelector('[data-dock="left"]')?.children ?? [])].map((panel) =>
         panel.getAttribute('data-panel'),
@@ -123,6 +138,41 @@ describe('the explorer (TYTO-279)', () => {
     await expect.poll(tabNames, { timeout: 10_000 }).toContain('capa.brief');
   }, 30_000);
 
+  it('draws each row and tab with the icon of its type (TYTO-282)', async () => {
+    await row('tipos').click();
+    await expect.poll(rows).toContain('  planilha.xlsx');
+
+    const icons = await window.evaluate(() =>
+      Object.fromEntries(
+        [...document.querySelectorAll<HTMLElement>('.explorer__row')].map((each) => [
+          each.dataset.name ?? '',
+          [each.dataset.icon, each.querySelector('.explorer__icon svg') !== null],
+        ]),
+      ),
+    );
+    expect(icons).toMatchObject({
+      '.tyto': ['folder', true],
+      briefs: ['folderOpen', true],
+      saida: ['folderOutput', true],
+      'capa.brief': ['brief', true],
+      'logo.png': ['image', true],
+      'LEIA-ME.md': ['text', true],
+      'dados.json': ['json', true],
+      'Inter.woff2': ['font', true],
+      'template.html': ['templateHtml', true],
+      'planilha.xlsx': ['file', true],
+    });
+    const tabIcons = await window.evaluate(() =>
+      [...document.querySelectorAll<HTMLElement>('.tabs__tab .tabs__icon')].map(
+        (each) => each.dataset.icon,
+      ),
+    );
+    expect(tabIcons).toContain('brief');
+
+    await row('tipos').click();
+    await expect.poll(rows).not.toContain('  planilha.xlsx');
+  }, 30_000);
+
   it('shows a file made outside and drops a folder deleted outside', async () => {
     await row('old').click();
     await row('inside').click();
@@ -133,7 +183,7 @@ describe('the explorer (TYTO-279)', () => {
 
     await expect
       .poll(rows, { timeout: 10_000 })
-      .toEqual(['.tyto', 'briefs', '  capa.brief', '  nova.brief', 'logo.png']);
+      .toEqual(['.tyto', 'briefs', '  capa.brief', '  nova.brief', 'saida', 'tipos', 'logo.png']);
   }, 30_000);
 
   it('hides from its status-bar button, and stays hidden when the folder comes back', async () => {

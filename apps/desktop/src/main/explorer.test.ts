@@ -274,3 +274,90 @@ describe('hearing a change', () => {
     }
   });
 });
+
+describe('flagging what a name cannot tell (TYTO-282, ADR 0116)', () => {
+  beforeEach(async () => {
+    await mkdir(join(work, '.tyto'), { recursive: true });
+    await writeFile(join(work, '.tyto', 'project.json'), '{}');
+    await writeFile(join(work, 'project.json'), '{}');
+    await mkdir(join(work, 'saida'), { recursive: true });
+    await mkdir(join(work, 'modelos', 'banner'), { recursive: true });
+    await mkdir(join(work, 'fotos'), { recursive: true });
+  });
+
+  const placesOf = async (
+    explorer: ReturnType<typeof quiet>,
+    entryId: string | null,
+  ): Promise<Record<string, string | undefined>> =>
+    Object.fromEntries(
+      (await explorer.list(entryId)).entries.map((entry) => [entry.name, entry.place]),
+    );
+
+  const idOf = async (explorer: ReturnType<typeof quiet>, name: string): Promise<string> =>
+    (await explorer.list(null)).entries.find((entry) => entry.name === name)?.id ?? '';
+
+  it('flags the output, templates and assets folders, a template, and the project file', async () => {
+    const explorer = quiet();
+    await explorer.setRoot(work, {
+      output: join(work, 'saida'),
+      assets: [join(work, 'fotos')],
+      templates: [join(work, 'modelos')],
+    });
+
+    expect(await placesOf(explorer, null)).toMatchObject({
+      saida: 'output',
+      modelos: 'templates',
+      fotos: 'assets',
+      // `assets` by name is the window's to draw; main flags only what the project named.
+      assets: undefined,
+      slides: undefined,
+      'project.json': undefined,
+    });
+    expect(await placesOf(explorer, await idOf(explorer, 'modelos'))).toEqual({
+      banner: 'template',
+    });
+    expect(await placesOf(explorer, await idOf(explorer, '.tyto'))).toEqual({
+      'project.json': 'project',
+    });
+  });
+
+  it('gives one folder named twice the first place in the order', async () => {
+    const explorer = quiet();
+    await explorer.setRoot(work, {
+      output: join(work, 'saida'),
+      assets: [join(work, 'saida'), join(work, 'modelos')],
+      templates: [join(work, 'modelos'), join(work, 'modelos', 'banner')],
+    });
+
+    expect(await placesOf(explorer, null)).toMatchObject({
+      saida: 'output',
+      modelos: 'templates',
+    });
+    // Both a templates folder and a folder inside one: the templates folder wins.
+    expect(await placesOf(explorer, await idOf(explorer, 'modelos'))).toEqual({
+      banner: 'templates',
+    });
+  });
+
+  it('flags nothing for a place that does not exist', async () => {
+    const explorer = quiet();
+    await explorer.setRoot(work, { output: join(work, 'nada'), assets: [], templates: [] });
+
+    expect(Object.values(await placesOf(explorer, null)).filter(Boolean)).toEqual([]);
+  });
+
+  it('tells the window to list again when the same folder names new places, keeping the ids', async () => {
+    const onChange = vi.fn();
+    const explorer = createExplorerService({ onChange, watch: handWatcher().watch });
+    await explorer.setRoot(work);
+    const before = await idOf(explorer, 'saida');
+
+    await explorer.setRoot(work, { output: undefined, assets: [], templates: [] });
+    expect(onChange).not.toHaveBeenCalled();
+    await explorer.setRoot(work, { output: join(work, 'saida'), assets: [], templates: [] });
+
+    expect(onChange).toHaveBeenCalledTimes(1);
+    expect(await idOf(explorer, 'saida')).toBe(before);
+    expect((await placesOf(explorer, null)).saida).toBe('output');
+  });
+});

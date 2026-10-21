@@ -615,7 +615,7 @@ async function start(): Promise<void> {
     setTemplateFolders: async (folders) => {
       await sources.setWorkspaceFolders(folders);
     },
-    onFolder: (folder) => explorer.setRoot(folder),
+    onFolder: (folder, places) => explorer.setRoot(folder, places),
   });
 
   aboutFacts = () => ({

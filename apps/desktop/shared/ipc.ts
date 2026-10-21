@@ -3,6 +3,7 @@ import { THEME_KINDS, THEME_TOKEN_NAME, isThemeColor } from '@tyto/plugin-api';
 import { z } from 'zod';
 
 import { BRIEF_COLUMN_LOOK_IDS } from './brief-columns.js';
+import { EXPLORER_PLACES } from './file-icons.js';
 import { typographySchema } from './typography.js';
 import { layoutSchema } from './layout.js';
 import type { SessionGroupNode } from './session-groups.js';
@@ -706,6 +707,8 @@ export const IPC_CHANNELS = {
             id: explorerEntryId,
             name: z.string().min(1),
             kind: z.enum(['folder', 'brief', 'file']),
+            // What the name cannot say, from the resolved project (TYTO-282, ADR 0116).
+            place: z.enum(EXPLORER_PLACES).optional(),
           }),
         )
         .max(2000),

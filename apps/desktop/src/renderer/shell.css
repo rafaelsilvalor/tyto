@@ -1323,6 +1323,13 @@ tyto-command-bar[open] {
 }
 
 /* A long file name is cut rather than allowed to push every other tab off the strip. */
+/* TYTO-282: the file's icon before its name, in the tab's own colour. */
+.tabs__icon {
+  display: grid;
+  flex: none;
+  place-items: center;
+}
+
 .tabs__label {
   max-width: var(--tyto-tab-label-max);
   overflow: hidden;
@@ -1943,6 +1950,14 @@ tyto-plugins-dialog[open] {
   width: var(--tyto-space-6);
   place-items: center;
   color: var(--tyto-text-muted);
+}
+
+/* TYTO-282: the file-type icon, between the chevron's column and the name (ADR 0116). */
+.explorer__icon {
+  display: grid;
+  flex: none;
+  place-items: center;
+  margin-inline-end: var(--tyto-space-3);
 }
 
 .explorer__name {

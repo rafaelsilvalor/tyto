@@ -66,6 +66,24 @@ describe('a preview tab (TYTO-287)', () => {
   });
 });
 
+describe("a tab's file icon (TYTO-282, ADR 0116)", () => {
+  it('draws the icon it was given before the name, and none when given none', async () => {
+    const { strip } = await open([
+      { id: 'a', label: 'campanha.brief', dirty: false, icon: 'brief' },
+      { id: 's', label: 'settings.json', dirty: false, icon: 'settingsFile' },
+      { id: 'n', label: 'other', dirty: false },
+    ]);
+
+    const drawn = [...strip.querySelectorAll('.tabs__name')].map(
+      (name) => name.querySelector<HTMLElement>('.tabs__icon')?.dataset.icon,
+    );
+    expect(drawn).toEqual(['brief', 'settingsFile', undefined]);
+    const first = strip.querySelector('.tabs__name');
+    expect(first?.firstElementChild?.classList.contains('tabs__icon')).toBe(true);
+    expect(first?.querySelector('.tabs__icon svg')).not.toBeNull();
+  });
+});
+
 describe('the path on hover (TYTO-288, ADR 0086)', () => {
   it('is the title of a file tab and a preview tab, and an untitled tab has none', async () => {
     const { strip } = await open([

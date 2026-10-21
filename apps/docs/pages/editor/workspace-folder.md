@@ -38,6 +38,8 @@ Opening a folder with **File ▸ Open Folder…** opens the **Explorer** in the 
 - **Any other file** — an image, a PDF — is listed and does nothing when clicked. Tyto does not open files with other programs from the Explorer.
 - A folder holding more than 2,000 entries shows the first 2,000 and a line saying how many more there are. `.git` is not listed.
 
+Each entry has an icon for its type: a brief, an image, a font, a JSON file, a text file, a template folder and the `template.html`, `template.ts` and `manifest.yaml` in it, the project's own `.tyto/project.json`, and the app's `settings.json`, `keybindings.json` and `snippets.json`. A folder named `assets`, and the folders your `.tyto/project.json` names as `assets`, `templates` or `output`, get icons of their own. A file Tyto has no icon for gets a plain page. The tabs use the same icons.
+
 The **Explorer** button in the status bar, beside the queue's, shows and hides it, as does **Show or hide: Explorer** in the command bar. When Tyto starts again with the folder still open, the Explorer is as you left it: closed if you closed it. With no folder open it says _No folder open_ and offers **Open Folder…**. It lists an untrusted folder like any other: listing a folder runs nothing in it.
 
 ## A folder you have not trusted

@@ -175,6 +175,7 @@ import { SAVE_FAILED, saveFailureDiagnostic } from './save-failure.js';
 import { type EditorGroupElement, arrangeGroups } from './editor-group.js';
 import { applyShares, showShares, wireGroupSplitters } from './group-splitter.js';
 import { wireTabDrag } from './tab-drag.js';
+import type { IconName } from './icons.js';
 import type { TabEntry } from './tabs.js';
 import {
   type EditorGroup,
@@ -724,6 +725,7 @@ function paintTabs(): void {
               label: labelOf(document_),
               ...whereOf(document_),
               dirty: isUnsaved(document_),
+              icon: tabIconOf(document_),
             },
           ];
     });
@@ -735,6 +737,20 @@ function paintTabs(): void {
     };
   }
 }
+
+/**
+ * A tab's icon (TYTO-282, ADR 0116). A document is the app's own settings, keybindings or
+ * snippets file, or a brief — saved or untitled, a queue task's included — so its kind says it
+ * and no name is looked at.
+ */
+const TAB_ICONS: Readonly<Record<NonNullable<DocumentState['kind']>, IconName>> = {
+  settings: 'settingsFile',
+  keybindings: 'keybindingsFile',
+  snippets: 'snippetsFile',
+};
+
+const tabIconOf = (document_: DocumentState): IconName =>
+  document_.kind === undefined ? 'brief' : TAB_ICONS[document_.kind];
 
 /**
  * A preview's tab: "Preview <name>" for the brief it shows now (TYTO-287) — for a following one,
@@ -749,6 +765,7 @@ function previewEntry(tab: EditorTab): TabEntry {
     // The path of the brief it shows, which is the question a hover over it asks.
     ...(shown === undefined ? {} : whereOf(shown)),
     dirty: false,
+    icon: 'preview',
     preview: true,
     ...(tab.locked === true ? { locked: true } : {}),
   };

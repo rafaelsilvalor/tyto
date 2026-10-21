@@ -38,6 +38,8 @@ Abrir uma pasta com **Arquivo ▸ Abrir pasta…** abre o **Explorador** na áre
 - **Qualquer outro arquivo** — uma imagem, um PDF — aparece na lista e não faz nada ao clique. O Tyto não abre arquivos com outros programas a partir do Explorador.
 - Uma pasta com mais de 2.000 itens mostra os 2.000 primeiros e uma linha dizendo quantos faltam. A pasta `.git` não aparece.
 
+Cada item tem um ícone do seu tipo: um brief, uma imagem, uma fonte, um arquivo JSON, um arquivo de texto, uma pasta de template e o `template.html`, o `template.ts` e o `manifest.yaml` dela, o `.tyto/project.json` do próprio projeto, e o `settings.json`, o `keybindings.json` e o `snippets.json` do app. Uma pasta chamada `assets`, e as pastas que o seu `.tyto/project.json` aponta como `assets`, `templates` ou `output`, ganham ícones próprios. Um arquivo para o qual o Tyto não tem ícone aparece como uma página em branco. As abas usam os mesmos ícones.
+
 O botão do **Explorador** na barra de status, ao lado do da fila, mostra e esconde o painel, assim como **Mostrar ou esconder: Explorador** na barra de comandos. Quando o Tyto abre de novo com a pasta ainda aberta, o Explorador fica como você deixou: fechado, se você o fechou. Sem pasta aberta, ele diz _Nenhuma pasta aberta_ e oferece **Abrir pasta…**. Ele lista uma pasta em que você não confiou como qualquer outra: listar uma pasta não executa nada dela.
 
 ## Uma pasta em que você ainda não confiou
