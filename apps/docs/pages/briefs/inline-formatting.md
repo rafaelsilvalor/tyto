@@ -11,6 +11,7 @@ The example is for `notice`, the manual's own template. Copy [its folder](https:
 | You write                       | You get                                              |
 | ------------------------------- | ---------------------------------------------------- |
 | `**free**`                      | **bold**                                             |
+| `*children*`                    | _italic_                                             |
 | a new line in an indented block | a new line in the artwork                            |
 | `{cor:laranja}this Saturday{/}` | the words in the colour the template calls `laranja` |
 
@@ -28,9 +29,11 @@ In text written on the directive's own line, a `\` breaks the line there: `::tit
 
 `{cor:name}` starts a colour and `{/}` ends it. The names are the template's own — `notice` has `laranja` (orange) and `amarelo` (yellow) — and a name the template does not know leaves the words in their usual colour, with no warning.
 
-## Italic, and why the examples do not use it
+## Italic
 
-One asterisk on each side, `*like this*`, is italic. The typefaces that come with Tyto have no italic, so with a template that uses them — `notice` and the built-in templates among them — exporting stops with `E_EXPORT_FONT_UNRESOLVED`. Use italic only with a template whose typeface has one.
+One asterisk on each side, `*like this*`, is italic. Italic inside bold, `**a *free* class**`, is bold italic. The typeface that comes with Tyto has both, so `notice` and the built-in templates draw them.
+
+A template whose typeface has no italic cannot export it. Tyto says so while you write, with `E_FONT_FACE_UNAVAILABLE` on the italic words in the Problems panel; the preview still draws, but no file is written for that artwork until the italic comes out or the template changes.
 
 ## Where formatting is read
 

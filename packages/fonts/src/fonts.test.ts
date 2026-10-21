@@ -13,6 +13,8 @@ import {
 
 const REGULAR = { family: 'Source Sans 3', weight: 400, style: 'normal' } as const;
 const BOLD = { family: 'Source Sans 3', weight: 700, style: 'normal' } as const;
+const ITALIC = { family: 'Source Sans 3', weight: 400, style: 'italic' } as const;
+const BOLD_ITALIC = { family: 'Source Sans 3', weight: 700, style: 'italic' } as const;
 
 /** The bytes behind a `data:` URI, so the assertions are about a font and not a string. */
 function decode(uri: string): Buffer {
@@ -48,6 +50,22 @@ describe('the bundled faces', () => {
     expect(readFileSync(path).readUInt32BE(0)).toBe(0x00010000);
   });
 
+  it('include an italic at both weights, from both halves of the port (TYTO-329)', () => {
+    // `*text*` is ordinary brief syntax. Without these two faces it compiled and then failed
+    // at export with E_EXPORT_FONT_UNRESOLVED; ADR 0110 ships them.
+    for (const face of [ITALIC, BOLD_ITALIC]) {
+      const uri = bundledFont({ font: { family: face.family, source: 'bundled' }, ...face });
+      if (uri === undefined)
+        throw new Error(`Source Sans 3 ${String(face.weight)} italic is not bundled.`);
+      expect(decode(uri).subarray(0, 4).toString('ascii')).toBe('wOF2');
+      expect(bundledFontSource.outlines(face)?.length).toBeGreaterThan(0);
+    }
+    // Four different files, so a resolver that drops the style is as visible as one that
+    // drops the weight.
+    const uris = new Set([REGULAR, BOLD, ITALIC, BOLD_ITALIC].map((face) => bundledFontUri(face)));
+    expect(uris.size).toBe(4);
+  });
+
   it('are the families a scene is allowed to name', () => {
     expect([...BUNDLED_FONT_FAMILIES]).toEqual(['Source Sans 3']);
   });
@@ -78,13 +96,13 @@ describe('the folder this package ships', () => {
 
 describe('a face nothing bundles', () => {
   it('is undefined rather than a substitute', () => {
-    // The italic is the case the visual suite leans on: `undefined` here is what becomes
-    // E_EXPORT_FONT_UNRESOLVED downstream, and a substituted face would render wrong
+    // A weight nothing ships is the case the visual suite leans on: `undefined` here is what
+    // becomes E_EXPORT_FONT_UNRESOLVED downstream, and a substituted face would render wrong
     // glyphs silently.
-    expect(bundledFontUri({ ...REGULAR, style: 'italic' })).toBeUndefined();
+    expect(bundledFontUri({ ...REGULAR, weight: 300 })).toBeUndefined();
     expect(bundledFontUri({ ...REGULAR, weight: 900 })).toBeUndefined();
     expect(bundledFontUri({ ...REGULAR, family: 'Inter' })).toBeUndefined();
-    expect(bundledFontOutlinePath({ ...REGULAR, style: 'italic' })).toBeUndefined();
+    expect(bundledFontOutlinePath({ ...ITALIC, weight: 300 })).toBeUndefined();
   });
 });
 

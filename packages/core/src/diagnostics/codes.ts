@@ -732,6 +732,20 @@ export const diagnosticCodes = {
       'and the others are written. `template.txt` or an image in `assets/`: the artwork is ' +
       'written and that file is not. `result.json`: the artwork is written and no report is.',
   },
+  // Raised by `compile` while it lays out text (ADR 0110): the font source answers nothing for
+  // the face, so the export that follows is certain to stop at E_EXPORT_FONT_UNRESOLVED.
+  E_FONT_FACE_UNAVAILABLE: {
+    severity: 'error',
+    summary: 'Text asks for a face the fonts Tyto can read do not have, so it cannot be exported.',
+    template:
+      "Font '{font}' is not available to template '{template}', so this text cannot be exported. Remove the formatting that asks for it, or use a template whose font has that face.",
+    spec: 'docs/adr/0110-italic-ships-and-a-missing-face-is-a-compile-error.md',
+    fatal: false,
+    fatality:
+      'The frame is still built and previewed, with the text laid out from the lines the brief ' +
+      'wrote; it is an error because the export is certain to fail, and saying so while the ' +
+      'brief is written is the point.',
+  },
   W_TEXT_OVERFLOW: {
     severity: 'warning',
     summary: 'Compiled text does not fit its frame in one of the requested formats.',

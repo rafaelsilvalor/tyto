@@ -30,12 +30,23 @@ export interface FontSource {
   /**
    * The face's outline bytes, or `undefined` when nothing supplies it.
    *
-   * Absence is a value, not a rejection, and it is not an error either: a scene whose font
-   * nobody can measure is laid out from the lines the brief wrote, exactly as it was
-   * before anything measured anything. The exporters still report the missing face when
-   * they cannot embed it (`E_EXPORT_FONT_UNRESOLVED`), which is where an author needs to
-   * hear about it — a compile that refused would take the whole artwork down over a
+   * Absence is a value, not a rejection: a scene whose font nobody can measure is still
+   * built, and laid out from the lines the brief wrote, exactly as it was before anything
+   * measured anything — a compile that refused would take the whole artwork down over a
    * measurement it only wanted in order to improve the line breaks.
+   *
+   * It is reported, though, and at compile time (ADR 0110): `compile` raises
+   * `E_FONT_FACE_UNAVAILABLE`, an error that is not fatal, on the text that asks for the
+   * face, because the exporters ask the same question of their own port and will have no
+   * bytes either (`E_EXPORT_FONT_UNRESOLVED`). Hearing it at the end of an export is too
+   * late for whoever is writing the brief.
+   *
+   * The two questions are not quite the same one, and where they part the export is still
+   * the only one that reports. This port is asked by face, without the `FontRef.source` the
+   * exporters see, so it cannot refuse a `file` font as they do; and `@tyto/fonts`' library
+   * answers a family it does not ship with the machine's face or a substitute, while the
+   * exporters substitute only for a `system` font. What this catches is a family the
+   * adapter ships with a face it does not — the italic of ADR 0110's title, before it shipped.
    */
   outlines(face: FontFace): Uint8Array | undefined;
 }

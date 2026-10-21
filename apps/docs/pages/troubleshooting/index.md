@@ -12,9 +12,7 @@ Almost everything that goes wrong in Tyto is said in the Problems panel — a br
 
 **The preview stopped changing.** The brief has an error: the preview keeps the last drawing that worked until it is fixed. The Problems panel says what and where.
 
-**Export finished but wrote no file.** Read the lines under the progress bar. `E_EXPORT_FONT_UNRESOLVED` naming an _italic_ face means the brief has `*italic*` text, which does not export yet; take the italic out. See [Images](../export/images.md#when-an-image-is-not-written).
-
-<!-- TYTO-329: italic fails at export. -->
+**Export finished but wrote no file.** Read the lines under the progress bar. `E_EXPORT_FONT_UNRESOLVED` naming a font means the template's typeface lacks a face the brief asks for, such as italic; the Problems panel shows the same as `E_FONT_FACE_UNAVAILABLE` on those words. See [Images](../export/images.md#when-an-image-is-not-written).
 
 **A setting does nothing.** Look for `W_SETTING_INVALID` (the value is not one the setting takes, so its default applies) or `E_SETTINGS_SYNTAX` (the file cannot be read, so the window keeps the settings it had). [settings.json](../customize/settings-json.md#when-a-value-is-wrong) explains both. Remember to save: nothing applies before.
 

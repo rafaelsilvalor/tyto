@@ -17,7 +17,7 @@
 | Release | https://github.com/adobe-fonts/source-sans/releases/tag/3.052R |
 | Licence | SIL Open Font License 1.1 (text below) |
 
-The four files beside this one keep their upstream names and bytes. They come from two
+The eight files beside this one keep their upstream names and bytes. They come from two
 archives of that one release, so the `.woff2` is the compressed form of the `.ttf` next to
 it rather than a different build of the same design:
 
@@ -27,6 +27,19 @@ it rather than a different build of the same design:
 | `SourceSans3-Regular.ttf.woff2` | `WOFF2-source-sans-3.052R.zip`, `WOFF2/TTF/` | `53492fb3a0def77354f166a55d09b63a10855e91c206c7620a81cf56e97f8ec3` |
 | `SourceSans3-Bold.ttf` | `TTF-source-sans-3.052R.zip`, `TTF/` | `9214b9d95e4231c609802815c2646c98174e2102d0d37f88978a7f8e71006e6a` |
 | `SourceSans3-Bold.ttf.woff2` | `WOFF2-source-sans-3.052R.zip`, `WOFF2/TTF/` | `8d35c6d40e750a4ee23bbbba2bd604ad098d172907369b43281507e16b8e2e7a` |
+| `SourceSans3-It.ttf` | `TTF-source-sans-3.052R.zip`, `TTF/` | `192afd78f0f54a3c69eaf02d43f4d9a821e9d6110e41d3d25d61a7385cd580e4` |
+| `SourceSans3-It.ttf.woff2` | `WOFF2-source-sans-3.052R.zip`, `WOFF2/TTF/` | `4d80b3b801f4c457f1b4adbd3911d8501338e6d282141663770c38d3a2e97859` |
+| `SourceSans3-BoldIt.ttf` | `TTF-source-sans-3.052R.zip`, `TTF/` | `7978291fc1bf314db887e0366853b33c5cf2e964c7b95cfb9ce403a6ec46a842` |
+| `SourceSans3-BoldIt.ttf.woff2` | `WOFF2-source-sans-3.052R.zip`, `WOFF2/TTF/` | `8c4b66aea0e7887dfd1e296b03ae53b76ce25256fae1437777514933acaef0f3` |
+
+The two italic faces were added by TYTO-329 (ADR 0110), from the same two archives of the
+same release; the archives' SHA-256 were
+`1b0dd1ec44b39f1dd98bbd153a1a3815f083639874ddee02c842bd601bad3d21` (TTF) and
+`d7f6724027fe5ca0bab44d6121284f1fa8f66dec5f2864aa969aed347041ac95` (WOFF2), and the four
+earlier files in them hash to the rows above, unchanged. The archives carry no licence file
+of their own; the licence below is the release's, and each italic face's `name` table says
+the same: _licensed under the SIL Open Font License, Version 1.1_, Reserved Font Name
+'Source'.
 
 ---
 

@@ -456,17 +456,22 @@ function codesOf(result: {
   );
 }
 
-/** The text fixture with every run flipped to a face the repository does not bundle. */
-function inItalic(): Scene {
+/**
+ * The text fixture with every run moved to a face the repository does not bundle.
+ *
+ * Weight 300: italic was this face until TYTO-329 shipped it (ADR 0110), and Light is the
+ * nearest weight nothing ships, so the intent — a real family, an absent face — is kept.
+ */
+function inUnbundledWeight(): Scene {
   const scene = sceneOf(textFixture) as unknown as {
-    artworks: { frames: { children: { runs?: { kind: string; style?: string }[] }[] }[] }[];
+    artworks: { frames: { children: { runs?: { kind: string; weight?: number }[] }[] }[] }[];
   };
   const clone = structuredClone(scene);
   for (const artwork of clone.artworks) {
     for (const frame of artwork.frames) {
       for (const child of frame.children) {
         for (const run of child.runs ?? []) {
-          if (run.kind === 'text') run.style = 'italic';
+          if (run.kind === 'text') run.weight = 300;
         }
       }
     }
@@ -533,12 +538,12 @@ describe('the bundled font', () => {
   });
 
   it('reports a face it does not bundle rather than substituting one', () => {
-    const italic = inItalic();
+    const light = inUnbundledWeight();
 
-    expect(codesOf(exportHtml(italic, { resources: { font: bundledFont } }))).toContain(
+    expect(codesOf(exportHtml(light, { resources: { font: bundledFont } }))).toContain(
       'E_EXPORT_FONT_UNRESOLVED',
     );
-    expect(codesOf(exportSvg(italic, { resources: { font: bundledFont } }))).toContain(
+    expect(codesOf(exportSvg(light, { resources: { font: bundledFont } }))).toContain(
       'E_EXPORT_FONT_UNRESOLVED',
     );
   });

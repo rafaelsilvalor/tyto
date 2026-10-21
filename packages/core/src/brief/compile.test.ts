@@ -7,6 +7,7 @@ import { formatCatalogue } from '../config/formats.js';
 import type { AssetResolver } from '../ports/asset-resolver.js';
 import { GAP_COLOR } from '../scene/gap.js';
 import type { AssetRef } from '../scene/primitives.js';
+import type { Face, FaceCache } from '../text/face.js';
 import type { Frame, Scene } from '../scene/scene.js';
 import { sourceRange } from '../source/range.js';
 import { type DeferredTemplate, type Template, defineTemplate } from '../template/define.js';
@@ -567,5 +568,84 @@ describe('a template reports beside its frame (ADR 0058)', () => {
     expect(result.ok && result.diagnostics.map((item) => [item.code, item.range])).toEqual([
       ['W_TEMPLATE_OVERFLOW', SLIDES[1]],
     ]);
+  });
+});
+
+describe('a face the font source cannot answer (TYTO-329, ADR 0110)', () => {
+  // The italic word at its own place in the source, so the range proves which text is meant.
+  const ITALIC_TEXT = sourceRange(120, 125);
+  const ITALIC: BriefAst = {
+    ...BRIEF,
+    directives: [
+      ...BRIEF.directives.filter((item) => item.name !== 'slide'),
+      directive('slide', [
+        { kind: 'text', value: 'Estude com ', range: sourceRange(109, 120) },
+        {
+          kind: 'italic',
+          children: [{ kind: 'text', value: 'calma', range: ITALIC_TEXT }],
+          range: sourceRange(119, 126),
+        },
+      ]),
+      directive('slide', textOf('Garanta sua vaga')),
+    ],
+  };
+
+  const EVEN: Face = { advance: (value) => value.length * 0.5, contentHeight: 1.2 };
+  /** Every upright face, and no italic: the bundled package before this card. */
+  const uprightOnly: FaceCache = {
+    get: (face) => (face.style === 'italic' ? undefined : EVEN),
+  };
+
+  it('is an error that is not fatal, on the italic text, once for both formats', async () => {
+    const result = compile(await resolved(ITALIC), promoCurso, {
+      formats: FORMATS,
+      faces: uprightOnly,
+    });
+
+    // The scene survives: the preview still draws, and the export is what cannot.
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect(result.value.artworks).toHaveLength(2);
+    expect(result.diagnostics).toEqual([
+      {
+        severity: 'error',
+        code: 'E_FONT_FACE_UNAVAILABLE',
+        message:
+          "Font 'Inter 400 italic' is not available to template 'promo-curso', so this text cannot be exported. Remove the formatting that asks for it, or use a template whose font has that face.",
+        range: ITALIC_TEXT,
+      },
+    ]);
+  });
+
+  it('covers a deferred template, which compiles through the same layout', async () => {
+    const deferred: DeferredTemplate = {
+      manifest: MANIFEST,
+      buildLater: (context) =>
+        Promise.resolve({ ok: true, value: promoCurso.build(context), diagnostics: [] }),
+    };
+
+    const result = await compileDeferred(await resolved(ITALIC), deferred, {
+      formats: FORMATS,
+      faces: uprightOnly,
+    });
+
+    expect(result.ok && result.diagnostics.map((item) => [item.code, item.range])).toEqual([
+      ['E_FONT_FACE_UNAVAILABLE', ITALIC_TEXT],
+    ]);
+  });
+
+  it('says nothing without faces, because nothing was asked', async () => {
+    const result = compile(await resolved(ITALIC), promoCurso, { formats: FORMATS });
+
+    expect(result.ok && result.diagnostics).toEqual([]);
+  });
+
+  it('says nothing for a brief whose faces are all there, which is the control', async () => {
+    const result = compile(await resolved(), promoCurso, {
+      formats: FORMATS,
+      faces: uprightOnly,
+    });
+
+    expect(result.ok && result.diagnostics).toEqual([]);
   });
 });

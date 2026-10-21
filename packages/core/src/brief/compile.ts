@@ -140,6 +140,50 @@ function provenance(
 }
 
 /**
+ * What the face checks of one compile have already said, so a face is reported once per
+ * place in the brief and not once per format or per artwork that draws the same words.
+ */
+interface FaceReport {
+  readonly template: string;
+  readonly seen: Set<string>;
+}
+
+/**
+ * `E_FONT_FACE_UNAVAILABLE` for every run whose face the font source cannot answer (ADR 0110).
+ *
+ * Read from the runs as the template built them, before layout rewrites them: the range is
+ * the inline that asked for the face — `*this*`, not the whole directive — and `originOf`
+ * only knows the run objects `runsOf` made. The label is the one `E_EXPORT_FONT_UNRESOLVED`
+ * prints, so the two read as the same face.
+ */
+function reportUnavailableFaces(
+  node: TextNode,
+  faces: FaceCache,
+  report: FaceReport,
+  problems: Diagnostic[],
+): void {
+  for (const run of node.runs) {
+    if (run.kind !== 'text') continue;
+    const face = { family: run.font.family, weight: run.weight, style: run.style };
+    if (faces.get(face) !== undefined) continue;
+
+    const font = `${face.family} ${String(face.weight)} ${face.style}`;
+    const range = originOf(run);
+    const key = `${font}|${range === undefined ? '' : `${String(range.start)}-${String(range.end)}`}`;
+    if (report.seen.has(key)) continue;
+    report.seen.add(key);
+
+    problems.push(
+      diagnostic(
+        'E_FONT_FACE_UNAVAILABLE',
+        { font, template: report.template },
+        range === undefined ? {} : { range },
+      ),
+    );
+  }
+}
+
+/**
  * Lays out every text node of a frame and reports the ones that still do not fit.
  *
  * Two things change in the node. The runs arrive with every line break decided, which is
@@ -152,13 +196,21 @@ function layoutText(
   faces: FaceCache,
   slots: Readonly<Record<string, ResolvedSlot>>,
   format: string,
+  report: FaceReport,
   problems: Diagnostic[],
 ): SceneNode[] {
   return nodes.map((node): SceneNode => {
     if (node.kind === 'group') {
-      return { ...node, children: layoutText(node.children, faces, slots, format, problems) };
+      return {
+        ...node,
+        children: layoutText(node.children, faces, slots, format, report, problems),
+      };
     }
     if (node.kind !== 'text') return node;
+
+    // Before the early return below: a face nobody can answer is exactly the node that is
+    // not measured, and the one whose export is going to fail.
+    reportUnavailableFaces(node, faces, report, problems);
 
     const measured = measureText(node, faces);
     // No face, no measurement: the node keeps the lines its template wrote.
@@ -246,6 +298,11 @@ export interface CompileOptions {
    * the lines its template produced, which is what happened before anything measured. With
    * it, wrapping and `overflow: 'shrink'` are decided in the IR and both exporters draw the
    * same lines instead of each guessing.
+   *
+   * With it, a face the cache answers `undefined` for is also `E_FONT_FACE_UNAVAILABLE` on
+   * the text that asks for it (ADR 0110): that is the face the exporters will have no bytes
+   * for, and saying so here puts it in the Problems panel instead of at the end of an export.
+   * Without it nothing was asked, so nothing is reported.
    */
   readonly faces?: FaceCache;
   /**
@@ -410,6 +467,7 @@ function compileWith(
   const artworks: Artwork[] = [];
   const fonts = new Map<string, FontRef>();
   const assets = new Map<string, AssetRef>();
+  const faceReport: FaceReport = { template: manifest.name, seen: new Set() };
 
   for (const plan of plans) {
     const frames: Frame[] = [];
@@ -447,7 +505,7 @@ function compileWith(
       if (faces !== undefined) {
         frame = {
           ...frame,
-          children: layoutText(frame.children, faces, plan.slots, format, problems),
+          children: layoutText(frame.children, faces, plan.slots, format, faceReport, problems),
         };
       }
 
