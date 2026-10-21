@@ -81,6 +81,18 @@ export interface Catalogue {
   readonly 'command.templates.clearFolder': string;
   readonly 'command.workspace.openFolder': string;
   readonly 'command.workspace.closeFolder': string;
+  readonly 'command.workspace.manageTrust': string;
+  readonly 'workspace.banner.text': string;
+  readonly 'workspace.banner.trust': string;
+  readonly 'workspace.banner.problems': string;
+  readonly 'workspace.trust.heading': string;
+  readonly 'workspace.trust.none': string;
+  readonly 'workspace.trust.trusted': string;
+  readonly 'workspace.trust.restricted': string;
+  readonly 'workspace.trust.revoked': string;
+  readonly 'workspace.trust.grant': string;
+  readonly 'workspace.trust.revoke': string;
+  readonly 'workspace.trust.close': string;
   /**
    * The command bar (E9.12), and the labels of everything it lists.
    *
@@ -623,6 +635,18 @@ export const CATALOGUE_KEYS = [
   'command.templates.clearFolder',
   'command.workspace.openFolder',
   'command.workspace.closeFolder',
+  'command.workspace.manageTrust',
+  'workspace.banner.text',
+  'workspace.banner.trust',
+  'workspace.banner.problems',
+  'workspace.trust.heading',
+  'workspace.trust.none',
+  'workspace.trust.trusted',
+  'workspace.trust.restricted',
+  'workspace.trust.revoked',
+  'workspace.trust.grant',
+  'workspace.trust.revoke',
+  'workspace.trust.close',
   'command.bar.placeholder',
   'command.bar.empty',
   'command.undo',

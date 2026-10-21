@@ -62,6 +62,15 @@
         an entry in a record rather than a change to this file.
       -->
       <div class="workspace">
+        <!--
+          TYTO-278, ADR 0111. Above the editor groups, and only when an untrusted folder left
+          something out: `workspace-banner.ts` paints it from main's answer.
+        -->
+        <div class="workspace-banner" id="workspace-banner" role="region" hidden>
+          <span class="workspace-banner__text"></span>
+          <button type="button" class="workspace-banner__trust"></button>
+          <button type="button" class="workspace-banner__problems"></button>
+        </div>
         <div class="work" id="work">
           <div class="dock dock--left" data-dock="left" hidden></div>
           <div
@@ -123,6 +132,7 @@
       the window, and it renders nothing while closed.
     -->
     <tyto-plugins-dialog></tyto-plugins-dialog>
+    <tyto-trust-dialog></tyto-trust-dialog>
 
     <!--
       The template mode (TYTO-44), outside `.shell` because it covers the window. Unlike the

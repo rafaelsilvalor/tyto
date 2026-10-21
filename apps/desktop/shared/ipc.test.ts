@@ -81,6 +81,7 @@ describe('the IPC contract', () => {
       'window:zoom',
       'workspace:folder',
       'workspace:set-folder',
+      'workspace:trust',
     ]);
     expect(new Set(IPC_CHANNEL_NAMES).size).toBe(IPC_CHANNEL_NAMES.length);
   });

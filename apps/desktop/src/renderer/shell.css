@@ -1841,6 +1841,75 @@ tyto-plugins-dialog[open] {
 }
 
 /*
+ * The untrusted-folder strip (TYTO-278, ADR 0111): one line above the editor groups, with the
+ * warning edge the plugins notice has, so it reads as the same kind of sentence.
+ */
+.workspace-banner {
+  display: flex;
+  flex: none;
+  align-items: center;
+  padding: var(--tyto-space-2) var(--tyto-space-4);
+  border-bottom: var(--tyto-hairline-width) solid var(--tyto-border);
+  border-left: var(--tyto-focus-width) solid var(--tyto-warning);
+  background: var(--tyto-surface-raised);
+  font-size: var(--tyto-text-sm);
+  gap: var(--tyto-space-3);
+}
+
+.workspace-banner[hidden] {
+  display: none;
+}
+
+.workspace-banner__text {
+  flex: 1;
+  min-width: 0;
+}
+
+/* Workspace: Manage Trust (TYTO-278): the plugins screen's frame, at the small width. */
+tyto-trust-dialog {
+  display: contents;
+}
+
+tyto-trust-dialog[open] {
+  position: fixed;
+  inset: 0;
+  z-index: 10;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--tyto-scrim);
+}
+
+.trust__panel {
+  display: flex;
+  width: min(var(--tyto-dialog-width-sm), calc(100vw - 2 * var(--tyto-space-6)));
+  flex-direction: column;
+  padding: var(--tyto-space-6);
+  border: var(--tyto-hairline-width) solid var(--tyto-border);
+  border-radius: var(--tyto-radius-md);
+  background: var(--tyto-surface-raised);
+  box-shadow: var(--tyto-shadow-overlay);
+  gap: var(--tyto-space-4);
+}
+
+.trust__title {
+  margin: 0;
+  font-size: var(--tyto-text-lg);
+}
+
+.trust__folder,
+.trust__state {
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+
+.trust__actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: var(--tyto-space-3);
+}
+
+/*
  * The local queue panel (TYTO-45).
  *
  * A column in the left dock, read top to bottom: where to drop a task, the two controls, then

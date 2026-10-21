@@ -1,6 +1,13 @@
 import { basename, relative } from 'node:path';
 
-import { type Diagnostic, type TrustStore, createLineIndex, lineColumnAtIndex } from '@tyto/core';
+import {
+  type Diagnostic,
+  type Result,
+  type TrustStore,
+  createLineIndex,
+  lineColumnAtIndex,
+  ok,
+} from '@tyto/core';
 import { type LoadedWorkspace, isInside, loadWorkspace } from '@tyto/io';
 
 import type { IpcResponse } from '../../shared/ipc.js';
@@ -40,6 +47,17 @@ export interface WorkspaceService {
    */
   open(folder: string): Promise<boolean>;
   close(): Promise<void>;
+  /**
+   * Trusts the open folder and reads it again at once (ADR 0111): raising trust is safe, so
+   * the folders it withheld apply now. Nothing open, nothing happens. Never given a path: it
+   * acts on the folder main has open and on no other.
+   */
+  grant(): Promise<Result<true>>;
+  /**
+   * Takes the open folder's trust back. **It applies the next time the folder is opened**
+   * (ADR 0111): the window keeps it as it is until then, and says so.
+   */
+  revoke(): Promise<Result<true>>;
   /** The places for a brief in `briefDirectory`: the workspace's only when it is inside. */
   placesFor(briefDirectory: string | undefined): BriefPlaces;
 }
@@ -55,13 +73,33 @@ export interface WorkspaceServiceOptions {
 const NOTHING_OPEN: WorkspaceState = {
   folder: null,
   name: null,
-  trusted: false,
+  trust: 'restricted',
+  leftOut: 0,
   output: null,
   problems: [],
 };
 
+/** What a restricted folder leaves out: each key that led outside, and its withheld sections. */
+const LEFT_OUT: ReadonlySet<string> = new Set([
+  'W_PROJECT_PATH_OUTSIDE',
+  'W_PROJECT_SECTIONS_WITHHELD',
+]);
+
 export function createWorkspaceService(options: WorkspaceServiceOptions): WorkspaceService {
   let open: LoadedWorkspace | undefined;
+  /** Trust taken back while the folder is open: still trusted until it is opened again. */
+  let revoked = false;
+
+  const read = async (folder: string): Promise<boolean> => {
+    const loaded = await loadWorkspace(folder, {
+      trustStore: options.trustStore,
+      home: options.home,
+    });
+    open = loaded;
+    revoked = false;
+    await options.setTemplateFolders(loaded?.project.templates ?? []);
+    return loaded !== undefined;
+  };
 
   return {
     state() {
@@ -69,25 +107,36 @@ export function createWorkspaceService(options: WorkspaceServiceOptions): Worksp
       return {
         folder: open.folder,
         name: basename(open.folder),
-        trusted: open.trust === 'trusted',
+        trust: revoked ? 'revoked' : open.trust,
+        leftOut: open.diagnostics.filter((item) => LEFT_OUT.has(item.code)).length,
         output: open.project.output ?? null,
         problems: [...problemsOf(open)],
       };
     },
 
-    async open(folder) {
-      const loaded = await loadWorkspace(folder, {
-        trustStore: options.trustStore,
-        home: options.home,
-      });
-      open = loaded;
-      await options.setTemplateFolders(loaded?.project.templates ?? []);
-      return loaded !== undefined;
-    },
+    open: read,
 
     async close() {
       open = undefined;
+      revoked = false;
       await options.setTemplateFolders([]);
+    },
+
+    async grant() {
+      if (open === undefined) return ok(true);
+      const granted = await options.trustStore.grant(open.folder);
+      if (!granted.ok) return granted;
+      await read(open.folder);
+      return ok(true);
+    },
+
+    async revoke() {
+      if (open === undefined) return ok(true);
+      const removed = await options.trustStore.revoke(open.folder);
+      if (!removed.ok) return removed;
+      // Only an approval that was there is pending removal; a restricted folder stays as it is.
+      if (open.trust === 'trusted') revoked = true;
+      return ok(true);
     },
 
     placesFor(briefDirectory) {

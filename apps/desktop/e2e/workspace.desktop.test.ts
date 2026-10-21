@@ -1,4 +1,4 @@
-import { cpSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { cpSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -207,4 +207,57 @@ describe('a workspace folder in the window (TYTO-278)', () => {
     await expect.poll(problemsText, { timeout: 10_000 }).not.toContain('W_PROJECT_PATH_OUTSIDE');
     await expect.poll(problemsText, { timeout: 10_000 }).toContain('E_UNKNOWN_TEMPLATE');
   }, 60_000);
+});
+
+describe('trusting a folder from the window (TYTO-278, ADR 0111)', () => {
+  const SHARED = solidPng([200, 120, 30]);
+  const bannerShown = async (): Promise<boolean> =>
+    window.evaluate(() => document.getElementById('workspace-banner')?.hidden === false);
+
+  it('shows the banner, and Trust applies the withheld folder at once', async () => {
+    const team = join(scratch, 'equipe');
+    mkdirSync(join(team, '.tyto'), { recursive: true });
+    mkdirSync(join(team, 'briefs'), { recursive: true });
+    mkdirSync(join(scratch, 'shared-art'), { recursive: true });
+    writeFileSync(join(scratch, 'shared-art', 'shared.png'), SHARED);
+    writeFileSync(join(team, '.tyto', 'project.json'), '{ "assets": ["../shared-art"] }');
+    writeFileSync(
+      join(team, 'briefs', 'shared.brief'),
+      [
+        '---',
+        'template: promo-curso',
+        'formats: [grid-1x1]',
+        'imagem: shared.png',
+        '---',
+        '::titulo',
+        '  Arte da equipe',
+      ].join('\n'),
+    );
+
+    await answerPickers({ directory: team });
+    await run('workspace.openFolder');
+    await expect.poll(bannerShown, { timeout: 10_000 }).toBe(true);
+    await openBrief(join(team, 'briefs', 'shared.brief'), 'Arte da equipe');
+    expect(await previewSrcdoc(window)).not.toContain(SHARED.toString('base64'));
+
+    await window.locator('.workspace-banner__trust').click();
+    await expect.poll(bannerShown, { timeout: 10_000 }).toBe(false);
+    await expect
+      .poll(() => previewSrcdoc(window), { timeout: 15_000 })
+      .toContain(SHARED.toString('base64'));
+    expect(readFileSync(join(scratch, 'tyto-home', 'trust.json'), 'utf8')).toContain('equipe');
+  }, 60_000);
+
+  it('takes the trust back from Manage Trust, saying it applies on the next open', async () => {
+    await run('workspace.manageTrust');
+    await window.locator('.trust__panel').waitFor({ state: 'visible' });
+    await window.locator('.trust__revoke').click();
+    await window.waitForFunction(
+      () => document.querySelector('.trust__state')?.getAttribute('data-trust') === 'revoked',
+    );
+    // Still drawn as trusted until the folder is opened again.
+    expect(await bannerShown()).toBe(false);
+    expect(readFileSync(join(scratch, 'tyto-home', 'trust.json'), 'utf8')).not.toContain('equipe');
+    await window.locator('.trust__close').click();
+  }, 30_000);
 });

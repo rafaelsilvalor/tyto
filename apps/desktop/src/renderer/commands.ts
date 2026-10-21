@@ -131,6 +131,8 @@ export const TEMPLATES_CLEAR_FOLDER = 'templates.clearFolder';
  */
 export const WORKSPACE_OPEN_FOLDER = 'workspace.openFolder';
 export const WORKSPACE_CLOSE_FOLDER = 'workspace.closeFolder';
+/** TYTO-278. The open folder's trust, in a small dialog of its own (ADR 0111). */
+export const WORKSPACE_MANAGE_TRUST = 'workspace.manageTrust';
 /**
  * TYTO-44. The template mode: open a template folder to edit, or scaffold a new one.
  *
@@ -277,6 +279,7 @@ export const COMMAND_LABELS: Readonly<Record<string, CatalogueKey>> = {
   [TEMPLATES_CLEAR_FOLDER]: 'command.templates.clearFolder',
   [WORKSPACE_OPEN_FOLDER]: 'command.workspace.openFolder',
   [WORKSPACE_CLOSE_FOLDER]: 'command.workspace.closeFolder',
+  [WORKSPACE_MANAGE_TRUST]: 'command.workspace.manageTrust',
   [TEMPLATE_EDIT]: 'command.template.edit',
   [TEMPLATE_NEW]: 'command.template.new',
   [LAYOUT_RESTORE]: 'command.layout.restore',
@@ -385,6 +388,7 @@ export interface DesktopActions {
   clearTemplateFolder(): void;
   openWorkspaceFolder(): void;
   closeWorkspaceFolder(): void;
+  manageTrust(): void;
   /** TYTO-44. Both open the template mode; what happens in it is a round trip to main. */
   editTemplate(): void;
   newTemplate(): void;
@@ -528,6 +532,10 @@ export function createDesktopRegistry(actions: DesktopActions): CommandRegistry 
 
   add(WORKSPACE_CLOSE_FOLDER, () => {
     actions.closeWorkspaceFolder();
+  });
+
+  add(WORKSPACE_MANAGE_TRUST, () => {
+    actions.manageTrust();
   });
 
   add(TEMPLATE_EDIT, () => {
