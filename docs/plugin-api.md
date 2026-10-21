@@ -404,6 +404,7 @@ The network and the secrets are a port, `HostCapabilities`. **In the CLI a crede
 - Main: each plugin in a process of its own under Node's permission model: a child of the CLI's Node, or of the Node the desktop carries (ADR 0050). Typed RPC; the host is a proxy.
 - Renderer: `panel` runs in an iframe with `sandbox="allow-scripts"` alone; talks to the host via a `postMessage` bridge the renderer validates and main checks (ADR 0045). The window's CSP and main's `will-frame-navigate` guard keep its frame on its own plugin's pages.
 - Permissions are approved at install time; denied ⇒ the call rejects with `E_PERMISSION`.
+- Installing is the only way a plugin is trusted. A plugin a workspace folder or a profile carries is not loaded while that source is restricted, and a plugin's section of a restricted source's `project.json` is withheld from it (ADR 0111).
 
 **Built in the CLI (TYTO-48, ADR 0041, ADR 0049).** Each installed plugin's module is imported by a child process of its own — started from `dist/guest/plugin-guest.js`, one per plugin for the life of the command — and what reaches a task's host is a proxy. Built-ins stay in process.
 
