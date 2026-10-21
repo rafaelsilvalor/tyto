@@ -1,4 +1,4 @@
-import { mkdir, mkdtemp, readFile, rm, symlink, writeFile } from 'node:fs/promises';
+import { mkdir, mkdtemp, readFile, realpath, rm, symlink, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
@@ -177,7 +177,7 @@ describe('briefAssetResolver with workspace folders', () => {
     const resolver = briefAssetResolver({ briefDirectory: briefs, projectAssets: [art] });
     expect((await resolver.resolve('logo.png'))?.path).toBe(join(art, 'logo.png'));
     expect((await resolver.resolve('own.png'))?.path).toBe(join(briefs, 'assets', 'own.png'));
-    // A workspace folder is a containment root too: climbing out of it finds nothing.
+    // Climbing out of the brief's folder is refused before any later folder is tried.
     expect(await resolver.resolve('../work/art/logo.png')).toBeUndefined();
   });
 });
@@ -207,10 +207,15 @@ describe('fsTrustStore', () => {
     expect((await store.trustOf(join(scratch, 'target-evil'))).trust).toBe('restricted');
   });
 
-  it('compares without case where the file system does', async () => {
-    const store = fsTrustStore({ home, ignoreCase: true });
-    await store.grant(work);
-    expect((await store.trustOf(work.toUpperCase())).trust).toBe('trusted');
+  it('compares without case where the file system does, and only there', async () => {
+    // Written in another case by hand: asking with a differently cased path would prove
+    // nothing on Windows, where `realpath` hands back the folder's own spelling first.
+    const entry = { trusted: [{ path: (await realpath(work)).toUpperCase() }] };
+    await writeFile(join(home, 'trust.json'), JSON.stringify(entry));
+    expect((await fsTrustStore({ home, ignoreCase: true }).trustOf(work)).trust).toBe('trusted');
+    expect((await fsTrustStore({ home, ignoreCase: false }).trustOf(work)).trust).toBe(
+      'restricted',
+    );
   });
 
   it('keeps the comments a person wrote when it edits the file', async () => {
