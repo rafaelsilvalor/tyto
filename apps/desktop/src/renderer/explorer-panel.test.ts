@@ -176,16 +176,19 @@ describe('the explorer panel', () => {
   it('does not draw an answer for the folder it listed before', async () => {
     const { element } = await mount(disk());
     let answerOld: (value: ExplorerListing) => void = () => undefined;
+    let first = true;
     element.source = {
       ...element.source,
-      list: (entryId) =>
-        entryId === 'slides'
-          ? new Promise((resolve) => {
-              answerOld = resolve;
-            })
-          : Promise.resolve(entries(['other', 'other.brief', 'brief'])),
+      // The old folder's root listing is slow; the new folder's answers at once.
+      list: () => {
+        if (!first) return Promise.resolve(entries(['other', 'other.brief', 'brief']));
+        first = false;
+        return new Promise((resolve) => {
+          answerOld = resolve;
+        });
+      },
     };
-    row(element, 'slides').click();
+    element.refresh();
 
     // Another folder opens while the old one's answer is still on its way.
     element.folderName = 'other';
