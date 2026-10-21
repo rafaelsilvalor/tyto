@@ -326,7 +326,7 @@ describe('flagging what a name cannot tell (TYTO-282, ADR 0116)', () => {
     await explorer.setRoot(work, {
       output: join(work, 'saida'),
       assets: [join(work, 'saida'), join(work, 'modelos')],
-      templates: [join(work, 'modelos'), join(work, 'modelos', 'banner')],
+      templates: [join(work, 'saida'), join(work, 'modelos'), join(work, 'modelos', 'banner')],
     });
 
     expect(await placesOf(explorer, null)).toMatchObject({
