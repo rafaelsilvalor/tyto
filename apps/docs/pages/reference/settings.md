@@ -54,11 +54,11 @@ How thick the icons are drawn, from 0.75 to 2 (default 1.25).
 
 ## statusBarItems
 
-Which status bar items show, in order inside their side: leftArea, commandBar, vimMode, cursorPosition, tabKind, template, problems, queue, plugins, export, settings, bottomArea, rightArea.
+Which status bar items show, in order inside their side: leftArea, commandBar, vimMode, cursorPosition, tabKind, template, problems, explorer, queue, plugins, export, settings, bottomArea, rightArea.
 
 | Type | Default |
 | --- | --- |
-| `list of string` | `["leftArea","commandBar","vimMode","cursorPosition","tabKind","template","problems","queue","plugins","export","settings","bottomArea","rightArea"]` |
+| `list of string` | `["leftArea","commandBar","vimMode","cursorPosition","tabKind","template","problems","explorer","queue","plugins","export","settings","bottomArea","rightArea"]` |
 
 **Values of each entry**
 
@@ -71,6 +71,7 @@ Which status bar items show, in order inside their side: leftArea, commandBar, v
 | `"tabKind"` | What the tab in front holds: brief, settings, preview… |
 | `"template"` | The template the brief's frontmatter names. |
 | `"problems"` | Problems count; toggles the problems panel. |
+| `"explorer"` | Toggles the explorer panel. |
 | `"queue"` | Toggles the queue panel. |
 | `"plugins"` | Opens the plugins dialog. |
 | `"export"` | Exports the brief in front. |
@@ -80,7 +81,7 @@ Which status bar items show, in order inside their side: leftArea, commandBar, v
 
 ## statusBarColors
 
-Colours that win over the theme for the status bar, in every theme. background: The bar's background. foreground: The bar's text and icons. itemHoverBackground: A button under the pointer. itemHoverForeground: A button's text under the pointer. itemActiveBackground: A toggle that is on, such as an open panel. itemActiveForeground: A toggle's text while it is on. vimMode.normal: Vim's NORMAL badge; its text is the theme's best-reading. vimMode.insert: Vim's INSERT badge; its text is the theme's best-reading. vimMode.visual: Vim's VISUAL badge; its text is the theme's best-reading. vimMode.replace: Vim's REPLACE badge; its text is the theme's best-reading. item.leftArea: The text of leftArea: Button that shows or hides the left area. item.commandBar: The text of commandBar: Button that opens the command bar. item.vimMode: The text of vimMode: Vim's mode badge and pending keys, while vim is on. item.cursorPosition: The text of cursorPosition: Line and column of the caret, and the selection size. item.tabKind: The text of tabKind: What the tab in front holds: brief, settings, preview… item.template: The text of template: The template the brief's frontmatter names. item.problems: The text of problems: Problems count; toggles the problems panel. item.queue: The text of queue: Toggles the queue panel. item.plugins: The text of plugins: Opens the plugins dialog. item.export: The text of export: Exports the brief in front. item.settings: The text of settings: Opens settings.json. item.bottomArea: The text of bottomArea: Button that shows or hides the bottom area. item.rightArea: The text of rightArea: Button that shows or hides the right area.
+Colours that win over the theme for the status bar, in every theme. background: The bar's background. foreground: The bar's text and icons. itemHoverBackground: A button under the pointer. itemHoverForeground: A button's text under the pointer. itemActiveBackground: A toggle that is on, such as an open panel. itemActiveForeground: A toggle's text while it is on. vimMode.normal: Vim's NORMAL badge; its text is the theme's best-reading. vimMode.insert: Vim's INSERT badge; its text is the theme's best-reading. vimMode.visual: Vim's VISUAL badge; its text is the theme's best-reading. vimMode.replace: Vim's REPLACE badge; its text is the theme's best-reading. item.leftArea: The text of leftArea: Button that shows or hides the left area. item.commandBar: The text of commandBar: Button that opens the command bar. item.vimMode: The text of vimMode: Vim's mode badge and pending keys, while vim is on. item.cursorPosition: The text of cursorPosition: Line and column of the caret, and the selection size. item.tabKind: The text of tabKind: What the tab in front holds: brief, settings, preview… item.template: The text of template: The template the brief's frontmatter names. item.problems: The text of problems: Problems count; toggles the problems panel. item.explorer: The text of explorer: Toggles the explorer panel. item.queue: The text of queue: Toggles the queue panel. item.plugins: The text of plugins: Opens the plugins dialog. item.export: The text of export: Exports the brief in front. item.settings: The text of settings: Opens settings.json. item.bottomArea: The text of bottomArea: Button that shows or hides the bottom area. item.rightArea: The text of rightArea: Button that shows or hides the right area.
 
 | Type | Default |
 | --- | --- |
@@ -107,6 +108,7 @@ Colours that win over the theme for the status bar, in every theme. background: 
 | `"item.tabKind"` | The text of tabKind: What the tab in front holds: brief, settings, preview… |
 | `"item.template"` | The text of template: The template the brief's frontmatter names. |
 | `"item.problems"` | The text of problems: Problems count; toggles the problems panel. |
+| `"item.explorer"` | The text of explorer: Toggles the explorer panel. |
 | `"item.queue"` | The text of queue: Toggles the queue panel. |
 | `"item.plugins"` | The text of plugins: Opens the plugins dialog. |
 | `"item.export"` | The text of export: Exports the brief in front. |
@@ -286,7 +288,7 @@ The size of the editor’s text, in pixels, from 9 to 32 (default 14).
 
 ## fontSizes
 
-A text size in pixels for one part of the window, over its base (uiFontSize or codeFontSize). An area left out follows its base. editor: The brief editor and the template buffers. json: The settings, keybindings and snippets tabs. completion: The editor's suggestion list. problems: The problems panel's rows. commandBar: The command bar (Ctrl+K) and its lists. titleBar: The window's title bar, up to 18; the native menus keep the system's text. tabs: The editor groups' tab strips, which grow to fit. paneHeaders: The breadcrumb row, a preview's bar and the panels' headers. statusBar: The status bar. queue: The queue panel's body. explorer: The file explorer, once the window has one (TYTO-279); nothing yet.
+A text size in pixels for one part of the window, over its base (uiFontSize or codeFontSize). An area left out follows its base. editor: The brief editor and the template buffers. json: The settings, keybindings and snippets tabs. completion: The editor's suggestion list. problems: The problems panel's rows. commandBar: The command bar (Ctrl+K) and its lists. titleBar: The window's title bar, up to 18; the native menus keep the system's text. tabs: The editor groups' tab strips, which grow to fit. paneHeaders: The breadcrumb row, a preview's bar and the panels' headers. statusBar: The status bar. queue: The queue panel's body. explorer: The explorer panel's tree.
 
 | Type | Default |
 | --- | --- |
@@ -306,11 +308,11 @@ A text size in pixels for one part of the window, over its base (uiFontSize or c
 | `"paneHeaders"` | The breadcrumb row, a preview's bar and the panels' headers. Follows uiFontSize and uiFontFamily while unset. |
 | `"statusBar"` | The status bar. Follows uiFontSize and uiFontFamily while unset. |
 | `"queue"` | The queue panel's body. Follows uiFontSize and uiFontFamily while unset. |
-| `"explorer"` | The file explorer, once the window has one (TYTO-279); nothing yet. Follows uiFontSize and uiFontFamily while unset. |
+| `"explorer"` | The explorer panel's tree. Follows uiFontSize and uiFontFamily while unset. |
 
 ## fontFamilies
 
-A face for one part of the window, over its base (uiFontFamily or codeFontFamily). An area left out follows its base. editor: The brief editor and the template buffers. json: The settings, keybindings and snippets tabs. completion: The editor's suggestion list. problems: The problems panel's rows. commandBar: The command bar (Ctrl+K) and its lists. titleBar: The window's title bar, up to 18; the native menus keep the system's text. tabs: The editor groups' tab strips, which grow to fit. paneHeaders: The breadcrumb row, a preview's bar and the panels' headers. statusBar: The status bar. queue: The queue panel's body. explorer: The file explorer, once the window has one (TYTO-279); nothing yet.
+A face for one part of the window, over its base (uiFontFamily or codeFontFamily). An area left out follows its base. editor: The brief editor and the template buffers. json: The settings, keybindings and snippets tabs. completion: The editor's suggestion list. problems: The problems panel's rows. commandBar: The command bar (Ctrl+K) and its lists. titleBar: The window's title bar, up to 18; the native menus keep the system's text. tabs: The editor groups' tab strips, which grow to fit. paneHeaders: The breadcrumb row, a preview's bar and the panels' headers. statusBar: The status bar. queue: The queue panel's body. explorer: The explorer panel's tree.
 
 | Type | Default |
 | --- | --- |
@@ -330,4 +332,4 @@ A face for one part of the window, over its base (uiFontFamily or codeFontFamily
 | `"paneHeaders"` | The breadcrumb row, a preview's bar and the panels' headers. Follows uiFontSize and uiFontFamily while unset. |
 | `"statusBar"` | The status bar. Follows uiFontSize and uiFontFamily while unset. |
 | `"queue"` | The queue panel's body. Follows uiFontSize and uiFontFamily while unset. |
-| `"explorer"` | The file explorer, once the window has one (TYTO-279); nothing yet. Follows uiFontSize and uiFontFamily while unset. |
+| `"explorer"` | The explorer panel's tree. Follows uiFontSize and uiFontFamily while unset. |
