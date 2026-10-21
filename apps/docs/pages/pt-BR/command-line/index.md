@@ -26,7 +26,7 @@ O `tyto` ainda não vem no instalador do aplicativo. Ele roda a partir de uma c�
 
 `tyto render` e `tyto watch` leem duas coisas da pasta em que você os executa:
 
-- **`formats.yaml`**, os tamanhos — `grid` é 1080 × 1350, `story` 1080 × 1920 e assim por diante. Sem ele, a renderização para com `E_FORMATS_READ`. Copie o que o Tyto usa, `packages/templates/templates/formats.yaml` no repositório, para a sua pasta, ou aponte para ele com `--formats-file`. [Formatos](../briefs/formats.md) explica o arquivo.
+- **`formats.yaml`**, os tamanhos — `grid` é 1080 × 1350, `story` 1080 × 1920 e assim por diante. É opcional: sem ele, valem os tamanhos que vêm com o Tyto, como na janela. Um `formats.yaml` seu os substitui, e `--formats-file` aponta outro arquivo. [Formatos](../briefs/formats.md) explica o arquivo.
 - **`templates/`**, os seus templates, uma subpasta para cada, como na [sua pasta de templates](../templates/templates-folder.md). É opcional: os templates que vêm com o Tyto estão sempre lá, e `--templates` aponta outra pasta.
 
 ## O que todo comando tem em comum

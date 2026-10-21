@@ -26,7 +26,7 @@ The `tyto` command does from a terminal what the window does: render a brief, wa
 
 `tyto render` and `tyto watch` read two things from the folder you run them in:
 
-- **`formats.yaml`**, the sizes — `grid` is 1080 × 1350, `story` 1080 × 1920 and so on. Without it, a render stops with `E_FORMATS_READ`. Copy the one Tyto uses, `packages/templates/templates/formats.yaml` in the repository, into your folder, or point at it with `--formats-file`. [Formats](../briefs/formats.md) explains the file.
+- **`formats.yaml`**, the sizes — `grid` is 1080 × 1350, `story` 1080 × 1920 and so on. It is optional: without one, the sizes that come with Tyto apply, as in the window. A `formats.yaml` of your own replaces them, and `--formats-file` names another file. [Formats](../briefs/formats.md) explains the file.
 - **`templates/`**, your own templates, one subfolder each, as in [your templates folder](../templates/templates-folder.md). It is optional: the templates that come with Tyto are always there, and `--templates` names another folder.
 
 ## What every command shares
