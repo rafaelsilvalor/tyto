@@ -134,6 +134,11 @@ export const WORKSPACE_CLOSE_FOLDER = 'workspace.closeFolder';
 /** TYTO-278. The open folder's trust, in a small dialog of its own (ADR 0111). */
 export const WORKSPACE_MANAGE_TRUST = 'workspace.manageTrust';
 /**
+ * TYTO-347. Opens the Project panel: where each place came from (ADR 0114). Open and not
+ * toggle, for `queue.show`'s reason; the trust strip's third button runs it too.
+ */
+export const WORKSPACE_SHOW_PROJECT = 'workspace.showProject';
+/**
  * TYTO-44. The template mode: open a template folder to edit, or scaffold a new one.
  *
  * Two verbs for the File menu's reason — the bar lists what a person can do, and "edit" and
@@ -280,6 +285,7 @@ export const COMMAND_LABELS: Readonly<Record<string, CatalogueKey>> = {
   [WORKSPACE_OPEN_FOLDER]: 'command.workspace.openFolder',
   [WORKSPACE_CLOSE_FOLDER]: 'command.workspace.closeFolder',
   [WORKSPACE_MANAGE_TRUST]: 'command.workspace.manageTrust',
+  [WORKSPACE_SHOW_PROJECT]: 'command.workspace.showProject',
   [TEMPLATE_EDIT]: 'command.template.edit',
   [TEMPLATE_NEW]: 'command.template.new',
   [LAYOUT_RESTORE]: 'command.layout.restore',
@@ -389,6 +395,8 @@ export interface DesktopActions {
   openWorkspaceFolder(): void;
   closeWorkspaceFolder(): void;
   manageTrust(): void;
+  /** TYTO-347. Opens the Project panel beside Problems. */
+  showProject(): void;
   /** TYTO-44. Both open the template mode; what happens in it is a round trip to main. */
   editTemplate(): void;
   newTemplate(): void;
@@ -536,6 +544,10 @@ export function createDesktopRegistry(actions: DesktopActions): CommandRegistry 
 
   add(WORKSPACE_MANAGE_TRUST, () => {
     actions.manageTrust();
+  });
+
+  add(WORKSPACE_SHOW_PROJECT, () => {
+    actions.showProject();
   });
 
   add(TEMPLATE_EDIT, () => {

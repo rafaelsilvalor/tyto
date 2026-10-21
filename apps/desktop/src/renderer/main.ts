@@ -43,6 +43,7 @@ import {
 
 import {
   type IpcEventPayload,
+  type IpcRequest,
   type IpcResponse,
   type TytoBridge,
   type UpdateStatus,
@@ -100,6 +101,7 @@ import {
   servePanelBridge,
 } from './plugin-panel.js';
 import { type QueuePanel, QUEUE_PANEL_TAG } from './queue-panel.js';
+import { type ProjectPanel, PROJECT_PANEL_TAG } from './project-panel.js';
 import type { RestoredDrafts, TemplateMode } from './template-mode.js';
 import { TEMPLATE_MODE_TAG } from './template-mode-tag.js';
 import {
@@ -218,6 +220,7 @@ import {
   PLUGIN_PANEL_ELEMENT,
   PROBLEMS_PANEL,
   QUEUE_PANEL,
+  PROJECT_PANEL,
   dockHasPanels,
   dockIsHidden,
   dockIsShown,
@@ -576,6 +579,8 @@ function resolveElements() {
     pluginsDialog: document.querySelector<PluginsDialog>(PLUGINS_DIALOG_TAG),
     // TYTO-45. A dock panel, so `null` whenever it is closed — which is how it starts.
     queuePanel: document.querySelector<QueuePanel>(QUEUE_PANEL_TAG),
+    // TYTO-347. A dock panel too, `null` while closed; painted from the workspace answer.
+    projectPanel: document.querySelector<ProjectPanel>(PROJECT_PANEL_TAG),
     // TYTO-44. Outside `.shell` for the export dialog's reason: it covers the window.
     templateMode: document.querySelector<TemplateMode>(TEMPLATE_MODE_TAG),
     // TYTO-131. At the end of the status bar; hidden while there is nothing newer.
@@ -1110,6 +1115,9 @@ const registry: CommandRegistry = withCommandGate(
     },
     manageTrust: () => {
       openTrustDialog();
+    },
+    showProject: () => {
+      showProject();
     },
     openExport: () => {
       openExportDialog();
@@ -2628,19 +2636,37 @@ function showWorkspace(answer: IpcResponse<'workspace:folder'>): void {
     paintWorkspaceBanner(elements.workspaceBanner, answer, state.locale);
   }
   if (elements.trustDialog) elements.trustDialog.view = answer;
+  if (elements.projectPanel) elements.projectPanel.view = answer;
+}
+
+/**
+ * Workspace: Show Project (TYTO-347): the Project panel open beside Problems, painted from the
+ * last answer at once and from a fresh one when it comes.
+ */
+function showProject(): void {
+  void changeLayout(withPanelOpen(layout, PROJECT_PANEL, true)).then(() => {
+    if (elements.projectPanel) elements.projectPanel.view = workspaceShown;
+    void withBridge(async (bridge) => {
+      showWorkspace(await bridge['workspace:folder']({}));
+    });
+  });
 }
 
 /** The last workspace answer, for the Manage Trust dialog and a repaint in another language. */
 let workspaceShown: IpcResponse<'workspace:folder'> | undefined;
 
 /**
- * Trusts the open folder, or takes the trust back (TYTO-278, ADR 0111). Main acts on the folder
- * it has open; a grant reads it again, so the templates and every preview are asked again for
- * what it now lets through. A revoke changes nothing until the folder is opened again.
+ * Trusts the open folder or the work profile it names, or takes the trust back (TYTO-278,
+ * TYTO-347, ADR 0111). Main acts on what it has open; a grant reads the folder again, so the
+ * templates and every preview are asked again for what it now lets through. A revoke changes
+ * nothing until the folder is opened again.
  */
-async function setWorkspaceTrust(trusted: boolean): Promise<void> {
+async function setWorkspaceTrust(
+  trusted: boolean,
+  source: IpcRequest<'workspace:trust'>['source'],
+): Promise<void> {
   await withBridge(async (bridge) => {
-    showWorkspace(await bridge['workspace:trust']({ trusted }));
+    showWorkspace(await bridge['workspace:trust']({ trusted, source }));
     if (trusted) await afterTemplatesReread(bridge);
     else repaint();
   });
@@ -2652,8 +2678,8 @@ function openTrustDialog(): void {
   if (dialog === null || dialog === undefined) return;
   dialog.locale = state.locale;
   dialog.view = workspaceShown;
-  dialog.onTrust = (trusted) => {
-    void setWorkspaceTrust(trusted);
+  dialog.onTrust = (trusted, source) => {
+    void setWorkspaceTrust(trusted, source);
   };
   dialog.open = true;
   void withBridge(async (bridge) => {
@@ -3429,6 +3455,7 @@ const PANEL_NAMES: Readonly<Record<string, CatalogueKey>> = {
   editor: 'panel.editor',
   problems: 'panel.problems',
   queue: 'panel.queue',
+  project: 'panel.project',
 };
 
 /** Every command the registry holds, translated and with the key that runs it. */
@@ -3645,6 +3672,8 @@ async function applyLayout(persist: boolean): Promise<void> {
   elements = resolveElements();
   wirePanelControls();
   wireQueuePanel();
+  // A Project panel the dock just made has no answer yet; the last one is still true.
+  if (elements.projectPanel) elements.projectPanel.view = workspaceShown;
   wireCommandBar();
   present();
   repaint();
@@ -4429,13 +4458,21 @@ async function load(): Promise<void> {
     once(elements.updateNotice, 'click', () => {
       void bridge['update:act']({});
     });
-    // The trust banner's two buttons (TYTO-278): wired once, painted on every workspace answer.
+    // The trust banner's buttons (TYTO-278, TYTO-347): wired once, painted on every answer.
     const bannerTrust = elements.workspaceBanner?.querySelector('.workspace-banner__trust');
     bannerTrust?.addEventListener('click', () => {
-      void setWorkspaceTrust(true);
+      void setWorkspaceTrust(true, 'folder');
+    });
+    const bannerTrustProfile = elements.workspaceBanner?.querySelector(
+      '.workspace-banner__trust-profile',
+    );
+    bannerTrustProfile?.addEventListener('click', () => {
+      void setWorkspaceTrust(true, 'profile');
     });
     const bannerProblems = elements.workspaceBanner?.querySelector('.workspace-banner__problems');
     bannerProblems?.addEventListener('click', showProblems);
+    const bannerProject = elements.workspaceBanner?.querySelector('.workspace-banner__project');
+    bannerProject?.addEventListener('click', showProject);
     void refreshUpdate(bridge);
   }
 

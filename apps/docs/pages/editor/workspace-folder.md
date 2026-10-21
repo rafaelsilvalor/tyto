@@ -1,7 +1,7 @@
 # Workspace folder
 
 ::: info How this page was checked
-Every step was followed on 2026-10-21 on a development build of Tyto on Windows 11, in a folder holding a `.tyto/project.json`, a template in `tpl/`, an image in `art/` and two briefs in `briefs/`, and in a second folder whose `assets` led outside it. Menus and labels below are the English window's.
+Every step was followed on 2026-10-21 on a development build of Tyto on Windows 11, in a folder holding a `.tyto/project.json`, a template in `tpl/`, an image in `art/` and two briefs in `briefs/`, in a second folder whose `assets` led outside it, and on the same day in a folder naming a work profile kept in `~/.tyto/profiles/` and in one naming a profile file inside it whose `assets` led outside the profile's folder. Menus and labels below are the English window's.
 :::
 
 A workspace folder is a project folder with a `.tyto/project.json` in it. The file says where the project keeps its templates, images and fonts, and where its exports go:
@@ -33,10 +33,20 @@ A brief outside the folder works as it always did.
 
 Every folder starts untrusted. An untrusted folder still opens, previews and exports, but every folder its project file names must be inside it: a name that leads outside — `../shared`, an absolute path, or a shortcut inside the folder that points elsewhere — is left out. Each one left out is listed in the **Problems** panel as `W_PROJECT_PATH_OUTSIDE`, with its line and column in `.tyto/project.json`. Its plugin sections are withheld too.
 
-When something was left out, a strip above the editor says so, with two buttons: **Trust this folder** trusts it and applies what was left out at once, and **Show problems** opens the Problems panel. A folder whose names all stay inside it never shows the strip.
+When something was left out, a strip above the editor says so, with three buttons: **Trust this folder** trusts it and applies what was left out at once, **Show problems** opens the Problems panel, and **Show project** opens the Project panel (below). A folder whose names all stay inside it never shows the strip.
+
+## Work profiles
+
+A project file can name a **work profile**: a sheet of places many folders share, such as one vertical's images, templates, fonts and output folder. `"profile": "saude"` names one kept in your Tyto home folder, at `~/.tyto/profiles/saude/profile.json`; a path such as `"profile": "team/saude.json"` names one your team shares. The profile's places come first and the folder's own keys win, one key at a time. [Render a brief](../command-line/render.md#share-one-sheet-across-folders-work-profiles) shows how to write one.
+
+A profile kept in your Tyto home folder is trusted where it lives and never asks. A profile named by its path is trusted on its own, never because the folder that names it is: until you trust it, its folders must stay inside its own folder. When it left something out, the strip above the editor has a line of its own for it, with **Trust this profile**, and its problems are listed in **Problems** with the profile's file in front, such as `team\saude.json:2:14`. A trusted folder can show the profile's line alone.
+
+## See where each place came from
+
+**Workspace: Show Project**, from the command bar, opens the **Project** panel beside Problems. It has one line each for `assets`, `templates`, `fonts` and `output`: the folders in force, and where they came from — `profile saude`, `this folder`, or `not set`. With no folder open it says _No folder open_. The strip's **Show project** button opens it too, but the strip only appears when an untrusted folder or profile left something out, so for a folder you trust the command is the way in.
 
 ## Manage trust
 
-**Workspace: Manage Trust**, from the command bar, shows the open folder and whether it is trusted, with **Trust** and **Remove trust**. Removing trust applies the next time the folder is opened; until then it stays as it is.
+**Workspace: Manage Trust**, from the command bar, shows the open folder and whether it is trusted, with **Trust** and **Remove trust**, and the work profile it names with its own two buttons — none for a profile kept in your Tyto home folder. Removing trust applies the next time the folder is opened; until then it stays as it is.
 
-The folders you trust are listed in `trust.json` in your Tyto home folder (`~/.tyto`). From the command line, `tyto trust remove <folder>` takes a trust back; [Render a brief](../command-line/render.md) has the rest.
+The folders and profile files you trust are listed in `trust.json` in your Tyto home folder (`~/.tyto`). From the command line, `tyto trust remove <folder>` takes a trust back; [Render a brief](../command-line/render.md) has the rest.

@@ -28,6 +28,15 @@ const STATE_KEYS: Record<WorkspaceView['trust'], CatalogueKey> = {
   revoked: 'workspace.trust.revoked',
 };
 
+const PROFILE_STATE_KEYS: Record<WorkspaceView['trust'], CatalogueKey> = {
+  trusted: 'workspace.trust.profileTrusted',
+  restricted: 'workspace.trust.profileRestricted',
+  revoked: 'workspace.trust.profileRevoked',
+};
+
+/** Which source a button means: main acts on the folder it has open or the profile it names. */
+export type TrustSource = 'folder' | 'profile';
+
 export class TrustDialog extends LitElement {
   static override properties = {
     open: { type: Boolean, reflect: true },
@@ -39,8 +48,8 @@ export class TrustDialog extends LitElement {
   declare open: boolean;
   declare locale: Locale;
   declare view: WorkspaceView | undefined;
-  /** Where Trust (`true`) and Remove trust (`false`) go. */
-  declare onTrust: ((trusted: boolean) => void) | undefined;
+  /** Where Trust (`true`) and Remove trust (`false`) go, and for which source. */
+  declare onTrust: ((trusted: boolean, source: TrustSource) => void) | undefined;
 
   constructor() {
     super();
@@ -81,6 +90,7 @@ export class TrustDialog extends LitElement {
           : html`<p class="trust__folder"><code>${folder}</code></p>
               <p class="trust__state" data-trust=${view.trust}>${say(STATE_KEYS[view.trust])}</p>`
       }
+      ${this.profileState()}
       <div class="trust__actions">
         ${
           folder === null || view === undefined
@@ -89,7 +99,7 @@ export class TrustDialog extends LitElement {
                   class="trust__grant"
                   type="button"
                   ?disabled=${view.trust === 'trusted'}
-                  @click=${() => this.onTrust?.(true)}
+                  @click=${() => this.onTrust?.(true, 'folder')}
                 >
                   ${say('workspace.trust.grant')}
                 </button>
@@ -97,16 +107,62 @@ export class TrustDialog extends LitElement {
                   class="trust__revoke"
                   type="button"
                   ?disabled=${view.trust !== 'trusted'}
-                  @click=${() => this.onTrust?.(false)}
+                  @click=${() => this.onTrust?.(false, 'folder')}
                 >
                   ${say('workspace.trust.revoke')}
                 </button>`
         }
+        ${this.profileActions()}
         <button class="trust__close" type="button" @click=${() => this.close()}>
           ${say('workspace.trust.close')}
         </button>
       </div>
     </div>`;
+  }
+
+  /**
+   * The work profile the folder names, as its own source (TYTO-347, ADR 0111): its name and its
+   * answer. One kept in `TYTO_HOME` is trusted where it lives and says so, with no buttons.
+   */
+  private profileState(): unknown {
+    const profile = this.view?.folder === null ? null : (this.view?.profile ?? null);
+    if (profile === null) return nothing;
+    const say = (key: CatalogueKey): string => translate(this.locale, key);
+    return html`<h3 class="trust__profile">
+        ${say('workspace.trust.profile').replaceAll('{name}', profile.label)}
+      </h3>
+      <p
+        class="trust__profile-state"
+        data-trust-profile=${profile.byLocation ? 'location' : profile.trust}
+      >
+        ${say(
+          profile.byLocation
+            ? 'workspace.trust.profileByLocation'
+            : PROFILE_STATE_KEYS[profile.trust],
+        )}
+      </p>`;
+  }
+
+  private profileActions(): unknown {
+    const profile = this.view?.folder === null ? null : (this.view?.profile ?? null);
+    if (profile === null || profile.byLocation) return nothing;
+    const say = (key: CatalogueKey): string => translate(this.locale, key);
+    return html`<button
+        class="trust__grant-profile"
+        type="button"
+        ?disabled=${profile.trust === 'trusted'}
+        @click=${() => this.onTrust?.(true, 'profile')}
+      >
+        ${say('workspace.banner.trustProfile')}
+      </button>
+      <button
+        class="trust__revoke-profile"
+        type="button"
+        ?disabled=${profile.trust !== 'trusted'}
+        @click=${() => this.onTrust?.(false, 'profile')}
+      >
+        ${say('workspace.trust.revokeProfile')}
+      </button>`;
   }
 }
 

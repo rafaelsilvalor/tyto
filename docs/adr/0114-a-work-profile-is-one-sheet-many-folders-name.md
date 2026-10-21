@@ -122,9 +122,6 @@ ADR 0011 still holds: a profile names places, and plugins interpret their own se
   confinement), `tyto render` and the command-line pages of the manual. The next one: the window —
   a banner line naming a restricted profile on its own (ADR 0111), the profile's problems in the
   problems panel, and where a value came from.
-- Until the window's pull request lands, the window already resolves a folder's profile, because
-  it calls the same `loadWorkspace`; it does not yet show the profile's own problems or name a
-  restricted profile in the banner.
 - Two campaign folders naming `"saude"` share its templates, images, fonts and output folder; one
   that writes `"output": "out"` exports there while the other keeps the profile's.
 - Not built: making a profile from the window, switching a folder's profile with a click, and
@@ -133,3 +130,28 @@ ADR 0011 still holds: a profile names places, and plugins interpret their own se
 - Not measured: how a profile shared from a synchronised folder (Drive, OneDrive) behaves when the
   file is replaced while a window has it open. The window reads the profile when it opens the
   folder, as it reads `project.json`; a change is seen on the next open.
+
+## The window (the second pull request)
+
+Rafael chose on 2026-10-21 where "which layer" is shown: **a Project panel beside Problems**,
+opened by Workspace: Show Project and by a third button on the trust strip. The settings tab was
+considered and left, because it is the `settings.json` text and a person asks where a font came
+from while a brief is in front.
+
+- **`workspace:folder` tells the window the profile as a label, never its path**: the name the
+  folder wrote, or for a path the profile's own folder (a `profile.json`) or the file's name
+  without `.json`; its trust; whether it is trusted by location; and how much it left out. It
+  also sends `places`, each set key with its folders and its origin.
+- **`workspace:trust` takes a strict `source`, `folder` or `profile`**, and still no path. Main
+  writes the folder's real path or the profile file's into `trust.json`; for a profile trusted by
+  location it writes nothing, and the window offers no button for one. Revoking a profile, like a
+  folder, applies the next time the folder is opened.
+- **The trust strip has one line per source** that left something out, each with its own trust
+  button, then Show problems and Show project. A trusted folder naming a restricted profile shows
+  the profile's line alone: trust does not travel (ADR 0111).
+- **A profile's problems are rows in the problems panel** with its file in front:
+  `profiles\saude\profile.json:2:14` for a named one, the path relative to the folder for one
+  inside it, and the whole path for one elsewhere, whose place is what the person needs.
+- **The Project panel lists all four keys**, each with its folders and `profile <name>`,
+  `this folder` or `not set`; with no folder open it says so. It is closed in the default layout,
+  in the bottom dock beside Problems, and read-only.

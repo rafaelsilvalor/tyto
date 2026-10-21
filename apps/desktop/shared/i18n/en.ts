@@ -32,10 +32,12 @@ export const en: Catalogue = {
   'command.workspace.openFolder': 'Open Folder…',
   'command.workspace.closeFolder': 'Close Folder',
   'command.workspace.manageTrust': 'Workspace: Manage Trust',
+  'command.workspace.showProject': 'Workspace: Show Project',
   'workspace.banner.text':
     'This folder is not trusted, so {count} of the folders and sections its project file names were left out.',
   'workspace.banner.trust': 'Trust this folder',
   'workspace.banner.problems': 'Show problems',
+  'workspace.banner.project': 'Show project',
   'workspace.trust.heading': 'Manage Trust',
   'workspace.trust.none': 'No workspace folder is open.',
   'workspace.trust.trusted':
@@ -46,6 +48,18 @@ export const en: Catalogue = {
   'workspace.trust.grant': 'Trust',
   'workspace.trust.revoke': 'Remove trust',
   'workspace.trust.close': 'Close',
+  'workspace.banner.profile':
+    "The work profile '{name}' is not trusted, so {count} of the folders and sections it names were left out.",
+  'workspace.banner.trustProfile': 'Trust this profile',
+  'workspace.trust.profile': 'Work profile: {name}',
+  'workspace.trust.profileByLocation': 'Kept in your Tyto folder, so it is trusted where it lives.',
+  'workspace.trust.profileTrusted':
+    'Trusted: every folder it names applies, and its plugin sections are handed over.',
+  'workspace.trust.profileRestricted':
+    'Not trusted: only folders inside its own folder apply, and its plugin sections are withheld.',
+  'workspace.trust.profileRevoked':
+    'Trust removed. It applies the next time this folder is opened.',
+  'workspace.trust.revokeProfile': "Remove the profile's trust",
   'command.bar.placeholder': 'Type a command',
   'command.bar.empty': 'No command by that name',
   'command.undo': 'Undo',
@@ -143,6 +157,7 @@ export const en: Catalogue = {
   'panel.editor': 'Brief',
   'panel.problems': 'Problems',
   'panel.queue': 'Local queue',
+  'panel.project': 'Project',
   'search.find': 'Find',
   'search.replace': 'Replace',
   'search.next': 'next',
@@ -314,6 +329,11 @@ export const en: Catalogue = {
   'slash.template.switch': 'switches the template (current: {current})',
   'command.queue.show': 'Show the local queue',
   'queue.heading': 'Local queue',
+  'project.heading': 'Project',
+  'project.none': 'No folder open',
+  'project.unset': 'not set',
+  'project.origin.folder': 'this folder',
+  'project.origin.profile': 'profile {name}',
   'queue.folder.none': 'No queue folder chosen yet. Choose one with the folder button above.',
   'queue.folder.choose': 'Choose folder…',
   'queue.folder.clear': 'Forget folder',

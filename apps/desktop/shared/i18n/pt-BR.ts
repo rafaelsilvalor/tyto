@@ -32,10 +32,12 @@ export const ptBR: Catalogue = {
   'command.workspace.openFolder': 'Abrir pasta…',
   'command.workspace.closeFolder': 'Fechar pasta',
   'command.workspace.manageTrust': 'Pasta de trabalho: gerenciar confiança',
+  'command.workspace.showProject': 'Pasta de trabalho: mostrar projeto',
   'workspace.banner.text':
     'Esta pasta não é confiável, então {count} das pastas e seções que o arquivo do projeto nomeia ficaram de fora.',
   'workspace.banner.trust': 'Confiar nesta pasta',
   'workspace.banner.problems': 'Mostrar problemas',
+  'workspace.banner.project': 'Mostrar projeto',
   'workspace.trust.heading': 'Gerenciar confiança',
   'workspace.trust.none': 'Nenhuma pasta de trabalho está aberta.',
   'workspace.trust.trusted':
@@ -46,6 +48,19 @@ export const ptBR: Catalogue = {
   'workspace.trust.grant': 'Confiar',
   'workspace.trust.revoke': 'Retirar confiança',
   'workspace.trust.close': 'Fechar',
+  'workspace.banner.profile':
+    "O perfil de trabalho '{name}' não é confiável, então {count} das pastas e seções que ele nomeia ficaram de fora.",
+  'workspace.banner.trustProfile': 'Confiar neste perfil',
+  'workspace.trust.profile': 'Perfil de trabalho: {name}',
+  'workspace.trust.profileByLocation':
+    'Guardado na sua pasta do Tyto, então é confiável pelo lugar onde está.',
+  'workspace.trust.profileTrusted':
+    'Confiável: toda pasta que ele nomeia vale, e as seções de plugin são entregues.',
+  'workspace.trust.profileRestricted':
+    'Sem confiança: só valem pastas dentro da pasta dele, e as seções de plugin ficam retidas.',
+  'workspace.trust.profileRevoked':
+    'Confiança retirada. Vale na próxima vez que esta pasta for aberta.',
+  'workspace.trust.revokeProfile': 'Retirar a confiança do perfil',
   'command.bar.placeholder': 'Digite um comando',
   'command.bar.empty': 'Nenhum comando com esse nome',
   'command.undo': 'Desfazer',
@@ -144,6 +159,7 @@ export const ptBR: Catalogue = {
   'panel.editor': 'Brief',
   'panel.problems': 'Problemas',
   'panel.queue': 'Fila local',
+  'panel.project': 'Projeto',
   'search.find': 'Procurar',
   'search.replace': 'Substituir',
   'search.next': 'próxima',
@@ -315,6 +331,11 @@ export const ptBR: Catalogue = {
   'slash.template.switch': 'troca o template (atual: {current})',
   'command.queue.show': 'Mostrar a fila local',
   'queue.heading': 'Fila local',
+  'project.heading': 'Projeto',
+  'project.none': 'Nenhuma pasta aberta',
+  'project.unset': 'não definido',
+  'project.origin.folder': 'esta pasta',
+  'project.origin.profile': 'perfil {name}',
   'queue.folder.none':
     'Nenhuma pasta de fila escolhida ainda. Escolha uma no botão de pasta acima.',
   'queue.folder.choose': 'Escolher pasta…',

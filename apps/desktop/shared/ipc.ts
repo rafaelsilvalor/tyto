@@ -94,6 +94,31 @@ const diagnostic = z.object({
   hint: z.string().optional(),
 });
 
+/** Whether a source is trusted; `revoked` is trust taken back while it is open (ADR 0111). */
+const sourceTrust = z.enum(['trusted', 'restricted', 'revoked']);
+
+/** Which sheet a resolved place came from (TYTO-347, ADR 0114). */
+const placeOrigin = z.enum(['profile', 'folder']);
+
+/**
+ * The work profile the open folder names, as the window may know it (TYTO-347, ADR 0114): a
+ * label to show, never its path. `byLocation` is a profile in `TYTO_HOME`, trusted by where it
+ * lives, so the window offers no button that would change its trust.
+ */
+const workspaceProfile = z.object({
+  label: z.string().min(1).max(300),
+  trust: sourceTrust,
+  byLocation: z.boolean(),
+  leftOut: z.number().int().nonnegative(),
+});
+
+/** One place the open folder resolves, with where it came from, for the project view. */
+const workspacePlace = z.object({
+  key: z.enum(['assets', 'templates', 'fonts', 'output']),
+  folders: z.array(z.string().max(4096)).max(100),
+  origin: placeOrigin,
+});
+
 /** The open workspace folder, as the window may know it (TYTO-278, ADR 0113). */
 const workspaceState = z.object({
   folder: z.string().nullable(),
@@ -102,10 +127,14 @@ const workspaceState = z.object({
    * `revoked` is a folder whose trust was taken back while it is open: still trusted until it
    * is opened again (ADR 0111), which the Manage Trust dialog says.
    */
-  trust: z.enum(['trusted', 'restricted', 'revoked']),
+  trust: sourceTrust,
   /** How many keys and section sets a restricted folder left out: the banner shows when > 0. */
   leftOut: z.number().int().nonnegative(),
   output: z.string().nullable(),
+  /** The work profile it names and that was read, or `null` (TYTO-347). */
+  profile: workspaceProfile.nullable(),
+  /** Each place set by a sheet, in key order; a key no sheet set is absent. */
+  places: z.array(workspacePlace).max(4),
   problems: z.array(diagnostic.omit({ range: true })).max(200),
 });
 
@@ -645,13 +674,17 @@ export const IPC_CHANNELS = {
   'workspace:set-folder': channel(z.strictObject({ choose: z.boolean() }), workspaceState),
 
   /**
-   * Trusts the open folder, or takes its trust back (ADR 0111), from the banner or the Manage
-   * Trust dialog. **Strict, and it names no folder**: it acts on the one main has open, so a
-   * window cannot get a folder of its choosing written into `trust.json`. Granting reads the
-   * folder again at once; revoking applies the next time it is opened. A `trust.json` that
-   * cannot be written comes back as an `E_TRUST_FILE` row in `problems`.
+   * Trusts the open folder, or the work profile it names, or takes that trust back (ADR 0111,
+   * ADR 0114), from the banner or the Manage Trust dialog. **Strict, and it names no path**:
+   * `source` says which of the two main has open, so a window cannot get a path of its choosing
+   * written into `trust.json`. Granting reads the folder again at once; revoking applies the
+   * next time it is opened. A `trust.json` that cannot be written comes back as an
+   * `E_TRUST_FILE` row in `problems`.
    */
-  'workspace:trust': channel(z.strictObject({ trusted: z.boolean() }), workspaceState),
+  'workspace:trust': channel(
+    z.strictObject({ trusted: z.boolean(), source: z.enum(['folder', 'profile']) }),
+    workspaceState,
+  ),
 
   /**
    * A brief on disk, as the renderer is allowed to know it (E9.8).

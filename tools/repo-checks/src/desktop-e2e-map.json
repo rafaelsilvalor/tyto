@@ -877,12 +877,13 @@
     {
       "paths": [
         "apps/desktop/src/main/workspace.ts",
+        "apps/desktop/src/renderer/project-panel.ts",
         "apps/desktop/src/renderer/trust-dialog.ts",
         "apps/desktop/src/renderer/workspace-banner.ts",
         "apps/desktop/src/renderer/workspace-folder.ts"
       ],
       "e2e": ["workspace.desktop.test.ts"],
-      "why": "reviewed: the open workspace folder, its places, its problem rows, its trust banner and Manage Trust (TYTO-278)"
+      "why": "reviewed: the open workspace folder, its places, its problem rows, its trust banner, Manage Trust (TYTO-278), its work profile and the Project panel (TYTO-347)"
     },
     {
       "paths": ["apps/desktop/src/main/window-plugins.ts"],
