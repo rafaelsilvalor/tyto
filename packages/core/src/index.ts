@@ -150,6 +150,21 @@ export type { AssetResolver } from './ports/asset-resolver.js';
 
 export type { FontFace, FontSource } from './ports/font-source.js';
 
+export type { Trust, TrustAnswer, TrustStore } from './ports/trust-store.js';
+
+export {
+  PROJECT_DIRECTORY,
+  PROJECT_FILE_NAME,
+  type ProjectEntry,
+  type ProjectLayer,
+  type ProjectResolveOptions,
+  type ResolvedProject,
+  projectPaths,
+  resolveProject,
+} from './project/project.js';
+
+export { isAbsolutePath, isInsidePath, resolvePath } from './project/paths.js';
+
 export { type Face, type FaceCache, createFaceCache, describeFace } from './text/face.js';
 
 export {

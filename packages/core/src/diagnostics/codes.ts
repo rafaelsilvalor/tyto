@@ -1078,6 +1078,67 @@ export const diagnosticCodes = {
     fatal: false,
     fatality: 'A warning never replaces a value (ADR 0013).',
   },
+  // The project file (TYTO-278, ADR 0112): tolerant per key, like the settings it sits beside.
+  E_PROJECT_SYNTAX: {
+    severity: 'error',
+    summary: "A workspace's .tyto/project.json is not valid JSON with comments, or cannot be read.",
+    template: 'The project file cannot be read here: {problem}.',
+    spec: 'docs/adr/0112-a-workspace-folder-names-its-places-in-one-file.md',
+    fatal: false,
+    fatality: 'Every key that parsed still applies, and the brief renders without the rest.',
+  },
+  W_PROJECT_KEY_UNKNOWN: {
+    severity: 'warning',
+    summary: 'The project file names a key Tyto does not know.',
+    template: "Unknown project key '{key}'.",
+    spec: 'docs/adr/0112-a-workspace-folder-names-its-places-in-one-file.md',
+    fatal: false,
+    fatality: 'A warning never replaces a value (ADR 0013).',
+  },
+  W_PROJECT_KEY_INVALID: {
+    severity: 'warning',
+    summary: "A project key's value, or one entry of it, is not accepted, so it is left out.",
+    template: "Project key '{key}' {problem}; it is left out.",
+    spec: 'docs/adr/0112-a-workspace-folder-names-its-places-in-one-file.md',
+    fatal: false,
+    fatality: 'A warning never replaces a value (ADR 0013).',
+  },
+  // ADR 0111's confinement: a restricted source's path keys stay inside it, after realpath.
+  W_PROJECT_PATH_OUTSIDE: {
+    severity: 'warning',
+    summary:
+      "A restricted source's folder key leads outside the source, directly or through a link, so it is left out.",
+    template:
+      "Project key '{key}' leads outside this folder ('{path}'), which an untrusted folder may not do; it is left out.",
+    spec: 'docs/adr/0111-nothing-a-source-ships-runs-before-the-person-trusts-it.md',
+    fatal: false,
+    fatality: 'A warning never replaces a value (ADR 0013).',
+  },
+  W_PROJECT_SECTIONS_WITHHELD: {
+    severity: 'warning',
+    summary:
+      "A restricted source's plugin sections are withheld from the plugins that would read them.",
+    template: 'The sections for {plugins} are withheld because this folder is not trusted.',
+    spec: 'docs/adr/0111-nothing-a-source-ships-runs-before-the-person-trusts-it.md',
+    fatal: false,
+    fatality: 'A warning never replaces a value (ADR 0013).',
+  },
+  W_PROJECT_PROFILE_UNSUPPORTED: {
+    severity: 'warning',
+    summary: 'The project file names a work profile, which this version does not read yet.',
+    template: "The work profile '{profile}' is not read: work profiles are not supported yet.",
+    spec: 'docs/adr/0112-a-workspace-folder-names-its-places-in-one-file.md',
+    fatal: false,
+    fatality: 'A warning never replaces a value (ADR 0013).',
+  },
+  E_TRUST_FILE: {
+    severity: 'error',
+    summary: 'TYTO_HOME/trust.json cannot be read or written.',
+    template: 'The trust file cannot be used: {problem}.',
+    spec: 'docs/adr/0111-nothing-a-source-ships-runs-before-the-person-trusts-it.md',
+    fatal: false,
+    fatality: 'Every source opens restricted instead, which is what an absent approval means.',
+  },
 } as const satisfies Record<string, DiagnosticCodeDefinition>;
 
 export type DiagnosticCode = keyof typeof diagnosticCodes;

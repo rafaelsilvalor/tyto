@@ -98,3 +98,15 @@ export {
   resultArtifactSchema,
   resultDiagnosticSchema,
 } from './result.js';
+
+export { type ProjectText, readProjectText } from './project-file.js';
+
+export {
+  type LoadWorkspaceOptions,
+  type LoadedWorkspace,
+  findWorkspace,
+  loadWorkspace,
+  projectFileOf,
+} from './workspace.js';
+
+export { type FsTrustStoreOptions, TRUST_FILE, fsTrustStore } from './fs-trust-store.js';
