@@ -98,7 +98,13 @@ const diagnostic = z.object({
 const workspaceState = z.object({
   folder: z.string().nullable(),
   name: z.string().nullable(),
-  trusted: z.boolean(),
+  /**
+   * `revoked` is a folder whose trust was taken back while it is open: still trusted until it
+   * is opened again (ADR 0111), which the Manage Trust dialog says.
+   */
+  trust: z.enum(['trusted', 'restricted', 'revoked']),
+  /** How many keys and section sets a restricted folder left out: the banner shows when > 0. */
+  leftOut: z.number().int().nonnegative(),
   output: z.string().nullable(),
   problems: z.array(diagnostic.omit({ range: true })).max(200),
 });
@@ -637,6 +643,15 @@ export const IPC_CHANNELS = {
    * for main to read (ADR 0113). A dismissed picker answers what was already open.
    */
   'workspace:set-folder': channel(z.strictObject({ choose: z.boolean() }), workspaceState),
+
+  /**
+   * Trusts the open folder, or takes its trust back (ADR 0111), from the banner or the Manage
+   * Trust dialog. **Strict, and it names no folder**: it acts on the one main has open, so a
+   * window cannot get a folder of its choosing written into `trust.json`. Granting reads the
+   * folder again at once; revoking applies the next time it is opened. A `trust.json` that
+   * cannot be written comes back as an `E_TRUST_FILE` row in `problems`.
+   */
+  'workspace:trust': channel(z.strictObject({ trusted: z.boolean() }), workspaceState),
 
   /**
    * A brief on disk, as the renderer is allowed to know it (E9.8).

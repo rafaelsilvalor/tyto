@@ -2,7 +2,7 @@
 
 # Comandos
 
-Tudo o que a janela sabe fazer, pelo título que a barra de comandos mostra: 71. Abra a barra com **`Ctrl+k` / `⌘k`** e digite parte de um título. O id é o que o `keybindings.json` usa para pôr um comando numa tecla.
+Tudo o que a janela sabe fazer, pelo título que a barra de comandos mostra: 72. Abra a barra com **`Ctrl+k` / `⌘k`** e digite parte de um título. O id é o que o `keybindings.json` usa para pôr um comando numa tecla.
 
 A janela acrescenta outros enquanto roda, que esta lista não tem como mostrar: um para abrir e fechar cada painel, inclusive os de plugins, e um para cada arquivo aberto recentemente.
 
@@ -52,6 +52,7 @@ A janela acrescenta outros enquanto roda, que esta lista não tem como mostrar: 
 | Voltar aos templates internos | `templates.clearFolder` |  |  |
 | Abrir pasta… | `workspace.openFolder` |  |  |
 | Fechar pasta | `workspace.closeFolder` |  |  |
+| Pasta de trabalho: gerenciar confiança | `workspace.manageTrust` |  |  |
 | Editar template… | `template.edit` |  |  |
 | Novo template… | `template.new` |  |  |
 | Restaurar a disposição padrão | `layout.restore` |  |  |

@@ -58,6 +58,8 @@ import {
 import { followScheme } from './color-scheme.js';
 import { applyTheme, withThemeRows } from './theme.js';
 import { exportDestination, withWorkspaceRows } from './workspace-folder.js';
+import { WORKSPACE_BANNER, paintWorkspaceBanner } from './workspace-banner.js';
+import { type TrustDialog, TRUST_DIALOG_TAG } from './trust-dialog.js';
 import { canvasMeasure, missingFamilyRows, withFontRows } from './typography.js';
 import { DEFAULT_TYPOGRAPHY, type Typography } from '../../shared/typography.js';
 import { offeredFormats, templateOf } from './frontmatter.js';
@@ -578,6 +580,10 @@ function resolveElements() {
     templateMode: document.querySelector<TemplateMode>(TEMPLATE_MODE_TAG),
     // TYTO-131. At the end of the status bar; hidden while there is nothing newer.
     updateNotice: byId<HTMLButtonElement>('update-notice'),
+    // TYTO-278. Above the editor groups; hidden unless an untrusted folder left something out.
+    workspaceBanner: byId<HTMLDivElement>(WORKSPACE_BANNER),
+    // TYTO-278. Workspace: Manage Trust, by tag like the plugins screen.
+    trustDialog: document.querySelector<TrustDialog>(TRUST_DIALOG_TAG),
     // TYTO-297. A line the window says for a few seconds; hidden the rest of the time.
     statusNotice: byId<HTMLOutputElement>('status-notice'),
     // TYTO-248. Outside the docks, like the command bar: the bar belongs to the window.
@@ -1101,6 +1107,9 @@ const registry: CommandRegistry = withCommandGate(
     },
     closeWorkspaceFolder: () => {
       void setWorkspaceFolder(false);
+    },
+    manageTrust: () => {
+      openTrustDialog();
     },
     openExport: () => {
       openExportDialog();
@@ -2613,7 +2622,48 @@ async function setWorkspaceFolder(choose: boolean): Promise<void> {
 function showWorkspace(answer: IpcResponse<'workspace:folder'>): void {
   state.workspaceOutput = answer.output;
   state.workspaceName = answer.name;
+  workspaceShown = answer;
   panel.installation = withWorkspaceRows(panel.installation, answer.problems);
+  if (elements.workspaceBanner !== null) {
+    paintWorkspaceBanner(elements.workspaceBanner, answer, state.locale);
+  }
+  if (elements.trustDialog) elements.trustDialog.view = answer;
+}
+
+/** The last workspace answer, for the Manage Trust dialog and a repaint in another language. */
+let workspaceShown: IpcResponse<'workspace:folder'> | undefined;
+
+/**
+ * Trusts the open folder, or takes the trust back (TYTO-278, ADR 0111). Main acts on the folder
+ * it has open; a grant reads it again, so the templates and every preview are asked again for
+ * what it now lets through. A revoke changes nothing until the folder is opened again.
+ */
+async function setWorkspaceTrust(trusted: boolean): Promise<void> {
+  await withBridge(async (bridge) => {
+    showWorkspace(await bridge['workspace:trust']({ trusted }));
+    if (trusted) await afterTemplatesReread(bridge);
+    else repaint();
+  });
+}
+
+/** Workspace: Manage Trust, showing the last answer at once and the fresh one when it comes. */
+function openTrustDialog(): void {
+  const dialog = elements.trustDialog;
+  if (dialog === null || dialog === undefined) return;
+  dialog.locale = state.locale;
+  dialog.view = workspaceShown;
+  dialog.onTrust = (trusted) => {
+    void setWorkspaceTrust(trusted);
+  };
+  dialog.open = true;
+  void withBridge(async (bridge) => {
+    showWorkspace(await bridge['workspace:folder']({}));
+  });
+}
+
+/** The banner's second button: the problems panel, opened when it is not already shown. */
+function showProblems(): void {
+  if (!panelShown(PROBLEMS_PANEL)) runCommand(togglePanelCommandId(PROBLEMS_PANEL));
 }
 
 /**
@@ -3629,6 +3679,10 @@ function applyLocale(next: Locale): void {
     elements.templateMode.locale = next;
   }
   if (elements.pluginsDialog) elements.pluginsDialog.locale = next;
+  if (elements.trustDialog) elements.trustDialog.locale = next;
+  if (workspaceShown !== undefined && elements.workspaceBanner !== null) {
+    paintWorkspaceBanner(elements.workspaceBanner, workspaceShown, next);
+  }
   editor?.setSearchPhrases(searchPhrasesFor(state.locale));
   repaint();
   // And three things, since TYTO-124: the application menu is main's and now carries this
@@ -4375,6 +4429,13 @@ async function load(): Promise<void> {
     once(elements.updateNotice, 'click', () => {
       void bridge['update:act']({});
     });
+    // The trust banner's two buttons (TYTO-278): wired once, painted on every workspace answer.
+    const bannerTrust = elements.workspaceBanner?.querySelector('.workspace-banner__trust');
+    bannerTrust?.addEventListener('click', () => {
+      void setWorkspaceTrust(true);
+    });
+    const bannerProblems = elements.workspaceBanner?.querySelector('.workspace-banner__problems');
+    bannerProblems?.addEventListener('click', showProblems);
     void refreshUpdate(bridge);
   }
 

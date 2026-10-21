@@ -31,6 +31,21 @@ export const en: Catalogue = {
   'command.templates.clearFolder': 'Back to the built-in templates',
   'command.workspace.openFolder': 'Open Folder…',
   'command.workspace.closeFolder': 'Close Folder',
+  'command.workspace.manageTrust': 'Workspace: Manage Trust',
+  'workspace.banner.text':
+    'This folder is not trusted, so {count} of the folders and sections its project file names were left out.',
+  'workspace.banner.trust': 'Trust this folder',
+  'workspace.banner.problems': 'Show problems',
+  'workspace.trust.heading': 'Manage Trust',
+  'workspace.trust.none': 'No workspace folder is open.',
+  'workspace.trust.trusted':
+    'Trusted: every folder its project file names applies, and its plugin sections are handed over.',
+  'workspace.trust.restricted':
+    'Not trusted: only folders inside it apply, and its plugin sections are withheld.',
+  'workspace.trust.revoked': 'Trust removed. It applies the next time this folder is opened.',
+  'workspace.trust.grant': 'Trust',
+  'workspace.trust.revoke': 'Remove trust',
+  'workspace.trust.close': 'Close',
   'command.bar.placeholder': 'Type a command',
   'command.bar.empty': 'No command by that name',
   'command.undo': 'Undo',

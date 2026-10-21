@@ -103,20 +103,29 @@ const projectFolder = () => {
 /** The workspace folder, as main would answer it, recording each question (TYTO-278). */
 const workspaceFolder = () => {
   const asked: unknown[] = [];
+  const trustAsked: boolean[] = [];
   let folder: string | null = null;
+  let trust: 'trusted' | 'restricted' | 'revoked' = 'restricted';
   const state = () => ({
     folder,
     name: folder === null ? null : 'promo',
-    trusted: false,
+    trust,
+    leftOut: trust === 'restricted' && folder !== null ? 1 : 0,
     output: folder === null ? null : '/work/promo/exports',
     problems: [],
   });
   return {
     asked,
+    trustAsked,
     state,
     setFolder: (choose: boolean) => {
       asked.push(choose);
       folder = choose ? '/work/promo' : null;
+      return Promise.resolve(state());
+    },
+    setTrust: (trusted: boolean) => {
+      trustAsked.push(trusted);
+      trust = trusted ? 'trusted' : 'revoked';
       return Promise.resolve(state());
     },
   };
@@ -1237,6 +1246,32 @@ describe('the workspace folder channels (TYTO-278)', () => {
     ).rejects.toBeInstanceOf(IpcContractError);
     await expect(guarded({ choose: true, path: '/etc' })).rejects.toBeInstanceOf(IpcContractError);
     expect(workspace.asked).toEqual([]);
+  });
+
+  it('trusts the open folder and takes it back, each through main', async () => {
+    const workspace = workspaceFolder();
+    const handlers = createHandlers({ ...dependencies(), workspace });
+    await handlers['workspace:set-folder']({ choose: true });
+
+    expect(await handlers['workspace:trust']({ trusted: true })).toMatchObject({
+      trust: 'trusted',
+      leftOut: 0,
+    });
+    expect((await handlers['workspace:trust']({ trusted: false })).trust).toBe('revoked');
+    expect(workspace.trustAsked).toEqual([true, false]);
+  });
+
+  it('refuses a trust request that names a folder, so no window can approve one of its choosing', async () => {
+    const workspace = workspaceFolder();
+    const guarded = guard(
+      'workspace:trust',
+      createHandlers({ ...dependencies(), workspace })['workspace:trust'],
+    );
+
+    await expect(guarded({ trusted: true, folder: '/home/someone' })).rejects.toBeInstanceOf(
+      IpcContractError,
+    );
+    expect(workspace.trustAsked).toEqual([]);
   });
 });
 

@@ -353,6 +353,8 @@ describe('the bridge', () => {
       // `e2e/workspace.desktop.test.ts`.
       'workspace:folder',
       'workspace:set-folder',
+      // TYTO-278: the banner's and Manage Trust's one channel, on main's open folder only.
+      'workspace:trust',
     ]);
   });
 });
@@ -428,6 +430,19 @@ describe('switching the language', () => {
     // TYTO-278: the workspace folder's commands, File menu and command bar only.
     'command.workspace.openFolder',
     'command.workspace.closeFolder',
+    // TYTO-278: the trust banner and the Manage Trust dialog, painted from main's answer.
+    'command.workspace.manageTrust',
+    'workspace.banner.text',
+    'workspace.banner.trust',
+    'workspace.banner.problems',
+    'workspace.trust.heading',
+    'workspace.trust.none',
+    'workspace.trust.trusted',
+    'workspace.trust.restricted',
+    'workspace.trust.revoked',
+    'workspace.trust.grant',
+    'workspace.trust.revoke',
+    'workspace.trust.close',
     // E9.12: the command bar renders its own strings and renders nothing at all while it is
     // closed, which is most of the time — so none of these is in the document on load, and
     // the two that are only reachable *inside* the bar never will be by this route. The

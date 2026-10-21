@@ -3,6 +3,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
 import { type TrustStore, ok } from '@tyto/core';
+import { fsTrustStore } from '@tyto/io';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
 import { fontsFor } from './fonts.js';
@@ -56,7 +57,7 @@ describe('the window workspace service', () => {
     const { workspace, handed } = service();
 
     expect(await workspace.open(work)).toBe(true);
-    expect(workspace.state()).toMatchObject({ folder: work, name: 'promo', trusted: false });
+    expect(workspace.state()).toMatchObject({ folder: work, name: 'promo', trust: 'restricted' });
     await workspace.close();
     expect(handed).toEqual([[join(work, 'tpl')], []]);
     expect(workspace.state().folder).toBeNull();
@@ -100,6 +101,47 @@ describe('the window workspace service', () => {
     expect(await workspace.open(join(scratch, 'home'))).toBe(false);
     expect(workspace.state().folder).toBeNull();
     expect(handed).toEqual([[]]);
+  });
+});
+
+describe('trusting the open folder (ADR 0111)', () => {
+  it('applies what was withheld at once on grant, and keeps it until the next open on revoke', async () => {
+    await writeFile(join(work, '.tyto', 'project.json'), '{ "assets": ["../shared"] }');
+    const workspace = createWorkspaceService({
+      trustStore: fsTrustStore({ home }),
+      home,
+      setTemplateFolders: () => Promise.resolve(),
+    });
+    const inside = join(work, 'briefs');
+
+    await workspace.open(work);
+    expect(workspace.state()).toMatchObject({ trust: 'restricted', leftOut: 1 });
+    expect(workspace.placesFor(inside).assets).toEqual([]);
+
+    expect((await workspace.grant()).ok).toBe(true);
+    expect(workspace.state()).toMatchObject({ trust: 'trusted', leftOut: 0 });
+    expect(workspace.placesFor(inside).assets).toEqual([join(scratch, 'shared')]);
+
+    expect((await workspace.revoke()).ok).toBe(true);
+    expect(workspace.state().trust).toBe('revoked');
+    expect(workspace.placesFor(inside).assets).toEqual([join(scratch, 'shared')]);
+
+    await workspace.open(work);
+    expect(workspace.state()).toMatchObject({ trust: 'restricted', leftOut: 1 });
+  });
+
+  it('writes nothing and changes nothing when the trust file cannot be read', async () => {
+    await writeFile(join(work, '.tyto', 'project.json'), '{ "assets": ["../shared"] }');
+    await writeFile(join(home, 'trust.json'), 'not json');
+    const workspace = createWorkspaceService({
+      trustStore: fsTrustStore({ home }),
+      home,
+      setTemplateFolders: () => Promise.resolve(),
+    });
+    await workspace.open(work);
+    const granted = await workspace.grant();
+    expect(granted.ok).toBe(false);
+    expect(workspace.state().trust).toBe('restricted');
   });
 });
 

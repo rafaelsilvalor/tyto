@@ -31,6 +31,21 @@ export const ptBR: Catalogue = {
   'command.templates.clearFolder': 'Voltar aos templates internos',
   'command.workspace.openFolder': 'Abrir pasta…',
   'command.workspace.closeFolder': 'Fechar pasta',
+  'command.workspace.manageTrust': 'Pasta de trabalho: gerenciar confiança',
+  'workspace.banner.text':
+    'Esta pasta não é confiável, então {count} das pastas e seções que o arquivo do projeto nomeia ficaram de fora.',
+  'workspace.banner.trust': 'Confiar nesta pasta',
+  'workspace.banner.problems': 'Mostrar problemas',
+  'workspace.trust.heading': 'Gerenciar confiança',
+  'workspace.trust.none': 'Nenhuma pasta de trabalho está aberta.',
+  'workspace.trust.trusted':
+    'Confiável: toda pasta que o arquivo do projeto nomeia vale, e as seções de plugin são entregues.',
+  'workspace.trust.restricted':
+    'Sem confiança: só valem pastas dentro dela, e as seções de plugin ficam retidas.',
+  'workspace.trust.revoked': 'Confiança retirada. Vale na próxima vez que esta pasta for aberta.',
+  'workspace.trust.grant': 'Confiar',
+  'workspace.trust.revoke': 'Retirar confiança',
+  'workspace.trust.close': 'Fechar',
   'command.bar.placeholder': 'Digite um comando',
   'command.bar.empty': 'Nenhum comando com esse nome',
   'command.undo': 'Desfazer',
