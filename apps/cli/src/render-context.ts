@@ -51,6 +51,12 @@ import { registerOrigin } from './report.js';
 export interface RenderContextOptions {
   /** The folder holding one subfolder per template. Absolute. Searched first. */
   readonly templatesDirectory: string;
+  /**
+   * The brief's workspace's template folders (TYTO-278, ADR 0112), searched after
+   * {@link templatesDirectory} and before the built-in pack: a folder typed or defaulted on
+   * the command line is the more specific statement, the project's stock the next.
+   */
+  readonly projectTemplatesDirectories?: readonly string[];
   /** The project's `formats.yaml`. Absolute. */
   readonly formatsFile: string;
   /**
@@ -164,6 +170,7 @@ export async function loadRenderContext(
   // names an installed template that a built-in or the project hides.
   const registry = await loadTemplateRegistry(fileSystem, [
     options.templatesDirectory,
+    ...(options.projectTemplatesDirectories ?? []),
     ...builtInDirectories,
     ...installed.directories,
   ]);

@@ -18,7 +18,7 @@ grid-04.png
 story-04.png
 ```
 
-Ele imprime cada arquivo à medida que grava. Depois, `out/` tem as oito imagens e um `result.json` que as lista. `--out` é obrigatório.
+Ele imprime cada arquivo à medida que grava. Depois, `out/` tem as oito imagens e um `result.json` que as lista. `--out` é obrigatório, a não ser que o brief esteja numa pasta de trabalho cujo arquivo de projeto diga uma pasta de saída (abaixo).
 
 ## Escolher tipos de arquivo, escala e qualidade
 
@@ -49,6 +49,41 @@ deliveries/
       result.json
       template.txt
 ```
+
+## Renderizar dentro de uma pasta de trabalho
+
+Uma pasta de trabalho é uma pasta de projeto com um `.tyto/project.json` dentro. O arquivo diz onde o projeto guarda seus templates, imagens e fontes, e para onde vão as exportações:
+
+```jsonc
+{
+  // where this project keeps its things
+  "templates": ["tpl"],
+  "assets": ["art"],
+  "output": "exports",
+}
+```
+
+O `tyto render` procura esse arquivo na pasta do brief e em cada pasta acima dela, então um brief em qualquer lugar do projeto o usa sem você digitar nada. Os comandos abaixo foram executados em 2026-10-21 numa pasta assim, com o brief em `briefs/`, o template em `tpl/` e a imagem em `art/`:
+
+```
+$ tyto render briefs/cartaz.brief --types svg
+feed-01.svg
+feed-02.svg
+```
+
+Os arquivos foram para `exports/`. Um `--out` que você digitar continua valendo mais, e `--templates` também. Caminhos de imagem são procurados primeiro ao lado do brief, depois em `assets/` ao lado dele, depois nas pastas `assets` do projeto.
+
+### Uma pasta em que você ainda não confiou
+
+Até você confiar numa pasta de trabalho, toda pasta que o arquivo do projeto nomeia precisa estar dentro dela. Um nome que leva para fora — `../shared/exports`, um caminho absoluto, ou um atalho dentro da pasta que aponta para outro lugar — fica de fora e é impresso:
+
+```
+$ tyto render briefs/cartaz.brief --types svg
+.tyto\project.json:4:13: warning W_PROJECT_PATH_OUTSIDE Project key 'output' leads outside this folder ('../shared/exports'), which an untrusted folder may not do; it is left out.
+error: --out is required: .tyto\project.json declares no output folder this run may use
+```
+
+`--trust` confia na pasta só naquela execução e não anota nada. `tyto trust remove <pasta>` desfaz uma confiança dada antes; as pastas em que você confia ficam listadas no `trust.json` da sua pasta do Tyto (`~/.tyto`).
 
 ## Quando o brief tem erros
 

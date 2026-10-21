@@ -2,7 +2,7 @@
 
 # Command line
 
-Every command `tyto` takes: 10. `tyto --help` and `tyto <command> --help` print the same text in the terminal.
+Every command `tyto` takes: 11. `tyto --help` and `tyto <command> --help` print the same text in the terminal.
 
 ## tyto render
 
@@ -22,9 +22,10 @@ tyto render [options] <brief>
 
 | Option | What it does | Default |
 | --- | --- | --- |
-| `-o, --out <dir>` | folder for the artifacts and result.json (required) |  |
+| `-o, --out <dir>` | folder for the artifacts and result.json (default: the workspace's output folder) |  |
 | `--folder` | deliver into &lt;out>/&lt;brief-name>/ — artwork at the top, brief and result.json in editaveis/ |  |
 | `--assets <dir>` | what relative asset paths resolve against (default: assets/ beside the brief, else the brief's folder) |  |
+| `--trust` | trust the brief's workspace folder for this run only; never written to trust.json |  |
 | `--templates <dir>` | folder holding one subfolder per template | `"templates"` |
 | `--formats-file <path>` | the project's formats.yaml; the built-in sizes when the default is not there | `"formats.yaml"` |
 | `-t, --template <name>` | template to use when the brief's frontmatter names none |  |
@@ -203,3 +204,17 @@ tyto plugin enable [options] <name>
 | Argument | What it does |
 | --- | --- |
 | `<name>` | the plugin's name, as tyto plugin list prints it |
+
+## tyto trust remove
+
+take back the trust given to a workspace folder
+
+```sh
+tyto trust remove [options] <folder>
+```
+
+**Arguments**
+
+| Argument | What it does |
+| --- | --- |
+| `<folder>` | the workspace folder, as it was trusted |

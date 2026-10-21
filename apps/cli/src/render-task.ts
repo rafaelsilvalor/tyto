@@ -1,5 +1,5 @@
 import { type Diagnostics, createFaceCache, describeFace, hasErrors } from '@tyto/core';
-import { createFontLibrary } from '@tyto/fonts';
+import { type FontLibrary, createFontLibrary, systemFontDirectories } from '@tyto/fonts';
 import {
   type ExportResources,
   type RenderResult,
@@ -50,6 +50,11 @@ export interface RenderTask {
    * fallback. The person named where the files are, so nothing else is searched.
    */
   readonly assetsOverride?: string;
+  /**
+   * The brief's workspace's asset folders (TYTO-278), searched after the brief's own folder
+   * and its `assets/`. Ignored with {@link assetsOverride}, which searches one folder only.
+   */
+  readonly projectAssets?: readonly string[];
   /** Where the artifacts and `result.json` go. Created if it is not there. */
   readonly outDirectory: string;
   /**
@@ -83,6 +88,11 @@ export interface RenderTaskOptions {
   readonly version: string;
   /** Installed plugins, imported once per process and activated into every task's host. */
   readonly plugins?: LoadedPlugins;
+  /**
+   * The brief's workspace's font folders (TYTO-278), searched before this machine's own, so a
+   * project's face wins over an installed one of the same family.
+   */
+  readonly fontDirectories?: readonly string[];
 }
 
 export interface RenderTaskReport {
@@ -110,8 +120,36 @@ export interface RenderTaskReport {
  * machine lacks is measured and drawn in the same substitute. The machine's font folders
  * are read once per process: a face installed while `tyto watch` runs is seen on restart.
  */
-const fonts = createFontLibrary({ describe: describeFace });
-const faces = createFaceCache(fonts.source);
+const machineFonts = createFontLibrary({ describe: describeFace });
+const machineFaces = createFaceCache(machineFonts.source);
+
+/**
+ * A library per set of workspace font folders, kept for the process like the machine's: a
+ * `tyto watch` renders every task of one workspace against the same folders.
+ */
+const projectFonts = new Map<
+  string,
+  { readonly fonts: FontLibrary; readonly faces: ReturnType<typeof createFaceCache> }
+>();
+
+export function fontsFor(directories: readonly string[] | undefined): {
+  readonly fonts: FontLibrary;
+  readonly faces: ReturnType<typeof createFaceCache>;
+} {
+  if (directories === undefined || directories.length === 0) {
+    return { fonts: machineFonts, faces: machineFaces };
+  }
+  const key = JSON.stringify(directories);
+  const known = projectFonts.get(key);
+  if (known !== undefined) return known;
+  const fonts = createFontLibrary({
+    describe: describeFace,
+    directories: [...directories, ...systemFontDirectories()],
+  });
+  const built = { fonts, faces: createFaceCache(fonts.source) };
+  projectFonts.set(key, built);
+  return built;
+}
 
 /**
  * Everything an exporter can be asked for, from the places that have it.
@@ -129,7 +167,11 @@ const faces = createFaceCache(fonts.source);
  * stage (ADR 0010). `@tyto/fonts` is a Node adapter; `pipeline` and the exporters know only
  * the ports.
  */
-function exportResources(brief: ExportResources, template: ExportResources): ExportResources {
+function exportResources(
+  brief: ExportResources,
+  template: ExportResources,
+  fonts: FontLibrary,
+): ExportResources {
   // The window binds the same two layers through the same function, so a field one program
   // forgot could not reach only one of them again (TYTO-215, TYTO-216).
   const layered = layeredExportResources([brief, template]);
@@ -166,6 +208,7 @@ export async function renderTask(
   /** Diagnostics the context itself produced — a broken template folder, say. */
   inherited: Diagnostics = [],
 ): Promise<RenderTaskReport> {
+  const { fonts, faces } = fontsFor(options.fontDirectories);
   const wiring = templateWiring(context, {
     outlines: (face) => fonts.source.outlines(face),
     fromMachine: (face) => fonts.fromMachine(face),
@@ -202,7 +245,7 @@ export async function renderTask(
   // in a `tyto watch` have different `assets/`, and an exporter bound to the wrong one
   // would embed the wrong logo (ADR 0007 — every built-in through the same door).
   const host = activateBuiltIns({
-    resources: exportResources(briefResources, wiring.resources),
+    resources: exportResources(briefResources, wiring.resources, fonts),
     ...(options.rasterizer === undefined ? {} : { rasterizer: options.rasterizer }),
   });
   // After the built-ins, so a built-in keeps every id it has. A plugin refused here is a
@@ -220,7 +263,10 @@ export async function renderTask(
   // the files the artwork was drawn from (ADR 0057). `--out` never reads the record.
   const assets = recordingAssetResolver(
     task.assetsOverride === undefined
-      ? briefAssetResolver({ briefDirectory: task.briefDirectory })
+      ? briefAssetResolver({
+          briefDirectory: task.briefDirectory,
+          ...(task.projectAssets === undefined ? {} : { projectAssets: task.projectAssets }),
+        })
       : fileAssetResolver({ base: task.assetsOverride }),
   );
 

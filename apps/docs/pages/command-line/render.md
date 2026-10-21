@@ -18,7 +18,7 @@ grid-04.png
 story-04.png
 ```
 
-It prints each file as it is written. `out/` then holds the eight images and a `result.json` listing them. `--out` is required.
+It prints each file as it is written. `out/` then holds the eight images and a `result.json` listing them. `--out` is required, unless the brief is in a workspace folder whose project file names an output folder (below).
 
 ## Choose the file types, scale and quality
 
@@ -49,6 +49,41 @@ deliveries/
       result.json
       template.txt
 ```
+
+## Render inside a workspace folder
+
+A workspace folder is a project folder with a `.tyto/project.json` in it. The file says where the project keeps its templates, images and fonts, and where its exports go:
+
+```jsonc
+{
+  // where this project keeps its things
+  "templates": ["tpl"],
+  "assets": ["art"],
+  "output": "exports",
+}
+```
+
+`tyto render` looks for that file in the brief's folder and in each folder above it, so a brief anywhere inside the project uses it with nothing typed. The commands below were run on 2026-10-21 in such a folder, with the brief in `briefs/`, its template in `tpl/` and its image in `art/`:
+
+```
+$ tyto render briefs/cartaz.brief --types svg
+feed-01.svg
+feed-02.svg
+```
+
+The files went to `exports/`. An `--out` you type still wins, and so does `--templates`. Image paths are looked for beside the brief first, then in `assets/` beside it, then in the project's `assets` folders.
+
+### A folder you have not trusted
+
+Until you trust a workspace folder, every folder its project file names must be inside it. A name that leads outside — `../shared/exports`, an absolute path, or a link inside the folder that points elsewhere — is left out and printed:
+
+```
+$ tyto render briefs/cartaz.brief --types svg
+.tyto\project.json:4:13: warning W_PROJECT_PATH_OUTSIDE Project key 'output' leads outside this folder ('../shared/exports'), which an untrusted folder may not do; it is left out.
+error: --out is required: .tyto\project.json declares no output folder this run may use
+```
+
+`--trust` trusts the folder for that one run and writes nothing down. `tyto trust remove <folder>` takes back a trust given earlier; the folders you trust are listed in `trust.json` in your Tyto home folder (`~/.tyto`).
 
 ## When the brief has errors
 
