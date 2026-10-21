@@ -219,13 +219,22 @@ describe('each button runs its command', () => {
     ).toBe(0);
   });
 
-  it('opens the empty left area on its first panel, the queue', async () => {
+  it('opens the empty left area on its first panel, the explorer since TYTO-279', async () => {
     expect(await isOn('layout.toggleDock:left')).toBe(false);
     await click('layout.toggleDock:left');
-    expect(await panels()).toContain('queue');
+    expect(await panels()).toContain('explorer');
+    expect(await panels()).not.toContain('queue');
     expect(await isOn('layout.toggleDock:left')).toBe(true);
-    expect(await isOn('layout.togglePanel:queue')).toBe(true);
+    expect(await isOn('layout.togglePanel:explorer')).toBe(true);
 
+    await click('layout.togglePanel:explorer');
+    expect(await panels()).not.toContain('explorer');
+  });
+
+  it('toggles the queue panel', async () => {
+    await click('layout.togglePanel:queue');
+    expect(await panels()).toContain('queue');
+    expect(await isOn('layout.togglePanel:queue')).toBe(true);
     await click('layout.togglePanel:queue');
     expect(await panels()).not.toContain('queue');
   });

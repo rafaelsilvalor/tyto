@@ -30,6 +30,8 @@ const DEFAULT_ORDER = [
   'tabKind',
   'template',
   'problems',
+  // TYTO-279.
+  'explorer',
   'queue',
   'plugins',
   'export',
