@@ -312,6 +312,8 @@ const state = {
   templatesFound: 0,
   /** The open workspace folder's output folder, the export dialog's default (TYTO-278). */
   workspaceOutput: null as string | null,
+  /** Its name, for the titles (TYTO-278). */
+  workspaceName: null as string | null,
 };
 
 /**
@@ -2610,6 +2612,7 @@ async function setWorkspaceFolder(choose: boolean): Promise<void> {
 /** Paints a workspace answer: its rows in the problems panel and its output folder. */
 function showWorkspace(answer: IpcResponse<'workspace:folder'>): void {
   state.workspaceOutput = answer.output;
+  state.workspaceName = answer.name;
   panel.installation = withWorkspaceRows(panel.installation, answer.problems);
 }
 
@@ -3648,7 +3651,11 @@ function applyLocale(next: Locale): void {
 function shellState(): ShellState {
   const current = active();
   // The title is the active tab, which is the whole of point 5 of E9.11's card.
-  return { ...state, document: { name: current.name, dirty: isUnsaved(current) } };
+  return {
+    ...state,
+    document: { name: current.name, dirty: isUnsaved(current) },
+    workspaceName: state.workspaceName,
+  };
 }
 
 function repaint(): void {

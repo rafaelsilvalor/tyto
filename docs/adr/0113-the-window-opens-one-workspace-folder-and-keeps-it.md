@@ -45,7 +45,11 @@ that ADR.
    in front. A restricted folder's left-out keys are therefore visible from this pull request on,
    before the banner of ADR 0111 exists. The rows are replaced by each workspace answer and
    survive a template read, as a theme's rows do.
-5. **Fonts.** One library per set of workspace font folders for the life of the process, with the
+5. **The titles name the folder**, between the file and the app: `promo.brief — campanha —
+Tyto` in the window's title and in the drawn title bar of ADR 0078, `campanha — Tyto` for a
+   tab in no file. Rafael chose the order on 2026-10-21. With no folder open, both titles are
+   what they were.
+6. **Fonts.** One library per set of workspace font folders for the life of the process, with the
    machine's folders after them; the machine's own library is unchanged for every other brief.
 
 ## Consequences

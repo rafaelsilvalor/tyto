@@ -90,7 +90,7 @@ describe('the window workspace service', () => {
 
     const [problem] = workspace.state().problems;
     expect(problem?.code).toBe('W_PROJECT_PATH_OUTSIDE');
-    expect(problem?.message.startsWith(`${join(work, '.tyto', 'project.json')}:2:13: `)).toBe(true);
+    expect(problem?.message.startsWith(`${join('.tyto', 'project.json')}:2:13: `)).toBe(true);
     expect(problem).not.toHaveProperty('range');
     expect(workspace.state().output).toBeNull();
   });

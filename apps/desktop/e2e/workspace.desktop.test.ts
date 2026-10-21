@@ -174,6 +174,8 @@ describe('a workspace folder in the window (TYTO-278)', () => {
 
     await openBrief(join(work, 'briefs', 'logo.brief'), 'Da pasta do projeto');
     expect(await previewSrcdoc(window)).toContain(LOGO.toString('base64'));
+    // The titles name the folder between the file and the app (Rafael, 2026-10-21).
+    expect(await window.title()).toBe('logo.brief — promo — Tyto');
 
     await openBrief(join(work, 'briefs', 'guarda.brief'), 'Template do projeto');
     expect(await problemsText()).not.toContain('E_UNKNOWN_TEMPLATE');

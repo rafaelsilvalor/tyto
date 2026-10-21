@@ -19,7 +19,7 @@ Toda chave é opcional, e o arquivo também: uma pasta sem ele abre sem nada dec
 
 ## Abrir e fechar
 
-**Arquivo ▸ Abrir pasta…** escolhe a pasta. Há uma pasta aberta por janela, e ela volta aberta na próxima vez que o Tyto abrir. **Arquivo ▸ Fechar pasta** fecha.
+**Arquivo ▸ Abrir pasta…** escolhe a pasta. Há uma pasta aberta por janela, e ela volta aberta na próxima vez que o Tyto abrir. **Arquivo ▸ Fechar pasta** fecha. Com uma pasta aberta, a barra de título mostra o nome dela entre o arquivo e o app: `logo.brief — promo — Tyto`.
 
 Enquanto ela está aberta:
 

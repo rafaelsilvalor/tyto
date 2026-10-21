@@ -125,6 +125,21 @@ describe('the window title', () => {
   });
 });
 
+describe('the titles with a workspace folder open (TYTO-278)', () => {
+  it('put the folder between the file and the app, and nothing changes without one', () => {
+    expect(titleBarText('en', 'promo.brief', 'campanha')).toBe('promo.brief — campanha — Tyto');
+    expect(titleBarText('en', undefined, 'campanha')).toBe('campanha — Tyto');
+    expect(titleBarText('en', 'promo.brief', null)).toBe('Tyto — promo.brief');
+    expect(
+      windowTitle({
+        locale: 'en',
+        document: { name: 'promo.brief', dirty: false },
+        workspaceName: 'campanha',
+      }),
+    ).toBe('promo.brief — campanha — Tyto');
+  });
+});
+
 describe('titleBarText (TYTO-244)', () => {
   it('names the app and the file in front', () => {
     expect(titleBarText('pt-BR', 'campanha.brief')).toBe('Tyto — campanha.brief');

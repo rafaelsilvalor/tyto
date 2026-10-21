@@ -19,7 +19,7 @@ Every key is optional, and so is the file: a folder without one opens with nothi
 
 ## Open and close it
 
-**File ▸ Open Folder…** picks the folder. One folder is open per window, and it is open again the next time Tyto starts. **File ▸ Close Folder** closes it.
+**File ▸ Open Folder…** picks the folder. One folder is open per window, and it is open again the next time Tyto starts. **File ▸ Close Folder** closes it. While a folder is open, the title bar names it between the file and the app: `logo.brief — promo — Tyto`.
 
 While it is open:
 

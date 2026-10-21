@@ -1,4 +1,4 @@
-import { basename } from 'node:path';
+import { basename, relative } from 'node:path';
 
 import { type Diagnostic, type TrustStore, createLineIndex, lineColumnAtIndex } from '@tyto/core';
 import { type LoadedWorkspace, isInside, loadWorkspace } from '@tyto/io';
@@ -106,18 +106,21 @@ export function createWorkspaceService(options: WorkspaceServiceOptions): Worksp
 }
 
 /**
- * Each diagnostic as a row the problems panel can show without a range: `project.json:4:13`
- * in front of the message, the way the command line prints the same diagnostic.
+ * Each diagnostic as a row the problems panel can show without a range: `.tyto\project.json:4:13`
+ * in front of the message, the way the command line prints the same diagnostic. **Relative to
+ * the folder**: the absolute path filled the row and cut the message off, seen in the real
+ * window — the folder is already in the title.
  */
 function problemsOf(open: LoadedWorkspace): readonly Diagnostic[] {
   const index = createLineIndex(open.text);
+  const file = relative(open.folder, open.file);
   const located = open.diagnostics.map((item): Diagnostic => {
     const where =
       item.range === undefined
-        ? open.file
+        ? file
         : (() => {
             const at = lineColumnAtIndex(index, item.range.start);
-            return `${open.file}:${String(at.line)}:${String(at.column)}`;
+            return `${file}:${String(at.line)}:${String(at.column)}`;
           })();
     const { range: _range, ...rest } = item;
     return { ...rest, message: `${where}: ${item.message}` };
