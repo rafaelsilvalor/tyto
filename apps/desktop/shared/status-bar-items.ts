@@ -48,6 +48,7 @@ export const STATUS_BAR_ITEMS = [
   },
   { id: 'template', side: 'end', description: "The template the brief's frontmatter names." },
   { id: 'problems', side: 'end', description: 'Problems count; toggles the problems panel.' },
+  { id: 'explorer', side: 'end', description: 'Toggles the explorer panel.' },
   { id: 'queue', side: 'end', description: 'Toggles the queue panel.' },
   { id: 'plugins', side: 'end', description: 'Opens the plugins dialog.' },
   { id: 'export', side: 'end', description: 'Exports the brief in front.' },

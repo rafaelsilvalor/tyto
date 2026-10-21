@@ -17,6 +17,10 @@ import { type SVGTemplateResult, html, svg } from 'lit';
  * redrew both in the nine's manner — the same frame, the same stroke, the problems icon's dot —
  * and put them on a sheet beside the nine for Rafael's approval, which is still pending.
  * `folder` (TYTO-302) is drawn the same way and waits on the same kind of sheet.
+ *
+ * `explorer` and the two chevrons are **on a sheet Rafael approved on 2026-10-21** (TYTO-279):
+ * the tree he chose for the explorer's button, on the frame icons' 2.75–13.25 band so its
+ * foot sits where theirs does, and the tree rows' chevron, drawn once and turned.
  */
 
 export type IconName =
@@ -33,7 +37,11 @@ export type IconName =
   | 'preview'
   | 'lock'
   // TYTO-302: "Choose folder…" in the queue's tool header.
-  | 'folder';
+  | 'folder'
+  // TYTO-279: the explorer's status-bar button, and a folder row closed and open.
+  | 'explorer'
+  | 'chevronRight'
+  | 'chevronDown';
 
 const FRAME = svg`<rect x="2" y="2.75" width="12" height="10.5" rx="2" />`;
 
@@ -66,6 +74,11 @@ const GEOMETRY: Readonly<Record<IconName, (lit: boolean) => SVGTemplateResult>> 
   // runs across under it.
   folder: () =>
     svg`<path d="M2 5a2 2 0 0 1 2-2h2.25l1.5 1.75H12a2 2 0 0 1 2 2v4.5a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2Z" /><path d="M2 7h12" />`,
+  // A node and the two it holds, joined by one stroke that turns into each branch.
+  explorer: () =>
+    svg`<rect x="2.5" y="2.75" width="5" height="3" rx="1" /><path d="M4.5 5.75v5.375a.75.75 0 0 0 .75.75H8.5M4.5 7.875h4" /><rect x="8.5" y="6.5" width="5" height="2.75" rx="1" /><rect x="8.5" y="10.5" width="5" height="2.75" rx="1" />`,
+  chevronRight: () => svg`<path d="M6.5 4 10.5 8 6.5 12" />`,
+  chevronDown: () => svg`<path d="M4 6.5 8 10.5 12 6.5" />`,
 };
 
 /** One icon, decorative: the button it sits in carries the words (`aria-label`). */

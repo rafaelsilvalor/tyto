@@ -146,7 +146,7 @@ export interface FontArea {
  * is a contract with the markup, and the markup is free to change. Each area's root carries
  * `data-font-area="<id>"`, where the window redeclares the base's custom properties, so the
  * ramp inside the area follows (`tokens.css`). The title bar is capped at 18, under the
- * system buttons' 32 px. The explorer has no root until TYTO-279 builds one.
+ * system buttons' 32 px.
  */
 export const FONT_AREAS = [
   {
@@ -213,7 +213,7 @@ export const FONT_AREAS = [
     id: 'explorer',
     base: 'ui',
     maximum: UI_FONT_SIZE.maximum,
-    description: 'The file explorer, once the window has one (TYTO-279); nothing yet.',
+    description: "The explorer panel's tree.",
   },
 ] as const satisfies readonly FontArea[];
 

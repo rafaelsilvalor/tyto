@@ -346,6 +346,8 @@ export interface Catalogue {
   /** TYTO-45. Closed in the default layout, like the panel it names. */
   readonly 'panel.queue': string;
   readonly 'panel.project': string;
+  /** TYTO-279. The explorer, closed in the default layout until a folder is opened. */
+  readonly 'panel.explorer': string;
 
   /**
    * The find-and-replace panel (E8.5), which is CodeMirror's own DOM.
@@ -596,6 +598,11 @@ export interface Catalogue {
   readonly 'command.queue.show': string;
   readonly 'queue.heading': string;
   readonly 'project.heading': string;
+  /** TYTO-279. The explorer's header, its line with no folder open, an empty folder, a capped one. */
+  readonly 'explorer.heading': string;
+  readonly 'explorer.none': string;
+  readonly 'explorer.empty': string;
+  readonly 'explorer.more': string;
   readonly 'project.none': string;
   readonly 'project.unset': string;
   readonly 'project.origin.folder': string;
@@ -767,6 +774,7 @@ export const CATALOGUE_KEYS = [
   'panel.problems',
   'panel.queue',
   'panel.project',
+  'panel.explorer',
   'search.find',
   'search.replace',
   'search.next',
@@ -926,6 +934,10 @@ export const CATALOGUE_KEYS = [
   'command.queue.show',
   'queue.heading',
   'project.heading',
+  'explorer.heading',
+  'explorer.none',
+  'explorer.empty',
+  'explorer.more',
   'project.none',
   'project.unset',
   'project.origin.folder',

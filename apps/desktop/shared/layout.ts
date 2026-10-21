@@ -81,6 +81,7 @@ export type Layout = z.infer<typeof layoutSchema>;
 export const EDITOR_PANEL = 'editor';
 export const PROBLEMS_PANEL = 'problems';
 export const QUEUE_PANEL = 'queue';
+export const EXPLORER_PANEL = 'explorer';
 export const PROJECT_PANEL = 'project';
 
 /**
@@ -128,6 +129,18 @@ export const DEFAULT_LAYOUT: Layout = {
       // "nothing to report". A dock that a person can drag and that remembers where they
       // left it cannot also size itself, so the fix is a smaller default and a handle.
       size: 140,
+      fixed: false,
+    },
+    {
+      // TYTO-279. Above the queue in the left area, as Rafael placed it on 2026-10-21, and
+      // closed until a folder is opened: opening one opens it, as VS Code does. Listed before
+      // the queue because a dock stacks its panels in this order, and `layoutFrom` keeps this
+      // order for a saved layout that predates the panel.
+      id: EXPLORER_PANEL,
+      element: 'tyto-explorer-panel',
+      dock: 'left',
+      open: false,
+      size: 280,
       fixed: false,
     },
     {

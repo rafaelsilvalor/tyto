@@ -8,6 +8,7 @@ import {
   ELASTIC_DOCK,
   PLUGIN_PANEL_ELEMENT,
   PROBLEMS_PANEL,
+  EXPLORER_PANEL,
   QUEUE_PANEL,
   clampSize,
   dockHasPanels,
@@ -316,11 +317,13 @@ describe('hiding a whole area (TYTO-248, ADR 0076)', () => {
   });
 
   it('opens the first panel of an empty area rather than lighting up nothing', () => {
-    // The left area is empty by default: the queue lives there, closed.
+    // The left area is empty by default: the explorer and the queue live there, closed. The
+    // explorer is first since TYTO-279, so it is the one that opens.
     const shown = withDockToggled(DEFAULT_LAYOUT, 'left');
 
     expect(dockIsShown(shown, 'left')).toBe(true);
-    expect(panelOf(shown, QUEUE_PANEL)?.open).toBe(true);
+    expect(panelOf(shown, EXPLORER_PANEL)?.open).toBe(true);
+    expect(panelOf(shown, QUEUE_PANEL)?.open).toBe(false);
   });
 
   it('does nothing for an area no panel lives in', () => {

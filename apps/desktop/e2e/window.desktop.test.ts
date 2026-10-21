@@ -464,6 +464,10 @@ describe('switching the language', () => {
     'command.workspace.showProject',
     'panel.project',
     ...CATALOGUE_KEYS.filter((key) => key.startsWith('project.')),
+    // TYTO-279: the explorer is closed until a folder is opened, so none of its words is on
+    // screen at load; `explorer-panel.test.ts` holds them.
+    'panel.explorer',
+    ...CATALOGUE_KEYS.filter((key) => key.startsWith('explorer.')),
     'command.bar.placeholder',
     'command.bar.empty',
     'command.undo',
