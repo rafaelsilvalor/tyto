@@ -195,6 +195,9 @@ const openDocument = z.object({
  */
 const documentId = z.string().min(1).max(100);
 
+/** An explorer entry as main minted it (TYTO-279, ADR 0115): opaque, and never a path. */
+const explorerEntryId = z.string().min(1).max(100);
+
 /** What a session tab holds: a brief, or one of the app's own files (TYTO-113, TYTO-277). */
 const sessionTabKind = z.enum(['brief', 'settings', 'keybindings', 'snippets']);
 
@@ -684,6 +687,42 @@ export const IPC_CHANNELS = {
   'workspace:trust': channel(
     z.strictObject({ trusted: z.boolean(), source: z.enum(['folder', 'profile']) }),
     workspaceState,
+  ),
+
+  /**
+   * The children of one folder of the open workspace, for the explorer (TYTO-279, ADR 0115):
+   * `entryId: null` is the folder itself. **Strict, and it names no path**: an entry is an id
+   * main minted when it listed the folder above it, and means nothing once that folder closes.
+   * Folders first, then names; at most 2,000, with `more` counting the ones left out. `gone`
+   * says the id names nothing any more — never minted, or its folder deleted or renamed outside
+   * — and the listing is then empty, so the window drops the branch rather than failing.
+   */
+  'explorer:list': channel(
+    z.strictObject({ entryId: explorerEntryId.nullable() }),
+    z.object({
+      entries: z
+        .array(
+          z.object({
+            id: explorerEntryId,
+            name: z.string().min(1),
+            kind: z.enum(['folder', 'brief', 'file']),
+          }),
+        )
+        .max(2000),
+      more: z.number().int().nonnegative(),
+      gone: z.boolean(),
+    }),
+  ),
+
+  /**
+   * Opens the brief an explorer entry names in a tab, `queue:open-brief`'s way: an id and never a
+   * path, and only a `.brief` main listed inside the open folder. Any other entry, or one whose
+   * file has gone, answers no document. Nothing else is opened, run or handed to the operating
+   * system (ADR 0111).
+   */
+  'explorer:open': channel(
+    z.strictObject({ documentId, entryId: explorerEntryId }),
+    z.object({ document: openDocument.nullable(), documentId: documentId.nullable() }),
   ),
 
   /**
@@ -1656,6 +1695,13 @@ export const IPC_EVENTS = {
    * once. The third push, and the second that is a notice rather than a question (ADR 0029).
    */
   'queue:changed': z.object({}),
+
+  /**
+   * Something in the open workspace folder changed on disk (TYTO-279, ADR 0115), after a burst
+   * of watcher events went quiet for 150 ms. Empty, for `queue:changed`'s reason: the explorer
+   * lists again each folder it has expanded.
+   */
+  'explorer:changed': z.object({}),
 
   /**
    * The update status changed (TYTO-131). Empty, for `queue:changed`'s reason: the window asks

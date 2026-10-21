@@ -270,6 +270,10 @@ describe('the bridge', () => {
       'credentials:set',
       'dialog:confirm',
       'dialog:save-changes',
+      // TYTO-279, ADR 0115: the explorer, by ids main minted. The panel that asks them is the
+      // card's second pull request.
+      'explorer:list',
+      'explorer:open',
       'export:cancel',
       'export:choose-directory',
       // TYTO-48, ADR 0044: which kinds an export can produce, installed exporters' included.

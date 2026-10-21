@@ -101,6 +101,31 @@ const projectFolder = () => {
 };
 
 /** The workspace folder, as main would answer it, recording each question (TYTO-278). */
+/** The explorer as the handlers see it: one brief and one picture, each by an id it minted. */
+const explorerFiles = () => {
+  const asked: (string | null)[] = [];
+  return {
+    asked,
+    list: (entryId: string | null) => {
+      asked.push(entryId);
+      return Promise.resolve(
+        entryId === null
+          ? {
+              entries: [
+                { id: 'e-brief', name: 'promo.brief', kind: 'brief' as const },
+                { id: 'e-image', name: 'foto.png', kind: 'file' as const },
+              ],
+              more: 0,
+              gone: false,
+            }
+          : { entries: [], more: 0, gone: true },
+      );
+    },
+    briefPath: (entryId: string) =>
+      Promise.resolve(entryId === 'e-brief' ? '/work/promo/promo.brief' : undefined),
+  };
+};
+
 const workspaceFolder = () => {
   const asked: unknown[] = [];
   const trustAsked: [boolean, 'folder' | 'profile'][] = [];
@@ -592,6 +617,7 @@ const dependencies = () => {
     preview: preview(),
     project: projectFolder(),
     workspace: workspaceFolder(),
+    explorer: explorerFiles(),
     queue: queueDependency(),
     settings: {
       open: () => Promise.resolve({ document: null, documentId: null }),
@@ -1525,5 +1551,44 @@ describe('the drawn menu row (TYTO-244)', () => {
     const popup = guard('menu:popup', handlers['menu:popup']);
     await expect(popup({ id: '', x: 0, y: 0 })).rejects.toThrow();
     await expect(popup({ id: 'help', x: Number.NaN, y: 0 })).rejects.toThrow();
+  });
+});
+
+/** TYTO-279, ADR 0115: the explorer names entries by the ids main minted, never by a path. */
+describe('the explorer channels', () => {
+  it('lists by id and opens only a brief main listed', async () => {
+    const explorer = explorerFiles();
+    const handlers = createHandlers({ ...dependencies(), explorer });
+
+    const root = await handlers['explorer:list']({ entryId: null });
+    expect(root.entries.map((entry) => entry.name)).toEqual(['promo.brief', 'foto.png']);
+    expect(await handlers['explorer:list']({ entryId: 'e-unknown' })).toEqual({
+      entries: [],
+      more: 0,
+      gone: true,
+    });
+
+    const brief = await handlers['explorer:open']({ documentId: 'document-5', entryId: 'e-brief' });
+    expect(brief.document?.path).toBe('/work/promo/promo.brief');
+    expect(brief.documentId).toBe('document-5');
+    // A picture is listed and opens nothing: nothing in a folder is handed to the system.
+    expect(
+      await handlers['explorer:open']({ documentId: 'document-6', entryId: 'e-image' }),
+    ).toEqual({ document: null, documentId: null });
+  });
+
+  it('refuses a request that names a path, so no window can list or open one of its choosing', async () => {
+    const explorer = explorerFiles();
+    const handlers = createHandlers({ ...dependencies(), explorer });
+    const list = guard('explorer:list', handlers['explorer:list']);
+    const open = guard('explorer:open', handlers['explorer:open']);
+
+    await expect(list({ entryId: null, path: 'C:/Users/someone' })).rejects.toBeInstanceOf(
+      IpcContractError,
+    );
+    await expect(
+      open({ documentId: 'document-7', entryId: 'e-brief', path: '/etc/passwd' }),
+    ).rejects.toBeInstanceOf(IpcContractError);
+    expect(explorer.asked).toEqual([]);
   });
 });

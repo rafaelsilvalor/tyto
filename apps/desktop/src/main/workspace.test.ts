@@ -1,6 +1,6 @@
 import { mkdir, mkdtemp, realpath, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
-import { join } from 'node:path';
+import { dirname, join } from 'node:path';
 
 import { type TrustStore, ok } from '@tyto/core';
 import { fsTrustStore } from '@tyto/io';
@@ -40,6 +40,7 @@ const restricted: TrustStore = {
 
 function service() {
   const handed: (readonly string[])[] = [];
+  const listed: (string | undefined)[] = [];
   const workspace = createWorkspaceService({
     trustStore: restricted,
     home,
@@ -47,11 +48,27 @@ function service() {
       handed.push(folders);
       return Promise.resolve();
     },
+    onFolder: (folder) => {
+      listed.push(folder);
+      return Promise.resolve();
+    },
   });
-  return { workspace, handed };
+  return { workspace, handed, listed };
 }
 
 describe('the window workspace service', () => {
+  it('tells the explorer the folder it opened, the same one again, and nothing on close', async () => {
+    const { workspace, listed } = service();
+
+    await workspace.open(work);
+    await workspace.grant('folder');
+    await workspace.close();
+    // The home folder is never a workspace (ADR 0112), so the explorer lists nothing there.
+    expect(await workspace.open(dirname(home))).toBe(false);
+
+    expect(listed).toEqual([work, work, undefined, undefined]);
+  });
+
   it('hands the template folders to the sources on open, and takes them back on close', async () => {
     await writeFile(join(work, '.tyto', 'project.json'), '{ "templates": ["tpl"] }');
     const { workspace, handed } = service();

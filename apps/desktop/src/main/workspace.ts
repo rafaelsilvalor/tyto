@@ -78,6 +78,11 @@ export interface WorkspaceServiceOptions {
   readonly home: string;
   /** Hands the workspace's template folders to the sources, which read them again. */
   readonly setTemplateFolders: (folders: readonly string[]) => Promise<void>;
+  /**
+   * The folder now open, or nothing, after every open, re-read and close — what the explorer
+   * lists (TYTO-279, ADR 0115). A folder that is not a workspace is nothing.
+   */
+  readonly onFolder?: (folder: string | undefined) => Promise<void>;
 }
 
 const NOTHING_OPEN: WorkspaceState = {
@@ -112,6 +117,7 @@ export function createWorkspaceService(options: WorkspaceServiceOptions): Worksp
     open = loaded;
     revoked = { folder: false, profile: false };
     await options.setTemplateFolders(loaded?.project.templates ?? []);
+    await options.onFolder?.(loaded?.folder);
     return loaded !== undefined;
   };
 
@@ -156,6 +162,7 @@ export function createWorkspaceService(options: WorkspaceServiceOptions): Worksp
       open = undefined;
       revoked = { folder: false, profile: false };
       await options.setTemplateFolders([]);
+      await options.onFolder?.(undefined);
     },
 
     async grant(source) {

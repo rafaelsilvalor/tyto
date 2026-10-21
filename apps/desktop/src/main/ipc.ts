@@ -29,6 +29,7 @@ import { credentialAccount } from './installed-plugins.js';
 import { declaredCredentialKeys } from './plugin-list.js';
 import { type DesktopLog } from './log.js';
 import { type DocumentService } from './documents.js';
+import { type ExplorerService } from './explorer.js';
 import { type ExportService } from './export.js';
 import { type LayoutStore } from './layout-store.js';
 import { type SessionService, type TemplateFolder } from './session.js';
@@ -214,6 +215,11 @@ export interface IpcDependencies {
     ) => Promise<IpcResponse<'workspace:trust'>>;
   };
   /**
+   * The open workspace folder's files (TYTO-279, ADR 0115): listed by id, and a brief's path
+   * found by id, only inside the folder main has open.
+   */
+  readonly explorer: Pick<ExplorerService, 'list' | 'briefPath'>;
+  /**
    * Rebuilds the application menu in a language (TYTO-124).
    *
    * A function and not the menu, for the reason every other Electron thing here arrives as
@@ -386,6 +392,7 @@ export function createHandlers(dependencies: IpcDependencies): Handlers {
     preview,
     project,
     workspace,
+    explorer,
     queue,
     session,
     settings,
@@ -434,6 +441,14 @@ export function createHandlers(dependencies: IpcDependencies): Handlers {
     'workspace:set-folder': ({ choose }) => workspace.setFolder(choose),
 
     'workspace:trust': ({ trusted, source }) => workspace.setTrust(trusted, source),
+
+    'explorer:list': ({ entryId }) => explorer.list(entryId),
+
+    'explorer:open': async ({ documentId, entryId }) => {
+      const path = await explorer.briefPath(entryId);
+      if (path === undefined) return { document: null, documentId: null };
+      return documents.openPath(documentId, path);
+    },
 
     'file:open': ({ documentId }) => documents.open(documentId),
 
