@@ -472,6 +472,45 @@ describe('blank lines inside an agenda-semana lamina', () => {
 });
 
 /**
+ * A `\` ending a block line with another line after it (TYTO-330, ADR 0109).
+ *
+ * Every block line already starts a new line, and the `\` used to stack a second break on the
+ * first — an empty line in the artwork. Compiled through a built-in, the brief with the `\`
+ * has to be the brief without it, down to one break run in the title.
+ */
+describe('a backslash ending a line of an indented title', () => {
+  const AGENDA = join(PACK, 'agenda-semana');
+  const FIXTURES = join(HERE, 'fixture/blank-lines');
+
+  const titleBreaks = (scene: Scene): number[] =>
+    scene.artworks.flatMap((artwork) =>
+      artwork.frames.map(
+        (frame) =>
+          textNodes(frame.children)
+            .filter((node) =>
+              node.runs.some((run) => run.kind === 'text' && run.text.includes('SEMANA')),
+            )
+            .flatMap((node) => node.runs.filter((run) => run.kind === 'break')).length,
+      ),
+    );
+
+  it('compiles to the Scene the brief without it does, with one break in the title', async () => {
+    const without = await readFile(join(FIXTURES, 'without-blank-lines.brief'), 'utf8');
+    const split = without.replace('  AGENDA DA SEMANA', '  AGENDA DA\n  SEMANA');
+    const trailing = without.replace('  AGENDA DA SEMANA', '  AGENDA DA \\\n  SEMANA');
+    expect(split).not.toEqual(without);
+
+    const control = await buildSource(split, 'agenda-semana', AGENDA);
+    const backslashed = await buildSource(trailing, 'agenda-semana', AGENDA);
+
+    // Frames without the title count zero; the one that draws it has the single break.
+    expect(titleBreaks(control.scene).filter((count) => count > 0)).toEqual([1]);
+    expect(titleBreaks(backslashed.scene).filter((count) => count > 0)).toEqual([1]);
+    expect(backslashed.scene).toEqual(control.scene);
+  }, 60_000);
+});
+
+/**
  * The example brief with blank lines in front of every body line — between a directive and
  * its first line, and between every two lines of a block: one, two, three in turn, and a line
  * of spaces every fourth time. Several examples have one-line blocks only, so the gap after

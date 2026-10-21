@@ -22,6 +22,8 @@ Dois asteriscos de cada lado. Num slot que o template já desenha em negrito, co
 
 Num [bloco com recuo](./directives.md#dois-jeitos-de-escrever-o-texto), cada linha é uma linha na arte, então o título acima tem duas. Uma linha comprida continua quebrando sozinha onde termina a largura do template.
 
+No texto escrito na própria linha da diretiva, uma `\` quebra a linha ali: `::title Free class\this Saturday` são duas linhas. Um bloco não precisa dela — as linhas dele já quebram —, então o Tyto descarta a `\` no fim de uma linha do bloco e avisa com `W_REDUNDANT_BREAK`.
+
 ## Marcas de cor
 
 `{cor:nome}` começa uma cor e `{/}` termina. Os nomes são do template — o `notice` tem `laranja` e `amarelo` — e um nome que o template não conhece deixa as palavras na cor de sempre, sem aviso.

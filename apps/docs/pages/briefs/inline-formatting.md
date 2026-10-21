@@ -22,6 +22,8 @@ Two asterisks on each side. In a slot the template already sets in bold, like `n
 
 In an [indented block](./directives.md#two-ways-to-write-the-text), every line is a line in the artwork, so the title above has two. A long line still wraps on its own where the template's width ends.
 
+In text written on the directive's own line, a `\` breaks the line there: `::title Free class\this Saturday` is two lines. A block does not need it — its lines already break — so Tyto drops a `\` at the end of a block line and warns with `W_REDUNDANT_BREAK`.
+
 ## Colour marks
 
 `{cor:name}` starts a colour and `{/}` ends it. The names are the template's own — `notice` has `laranja` (orange) and `amarelo` (yellow) — and a name the template does not know leaves the words in their usual colour, with no warning.

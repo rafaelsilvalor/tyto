@@ -92,6 +92,7 @@ non-zero.
 | `W_TEMPLATE_OVERFLOW` | warning | no | An artwork's content runs past the room its template has for it in one format. |
 | `W_UNUSED_SLOT` | warning | no | The brief sets a slot the chosen template never renders. |
 | `W_MARKUP_IN_FRONTMATTER` | warning | no | A frontmatter scalar on a rich-text slot contains what looks like inline markup. |
+| `W_REDUNDANT_BREAK` | warning | no | A line of a directive body ends in a `\` and another line of its indented block follows, which already starts a new line. |
 | `W_BRAND_KIT_SHADOWED` | warning | no | Two plugins contribute a kit for the same brand; the earlier plugin is the one used. |
 | `W_TEMPLATE_SHADOWED` | warning | no | Two template sources declare the same name; the earlier source is the one used. |
 | `W_SLOT_VOCABULARY` | warning | no | A manifest names a slot against the standard slot vocabulary: a known synonym, a reserved name with the wrong shape, or a repeatable slot not named lamina. |
@@ -1318,6 +1319,20 @@ Slot '{slot}' is set in the frontmatter, where '{markup}' is literal text. Write
 ```
 
 Parameters: `slot`, `markup`
+
+### `W_REDUNDANT_BREAK`
+
+**Severity:** warning · **Fatal:** no · **Spec:** `docs/brief-language.md`
+
+A line of a directive body ends in a `\` and another line of its indented block follows, which already starts a new line.
+
+A warning never replaces a value (ADR 0013).
+
+```
+Every line of an indented block already starts a new line; this \ is not needed.
+```
+
+Parameters: none
 
 ### `W_BRAND_KIT_SHADOWED`
 

@@ -34,7 +34,7 @@ write briefs; this document is the grammar for people who change it.
 - **Slot directive** `::name value` — inline value to end of line, or an indented block on the following lines. The name must exist in the template manifest (`E_UNKNOWN_SLOT`).
 - **Repeatable directive** (`::lamina`) — each occurrence becomes an `Artwork`. The manifest declares which slot is `repeat`.
 - **Adjustments** `{a, b: value}` — only those declared in `manifest.adjustments`. They apply to the slot; on a repeatable slot, to that slide.
-- **Text**: inline Markdown only — `**bold**`, `*italic*`, `\` line break, `{cor:x}text{/}` mark. No headings, lists or links.
+- **Text**: inline Markdown only — `**bold**`, `*italic*`, `\` line break, `{cor:x}text{/}` mark. No headings, lists or links. Every line of an indented block already starts a new line, so a `\` ending a line with another block line after it adds nothing: it is dropped, with `W_REDUNDANT_BREAK` (ADR 0109), and `\\` there leaves one empty line. A `\` in the middle of a line, at the end of an inline body with no block under it, or on the last line of a block still breaks the line.
 - **Assets**: a path is read as written, relative to the `.brief` file; when nothing is there, the same path is read from `assets/` beside the brief (ADR 0056). If both exist, the one beside the brief wins, and a path that climbs out of the brief's folder is read from neither. `resolve` confirms existence and computes a hash of the bytes, so the hash is the same whichever folder the file was found in. The CLI, `tyto watch`, the queue, the preview and the export box all follow this rule; only `tyto render --assets <dir>` replaces it, with that one folder and no fallback. A brief in a folder named `editaveis` — a delivery's copy — also reads `../assets`, the delivery's images (ADR 0057).
 - **Comments**: `//` at line start.
 - **Escape**: `\::` for text starting with `::`.
@@ -102,7 +102,8 @@ had to answer them.
 - **Spaces and tabs at the end of a line of text have no meaning** (ADR 0096). Nobody can see
   them, so `Profª. Mara Rebeiro  ` means `Profª. Mara Rebeiro`, in an inline body and on every
   line of a block. Only the text a line ends with is trimmed: spaces before a trailing `\`,
-  between words, or inside bold or a mark stay where they are.
+  between words, or inside bold or a mark stay where they are — unless that `\` is dropped as
+  redundant (ADR 0109), which leaves the spaces at the end of the line, and they go.
 - **How far a body line is indented has no meaning either**: two spaces, six or a tab all
   make a body line. **Format Brief** (`formatBrief` in `brief-lang`, Alt+Shift+F in the
   window) rewrites exactly what the language ignores — the indent of each body line to
@@ -269,7 +270,10 @@ rename. These are the choices that gap forced, and where each one shows.
   rather than a soft and a hard kind, because nothing downstream would tell them apart:
   the overflow strategies are `clip`, `shrink` and `grow`, all of which change size, and
   none of which reflows by collapsing a break. A `Break` lands in the IR as its own
-  `TextRun` (ADR 0016); `compile` writes that mapping.
+  `TextRun` (ADR 0016); `compile` writes that mapping. A `\` that ends a line with another
+  block line after it would stack a second `Break` on that one, so `parseBrief` drops it and
+  reports `W_REDUNDANT_BREAK` on its range (ADR 0109); it tells the `\` from the boundary's
+  own `Break` by the character its range covers.
 - **A directive's range stops before the line break that ends it.** The break is
   punctuation; an editor squiggle that ran onto the next line would be pointing at it.
 - **A directive is ranged twice: the whole of it, and its name.** `range` covers `::` to

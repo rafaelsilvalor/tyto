@@ -231,7 +231,27 @@ function trimLineEnd(body: Inline[]): void {
   };
 }
 
-function bodyOf(node: SyntaxNode, text: string): RichText {
+/**
+ * A `\` that ends a line with another block line after it says nothing (TYTO-330, ADR 0109).
+ *
+ * Every line of an indented block already starts a new line, so the `\` used to stack a
+ * second break on the one the boundary gives — an empty line in the artwork nobody asked for
+ * by looking. One `\` comes off and a warning says why; `\\` still leaves one empty line,
+ * because a second break is one more than the block gives and that is a choice an author can
+ * make. The `\` is told apart from a boundary's break by its source character, since a
+ * boundary covers the line ending instead. Spaces before the dropped `\` were inside the line
+ * while it ended in markup and are at its end now, so they go too (ADR 0096).
+ */
+function dropRedundantBreak(body: Inline[], text: string, diagnostics: Diagnostic[]): void {
+  const last = body[body.length - 1];
+  if (last === undefined || last.kind !== 'break') return;
+  if (text.slice(last.range.start, last.range.end) !== '\\') return;
+  body.pop();
+  diagnostics.push(diagnostic('W_REDUNDANT_BREAK', {}, { range: last.range }));
+  trimLineEnd(body);
+}
+
+function bodyOf(node: SyntaxNode, text: string, diagnostics: Diagnostic[]): RichText {
   const body: Inline[] = [];
 
   for (const child of children(node)) {
@@ -248,6 +268,7 @@ function bodyOf(node: SyntaxNode, text: string): RichText {
       const blockText = child.getChild('BlockText');
       if (blockText === null) continue;
       if (body.length > 0) {
+        dropRedundantBreak(body, text, diagnostics);
         // A `BodyLine` opens with `blockIndent`, which is the line ending plus the indent,
         // so the break starts where the line does. Its length is not always one: `\r\n` is
         // two units, and a hardcoded `+ 1` left the `Break` node covering half of it —
@@ -309,7 +330,7 @@ function withoutTrailingBlank(text: string, from: number, to: number): SourceRan
 /** `::` — the two characters a directive opens with, which `nameRange` starts after. */
 const DIRECTIVE_MARK = 2;
 
-function directiveOf(node: SyntaxNode, text: string): Directive {
+function directiveOf(node: SyntaxNode, text: string, diagnostics: Diagnostic[]): Directive {
   const name = node.getChild('Name');
   const namespace = node.getChild('Namespace');
 
@@ -325,7 +346,7 @@ function directiveOf(node: SyntaxNode, text: string): Directive {
     // name of the namespace does not include it.
     ...(namespace === null ? {} : { namespace: sliceOf(text, namespace).slice(0, -1) }),
     adjustments: adjustmentsOf(node, text),
-    body: bodyOf(node, text),
+    body: bodyOf(node, text, diagnostics),
     range: withoutTrailingBlank(text, node.from, node.to),
     nameRange: sourceRange(nameStart, nameEnd),
   };
@@ -359,7 +380,7 @@ export function parseBrief(text: string): Result<BriefAst, Diagnostics> {
       frontmatter = { data: parsed.data, ranges: parsed.ranges, range: rangeOf(child) };
       diagnostics.push(...parsed.diagnostics);
     } else if (child.name === 'Directive') {
-      directives.push(directiveOf(child, text));
+      directives.push(directiveOf(child, text, diagnostics));
     }
   }
 

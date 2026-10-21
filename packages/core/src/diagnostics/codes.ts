@@ -769,6 +769,18 @@ export const diagnosticCodes = {
     fatal: false,
     fatality: 'A warning never replaces a value (ADR 0013).',
   },
+  // A warning and not an error, because the brief still means what the author meant: the
+  // `\` is dropped and the line breaks once, as every block line does (ADR 0109). It says so
+  // because the `\` used to add an empty line, and an author who wrote it for that gets told.
+  W_REDUNDANT_BREAK: {
+    severity: 'warning',
+    summary:
+      'A line of a directive body ends in a `\\` and another line of its indented block follows, which already starts a new line.',
+    template: 'Every line of an indented block already starts a new line; this \\ is not needed.',
+    spec: 'docs/brief-language.md',
+    fatal: false,
+    fatality: 'A warning never replaces a value (ADR 0013).',
+  },
   // A warning and not an error, because nothing is wrong: the run produced the template the
   // user asked for. It exists because "my edit to the built-in did nothing" and "why does
   // mine look different on this machine" are the two questions shadowing will generate, and
