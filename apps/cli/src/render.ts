@@ -17,6 +17,7 @@ import {
 import { type RenderContextOptions, loadRenderContext, readFailure } from './render-context.js';
 import { renderTask } from './render-task.js';
 import { diagnosticsDocument, formatDiagnostics, json } from './report.js';
+import { workspaceOfBrief } from './workspace.js';
 
 /**
  * `tyto render <brief> --out <dir>` — the contract command (ADR 0011).
@@ -27,7 +28,13 @@ import { diagnosticsDocument, formatDiagnostics, json } from './report.js';
  */
 
 export interface RenderCommandOptions {
-  readonly out: string;
+  /**
+   * `--out`. Optional since TYTO-278: absent, the brief's workspace's `output` folder is used,
+   * and with neither the run stops before reading anything else.
+   */
+  readonly out?: string;
+  /** `--trust`: the brief's workspace is trusted for this run, never written down (ADR 0111). */
+  readonly trust?: boolean;
   /**
    * `--folder`: deliver into `<out>/<brief-name>/` instead of into `<out>` itself.
    *
@@ -117,6 +124,26 @@ export async function renderCommand(
     return reportFailure(readFailure(shownBrief, cause), options, environment);
   }
 
+  // The workspace before anything else, because it decides where the run writes; a run with
+  // nowhere to write stops here, with whatever the project file said printed first so the
+  // refusal explains itself (a restricted folder's `output` that led outside, say).
+  const workspace = await workspaceOfBrief(briefPath, options, environment, (path) =>
+    displayPath(cwd, path),
+  );
+  const projectDiagnostics = workspace?.diagnostics ?? [];
+  const project = workspace?.loaded.project;
+  const out = options.out === undefined ? project?.output : resolve(cwd, options.out);
+  if (out === undefined) {
+    if (projectDiagnostics.length > 0)
+      environment.console.err(formatDiagnostics(projectDiagnostics));
+    environment.console.err(
+      workspace === undefined
+        ? "error: required option '-o, --out <dir>' not specified\n"
+        : `error: --out is required: ${displayPath(cwd, workspace.loaded.file)} declares no output folder this run may use\n`,
+    );
+    return EXIT_DIAGNOSTICS;
+  }
+
   // Before the project, because an installed plugin's template pack is part of it: the
   // registry a brief is resolved against has to be able to find its templates (ADR 0046).
   const loaded = await loadInstalledPlugins(environment.home, {
@@ -124,6 +151,7 @@ export async function renderCommand(
   });
   const context = await loadRenderContext({
     templatesDirectory: resolve(cwd, options.templates),
+    projectTemplatesDirectories: project?.templates ?? [],
     formatsFile: resolve(cwd, options.formatsFile),
     templatesDirectoryIsDefault: options.templatesNamed !== true,
     formatsFileIsDefault: options.formatsNamed !== true,
@@ -162,7 +190,8 @@ export async function renderCommand(
         briefPath: shownBrief,
         briefDirectory: resolve(briefPath, '..'),
         ...(options.assets === undefined ? {} : { assetsOverride: options.assets }),
-        outDirectory: resolve(cwd, options.out),
+        ...(project === undefined ? {} : { projectAssets: project.assets }),
+        outDirectory: out,
         // `basename` and nothing else. The name comes off a file that exists, so it is
         // already legal here, and a second sanitiser is what `artifact.ts` warns against.
         ...(options.folder === true
@@ -177,8 +206,9 @@ export async function renderCommand(
         ...(options.formats === undefined ? {} : { formats: options.formats }),
         ...(rasterizer === undefined ? {} : { rasterizer }),
         ...(options.concurrency === undefined ? {} : { concurrency: options.concurrency }),
+        ...(project === undefined ? {} : { fontDirectories: project.fonts }),
       },
-      context.diagnostics,
+      [...projectDiagnostics, ...context.diagnostics],
     );
 
     const scope = { primary: { path: shownBrief, source } };

@@ -7,6 +7,7 @@ import { pluginNewCommand } from './plugin-new.js';
 import { pluginInstallCommand, pluginListCommand, pluginStateCommand } from './plugin.js';
 import { renderCommand } from './render.js';
 import { templateCheckCommand, templateNewCommand } from './template.js';
+import { trustRemoveCommand } from './trust.js';
 import { watchCommand } from './watch.js';
 
 /**
@@ -106,7 +107,12 @@ export function createProgram(environment: CliEnvironment, captured: Captured): 
     .command('render')
     .description('render one brief into an output folder (the ADR 0011 contract)')
     .argument('<brief>', 'path to the .brief file')
-    .requiredOption('-o, --out <dir>', 'folder for the artifacts and result.json')
+    // Optional since TYTO-278: a brief inside a workspace whose project file declares an
+    // `output` folder goes there. Typed, it wins and is not confined (ADR 0111).
+    .option(
+      '-o, --out <dir>',
+      "folder for the artifacts and result.json (default: the workspace's output folder)",
+    )
     // A flag on `render` rather than a command beside it, and the choice is worth one line:
     // `render` carries ten options that a delivery needs every one of, so a sibling command
     // would be a second copy of the whole surface, its help, its docs and its tests. Off by
@@ -120,6 +126,11 @@ export function createProgram(environment: CliEnvironment, captured: Captured): 
     .option(
       '--assets <dir>',
       "what relative asset paths resolve against (default: assets/ beside the brief, else the brief's folder)",
+    )
+    .option(
+      '--trust',
+      "trust the brief's workspace folder for this run only; never written to trust.json",
+      false,
     );
 
   withOutputOptions(withProjectOptions(render)).action(async (brief: string) => {
@@ -233,6 +244,20 @@ export function createProgram(environment: CliEnvironment, captured: Captured): 
         captured.code = await pluginStateCommand(change, name, environment);
       });
   }
+
+  /* ---------------------------------------------------------------------------- trust -- */
+
+  const trust = program
+    .command('trust')
+    .description('the workspace folders this person trusts (~/.tyto/trust.json, ADR 0111)');
+
+  trust
+    .command('remove')
+    .description('take back the trust given to a workspace folder')
+    .argument('<folder>', 'the workspace folder, as it was trusted')
+    .action(async (folder: string) => {
+      captured.code = await trustRemoveCommand(folder, environment);
+    });
 
   // Applied after the tree is built and to every node of it. Commander copies
   // `_exitCallback` to a subcommand when the subcommand is *created*, so an
