@@ -88,7 +88,7 @@ describe('suggesting in settings.json', () => {
 
   it('offers the status bar ids not already in the list', () => {
     const shown = labels('{ "statusBarItems": ["leftArea", "|"] }');
-    expect(shown).toHaveLength(12);
+    expect(shown).toHaveLength(13);
     expect(shown).not.toContain('leftArea');
   });
 
@@ -144,7 +144,7 @@ describe('hover help in settings.json', () => {
       { label: 'Type', value: 'object' },
       { label: 'Default', value: '{}' },
     ]);
-    expect(answer?.items).toHaveLength(23);
+    expect(answer?.items).toHaveLength(24);
     expect(answer?.items?.filter((item) => item.name === 'vimMode.normal')).toEqual([
       {
         name: 'vimMode.normal',
@@ -155,7 +155,7 @@ describe('hover help in settings.json', () => {
 
   it("lists statusBarItems' ids the same way", () => {
     const items = hover('{ "statusBar|Items": [] }')?.items ?? [];
-    expect(items.map((item) => item.name)).toHaveLength(13);
+    expect(items.map((item) => item.name)).toHaveLength(14);
     expect(items[0]).toEqual({
       name: 'leftArea',
       description: 'Button that shows or hides the left area.',

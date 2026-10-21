@@ -102,6 +102,7 @@ import {
 } from './plugin-panel.js';
 import { type QueuePanel, QUEUE_PANEL_TAG } from './queue-panel.js';
 import { type ProjectPanel, PROJECT_PANEL_TAG } from './project-panel.js';
+import { type ExplorerPanel, EXPLORER_PANEL_TAG } from './explorer-panel.js';
 import type { RestoredDrafts, TemplateMode } from './template-mode.js';
 import { TEMPLATE_MODE_TAG } from './template-mode-tag.js';
 import {
@@ -221,6 +222,7 @@ import {
   PROBLEMS_PANEL,
   QUEUE_PANEL,
   PROJECT_PANEL,
+  EXPLORER_PANEL,
   dockHasPanels,
   dockIsHidden,
   dockIsShown,
@@ -581,6 +583,8 @@ function resolveElements() {
     queuePanel: document.querySelector<QueuePanel>(QUEUE_PANEL_TAG),
     // TYTO-347. A dock panel too, `null` while closed; painted from the workspace answer.
     projectPanel: document.querySelector<ProjectPanel>(PROJECT_PANEL_TAG),
+    // TYTO-279. In the left area above the queue, `null` while closed; it asks main itself.
+    explorerPanel: document.querySelector<ExplorerPanel>(EXPLORER_PANEL_TAG),
     // TYTO-44. Outside `.shell` for the export dialog's reason: it covers the window.
     templateMode: document.querySelector<TemplateMode>(TEMPLATE_MODE_TAG),
     // TYTO-131. At the end of the status bar; hidden while there is nothing newer.
@@ -2621,7 +2625,15 @@ async function setTemplateFolder(choose: boolean): Promise<void> {
  */
 async function setWorkspaceFolder(choose: boolean): Promise<void> {
   await withBridge(async (bridge) => {
-    showWorkspace(await bridge['workspace:set-folder']({ choose }));
+    const before = workspaceShown?.folder ?? null;
+    const answer = await bridge['workspace:set-folder']({ choose });
+    showWorkspace(answer);
+    // Opening a folder opens the explorer (Rafael, 2026-10-21), and only here: a folder the
+    // session brings back at launch leaves the panel as the saved layout has it, and a picker
+    // dismissed with the same folder open changes nothing.
+    if (choose && answer.folder !== null && answer.folder !== before) {
+      await changeLayout(withPanelOpen(layout, EXPLORER_PANEL, true));
+    }
     await afterTemplatesReread(bridge);
   });
 }
@@ -2637,6 +2649,55 @@ function showWorkspace(answer: IpcResponse<'workspace:folder'>): void {
   }
   if (elements.trustDialog) elements.trustDialog.view = answer;
   if (elements.projectPanel) elements.projectPanel.view = answer;
+  showExplorerFolder(answer);
+}
+
+/** The folder the explorer lists, by main's real path; another one starts the tree afresh. */
+let explorerFolder: string | null | undefined;
+
+/**
+ * Hands the explorer the folder's name, and starts its tree again when the folder is not the
+ * one it lists. Re-reading the same folder — a trust change — keeps what was open, as main keeps
+ * its ids (ADR 0115).
+ */
+function showExplorerFolder(answer: IpcResponse<'workspace:folder'> | undefined): void {
+  const panel = elements.explorerPanel;
+  if (panel === null || answer === undefined) return;
+  panel.folderName = answer.folder === null ? null : answer.name;
+  if (explorerFolder === answer.folder) return;
+  explorerFolder = answer.folder;
+  panel.reset();
+}
+
+/** The explorers `wireExplorerPanel` has wired, by element, for `wiredQueuePanels`'s reason. */
+const wiredExplorerPanels = new WeakSet<ExplorerPanel>();
+
+/**
+ * The explorer (TYTO-279): what it asks main, and its first tree. A brief opens through `adopt`,
+ * like a picked file, so one already in a tab is that tab.
+ */
+function wireExplorerPanel(): void {
+  const explorer = elements.explorerPanel;
+  if (explorer === null || wiredExplorerPanels.has(explorer)) return;
+  wiredExplorerPanels.add(explorer);
+  explorer.source = {
+    list: (entryId) =>
+      window.tyto?.['explorer:list']({ entryId }) ??
+      Promise.resolve({ entries: [], more: 0, gone: true }),
+    open: (entryId) => {
+      void withBridge(async (bridge) => {
+        const wanted = nextDocumentId();
+        const opened = await bridge['explorer:open']({ documentId: wanted, entryId });
+        adopt(opened.document, opened.documentId, wanted);
+      });
+    },
+    openFolder: () => {
+      runCommand('workspace.openFolder');
+    },
+  };
+  // A new element lists from the top, whatever folder the last one had.
+  explorerFolder = undefined;
+  showExplorerFolder(workspaceShown);
 }
 
 /**
@@ -3456,6 +3517,7 @@ const PANEL_NAMES: Readonly<Record<string, CatalogueKey>> = {
   problems: 'panel.problems',
   queue: 'panel.queue',
   project: 'panel.project',
+  explorer: 'panel.explorer',
 };
 
 /** Every command the registry holds, translated and with the key that runs it. */
@@ -3569,6 +3631,7 @@ let briefColumns: BriefColumnLook = 'separator';
 const STATUS_COMMANDS: StatusBarCommands = {
   commandBar: COMMAND_BAR_TOGGLE,
   problems: togglePanelCommandId(PROBLEMS_PANEL),
+  explorer: togglePanelCommandId(EXPLORER_PANEL),
   queue: togglePanelCommandId(QUEUE_PANEL),
   plugins: PLUGINS_SHOW,
   export: FILE_EXPORT,
@@ -3622,6 +3685,7 @@ function paintStatusBar(): void {
       right: dockIsShown(layout, 'right'),
       bottom: dockIsShown(layout, 'bottom'),
       problems: problemsShown,
+      explorer: panelShown(EXPLORER_PANEL),
       queue: panelShown(QUEUE_PANEL),
     },
     areas: {
@@ -3672,6 +3736,7 @@ async function applyLayout(persist: boolean): Promise<void> {
   elements = resolveElements();
   wirePanelControls();
   wireQueuePanel();
+  wireExplorerPanel();
   // A Project panel the dock just made has no answer yet; the last one is still true.
   if (elements.projectPanel) elements.projectPanel.view = workspaceShown;
   wireCommandBar();
@@ -4428,6 +4493,12 @@ async function load(): Promise<void> {
     // it is closed: the panel asks once when it opens, so nothing is lost by not listening.
     bridge.on('queue:changed', () => {
       if (elements.queuePanel !== null) void refreshQueue();
+    });
+
+    // The open folder changed on disk (TYTO-279, ADR 0115): the explorer lists its open
+    // folders again. Ignored while it is closed, for the queue's reason.
+    bridge.on('explorer:changed', () => {
+      elements.explorerPanel?.refresh();
     });
 
     // `settings.json` changed or refused a screen's change (TYTO-206).

@@ -53,7 +53,7 @@ export interface StatusBarState {
    */
   readonly newProblems: boolean;
   /** Which areas are on screen, and which of the two toggled panels are open. */
-  readonly shown: Readonly<Record<HideableDock | 'problems' | 'queue', boolean>>;
+  readonly shown: Readonly<Record<HideableDock | 'problems' | 'explorer' | 'queue', boolean>>;
   /**
    * Which areas any panel lives in (TYTO-287): an area with none gets no button, which is the
    * right one by default since the preview became a tab. Absent means every area has one.
@@ -65,6 +65,7 @@ export interface StatusBarState {
 export interface StatusBarCommands {
   readonly commandBar: string;
   readonly problems: string;
+  readonly explorer: string;
   readonly queue: string;
   readonly plugins: string;
   readonly export: string;
@@ -171,11 +172,19 @@ export class StatusBar extends LitElement {
       problems: 0,
       errors: 0,
       newProblems: false,
-      shown: { left: false, right: false, bottom: false, problems: false, queue: false },
+      shown: {
+        left: false,
+        right: false,
+        bottom: false,
+        problems: false,
+        explorer: false,
+        queue: false,
+      },
     };
     this.commands = {
       commandBar: '',
       problems: '',
+      explorer: '',
       queue: '',
       plugins: '',
       export: '',
@@ -294,6 +303,14 @@ export class StatusBar extends LitElement {
                 ? html`<span class="status-bar__new" aria-hidden="true"></span>`
                 : nothing
             }`,
+        );
+      case 'explorer':
+        return this.button(
+          id,
+          'explorer',
+          this.commands.explorer,
+          toggle('panel.explorer'),
+          state.shown.explorer,
         );
       case 'queue':
         return this.button(

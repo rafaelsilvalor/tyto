@@ -29,6 +29,17 @@ While it is open:
 
 A brief outside the folder works as it always did.
 
+## Browse its files: the Explorer
+
+Opening a folder with **File ▸ Open Folder…** opens the **Explorer** in the left area, above the queue. It lists the folder's files and folders, folders first, and shows a folder's contents when you open it. A file made, renamed or deleted outside Tyto appears or goes away on its own, a moment later.
+
+- **Click a brief** to open it in a tab, or select it and press **Enter**. A brief already open is its tab.
+- **Click a folder**, or press **Right** and **Left**, to open and close it. **Up**, **Down**, **Home** and **End** move through the list.
+- **Any other file** — an image, a PDF — is listed and does nothing when clicked. Tyto does not open files with other programs from the Explorer.
+- A folder holding more than 2,000 entries shows the first 2,000 and a line saying how many more there are. `.git` is not listed.
+
+The **Explorer** button in the status bar, beside the queue's, shows and hides it, as does **Show or hide: Explorer** in the command bar. When Tyto starts again with the folder still open, the Explorer is as you left it: closed if you closed it. With no folder open it says _No folder open_ and offers **Open Folder…**. It lists an untrusted folder like any other: listing a folder runs nothing in it.
+
 ## A folder you have not trusted
 
 Every folder starts untrusted. An untrusted folder still opens, previews and exports, but every folder its project file names must be inside it: a name that leads outside — `../shared`, an absolute path, or a shortcut inside the folder that points elsewhere — is left out. Each one left out is listed in the **Problems** panel as `W_PROJECT_PATH_OUTSIDE`, with its line and column in `.tyto/project.json`. Its plugin sections are withheld too.

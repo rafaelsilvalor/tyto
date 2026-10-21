@@ -4,7 +4,7 @@
 Every step was followed on 2026-10-19 on a development build of Tyto 0.7.0 (commit `e3d32e9`) on Windows 11, once with the window in English and once in Brazilian Portuguese. Menus and labels below are the English window's.
 :::
 
-Panels sit in three **areas** around the editor groups: left, right and bottom. Two come with Tyto — **Problems** and the **local queue** — and a plugin can add its own. The preview is not a panel: it is a tab, and has its own section below.
+Panels sit in three **areas** around the editor groups: left, right and bottom. Tyto's own are the **Explorer**, **Problems**, **Project** and the **local queue**, and a plugin can add its own. The preview is not a panel: it is a tab, and has its own section below.
 
 ## Show and hide
 
@@ -25,6 +25,10 @@ Problems lists what is wrong with the brief in front: each line has a **code** s
 A brief with no problems says so instead of leaving the panel empty. The codes you meet most while writing are explained in [Briefs](../briefs/index.md#when-something-is-wrong).
 
 <!-- TYTO-322: with settings.json in front the panel still says "about this brief"; it means the file in front. -->
+
+## Explorer
+
+The Explorer lists the files of the open [workspace folder](workspace-folder.md#browse-its-files-the-explorer) in the left area, above the queue. Opening a folder opens it, and clicking a brief in it opens the brief in a tab.
 
 ## The local queue
 

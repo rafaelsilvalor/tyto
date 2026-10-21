@@ -29,6 +29,17 @@ Enquanto ela está aberta:
 
 Um brief fora da pasta funciona como sempre funcionou.
 
+## Ver os arquivos dela: o Explorador
+
+Abrir uma pasta com **Arquivo ▸ Abrir pasta…** abre o **Explorador** na área esquerda, acima da fila. Ele lista os arquivos e pastas dela, pastas primeiro, e mostra o que há numa pasta quando você a abre. Um arquivo criado, renomeado ou apagado fora do Tyto aparece ou some sozinho, um instante depois.
+
+- **Clique num brief** para abri-lo numa aba, ou selecione-o e aperte **Enter**. Um brief que já está aberto é a aba dele.
+- **Clique numa pasta**, ou aperte **Direita** e **Esquerda**, para abri-la e fechá-la. **Cima**, **Baixo**, **Home** e **End** andam pela lista.
+- **Qualquer outro arquivo** — uma imagem, um PDF — aparece na lista e não faz nada ao clique. O Tyto não abre arquivos com outros programas a partir do Explorador.
+- Uma pasta com mais de 2.000 itens mostra os 2.000 primeiros e uma linha dizendo quantos faltam. A pasta `.git` não aparece.
+
+O botão do **Explorador** na barra de status, ao lado do da fila, mostra e esconde o painel, assim como **Mostrar ou esconder: Explorador** na barra de comandos. Quando o Tyto abre de novo com a pasta ainda aberta, o Explorador fica como você deixou: fechado, se você o fechou. Sem pasta aberta, ele diz _Nenhuma pasta aberta_ e oferece **Abrir pasta…**. Ele lista uma pasta em que você não confiou como qualquer outra: listar uma pasta não executa nada dela.
+
 ## Uma pasta em que você ainda não confiou
 
 Toda pasta começa sem confiança. Uma pasta assim abre, mostra a prévia e exporta, mas toda pasta que o arquivo do projeto nomeia precisa estar dentro dela: um nome que leva para fora — `../shared`, um caminho absoluto, ou um atalho dentro da pasta que aponta para outro lugar — fica de fora. Cada um que fica de fora aparece no painel **Problemas** como `W_PROJECT_PATH_OUTSIDE`, com linha e coluna no `.tyto/project.json`. As seções de plugin dela também ficam retidas.

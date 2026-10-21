@@ -72,3 +72,33 @@ so whatever it names them by is the question this ADR answers.
   default program.
 - The panel, its status-bar button, its Ctrl+K toggle and the end-to-end suite are this card's
   second pull request.
+
+## Amendment: the panel (TYTO-279, second pull request, 2026-10-21)
+
+Rafael answered the card's taste questions on 2026-10-21. These are the decisions the panel
+adds:
+
+1. **In the left area, above the queue, headed EXPLORER / EXPLORADOR.** The record comes before
+   the queue's in `DEFAULT_LAYOUT`, and a dock stacks its panels in that order. `layoutFrom`
+   keeps that order for a `layout.json` written before the panel existed, so the explorer lands
+   above the queue there too. One consequence: showing an empty left area (ADR 0076) now opens
+   the explorer, which is its first panel, where it used to open the queue.
+2. **An explicit File ▸ Open Folder opens it; nothing else does.** Only when the picker answers
+   with a folder other than the one open. A folder the session brings back at launch leaves the
+   panel as the saved layout has it, so a person who closed the explorer finds it closed. A
+   dismissed picker changes nothing. Close Folder leaves the panel open, saying "No folder
+   open" with an Open Folder… button.
+3. **A status-bar item `explorer`**, beside the queue's (ADR 0091), and
+   `layout.togglePanel:explorer` in the command bar, as every panel has. The button's icon is
+   the tree Rafael chose from three candidates and approved, lifted onto the 2.75–13.25 band of
+   the frame icons. The rows' chevron is drawn once and turned. Both are in `icons.ts`. There
+   are no file-type icons: TYTO-282 owns those.
+4. **The tree is a value in the window** (`explorer-tree.ts`): each opened folder's listing by
+   id, which folders are open, and the selection. A change on disk lists the root and each open
+   folder on screen again. A folder answered `gone` drops its subtree, so a folder deleted
+   outside the app goes away with whatever was open inside it, and a selection inside it moves
+   to the folder. The keys are VS Code's: Up, Down, Home, End, Right, Left, Enter and Space.
+5. **The panel forgets which folders were open when it closes.** The dock makes a new element
+   each time it opens a panel, as it does for the queue, and the record is layout rather than
+   state. A panel kept open keeps its tree across changes on disk and across a trust change
+   (the same folder, the same ids).

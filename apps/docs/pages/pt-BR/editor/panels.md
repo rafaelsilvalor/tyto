@@ -4,7 +4,7 @@
 Cada passo foi seguido em 2026-10-19 numa versão de desenvolvimento do Tyto 0.7.0 (commit `e3d32e9`) no Windows 11, uma vez com a janela em inglês e outra em português do Brasil. Os menus e rótulos abaixo são os da janela em português.
 :::
 
-Os painéis ficam em três **áreas** em volta dos grupos de editores: esquerda, direita e de baixo. Dois vêm com o Tyto — **Problemas** e a **fila local** — e um plugin pode acrescentar os seus. A prévia não é um painel: é uma aba, e tem a sua própria parte mais abaixo.
+Os painéis ficam em três **áreas** em volta dos grupos de editores: esquerda, direita e de baixo. Os do próprio Tyto são o **Explorador**, **Problemas**, **Projeto** e a **fila local**, e um plugin pode acrescentar os seus. A prévia não é um painel: é uma aba, e tem a sua própria parte mais abaixo.
 
 ## Mostrar e esconder
 
@@ -27,6 +27,10 @@ Um brief sem problemas diz isso, em vez de deixar o painel vazio. As frases dos 
 <!-- TYTO-342: mensagens de problema ainda em inglês na janela em português. -->
 
 <!-- TYTO-322: com o settings.json na frente o painel ainda diz "sobre este brief"; quer dizer o arquivo da frente. -->
+
+## Explorador
+
+O Explorador lista os arquivos da [pasta de trabalho](workspace-folder.md#ver-os-arquivos-dela-o-explorador) aberta, na área esquerda, acima da fila. Abrir uma pasta abre o Explorador, e clicar num brief nele abre o brief numa aba.
 
 ## A fila local
 

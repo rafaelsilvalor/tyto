@@ -8,6 +8,7 @@ import {
   ELASTIC_DOCK,
   PLUGIN_PANEL_ELEMENT,
   PROBLEMS_PANEL,
+  EXPLORER_PANEL,
   QUEUE_PANEL,
   clampSize,
   dockHasPanels,
@@ -195,6 +196,23 @@ describe('reading what was on the disk', () => {
     expect(panelOf(layout, PROBLEMS_PANEL)?.size).toBe(143);
   });
 
+  it('puts the explorer above the queue, closed, in a file written before it (TYTO-279)', () => {
+    // The queue open, as a person who uses it left it: the explorer joins above it.
+    const beforeTheExplorer = {
+      panels: DEFAULT_LAYOUT.panels
+        .filter((panel) => panel.id !== EXPLORER_PANEL)
+        .map((panel) => (panel.id === QUEUE_PANEL ? { ...panel, open: true } : panel)),
+    };
+
+    const layout = withPanelOpen(layoutFrom(beforeTheExplorer), EXPLORER_PANEL, true);
+
+    expect(panelOf(layoutFrom(beforeTheExplorer), EXPLORER_PANEL)?.open).toBe(false);
+    expect(openPanelsOf(layout, 'left').map((panel) => panel.id)).toEqual([
+      EXPLORER_PANEL,
+      QUEUE_PANEL,
+    ]);
+  });
+
   it('takes the element name from this build and never from the file', () => {
     // A saved layout naming an element that no longer exists would be a dock creating an
     // unknown tag and a panel that silently renders nothing. `element` is code.
@@ -316,11 +334,13 @@ describe('hiding a whole area (TYTO-248, ADR 0076)', () => {
   });
 
   it('opens the first panel of an empty area rather than lighting up nothing', () => {
-    // The left area is empty by default: the queue lives there, closed.
+    // The left area is empty by default: the explorer and the queue live there, closed. The
+    // explorer is first since TYTO-279, so it is the one that opens.
     const shown = withDockToggled(DEFAULT_LAYOUT, 'left');
 
     expect(dockIsShown(shown, 'left')).toBe(true);
-    expect(panelOf(shown, QUEUE_PANEL)?.open).toBe(true);
+    expect(panelOf(shown, EXPLORER_PANEL)?.open).toBe(true);
+    expect(panelOf(shown, QUEUE_PANEL)?.open).toBe(false);
   });
 
   it('does nothing for an area no panel lives in', () => {

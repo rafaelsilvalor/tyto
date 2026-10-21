@@ -23,6 +23,7 @@ import {
 const COMMANDS = {
   commandBar: 'commandBar.toggle',
   problems: 'layout.togglePanel:problems',
+  explorer: 'layout.togglePanel:explorer',
   queue: 'layout.togglePanel:queue',
   plugins: 'plugins.show',
   export: 'file.export',
@@ -38,7 +39,14 @@ const base: StatusBarState = {
   problems: 3,
   errors: 1,
   newProblems: false,
-  shown: { left: false, right: true, bottom: true, problems: true, queue: false },
+  shown: {
+    left: false,
+    right: true,
+    bottom: true,
+    problems: true,
+    explorer: false,
+    queue: false,
+  },
 };
 
 const mount = async (state: StatusBarState = base): Promise<{ bar: StatusBar; ran: string[] }> => {
@@ -72,6 +80,7 @@ describe('the status bar', () => {
       toggleDockCommandId('left'),
       COMMANDS.commandBar,
       COMMANDS.problems,
+      COMMANDS.explorer,
       COMMANDS.queue,
       COMMANDS.plugins,
       COMMANDS.export,
@@ -241,6 +250,7 @@ describe('the statusBarItems setting (TYTO-301, ADR 0091)', () => {
         'tabKind',
         'template',
         'problems',
+        'explorer',
         'queue',
         'plugins',
         'export',
@@ -249,6 +259,14 @@ describe('the statusBarItems setting (TYTO-301, ADR 0091)', () => {
         'rightArea',
       ],
     });
+  });
+
+  it('lights the explorer button while its panel is on screen (TYTO-279)', async () => {
+    const { bar } = await mount({ ...base, shown: { ...base.shown, explorer: true } });
+    const button = bar.querySelector<HTMLButtonElement>('button[data-item="explorer"]');
+
+    expect(button?.getAttribute('aria-label')).toBe('Show or hide: Explorer');
+    expect(button?.classList.contains('status-bar__button--on')).toBe(true);
   });
 
   it('leaves out an item the list does not name', async () => {

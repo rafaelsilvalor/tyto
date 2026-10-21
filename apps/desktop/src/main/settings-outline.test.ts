@@ -103,7 +103,7 @@ describe("the app's settings outline", () => {
   });
 
   it("offers the status bar's ids as entries and its colour keys as members", () => {
-    expect(setting('statusBarItems')?.entries?.options).toHaveLength(13);
+    expect(setting('statusBarItems')?.entries?.options).toHaveLength(14);
     expect(setting('statusBarColors')?.members?.options.map((option) => option.value)).toContain(
       'vimMode.insert',
     );

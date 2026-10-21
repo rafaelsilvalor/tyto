@@ -144,9 +144,13 @@
       "why": "reviewed: opening a document, which nearly every file does"
     },
     {
-      "paths": ["apps/desktop/src/main/explorer.ts"],
-      "e2e": ["window.desktop.test.ts", "workspace.desktop.test.ts"],
-      "why": "reviewed: the explorer's listing and watcher (TYTO-279), set by every workspace folder opened; its channels are in the bridge's list"
+      "paths": [
+        "apps/desktop/src/main/explorer.ts",
+        "apps/desktop/src/renderer/explorer-panel.ts",
+        "apps/desktop/src/renderer/explorer-tree.ts"
+      ],
+      "e2e": ["explorer.desktop.test.ts", "window.desktop.test.ts", "workspace.desktop.test.ts"],
+      "why": "reviewed: the explorer's listing, watcher and panel (TYTO-279), set by every workspace folder opened; its channels are in the bridge's list"
     },
     {
       "paths": ["apps/desktop/src/main/export.ts"],
