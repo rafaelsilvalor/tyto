@@ -50,6 +50,12 @@ export interface RenderCommandOptions {
    */
   readonly templatesNamed?: boolean;
   readonly formatsFile: string;
+  /**
+   * True when `--formats-file` was typed rather than defaulted: a file somebody named and
+   * does not have is `E_FORMATS_READ`, while the default one not being there falls back to
+   * the built-in pack's formats, as the window does (TYTO-336).
+   */
+  readonly formatsNamed?: boolean;
   readonly assets?: string;
   readonly concurrency?: number;
   readonly json: boolean;
@@ -120,6 +126,7 @@ export async function renderCommand(
     templatesDirectory: resolve(cwd, options.templates),
     formatsFile: resolve(cwd, options.formatsFile),
     templatesDirectoryIsDefault: options.templatesNamed !== true,
+    formatsFileIsDefault: options.formatsNamed !== true,
     ...installedOption(environment, loaded),
   });
   if (!context.ok) {

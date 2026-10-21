@@ -35,7 +35,7 @@ function withProjectOptions(command: Command): Command {
     )
     .option(
       '--formats-file <path>',
-      "the project's formats.yaml, the one place a size is written",
+      "the project's formats.yaml; the built-in sizes when the default is not there",
       DEFAULT_FORMATS_FILE,
     )
     .option('-t, --template <name>', "template to use when the brief's frontmatter names none")
@@ -125,7 +125,11 @@ export function createProgram(environment: CliEnvironment, captured: Captured): 
   withOutputOptions(withProjectOptions(render)).action(async (brief: string) => {
     captured.code = await renderCommand(
       brief,
-      { ...render.opts(), templatesNamed: namedOnTheCommandLine(render, 'templates') },
+      {
+        ...render.opts(),
+        templatesNamed: namedOnTheCommandLine(render, 'templates'),
+        formatsNamed: namedOnTheCommandLine(render, 'formatsFile'),
+      },
       environment,
     );
   });
@@ -146,7 +150,11 @@ export function createProgram(environment: CliEnvironment, captured: Captured): 
   withOutputOptions(withProjectOptions(watch)).action(async (folder: string) => {
     captured.code = await watchCommand(
       folder,
-      { ...watch.opts(), templatesNamed: namedOnTheCommandLine(watch, 'templates') },
+      {
+        ...watch.opts(),
+        templatesNamed: namedOnTheCommandLine(watch, 'templates'),
+        formatsNamed: namedOnTheCommandLine(watch, 'formatsFile'),
+      },
       environment,
     );
   });

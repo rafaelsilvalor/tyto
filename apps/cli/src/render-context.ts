@@ -69,6 +69,16 @@ export interface RenderContextOptions {
    */
   readonly templatesDirectoryIsDefault?: boolean;
   /**
+   * True when `formatsFile` is the default rather than a file somebody named.
+   *
+   * The same question as `templatesDirectoryIsDefault`, with the window's answer: a default
+   * `formats.yaml` that is not there falls back to the built-in pack's, silently, as the
+   * window does when a chosen folder brings none (`apps/desktop/src/main/project.ts`). A
+   * file somebody typed and does not have is still `E_FORMATS_READ`, and a file that is
+   * there and wrong still fails whichever way it was reached (TYTO-336).
+   */
+  readonly formatsFileIsDefault?: boolean;
+  /**
    * Installed plugins, whose template packs are searched after the built-in one (ADR 0046).
    *
    * `folderOf` is where install copied a plugin, which is what a pack's `directory` is
@@ -108,8 +118,9 @@ export async function loadRenderContext(
   options: RenderContextOptions,
 ): Promise<Result<RenderContext, Diagnostics>> {
   const fileSystem = nodeFileSystem();
+  const packDirectory = options.builtInTemplatesDirectory ?? builtInTemplatesDirectory();
 
-  const formats = await loadFormats(fileSystem, options.formatsFile);
+  const formats = await loadProjectFormats(fileSystem, options, packDirectory);
   if (!formats.ok) return err(formats.error);
 
   // The built-in pack, through the extension point rather than past it (ADR 0007). What
@@ -120,7 +131,6 @@ export async function loadRenderContext(
   // per task because an exporter binds the bytes of the folder it is rendering; a template
   // pack has no such tie, and re-reading its manifests per task would make the second
   // render slower than the first for nothing.
-  const packDirectory = options.builtInTemplatesDirectory ?? builtInTemplatesDirectory();
   const pack = await loadTemplateRegistry(fileSystem, packDirectory);
 
   const host = createPluginHost();
@@ -187,6 +197,29 @@ export async function loadRenderContext(
     },
     problems,
   );
+}
+
+/** The built-in pack's catalogue sits beside its templates, where the window reads it. */
+const BUILT_IN_FORMATS_FILE = 'formats.yaml';
+
+/**
+ * The project's `formats.yaml`, or the built-in pack's when the default one is not there.
+ *
+ * Only a file that **could not be read** falls back, and only when nobody named it: an
+ * absent default is the empty folder a person starts in, while a typed path that is not
+ * there, or a file that is there and does not parse, is a mistake worth reporting. Silent,
+ * like the default `templates/` folder and like the window: the built-in sizes are what a
+ * person who wrote no file expects, so there is nothing to tell them.
+ */
+async function loadProjectFormats(
+  fileSystem: FileSystem,
+  options: RenderContextOptions,
+  packDirectory: string,
+): Promise<Result<FormatCatalogue, Diagnostics>> {
+  const own = await loadFormats(fileSystem, options.formatsFile);
+  if (own.ok || options.formatsFileIsDefault !== true) return own;
+  if (!own.error.every((item) => item.code === 'E_FORMATS_READ')) return own;
+  return loadFormats(fileSystem, fileSystem.join(packDirectory, BUILT_IN_FORMATS_FILE));
 }
 
 export interface TemplateWiring {

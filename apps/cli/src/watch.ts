@@ -45,6 +45,8 @@ export interface WatchCommandOptions {
    */
   readonly templatesNamed?: boolean;
   readonly formatsFile: string;
+  /** True when `--formats-file` was typed rather than defaulted; see `renderCommand`'s. */
+  readonly formatsNamed?: boolean;
   readonly interval?: number;
   readonly concurrency?: number;
   /** Handle whatever is in the inbox right now and return, instead of watching. */
@@ -71,6 +73,7 @@ export async function watchCommand(
     templatesDirectory: resolve(cwd, options.templates),
     formatsFile: resolve(cwd, options.formatsFile),
     templatesDirectoryIsDefault: options.templatesNamed !== true,
+    formatsFileIsDefault: options.formatsNamed !== true,
     ...installedOption(environment, loaded),
   });
   if (!context.ok) {

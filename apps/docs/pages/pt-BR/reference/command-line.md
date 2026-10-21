@@ -30,7 +30,7 @@ tyto render [options] <brief>
 | `--folder` | deliver into &lt;out>/&lt;brief-name>/ — artwork at the top, brief and result.json in editaveis/ |  |
 | `--assets <dir>` | what relative asset paths resolve against (default: assets/ beside the brief, else the brief's folder) |  |
 | `--templates <dir>` | folder holding one subfolder per template | `"templates"` |
-| `--formats-file <path>` | the project's formats.yaml, the one place a size is written | `"formats.yaml"` |
+| `--formats-file <path>` | the project's formats.yaml; the built-in sizes when the default is not there | `"formats.yaml"` |
 | `-t, --template <name>` | template to use when the brief's frontmatter names none |  |
 | `-f, --formats <ids>` | comma-separated format ids; narrows the brief's own list when it has one |  |
 | `--types <kinds>` | comma-separated: png, jpeg, webp, svg, or a kind an installed exporter adds | `["png"]` |
@@ -60,7 +60,7 @@ tyto watch [options] <folder>
 | `--interval <ms>` | milliseconds between sweeps of the inbox (default 1000) |  |
 | `--once` | handle what is in the inbox now and exit, instead of watching |  |
 | `--templates <dir>` | folder holding one subfolder per template | `"templates"` |
-| `--formats-file <path>` | the project's formats.yaml, the one place a size is written | `"formats.yaml"` |
+| `--formats-file <path>` | the project's formats.yaml; the built-in sizes when the default is not there | `"formats.yaml"` |
 | `-t, --template <name>` | template to use when the brief's frontmatter names none |  |
 | `-f, --formats <ids>` | comma-separated format ids; narrows the brief's own list when it has one |  |
 | `--types <kinds>` | comma-separated: png, jpeg, webp, svg, or a kind an installed exporter adds | `["png"]` |

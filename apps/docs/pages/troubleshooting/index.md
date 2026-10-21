@@ -24,7 +24,7 @@ Almost everything that goes wrong in Tyto is said in the Problems panel — a br
 
 **Something changed after installing a plugin.** Switch it off with `tyto plugin disable <name>` and open the window again. If the trouble goes, the plugin is the cause. See [Plugins](../customize/plugins.md).
 
-**`tyto render` stops with `E_FORMATS_READ`.** The command line needs a `formats.yaml` in the folder you run it from; see [Command line](../command-line/#before-the-first-render-sizes-and-templates).
+**`tyto render` stops with `E_FORMATS_READ`.** The file `--formats-file` names is not there. Check the path, or leave the option out: without it, the `formats.yaml` in the folder you run from is read, and without that, the sizes that come with Tyto; see [Command line](../command-line/#before-the-first-render-sizes-and-templates).
 
 ## The log
 
