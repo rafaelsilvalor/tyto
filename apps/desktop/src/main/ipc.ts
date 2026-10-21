@@ -202,6 +202,14 @@ export interface IpcDependencies {
     setFolder: (choose: boolean) => Promise<{ folder: string | null; found: number }>;
   };
   /**
+   * The workspace folder (TYTO-278, ADR 0113), wrapped for `project`'s reason: opening one is a
+   * native dialog, a trust lookup and a read, all the composition root's. Never handed a path.
+   */
+  readonly workspace: {
+    state: () => IpcResponse<'workspace:folder'>;
+    setFolder: (choose: boolean) => Promise<IpcResponse<'workspace:set-folder'>>;
+  };
+  /**
    * Rebuilds the application menu in a language (TYTO-124).
    *
    * A function and not the menu, for the reason every other Electron thing here arrives as
@@ -373,6 +381,7 @@ export function createHandlers(dependencies: IpcDependencies): Handlers {
     plugins,
     preview,
     project,
+    workspace,
     queue,
     session,
     settings,
@@ -415,6 +424,10 @@ export function createHandlers(dependencies: IpcDependencies): Handlers {
     'templates:folder': () => Promise.resolve(project.folder()),
 
     'templates:set-folder': ({ choose }) => project.setFolder(choose),
+
+    'workspace:folder': () => Promise.resolve(workspace.state()),
+
+    'workspace:set-folder': ({ choose }) => workspace.setFolder(choose),
 
     'file:open': ({ documentId }) => documents.open(documentId),
 

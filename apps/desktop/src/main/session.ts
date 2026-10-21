@@ -75,6 +75,15 @@ export interface SessionServiceOptions {
   readonly templateFolder: TemplateFolder;
   /** Reads a template folder as `template:open` does, to restore the mode against the disk. */
   readonly openTemplate: (directory: string) => Promise<OpenedTemplate>;
+  /**
+   * The workspace folder main has open (TYTO-278, ADR 0113): kept like the template mode's
+   * folder, by main, and reopened through the same door File ▸ Open Folder uses, which asks
+   * the trust store again. Absent, no workspace is kept.
+   */
+  readonly workspace?: {
+    current(): string | undefined;
+    reopen(folder: string | undefined): Promise<void>;
+  };
 }
 
 export interface SessionService {
@@ -211,6 +220,7 @@ export function createSessionService(options: SessionServiceOptions): SessionSer
         });
       }
       const keptMode = keptTemplate(template);
+      const workspaceFolder = options.workspace?.current();
       // The groups name the kept tabs by index (TYTO-286); a tab that was not kept — a brief in
       // no file with nothing typed — leaves its groups, and a group left with none goes. A
       // following preview names no tab and stays; a locked one goes with its brief (TYTO-287).
@@ -231,6 +241,7 @@ export function createSessionService(options: SessionServiceOptions): SessionSer
           tabs: kept,
           active: keptActive,
           ...(keptMode === undefined ? {} : { template: keptMode }),
+          ...(workspaceFolder === undefined ? {} : { workspace: { folder: workspaceFolder } }),
           // Always: a session without groups reads as a first launch (TYTO-287, NO_GROUPS).
           groups: keptGroups ?? NO_GROUPS,
         }),
@@ -242,6 +253,9 @@ export function createSessionService(options: SessionServiceOptions): SessionSer
       documents.reset();
       options.templateFolder.set(undefined);
       const stored = await store.read();
+      // Before the tabs, so a brief that comes back inside the folder previews with its places.
+      // A folder that is gone, or no longer a workspace, simply is not open (ADR 0113).
+      await options.workspace?.reopen(stored.workspace?.folder);
       const tabs: RestoredTab[] = [];
       for (const [index, tab] of stored.tabs.entries()) tabs.push(await restore(tab, index));
       const template =

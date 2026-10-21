@@ -79,6 +79,8 @@ describe('the IPC contract', () => {
       'update:act',
       'update:status',
       'window:zoom',
+      'workspace:folder',
+      'workspace:set-folder',
     ]);
     expect(new Set(IPC_CHANNEL_NAMES).size).toBe(IPC_CHANNEL_NAMES.length);
   });
@@ -355,6 +357,8 @@ describe('what the contract does not promise', () => {
       // TYTO-122. "Which folder is searched" has no subject either: there is one setting, and
       // where it points is main's.
       'templates:folder',
+      // TYTO-278. "Which workspace is open" too: one window, one folder, main's.
+      'workspace:folder',
       // TYTO-44, ADR 0039. "This page can hear the question" names nothing: there is one
       // window, and the page saying it is the page it is about.
       'app:exit-listening',

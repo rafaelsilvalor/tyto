@@ -37,9 +37,10 @@ import {
 } from '@tyto/pipeline';
 import type { Rasterizer } from '@tyto/raster';
 
-import { faces, fonts } from './fonts.js';
+import { type FontsInForce, fontsFor } from './fonts.js';
 import { type ProjectSources } from './project.js';
 import { templateSourceOf } from './template-source.js';
+import type { BriefPlaces } from './workspace.js';
 
 /**
  * Brief text in, files on disk out — the export's whole job (E9.4, TYTO-43).
@@ -198,6 +199,11 @@ export interface ExportServiceOptions {
    * costs its own deadline (ADR 0042) to the first export, not to the app's start.
    */
   readonly plugins?: LoadedPlugins | Promise<LoadedPlugins>;
+  /**
+   * The open workspace's asset and font folders for a brief in this folder (TYTO-278,
+   * ADR 0113), asked per run, as `preview.ts` asks per compile.
+   */
+  readonly places?: (briefDirectory: string | undefined) => BriefPlaces;
 }
 
 /** A run in flight, and what the poller reads. */
@@ -226,6 +232,7 @@ function exporterHost(
   resources: ExportResources,
   rasterizer: Rasterizer | undefined,
   plugins: LoadedPlugins,
+  { fonts }: FontsInForce,
 ): { readonly host: InProcessHost; readonly warnings: Diagnostics } {
   const host = createPluginHost();
 
@@ -313,17 +320,23 @@ export async function createExportService(options: ExportServiceOptions): Promis
       return;
     }
 
+    const places = options.places?.(request.briefDirectory) ?? {
+      assets: [],
+      fonts: fontsFor([]),
+    };
+    const { fonts, faces } = places.fonts;
     const images =
       request.briefDirectory === undefined
         ? undefined
         : fileResources({ base: request.briefDirectory });
     // Built before the exporters so they can be bound to the template's own files as well as
     // the brief's (TYTO-176); it fills those as the job loads the template.
-    const wiring = templateSourceOf(fileSystem, templates, codePacks);
+    const wiring = templateSourceOf(fileSystem, templates, codePacks, undefined, fonts);
     const { host, warnings: skipped } = exporterHost(
       layeredExportResources([images, wiring.resources]),
       options.rasterizer,
       await plugins,
+      places.fonts,
     );
     // The kits of the plugins this run activated, one per brand (ADR 0063): the same host
     // the run reports refusals of, so a refused plugin offers no kit either.
@@ -363,7 +376,10 @@ export async function createExportService(options: ExportServiceOptions): Promis
     const assets = recordingAssetResolver(
       request.briefDirectory === undefined
         ? fileAssetResolver({ base: request.directory })
-        : briefAssetResolver({ briefDirectory: request.briefDirectory }),
+        : briefAssetResolver({
+            briefDirectory: request.briefDirectory,
+            projectAssets: places.assets,
+          }),
     );
 
     const job = await runJob(
@@ -535,7 +551,7 @@ export async function createExportService(options: ExportServiceOptions): Promis
 
     async kinds(): Promise<readonly ExportableKind[]> {
       // A host with no folder's bytes bound: what is asked is only which kinds exist.
-      const { host } = exporterHost({}, options.rasterizer, await plugins);
+      const { host } = exporterHost({}, options.rasterizer, await plugins, fontsFor([]));
       return host.registry.exporters
         .list()
         .flatMap((exporter) =>

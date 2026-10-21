@@ -6,7 +6,12 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
 import { createDocumentService } from './documents.js';
 import { type RecentFiles } from './recent-files.js';
-import { createSessionService, createTemplateFolder, savedHashOf } from './session.js';
+import {
+  type SessionServiceOptions,
+  createSessionService,
+  createTemplateFolder,
+  savedHashOf,
+} from './session.js';
 import {
   EMPTY_SESSION,
   NO_GROUPS,
@@ -181,6 +186,7 @@ const SNIPPETS = '/data/snippets.json';
 const setup = (
   files: Record<string, string>,
   endSettingsTab: (documentId: string) => Promise<boolean> = () => Promise.resolve(false),
+  workspace?: SessionServiceOptions['workspace'],
 ) => {
   const disk = memoryDisk(files);
   const documents = createDocumentService({
@@ -201,6 +207,7 @@ const setup = (
     endSettingsTab,
     templateFolder,
     openTemplate: (directory) => openTemplate(files, directory),
+    ...(workspace === undefined ? {} : { workspace }),
   });
   return { documents, store, session, templateFolder };
 };
@@ -846,5 +853,48 @@ describe('the previews in the session (TYTO-287, ADR 0084)', () => {
     const before = await session.read();
     expect(before).toMatchObject({ firstLaunch: true, groups: null });
     expect(before.tabs).toHaveLength(1);
+  });
+});
+
+describe('the workspace folder in the session (TYTO-278, ADR 0113)', () => {
+  const workspaceHolder = (folder?: string) => {
+    let open = folder;
+    const reopened: (string | undefined)[] = [];
+    return {
+      reopened,
+      current: () => open,
+      reopen: (next: string | undefined) => {
+        reopened.push(next);
+        open = next;
+        return Promise.resolve();
+      },
+    };
+  };
+
+  it('keeps the folder main has open, and nothing when none is', async () => {
+    const holder = workspaceHolder('/work/promo');
+    const { store, session } = setup({}, undefined, holder);
+    await session.write({ tabs: [], active: 0, template: null, final: false });
+    expect(store.saved()).toMatchObject({ workspace: { folder: '/work/promo' } });
+
+    await holder.reopen(undefined);
+    await session.write({ tabs: [], active: 0, template: null, final: false });
+    expect(store.saved()).not.toHaveProperty('workspace');
+  });
+
+  it('reopens the kept folder through main before the tabs come back', async () => {
+    const holder = workspaceHolder('/work/promo');
+    const { session } = setup({}, undefined, holder);
+    await session.write({ tabs: [], active: 0, template: null, final: false });
+
+    const next = workspaceHolder();
+    const { store, session: later } = setup({}, undefined, next);
+    await store.write({ version: 1, tabs: [], active: 0, workspace: { folder: '/work/promo' } });
+    await later.read();
+    expect(next.reopened).toEqual(['/work/promo']);
+    // A session that kept none closes whatever the last page had open.
+    await store.write({ version: 1, tabs: [], active: 0 });
+    await later.read();
+    expect(next.reopened).toEqual(['/work/promo', undefined]);
   });
 });

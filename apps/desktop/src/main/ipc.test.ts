@@ -100,6 +100,28 @@ const projectFolder = () => {
   };
 };
 
+/** The workspace folder, as main would answer it, recording each question (TYTO-278). */
+const workspaceFolder = () => {
+  const asked: unknown[] = [];
+  let folder: string | null = null;
+  const state = () => ({
+    folder,
+    name: folder === null ? null : 'promo',
+    trusted: false,
+    output: folder === null ? null : '/work/promo/exports',
+    problems: [],
+  });
+  return {
+    asked,
+    state,
+    setFolder: (choose: boolean) => {
+      asked.push(choose);
+      folder = choose ? '/work/promo' : null;
+      return Promise.resolve(state());
+    },
+  };
+};
+
 /**
  * A document service with one file in it and no disk under it (E9.8).
  *
@@ -558,6 +580,7 @@ const dependencies = () => {
     },
     preview: preview(),
     project: projectFolder(),
+    workspace: workspaceFolder(),
     queue: queueDependency(),
     settings: {
       open: () => Promise.resolve({ document: null, documentId: null }),
@@ -1186,6 +1209,34 @@ describe('the template folder channels', () => {
     // The point: a missing `choose` must not reach a handler that would read it as falsy and
     // silently clear somebody's folder.
     expect(project.asked).toEqual([]);
+  });
+});
+
+describe('the workspace folder channels (TYTO-278)', () => {
+  it('opens through main and answers what is open, and closes', async () => {
+    const workspace = workspaceFolder();
+    const handlers = createHandlers({ ...dependencies(), workspace });
+
+    expect((await handlers['workspace:folder']({})).folder).toBeNull();
+    const opened = await handlers['workspace:set-folder']({ choose: true });
+    expect(opened).toMatchObject({ folder: '/work/promo', output: '/work/promo/exports' });
+    expect(await handlers['workspace:folder']({})).toEqual(opened);
+    expect((await handlers['workspace:set-folder']({ choose: false })).folder).toBeNull();
+    expect(workspace.asked).toEqual([true, false]);
+  });
+
+  it('refuses a request that names a folder, so no window can choose one for main', async () => {
+    const workspace = workspaceFolder();
+    const guarded = guard(
+      'workspace:set-folder',
+      createHandlers({ ...dependencies(), workspace })['workspace:set-folder'],
+    );
+
+    await expect(
+      guarded({ choose: true, folder: 'C:/Users/someone/secrets' }),
+    ).rejects.toBeInstanceOf(IpcContractError);
+    await expect(guarded({ choose: true, path: '/etc' })).rejects.toBeInstanceOf(IpcContractError);
+    expect(workspace.asked).toEqual([]);
   });
 });
 

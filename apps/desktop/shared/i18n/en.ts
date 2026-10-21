@@ -29,6 +29,8 @@ export const en: Catalogue = {
   'templates.folder.empty': 'This folder has no templates',
   'command.templates.chooseFolder': 'Choose template folder…',
   'command.templates.clearFolder': 'Back to the built-in templates',
+  'command.workspace.openFolder': 'Open Folder…',
+  'command.workspace.closeFolder': 'Close Folder',
   'command.bar.placeholder': 'Type a command',
   'command.bar.empty': 'No command by that name',
   'command.undo': 'Undo',

@@ -408,6 +408,7 @@ describe('the File submenu', () => {
       'document.new',
       'document.newFromTemplate',
       'editor.open',
+      'workspace.openFolder',
       '—',
       'editor.save',
       'editor.saveAs',
@@ -424,6 +425,7 @@ describe('the File submenu', () => {
       'snippets.open',
       '—',
       'document.close',
+      'workspace.closeFolder',
       '—',
       'quit',
     ]);

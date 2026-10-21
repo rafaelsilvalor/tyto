@@ -2,7 +2,7 @@
 
 # Commands
 
-Everything the window can be told to do, by title as the command bar shows it: 69. Open the bar with **`Ctrl+k` / `⌘k`** and type part of a title. The id is what `keybindings.json` names to put a command on a key.
+Everything the window can be told to do, by title as the command bar shows it: 71. Open the bar with **`Ctrl+k` / `⌘k`** and type part of a title. The id is what `keybindings.json` names to put a command on a key.
 
 The window adds more while it runs, which this list cannot show: a toggle for each panel, including a plugin's, and an entry for each recently opened file.
 
@@ -50,6 +50,8 @@ The window adds more while it runs, which this list cannot show: a toggle for ea
 | Preferences: Color Theme | `theme.pick` |  |  |
 | Choose template folder… | `templates.chooseFolder` |  |  |
 | Back to the built-in templates | `templates.clearFolder` |  |  |
+| Open Folder… | `workspace.openFolder` |  |  |
+| Close Folder | `workspace.closeFolder` |  |  |
 | Edit template… | `template.edit` |  |  |
 | New template… | `template.new` |  |  |
 | Restore the default layout | `layout.restore` |  |  |

@@ -94,6 +94,15 @@ const diagnostic = z.object({
   hint: z.string().optional(),
 });
 
+/** The open workspace folder, as the window may know it (TYTO-278, ADR 0113). */
+const workspaceState = z.object({
+  folder: z.string().nullable(),
+  name: z.string().nullable(),
+  trusted: z.boolean(),
+  output: z.string().nullable(),
+  problems: z.array(diagnostic.omit({ range: true })).max(200),
+});
+
 /** One value a setting may take and what it does, as `settings:outline` sends it (TYTO-304). */
 const settingOption = z.object({
   value: z.union([z.string().max(300), z.number(), z.boolean(), z.null()]),
@@ -609,6 +618,25 @@ export const IPC_CHANNELS = {
       found: z.number().int().nonnegative(),
     }),
   ),
+
+  /**
+   * The workspace folder the window has open (TYTO-278, ADR 0113), asked on load after the
+   * session is restored and after every change.
+   *
+   * The renderer is told the folder to show it, and the output folder to put in the export
+   * dialog. No channel takes either back (ADR 0010, ADR 0086). `problems` are the project
+   * file's diagnostics with the place in the file written into the message, for the problems
+   * panel, whose ranges point into the brief in front.
+   */
+  'workspace:folder': channel(z.object({}), workspaceState),
+
+  /**
+   * Opens a workspace folder with main's picker, or closes the one open, and answers with what
+   * is in force afterwards — `templates:set-folder`'s shape. **Strict**: a request carrying a
+   * path is refused rather than stripped, so no window, however compromised, can name a folder
+   * for main to read (ADR 0113). A dismissed picker answers what was already open.
+   */
+  'workspace:set-folder': channel(z.strictObject({ choose: z.boolean() }), workspaceState),
 
   /**
    * A brief on disk, as the renderer is allowed to know it (E9.8).

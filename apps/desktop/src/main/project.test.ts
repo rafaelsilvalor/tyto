@@ -268,3 +268,15 @@ describe("installed plugins' packs (ADR 0046)", () => {
     expect(snapshot.folder).toEqual({ path: empty, found: 0 });
   });
 });
+
+describe("an open workspace's template folders (TYTO-278, ADR 0113)", () => {
+  it('are searched after the chosen folder and before the built-in pack, until it closes', async () => {
+    const sources = await sourcesOver(mine);
+
+    const opened = await sources.setWorkspaceFolders([empty]);
+    expect(opened.roots).toEqual([mine, empty, builtIn]);
+    // The chosen folder keeps its place when the folders are read again.
+    expect((await sources.reload(mine)).roots).toEqual([mine, empty, builtIn]);
+    expect((await sources.setWorkspaceFolders([])).roots).toEqual([mine, builtIn]);
+  });
+});

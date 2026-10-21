@@ -1,4 +1,5 @@
 import type { FileSystem, TemplateRegistry } from '@tyto/core';
+import type { FontLibrary } from '@tyto/fonts';
 import {
   type ExportResources,
   type InstalledCodePack,
@@ -52,6 +53,8 @@ export function templateSourceOf(
   codePacks: readonly InstalledCodePack[],
   /** The template folder's reader. A seam for the test that a folderless name reads nothing. */
   readTemplateAssets: typeof fileTemplateAssets = fileTemplateAssets,
+  /** The fonts the brief is drawn in, a workspace's when it has some (TYTO-278). */
+  library: FontLibrary = fonts,
 ): TemplateWiring {
   const loaded: ExportResources[] = [];
 
@@ -90,8 +93,8 @@ export function templateSourceOf(
       registry,
       packs: codePacks,
       fonts: {
-        outlines: (face) => fonts.source.outlines(face),
-        fromMachine: (face) => fonts.fromMachine(face),
+        outlines: (face) => library.source.outlines(face),
+        fromMachine: (face) => library.fromMachine(face),
       },
       next: builtIn,
     }),

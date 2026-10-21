@@ -120,11 +120,19 @@ const storedTemplate = z.object({
   drafts: z.object({ manifest: storedDraft.optional(), markup: storedDraft.optional() }),
 });
 
+/**
+ * The workspace folder the window had open (TYTO-278, ADR 0113): its real path, written by main
+ * from what main opened and never from anything the window sent. Optional with the version
+ * still 1, for `template`'s reason; one that does not parse costs the folder alone.
+ */
+const storedWorkspace = z.object({ folder: z.string().min(1) });
+
 const storedSession = z.object({
   version: z.literal(1),
   tabs: z.array(storedTab),
   active: z.number().int().min(0),
   template: storedTemplate.optional(),
+  workspace: storedWorkspace.optional().catch(() => undefined),
   // A tree that does not parse costs the arrangement and nothing else: it reads as no group,
   // and not as a session without groups, which would be a first launch (TYTO-287).
   groups: storedGroups.optional().catch(() => ({ root: { tabs: [], active: 0 }, focused: 0 })),
