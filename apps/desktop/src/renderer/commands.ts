@@ -126,6 +126,12 @@ export const THEME_PICK = 'theme.pick';
 export const TEMPLATES_CHOOSE_FOLDER = 'templates.chooseFolder';
 export const TEMPLATES_CLEAR_FOLDER = 'templates.clearFolder';
 /**
+ * TYTO-278. Opens a workspace folder with main's picker, or closes the one open (ADR 0113).
+ * Two commands, for the template folder's reason; both on the File menu.
+ */
+export const WORKSPACE_OPEN_FOLDER = 'workspace.openFolder';
+export const WORKSPACE_CLOSE_FOLDER = 'workspace.closeFolder';
+/**
  * TYTO-44. The template mode: open a template folder to edit, or scaffold a new one.
  *
  * Two verbs for the File menu's reason — the bar lists what a person can do, and "edit" and
@@ -269,6 +275,8 @@ export const COMMAND_LABELS: Readonly<Record<string, CatalogueKey>> = {
   [THEME_PICK]: 'command.theme.pick',
   [TEMPLATES_CHOOSE_FOLDER]: 'command.templates.chooseFolder',
   [TEMPLATES_CLEAR_FOLDER]: 'command.templates.clearFolder',
+  [WORKSPACE_OPEN_FOLDER]: 'command.workspace.openFolder',
+  [WORKSPACE_CLOSE_FOLDER]: 'command.workspace.closeFolder',
   [TEMPLATE_EDIT]: 'command.template.edit',
   [TEMPLATE_NEW]: 'command.template.new',
   [LAYOUT_RESTORE]: 'command.layout.restore',
@@ -375,6 +383,8 @@ export interface DesktopActions {
    */
   chooseTemplateFolder(): void;
   clearTemplateFolder(): void;
+  openWorkspaceFolder(): void;
+  closeWorkspaceFolder(): void;
   /** TYTO-44. Both open the template mode; what happens in it is a round trip to main. */
   editTemplate(): void;
   newTemplate(): void;
@@ -510,6 +520,14 @@ export function createDesktopRegistry(actions: DesktopActions): CommandRegistry 
 
   add(TEMPLATES_CLEAR_FOLDER, () => {
     actions.clearTemplateFolder();
+  });
+
+  add(WORKSPACE_OPEN_FOLDER, () => {
+    actions.openWorkspaceFolder();
+  });
+
+  add(WORKSPACE_CLOSE_FOLDER, () => {
+    actions.closeWorkspaceFolder();
   });
 
   add(TEMPLATE_EDIT, () => {

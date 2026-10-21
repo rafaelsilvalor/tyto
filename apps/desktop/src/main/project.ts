@@ -79,6 +79,12 @@ export interface ProjectSources {
     readonly warnings: readonly Diagnostic[];
     readonly code?: readonly InstalledCodePack[];
   }): Promise<ProjectSnapshot>;
+  /**
+   * The open workspace's template folders (TYTO-278, ADR 0113), searched after the chosen
+   * folder and before the built-in pack, the order `tyto render` gives them. Empty when no
+   * workspace is open. Reads the folders again with the chosen one kept.
+   */
+  setWorkspaceFolders(folders: readonly string[]): Promise<ProjectSnapshot>;
 }
 
 export interface ProjectSourcesOptions {
@@ -114,9 +120,15 @@ export async function createProjectSources({
   let installed: readonly string[] = [];
   let installedWarnings: readonly Diagnostic[] = [];
   let codePacks: readonly InstalledCodePack[] = [];
+  let workspaceFolders: readonly string[] = [];
 
   const read = async (chosen: string | undefined): Promise<ProjectSnapshot> => {
-    const roots = [...(chosen === undefined ? [] : [chosen]), builtIn, ...installed];
+    const roots = [
+      ...(chosen === undefined ? [] : [chosen]),
+      ...workspaceFolders,
+      builtIn,
+      ...installed,
+    ];
 
     const probe = chosen === undefined ? undefined : await countIn(chosen);
 
@@ -187,6 +199,11 @@ export async function createProjectSources({
       installed = [...packs.directories];
       installedWarnings = [...packs.warnings];
       codePacks = [...(packs.code ?? [])];
+      snapshot = await read(chosenFolder);
+      return snapshot;
+    },
+    setWorkspaceFolders: async (folders) => {
+      workspaceFolders = [...folders];
       snapshot = await read(chosenFolder);
       return snapshot;
     },

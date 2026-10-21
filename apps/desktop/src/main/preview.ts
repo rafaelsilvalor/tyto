@@ -15,9 +15,10 @@ import { fontSubstitutionWarnings } from '@tyto/pipeline';
 import { briefAssetResolver, fileResources, layeredExportResources } from '@tyto/io';
 
 import type { WindowPlugins } from './window-plugins.js';
-import { faces, fonts } from './fonts.js';
+import { fontsFor } from './fonts.js';
 import { type ProjectSources } from './project.js';
 import { templateSourceOf } from './template-source.js';
+import type { BriefPlaces } from './workspace.js';
 
 /**
  * Brief text in, one HTML document per frame out — the preview's whole job (E9.2).
@@ -113,6 +114,12 @@ export interface PreviewServiceOptions {
    * kit. Asked per compile, because the plugins start after the window opens.
    */
   readonly brandKits?: Pick<WindowPlugins, 'brandKits'>;
+  /**
+   * The open workspace's asset and font folders for a brief in this folder (TYTO-278,
+   * ADR 0113), asked per compile. Absent, every brief renders from its own folder and the
+   * machine's fonts, as before there were workspaces.
+   */
+  readonly places?: (briefDirectory: string | undefined) => BriefPlaces;
 }
 
 export interface PreviewService {
@@ -190,10 +197,12 @@ export async function createPreviewService(
       // the service. `confine` stays on, its default: a brief is often written by something
       // else (ADR 0011), and `../../../.ssh/id_rsa` embedded in an exported PNG is a real
       // way to leak a file. An author previewing their own folder is inside it anyway.
+      const places = options.places?.(baseDirectory) ?? { assets: [], fonts: fontsFor([]) };
+      const { fonts, faces } = places.fonts;
       const assets =
         baseDirectory === undefined
           ? noAssets
-          : briefAssetResolver({ briefDirectory: baseDirectory });
+          : briefAssetResolver({ briefDirectory: baseDirectory, projectAssets: places.assets });
 
       const resolved = await resolve(ast.value, {
         registry: templates,
@@ -204,7 +213,7 @@ export async function createPreviewService(
 
       // The same pairing the export path uses: a preview that could not draw a code
       // template would send somebody to the CLI to find out whether their work rendered.
-      const wiring = templateSourceOf(fileSystem, templates, codePacks);
+      const wiring = templateSourceOf(fileSystem, templates, codePacks, undefined, fonts);
       const template = await wiring.source.load(resolved.value.template);
       if (!template.ok) {
         return failed([...ast.diagnostics, ...resolved.diagnostics, ...template.error]);

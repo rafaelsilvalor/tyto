@@ -48,6 +48,8 @@ import {
   PREVIEW_ZOOM_OUT,
   TEMPLATES_CHOOSE_FOLDER,
   TEMPLATES_CLEAR_FOLDER,
+  WORKSPACE_CLOSE_FOLDER,
+  WORKSPACE_OPEN_FOLDER,
   TEMPLATE_EDIT,
   TEMPLATE_NEW,
   SHELL_TOGGLE_LOCALE,
@@ -106,6 +108,8 @@ const actions = () =>
     pickTheme: vi.fn<() => void>(),
     chooseTemplateFolder: vi.fn<() => void>(),
     clearTemplateFolder: vi.fn<() => void>(),
+    openWorkspaceFolder: vi.fn<() => void>(),
+    closeWorkspaceFolder: vi.fn<() => void>(),
     editTemplate: vi.fn<() => void>(),
     newTemplate: vi.fn<() => void>(),
     openPreview: vi.fn<(side: boolean) => void>(),
@@ -233,6 +237,16 @@ describe('the ids the window registers', () => {
     // in and the bar lists a verb (TYTO-122).
     expect(spies.chooseTemplateFolder).toHaveBeenCalledOnce();
     expect(spies.clearTemplateFolder).toHaveBeenCalledOnce();
+  });
+
+  it('runs the two workspace folder commands, each to its own action (TYTO-278)', () => {
+    const spies = actions();
+    const registry = createDesktopRegistry(spies);
+
+    expect(registry.run(WORKSPACE_OPEN_FOLDER, NO_VIEW)).toBe(true);
+    expect(registry.run(WORKSPACE_CLOSE_FOLDER, NO_VIEW)).toBe(true);
+    expect(spies.openWorkspaceFolder).toHaveBeenCalledOnce();
+    expect(spies.closeWorkspaceFolder).toHaveBeenCalledOnce();
   });
 
   it('runs the two template mode commands, each to its own action (TYTO-44)', () => {

@@ -20,6 +20,7 @@ import {
   PLUGINS_DIR,
   fsInbox,
   fsPluginStore,
+  fsTrustStore,
   installedPacks,
   nodeFileSystem,
   withoutRefused,
@@ -88,6 +89,7 @@ import { type WindowPlugins, windowPlugins } from './window-plugins.js';
 import { createPreviewService } from './preview.js';
 import { createProjectSources } from './project.js';
 import { createTemplateEditor } from './template-editor.js';
+import { createWorkspaceService } from './workspace.js';
 import { createExitGuard, mayUnload } from './quit.js';
 import { createLiveTextFile } from './live-text-file.js';
 import { type LiveSettings, createLiveSettings } from './settings-live.js';
@@ -588,6 +590,16 @@ async function start(): Promise<void> {
     ...(saved.templatesFolder === null ? {} : { folder: saved.templatesFolder }),
   });
 
+  // **The workspace folder** (TYTO-278, ADR 0113): its trust answer from the same `TYTO_HOME` the
+  // plugins live in, and its template folders handed to the same `sources` the folder above is.
+  const workspace = createWorkspaceService({
+    trustStore: fsTrustStore({ home: pluginsHome }),
+    home: pluginsHome,
+    setTemplateFolders: async (folders) => {
+      await sources.setWorkspaceFolders(folders);
+    },
+  });
+
   aboutFacts = () => ({
     version: app.getVersion(),
     platform: process.platform,
@@ -722,6 +734,7 @@ async function start(): Promise<void> {
     sources,
     directives: contributed,
     brandKits: contributed,
+    places: (directory) => workspace.placesFor(directory),
   });
 
   // The template mode (TYTO-44). The same `sources` as the preview, so a save that reads the
@@ -738,6 +751,7 @@ async function start(): Promise<void> {
     log,
     sources,
     plugins: checked,
+    places: (directory) => workspace.placesFor(directory),
     version: app.getVersion(),
     ...(host.registry.rasterizers<Rasterizer>()[0]?.value === undefined
       ? {}
@@ -850,6 +864,13 @@ async function start(): Promise<void> {
     endSettingsTab: (documentId) => liveSettings.closed(documentId),
     templateFolder,
     openTemplate: (directory) => templateEditor.open(directory),
+    workspace: {
+      current: () => workspace.state().folder ?? undefined,
+      reopen: async (folder) => {
+        if (folder === undefined) await workspace.close();
+        else await workspace.open(folder);
+      },
+    },
   });
   // **Live keybindings** (TYTO-207) and **live snippets** (TYTO-277): main only watches; the
   // window parses them, against its command registry and its templates.
@@ -1040,8 +1061,11 @@ async function start(): Promise<void> {
     // handlers take functions — the same arrangement the brief dialogs above already have.
     folders: {
       choose: async () => {
+        // Opened at the workspace's output folder when it declares one (ADR 0113).
+        const output = workspace.state().output;
         const answer = await dialog.showOpenDialog({
           properties: ['openDirectory', 'createDirectory'],
+          ...(output === null ? {} : { defaultPath: output }),
         });
         return answer.canceled ? undefined : answer.filePaths[0];
       },
@@ -1117,6 +1141,20 @@ async function start(): Promise<void> {
         // A refused write leaves the folder in force as it was (TYTO-206).
         if (await remember({ templatesFolder: chosen ?? null })) await sources.reload(chosen);
         return inForce();
+      },
+    },
+    workspace: {
+      state: () => workspace.state(),
+      setFolder: async (choose) => {
+        if (!choose) {
+          await workspace.close();
+          return workspace.state();
+        }
+        // Main's picker, never a path from the window (ADR 0113). Dismissed, nothing changes.
+        const answer = await dialog.showOpenDialog({ properties: ['openDirectory'] });
+        const chosen = answer.canceled ? undefined : answer.filePaths[0];
+        if (chosen !== undefined) await workspace.open(chosen);
+        return workspace.state();
       },
     },
     queue: {

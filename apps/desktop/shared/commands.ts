@@ -42,6 +42,8 @@ export const FILE_MENU_GROUPS: readonly (readonly MenuCommand[])[] = [
     // TYTO-275. Beside New: the same verb, with a template's skeleton in the tab.
     { id: 'document.newFromTemplate', label: 'command.document.newFromTemplate' },
     { id: 'editor.open', label: 'command.file.open' },
+    // TYTO-278. Beside Open: a folder is opened the way a file is (ADR 0113).
+    { id: 'workspace.openFolder', label: 'command.workspace.openFolder' },
   ],
   [
     // `editor.save` is `@tyto/editor`'s own id, not this app's: the editor ships the binding
@@ -70,7 +72,11 @@ export const FILE_MENU_GROUPS: readonly (readonly MenuCommand[])[] = [
     // TYTO-277. `snippets.json` after it, the third of the person's files.
     { id: 'snippets.open', label: 'command.snippets.open' },
   ],
-  [{ id: 'document.close', label: 'command.document.close' }],
+  [
+    { id: 'document.close', label: 'command.document.close' },
+    // TYTO-278. Beside Close, the other verb that puts something away.
+    { id: 'workspace.closeFolder', label: 'command.workspace.closeFolder' },
+  ],
 ];
 
 /**

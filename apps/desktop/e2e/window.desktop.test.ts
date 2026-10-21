@@ -349,6 +349,10 @@ describe('the bridge', () => {
       // TYTO-272: View > Zoom and its keys, which write the `zoom` setting. Exercised by
       // `e2e/typography.desktop.test.ts`.
       'window:zoom',
+      // TYTO-278, ADR 0113: the workspace folder, opened only by main's picker. Exercised by
+      // `e2e/workspace.desktop.test.ts`.
+      'workspace:folder',
+      'workspace:set-folder',
     ]);
   });
 });
@@ -421,6 +425,9 @@ describe('switching the language', () => {
     'templates.folder.empty',
     'command.templates.chooseFolder',
     'command.templates.clearFolder',
+    // TYTO-278: the workspace folder's commands, File menu and command bar only.
+    'command.workspace.openFolder',
+    'command.workspace.closeFolder',
     // E9.12: the command bar renders its own strings and renders nothing at all while it is
     // closed, which is most of the time — so none of these is in the document on load, and
     // the two that are only reachable *inside* the bar never will be by this route. The

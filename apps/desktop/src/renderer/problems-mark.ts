@@ -1,6 +1,7 @@
 import type { Diagnostic } from './panel.js';
 import { SAVE_FAILED } from './save-failure.js';
 import { THEME_CODES } from './theme.js';
+import { WORKSPACE_CODES } from './workspace-folder.js';
 import { FONT_FAMILY_MISSING } from './typography.js';
 
 /**
@@ -67,7 +68,9 @@ export const carriedAcrossTemplateRead = (
       item.code === SESSION_DRAFT_STALE ||
       // A face the machine lacks (TYTO-272) is the theme answer's, like a theme's own rows.
       item.code === FONT_FAMILY_MISSING ||
-      THEME_CODES.has(item.code),
+      THEME_CODES.has(item.code) ||
+      // The open folder's rows (TYTO-278) are the workspace answer's, like a theme's.
+      WORKSPACE_CODES.has(item.code),
   );
 
 /**

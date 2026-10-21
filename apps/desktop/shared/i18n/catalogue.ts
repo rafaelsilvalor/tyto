@@ -79,6 +79,8 @@ export interface Catalogue {
   readonly 'templates.folder.empty': string;
   readonly 'command.templates.chooseFolder': string;
   readonly 'command.templates.clearFolder': string;
+  readonly 'command.workspace.openFolder': string;
+  readonly 'command.workspace.closeFolder': string;
   /**
    * The command bar (E9.12), and the labels of everything it lists.
    *
@@ -619,6 +621,8 @@ export const CATALOGUE_KEYS = [
   'templates.folder.empty',
   'command.templates.chooseFolder',
   'command.templates.clearFolder',
+  'command.workspace.openFolder',
+  'command.workspace.closeFolder',
   'command.bar.placeholder',
   'command.bar.empty',
   'command.undo',

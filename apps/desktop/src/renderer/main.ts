@@ -57,6 +57,7 @@ import {
 } from '../../shared/i18n/index.js';
 import { followScheme } from './color-scheme.js';
 import { applyTheme, withThemeRows } from './theme.js';
+import { exportDestination, withWorkspaceRows } from './workspace-folder.js';
 import { canvasMeasure, missingFamilyRows, withFontRows } from './typography.js';
 import { DEFAULT_TYPOGRAPHY, type Typography } from '../../shared/typography.js';
 import { offeredFormats, templateOf } from './frontmatter.js';
@@ -309,6 +310,10 @@ const state = {
   /** The folder searched before the built-in pack, and how many it brought (TYTO-122). */
   templatesFolder: null as string | null,
   templatesFound: 0,
+  /** The open workspace folder's output folder, the export dialog's default (TYTO-278). */
+  workspaceOutput: null as string | null,
+  /** Its name, for the titles (TYTO-278). */
+  workspaceName: null as string | null,
 };
 
 /**
@@ -780,7 +785,7 @@ function paintExport(progress: ExportProgressView | undefined): void {
   const dialog = elements.exportDialog;
   if (dialog === null || dialog === undefined) return;
   dialog.locale = state.locale;
-  dialog.directory = exportDirectory;
+  dialog.directory = exportDestination(exportDirectory, state.workspaceOutput);
   dialog.progress = progress;
 }
 
@@ -1090,6 +1095,12 @@ const registry: CommandRegistry = withCommandGate(
     },
     clearTemplateFolder: () => {
       void setTemplateFolder(false);
+    },
+    openWorkspaceFolder: () => {
+      void setWorkspaceFolder(true);
+    },
+    closeWorkspaceFolder: () => {
+      void setWorkspaceFolder(false);
     },
     openExport: () => {
       openExportDialog();
@@ -2587,6 +2598,25 @@ async function setTemplateFolder(choose: boolean): Promise<void> {
 }
 
 /**
+ * Opens a workspace folder, or closes it (TYTO-278, ADR 0113). Main shows the picker and reads
+ * the folder; the window paints the answer and asks again for what the folder changed: the
+ * templates, and every open brief's preview, whose assets and fonts may now come from it.
+ */
+async function setWorkspaceFolder(choose: boolean): Promise<void> {
+  await withBridge(async (bridge) => {
+    showWorkspace(await bridge['workspace:set-folder']({ choose }));
+    await afterTemplatesReread(bridge);
+  });
+}
+
+/** Paints a workspace answer: its rows in the problems panel and its output folder. */
+function showWorkspace(answer: IpcResponse<'workspace:folder'>): void {
+  state.workspaceOutput = answer.output;
+  state.workspaceName = answer.name;
+  panel.installation = withWorkspaceRows(panel.installation, answer.problems);
+}
+
+/**
  * Closing a tab, which is the one thing in this window that asks before it acts.
  *
  * The question is main's dialog and not the renderer's `confirm()`: the buttons have to be
@@ -3621,7 +3651,11 @@ function applyLocale(next: Locale): void {
 function shellState(): ShellState {
   const current = active();
   // The title is the active tab, which is the whole of point 5 of E9.11's card.
-  return { ...state, document: { name: current.name, dirty: isUnsaved(current) } };
+  return {
+    ...state,
+    document: { name: current.name, dirty: isUnsaved(current) },
+    workspaceName: state.workspaceName,
+  };
 }
 
 function repaint(): void {
@@ -4494,6 +4528,10 @@ async function load(): Promise<void> {
       void request(bridge, active().id, activeText());
       // The tabs the last session left (TYTO-113), now that there is an editor to build them.
       await restoreSession(bridge, handle);
+      // The session reopened the workspace folder it kept, if any (TYTO-278): its rows, and the
+      // templates and previews it changes.
+      showWorkspace(await bridge['workspace:folder']({}));
+      await afterTemplatesReread(bridge);
     }
   }
 

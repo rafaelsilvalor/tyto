@@ -36,6 +36,11 @@ export interface ShellState {
   readonly locale: Locale;
   /** What is open and whether it has been touched since it was last written (E9.8). */
   readonly document: DocumentState;
+  /**
+   * The open workspace folder's name (TYTO-278), between the file and the app in both titles:
+   * `promo.brief — campanha — Tyto`. Absent or `null`, the titles are what they always were.
+   */
+  readonly workspaceName?: string | null;
 }
 
 export interface DocumentState {
@@ -64,7 +69,9 @@ export function windowTitle(state: ShellState): string {
   const app = translate(state.locale, 'app.name');
   const name = state.document.name ?? translate(state.locale, 'document.untitled');
   const mark = state.document.dirty ? ` (${translate(state.locale, 'document.unsaved')})` : '';
-  return `${name}${mark} — ${app}`;
+  const workspace = state.workspaceName ?? null;
+  const folder = workspace === null ? '' : ` — ${workspace}`;
+  return `${name}${mark}${folder} — ${app}`;
 }
 
 /**
@@ -75,8 +82,16 @@ export function windowTitle(state: ShellState): string {
  * unsaved marker: the tab carries the dot, and a second one a few pixels above it would be the
  * same fact twice. The file's name is never translated.
  */
-export function titleBarText(locale: Locale, name: string | undefined): string {
+export function titleBarText(
+  locale: Locale,
+  name: string | undefined,
+  workspaceName?: string | null,
+): string {
   const app = translate(locale, 'app.name');
+  // With a workspace open, Rafael's order (TYTO-278): the file, the folder, then the app.
+  if (workspaceName !== undefined && workspaceName !== null) {
+    return name === undefined ? `${workspaceName} — ${app}` : `${name} — ${workspaceName} — ${app}`;
+  }
   return name === undefined ? app : `${app} — ${name}`;
 }
 
@@ -97,7 +112,9 @@ export function paintTitle(root: ParentNode, state: ShellState): void {
   if (title !== null) title.textContent = windowTitle(state);
   // The drawn bar follows the same tab, on the same calls: a switch, a save, a rename.
   const bar = root.querySelector(TITLE_BAR_TITLE);
-  if (bar !== null) bar.textContent = titleBarText(state.locale, state.document.name);
+  if (bar !== null) {
+    bar.textContent = titleBarText(state.locale, state.document.name, state.workspaceName);
+  }
 }
 
 /**
