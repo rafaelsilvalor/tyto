@@ -31,6 +31,4 @@ Scale changes the pixels, not the design. SVG files are not affected by it.
 
 If something stops a file from being made, the dialog lists the reason under the progress bar and the Problems panel shows it too. One you may meet:
 
-- `E_EXPORT_FONT_UNRESOLVED` naming an _italic_ font: text in `*italic*` cannot be exported with the fonts that come with Tyto, and no file is written for that artwork. Take the italic out of the brief to export it.
-
-<!-- TYTO-329: italic fails at export. Measured on e3d32e9 with `::titulo Open day at the *library*`: no file written. -->
+- `E_EXPORT_FONT_UNRESOLVED` naming a font: the template's typeface has no such face — italic in a typeface without one, for example — and no file is written for that artwork. The Problems panel already showed it as `E_FONT_FACE_UNAVAILABLE` on the words that ask for it. Take that formatting out of the brief, or use a template whose typeface has the face.

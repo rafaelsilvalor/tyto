@@ -11,6 +11,7 @@ O exemplo é para o `notice`, o template do próprio manual. Copie [a pasta dele
 | Você escreve                       | Você obtém                                           |
 | ---------------------------------- | ---------------------------------------------------- |
 | `**free**`                         | **negrito**                                          |
+| `*children*`                       | _itálico_                                            |
 | uma linha nova num bloco com recuo | uma linha nova na arte                               |
 | `{cor:laranja}this Saturday{/}`    | as palavras na cor que o template chama de `laranja` |
 
@@ -28,9 +29,11 @@ No texto escrito na própria linha da diretiva, uma `\` quebra a linha ali: `::t
 
 `{cor:nome}` começa uma cor e `{/}` termina. Os nomes são do template — o `notice` tem `laranja` e `amarelo` — e um nome que o template não conhece deixa as palavras na cor de sempre, sem aviso.
 
-## Itálico, e por que os exemplos não usam
+## Itálico
 
-Um asterisco de cada lado, `*assim*`, é itálico. As fontes que vêm com o Tyto não têm itálico, então com um template que usa essas fontes — o `notice` e os templates internos entre eles — a exportação para com `E_EXPORT_FONT_UNRESOLVED`. Use itálico só com um template cuja fonte tenha itálico.
+Um asterisco de cada lado, `*assim*`, é itálico. Itálico dentro do negrito, `**uma aula *grátis* hoje**`, é negrito itálico. A fonte que vem com o Tyto tem os dois, então o `notice` e os templates internos desenham ambos.
+
+Um template cuja fonte não tem itálico não consegue exportá-lo. O Tyto avisa enquanto você escreve, com `E_FONT_FACE_UNAVAILABLE` nas palavras em itálico no painel de Problemas; a prévia continua desenhando, mas nenhum arquivo é gravado para aquela arte até o itálico sair ou o template mudar.
 
 ## Onde a formatação é lida
 

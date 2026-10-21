@@ -51,9 +51,9 @@ interface Bundled extends BundledFontFace {
  * a file into the tree enough to change what every render embeds, and which faces exist is
  * a decision with a licence attached to it (`README.md` beside this folder).
  *
- * Italic is absent on purpose — `raster`'s visual suite asks for one in order to watch the
- * resolver answer `undefined` and the exporter report `E_EXPORT_FONT_UNRESOLVED`, which is
- * the behaviour a missing face is supposed to have.
+ * Italic ships since TYTO-329 (ADR 0110): `*text*` is ordinary brief syntax, and a face the
+ * table cannot answer used to surface only at export, as `E_EXPORT_FONT_UNRESOLVED`. The
+ * visual suite still watches a missing face fail, with a weight nothing ships instead.
  */
 const BUNDLED: readonly Bundled[] = [
   {
@@ -71,6 +71,22 @@ const BUNDLED: readonly Bundled[] = [
     folder: 'source-sans-3',
     outlines: 'SourceSans3-Bold.ttf',
     web: 'SourceSans3-Bold.ttf.woff2',
+  },
+  {
+    family: 'Source Sans 3',
+    weight: 400,
+    style: 'italic',
+    folder: 'source-sans-3',
+    outlines: 'SourceSans3-It.ttf',
+    web: 'SourceSans3-It.ttf.woff2',
+  },
+  {
+    family: 'Source Sans 3',
+    weight: 700,
+    style: 'italic',
+    folder: 'source-sans-3',
+    outlines: 'SourceSans3-BoldIt.ttf',
+    web: 'SourceSans3-BoldIt.ttf.woff2',
   },
 ];
 
@@ -160,7 +176,7 @@ const uris = new Map<string, string>();
  * report nothing.
  *
  * Read once and kept. `HtmlResources.font` and `SvgResources.font` are called from inside a
- * scene walk and cannot await, so every face is read with `readFileSync`; two faces at about
+ * scene walk and cannot await, so every face is read with `readFileSync`; four faces at about
  * a hundred kilobytes each is a rounding error next to launching Chromium, and a synchronous
  * read is the only shape the port accepts.
  */

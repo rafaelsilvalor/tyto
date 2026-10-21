@@ -14,9 +14,7 @@ Quase tudo o que dá errado no Tyto aparece no painel de Problemas — num brief
 
 **A prévia parou de mudar.** O brief tem um erro: a prévia mantém o último desenho que funcionou até ele ser corrigido. O painel de Problemas diz o que e onde.
 
-**A exportação terminou mas não gravou arquivo.** Leia as linhas embaixo da barra de progresso. `E_EXPORT_FONT_UNRESOLVED` citando uma fonte _italic_ quer dizer que o brief tem texto em `*itálico*`, que ainda não exporta; tire o itálico. Veja [Imagens](../export/images.md#quando-uma-imagem-nao-e-gravada).
-
-<!-- TYTO-329: itálico falha na exportação. -->
+**A exportação terminou mas não gravou arquivo.** Leia as linhas embaixo da barra de progresso. `E_EXPORT_FONT_UNRESOLVED` citando uma fonte quer dizer que a fonte do template não tem uma variação que o brief pede, como o itálico; o painel de Problemas mostra o mesmo como `E_FONT_FACE_UNAVAILABLE` nessas palavras. Veja [Imagens](../export/images.md#quando-uma-imagem-nao-e-gravada).
 
 **Uma configuração não faz nada.** Procure `W_SETTING_INVALID` (o valor não é um que a configuração aceita, então vale o padrão) ou `E_SETTINGS_SYNTAX` (o arquivo não pode ser lido, então a janela mantém as configurações que tinha). [settings.json](../customize/settings-json.md#quando-um-valor-esta-errado) explica os dois. E lembre de salvar: nada vale antes.
 

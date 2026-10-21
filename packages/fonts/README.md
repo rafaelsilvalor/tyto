@@ -33,10 +33,10 @@ without knowing what a fixture is.
 
 ## What is here
 
-| Family        | Version              | Faces                 | Licence | Read by                 |
-| ------------- | -------------------- | --------------------- | ------- | ----------------------- |
-| Source Sans 3 | 3.052R               | Regular 400, Bold 700 | OFL 1.1 | renders and the window  |
-| IBM Plex Mono | @ibm/plex-mono@2.5.0 | Regular 400, Bold 700 | OFL 1.1 | the desktop editor only |
+| Family        | Version              | Faces                                              | Licence | Read by                 |
+| ------------- | -------------------- | -------------------------------------------------- | ------- | ----------------------- |
+| Source Sans 3 | 3.052R               | Regular 400, Bold 700, Italic 400, Bold Italic 700 | OFL 1.1 | renders and the window  |
+| IBM Plex Mono | @ibm/plex-mono@2.5.0 | Regular 400, Bold 700                              | OFL 1.1 | the desktop editor only |
 
 **IBM Plex Mono is the window's, not a render's** (TYTO-269, ADR 0075). The desktop renderer
 reads its two `.woff2` files through the `@tyto-fonts` alias, as it does Source Sans 3's, so the
@@ -49,11 +49,14 @@ is a Reserved Font Name under the OFL; the files are shipped unmodified and unde
 name. There is no italic face — the editor's italic comments are the Regular face slanted by
 the browser.
 
-Two faces rather than one because the exporters key a `@font-face` on family **and**
+Two weights rather than one because the exporters key a `@font-face` on family **and**
 weight, and a corpus with a single weight cannot tell a resolver that ignores the weight
-from one that honours it. Italic is deliberately absent: it is the face the suite asks for
-in order to watch the resolver answer `undefined` and the exporter report
-`E_EXPORT_FONT_UNRESOLVED`, which is the behaviour a missing face is supposed to have.
+from one that honours it. **Italic ships since TYTO-329** (ADR 0110): `*text*` is ordinary
+brief syntax, and without the face it compiled cleanly and then failed at export. Before
+that, italic was left out on purpose as the face the visual suite asked for to watch the
+exporter report `E_EXPORT_FONT_UNRESOLVED`; the suite now asks for weight 300, which
+nothing ships, and a face the source cannot answer is also a compile-time error,
+`E_FONT_FACE_UNAVAILABLE`.
 
 **Redistribution.** OFL 1.1 permits shipping these bytes inside Tyto, and requires the
 licence to travel with them and the reserved font name to be left alone. Both hold as long

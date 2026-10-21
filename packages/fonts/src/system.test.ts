@@ -103,12 +103,12 @@ describe('a bundled face', () => {
       weight: 400,
       style: 'normal',
     } as const;
-    const italic = { ...bundled, style: 'italic' } as const;
+    const light = { ...bundled, weight: 300 } as const;
 
     expect(library.font(bundled)).toBe(bundledFontUri(REGULAR));
-    // No italic ships, and a bundled face that is absent stays E_EXPORT_FONT_UNRESOLVED.
-    expect(library.font(italic)).toBeUndefined();
-    expect(library.substitutions([bundled, italic])).toEqual([]);
+    // No 300 ships, and a bundled face that is absent stays E_EXPORT_FONT_UNRESOLVED.
+    expect(library.font(light)).toBeUndefined();
+    expect(library.substitutions([bundled, light])).toEqual([]);
   });
 
   it('refuses a file font, as bundledFont does', () => {

@@ -31,6 +31,4 @@ A escala muda os pixels, não o design. Os arquivos SVG não são afetados por e
 
 Se algo impede um arquivo de ser feito, a caixa mostra o motivo embaixo da barra de progresso, e o painel de Problemas também. Um que você pode encontrar:
 
-- `E_EXPORT_FONT_UNRESOLVED` citando uma fonte _italic_: texto em `*itálico*` não pode ser exportado com as fontes que vêm com o Tyto, e nenhum arquivo é gravado para aquela arte. Tire o itálico do brief para exportar.
-
-<!-- TYTO-329: itálico falha na exportação. Medido no e3d32e9 com `::titulo Open day at the *library*`: nenhum arquivo gravado. -->
+- `E_EXPORT_FONT_UNRESOLVED` citando uma fonte: a fonte do template não tem aquela variação — itálico numa fonte sem itálico, por exemplo — e nenhum arquivo é gravado para aquela arte. O painel de Problemas já mostrava isso como `E_FONT_FACE_UNAVAILABLE` nas palavras que pedem a variação. Tire essa formatação do brief, ou use um template cuja fonte tenha a variação.
