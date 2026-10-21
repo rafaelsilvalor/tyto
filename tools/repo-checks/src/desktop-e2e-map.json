@@ -875,6 +875,14 @@
       "why": "reviewed: the user-data folder every launch resolves"
     },
     {
+      "paths": [
+        "apps/desktop/src/main/workspace.ts",
+        "apps/desktop/src/renderer/workspace-folder.ts"
+      ],
+      "e2e": ["workspace.desktop.test.ts"],
+      "why": "reviewed: the open workspace folder, its places and its problem rows (TYTO-278)"
+    },
+    {
       "paths": ["apps/desktop/src/main/window-plugins.ts"],
       "e2e": [
         "assets.desktop.test.ts",
