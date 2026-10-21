@@ -38,13 +38,16 @@ export interface EditorKeymap {
 /**
  * The ids the built-in sets bind that this package does not implement.
  *
- * Saving and rendering belong to the host — `apps/desktop` writes a file, the CLI does
- * not exist in a renderer — so the editor ships the *binding* and the host ships the
- * command. Until it does, the key does nothing and says nothing, which is the correct
- * behaviour for a menu item that is not installed.
+ * Saving belongs to the host — `apps/desktop` writes a file, the CLI does not exist in a
+ * renderer — so the editor ships the *binding* and the host ships the command. Until it
+ * does, the key does nothing and says nothing, which is the correct behaviour for a menu
+ * item that is not installed.
+ *
+ * There used to be an `editor.render` on `Mod-Enter` here too, a placeholder from before the
+ * preview drew live (TYTO-41). No host ever registered it, so TYTO-285 removed it: a binding
+ * to a command nobody runs is a promise in the keyboard reference that the window breaks.
  */
 export const EDITOR_SAVE = 'editor.save';
-export const EDITOR_RENDER = 'editor.render';
 /**
  * Split the editor group in front, to the right or down (TYTO-286). Named here, beside save,
  * because vim's `:vsplit` and `:split` reach them by id and vim is this package's; what a
@@ -103,7 +106,6 @@ export const defaultKeymapSet: EditorKeymap = {
     { key: 'Mod-y', mac: 'Mod-Shift-z', command: EDITOR_REDO },
     { key: 'Ctrl-Shift-z', command: EDITOR_REDO },
     { key: 'Mod-s', command: EDITOR_SAVE },
-    { key: 'Mod-Enter', command: EDITOR_RENDER },
     // Find and replace (E8.5). The keys are CodeMirror's own from `searchKeymap`, rebound
     // through ids so the palette and the editor read one table — `Mod-Alt-g` for go-to-line
     // included, odd as it looks, because changing it would make this repository's editor
@@ -150,10 +152,7 @@ export const defaultKeymapSet: EditorKeymap = {
  */
 export const vimKeymapSet: EditorKeymap = {
   id: 'vim',
-  bindings: [
-    { key: 'Mod-s', command: EDITOR_SAVE },
-    { key: 'Mod-Enter', command: EDITOR_RENDER },
-  ],
+  bindings: [{ key: 'Mod-s', command: EDITOR_SAVE }],
 };
 
 export const keymapSets: Readonly<Record<string, EditorKeymap>> = {

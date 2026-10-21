@@ -122,7 +122,6 @@ export {
 export {
   type CommandBinding,
   type EditorKeymap,
-  EDITOR_RENDER,
   EDITOR_SPLIT_DOWN,
   EDITOR_SPLIT_RIGHT,
   EDITOR_SAVE,

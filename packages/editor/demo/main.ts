@@ -14,7 +14,6 @@ import {
   createEditor,
   createTemplateAnalyzer,
   createWorkerAnalyzer,
-  EDITOR_RENDER,
   EDITOR_SAVE,
   type EditorHandle,
   type LanguageName,
@@ -98,7 +97,7 @@ for (const [index, example] of EXAMPLES.entries()) {
 let edits = 0;
 let handle: EditorHandle | undefined;
 
-const counters = { saves: 0, renders: 0, format: 'feed' };
+const counters = { saves: 0, format: 'feed' };
 
 function report(): void {
   const lines = handle?.getValue().split('\n').length ?? 0;
@@ -112,7 +111,7 @@ function report(): void {
   }
   status.textContent =
     `${lines} lines · ${edits} edits · ${errors} errors · ${warnings} warnings · ` +
-    `${counters.saves} saves · ${counters.renders} renders · format ${counters.format}`;
+    `${counters.saves} saves · format ${counters.format}`;
 }
 
 /**
@@ -139,15 +138,6 @@ commands.register({
   label: 'Save',
   run: () => {
     counters.saves += 1;
-    report();
-  },
-});
-
-commands.register({
-  id: EDITOR_RENDER,
-  label: 'Render',
-  run: () => {
-    counters.renders += 1;
     report();
   },
 });

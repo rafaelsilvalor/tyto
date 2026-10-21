@@ -10,7 +10,7 @@ import {
   createCommandRegistry,
 } from './commands.js';
 import { createEditor, type EditorHandle } from './editor.js';
-import { EDITOR_RENDER, EDITOR_SAVE, defaultKeymapSet, vimKeymapSet } from './keymap.js';
+import { EDITOR_SAVE, defaultKeymapSet, vimKeymapSet } from './keymap.js';
 import {
   EDITOR_FIND,
   EDITOR_FIND_NEXT,
@@ -69,11 +69,12 @@ describe('the keymap layer', () => {
   it('dispatches a second binding to a different command', () => {
     const seen: string[] = [];
     const registry = createCommandRegistry();
-    registry.register(counting(EDITOR_RENDER, seen));
+    // Re-registering an id replaces it, so this counts `Mod-f` instead of opening the panel.
+    registry.register(counting(EDITOR_FIND, seen));
     const editor = open(registry);
 
-    expect(press(editor.view, 'Enter', mod)).toBe(true);
-    expect(seen).toEqual([EDITOR_RENDER]);
+    expect(press(editor.view, 'f', mod)).toBe(true);
+    expect(seen).toEqual([EDITOR_FIND]);
   });
 
   it('lets the key fall through when the command is not installed', () => {
@@ -145,13 +146,12 @@ describe('the built-in sets', () => {
   const idsOf = (set: { bindings: readonly { command: string }[] }): string[] =>
     set.bindings.map((binding) => binding.command);
 
-  it('binds undo, redo, save, render and find in the default set', () => {
+  it('binds undo, redo, save and find in the default set', () => {
     expect(idsOf(defaultKeymapSet)).toEqual([
       EDITOR_UNDO,
       EDITOR_REDO,
       EDITOR_REDO,
       EDITOR_SAVE,
-      EDITOR_RENDER,
       EDITOR_FIND,
       EDITOR_FIND_NEXT,
       EDITOR_FIND_PREVIOUS,

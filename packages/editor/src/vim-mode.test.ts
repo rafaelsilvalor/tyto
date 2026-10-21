@@ -15,7 +15,7 @@ import { briefLanguage } from './brief-language.js';
 import { type CommandRegistry, createCommandRegistry } from './commands.js';
 import { briefCompletion } from './completion.js';
 import { createEditor, cursorOf, type EditorHandle } from './editor.js';
-import { EDITOR_RENDER, EDITOR_SAVE, EDITOR_SPLIT_DOWN, EDITOR_SPLIT_RIGHT } from './keymap.js';
+import { EDITOR_SAVE, EDITOR_SPLIT_DOWN, EDITOR_SPLIT_RIGHT } from './keymap.js';
 import { defaultExCommands } from './vim-mode.js';
 
 const BRIEF = ['---', 'template: promo-curso', '---', '::titulo Direito', '::subtitulo Turma'].join(
@@ -124,16 +124,6 @@ describe('vim mode', () => {
       'editor',
     );
     expect(seen).toEqual([EDITOR_SAVE, EDITOR_SAVE]);
-  });
-
-  it('runs render from :render', () => {
-    const registry = createCommandRegistry();
-    const seen = seenCommands(registry, EDITOR_RENDER);
-    const editor = open(registry, true);
-
-    ex(editor.view, 'render');
-
-    expect(seen).toEqual([EDITOR_RENDER]);
   });
 
   it('says nothing and does nothing for an ex-command whose id is not installed', () => {
@@ -360,10 +350,9 @@ describe('cursorOf', () => {
 });
 
 describe('defaultExCommands', () => {
-  it('maps the two the card names, with w as the abbreviation of write, and the splits', () => {
+  it('maps write, with w as its abbreviation, and the splits', () => {
     expect(defaultExCommands).toEqual([
       { name: 'write', shortName: 'w', command: EDITOR_SAVE },
-      { name: 'render', command: EDITOR_RENDER },
       // TYTO-286: vim's own names for the editor's two splits.
       { name: 'vsplit', shortName: 'vs', command: EDITOR_SPLIT_RIGHT },
       { name: 'split', shortName: 'sp', command: EDITOR_SPLIT_DOWN },
