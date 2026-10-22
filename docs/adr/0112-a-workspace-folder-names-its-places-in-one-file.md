@@ -100,6 +100,8 @@ Windows, edited in place so a person's comments survive. A `trust.json` that can
 of this card), **or by editing the file by hand**. The command line has `tyto trust remove
 <folder>` and `--trust` for one run, and no `tyto trust add` yet.
 
+> Built in TYTO-349 (2026-10-22): `tyto trust add` / `list`.
+
 ### Which folder is the workspace
 
 - **The window opens one folder per window**, chosen with File ▸ Open Folder and restored on

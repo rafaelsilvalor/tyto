@@ -119,4 +119,10 @@ export {
 
 export type { LoadedProfile } from './profile.js';
 
-export { type FsTrustStoreOptions, TRUST_FILE, fsTrustStore } from './fs-trust-store.js';
+export {
+  type FsTrustStore,
+  type FsTrustStoreOptions,
+  TRUST_FILE,
+  type TrustedEntry,
+  fsTrustStore,
+} from './fs-trust-store.js';

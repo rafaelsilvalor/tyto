@@ -2,7 +2,7 @@
 
 # Command line
 
-Every command `tyto` takes: 11. `tyto --help` and `tyto <command> --help` print the same text in the terminal.
+Every command `tyto` takes: 13. `tyto --help` and `tyto <command> --help` print the same text in the terminal.
 
 ## tyto render
 
@@ -206,6 +206,28 @@ tyto plugin enable [options] <name>
 | Argument | What it does |
 | --- | --- |
 | `<name>` | the plugin's name, as tyto plugin list prints it |
+
+## tyto trust add
+
+trust a workspace folder or a shared work profile file for good, after printing what it does restricted
+
+```sh
+tyto trust add [options] <path>
+```
+
+**Arguments**
+
+| Argument | What it does |
+| --- | --- |
+| `<path>` | the workspace folder, or the profile file it names |
+
+## tyto trust list
+
+print every trusted folder and profile file, with the day it was trusted
+
+```sh
+tyto trust list [options]
+```
 
 ## tyto trust remove
 

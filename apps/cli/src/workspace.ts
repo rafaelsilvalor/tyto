@@ -27,8 +27,11 @@ export interface BriefWorkspace {
   readonly diagnostics: Diagnostics;
 }
 
-/** Everything restricted, for an environment that names no home and so has no store. */
-const NO_STORE: TrustStore = {
+/**
+ * Everything restricted: for an environment that names no home and so has no store, and for
+ * `tyto trust add`, which shows what a folder does restricted before it grants (TYTO-349).
+ */
+export const ALWAYS_RESTRICTED: TrustStore = {
   trustOf: () => Promise.resolve({ trust: 'restricted', diagnostics: [] }),
   grant: () => Promise.resolve(ok(false)),
   revoke: () => Promise.resolve(ok(false)),
@@ -45,12 +48,23 @@ export async function workspaceOfBrief(
   if (folder === undefined) return undefined;
 
   const loaded = await loadWorkspace(folder, {
-    trustStore: home === undefined ? NO_STORE : fsTrustStore({ home }),
+    trustStore: home === undefined ? ALWAYS_RESTRICTED : fsTrustStore({ home }),
     ...(home === undefined ? {} : { home }),
     trustForThisRun: options.trust === true,
   });
   if (loaded === undefined) return undefined;
+  return { loaded, diagnostics: workspaceDiagnostics(loaded, home, shown) };
+}
 
+/**
+ * Everything a loaded workspace had to say, each diagnostic registered against the file it
+ * points into: the project file, the work profile it names (ADR 0114), or `trust.json`.
+ */
+export function workspaceDiagnostics(
+  loaded: LoadedWorkspace,
+  home: string | undefined,
+  shown: (path: string) => string,
+): Diagnostics {
   registerOrigin(loaded.diagnostics, { path: shown(loaded.file), source: loaded.text });
   // A work profile's problems point into the profile's own file (ADR 0114).
   const profile = loaded.profile;
@@ -61,8 +75,5 @@ export async function workspaceOfBrief(
   if (home !== undefined) {
     registerOrigin(trustDiagnostics, { path: shown(join(home, TRUST_FILE)), source: '' });
   }
-  return {
-    loaded,
-    diagnostics: [...trustDiagnostics, ...(profile?.diagnostics ?? []), ...loaded.diagnostics],
-  };
+  return [...trustDiagnostics, ...(profile?.diagnostics ?? []), ...loaded.diagnostics];
 }

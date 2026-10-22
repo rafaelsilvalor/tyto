@@ -225,6 +225,30 @@ describe('fsTrustStore', () => {
     expect(await readFile(join(home, 'trust.json'), 'utf8')).toContain('// mine');
   });
 
+  it('lists every approval with its date, and refuses a file it cannot read', async () => {
+    const store = fsTrustStore({ home, now: () => new Date('2026-10-22T09:00:00Z') });
+    expect(await store.list()).toEqual(ok([]));
+    await store.grant(work);
+    await writeFile(
+      join(home, 'trust.json'),
+      (await readFile(join(home, 'trust.json'), 'utf8')).replace(
+        ']',
+        ', { "path": "D:\\\\by-hand" }, { "path": "D:\\\\noted", "since": 7 } ]',
+      ),
+    );
+    expect(await store.list()).toEqual(
+      ok([
+        { path: await realpath(work), since: '2026-10-22' },
+        { path: 'D:\\by-hand' },
+        { path: 'D:\\noted' },
+      ]),
+    );
+
+    await writeFile(join(home, 'trust.json'), '{ "trusted": [ }');
+    const broken = await store.list();
+    expect(broken.ok ? [] : broken.error.map((item) => item.code)).toEqual(['E_TRUST_FILE']);
+  });
+
   it('refuses to write a file it cannot read', async () => {
     await writeFile(join(home, 'trust.json'), 'not json');
     const granted = await fsTrustStore({ home }).grant(work);

@@ -2,7 +2,7 @@
 
 # Linha de comando
 
-Todos os comandos que o `tyto` aceita: 11. `tyto --help` e `tyto <comando> --help` imprimem o mesmo texto no terminal.
+Todos os comandos que o `tyto` aceita: 13. `tyto --help` e `tyto <comando> --help` imprimem o mesmo texto no terminal.
 
 ::: info Ajuda em inglês
 A ajuda da linha de comando existe só em inglês, e esta página a mostra como o terminal a imprime.
@@ -210,6 +210,28 @@ tyto plugin enable [options] <name>
 | Argumento | O que faz |
 | --- | --- |
 | `<name>` | the plugin's name, as tyto plugin list prints it |
+
+## tyto trust add
+
+trust a workspace folder or a shared work profile file for good, after printing what it does restricted
+
+```sh
+tyto trust add [options] <path>
+```
+
+**Argumentos**
+
+| Argumento | O que faz |
+| --- | --- |
+| `<path>` | the workspace folder, or the profile file it names |
+
+## tyto trust list
+
+print every trusted folder and profile file, with the day it was trusted
+
+```sh
+tyto trust list [options]
+```
 
 ## tyto trust remove
 
