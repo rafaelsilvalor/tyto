@@ -1078,9 +1078,9 @@ describe('the fonts the pack draws in, as a render embeds them (ADR 0021)', () =
       // One per face the runs draw, in the order the scene is walked, and no fourth for the
       // declaration: a `400` nobody draws is not a substitution anybody sees.
       expect(
-        substituted.map((item) => /'CircularXX (\d+) normal'/.exec(item.message)?.[1]).sort(),
+        substituted.map((item) => /'CircularXX (\d+)'/.exec(item.message)?.[1]).sort(),
       ).toEqual(['300', '500', '900']);
-      expect(substituted.every((item) => item.message.includes("'Source Sans 3 "))).toBe(true);
+      expect(substituted.every((item) => item.message.includes("'Source Sans 3'"))).toBe(true);
       // Light and Medium both land on the bundled Regular, Black on the Bold.
       expect(new Set(embedded).size).toBe(2);
     }

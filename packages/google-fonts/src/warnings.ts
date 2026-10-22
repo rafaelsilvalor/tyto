@@ -22,6 +22,13 @@ export type AlternativesOf = (family: string) => readonly string[] | undefined;
 const label = (face: Face): string => `${face.family} ${String(face.weight)} ${face.style}`;
 
 /**
+ * `W_FONT_UNAVAILABLE`'s own wording, as Rafael approved it on 2026-10-22: the face as a person
+ * names it — `CircularXX 500`, `italic` only when it is — and the substitute by its family.
+ */
+const unavailableLabel = (face: Face): string =>
+  `${face.family} ${String(face.weight)}${face.style === 'italic' ? ' italic' : ''}`;
+
+/**
  * What a missing face says when Google Fonts is on (ADR 0120): **one line per face**.
  *
  * A family nobody can supply — not Google, not another plugin's `font-source` — is
@@ -39,13 +46,16 @@ export function googleFontWarnings(
   servedElsewhere: (family: string) => boolean = () => false,
 ): Diagnostics {
   return substitutions.map(({ requested, drawn }) => {
-    const params = { font: label(requested), substitute: label(drawn) };
     if (googleFamily(requested.family) !== undefined || servedElsewhere(requested.family)) {
-      return diagnostic('W_FONT_SUBSTITUTED', params);
+      return diagnostic('W_FONT_SUBSTITUTED', {
+        font: label(requested),
+        substitute: label(drawn),
+      });
     }
     const named = alternativesOf(requested.family) ?? [];
     return diagnostic('W_FONT_UNAVAILABLE', {
-      ...params,
+      font: unavailableLabel(requested),
+      substitute: drawn.family,
       family: requested.family,
       alternatives: named.length === 0 ? '' : ` Free fonts of the same kind: ${named.join(', ')}.`,
     });

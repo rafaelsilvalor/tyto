@@ -156,10 +156,14 @@ describe('a missing face, with Google Fonts on', () => {
   });
 
   it('is W_FONT_UNAVAILABLE, naming the substitute and the alternatives, when nobody serves it', () => {
-    const [said] = googleFontWarnings([missing('CircularXX')], () => ['Inter', 'Manrope']);
+    const [said] = googleFontWarnings([missing('CircularXX')], () => [
+      'Inter',
+      'Manrope',
+      'DM Sans',
+    ]);
     expect(said?.code).toBe('W_FONT_UNAVAILABLE');
     expect(said?.message).toBe(
-      "Font 'CircularXX 500 normal' is not installed on this machine and Tyto cannot download it: it is not on Google Fonts, so it is likely a licensed font. Drawn in 'Source Sans 3 400 normal' instead. Free fonts of the same kind: Inter, Manrope. Install 'CircularXX' to render it as designed.",
+      "Font 'CircularXX 500' is not installed on this machine and Tyto cannot download it: it is not on Google Fonts, so it is likely a licensed font. Drawn in 'Source Sans 3' instead. Free fonts of the same kind: Inter, Manrope, DM Sans. Install 'CircularXX' to render it as designed.",
     );
   });
 

@@ -250,10 +250,8 @@ describe('a family nobody can supply', () => {
       expect(requests).toEqual([]);
       expect(codes(rendered)).toEqual(['W_FONT_UNAVAILABLE']);
       const message = rendered.diagnostics[0]?.message ?? '';
-      expect(message).toContain(
-        "Font 'Tyto Licensed Sans 500 normal' is not installed on this machine",
-      );
-      expect(message).toContain("Drawn in 'Source Sans 3");
+      expect(message).toContain("Font 'Tyto Licensed Sans 500' is not installed on this machine");
+      expect(message).toContain("Drawn in 'Source Sans 3' instead.");
       expect(message).toContain(`Free fonts of the same kind: ${ALTERNATIVES.join(', ')}.`);
     },
     SLOW,
