@@ -48,25 +48,32 @@ function withProjectOptions(command: Command): Command {
 }
 
 function withOutputOptions(command: Command): Command {
-  return command
-    .option(
-      '--types <kinds>',
-      'comma-separated: png, jpeg, webp, svg, or a kind an installed exporter adds',
-      parseTypes,
-      ['png'],
-    )
-    .option(
-      '--scale <n>',
-      'device pixels per CSS pixel; 2 is the retina export',
-      parsePositiveInteger('--scale'),
-    )
-    .option('--quality <n>', 'encoder quality 1-100, for jpeg and webp only', parseQuality)
-    .option(
-      '--concurrency <n>',
-      'frames rastered at once (default 2)',
-      parsePositiveInteger('--concurrency'),
-    )
-    .option('--json', 'print a machine-readable document instead of prose', false);
+  return (
+    command
+      .option(
+        '--types <kinds>',
+        'comma-separated: png, jpeg, webp, svg, or a kind an installed exporter adds',
+        parseTypes,
+        ['png'],
+      )
+      .option(
+        '--scale <n>',
+        'device pixels per CSS pixel; 2 is the retina export',
+        parsePositiveInteger('--scale'),
+      )
+      .option('--quality <n>', 'encoder quality 1-100, for jpeg and webp only', parseQuality)
+      .option(
+        '--concurrency <n>',
+        'frames rastered at once (default 2)',
+        parsePositiveInteger('--concurrency'),
+      )
+      .option('--json', 'print a machine-readable document instead of prose', false)
+      // On by default (ADR 0120); `TYTO_GOOGLE_FONTS=off` turns it off for every run too.
+      .option(
+        '--no-google-fonts',
+        'never ask Google Fonts for a face this machine lacks (each fetch sends Google the family, weight and style)',
+      )
+  );
 }
 
 /**

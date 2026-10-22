@@ -1,0 +1,7 @@
+{
+  "name": "google-fonts",
+  "version": "0.1.0",
+  "engine": ">=0.1",
+  "contributes": ["font-source"],
+  "permissions": ["net:fonts.googleapis.com", "net:fonts.gstatic.com"]
+}

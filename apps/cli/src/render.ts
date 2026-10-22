@@ -16,6 +16,7 @@ import {
 } from './plugins/index.js';
 import { type RenderContextOptions, loadRenderContext, readFailure } from './render-context.js';
 import { renderTask } from './render-task.js';
+import { googleFontsOption } from './google-fonts.js';
 import { optionalSources, renderSources } from './sources.js';
 import { diagnosticsDocument, formatDiagnostics, json } from './report.js';
 import { workspaceOfBrief } from './workspace.js';
@@ -67,6 +68,8 @@ export interface RenderCommandOptions {
   readonly assets?: string;
   readonly concurrency?: number;
   readonly json: boolean;
+  /** `--no-google-fonts` makes this false; on by default (ADR 0120). */
+  readonly googleFonts?: boolean;
 }
 
 /**
@@ -209,6 +212,7 @@ export async function renderCommand(
         ...(options.concurrency === undefined ? {} : { concurrency: options.concurrency }),
         ...(project === undefined ? {} : { fontDirectories: project.fonts }),
         ...optionalSources(renderSources(environment.home, workspace?.loaded)),
+        ...googleFontsOption(options.googleFonts, environment.variables),
       },
       [...projectDiagnostics, ...context.diagnostics],
     );

@@ -1,0 +1,16 @@
+{
+  "name": "@tyto/google-fonts-catalogue",
+  "private": true,
+  "type": "module",
+  "description": "Regenerates the Google Fonts catalogue @tyto/google-fonts ships: which families Google serves, their category, styles and licence.",
+  "license": "UNLICENSED",
+  "scripts": {
+    "generate": "node --experimental-strip-types src/generate.ts",
+    "typecheck": "tsc --noEmit",
+    "lint": "eslint . --max-warnings 0",
+    "test": "vitest run --passWithNoTests"
+  },
+  "devDependencies": {
+    "vitest": "^5.0.1"
+  }
+}

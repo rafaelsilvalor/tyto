@@ -85,6 +85,7 @@ non-zero.
 | `W_EXPORT_APPROXIMATED` | warning | no | An exporter rendered something close to, but not exactly, what the IR asked for. |
 | `W_PLUGIN_FONT_WITHHELD` | warning | no | A face installed on this machine was not sent to a plugin's template, which did not ask for it. |
 | `W_FONT_SUBSTITUTED` | warning | no | A face the scene asks this machine for is not installed, so a bundled one drew it. |
+| `W_FONT_UNAVAILABLE` | warning | no | A face the scene asks this machine for is not installed and is not on Google Fonts, so a bundled one drew it. |
 | `W_FONT_SOURCE_FAILED` | warning | no | A plugin that serves a font family could not supply a face the scene asks for. |
 | `E_RENDER_FAILED` | error | no | A frame could not be turned into bytes by the exporter or the rasterizer. |
 | `E_OUTPUT_WRITE` | error | no | No longer produced since ADR 0108. An artifact was rendered but could not be written to the output. |
@@ -1335,6 +1336,20 @@ Font '{font}' is not installed on this machine; drawn in '{substitute}' instead.
 ```
 
 Parameters: `font`, `substitute`
+
+### `W_FONT_UNAVAILABLE`
+
+**Severity:** warning · **Fatal:** no · **Spec:** `docs/adr/0120-a-missing-font-is-fetched-from-google-fonts.md`
+
+A face the scene asks this machine for is not installed and is not on Google Fonts, so a bundled one drew it.
+
+The artwork is drawn and measured in the substitute, as `W_FONT_SUBSTITUTED` says for any missing face; this takes its place when Google Fonts cannot supply the family either, and names the free families the template's manifest lists as alternatives.
+
+```
+Font '{font}' is not installed on this machine and Tyto cannot download it: it is not on Google Fonts, so it is likely a licensed font. Drawn in '{substitute}' instead.{alternatives} Install '{family}' to render it as designed.
+```
+
+Parameters: `font`, `substitute`, `alternatives`, `family`
 
 ### `W_FONT_SOURCE_FAILED`
 

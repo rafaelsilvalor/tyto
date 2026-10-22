@@ -1194,7 +1194,8 @@ ${day('26/10')}${day('27/10')}
 
     // Only the overflow is this card's. The simulados draw in CircularXX, a face licensed to a
     // machine and never shipped (ADR 0037), so a machine without it — CI's runner — also reports
-    // one W_FONT_SUBSTITUTED per weight. Those are about the machine, not the brief.
+    // one W_FONT_UNAVAILABLE per weight (W_FONT_SUBSTITUTED with Google Fonts off, ADR 0120).
+    // Those are about the machine, not the brief.
     const parsed = parseRenderResult(await resultAt('task', 'out'));
     if (!parsed.ok) throw new Error(parsed.error.join('; '));
     const overflows = parsed.value.diagnostics.filter(

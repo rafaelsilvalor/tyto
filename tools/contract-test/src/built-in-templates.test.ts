@@ -1041,9 +1041,14 @@ describe('the fonts the pack draws in, as a render embeds them (ADR 0021)', () =
     const result = JSON.parse(await readFile(join(agenda, 'out/result.json'), 'utf8')) as {
       diagnostics?: { code: string; message: string }[];
     };
-    const substituted = (result.diagnostics ?? []).filter(
-      (item) => item.code === 'W_FONT_SUBSTITUTED',
+    // `W_FONT_UNAVAILABLE` since TYTO-281 (ADR 0120): the binary runs with Google Fonts on, its
+    // default, and CircularXX is not Google's, so the one line per face is that code, still
+    // naming the substitute. Nothing is fetched for it. The old code is what a run with
+    // `TYTO_GOOGLE_FONTS=off` says, which `apps/cli/src/google-fonts.test.ts` asserts.
+    const substituted = (result.diagnostics ?? []).filter((item) =>
+      ['W_FONT_SUBSTITUTED', 'W_FONT_UNAVAILABLE'].includes(item.code),
     );
+    expect(substituted.every((item) => item.code === 'W_FONT_UNAVAILABLE')).toBe(true);
 
     const machine = createFontLibrary({ describe: describeFace });
     const weights = [300, 500, 900];
@@ -1073,9 +1078,9 @@ describe('the fonts the pack draws in, as a render embeds them (ADR 0021)', () =
       // One per face the runs draw, in the order the scene is walked, and no fourth for the
       // declaration: a `400` nobody draws is not a substitution anybody sees.
       expect(
-        substituted.map((item) => /'CircularXX (\d+) normal'/.exec(item.message)?.[1]).sort(),
+        substituted.map((item) => /'CircularXX (\d+)'/.exec(item.message)?.[1]).sort(),
       ).toEqual(['300', '500', '900']);
-      expect(substituted.every((item) => item.message.includes("'Source Sans 3 "))).toBe(true);
+      expect(substituted.every((item) => item.message.includes("'Source Sans 3'"))).toBe(true);
       // Light and Medium both land on the bundled Regular, Black on the Bold.
       expect(new Set(embedded).size).toBe(2);
     }

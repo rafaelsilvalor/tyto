@@ -18,9 +18,11 @@ import { BUILT_IN_FORMATS_FILE, BUILT_IN_PACK, GALLERY_IMAGES, readPack } from '
  * raster adapter: composing adapters is `apps/*`'s job (architecture.md), and the binary is
  * the composition. Build it first: `pnpm --filter @tyto/cli... build`.
  *
- * **Any diagnostic stops it.** A `W_FONT_SUBSTITUTED` is the one that matters: on a machine
- * without the brand fonts the render succeeds, in the wrong typeface, and a picture that looks
- * almost right would be published as the template. A warning is a wrong picture here.
+ * **Any diagnostic stops it.** A `W_FONT_SUBSTITUTED` is the one that matters — or
+ * `W_FONT_UNAVAILABLE`, which takes its place for a brand face Google Fonts does not serve
+ * (ADR 0120): on a machine without the brand fonts the render succeeds, in the wrong typeface,
+ * and a picture that looks almost right would be published as the template. A warning is a
+ * wrong picture here.
  *
  * **No brand kit reaches it.** A brand's logo and signature come from a kit installed on the
  * machine (ADR 0063) and stay out of the public repository (E15), so every render runs with a

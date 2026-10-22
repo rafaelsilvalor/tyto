@@ -684,6 +684,19 @@ export const diagnosticCodes = {
       'The artwork is complete and measured against the face that was drawn, so the line ' +
       'breaks match the pixels; only the typeface differs, and this is what says so.',
   },
+  W_FONT_UNAVAILABLE: {
+    severity: 'warning',
+    summary:
+      'A face the scene asks this machine for is not installed and is not on Google Fonts, so a bundled one drew it.',
+    template:
+      "Font '{font}' is not installed on this machine and Tyto cannot download it: it is not on Google Fonts, so it is likely a licensed font. Drawn in '{substitute}' instead.{alternatives} Install '{family}' to render it as designed.",
+    spec: 'docs/adr/0120-a-missing-font-is-fetched-from-google-fonts.md',
+    fatal: false,
+    fatality:
+      'The artwork is drawn and measured in the substitute, as `W_FONT_SUBSTITUTED` says for any ' +
+      'missing face; this takes its place when Google Fonts cannot supply the family either, ' +
+      "and names the free families the template's manifest lists as alternatives.",
+  },
   W_FONT_SOURCE_FAILED: {
     severity: 'warning',
     summary: 'A plugin that serves a font family could not supply a face the scene asks for.',

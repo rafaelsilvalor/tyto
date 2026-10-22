@@ -39,6 +39,7 @@ tyto render [options] <brief>
 | `--quality <n>` | encoder quality 1-100, for jpeg and webp only |  |
 | `--concurrency <n>` | frames rastered at once (default 2) |  |
 | `--json` | print a machine-readable document instead of prose |  |
+| `--no-google-fonts` | never ask Google Fonts for a face this machine lacks (each fetch sends Google the family, weight and style) |  |
 
 ## tyto watch
 
@@ -69,6 +70,7 @@ tyto watch [options] <folder>
 | `--quality <n>` | encoder quality 1-100, for jpeg and webp only |  |
 | `--concurrency <n>` | frames rastered at once (default 2) |  |
 | `--json` | print a machine-readable document instead of prose |  |
+| `--no-google-fonts` | never ask Google Fonts for a face this machine lacks (each fetch sends Google the family, weight and style) |  |
 
 ## tyto template check
 

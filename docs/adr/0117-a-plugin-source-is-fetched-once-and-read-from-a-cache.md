@@ -1,6 +1,6 @@
 # 0117 — A plugin source is fetched once and read from a cache
 
-Status: accepted · 2026-10-22 · TYTO-280 · under ADR 0011, ADR 0037, ADR 0041, ADR 0042, ADR 0049, ADR 0056, ADR 0110, ADR 0111, ADR 0112 and ADR 0114
+Status: accepted · 2026-10-22 · TYTO-280 · under ADR 0011, ADR 0037, ADR 0041, ADR 0042, ADR 0049, ADR 0056, ADR 0110, ADR 0111, ADR 0112 and ADR 0114 · point 1 amended by ADR 0120 (a built-in may contribute a source)
 
 ## Context
 

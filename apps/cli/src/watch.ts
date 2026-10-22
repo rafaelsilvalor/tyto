@@ -15,6 +15,7 @@ import { loadRenderContext } from './render-context.js';
 import { renderTask } from './render-task.js';
 import { displayPath, installedOption } from './render.js';
 import { diagnosticsDocument, formatDiagnostics, json } from './report.js';
+import { googleFontsOption } from './google-fonts.js';
 import { optionalSources, watchSources } from './sources.js';
 
 /**
@@ -53,6 +54,8 @@ export interface WatchCommandOptions {
   /** Handle whatever is in the inbox right now and return, instead of watching. */
   readonly once: boolean;
   readonly json: boolean;
+  /** `--no-google-fonts` makes this false; on by default (ADR 0120). */
+  readonly googleFonts?: boolean;
 }
 
 export async function watchCommand(
@@ -137,6 +140,7 @@ export async function watchCommand(
         ...(options.concurrency === undefined ? {} : { concurrency: options.concurrency }),
         ...(signal === undefined ? {} : { signal }),
         ...optionalSources(watchSources(environment.home)),
+        ...googleFontsOption(options.googleFonts, environment.variables),
       },
       projectProblems,
     );
