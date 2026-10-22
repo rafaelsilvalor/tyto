@@ -289,7 +289,9 @@ describe('where the plugin connects (ADR 0120)', () => {
       await mkdir(join(project, '.tyto'), { recursive: true });
       await writeFile(
         join(project, '.tyto', 'project.json'),
-        JSON.stringify({ 'google-fonts': { base, [GOOGLE_FONTS_BASE]: base } }),
+        // Under `plugins`, where a section is read from (ADR 0112): a key at the top was a
+        // section that never reached the plugin, and this case passed with the hole open.
+        JSON.stringify({ plugins: { 'google-fonts': { base, [GOOGLE_FONTS_BASE]: base } } }),
       );
       // Trusted, so the section reaches the plugin; the environment names no server.
       const rendered = await render('tipo-google', join(workspace, 'out'), {
