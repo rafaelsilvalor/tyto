@@ -1,5 +1,6 @@
 import { htmlExporterManifest, htmlExporterPlugin } from '@tyto/export-html';
 import { svgExporterManifest, svgExporterPlugin } from '@tyto/export-svg';
+import { googleFontsPlugin } from '@tyto/google-fonts';
 import { validatePluginManifest } from '@tyto/plugin-api';
 import { beforeEach, describe, expect, it } from 'vitest';
 
@@ -57,6 +58,7 @@ describe('tyto plugin list', () => {
       chromium            0.1.0  built-in  enabled  rasterizer
       fs-inbox            1.0.3  built-in  enabled  source
       fs-outbox           1.0.3  built-in  enabled  sink
+      google-fonts        0.1.0  built-in  enabled  font-source
       "
     `);
   });
@@ -77,6 +79,7 @@ describe('tyto plugin list', () => {
       ['chromium', 'rasterizer'],
       ['fs-inbox', 'source'],
       ['fs-outbox', 'sink'],
+      ['google-fonts', 'font-source'],
     ]);
     expect(document.plugins.every((plugin) => plugin.origin === 'built-in')).toBe(true);
   });
@@ -101,6 +104,7 @@ describe('the catalog the listing reads', () => {
       rasterizerPlugin({ raster: () => Promise.resolve(new Uint8Array()) }).manifest,
       sourcePlugin({ pull: () => Promise.resolve([]), ack: () => Promise.resolve() }).manifest,
       sinkPlugin({ open: () => Promise.reject(new Error('not opened')) }).manifest,
+      googleFontsPlugin().manifest,
     ];
 
     for (const manifest of shipped) expect(BUILT_IN_MANIFESTS).toContain(manifest);
@@ -118,6 +122,7 @@ describe('the catalog the listing reads', () => {
       rasterizerPlugin({ raster: () => Promise.resolve(new Uint8Array()) }),
       sourcePlugin({ pull: () => Promise.resolve([]), ack: () => Promise.resolve() }),
       sinkPlugin({ open: () => Promise.reject(new Error('not opened')) }),
+      googleFontsPlugin(),
     ];
 
     for (const plugin of named) {

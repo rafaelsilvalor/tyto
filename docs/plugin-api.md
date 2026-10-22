@@ -74,7 +74,7 @@ The last five are named `<id>.tyto-plugin.json` and that is the one place a buil
 | `configuration`   | a key of `settings.json`: `{ id, schema, default, description }` (ADR 0073)   | desktop (the app's settings)                          |
 | `theme`           | a colour theme, a JSON file in the plugin: `{ id, label, kind, path }` (0077) | desktop (Tyto Light, Tyto Dark)                       |
 | `asset-source`    | images behind URI schemes: `{ id, schemes, fetch }`, cached (ADR 0117)        | —                                                     |
-| `font-source`     | faces of named families: `{ id, families, fetch }`, cached (ADR 0117)         | —                                                     |
+| `font-source`     | faces of named families: `{ id, families, fetch }`, cached (ADR 0117)         | google-fonts (ADR 0120)                               |
 
 ### `configuration`, in full
 

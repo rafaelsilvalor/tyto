@@ -1,11 +1,18 @@
 import {
   type Diagnostics,
   type FaceCache,
+  type TemplateManifest,
   createFaceCache,
   describeFace,
   hasErrors,
 } from '@tyto/core';
 import { type FontLibrary, createFontLibrary, systemFontDirectories } from '@tyto/fonts';
+import {
+  GOOGLE_FONTS_ID,
+  type GoogleFontsOptions,
+  familyKey,
+  googleFontWarnings,
+} from '@tyto/google-fonts';
 import {
   type ExportResources,
   type RenderResult,
@@ -22,10 +29,11 @@ import {
 import {
   type LoadedResources,
   type OutputRequest,
+  type TemplateSource,
   fontSubstitutionWarnings,
   runJob,
 } from '@tyto/pipeline';
-import { directiveResolverOf } from '@tyto/plugin-api';
+import { type HostCapabilities, directiveResolverOf } from '@tyto/plugin-api';
 import type { Rasterizer } from '@tyto/raster';
 
 import {
@@ -111,6 +119,13 @@ export interface RenderTaskOptions {
    * means no installed plugin: a plugin reference is then a file that is not there.
    */
   readonly sources?: TaskSources;
+  /**
+   * The Google Fonts `font-source` (ADR 0120), on when present; `googleFontsFor` decides it
+   * from the flag and the environment.
+   */
+  readonly googleFonts?: GoogleFontsOptions;
+  /** `host.fetch` for a built-in that reaches the network — Google Fonts. */
+  readonly capabilities?: HostCapabilities;
 }
 
 export interface TaskSources {
@@ -298,6 +313,8 @@ export async function renderTask(
   const host = activateBuiltIns({
     resources: exportResources(briefResources, wiring.resources, () => taskFonts.fonts),
     ...(options.rasterizer === undefined ? {} : { rasterizer: options.rasterizer }),
+    ...(options.googleFonts === undefined ? {} : { googleFonts: options.googleFonts }),
+    ...(options.capabilities === undefined ? {} : { capabilities: options.capabilities }),
   });
   // After the built-ins, so a built-in keeps every id it has. A plugin refused here is a
   // warning in this task's `result.json`, and the task renders without it (ADR 0040).
@@ -340,6 +357,34 @@ export async function renderTask(
       : fileAssetResolver({ base: task.assetsOverride });
   const assets = recordingAssetResolver(cache === undefined ? files : cache.assets(files));
 
+  // The template the job loads, kept for the one question only its manifest answers: which
+  // free families stand in for a face nobody can supply (ADR 0120).
+  let loaded: TemplateManifest | undefined;
+  const templates: TemplateSource = {
+    load: async (name) => {
+      const answer = await wiring.source.load(name);
+      if (answer.ok) loaded = answer.value.manifest;
+      return answer;
+    },
+  };
+  // One line per missing face: with Google Fonts on, a family it does not serve is
+  // `W_FONT_UNAVAILABLE` in place of `W_FONT_SUBSTITUTED`; off, exactly as before.
+  const missingFaceWarnings = (substitutions: Parameters<typeof fontSubstitutionWarnings>[0]) =>
+    options.googleFonts === undefined
+      ? fontSubstitutionWarnings(substitutions)
+      : googleFontWarnings(
+          substitutions,
+          (family) => loaded?.fonts?.[family]?.alternatives,
+          (family) =>
+            host.registry
+              .fontSources()
+              .some(
+                ({ plugin, source }) =>
+                  plugin !== GOOGLE_FONTS_ID &&
+                  source.families.some((name) => familyKey(name) === familyKey(family)),
+              ),
+        );
+
   const job = await runJob(
     {
       brief: task.brief,
@@ -350,7 +395,7 @@ export async function renderTask(
     },
     {
       registry: context.registry,
-      templates: wiring.source,
+      templates,
       assets: assets.resolver,
       exporters: host.registry.exporters,
       directives: directiveResolverOf(() => host.registry.directives()),
@@ -376,12 +421,12 @@ export async function renderTask(
           // again, which is a second request, and then they must describe what is drawn.
           const still = fonts.fonts.substitutions(needed.faces);
           return {
-            diagnostics: [...fontSubstitutionWarnings(still), ...fetched.diagnostics],
+            diagnostics: [...missingFaceWarnings(still), ...fetched.diagnostics],
             recompile: { faces },
           };
         }
         return {
-          diagnostics: [...fontSubstitutionWarnings(missing), ...(fetched?.diagnostics ?? [])],
+          diagnostics: [...missingFaceWarnings(missing), ...(fetched?.diagnostics ?? [])],
         };
       },
       ...(options.concurrency === undefined ? {} : { concurrency: options.concurrency }),

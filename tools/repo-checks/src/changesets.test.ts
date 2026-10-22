@@ -157,6 +157,7 @@ describe('changesets', () => {
     expect([...tools.keys()].sort()).toEqual([
       '@tyto/contract-test',
       '@tyto/docs-gen',
+      '@tyto/google-fonts-catalogue',
       '@tyto/repo-checks',
       '@tyto/template-preview',
     ]);

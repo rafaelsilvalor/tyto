@@ -154,6 +154,18 @@ external is a plugin that does not activate.
   On a machine without the face, Tyto measures and draws the bundled substitute, which needs no
   permission.
 
+- **A face Google Fonts serves is fetched the first time it is missing** (ADR 0120), once per
+  machine, unless the person turned Google Fonts off. A face Google does not serve, such as a
+  licensed CircularXX, is reported as `W_FONT_UNAVAILABLE` naming the substitute. Name the free
+  families a person can use instead, any kind of template, in its `manifest.yaml`:
+
+  ```yaml
+  fonts:
+    CircularXX: { alternatives: [Inter, Manrope, DM Sans] }
+  ```
+
+  The warning lists them; nothing is drawn in them unless somebody changes the template.
+
 `tyto template check` reads markup, so it has nothing to check in a code template's folder but
 the manifest. Render the example brief instead.
 

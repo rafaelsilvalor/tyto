@@ -25,6 +25,9 @@ const PURE_PACKAGES = [
   'packages/plugin-api',
   // Data and one `registerTheme` loop: it is bundled into main and runs anywhere (TYTO-300).
   'packages/theme-pack',
+  // A font source that reaches Google only through `host.fetch`; the app composes the network
+  // (TYTO-281, ADR 0120).
+  'packages/google-fonts',
 ];
 
 const NODE_PACKAGES = [
@@ -269,6 +272,18 @@ export default tseslint.config(
      */
     name: 'boundary/desktop-fetch-node',
     files: ['apps/desktop/scripts/fetch-node.ts'],
+    rules: { 'no-restricted-globals': 'off' },
+  },
+
+  {
+    /**
+     * The script a person runs to regenerate the Google Fonts catalogue (ADR 0120): it reads
+     * Google's metadata and the google/fonts repository and writes a file that is reviewed and
+     * committed. A tool, not the app — no render ever reads the network for the catalogue.
+     * Scoped to the file for the reason the rules above are.
+     */
+    name: 'boundary/google-fonts-catalogue-fetch',
+    files: ['tools/google-fonts-catalogue/src/generate.ts'],
     rules: { 'no-restricted-globals': 'off' },
   },
 

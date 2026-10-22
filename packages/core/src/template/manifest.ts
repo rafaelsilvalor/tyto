@@ -190,6 +190,19 @@ export const templateManifestSchema = z
      * process, needs none.
      */
     faces: z.array(manifestFaceSchema).optional(),
+    /**
+     * Per family the template draws, the free families a person can use instead when this
+     * machine has none of it and Google Fonts does not serve it either (TYTO-281, ADR 0120):
+     * `fonts: { CircularXX: { alternatives: [Inter, Manrope] } }`. The template's author knows
+     * the brand, and a licensed face is by definition one no public catalogue can classify.
+     * Named in `W_FONT_UNAVAILABLE`; nothing is drawn in them on Tyto's own initiative.
+     */
+    fonts: z
+      .record(
+        z.string().min(1),
+        z.strictObject({ alternatives: z.array(z.string().min(1)).min(1) }),
+      )
+      .optional(),
   })
   .superRefine((manifest, context) => {
     // Checked here rather than as a key schema on the records: Zod reports a failing

@@ -1,9 +1,15 @@
 import { htmlExporterManifest, htmlExporterPlugin } from '@tyto/export-html';
 import { svgExporterManifest, svgExporterPlugin } from '@tyto/export-svg';
 import type { Diagnostics } from '@tyto/core';
+import {
+  type GoogleFontsOptions,
+  googleFontsManifest,
+  googleFontsPlugin,
+} from '@tyto/google-fonts';
 import type { ExportResources } from '@tyto/io';
 import {
   type ExporterRegistry,
+  type HostCapabilities,
   type InProcessHost,
   type Plugin,
   createPluginHost,
@@ -60,6 +66,7 @@ export const BUILT_IN_MANIFESTS: readonly unknown[] = [
   chromiumManifest,
   fsInboxManifest,
   fsOutboxManifest,
+  googleFontsManifest,
 ];
 
 export interface BuiltInOptions {
@@ -67,10 +74,19 @@ export interface BuiltInOptions {
   readonly resources?: ExportResources;
   /** Registered when the run has something to raster. Absent for an svg-only render. */
   readonly rasterizer?: Rasterizer;
+  /**
+   * The Google Fonts `font-source` (ADR 0120), registered when present; absent when the run
+   * turned it off. It reaches the network through {@link capabilities} only.
+   */
+  readonly googleFonts?: GoogleFontsOptions;
+  /** `host.fetch` for a built-in that declares `net:` permissions: Google Fonts, today. */
+  readonly capabilities?: HostCapabilities;
 }
 
 export function activateBuiltIns(options: BuiltInOptions = {}): InProcessHost {
-  const host = createPluginHost();
+  const host = createPluginHost(
+    options.capabilities === undefined ? {} : { capabilities: options.capabilities },
+  );
 
   const plugins: Plugin[] = [
     htmlExporterPlugin({
@@ -83,6 +99,7 @@ export function activateBuiltIns(options: BuiltInOptions = {}): InProcessHost {
       ...(options.resources?.svg === undefined ? {} : { resources: options.resources.svg }),
     }),
     ...(options.rasterizer === undefined ? [] : [rasterizerPlugin(options.rasterizer)]),
+    ...(options.googleFonts === undefined ? [] : [googleFontsPlugin(options.googleFonts)]),
   ];
 
   // `host.activate`, not `plugin.activate(host.hostFor(...))`. The host is what validates

@@ -32,6 +32,9 @@
 'pkg:fonts':
   - changed-files:
       - any-glob-to-any-file: 'packages/fonts/**'
+'pkg:google-fonts':
+  - changed-files:
+      - any-glob-to-any-file: 'packages/google-fonts/**'
 'pkg:plugin-api':
   - changed-files:
       - any-glob-to-any-file: 'packages/plugin-api/**'
