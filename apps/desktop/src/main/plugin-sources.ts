@@ -5,6 +5,7 @@ import type {
   OwnedSource,
 } from '@tyto/plugin-api';
 
+import { NO_GOOGLE_FONTS, type WindowGoogleFonts } from './google-fonts.js';
 import type { SourceTrust } from './workspace.js';
 
 /**
@@ -59,19 +60,31 @@ export interface DesktopSourcesOptions {
    * already started.
    */
   readonly ready?: Promise<void>;
+  /**
+   * The built-in Google Fonts source (ADR 0120), asked after the installed plugins' sources,
+   * under the same rule. Absent: off.
+   */
+  readonly googleFonts?: WindowGoogleFonts;
 }
 
 export interface DesktopSources {
   readonly cache: SourceCache;
+  /** Google Fonts as this process composed it; {@link NO_GOOGLE_FONTS} when it did not. */
+  readonly googleFonts: WindowGoogleFonts;
+  /** Every font source the preview asks: the window plugins', then Google's while it is on. */
+  fontSources(): readonly OwnedSource<FontSourceContribution>[];
   /** The rule for one compile of a brief in `briefDirectory`, asked for `intent`. */
   callFor(briefDirectory: string | undefined, intent: SourceIntent): Promise<SourceCall>;
 }
 
 export function desktopSources(options: DesktopSourcesOptions): DesktopSources {
+  const googleFonts = options.googleFonts ?? NO_GOOGLE_FONTS;
+  // An installed plugin's source first: a family it serves is its own, not Google's.
+  const fontSources = () => [...options.fontSources(), ...googleFonts.fontSources()];
   const cache = sourceCache({
     home: options.home,
     assetSources: options.assetSources,
-    fontSources: options.fontSources,
+    fontSources,
     // The cache's own default is never used: every call here says whether it fetches.
     fetches: false,
     remembersFailures: { retry: ASK_AGAIN },
@@ -79,6 +92,8 @@ export function desktopSources(options: DesktopSourcesOptions): DesktopSources {
 
   return {
     cache,
+    googleFonts,
+    fontSources,
     async callFor(briefDirectory, intent) {
       const refused = (because: string): SourceCall => ({
         fetches: false,

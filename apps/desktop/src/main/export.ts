@@ -2,6 +2,7 @@ import {
   type Diagnostic,
   type Diagnostics,
   type FileSystem,
+  type TemplateManifest,
   diagnostic,
   hasErrors,
 } from '@tyto/core';
@@ -32,6 +33,7 @@ import {
   type JobEvent,
   type LoadedResources,
   type OutputRequest,
+  type TemplateSource,
   fontSubstitutionWarnings,
   isRasterFormat,
   runJob,
@@ -365,15 +367,38 @@ export async function createExportService(options: ExportServiceOptions): Promis
       await plugins,
       inForce,
     );
-    // Asked through this run's host, the activation the run reports refusals of.
+    // Asked through this run's host, the activation the run reports refusals of, and then
+    // Google Fonts while it is on (ADR 0120), which no run's host activates.
+    const runFontSources = () => [
+      ...host.registry.fontSources(),
+      ...(pluginSources?.googleFonts.fontSources() ?? []),
+    ];
     const call =
       asked === undefined
         ? undefined
         : {
             ...asked,
             assetSources: () => host.registry.assetSources(),
-            fontSources: () => host.registry.fontSources(),
+            fontSources: runFontSources,
           };
+    // The template the job loads, kept for the one question only its manifest answers: which
+    // free families stand in for a face nobody can supply (ADR 0120).
+    let loadedManifest: TemplateManifest | undefined;
+    const loadingTemplates: TemplateSource = {
+      load: async (name) => {
+        const answer = await wiring.source.load(name);
+        if (answer.ok) loadedManifest = answer.value.manifest;
+        return answer;
+      },
+    };
+    const missingFaceWarnings = (substitutions: Parameters<typeof fontSubstitutionWarnings>[0]) =>
+      pluginSources === undefined
+        ? fontSubstitutionWarnings(substitutions)
+        : pluginSources.googleFonts.missingFaceWarnings(
+            substitutions,
+            loadedManifest,
+            runFontSources(),
+          );
     // The kits of the plugins this run activated, one per brand (ADR 0063): the same host
     // the run reports refusals of, so a refused plugin offers no kit either.
     const brandKits = host.registry.brandKitsByBrand();
@@ -433,7 +458,7 @@ export async function createExportService(options: ExportServiceOptions): Promis
         // Bundled in front of markup, so a template whose body is code draws here the
         // same way it draws through the CLI. Nothing is loaded from a folder either way.
         // An installed code template in front of both, drawn in its plugin's process.
-        templates: wiring.source,
+        templates: loadingTemplates,
         // `confine` stays on, its default: a brief is often written by something else
         // (ADR 0011), and `../../../.ssh/id_rsa` embedded in an exported PNG is a real way
         // to leak a file.
@@ -461,12 +486,12 @@ export async function createExportService(options: ExportServiceOptions): Promis
             const faces = refreshFonts(inForce);
             const still = fonts.substitutions(needed.faces);
             return {
-              diagnostics: [...fontSubstitutionWarnings(still), ...fetched.diagnostics],
+              diagnostics: [...missingFaceWarnings(still), ...fetched.diagnostics],
               recompile: { faces },
             };
           }
           return {
-            diagnostics: [...fontSubstitutionWarnings(missing), ...(fetched?.diagnostics ?? [])],
+            diagnostics: [...missingFaceWarnings(missing), ...(fetched?.diagnostics ?? [])],
           };
         },
         sink,

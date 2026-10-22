@@ -41,6 +41,7 @@ describe("the app's settings outline", () => {
       'codeFontSize',
       'fontSizes',
       'fontFamilies',
+      'googleFonts',
     ]);
   });
 

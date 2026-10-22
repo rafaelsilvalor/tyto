@@ -32,7 +32,7 @@ import { type VimModeStyle, vimModeStyleContribution } from './vim-mode-style.js
  * reads off a disk and the window is told what the answer was, so the shape has to be one
  * declaration both halves import. Linted pure — no Node, no DOM.
  *
- * **Twenty-one settings the built-in `desktop` plugin declares** through the `configuration`
+ * **Twenty-two settings the built-in `desktop` plugin declares** through the `configuration`
  * extension point (TYTO-206, ADR 0073), like any plugin's: built-in is a plugin. Their keys
  * stay unprefixed, exactly as every `settings.json` written before that card spells them.
  * Each one is validated alone, so a hand-broken value costs that key and nothing else.
@@ -238,7 +238,47 @@ export function tabSizeExample(): string {
 }
 
 /**
- * The twenty-one, in the order the settings file is documented in. `theme` checks its ids against
+ * Whether the window asks Google Fonts for a template's face this machine lacks (TYTO-281,
+ * ADR 0120). On by default, as the CLI's is, because Rafael asked for it; read on every
+ * compile, so a save applies it to the next preview with no restart. Off, a missing face is
+ * `W_FONT_SUBSTITUTED` exactly as before, and nothing is asked.
+ *
+ * A boolean and nothing else: **where** Tyto connects is never a setting's to say. The test
+ * server's address is the environment's `TYTO_GOOGLE_FONTS_BASE`, which main reads and nothing
+ * here can reach. The key is `googleFonts`, not `fonts.googleFonts`: a built-in's key is letters
+ * and digits, and the host would read a dot as a plugin's prefix (`configuration.ts`).
+ */
+export const googleFontsContribution = {
+  id: 'googleFonts',
+  schema: z.boolean(),
+  default: true,
+  description:
+    "Fetch a template's font this machine lacks from Google Fonts on first use (default true). Each fetch sends Google the family, weight and style.",
+  options: [
+    {
+      value: true,
+      description:
+        'A missing font Google serves is fetched once, on save or open, and drawn from then on.',
+    },
+    {
+      value: false,
+      description: 'Nothing is asked of Google; a missing font is drawn in a substitute, reported.',
+    },
+  ],
+} satisfies ConfigurationContribution<boolean>;
+
+/** The key as a newly created `settings.json` shows it, commented out (TYTO-281). */
+export function googleFontsExample(): string {
+  return [
+    "// Fetch a template's font this machine lacks from Google Fonts on first use: true (the default) or false.",
+    '// "googleFonts": true,',
+  ]
+    .map((line) => `  ${line}`)
+    .join('\n');
+}
+
+/**
+ * The twenty-two, in the order the settings file is documented in. `theme` checks its ids against
  * `lookup`, which main builds from every theme the plugins registered (TYTO-208); the default
  * knows the built-in two and lets any other id through.
  */
@@ -267,6 +307,7 @@ export function settingContributions(
     codeFontSizeContribution,
     fontSizesContribution,
     fontFamiliesContribution,
+    googleFontsContribution,
   ] as readonly ConfigurationContribution[];
 }
 
@@ -304,6 +345,8 @@ export interface Settings {
   /** A size and a face per area of the window, over the two bases (TYTO-272 PR B). */
   readonly fontSizes: FontSizes;
   readonly fontFamilies: FontFamilies;
+  /** Whether a missing face is asked of Google Fonts (TYTO-281, ADR 0120). */
+  readonly googleFonts: boolean;
 }
 
 export const DEFAULT_SETTINGS: Settings = {
@@ -328,13 +371,14 @@ export const DEFAULT_SETTINGS: Settings = {
   codeFontSize: codeFontSizeContribution.default,
   fontSizes: fontSizesContribution.default,
   fontFamilies: fontFamiliesContribution.default,
+  googleFonts: googleFontsContribution.default,
 };
 
 /** What a queue folder produces until a person chooses otherwise (ADR 0044). */
 export const DEFAULT_QUEUE_KINDS: readonly string[] = ['png'];
 
 /**
- * The twenty-one out of the resolved values, which already hold every declared key with a value
+ * The twenty-two out of the resolved values, which already hold every declared key with a value
  * its schema accepted or its default (`resolveSettings`).
  */
 export function settingsFrom(values: Readonly<Record<string, unknown>>): Settings {
@@ -362,5 +406,6 @@ export function settingsFrom(values: Readonly<Record<string, unknown>>): Setting
     codeFontSize: pick('codeFontSize'),
     fontSizes: pick('fontSizes'),
     fontFamilies: pick('fontFamilies'),
+    googleFonts: pick('googleFonts'),
   };
 }

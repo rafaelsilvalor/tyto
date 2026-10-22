@@ -31,6 +31,7 @@ import type { Rasterizer } from '@tyto/raster';
 import { type Locale, localeFor, translate } from '../../shared/i18n/index.js';
 import {
   formatBriefOnSaveExample,
+  googleFontsExample,
   indentGuidesExample,
   type Settings,
   stickyScrollExample,
@@ -87,6 +88,7 @@ import {
 import { drawsTitleBar, frameOptions, overlayFor } from './title-bar.js';
 import { type WindowPlugins, windowPlugins } from './window-plugins.js';
 import { desktopSources } from './plugin-sources.js';
+import { googleFontsOptionsFor, windowGoogleFonts } from './google-fonts.js';
 import { createPreviewService } from './preview.js';
 import { createProjectSources } from './project.js';
 import { createTemplateEditor } from './template-editor.js';
@@ -136,14 +138,14 @@ const SETTINGS_SETTLE_MS = 100;
  * and an example colour, and `vimModeStyle` with its three values (TYTO-301), so the bar's
  * options are in the file the person is looking at; and `indentGuides` (TYTO-293),
  * `stickyScroll` (TYTO-295), `formatBriefOnSave` and `tabSize` (TYTO-297), `briefColumns`
- * with its four looks (TYTO-298).
+ * with its four looks (TYTO-298), and `googleFonts` (TYTO-281).
  */
 const NEW_SETTINGS_FILE =
   '// Tyto settings: JSON with comments. Saving this file applies it, with no restart.\n{\n' +
   `${statusBarItemsExample()}\n${statusBarColorsExample()}\n${vimModeStyleExample()}\n` +
   `${indentGuidesExample()}\n${stickyScrollExample()}\n` +
   `${formatBriefOnSaveExample()}\n${tabSizeExample()}\n${briefColumnsExample()}\n` +
-  `${typographyExample()}\n}\n`;
+  `${typographyExample()}\n${googleFontsExample()}\n}\n`;
 
 /**
  * Puts a crash on screen (TYTO-140).
@@ -549,6 +551,8 @@ async function start(): Promise<void> {
   // And the indent width and format-on-save (TYTO-297), on the same answer.
   let tabSize = saved.tabSize;
   let formatBriefOnSave = saved.formatBriefOnSave;
+  // And whether a missing face is asked of Google Fonts (TYTO-281), read on every compile.
+  let googleFonts = saved.googleFonts;
   // And how the columns of a `|` line are drawn (TYTO-298), on the same answer.
   let briefColumns = saved.briefColumns;
   // And the faces and sizes (TYTO-272), on the same answer. The zoom is applied here, in main.
@@ -756,6 +760,13 @@ async function start(): Promise<void> {
     fontSources: () => contributed.fontSources(),
     trustFor: (directory) => workspace.sourceTrustFor(directory),
     ready: contributed.ready,
+    // The built-in Google Fonts source (ADR 0120), behind the same cache and rule, on the
+    // window's own network. Where it connects is the environment's alone: a test server.
+    googleFonts: windowGoogleFonts({
+      options: googleFontsOptionsFor(process.env),
+      capabilities,
+      enabled: () => googleFonts,
+    }),
   });
   const preview = await createPreviewService({
     fileSystem,
@@ -854,6 +865,7 @@ async function start(): Promise<void> {
       if (keys.includes('stickyScroll')) stickyScroll = next.stickyScroll;
       if (keys.includes('tabSize')) tabSize = next.tabSize;
       if (keys.includes('formatBriefOnSave')) formatBriefOnSave = next.formatBriefOnSave;
+      if (keys.includes('googleFonts')) googleFonts = next.googleFonts;
       if (keys.includes('briefColumns')) briefColumns = next.briefColumns;
       if (keys.includes('zoom')) applyZoom(next.zoom);
       if (
