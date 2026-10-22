@@ -1,7 +1,7 @@
 import { randomUUID } from 'node:crypto';
 import { type Dirent, type FSWatcher, watch as watchFolder } from 'node:fs';
-import { readdir, realpath, stat } from 'node:fs/promises';
-import { dirname, extname, join } from 'node:path';
+import { lstat, mkdir, readdir, realpath, rename, stat, writeFile } from 'node:fs/promises';
+import { basename, dirname, extname, isAbsolute, join, relative, resolve } from 'node:path';
 
 import { isInside } from '@tyto/io';
 
@@ -22,6 +22,11 @@ import type { IpcResponse } from '../../shared/ipc.js';
  *
  * **Nothing here runs anything** (ADR 0111): an untrusted folder lists exactly as a trusted one,
  * and the only thing an entry can be used for is opening a `.brief` as text.
+ *
+ * **New, rename and delete take an id and a name, never a path** (TYTO-352, ADR 0121). A name is
+ * checked here, the same on every operating system; no write overwrites anything; and a delete
+ * goes to the operating system's trash and nowhere else. They run nothing either, so they work
+ * in an untrusted folder as in a trusted one.
  */
 
 export type ExplorerListing = IpcResponse<'explorer:list'>;
@@ -77,6 +82,30 @@ export interface ExplorerService {
   list(entryId: string | null): Promise<ExplorerListing>;
   /** The brief `entryId` names, while it still lives inside the root; nothing otherwise. */
   briefPath(entryId: string): Promise<string | undefined>;
+  /**
+   * Makes an empty file or folder called `name` in the folder `parentId` names (`null` is the
+   * root). Fails with `exists` rather than replace anything, and with `invalid` for a name
+   * {@link checkEntryName} refuses.
+   */
+  create(
+    parentId: string | null,
+    name: string,
+    kind: 'file' | 'folder',
+  ): Promise<ExplorerWrite<{ entry: ExplorerEntry; path: string }>>;
+  /**
+   * Renames the entry in place, in its own folder. The entry keeps its id and everything under
+   * a folder keeps theirs, so an expanded subtree survives; `from` and `to` are for the tabs.
+   */
+  rename(
+    entryId: string,
+    name: string,
+  ): Promise<ExplorerWrite<{ entry: ExplorerEntry; from: string; to: string }>>;
+  /**
+   * Moves the entry to the operating system's trash through the injected adapter, and forgets
+   * its ids. A trash that fails answers `trash-failed` and leaves the entry where it was:
+   * there is no second way to delete.
+   */
+  delete(entryId: string): Promise<ExplorerDelete>;
   /** Stops watching. Nothing is emitted afterwards. */
   close(): void;
 }
@@ -95,7 +124,73 @@ export interface ExplorerServiceOptions {
   readonly watch?: WatchFolder;
   readonly settleMs?: number;
   readonly cap?: number;
+  /**
+   * Moves a path to the operating system's trash — `shell.trashItem` in the app, which the
+   * composition root wraps so it is looked up at every call and an end-to-end suite can stand
+   * in for it. Absent, every delete answers `trash-failed`: there is no fallback to `rm`.
+   */
+  readonly trash?: (path: string) => Promise<void>;
 }
+
+/** Why a new or a rename did not happen; see ADR 0121. */
+export type ExplorerWriteFailure = 'invalid' | 'exists' | 'gone';
+
+export type ExplorerWrite<Done> =
+  ({ readonly ok: true } & Done) | { readonly ok: false; readonly reason: ExplorerWriteFailure };
+
+export type ExplorerDelete =
+  | { readonly ok: true; readonly path: string }
+  | { readonly ok: false; readonly reason: 'gone' | 'trash-failed' };
+
+/** Windows' reserved device names, which name a device and not a file with any extension. */
+const DEVICE_NAME = /^(?:con|prn|aux|nul|com[1-9]|lpt[1-9])(?:\..*)?$/iu;
+
+/** Separators, NUL and every other control character, and what Windows forbids in a name. */
+// eslint-disable-next-line no-control-regex -- refusing control characters is the point.
+const FORBIDDEN_CHARACTER = /[/\\<>:"|?*\u0000-\u001f\u007f]/u;
+
+/** The longest name a file system this app runs on accepts in one segment. */
+export const ENTRY_NAME_MAX = 255;
+
+/**
+ * Whether `name` may be given to a new or renamed entry (ADR 0121 rule 1). **The same rules on
+ * every operating system**, Windows' included, so a folder made on Linux still opens on
+ * Windows. Refused: empty or blank, `.` and `..`, a separator, NUL or another control
+ * character, any of `<>:"|?*`, a trailing dot or space, a device name such as `CON` or
+ * `com1.txt`, more than 255 characters, and `.git`. Nothing is trimmed: what the person typed
+ * is the name, or it is refused.
+ */
+export function checkEntryName(name: string): boolean {
+  if (name.trim() === '' || name === '.' || name === '..') return false;
+  if (name.length > ENTRY_NAME_MAX) return false;
+  if (FORBIDDEN_CHARACTER.test(name)) return false;
+  if (name.endsWith('.') || name.endsWith(' ')) return false;
+  if (DEVICE_NAME.test(name)) return false;
+  return name.toLowerCase() !== '.git';
+}
+
+/**
+ * Where `path` lies under `base`, as a relative path — `''` for `base` itself — or nothing when
+ * it is not under it. Not `isInside`'s `startsWith('..')`, which would also leave out a child
+ * called `..notes`; only a first segment that *is* `..` leads out.
+ */
+export function relativeUnder(base: string, path: string): string | undefined {
+  const rest = relative(resolve(base), resolve(path));
+  if (rest === '') return '';
+  if (isAbsolute(rest) || rest.split(/[\\/]/u)[0] === '..') return undefined;
+  return rest;
+}
+
+const codeOf = (cause: unknown): string | undefined =>
+  typeof cause === 'object' && cause !== null && 'code' in cause
+    ? String((cause as { code: unknown }).code)
+    : undefined;
+
+const exists = (path: string): Promise<boolean> =>
+  lstat(path).then(
+    () => true,
+    () => false,
+  );
 
 /** Recursive `fs.watch`: native on Windows and macOS, Node's own walk on Linux. */
 export const watchRecursively: WatchFolder = (folder, onChange, onError) => {
@@ -266,6 +361,68 @@ export function createExplorerService(options: ExplorerServiceOptions): Explorer
     }
   };
 
+  /** The folder a new entry goes in, by id (`null` is the root), while it is one, inside. */
+  const folderToWriteIn = async (
+    folderId: string | null,
+    rootReal: string,
+  ): Promise<string | undefined> => {
+    if (root === undefined) return undefined;
+    const entry = folderId === null ? undefined : entryOf.get(folderId);
+    if (folderId !== null && entry?.kind !== 'folder') return undefined;
+    const folder = entry?.path ?? root.folder;
+    return (await folderInside(folder, rootReal)) ? folder : undefined;
+  };
+
+  /** An entry just written, as the listing would show it, under the id it has or a new one. */
+  const describeEntry = async (
+    path: string,
+    isFolder: boolean,
+    rootReal: string,
+  ): Promise<ExplorerEntry> => {
+    const name = basename(path);
+    const kind = kindOf(isFolder, name);
+    const place = await realpath(path).then(
+      (real) => placeOf(real, isFolder, rootReal, places),
+      () => undefined,
+    );
+    return { id: idFor(path, kind), name, kind, ...(place === undefined ? {} : { place }) };
+  };
+
+  /**
+   * Moves every id at or under `from` to the same place under `to`, so the entry and its
+   * descendants keep theirs — the window's expanded subtree is keyed by them. An id left at the
+   * new path by an entry that vanished outside the app is dropped, not shared.
+   */
+  const rekey = (from: string, to: string): void => {
+    const moved = new Map<string, string>();
+    const kept = new Map<string, string>();
+    for (const [path, id] of idOfPath) {
+      const rest = relativeUnder(from, path);
+      if (rest === undefined) {
+        kept.set(path, id);
+        continue;
+      }
+      const next = rest === '' ? to : join(to, rest);
+      moved.set(next, id);
+      const known = entryOf.get(id);
+      if (known !== undefined) entryOf.set(id, { ...known, path: next });
+    }
+    for (const [path, id] of kept) {
+      if (moved.has(path)) entryOf.delete(id);
+      else moved.set(path, id);
+    }
+    idOfPath = moved;
+  };
+
+  /** Forgets every id at or under `path`, which has just gone to the trash. */
+  const forgetUnder = (path: string): void => {
+    for (const [held, id] of idOfPath) {
+      if (relativeUnder(path, held) === undefined) continue;
+      idOfPath.delete(held);
+      entryOf.delete(id);
+    }
+  };
+
   const listFolder = async (folder: string): Promise<ExplorerListing> => {
     const current = root;
     if (current === undefined) return NOTHING;
@@ -339,8 +496,110 @@ export function createExplorerService(options: ExplorerServiceOptions): Explorer
       }
     },
 
+    async create(parentId, name, kind) {
+      const current = root;
+      if (current === undefined) return GONE;
+      if (!checkEntryName(name)) return INVALID;
+      const folder = await folderToWriteIn(parentId, current.real);
+      if (folder === undefined) return GONE;
+      const target = join(folder, name);
+      if (dirname(resolve(target)) !== resolve(folder)) return INVALID;
+      try {
+        // `wx` and a mkdir that is not recursive: each fails on anything already there, so
+        // the check and the write are one call and nothing can slip between them.
+        if (kind === 'folder') await mkdir(target);
+        else await writeFile(target, '', { encoding: 'utf8', flag: 'wx' });
+      } catch (cause) {
+        const code = codeOf(cause);
+        if (code === 'EEXIST') return EXISTS;
+        if (code === 'ENOENT' || code === 'ENOTDIR') return GONE;
+        throw cause;
+      }
+      if (root !== current) return GONE;
+      return {
+        ok: true,
+        entry: await describeEntry(target, kind === 'folder', current.real),
+        path: target,
+      };
+    },
+
+    async rename(entryId, name) {
+      const current = root;
+      const entry = entryOf.get(entryId);
+      if (current === undefined || entry === undefined) return GONE;
+      if (!checkEntryName(name)) return INVALID;
+      const from = entry.path;
+      const folder = dirname(from);
+      if (!(await folderInside(folder, current.real)) || !(await exists(from))) return GONE;
+      const to = join(folder, name);
+      if (dirname(resolve(to)) !== resolve(folder)) return INVALID;
+      const isFolder = entry.kind === 'folder';
+      if (to !== from) {
+        // Asked first, because `rename` replaces a file that is there — on Windows too. The one
+        // target allowed to exist is the entry itself under another case, on a disk that
+        // ignores case: then the real paths are one.
+        if ((await exists(to)) && !(await sameEntryByCase(from, to))) return EXISTS;
+        try {
+          await rename(from, to);
+        } catch (cause) {
+          const code = codeOf(cause);
+          if (code === 'ENOENT') return GONE;
+          if (code === 'EEXIST' || code === 'ENOTEMPTY') return EXISTS;
+          throw cause;
+        }
+        rekey(from, to);
+      }
+      if (root !== current) return GONE;
+      return { ok: true, entry: await describeEntry(to, isFolder, current.real), from, to };
+    },
+
+    async delete(entryId) {
+      const current = root;
+      const entry = entryOf.get(entryId);
+      if (current === undefined || entry === undefined) return { ok: false, reason: 'gone' };
+      const { path } = entry;
+      if (!(await folderInside(dirname(path), current.real)) || !(await exists(path))) {
+        return { ok: false, reason: 'gone' };
+      }
+      const trash = options.trash;
+      if (trash === undefined) return { ok: false, reason: 'trash-failed' };
+      try {
+        await trash(path);
+      } catch (cause) {
+        // Never a second way: a file the trash refused stays, and the window says so.
+        options.onError?.('explorer: the trash refused an entry', cause);
+        return { ok: false, reason: 'trash-failed' };
+      }
+      forgetUnder(path);
+      return { ok: true, path };
+    },
+
     close() {
       stopWatching();
     },
   };
+}
+
+const GONE = { ok: false, reason: 'gone' } as const;
+const INVALID = { ok: false, reason: 'invalid' } as const;
+const EXISTS = { ok: false, reason: 'exists' } as const;
+
+/** Whether `folder` is still a folder whose real path lies inside the root's. */
+async function folderInside(folder: string, rootReal: string): Promise<boolean> {
+  try {
+    const real = await realpath(folder);
+    return isInside(rootReal, real) && (await stat(real)).isDirectory();
+  } catch {
+    return false;
+  }
+}
+
+/** `to` is `from` under another case on a disk that ignores case, and not a second entry. */
+async function sameEntryByCase(from: string, to: string): Promise<boolean> {
+  if (from.toLowerCase() !== to.toLowerCase()) return false;
+  try {
+    return (await realpath(from)) === (await realpath(to));
+  } catch {
+    return false;
+  }
 }

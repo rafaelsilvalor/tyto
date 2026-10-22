@@ -218,7 +218,13 @@ export interface IpcDependencies {
    * The open workspace folder's files (TYTO-279, ADR 0115): listed by id, and a brief's path
    * found by id, only inside the folder main has open.
    */
-  readonly explorer: Pick<ExplorerService, 'list' | 'briefPath'>;
+  readonly explorer: Pick<ExplorerService, 'list' | 'briefPath' | 'create' | 'rename' | 'delete'>;
+  /**
+   * A native context menu of the window's items at a point, settling with the id picked or
+   * `null` (TYTO-352, ADR 0121). A function for the reason `confirm` is one: `Menu.popup` is
+   * the browser process's.
+   */
+  readonly contextMenu: (request: IpcRequest<'menu:context'>) => Promise<string | null>;
   /**
    * Rebuilds the application menu in a language (TYTO-124).
    *
@@ -377,6 +383,7 @@ export function createHandlers(dependencies: IpcDependencies): Handlers {
   const {
     askToSave,
     confirm,
+    contextMenu,
     credentials,
     documents,
     exit,
@@ -452,6 +459,34 @@ export function createHandlers(dependencies: IpcDependencies): Handlers {
       const path = await explorer.briefPath(entryId);
       if (path === undefined) return { document: null, documentId: null };
       return documents.openPath(documentId, path);
+    },
+
+    // TYTO-352, ADR 0121: the explorer writes by id and name; the tabs follow here, in the one
+    // place that holds both the explorer and the documents.
+    'explorer:create': async ({ documentId, parentId, name, kind }) => {
+      const made = await explorer.create(parentId, name, kind);
+      if (!made.ok) return made;
+      const opened =
+        made.entry.kind === 'brief'
+          ? await documents.openPath(documentId, made.path)
+          : { document: null, documentId: null };
+      return { ok: true, entry: made.entry, ...opened };
+    },
+
+    'explorer:rename': async ({ entryId, name }) => {
+      const renamed = await explorer.rename(entryId, name);
+      if (!renamed.ok) return renamed;
+      return {
+        ok: true,
+        entry: renamed.entry,
+        moved: documents.retargetUnder(renamed.from, renamed.to),
+      };
+    },
+
+    'explorer:delete': async ({ entryId }) => {
+      const deleted = await explorer.delete(entryId);
+      if (!deleted.ok) return deleted;
+      return { ok: true, released: documents.releaseUnder(deleted.path) };
     },
 
     'file:open': ({ documentId }) => documents.open(documentId),
@@ -716,6 +751,13 @@ export function createHandlers(dependencies: IpcDependencies): Handlers {
     'menu:model': () => Promise.resolve({ menus: menu.model() }),
 
     'menu:popup': ({ id, x, y }) => menu.popup(id, { x, y }),
+
+    'menu:context': async (request) => {
+      const chosen = await contextMenu(request);
+      // Only an item the window offered, and offered enabled, is an answer.
+      const offered = request.items.some((item) => item.id === chosen && item.enabled);
+      return { chosen: offered ? chosen : null };
+    },
 
     'template:open': async ({ directory }) => {
       const chosen = directory ?? (await templateDialogs.chooseTemplate());

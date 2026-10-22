@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 
 import { type FileDialogs, createDocumentService } from './documents.js';
+import { pathLabelOf } from './path-label.js';
 import { type RecentEntry, type RecentFiles } from './recent-files.js';
 
 /**
@@ -519,5 +520,76 @@ describe('the path a tab shows on hover (TYTO-288, ADR 0086)', () => {
       document: null,
       missing: false,
     });
+  });
+});
+
+/** TYTO-352, ADR 0121: the explorer renamed or trashed a file or a folder that tabs hold. */
+describe('tabs that follow the explorer', () => {
+  const FOLDER = at('work', 'slides');
+  const CAPA = at('work', 'slides', 'capa.brief');
+  const FECHO = at('work', 'slides', 'extra', 'fecho.brief');
+  // Shares the folder's name as a prefix, and is not under it.
+  const NEIGHBOUR = at('work', 'slides-old', 'capa.brief');
+  const HOME = at('casa');
+
+  const opened = async () => {
+    const files = disk({ [CAPA]: 'a', [FECHO]: 'b', [NEIGHBOUR]: 'c' });
+    const service = createDocumentService({
+      dialogs: dialogs({}),
+      recent: recentFiles(),
+      home: () => HOME,
+      disk: files,
+    });
+    await service.openPath('tab-capa', CAPA);
+    await service.openPath('tab-fecho', FECHO, 'fecho · brief');
+    await service.openPath('tab-neighbour', NEIGHBOUR);
+    return { service, files };
+  };
+
+  it('moves every tab under a renamed folder, its label with it, and no neighbour', async () => {
+    const { service, files } = await opened();
+    const RENAMED = at('work', 'capitulos');
+
+    const moved = service.retargetUnder(FOLDER, RENAMED);
+
+    expect(moved).toEqual([
+      {
+        documentId: 'tab-capa',
+        name: 'capa.brief',
+        pathLabel: pathLabelOf(at(RENAMED, 'capa.brief'), HOME),
+      },
+      {
+        documentId: 'tab-fecho',
+        name: 'fecho · brief',
+        pathLabel: pathLabelOf(at(RENAMED, 'extra', 'fecho.brief'), HOME),
+      },
+    ]);
+    expect(service.pathOf('tab-capa')).toBe(at(RENAMED, 'capa.brief'));
+    expect(service.pathOf('tab-fecho')).toBe(at(RENAMED, 'extra', 'fecho.brief'));
+    expect(service.pathOf('tab-neighbour')).toBe(NEIGHBOUR);
+
+    // The next save lands at the new place, under the label the tab already had.
+    const saved = await service.save('tab-fecho', 'depois', false);
+    expect(files.written[at(RENAMED, 'extra', 'fecho.brief')]).toBe('depois');
+    expect(saved.document?.name).toBe('fecho · brief');
+  });
+
+  it('moves the one tab of a renamed file and names it by the new name', async () => {
+    const { service } = await opened();
+    const moved = service.retargetUnder(CAPA, at(FOLDER, 'abertura.brief'));
+    expect(moved.map((each) => [each.documentId, each.name])).toEqual([
+      ['tab-capa', 'abertura.brief'],
+    ]);
+    expect(service.pathOf('tab-fecho')).toBe(FECHO);
+  });
+
+  it('releases every tab under a trashed folder, and only those', async () => {
+    const { service } = await opened();
+
+    expect(service.releaseUnder(FOLDER)).toEqual(['tab-capa', 'tab-fecho']);
+    expect(service.pathOf('tab-capa')).toBeUndefined();
+    expect(service.pathOf('tab-fecho')).toBeUndefined();
+    expect(service.pathOf('tab-neighbour')).toBe(NEIGHBOUR);
+    expect(service.releaseUnder(FOLDER)).toEqual([]);
   });
 });
