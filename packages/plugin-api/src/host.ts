@@ -34,6 +34,12 @@ import {
   declaredSetting,
 } from './configuration.js';
 import { type ContributionPoint, type PluginManifest, validatePluginManifest } from './manifest.js';
+import {
+  type AssetSourceContribution,
+  type FontSourceContribution,
+  type OwnedSource,
+  SOURCE_SCHEME,
+} from './sources.js';
 import { type ThemeContribution, checkThemeContribution } from './theme.js';
 
 /**
@@ -102,6 +108,10 @@ export interface PluginHost {
    * Data only, so an installed plugin may contribute one.
    */
   registerTheme(theme: ThemeContribution): Disposable;
+  /** Images behind one or more URI schemes, fetched once and cached by the host (ADR 0117). */
+  registerAssetSource(source: AssetSourceContribution): Disposable;
+  /** Faces of the families it names, for a face no local folder has (ADR 0117). */
+  registerFontSource(source: FontSourceContribution): Disposable;
 
   /**
    * The plugin's own configuration, validated.
@@ -175,6 +185,10 @@ export interface PluginRegistry {
   configurations(): readonly DeclaredSetting[];
   /** Every colour theme, in registration order: built-ins first (ADR 0077). */
   themes(): readonly ThemeContribution[];
+  /** Every asset source with its plugin, in registration order: earlier wins a scheme. */
+  assetSources(): readonly OwnedSource<AssetSourceContribution>[];
+  /** Every font source with its plugin, in registration order: earlier wins a family. */
+  fontSources(): readonly OwnedSource<FontSourceContribution>[];
 }
 
 /** The kits of every plugin merged into one per brand, and the warnings the merge made. */
@@ -358,6 +372,34 @@ function mergeBrandKits(entries: readonly Entry<BrandKitContribution>[]): BrandK
   return { kits, diagnostics };
 }
 
+/**
+ * A scheme a reference could never spell is a wiring mistake, said at registration rather
+ * than met as a source that silently answers nothing. A `TypeError`, which `tryActivate`
+ * turns into `E_PLUGIN_ACTIVATE` for a plugin somebody installed.
+ */
+function checkAssetSource(pluginId: string, source: AssetSourceContribution): void {
+  const bad = source.schemes.filter((scheme) => !SOURCE_SCHEME.test(scheme));
+  if (source.schemes.length === 0 || bad.length > 0) {
+    throw new TypeError(
+      `Plugin '${pluginId}' registered asset source '${source.id}' with ` +
+        (bad.length > 0
+          ? `the scheme${bad.length > 1 ? 's' : ''} ${bad.map((scheme) => `'${scheme}'`).join(', ')}`
+          : 'no scheme') +
+        `. A scheme is two or more lowercase letters, digits, '+', '.' or '-', starting ` +
+        `with a letter, and written without its colon.`,
+    );
+  }
+}
+
+function checkFontSource(pluginId: string, source: FontSourceContribution): void {
+  if (source.families.length === 0 || source.families.some((family) => family.trim() === '')) {
+    throw new TypeError(
+      `Plugin '${pluginId}' registered font source '${source.id}' with no family, or an ` +
+        `empty one. A font source is asked by family, so it has to name at least one.`,
+    );
+  }
+}
+
 function createEmitter(): TypedEmitter {
   const listeners = new Map<string, Set<(payload: never) => void>>();
 
@@ -412,6 +454,8 @@ export function createPluginHost(options: PluginHostOptions = {}): InProcessHost
     contributed,
   );
   const themes = new Point<ThemeContribution>('theme', emitter, contributed);
+  const assetSources = new Point<AssetSourceContribution>('asset-source', emitter, contributed);
+  const fontSources = new Point<FontSourceContribution>('font-source', emitter, contributed);
   let rawConfig: Readonly<Record<string, unknown>> | undefined = options.config;
 
   const points = [
@@ -427,6 +471,8 @@ export function createPluginHost(options: PluginHostOptions = {}): InProcessHost
     panels,
     configurations,
     themes,
+    assetSources,
+    fontSources,
   ];
 
   const registry: PluginRegistry = {
@@ -447,6 +493,10 @@ export function createPluginHost(options: PluginHostOptions = {}): InProcessHost
     panels: () => panels.list(),
     configurations: () => configurations.list().map((entry) => entry.setting),
     themes: () => themes.list(),
+    assetSources: () =>
+      assetSources.owned().map((entry) => ({ plugin: entry.plugin, source: entry.value })),
+    fontSources: () =>
+      fontSources.owned().map((entry) => ({ plugin: entry.plugin, source: entry.value })),
   };
 
   function hostWith(
@@ -479,6 +529,14 @@ export function createPluginHost(options: PluginHostOptions = {}): InProcessHost
       registerTheme: (theme) => {
         checkThemeContribution(pluginId, theme);
         return themes.add(pluginId, theme, onConflict);
+      },
+      registerAssetSource: (source) => {
+        checkAssetSource(pluginId, source);
+        return assetSources.add(pluginId, source, onConflict);
+      },
+      registerFontSource: (source) => {
+        checkFontSource(pluginId, source);
+        return fontSources.add(pluginId, source, onConflict);
       },
 
       config<T>(schema: ZodType<T>): T {

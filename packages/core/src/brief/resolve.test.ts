@@ -376,6 +376,36 @@ describe('one test per diagnostic code', () => {
     );
   });
 
+  it("reports a resolver's own explanation of a miss in place of E_ASSET_NOT_FOUND", async () => {
+    // A plugin source that failed knows why, and "not found in briefs/" would send the
+    // author looking on a disk for a file that was never going to be there (ADR 0117).
+    const at = sourceRange(60, 80);
+    const ast = valid({ directives: [directive('imagem', 'test:logo', {}, at)] });
+    const failed = diagnostic('E_ASSET_SOURCE_FAILED', {
+      path: 'test:logo',
+      plugin: 'drive',
+      problem: 'quota exceeded',
+    });
+    const found = await problems(ast, {
+      assets: {
+        ...assets,
+        explain: (reference) => (reference === 'test:logo' ? failed : undefined),
+      },
+    });
+
+    expect(found.map((item) => item.code)).not.toContain('E_ASSET_NOT_FOUND');
+    const [problem] = found.filter((item) => item.code === 'E_ASSET_SOURCE_FAILED');
+    expect(problem?.message).toBe(failed.message);
+    expect(problem?.range).toEqual(at);
+  });
+
+  it('keeps E_ASSET_NOT_FOUND when the resolver has nothing to add', async () => {
+    const ast = valid({ directives: [directive('imagem', './sumiu.png')] });
+    expect(await codes(ast, { assets: { ...assets, explain: () => undefined } })).toContain(
+      'E_ASSET_NOT_FOUND',
+    );
+  });
+
   it('W_UNUSED_SLOT — a slot the brief set that the template does not render', async () => {
     // Only a caller that has read the template body knows what it renders, so the warning
     // fires only when one passes the set.

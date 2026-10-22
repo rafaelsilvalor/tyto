@@ -223,13 +223,37 @@ export interface JobPorts {
    * It may answer with diagnostics, which join the job's own. A loader is the one place
    * that learns a face was substituted (`W_FONT_SUBSTITUTED`, ADR 0037): the resolvers it
    * fills answer with bytes and have no channel for saying whose bytes they were.
+   *
+   * **Or it may ask for one more compile** (ADR 0117), by answering {@link LoadedResources}
+   * with the faces to measure against. A face a plugin fetched arrives after `compile`
+   * measured the text against its substitute, so the line breaks are the substitute's; the
+   * job compiles once more with the new faces and calls the loader again on that scene. The
+   * first pass's diagnostics — the compile's and the loader's — are dropped, because both
+   * described a scene that is not the one rendered. **Once**: a second request is ignored,
+   * so no answer can turn the job into a loop.
    */
   readonly loadResources?: (
     needed: SceneResources,
-  ) => void | Diagnostics | Promise<void | Diagnostics>;
+  ) => void | Diagnostics | LoadedResources | Promise<void | Diagnostics | LoadedResources>;
   /** Frames rastered at once. Defaults to 2 — see `limit.ts` for why not more. */
   readonly concurrency?: number;
   readonly onEvent?: JobListener;
+}
+
+/** A loader's answer when it has more to say than its diagnostics (ADR 0117). */
+export interface LoadedResources {
+  readonly diagnostics?: Diagnostics;
+  /**
+   * Compile again, measuring against these faces: the loader added a face the first
+   * compile measured with a substitute. Honoured once per job.
+   */
+  readonly recompile?: { readonly faces: FaceCache };
+}
+
+function isLoadedResources(
+  answer: void | Diagnostics | LoadedResources,
+): answer is LoadedResources {
+  return answer !== undefined && !Array.isArray(answer);
 }
 
 export interface JobReport {
@@ -462,30 +486,52 @@ export async function runJob(
 
   /* ---------------------------------------------------------------------- compile -- */
 
-  notify(onEvent, { kind: 'stage-started', stage: 'compile' });
-  const compileOptions = {
-    formats: ports.formats,
-    ...(ports.faces === undefined ? {} : { faces: ports.faces }),
-    ...(ports.brandKits === undefined ? {} : { brandKits: ports.brandKits }),
+  const compileWith = async (faces: FaceCache | undefined) => {
+    notify(onEvent, { kind: 'stage-started', stage: 'compile' });
+    const compileOptions = {
+      formats: ports.formats,
+      ...(faces === undefined ? {} : { faces }),
+      ...(ports.brandKits === undefined ? {} : { brandKits: ports.brandKits }),
+    };
+    // Only an installed code template answers later (ADR 0048); every other one is compiled
+    // by the same synchronous `compile` as before.
+    const result = isDeferredTemplate(template)
+      ? await compileDeferred(resolved.value, template, compileOptions)
+      : compile(resolved.value, template, compileOptions);
+    if (result.ok) notify(onEvent, { kind: 'stage-finished', stage: 'compile' });
+    return result;
   };
-  // Only an installed code template answers later (ADR 0048); every other one is compiled
-  // by the same synchronous `compile` as before.
-  const compiled = isDeferredTemplate(template)
-    ? await compileDeferred(resolved.value, template, compileOptions)
-    : compile(resolved.value, template, compileOptions);
+
+  // Everything before `compile`; a recompile starts again from here.
+  const beforeCompile = problems.length;
+  let compiled = await compileWith(ports.faces);
   if (!compiled.ok) return err([...problems, ...compiled.error]);
   problems.push(...compiled.diagnostics);
-  notify(onEvent, { kind: 'stage-finished', stage: 'compile' });
 
   /* -------------------------------------------------------------------- resources -- */
 
   // After `compile` and before the first export, which is the only window where the
   // question has an answer and the answer is still useful.
   if (ports.loadResources !== undefined) {
-    notify(onEvent, { kind: 'stage-started', stage: 'resources' });
-    const loaded = await ports.loadResources(sceneResources(compiled.value));
-    if (loaded !== undefined) problems.push(...loaded);
-    notify(onEvent, { kind: 'stage-finished', stage: 'resources' });
+    const load = async (scene: Scene): Promise<LoadedResources> => {
+      notify(onEvent, { kind: 'stage-started', stage: 'resources' });
+      const answer = await ports.loadResources?.(sceneResources(scene));
+      notify(onEvent, { kind: 'stage-finished', stage: 'resources' });
+      if (isLoadedResources(answer)) return answer;
+      return answer === undefined ? {} : { diagnostics: answer };
+    };
+
+    let loaded = await load(compiled.value);
+    if (loaded.recompile !== undefined) {
+      // The first pass measured with a substitute, so neither its compile's diagnostics nor
+      // its loader's describe what will be drawn. A second request is not honoured.
+      problems.length = beforeCompile;
+      compiled = await compileWith(loaded.recompile.faces);
+      if (!compiled.ok) return err([...problems, ...compiled.error]);
+      problems.push(...compiled.diagnostics);
+      loaded = await load(compiled.value);
+    }
+    problems.push(...(loaded.diagnostics ?? []));
   }
 
   if (aborted()) {

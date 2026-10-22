@@ -30,6 +30,7 @@ non-zero.
 | `E_MISSING_REQUIRED_SLOT` | error | no | The manifest marks a slot as required and the brief leaves it unset. |
 | `E_BAD_ADJUSTMENT` | error | no | An adjustment is not declared for the slot it is applied to. |
 | `E_ASSET_NOT_FOUND` | error | no | An asset path in the brief does not resolve to a file. |
+| `E_ASSET_SOURCE_FAILED` | error | no | A plugin that serves an asset scheme could not supply the asset the brief named. |
 | `E_UNSUPPORTED_CSS` | error | yes | A template uses a CSS property outside the accepted set. |
 | `E_UNSUPPORTED_TAG` | error | yes | A template uses a tag the template language does not define. |
 | `E_UNSUPPORTED_ATTRIBUTE` | error | yes | A template uses an attribute the tag it sits on does not accept. |
@@ -84,6 +85,7 @@ non-zero.
 | `W_EXPORT_APPROXIMATED` | warning | no | An exporter rendered something close to, but not exactly, what the IR asked for. |
 | `W_PLUGIN_FONT_WITHHELD` | warning | no | A face installed on this machine was not sent to a plugin's template, which did not ask for it. |
 | `W_FONT_SUBSTITUTED` | warning | no | A face the scene asks this machine for is not installed, so a bundled one drew it. |
+| `W_FONT_SOURCE_FAILED` | warning | no | A plugin that serves a font family could not supply a face the scene asks for. |
 | `E_RENDER_FAILED` | error | no | A frame could not be turned into bytes by the exporter or the rasterizer. |
 | `E_OUTPUT_WRITE` | error | no | No longer produced since ADR 0108. An artifact was rendered but could not be written to the output. |
 | `E_DELIVERY_FOLDER_BLOCKED` | error | yes | A delivery needs a folder at a path where a file already is. |
@@ -161,6 +163,7 @@ incomplete brief, and a crossed box where a picture the exporter could not load 
 | `E_MISSING_REQUIRED_SLOT` | no | The artwork renders with a hole, and since ADR 0035 the hole is drawn: `compile` stamps every frame built from a brief that left a required slot unset, so the gap is in the exported bytes and not only in the problems panel. |
 | `E_BAD_ADJUSTMENT` | no | One adjustment on one slot; the slot keeps the adjustments that are declared. |
 | `E_ASSET_NOT_FOUND` | no | One image the brief named. The slot stays unset, so the scene never references bytes nobody can supply. |
+| `E_ASSET_SOURCE_FAILED` | no | One image the brief named, exactly as a missing file is: the slot stays unset and the rest of the brief renders. |
 | `E_UNSUPPORTED_CSS` | yes | The template is what every artwork is drawn through, so a broken one breaks all of them rather than one slot. |
 | `E_UNSUPPORTED_TAG` | yes | The template is what every artwork is drawn through, so a broken one breaks all of them rather than one slot. |
 | `E_UNSUPPORTED_ATTRIBUTE` | yes | The template is what every artwork is drawn through, so a broken one breaks all of them rather than one slot. |
@@ -406,6 +409,20 @@ Asset '{path}' was not found in {searched}.
 ```
 
 Parameters: `path`, `searched`
+
+### `E_ASSET_SOURCE_FAILED`
+
+**Severity:** error · **Fatal:** no · **Spec:** `docs/adr/0117-a-plugin-source-is-fetched-once-and-read-from-a-cache.md`
+
+A plugin that serves an asset scheme could not supply the asset the brief named.
+
+One image the brief named, exactly as a missing file is: the slot stays unset and the rest of the brief renders.
+
+```
+Asset '{path}' could not be fetched from plugin '{plugin}': {problem}.
+```
+
+Parameters: `path`, `plugin`, `problem`
 
 ### `E_UNSUPPORTED_CSS`
 
@@ -1318,6 +1335,20 @@ Font '{font}' is not installed on this machine; drawn in '{substitute}' instead.
 ```
 
 Parameters: `font`, `substitute`
+
+### `W_FONT_SOURCE_FAILED`
+
+**Severity:** warning · **Fatal:** no · **Spec:** `docs/adr/0117-a-plugin-source-is-fetched-once-and-read-from-a-cache.md`
+
+A plugin that serves a font family could not supply a face the scene asks for.
+
+The face is drawn as any face this machine lacks is, by a bundled one with `W_FONT_SUBSTITUTED` beside this; this names why the plugin did not supply it.
+
+```
+Font '{font}' could not be fetched from plugin '{plugin}': {problem}.
+```
+
+Parameters: `font`, `plugin`, `problem`
 
 ### `W_TEXT_OVERFLOW`
 

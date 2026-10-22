@@ -158,6 +158,16 @@ export const diagnosticCodes = {
     fatality:
       'One image the brief named. The slot stays unset, so the scene never references bytes nobody can supply.',
   },
+  E_ASSET_SOURCE_FAILED: {
+    severity: 'error',
+    summary: 'A plugin that serves an asset scheme could not supply the asset the brief named.',
+    template: "Asset '{path}' could not be fetched from plugin '{plugin}': {problem}.",
+    spec: 'docs/adr/0117-a-plugin-source-is-fetched-once-and-read-from-a-cache.md',
+    fatal: false,
+    fatality:
+      'One image the brief named, exactly as a missing file is: the slot stays unset and the ' +
+      'rest of the brief renders.',
+  },
   E_UNSUPPORTED_CSS: {
     severity: 'error',
     summary: 'A template uses a CSS property outside the accepted set.',
@@ -673,6 +683,16 @@ export const diagnosticCodes = {
     fatality:
       'The artwork is complete and measured against the face that was drawn, so the line ' +
       'breaks match the pixels; only the typeface differs, and this is what says so.',
+  },
+  W_FONT_SOURCE_FAILED: {
+    severity: 'warning',
+    summary: 'A plugin that serves a font family could not supply a face the scene asks for.',
+    template: "Font '{font}' could not be fetched from plugin '{plugin}': {problem}.",
+    spec: 'docs/adr/0117-a-plugin-source-is-fetched-once-and-read-from-a-cache.md',
+    fatal: false,
+    fatality:
+      'The face is drawn as any face this machine lacks is, by a bundled one with ' +
+      '`W_FONT_SUBSTITUTED` beside this; this names why the plugin did not supply it.',
   },
   E_RENDER_FAILED: {
     severity: 'error',

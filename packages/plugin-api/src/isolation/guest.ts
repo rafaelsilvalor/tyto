@@ -191,6 +191,8 @@ export function runGuest(
     registerPanel: (value) => register('registerPanel', value),
     registerConfiguration: (value) => register('registerConfiguration', value),
     registerTheme: (value) => register('registerTheme', value),
+    registerAssetSource: (value) => register('registerAssetSource', value),
+    registerFontSource: (value) => register('registerFontSource', value),
     config<T>(schema: ZodType<T>): T {
       const parsed = schema.safeParse(config);
       if (!parsed.success) {

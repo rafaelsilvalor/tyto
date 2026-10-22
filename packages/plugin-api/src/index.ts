@@ -26,6 +26,18 @@ export type {
   TemplatePack,
 } from './contributions.js';
 
+export {
+  type AssetSourceContribution,
+  type FontSourceContribution,
+  type OwnedSource,
+  type SourceRequest,
+  type SourcedAsset,
+  ASSET_SOURCE_MAX_BYTES,
+  FONT_SOURCE_MAX_BYTES,
+  SOURCE_SCHEME,
+  schemeOf,
+} from './sources.js';
+
 export { directiveNamesOf, directiveResolverOf } from './directives.js';
 
 export {

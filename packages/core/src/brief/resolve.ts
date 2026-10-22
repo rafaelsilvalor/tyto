@@ -421,12 +421,17 @@ class Resolver {
       case 'image': {
         const asset = await this.options.assets.resolve(plain);
         if (asset === undefined) {
+          const explained = this.options.assets.explain?.(plain);
           this.report(
-            diagnostic(
-              'E_ASSET_NOT_FOUND',
-              { path: plain, searched: searchedIn(this.options.assets) },
-              { range: candidate.range },
-            ),
+            explained === undefined
+              ? diagnostic(
+                  'E_ASSET_NOT_FOUND',
+                  { path: plain, searched: searchedIn(this.options.assets) },
+                  { range: candidate.range },
+                )
+              : candidate.range === undefined
+                ? explained
+                : { ...explained, range: candidate.range },
           );
           return undefined;
         }

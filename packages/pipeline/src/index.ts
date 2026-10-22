@@ -29,6 +29,7 @@ export {
   type JobPorts,
   type JobReport,
   type JobRequest,
+  type LoadedResources,
   type OutputRequest,
   runJob,
 } from './job.js';

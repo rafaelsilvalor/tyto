@@ -21,6 +21,13 @@ export {
 
 export { isInside } from './contain.js';
 
+export {
+  type FetchedFaces,
+  type SourceCache,
+  type SourceCacheOptions,
+  sourceCache,
+} from './source-cache.js';
+
 export type { ExportResources } from './export-resources.js';
 
 export {

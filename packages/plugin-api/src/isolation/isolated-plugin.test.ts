@@ -35,6 +35,7 @@ import {
   createPluginHost,
 } from '../host.js';
 import type { HostCapabilities } from '../capabilities.js';
+import { ASSET_SOURCE_MAX_BYTES } from '../sources.js';
 import type { GuestChannel, PluginChannel } from './channel.js';
 import { runGuest } from './guest.js';
 import { type IsolatedPlugin, connectIsolatedPlugin } from './isolated-plugin.js';
@@ -1116,5 +1117,110 @@ describe('an isolated plugin’s brand kit (ADR 0063)', () => {
       'none|secondary:M0 0H10V10H0Z M2 2V8H8V2Z,primary:M3 3H7V7H3Z|M0 10 L5 0 L10 10 Z',
     );
     expect(withoutKit.ok && withoutKit.value.frame.format).toBe('none|none|none');
+  });
+});
+
+describe('isolated asset and font sources (TYTO-280, ADR 0117)', () => {
+  const PNG = new Uint8Array([0x89, 0x50, 0x4e, 0x47]);
+
+  async function connected(activate: (host: PluginHost) => Disposable | void, point: string) {
+    const { connected } = await isolate(activate, { contributes: [point] });
+    if (!connected.ok) throw new Error(connected.error[0]?.message);
+    const host = createPluginHost();
+    const activated = host.tryActivate(connected.value.plugin);
+    if (!activated.ok) throw new Error(activated.error[0]?.message);
+    return host.registry;
+  }
+
+  it('fetches an asset across the boundary, with the section the call carried', async () => {
+    const seen: unknown[] = [];
+    const registry = await connected(
+      (host) =>
+        host.registerAssetSource({
+          id: 'test',
+          schemes: ['test'],
+          fetch: (reference, request) => {
+            seen.push([reference, request.section]);
+            return ok({ bytes: PNG, mime: 'image/png' });
+          },
+        }),
+      'asset-source',
+    );
+
+    const [owned] = registry.assetSources();
+    expect(owned?.plugin).toBe('texto');
+    expect(owned?.source.schemes).toEqual(['test']);
+    const answer = await owned!.source.fetch('test:logo', { section: { folder: 'abc' } });
+    expect(answer).toEqual(ok({ bytes: PNG, mime: 'image/png' }));
+    expect(seen).toEqual([['test:logo', { folder: 'abc' }]]);
+
+    // A withheld section is no section at all, and the plugin reads it as absent.
+    await owned!.source.fetch('test:logo', {});
+    expect(seen[1]).toEqual(['test:logo', undefined]);
+  });
+
+  it('refuses an asset over the ceiling before anything can cache it', async () => {
+    const registry = await connected(
+      (host) =>
+        host.registerAssetSource({
+          id: 'test',
+          schemes: ['test'],
+          fetch: () => ok({ bytes: new Uint8Array(ASSET_SOURCE_MAX_BYTES + 1), mime: 'image/png' }),
+        }),
+      'asset-source',
+    );
+    const answer = await registry.assetSources()[0]!.source.fetch('test:huge', {});
+    expect(answer.ok).toBe(false);
+    expect(answer.ok ? [] : answer.error.map((problem) => problem.code)).toEqual([
+      'E_PLUGIN_PROTOCOL',
+    ]);
+  });
+
+  it('fetches a face across the boundary', async () => {
+    const asked: unknown[] = [];
+    const registry = await connected(
+      (host) =>
+        host.registerFontSource({
+          id: 'faces',
+          families: ['Inter'],
+          fetch: (face) => {
+            asked.push(face);
+            return ok(new Uint8Array([1, 2, 3]));
+          },
+        }),
+      'font-source',
+    );
+    const face = { family: 'Inter', weight: 700, style: 'italic' } as const;
+    const answer = await registry.fontSources()[0]!.source.fetch(face, {});
+    expect(answer).toEqual(ok(new Uint8Array([1, 2, 3])));
+    expect(asked).toEqual([face]);
+  });
+
+  it('answers a throw in the plugin as a failed call, not a rejection', async () => {
+    const registry = await connected(
+      (host) =>
+        host.registerFontSource({
+          id: 'faces',
+          families: ['Inter'],
+          fetch: () => {
+            throw new Error('quota exceeded');
+          },
+        }),
+      'font-source',
+    );
+    const answer = await registry
+      .fontSources()[0]!
+      .source.fetch({ family: 'Inter', weight: 400, style: 'normal' }, {});
+    expect(answer.ok ? '' : answer.error[0]?.message).toContain('quota exceeded');
+  });
+
+  it('is refused with a scheme a reference could never spell', async () => {
+    const { connected } = await isolate(
+      (host) => host.registerAssetSource({ id: 't', schemes: ['C'], fetch: () => ok({} as never) }),
+      { contributes: ['asset-source'] },
+    );
+    expect(connected.ok ? '' : connected.error[0]?.message).toContain(
+      "its 'asset-source' contribution does not match",
+    );
   });
 });

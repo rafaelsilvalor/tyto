@@ -49,6 +49,15 @@ export interface FontLibrary {
    * reaches a plugin's process only under `font:<family>` (ADR 0048).
    */
   fromMachine(face: BundledFontFace): boolean;
+  /**
+   * Forgets what the folders held, so the next question reads them again.
+   *
+   * The folders are listed once and each family is read once, which is right while nothing
+   * writes to them during a run. A plugin's font source does (ADR 0117): it fetches a face
+   * into a cache folder this library reads, and the face has to be found on the compile
+   * that follows.
+   */
+  refresh(): void;
 }
 
 export interface FontLibraryOptions {
@@ -64,6 +73,8 @@ export interface FontLibraryOptions {
   /**
    * The folders searched for installed faces. Defaults to the platform's own
    * ({@link systemFontDirectories}); a test passes an empty list to be a machine without.
+   * The first folder that has a face wins, so a plugin's cache goes last: a face installed
+   * here is never shadowed by one a plugin fetched (ADR 0117).
    */
   readonly directories?: readonly string[];
 }
@@ -248,6 +259,12 @@ export function createFontLibrary(options: FontLibraryOptions): FontLibrary {
           missing.push({ requested: face, drawn: substituteFor(face) });
       }
       return missing;
+    },
+
+    refresh(): void {
+      files = undefined;
+      families.clear();
+      uris.clear();
     },
   };
 }

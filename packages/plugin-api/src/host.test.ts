@@ -3,7 +3,13 @@ import { describe, expect, it, vi } from 'vitest';
 import { z } from 'zod';
 
 import type { BrandKitContribution, Exporter } from './contributions.js';
-import { type Disposable, type Logger, type Plugin, createPluginHost } from './host.js';
+import {
+  type Disposable,
+  type Logger,
+  type Plugin,
+  type PluginHost,
+  createPluginHost,
+} from './host.js';
 import { CONTRIBUTION_POINTS } from './manifest.js';
 
 /**
@@ -304,10 +310,10 @@ describe('activating a plugin', () => {
     expect(host.registry.exporters.list()).toEqual([]);
   });
 
-  it('knows the same twelve points the manifest vocabulary names', () => {
+  it('knows the same fourteen points the manifest vocabulary names', () => {
     // Two declarations of one vocabulary: `CONTRIBUTION_POINTS` is what a JSON file may
     // say, and the host's points are what code may register into. This activates one
-    // plugin into all twelve and compares what was recorded against the list.
+    // plugin into all fourteen and compares what was recorded against the list.
     const host = createPluginHost();
     host.activate(
       pluginOf({
@@ -330,15 +336,17 @@ describe('activating a plugin', () => {
             description: 'A switch.',
           });
           plugin.registerTheme({ id: 'k', label: 'Dusk', kind: 'dark', path: 'dusk.json' });
+          plugin.registerAssetSource({ id: 'l', schemes: ['test'], fetch: () => ok(PIXEL) });
+          plugin.registerFontSource({ id: 'm', families: ['Inter'], fetch: () => ok(BYTES) });
         },
       }),
     );
 
     // The real assertion is that this did not throw: a point the host knows and
     // `CONTRIBUTION_POINTS` does not would have been registered without being declared,
-    // which `activate` refuses. The counts below say the twelve arrived rather than that
+    // which `activate` refuses. The counts below say the fourteen arrived rather than that
     // nothing was attempted.
-    expect(CONTRIBUTION_POINTS).toHaveLength(12);
+    expect(CONTRIBUTION_POINTS).toHaveLength(14);
     expect(
       [
         host.registry.sources(),
@@ -353,8 +361,63 @@ describe('activating a plugin', () => {
         host.registry.panels(),
         host.registry.configurations(),
         host.registry.themes(),
+        host.registry.assetSources(),
+        host.registry.fontSources(),
       ].map((point) => point.length),
-    ).toEqual([1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1]);
+    ).toEqual([1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1]);
+  });
+});
+
+const PIXEL = { bytes: new Uint8Array([1]), mime: 'image/png' };
+const BYTES = new Uint8Array([1]);
+
+describe('asset and font sources (TYTO-280, ADR 0117)', () => {
+  function withSources(activate: (plugin: PluginHost) => void, id = 'promo') {
+    const host = createPluginHost();
+    const activated = host.tryActivate({
+      id,
+      manifest: {
+        name: id,
+        version: '0.1.0',
+        engine: '>=0.1',
+        contributes: ['asset-source', 'font-source'],
+        permissions: [],
+      },
+      activate,
+    });
+    return { host, activated };
+  }
+
+  it('lists each source with the plugin that registered it, in registration order', () => {
+    const { host } = withSources((plugin) => {
+      plugin.registerAssetSource({ id: 'a', schemes: ['test', 'drive'], fetch: () => ok(PIXEL) });
+      plugin.registerFontSource({ id: 'f', families: ['Inter'], fetch: () => ok(BYTES) });
+    });
+    expect(host.registry.assetSources().map(({ plugin, source }) => [plugin, source.id])).toEqual([
+      ['promo', 'a'],
+    ]);
+    expect(host.registry.fontSources().map(({ plugin, source }) => [plugin, source.id])).toEqual([
+      ['promo', 'f'],
+    ]);
+  });
+
+  it.each([[[]], [['C']], [['Test']], [['te st']]])(
+    'refuses an asset source whose schemes are %j',
+    (schemes) => {
+      const { activated } = withSources((plugin) => {
+        plugin.registerAssetSource({ id: 'a', schemes, fetch: () => ok(PIXEL) });
+      });
+      expect(activated.ok ? [] : activated.error.map((problem) => problem.code)).toEqual([
+        'E_PLUGIN_ACTIVATE',
+      ]);
+    },
+  );
+
+  it('refuses a font source that names no family', () => {
+    const { activated } = withSources((plugin) => {
+      plugin.registerFontSource({ id: 'f', families: [' '], fetch: () => ok(BYTES) });
+    });
+    expect(activated.ok).toBe(false);
   });
 });
 

@@ -73,6 +73,8 @@ The last five are named `<id>.tyto-plugin.json` and that is the one place a buil
 | `panel`           | a page in the desktop window, `sandbox="allow-scripts"` (ADR 0045)            | —                                                     |
 | `configuration`   | a key of `settings.json`: `{ id, schema, default, description }` (ADR 0073)   | desktop (the app's settings)                          |
 | `theme`           | a colour theme, a JSON file in the plugin: `{ id, label, kind, path }` (0077) | desktop (Tyto Light, Tyto Dark)                       |
+| `asset-source`    | images behind URI schemes: `{ id, schemes, fetch }`, cached (ADR 0117)        | —                                                     |
+| `font-source`     | faces of named families: `{ id, families, fetch }`, cached (ADR 0117)         | —                                                     |
 
 ### `configuration`, in full
 
@@ -304,6 +306,39 @@ pass them: `tyto render` and `tyto watch` from each task's host, and the desktop
 the window's plugins and its export and queue from each run's host, each with the merge's
 warnings beside its own diagnostics.
 
+### `asset-source` and `font-source`, in full
+
+```ts
+registerAssetSource({
+  id: 'drive',
+  schemes: ['drive'], // `drive:1AbC` in a brief; two or more lowercase characters
+  fetch: async (reference, { section }) => ok({ bytes, mime: 'image/png' }),
+});
+registerFontSource({
+  id: 'drive-fonts',
+  families: ['Inter'],
+  fetch: async ({ family, weight, style }, { section }) => ok(outlineBytes), // .ttf or .otf
+});
+```
+
+**Asked once, then read from a cache** (ADR 0117). The host asks `fetch` while `resolve`
+resolves an image whose reference starts with a declared scheme, and in the job's resource
+stage for a `source: 'system'` face that no workspace font folder and no installed font has.
+The answer is written to `TYTO_HOME/cache/sources/<plugin>/`, named by a hash and never by
+the reference, and every later render reads the file without asking. A face that arrives
+after `compile` makes the job compile once more, so the line breaks are measured against it.
+**A locally installed face always wins**: a font source is never asked for a face the
+machine has. An entry is kept until somebody deletes it, so a file changed at its source is
+not seen until then.
+
+`section` is the plugin's own section of the folder's `.tyto/project.json` (ADR 0112), resolved
+with the work profile, and absent when the folder has none or is restricted. **A restricted
+folder fetches nothing**: it reads what is already cached, and a miss says to trust the
+folder. An error answer, a throw, an image over 32 MB, a face over 16 MB or a type a
+document cannot embed is `E_ASSET_SOURCE_FAILED` for an image and `W_FONT_SOURCE_FAILED`
+(beside `W_FONT_SUBSTITUTED`) for a face. Reach the network with `host.fetch` under
+`net:<host>`.
+
 ### `editor.command` and `editor.keymap`, in full
 
 **A plugin's `editor.command` is a name and a title, and nothing runs it yet.** The point's
@@ -421,7 +456,7 @@ host (CLI process)                               guest (plugin's process)
                         ◀── result {value} ──      answer checked by the host
 ```
 
-**Each side validates what it receives**, with the Zod schemas in `isolation/protocol.ts` and `isolation/points.ts`: the host every guest message and every answer, the guest every host message and a call's arguments, before the plugin's code sees them. **A contribution crosses as data, and its functions stay behind as handles**; a function is callable only if its point names it, with a schema for its arguments and one for its answer. Today that is `exporter.exportFrame` and `directive.transform` (TYTO-49), which may therefore return a `Promise`; the job and `resolve` await them. `template-pack`, `brand-kit`, `editor.command`, `editor.keymap`, `panel` and `theme` cross as data. `source`, `sink` and `rasterizer` are refused by name — _not available to an isolated plugin yet_. A directive's answer schema is strict: a replacement that carries a `namespace` or a `range` is `E_PLUGIN_PROTOCOL`.
+**Each side validates what it receives**, with the Zod schemas in `isolation/protocol.ts` and `isolation/points.ts`: the host every guest message and every answer, the guest every host message and a call's arguments, before the plugin's code sees them. **A contribution crosses as data, and its functions stay behind as handles**; a function is callable only if its point names it, with a schema for its arguments and one for its answer. Today that is `exporter.exportFrame`, `directive.transform` (TYTO-49) and `fetch` on `asset-source` and `font-source` (ADR 0117), which may therefore return a `Promise`; the job and `resolve` await them. `template-pack`, `brand-kit`, `editor.command`, `editor.keymap`, `panel` and `theme` cross as data. `source`, `sink` and `rasterizer` are refused by name — _not available to an isolated plugin yet_. A directive's answer schema is strict: a replacement that carries a `namespace` or a `range` is `E_PLUGIN_PROTOCOL`.
 
 **The proxy goes through `tryActivate`**, so an isolated plugin meets every check an in-process one does. `protocol` is its own number, compared at the `hello` handshake and nowhere else; it is not the engine (ADR 0040), because a plugin never sees these messages.
 
