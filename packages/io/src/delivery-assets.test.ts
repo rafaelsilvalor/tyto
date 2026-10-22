@@ -208,6 +208,71 @@ describe('fsDeliveryOutput.deliverAssets', () => {
     );
   });
 
+  it('names an image a plugin supplied after its reference, never after its cached file', async () => {
+    // As the source cache writes them (ADR 0117): hash names, in a folder of their own.
+    const cache = join(workspace, 'cache');
+    await mkdir(cache, { recursive: true });
+    const references = [
+      'test:logo',
+      'drive:pasta/Logo Final.png',
+      'drive:logo',
+      'test:con',
+      'test:..',
+      'test:a/b\\..\\evil',
+    ];
+    const recorder = recordingAssetResolver({
+      base: cache,
+      resolve: (reference) => {
+        const path = join(cache, `${String(references.indexOf(reference)).repeat(64)}.png`);
+        return Promise.resolve({ id: reference, source: 'url', path, hash: reference });
+      },
+    });
+    for (const [index, reference] of references.entries()) {
+      await writeFile(join(cache, `${String(index).repeat(64)}.png`), `bytes of ${reference}`);
+      await recorder.resolver.resolve(reference);
+    }
+    const brief = [
+      '---',
+      ...references.map((reference, index) => `k${String(index)}: ${reference}`),
+      '---',
+      '',
+    ];
+    const output = await openDelivery(join(workspace, 'entrega'), {
+      name: 'entrega',
+      brief: new TextEncoder().encode(brief.join('\n')),
+      folder: 'destination',
+    });
+
+    expect(recorder.delivered().every(({ fetched }) => fetched === true)).toBe(true);
+    expect(await output.deliverAssets(recorder.delivered())).toEqual([]);
+
+    const root = join(workspace, 'entrega');
+    // The text after the last separator, made safe; a device name gains `-image`; nothing
+    // left is the scheme; and two references that land on one name are told apart.
+    expect((await readdir(join(root, 'assets'))).sort()).toEqual([
+      'Logo-Final.png',
+      'con-image.png',
+      'evil.png',
+      'logo-2.png',
+      'logo.png',
+      'test.png',
+    ]);
+    expect(await readFile(join(root, 'assets', 'logo.png'), 'utf8')).toBe('bytes of test:logo');
+    expect(await readFile(join(root, 'editaveis', 'entrega.brief'), 'utf8')).toBe(
+      [
+        '---',
+        'k0: logo.png',
+        'k1: Logo-Final.png',
+        'k2: logo-2.png',
+        'k3: con-image.png',
+        'k4: test.png',
+        'k5: evil.png',
+        '---',
+        '',
+      ].join('\n'),
+    );
+  });
+
   it('removes what the previous delivery brought and this one does not, and nothing else', async () => {
     const briefs = await sourceFolder();
     const root = join(workspace, 'entrega');

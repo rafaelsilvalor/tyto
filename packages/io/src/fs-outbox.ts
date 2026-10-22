@@ -456,18 +456,47 @@ export async function makeFolder(
   }
 }
 
+/** Names Windows reserves for a device, with or without an extension. */
+const DEVICE_NAME = /^(con|prn|aux|nul|com[0-9]|lpt[0-9])$/iu;
+const LONGEST_FETCHED_STEM = 64;
+
+/**
+ * The stem a fetched image is copied under, from its reference (ADR 0118).
+ *
+ * Its cached file is named by a hash, which says nothing to the person opening `assets/`,
+ * and the reference — `test:logo`, `drive:pasta/Logo Final` — is not a file name on every
+ * system. So the text after the reference's last `/`, `\` or `:` is kept, with every
+ * character outside `[A-Za-z0-9._-]` turned into `-`, its own extension dropped (the cached
+ * type gives the extension), leading and trailing dots removed, and at most 64 characters.
+ * A device name gains `-image`. Nothing left is the scheme, which is always a name.
+ *
+ * The reference is text from a brief, and this is the only place it becomes part of a path:
+ * nothing it holds can name a folder, because every separator is cut before it is used.
+ */
+function fetchedStem(reference: string): string {
+  const scheme = reference.slice(0, reference.indexOf(':'));
+  const last = reference.split(/[/\\:]/u).pop() ?? '';
+  const safe = last.replace(/[^A-Za-z0-9._-]/gu, '-');
+  const stem = basename(safe, extname(safe))
+    .replace(/^\.+|\.+$/gu, '')
+    .slice(0, LONGEST_FETCHED_STEM);
+  const name = stem === '' ? scheme : stem;
+  return DEVICE_NAME.test(name) ? `${name}-image` : name;
+}
+
 /**
  * Each image's name in `assets/`: its own file name, and `-2`, `-3`… before the extension
  * when two different files share one. The same file named twice by the brief is copied once.
- * Compared without case, because a delivery is opened on filesystems that ignore it.
+ * Compared without case, because a delivery is opened on filesystems that ignore it. An
+ * image a plugin supplied is named after its reference instead of its cached file.
  */
 function deliveredNames(assets: readonly DeliveredAsset[]): Map<string, string> {
   const names = new Map<string, string>();
   const taken = new Set<string>();
-  for (const { path } of assets) {
+  for (const { path, reference, fetched } of assets) {
     if (names.has(path)) continue;
     const extension = extname(path);
-    const stem = basename(path, extension);
+    const stem = fetched === true ? fetchedStem(reference) : basename(path, extension);
     let name = `${stem}${extension}`;
     for (let count = 2; taken.has(name.toLowerCase()); count += 1) {
       name = `${stem}-${String(count)}${extension}`;

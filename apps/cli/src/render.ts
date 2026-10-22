@@ -16,6 +16,7 @@ import {
 } from './plugins/index.js';
 import { type RenderContextOptions, loadRenderContext, readFailure } from './render-context.js';
 import { renderTask } from './render-task.js';
+import { optionalSources, renderSources } from './sources.js';
 import { diagnosticsDocument, formatDiagnostics, json } from './report.js';
 import { workspaceOfBrief } from './workspace.js';
 
@@ -207,6 +208,7 @@ export async function renderCommand(
         ...(rasterizer === undefined ? {} : { rasterizer }),
         ...(options.concurrency === undefined ? {} : { concurrency: options.concurrency }),
         ...(project === undefined ? {} : { fontDirectories: project.fonts }),
+        ...optionalSources(renderSources(environment.home, workspace?.loaded)),
       },
       [...projectDiagnostics, ...context.diagnostics],
     );

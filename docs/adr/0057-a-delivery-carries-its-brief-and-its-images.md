@@ -1,7 +1,7 @@
 # 0057 — A delivery carries its brief in `editaveis/` and its images in `assets/`
 
 Status: accepted · 2026-09-29 · TYTO-205 · extends TYTO-121's delivery layout, ADR 0054's
-leftover rule and ADR 0056's asset rule
+leftover rule and ADR 0056's asset rule · amended by ADR 0118 (the name of an image a plugin supplied)
 
 ## Context
 

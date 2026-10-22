@@ -242,6 +242,26 @@ describe('a restricted folder (ADR 0111, ADR 0117)', () => {
     expect(restricted).toEqual(trusted);
   });
 
+  it('says the caller’s own reason when it never fetches for another one (ADR 0118)', async () => {
+    const counted = assetSource();
+    const fonts = fontSource();
+    const cache = sourceCache({
+      home: home(),
+      assetSources: () => [{ plugin: 'drive-ish', source: counted.source }],
+      fontSources: () => [{ plugin: 'drive-ish', source: fonts.source }],
+      fetches: false,
+      notFetchedBecause: 'tyto watch never fetches',
+    });
+    const assets = cache.assets(nowhere);
+
+    expect(await assets.resolve('test:logo')).toBeUndefined();
+    expect(assets.explain?.('test:logo')?.message).toContain('tyto watch never fetches');
+    expect(assets.explain?.('test:logo')?.message).not.toContain('trust the folder');
+    const faces = await cache.fetchFaces([FACE]);
+    expect(faces.diagnostics[0]?.message).toContain('tyto watch never fetches');
+    expect([...counted.asked, ...fonts.asked]).toEqual([]);
+  });
+
   it('fetches no face either', async () => {
     const counted = fontSource();
     const cache = cacheOf(home(), { fonts: counted.source, fetches: false });

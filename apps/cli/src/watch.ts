@@ -15,6 +15,7 @@ import { loadRenderContext } from './render-context.js';
 import { renderTask } from './render-task.js';
 import { displayPath, installedOption } from './render.js';
 import { diagnosticsDocument, formatDiagnostics, json } from './report.js';
+import { optionalSources, watchSources } from './sources.js';
 
 /**
  * `tyto watch <folder>` — the fs-inbox adapter, driven (ADR 0008, `docs/integrations.md`).
@@ -135,6 +136,7 @@ export async function watchCommand(
         ...(rasterizer === undefined ? {} : { rasterizer }),
         ...(options.concurrency === undefined ? {} : { concurrency: options.concurrency }),
         ...(signal === undefined ? {} : { signal }),
+        ...optionalSources(watchSources(environment.home)),
       },
       projectProblems,
     );

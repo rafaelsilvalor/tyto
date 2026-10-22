@@ -59,6 +59,12 @@ export interface SourceCacheOptions {
   readonly sectionOf?: (plugin: string) => unknown;
   /** `false` for a restricted source: the cache is read and nothing is fetched. */
   readonly fetches: boolean;
+  /**
+   * Why nothing is fetched, said at each miss when {@link fetches} is `false`. Defaults to
+   * the restricted folder's reason; a caller that never fetches for another reason — `tyto
+   * watch` (ADR 0118) — says its own, because "trust the folder" would be wrong advice there.
+   */
+  readonly notFetchedBecause?: string;
 }
 
 export interface FetchedFaces {
@@ -145,6 +151,7 @@ const RESTRICTED =
 
 export function sourceCache(options: SourceCacheOptions): SourceCache {
   const root = join(options.home, 'cache', 'sources');
+  const notFetched = options.notFetchedBecause ?? RESTRICTED;
   const folderOf = (plugin: string): string => join(root, plugin);
   const requestOf = (plugin: string): SourceRequest => {
     const section = options.sectionOf?.(plugin);
@@ -207,7 +214,7 @@ export function sourceCache(options: SourceCacheOptions): SourceCache {
           const stem = join(folderOf(owned.plugin), hexOf(reference));
           let path = await existing(stem, ASSET_EXTENSIONS);
           if (path === undefined) {
-            if (!options.fetches) return failed(RESTRICTED);
+            if (!options.fetches) return failed(notFetched);
             try {
               path = await fetchAsset(owned, reference, stem);
             } catch (cause) {
@@ -275,7 +282,7 @@ export function sourceCache(options: SourceCacheOptions): SourceCache {
         };
 
         if (!options.fetches) {
-          fail(RESTRICTED);
+          fail(notFetched);
           continue;
         }
         try {

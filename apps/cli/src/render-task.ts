@@ -1,4 +1,10 @@
-import { type Diagnostics, createFaceCache, describeFace, hasErrors } from '@tyto/core';
+import {
+  type Diagnostics,
+  type FaceCache,
+  createFaceCache,
+  describeFace,
+  hasErrors,
+} from '@tyto/core';
 import { type FontLibrary, createFontLibrary, systemFontDirectories } from '@tyto/fonts';
 import {
   type ExportResources,
@@ -11,8 +17,14 @@ import {
   layeredExportResources,
   recordingAssetResolver,
   renderResult,
+  sourceCache,
 } from '@tyto/io';
-import { type OutputRequest, fontSubstitutionWarnings, runJob } from '@tyto/pipeline';
+import {
+  type LoadedResources,
+  type OutputRequest,
+  fontSubstitutionWarnings,
+  runJob,
+} from '@tyto/pipeline';
 import { directiveResolverOf } from '@tyto/plugin-api';
 import type { Rasterizer } from '@tyto/raster';
 
@@ -93,6 +105,23 @@ export interface RenderTaskOptions {
    * project's face wins over an installed one of the same family.
    */
   readonly fontDirectories?: readonly string[];
+  /**
+   * Where a plugin's `asset-source` and `font-source` answers are kept, and whether a miss
+   * may ask them (ADR 0117, ADR 0118). Absent when there is no `TYTO_HOME`, which also
+   * means no installed plugin: a plugin reference is then a file that is not there.
+   */
+  readonly sources?: TaskSources;
+}
+
+export interface TaskSources {
+  /** `TYTO_HOME`; the cache is `cache/sources/` inside it. */
+  readonly home: string;
+  /** False for a restricted folder and for `tyto watch`: the cache is read, nothing fetched. */
+  readonly fetches: boolean;
+  /** What a miss says when {@link fetches} is false. The restricted folder's reason by default. */
+  readonly notFetchedBecause?: string;
+  /** Each plugin's section of the brief's resolved project (ADR 0112), handed on each fetch. */
+  readonly sections?: Readonly<Record<string, unknown>>;
 }
 
 export interface RenderTaskReport {
@@ -127,28 +156,47 @@ const machineFaces = createFaceCache(machineFonts.source);
  * A library per set of workspace font folders, kept for the process like the machine's: a
  * `tyto watch` renders every task of one workspace against the same folders.
  */
-const projectFonts = new Map<
-  string,
-  { readonly fonts: FontLibrary; readonly faces: ReturnType<typeof createFaceCache> }
->();
+const projectFonts = new Map<string, TaskFonts>();
 
-export function fontsFor(directories: readonly string[] | undefined): {
+export interface TaskFonts {
   readonly fonts: FontLibrary;
-  readonly faces: ReturnType<typeof createFaceCache>;
-} {
-  if (directories === undefined || directories.length === 0) {
-    return { fonts: machineFonts, faces: machineFaces };
-  }
-  const key = JSON.stringify(directories);
+  /** Replaced, not cleared, when a plugin adds a face: it remembers every face it was asked. */
+  faces: FaceCache;
+}
+
+const machine: TaskFonts = { fonts: machineFonts, faces: machineFaces };
+
+/**
+ * The library for a workspace's font folders and for the source cache's (ADR 0117), in that
+ * order around this machine's: a project's face wins over an installed one, and **an
+ * installed one over a plugin's**, so a render offline draws what it drew online.
+ */
+export function fontsFor(
+  directories: readonly string[] | undefined,
+  sourceDirectories: readonly string[] = [],
+): TaskFonts {
+  const project = directories ?? [];
+  if (project.length === 0 && sourceDirectories.length === 0) return machine;
+  const key = JSON.stringify([project, sourceDirectories]);
   const known = projectFonts.get(key);
   if (known !== undefined) return known;
   const fonts = createFontLibrary({
     describe: describeFace,
-    directories: [...directories, ...systemFontDirectories()],
+    directories: [...project, ...systemFontDirectories(), ...sourceDirectories],
   });
-  const built = { fonts, faces: createFaceCache(fonts.source) };
+  const built: TaskFonts = { fonts, faces: createFaceCache(fonts.source) };
   projectFonts.set(key, built);
   return built;
+}
+
+/**
+ * After a font source wrote a face: the library lists its folders again, and a new face
+ * cache measures with it. The old cache answered that face with its substitute.
+ */
+function refreshFonts(fonts: TaskFonts): FaceCache {
+  fonts.fonts.refresh();
+  fonts.faces = createFaceCache(fonts.fonts.source);
+  return fonts.faces;
 }
 
 /**
@@ -170,12 +218,14 @@ export function fontsFor(directories: readonly string[] | undefined): {
 function exportResources(
   brief: ExportResources,
   template: ExportResources,
-  fonts: FontLibrary,
+  fonts: () => FontLibrary,
 ): ExportResources {
   // The window binds the same two layers through the same function, so a field one program
   // forgot could not reach only one of them again (TYTO-215, TYTO-216).
   const layered = layeredExportResources([brief, template]);
-  const font = fonts.font;
+  // Read when an exporter asks, because the library is chosen after the host that holds the
+  // exporters: its last folders are the font sources' that host's plugins registered.
+  const font: FontLibrary['font'] = (face) => fonts().font(face);
   return { html: { ...layered.html, font }, svg: { ...layered.svg, font } };
 }
 
@@ -208,10 +258,11 @@ export async function renderTask(
   /** Diagnostics the context itself produced — a broken template folder, say. */
   inherited: Diagnostics = [],
 ): Promise<RenderTaskReport> {
-  const { fonts, faces } = fontsFor(options.fontDirectories);
+  // Settled once the host exists, below; nothing reads it before the job runs.
+  let taskFonts = fontsFor(options.fontDirectories);
   const wiring = templateWiring(context, {
-    outlines: (face) => fonts.source.outlines(face),
-    fromMachine: (face) => fonts.fromMachine(face),
+    outlines: (face) => taskFonts.fonts.source.outlines(face),
+    fromMachine: (face) => taskFonts.fonts.fromMachine(face),
   });
   // Typed as the wider one where there is one, because the template it used is only known
   // once the job has run and `TaskOutput` has nowhere to put that.
@@ -245,7 +296,7 @@ export async function renderTask(
   // in a `tyto watch` have different `assets/`, and an exporter bound to the wrong one
   // would embed the wrong logo (ADR 0007 — every built-in through the same door).
   const host = activateBuiltIns({
-    resources: exportResources(briefResources, wiring.resources, fonts),
+    resources: exportResources(briefResources, wiring.resources, () => taskFonts.fonts),
     ...(options.rasterizer === undefined ? {} : { rasterizer: options.rasterizer }),
   });
   // After the built-ins, so a built-in keeps every id it has. A plugin refused here is a
@@ -261,14 +312,33 @@ export async function renderTask(
 
   // Recorded as the brief resolves, so a `--folder` delivery copies into `assets/` exactly
   // the files the artwork was drawn from (ADR 0057). `--out` never reads the record.
-  const assets = recordingAssetResolver(
+  // A plugin's images and faces, fetched once into `TYTO_HOME` and read from there (ADR 0117).
+  // Inside the recorder, so a delivery copies a fetched image like any other (ADR 0118).
+  const sources = options.sources;
+  const cache =
+    sources === undefined
+      ? undefined
+      : sourceCache({
+          home: sources.home,
+          assetSources: () => host.registry.assetSources(),
+          fontSources: () => host.registry.fontSources(),
+          sectionOf: (plugin) => sources.sections?.[plugin],
+          fetches: sources.fetches,
+          ...(sources.notFetchedBecause === undefined
+            ? {}
+            : { notFetchedBecause: sources.notFetchedBecause }),
+        });
+  if (cache !== undefined) taskFonts = fontsFor(options.fontDirectories, cache.fontDirectories());
+  const fonts = taskFonts;
+
+  const files =
     task.assetsOverride === undefined
       ? briefAssetResolver({
           briefDirectory: task.briefDirectory,
           ...(task.projectAssets === undefined ? {} : { projectAssets: task.projectAssets }),
         })
-      : fileAssetResolver({ base: task.assetsOverride }),
-  );
+      : fileAssetResolver({ base: task.assetsOverride });
+  const assets = recordingAssetResolver(cache === undefined ? files : cache.assets(files));
 
   const job = await runJob(
     {
@@ -285,7 +355,7 @@ export async function renderTask(
       exporters: host.registry.exporters,
       directives: directiveResolverOf(() => host.registry.directives()),
       formats: context.formats,
-      faces,
+      faces: fonts.faces,
       brandKits: brandKits.kits,
       // Read back out of the registry rather than passed through: what renders is what was
       // registered, which is the claim the extension point makes.
@@ -294,9 +364,25 @@ export async function renderTask(
       // and nothing has asked an exporter for bytes yet. The template's own `src=` files
       // are not loaded here — `templateWiring` reads that folder when it loads the
       // template, which is already after the brief named it.
-      loadResources: async (needed) => {
+      // A face no local folder has is asked of a font source here; when one arrived, the job
+      // compiles once more against it, because the first pass measured its substitute.
+      loadResources: async (needed): Promise<LoadedResources> => {
         await briefResources.load(needed);
-        return fontSubstitutionWarnings(fonts.substitutions(needed.faces));
+        const missing = fonts.fonts.substitutions(needed.faces);
+        const fetched = await cache?.fetchFaces(missing.map(({ requested }) => requested));
+        if (fetched !== undefined && fetched.fetched > 0) {
+          const faces = refreshFonts(fonts);
+          // Asked again after the refresh: the job keeps these only when it does not compile
+          // again, which is a second request, and then they must describe what is drawn.
+          const still = fonts.fonts.substitutions(needed.faces);
+          return {
+            diagnostics: [...fontSubstitutionWarnings(still), ...fetched.diagnostics],
+            recompile: { faces },
+          };
+        }
+        return {
+          diagnostics: [...fontSubstitutionWarnings(missing), ...(fetched?.diagnostics ?? [])],
+        };
       },
       ...(options.concurrency === undefined ? {} : { concurrency: options.concurrency }),
       sink: output,
