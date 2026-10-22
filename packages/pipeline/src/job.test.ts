@@ -1199,6 +1199,29 @@ describe('a loader that asks for one more compile (TYTO-280, ADR 0117)', () => {
     expect(plugins).toEqual([diagnostic('W_FONT_SOURCE_FAILED', KEPT).message]);
   });
 
+  it("drops the first compile's diagnostics, which measured a scene nobody draws", async () => {
+    // A cache whose every face is missing makes `compile` say so on every text it measures
+    // (ADR 0110), so a pass's diagnostics are countable.
+    const unavailable = async (loadResources: JobPorts['loadResources']) => {
+      const result = await runJob(
+        { brief: briefSource, outputs: BOTH },
+        await portsOf({ faces: countingFaces(), ...(loadResources ? { loadResources } : {}) }),
+      );
+      const produced = result.ok ? result.diagnostics : result.error;
+      return produced.filter((item) => item.code === 'E_FONT_FACE_UNAVAILABLE').length;
+    };
+
+    const once = await unavailable(undefined);
+    let calls = 0;
+    const twice = await unavailable(() => {
+      calls += 1;
+      return calls === 1 ? { recompile: { faces: countingFaces() } } : undefined;
+    });
+
+    expect(once).toBeGreaterThan(0);
+    expect(twice).toBe(once);
+  });
+
   it('honours the request once: a second one does not compile a third time', async () => {
     const stages: string[] = [];
     let calls = 0;
