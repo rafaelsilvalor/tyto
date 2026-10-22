@@ -1,9 +1,9 @@
-import { LitElement, type TemplateResult, html } from 'lit';
+import { LitElement, type TemplateResult, html, nothing } from 'lit';
 import { ifDefined } from 'lit/directives/if-defined.js';
 import { repeat } from 'lit/directives/repeat.js';
 
 import { type Locale, DEFAULT_LOCALE, translate } from '../../shared/i18n/index.js';
-import { icon } from './icons.js';
+import { type IconName, icon } from './icons.js';
 
 /**
  * One editor group's tabs, over that group's pane (E9.11; TYTO-286, ADR 0083).
@@ -31,6 +31,8 @@ export interface TabEntry {
    */
   readonly where?: string;
   readonly dirty: boolean;
+  /** TYTO-282: the file's icon, drawn before its name (ADR 0116). */
+  readonly icon?: IconName;
   /** TYTO-287: a preview tab, marked so a person and a suite can tell it from its brief's. */
   readonly preview?: boolean;
   /** TYTO-287: a preview locked on its brief, drawn with a lock after its name. */
@@ -96,6 +98,11 @@ export class DocumentTabs extends LitElement {
           this.select(entry.id);
         }}
       >
+        ${
+          entry.icon === undefined
+            ? nothing
+            : html`<span class="tabs__icon" data-icon=${entry.icon}>${icon(entry.icon)}</span>`
+        }
         <span class="tabs__label">${entry.label}</span>
         ${
           entry.locked === true

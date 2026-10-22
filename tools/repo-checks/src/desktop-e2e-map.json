@@ -12,6 +12,11 @@
       "why": "generated: name, prefix, static import or text of the stem in the e2e file"
     },
     {
+      "paths": ["apps/desktop/shared/file-icons.ts"],
+      "e2e": ["explorer.desktop.test.ts"],
+      "why": "reviewed: which icon an explorer row and a tab draw (TYTO-282); only the explorer's suite asserts them"
+    },
+    {
       "paths": ["apps/desktop/shared/layout.ts"],
       "e2e": "all",
       "why": "reviewed: the layout every window opens with"

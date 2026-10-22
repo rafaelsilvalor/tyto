@@ -200,3 +200,44 @@ describe('the explorer panel', () => {
     expect(rows(element)).toEqual(['other.brief']);
   });
 });
+
+describe('file-type icons (TYTO-282, ADR 0116)', () => {
+  const icons = (element: ExplorerPanel): Record<string, string | undefined> =>
+    Object.fromEntries(
+      [...element.querySelectorAll<HTMLElement>('.explorer__row')].map((each) => [
+        each.dataset.name ?? '',
+        each.dataset.icon,
+      ]),
+    );
+
+  it("draws each row's icon from its name, its kind and main's place", async () => {
+    const { element } = await mount({
+      root: {
+        entries: [
+          { id: 'saida', name: 'saida', kind: 'folder', place: 'output' },
+          { id: 'slides', name: 'slides', kind: 'folder' },
+          { id: 'promo', name: 'promo.brief', kind: 'brief' },
+          { id: 'logo', name: 'logo.png', kind: 'file' },
+          { id: 'sheet', name: 'planilha.xlsx', kind: 'file' },
+        ],
+        more: 0,
+        gone: false,
+      },
+      slides: entries(),
+    });
+
+    expect(icons(element)).toEqual({
+      saida: 'folderOutput',
+      slides: 'folder',
+      'promo.brief': 'brief',
+      'logo.png': 'image',
+      'planilha.xlsx': 'file',
+    });
+    expect(row(element, 'logo.png').querySelector('.explorer__icon svg')).not.toBeNull();
+
+    row(element, 'slides').click();
+    await settle(element);
+
+    expect(icons(element).slides).toBe('folderOpen');
+  });
+});

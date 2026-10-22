@@ -72,6 +72,15 @@ export interface WorkspaceService {
   placesFor(briefDirectory: string | undefined): BriefPlaces;
 }
 
+/** The places of the resolved project: what a restricted folder refused is not among them. */
+export interface FolderPlaces {
+  readonly output: string | undefined;
+  readonly assets: readonly string[];
+  readonly templates: readonly string[];
+}
+
+const NO_FOLDER_PLACES: FolderPlaces = { output: undefined, assets: [], templates: [] };
+
 export interface WorkspaceServiceOptions {
   readonly trustStore: TrustStore;
   /** `TYTO_HOME`, so the folder holding it is never read as a project (ADR 0112). */
@@ -80,9 +89,10 @@ export interface WorkspaceServiceOptions {
   readonly setTemplateFolders: (folders: readonly string[]) => Promise<void>;
   /**
    * The folder now open, or nothing, after every open, re-read and close — what the explorer
-   * lists (TYTO-279, ADR 0115). A folder that is not a workspace is nothing.
+   * lists (TYTO-279, ADR 0115). A folder that is not a workspace is nothing. With it, the
+   * folders the resolved project names, so the explorer can flag them (TYTO-282, ADR 0116).
    */
-  readonly onFolder?: (folder: string | undefined) => Promise<void>;
+  readonly onFolder?: (folder: string | undefined, places: FolderPlaces) => Promise<void>;
 }
 
 const NOTHING_OPEN: WorkspaceState = {
@@ -117,7 +127,16 @@ export function createWorkspaceService(options: WorkspaceServiceOptions): Worksp
     open = loaded;
     revoked = { folder: false, profile: false };
     await options.setTemplateFolders(loaded?.project.templates ?? []);
-    await options.onFolder?.(loaded?.folder);
+    await options.onFolder?.(
+      loaded?.folder,
+      loaded === undefined
+        ? NO_FOLDER_PLACES
+        : {
+            output: loaded.project.output,
+            assets: loaded.project.assets,
+            templates: loaded.project.templates,
+          },
+    );
     return loaded !== undefined;
   };
 
@@ -162,7 +181,7 @@ export function createWorkspaceService(options: WorkspaceServiceOptions): Worksp
       open = undefined;
       revoked = { folder: false, profile: false };
       await options.setTemplateFolders([]);
-      await options.onFolder?.(undefined);
+      await options.onFolder?.(undefined, NO_FOLDER_PLACES);
     },
 
     async grant(source) {

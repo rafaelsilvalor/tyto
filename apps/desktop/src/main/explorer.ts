@@ -1,10 +1,11 @@
 import { randomUUID } from 'node:crypto';
 import { type Dirent, type FSWatcher, watch as watchFolder } from 'node:fs';
 import { readdir, realpath, stat } from 'node:fs/promises';
-import { extname, join } from 'node:path';
+import { dirname, extname, join } from 'node:path';
 
 import { isInside } from '@tyto/io';
 
+import type { ExplorerPlace } from '../../shared/file-icons.js';
 import type { IpcResponse } from '../../shared/ipc.js';
 
 /**
@@ -48,13 +49,26 @@ const IGNORED_BY_THE_WATCHER: ReadonlySet<string> = new Set(['.git', 'node_modul
 
 const NOTHING: ExplorerListing = { entries: [], more: 0, gone: true };
 
+/**
+ * The folders the resolved project names, as the workspace read them (TYTO-282, ADR 0116): only
+ * what survived, so a key a restricted folder refused names nothing here and flags nothing.
+ */
+export interface ExplorerPlaces {
+  readonly output: string | undefined;
+  readonly assets: readonly string[];
+  readonly templates: readonly string[];
+}
+
+export const NO_PLACES: ExplorerPlaces = { output: undefined, assets: [], templates: [] };
+
 export interface ExplorerService {
   /**
    * Lists `folder` from now on, or nothing. Replaces the ids and the watcher of whatever was
    * listed before; the same folder again keeps both, so re-reading a folder after a trust
-   * change does not collapse the tree.
+   * change does not collapse the tree. `places` flag the entries a name cannot tell; when they
+   * change for the same folder, the window is told to list again.
    */
-  setRoot(folder: string | undefined): Promise<void>;
+  setRoot(folder: string | undefined, places?: ExplorerPlaces): Promise<void>;
   /**
    * The children of the folder `entryId` names, or of the root for `null`. An id that names
    * nothing — never minted, minted for another folder, or a path that has since gone — answers
@@ -101,6 +115,66 @@ const collator = new Intl.Collator(undefined, { numeric: true, sensitivity: 'bas
 const kindOf = (isFolder: boolean, name: string): ExplorerEntry['kind'] =>
   isFolder ? 'folder' : extname(name).toLowerCase() === '.brief' ? 'brief' : 'file';
 
+/** The places by real path, which is what a listed entry is compared by. */
+interface RealPlaces {
+  readonly output: string | undefined;
+  readonly templates: ReadonlySet<string>;
+  readonly assets: ReadonlySet<string>;
+}
+
+const NO_REAL_PLACES: RealPlaces = { output: undefined, templates: new Set(), assets: new Set() };
+
+const realOrNothing = async (path: string): Promise<string | undefined> => {
+  try {
+    return await realpath(path);
+  } catch {
+    return undefined;
+  }
+};
+
+async function realPlaces(places: ExplorerPlaces): Promise<RealPlaces> {
+  const each = async (paths: readonly string[]): Promise<ReadonlySet<string>> =>
+    new Set(
+      (await Promise.all(paths.map(realOrNothing))).filter(
+        (path): path is string => path !== undefined,
+      ),
+    );
+  return {
+    output: places.output === undefined ? undefined : await realOrNothing(places.output),
+    templates: await each(places.templates),
+    assets: await each(places.assets),
+  };
+}
+
+const samePlaces = (a: RealPlaces, b: RealPlaces): boolean =>
+  a.output === b.output &&
+  a.templates.size === b.templates.size &&
+  [...a.templates].every((path) => b.templates.has(path)) &&
+  a.assets.size === b.assets.size &&
+  [...a.assets].every((path) => b.assets.has(path));
+
+/**
+ * What a listed entry is, beyond its name. **One answer, in a fixed order** (ADR 0116 rule 3):
+ * the output folder, then a templates folder, then a folder directly inside one, then an assets
+ * folder — so an output folder the project also names under `assets` is the output folder.
+ * The project file is `.tyto/project.json` at the root, the one file a place names.
+ */
+export function placeOf(
+  real: string,
+  isFolder: boolean,
+  rootReal: string,
+  places: RealPlaces,
+): ExplorerPlace | undefined {
+  if (!isFolder) {
+    return real === join(rootReal, '.tyto', 'project.json') ? 'project' : undefined;
+  }
+  if (real === places.output) return 'output';
+  if (places.templates.has(real)) return 'templates';
+  if (places.templates.has(dirname(real))) return 'template';
+  if (places.assets.has(real)) return 'assets';
+  return undefined;
+}
+
 export function createExplorerService(options: ExplorerServiceOptions): ExplorerService {
   const watch = options.watch ?? watchRecursively;
   const settleMs = options.settleMs ?? EXPLORER_SETTLE_MS;
@@ -108,6 +182,7 @@ export function createExplorerService(options: ExplorerServiceOptions): Explorer
 
   /** The folder as given, and its real path — what every entry is held inside. */
   let root: { folder: string; real: string } | undefined;
+  let places: RealPlaces = NO_REAL_PLACES;
   let idOfPath = new Map<string, string>();
   let entryOf = new Map<string, { path: string; kind: ExplorerEntry['kind'] }>();
   let watcher: { close(): void } | undefined;
@@ -178,7 +253,13 @@ export function createExplorerService(options: ExplorerServiceOptions): Explorer
         ? (await stat(real)).isDirectory()
         : dirent.isDirectory();
       const kind = kindOf(isFolder, dirent.name);
-      return { id: idFor(path, kind), name: dirent.name, kind };
+      const place = placeOf(real, isFolder, rootReal, places);
+      return {
+        id: idFor(path, kind),
+        name: dirent.name,
+        kind,
+        ...(place === undefined ? {} : { place }),
+      };
     } catch {
       // A broken link, or a file gone between the listing and this look at it.
       return undefined;
@@ -213,12 +294,20 @@ export function createExplorerService(options: ExplorerServiceOptions): Explorer
   };
 
   return {
-    async setRoot(folder) {
-      if (folder !== undefined && root?.folder === folder) return;
+    async setRoot(folder, named = NO_PLACES) {
+      const next = await realPlaces(named);
+      if (folder !== undefined && root?.folder === folder) {
+        // The same folder read again — a trust change can accept a key it refused before.
+        const changed = !samePlaces(places, next);
+        places = next;
+        if (changed) options.onChange();
+        return;
+      }
       stopWatching();
       idOfPath = new Map();
       entryOf = new Map();
       root = undefined;
+      places = next;
       if (folder === undefined) return;
       try {
         root = { folder, real: await realpath(folder) };

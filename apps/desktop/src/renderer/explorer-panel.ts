@@ -12,6 +12,7 @@ import {
   withListing,
   withSelected,
 } from './explorer-tree.js';
+import { fileIconFor } from '../../shared/file-icons.js';
 import { icon } from './icons.js';
 import { DockedPanel } from './panels.js';
 
@@ -183,10 +184,12 @@ export class ExplorerPanel extends DockedPanel {
     const { entry } = row;
     const folder = entry.kind === 'folder';
     const selected = this.tree.selected === entry.id;
+    const fileIcon = fileIconFor({ ...entry, expanded: row.expanded });
     return html`<li
       class="explorer__row"
       role="treeitem"
       data-kind=${entry.kind}
+      data-icon=${fileIcon}
       data-name=${entry.name}
       aria-level=${row.depth + 1}
       aria-expanded=${folder ? String(row.expanded) : nothing}
@@ -200,6 +203,7 @@ export class ExplorerPanel extends DockedPanel {
     >
       <span class="explorer__chevron"
         >${folder ? icon(row.expanded ? 'chevronDown' : 'chevronRight') : nothing}</span
+      ><span class="explorer__icon">${icon(fileIcon)}</span
       ><span class="explorer__name">${entry.name}</span>
     </li>`;
   }
