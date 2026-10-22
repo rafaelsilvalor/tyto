@@ -52,6 +52,13 @@ export interface DesktopSourcesOptions {
   readonly fontSources: () => readonly OwnedSource<FontSourceContribution>[];
   /** The trust a brief's folder answers to (`workspace.ts`). */
   readonly trustFor: (briefDirectory: string | undefined) => Promise<SourceTrust | undefined>;
+  /**
+   * Settles when the window's plugins have started (ADR 0044), never rejecting. A compile that
+   * may fetch waits for it: the tabs a session restores and a file opened in the first second
+   * compile before any plugin has registered a source, and would find nobody to ask. Absent:
+   * already started.
+   */
+  readonly ready?: Promise<void>;
 }
 
 export interface DesktopSources {
@@ -90,6 +97,9 @@ export function desktopSources(options: DesktopSourcesOptions): DesktopSources {
         return { ...refused(because), ...sectionOf };
       }
       if (intent === 'typing') return { ...refused(NOT_FETCHED.typing), ...sectionOf };
+      // Only here: typing never waits, and a compile that may fetch is worth the wait — the
+      // restore of a session is the one that otherwise asks before anybody is listening.
+      await options.ready;
       return { fetches: true, ...sectionOf };
     },
   };

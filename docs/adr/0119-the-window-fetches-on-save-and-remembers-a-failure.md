@@ -29,6 +29,11 @@ outside it has no banner at all, so a miss that pointed at it pointed at nothing
    field, not a channel. **A restored hot-exit draft whose text differs from its file does not
    fetch on restore**: it is a draft, not a file (ADR 0080), and it fetches on its first save. A
    restored tab whose text is its file's fetches, as an open does.
+   **A compile that may fetch waits for the window's plugins to start** (ADR 0044), and only
+   then reads the template registry. The tabs a session restores, and a file opened in the
+   first second, compile before any plugin has registered a source or installed its
+   templates; without the wait they asked nobody — found by perturbing this rule and watching
+   the restore stay silent. Typing never waits.
 2. **A fetch in flight is not cancelled.** It is bounded by ADR 0117's size ceilings and the
    plugin's deadline, and lands in the cache atomically. Previews answer out of order by design
    (`shared/ipc.ts`): text typed while it runs is compiled at once against the cache, and the

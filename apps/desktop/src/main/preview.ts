@@ -182,6 +182,13 @@ export async function createPreviewService(
       baseDirectory?: string,
       intent: PreviewIntent = 'typing',
     ): Promise<PreviewResult> {
+      // This compile's rule for the source cache (ADR 0119), asked before anything is read: a
+      // compile that may fetch waits for the plugins to start, and the registry read below
+      // then holds the templates they install — a restored tab whose template a plugin ships
+      // would otherwise compile without it, and ask nobody for its images.
+      const pluginSources = options.pluginSources;
+      const call = await pluginSources?.callFor(baseDirectory, intent);
+
       // Read once per compile, not per frame, and not at construction (TYTO-122). Per
       // compile is what lets a folder chosen at 11am be searched at 11:01 with no restart;
       // once, so a reload landing mid-compile cannot change the registry under it.
@@ -217,9 +224,7 @@ export async function createPreviewService(
       // way to leak a file. An author previewing their own folder is inside it anyway.
       const places = options.places?.(baseDirectory) ?? { assets: [], fonts: fontsFor([]) };
       // The source cache's font folders after the project's and the machine's, so a local
-      // face wins (ADR 0117); and its rule for this compile, which only a save may fetch under.
-      const pluginSources = options.pluginSources;
-      const call = await pluginSources?.callFor(baseDirectory, intent);
+      // face wins (ADR 0117).
       const inForce =
         pluginSources === undefined
           ? places.fonts

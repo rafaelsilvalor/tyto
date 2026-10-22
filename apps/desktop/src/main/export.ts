@@ -317,6 +317,14 @@ export async function createExportService(options: ExportServiceOptions): Promis
   let counter = 0;
 
   async function execute(request: ExportRequest, run: Run): Promise<void> {
+    // Asked before the snapshot, as the preview asks (ADR 0119): a run that may fetch waits
+    // for the plugins, and the registry it then reads holds the templates they install.
+    const pluginSources = options.pluginSources;
+    const asked = await pluginSources?.callFor(
+      request.briefDirectory,
+      request.queued === true ? 'queue' : 'export',
+    );
+
     // The snapshot this run is exporting under, taken once at the top. Startup problems are
     // replayed into the run's diagnostics rather than thrown, for `preview.ts`'s reason: an
     // app whose template folder is unreadable should open and say so.
@@ -339,11 +347,6 @@ export async function createExportService(options: ExportServiceOptions): Promis
     };
     // The cache's font folders last, so a local face wins (ADR 0117); the folders are the
     // window plugins', which are the plugins this run activates below.
-    const pluginSources = options.pluginSources;
-    const asked = await pluginSources?.callFor(
-      request.briefDirectory,
-      request.queued === true ? 'queue' : 'export',
-    );
     const inForce =
       pluginSources === undefined
         ? places.fonts

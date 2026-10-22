@@ -755,6 +755,7 @@ async function start(): Promise<void> {
     assetSources: () => contributed.assetSources(),
     fontSources: () => contributed.fontSources(),
     trustFor: (directory) => workspace.sourceTrustFor(directory),
+    ready: contributed.ready,
   });
   const preview = await createPreviewService({
     fileSystem,
