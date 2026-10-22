@@ -133,6 +133,12 @@ const devServerUrl = process.env['ELECTRON_RENDERER_URL'];
 const SETTINGS_SETTLE_MS = 100;
 
 /**
+ * How long after a context menu closes its pick is read (TYTO-352). An item's `click` may come
+ * after the close on Windows; a person cannot open another menu in this time.
+ */
+const CONTEXT_MENU_CLICK_GRACE_MS = 50;
+
+/**
  * `settings.json` as "Open Settings (JSON)" creates it when there is none (TYTO-206). It
  * carries `statusBarItems` commented out with every id, and `statusBarColors` with every key
  * and an example colour, and `vimModeStyle` with its three values (TYTO-301), so the bar's
@@ -609,6 +615,9 @@ async function start(): Promise<void> {
     onError: (message, cause) => {
       log.error(message, cause);
     },
+    // The system's trash and nothing else (ADR 0121). Looked up at every call rather than
+    // bound once, so an end-to-end suite can stand a folder in for it through `app.evaluate`.
+    trash: (path) => shell.trashItem(path),
   });
   app.on('will-quit', () => {
     explorer.close();
@@ -1094,6 +1103,36 @@ async function start(): Promise<void> {
       if (answer.response === 0) return 'save';
       if (answer.response === 1) return 'discard';
       return 'cancel';
+    },
+    // The explorer's context menu (TYTO-352, ADR 0121): the window's items, drawn natively at
+    // the point, scaled by the page's zoom as the menu row's lists are. **The pick is read only
+    // after the list has closed and the event loop has turned**: on Windows an item's `click`
+    // can arrive after the `popup` callback, and settling in the callback would lose it.
+    contextMenu: ({ x, y, items }) => {
+      const window = mainWindow;
+      if (window === undefined || window.isDestroyed()) return Promise.resolve(null);
+      return new Promise((settle) => {
+        let chosen: string | null = null;
+        const zoom = window.webContents.getZoomFactor();
+        Menu.buildFromTemplate(
+          items.map((item) => ({
+            label: item.label,
+            enabled: item.enabled,
+            click: () => {
+              chosen = item.id;
+            },
+          })),
+        ).popup({
+          window,
+          x: Math.round(x * zoom),
+          y: Math.round(y * zoom),
+          callback: () => {
+            setTimeout(() => {
+              settle(chosen);
+            }, CONTEXT_MENU_CLICK_GRACE_MS);
+          },
+        });
+      });
     },
     credentials,
     documents,

@@ -199,6 +199,35 @@ const documentId = z.string().min(1).max(100);
 /** An explorer entry as main minted it (TYTO-279, ADR 0115): opaque, and never a path. */
 const explorerEntryId = z.string().min(1).max(100);
 
+/** One listed entry: its id, its name, what kind it is, and what the name cannot say. */
+const explorerEntry = z.object({
+  id: explorerEntryId,
+  name: z.string().min(1),
+  kind: z.enum(['folder', 'brief', 'file']),
+  // What the name cannot say, from the resolved project (TYTO-282, ADR 0116).
+  place: z.enum(EXPLORER_PLACES).optional(),
+});
+
+/**
+ * A name a person typed for a new or renamed entry (TYTO-352, ADR 0121). **Only bounded here**:
+ * main's `checkEntryName` decides what a name may be, and answers `invalid`, so a name refused
+ * reaches the window as an answer it can say and not as a contract error.
+ */
+const explorerEntryName = z.string().max(1000);
+
+/** Why a new or a rename did not happen: a name main refuses, a name taken, or an entry gone. */
+const explorerWriteFailure = z.object({
+  ok: z.literal(false),
+  reason: z.enum(['invalid', 'exists', 'gone']),
+});
+
+/** A tab whose file a rename moved, as the window shows it now. */
+const movedDocument = z.object({
+  documentId,
+  name: z.string().min(1),
+  pathLabel: z.string().min(1),
+});
+
 /** What a session tab holds: a brief, or one of the app's own files (TYTO-113, TYTO-277). */
 const sessionTabKind = z.enum(['brief', 'settings', 'keybindings', 'snippets']);
 
@@ -708,17 +737,7 @@ export const IPC_CHANNELS = {
   'explorer:list': channel(
     z.strictObject({ entryId: explorerEntryId.nullable() }),
     z.object({
-      entries: z
-        .array(
-          z.object({
-            id: explorerEntryId,
-            name: z.string().min(1),
-            kind: z.enum(['folder', 'brief', 'file']),
-            // What the name cannot say, from the resolved project (TYTO-282, ADR 0116).
-            place: z.enum(EXPLORER_PLACES).optional(),
-          }),
-        )
-        .max(2000),
+      entries: z.array(explorerEntry).max(2000),
       more: z.number().int().nonnegative(),
       gone: z.boolean(),
     }),
@@ -733,6 +752,59 @@ export const IPC_CHANNELS = {
   'explorer:open': channel(
     z.strictObject({ documentId, entryId: explorerEntryId }),
     z.object({ document: openDocument.nullable(), documentId: documentId.nullable() }),
+  ),
+
+  /**
+   * A new empty file or folder called `name` in the folder `parentId` names (`null` is the open
+   * folder), from the explorer (TYTO-352, ADR 0121). **Strict, and an id and a name, never a
+   * path.** Nothing is overwritten: a name already taken answers `exists`. A new `*.brief`
+   * opens in the tab `documentId`, the way `explorer:open` does; any other entry answers no
+   * document. Works in an untrusted folder too: it runs nothing.
+   */
+  'explorer:create': channel(
+    z.strictObject({
+      documentId,
+      parentId: explorerEntryId.nullable(),
+      name: explorerEntryName,
+      kind: z.enum(['file', 'folder']),
+    }),
+    z.discriminatedUnion('ok', [
+      z.object({
+        ok: z.literal(true),
+        entry: explorerEntry,
+        document: openDocument.nullable(),
+        documentId: documentId.nullable(),
+      }),
+      explorerWriteFailure,
+    ]),
+  ),
+
+  /**
+   * Renames an entry in its own folder (TYTO-352, ADR 0121). The entry and everything under it
+   * keep their ids. Nothing is overwritten — only a change of case of the same entry may land
+   * on a name that exists. `moved` is every tab whose file moved, with what it is called now;
+   * a tab with unsaved text keeps it.
+   */
+  'explorer:rename': channel(
+    z.strictObject({ entryId: explorerEntryId, name: explorerEntryName }),
+    z.discriminatedUnion('ok', [
+      z.object({ ok: z.literal(true), entry: explorerEntry, moved: z.array(movedDocument) }),
+      explorerWriteFailure,
+    ]),
+  ),
+
+  /**
+   * Moves an entry to the operating system's trash (TYTO-352, ADR 0121), **never a hard
+   * delete**: a trash that fails answers `trash-failed` and the entry stays. `released` is every
+   * tab that held a file in it, which now holds no file (TYTO-104). Asking first is the
+   * window's, through `dialog:confirm`.
+   */
+  'explorer:delete': channel(
+    z.strictObject({ entryId: explorerEntryId }),
+    z.discriminatedUnion('ok', [
+      z.object({ ok: z.literal(true), released: z.array(documentId) }),
+      z.object({ ok: z.literal(false), reason: z.enum(['gone', 'trash-failed']) }),
+    ]),
   ),
 
   /**
@@ -1541,6 +1613,34 @@ export const IPC_CHANNELS = {
       y: z.number().finite(),
     }),
     z.object({ opened: z.boolean(), move: menuMoveSchema.optional() }),
+  ),
+
+  /**
+   * A context menu at a point in the window, of items the window names (TYTO-352, ADR 0121):
+   * the explorer's New File…, Rename…, Delete. Drawn by the system with `Menu.popup`, so it
+   * looks like every other menu. **The labels are the window's, already translated**, the way
+   * `dialog:confirm`'s are; main draws them and reads back which `id` was chosen — `null` when
+   * the menu closed with nothing picked. `x` and `y` are CSS pixels, scaled as `menu:popup`'s.
+   */
+  'menu:context': channel(
+    z.strictObject({
+      x: z.number().finite(),
+      y: z.number().finite(),
+      items: z
+        .array(
+          z.strictObject({
+            id: z.string().min(1).max(100),
+            label: z.string().min(1).max(100),
+            enabled: z.boolean(),
+          }),
+        )
+        .min(1)
+        .max(20)
+        .refine((items) => new Set(items.map((item) => item.id)).size === items.length, {
+          message: 'two items share an id',
+        }),
+    }),
+    z.object({ chosen: z.string().min(1).max(100).nullable() }),
   ),
 
   /**

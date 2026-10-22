@@ -57,7 +57,8 @@ so whatever it names them by is the question this ADR answers.
    a workspace (ADR 0112), so `workspace:folder` answers no folder and the explorer has no root.
    Nothing is lost by it: only briefs open, and a brief there still opens through File ▸ Open.
 8. **New, rename and delete are not in this card.** When they come, delete goes to the
-   operating system's trash and is never a hard delete.
+   operating system's trash and is never a hard delete. (2026-10-22: they came in TYTO-352, ADR
+   0121.)
 
 ## Consequences
 

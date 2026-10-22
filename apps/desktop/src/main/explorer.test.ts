@@ -1,13 +1,27 @@
-import { mkdir, mkdtemp, realpath, rename, rm, symlink, writeFile } from 'node:fs/promises';
+import {
+  mkdir,
+  mkdtemp,
+  readFile,
+  readdir,
+  realpath,
+  rename,
+  rm,
+  stat,
+  symlink,
+  writeFile,
+} from 'node:fs/promises';
 import { tmpdir } from 'node:os';
-import { join } from 'node:path';
+import { basename, join } from 'node:path';
 
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import {
+  type ExplorerService,
   type WatchFolder,
+  checkEntryName,
   createExplorerService,
   ignoredByTheWatcher,
+  relativeUnder,
   watchRecursively,
 } from './explorer.js';
 
@@ -55,6 +69,14 @@ const handWatcher = () => {
 
 const quiet = () =>
   createExplorerService({ onChange: () => undefined, watch: handWatcher().watch });
+
+/** The id the listing of `folder` (`null` is the root) gives `name`, or `''`. */
+const entryIdOf = async (
+  explorer: ExplorerService,
+  name: string,
+  folder: string | null = null,
+): Promise<string> =>
+  (await explorer.list(folder)).entries.find((entry) => entry.name === name)?.id ?? '';
 
 describe('listing the open folder', () => {
   it('answers folders first, names as a person reads numbers, and no .git', async () => {
@@ -359,5 +381,303 @@ describe('flagging what a name cannot tell (TYTO-282, ADR 0116)', () => {
     expect(onChange).toHaveBeenCalledTimes(1);
     expect(await idOf(explorer, 'saida')).toBe(before);
     expect((await placesOf(explorer, null)).saida).toBe('output');
+  });
+});
+
+/** The names nothing may be called, on any operating system (TYTO-352, ADR 0121 rule 1). */
+describe('a name for a new or renamed entry', () => {
+  it('refuses what would leave the folder, what Windows forbids, and .git', () => {
+    const refused = [
+      '',
+      '   ',
+      '.',
+      '..',
+      '..\\x',
+      '../x',
+      'a/b',
+      'a\\b',
+      'nul\u0000l',
+      'tab\there',
+      'del\u007f',
+      'a<b',
+      'a>b',
+      'a:b',
+      'a"b',
+      'a|b',
+      'a?b',
+      'a*b',
+      'fim.',
+      'fim ',
+      'CON',
+      'con.brief',
+      'Prn',
+      'aux.txt',
+      'NUL',
+      'com1',
+      'LPT9.log',
+      'x'.repeat(256),
+      '.git',
+      '.GIT',
+    ];
+    expect(refused.filter((name) => checkEntryName(name))).toEqual([]);
+  });
+
+  it('accepts ordinary names, a leading dot and names that only start like a device', () => {
+    const accepted = [
+      'promo.brief',
+      'slide 2',
+      '.tyto',
+      '..notas',
+      ' espaço antes',
+      'lâminas',
+      'console.brief',
+      'com0',
+      'lpt10',
+      'CONTRATO',
+      '.gitignore',
+      'x'.repeat(255),
+    ];
+    expect(accepted.filter((name) => !checkEntryName(name))).toEqual([]);
+  });
+
+  it('reads a child called ..notas as under its folder, and the parent as not', () => {
+    expect(relativeUnder(work, join(work, '..notas'))).toBe('..notas');
+    expect(relativeUnder(work, work)).toBe('');
+    expect(relativeUnder(work, scratch)).toBeUndefined();
+    expect(relativeUnder(work, join(scratch, 'promo-old'))).toBeUndefined();
+  });
+});
+
+describe('making a new entry', () => {
+  it('makes an empty file or folder by id and name, and the listing shows it with that id', async () => {
+    const explorer = quiet();
+    await explorer.setRoot(work);
+    const slides = await entryIdOf(explorer, 'slides');
+
+    const brief = await explorer.create(null, 'novo.brief', 'file');
+    const folder = await explorer.create(slides, 'anexos', 'folder');
+
+    expect(brief).toMatchObject({ ok: true, entry: { name: 'novo.brief', kind: 'brief' } });
+    expect(folder).toMatchObject({ ok: true, entry: { name: 'anexos', kind: 'folder' } });
+    expect(await readFile(join(work, 'novo.brief'), 'utf8')).toBe('');
+    expect((await stat(join(work, 'slides', 'anexos'))).isDirectory()).toBe(true);
+    expect(brief.ok && (await entryIdOf(explorer, 'novo.brief'))).toBe(brief.ok && brief.entry.id);
+  });
+
+  it('answers exists rather than replace a file or a folder that is there', async () => {
+    const explorer = quiet();
+    await explorer.setRoot(work);
+    await writeFile(join(work, 'slide 2.brief'), 'kept');
+
+    await expect(explorer.create(null, 'slide 2.brief', 'file')).resolves.toEqual({
+      ok: false,
+      reason: 'exists',
+    });
+    await expect(explorer.create(null, 'slides', 'folder')).resolves.toEqual({
+      ok: false,
+      reason: 'exists',
+    });
+    await expect(explorer.create(null, 'slides', 'file')).resolves.toEqual({
+      ok: false,
+      reason: 'exists',
+    });
+    expect(await readFile(join(work, 'slide 2.brief'), 'utf8')).toBe('kept');
+    expect((await readdir(join(work, 'slides'))).sort()).toEqual(['capa.brief', 'extra']);
+  });
+
+  it('writes nothing for a name that is refused, and nothing outside the folder', async () => {
+    const explorer = quiet();
+    await explorer.setRoot(work);
+    const before = await readdir(scratch);
+
+    for (const name of ['..\\fora.brief', '../fora.brief', 'a/b', 'CON', '..']) {
+      await expect(explorer.create(null, name, 'file')).resolves.toEqual({
+        ok: false,
+        reason: 'invalid',
+      });
+    }
+    expect(await readdir(scratch)).toEqual(before);
+    expect((await readdir(work)).sort()).toEqual(
+      ['.git', 'assets', 'logo.png', 'slide 10.brief', 'slide 2.brief', 'slides'].sort(),
+    );
+  });
+
+  it('answers gone for a parent that is a file, an id it never minted, or a folder deleted', async () => {
+    const explorer = quiet();
+    await explorer.setRoot(work);
+    const logo = await entryIdOf(explorer, 'logo.png');
+    const assets = await entryIdOf(explorer, 'assets');
+    await rm(join(work, 'assets'), { recursive: true });
+
+    for (const parent of [logo, 'never-minted', assets]) {
+      await expect(explorer.create(parent, 'x.brief', 'file')).resolves.toEqual({
+        ok: false,
+        reason: 'gone',
+      });
+    }
+  });
+});
+
+describe('renaming an entry', () => {
+  it('keeps the id of the entry and of everything under a folder', async () => {
+    const explorer = quiet();
+    await explorer.setRoot(work);
+    const slides = await entryIdOf(explorer, 'slides');
+    const capa = await entryIdOf(explorer, 'capa.brief', slides);
+    const extra = await entryIdOf(explorer, 'extra', slides);
+
+    const renamed = await explorer.rename(slides, 'lâminas');
+
+    expect(renamed).toMatchObject({
+      ok: true,
+      entry: { id: slides, name: 'lâminas', kind: 'folder' },
+      from: join(work, 'slides'),
+      to: join(work, 'lâminas'),
+    });
+    expect(await entryIdOf(explorer, 'lâminas')).toBe(slides);
+    // The expanded subtree is listed by the ids it already had.
+    expect(await entryIdOf(explorer, 'capa.brief', slides)).toBe(capa);
+    expect(await entryIdOf(explorer, 'extra', slides)).toBe(extra);
+    expect(await explorer.briefPath(capa)).toBe(join(work, 'lâminas', 'capa.brief'));
+  });
+
+  it('answers exists and moves nothing when the name is taken', async () => {
+    const explorer = quiet();
+    await explorer.setRoot(work);
+    await writeFile(join(work, 'slide 2.brief'), 'two');
+    await writeFile(join(work, 'slide 10.brief'), 'ten');
+    const two = await entryIdOf(explorer, 'slide 2.brief');
+
+    await expect(explorer.rename(two, 'slide 10.brief')).resolves.toEqual({
+      ok: false,
+      reason: 'exists',
+    });
+    await expect(explorer.rename(two, 'slides')).resolves.toEqual({
+      ok: false,
+      reason: 'exists',
+    });
+    expect(await readFile(join(work, 'slide 2.brief'), 'utf8')).toBe('two');
+    expect(await readFile(join(work, 'slide 10.brief'), 'utf8')).toBe('ten');
+  });
+
+  it('changes only the case of a name, which lands on the entry itself where case is ignored', async () => {
+    const explorer = quiet();
+    await explorer.setRoot(work);
+    const two = await entryIdOf(explorer, 'slide 2.brief');
+
+    await expect(explorer.rename(two, 'Slide 2.brief')).resolves.toMatchObject({
+      ok: true,
+      entry: { id: two, name: 'Slide 2.brief' },
+    });
+    expect(await readdir(work)).toContain('Slide 2.brief');
+    expect(await readdir(work)).not.toContain('slide 2.brief');
+  });
+
+  it.runIf(process.platform === 'linux')(
+    'answers exists for another case where case is a different file',
+    async () => {
+      await writeFile(join(work, 'Slide 2.brief'), 'other');
+      const explorer = quiet();
+      await explorer.setRoot(work);
+      const two = await entryIdOf(explorer, 'slide 2.brief');
+
+      await expect(explorer.rename(two, 'Slide 2.brief')).resolves.toEqual({
+        ok: false,
+        reason: 'exists',
+      });
+      expect(await readFile(join(work, 'Slide 2.brief'), 'utf8')).toBe('other');
+    },
+  );
+
+  it('changes the kind with the extension, and refuses a name that would leave the folder', async () => {
+    const explorer = quiet();
+    await explorer.setRoot(work);
+    const logo = await entryIdOf(explorer, 'logo.png');
+
+    await expect(explorer.rename(logo, '..\\fora.png')).resolves.toEqual({
+      ok: false,
+      reason: 'invalid',
+    });
+    await expect(explorer.rename(logo, 'logo.brief')).resolves.toMatchObject({
+      ok: true,
+      entry: { id: logo, kind: 'brief' },
+    });
+    expect(await explorer.briefPath(logo)).toBe(join(work, 'logo.brief'));
+  });
+
+  it('answers gone for an entry deleted outside the app', async () => {
+    const explorer = quiet();
+    await explorer.setRoot(work);
+    const logo = await entryIdOf(explorer, 'logo.png');
+    await rm(join(work, 'logo.png'));
+
+    await expect(explorer.rename(logo, 'logo2.png')).resolves.toEqual({
+      ok: false,
+      reason: 'gone',
+    });
+  });
+});
+
+describe('deleting an entry', () => {
+  /** A trash that is a folder of the scratch, so a test can see what went in. */
+  const standInTrash = async () => {
+    const bin = join(scratch, 'lixeira');
+    await mkdir(bin);
+    const trashed: string[] = [];
+    const trash = async (path: string): Promise<void> => {
+      trashed.push(path);
+      await rename(path, join(bin, `${String(trashed.length)}-${basename(path)}`));
+    };
+    return { bin, trashed, trash };
+  };
+
+  it('moves the entry to the trash, and forgets its id and the ids under it', async () => {
+    const { bin, trash } = await standInTrash();
+    const explorer = createExplorerService({
+      onChange: () => undefined,
+      watch: handWatcher().watch,
+      trash,
+    });
+    await explorer.setRoot(work);
+    const slides = await entryIdOf(explorer, 'slides');
+    const capa = await entryIdOf(explorer, 'capa.brief', slides);
+
+    await expect(explorer.delete(slides)).resolves.toEqual({
+      ok: true,
+      path: join(work, 'slides'),
+    });
+
+    expect(await readdir(work)).not.toContain('slides');
+    expect((await readdir(join(bin, '1-slides'))).sort()).toEqual(['capa.brief', 'extra']);
+    await expect(explorer.list(slides)).resolves.toMatchObject({ gone: true });
+    expect(await explorer.briefPath(capa)).toBeUndefined();
+    await expect(explorer.delete(slides)).resolves.toEqual({ ok: false, reason: 'gone' });
+  });
+
+  it('answers trash-failed and leaves the file where it was when the trash refuses', async () => {
+    const onError = vi.fn();
+    const explorer = createExplorerService({
+      onChange: () => undefined,
+      onError,
+      watch: handWatcher().watch,
+      trash: () => Promise.reject(new Error('the bin is full')),
+    });
+    await explorer.setRoot(work);
+    const two = await entryIdOf(explorer, 'slide 2.brief');
+
+    await expect(explorer.delete(two)).resolves.toEqual({ ok: false, reason: 'trash-failed' });
+
+    expect(await readFile(join(work, 'slide 2.brief'), 'utf8')).toBe('::a');
+    expect(await entryIdOf(explorer, 'slide 2.brief')).toBe(two);
+    expect(onError).toHaveBeenCalledTimes(1);
+  });
+
+  it('deletes nothing when there is no trash at all', async () => {
+    const explorer = quiet();
+    await explorer.setRoot(work);
+    const two = await entryIdOf(explorer, 'slide 2.brief');
+
+    await expect(explorer.delete(two)).resolves.toEqual({ ok: false, reason: 'trash-failed' });
+    expect(await readdir(work)).toContain('slide 2.brief');
   });
 });

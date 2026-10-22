@@ -1,8 +1,9 @@
 import { access, readFile, writeFile } from 'node:fs/promises';
 import { homedir } from 'node:os';
-import { basename, dirname } from 'node:path';
+import { basename, dirname, join } from 'node:path';
 
 import { type IpcResponse } from '../../shared/ipc.js';
+import { relativeUnder } from './explorer.js';
 import { pathLabelOf } from './path-label.js';
 import { type RecentEntry, type RecentFiles } from './recent-files.js';
 
@@ -64,6 +65,13 @@ export interface AdoptedDocument {
   readonly documentId: string | null;
 }
 
+/** A tab whose file the explorer renamed, as the window shows it now — see `retargetUnder`. */
+export interface MovedDocument {
+  readonly documentId: string;
+  readonly name: string;
+  readonly pathLabel: string;
+}
+
 /** What saving produced, and which other tab lost the path to it — see `file:save`. */
 export interface SavedDocument {
   readonly document: OpenDocument | null;
@@ -97,6 +105,18 @@ export interface DocumentService {
    * save would fail. A path no tab holds is not an error.
    */
   retarget(from: string, to: string): void;
+  /**
+   * The explorer renamed `from` — a file, or a folder with files inside — to `to` (TYTO-352,
+   * ADR 0121). Every tab at or under `from` follows by the same relative path, its label with
+   * it, and the answer is each tab that moved with what it is called now, so the window can
+   * rename its tab. A dirty tab keeps its text; what moves is only where it saves.
+   */
+  retargetUnder(from: string, to: string): MovedDocument[];
+  /**
+   * The explorer sent `path` to the trash (TYTO-352): every tab at or under it lets go of its
+   * file, as a save-as onto it would make it (TYTO-104), and the answer is those tabs' ids.
+   */
+  releaseUnder(path: string): string[];
   save(documentId: string, text: string, saveAs: boolean): Promise<SavedDocument>;
   /** Forgets a tab's path. A tab main never heard of is not an error. */
   close(documentId: string): void;
@@ -260,6 +280,41 @@ export function createDocumentService(options: DocumentServiceOptions): Document
         labels.delete(from);
         labels.set(to, label);
       }
+    },
+
+    retargetUnder(from, to) {
+      const moved: string[] = [];
+      for (const [id, held] of paths) {
+        const rest = relativeUnder(from, held);
+        if (rest === undefined) continue;
+        const next = rest === '' ? to : join(to, rest);
+        paths.set(id, next);
+        moved.push(id);
+      }
+      for (const [held, label] of [...labels]) {
+        const rest = relativeUnder(from, held);
+        if (rest === undefined) continue;
+        labels.delete(held);
+        labels.set(rest === '' ? to : join(to, rest), label);
+      }
+      // Described after the labels have moved, so a tab that carries one keeps showing it.
+      return moved.map((documentId): MovedDocument => {
+        const path = paths.get(documentId) ?? to;
+        return { documentId, name: nameFor(path), pathLabel: pathLabelOf(path, home()) };
+      });
+    },
+
+    releaseUnder(path) {
+      const released: string[] = [];
+      for (const [id, held] of paths) {
+        if (relativeUnder(path, held) === undefined) continue;
+        paths.delete(id);
+        released.push(id);
+      }
+      for (const held of [...labels.keys()]) {
+        if (relativeUnder(path, held) !== undefined) labels.delete(held);
+      }
+      return released;
     },
 
     close(documentId) {

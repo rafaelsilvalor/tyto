@@ -8,6 +8,7 @@ import {
   type UpdateStatus,
 } from '../../shared/ipc.js';
 import { type Credentials } from './credentials.js';
+import { type ExplorerService } from './explorer.js';
 import { type WindowThemes, createHandlers, guard, registerIpcHandlers } from './ipc.js';
 import { createTemplateFolder } from './session.js';
 import { BUILT_IN_THEMES, builtInThemeSource, createThemeService } from './themes.js';
@@ -123,6 +124,43 @@ const explorerFiles = () => {
     },
     briefPath: (entryId: string) =>
       Promise.resolve(entryId === 'e-brief' ? '/work/promo/promo.brief' : undefined),
+    // TYTO-352: one name already taken, one folder that renames and trashes, and a trash that
+    // refuses everything else.
+    create: (
+      parentId: string | null,
+      name: string,
+      kind: 'file' | 'folder',
+    ): ReturnType<ExplorerService['create']> => {
+      asked.push(parentId);
+      if (name === 'taken.brief') return Promise.resolve({ ok: false, reason: 'exists' });
+      const entryKind = kind === 'folder' ? 'folder' : name.endsWith('.brief') ? 'brief' : 'file';
+      return Promise.resolve({
+        ok: true,
+        entry: { id: 'e-new', name, kind: entryKind },
+        path: `/work/promo/${name}`,
+      });
+    },
+    rename: (entryId: string, name: string): ReturnType<ExplorerService['rename']> => {
+      asked.push(entryId);
+      return Promise.resolve(
+        entryId === 'e-folder'
+          ? {
+              ok: true,
+              entry: { id: 'e-folder', name, kind: 'folder' },
+              from: '/work/promo/slides',
+              to: `/work/promo/${name}`,
+            }
+          : { ok: false, reason: 'gone' },
+      );
+    },
+    delete: (entryId: string): ReturnType<ExplorerService['delete']> => {
+      asked.push(entryId);
+      return Promise.resolve(
+        entryId === 'e-folder'
+          ? { ok: true, path: '/work/promo/slides' }
+          : { ok: false, reason: 'trash-failed' },
+      );
+    },
   };
 };
 
@@ -167,6 +205,7 @@ const workspaceFolder = () => {
  */
 const documents = () => {
   const closed: string[] = [];
+  const followed: string[][] = [];
   return {
     closed,
     open: (documentId: string) =>
@@ -217,6 +256,16 @@ const documents = () => {
     nameOf: (documentId: string) => (documentId === 'document-1' ? 'promo' : undefined),
     pathOf: () => undefined,
     reset: () => undefined,
+    // TYTO-352: what the explorer's handlers hand on, recorded, with one tab under each.
+    followed,
+    retargetUnder: (from: string, to: string) => {
+      followed.push(['retarget', from, to]);
+      return [{ documentId: 'document-9', name: 'capa.brief', pathLabel: to }];
+    },
+    releaseUnder: (path: string) => {
+      followed.push(['release', path]);
+      return ['document-9'];
+    },
   };
 };
 
@@ -573,6 +622,9 @@ const dependencies = () => {
   const keychain = credentials();
   return {
     confirm: () => Promise.resolve(true),
+    // The system's menu picks the second item, whatever was offered (TYTO-352).
+    contextMenu: (request: { items: readonly { id: string }[] }) =>
+      Promise.resolve(request.items[1]?.id ?? null),
     askToSave: () => Promise.resolve('cancel' as const),
     log: recordingLog(),
     credentials: keychain,
@@ -1590,5 +1642,150 @@ describe('the explorer channels', () => {
       open({ documentId: 'document-7', entryId: 'e-brief', path: '/etc/passwd' }),
     ).rejects.toBeInstanceOf(IpcContractError);
     expect(explorer.asked).toEqual([]);
+  });
+});
+
+/** TYTO-352, ADR 0121: the explorer writes by id and name, and the tabs follow. */
+describe('the explorer write channels', () => {
+  it('opens a new brief in the tab it was given, and nothing for a folder or a taken name', async () => {
+    const handlers = createHandlers(dependencies());
+    const create = guard('explorer:create', handlers['explorer:create']);
+
+    const brief = await create({
+      documentId: 'document-3',
+      parentId: null,
+      name: 'novo.brief',
+      kind: 'file',
+    });
+    expect(brief).toMatchObject({
+      ok: true,
+      entry: { id: 'e-new', kind: 'brief' },
+      documentId: 'document-3',
+      document: { path: '/work/promo/novo.brief' },
+    });
+    await expect(
+      create({ documentId: 'document-4', parentId: 'e-folder', name: 'anexos', kind: 'folder' }),
+    ).resolves.toEqual({
+      ok: true,
+      entry: { id: 'e-new', name: 'anexos', kind: 'folder' },
+      document: null,
+      documentId: null,
+    });
+    await expect(
+      create({ documentId: 'document-5', parentId: null, name: 'taken.brief', kind: 'file' }),
+    ).resolves.toEqual({ ok: false, reason: 'exists' });
+  });
+
+  it('moves the tabs under a renamed entry and answers each one, never a path', async () => {
+    const deps = dependencies();
+    const handlers = createHandlers(deps);
+    const rename = guard('explorer:rename', handlers['explorer:rename']);
+
+    const renamed = await rename({ entryId: 'e-folder', name: 'capitulos' });
+
+    expect(renamed).toEqual({
+      ok: true,
+      entry: { id: 'e-folder', name: 'capitulos', kind: 'folder' },
+      moved: [{ documentId: 'document-9', name: 'capa.brief', pathLabel: '/work/promo/capitulos' }],
+    });
+    expect(deps.documents.followed).toEqual([
+      ['retarget', '/work/promo/slides', '/work/promo/capitulos'],
+    ]);
+    await expect(rename({ entryId: 'e-other', name: 'x' })).resolves.toEqual({
+      ok: false,
+      reason: 'gone',
+    });
+  });
+
+  it('releases the tabs under a trashed entry, and none when the trash refused', async () => {
+    const deps = dependencies();
+    const handlers = createHandlers(deps);
+    const remove = guard('explorer:delete', handlers['explorer:delete']);
+
+    await expect(remove({ entryId: 'e-folder' })).resolves.toEqual({
+      ok: true,
+      released: ['document-9'],
+    });
+    expect(deps.documents.followed).toEqual([['release', '/work/promo/slides']]);
+    await expect(remove({ entryId: 'e-brief' })).resolves.toEqual({
+      ok: false,
+      reason: 'trash-failed',
+    });
+    expect(deps.documents.followed).toHaveLength(1);
+  });
+
+  it('refuses a request that names a path, so no window can write where it chooses', async () => {
+    const explorer = explorerFiles();
+    const handlers = createHandlers({ ...dependencies(), explorer });
+    const create = guard('explorer:create', handlers['explorer:create']);
+    const rename = guard('explorer:rename', handlers['explorer:rename']);
+    const remove = guard('explorer:delete', handlers['explorer:delete']);
+
+    await expect(
+      create({
+        documentId: 'document-1',
+        parentId: null,
+        name: 'x.brief',
+        kind: 'file',
+        path: 'C:/Windows',
+      }),
+    ).rejects.toBeInstanceOf(IpcContractError);
+    await expect(
+      rename({ entryId: 'e-brief', name: 'x.brief', to: '/etc/passwd' }),
+    ).rejects.toBeInstanceOf(IpcContractError);
+    await expect(remove({ entryId: 'e-brief', path: '/' })).rejects.toBeInstanceOf(
+      IpcContractError,
+    );
+    // A kind that is neither, and a name past the bound, are refused before main looks.
+    await expect(
+      create({ documentId: 'document-1', parentId: null, name: 'x', kind: 'brief' }),
+    ).rejects.toBeInstanceOf(IpcContractError);
+    await expect(rename({ entryId: 'e-brief', name: 'x'.repeat(1001) })).rejects.toBeInstanceOf(
+      IpcContractError,
+    );
+    expect(explorer.asked).toEqual([]);
+  });
+});
+
+/** TYTO-352, ADR 0121: the native context menu, whose labels are the window's. */
+describe('the context menu channel', () => {
+  const items = [
+    { id: 'new-file', label: 'New File…', enabled: true },
+    { id: 'rename', label: 'Rename…', enabled: true },
+    { id: 'delete', label: 'Delete', enabled: true },
+  ];
+
+  it('answers the id the system menu picked', async () => {
+    const handlers = createHandlers(dependencies());
+    const context = guard('menu:context', handlers['menu:context']);
+    await expect(context({ x: 10, y: 20, items })).resolves.toEqual({ chosen: 'rename' });
+  });
+
+  it('answers nothing for an item that was offered disabled, or was not offered', async () => {
+    const handlers = createHandlers(dependencies());
+    const disabled = guard('menu:context', handlers['menu:context']);
+    await expect(
+      disabled({ x: 0, y: 0, items: items.map((item) => ({ ...item, enabled: false })) }),
+    ).resolves.toEqual({ chosen: null });
+
+    const stray = createHandlers({
+      ...dependencies(),
+      contextMenu: () => Promise.resolve('format-disk'),
+    });
+    await expect(
+      guard('menu:context', stray['menu:context'])({ x: 0, y: 0, items }),
+    ).resolves.toEqual({ chosen: null });
+  });
+
+  it('refuses no items, two items with one id, and an item with a key it does not know', async () => {
+    const handlers = createHandlers(dependencies());
+    const context = guard('menu:context', handlers['menu:context']);
+    await expect(context({ x: 0, y: 0, items: [] })).rejects.toBeInstanceOf(IpcContractError);
+    await expect(
+      context({ x: 0, y: 0, items: [items[0], { ...items[1], id: 'new-file' }] }),
+    ).rejects.toBeInstanceOf(IpcContractError);
+    await expect(
+      context({ x: 0, y: 0, items: [{ ...items[0], role: 'quit' }] }),
+    ).rejects.toBeInstanceOf(IpcContractError);
   });
 });
