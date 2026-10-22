@@ -202,6 +202,11 @@
       "why": "reviewed: generated hits plus the type settings"
     },
     {
+      "paths": ["apps/desktop/src/main/google-fonts.ts"],
+      "e2e": ["google-fonts.desktop.test.ts", "plugin-sources.desktop.test.ts"],
+      "why": "reviewed: the built-in Google Fonts source behind the window's source cache (TYTO-281, ADR 0120); the plugin-sources suite shares the cache"
+    },
+    {
       "paths": ["apps/desktop/src/main/installed-plugins.ts"],
       "e2e": [
         "assets.desktop.test.ts",
@@ -407,7 +412,7 @@
     },
     {
       "paths": ["apps/desktop/src/main/plugin-sources.ts"],
-      "e2e": ["plugin-sources.desktop.test.ts"],
+      "e2e": ["google-fonts.desktop.test.ts", "plugin-sources.desktop.test.ts"],
       "why": "reviewed: when the preview, the export and the queue may fetch a plugin's image or face (TYTO-280, ADR 0119); only that suite installs a source"
     },
     {

@@ -2,7 +2,7 @@
 
 # Configurações
 
-Todas as chaves que o app declara no `settings.json`: 21. Abra o arquivo com **Preferências: Abrir configurações (JSON)**; uma chave que você não escreve fica com o valor padrão, e um valor que o app não consegue ler aparece no painel Problemas e o padrão vale no lugar dele. Um plugin acrescenta as próprias chaves como `<id do plugin>.<chave>`, que não aparecem aqui.
+Todas as chaves que o app declara no `settings.json`: 22. Abra o arquivo com **Preferências: Abrir configurações (JSON)**; uma chave que você não escreve fica com o valor padrão, e um valor que o app não consegue ler aparece no painel Problemas e o padrão vale no lugar dele. Um plugin acrescenta as próprias chaves como `<id do plugin>.<chave>`, que não aparecem aqui.
 
 ::: info Descrições em inglês
 As descrições abaixo estão em inglês: o código guarda cada uma em um só idioma, e esta página as mostra como estão em vez de traduzi-las à parte.
@@ -337,3 +337,18 @@ A face for one part of the window, over its base (uiFontFamily or codeFontFamily
 | `"statusBar"` | The status bar. Follows uiFontSize and uiFontFamily while unset. |
 | `"queue"` | The queue panel's body. Follows uiFontSize and uiFontFamily while unset. |
 | `"explorer"` | The explorer panel's tree. Follows uiFontSize and uiFontFamily while unset. |
+
+## googleFonts
+
+Fetch a template's font this machine lacks from Google Fonts on first use (default true). Each fetch sends Google the family, weight and style.
+
+| Tipo | Padrão |
+| --- | --- |
+| `boolean` | `true` |
+
+**Valores**
+
+| Valor | Significado |
+| --- | --- |
+| `true` | A missing font Google serves is fetched once, on save or open, and drawn from then on. |
+| `false` | Nothing is asked of Google; a missing font is drawn in a substitute, reported. |

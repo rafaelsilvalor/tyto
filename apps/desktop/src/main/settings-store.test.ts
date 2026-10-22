@@ -119,6 +119,7 @@ describe('fileSettingsStore', () => {
       codeFontSize: DEFAULT_SETTINGS.codeFontSize,
       fontSizes: DEFAULT_SETTINGS.fontSizes,
       fontFamilies: DEFAULT_SETTINGS.fontFamilies,
+      googleFonts: DEFAULT_SETTINGS.googleFonts,
     });
   });
 
@@ -153,6 +154,7 @@ describe('fileSettingsStore', () => {
       codeFontSize: DEFAULT_SETTINGS.codeFontSize,
       fontSizes: DEFAULT_SETTINGS.fontSizes,
       fontFamilies: DEFAULT_SETTINGS.fontFamilies,
+      googleFonts: DEFAULT_SETTINGS.googleFonts,
     });
   });
 
@@ -187,6 +189,7 @@ describe('fileSettingsStore', () => {
       codeFontSize: DEFAULT_SETTINGS.codeFontSize,
       fontSizes: DEFAULT_SETTINGS.fontSizes,
       fontFamilies: DEFAULT_SETTINGS.fontFamilies,
+      googleFonts: DEFAULT_SETTINGS.googleFonts,
     });
   });
 
@@ -220,6 +223,7 @@ describe('fileSettingsStore', () => {
       codeFontSize: DEFAULT_SETTINGS.codeFontSize,
       fontSizes: DEFAULT_SETTINGS.fontSizes,
       fontFamilies: DEFAULT_SETTINGS.fontFamilies,
+      googleFonts: DEFAULT_SETTINGS.googleFonts,
     });
   });
 

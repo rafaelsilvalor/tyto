@@ -81,3 +81,5 @@ Measured on 2026-10-22 against Google, read-only:
   the snapshot is regenerated.
 - Open: pinning a version across machines, a per-family switch, and the window's setting (the
   second pull request of TYTO-281).
+- The window's setting landed with TYTO-281's second pull request as `googleFonts`, a boolean (a
+  built-in's key cannot carry a dot); the window also honours `TYTO_GOOGLE_FONTS=off`.

@@ -34,7 +34,8 @@ export default defineConfig({
     globalSetup: ['e2e/electron-binary.global-setup.ts', 'e2e/launch-ledger.global-setup.ts'],
     // Every window a second launch unless a suite asks for a first one (TYTO-287): the first
     // opens the preview to the side, and every suite starts in a folder with no session.
-    setupFiles: ['e2e/not-a-first-launch.setup.ts'],
+    // And Google Fonts off in every launch that does not ask for it (TYTO-281, ADR 0120).
+    setupFiles: ['e2e/not-a-first-launch.setup.ts', 'e2e/no-google-fonts.setup.ts'],
     // Launching Electron is seconds, not milliseconds, and the first run on a machine also
     // downloads the binary. The 5s default would read that as a hang.
     testTimeout: 120_000,

@@ -2,7 +2,7 @@
 
 # Settings
 
-Every key the app declares in `settings.json`: 21. Open the file with **Preferences: Open Settings (JSON)**; a key you leave out keeps its default, and a value the app cannot read is reported in the Problems panel and the default applies. A plugin adds its own keys as `<plugin id>.<key>`, which are not listed here.
+Every key the app declares in `settings.json`: 22. Open the file with **Preferences: Open Settings (JSON)**; a key you leave out keeps its default, and a value the app cannot read is reported in the Problems panel and the default applies. A plugin adds its own keys as `<plugin id>.<key>`, which are not listed here.
 
 ## templatesFolder
 
@@ -333,3 +333,18 @@ A face for one part of the window, over its base (uiFontFamily or codeFontFamily
 | `"statusBar"` | The status bar. Follows uiFontSize and uiFontFamily while unset. |
 | `"queue"` | The queue panel's body. Follows uiFontSize and uiFontFamily while unset. |
 | `"explorer"` | The explorer panel's tree. Follows uiFontSize and uiFontFamily while unset. |
+
+## googleFonts
+
+Fetch a template's font this machine lacks from Google Fonts on first use (default true). Each fetch sends Google the family, weight and style.
+
+| Type | Default |
+| --- | --- |
+| `boolean` | `true` |
+
+**Values**
+
+| Value | Meaning |
+| --- | --- |
+| `true` | A missing font Google serves is fetched once, on save or open, and drawn from then on. |
+| `false` | Nothing is asked of Google; a missing font is drawn in a substitute, reported. |

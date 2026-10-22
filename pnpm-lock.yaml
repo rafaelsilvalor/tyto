@@ -129,6 +129,9 @@ importers:
       '@tyto/fonts':
         specifier: workspace:*
         version: link:../../packages/fonts
+      '@tyto/google-fonts':
+        specifier: workspace:*
+        version: link:../../packages/google-fonts
       '@tyto/io':
         specifier: workspace:*
         version: link:../../packages/io

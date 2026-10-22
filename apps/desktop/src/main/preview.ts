@@ -324,7 +324,15 @@ export async function createPreviewService(
         ...resolved.diagnostics,
         ...template.diagnostics,
         ...scene.diagnostics,
-        ...fontSubstitutionWarnings(fonts.substitutions(needed.faces)),
+        // One line per missing face: `W_FONT_UNAVAILABLE` for a family nobody serves while
+        // Google Fonts is on (ADR 0120), `W_FONT_SUBSTITUTED` otherwise, as before.
+        ...(pluginSources === undefined
+          ? fontSubstitutionWarnings(fonts.substitutions(needed.faces))
+          : pluginSources.googleFonts.missingFaceWarnings(
+              fonts.substitutions(needed.faces),
+              loaded.manifest,
+              pluginSources.fontSources(),
+            )),
         ...fetchedFaces,
       ];
 
