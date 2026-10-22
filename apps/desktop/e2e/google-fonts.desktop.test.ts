@@ -285,6 +285,9 @@ describe('a missing face from Google Fonts in the window (ADR 0120)', () => {
     await open('tipo-licenciado');
     await problemsSay("Font 'Tyto Licensed Sans 500' is not installed on this machine and Tyto");
     await problemsSay('Free fonts of the same kind: Inter, Manrope, DM Sans.');
+    // One line for the face, and no source was asked: nothing failed to arrive.
+    expect(await problems()).not.toContain('W_FONT_SOURCE_FAILED');
+    expect(await problems()).not.toContain('W_FONT_SUBSTITUTED');
     await run('editor.save');
     await page.waitForTimeout(1_500);
     expect(requests).toHaveLength(2);
