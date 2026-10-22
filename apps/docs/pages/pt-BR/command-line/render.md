@@ -83,7 +83,24 @@ $ tyto render briefs/cartaz.brief --types svg
 error: --out is required: .tyto\project.json declares no output folder this run may use
 ```
 
-`--trust` confia na pasta só naquela execução e não anota nada. `tyto trust remove <pasta>` desfaz uma confiança dada antes; as pastas em que você confia ficam listadas no `trust.json` da sua pasta do Tyto (`~/.tyto`).
+`--trust` confia na pasta só naquela execução e não anota nada. Para confiar de vez, rode `tyto trust add <pasta>`: ele primeiro imprime o que a pasta faz enquanto não tem confiança e depois anota a aprovação, sem pergunta para responder, então um script também pode rodá-lo. Uma pasta sem `.tyto/project.json` também pode receber confiança.
+
+Executado em 2026-10-22 numa pasta cujo arquivo do projeto cita `../shared/exports` e `../team/saude.json` (o caminho da pasta encurtado para `D:\work\campanha`):
+
+```
+$ tyto trust add .
+.tyto\project.json:3:13: warning W_PROJECT_PATH_OUTSIDE Project key 'output' leads outside this folder ('../shared/exports'), which an untrusted folder may not do; it is left out.
+.tyto\project.json:4:14: warning W_PROJECT_PATH_OUTSIDE Project key 'profile' leads outside this folder ('../team/saude.json'), which an untrusted folder may not do; it is left out.
+Above: what this folder does while restricted; trusting it lifts that.
+Trusted: D:\work\campanha (since 2026-10-22)
+It names the work profile D:\work\team\saude.json, which is trusted on its own (ADR 0114): tyto trust add "D:\work\team\saude.json"
+
+$ tyto trust list
+D:\work\campanha  since 2026-10-22
+Take one back with tyto trust remove <path>.
+```
+
+`tyto trust list` imprime todas as pastas e arquivos de perfil em que você confia, com o dia em que confiou, e marca com `(missing)` o que não existe mais. `tyto trust remove <pasta>` desfaz uma confiança dada antes. Os dois leem e gravam o `trust.json` da sua pasta do Tyto (`~/.tyto`), o mesmo arquivo que o app de mesa grava quando você confia numa pasta por lá. A própria pasta do Tyto não pode receber confiança como projeto: ela guarda seus plugins e o `trust.json`, não o conteúdo de um projeto.
 
 ### Uma ficha para várias pastas: perfis de trabalho
 
@@ -125,7 +142,7 @@ De `campanha-a` os arquivos foram para o `exports/` do perfil; de `campanha-b` f
 
 O nome de um perfil é um nome de pasta comum: letras, números, espaços e acentos podem, mas barra, ponto no começo ou `..` não. Um nome que não está em `~/.tyto/profiles/` sai como `W_PROJECT_PROFILE_MISSING`, e a pasta renderiza com as chaves dela.
 
-**Um perfil compartilhado pela equipe** é um arquivo citado pelo caminho, como `"profile": "../team/saude.json"`, ou uma pasta com um `profile.json` dentro. Como outra pessoa pode editá-lo, ele recebe confiança por conta própria, nunca porque a pasta que o cita recebeu: até você confiar nesse arquivo, as pastas dele precisam ficar dentro da pasta dele, e `tyto trust remove <arquivo>` desfaz essa confiança. Uma pasta em que você ainda não confiou só pode citar um arquivo de perfil que esteja dentro dela:
+**Um perfil compartilhado pela equipe** é um arquivo citado pelo caminho, como `"profile": "../team/saude.json"`, ou uma pasta com um `profile.json` dentro. Como outra pessoa pode editá-lo, ele recebe confiança por conta própria, nunca porque a pasta que o cita recebeu: até você confiar nesse arquivo com `tyto trust add <arquivo>`, as pastas dele precisam ficar dentro da pasta dele, e `tyto trust remove <arquivo>` desfaz essa confiança. O `tyto trust add <pasta>` diz qual arquivo confiar quando a pasta cita um. Um perfil em `~/.tyto/profiles/` já tem confiança, por causa de onde fica. Uma pasta em que você ainda não confiou só pode citar um arquivo de perfil que esteja dentro dela:
 
 ```
 $ tyto render briefs/cartaz.brief --types svg

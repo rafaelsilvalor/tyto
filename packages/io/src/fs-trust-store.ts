@@ -37,13 +37,26 @@ export interface FsTrustStoreOptions {
   readonly ignoreCase?: boolean;
 }
 
-interface TrustEntry {
+/** One approval as `trust.json` holds it, for `tyto trust list` (TYTO-349). */
+export interface TrustedEntry {
+  /** The source's real path, as it was granted. */
   readonly path: string;
+  /** The day it was granted, `YYYY-MM-DD`; absent for an entry written by hand without one. */
+  readonly since?: string;
+}
+
+/**
+ * The port, plus the listing only a command line needs. Kept off `TrustStore` because the
+ * resolver never lists: it asks about one source at a time (ADR 0111).
+ */
+export interface FsTrustStore extends TrustStore {
+  /** Every approval in file order; `E_TRUST_FILE` when the file cannot be read. */
+  list(): Promise<Result<readonly TrustedEntry[]>>;
 }
 
 interface TrustFile {
   readonly text: string;
-  readonly entries: readonly TrustEntry[];
+  readonly entries: readonly TrustedEntry[];
   /** Non-empty means the file must not be written: an edit to a tree the parser guessed at. */
   readonly problems: readonly Diagnostic[];
 }
@@ -51,7 +64,7 @@ interface TrustFile {
 const OPTIONS = { allowTrailingComma: true, disallowComments: false } as const;
 const EMPTY = '{\n  "trusted": []\n}\n';
 
-export function fsTrustStore(options: FsTrustStoreOptions): TrustStore {
+export function fsTrustStore(options: FsTrustStoreOptions): FsTrustStore {
   const file = join(options.home, TRUST_FILE);
   const ignoreCase = options.ignoreCase ?? process.platform === 'win32';
   const now = options.now ?? (() => new Date());
@@ -80,6 +93,11 @@ export function fsTrustStore(options: FsTrustStoreOptions): TrustStore {
   }
 
   return {
+    async list(): Promise<Result<readonly TrustedEntry[]>> {
+      const current = await read();
+      return current.problems.length > 0 ? err(current.problems) : ok(current.entries);
+    },
+
     async trustOf(source): Promise<TrustAnswer> {
       const current = await read();
       const real = await realOrResolved(source);
@@ -131,14 +149,18 @@ function parseTrust(text: string): TrustFile {
   if (!Array.isArray(trusted)) {
     return { text, entries: [], problems: [trustProblem("'trusted' is not a list")] };
   }
-  const entries: TrustEntry[] = [];
+  const entries: TrustedEntry[] = [];
   for (const item of trusted) {
-    const path =
-      typeof item === 'object' && item !== null ? (item as { path?: unknown }).path : undefined;
+    const fields =
+      typeof item === 'object' && item !== null
+        ? (item as { path?: unknown; since?: unknown })
+        : {};
+    const path = fields.path;
     if (typeof path !== 'string' || path === '') {
       return { text, entries: [], problems: [trustProblem("an entry of 'trusted' has no path")] };
     }
-    entries.push({ path });
+    // A `since` that is not a string is the person's own note, not a date to show.
+    entries.push(typeof fields.since === 'string' ? { path, since: fields.since } : { path });
   }
   return { text, entries, problems: [] };
 }

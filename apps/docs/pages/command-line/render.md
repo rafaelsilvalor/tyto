@@ -83,7 +83,24 @@ $ tyto render briefs/cartaz.brief --types svg
 error: --out is required: .tyto\project.json declares no output folder this run may use
 ```
 
-`--trust` trusts the folder for that one run and writes nothing down. `tyto trust remove <folder>` takes back a trust given earlier; the folders you trust are listed in `trust.json` in your Tyto home folder (`~/.tyto`).
+`--trust` trusts the folder for that one run and writes nothing down. To trust it for good, run `tyto trust add <folder>`: it first prints what the folder does while it is not trusted, then writes the approval, with no question to answer, so a script can run it too. A folder without a `.tyto/project.json` can be trusted as well.
+
+Run on 2026-10-22 in a folder whose project file names `../shared/exports` and `../team/saude.json` (the folder's path shortened to `D:\work\campanha`):
+
+```
+$ tyto trust add .
+.tyto\project.json:3:13: warning W_PROJECT_PATH_OUTSIDE Project key 'output' leads outside this folder ('../shared/exports'), which an untrusted folder may not do; it is left out.
+.tyto\project.json:4:14: warning W_PROJECT_PATH_OUTSIDE Project key 'profile' leads outside this folder ('../team/saude.json'), which an untrusted folder may not do; it is left out.
+Above: what this folder does while restricted; trusting it lifts that.
+Trusted: D:\work\campanha (since 2026-10-22)
+It names the work profile D:\work\team\saude.json, which is trusted on its own (ADR 0114): tyto trust add "D:\work\team\saude.json"
+
+$ tyto trust list
+D:\work\campanha  since 2026-10-22
+Take one back with tyto trust remove <path>.
+```
+
+`tyto trust list` prints every folder and profile file you trust, with the day you trusted it, and marks one that is no longer there with `(missing)`. `tyto trust remove <folder>` takes back a trust given earlier. Both read and write `trust.json` in your Tyto home folder (`~/.tyto`), the same file the desktop app writes when you trust a folder there. Your Tyto home folder itself cannot be trusted as a project: it holds your plugins and `trust.json`, not a project's content.
 
 ### Share one sheet across folders: work profiles
 
@@ -125,7 +142,7 @@ From `campanha-a` the files went to the profile's `exports/`; from `campanha-b` 
 
 A profile's name is a plain folder name: letters, digits, spaces and accents are fine, but not a slash, a leading dot or `..`. A name that is not in `~/.tyto/profiles/` is printed as `W_PROJECT_PROFILE_MISSING`, and the folder renders with its own keys.
 
-**A profile shared by a team** is a file you name by its path instead, such as `"profile": "../team/saude.json"`, or a folder holding a `profile.json`. Because somebody else may edit it, it is trusted on its own, never because the folder that names it is: until you trust that file, its folders must stay inside its own folder, and `tyto trust remove <file>` takes its trust back. A folder you have not trusted may only name a profile file inside itself:
+**A profile shared by a team** is a file you name by its path instead, such as `"profile": "../team/saude.json"`, or a folder holding a `profile.json`. Because somebody else may edit it, it is trusted on its own, never because the folder that names it is: until you trust that file with `tyto trust add <file>`, its folders must stay inside its own folder, and `tyto trust remove <file>` takes its trust back. `tyto trust add <folder>` tells you which file to trust when the folder names one. A profile in `~/.tyto/profiles/` is already trusted, because of where it lives. A folder you have not trusted may only name a profile file inside itself:
 
 ```
 $ tyto render briefs/cartaz.brief --types svg

@@ -7,7 +7,7 @@ import { pluginNewCommand } from './plugin-new.js';
 import { pluginInstallCommand, pluginListCommand, pluginStateCommand } from './plugin.js';
 import { renderCommand } from './render.js';
 import { templateCheckCommand, templateNewCommand } from './template.js';
-import { trustRemoveCommand } from './trust.js';
+import { trustAddCommand, trustListCommand, trustRemoveCommand } from './trust.js';
 import { watchCommand } from './watch.js';
 
 /**
@@ -257,6 +257,23 @@ export function createProgram(environment: CliEnvironment, captured: Captured): 
   const trust = program
     .command('trust')
     .description('the workspace folders this person trusts (~/.tyto/trust.json, ADR 0111)');
+
+  trust
+    .command('add')
+    .description(
+      'trust a workspace folder or a shared work profile file for good, after printing what it does restricted',
+    )
+    .argument('<path>', 'the workspace folder, or the profile file it names')
+    .action(async (path: string) => {
+      captured.code = await trustAddCommand(path, environment);
+    });
+
+  trust
+    .command('list')
+    .description('print every trusted folder and profile file, with the day it was trusted')
+    .action(async () => {
+      captured.code = await trustListCommand(environment);
+    });
 
   trust
     .command('remove')

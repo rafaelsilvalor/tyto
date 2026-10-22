@@ -127,6 +127,7 @@ ADR 0011 still holds: a profile names places, and plugins interpret their own se
 - Not built: making a profile from the window, switching a folder's profile with a click, and
   granting a profile file's trust from the command line (`tyto trust add` does not exist for
   folders either, ADR 0112).
+  Built in TYTO-349 (2026-10-22): `tyto trust add` / `list`.
 - Not measured: how a profile shared from a synchronised folder (Drive, OneDrive) behaves when the
   file is replaced while a window has it open. The window reads the profile when it opens the
   folder, as it reads `project.json`; a change is seen on the next open.
