@@ -334,7 +334,11 @@ not seen until then.
 `section` is the plugin's own section of the folder's `.tyto/project.json` (ADR 0112), resolved
 with the work profile, and absent when the folder has none or is restricted. **A restricted
 folder fetches nothing**: it reads what is already cached, and a miss says to trust the
-folder. An error answer, a throw, an image over 32 MB, a face over 16 MB or a type a
+folder. **Nor does `tyto watch`** (ADR 0118): an inbox is filled unattended, so the watcher
+reads what a `tyto render` of the same reference cached, and its miss says that instead. A
+brief in no workspace fetches. A `tyto render --folder` delivery copies a fetched image into
+`assets/` under a name taken from its reference — `test:logo` is `logo.png` — so the delivered
+brief renders without the plugin. An error answer, a throw, an image over 32 MB, a face over 16 MB or a type a
 document cannot embed is `E_ASSET_SOURCE_FAILED` for an image and `W_FONT_SOURCE_FAILED`
 (beside `W_FONT_SUBSTITUTED`) for a face. Reach the network with `host.fetch` under
 `net:<host>`.

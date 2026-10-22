@@ -151,6 +151,12 @@ export function briefAssetResolver(options: {
 export interface DeliveredAsset {
   readonly reference: string;
   readonly path: string;
+  /**
+   * True when a plugin's `asset-source` supplied it, and `path` is a file in the source
+   * cache named by a hash (ADR 0117). A delivery then names the copy after the reference
+   * instead (ADR 0118).
+   */
+  readonly fetched?: boolean;
 }
 
 /**
@@ -172,7 +178,11 @@ export function recordingAssetResolver(inner: AssetResolver): {
       ...(inner.searched === undefined ? {} : { searched: inner.searched }),
       async resolve(reference: string): Promise<AssetRef | undefined> {
         const asset = await inner.resolve(reference);
-        if (asset?.path !== undefined) found.set(reference, { reference, path: asset.path });
+        if (asset?.path !== undefined) {
+          // `url` is what the source cache answers, and nothing else does.
+          const fetched = asset.source === 'url';
+          found.set(reference, { reference, path: asset.path, ...(fetched ? { fetched } : {}) });
+        }
         return asset;
       },
       // Forwarded, or a plugin source's reason for a miss would be lost behind the record.

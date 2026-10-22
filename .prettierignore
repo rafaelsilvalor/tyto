@@ -26,6 +26,7 @@ apps/docs/pages/pt-BR/templates/gallery.md
 # Upstream licence text, redistributed verbatim (packages/fonts/README.md). Reflowing a
 # licence is not a formatting decision this repository gets to make.
 packages/fonts/fonts/*/LICENSE.md
+apps/cli/src/__fixtures__/plugin-sources/LICENSE.md
 
 # Tyto template markup. It looks like HTML+CSS and is not: Prettier reflows it as a
 # stylesheet and rewrites `"Source Sans 3"` to single quotes, which the grammar refuses
