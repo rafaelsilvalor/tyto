@@ -1,8 +1,11 @@
 import type { DirectiveResolver } from '@tyto/core';
 import {
+  type AssetSourceContribution,
   type BrandKits,
   type EditorKeymap,
+  type FontSourceContribution,
   type LoadedPlugins,
+  type OwnedSource,
   type PanelContribution,
   type ThemeContribution,
   createPluginHost,
@@ -45,6 +48,12 @@ export interface WindowPlugins {
    * made. Empty until the plugins have started, like the directives.
    */
   brandKits(): BrandKits;
+  /**
+   * The installed plugins' `asset-source` and `font-source` (ADR 0117), which the preview asks
+   * through the app's source cache. Empty until the plugins have started.
+   */
+  assetSources(): readonly OwnedSource<AssetSourceContribution>[];
+  fontSources(): readonly OwnedSource<FontSourceContribution>[];
 }
 
 export interface WindowPanel {
@@ -111,5 +120,7 @@ export function windowPlugins(plugins: Promise<LoadedPlugins>): WindowPlugins {
     themes: () => themes.filter(({ theme }) => host.registry.themes().includes(theme)),
     permissionsOf: (plugin) => permissions.get(plugin),
     brandKits: () => (started ? host.registry.brandKitsByBrand() : noKits),
+    assetSources: () => (started ? host.registry.assetSources() : []),
+    fontSources: () => (started ? host.registry.fontSources() : []),
   };
 }

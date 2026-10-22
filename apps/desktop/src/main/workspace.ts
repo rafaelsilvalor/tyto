@@ -10,7 +10,13 @@ import {
   lineColumnAtIndex,
   ok,
 } from '@tyto/core';
-import { type LoadedProfile, type LoadedWorkspace, isInside, loadWorkspace } from '@tyto/io';
+import {
+  type LoadedProfile,
+  type LoadedWorkspace,
+  findWorkspace,
+  isInside,
+  loadWorkspace,
+} from '@tyto/io';
 
 import type { IpcResponse } from '../../shared/ipc.js';
 import { type FontsInForce, fontsFor } from './fonts.js';
@@ -46,6 +52,22 @@ export type TrustSource = 'folder' | 'profile';
 export interface BriefPlaces {
   readonly assets: readonly string[];
   readonly fonts: FontsInForce;
+  /**
+   * The font folders `fonts` was built from, so a caller adding the source cache's folders
+   * (ADR 0117) can ask for the library that has both. Absent means none.
+   */
+  readonly fontFolders?: readonly string[];
+}
+
+/**
+ * Whether a plugin may be asked for what a brief in some folder names (ADR 0118, ADR 0119),
+ * and the sections it is handed. `none` is a brief in no workspace at all.
+ */
+export interface SourceTrust {
+  readonly trust: 'trusted' | 'restricted' | 'none';
+  readonly sections?: Readonly<Record<string, unknown>>;
+  /** The folder the window has open, which Workspace: Manage Trust acts on. */
+  readonly open?: true;
 }
 
 export interface WorkspaceService {
@@ -70,6 +92,14 @@ export interface WorkspaceService {
   revoke(source: TrustSource): Promise<Result<true>>;
   /** The places for a brief in `briefDirectory`: the workspace's only when it is inside. */
   placesFor(briefDirectory: string | undefined): BriefPlaces;
+  /**
+   * The trust a fetch for a brief in `briefDirectory` answers to (ADR 0119). Inside the open
+   * folder, the folder's — a trust taken back still holds until it reopens, as everywhere
+   * (ADR 0111). Outside it, the workspace the CLI would find by walking up, and its answer in
+   * the trust store, so one file fetches the same in both programs. `undefined` is a brief in
+   * no file yet, which has no folder to answer for it.
+   */
+  sourceTrustFor(briefDirectory: string | undefined): Promise<SourceTrust | undefined>;
 }
 
 /** The places of the resolved project: what a restricted folder refused is not among them. */
@@ -213,7 +243,23 @@ export function createWorkspaceService(options: WorkspaceServiceOptions): Worksp
       ) {
         return { assets: [], fonts: fontsFor([]) };
       }
-      return { assets: open.project.assets, fonts: fontsFor(open.project.fonts) };
+      return {
+        assets: open.project.assets,
+        fonts: fontsFor(open.project.fonts),
+        fontFolders: open.project.fonts,
+      };
+    },
+
+    async sourceTrustFor(briefDirectory) {
+      if (briefDirectory === undefined) return undefined;
+      if (open !== undefined && isInside(open.folder, briefDirectory)) {
+        return { trust: open.trust, sections: open.project.sections, open: true };
+      }
+      const folder = await findWorkspace(briefDirectory, { home: options.home });
+      if (folder === undefined) return { trust: 'none' };
+      // The store resolves the real path itself, as `loadWorkspace` asks it.
+      const answer = await options.trustStore.trustOf(folder);
+      return { trust: answer.trust };
     },
   };
 }

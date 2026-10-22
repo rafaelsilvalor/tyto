@@ -86,6 +86,7 @@ import {
 } from './themes.js';
 import { drawsTitleBar, frameOptions, overlayFor } from './title-bar.js';
 import { type WindowPlugins, windowPlugins } from './window-plugins.js';
+import { desktopSources } from './plugin-sources.js';
 import { createPreviewService } from './preview.js';
 import { createProjectSources } from './project.js';
 import { createTemplateEditor } from './template-editor.js';
@@ -747,12 +748,22 @@ async function start(): Promise<void> {
       read: folderThemeReader(pluginStore.directoryOf(plugin)),
     }));
   void contributed.ready.then(themesReady);
+  // The images and faces installed plugins supply, in one cache for the process, which the
+  // preview and the export share (ADR 0117, ADR 0119).
+  const pluginSources = desktopSources({
+    home: pluginsHome,
+    assetSources: () => contributed.assetSources(),
+    fontSources: () => contributed.fontSources(),
+    trustFor: (directory) => workspace.sourceTrustFor(directory),
+    ready: contributed.ready,
+  });
   const preview = await createPreviewService({
     fileSystem,
     sources,
     directives: contributed,
     brandKits: contributed,
     places: (directory) => workspace.placesFor(directory),
+    pluginSources,
   });
 
   // The template mode (TYTO-44). The same `sources` as the preview, so a save that reads the
@@ -770,6 +781,7 @@ async function start(): Promise<void> {
     sources,
     plugins: checked,
     places: (directory) => workspace.placesFor(directory),
+    pluginSources,
     version: app.getVersion(),
     ...(host.registry.rasterizers<Rasterizer>()[0]?.value === undefined
       ? {}

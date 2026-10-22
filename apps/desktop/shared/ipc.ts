@@ -494,6 +494,13 @@ export const IPC_CHANNELS = {
       /** Which tab this brief is in, which is how main knows what folder to resolve against. */
       documentId,
       brief: z.string(),
+      /**
+       * Sent after a save and after a file is opened from disk: this compile may ask an
+       * installed plugin for an image or a face the source cache lacks (ADR 0119). Absent —
+       * every compile while typing — reads the cache only, so a half-typed `test:lo` is never
+       * a request to anybody.
+       */
+      fetch: z.boolean().optional(),
     }),
     z.object({
       requestId: z.number().int().nonnegative(),

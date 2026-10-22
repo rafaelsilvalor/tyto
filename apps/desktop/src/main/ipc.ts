@@ -406,11 +406,15 @@ export function createHandlers(dependencies: IpcDependencies): Handlers {
   return {
     'app:info': () => Promise.resolve(info()),
 
-    'brief:preview': async ({ requestId, documentId, brief }) => {
+    'brief:preview': async ({ requestId, documentId, brief, fetch }) => {
       // The folder is looked up from the id **this request carries**, not from whichever
       // tab is in front. A preview is debounced and answers out of order by design, so the
       // subject has to travel with the question (`shared/ipc.ts`).
-      const result = await preview.preview(brief, documents.folderOf(documentId));
+      const result = await preview.preview(
+        brief,
+        documents.folderOf(documentId),
+        fetch === true ? 'save' : 'typing',
+      );
       // The id goes back untouched. Main does not know which answer the renderer still
       // wants — only the renderer knows what it has asked since — so the whole of main's
       // part in discarding a stale result is not losing the number.

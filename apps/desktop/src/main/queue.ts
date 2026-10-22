@@ -198,6 +198,9 @@ export function createQueueService(options: QueueOptions): QueueService {
       // A kind chosen for this folder whose plugin has since been removed is left out with a
       // warning on the task, never a failed task (ADR 0061).
       dropUnavailableKinds: true,
+      // An inbox is filled unattended: what a plugin supplies is drawn from the cache, never
+      // fetched for a task (ADR 0118, ADR 0119).
+      queued: true,
       // A task is run again after a failure, usually with a brief that changed; without this
       // a brief that lost slides leaves the old ones in `out/` beside the new `result.json`.
       // TYTO-127's rule, not a clear: a retry that fails again keeps them (ADR 0059).

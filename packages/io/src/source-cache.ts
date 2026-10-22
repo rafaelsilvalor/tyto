@@ -65,6 +65,27 @@ export interface SourceCacheOptions {
    * watch` (ADR 0118) — says its own, because "trust the folder" would be wrong advice there.
    */
   readonly notFetchedBecause?: string;
+  /**
+   * Remember a failed fetch for this cache's life, image or face, and ask for it again only
+   * when its reference changes or a new cache is made (ADR 0119). Set by a caller that keeps
+   * one cache for a long-lived process — the desktop, where every save would otherwise ask a
+   * failing plugin again. `retry` is added to the miss, saying how to ask again. A miss that
+   * was never a fetch — {@link fetches} off — is not remembered: it is a rule, not a failure.
+   */
+  readonly remembersFailures?: { readonly retry: string };
+}
+
+/**
+ * What one question may change about a long-lived cache's options (ADR 0119): whether this
+ * compile may fetch, why not, whose sections and which plugins' sources. A key left out is
+ * the cache's own.
+ */
+export interface SourceCall {
+  readonly fetches?: boolean;
+  readonly notFetchedBecause?: string;
+  readonly sectionOf?: (plugin: string) => unknown;
+  readonly assetSources?: () => readonly OwnedSource<AssetSourceContribution>[];
+  readonly fontSources?: () => readonly OwnedSource<FontSourceContribution>[];
 }
 
 export interface FetchedFaces {
@@ -78,12 +99,12 @@ export interface SourceCache {
    * `inner`, with every reference in a scheme a source claims answered from the cache or
    * fetched into it. Any other reference is `inner`'s, untouched.
    */
-  assets(inner: AssetResolver): AssetResolver;
+  assets(inner: AssetResolver, call?: SourceCall): AssetResolver;
   /**
    * The cache folder of each font source's plugin, in registration order. A font library
    * lists them after every local folder, so a local face always wins.
    */
-  fontDirectories(): readonly string[];
+  fontDirectories(call?: SourceCall): readonly string[];
   /**
    * Fetches, into the cache, each face a font source names. `missing` is what the font
    * library could not find locally, so nothing here can shadow an installed face.
@@ -91,7 +112,7 @@ export interface SourceCache {
    * A face that failed once is not asked for again by this cache, and its diagnostic is
    * answered again — a job that compiles twice is told about it once per pass.
    */
-  fetchFaces(missing: readonly FontFace[]): Promise<FetchedFaces>;
+  fetchFaces(missing: readonly FontFace[], call?: SourceCall): Promise<FetchedFaces>;
 }
 
 /** The scheme a reference names, or the family a face is, compared without case. */
@@ -151,21 +172,34 @@ const RESTRICTED =
 
 export function sourceCache(options: SourceCacheOptions): SourceCache {
   const root = join(options.home, 'cache', 'sources');
-  const notFetched = options.notFetchedBecause ?? RESTRICTED;
   const folderOf = (plugin: string): string => join(root, plugin);
-  const requestOf = (plugin: string): SourceRequest => {
-    const section = options.sectionOf?.(plugin);
-    return section === undefined ? {} : { section };
-  };
+  /** The cache's options, with what this one question changes. */
+  const settled = (call: SourceCall = {}) => ({
+    fetches: call.fetches ?? options.fetches,
+    notFetched: call.notFetchedBecause ?? options.notFetchedBecause ?? RESTRICTED,
+    assetSources: call.assetSources ?? options.assetSources,
+    fontSources: call.fontSources ?? options.fontSources,
+    requestOf: (plugin: string): SourceRequest => {
+      const section = (call.sectionOf ?? options.sectionOf)?.(plugin);
+      return section === undefined ? {} : { section };
+    },
+  });
+  const retry = options.remembersFailures?.retry;
+  /** A failed fetch's own reason, and how to ask again when this cache remembers it. */
+  const failure = (problem: string): string =>
+    retry === undefined ? problem : `${problem}; ${retry}`;
   /** Why the last fetch of a face failed, by the face's key, so it is asked only once. */
   const failedFaces = new Map<string, Diagnostic>();
+  /** The same for an image, by plugin and reference, only when the caller asked (ADR 0119). */
+  const failedAssets = new Map<string, Diagnostic>();
 
   async function fetchAsset(
     owned: OwnedSource<AssetSourceContribution>,
     reference: string,
     stem: string,
+    request: SourceRequest,
   ): Promise<string> {
-    const answer = await owned.source.fetch(reference, requestOf(owned.plugin));
+    const answer = await owned.source.fetch(reference, request);
     if (!answer.ok) throw new Error(answer.error.map((problem) => problem.message).join('; '));
     const { bytes, mime } = answer.value;
     // Again here, and not only on the wire: an in-process source crosses no wire.
@@ -185,7 +219,8 @@ export function sourceCache(options: SourceCacheOptions): SourceCache {
   }
 
   return {
-    assets(inner: AssetResolver): AssetResolver {
+    assets(inner: AssetResolver, call?: SourceCall): AssetResolver {
+      const asked = settled(call);
       const failures = new Map<string, Diagnostic>();
       return {
         base: inner.base,
@@ -196,34 +231,36 @@ export function sourceCache(options: SourceCacheOptions): SourceCache {
           const owned =
             scheme === undefined
               ? undefined
-              : options.assetSources().find(({ source }) => source.schemes.includes(scheme));
+              : asked.assetSources().find(({ source }) => source.schemes.includes(scheme));
           if (owned === undefined) return inner.resolve(reference);
 
-          const failed = (problem: string): undefined => {
-            failures.set(
-              reference,
-              diagnostic('E_ASSET_SOURCE_FAILED', {
-                path: reference,
-                plugin: owned.plugin,
-                problem,
-              }),
-            );
+          const said = (problem: string): Diagnostic =>
+            diagnostic('E_ASSET_SOURCE_FAILED', { path: reference, plugin: owned.plugin, problem });
+          const missed = (problem: Diagnostic): undefined => {
+            failures.set(reference, problem);
             return undefined;
           };
 
+          const key = `${owned.plugin}|${reference}`;
           const stem = join(folderOf(owned.plugin), hexOf(reference));
           let path = await existing(stem, ASSET_EXTENSIONS);
           if (path === undefined) {
-            if (!options.fetches) return failed(notFetched);
+            const before = failedAssets.get(key);
+            if (before !== undefined) return missed(before);
+            if (!asked.fetches) return missed(said(asked.notFetched));
             try {
-              path = await fetchAsset(owned, reference, stem);
+              path = await fetchAsset(owned, reference, stem, asked.requestOf(owned.plugin));
             } catch (cause) {
-              return failed(problemOf(cause));
+              const problem = said(failure(problemOf(cause)));
+              if (retry !== undefined) failedAssets.set(key, problem);
+              return missed(problem);
             }
           }
 
           const bytes = await readFile(path).catch(() => undefined);
-          if (bytes === undefined) return failed(`its cached copy at ${path} cannot be read`);
+          if (bytes === undefined) {
+            return missed(said(`its cached copy at ${path} cannot be read`));
+          }
           failures.delete(reference);
           return { id: reference, source: 'url', path, hash: hashOf(bytes) };
         },
@@ -234,15 +271,17 @@ export function sourceCache(options: SourceCacheOptions): SourceCache {
       };
     },
 
-    fontDirectories(): readonly string[] {
-      const plugins = [...new Set(options.fontSources().map(({ plugin }) => plugin))];
+    fontDirectories(call?: SourceCall): readonly string[] {
+      const sources = settled(call).fontSources();
+      const plugins = [...new Set(sources.map(({ plugin }) => plugin))];
       return plugins.map((plugin) => join(folderOf(plugin), 'fonts'));
     },
 
-    async fetchFaces(missing: readonly FontFace[]): Promise<FetchedFaces> {
+    async fetchFaces(missing: readonly FontFace[], call?: SourceCall): Promise<FetchedFaces> {
+      const asked = settled(call);
       const diagnostics: Diagnostic[] = [];
       let fetched = 0;
-      const sources = options.fontSources();
+      const sources = asked.fontSources();
 
       for (const face of missing) {
         const family = normalise(face.family);
@@ -271,22 +310,26 @@ export function sourceCache(options: SourceCacheOptions): SourceCache {
         // asking again would answer the same bytes.
         if ((await existing(stem, FONT_EXTENSIONS)) !== undefined) continue;
 
-        const fail = (problem: string): void => {
-          const said = diagnostic('W_FONT_SOURCE_FAILED', {
+        const said = (problem: string): Diagnostic =>
+          diagnostic('W_FONT_SOURCE_FAILED', {
             font: `${face.family} ${String(face.weight)}${face.style === 'italic' ? ' italic' : ''}`,
             plugin: owned.plugin,
             problem,
           });
-          failedFaces.set(key, said);
-          diagnostics.push(said);
+        const fail = (problem: string): void => {
+          const failed = said(failure(problem));
+          failedFaces.set(key, failed);
+          diagnostics.push(failed);
         };
 
-        if (!options.fetches) {
-          fail(notFetched);
+        // Not remembered: a compile that may not fetch says so, and the next one that may
+        // still asks — in the desktop, the save after a restricted keystroke (ADR 0119).
+        if (!asked.fetches) {
+          diagnostics.push(said(asked.notFetched));
           continue;
         }
         try {
-          const answer = await owned.source.fetch(face, requestOf(owned.plugin));
+          const answer = await owned.source.fetch(face, asked.requestOf(owned.plugin));
           if (!answer.ok) {
             fail(answer.error.map((problem) => problem.message).join('; '));
             continue;
