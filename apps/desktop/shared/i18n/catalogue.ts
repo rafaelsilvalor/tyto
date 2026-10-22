@@ -603,6 +603,28 @@ export interface Catalogue {
   readonly 'explorer.none': string;
   readonly 'explorer.empty': string;
   readonly 'explorer.more': string;
+  /**
+   * TYTO-352, ADR 0121. The explorer's context menu, the delete question and the line under the
+   * name field. `{bin}` is the system's trash, by the platform's name in English and *Lixeira*
+   * in Portuguese on all three; `{name}`, `{count}` and `{reason}` are filled by the panel.
+   */
+  readonly 'explorer.menu.newFile': string;
+  readonly 'explorer.menu.newFolder': string;
+  readonly 'explorer.menu.rename': string;
+  readonly 'explorer.menu.delete': string;
+  readonly 'explorer.bin.windows': string;
+  readonly 'explorer.bin.other': string;
+  readonly 'explorer.delete.file': string;
+  readonly 'explorer.delete.folder': string;
+  readonly 'explorer.delete.detail': string;
+  readonly 'explorer.delete.unsaved.one': string;
+  readonly 'explorer.delete.unsaved.many': string;
+  readonly 'explorer.delete.confirm': string;
+  readonly 'explorer.delete.cancel': string;
+  readonly 'explorer.error.exists': string;
+  readonly 'explorer.error.invalid': string;
+  readonly 'explorer.error.trash': string;
+  readonly 'explorer.error.failed': string;
   readonly 'project.none': string;
   readonly 'project.unset': string;
   readonly 'project.origin.folder': string;
@@ -938,6 +960,23 @@ export const CATALOGUE_KEYS = [
   'explorer.none',
   'explorer.empty',
   'explorer.more',
+  'explorer.menu.newFile',
+  'explorer.menu.newFolder',
+  'explorer.menu.rename',
+  'explorer.menu.delete',
+  'explorer.bin.windows',
+  'explorer.bin.other',
+  'explorer.delete.file',
+  'explorer.delete.folder',
+  'explorer.delete.detail',
+  'explorer.delete.unsaved.one',
+  'explorer.delete.unsaved.many',
+  'explorer.delete.confirm',
+  'explorer.delete.cancel',
+  'explorer.error.exists',
+  'explorer.error.invalid',
+  'explorer.error.trash',
+  'explorer.error.failed',
   'project.none',
   'project.unset',
   'project.origin.folder',

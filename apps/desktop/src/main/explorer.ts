@@ -106,6 +106,11 @@ export interface ExplorerService {
    * there is no second way to delete.
    */
   delete(entryId: string): Promise<ExplorerDelete>;
+  /**
+   * Where an entry lives, for main's own use only: which tabs hold a file under it, before a
+   * delete is asked about (TYTO-352). Never sent to the window.
+   */
+  pathOf(entryId: string): string | undefined;
   /** Stops watching. Nothing is emitted afterwards. */
   close(): void;
 }
@@ -132,11 +137,15 @@ export interface ExplorerServiceOptions {
   readonly trash?: (path: string) => Promise<void>;
 }
 
-/** Why a new or a rename did not happen; see ADR 0121. */
-export type ExplorerWriteFailure = 'invalid' | 'exists' | 'gone';
+/**
+ * Why a new or a rename did not happen; see ADR 0121. `failed` is any other refusal from the
+ * disk — a read-only drive, a permission — and carries the system's error code, never a path.
+ */
+export type ExplorerWriteFailure = 'invalid' | 'exists' | 'gone' | 'failed';
 
 export type ExplorerWrite<Done> =
-  ({ readonly ok: true } & Done) | { readonly ok: false; readonly reason: ExplorerWriteFailure };
+  | ({ readonly ok: true } & Done)
+  | { readonly ok: false; readonly reason: ExplorerWriteFailure; readonly detail?: string };
 
 export type ExplorerDelete =
   | { readonly ok: true; readonly path: string }
@@ -513,7 +522,7 @@ export function createExplorerService(options: ExplorerServiceOptions): Explorer
         const code = codeOf(cause);
         if (code === 'EEXIST') return EXISTS;
         if (code === 'ENOENT' || code === 'ENOTDIR') return GONE;
-        throw cause;
+        return failed(cause);
       }
       if (root !== current) return GONE;
       return {
@@ -545,7 +554,7 @@ export function createExplorerService(options: ExplorerServiceOptions): Explorer
           const code = codeOf(cause);
           if (code === 'ENOENT') return GONE;
           if (code === 'EEXIST' || code === 'ENOTEMPTY') return EXISTS;
-          throw cause;
+          return failed(cause);
         }
         rekey(from, to);
       }
@@ -574,11 +583,22 @@ export function createExplorerService(options: ExplorerServiceOptions): Explorer
       return { ok: true, path };
     },
 
+    pathOf(entryId) {
+      return root === undefined ? undefined : entryOf.get(entryId)?.path;
+    },
+
     close() {
       stopWatching();
     },
   };
 }
+
+/**
+ * Any other refusal from the disk is an answer, not a rejection (TYTO-352): the window keeps
+ * the field open and says why. Only the error's code travels, because its message names a path.
+ */
+const failed = (cause: unknown) =>
+  ({ ok: false, reason: 'failed', detail: codeOf(cause) ?? 'UNKNOWN' }) as const;
 
 const GONE = { ok: false, reason: 'gone' } as const;
 const INVALID = { ok: false, reason: 'invalid' } as const;

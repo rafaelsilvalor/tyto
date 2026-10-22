@@ -218,7 +218,9 @@ const explorerEntryName = z.string().max(1000);
 /** Why a new or a rename did not happen: a name main refuses, a name taken, or an entry gone. */
 const explorerWriteFailure = z.object({
   ok: z.literal(false),
-  reason: z.enum(['invalid', 'exists', 'gone']),
+  reason: z.enum(['invalid', 'exists', 'gone', 'failed']),
+  /** With `failed` only: the system's error code (`EPERM`, `EROFS`), never a path. */
+  detail: z.string().max(100).optional(),
 });
 
 /** A tab whose file a rename moved, as the window shows it now. */
@@ -805,6 +807,16 @@ export const IPC_CHANNELS = {
       z.object({ ok: z.literal(true), released: z.array(documentId) }),
       z.object({ ok: z.literal(false), reason: z.enum(['gone', 'trash-failed']) }),
     ]),
+  ),
+
+  /**
+   * The tabs that hold a file at or under an entry, so the window can say before a delete how
+   * many of them have unsaved text (TYTO-352). Ids of tabs, never a path; an entry main does
+   * not know answers none.
+   */
+  'explorer:tabs-under': channel(
+    z.strictObject({ entryId: explorerEntryId }),
+    z.object({ documentIds: z.array(documentId) }),
   ),
 
   /**

@@ -583,6 +583,14 @@ describe('tabs that follow the explorer', () => {
     expect(service.pathOf('tab-fecho')).toBe(FECHO);
   });
 
+  it('names the tabs under a folder without letting go of them', async () => {
+    const { service } = await opened();
+
+    expect(service.heldUnder(FOLDER)).toEqual(['tab-capa', 'tab-fecho']);
+    expect(service.heldUnder(CAPA)).toEqual(['tab-capa']);
+    expect(service.pathOf('tab-capa')).toBe(CAPA);
+  });
+
   it('releases every tab under a trashed folder, and only those', async () => {
     const { service } = await opened();
 

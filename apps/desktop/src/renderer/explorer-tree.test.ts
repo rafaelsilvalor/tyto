@@ -7,6 +7,11 @@ import {
   foldersToRelist,
   moveFor,
   rowsOf,
+  startCreating,
+  startRenaming,
+  stopEditing,
+  withDraft,
+  withEditError,
   withExpanded,
   withListing,
   withSelected,
@@ -55,7 +60,11 @@ function tree(): ExplorerTree {
 
 const names = (value: ExplorerTree): string[] =>
   rowsOf(value).map((row) =>
-    row.type === 'entry' ? `${'  '.repeat(row.depth)}${row.entry.name}` : `+${String(row.count)}`,
+    row.type === 'entry'
+      ? `${'  '.repeat(row.depth)}${row.entry.name}${row.renaming === true ? ' [renaming]' : ''}`
+      : row.type === 'new'
+        ? `${'  '.repeat(row.depth)}[new ${row.kind}]`
+        : `+${String(row.count)}`,
   );
 
 describe('the rows', () => {
@@ -147,5 +156,90 @@ describe('the keys', () => {
     expect(moveFor(at('slides'), ' ')).toEqual({ do: 'expand', id: 'slides', open: false });
     expect(moveFor(at('fundo'), 'Enter')).toBeUndefined();
     expect(moveFor(at('capa'), 'x')).toBeUndefined();
+  });
+});
+
+/** TYTO-352, ADR 0121: the name field is tree state, kept apart from the listings. */
+describe('the name field', () => {
+  it('puts a new entry in the selected folder, the selected file’s folder, or the root', () => {
+    const inFolder = startCreating(withSelected(tree(), 'extra'), 'file');
+    expect(inFolder.editing).toMatchObject({ parentId: 'extra', kind: 'file', draft: '' });
+    expect(names(inFolder).slice(0, 4)).toEqual([
+      'slides',
+      '  extra',
+      '    [new file]',
+      '    fundo.png',
+    ]);
+
+    expect(startCreating(withSelected(tree(), 'capa'), 'folder').editing).toMatchObject({
+      parentId: 'slides',
+    });
+    expect(startCreating(tree(), 'file').editing).toMatchObject({ parentId: null });
+    expect(names(startCreating(tree(), 'file'))[0]).toBe('[new file]');
+    // A closed folder opens, so the field shows under it.
+    const closed = startCreating(withSelected(tree(), 'assets'), 'file');
+    expect(closed.expanded.has('assets')).toBe(true);
+    // The panel's empty space names the root, whatever is selected.
+    expect(startCreating(withSelected(tree(), 'extra'), 'file', null).editing).toMatchObject({
+      parentId: null,
+    });
+  });
+
+  it('survives a re-list with what was typed and the line under it', () => {
+    let value = withEditError(withDraft(startRenaming(tree(), 'capa'), 'abertura'), 'taken');
+    value = withListing(
+      value,
+      'slides',
+      listing([
+        ['extra', 'extra', 'folder'],
+        ['nova', 'nova.brief', 'brief'],
+        ['capa', 'capa.brief', 'brief'],
+      ]),
+    );
+    value = withListing(value, null, tree().root!);
+
+    expect(value.editing).toEqual({ renameId: 'capa', draft: 'abertura', error: 'taken' });
+    expect(names(value)).toContain('  capa.brief [renaming]');
+
+    const typing = withListing(
+      withDraft(startCreating(withSelected(tree(), 'extra'), 'file'), 'novo'),
+      'extra',
+      listing([['outro', 'outro.png', 'file']]),
+    );
+    expect(typing.editing).toMatchObject({ parentId: 'extra', draft: 'novo' });
+  });
+
+  it('goes when its folder comes back gone, or the renamed entry vanished', () => {
+    const creating = withListing(
+      startCreating(withSelected(tree(), 'extra'), 'file'),
+      'slides',
+      GONE,
+    );
+    expect(creating.editing).toBeUndefined();
+
+    const renaming = withListing(
+      startRenaming(tree(), 'capa'),
+      'slides',
+      listing([['extra', 'extra', 'folder']]),
+    );
+    expect(renaming.editing).toBeUndefined();
+  });
+
+  it('starts with the name it has, and clears the refusal on the next key', () => {
+    const value = startRenaming(tree(), 'promo');
+    expect(value.editing).toEqual({ renameId: 'promo', draft: 'promo.brief' });
+    expect(value.selected).toBe('promo');
+    expect(withDraft(withEditError(value, 'no'), 'x').editing).toEqual({
+      renameId: 'promo',
+      draft: 'x',
+    });
+    expect(stopEditing(value).editing).toBeUndefined();
+  });
+
+  it('renames with F2 and asks to delete with Delete, on the selected row', () => {
+    const selected = withSelected(tree(), 'capa');
+    expect(moveFor(selected, 'F2')).toEqual({ do: 'rename', id: 'capa' });
+    expect(moveFor(selected, 'Delete')).toEqual({ do: 'delete', id: 'capa' });
+    expect(moveFor(tree(), 'F2')).toBeUndefined();
   });
 });

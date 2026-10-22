@@ -10,10 +10,34 @@ import {
   symlink,
   writeFile,
 } from 'node:fs/promises';
+import type * as FsPromises from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { basename, join } from 'node:path';
 
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+
+/**
+ * A disk that refuses the next write with a code other than EEXIST or ENOENT, the way a
+ * read-only drive does (TYTO-352). Everything else is the real disk.
+ */
+const refusal = vi.hoisted(() => ({ code: undefined as string | undefined }));
+vi.mock('node:fs/promises', async (importOriginal) => {
+  const real = await importOriginal<typeof FsPromises>();
+  const refusing =
+    <Arguments extends unknown[], Result>(write: (...args: Arguments) => Promise<Result>) =>
+    (...args: Arguments): Promise<Result> => {
+      const code = refusal.code;
+      if (code === undefined) return write(...args);
+      refusal.code = undefined;
+      return Promise.reject(Object.assign(new Error(`${code}: refused, 'C:/somewhere'`), { code }));
+    };
+  return {
+    ...real,
+    mkdir: refusing(real.mkdir),
+    writeFile: refusing(real.writeFile),
+    rename: refusing(real.rename),
+  };
+});
 
 import {
   type ExplorerService,
@@ -515,6 +539,35 @@ describe('making a new entry', () => {
         reason: 'gone',
       });
     }
+  });
+});
+
+describe('a write the disk refuses', () => {
+  it('answers failed with the code and no path, for a new entry and a rename', async () => {
+    const explorer = quiet();
+    await explorer.setRoot(work);
+    const logo = await entryIdOf(explorer, 'logo.png');
+
+    refusal.code = 'EPERM';
+    await expect(explorer.create(null, 'novo.brief', 'file')).resolves.toEqual({
+      ok: false,
+      reason: 'failed',
+      detail: 'EPERM',
+    });
+    refusal.code = 'EROFS';
+    await expect(explorer.create(null, 'anexos', 'folder')).resolves.toEqual({
+      ok: false,
+      reason: 'failed',
+      detail: 'EROFS',
+    });
+    refusal.code = 'EACCES';
+    await expect(explorer.rename(logo, 'marca.png')).resolves.toEqual({
+      ok: false,
+      reason: 'failed',
+      detail: 'EACCES',
+    });
+    expect(await readdir(work)).toContain('logo.png');
+    expect(await readdir(work)).not.toContain('novo.brief');
   });
 });
 

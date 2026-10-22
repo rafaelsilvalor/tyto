@@ -1922,6 +1922,7 @@ tyto-plugins-dialog[open] {
 }
 
 .explorer__row,
+.explorer__new,
 .explorer__more {
   display: flex;
   align-items: center;
@@ -1967,6 +1968,36 @@ tyto-plugins-dialog[open] {
 
 .explorer__more {
   color: var(--tyto-text-muted);
+}
+
+/*
+ * TYTO-352: the name field of a new or renamed entry, in the name's place, and the line a
+ * refused name or a failed delete leaves under the row. The row grows to hold the line.
+ */
+.explorer__row--editing,
+.explorer__row:has(.explorer__error) {
+  flex-wrap: wrap;
+  height: auto;
+  min-height: var(--tyto-pane-header-block);
+}
+
+.explorer__field {
+  flex: 1;
+  min-width: 0;
+  padding: 0 var(--tyto-space-2);
+  font: inherit;
+  border: var(--tyto-hairline-width) solid var(--tyto-focus-ring);
+}
+
+.explorer__field[aria-invalid='true'] {
+  border-color: var(--tyto-error);
+}
+
+.explorer__error {
+  flex-basis: 100%;
+  padding: var(--tyto-space-1) 0 var(--tyto-space-2) var(--tyto-space-6);
+  color: var(--tyto-error);
+  white-space: normal;
 }
 
 /*

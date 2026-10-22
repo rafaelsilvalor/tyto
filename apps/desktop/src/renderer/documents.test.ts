@@ -17,6 +17,8 @@ import {
   rebaseEdit,
   releaseDocument,
   selectDocument,
+  withMovedDocuments,
+  withReleasedDocuments,
   stepDocument,
   updateDocument,
   workspaceOf,
@@ -300,6 +302,30 @@ describe('letting go of a file another tab saved over', () => {
       { ...holding('b', SECOND, SECOND), name: 'promo.brief' },
     ],
     activeId: 'b',
+  });
+
+  it('follows an explorer rename by name and tooltip, and stays unsaved (TYTO-352)', () => {
+    const dirty = { ...holding('a', FIRST, SECOND), name: 'capa.brief', pathLabel: '~/promo' };
+    const after = withMovedDocuments({ documents: [dirty], activeId: 'a' }, [
+      { documentId: 'a', name: 'abertura.brief', pathLabel: '~/promo/slides' },
+    ]);
+
+    expect(documentOf(after, 'a')).toMatchObject({
+      name: 'abertura.brief',
+      pathLabel: '~/promo/slides',
+      savedText: dirty.savedText,
+    });
+    expect(isUnsaved(documentOf(after, 'a')!)).toBe(true);
+  });
+
+  it('lets go of every tab an explorer delete released, keeping the text (TYTO-352)', () => {
+    const after = withReleasedDocuments(held(), ['a', 'b']);
+
+    expect(after.documents.map((each) => [each.name, each.savedText])).toEqual([
+      [undefined, ''],
+      [undefined, ''],
+    ]);
+    expect(after.documents.map((each) => each.id)).toEqual(['a', 'b']);
   });
 
   it('takes the name off and empties the text it compares against', () => {

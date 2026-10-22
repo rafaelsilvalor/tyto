@@ -11,6 +11,17 @@ import type { IpcResponse } from '../../shared/ipc.js';
 export type ExplorerListing = IpcResponse<'explorer:list'>;
 export type ExplorerEntry = ExplorerListing['entries'][number];
 
+/**
+ * A name being typed in the tree (TYTO-352, ADR 0121): a new entry in a folder (`null` is the
+ * root), or a new name for an entry. **Kept apart from the listings**, so a re-list redraws
+ * around the field and never drops what was typed. `draft` is the text in the field and
+ * `error` the line under it, after main refused the name.
+ */
+export type ExplorerEditing = (
+  | { readonly parentId: string | null; readonly kind: 'file' | 'folder' }
+  | { readonly renameId: string }
+) & { readonly draft: string; readonly error?: string };
+
 export interface ExplorerTree {
   /** The open folder's own listing, or nothing while it is asked. */
   readonly root: ExplorerListing | undefined;
@@ -18,6 +29,7 @@ export interface ExplorerTree {
   readonly children: ReadonlyMap<string, ExplorerListing>;
   readonly expanded: ReadonlySet<string>;
   readonly selected: string | undefined;
+  readonly editing?: ExplorerEditing | undefined;
 }
 
 export const EMPTY_TREE: ExplorerTree = {
@@ -25,6 +37,7 @@ export const EMPTY_TREE: ExplorerTree = {
   children: new Map(),
   expanded: new Set(),
   selected: undefined,
+  editing: undefined,
 };
 
 /** One line of the tree as drawn: an entry, or the count of what a folder's listing left out. */
@@ -35,6 +48,15 @@ export type ExplorerRow =
       readonly depth: number;
       readonly parent: string | null;
       readonly expanded: boolean;
+      /** Its name is the field: it is being renamed. */
+      readonly renaming?: boolean;
+    }
+  | {
+      /** The field of a new entry, first under the folder it will be made in. */
+      readonly type: 'new';
+      readonly kind: 'file' | 'folder';
+      readonly depth: number;
+      readonly parent: string | null;
     }
   | {
       readonly type: 'more';
@@ -46,10 +68,23 @@ export type ExplorerRow =
 /** The rows on screen, depth first: an open folder's children under it, once they are listed. */
 export function rowsOf(tree: ExplorerTree): readonly ExplorerRow[] {
   const rows: ExplorerRow[] = [];
+  const editing = tree.editing;
   const walk = (listing: ExplorerListing, depth: number, parent: string | null): void => {
+    if (editing !== undefined && 'parentId' in editing && editing.parentId === parent) {
+      rows.push({ type: 'new', kind: editing.kind, depth, parent });
+    }
     for (const entry of listing.entries) {
       const expanded = entry.kind === 'folder' && tree.expanded.has(entry.id);
-      rows.push({ type: 'entry', entry, depth, parent, expanded });
+      const renaming =
+        editing !== undefined && 'renameId' in editing && editing.renameId === entry.id;
+      rows.push({
+        type: 'entry',
+        entry,
+        depth,
+        parent,
+        expanded,
+        ...(renaming ? { renaming } : {}),
+      });
       const listed = expanded ? tree.children.get(entry.id) : undefined;
       if (listed !== undefined) walk(listed, depth + 1, entry.id);
     }
@@ -84,6 +119,10 @@ export function withListing(
   folder: string | null,
   listing: ExplorerListing,
 ): ExplorerTree {
+  return withEditingChecked(listed(tree, folder, listing));
+}
+
+function listed(tree: ExplorerTree, folder: string | null, listing: ExplorerListing): ExplorerTree {
   if (folder === null) return { ...tree, root: listing };
   if (!listing.gone) {
     const children = new Map(tree.children);
@@ -98,6 +137,77 @@ export function withListing(
       ? folder
       : tree.selected;
   return { ...tree, children, expanded, selected };
+}
+
+/**
+ * The field survives a re-list, and goes only when what it is about has: the folder a new
+ * entry is typed into came back `gone`, or the entry being renamed is in no listing any more.
+ */
+function withEditingChecked(tree: ExplorerTree): ExplorerTree {
+  const editing = tree.editing;
+  if (editing === undefined) return tree;
+  const listings = [...(tree.root === undefined ? [] : [tree.root]), ...tree.children.values()];
+  const stays =
+    'parentId' in editing
+      ? editing.parentId === null
+        ? tree.root?.gone !== true
+        : tree.children.has(editing.parentId)
+      : listings.some((listing) => listing.entries.some((entry) => entry.id === editing.renameId));
+  return stays ? tree : { ...tree, editing: undefined };
+}
+
+/**
+ * Opens the field of a new file or folder (TYTO-352): in `parent` when it is given, otherwise
+ * in the selected folder, the selected file's folder, or the root with nothing selected. The
+ * folder is opened, so the field shows under it; one never listed is the caller's to list.
+ */
+export function startCreating(
+  tree: ExplorerTree,
+  kind: 'file' | 'folder',
+  parent?: string | null,
+): ExplorerTree {
+  const selected = rowsOf(tree).find(
+    (row) => row.type === 'entry' && row.entry.id === tree.selected,
+  );
+  const parentId =
+    parent !== undefined
+      ? parent
+      : selected?.type !== 'entry'
+        ? null
+        : selected.entry.kind === 'folder'
+          ? selected.entry.id
+          : selected.parent;
+  const opened = parentId === null ? tree : withExpanded(tree, parentId, true);
+  return { ...opened, editing: { parentId, kind, draft: '' } };
+}
+
+/** Opens the field over an entry's name, holding the name it has now. */
+export function startRenaming(tree: ExplorerTree, id: string): ExplorerTree {
+  const row = rowsOf(tree).find((each) => each.type === 'entry' && each.entry.id === id);
+  if (row?.type !== 'entry') return tree;
+  return { ...tree, selected: id, editing: { renameId: id, draft: row.entry.name } };
+}
+
+/** What was typed, which clears the line a refused name left under the field. */
+export function withDraft(tree: ExplorerTree, draft: string): ExplorerTree {
+  if (tree.editing === undefined) return tree;
+  const { error: _cleared, ...editing } = tree.editing;
+  return { ...tree, editing: { ...editing, draft } };
+}
+
+/** Main refused the name: the field stays, with its text and this line under it. */
+export function withEditError(tree: ExplorerTree, error: string): ExplorerTree {
+  return tree.editing === undefined ? tree : { ...tree, editing: { ...tree.editing, error } };
+}
+
+export const stopEditing = (tree: ExplorerTree): ExplorerTree => ({ ...tree, editing: undefined });
+
+/** The folder a row is in, by the rows on screen; `null` is the root. */
+export function parentOf(tree: ExplorerTree, id: string): string | null | undefined {
+  for (const row of rowsOf(tree)) {
+    if (row.type === 'entry' && row.entry.id === id) return row.parent;
+  }
+  return undefined;
 }
 
 /** Opens or closes a folder. What was open under it stays open, to come back when it reopens. */
@@ -128,12 +238,15 @@ export function foldersToRelist(tree: ExplorerTree): readonly (string | null)[] 
 export type ExplorerMove =
   | { readonly do: 'select'; readonly id: string }
   | { readonly do: 'expand'; readonly id: string; readonly open: boolean }
-  | { readonly do: 'open'; readonly id: string };
+  | { readonly do: 'open'; readonly id: string }
+  | { readonly do: 'rename'; readonly id: string }
+  | { readonly do: 'delete'; readonly id: string };
 
 /**
  * The tree's keys, VS Code's: Up and Down move, Home and End jump, Right opens a folder and then
  * goes into it, Left closes it and then goes to its parent, Enter and Space open what is
- * selected. `undefined` when the key means nothing here.
+ * selected; F2 renames it and Delete asks to move it to the trash (TYTO-352). `undefined` when
+ * the key means nothing here.
  */
 export function moveFor(tree: ExplorerTree, key: string): ExplorerMove | undefined {
   const entries = rowsOf(tree).flatMap((row) => (row.type === 'entry' ? [row] : []));
@@ -165,6 +278,10 @@ export function moveFor(tree: ExplorerTree, key: string): ExplorerMove | undefin
     case 'ArrowLeft':
       if (folder && current.expanded) return { do: 'expand', id: current.entry.id, open: false };
       return current.parent === null ? undefined : { do: 'select', id: current.parent };
+    case 'F2':
+      return { do: 'rename', id: current.entry.id };
+    case 'Delete':
+      return { do: 'delete', id: current.entry.id };
     case 'Enter':
     case ' ':
       if (folder) return { do: 'expand', id: current.entry.id, open: !current.expanded };
