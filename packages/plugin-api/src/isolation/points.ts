@@ -19,6 +19,7 @@ import {
 import { z } from 'zod';
 
 import type { ContributionPoint } from '../manifest.js';
+import { ASSET_SOURCE_MAX_BYTES, FONT_SOURCE_MAX_BYTES, SOURCE_SCHEME } from '../sources.js';
 import { THEME_KINDS, isThemePath } from '../theme.js';
 import type { GuestFaces, ShippedFace } from './faces.js';
 import { resultSchema } from './protocol.js';
@@ -85,7 +86,9 @@ export type RegisterMethod =
   | 'registerKeymap'
   | 'registerPanel'
   | 'registerConfiguration'
-  | 'registerTheme';
+  | 'registerTheme'
+  | 'registerAssetSource'
+  | 'registerFontSource';
 
 const rangeSchema = z.strictObject({
   start: z.number().int().nonnegative(),
@@ -213,6 +216,25 @@ const shippedFaceSchema = z.strictObject({
   bytes: z.instanceof(Uint8Array),
 });
 
+const fontFaceSchema = z.strictObject({
+  family: z.string().min(1),
+  weight: z.number(),
+  style: z.enum(['normal', 'italic']),
+});
+
+/**
+ * What a source call carries besides the reference (ADR 0117): the plugin's own project
+ * section, or nothing when the folder has none or withheld it.
+ */
+const sourceRequestSchema = z.strictObject({ section: z.unknown().optional() });
+
+/** Bytes under a ceiling, so an answer over it is refused before anything caches it. */
+function boundedBytes(max: number): z.ZodType<Uint8Array> {
+  return z
+    .instanceof(Uint8Array)
+    .refine((bytes) => bytes.byteLength <= max, `must be at most ${String(max)} bytes`);
+}
+
 export const ISOLATED_POINTS: Readonly<Partial<Record<ContributionPoint, PointSpec>>> = {
   exporter: {
     method: 'registerExporter',
@@ -336,6 +358,43 @@ export const ISOLATED_POINTS: Readonly<Partial<Record<ContributionPoint, PointSp
       path: z.string().refine(isThemePath, 'must be a relative path inside the plugin folder'),
     }),
     callables: {},
+  },
+  // Data plus `fetch`, which stays in the plugin's process; the bytes cross back, bounded
+  // here and again by the cache that keeps them (ADR 0117).
+  'asset-source': {
+    method: 'registerAssetSource',
+    data: z.strictObject({
+      id: z.string().min(1),
+      schemes: z.array(z.string().regex(SOURCE_SCHEME)).min(1),
+    }),
+    callables: {
+      fetch: {
+        args: z.tuple([z.string().min(1).max(4096), sourceRequestSchema]),
+        send: ([reference, request]) => [reference, request ?? {}],
+        result: resultSchema(
+          z.strictObject({
+            bytes: boundedBytes(ASSET_SOURCE_MAX_BYTES),
+            mime: z.string().min(1).max(100),
+          }),
+        ),
+        failed: (problems) => err(problems),
+      },
+    },
+  },
+  'font-source': {
+    method: 'registerFontSource',
+    data: z.strictObject({
+      id: z.string().min(1),
+      families: z.array(z.string().min(1)).min(1),
+    }),
+    callables: {
+      fetch: {
+        args: z.tuple([fontFaceSchema, sourceRequestSchema]),
+        send: ([face, request]) => [face, request ?? {}],
+        result: resultSchema(boundedBytes(FONT_SOURCE_MAX_BYTES)),
+        failed: (problems) => err(problems),
+      },
+    },
   },
 };
 

@@ -1,3 +1,4 @@
+import type { Diagnostic } from '../diagnostics/diagnostic.js';
 import type { AssetRef } from '../scene/primitives.js';
 
 /**
@@ -35,4 +36,15 @@ export interface AssetResolver {
    * rejection is left to mean what the operating system meant by it.
    */
   resolve(reference: string): Promise<AssetRef | undefined>;
+
+  /**
+   * Why `reference` resolved to nothing, when this resolver knows better than "no file".
+   *
+   * Asked only after `resolve` answered `undefined`. A plugin source that failed, or was not
+   * asked because the folder is not trusted, has a reason an author can act on, and
+   * `E_ASSET_NOT_FOUND` naming folders would send them looking on a disk (ADR 0117).
+   * Absent, or answering `undefined`, the miss is `E_ASSET_NOT_FOUND`. `resolve` puts the
+   * reference's range on whatever comes back.
+   */
+  explain?(reference: string): Diagnostic | undefined;
 }

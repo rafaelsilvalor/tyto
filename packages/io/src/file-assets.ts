@@ -175,6 +175,8 @@ export function recordingAssetResolver(inner: AssetResolver): {
         if (asset?.path !== undefined) found.set(reference, { reference, path: asset.path });
         return asset;
       },
+      // Forwarded, or a plugin source's reason for a miss would be lost behind the record.
+      ...(inner.explain === undefined ? {} : { explain: inner.explain.bind(inner) }),
     },
     delivered: () => [...found.values()],
   };

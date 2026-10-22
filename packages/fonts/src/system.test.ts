@@ -164,3 +164,23 @@ describe.skipIf(!hasCircular)('CircularXX, where it is installed', () => {
     ).toBe(false);
   });
 });
+
+describe('a face written into a folder after the library read it (ADR 0117)', () => {
+  it('is found once the library is refreshed, and not before', () => {
+    const later = mkdtempSync(join(tmpdir(), 'tyto-fetched-fonts-'));
+    try {
+      const library = createFontLibrary({ describe: describeFace, directories: [later] });
+      const bold = system('Source Sans 3', 700);
+      expect(library.substitutions([bold])).toHaveLength(1);
+
+      // What a plugin's font source does mid-run: the face lands in a folder already read.
+      copyFileSync(bundledFontOutlinePath(BOLD) ?? '', join(later, 'SourceSans3-Bold.ttf'));
+      expect(library.substitutions([bold])).toHaveLength(1);
+
+      library.refresh();
+      expect(library.substitutions([bold])).toEqual([]);
+    } finally {
+      rmSync(later, { recursive: true, force: true });
+    }
+  });
+});

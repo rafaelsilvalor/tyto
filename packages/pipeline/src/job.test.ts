@@ -4,6 +4,7 @@ import type {
   Diagnostic,
   Diagnostics,
   DirectoryEntry,
+  FaceCache,
   FileSystem,
   SceneResources,
   TemplateRegistry,
@@ -1148,3 +1149,118 @@ describe('a template whose body is code', () => {
     expect(result.diagnostics.map((item) => item.code)).not.toContain('W_UNUSED_SLOT');
   });
 });
+
+describe('a loader that asks for one more compile (TYTO-280, ADR 0117)', () => {
+  /** A face cache that counts how often compile measured with it. */
+  function countingFaces(): FaceCache & { asked: number } {
+    const cache = {
+      asked: 0,
+      get: () => {
+        cache.asked += 1;
+        return undefined;
+      },
+    };
+    return cache;
+  }
+
+  it('compiles again with the faces it returned, and calls the loader on that scene', async () => {
+    const first = countingFaces();
+    const second = countingFaces();
+    const stages: string[] = [];
+    let calls = 0;
+    const result = await runJob(
+      { brief: briefSource, outputs: BOTH },
+      await portsOf({
+        faces: first,
+        onEvent: (event) => {
+          if (event.kind === 'stage-started') stages.push(event.stage);
+        },
+        loadResources: () => {
+          calls += 1;
+          return calls === 1
+            ? {
+                diagnostics: [diagnostic('W_FONT_SOURCE_FAILED', DROPPED)],
+                recompile: { faces: second },
+              }
+            : { diagnostics: [diagnostic('W_FONT_SOURCE_FAILED', KEPT)] };
+        },
+      }),
+    );
+
+    if (!result.ok) throw new Error(result.error.map((item) => item.message).join('; '));
+    expect(calls).toBe(2);
+    expect(first.asked).toBeGreaterThan(0);
+    expect(second.asked).toBeGreaterThan(0);
+    expect(stages.filter((stage) => stage === 'compile')).toHaveLength(2);
+    // The first pass described a scene that is not the one rendered, so its words go with it.
+    const plugins = result.diagnostics
+      .filter((item) => item.code === 'W_FONT_SOURCE_FAILED')
+      .map((item) => item.message);
+    expect(plugins).toEqual([diagnostic('W_FONT_SOURCE_FAILED', KEPT).message]);
+  });
+
+  it("drops the first compile's diagnostics, which measured a scene nobody draws", async () => {
+    // A cache whose every face is missing makes `compile` say so on every text it measures
+    // (ADR 0110), so a pass's diagnostics are countable.
+    const unavailable = async (loadResources: JobPorts['loadResources']) => {
+      const result = await runJob(
+        { brief: briefSource, outputs: BOTH },
+        await portsOf({ faces: countingFaces(), ...(loadResources ? { loadResources } : {}) }),
+      );
+      const produced = result.ok ? result.diagnostics : result.error;
+      return produced.filter((item) => item.code === 'E_FONT_FACE_UNAVAILABLE').length;
+    };
+
+    const once = await unavailable(undefined);
+    let calls = 0;
+    const twice = await unavailable(() => {
+      calls += 1;
+      return calls === 1 ? { recompile: { faces: countingFaces() } } : undefined;
+    });
+
+    expect(once).toBeGreaterThan(0);
+    expect(twice).toBe(once);
+  });
+
+  it('honours the request once: a second one does not compile a third time', async () => {
+    const stages: string[] = [];
+    let calls = 0;
+    const result = await runJob(
+      { brief: briefSource, outputs: BOTH },
+      await portsOf({
+        onEvent: (event) => {
+          if (event.kind === 'stage-started') stages.push(event.stage);
+        },
+        loadResources: () => {
+          calls += 1;
+          // Every answer asks again, as a loader that fetched a second missing face would.
+          return { recompile: { faces: countingFaces() } };
+        },
+      }),
+    );
+
+    expect(result.ok).toBe(true);
+    expect(calls).toBe(2);
+    expect(stages.filter((stage) => stage === 'compile')).toHaveLength(2);
+  });
+
+  it('compiles once when the loader answers diagnostics alone, as before', async () => {
+    const stages: string[] = [];
+    const result = await runJob(
+      { brief: briefSource, outputs: BOTH },
+      await portsOf({
+        onEvent: (event) => {
+          if (event.kind === 'stage-started') stages.push(event.stage);
+        },
+        loadResources: () => [diagnostic('W_FONT_SOURCE_FAILED', KEPT)],
+      }),
+    );
+
+    if (!result.ok) throw new Error(result.error.map((item) => item.message).join('; '));
+    expect(stages.filter((stage) => stage === 'compile')).toHaveLength(1);
+    expect(result.diagnostics.some((item) => item.code === 'W_FONT_SOURCE_FAILED')).toBe(true);
+  });
+});
+
+const DROPPED = { font: 'Inter 400', plugin: 'faces', problem: 'first pass' };
+const KEPT = { font: 'Inter 400', plugin: 'faces', problem: 'second pass' };

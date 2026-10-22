@@ -19,16 +19,16 @@ import { z } from 'zod';
  */
 
 /**
- * The twelve extension points, spelled the way a manifest spells them.
+ * The fourteen extension points, spelled the way a manifest spells them.
  *
- * The same twelve as `contributions.ts`, which is a duplication with a reason: those are
- * TypeScript types a plugin's *code* implements, and these are strings a JSON file
- * declares before any code exists.
+ * The same fourteen as `contributions.ts` and `sources.ts`, which is a duplication with a
+ * reason: those are TypeScript types a plugin's *code* implements, and these are strings a
+ * JSON file declares before any code exists.
  *
  * They are held equal from both sides. `Point`'s name is typed `ContributionPoint`, so the
  * host cannot open a point this list does not name; and `host.test.ts` activates one
- * plugin declaring all twelve and registering into all twelve, which fails if the host knows a
- * point this list has forgotten.
+ * plugin declaring all fourteen and registering into all fourteen, which fails if the host
+ * knows a point this list has forgotten.
  */
 export const CONTRIBUTION_POINTS = [
   'source',
@@ -43,6 +43,8 @@ export const CONTRIBUTION_POINTS = [
   'panel',
   'configuration',
   'theme',
+  'asset-source',
+  'font-source',
 ] as const;
 
 export type ContributionPoint = (typeof CONTRIBUTION_POINTS)[number];
