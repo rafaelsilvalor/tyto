@@ -193,6 +193,38 @@ describe('trusting the open folder (ADR 0111)', () => {
   });
 });
 
+describe('the trust a plugin fetch answers to (ADR 0119)', () => {
+  it('is the open folder’s inside it, and the CLI’s answer outside it', async () => {
+    await writeFile(join(work, '.tyto', 'project.json'), '{}');
+    const elsewhere = join(scratch, 'other');
+    await mkdir(join(elsewhere, '.tyto'), { recursive: true });
+    await mkdir(join(elsewhere, 'briefs'), { recursive: true });
+    await writeFile(join(elsewhere, '.tyto', 'project.json'), '{}');
+    const loose = join(scratch, 'loose');
+    await mkdir(loose, { recursive: true });
+    const store = fsTrustStore({ home });
+    const workspace = createWorkspaceService({
+      trustStore: store,
+      home,
+      setTemplateFolders: () => Promise.resolve(),
+    });
+    await workspace.open(work);
+    expect((await store.grant(work)).ok).toBe(true);
+    await workspace.open(work);
+
+    expect(await workspace.sourceTrustFor(join(work, 'briefs'))).toMatchObject({
+      trust: 'trusted',
+    });
+    // Another workspace, which the window has not opened: its own answer, as `tyto render`
+    // would find walking up — restricted, because nobody trusted it.
+    expect(await workspace.sourceTrustFor(join(elsewhere, 'briefs'))).toEqual({
+      trust: 'restricted',
+    });
+    expect(await workspace.sourceTrustFor(loose)).toEqual({ trust: 'none' });
+    expect(await workspace.sourceTrustFor(undefined)).toBeUndefined();
+  });
+});
+
 describe('a work profile in the window (TYTO-347, ADR 0114)', () => {
   async function named(text: string): Promise<string> {
     const folder = join(home, 'profiles', 'saude');

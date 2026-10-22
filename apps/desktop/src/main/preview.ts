@@ -2,6 +2,7 @@ import { parseBrief } from '@tyto/brief-lang';
 import {
   type AssetResolver,
   type Diagnostics,
+  type FaceCache,
   type FileSystem,
   type TemplateManifest,
   compile,
@@ -15,7 +16,8 @@ import { fontSubstitutionWarnings } from '@tyto/pipeline';
 import { briefAssetResolver, fileResources, layeredExportResources } from '@tyto/io';
 
 import type { WindowPlugins } from './window-plugins.js';
-import { fontsFor } from './fonts.js';
+import { fontsFor, refreshFonts } from './fonts.js';
+import type { DesktopSources } from './plugin-sources.js';
 import { type ProjectSources } from './project.js';
 import { templateSourceOf } from './template-source.js';
 import type { BriefPlaces } from './workspace.js';
@@ -120,7 +122,19 @@ export interface PreviewServiceOptions {
    * machine's fonts, as before there were workspaces.
    */
   readonly places?: (briefDirectory: string | undefined) => BriefPlaces;
+  /**
+   * The app's source cache over the window plugins' `asset-source` and `font-source`, and the
+   * rule for when a compile may fetch (ADR 0117, ADR 0119). Absent: a `test:` reference is a
+   * file that is not there, as before plugins could supply one.
+   */
+  readonly pluginSources?: DesktopSources;
 }
+
+/**
+ * Why this compile was asked for (ADR 0119): `typing` reads the source cache only; `save` —
+ * the brief was saved, or opened from disk — may fetch what the cache lacks.
+ */
+export type PreviewIntent = 'typing' | 'save';
 
 export interface PreviewService {
   /**
@@ -132,7 +146,7 @@ export interface PreviewService {
    * several, and the only side that knows which one a given compile is for is the caller
    * that was handed the request's `documentId`.
    */
-  preview(brief: string, baseDirectory?: string): Promise<PreviewResult>;
+  preview(brief: string, baseDirectory?: string, intent?: PreviewIntent): Promise<PreviewResult>;
 }
 
 /**
@@ -163,7 +177,11 @@ export async function createPreviewService(
   // the installed ones are a function of which template folder is in force.
 
   return {
-    async preview(brief: string, baseDirectory?: string): Promise<PreviewResult> {
+    async preview(
+      brief: string,
+      baseDirectory?: string,
+      intent: PreviewIntent = 'typing',
+    ): Promise<PreviewResult> {
       // Read once per compile, not per frame, and not at construction (TYTO-122). Per
       // compile is what lets a folder chosen at 11am be searched at 11:01 with no restart;
       // once, so a reload landing mid-compile cannot change the registry under it.
@@ -198,11 +216,20 @@ export async function createPreviewService(
       // else (ADR 0011), and `../../../.ssh/id_rsa` embedded in an exported PNG is a real
       // way to leak a file. An author previewing their own folder is inside it anyway.
       const places = options.places?.(baseDirectory) ?? { assets: [], fonts: fontsFor([]) };
-      const { fonts, faces } = places.fonts;
-      const assets =
+      // The source cache's font folders after the project's and the machine's, so a local
+      // face wins (ADR 0117); and its rule for this compile, which only a save may fetch under.
+      const pluginSources = options.pluginSources;
+      const call = await pluginSources?.callFor(baseDirectory, intent);
+      const inForce =
+        pluginSources === undefined
+          ? places.fonts
+          : fontsFor(places.fontFolders ?? [], pluginSources.cache.fontDirectories(call));
+      const { fonts } = inForce;
+      const files =
         baseDirectory === undefined
           ? noAssets
           : briefAssetResolver({ briefDirectory: baseDirectory, projectAssets: places.assets });
+      const assets = pluginSources === undefined ? files : pluginSources.cache.assets(files, call);
 
       const resolved = await resolve(ast.value, {
         registry: templates,
@@ -222,17 +249,34 @@ export async function createPreviewService(
       // A template of a brand some plugin supplied a kit for is handed that kit, as in the
       // export and the CLI (ADR 0063); a brand two plugins offer says so on every preview.
       const brandKits = options.brandKits?.brandKits();
-      const compileOptions = {
-        formats: catalogue,
-        faces,
-        ...(brandKits === undefined ? {} : { brandKits: brandKits.kits }),
-      };
       const kitWarnings = brandKits?.diagnostics ?? [];
+      const loaded = template.value;
       // An installed code template answers from its plugin's process (ADR 0048); every other
       // one is compiled in the loop as before.
-      const scene = isDeferredTemplate(template.value)
-        ? await compileDeferred(resolved.value, template.value, compileOptions)
-        : compile(resolved.value, template.value, compileOptions);
+      const compileWith = async (faces: FaceCache) => {
+        const compileOptions = {
+          formats: catalogue,
+          faces,
+          ...(brandKits === undefined ? {} : { brandKits: brandKits.kits }),
+        };
+        return isDeferredTemplate(loaded)
+          ? compileDeferred(resolved.value, loaded, compileOptions)
+          : compile(resolved.value, loaded, compileOptions);
+      };
+      let scene = await compileWith(inForce.faces);
+      // A `system` face no local folder has is asked of a font source; when one arrived, the
+      // first compile measured its substitute, so it compiles once more against it (ADR 0117)
+      // — never twice. Typing asks nothing: the call says so, and the miss says to save.
+      let fetchedFaces: Diagnostics = [];
+      if (scene.ok && pluginSources !== undefined) {
+        const missing = fonts.substitutions(sceneResources(scene.value).faces);
+        const fetched = await pluginSources.cache.fetchFaces(
+          missing.map(({ requested }) => requested),
+          call,
+        );
+        fetchedFaces = fetched.diagnostics;
+        if (fetched.fetched > 0) scene = await compileWith(refreshFonts(inForce));
+      }
       if (!scene.ok) {
         return failed([
           ...kitWarnings,
@@ -276,6 +320,7 @@ export async function createPreviewService(
         ...template.diagnostics,
         ...scene.diagnostics,
         ...fontSubstitutionWarnings(fonts.substitutions(needed.faces)),
+        ...fetchedFaces,
       ];
 
       // Zipped by position, which is exact rather than close enough: `planArtworks` maps

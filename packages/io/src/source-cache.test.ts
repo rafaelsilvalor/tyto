@@ -330,3 +330,76 @@ describe('a face a plugin serves', () => {
     expect(answer.diagnostics[0]?.message).toContain('over the');
   });
 });
+
+describe('a cache kept for a long-lived process (ADR 0119)', () => {
+  const RETRY = 'Tyto asks again after a restart, or for a different reference';
+
+  function kept(tytoHome: string, assets: AssetSourceContribution, fonts?: FontSourceContribution) {
+    return sourceCache({
+      home: tytoHome,
+      assetSources: () => [{ plugin: 'drive-ish', source: assets }],
+      fontSources: () => (fonts === undefined ? [] : [{ plugin: 'drive-ish', source: fonts }]),
+      fetches: true,
+      remembersFailures: { retry: RETRY },
+    });
+  }
+
+  const refused = () => err([diagnostic('E_ASSET_NOT_FOUND', { path: 'x', searched: 'drive' })]);
+
+  it('asks a failing image once, and says how to ask again', async () => {
+    const counted = assetSource(refused);
+    const cache = kept(home(), counted.source);
+
+    for (let save = 0; save < 3; save += 1) {
+      const assets = cache.assets(nowhere);
+      expect(await assets.resolve('test:logo')).toBeUndefined();
+      expect(assets.explain?.('test:logo')?.message).toContain(RETRY);
+    }
+    expect(counted.asked).toHaveLength(1);
+
+    // A different reference is a different question.
+    await cache.assets(nowhere).resolve('test:other');
+    expect(counted.asked).toHaveLength(2);
+  });
+
+  it('asks again on every call when nobody asked it to remember, as the CLI is', async () => {
+    const counted = assetSource(refused);
+    const cache = cacheOf(home(), { assets: counted.source });
+
+    await cache.assets(nowhere).resolve('test:logo');
+    await cache.assets(nowhere).resolve('test:logo');
+    expect(counted.asked).toHaveLength(2);
+  });
+
+  it('remembers no miss a call was not allowed to fetch, so the next call that may still asks', async () => {
+    const counted = assetSource();
+    const fonts = fontSource();
+    const cache = kept(home(), counted.source, fonts.source);
+
+    const typing = cache.assets(nowhere, { fetches: false, notFetchedBecause: 'save to fetch' });
+    expect(await typing.resolve('test:logo')).toBeUndefined();
+    expect(typing.explain?.('test:logo')?.message).toContain('save to fetch');
+    expect((await cache.fetchFaces([FACE], { fetches: false })).diagnostics).toHaveLength(1);
+    expect([...counted.asked, ...fonts.asked]).toEqual([]);
+
+    expect(await cache.assets(nowhere, { fetches: true }).resolve('test:logo')).toBeDefined();
+    expect(await cache.fetchFaces([FACE], { fetches: true })).toEqual({
+      fetched: 1,
+      diagnostics: [],
+    });
+    expect(counted.asked).toHaveLength(1);
+    expect(fonts.asked).toHaveLength(1);
+  });
+
+  it('hands each call its own section', async () => {
+    const counted = assetSource();
+    const cache = kept(home(), counted.source);
+
+    await cache.assets(nowhere, { sectionOf: () => ({ folder: 'one' }) }).resolve('test:a');
+    await cache.assets(nowhere, { sectionOf: () => undefined }).resolve('test:b');
+    expect(counted.asked.map(([, request]) => request)).toEqual([
+      { section: { folder: 'one' } },
+      {},
+    ]);
+  });
+});

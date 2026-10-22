@@ -20,6 +20,8 @@ function contributed(permissions: readonly string[]): WindowPlugins {
     themes: () => [],
     permissionsOf: (plugin) => (plugin === 'demo' ? permissions : undefined),
     brandKits: () => ({ kits: new Map(), diagnostics: [] }),
+    assetSources: () => [],
+    fontSources: () => [],
   };
 }
 

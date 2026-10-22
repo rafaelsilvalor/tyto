@@ -25,6 +25,7 @@ export {
   type FetchedFaces,
   type SourceCache,
   type SourceCacheOptions,
+  type SourceCall,
   sourceCache,
 } from './source-cache.js';
 

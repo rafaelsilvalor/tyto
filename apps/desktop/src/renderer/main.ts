@@ -1806,9 +1806,10 @@ function adopt(
     : addDocument(workspace, created);
 
   followWorkspace();
+  // Opened from disk, so the text is a file's and settled: it may fetch (ADR 0119).
   void withBridge((bridge) =>
     kind === undefined
-      ? request(bridge, created.id, opened.text)
+      ? request(bridge, created.id, opened.text, { fetch: true })
       : validateAppFile(bridge, created.id),
   );
   void refreshRecent();
@@ -2897,6 +2898,12 @@ async function saveOneDocument(
   void refreshRecent();
   // Saved, so main stops routing a screen's change into this buffer (TYTO-206).
   if (isSettings(target)) void validateSettings(bridge, documentId);
+  // Saved, so the text is settled: this compile may ask an installed plugin for what the
+  // source cache lacks (ADR 0119). While typing it never does.
+  const saved = documentOf(workspace, documentId);
+  if (saved !== undefined && saved.kind === undefined) {
+    void request(bridge, documentId, contentOf(saved), { fetch: true });
+  }
   return 'saved';
 }
 
@@ -3251,7 +3258,11 @@ async function restoreSession(bridge: TytoBridge, handle: EditorHandle): Promise
     if (answer.groups !== null) await restoreGroups(answer.groups, builtAt, staleAt);
     followWorkspace();
     for (const document_ of restored) {
-      if (document_.kind === undefined) void request(bridge, document_.id, contentOf(document_));
+      // A tab whose text is its file's was opened from disk and may fetch; a hot-exit draft
+      // that differs fetches on its first save, never on the restore (ADR 0119).
+      const fetch = !isUnsaved(document_);
+      if (document_.kind === undefined)
+        void request(bridge, document_.id, contentOf(document_), { fetch });
       else void validateAppFile(bridge, document_.id);
     }
   }
@@ -3875,10 +3886,21 @@ async function refreshUpdate(bridge: TytoBridge): Promise<void> {
  * finished when a person comes back to it rather than started then. **Nothing repaints for
  * a document nobody is looking at**, which is the card's third point in its literal form.
  */
-async function request(bridge: TytoBridge, documentId: string, brief: string): Promise<void> {
+async function request(
+  bridge: TytoBridge,
+  documentId: string,
+  brief: string,
+  /** `fetch` after a save or an open from disk, never while typing (ADR 0119). */
+  { fetch = false }: { readonly fetch?: boolean } = {},
+): Promise<void> {
   const gate = gateFor(documentId);
   const requestId = gate.next();
-  const answer = await bridge['brief:preview']({ requestId, documentId, brief });
+  const answer = await bridge['brief:preview']({
+    requestId,
+    documentId,
+    brief,
+    ...(fetch ? { fetch } : {}),
+  });
   if (!gate.accept(answer.requestId)) return;
   // Every document a group shows has its answers reach that pane's gutter (TYTO-286); a tab
   // compiled in the background is published when it is compiled again on screen.

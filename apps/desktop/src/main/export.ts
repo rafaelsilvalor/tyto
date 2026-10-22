@@ -30,6 +30,7 @@ import {
 } from '@tyto/plugin-api';
 import {
   type JobEvent,
+  type LoadedResources,
   type OutputRequest,
   fontSubstitutionWarnings,
   isRasterFormat,
@@ -37,7 +38,8 @@ import {
 } from '@tyto/pipeline';
 import type { Rasterizer } from '@tyto/raster';
 
-import { type FontsInForce, fontsFor } from './fonts.js';
+import { type FontsInForce, fontsFor, refreshFonts } from './fonts.js';
+import type { DesktopSources } from './plugin-sources.js';
 import { type ProjectSources } from './project.js';
 import { templateSourceOf } from './template-source.js';
 import type { BriefPlaces } from './workspace.js';
@@ -99,6 +101,11 @@ export interface ExportRequest {
    * the export box, which only offers what `kinds` answered.
    */
   readonly dropUnavailableKinds?: boolean;
+  /**
+   * A task the queue picked up. It never fetches from a plugin, as `tyto watch` does not
+   * (ADR 0118): an inbox is filled unattended. What the source cache holds is still drawn.
+   */
+  readonly queued?: boolean;
 }
 
 export type ExportStatus = 'running' | 'finished' | 'cancelled';
@@ -204,6 +211,12 @@ export interface ExportServiceOptions {
    * ADR 0113), asked per run, as `preview.ts` asks per compile.
    */
   readonly places?: (briefDirectory: string | undefined) => BriefPlaces;
+  /**
+   * The app's source cache (ADR 0117), shared with the preview, so an image the preview
+   * fetched on save is the one the export embeds. An export box run fetches what it lacks; a
+   * queued one does not (ADR 0118, ADR 0119). Absent: no plugin is asked for anything.
+   */
+  readonly pluginSources?: DesktopSources;
 }
 
 /** A run in flight, and what the poller reads. */
@@ -324,7 +337,18 @@ export async function createExportService(options: ExportServiceOptions): Promis
       assets: [],
       fonts: fontsFor([]),
     };
-    const { fonts, faces } = places.fonts;
+    // The cache's font folders last, so a local face wins (ADR 0117); the folders are the
+    // window plugins', which are the plugins this run activates below.
+    const pluginSources = options.pluginSources;
+    const asked = await pluginSources?.callFor(
+      request.briefDirectory,
+      request.queued === true ? 'queue' : 'export',
+    );
+    const inForce =
+      pluginSources === undefined
+        ? places.fonts
+        : fontsFor(places.fontFolders ?? [], pluginSources.cache.fontDirectories(asked));
+    const { fonts } = inForce;
     const images =
       request.briefDirectory === undefined
         ? undefined
@@ -336,8 +360,17 @@ export async function createExportService(options: ExportServiceOptions): Promis
       layeredExportResources([images, wiring.resources]),
       options.rasterizer,
       await plugins,
-      places.fonts,
+      inForce,
     );
+    // Asked through this run's host, the activation the run reports refusals of.
+    const call =
+      asked === undefined
+        ? undefined
+        : {
+            ...asked,
+            assetSources: () => host.registry.assetSources(),
+            fontSources: () => host.registry.fontSources(),
+          };
     // The kits of the plugins this run activated, one per brand (ADR 0063): the same host
     // the run reports refusals of, so a refused plugin offers no kit either.
     const brandKits = host.registry.brandKitsByBrand();
@@ -372,14 +405,17 @@ export async function createExportService(options: ExportServiceOptions): Promis
         label: request.label,
         removeLeftovers: request.removeLeftovers ?? false,
       }));
-    // Recorded as the brief resolves, so a delivery copies exactly what was drawn.
-    const assets = recordingAssetResolver(
+    // Recorded as the brief resolves, so a delivery copies exactly what was drawn — a fetched
+    // image under a name from its reference (ADR 0118).
+    const files =
       request.briefDirectory === undefined
         ? fileAssetResolver({ base: request.directory })
         : briefAssetResolver({
             briefDirectory: request.briefDirectory,
             projectAssets: places.assets,
-          }),
+          });
+    const assets = recordingAssetResolver(
+      pluginSources === undefined ? files : pluginSources.cache.assets(files, call),
     );
 
     const job = await runJob(
@@ -407,11 +443,28 @@ export async function createExportService(options: ExportServiceOptions): Promis
         ...(options.rasterizer === undefined ? {} : { rasterizer: options.rasterizer }),
         // Measured, as the CLI and the preview are: without faces a `shrink` is clipped and
         // no line is broken, so the export would differ from the preview it was made from.
-        faces,
+        faces: inForce.faces,
         brandKits: brandKits.kits,
-        loadResources: async (needed) => {
+        // A face no local folder has is asked of a font source here; when one arrived, the
+        // job compiles once more against it, as the CLI's does (ADR 0117).
+        loadResources: async (needed): Promise<LoadedResources> => {
           if (images !== undefined) await images.load(needed);
-          return fontSubstitutionWarnings(fonts.substitutions(needed.faces));
+          const missing = fonts.substitutions(needed.faces);
+          const fetched = await pluginSources?.cache.fetchFaces(
+            missing.map(({ requested }) => requested),
+            call,
+          );
+          if (fetched !== undefined && fetched.fetched > 0) {
+            const faces = refreshFonts(inForce);
+            const still = fonts.substitutions(needed.faces);
+            return {
+              diagnostics: [...fontSubstitutionWarnings(still), ...fetched.diagnostics],
+              recompile: { faces },
+            };
+          }
+          return {
+            diagnostics: [...fontSubstitutionWarnings(missing), ...(fetched?.diagnostics ?? [])],
+          };
         },
         sink,
         onEvent: (event: JobEvent) => {

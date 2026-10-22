@@ -406,6 +406,11 @@
       "why": "reviewed: the protocol themes, panels and the window load through"
     },
     {
+      "paths": ["apps/desktop/src/main/plugin-sources.ts"],
+      "e2e": ["plugin-sources.desktop.test.ts"],
+      "why": "reviewed: when the preview, the export and the queue may fetch a plugin's image or face (TYTO-280, ADR 0119); only that suite installs a source"
+    },
+    {
       "paths": ["apps/desktop/src/main/plugin-wire.ts"],
       "e2e": [
         "assets.desktop.test.ts",
