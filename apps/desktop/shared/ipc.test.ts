@@ -28,6 +28,7 @@ describe('the IPC contract', () => {
       'dialog:save-changes',
       'explorer:create',
       'explorer:delete',
+      'explorer:image',
       'explorer:list',
       'explorer:open',
       'explorer:rename',

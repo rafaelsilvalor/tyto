@@ -47,6 +47,7 @@ import {
   type IpcResponse,
   type TytoBridge,
   type UpdateStatus,
+  EXPLORER_IMAGE_MAX_BYTES,
 } from '../../shared/ipc.js';
 import type { SessionGroupNode } from '../../shared/session-groups.js';
 import {
@@ -193,6 +194,7 @@ import {
   focusedDocumentId,
   focusedGroup,
   followBrief,
+  followBriefAgain,
   followingPreview,
   groupById,
   groupList,
@@ -213,6 +215,7 @@ import {
   splitGroup,
   toggleLock,
   setPreviewMode,
+  showInFollowingPreview,
   toggleStrip,
 } from './editor-groups.js';
 import { type PreviewPane, previewElementsOf } from './preview-pane.js';
@@ -245,6 +248,7 @@ import { paintUpdateNotice } from './update-notice.js';
 import { type ShellState, paint, paintTitle } from './shell.js';
 import { AltTap, MenuRow, altLettersTaken, isMenuLetterStroke } from './menu-row.js';
 import {
+  type ImagePreviewState,
   type PreviewElements,
   type PreviewState,
   type RequestGate,
@@ -255,10 +259,14 @@ import {
   artworksOf,
   createRequestGate,
   errorCount,
+  formatBytes,
   formatsOf,
+  imageInfoLine,
   keepSelection,
+  paintImage,
   paintPreview,
   stepZoom,
+  svgViewBoxSize,
 } from './preview.js';
 
 /**
@@ -386,6 +394,13 @@ const activeKind = (): TabKind => (focusedPreview() === undefined ? active().kin
  * as VS Code's Markdown preview keeps the last Markdown file. `''` while no brief is open.
  */
 let followedBrief = '';
+
+/**
+ * The brief whose own tab was in front of the focused group at the last follow (TYTO-366): a
+ * different one now is a brief brought forward, which takes the following preview back from an
+ * image. A tab chosen by hand forgets it, so choosing the brief already in front counts too.
+ */
+let frontBrief: string | undefined;
 
 /**
  * What the document in front says, read from the workspace and never from the editor.
@@ -764,6 +779,18 @@ const tabIconOf = (document_: DocumentState): IconName =>
  */
 function previewEntry(tab: EditorTab): TabEntry {
   const heading = translate(state.locale, 'preview.heading');
+  const image = imageOfTab(tab);
+  if (image !== undefined) {
+    // TYTO-366: an image's preview is called by the file's name, which main sends each answer.
+    return {
+      id: tab.id,
+      label: imageViews.get(image)?.answer?.name ?? heading,
+      dirty: false,
+      icon: 'preview',
+      preview: true,
+      ...(tab.locked === true ? { locked: true } : {}),
+    };
+  }
   const shown = documentOf(workspace, tab.documentId);
   return {
     id: tab.id,
@@ -1073,6 +1100,14 @@ const registry: CommandRegistry = withCommandGate(
       // A step from whatever is on screen, the same as the buttons: the first step after
       // `fit` moves from the size the user is looking at — in the preview showing this brief,
       // the focused one first (TYTO-287).
+      const image = focusedImage();
+      if (image !== undefined) {
+        const view = imageViewOf(image);
+        const from = paintedZoom.get(groups.focusedGroupId) ?? 1;
+        view.zoom = stepZoom(view.zoom === 'fit' ? from : view.zoom, direction);
+        repaint();
+        return;
+      }
       const current = active();
       const from = shownZoomOf(current.id) ?? (current.zoom === 'fit' ? 1 : current.zoom);
       updateActive((document_) => ({ ...document_, zoom: stepZoom(from, direction) }));
@@ -1101,6 +1136,12 @@ const registry: CommandRegistry = withCommandGate(
     },
 
     zoomToFit: () => {
+      const image = focusedImage();
+      if (image !== undefined) {
+        imageViewOf(image).zoom = 'fit';
+        repaint();
+        return;
+      }
       updateActive((document_) => ({ ...document_, zoom: 'fit' as Zoom }));
       repaint();
     },
@@ -1635,6 +1676,8 @@ function followActiveBrief(): void {
     return tab === undefined || isPreview(tab) ? undefined : tab.documentId;
   };
   const focused = textInFront(focusedGroup(groups));
+  const broughtForward = isBrief(focused) && focused !== frontBrief;
+  frontBrief = focused;
   if (isBrief(focused)) followedBrief = focused;
   else if (!isBrief(followedBrief)) {
     followedBrief =
@@ -1642,7 +1685,9 @@ function followActiveBrief(): void {
       workspace.documents.find((document_) => document_.kind === undefined)?.id ??
       '';
   }
-  groups = followBrief(groups, followedBrief);
+  groups = broughtForward
+    ? followBriefAgain(groups, followedBrief)
+    : followBrief(groups, followedBrief);
 }
 
 /**
@@ -1728,6 +1773,7 @@ function activate(id: string): void {
 
 /** A tab clicked, a slot key, a step: that tab in front of its group, and its group focused. */
 function selectTab(tabId: string): void {
+  frontBrief = undefined;
   groups = activateTab(groups, tabId);
   showGroups();
 }
@@ -2693,6 +2739,8 @@ let explorerFolder: string | null | undefined;
  * its ids (ADR 0115).
  */
 function showExplorerFolder(answer: IpcResponse<'workspace:folder'> | undefined): void {
+  // Another folder makes every image id of the last one name nothing: main answers `gone`.
+  refreshImages();
   const panel = elements.explorerPanel;
   if (panel === null || answer === undefined) return;
   panel.folderName = answer.folder === null ? null : answer.name;
@@ -2728,6 +2776,9 @@ function wireExplorerPanel(): void {
         const opened = await bridge['explorer:open']({ documentId: wanted, entryId });
         adopt(opened.document, opened.documentId, wanted);
       });
+    },
+    show: (entryId) => {
+      showImage(entryId);
     },
     openFolder: () => {
       runCommand('workspace.openFolder');
@@ -3140,6 +3191,8 @@ function groupsForSession(): SessionGroups {
         ...(tab.stripHidden === true ? { stripHidden: true as const } : {}),
         ...(tab.mode === 'all' ? { mode: 'all' as const } : {}),
       };
+      // A locked image names no document (`''`), so `sessionOf` drops it with the briefs it does
+      // not keep: an explorer id means nothing in the next run (TYTO-366, ADR 0010).
       return tab.locked === true
         ? { documentId: tab.documentId, view: 'preview', locked: true, ...hidden }
         : { view: 'preview', ...hidden };
@@ -4068,6 +4121,149 @@ function previewedIn(documentId: string): readonly string[] {
   });
 }
 
+/**
+ * The images the previews show, by explorer id (TYTO-366, ADR 0124): main's last answer that was
+ * not `unchanged`, the size the window decoded, and the zoom — per image, as a brief's zoom is
+ * per brief, so a locked and a following preview of one image share it.
+ */
+interface ImageView {
+  answer?: ImageAnswer;
+  size?:
+    { readonly width: number; readonly height: number; readonly scalable: boolean } | undefined;
+  zoom: Zoom;
+}
+
+type ImageAnswer = Exclude<IpcResponse<'explorer:image'>, { unchanged: true }>;
+
+const imageViews = new Map<string, ImageView>();
+
+/** The image the preview tab shows, or `undefined` for a brief's. */
+const imageOfTab = (tab: EditorTab | undefined): string | undefined =>
+  tab !== undefined && isPreview(tab) && tab.subject?.kind === 'image'
+    ? tab.subject.entryId
+    : undefined;
+
+function imageViewOf(entryId: string): ImageView {
+  const known = imageViews.get(entryId);
+  if (known !== undefined) return known;
+  const made: ImageView = { zoom: 'fit' };
+  imageViews.set(entryId, made);
+  return made;
+}
+
+/**
+ * The size an image is drawn at, decoded here and not read from its header (TYTO-366): an
+ * `<img>` the window's CSP lets show `data:` and `decode()`. An SVG with no `width` and `height`
+ * of its own is drawn at its viewBox and marked scalable. `undefined` for bytes Chromium cannot
+ * draw, which the bar then says it cannot show.
+ */
+async function decodedSize(
+  answer: ImageAnswer & { ok: true },
+): Promise<ImageView['size'] | undefined> {
+  const image = new Image();
+  image.src = answer.dataUrl;
+  try {
+    await image.decode();
+  } catch {
+    return undefined;
+  }
+  if (answer.mime === 'image/svg+xml') {
+    const box = svgViewBoxSize(atob(answer.dataUrl.slice(answer.dataUrl.indexOf(',') + 1)));
+    if (box !== undefined) return { ...box, scalable: true };
+  }
+  if (image.naturalWidth === 0 || image.naturalHeight === 0) return undefined;
+  return { width: image.naturalWidth, height: image.naturalHeight, scalable: false };
+}
+
+/**
+ * Asks main for an image with the version on screen, so a file that has not changed is
+ * `unchanged` and read no second time. A `gone` image lets the following preview go back to the
+ * brief in front; a locked one stays, saying so.
+ */
+async function askImage(entryId: string): Promise<void> {
+  const bridge = window.tyto;
+  if (bridge === undefined) return;
+  const view = imageViewOf(entryId);
+  const have =
+    view.answer !== undefined && 'version' in view.answer ? view.answer.version : undefined;
+  let answer: IpcResponse<'explorer:image'>;
+  try {
+    answer = await bridge['explorer:image']({ entryId, ...(have === undefined ? {} : { have }) });
+  } catch {
+    answer = { ok: false, reason: 'failed' };
+  }
+  if ('unchanged' in answer) return;
+  const size = answer.ok ? await decodedSize(answer) : undefined;
+  view.answer =
+    answer.ok && size === undefined
+      ? { ok: false, reason: 'unsupported', name: answer.name, version: answer.version }
+      : answer;
+  view.size = size;
+  if (!view.answer.ok && view.answer.reason === 'gone') {
+    const following = followingPreview(groups);
+    if (imageOfTab(following) === entryId) groups = followBriefAgain(groups, followedBrief);
+    present();
+  }
+  repaint();
+}
+
+/** Every image a preview shows asked again, and the ones no preview shows any more forgotten. */
+function refreshImages(): void {
+  const shown = new Set(groupList(groups).flatMap((group) => group.tabs.map(imageOfTab)));
+  for (const entryId of [...imageViews.keys()]) {
+    if (shown.has(entryId)) void askImage(entryId);
+    else imageViews.delete(entryId);
+  }
+}
+
+/**
+ * An image clicked in the explorer (TYTO-366, ADR 0124): the following preview shows it, or a new
+ * one opens the way "Open preview" opens it. **The focus is left where it was**, in the explorer,
+ * so nothing here calls `showGroups`, which would move it into the preview.
+ */
+function showImage(entryId: string): void {
+  if (editor === undefined || !sessionRead) return;
+  groups = showInFollowingPreview(groups, { kind: 'image', entryId });
+  syncActiveDocument();
+  present();
+  imageViewOf(entryId);
+  refreshImages();
+  repaint();
+}
+
+const IMAGE_NOTICES = {
+  'too-large': 'preview.image.tooLarge',
+  unsupported: 'preview.image.unsupported',
+  failed: 'preview.image.unsupported',
+  gone: 'preview.image.gone',
+} as const satisfies Record<string, CatalogueKey>;
+
+/** What a preview of the image `entryId` draws, from what main answered and the window decoded. */
+function imageStateOf(entryId: string): ImagePreviewState {
+  const view = imageViewOf(entryId);
+  const answer = view.answer;
+  const size = view.size;
+  const locale = state.locale;
+  const info = imageInfoLine({
+    name: answer?.name ?? '',
+    bytes: answer?.bytes,
+    size,
+    scalable: size?.scalable === true ? translate(locale, 'preview.image.scalable') : undefined,
+    locale,
+  });
+  if (answer?.ok === true && size !== undefined) {
+    return { image: { dataUrl: answer.dataUrl, ...size }, info, zoom: view.zoom };
+  }
+  if (answer === undefined || answer.ok) return { info, zoom: view.zoom };
+  const notice = translate(locale, IMAGE_NOTICES[answer.reason])
+    .replaceAll('{size}', formatBytes(answer.bytes ?? 0, locale))
+    .replaceAll('{limit}', formatBytes(EXPLORER_IMAGE_MAX_BYTES, locale));
+  return { info, notice, zoom: view.zoom };
+}
+
+/** The image in front of the focused group, which the zoom commands act on (TYTO-366). */
+const focusedImage = (): string | undefined => imageOfTab(focusedPreview());
+
 /** The zoom each preview pane was last drawn at, by group: `fit` resolved against its stage. */
 const paintedZoom = new Map<string, number>();
 
@@ -4115,6 +4311,11 @@ function paintPreviews(): void {
     const lock = pane_.querySelector<HTMLElement>('[data-preview-lock]');
     lock?.setAttribute('aria-pressed', String(tab.locked === true));
     lock?.classList.toggle('preview__lock--on', tab.locked === true);
+    const image = imageOfTab(tab);
+    if (image !== undefined) {
+      paintedZoom.set(group.id, paintImage(nodes, imageStateOf(image)));
+      continue;
+    }
     const shown = documentOf(workspace, tab.documentId);
     const drawn =
       shown === undefined
@@ -4258,6 +4459,8 @@ function wirePreviewPane(pane_: PreviewPane, nodes: PreviewElements): void {
 /** Whether a group has a preview in front drawn at `fit`. */
 function isFitPreview(group: EditorGroup): boolean {
   const tab = activeTabOf(group);
+  const image = imageOfTab(tab);
+  if (image !== undefined) return imageViewOf(image).zoom === 'fit';
   return (
     tab !== undefined && isPreview(tab) && documentOf(workspace, tab.documentId)?.zoom === 'fit'
   );
@@ -4672,6 +4875,9 @@ async function load(): Promise<void> {
     // folders again. Ignored while it is closed, for the queue's reason.
     bridge.on('explorer:changed', () => {
       elements.explorerPanel?.refresh();
+      // TYTO-366: an image a preview shows is asked again with its version, so main answers
+      // `unchanged` from a `stat` unless the file did change.
+      refreshImages();
     });
 
     // `settings.json` changed or refused a screen's change (TYTO-206).

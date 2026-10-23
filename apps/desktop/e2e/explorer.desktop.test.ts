@@ -12,7 +12,7 @@ import { firstWindow } from './first-window.js';
 /**
  * The explorer in the real window (TYTO-279, ADR 0115): File ▸ Open Folder opens it in the left
  * area above the queue, a folder opens under its row, a brief opens in a tab and a picture opens
- * nothing, a file made and a folder deleted outside the app show within the watcher's settle,
+ * no tab of text (TYTO-366 shows it in the preview), a file made and a folder deleted outside the app show within the watcher's settle,
  * and a relaunch that brings the folder back leaves the panel as the person left it. Each row
  * and tab draws the icon of its type, and the folder the project's `output` names draws the
  * output folder's (TYTO-282, ADR 0116).
@@ -125,14 +125,15 @@ describe('the explorer (TYTO-279)', () => {
     );
   }, 30_000);
 
-  it('opens a brief in a tab, and nothing for a picture', async () => {
+  it('opens a brief in a tab, and a picture in the preview with no tab of its text', async () => {
     await row('briefs').click();
     await expect.poll(rows).toContain('  capa.brief');
     const before = await tabNames();
 
+    // TYTO-366: a picture shows in the preview, a tab named for the file; this one is empty, so
+    // the preview says it cannot be shown (`explorer-image.desktop.test.ts` shows real ones).
     await row('logo.png').click();
-    await window.waitForTimeout(300);
-    expect(await tabNames()).toEqual(before);
+    await expect.poll(tabNames, { timeout: 10_000 }).toEqual([...before, 'logo.png']);
 
     await row('capa.brief').click();
     await expect.poll(tabNames, { timeout: 10_000 }).toContain('capa.brief');

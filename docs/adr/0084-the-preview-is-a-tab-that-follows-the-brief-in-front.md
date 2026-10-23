@@ -128,3 +128,5 @@ second is said where it applies.
 - The strip's and the bar's final look landed with TYTO-288 (ADR 0085), and a preview tab is
   dragged between groups like any other since its third pull request (ADR 0083, amended
   2026-10-16): it keeps its id and its lock, and a following one keeps following.
+- _Amended 2026-10-23, TYTO-366 (ADR 0124):_ a following preview shows the last thing chosen, a
+  brief brought to the front or an image clicked in the explorer, not only the brief in front.

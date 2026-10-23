@@ -884,6 +884,19 @@ tyto-preview-pane[hidden] {
   gap: var(--tyto-space-2);
 }
 
+/*
+ * An image's name, pixel size and file size, in the formats' place (TYTO-366): one line that
+ * gives way with an ellipsis before the zoom and the lock do.
+ */
+.preview__info {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--tyto-text-muted);
+}
+
 .preview__tab {
   border: var(--tyto-hairline-width) solid transparent;
   border-radius: var(--tyto-radius-sm);
@@ -1199,6 +1212,7 @@ tyto-preview-pane[hidden] {
  * `display` on a class outranks the attribute's own rule, so it is restated for each.
  */
 .preview__tabs[hidden],
+.preview__info[hidden],
 .preview__zoom[hidden] {
   display: none;
 }

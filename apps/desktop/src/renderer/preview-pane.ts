@@ -41,6 +41,8 @@ export class PreviewPane extends LitElement {
     this.tabIndex = -1;
     return html`<div class="preview__bar pane__header" data-font-area="paneHeaders">
         <div class="preview__tabs" data-preview-formats role="tablist"></div>
+        <!-- TYTO-366: an image's name, pixel size and file size, in the formats' place. -->
+        <span class="preview__info" data-preview-info hidden></span>
         <div class="pane__actions">
           <div class="preview__modes" data-preview-modes role="group" hidden>
             <button
@@ -93,6 +95,8 @@ export class PreviewPane extends LitElement {
         <!-- TYTO-268: in the empty line's place when the brief is written and cannot be drawn. -->
         <p class="preview__empty" data-preview-broken data-i18n="preview.broken" hidden></p>
         <p class="preview__stale" data-preview-stale data-i18n="preview.stale" hidden></p>
+        <!-- TYTO-366: why an image is not shown, its size filled in by the window. -->
+        <p class="preview__empty" data-preview-notice hidden></p>
       </div>
       <tyto-slide-thumbnails
         class="preview__strip"
@@ -140,6 +144,8 @@ export function previewElementsOf(pane: ParentNode): PreviewElements | undefined
   }
   const modes = find('data-preview-modes') ?? undefined;
   const zoom = find('data-preview-zoom-group') ?? undefined;
+  const info = find('data-preview-info') ?? undefined;
+  const notice = find('data-preview-notice') ?? undefined;
   return {
     tabs,
     strip,
@@ -153,5 +159,7 @@ export function previewElementsOf(pane: ParentNode): PreviewElements | undefined
     zoomLevel,
     ...(modes === undefined ? {} : { modes }),
     ...(zoom === undefined ? {} : { zoom }),
+    ...(info === undefined ? {} : { info }),
+    ...(notice === undefined ? {} : { notice }),
   };
 }

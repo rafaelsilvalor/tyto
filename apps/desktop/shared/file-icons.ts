@@ -105,3 +105,11 @@ export function fileIconFor(subject: FileIconSubject): FileIconName {
   if (subject.kind === 'brief') return 'brief';
   return BY_NAME[name] ?? BY_EXTENSION[extensionOf(name)] ?? 'file';
 }
+
+/**
+ * Whether a click on a file of this name shows it in the preview (TYTO-366, ADR 0124): a PNG,
+ * JPEG, WebP, GIF or SVG, by extension. The window only asks; main checks the bytes and answers
+ * `unsupported` for a file that is not what its name says.
+ */
+export const isPreviewImage = (name: string): boolean =>
+  ['png', 'jpg', 'jpeg', 'webp', 'gif', 'svg'].includes(extensionOf(name));

@@ -13,12 +13,17 @@ import {
   createRequestGate,
   errorCount,
   fitZoom,
+  formatBytes,
   formatsOf,
   frameFor,
+  imageDocument,
+  imageInfoLine,
   keepSelection,
+  paintImage,
   paintPreview,
   stageBox,
   stepZoom,
+  svgViewBoxSize,
   artworkOfThumbnail,
   thumbnailId,
   thumbnailsOf,
@@ -823,5 +828,126 @@ describe('counting problems', () => {
     ];
 
     expect(errorCount(diagnostics)).toBe(1);
+  });
+});
+
+/** TYTO-366, ADR 0124: an image from the explorer, through the brief's one path to the screen. */
+describe('an image in the preview', () => {
+  const HOSTILE_SVG =
+    '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 40 20">' +
+    '<image href="http://127.0.0.1:9/img" width="40" height="20"/>' +
+    '<script>fetch("http://127.0.0.1:9/script")</script></svg>';
+  const svgUrl = `data:image/svg+xml;base64,${btoa(HOSTILE_SVG)}`;
+  /** A brief of ten slides, the pane's state before an image comes in. */
+  const brief: PreviewState = {
+    stale: false,
+    frames: TEN_FRAMES,
+    artworks: TEN,
+    selection: { format: 'grid-1x1', artwork: 'lamina-1' },
+    zoom: 'fit',
+    mode: 'one',
+  };
+
+  it('puts exactly one <img> of the data URI in the document, and no SVG markup', () => {
+    const html = imageDocument(svgUrl);
+    const parsed = new DOMParser().parseFromString(html, 'text/html');
+
+    expect([...parsed.querySelectorAll('img')].map((image) => image.getAttribute('src'))).toEqual([
+      svgUrl,
+    ]);
+    expect(parsed.querySelectorAll('svg, script, image, iframe, object, embed')).toHaveLength(0);
+    expect(html).not.toContain('<svg');
+    expect(html).not.toContain('127.0.0.1');
+  });
+
+  it('writes no source at all for a value that is not a base64 image data URI', () => {
+    for (const value of ['javascript:alert(1)', 'data:text/html;base64,PHA+', 'x" onerror="y']) {
+      expect(imageDocument(value)).toContain('<img alt="" src="">');
+    }
+  });
+
+  it('hides the formats, the modes and the strip, keeps the zoom, and fits without enlarging', async () => {
+    const element = document.createElement('tyto-preview-pane');
+    document.body.append(element);
+    await element.updateComplete;
+    const elements = previewElementsOf(element)!;
+    paintPreview(elements, brief);
+    loaded(elements.frame);
+
+    const zoom = paintImage(elements, {
+      image: { dataUrl: svgUrl, width: 40, height: 20 },
+      info: 'vetor.svg · 40 × 20 px (scalable) · 1 KB',
+      zoom: 'fit',
+    });
+
+    expect(zoom).toBe(1);
+    expect(elements.tabs.hidden).toBe(true);
+    expect(elements.info?.hidden).toBe(false);
+    expect(elements.info?.textContent).toBe('vetor.svg · 40 × 20 px (scalable) · 1 KB');
+    expect(elements.modes?.hidden).toBe(true);
+    expect(elements.stripToggle.hidden).toBe(true);
+    expect(elements.strip.hidden).toBe(true);
+    expect(elements.zoom?.hidden).toBe(false);
+    expect(elements.paper.hidden).toBe(false);
+    expect(elements.frame.getAttribute('srcdoc')).toBe(imageDocument(svgUrl));
+    expect(elements.frame.style.width).toBe('40px');
+    expect(fitZoom({ width: 4000, height: 2000, html: '' }, { width: 400, height: 400 })).toBe(0.1);
+
+    // A brief painted again gets its bar back.
+    paintPreview(elements, brief);
+    expect(elements.tabs.hidden).toBe(false);
+    expect(elements.info?.hidden).toBe(true);
+    expect(elements.notice?.hidden).toBe(true);
+    element.remove();
+  });
+
+  it('says why an image is not shown, in the stage, with nothing drawn', async () => {
+    const element = document.createElement('tyto-preview-pane');
+    document.body.append(element);
+    await element.updateComplete;
+    const elements = previewElementsOf(element)!;
+
+    paintImage(elements, {
+      info: 'foto.png · 40 MB',
+      notice: 'This image is 40 MB, over the 32 MB the preview shows.',
+      zoom: 'fit',
+    });
+
+    expect(elements.paper.hidden).toBe(true);
+    expect(elements.notice?.hidden).toBe(false);
+    expect(elements.notice?.textContent).toBe(
+      'This image is 40 MB, over the 32 MB the preview shows.',
+    );
+    expect(elements.empty.hidden).toBe(true);
+    expect(elements.zoomLevel.textContent).toBe('');
+    element.remove();
+  });
+
+  it('writes the bar line and the sizes in the window language', () => {
+    expect(
+      imageInfoLine({
+        name: 'logo.png',
+        bytes: 84 * 1024,
+        size: { width: 1200, height: 630 },
+        scalable: undefined,
+        locale: 'en',
+      }),
+    ).toBe('logo.png · 1200 × 630 px · 84 KB');
+    expect(
+      imageInfoLine({ name: 'a.svg', bytes: 500, size: undefined, scalable: 'x', locale: 'en' }),
+    ).toBe('a.svg · 500 B');
+    expect(formatBytes(32 * 1024 * 1024, 'en')).toBe('32 MB');
+    expect(formatBytes(1.5 * 1024 * 1024, 'pt-BR')).toBe('1,5 MB');
+  });
+
+  it('reads an SVG size from its viewBox only when the root gives no width and height', () => {
+    expect(svgViewBoxSize('<svg viewBox="0 0 40 20"></svg>')).toEqual({ width: 40, height: 20 });
+    expect(svgViewBoxSize('<svg viewBox="0,0,40.4,20.6" width="100%">')).toEqual({
+      width: 40,
+      height: 21,
+    });
+    expect(svgViewBoxSize('<svg width="80" height="40" viewBox="0 0 40 20">')).toBeUndefined();
+    expect(svgViewBoxSize('<svg viewBox="0 0 0 20">')).toBeUndefined();
+    expect(svgViewBoxSize('<svg>')).toBeUndefined();
   });
 });

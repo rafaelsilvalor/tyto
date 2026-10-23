@@ -103,3 +103,6 @@ adds:
    each time it opens a panel, as it does for the queue, and the record is layout rather than
    state. A panel kept open keeps its tree across changes on disk and across a trust change
    (the same folder, the same ids).
+
+_Amended 2026-10-23, TYTO-366 (ADR 0124):_ `explorer:open` is no longer the only effect of a
+click: an image the explorer lists shows in the preview through `explorer:image`, by id.

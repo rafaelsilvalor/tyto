@@ -7,6 +7,7 @@ import { isInside } from '@tyto/io';
 
 import type { ExplorerPlace } from '../../shared/file-icons.js';
 import type { IpcResponse } from '../../shared/ipc.js';
+import { type ExplorerImage, IMAGE_EXTENSIONS, readExplorerImage } from './explorer-image.js';
 
 /**
  * The files of the open workspace folder, as the explorer may know them (TYTO-279, ADR 0115).
@@ -21,7 +22,8 @@ import type { IpcResponse } from '../../shared/ipc.js';
  * read, which is why the cap is per folder and not on the whole tree.
  *
  * **Nothing here runs anything** (ADR 0111): an untrusted folder lists exactly as a trusted one,
- * and the only thing an entry can be used for is opening a `.brief` as text.
+ * and an entry can be used for two things: opening a `.brief` as text, and showing an image in
+ * the preview as bytes main checked (TYTO-366, ADR 0124).
  *
  * **New, rename and delete take an id and a name, never a path** (TYTO-352, ADR 0121). A name is
  * checked here, the same on every operating system; no write overwrites anything; and a delete
@@ -82,6 +84,17 @@ export interface ExplorerService {
   list(entryId: string | null): Promise<ExplorerListing>;
   /** The brief `entryId` names, while it still lives inside the root; nothing otherwise. */
   briefPath(entryId: string): Promise<string | undefined>;
+  /**
+   * The file `entryId` names when its name ends in one of `extensions` (lower case, with the
+   * dot) and it is still a file whose real path lies inside the root; nothing otherwise.
+   */
+  filePath(entryId: string, extensions: readonly string[]): Promise<string | undefined>;
+  /**
+   * The image `entryId` names, for the preview (TYTO-366, ADR 0124): `gone` for an id that names
+   * nothing inside the folder any more, `unsupported` for a file that is not an image the preview
+   * shows, and otherwise what {@link readExplorerImage} answers.
+   */
+  image(entryId: string, have: string | undefined): Promise<ExplorerImage>;
   /**
    * Makes an empty file or folder called `name` in the folder `parentId` names (`null` is the
    * root). Fails with `exists` rather than replace anything, and with `invalid` for a name
@@ -432,6 +445,24 @@ export function createExplorerService(options: ExplorerServiceOptions): Explorer
     }
   };
 
+  const filePath = async (
+    entryId: string,
+    extensions: readonly string[],
+  ): Promise<string | undefined> => {
+    const current = root;
+    const entry = entryOf.get(entryId);
+    if (current === undefined || entry === undefined || entry.kind === 'folder') return undefined;
+    if (!extensions.includes(extname(entry.path).toLowerCase())) return undefined;
+    try {
+      // Asked again at the click: the file may have become a link to somewhere else since.
+      const real = await realpath(entry.path);
+      if (!isInside(current.real, real)) return undefined;
+      return (await stat(real)).isFile() ? entry.path : undefined;
+    } catch {
+      return undefined;
+    }
+  };
+
   const listFolder = async (folder: string): Promise<ExplorerListing> => {
     const current = root;
     if (current === undefined) return NOTHING;
@@ -491,18 +522,23 @@ export function createExplorerService(options: ExplorerServiceOptions): Explorer
       return listFolder(entry.path);
     },
 
-    async briefPath(entryId) {
-      const current = root;
-      const entry = entryOf.get(entryId);
-      if (current === undefined || entry?.kind !== 'brief') return undefined;
-      try {
-        // Asked again at the click: the file may have become a link to somewhere else since.
-        const real = await realpath(entry.path);
-        if (!isInside(current.real, real)) return undefined;
-        return (await stat(real)).isFile() ? entry.path : undefined;
-      } catch {
-        return undefined;
+    briefPath(entryId) {
+      if (entryOf.get(entryId)?.kind !== 'brief') return Promise.resolve(undefined);
+      return filePath(entryId, ['.brief']);
+    },
+
+    filePath,
+
+    async image(entryId, have) {
+      const entry = root === undefined ? undefined : entryOf.get(entryId);
+      if (entry === undefined) return { ok: false, reason: 'gone' };
+      const name = basename(entry.path);
+      if (entry.kind === 'folder' || !IMAGE_EXTENSIONS.includes(extname(name).toLowerCase())) {
+        return { ok: false, reason: 'unsupported', name };
       }
+      const path = await filePath(entryId, IMAGE_EXTENSIONS);
+      if (path === undefined) return { ok: false, reason: 'gone', name };
+      return readExplorerImage(path, have);
     },
 
     async create(parentId, name, kind) {
