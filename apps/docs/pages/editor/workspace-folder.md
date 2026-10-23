@@ -35,7 +35,8 @@ Opening a folder with **File ▸ Open Folder…** opens the **Explorer** in the 
 
 - **Click a brief** to open it in a tab, or select it and press **Enter**. A brief already open is its tab.
 - **Click a folder**, or press **Right** and **Left**, to open and close it. **Up**, **Down**, **Home** and **End** move through the list.
-- **Any other file** — an image, a PDF — is listed and does nothing when clicked. Tyto does not open files with other programs from the Explorer.
+- **Click an image** — a `.png`, `.jpg`, `.jpeg`, `.webp`, `.gif` or `.svg` — to see it in the preview, or select it and press **Enter**. The Explorer keeps the focus, so you can go on choosing; the preview tab is named after the file, and [the preview](./panels.md#an-image-from-the-explorer) shows its size.
+- **Any other file** — a PDF, a font — is listed and does nothing when clicked. Tyto does not open files with other programs from the Explorer.
 - A folder holding more than 2,000 entries shows the first 2,000 and a line saying how many more there are. `.git` is not listed.
 
 Each entry has an icon for its type: a brief, an image, a font, a JSON file, a text file, a template folder and the `template.html`, `template.ts` and `manifest.yaml` in it, the project's own `.tyto/project.json`, and the app's `settings.json`, `keybindings.json` and `snippets.json`. A folder named `assets`, and the folders your `.tyto/project.json` names as `assets`, `templates` or `output`, get icons of their own. A file Tyto has no icon for gets a plain page. The tabs use the same icons.

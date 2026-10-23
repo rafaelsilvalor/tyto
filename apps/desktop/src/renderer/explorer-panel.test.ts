@@ -31,6 +31,7 @@ const GONE: ExplorerListing = { entries: [], more: 0, gone: true };
 function source(disk: Disk) {
   const asked: (string | null)[] = [];
   const opened: string[] = [];
+  const shown: string[] = [];
   const folders: number[] = [];
   const wrote: unknown[][] = [];
   const questions: string[] = [];
@@ -91,11 +92,14 @@ function source(disk: Disk) {
     open: (entryId) => {
       opened.push(entryId);
     },
+    show: (entryId) => {
+      shown.push(entryId);
+    },
     openFolder: () => {
       folders.push(1);
     },
   };
-  return { value, asked, opened, folders, wrote, questions, control };
+  return { value, asked, opened, shown, folders, wrote, questions, control };
 }
 
 const settle = async (element: ExplorerPanel): Promise<void> => {
@@ -157,15 +161,43 @@ describe('the explorer panel', () => {
     expect(row(element, 'slides').getAttribute('aria-expanded')).toBe('true');
   });
 
-  it('opens a brief on a click, and does nothing for any other file', async () => {
-    const { element, opened } = await mount(disk());
+  it('opens a brief on a click, shows an image (TYTO-366), and does nothing for any other file', async () => {
+    const folder = disk();
+    folder['root'] = entries(
+      ['promo', 'promo.brief', 'brief'],
+      ['logo', 'logo.png', 'file'],
+      ['vetor', 'vetor.SVG', 'file'],
+      ['notas', 'notas.txt', 'file'],
+    );
+    const { element, opened, shown } = await mount(folder);
 
     row(element, 'logo.png').click();
+    row(element, 'notas.txt').click();
+    row(element, 'vetor.SVG').click();
     row(element, 'promo.brief').click();
     await settle(element);
 
     expect(opened).toEqual(['promo']);
+    expect(shown).toEqual(['logo', 'vetor']);
     expect(row(element, 'promo.brief').getAttribute('aria-selected')).toBe('true');
+  });
+
+  it('shows an image with Enter, and only selects one with an arrow (TYTO-366)', async () => {
+    const { element, opened, shown } = await mount(disk());
+    const tree = element.querySelector<HTMLElement>('.explorer__tree')!;
+    const press = async (key: string): Promise<void> => {
+      tree.dispatchEvent(new KeyboardEvent('keydown', { key, bubbles: true }));
+      await settle(element);
+    };
+
+    // The first key selects the first row; the second goes to the last, the image.
+    await press('End');
+    await press('End');
+    expect(shown).toEqual([]);
+    await press('Enter');
+
+    expect(shown).toEqual(['logo']);
+    expect(opened).toEqual([]);
   });
 
   it('moves with the arrows and opens with Enter', async () => {

@@ -220,7 +220,7 @@ export interface IpcDependencies {
    */
   readonly explorer: Pick<
     ExplorerService,
-    'list' | 'briefPath' | 'create' | 'rename' | 'delete' | 'pathOf'
+    'list' | 'briefPath' | 'image' | 'create' | 'rename' | 'delete' | 'pathOf'
   >;
   /**
    * A native context menu of the window's items at a point, settling with the id picked or
@@ -463,6 +463,9 @@ export function createHandlers(dependencies: IpcDependencies): Handlers {
       if (path === undefined) return { document: null, documentId: null };
       return documents.openPath(documentId, path);
     },
+
+    // TYTO-366, ADR 0124: an image for the preview, by id, as bytes main checked.
+    'explorer:image': ({ entryId, have }) => explorer.image(entryId, have),
 
     // TYTO-352, ADR 0121: the explorer writes by id and name; the tabs follow here, in the one
     // place that holds both the explorer and the documents.

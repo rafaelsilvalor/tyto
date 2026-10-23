@@ -132,8 +132,11 @@ export function frameFor(frames: readonly Frame[], selection: Selection): Frame 
   );
 }
 
+/** What a frame needs to be put on screen: its size and its document. */
+type Picture = Pick<Frame, 'width' | 'height' | 'html'>;
+
 /** The largest whole-frame scale that fits `stage`, never enlarging past 1:1. */
-export function fitZoom(frame: Frame, stage: { width: number; height: number }): number {
+export function fitZoom(frame: Picture, stage: { width: number; height: number }): number {
   if (stage.width <= 0 || stage.height <= 0) return 1;
   return Math.min(1, stage.width / frame.width, stage.height / frame.height);
 }
@@ -216,6 +219,10 @@ export interface PreviewElements {
   readonly modes?: HTMLElement;
   /** The zoom's buttons and level, which have nothing to scale while every slide is shown. */
   readonly zoom?: HTMLElement;
+  /** An image's line in the formats' place (TYTO-366): its name, pixel size and file size. */
+  readonly info?: HTMLElement;
+  /** Why an image is not shown, in the stage (TYTO-366): too large, not an image, or gone. */
+  readonly notice?: HTMLElement;
   readonly stage: HTMLElement;
   readonly paper: HTMLElement;
   readonly frame: HTMLIFrameElement;
@@ -385,7 +392,7 @@ function paintModes(elements: PreviewElements, state: PreviewState, all: boolean
  * difference between a preview and a different artwork: `width: 1080px` laid out in a 300px
  * box would reflow the text and show a layout nobody is going to export.
  */
-function paintFrame(elements: PreviewElements, frame: Frame, zoom: number): void {
+function paintFrame(elements: PreviewElements, frame: Picture, zoom: number): void {
   const { paper, frame: iframe } = elements;
 
   iframe.style.width = `${String(frame.width)}px`;
@@ -411,6 +418,10 @@ function paintFrame(elements: PreviewElements, frame: Frame, zoom: number): void
  * stage — which changes when the window does, with no state change to notice it.
  */
 export function paintPreview(elements: PreviewElements, state: PreviewState): number {
+  // The same pane shows an image when its tab's subject is one (TYTO-366): undo what that hid.
+  elements.tabs.hidden = false;
+  if (elements.info !== undefined) elements.info.hidden = true;
+  if (elements.notice !== undefined) elements.notice.hidden = true;
   paintTabs(elements.tabs, state);
   const thumbnails = thumbnailsOf(state);
   const all = showsAll(state, thumbnails);
@@ -460,6 +471,145 @@ export function paintPreview(elements: PreviewElements, state: PreviewState): nu
   const zoom = state.zoom === 'fit' ? fitZoom(frame, stageBox(elements.stage)) : state.zoom;
 
   paintFrame(elements, frame, zoom);
+  elements.zoomLevel.textContent = `${String(Math.round(zoom * 100))}%`;
+  return zoom;
+}
+
+/**
+ * An image from the explorer, as a preview tab shows it (TYTO-366, ADR 0124). `image` is absent
+ * while main is asked and when it answered why not, which `notice` then says.
+ */
+export interface ImagePreviewState {
+  readonly image?: {
+    readonly dataUrl: string;
+    /** The size it is drawn at: its pixels, or an SVG's viewBox when it gives no size. */
+    readonly width: number;
+    readonly height: number;
+  };
+  /** The bar's line, in the formats' place: name, pixel size and file size. */
+  readonly info: string;
+  /** Why nothing is drawn: too large, not an image, or gone. Absent while it is asked. */
+  readonly notice?: string;
+  readonly zoom: Zoom;
+}
+
+/** What main's answer must look like before it goes into a document: `data:image/…;base64,…`. */
+const IMAGE_DATA_URL = /^data:image\/[a-z+.-]+;base64,[A-Za-z0-9+/]*={0,2}$/u;
+
+/**
+ * The document an image is shown in: **one `<img>` and nothing else** (TYTO-366, ADR 0124). An
+ * SVG goes in as `data:image/svg+xml` inside an `<img>`, where Chromium draws it as a picture —
+ * no script runs and nothing is fetched — and never as markup, which would be a live document.
+ * It is the first of three layers; the frame's `sandbox=""` and the window's CSP are the others.
+ * A value that is not a base64 `data:image/` URI gives an empty document rather than markup.
+ *
+ * `color-scheme: light dark`, so the frame's canvas is transparent in both themes and a
+ * transparent image shows the paper's checkerboard: a document whose scheme differs from the
+ * window's gets an opaque white canvas, seen in the dark theme before this was written.
+ */
+export function imageDocument(dataUrl: string): string {
+  const source = IMAGE_DATA_URL.test(dataUrl) ? dataUrl : '';
+  return (
+    '<!doctype html><html><head><meta charset="utf-8"><style>' +
+    ':root{color-scheme:light dark}' +
+    'html,body{margin:0;width:100%;height:100%;overflow:hidden;background:transparent}' +
+    'img{display:block;width:100%;height:100%}' +
+    `</style></head><body><img alt="" src="${source}"></body></html>`
+  );
+}
+
+/**
+ * A file size as the bar says it: bytes under a kilobyte, whole kilobytes under a megabyte, and
+ * megabytes to one decimal, in the window's language — "84 KB", "1,5 MB" in Portuguese.
+ */
+export function formatBytes(bytes: number, locale: string): string {
+  const number = (value: number): string =>
+    new Intl.NumberFormat(locale, { maximumFractionDigits: 1 }).format(value);
+  if (bytes < 1024) return `${String(bytes)} B`;
+  if (bytes < 1024 * 1024) return `${String(Math.round(bytes / 1024))} KB`;
+  return `${number(bytes / (1024 * 1024))} MB`;
+}
+
+/**
+ * The bar's line for an image: "logo.png · 1200 × 630 px · 84 KB", and an SVG whose size is its
+ * viewBox marked with the word for scalable. With no size yet, the name and the file size.
+ */
+export function imageInfoLine(parts: {
+  readonly name: string;
+  readonly bytes: number | undefined;
+  readonly size: { readonly width: number; readonly height: number } | undefined;
+  readonly scalable: string | undefined;
+  readonly locale: string;
+}): string {
+  const pieces = [parts.name];
+  if (parts.size !== undefined) {
+    const pixels = `${String(parts.size.width)} × ${String(parts.size.height)} px`;
+    pieces.push(parts.scalable === undefined ? pixels : `${pixels} (${parts.scalable})`);
+  }
+  if (parts.bytes !== undefined) pieces.push(formatBytes(parts.bytes, parts.locale));
+  return pieces.join(' · ');
+}
+
+/**
+ * An SVG's size from its viewBox, when its root element gives no `width` and `height` of its own
+ * (TYTO-366): what the preview draws it at and the bar says, marked scalable. `undefined` when the
+ * root has a size, or no usable viewBox, and the decoded size stands.
+ */
+export function svgViewBoxSize(svg: string): { width: number; height: number } | undefined {
+  const root = /<svg\b[^>]*>/iu.exec(svg)?.[0];
+  if (root === undefined) return undefined;
+  const attribute = (name: string): string | undefined =>
+    new RegExp(`\\s${name}\\s*=\\s*["']([^"']*)["']`, 'iu').exec(root)?.[1];
+  if (attribute('width') !== undefined && attribute('height') !== undefined) return undefined;
+  const box = attribute('viewBox')
+    ?.trim()
+    .split(/[\s,]+/u)
+    .map(Number);
+  if (box?.length !== 4 || !box.every(Number.isFinite)) return undefined;
+  const [, , width = 0, height = 0] = box;
+  return width > 0 && height > 0
+    ? { width: Math.round(width), height: Math.round(height) }
+    : undefined;
+}
+
+/**
+ * Paints an image into a preview pane, and returns the zoom used (TYTO-366, ADR 0124). The brief's
+ * furniture hides — the formats, the two modes, the strip and its toggle — and the zoom, Fit and
+ * Lock stay. **One path to the screen**: the image's document goes through the same frame, the
+ * same `showDocument` and the same `fitZoom` as a brief's art, so Fit never enlarges past 1:1.
+ */
+export function paintImage(elements: PreviewElements, state: ImagePreviewState): number {
+  elements.tabs.hidden = true;
+  if (elements.info !== undefined) {
+    elements.info.hidden = false;
+    elements.info.textContent = state.info;
+  }
+  if (elements.modes !== undefined) elements.modes.hidden = true;
+  elements.stripToggle.hidden = true;
+  elements.strip.hidden = true;
+  elements.strip.items = [];
+  // The zoom, Fit and the level have nothing to act on while a line says why no image is drawn.
+  if (elements.zoom !== undefined) elements.zoom.hidden = state.image === undefined;
+  elements.stage.classList.remove('preview__stage--marker');
+  elements.stage.hidden = false;
+  elements.empty.hidden = true;
+  elements.broken.hidden = true;
+  elements.stale.hidden = true;
+  const notice = state.image === undefined ? state.notice : undefined;
+  if (elements.notice !== undefined) {
+    elements.notice.hidden = notice === undefined;
+    elements.notice.textContent = notice ?? '';
+  }
+
+  if (state.image === undefined) {
+    elements.paper.hidden = true;
+    elements.zoomLevel.textContent = '';
+    return 1;
+  }
+  const picture = { ...state.image, html: imageDocument(state.image.dataUrl) };
+  elements.paper.hidden = false;
+  const zoom = state.zoom === 'fit' ? fitZoom(picture, stageBox(elements.stage)) : state.zoom;
+  paintFrame(elements, picture, zoom);
   elements.zoomLevel.textContent = `${String(Math.round(zoom * 100))}%`;
   return zoom;
 }

@@ -13,6 +13,7 @@ import {
   focusedDocumentId,
   focusedGroup,
   followBrief,
+  followBriefAgain,
   followingPreview,
   groupList,
   groupsFromLayout,
@@ -24,6 +25,7 @@ import {
   openPreviewHere,
   openPreviewToSide,
   placeTab,
+  previewSubjectOf,
   previewTabs,
   replaceDocument,
   resizeSplit,
@@ -33,6 +35,7 @@ import {
   stepTabInGroup,
   toggleLock,
   setPreviewMode,
+  showInFollowingPreview,
   toggleStrip,
 } from './editor-groups.js';
 
@@ -596,5 +599,63 @@ describe('a preview’s mode, One slide or All slides (TYTO-323)', () => {
     const groups = groupsOf(['a'], 'a');
     const text = focusedGroup(groups).tabs[0]?.id ?? '';
     expect(focusedGroup(setPreviewMode(groups, text, 'all')).tabs[0]?.mode).toBeUndefined();
+  });
+});
+
+describe('a preview of an image from the explorer (TYTO-366, ADR 0124)', () => {
+  /** Each preview as `P(subject)` or `L(subject)`, an image written `img:id`. */
+  const previews = (groups: EditorGroups): string[] =>
+    previewTabs(groups).map((tab) => {
+      const subject = previewSubjectOf(tab);
+      const shown = subject.kind === 'brief' ? subject.documentId : `img:${subject.entryId}`;
+      return `${tab.locked === true ? 'L' : 'P'}(${shown})`;
+    });
+  const logo = { kind: 'image', entryId: 'e-logo' } as const;
+
+  it('points the following preview at the image, and it stays there while briefs follow', () => {
+    const opened = openPreviewToSide(twoDocuments(), 'b', false);
+    const shown = showInFollowingPreview(opened, logo);
+    expect(previews(shown)).toEqual(['P(img:e-logo)']);
+    // Nothing a brief has is taken: the focus and the brief in front stay where they were.
+    expect(shown.focusedGroupId).toBe(opened.focusedGroupId);
+    expect(focusedDocumentId(shown)).toBe('b');
+    expect(previews(followBrief(shown, 'a'))).toEqual(['P(img:e-logo)']);
+  });
+
+  it('goes back to the brief once one is brought forward', () => {
+    const shown = showInFollowingPreview(openPreviewToSide(twoDocuments(), 'b', false), logo);
+    const back = followBriefAgain(shown, 'a');
+    expect(previews(back)).toEqual(['P(a)']);
+    expect(followingPreview(back)?.subject).toBeUndefined();
+  });
+
+  it('opens a preview the way Open preview does when there is none', () => {
+    const shown = showInFollowingPreview(twoDocuments(), logo);
+    expect(previews(shown)).toEqual(['P(img:e-logo)']);
+    expect(activeTabOf(focusedGroup(shown))?.subject).toEqual(logo);
+  });
+
+  it('locks on the image, one locked preview per image, and a locked one keeps it', () => {
+    const shown = showInFollowingPreview(openPreviewToSide(twoDocuments(), 'b', false), logo);
+    const locked = toggleLock(shown, followingPreview(shown)?.id ?? '');
+    expect(previews(locked)).toEqual(['L(img:e-logo)']);
+    // Another image shown opens a following preview in the focused group, the first in tree
+    // order, and leaves the locked one alone.
+    const other = showInFollowingPreview(locked, { kind: 'image', entryId: 'e-foto' });
+    expect(previews(other)).toEqual(['P(img:e-foto)', 'L(img:e-logo)']);
+    // The same image shown and locked again closes the first lock.
+    const same = showInFollowingPreview(other, logo);
+    const twice = toggleLock(same, followingPreview(same)?.id ?? '');
+    expect(previews(twice)).toEqual(['L(img:e-logo)']);
+  });
+
+  it('leaves a brief as it opens today', () => {
+    const shown = showInFollowingPreview(openPreviewToSide(twoDocuments(), 'b', false), logo);
+    const opened = openDocument(shown, 'c');
+    expect(focusedDocumentId(opened)).toBe('c');
+    expect(previewSubjectOf({ id: 't', documentId: 'b', view: 'preview' })).toEqual({
+      kind: 'brief',
+      documentId: 'b',
+    });
   });
 });

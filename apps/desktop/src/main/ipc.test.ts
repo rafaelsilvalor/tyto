@@ -124,6 +124,20 @@ const explorerFiles = () => {
     },
     briefPath: (entryId: string) =>
       Promise.resolve(entryId === 'e-brief' ? '/work/promo/promo.brief' : undefined),
+    // TYTO-366: the picture, at one version; that version again is unchanged.
+    image: (entryId: string, have: string | undefined): ReturnType<ExplorerService['image']> => {
+      asked.push(entryId);
+      if (entryId !== 'e-image') return Promise.resolve({ ok: false, reason: 'gone' });
+      if (have === '1:4') return Promise.resolve({ unchanged: true });
+      return Promise.resolve({
+        ok: true,
+        name: 'foto.png',
+        mime: 'image/png',
+        bytes: 4,
+        version: '1:4',
+        dataUrl: 'data:image/png;base64,iVBORw==',
+      });
+    },
     // TYTO-352: one name already taken, one folder that renames and trashes, and a trash that
     // refuses everything else.
     create: (
@@ -1644,6 +1658,48 @@ describe('the explorer channels', () => {
       open({ documentId: 'document-7', entryId: 'e-brief', path: '/etc/passwd' }),
     ).rejects.toBeInstanceOf(IpcContractError);
     expect(explorer.asked).toEqual([]);
+  });
+});
+
+/** TYTO-366, ADR 0124: an image for the preview, by id, never by a path. */
+describe('the explorer image channel', () => {
+  it('answers the image by id, unchanged for the version the window has, and gone otherwise', async () => {
+    const explorer = explorerFiles();
+    const image = guard(
+      'explorer:image',
+      createHandlers({ ...dependencies(), explorer })['explorer:image'],
+    );
+
+    await expect(image({ entryId: 'e-image' })).resolves.toMatchObject({
+      ok: true,
+      mime: 'image/png',
+      version: '1:4',
+    });
+    await expect(image({ entryId: 'e-image', have: '1:4' })).resolves.toEqual({ unchanged: true });
+    await expect(image({ entryId: 'e-brief' })).resolves.toEqual({ ok: false, reason: 'gone' });
+  });
+
+  it('refuses a request that names a path, and an answer that is not an image data URI', async () => {
+    const explorer = explorerFiles();
+    const image = guard(
+      'explorer:image',
+      createHandlers({ ...dependencies(), explorer })['explorer:image'],
+    );
+    await expect(image({ entryId: 'e-image', path: 'C:/Users/x.png' })).rejects.toBeInstanceOf(
+      IpcContractError,
+    );
+    expect(explorer.asked).toEqual([]);
+
+    const leaky = guard('explorer:image', (() =>
+      Promise.resolve({
+        ok: true,
+        name: 'x.svg',
+        mime: 'image/svg+xml',
+        bytes: 1,
+        version: '1:1',
+        dataUrl: 'javascript:alert(1)',
+      })) as never);
+    await expect(leaky({ entryId: 'e-image' })).rejects.toThrow(/response does not match/u);
   });
 });
 

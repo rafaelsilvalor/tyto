@@ -1,7 +1,7 @@
 # Painéis
 
 ::: info Como esta página foi conferida
-Cada passo foi seguido em 2026-10-19 numa versão de desenvolvimento do Tyto 0.7.0 (commit `e3d32e9`) no Windows 11, uma vez com a janela em inglês e outra em português do Brasil. Os menus e rótulos abaixo são os da janela em português.
+Cada passo foi seguido em 2026-10-19 numa versão de desenvolvimento do Tyto 0.7.0 (commit `e3d32e9`) no Windows 11, uma vez com a janela em inglês e outra em português do Brasil. Os menus e rótulos abaixo são os da janela em português. A seção sobre uma imagem do Explorador foi seguida em 2026-10-23 numa versão de desenvolvimento, na janela em inglês, no tema claro e no escuro.
 :::
 
 Os painéis ficam em três **áreas** em volta dos grupos de editores: esquerda, direita e de baixo. Os do próprio Tyto são o **Explorador**, **Problemas**, **Projeto** e a **fila local**, e um plugin pode acrescentar os seus. A prévia não é um painel: é uma aba, e tem a sua própria parte mais abaixo.
@@ -65,3 +65,9 @@ Embaixo da arte de um carrossel fica a **faixa de slides**: todos os slides no f
 Cada aba de prévia lembra o seu modo, também depois de recarregar a janela ou de fechar e abrir o Tyto de novo. **Prévia: mostrar todos os slides** e **Prévia: mostrar um slide** trocam o modo pela barra de comandos. Um brief de um slide só não tem modos: ele aparece sempre grande.
 
 Enquanto o brief tem um erro, a prévia mantém o último desenho que funcionou, e o painel de Problemas diz o que corrigir.
+
+### Uma imagem do Explorador
+
+Clicar numa imagem no [Explorador](./workspace-folder.md#ver-os-arquivos-dela-o-explorador) a mostra na prévia que segue, ou abre uma do jeito que **Abrir a prévia** abre. A barra dela diz o nome do arquivo, o tamanho em pixels e o tamanho em disco — _logo.png · 1200 × 630 px · 84 KB_ — no lugar dos formatos; um SVG que não diz o próprio tamanho aparece no tamanho do `viewBox` e marcado _escalável_. O zoom, **Ajustar** e **Travar** funcionam como para um brief, e **Ajustar** nunca aumenta uma imagem além do tamanho dela.
+
+Trazer a aba de um brief para a frente faz a prévia que segue mostrar aquele brief de novo; uma prévia travada fica com a imagem. Uma imagem alterada no disco aparece de novo; uma apagada ou tirada da pasta devolve a prévia que segue ao brief, e uma travada diz _Este arquivo não está mais na pasta._ Uma imagem de mais de 32 MB não é carregada, e um arquivo cujo conteúdo não é a imagem que o nome diz não aparece; a prévia diz qual dos dois. Um SVG aparece como figura: os scripts dele não rodam e ele não carrega nada da internet. Uma prévia travada numa imagem não volta quando o Tyto abre de novo.

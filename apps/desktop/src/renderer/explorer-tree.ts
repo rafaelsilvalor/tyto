@@ -1,3 +1,4 @@
+import { isPreviewImage } from '../../shared/file-icons.js';
 import type { IpcResponse } from '../../shared/ipc.js';
 
 /**
@@ -285,7 +286,11 @@ export function moveFor(tree: ExplorerTree, key: string): ExplorerMove | undefin
     case 'Enter':
     case ' ':
       if (folder) return { do: 'expand', id: current.entry.id, open: !current.expanded };
-      return current.entry.kind === 'brief' ? { do: 'open', id: current.entry.id } : undefined;
+      // A brief opens and an image shows (TYTO-366); the panel decides which.
+      return current.entry.kind === 'brief' ||
+        (current.entry.kind === 'file' && isPreviewImage(current.entry.name))
+        ? { do: 'open', id: current.entry.id }
+        : undefined;
     default:
       return undefined;
   }

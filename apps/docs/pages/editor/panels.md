@@ -1,7 +1,7 @@
 # Panels
 
 ::: info How this page was checked
-Every step was followed on 2026-10-19 on a development build of Tyto 0.7.0 (commit `e3d32e9`) on Windows 11, once with the window in English and once in Brazilian Portuguese. Menus and labels below are the English window's.
+Every step was followed on 2026-10-19 on a development build of Tyto 0.7.0 (commit `e3d32e9`) on Windows 11, once with the window in English and once in Brazilian Portuguese. Menus and labels below are the English window's. The section on an image from the Explorer was followed on 2026-10-23 on a development build, in the English window, in the light and the dark theme.
 :::
 
 Panels sit in three **areas** around the editor groups: left, right and bottom. Tyto's own are the **Explorer**, **Problems**, **Project** and the **local queue**, and a plugin can add its own. The preview is not a panel: it is a tab, and has its own section below.
@@ -63,3 +63,9 @@ Under a carousel's artwork is the **slide strip**: every slide in the chosen for
 Each preview tab remembers its mode, also after the window is reloaded or Tyto is closed and opened again. **Preview: show all slides** and **Preview: show one slide** switch it from the command bar. A brief with one slide has no modes: it is always shown large.
 
 While the brief has an error the preview keeps the last drawing that worked, and the Problems panel says what to fix.
+
+### An image from the Explorer
+
+Clicking an image in the [Explorer](./workspace-folder.md#browse-its-files-the-explorer) shows it in the following preview, or opens one the way **Open preview** does. Its toolbar says the file's name, its size in pixels and its size on disk — _logo.png · 1200 × 630 px · 84 KB_ — in place of the formats; an SVG that gives no size of its own is shown at its `viewBox` and marked _scalable_. Zoom, **Fit** and **Lock** work as for a brief, and **Fit** never enlarges an image past its own size.
+
+Bringing a brief's tab to the front makes the following preview show that brief again; a locked preview keeps the image. An image changed on disk is shown again; one deleted or moved out of the folder gives a following preview back to the brief, and a locked one says _This file is no longer in the folder._ An image over 32 MB is not loaded, and a file whose contents are not the image its name says is not shown; the preview says which. An SVG is shown as a picture: its scripts do not run and it loads nothing from the internet. A locked image preview is not brought back when Tyto starts again.

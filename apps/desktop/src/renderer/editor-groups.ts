@@ -12,17 +12,31 @@
 import type { SessionGroupNode } from '../../shared/session-groups.js';
 
 /**
+ * What a preview shows when it is not a brief (TYTO-366, ADR 0124): an image the explorer listed,
+ * by the id main minted for it. **A union with one member today**, kept open on purpose: a text
+ * file (TYTO-247) and a plugin's viewer (TYTO-367) are further kinds of the same subject.
+ */
+export type PreviewFileSubject = { readonly kind: 'image'; readonly entryId: string };
+
+/** What a preview tab shows: its brief, or a file the explorer named (TYTO-366, ADR 0124). */
+export type PreviewSubject =
+  { readonly kind: 'brief'; readonly documentId: string } | PreviewFileSubject;
+
+/**
  * One tab in one group. A tab with `view: 'preview'` shows a brief's art instead of its text
  * (TYTO-287, ADR 0084): a **following** preview (`locked` absent) shows whichever brief was last
  * in front, and the window keeps its `documentId` pointed there ({@link followBrief}); a
  * **locked** one keeps the brief it was locked on. `documentId` is `''` for a following preview
- * with no brief to show.
+ * with no brief to show, and for a preview whose `subject` is a file (TYTO-366): the last thing
+ * chosen is what a following preview shows, a brief brought forward or an image clicked.
  */
 export interface EditorTab {
   readonly id: string;
   readonly documentId: string;
   readonly view?: 'preview';
   readonly locked?: boolean;
+  /** A preview showing a file instead of a brief (TYTO-366, ADR 0124); absent is its brief. */
+  readonly subject?: PreviewFileSubject;
   /** A preview that hid its strip of slide thumbnails (TYTO-323, ADR 0123); absent is shown. */
   readonly stripHidden?: boolean;
   /** A preview showing every slide at once (TYTO-323); absent is One slide. */
@@ -30,6 +44,18 @@ export interface EditorTab {
 }
 
 export const isPreview = (tab: EditorTab): boolean => tab.view === 'preview';
+
+/** What a preview tab shows, its brief when it names no file (TYTO-366). */
+export const previewSubjectOf = (tab: EditorTab): PreviewSubject =>
+  tab.subject ?? { kind: 'brief', documentId: tab.documentId };
+
+const sameSubject = (a: EditorTab, b: EditorTab): boolean => {
+  const first = previewSubjectOf(a);
+  const second = previewSubjectOf(b);
+  if (first.kind === 'brief')
+    return second.kind === 'brief' && first.documentId === second.documentId;
+  return second.kind === first.kind && second.entryId === first.entryId;
+};
 
 /** A tab that shows a document's text: what every lookup by document means (TYTO-287). */
 const isEditorTab = (tab: EditorTab): boolean => tab.view === undefined;
@@ -612,8 +638,45 @@ function mapTabs(groups: EditorGroups, change: (tab: EditorTab) => EditorTab): E
  */
 export function followBrief(groups: EditorGroups, documentId: string): EditorGroups {
   const following = followingPreview(groups);
-  if (following === undefined || following.documentId === documentId) return groups;
+  // A file the person chose stays until a brief is chosen again (TYTO-366): {@link followBriefAgain}.
+  if (following === undefined || following.subject !== undefined) return groups;
+  if (following.documentId === documentId) return groups;
   return mapTabs(groups, (tab) => (tab.id === following.id ? { ...tab, documentId } : tab));
+}
+
+/**
+ * The following preview lets go of the file it shows and follows `documentId` again (TYTO-366):
+ * a brief came to the front, or the image it showed is no longer in the folder.
+ */
+export function followBriefAgain(groups: EditorGroups, documentId: string): EditorGroups {
+  const following = followingPreview(groups);
+  if (following?.subject === undefined) return followBrief(groups, documentId);
+  return mapTabs(groups, (tab) => {
+    if (tab.id !== following.id) return tab;
+    const { subject: _subject, ...brief } = tab;
+    return { ...brief, documentId };
+  });
+}
+
+/**
+ * A file clicked in the explorer shows in the following preview (TYTO-366, ADR 0124), or in a new
+ * one made the way "Open preview" makes it when there is none. The focus stays where it was, so
+ * the explorer keeps it and its arrows go on choosing. A locked preview keeps what it shows.
+ */
+export function showInFollowingPreview(
+  groups: EditorGroups,
+  subject: PreviewFileSubject,
+): EditorGroups {
+  const opened = followingPreview(groups) === undefined ? openPreviewHere(groups, '') : groups;
+  const following = followingPreview(opened);
+  if (following === undefined) return groups;
+  const shown = mapTabs(opened, (tab) =>
+    tab.id === following.id ? { ...tab, documentId: '', subject } : tab,
+  );
+  const group = groupOfTab(shown, following.id);
+  return group === undefined
+    ? shown
+    : withGroup(shown, group.id, (found) => ({ ...found, activeTabId: following.id }));
 }
 
 /**
@@ -677,11 +740,12 @@ export function toggleLock(groups: EditorGroups, tabId: string): EditorGroups {
   const tab = previewTabs(groups).find((each) => each.id === tabId);
   if (tab === undefined) return groups;
   const locking = tab.locked !== true;
-  if (locking && tab.documentId === '') return groups;
+  if (locking && tab.documentId === '' && tab.subject === undefined) return groups;
+  // At most one locked preview per subject, a brief's or an image's (TYTO-366).
   const duplicate = previewTabs(groups).find(
     (each) =>
       each.id !== tabId &&
-      (locking ? each.locked === true && each.documentId === tab.documentId : each.locked !== true),
+      (locking ? each.locked === true && sameSubject(each, tab) : each.locked !== true),
   );
   const closed = duplicate === undefined ? groups : closeTab(groups, duplicate.id);
   return mapTabs(closed, (each) => {

@@ -35,7 +35,8 @@ Abrir uma pasta com **Arquivo ▸ Abrir pasta…** abre o **Explorador** na áre
 
 - **Clique num brief** para abri-lo numa aba, ou selecione-o e aperte **Enter**. Um brief que já está aberto é a aba dele.
 - **Clique numa pasta**, ou aperte **Direita** e **Esquerda**, para abri-la e fechá-la. **Cima**, **Baixo**, **Home** e **End** andam pela lista.
-- **Qualquer outro arquivo** — uma imagem, um PDF — aparece na lista e não faz nada ao clique. O Tyto não abre arquivos com outros programas a partir do Explorador.
+- **Clique numa imagem** — um `.png`, `.jpg`, `.jpeg`, `.webp`, `.gif` ou `.svg` — para vê-la na prévia, ou selecione-a e aperte **Enter**. O Explorador continua com o foco, então você pode seguir escolhendo; a aba da prévia leva o nome do arquivo, e [a prévia](./panels.md#uma-imagem-do-explorador) mostra o tamanho dela.
+- **Qualquer outro arquivo** — um PDF, uma fonte — aparece na lista e não faz nada ao clique. O Tyto não abre arquivos com outros programas a partir do Explorador.
 - Uma pasta com mais de 2.000 itens mostra os 2.000 primeiros e uma linha dizendo quantos faltam. A pasta `.git` não aparece.
 
 Cada item tem um ícone do seu tipo: um brief, uma imagem, uma fonte, um arquivo JSON, um arquivo de texto, uma pasta de template e o `template.html`, o `template.ts` e o `manifest.yaml` dela, o `.tyto/project.json` do próprio projeto, e o `settings.json`, o `keybindings.json` e o `snippets.json` do app. Uma pasta chamada `assets`, e as pastas que o seu `.tyto/project.json` aponta como `assets`, `templates` ou `output`, ganham ícones próprios. Um arquivo para o qual o Tyto não tem ícone aparece como uma página em branco. As abas usam os mesmos ícones.

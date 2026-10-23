@@ -13,8 +13,8 @@
     },
     {
       "paths": ["apps/desktop/shared/file-icons.ts"],
-      "e2e": ["explorer.desktop.test.ts"],
-      "why": "reviewed: which icon an explorer row and a tab draw (TYTO-282); only the explorer's suite asserts them"
+      "e2e": ["explorer-image.desktop.test.ts", "explorer.desktop.test.ts"],
+      "why": "reviewed: which icon an explorer row and a tab draw (TYTO-282), and which names a click shows in the preview (TYTO-366); only the explorer's suites assert them"
     },
     {
       "paths": ["apps/desktop/shared/layout.ts"],
@@ -150,17 +150,19 @@
     },
     {
       "paths": [
+        "apps/desktop/src/main/explorer-image.ts",
         "apps/desktop/src/main/explorer.ts",
         "apps/desktop/src/renderer/explorer-panel.ts",
         "apps/desktop/src/renderer/explorer-tree.ts"
       ],
       "e2e": [
+        "explorer-image.desktop.test.ts",
         "explorer-write.desktop.test.ts",
         "explorer.desktop.test.ts",
         "window.desktop.test.ts",
         "workspace.desktop.test.ts"
       ],
-      "why": "reviewed: the explorer's listing, watcher and panel (TYTO-279), set by every workspace folder opened, and its new, rename and delete (TYTO-352); its channels are in the bridge's list"
+      "why": "reviewed: the explorer's listing, watcher and panel (TYTO-279), set by every workspace folder opened, its new, rename and delete (TYTO-352), and the image a click shows in the preview (TYTO-366); its channels are in the bridge's list"
     },
     {
       "paths": ["apps/desktop/src/main/export.ts"],
@@ -1311,6 +1313,7 @@
         "directives.desktop.test.ts",
         "dock.desktop.test.ts",
         "documents.desktop.test.ts",
+        "explorer-image.desktop.test.ts",
         "font-areas.desktop.test.ts",
         "installed-packs.desktop.test.ts",
         "new-from-template.desktop.test.ts",

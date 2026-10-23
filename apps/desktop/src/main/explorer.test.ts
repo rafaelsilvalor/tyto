@@ -48,6 +48,7 @@ import {
   relativeUnder,
   watchRecursively,
 } from './explorer.js';
+import { IMAGE_MAX_BYTES, imageMimeOf, readExplorerImage } from './explorer-image.js';
 
 /**
  * The explorer's listing and watcher on a real disk (TYTO-279, ADR 0115): what the window is
@@ -229,6 +230,186 @@ describe('the brief a click opens', () => {
 
     await rm(join(work, 'slide 2.brief'));
     expect(await explorer.briefPath(idOf('slide 2.brief'))).toBeUndefined();
+  });
+});
+
+/** The first bytes of each format, padded so each is a file of some size. */
+const PNG = Uint8Array.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 0, 0, 0, 13]);
+const ascii = (text: string): Uint8Array => new TextEncoder().encode(text);
+const GIF = ascii('GIF89a\u0001\u0000\u0001\u0000');
+const JPEG = Uint8Array.from([0xff, 0xd8, 0xff, 0xe0, 0, 16]);
+const WEBP = ascii('RIFF\u0004\u0000\u0000\u0000WEBPVP8 ');
+const SVG =
+  '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 40 20"><rect width="40" height="20"/></svg>';
+
+/** TYTO-366, ADR 0124: an image for the preview, by id, as bytes main checked. */
+describe('the image a click shows', () => {
+  it('is an image main listed inside the folder, its MIME type chosen from its bytes', async () => {
+    await writeFile(join(work, 'logo.png'), PNG);
+    await writeFile(join(work, 'anim.gif'), GIF);
+    await writeFile(join(work, 'foto.JPG'), JPEG);
+    await writeFile(join(work, 'web.webp'), WEBP);
+    await writeFile(join(work, 'vetor.svg'), SVG);
+    const explorer = quiet();
+    await explorer.setRoot(work);
+
+    const mimes: Record<string, unknown> = {};
+    for (const name of ['logo.png', 'anim.gif', 'foto.JPG', 'web.webp', 'vetor.svg']) {
+      const answer = await explorer.image(await entryIdOf(explorer, name), undefined);
+      mimes[name] = 'mime' in answer ? answer.mime : answer;
+    }
+    expect(mimes).toEqual({
+      'logo.png': 'image/png',
+      'anim.gif': 'image/gif',
+      'foto.JPG': 'image/jpeg',
+      'web.webp': 'image/webp',
+      'vetor.svg': 'image/svg+xml',
+    });
+    const svg = await explorer.image(await entryIdOf(explorer, 'vetor.svg'), undefined);
+    expect(svg).toMatchObject({
+      dataUrl: `data:image/svg+xml;base64,${Buffer.from(SVG).toString('base64')}`,
+    });
+    // A brief, a folder and an id never minted are not images.
+    expect(await explorer.image(await entryIdOf(explorer, 'slide 2.brief'), undefined)).toEqual({
+      ok: false,
+      reason: 'unsupported',
+      name: 'slide 2.brief',
+    });
+    expect(await explorer.image(await entryIdOf(explorer, 'slides'), undefined)).toMatchObject({
+      reason: 'unsupported',
+    });
+    expect(await explorer.image('not-an-id', undefined)).toEqual({ ok: false, reason: 'gone' });
+  });
+
+  it('answers unsupported for bytes the extension does not promise', () => {
+    expect(imageMimeOf('logo.png', GIF)).toBeUndefined();
+    expect(imageMimeOf('logo.gif', PNG)).toBeUndefined();
+    expect(imageMimeOf('foto.jpeg', PNG)).toBeUndefined();
+    expect(imageMimeOf('web.webp', ascii('RIFF\u0000\u0000\u0000\u0000WAVE'))).toBeUndefined();
+    // An SVG must be text holding an <svg> element: binary bytes, or text without one, are not.
+    expect(imageMimeOf('vetor.svg', PNG)).toBeUndefined();
+    expect(imageMimeOf('vetor.svg', ascii('<html><body>svg</body></html>'))).toBeUndefined();
+    expect(imageMimeOf('vetor.svg', ascii(`<?xml version="1.0"?>\n${SVG}`))).toBe('image/svg+xml');
+    expect(imageMimeOf('notas.txt', PNG)).toBeUndefined();
+  });
+
+  it('shows an image of exactly 32 MiB and refuses one byte more with its size', async () => {
+    const at = new Uint8Array(IMAGE_MAX_BYTES);
+    at.set(PNG);
+    await writeFile(join(work, 'at.png'), at);
+    const over = new Uint8Array(IMAGE_MAX_BYTES + 1);
+    over.set(PNG);
+    await writeFile(join(work, 'over.png'), over);
+    const explorer = quiet();
+    await explorer.setRoot(work);
+
+    expect(IMAGE_MAX_BYTES).toBe(32 * 1024 * 1024);
+    const shown = await explorer.image(await entryIdOf(explorer, 'at.png'), undefined);
+    expect(shown).toMatchObject({ ok: true, bytes: IMAGE_MAX_BYTES });
+    const refused = await explorer.image(await entryIdOf(explorer, 'over.png'), undefined);
+    expect(refused).toMatchObject({
+      ok: false,
+      reason: 'too-large',
+      name: 'over.png',
+      bytes: IMAGE_MAX_BYTES + 1,
+    });
+  });
+
+  it('asks the size before reading, and reads nothing over the ceiling', async () => {
+    const reads: string[] = [];
+    const disk = (size: number) => ({
+      stat: () => Promise.resolve({ isFile: () => true, mtimeMs: 1, size }),
+      readFile: (path: string) => {
+        reads.push(path);
+        const bytes = new Uint8Array(size);
+        bytes.set(PNG);
+        return Promise.resolve(bytes);
+      },
+    });
+
+    const over = await readExplorerImage('/w/over.png', undefined, 64, disk(65));
+    expect(over).toMatchObject({ ok: false, reason: 'too-large', bytes: 65 });
+    expect(reads).toEqual([]);
+
+    const at = await readExplorerImage('/w/at.png', undefined, 64, disk(64));
+    expect(at).toMatchObject({ ok: true });
+    expect(reads).toEqual(['/w/at.png']);
+  });
+
+  it('answers unchanged for the version the window has, from a stat and no read', async () => {
+    await writeFile(join(work, 'logo.png'), PNG);
+    const explorer = quiet();
+    await explorer.setRoot(work);
+    const id = await entryIdOf(explorer, 'logo.png');
+    const first = await explorer.image(id, undefined);
+    const version = 'version' in first ? first.version : undefined;
+    expect(version).toMatch(/^\d+(\.\d+)?:12$/u);
+
+    await expect(explorer.image(id, version)).resolves.toEqual({ unchanged: true });
+    const reads: string[] = [];
+    const counting = {
+      stat,
+      readFile: (path: string) => {
+        reads.push(path);
+        return readFile(path);
+      },
+    };
+    const again = await readExplorerImage(
+      join(work, 'logo.png'),
+      version,
+      IMAGE_MAX_BYTES,
+      counting,
+    );
+    expect(again).toEqual({ unchanged: true });
+    expect(reads).toEqual([]);
+
+    await writeFile(join(work, 'logo.png'), new Uint8Array([...PNG, 0, 0]));
+    await expect(explorer.image(id, version)).resolves.toMatchObject({ ok: true, bytes: 14 });
+  });
+
+  it('keeps the id across a rename, answering the new name, and answers gone once deleted', async () => {
+    await writeFile(join(work, 'logo.png'), PNG);
+    const explorer = quiet();
+    await explorer.setRoot(work);
+    const id = await entryIdOf(explorer, 'logo.png');
+
+    await explorer.rename(id, 'marca.png');
+    const renamed = await explorer.image(id, undefined);
+    expect(renamed).toMatchObject({ ok: true, name: 'marca.png' });
+
+    await rm(join(work, 'marca.png'));
+    await expect(explorer.image(id, undefined)).resolves.toEqual({
+      ok: false,
+      reason: 'gone',
+      name: 'marca.png',
+    });
+
+    // Another folder opened: every id of the one before names nothing.
+    await writeFile(join(work, 'logo.png'), PNG);
+    const fresh = await entryIdOf(explorer, 'logo.png');
+    await explorer.setRoot(join(work, 'slides'));
+    await expect(explorer.image(fresh, undefined)).resolves.toEqual({ ok: false, reason: 'gone' });
+  });
+
+  it('answers gone for an image whose folder became a link out of the open one', async () => {
+    const outside = join(scratch, 'outside');
+    await mkdir(outside);
+    await writeFile(join(outside, 'capa.png'), PNG);
+    await writeFile(join(work, 'slides', 'capa.png'), PNG);
+    const explorer = quiet();
+    await explorer.setRoot(work);
+    const id = await entryIdOf(explorer, 'capa.png', await entryIdOf(explorer, 'slides'));
+    await expect(explorer.image(id, undefined)).resolves.toMatchObject({ ok: true });
+
+    await rm(join(work, 'slides'), { recursive: true });
+    // A junction on Windows needs no privilege, and is the link a person there would make.
+    await symlink(outside, join(work, 'slides'), 'junction');
+
+    await expect(explorer.image(id, undefined)).resolves.toEqual({
+      ok: false,
+      reason: 'gone',
+      name: 'capa.png',
+    });
   });
 });
 

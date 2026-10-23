@@ -26,6 +26,15 @@ export interface Catalogue {
   readonly 'preview.zoom.out': string;
   readonly 'preview.zoom.in': string;
   readonly 'preview.zoom.fit': string;
+  /**
+   * TYTO-366, ADR 0124: an image from the explorer in the preview. The bar's line says
+   * `scalable` after an SVG's size when the size is its viewBox; the stage says why an image is
+   * not shown, with `{size}` and `{limit}` written by the window.
+   */
+  readonly 'preview.image.scalable': string;
+  readonly 'preview.image.tooLarge': string;
+  readonly 'preview.image.unsupported': string;
+  readonly 'preview.image.gone': string;
   /** Shown in place of a frame while the brief produces none. */
   readonly 'preview.empty': string;
   /**
@@ -669,6 +678,10 @@ export const CATALOGUE_KEYS = [
   'preview.zoom.out',
   'preview.zoom.in',
   'preview.zoom.fit',
+  'preview.image.scalable',
+  'preview.image.tooLarge',
+  'preview.image.unsupported',
+  'preview.image.gone',
   'preview.empty',
   'preview.broken',
   'preview.stale',

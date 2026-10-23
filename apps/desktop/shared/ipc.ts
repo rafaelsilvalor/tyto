@@ -1,5 +1,10 @@
 import { slotSchema, templateManifestSchema } from '@tyto/core';
-import { THEME_KINDS, THEME_TOKEN_NAME, isThemeColor } from '@tyto/plugin-api';
+import {
+  ASSET_SOURCE_MAX_BYTES,
+  THEME_KINDS,
+  THEME_TOKEN_NAME,
+  isThemeColor,
+} from '@tyto/plugin-api';
 import { z } from 'zod';
 
 import { BRIEF_COLUMN_LOOK_IDS } from './brief-columns.js';
@@ -222,6 +227,18 @@ const explorerWriteFailure = z.object({
   /** With `failed` only: the system's error code (`EPERM`, `EROFS`), never a path. */
   detail: z.string().max(100).optional(),
 });
+
+/**
+ * An image's version as main reads it, `mtimeMs:size` (TYTO-366, ADR 0124): the window sends it
+ * back as `have`, and the same version is answered `unchanged` from a `stat`, without a read.
+ */
+const imageVersion = z.string().min(1).max(100);
+
+/** The most an image the preview shows may weigh: what a plugin's asset may (ADR 0117). */
+export const EXPLORER_IMAGE_MAX_BYTES = ASSET_SOURCE_MAX_BYTES;
+
+/** The longest `data:` URI an image at the ceiling becomes: base64 is four bytes per three. */
+const IMAGE_DATA_URL_MAX = Math.ceil(EXPLORER_IMAGE_MAX_BYTES / 3) * 4 + 64;
 
 /** A tab whose file a rename moved, as the window shows it now. */
 const movedDocument = z.object({
@@ -776,6 +793,38 @@ export const IPC_CHANNELS = {
   'explorer:open': channel(
     z.strictObject({ documentId, entryId: explorerEntryId }),
     z.object({ document: openDocument.nullable(), documentId: documentId.nullable() }),
+  ),
+
+  /**
+   * An image an explorer entry names, for the preview (TYTO-366, ADR 0124). **Strict, by id,
+   * never a path**, and only a `.png`, `.jpg`/`.jpeg`, `.webp`, `.gif` or `.svg` main listed
+   * inside the open folder. Main asks the size first and reads nothing over the ceiling
+   * (`too-large`); it checks the first bytes against the extension and chooses the MIME type
+   * (`unsupported` otherwise); and `have`, the version the window shows, answers `unchanged`
+   * from a `stat`. The image travels as a `data:` URI the window puts in an `<img>` inside the
+   * preview's sandboxed frame, so an SVG is a picture and never a document.
+   */
+  'explorer:image': channel(
+    z.strictObject({ entryId: explorerEntryId, have: imageVersion.optional() }),
+    z.union([
+      z.object({
+        ok: z.literal(true),
+        name: z.string().min(1),
+        mime: z.enum(['image/png', 'image/jpeg', 'image/webp', 'image/gif', 'image/svg+xml']),
+        bytes: z.number().int().nonnegative(),
+        version: imageVersion,
+        dataUrl: z.string().startsWith('data:image/').max(IMAGE_DATA_URL_MAX),
+      }),
+      z.object({ unchanged: z.literal(true) }),
+      z.object({
+        ok: z.literal(false),
+        reason: z.enum(['gone', 'too-large', 'unsupported', 'failed']),
+        name: z.string().min(1).optional(),
+        bytes: z.number().int().nonnegative().optional(),
+        /** With `too-large` and `unsupported`: the same file next time is `unchanged`. */
+        version: imageVersion.optional(),
+      }),
+    ]),
   ),
 
   /**

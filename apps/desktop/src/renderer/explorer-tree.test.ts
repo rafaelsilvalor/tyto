@@ -151,10 +151,11 @@ describe('the keys', () => {
     expect(moveFor(at('promo'), 'ArrowLeft')).toBeUndefined();
   });
 
-  it('opens a brief with Enter, toggles a folder, and does nothing for any other file', () => {
+  it('opens a brief or an image with Enter, toggles a folder, and does nothing for another key', () => {
     expect(moveFor(at('capa'), 'Enter')).toEqual({ do: 'open', id: 'capa' });
     expect(moveFor(at('slides'), ' ')).toEqual({ do: 'expand', id: 'slides', open: false });
-    expect(moveFor(at('fundo'), 'Enter')).toBeUndefined();
+    // TYTO-366: an image shows in the preview, so Enter on one opens it too.
+    expect(moveFor(at('fundo'), 'Enter')).toEqual({ do: 'open', id: 'fundo' });
     expect(moveFor(at('capa'), 'x')).toBeUndefined();
   });
 });

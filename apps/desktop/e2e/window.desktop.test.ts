@@ -274,6 +274,9 @@ describe('the bridge', () => {
       // TYTO-352, ADR 0121: new, rename and delete by id and name, and the tabs under an entry.
       'explorer:create',
       'explorer:delete',
+      // TYTO-366, ADR 0124: an image for the preview, by id. Exercised by
+      // `e2e/explorer-image.desktop.test.ts`.
+      'explorer:image',
       'explorer:list',
       'explorer:open',
       'explorer:rename',
@@ -421,6 +424,12 @@ describe('switching the language', () => {
     'preview.strip.hide',
     'preview.strip.show',
     'preview.strip.label',
+    // TYTO-366: an image preview's bar line and the stage's three reasons are written by
+    // `paintImage` with the size filled in; `preview.test.ts` paints all four.
+    'preview.image.scalable',
+    'preview.image.tooLarge',
+    'preview.image.unsupported',
+    'preview.image.gone',
     // E9.3: the problems panel and the template picker build their own rows, so their
     // strings reach the screen through `panel.ts` rather than through the `data-i18n` pass
     // this counts. They are a locale's strings all the same — `panel.test.ts` is what holds

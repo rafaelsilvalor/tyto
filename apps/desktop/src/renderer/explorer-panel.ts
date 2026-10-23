@@ -21,7 +21,7 @@ import {
   withListing,
   withSelected,
 } from './explorer-tree.js';
-import { fileIconFor } from '../../shared/file-icons.js';
+import { fileIconFor, isPreviewImage } from '../../shared/file-icons.js';
 import { type CatalogueKey, type Locale, translate } from '../../shared/i18n/index.js';
 import type { IpcRequest, IpcResponse } from '../../shared/ipc.js';
 import { icon } from './icons.js';
@@ -55,6 +55,8 @@ type MenuItems = IpcRequest<'menu:context'>['items'];
 export interface ExplorerSource {
   readonly list: (entryId: string | null) => Promise<ExplorerListing>;
   readonly open: (entryId: string) => void;
+  /** An image shown in the following preview, the focus left in the tree (TYTO-366). */
+  readonly show: (entryId: string) => void;
   /** File ▸ Open Folder, offered while no folder is open. */
   readonly openFolder: () => void;
   /** A new entry; a new brief opens in a tab on the window's side. */
@@ -80,6 +82,7 @@ const refused = { ok: false, reason: 'gone' } as const;
 const idle: ExplorerSource = {
   list: () => Promise.resolve({ entries: [], more: 0, gone: true }),
   open: () => undefined,
+  show: () => undefined,
   openFolder: () => undefined,
   create: () => Promise.resolve(refused),
   rename: () => Promise.resolve(refused),
@@ -251,7 +254,16 @@ export class ExplorerPanel extends DockedPanel {
       return;
     }
     this.tree = withSelected(this.tree, entry.id);
+    this.openEntry(entry);
+  }
+
+  /**
+   * A brief opens in a tab; an image shows in the preview, and the focus stays here so the
+   * arrows go on choosing (TYTO-366, ADR 0124). Any other file does nothing.
+   */
+  private openEntry(entry: ExplorerEntry): void {
     if (entry.kind === 'brief') this.source.open(entry.id);
+    else if (entry.kind === 'file' && isPreviewImage(entry.name)) this.source.show(entry.id);
   }
 
   private onKey(event: KeyboardEvent): void {
@@ -264,7 +276,10 @@ export class ExplorerPanel extends DockedPanel {
     else if (move.do === 'expand') this.toggle(move.id, move.open);
     else if (move.do === 'rename') this.tree = startRenaming(this.tree, move.id);
     else if (move.do === 'delete') void this.trashEntry(move.id);
-    else this.source.open(move.id);
+    else {
+      const entry = this.entryOf(move.id);
+      if (entry !== undefined) this.openEntry(entry);
+    }
   }
 
   private entryOf(id: string): ExplorerEntry | undefined {
