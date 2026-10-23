@@ -1,7 +1,7 @@
 # Pasta de trabalho
 
 ::: info Como esta página foi conferida
-Cada passo foi seguido em 2026-10-21 num build de desenvolvimento do Tyto no Windows 11, numa pasta com um `.tyto/project.json`, um template em `tpl/`, uma imagem em `art/` e dois briefs em `briefs/`, numa segunda pasta cujos `assets` levavam para fora dela, e no mesmo dia numa pasta que cita um perfil de trabalho guardado em `~/.tyto/profiles/` e numa que cita um arquivo de perfil dentro dela cujos `assets` levavam para fora da pasta do perfil. Os menus e rótulos abaixo são os da janela em português.
+Cada passo foi seguido em 2026-10-21 num build de desenvolvimento do Tyto no Windows 11, numa pasta com um `.tyto/project.json`, um template em `tpl/`, uma imagem em `art/` e dois briefs em `briefs/`, numa segunda pasta cujos `assets` levavam para fora dela, e no mesmo dia numa pasta que cita um perfil de trabalho guardado em `~/.tyto/profiles/` e numa que cita um arquivo de perfil dentro dela cujos `assets` levavam para fora da pasta do perfil. Os menus e rótulos abaixo são os da janela em português. Os botões do cabeçalho do Explorador foram conferidos em 2026-10-23 num build de desenvolvimento, no tema claro e no escuro.
 :::
 
 Uma pasta de trabalho é uma pasta de projeto com um `.tyto/project.json` dentro. O arquivo diz onde o projeto guarda seus templates, imagens e fontes, e para onde vão as exportações:
@@ -44,6 +44,8 @@ Cada item tem um ícone do seu tipo: um brief, uma imagem, uma fonte, um arquivo
 ### Criar, renomear e excluir
 
 Clique com o botão direito numa entrada para ter **Novo arquivo…**, **Nova pasta…**, **Renomear…** e **Excluir**; no espaço vazio abaixo da lista, só os dois itens de criar.
+
+Com uma pasta aberta, o cabeçalho do Explorador tem três botões ao lado do **×**: **Novo arquivo…** e **Nova pasta…** abrem o mesmo campo do menu, no mesmo lugar, e **Recolher tudo** fecha todas as pastas abertas, em qualquer nível. Não há botão de atualizar: o Explorador lista de novo sozinho quando a pasta muda.
 
 - **Novo arquivo…** e **Nova pasta…** abrem um campo na árvore: na pasta selecionada, na pasta do arquivo selecionado, ou no topo da pasta quando nada está selecionado (ou quando você clicou no espaço vazio). Digite o nome e aperte **Enter**. O nome fica exatamente como foi digitado, com ou sem extensão; um `.brief` novo abre numa aba, e qualquer outro arquivo só é criado.
 - **Renomear…**, ou **F2** na entrada selecionada, transforma o nome dela no mesmo campo. Um brief aberto numa aba continua na aba, que mostra o nome novo; o texto que você não tinha salvado continua não salvo, e o próximo salvamento grava no nome novo.

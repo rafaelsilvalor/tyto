@@ -29,6 +29,10 @@ import type { FileIconName } from '../../shared/file-icons.js';
  * same day: he asked for a shape that cannot be mistaken for a text file at 16 px, then for one
  * that is not the sparkle other apps use for AI, and chose the stamp. Which file gets which icon
  * is `shared/file-icons.ts`.
+ *
+ * `newFile`, `newFolder` and `collapseAll` are **on a sheet Rafael approved on 2026-10-23**
+ * (TYTO-365, candidates A, A and A): the page and the flapless folder of the file icons, each
+ * with a plus inside, and VS Code's box with a minus over a second box.
  */
 
 export type IconName =
@@ -52,6 +56,10 @@ export type IconName =
   | 'explorer'
   | 'chevronRight'
   | 'chevronDown'
+  // TYTO-365: New File, New Folder and Collapse All in the explorer's tool header.
+  | 'newFile'
+  | 'newFolder'
+  | 'collapseAll'
   // TYTO-282: a file or folder in the explorer and on a tab.
   | FileIconName;
 
@@ -105,6 +113,13 @@ const GEOMETRY: Readonly<Record<IconName, (lit: boolean) => SVGTemplateResult>> 
     svg`<rect x="2.5" y="2.75" width="5" height="3" rx="1" /><path d="M4.5 5.75v5.375a.75.75 0 0 0 .75.75H8.5M4.5 7.875h4" /><rect x="8.5" y="6.5" width="5" height="2.75" rx="1" /><rect x="8.5" y="10.5" width="5" height="2.75" rx="1" />`,
   chevronRight: () => svg`<path d="M6.5 4 10.5 8 6.5 12" />`,
   chevronDown: () => svg`<path d="M4 6.5 8 10.5 12 6.5" />`,
+  // The file icon's page with a plus where the text icon has its lines.
+  newFile: () => svg`${PAGE}<path d="M7.75 7.75v3.5M6 9.5h3.5" />`,
+  // The flapless folder with a plus where the output folder has its arrow.
+  newFolder: () => svg`${FOLDER}<path d="M8 7.25v3.5M6.25 9h3.5" />`,
+  // A box with a minus, a second box behind it showing its top and right edges.
+  collapseAll: () =>
+    svg`<rect x="2.75" y="5.25" width="8" height="8" rx="1.5" /><path d="M5.25 2.75H12a1.25 1.25 0 0 1 1.25 1.25v6.75" /><path d="M4.75 9.25h4" />`,
   // A rubber stamp on its base line: a brief prints the same artwork every time.
   brief: () =>
     svg`<circle cx="8" cy="4.25" r="1.75" /><path d="M7 6v2.25H4.25A1.25 1.25 0 0 0 3 9.5v1.5h10V9.5a1.25 1.25 0 0 0-1.25-1.25H9V6M3 13.25h10" />`,

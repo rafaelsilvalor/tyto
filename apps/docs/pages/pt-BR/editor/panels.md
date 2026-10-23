@@ -30,7 +30,7 @@ Um brief sem problemas diz isso, em vez de deixar o painel vazio. As frases dos 
 
 ## Explorador
 
-O Explorador lista os arquivos da [pasta de trabalho](workspace-folder.md#ver-os-arquivos-dela-o-explorador) aberta, na área esquerda, acima da fila. Abrir uma pasta abre o Explorador, e clicar num brief nele abre o brief numa aba. Clique com o botão direito numa entrada, ou aperte **F2** ou **Delete** nela, para [criar, renomear ou excluir](workspace-folder.md#criar-renomear-e-excluir) arquivos e pastas; excluir pergunta antes e vai para a Lixeira.
+O Explorador lista os arquivos da [pasta de trabalho](workspace-folder.md#ver-os-arquivos-dela-o-explorador) aberta, na área esquerda, acima da fila. Abrir uma pasta abre o Explorador, e clicar num brief nele abre o brief numa aba. Clique com o botão direito numa entrada, ou aperte **F2** ou **Delete** nela, para [criar, renomear ou excluir](workspace-folder.md#criar-renomear-e-excluir) arquivos e pastas; excluir pergunta antes e vai para a Lixeira. Os botões do cabeçalho dele, ao lado do **×**, são **Novo arquivo…**, **Nova pasta…** e **Recolher tudo**.
 
 ## A fila local
 

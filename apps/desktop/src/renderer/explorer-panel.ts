@@ -8,6 +8,7 @@ import {
   type ExplorerRow,
   type ExplorerTree,
   EMPTY_TREE,
+  collapseAll,
   foldersToRelist,
   moveFor,
   parentOf,
@@ -24,7 +25,7 @@ import {
 import { fileIconFor, isPreviewImage } from '../../shared/file-icons.js';
 import { type CatalogueKey, type Locale, translate } from '../../shared/i18n/index.js';
 import type { IpcRequest, IpcResponse } from '../../shared/ipc.js';
-import { icon } from './icons.js';
+import { type IconName, icon } from './icons.js';
 import { DockedPanel } from './panels.js';
 
 /**
@@ -40,7 +41,8 @@ import { DockedPanel } from './panels.js';
  * **New, rename and delete** (TYTO-352, ADR 0121) come from the system's context menu, from F2
  * and from Delete. A name is typed in a field in the tree: Enter or leaving the field confirms
  * it, Escape cancels it, and a name main refuses keeps the field open with a line under it.
- * A delete always asks first, in main's dialog, and goes to the system's trash.
+ * A delete always asks first, in main's dialog, and goes to the system's trash. The tool header
+ * has New File and New Folder too, beside Collapse All (TYTO-365).
  *
  * The tree is a value (`explorer-tree.ts`); this element draws it and turns clicks and keys into
  * the next value. It lives as long as the dock keeps it: closing the panel forgets which folders
@@ -425,8 +427,48 @@ export class ExplorerPanel extends DockedPanel {
     selected.focus();
   }
 
+  /**
+   * New File, New Folder and Collapse All in the tool header (TYTO-365), only while a folder is
+   * open: the first two start the context menu's field where `startCreating` puts it. No
+   * Refresh: the tree re-lists on main's watcher (ADR 0115).
+   */
+  private headerActions(): unknown {
+    if (this.folderName === null || this.folderName === undefined) return nothing;
+    const button = (
+      action: string,
+      key: CatalogueKey,
+      name: IconName,
+      run: () => void,
+    ): unknown => {
+      const label = this.say(key);
+      return html`<button
+        type="button"
+        class="tool__action"
+        data-action=${action}
+        title=${label}
+        aria-label=${label}
+        @click=${run}
+      >
+        ${icon(name)}
+      </button>`;
+    };
+    // A field still open takes the click as leaving it, which confirms its name, as the
+    // context menu waits for it to close.
+    const startNew = (kind: 'file' | 'folder'): void => {
+      if (this.tree.editing === undefined) this.startNew(kind);
+    };
+    return html`${button('explorer.newFile', EXPLORER_MENU.newFile, 'newFile', () => {
+      startNew('file');
+    })}${button('explorer.newFolder', EXPLORER_MENU.newFolder, 'newFolder', () => {
+      startNew('folder');
+    })}${button('explorer.collapseAll', 'explorer.collapseAll', 'collapseAll', () => {
+      this.notice = undefined;
+      this.tree = collapseAll(this.tree);
+    })}`;
+  }
+
   protected override render(): unknown {
-    return html`${this.bar('explorer-heading', 'explorer.heading')}
+    return html`${this.bar('explorer-heading', 'explorer.heading', this.headerActions())}
       <div
         class="explorer__body"
         data-font-area="explorer"

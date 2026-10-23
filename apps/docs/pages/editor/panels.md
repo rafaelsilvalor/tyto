@@ -28,7 +28,7 @@ A brief with no problems says so instead of leaving the panel empty. The codes y
 
 ## Explorer
 
-The Explorer lists the files of the open [workspace folder](workspace-folder.md#browse-its-files-the-explorer) in the left area, above the queue. Opening a folder opens it, and clicking a brief in it opens the brief in a tab. Right-click an entry, or press **F2** or **Delete** on it, to [make, rename or delete](workspace-folder.md#new-rename-and-delete) files and folders; a delete asks first and goes to the Recycle Bin.
+The Explorer lists the files of the open [workspace folder](workspace-folder.md#browse-its-files-the-explorer) in the left area, above the queue. Opening a folder opens it, and clicking a brief in it opens the brief in a tab. Right-click an entry, or press **F2** or **Delete** on it, to [make, rename or delete](workspace-folder.md#new-rename-and-delete) files and folders; a delete asks first and goes to the Recycle Bin. The buttons in its header, beside the **×**, are **New File…**, **New Folder…** and **Collapse All**.
 
 ## The local queue
 

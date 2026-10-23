@@ -629,6 +629,11 @@ export interface Catalogue {
   readonly 'explorer.menu.newFolder': string;
   readonly 'explorer.menu.rename': string;
   readonly 'explorer.menu.delete': string;
+  /**
+   * TYTO-365. The explorer's header button that folds every folder; New File and New Folder
+   * reuse the menu's two keys above.
+   */
+  readonly 'explorer.collapseAll': string;
   readonly 'explorer.bin.windows': string;
   readonly 'explorer.bin.other': string;
   readonly 'explorer.delete.file': string;
@@ -991,6 +996,7 @@ export const CATALOGUE_KEYS = [
   'explorer.menu.newFolder',
   'explorer.menu.rename',
   'explorer.menu.delete',
+  'explorer.collapseAll',
   'explorer.bin.windows',
   'explorer.bin.other',
   'explorer.delete.file',
