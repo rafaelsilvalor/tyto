@@ -920,6 +920,14 @@ describe('an image in the preview', () => {
     );
     expect(elements.empty.hidden).toBe(true);
     expect(elements.zoomLevel.textContent).toBe('');
+    // Nothing to zoom: the zoom, Fit and the level go while the line shows, and come back.
+    expect(elements.zoom?.hidden).toBe(true);
+    paintImage(elements, {
+      image: { dataUrl: 'data:image/png;base64,iVBORw==', width: 10, height: 10 },
+      info: 'foto.png',
+      zoom: 'fit',
+    });
+    expect(elements.zoom?.hidden).toBe(false);
     element.remove();
   });
 

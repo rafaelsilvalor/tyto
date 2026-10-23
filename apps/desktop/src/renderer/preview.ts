@@ -588,7 +588,8 @@ export function paintImage(elements: PreviewElements, state: ImagePreviewState):
   elements.stripToggle.hidden = true;
   elements.strip.hidden = true;
   elements.strip.items = [];
-  if (elements.zoom !== undefined) elements.zoom.hidden = false;
+  // The zoom, Fit and the level have nothing to act on while a line says why no image is drawn.
+  if (elements.zoom !== undefined) elements.zoom.hidden = state.image === undefined;
   elements.stage.classList.remove('preview__stage--marker');
   elements.stage.hidden = false;
   elements.empty.hidden = true;

@@ -222,6 +222,9 @@ describe('an image from the explorer in the preview (TYTO-366)', () => {
       .poll(async () => (await lines()).notice, { timeout: 10_000 })
       .toBe('This image is 40 MB, over the 32 MB the preview shows.');
     expect(await window.locator(previewPart('paper')).isHidden()).toBe(true);
+    // Nothing to zoom: the zoom, Fit and the level are hidden; Lock stays.
+    expect(await window.locator(previewPart('zoom-group')).isHidden()).toBe(true);
+    expect(await window.locator(previewPart('lock')).isVisible()).toBe(true);
     await shoot('image-too-large');
   }, 60_000);
 
