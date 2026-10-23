@@ -5,6 +5,7 @@ import { type ExplorerListing } from './explorer-tree.js';
 import {
   type ExplorerPanel,
   type ExplorerSource,
+  EXPLORER_MENU,
   EXPLORER_PANEL_TAG,
   deleteQuestion,
 } from './explorer-panel.js';
@@ -39,6 +40,7 @@ function source(disk: Disk) {
     confirmed: true,
     chosen: null as string | null,
     menus: [] as string[][],
+    points: [] as [number, number][],
     trash: 'ok' as 'ok' | 'trash-failed',
   };
   const value: ExplorerSource = {
@@ -81,8 +83,9 @@ function source(disk: Disk) {
       }
       return Promise.resolve({ ok: true, released: [] });
     },
-    menu: (_x, _y, items) => {
+    menu: (x, y, items) => {
       control.menus.push(items.map((item) => item.label));
+      control.points.push([x, y]);
       return Promise.resolve(control.chosen);
     },
     list: (entryId) => {
@@ -463,6 +466,119 @@ describe('new, rename and delete', () => {
     ]);
     expect(rows(element)[0]).toBe('slides');
     expect(field(element)).not.toBeNull();
+  });
+});
+
+describe('the context menu from the keyboard (TYTO-364)', () => {
+  const field = (element: ExplorerPanel): HTMLInputElement | null =>
+    element.querySelector<HTMLInputElement>('.explorer__field');
+  const press = async (
+    element: ExplorerPanel,
+    key: string,
+    init: KeyboardEventInit = {},
+  ): Promise<void> => {
+    const tree = element.querySelector<HTMLElement>('.explorer__tree')!;
+    const target = element.querySelector<HTMLElement>('.explorer__row[tabindex="0"]') ?? tree;
+    target.dispatchEvent(new KeyboardEvent('keydown', { key, bubbles: true, ...init }));
+    await settle(element);
+  };
+  /** jsdom lays nothing out: each row is given a box, 22 px tall, one under the other. */
+  const layOut = (element: ExplorerPanel): void => {
+    element.querySelectorAll<HTMLElement>('.explorer__row').forEach((each, index) => {
+      each.getBoundingClientRect = () =>
+        ({ left: 12, top: 100 + index * 22, bottom: 122 + index * 22 }) as DOMRect;
+    });
+  };
+  const ROW_ITEMS = ['New File…', 'New Folder…', 'Rename…', 'Delete'];
+
+  it('opens a row’s menu with Shift+F10, under the selected row’s left edge', async () => {
+    const { element, control } = await mount(disk());
+    row(element, 'logo.png').click();
+    await settle(element);
+    layOut(element);
+    await press(element, 'F10', { shiftKey: true });
+
+    expect(control.menus).toEqual([ROW_ITEMS]);
+    expect(control.points).toEqual([[12, 166]]);
+    // F10 alone is the window's menu bar key, not this one.
+    await press(element, 'F10');
+    expect(control.menus).toHaveLength(1);
+  });
+
+  it('opens the same menu with the ContextMenu key', async () => {
+    const { element, control } = await mount(disk());
+    row(element, 'promo.brief').click();
+    await settle(element);
+    layOut(element);
+    await press(element, 'ContextMenu');
+
+    expect(control.menus).toEqual([ROW_ITEMS]);
+    expect(control.points).toEqual([[12, 144]]);
+  });
+
+  it('offers only the two New items while no row is selected, the empty space’s menu', async () => {
+    const { element, control } = await mount(disk());
+    layOut(element);
+    await press(element, 'ContextMenu');
+    await press(element, 'F10', { shiftKey: true });
+
+    expect(control.menus).toEqual([
+      ['New File…', 'New Folder…'],
+      ['New File…', 'New Folder…'],
+    ]);
+    // Under the focused row, the first, which takes the focus while none is selected.
+    expect(control.points).toEqual([
+      [12, 122],
+      [12, 122],
+    ]);
+  });
+
+  it('starts the inline field when New File is chosen, as the mouse’s menu does', async () => {
+    const { element, control, wrote } = await mount(disk());
+    row(element, 'logo.png').click();
+    await settle(element);
+    control.chosen = 'explorer.menu.newFile';
+    await press(element, 'F10', { shiftKey: true });
+
+    expect(field(element)).not.toBeNull();
+    expect(document.activeElement).toBe(field(element));
+    field(element)!.value = 'novo.brief';
+    field(element)!.dispatchEvent(new InputEvent('input', { bubbles: true }));
+    await settle(element);
+    field(element)!.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true }));
+    await settle(element);
+    expect(wrote).toEqual([['create', null, 'novo.brief', 'file']]);
+  });
+
+  it('asks for no second menu while one is open, nor from a key typed in the field', async () => {
+    const { element, control } = await mount(disk());
+    row(element, 'logo.png').click();
+    await settle(element);
+    let close: (chosen: string | null) => void = () => undefined;
+    const asked: string[][] = [];
+    element.source = {
+      ...element.source,
+      menu: (_x, _y, items) => {
+        asked.push(items.map((item) => item.label));
+        return new Promise((settleMenu) => {
+          close = settleMenu;
+        });
+      },
+    };
+    await press(element, 'ContextMenu');
+    // What Chromium may send after the key: a contextmenu event on the focused row.
+    row(element, 'logo.png').dispatchEvent(new MouseEvent('contextmenu', { bubbles: true }));
+    await settle(element);
+    expect(asked).toHaveLength(1);
+    close(EXPLORER_MENU.rename);
+    await settle(element);
+
+    field(element)!.dispatchEvent(
+      new KeyboardEvent('keydown', { key: 'F10', shiftKey: true, bubbles: true }),
+    );
+    await settle(element);
+    expect(asked).toHaveLength(1);
+    expect(control.menus).toEqual([]);
   });
 });
 

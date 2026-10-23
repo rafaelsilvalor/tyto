@@ -255,19 +255,31 @@ export type ExplorerMove =
   | { readonly do: 'expand'; readonly id: string; readonly open: boolean }
   | { readonly do: 'open'; readonly id: string }
   | { readonly do: 'rename'; readonly id: string }
-  | { readonly do: 'delete'; readonly id: string };
+  | { readonly do: 'delete'; readonly id: string }
+  /** The context menu, for the selected row, or `null` for the panel's empty space. */
+  | { readonly do: 'menu'; readonly id: string | null };
+
+/**
+ * Shift+F10 and the ContextMenu key, the system's two keys for a context menu (TYTO-364). F10
+ * alone is not one: it is the window's menu bar key on Windows.
+ */
+export function isMenuKey(key: string, shift: boolean): boolean {
+  return key === 'ContextMenu' || (key === 'F10' && shift);
+}
 
 /**
  * The tree's keys, VS Code's: Up and Down move, Home and End jump, Right opens a folder and then
  * goes into it, Left closes it and then goes to its parent, Enter and Space open what is
- * selected; F2 renames it and Delete asks to move it to the trash (TYTO-352). `undefined` when
- * the key means nothing here.
+ * selected; F2 renames it and Delete asks to move it to the trash (TYTO-352); Shift+F10 and the
+ * ContextMenu key open the context menu, a row's while one is selected and the empty space's
+ * while none is (TYTO-364). `undefined` when the key means nothing here.
  */
-export function moveFor(tree: ExplorerTree, key: string): ExplorerMove | undefined {
+export function moveFor(tree: ExplorerTree, key: string, shift = false): ExplorerMove | undefined {
   const entries = rowsOf(tree).flatMap((row) => (row.type === 'entry' ? [row] : []));
   if (entries.length === 0) return undefined;
   const at = entries.findIndex((row) => row.entry.id === tree.selected);
   const current = at === -1 ? undefined : entries[at];
+  if (isMenuKey(key, shift)) return { do: 'menu', id: current?.entry.id ?? null };
   const select = (index: number): ExplorerMove | undefined => {
     const row = entries[Math.max(0, Math.min(entries.length - 1, index))];
     return row === undefined ? undefined : { do: 'select', id: row.entry.id };

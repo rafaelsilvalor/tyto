@@ -43,7 +43,7 @@ Cada item tem um ícone do seu tipo: um brief, uma imagem, uma fonte, um arquivo
 
 ### Criar, renomear e excluir
 
-Clique com o botão direito numa entrada para ter **Novo arquivo…**, **Nova pasta…**, **Renomear…** e **Excluir**; no espaço vazio abaixo da lista, só os dois itens de criar.
+Clique com o botão direito numa entrada para ter **Novo arquivo…**, **Nova pasta…**, **Renomear…** e **Excluir**; no espaço vazio abaixo da lista, só os dois itens de criar. Pelo teclado, **Shift+F10** ou a tecla **Menu** abre o mesmo menu embaixo da entrada selecionada; sem entrada selecionada, ele oferece só os dois itens de criar.
 
 Com uma pasta aberta, o cabeçalho do Explorador tem três botões ao lado do **×**: **Novo arquivo…** e **Nova pasta…** abrem o mesmo campo do menu, no mesmo lugar, e **Recolher tudo** fecha todas as pastas abertas, em qualquer nível. Não há botão de atualizar: o Explorador lista de novo sozinho quando a pasta muda.
 
