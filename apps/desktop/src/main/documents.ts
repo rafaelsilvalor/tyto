@@ -117,6 +117,8 @@ export interface DocumentService {
    * file, as a save-as onto it would make it (TYTO-104), and the answer is those tabs' ids.
    */
   releaseUnder(path: string): string[];
+  /** The tabs that hold a file at or under `path`, changing nothing (TYTO-352). */
+  heldUnder(path: string): string[];
   save(documentId: string, text: string, saveAs: boolean): Promise<SavedDocument>;
   /** Forgets a tab's path. A tab main never heard of is not an error. */
   close(documentId: string): void;
@@ -302,6 +304,12 @@ export function createDocumentService(options: DocumentServiceOptions): Document
         const path = paths.get(documentId) ?? to;
         return { documentId, name: nameFor(path), pathLabel: pathLabelOf(path, home()) };
       });
+    },
+
+    heldUnder(path) {
+      return [...paths].flatMap(([id, held]) =>
+        relativeUnder(path, held) === undefined ? [] : [id],
+      );
     },
 
     releaseUnder(path) {

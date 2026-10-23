@@ -40,6 +40,17 @@ Abrir uma pasta com **Arquivo ▸ Abrir pasta…** abre o **Explorador** na áre
 
 Cada item tem um ícone do seu tipo: um brief, uma imagem, uma fonte, um arquivo JSON, um arquivo de texto, uma pasta de template e o `template.html`, o `template.ts` e o `manifest.yaml` dela, o `.tyto/project.json` do próprio projeto, e o `settings.json`, o `keybindings.json` e o `snippets.json` do app. Uma pasta chamada `assets`, e as pastas que o seu `.tyto/project.json` aponta como `assets`, `templates` ou `output`, ganham ícones próprios. Um arquivo para o qual o Tyto não tem ícone aparece como uma página em branco. As abas usam os mesmos ícones.
 
+### Criar, renomear e excluir
+
+Clique com o botão direito numa entrada para ter **Novo arquivo…**, **Nova pasta…**, **Renomear…** e **Excluir**; no espaço vazio abaixo da lista, só os dois itens de criar.
+
+- **Novo arquivo…** e **Nova pasta…** abrem um campo na árvore: na pasta selecionada, na pasta do arquivo selecionado, ou no topo da pasta quando nada está selecionado (ou quando você clicou no espaço vazio). Digite o nome e aperte **Enter**. O nome fica exatamente como foi digitado, com ou sem extensão; um `.brief` novo abre numa aba, e qualquer outro arquivo só é criado.
+- **Renomear…**, ou **F2** na entrada selecionada, transforma o nome dela no mesmo campo. Um brief aberto numa aba continua na aba, que mostra o nome novo; o texto que você não tinha salvado continua não salvo, e o próximo salvamento grava no nome novo.
+- No campo, **Enter** ou clicar fora confirma e **Esc** cancela. Um nome que já existe, ou que nenhum arquivo pode ter, deixa o campo aberto com o seu texto e uma linha embaixo dizendo por quê.
+- **Excluir**, ou a tecla **Delete** na entrada selecionada, sempre pergunta antes, e move o arquivo ou a pasta para a Lixeira do sistema, de onde dá para restaurar. O Tyto nunca apaga nada de vez. Se uma aba tem alterações não salvas de um arquivo ali, a pergunta avisa, e o texto continua na aba, que passa a não ter arquivo. Se a Lixeira recusar a entrada — alguns drives de rede não têm uma — nada é apagado e o Explorador avisa embaixo da entrada.
+
+Isso funciona em qualquer pasta, confiável ou não: nada disso executa coisa alguma dela.
+
 O botão do **Explorador** na barra de status, ao lado do da fila, mostra e esconde o painel, assim como **Mostrar ou esconder: Explorador** na barra de comandos. Quando o Tyto abre de novo com a pasta ainda aberta, o Explorador fica como você deixou: fechado, se você o fechou. Sem pasta aberta, ele diz _Nenhuma pasta aberta_ e oferece **Abrir pasta…**. Ele lista uma pasta em que você não confiou como qualquer outra: listar uma pasta não executa nada dela.
 
 ## Uma pasta em que você ainda não confiou

@@ -154,8 +154,13 @@
         "apps/desktop/src/renderer/explorer-panel.ts",
         "apps/desktop/src/renderer/explorer-tree.ts"
       ],
-      "e2e": ["explorer.desktop.test.ts", "window.desktop.test.ts", "workspace.desktop.test.ts"],
-      "why": "reviewed: the explorer's listing, watcher and panel (TYTO-279), set by every workspace folder opened; its channels are in the bridge's list"
+      "e2e": [
+        "explorer-write.desktop.test.ts",
+        "explorer.desktop.test.ts",
+        "window.desktop.test.ts",
+        "workspace.desktop.test.ts"
+      ],
+      "why": "reviewed: the explorer's listing, watcher and panel (TYTO-279), set by every workspace folder opened, and its new, rename and delete (TYTO-352); its channels are in the bridge's list"
     },
     {
       "paths": ["apps/desktop/src/main/export.ts"],

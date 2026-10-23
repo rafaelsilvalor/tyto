@@ -156,6 +156,8 @@ import {
   releaseDocument,
   selectDocument,
   updateDocument,
+  withMovedDocuments,
+  withReleasedDocuments,
   workspaceOf,
 } from './documents.js';
 import {
@@ -2690,14 +2692,20 @@ function showExplorerFolder(answer: IpcResponse<'workspace:folder'> | undefined)
 /** The explorers `wireExplorerPanel` has wired, by element, for `wiredQueuePanels`'s reason. */
 const wiredExplorerPanels = new WeakSet<ExplorerPanel>();
 
+/** What the explorer is answered with no bridge: nothing is written. */
+const EXPLORER_NO_BRIDGE = { ok: false, reason: 'gone' } as const;
+
 /**
  * The explorer (TYTO-279): what it asks main, and its first tree. A brief opens through `adopt`,
- * like a picked file, so one already in a tab is that tab.
+ * like a picked file, so one already in a tab is that tab. A new brief opens the same way, a
+ * rename renames the tabs it moved and keeps their text unsaved, and a delete leaves each tab
+ * that held a file there in no file (TYTO-352, ADR 0121).
  */
 function wireExplorerPanel(): void {
   const explorer = elements.explorerPanel;
   if (explorer === null || wiredExplorerPanels.has(explorer)) return;
   wiredExplorerPanels.add(explorer);
+  explorer.platform = state.platform;
   explorer.source = {
     list: (entryId) =>
       window.tyto?.['explorer:list']({ entryId }) ??
@@ -2711,6 +2719,53 @@ function wireExplorerPanel(): void {
     },
     openFolder: () => {
       runCommand('workspace.openFolder');
+    },
+    create: async (parentId, name, kind) => {
+      const bridge = window.tyto;
+      if (bridge === undefined) return EXPLORER_NO_BRIDGE;
+      const wanted = nextDocumentId();
+      const made = await bridge['explorer:create']({ documentId: wanted, parentId, name, kind });
+      if (made.ok && made.document !== null) adopt(made.document, made.documentId, wanted);
+      return made;
+    },
+    rename: async (entryId, name) => {
+      const bridge = window.tyto;
+      if (bridge === undefined) return EXPLORER_NO_BRIDGE;
+      const renamed = await bridge['explorer:rename']({ entryId, name });
+      if (renamed.ok && renamed.moved.length > 0) {
+        workspace = withMovedDocuments(workspace, renamed.moved);
+        repaint();
+      }
+      return renamed;
+    },
+    unsavedUnder: async (entryId) => {
+      const bridge = window.tyto;
+      if (bridge === undefined) return 0;
+      const { documentIds } = await bridge['explorer:tabs-under']({ entryId });
+      return documentIds.filter((id) => {
+        const held = documentOf(workspace, id);
+        return held !== undefined && isUnsaved(held);
+      }).length;
+    },
+    confirm: async (question) => {
+      const bridge = window.tyto;
+      if (bridge === undefined) return false;
+      return (await bridge['dialog:confirm'](question)).confirmed;
+    },
+    remove: async (entryId) => {
+      const bridge = window.tyto;
+      if (bridge === undefined) return EXPLORER_NO_BRIDGE;
+      const deleted = await bridge['explorer:delete']({ entryId });
+      if (deleted.ok && deleted.released.length > 0) {
+        workspace = withReleasedDocuments(workspace, deleted.released);
+        repaint();
+      }
+      return deleted;
+    },
+    menu: async (x, y, items) => {
+      const bridge = window.tyto;
+      if (bridge === undefined) return null;
+      return (await bridge['menu:context']({ x, y, items })).chosen;
     },
   };
   // A new element lists from the top, whatever folder the last one had.
@@ -3802,6 +3857,10 @@ function applyLocale(next: Locale): void {
   }
   if (elements.pluginsDialog) elements.pluginsDialog.locale = next;
   if (elements.trustDialog) elements.trustDialog.locale = next;
+  // The docked panels were handed the locale only when the dock was arranged, so a panel open
+  // across a switch kept the old language — the explorer's menu and delete question among
+  // them (TYTO-352).
+  if (elements.explorerPanel) elements.explorerPanel.locale = next;
   if (workspaceShown !== undefined && elements.workspaceBanner !== null) {
     paintWorkspaceBanner(elements.workspaceBanner, workspaceShown, next);
   }
@@ -4484,6 +4543,8 @@ async function load(): Promise<void> {
     const info = await bridge['app:info']({});
     state.version = info.version;
     state.platform = info.platform;
+    // What the explorer calls the trash: the Recycle Bin, or the Trash (TYTO-352).
+    if (elements.explorerPanel) elements.explorerPanel.platform = info.platform;
     // Which frame the window has: macOS keeps the system's, so `shell.css` hides the drawn
     // title bar there (TYTO-244, ADR 0078).
     document.documentElement.dataset['platform'] = info.platform;

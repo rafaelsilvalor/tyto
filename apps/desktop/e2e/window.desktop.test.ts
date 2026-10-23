@@ -270,15 +270,14 @@ describe('the bridge', () => {
       'credentials:set',
       'dialog:confirm',
       'dialog:save-changes',
-      // TYTO-279, ADR 0115: the explorer, by ids main minted. The panel that asks them is the
-      // card's second pull request.
-      // TYTO-352, ADR 0121: new, rename and delete by id and name. The window uses them in the
-      // card's second pull request.
+      // TYTO-279, ADR 0115: the explorer, by ids main minted.
+      // TYTO-352, ADR 0121: new, rename and delete by id and name, and the tabs under an entry.
       'explorer:create',
       'explorer:delete',
       'explorer:list',
       'explorer:open',
       'explorer:rename',
+      'explorer:tabs-under',
       'export:cancel',
       'export:choose-directory',
       // TYTO-48, ADR 0044: which kinds an export can produce, installed exporters' included.

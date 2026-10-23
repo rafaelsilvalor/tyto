@@ -40,6 +40,17 @@ Opening a folder with **File ▸ Open Folder…** opens the **Explorer** in the 
 
 Each entry has an icon for its type: a brief, an image, a font, a JSON file, a text file, a template folder and the `template.html`, `template.ts` and `manifest.yaml` in it, the project's own `.tyto/project.json`, and the app's `settings.json`, `keybindings.json` and `snippets.json`. A folder named `assets`, and the folders your `.tyto/project.json` names as `assets`, `templates` or `output`, get icons of their own. A file Tyto has no icon for gets a plain page. The tabs use the same icons.
 
+### New, rename and delete
+
+Right-click an entry for **New File…**, **New Folder…**, **Rename…** and **Delete**; right-click the empty space below the list for the two **New** items.
+
+- **New File…** and **New Folder…** open a field in the tree: in the folder selected, in the folder of the file selected, or at the top of the folder when nothing is selected (or when you right-clicked the empty space). Type the name and press **Enter**. The name is used exactly as typed, extension or not; a new `.brief` opens in a tab, and any other file is only made.
+- **Rename…**, or **F2** on the selected entry, turns its name into the same field. A brief open in a tab keeps its tab, which shows the new name; text you had not saved stays unsaved, and the next save writes to the new name.
+- In the field, **Enter** or clicking elsewhere confirms and **Escape** cancels. A name that is taken, or that no file can have, keeps the field open with your text and a line under it saying why.
+- **Delete**, or the **Delete** key on the selected entry, always asks first, and moves the file or the folder to the system's Recycle Bin (the Trash on macOS and Linux), where you can restore it. Tyto never deletes anything for good. If a tab has unsaved changes to a file in it, the question says so, and the text stays in the tab, which now belongs to no file. If the Recycle Bin refuses the entry — some network drives have none — nothing is deleted and the Explorer says so under the entry.
+
+These work in every folder, trusted or not: none of them runs anything in it.
+
 The **Explorer** button in the status bar, beside the queue's, shows and hides it, as does **Show or hide: Explorer** in the command bar. When Tyto starts again with the folder still open, the Explorer is as you left it: closed if you closed it. With no folder open it says _No folder open_ and offers **Open Folder…**. It lists an untrusted folder like any other: listing a folder runs nothing in it.
 
 ## A folder you have not trusted

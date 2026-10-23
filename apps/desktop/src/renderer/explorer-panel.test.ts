@@ -2,7 +2,12 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import { type ExplorerListing } from './explorer-tree.js';
-import { type ExplorerPanel, type ExplorerSource, EXPLORER_PANEL_TAG } from './explorer-panel.js';
+import {
+  type ExplorerPanel,
+  type ExplorerSource,
+  EXPLORER_PANEL_TAG,
+  deleteQuestion,
+} from './explorer-panel.js';
 
 /**
  * The explorer panel (TYTO-279, ADR 0115) as jsdom can see it: what it asks main and when, what
@@ -22,12 +27,63 @@ const entries = (
 
 const GONE: ExplorerListing = { entries: [], more: 0, gone: true };
 
-/** A source that answers from `disk`, and records what was asked and opened. */
+/** A source that answers from `disk`, and records what was asked, opened and written. */
 function source(disk: Disk) {
   const asked: (string | null)[] = [];
   const opened: string[] = [];
   const folders: number[] = [];
+  const wrote: unknown[][] = [];
+  const questions: string[] = [];
+  const control = {
+    confirmed: true,
+    chosen: null as string | null,
+    menus: [] as string[][],
+    trash: 'ok' as 'ok' | 'trash-failed',
+  };
   const value: ExplorerSource = {
+    create: (parentId, name, kind) => {
+      wrote.push(['create', parentId, name, kind]);
+      if (name === 'promo.brief') return Promise.resolve({ ok: false, reason: 'exists' });
+      const kindOf = kind === 'folder' ? 'folder' : name.endsWith('.brief') ? 'brief' : 'file';
+      const entry = { id: `new-${name}`, name, kind: kindOf } as const;
+      const folder = parentId ?? 'root';
+      disk[folder] = { ...(disk[folder] ?? GONE), gone: false };
+      disk[folder] = { ...disk[folder], entries: [entry, ...disk[folder].entries] };
+      return Promise.resolve({ ok: true, entry, document: null, documentId: null });
+    },
+    rename: (entryId, name) => {
+      wrote.push(['rename', entryId, name]);
+      if (name === 'logo.png') return Promise.resolve({ ok: false, reason: 'exists' });
+      for (const listing of Object.values(disk)) {
+        const at = listing.entries.findIndex((each) => each.id === entryId);
+        if (at !== -1) {
+          const entries_ = [...listing.entries];
+          entries_[at] = { ...entries_[at]!, name };
+          Object.assign(listing, { entries: entries_ });
+          return Promise.resolve({ ok: true, entry: entries_[at]!, moved: [] });
+        }
+      }
+      return Promise.resolve({ ok: false, reason: 'gone' });
+    },
+    unsavedUnder: () => Promise.resolve(0),
+    confirm: (question) => {
+      questions.push(question.message);
+      return Promise.resolve(control.confirmed);
+    },
+    remove: (entryId) => {
+      wrote.push(['delete', entryId]);
+      if (control.trash === 'trash-failed') {
+        return Promise.resolve({ ok: false, reason: 'trash-failed' });
+      }
+      for (const listing of Object.values(disk)) {
+        Object.assign(listing, { entries: listing.entries.filter((each) => each.id !== entryId) });
+      }
+      return Promise.resolve({ ok: true, released: [] });
+    },
+    menu: (_x, _y, items) => {
+      control.menus.push(items.map((item) => item.label));
+      return Promise.resolve(control.chosen);
+    },
     list: (entryId) => {
       asked.push(entryId);
       return Promise.resolve(disk[entryId ?? 'root'] ?? GONE);
@@ -39,7 +95,7 @@ function source(disk: Disk) {
       folders.push(1);
     },
   };
-  return { value, asked, opened, folders };
+  return { value, asked, opened, folders, wrote, questions, control };
 }
 
 const settle = async (element: ExplorerPanel): Promise<void> => {
@@ -239,5 +295,163 @@ describe('file-type icons (TYTO-282, ADR 0116)', () => {
     await settle(element);
 
     expect(icons(element).slides).toBe('folderOpen');
+  });
+});
+
+/** TYTO-352, ADR 0121: new, rename and delete from the explorer. */
+describe('new, rename and delete', () => {
+  const press = async (element: ExplorerPanel, key: string): Promise<void> => {
+    const target =
+      element.querySelector<HTMLElement>('.explorer__field') ??
+      element.querySelector<HTMLElement>('.explorer__tree')!;
+    target.dispatchEvent(new KeyboardEvent('keydown', { key, bubbles: true }));
+    await settle(element);
+  };
+  const field = (element: ExplorerPanel): HTMLInputElement | null =>
+    element.querySelector<HTMLInputElement>('.explorer__field');
+  const type = async (element: ExplorerPanel, text: string): Promise<void> => {
+    const input = field(element)!;
+    input.value = text;
+    input.dispatchEvent(new InputEvent('input', { bubbles: true }));
+    await settle(element);
+  };
+  const select = async (element: ExplorerPanel, name: string): Promise<void> => {
+    row(element, name).click();
+    await settle(element);
+  };
+
+  it('renames with F2: the field holds the name, Enter writes it, and the row is selected', async () => {
+    const { element, wrote } = await mount(disk());
+    await select(element, 'promo.brief');
+
+    await press(element, 'F2');
+    expect(field(element)?.value).toBe('promo.brief');
+    await type(element, 'abertura.brief');
+    await press(element, 'Enter');
+
+    expect(wrote).toEqual([['rename', 'promo', 'abertura.brief']]);
+    expect(field(element)).toBeNull();
+    expect(rows(element)).toEqual(['slides', 'abertura.brief', 'logo.png']);
+    expect(row(element, 'abertura.brief').getAttribute('aria-selected')).toBe('true');
+  });
+
+  it('keeps the field, its text and the line under it when the name is taken', async () => {
+    const { element } = await mount(disk());
+    await select(element, 'promo.brief');
+    await press(element, 'F2');
+    await type(element, 'logo.png');
+    await press(element, 'Enter');
+
+    expect(field(element)?.value).toBe('logo.png');
+    expect(element.querySelector('.explorer__error')?.textContent).toBe(
+      'A file or folder named “logo.png” already exists here.',
+    );
+    await press(element, 'Escape');
+    expect(field(element)).toBeNull();
+    expect(rows(element)).toContain('promo.brief');
+  });
+
+  it('keeps the field and what was typed through a re-list from the watcher', async () => {
+    const shared = disk();
+    const { element } = await mount(shared);
+    element.startNew('file');
+    await settle(element);
+    await type(element, 'novo');
+
+    shared.root = entries(
+      ['slides', 'slides', 'folder'],
+      ['nova', 'nova.brief', 'brief'],
+      ['promo', 'promo.brief', 'brief'],
+    );
+    element.refresh();
+    await settle(element);
+
+    expect(field(element)?.value).toBe('novo');
+    expect(rows(element)).toContain('nova.brief');
+  });
+
+  it('makes the entry on blur, as typed, in the folder selected', async () => {
+    const { element, wrote } = await mount(disk());
+    await select(element, 'slides');
+    element.startNew('folder');
+    await settle(element);
+    await type(element, 'anexos');
+    field(element)!.dispatchEvent(new FocusEvent('blur'));
+    await settle(element);
+
+    expect(wrote).toEqual([['create', 'slides', 'anexos', 'folder']]);
+    expect(rows(element)).toContain('  anexos');
+  });
+
+  it('asks before Delete, and moves nothing when the answer is no', async () => {
+    const { element, wrote, questions, control } = await mount(disk());
+    await select(element, 'logo.png');
+
+    control.confirmed = false;
+    await press(element, 'Delete');
+    expect(questions).toEqual(['Move “logo.png” to the Recycle Bin?']);
+    expect(wrote).toEqual([]);
+
+    control.confirmed = true;
+    await press(element, 'Delete');
+    expect(wrote).toEqual([['delete', 'logo']]);
+    expect(rows(element)).toEqual(['slides', 'promo.brief']);
+  });
+
+  it('says under the row that the trash refused, and nothing was deleted', async () => {
+    const { element, control } = await mount(disk());
+    await select(element, 'logo.png');
+    control.trash = 'trash-failed';
+    await press(element, 'Delete');
+
+    expect(element.querySelector('.explorer__error')?.textContent).toBe(
+      "Couldn't move it to the Recycle Bin. Nothing was deleted.",
+    );
+    expect(rows(element)).toContain('logo.png');
+  });
+
+  it('offers four items on a row and the two New items on the empty space', async () => {
+    const { element, control } = await mount(disk());
+    control.chosen = 'explorer.menu.rename';
+    row(element, 'logo.png').dispatchEvent(new MouseEvent('contextmenu', { bubbles: true }));
+    await settle(element);
+
+    expect(field(element)?.value).toBe('logo.png');
+    await press(element, 'Escape');
+
+    control.chosen = 'explorer.menu.newFile';
+    element
+      .querySelector('.explorer__body')!
+      .dispatchEvent(new MouseEvent('contextmenu', { bubbles: true }));
+    await settle(element);
+
+    expect(control.menus).toEqual([
+      ['New File…', 'New Folder…', 'Rename…', 'Delete'],
+      ['New File…', 'New Folder…'],
+    ]);
+    expect(rows(element)[0]).toBe('slides');
+    expect(field(element)).not.toBeNull();
+  });
+});
+
+describe('the delete question (TYTO-352)', () => {
+  it('says Recycle Bin on Windows and Trash elsewhere in English, Lixeira in Portuguese', () => {
+    const file = { name: 'capa.brief', kind: 'brief' } as const;
+    expect(deleteQuestion('en', 'win32', file, 0)).toEqual({
+      message: 'Move “capa.brief” to the Recycle Bin?',
+      detail: 'You can restore it from there.',
+      confirm: 'Move to Recycle Bin',
+      cancel: 'Cancel',
+    });
+    expect(deleteQuestion('en', 'darwin', file, 0).confirm).toBe('Move to Trash');
+    expect(deleteQuestion('en', 'linux', file, 0).message).toBe('Move “capa.brief” to the Trash?');
+    expect(deleteQuestion('pt-BR', 'darwin', { name: 'slides', kind: 'folder' }, 1)).toEqual({
+      message: 'Mover a pasta “slides” e tudo o que há nela para a Lixeira?',
+      detail:
+        'Dá para restaurar de lá.\n\n1 aba aberta tem alterações não salvas; o texto continua na aba.',
+      confirm: 'Mover para a Lixeira',
+      cancel: 'Cancelar',
+    });
+    expect(deleteQuestion('en', 'win32', file, 3).detail).toContain('3 open tabs have');
   });
 });

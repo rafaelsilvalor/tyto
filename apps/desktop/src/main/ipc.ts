@@ -218,7 +218,10 @@ export interface IpcDependencies {
    * The open workspace folder's files (TYTO-279, ADR 0115): listed by id, and a brief's path
    * found by id, only inside the folder main has open.
    */
-  readonly explorer: Pick<ExplorerService, 'list' | 'briefPath' | 'create' | 'rename' | 'delete'>;
+  readonly explorer: Pick<
+    ExplorerService,
+    'list' | 'briefPath' | 'create' | 'rename' | 'delete' | 'pathOf'
+  >;
   /**
    * A native context menu of the window's items at a point, settling with the id picked or
    * `null` (TYTO-352, ADR 0121). A function for the reason `confirm` is one: `Menu.popup` is
@@ -481,6 +484,11 @@ export function createHandlers(dependencies: IpcDependencies): Handlers {
         entry: renamed.entry,
         moved: documents.retargetUnder(renamed.from, renamed.to),
       };
+    },
+
+    'explorer:tabs-under': async ({ entryId }) => {
+      const path = explorer.pathOf(entryId);
+      return { documentIds: path === undefined ? [] : documents.heldUnder(path) };
     },
 
     'explorer:delete': async ({ entryId }) => {

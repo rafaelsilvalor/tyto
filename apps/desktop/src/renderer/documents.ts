@@ -325,6 +325,37 @@ export function releaseDocument(workspace: Workspace, id: string): Workspace {
 }
 
 /**
+ * The explorer renamed the file a tab holds, or a folder above it (TYTO-352, ADR 0121): only
+ * the name and the tooltip follow. **`savedText` stays**, so a tab with unsaved text is still
+ * unsaved, and its next save writes to the new path, which main already holds.
+ */
+export function withMovedDocuments(
+  workspace: Workspace,
+  moved: readonly {
+    readonly documentId: string;
+    readonly name: string;
+    readonly pathLabel: string;
+  }[],
+): Workspace {
+  return moved.reduce(
+    (next, { documentId, name, pathLabel }) =>
+      updateDocument(next, documentId, (document) => ({ ...document, name, pathLabel })),
+    workspace,
+  );
+}
+
+/**
+ * The explorer moved a file to the trash (TYTO-352): every tab that held it, or held a file in
+ * a trashed folder, becomes a tab in no file by TYTO-104's rule. The text stays in the tab.
+ */
+export function withReleasedDocuments(
+  workspace: Workspace,
+  released: readonly string[],
+): Workspace {
+  return released.reduce(releaseDocument, workspace);
+}
+
+/**
  * Closes a tab, and says which document the window is left looking at.
  *
  * `fresh` is called only when the tab being closed is the last one. Closing everything leaves

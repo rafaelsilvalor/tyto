@@ -161,6 +161,7 @@ const explorerFiles = () => {
           : { ok: false, reason: 'trash-failed' },
       );
     },
+    pathOf: (entryId: string) => (entryId === 'e-folder' ? '/work/promo/slides' : undefined),
   };
 };
 
@@ -266,6 +267,7 @@ const documents = () => {
       followed.push(['release', path]);
       return ['document-9'];
     },
+    heldUnder: (path: string) => (path === '/work/promo/slides' ? ['document-9'] : []),
   };
 };
 
@@ -1712,6 +1714,21 @@ describe('the explorer write channels', () => {
       reason: 'trash-failed',
     });
     expect(deps.documents.followed).toHaveLength(1);
+  });
+
+  it('names the tabs under an entry, changing nothing, and none for an entry it does not know', async () => {
+    const deps = dependencies();
+    const handlers = createHandlers(deps);
+    const tabsUnder = guard('explorer:tabs-under', handlers['explorer:tabs-under']);
+
+    await expect(tabsUnder({ entryId: 'e-folder' })).resolves.toEqual({
+      documentIds: ['document-9'],
+    });
+    await expect(tabsUnder({ entryId: 'e-unknown' })).resolves.toEqual({ documentIds: [] });
+    await expect(tabsUnder({ entryId: 'e-folder', path: '/' })).rejects.toBeInstanceOf(
+      IpcContractError,
+    );
+    expect(deps.documents.followed).toEqual([]);
   });
 
   it('refuses a request that names a path, so no window can write where it chooses', async () => {
