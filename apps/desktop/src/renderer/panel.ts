@@ -10,9 +10,9 @@ import { type IpcResponse } from '../../shared/ipc.js';
  *
  * **The problems panel used to live here and is now `problems-panel.ts`** — a Lit element
  * rather than a painter (ADR 0024). What stayed behind is what the element still needs
- * (`lineColumnAt`, the diagnostic types) and the artwork list, which writes into a `<select>`
- * a component would not make shorter: an option list is already the shape the DOM wants. The
- * template picker, the other one, left the window with TYTO-288 (ADR 0085).
+ * (`lineColumnAt`, the diagnostic types) and where an artwork was written. The artwork list's
+ * `<select>` left with TYTO-323, for the preview's strip of thumbnails (ADR 0123), and the
+ * template picker, the other one, with TYTO-288 (ADR 0085).
  */
 
 export type Diagnostic = IpcResponse<'brief:preview'>['diagnostics'][number];
@@ -61,35 +61,6 @@ export function lineColumnAt(text: string, offset: number): LineColumn {
   }
 
   return { line, column: upTo - lineStart + 1 };
-}
-
-/**
- * The artwork list, from the artworks the brief produced rather than from the frames.
- *
- * They differ, and the difference is the point: a slide that renders only to `story` has no
- * `feed` frame, and deriving the list from frames would make it change when somebody clicks
- * a format tab. What the card asks for is a list synced with the repeat directives, and
- * `artworks` is that list.
- */
-export interface ArtworkListState {
-  readonly artworks: readonly Artwork[];
-  readonly selected: string | undefined;
-}
-
-export function paintArtworkList(picker: HTMLSelectElement, state: ArtworkListState): void {
-  const document_ = picker.ownerDocument;
-
-  picker.replaceChildren(
-    ...state.artworks.map((artwork) => {
-      const option = document_.createElement('option');
-      option.value = artwork.id;
-      // A number and not the artwork's id: `slide-1` is the IR's name for it, and a person
-      // counting slides in a carousel is counting 1, 2, 3.
-      option.textContent = String(artwork.index + 1);
-      option.selected = artwork.id === state.selected;
-      return option;
-    }),
-  );
 }
 
 /** Where in the brief an artwork was written, for the editor to scroll to. */

@@ -16,7 +16,11 @@
 export interface Catalogue {
   readonly 'app.name': string;
   readonly 'preview.heading': string;
-  readonly 'preview.slide.label': string;
+  /** TYTO-323: the strip toggle's words while the strip shows and while it is hidden, and the
+   * strip's accessible name. */
+  readonly 'preview.strip.hide': string;
+  readonly 'preview.strip.show': string;
+  readonly 'preview.strip.label': string;
   readonly 'preview.zoom.out': string;
   readonly 'preview.zoom.in': string;
   readonly 'preview.zoom.fit': string;
@@ -653,7 +657,9 @@ export type CatalogueKey = keyof Catalogue;
 export const CATALOGUE_KEYS = [
   'app.name',
   'preview.heading',
-  'preview.slide.label',
+  'preview.strip.hide',
+  'preview.strip.show',
+  'preview.strip.label',
   'preview.zoom.out',
   'preview.zoom.in',
   'preview.zoom.fit',

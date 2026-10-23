@@ -1,18 +1,22 @@
 import { LitElement, html } from 'lit';
 
+import { icon } from './icons.js';
 import type { PreviewElements } from './preview.js';
+import type { SlideThumbnails } from './slide-thumbnails.js';
+import './slide-thumbnails.js';
 
 /**
  * A brief's art, as the content of a preview tab (TYTO-287, ADR 0084).
  *
  * The markup the PREVIEW dock panel had, with **no ids**: a window can show two previews at
  * once — a following one and a locked one — so every node is found by a `data-preview-*`
- * attribute inside its own pane ({@link previewElementsOf}). A bar of the brief's formats, its
- * slide, the zoom and the lock over the stage.
+ * attribute inside its own pane ({@link previewElementsOf}). A bar of the brief's formats, the
+ * strip's toggle, the zoom and the lock over the stage, and under the stage a strip of the
+ * slides as thumbnails, which is how a slide is chosen since TYTO-323 (ADR 0123).
  *
  * **The bar is the pane's header row** (TYTO-288, ADR 0085): the same height as every group's
  * and every panel's, one line that never wraps, the formats taking what room is left and the
- * slide, zoom and lock at the end, never shrunk. It stays inside this element because
+ * toggle, zoom and lock at the end, never shrunk. It stays inside this element because
  * `paintPreview` finds its nodes inside the pane; the group hides its own header row while a
  * preview is in front, so the two are never stacked.
  *
@@ -36,10 +40,9 @@ export class PreviewPane extends LitElement {
     return html`<div class="preview__bar pane__header" data-font-area="paneHeaders">
         <div class="preview__tabs" data-preview-formats role="tablist"></div>
         <div class="pane__actions">
-          <label class="preview__slide">
-            <span data-preview-slide-label data-i18n="preview.slide.label"></span>
-            <select data-preview-slide></select>
-          </label>
+          <button type="button" class="preview__strip-toggle" data-preview-strip-toggle>
+            ${icon('strip')}
+          </button>
           <div class="preview__zoom">
             <button type="button" data-preview-zoom="out" data-i18n-title="preview.zoom.out">
               −
@@ -72,7 +75,12 @@ export class PreviewPane extends LitElement {
         <!-- TYTO-268: in the empty line's place when the brief is written and cannot be drawn. -->
         <p class="preview__empty" data-preview-broken data-i18n="preview.broken" hidden></p>
         <p class="preview__stale" data-preview-stale data-i18n="preview.stale" hidden></p>
-      </div>`;
+      </div>
+      <tyto-slide-thumbnails
+        class="preview__strip"
+        data-preview-strip
+        hidden
+      ></tyto-slide-thumbnails>`;
   }
 }
 
@@ -89,8 +97,8 @@ export function previewElementsOf(pane: ParentNode): PreviewElements | undefined
   const find = <T extends HTMLElement = HTMLElement>(attribute: string): T | null =>
     pane.querySelector<T>(`[${attribute}]`);
   const tabs = find('data-preview-formats');
-  const slide = find<HTMLSelectElement>('data-preview-slide');
-  const slideLabel = find('data-preview-slide-label');
+  const strip = pane.querySelector('[data-preview-strip]') as SlideThumbnails | null;
+  const stripToggle = find('data-preview-strip-toggle');
   const stage = find('data-preview-stage');
   const paper = find('data-preview-paper');
   const frame = find<HTMLIFrameElement>('data-preview-frame');
@@ -100,8 +108,8 @@ export function previewElementsOf(pane: ParentNode): PreviewElements | undefined
   const zoomLevel = find('data-preview-zoom-level');
   if (
     tabs === null ||
-    slide === null ||
-    slideLabel === null ||
+    strip === null ||
+    stripToggle === null ||
     stage === null ||
     paper === null ||
     frame === null ||
@@ -112,5 +120,5 @@ export function previewElementsOf(pane: ParentNode): PreviewElements | undefined
   ) {
     return undefined;
   }
-  return { tabs, slide, slideLabel, stage, paper, frame, empty, broken, stale, zoomLevel };
+  return { tabs, strip, stripToggle, stage, paper, frame, empty, broken, stale, zoomLevel };
 }

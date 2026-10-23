@@ -23,6 +23,8 @@ export interface EditorTab {
   readonly documentId: string;
   readonly view?: 'preview';
   readonly locked?: boolean;
+  /** A preview that hid its strip of slide thumbnails (TYTO-323, ADR 0123); absent is shown. */
+  readonly stripHidden?: boolean;
 }
 
 export const isPreview = (tab: EditorTab): boolean => tab.view === 'preview';
@@ -473,9 +475,10 @@ export function layoutOf<T>(
  * A preview tab a session brings back (TYTO-287): a following one, whose brief the window points
  * it at once the groups are built (`documentId` `''` until then), or one locked on its brief.
  */
-export type RestoredPreview =
+export type RestoredPreview = (
   | { readonly view: 'preview'; readonly documentId: '' }
-  | { readonly view: 'preview'; readonly documentId: string; readonly locked: true };
+  | { readonly view: 'preview'; readonly documentId: string; readonly locked: true }
+) & { readonly stripHidden?: true };
 
 /**
  * The groups a session left, rebuilt (TYTO-286): `documentOf` says which document each kept
@@ -681,8 +684,23 @@ export function toggleLock(groups: EditorGroups, tabId: string): EditorGroups {
   const closed = duplicate === undefined ? groups : closeTab(groups, duplicate.id);
   return mapTabs(closed, (each) => {
     if (each.id !== tabId) return each;
-    return locking
-      ? { ...each, locked: true }
-      : { id: each.id, documentId: each.documentId, view: 'preview' };
+    if (locking) return { ...each, locked: true };
+    const { locked: _locked, ...following } = each;
+    return following;
+  });
+}
+
+/**
+ * Hides a preview's strip of slide thumbnails, or shows it again (TYTO-323, ADR 0123). Per tab,
+ * so a locked preview and the following one each keep their own.
+ */
+export function toggleStrip(groups: EditorGroups, tabId: string): EditorGroups {
+  return mapTabs(groups, (each) => {
+    if (each.id !== tabId || !isPreview(each)) return each;
+    if (each.stripHidden === true) {
+      const { stripHidden: _hidden, ...shown } = each;
+      return shown;
+    }
+    return { ...each, stripHidden: true };
   });
 }

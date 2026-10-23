@@ -44,6 +44,8 @@ export type IconName =
   // TYTO-287: "Open preview to the side" in a group's header row, and a locked preview.
   | 'preview'
   | 'lock'
+  // TYTO-323: showing and hiding the preview's strip of slide thumbnails.
+  | 'strip'
   // TYTO-302: "Choose folder…" in the queue's tool header.
   | 'folder'
   // TYTO-279: the explorer's status-bar button, and a folder row closed and open.
@@ -92,6 +94,9 @@ const GEOMETRY: Readonly<Record<IconName, (lit: boolean) => SVGTemplateResult>> 
   // A padlock on the frame's corner radius, with the problems icon's dot for the keyhole.
   lock: () =>
     svg`<rect x="3" y="7.25" width="10" height="6.25" rx="2" /><path d="M5.5 7.25V5.5a2.5 2.5 0 0 1 5 0v1.75" /><circle class="icon__dot" cx="8" cy="10.35" r=".5" fill="currentColor" stroke="none" />`,
+  // The slide on screen above a row of three small ones: the preview over its strip.
+  strip: () =>
+    svg`<rect x="2" y="2.5" width="12" height="7" rx="1.5" /><rect x="2" y="11.25" width="3" height="2.25" rx=".75" /><rect x="6.5" y="11.25" width="3" height="2.25" rx=".75" /><rect x="11" y="11.25" width="3" height="2.25" rx=".75" />`,
   // A folder on the frame's box and corner radius: the tab rises on the left, the flap's line
   // runs across under it.
   folder: () => svg`${FOLDER}<path d="M2 7h12" />`,

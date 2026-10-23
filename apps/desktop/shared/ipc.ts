@@ -282,19 +282,29 @@ function sessionGroups<T>(tab: z.ZodType<T>) {
  * every other tab does. Neither has a `place`, and neither ever carries a path. The locked shape
  * comes first in each union below, because zod keeps the first branch that parses.
  */
-const followingPreview = z.object({ view: z.literal('preview') });
+/**
+ * `stripHidden` is a preview that hid its strip of slide thumbnails (TYTO-323, ADR 0123). Only
+ * `true` is written, so a record from before it reads as a strip shown.
+ */
+const stripHidden = z.literal(true).optional();
+const followingPreview = z.object({ view: z.literal('preview'), stripHidden });
 const sessionTabIndex = z.number().int().min(0);
 
 const writtenGroups = sessionGroups(
   z.union([
-    z.object({ documentId, view: z.literal('preview'), locked: z.literal(true) }),
+    z.object({ documentId, view: z.literal('preview'), locked: z.literal(true), stripHidden }),
     followingPreview,
     z.object({ documentId, place: sessionPlace.nullable() }),
   ]),
 );
 const readGroups = sessionGroups(
   z.union([
-    z.object({ tab: sessionTabIndex, view: z.literal('preview'), locked: z.literal(true) }),
+    z.object({
+      tab: sessionTabIndex,
+      view: z.literal('preview'),
+      locked: z.literal(true),
+      stripHidden,
+    }),
     followingPreview,
     z.object({ tab: sessionTabIndex, place: sessionPlace.nullable() }),
   ]),

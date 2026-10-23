@@ -18,7 +18,12 @@ import {
   paintPreview,
   stageBox,
   stepZoom,
+  artworkOfThumbnail,
+  thumbnailId,
+  thumbnailsOf,
 } from './preview.js';
+import type { SlideThumbnails } from './slide-thumbnails.js';
+import './slide-thumbnails.js';
 
 /**
  * The preview pane, in jsdom.
@@ -63,14 +68,25 @@ const SLIDES: readonly Artwork[] = [
   { id: 'artwork-2', index: 1, range: { start: 31, end: 41 } },
 ];
 
+/** Ten slides in one format, numbered by the brief's own order. */
+const TEN: readonly Artwork[] = Array.from({ length: 10 }, (_, at) => ({
+  id: `lamina-${String(at + 1)}`,
+  index: at,
+  range: { start: at * 10, end: at * 10 + 9 },
+}));
+const TEN_FRAMES: readonly Frame[] = TEN.map((artwork) => frame(artwork.id, 'grid-1x1'));
+
+/** The toggle's two labels, as `main.ts` hands them over in English. */
+const LABELS = { hide: 'Hide the slide strip', show: 'Show the slide strip' } as const;
+
 const NOTHING: Selection = { format: undefined, artwork: undefined };
 
 function pane(document_: Document): PreviewElements {
   const make = <T extends HTMLElement>(tag: string): T => document_.createElement(tag) as T;
   const elements = {
     tabs: make('div'),
-    slide: make<HTMLSelectElement>('select'),
-    slideLabel: make('span'),
+    strip: make<SlideThumbnails>('tyto-slide-thumbnails'),
+    stripToggle: make('button'),
     stage: make('div'),
     paper: make('div'),
     frame: make<HTMLIFrameElement>('iframe'),
@@ -83,7 +99,7 @@ function pane(document_: Document): PreviewElements {
   elements.broken.hidden = true;
   elements.paper.append(elements.frame);
   elements.stage.append(elements.paper, elements.empty, elements.broken, elements.stale);
-  document_.body.append(elements.tabs, elements.slide, elements.slideLabel, elements.stage);
+  document_.body.append(elements.tabs, elements.stripToggle, elements.stage, elements.strip);
   return elements;
 }
 
@@ -135,6 +151,18 @@ describe('keeping the selection across a re-render', () => {
     const one = SLIDES.slice(0, 1);
 
     expect(keepSelection(chosen, shorter, one)).toEqual({ format: 'story', artwork: 'artwork-1' });
+  });
+
+  it('clamps to the last slide left when the selected one was past the new end', () => {
+    // On slide 10 of 10, the last `::lamina` deleted: slide 9, not back to slide 1 (TYTO-323).
+    const nine = TEN.slice(0, 9);
+    const frames = TEN_FRAMES.slice(0, 9);
+    const chosen: Selection = { format: 'grid-1x1', artwork: 'lamina-10' };
+
+    expect(keepSelection(chosen, frames, nine, TEN)).toEqual({
+      format: 'grid-1x1',
+      artwork: 'lamina-9',
+    });
   });
 
   it('keeps each half independently', () => {
@@ -197,8 +225,45 @@ describe('switching format', () => {
   });
 });
 
-describe('the slide picker', () => {
-  it('numbers the slides from one rather than showing their ids', () => {
+describe('the slide strip (TYTO-323)', () => {
+  it('has one thumbnail per slide, in the brief’s order, numbered from one', () => {
+    const thumbnails = thumbnailsOf({
+      frames: [...TEN_FRAMES].reverse(),
+      artworks: TEN,
+      selection: { format: 'grid-1x1', artwork: 'lamina-1' },
+    });
+
+    expect(thumbnails.map((thumbnail) => thumbnail.label)).toEqual([
+      '1',
+      '2',
+      '3',
+      '4',
+      '5',
+      '6',
+      '7',
+      '8',
+      '9',
+      '10',
+    ]);
+    expect(thumbnails.map((thumbnail) => artworkOfThumbnail(thumbnail.id))).toEqual(
+      TEN.map((artwork) => artwork.id),
+    );
+    expect(thumbnails[6]?.html).toContain('lamina-7.grid-1x1');
+  });
+
+  it('draws the selected format only, and a slide with no frame in it keeps the others’ numbers', () => {
+    const partial = [frame('artwork-1', 'story', 1080, 1920), frame('artwork-2', 'feed')];
+    const story = thumbnailsOf({
+      frames: [...CAROUSEL.filter((each) => each.artwork === 'artwork-2'), ...partial],
+      artworks: SLIDES,
+      selection: { format: 'feed', artwork: 'artwork-2' },
+    });
+
+    expect(story.map((thumbnail) => thumbnail.label)).toEqual(['2']);
+    expect(story[0]?.id).toBe(thumbnailId('artwork-2', 'feed'));
+  });
+
+  it('hands the strip its thumbnails and marks the selected one', () => {
     const { document } = globalThis;
     const elements = pane(document);
 
@@ -206,16 +271,63 @@ describe('the slide picker', () => {
       stale: false,
       frames: CAROUSEL,
       artworks: SLIDES,
-      selection: { format: 'feed', artwork: 'artwork-2' },
+      selection: { format: 'story', artwork: 'artwork-2' },
       zoom: 1,
+      stripLabel: 'Slide strip',
+      stripToggleLabels: LABELS,
     });
 
-    expect([...elements.slide.options].map((option) => option.textContent)).toEqual(['1', '2']);
-    expect(elements.slide.value).toBe('artwork-2');
+    expect(elements.strip.hidden).toBe(false);
+    expect(elements.strip.items.map((item) => item.label)).toEqual(['1', '2']);
+    expect(elements.strip.selected).toBe(thumbnailId('artwork-2', 'story'));
+    expect(elements.strip.label).toBe('Slide strip');
+    expect(elements.stripToggle.title).toBe('Hide the slide strip');
   });
 
-  it('hides itself, and its label, when there is only one slide', () => {
-    // A picker with one option is furniture that reads like a control.
+  it('says what a press does: Hide while the strip shows, Show once it is hidden', () => {
+    // Rafael, 2026-10-23: "O texto muda com o estado". The label changes, so no `aria-pressed`.
+    const { document } = globalThis;
+    const elements = pane(document);
+    const paint = (stripHidden: boolean): string[] => {
+      paintPreview(elements, {
+        stale: false,
+        frames: CAROUSEL,
+        artworks: SLIDES,
+        selection: { format: 'feed', artwork: 'artwork-1' },
+        zoom: 1,
+        stripHidden,
+        stripToggleLabels: LABELS,
+      });
+      return [elements.stripToggle.title, elements.stripToggle.getAttribute('aria-label') ?? ''];
+    };
+
+    expect(paint(false)).toEqual(['Hide the slide strip', 'Hide the slide strip']);
+    expect(paint(true)).toEqual(['Show the slide strip', 'Show the slide strip']);
+    expect(paint(false)).toEqual(['Hide the slide strip', 'Hide the slide strip']);
+    expect(elements.stripToggle.hasAttribute('aria-pressed')).toBe(false);
+  });
+
+  it('hides the strip when the tab hid it, and keeps the toggle to bring it back', () => {
+    const { document } = globalThis;
+    const elements = pane(document);
+
+    paintPreview(elements, {
+      stale: false,
+      frames: CAROUSEL,
+      artworks: SLIDES,
+      selection: { format: 'feed', artwork: 'artwork-1' },
+      zoom: 1,
+      stripHidden: true,
+    });
+
+    expect(elements.strip.hidden).toBe(true);
+    expect(elements.strip.items).toEqual([]);
+    expect(elements.stripToggle.hidden).toBe(false);
+    expect(elements.stripToggle.classList.contains('preview__strip-toggle--on')).toBe(false);
+  });
+
+  it('hides itself, and its toggle, when there is only one slide', () => {
+    // A strip of one is furniture that reads like a control.
     const { document } = globalThis;
     const elements = pane(document);
 
@@ -227,8 +339,8 @@ describe('the slide picker', () => {
       zoom: 1,
     });
 
-    expect(elements.slide.hidden).toBe(true);
-    expect(elements.slideLabel.hidden).toBe(true);
+    expect(elements.strip.hidden).toBe(true);
+    expect(elements.stripToggle.hidden).toBe(true);
   });
 });
 

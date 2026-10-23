@@ -32,6 +32,7 @@ import {
   splitGroup,
   stepTabInGroup,
   toggleLock,
+  toggleStrip,
 } from './editor-groups.js';
 
 /** What each group shows, in tree order: its documents, the one in front starred. */
@@ -536,5 +537,36 @@ describe('the preview as a tab (TYTO-287, ADR 0084)', () => {
     const opened = openPreviewToSide(groupsOf(['blank'], 'blank'), 'blank', false);
     const locked = toggleLock(opened, following(opened));
     expect(withPreviews(replaceDocument(locked, 'blank', 'file'))).toEqual(['*file', '*L(file)']);
+  });
+});
+
+describe('hiding a preview’s strip of slides (TYTO-323)', () => {
+  it('hides and shows it on the one tab, and the lock keeps it either way', () => {
+    const opened = openPreviewHere(groupsOf(['a'], 'a'), 'a');
+    const id = previewTabs(opened)[0]?.id ?? '';
+    const hidden = toggleStrip(opened, id);
+    expect(previewTabs(hidden)[0]?.stripHidden).toBe(true);
+
+    const locked = toggleLock(hidden, id);
+    expect(previewTabs(locked)[0]).toMatchObject({ locked: true, stripHidden: true });
+    const following = toggleLock(locked, id);
+    expect(previewTabs(following)[0]).toEqual({
+      id,
+      documentId: 'a',
+      view: 'preview',
+      stripHidden: true,
+    });
+
+    expect(previewTabs(toggleStrip(following, id))[0]).toEqual({
+      id,
+      documentId: 'a',
+      view: 'preview',
+    });
+  });
+
+  it('leaves a text tab alone', () => {
+    const groups = groupsOf(['a'], 'a');
+    const text = focusedGroup(groups).tabs[0]?.id ?? '';
+    expect(focusedGroup(toggleStrip(groups, text)).tabs[0]?.stripHidden).toBeUndefined();
   });
 });

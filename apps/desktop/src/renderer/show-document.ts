@@ -5,9 +5,10 @@ import { Directive, type PartInfo, PartType, directive } from 'lit/directive.js'
  * The window's one writer of `srcdoc`.
  *
  * Every iframe that shows a compiled document goes through `showDocument`: the brief preview
- * (`preview.ts`) directly, and the template-mode grid (`template-mode.ts`) through
- * `frameDocument`, because a lit `.srcdoc=` binding would write the property behind the rule's
- * back. The property reflects the attribute, so the rule writes and reads the attribute only.
+ * (`preview.ts`) directly, and the template-mode grid (`template-mode.ts`) and the preview's
+ * slide thumbnails (`slide-thumbnails.ts`) through `frameDocument`, because a lit `.srcdoc=`
+ * binding would write the property behind the rule's back. The property reflects the
+ * attribute, so the rule writes and reads the attribute only.
  */
 
 /** The document an iframe is loading, and the newest one asked for while it loads. */
@@ -68,12 +69,16 @@ class FrameDocument extends Directive {
     if (part.type !== PartType.ELEMENT) throw new Error('frameDocument belongs on an <iframe>');
   }
 
-  render(_html: string): typeof noChange {
+  render(_html: string | undefined): typeof noChange {
     return noChange;
   }
 
-  override update(part: ElementPart, [html]: [string]): typeof noChange {
-    showDocument(part.element as HTMLIFrameElement, html);
+  /**
+   * `undefined` writes nothing and leaves whatever the iframe shows (TYTO-323): a slide thumbnail
+   * off screen keeps its last document and is given a new one only once it is seen again.
+   */
+  override update(part: ElementPart, [html]: [string | undefined]): typeof noChange {
+    if (html !== undefined) showDocument(part.element as HTMLIFrameElement, html);
     return noChange;
   }
 }

@@ -651,11 +651,10 @@ textarea {
   display: none;
 }
 
-/* The preview's controls, small enough for the discreet row they share: a select's own height
-   is the browser's, so it is held under the row's with a little room above and below. Two
-   classes, so the zoom's and the lock's own `font: inherit` and padding do not undo it. */
-.preview__bar.pane__header button,
-.preview__bar.pane__header select {
+/* The preview's controls, small enough for the discreet row they share, held under the row's
+   height with a little room above and below. Two classes, so the zoom's and the lock's own
+   `font: inherit` and padding do not undo it. */
+.preview__bar.pane__header button {
   max-height: calc(var(--tyto-pane-header-block) - 2 * var(--tyto-space-1));
   padding-block: 0;
   font-size: var(--tyto-text-xs);
@@ -876,7 +875,7 @@ tyto-preview-pane[hidden] {
   height: 100%;
 }
 
-/* The bar is a header row (TYTO-288): the formats take what the slide, zoom and lock leave. */
+/* The bar is a header row (TYTO-288): the formats take what the toggle, zoom and lock leave. */
 .preview__tabs {
   display: flex;
   flex: 1 1 auto;
@@ -906,7 +905,6 @@ tyto-preview-pane[hidden] {
   font-weight: var(--tyto-weight-strong);
 }
 
-.preview__slide,
 .preview__zoom {
   display: flex;
   gap: var(--tyto-space-3);
@@ -1023,6 +1021,94 @@ tyto-preview-pane[hidden] {
 }
 
 /*
+ * TYTO-323 (ADR 0123): the slides as thumbnails under the stage. A fixed height, set where the
+ * thumbnails are scaled (`THUMBNAIL_HEIGHT`), so the row is as tall as a thumbnail and its number
+ * and scrolls sideways when the slides do not fit; the stage keeps the rest, and `fit` follows.
+ * The selected thumbnail is ringed in the accent, the way a format tab is marked by its fill.
+ */
+.preview__strip {
+  display: flex;
+  flex: none;
+  gap: var(--tyto-space-4);
+  overflow-x: auto;
+  overflow-y: hidden;
+  padding: var(--tyto-space-3) var(--tyto-space-4);
+  border-top: var(--tyto-hairline-width) solid var(--tyto-hairline);
+  background: var(--tyto-surface);
+}
+
+.preview__strip[hidden] {
+  display: none;
+}
+
+.thumbnail {
+  display: flex;
+  flex: none;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--tyto-space-1);
+  margin: 0;
+  padding: var(--tyto-space-1);
+  border-radius: var(--tyto-radius-sm);
+  cursor: pointer;
+}
+
+.thumbnail:hover {
+  background: var(--tyto-hover);
+}
+
+.thumbnail__paper {
+  overflow: hidden;
+  background-color: var(--tyto-checker-light);
+  box-shadow: var(--tyto-shadow-paper);
+  outline: var(--tyto-focus-width) solid transparent;
+  outline-offset: var(--tyto-hairline-width);
+}
+
+.thumbnail--on .thumbnail__paper {
+  outline-color: var(--tyto-accent);
+}
+
+.thumbnail__frame {
+  display: block;
+  border: 0;
+  /* A picture: the click lands on the thumbnail, which is what chooses it. */
+  pointer-events: none;
+}
+
+.thumbnail__label {
+  color: var(--tyto-text-muted);
+  font-size: var(--tyto-text-xs);
+  font-variant-numeric: tabular-nums;
+}
+
+.thumbnail--on .thumbnail__label {
+  color: var(--tyto-text);
+  font-weight: var(--tyto-weight-strong);
+}
+
+/* The bar's toggle for the strip: an icon, filled while the strip is shown, like the lock. */
+.preview__strip-toggle {
+  display: inline-flex;
+  align-items: center;
+  border: var(--tyto-hairline-width) solid transparent;
+  border-radius: var(--tyto-radius-sm);
+  padding: 0 var(--tyto-space-2);
+  background: none;
+  color: var(--tyto-text-muted);
+  cursor: pointer;
+}
+
+.preview__strip-toggle--on {
+  background: var(--tyto-button-on);
+  color: var(--tyto-text);
+}
+
+.preview__strip-toggle[hidden] {
+  display: none;
+}
+
+/*
  * E9.3: the problems panel and the template picker.
  *
  * The one colour decision here is the severity dot, and it is a decision the panel cannot
@@ -1035,7 +1121,6 @@ tyto-preview-pane[hidden] {
  * `display` on a class outranks the attribute's own rule, so it is restated for each.
  */
 .preview__tabs[hidden],
-.preview__slide[hidden],
 .preview__zoom[hidden] {
   display: none;
 }

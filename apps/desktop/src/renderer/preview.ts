@@ -1,6 +1,6 @@
 import { type IpcResponse } from '../../shared/ipc.js';
-import { paintArtworkList } from './panel.js';
 import { showDocument } from './show-document.js';
+import type { SlideThumbnails, Thumbnail } from './slide-thumbnails.js';
 
 /**
  * The preview pane: which frame is showing, at what size, and how it gets on screen.
@@ -53,14 +53,20 @@ export const artworksOf = (artworks: readonly Artwork[]): readonly string[] =>
  * the pane back to the first slide of the first format while somebody is typing on the
  * third. It falls back to the first frame's, which is also what the first answer of all
  * gets, since nothing was selected before it.
+ *
+ * **A slide that went clamps to the last one left** (TYTO-323): `before` is the artwork list
+ * the selection was made in, and a selected slide past the end of the new one — the last slide
+ * deleted, on slide 5 of 5 — lands on the new last slide rather than back on slide 1.
  */
 export function keepSelection(
   previous: Selection,
   frames: readonly Frame[],
   list: readonly Artwork[],
+  before: readonly Artwork[] = [],
 ): Selection {
   const formats = formatsOf(frames);
   const artworks = artworksOf(list);
+  const was = previous.artwork === undefined ? -1 : artworksOf(before).indexOf(previous.artwork);
 
   return {
     format:
@@ -70,8 +76,47 @@ export function keepSelection(
     artwork:
       previous.artwork !== undefined && artworks.includes(previous.artwork)
         ? previous.artwork
-        : artworks[0],
+        : was >= artworks.length
+          ? artworks.at(-1)
+          : artworks[0],
   };
+}
+
+/** A thumbnail's id: the slide and the format, so another format is another iframe. */
+export const thumbnailId = (artwork: string, format: string): string => `${artwork}|${format}`;
+
+/** The slide a thumbnail's id names: everything before the last `|`. */
+export const artworkOfThumbnail = (id: string): string => id.slice(0, id.lastIndexOf('|'));
+
+/**
+ * The strip's thumbnails (TYTO-323): one per slide, in the brief's order, each the selected
+ * format's frame of it and labelled with its number. A slide with no frame in that format has no
+ * thumbnail, and the slides after it keep their own numbers.
+ */
+export function thumbnailsOf(
+  state: Pick<PreviewState, 'frames' | 'artworks' | 'selection'>,
+): readonly Thumbnail[] {
+  const format = state.selection.format;
+  if (format === undefined) return [];
+  const seen = new Set<string>();
+  return state.artworks.flatMap(({ id: artwork, index }) => {
+    if (seen.has(artwork)) return [];
+    seen.add(artwork);
+    const frame = frameFor(state.frames, { format, artwork });
+    return frame === undefined
+      ? []
+      : [
+          {
+            id: thumbnailId(artwork, format),
+            // A number and not the artwork's id: `slide-1` is the IR's name for it, and a
+            // person counting slides in a carousel is counting 1, 2, 3.
+            label: String(index + 1),
+            html: frame.html,
+            width: frame.width,
+            height: frame.height,
+          },
+        ];
+  });
 }
 
 /**
@@ -160,8 +205,10 @@ export function createRequestGate(): RequestGate {
 /** The elements the pane writes into. Looked up once by `main.ts`. */
 export interface PreviewElements {
   readonly tabs: HTMLElement;
-  readonly slide: HTMLSelectElement;
-  readonly slideLabel: HTMLElement;
+  /** The slides as thumbnails, under the stage (TYTO-323); a click on one chooses it. */
+  readonly strip: SlideThumbnails;
+  /** The bar's button that hides and shows the strip, remembered per tab. */
+  readonly stripToggle: HTMLElement;
   readonly stage: HTMLElement;
   readonly paper: HTMLElement;
   readonly frame: HTMLIFrameElement;
@@ -198,6 +245,15 @@ export interface PreviewState {
    * works it out — and absent means no, which is every caller that only ever has frames.
    */
   readonly broken?: boolean;
+  /** Whether this preview tab hid its strip (TYTO-323). Absent means shown. */
+  readonly stripHidden?: boolean;
+  /** The strip's accessible name, in the window's language. */
+  readonly stripLabel?: string;
+  /**
+   * The toggle's words for each state, in the window's language: what a press does, so "Hide the
+   * slide strip" while it shows and "Show the slide strip" while it is hidden (Rafael, 2026-10-23).
+   */
+  readonly stripToggleLabels?: { readonly hide: string; readonly show: string };
 }
 
 /** The attribute a format tab carries, which is how a click knows what it selected. */
@@ -243,18 +299,30 @@ function paintTabs(tabs: HTMLElement, state: PreviewState): void {
   );
 }
 
-/** Fills the slide picker, and hides it for a brief with only one artwork. */
-function paintSlides(elements: PreviewElements, state: PreviewState): void {
-  paintArtworkList(elements.slide, {
-    artworks: state.artworks,
-    selected: state.selection.artwork,
-  });
-
-  // One slide is not a choice, and a picker with one option in it is furniture that reads
-  // like a control. The label goes with it, or it labels nothing.
-  const single = state.artworks.length <= 1;
-  elements.slide.hidden = single;
-  elements.slideLabel.hidden = single;
+/**
+ * Hands the strip its thumbnails, and hides it for a brief with only one artwork or when the tab
+ * hid it (TYTO-323). One slide is not a choice, and a strip of one is furniture that reads like a
+ * control, so its toggle goes with it.
+ */
+function paintStrip(elements: PreviewElements, state: PreviewState): void {
+  const { strip, stripToggle } = elements;
+  const single = artworksOf(state.artworks).length <= 1;
+  const shown = !single && state.stripHidden !== true;
+  stripToggle.hidden = single;
+  // The label says what a press does, so it changes with the state, and there is no
+  // `aria-pressed`: "Hide the slide strip, pressed" would announce the action and its opposite at
+  // once. A toggle keeps one label and `aria-pressed`, or changes its label and drops it; this is
+  // the second. The fill still marks the strip as shown for the eye.
+  const label = shown ? state.stripToggleLabels?.hide : state.stripToggleLabels?.show;
+  stripToggle.title = label ?? '';
+  stripToggle.setAttribute('aria-label', label ?? '');
+  stripToggle.classList.toggle('preview__strip-toggle--on', shown);
+  strip.hidden = !shown;
+  strip.label = state.stripLabel ?? '';
+  strip.items = shown ? thumbnailsOf(state) : [];
+  const { artwork, format } = state.selection;
+  strip.selected =
+    artwork === undefined || format === undefined ? undefined : thumbnailId(artwork, format);
 }
 
 /**
@@ -291,7 +359,7 @@ function paintFrame(elements: PreviewElements, frame: Frame, zoom: number): void
  */
 export function paintPreview(elements: PreviewElements, state: PreviewState): number {
   paintTabs(elements.tabs, state);
-  paintSlides(elements, state);
+  paintStrip(elements, state);
 
   const frame = frameFor(state.frames, state.selection);
 

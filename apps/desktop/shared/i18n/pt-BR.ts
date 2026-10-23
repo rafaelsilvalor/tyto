@@ -4,7 +4,9 @@ import { type Catalogue } from './catalogue.js';
 export const ptBR: Catalogue = {
   'app.name': 'Tyto',
   'preview.heading': 'Prévia',
-  'preview.slide.label': 'Slide',
+  'preview.strip.hide': 'Esconder a faixa de slides',
+  'preview.strip.show': 'Mostrar a faixa de slides',
+  'preview.strip.label': 'Faixa de slides',
   'preview.zoom.out': 'Diminuir',
   'preview.zoom.in': 'Aumentar',
   'preview.zoom.fit': 'Ajustar',

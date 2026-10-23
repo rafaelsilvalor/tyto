@@ -43,8 +43,10 @@ A prévia desenha o brief enquanto você digita. **Abrir a prévia ao lado** (**
 A barra dela tem:
 
 - um botão para cada formato que o brief pede — clique num para ver aquele tamanho;
-- **Slide** e um número para cada arte de um carrossel;
+- um botão que esconde ou mostra a faixa de slides, num carrossel;
 - **−**, o zoom, **+** e **Ajustar**, que encaixa a arte no espaço;
 - **Travar**. A prévia normalmente acompanha o brief da frente; travada, ela fica no brief que está mostrando enquanto você troca de aba, e a aba dela avisa. **Travar ou destravar a prévia** faz o mesmo pela barra de comandos.
+
+Embaixo da arte de um carrossel fica a **faixa de slides**: todos os slides no formato escolhido, pequenos e numerados a partir de 1. Clique num para mostrá-lo em cima — o editor pula para o `::lamina` que o fez — ou, com a faixa em foco, ande com **←**, **→**, **Home** e **End**. A faixa rola para o lado quando os slides não cabem, e cada aba de prévia lembra se você a escondeu.
 
 Enquanto o brief tem um erro, a prévia mantém o último desenho que funcionou, e o painel de Problemas diz o que corrigir.

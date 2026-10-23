@@ -228,11 +228,13 @@ export function createSessionService(options: SessionServiceOptions): SessionSer
         groups === undefined
           ? undefined
           : prunedGroups(groups, (tab) => {
-              if (!('documentId' in tab)) return { view: 'preview' as const };
+              const strip = 'stripHidden' in tab && tab.stripHidden === true;
+              const hidden = strip ? { stripHidden: true as const } : {};
+              if (!('documentId' in tab)) return { view: 'preview' as const, ...hidden };
               const at = keptIndex.get(tab.documentId);
               if (at === undefined) return undefined;
               if ('locked' in tab)
-                return { tab: at, view: 'preview' as const, locked: true as const };
+                return { tab: at, view: 'preview' as const, locked: true as const, ...hidden };
               return { tab: at, ...(tab.place === null ? {} : { place: tab.place }) };
             });
       return {
@@ -266,7 +268,7 @@ export function createSessionService(options: SessionServiceOptions): SessionSer
         stored.groups === undefined
           ? undefined
           : prunedGroups(stored.groups, (tab) => {
-              if (!('tab' in tab)) return { view: 'preview' as const };
+              if (!('tab' in tab)) return tab;
               const restored = tabs[tab.tab];
               if (restored === undefined) return undefined;
               if ('locked' in tab) return isBriefBack(restored) ? tab : undefined;

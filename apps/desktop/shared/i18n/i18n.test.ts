@@ -37,10 +37,10 @@ describe('the catalogue', () => {
     // disagree with the vocabulary its users already have.
     //
     // E9.2 added two of the same kind. `editor.heading` was "Brief", the title over the
-    // editor until each group became a pane of its own (TYTO-288). `preview.slide.label` is
-    // "Slide", which
-    // Portuguese borrowed whole; "Lâmina" is what a projector manual says and not what
-    // anybody making a carousel says.
+    // editor until each group became a pane of its own (TYTO-288). The other was the preview's
+    // "Slide" picker, gone with TYTO-323; `templateMode.slide` below keeps its reason: "Slide"
+    // is a word Portuguese borrowed whole, and "Lâmina" is what a projector manual says and not
+    // what anybody making a carousel says.
     //
     // So the acceptance criterion is read as it is meant: every string that *has* a
     // translation changes. `shell.test.ts` and the end-to-end suite both count against this
@@ -49,7 +49,6 @@ describe('the catalogue', () => {
 
     expect(shared).toEqual([
       'app.name',
-      'preview.slide.label',
       // "Template" is the word in both languages, the same way "Slide" is: it is what the
       // frontmatter key is called and what a Portuguese speaker says out loud.
       'template.label',
@@ -58,7 +57,7 @@ describe('the catalogue', () => {
       // "Resumo" would name something else.
       'panel.editor',
       'shell.about.templates',
-      // TYTO-44's slide picker, for `preview.slide.label`'s reason.
+      // TYTO-44's slide picker: "Slide", which Portuguese borrowed whole (above).
       'templateMode.slide',
       // TYTO-276's heading over the templates in the "/" menu, for `template.label`'s reason.
       'slash.section.templates',

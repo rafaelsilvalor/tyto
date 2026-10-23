@@ -162,16 +162,16 @@ describe('the main screen', () => {
     expect(nodes).toBeGreaterThan(0);
   });
 
-  it('offers one tab per format and a slide picker only when there are slides', async () => {
+  it('offers one tab per format and a slide strip only when there are slides', async () => {
     const tabs = await page
       .locator('tyto-preview-pane:not([hidden]) .preview__tab')
       .allTextContents();
 
     expect(tabs.length).toBeGreaterThan(0);
     expect(await page.locator('tyto-preview-pane:not([hidden]) .preview__tab--on').count()).toBe(1);
-    // `promo-curso` is a single artwork, so the picker is furniture and stays hidden.
+    // `promo-curso` is a single artwork, so the strip is furniture and stays hidden (TYTO-323).
     expect(
-      await page.locator('tyto-preview-pane:not([hidden]) [data-preview-slide]').isVisible(),
+      await page.locator('tyto-preview-pane:not([hidden]) [data-preview-strip]').isVisible(),
     ).toBe(false);
   });
 
@@ -377,9 +377,9 @@ describe('a template whose body is code', () => {
     expect(html).toContain('@assinatura');
   });
 
-  it('offers the slide picker, because the brief made more than one artwork', async () => {
+  it('offers the slide strip, because the brief made more than one artwork', async () => {
     await expect
-      .poll(() => page.locator('tyto-preview-pane:not([hidden]) [data-preview-slide]').isVisible())
+      .poll(() => page.locator('tyto-preview-pane:not([hidden]) [data-preview-strip]').isVisible())
       .toBe(true);
   });
 
