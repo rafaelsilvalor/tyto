@@ -118,49 +118,67 @@ const rows = (): Promise<string[][]> =>
   }, THUMBNAIL);
 
 /**
- * Pixels on the right and bottom edges of every thumbnail on screen that are not the slide's own
- * fill, by thumbnail label (TYTO-323). The seam it looks for: at 125 % a paper's light background
- * was snapped out to a device pixel its scaled document did not reach, so the last column or row
- * read 135,142,156 (light theme) against the slide's 20,33,61. Read off the screenshot's own
- * device pixels, each paper's last column and row against the pixel four device pixels in from
- * it; `guarda-teste` fills its edges with one colour and draws nothing near them, so a difference
- * over 24 in a channel is something other than the slide showing.
+ * Pixels of every thumbnail's paper that show past its document, by thumbnail label (TYTO-323).
+ * The seam it looks for: at 125 % a paper's light background was snapped out to a device pixel
+ * its scaled document did not reach, a 1 px light line on a thumbnail's right or bottom edge. The
+ * paper is painted magenta for the measure, so a bare pixel is told from an edge's ordinary
+ * antialiasing by its colour: the edges of `guarda-teste`'s slides are navy, and neither they nor
+ * the window around them is both redder and bluer than it is green.
  */
 async function bareEdges(): Promise<Record<string, number>> {
+  await page.addStyleTag({
+    content: '.thumbnail__paper { background: #ff00ff !important; }',
+  });
+  await page.evaluate(
+    () => new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve))),
+  );
+  await page.waitForTimeout(200);
   const { ratio, papers } = await page.evaluate(
     (selector) => ({
       ratio: window.devicePixelRatio,
       papers: [...document.querySelectorAll<HTMLElement>(selector)].map((cell) => {
         const box = cell.querySelector<HTMLElement>('.thumbnail__paper')!.getBoundingClientRect();
-        return { label: cell.textContent?.trim() ?? '', box: box.toJSON() as DOMRectReadOnly };
+        return {
+          label: cell.textContent?.trim() ?? '',
+          left: box.left,
+          top: box.top,
+          right: box.right,
+          bottom: box.bottom,
+        };
       }),
     }),
     THUMBNAIL,
   );
   const png = PNG.sync.read(await page.screenshot());
-  const pixel = (x: number, y: number): number[] => {
+  await page.evaluate(() => {
+    for (const style of document.querySelectorAll('style')) {
+      if (style.textContent?.includes('#ff00ff') === true) style.remove();
+    }
+  });
+  const magenta = (x: number, y: number): boolean => {
     const at = (png.width * y + x) * 4;
-    return [png.data[at]!, png.data[at + 1]!, png.data[at + 2]!];
+    const [red, green, blue] = [png.data[at]!, png.data[at + 1]!, png.data[at + 2]!];
+    return red - green > 40 && blue - green > 40;
   };
-  const differs = (a: number[], b: number[]): boolean =>
-    a.some((value, channel) => Math.abs(value - b[channel]!) > 24);
   const found: Record<string, number> = {};
-  for (const { label, box } of papers) {
-    // The device pixels the paper's snapped background covers.
-    const left = Math.round(box.left * ratio);
-    const top = Math.round(box.top * ratio);
-    const right = Math.round(box.right * ratio) - 1;
-    const bottom = Math.round(box.bottom * ratio) - 1;
+  for (const paper of papers) {
+    // Every device pixel the paper touches, one more each way for a snapped edge.
+    const left = Math.floor(paper.left * ratio) - 1;
+    const top = Math.floor(paper.top * ratio) - 1;
+    const right = Math.ceil(paper.right * ratio);
+    const bottom = Math.ceil(paper.bottom * ratio);
     // Off screen, or partly: a strip scrolled sideways has cells past the window's edge.
-    if (left < 0 || right >= png.width || bottom >= png.height) continue;
+    if (left < 0 || top < 0 || right >= png.width || bottom >= png.height) continue;
+    // Only the band of three device pixels along each edge: inside it the slide's own text is
+    // drawn with subpixel antialiasing, whose fringes can be magenta-ish too (seen at 100 % on
+    // "Grade", 116,68,121), and is no seam.
+    const band = (x: number, y: number): boolean =>
+      x - left < 3 || right - x < 3 || y - top < 3 || bottom - y < 3;
     let bare = 0;
-    for (let y = top + 4; y <= bottom - 4; y += 1) {
-      if (differs(pixel(right, y), pixel(right - 4, y))) bare += 1;
+    for (let y = top; y <= bottom; y += 1) {
+      for (let x = left; x <= right; x += 1) if (band(x, y) && magenta(x, y)) bare += 1;
     }
-    for (let x = left + 4; x <= right - 4; x += 1) {
-      if (differs(pixel(x, bottom), pixel(x, bottom - 4))) bare += 1;
-    }
-    if (bare > 0) found[label] = bare;
+    if (bare > 0) found[paper.label] = bare;
   }
   return found;
 }
