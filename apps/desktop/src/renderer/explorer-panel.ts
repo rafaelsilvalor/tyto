@@ -10,6 +10,7 @@ import {
   EMPTY_TREE,
   collapseAll,
   foldersToRelist,
+  isMenuKey,
   moveFor,
   parentOf,
   rowsOf,
@@ -42,7 +43,8 @@ import { DockedPanel } from './panels.js';
  * and from Delete. A name is typed in a field in the tree: Enter or leaving the field confirms
  * it, Escape cancels it, and a name main refuses keeps the field open with a line under it.
  * A delete always asks first, in main's dialog, and goes to the system's trash. The tool header
- * has New File and New Folder too, beside Collapse All (TYTO-365).
+ * has New File and New Folder too, beside Collapse All (TYTO-365), and Shift+F10 or the
+ * ContextMenu key opens the context menu under the selected row (TYTO-364).
  *
  * The tree is a value (`explorer-tree.ts`); this element draws it and turns clicks and keys into
  * the next value. It lives as long as the dock keeps it: closing the panel forgets which folders
@@ -190,6 +192,12 @@ export class ExplorerPanel extends DockedPanel {
   private committing = false;
   /** The row the tree moves the focus to on the next draw, after the field closed. */
   private focusSelected = false;
+  /**
+   * A context menu is on screen. Chromium follows the ContextMenu key with a `contextmenu`
+   * event of its own (the e2e measured a second menu with neither this nor `onKeyUp`); either
+   * one alone keeps that from asking twice, and both are kept.
+   */
+  private menuOpen = false;
 
   constructor() {
     super();
@@ -271,10 +279,11 @@ export class ExplorerPanel extends DockedPanel {
   private onKey(event: KeyboardEvent): void {
     // The field's keys are the field's: an arrow moves the caret, not the selection.
     if (event.target instanceof HTMLInputElement) return;
-    const move = moveFor(this.tree, event.key);
+    const move = moveFor(this.tree, event.key, event.shiftKey);
     if (move === undefined) return;
     event.preventDefault();
-    if (move.do === 'select') this.tree = withSelected(this.tree, move.id);
+    if (move.do === 'menu') void this.menuFromKey(move.id, event.target);
+    else if (move.do === 'select') this.tree = withSelected(this.tree, move.id);
     else if (move.do === 'expand') this.toggle(move.id, move.open);
     else if (move.do === 'rename') this.tree = startRenaming(this.tree, move.id);
     else if (move.do === 'delete') void this.trashEntry(move.id);
@@ -373,14 +382,48 @@ export class ExplorerPanel extends DockedPanel {
     }
   }
 
-  private async onContextMenu(
-    event: MouseEvent,
-    row?: ExplorerRow & { type: 'entry' },
-  ): Promise<void> {
+  /** Key up of the ContextMenu key: the menu opened on key down, so Chromium's is not asked. */
+  private onKeyUp(event: KeyboardEvent): void {
+    if (event.target instanceof HTMLInputElement) return;
+    if (isMenuKey(event.key, event.shiftKey)) event.preventDefault();
+  }
+
+  private onContextMenu(event: MouseEvent, row?: ExplorerRow & { type: 'entry' }): void {
     event.preventDefault();
     event.stopPropagation();
+    void this.openMenu(event.clientX, event.clientY, row);
+  }
+
+  /**
+   * Shift+F10 or the ContextMenu key (TYTO-364): the menu a right click opens, under the left
+   * edge of the selected row, or of the focused one when none is selected and the menu is the
+   * empty space's.
+   */
+  private async menuFromKey(id: string | null, focused: EventTarget | null): Promise<void> {
+    const row =
+      id === null
+        ? undefined
+        : rowsOf(this.tree).find(
+            (each): each is ExplorerRow & { type: 'entry' } =>
+              each.type === 'entry' && each.entry.id === id,
+          );
+    const anchor =
+      (id === null
+        ? undefined
+        : this.querySelector<HTMLElement>('.explorer__row[aria-selected="true"]')) ??
+      (focused instanceof HTMLElement ? focused : undefined);
+    const box = anchor?.getBoundingClientRect();
+    await this.openMenu(box?.left ?? 0, box?.bottom ?? 0, row);
+  }
+
+  /** The context menu at a point: four items on a row, the two New items on the empty space. */
+  private async openMenu(
+    x: number,
+    y: number,
+    row?: ExplorerRow & { type: 'entry' },
+  ): Promise<void> {
     if (this.folderName === null || this.folderName === undefined) return;
-    if (this.tree.editing !== undefined) return;
+    if (this.tree.editing !== undefined || this.menuOpen) return;
     this.notice = undefined;
     if (row !== undefined) this.tree = withSelected(this.tree, row.entry.id);
     const ids: readonly MenuId[] =
@@ -393,7 +436,13 @@ export class ExplorerPanel extends DockedPanel {
             EXPLORER_MENU.delete,
           ];
     const items = ids.map((id) => ({ id, label: this.say(id), enabled: true }));
-    const chosen = await this.source.menu(event.clientX, event.clientY, items);
+    this.menuOpen = true;
+    let chosen: string | null;
+    try {
+      chosen = await this.source.menu(x, y, items);
+    } finally {
+      this.menuOpen = false;
+    }
     // On the panel's empty space a new entry goes in the open folder itself.
     const parent = row === undefined ? null : undefined;
     if (chosen === EXPLORER_MENU.newFile) this.startNew('file', parent);
@@ -473,7 +522,7 @@ export class ExplorerPanel extends DockedPanel {
         class="explorer__body"
         data-font-area="explorer"
         @contextmenu=${(event: MouseEvent) => {
-          void this.onContextMenu(event);
+          this.onContextMenu(event);
         }}
       >
         ${this.body()}
@@ -506,6 +555,9 @@ export class ExplorerPanel extends DockedPanel {
       aria-label=${this.folderName}
       @keydown=${(event: KeyboardEvent) => {
         this.onKey(event);
+      }}
+      @keyup=${(event: KeyboardEvent) => {
+        this.onKeyUp(event);
       }}
     >
       ${repeat(
@@ -591,7 +643,7 @@ export class ExplorerPanel extends DockedPanel {
         if (row.renaming !== true) this.activate(row);
       }}
       @contextmenu=${(event: MouseEvent) => {
-        void this.onContextMenu(event, row);
+        this.onContextMenu(event, row);
       }}
     >
       <span class="explorer__chevron"

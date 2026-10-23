@@ -43,7 +43,7 @@ Each entry has an icon for its type: a brief, an image, a font, a JSON file, a t
 
 ### New, rename and delete
 
-Right-click an entry for **New File…**, **New Folder…**, **Rename…** and **Delete**; right-click the empty space below the list for the two **New** items.
+Right-click an entry for **New File…**, **New Folder…**, **Rename…** and **Delete**; right-click the empty space below the list for the two **New** items. From the keyboard, **Shift+F10** or the **Menu** key opens the same menu under the selected entry; with no entry selected, it offers the two **New** items.
 
 While a folder is open, the Explorer's header has three buttons beside its **×**: **New File…** and **New Folder…** open the same field as the menu, in the same place, and **Collapse All** closes every open folder, at every depth. There is no refresh button: the Explorer lists again on its own when the folder changes.
 

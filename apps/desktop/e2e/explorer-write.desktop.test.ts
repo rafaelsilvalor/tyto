@@ -231,6 +231,75 @@ describe('new, rename and delete from the explorer (TYTO-352)', () => {
     expect(offered.at(-1)).toEqual(['New File…', 'New Folder…']);
   }, 30_000);
 
+  it('opens the menu from the keyboard under the row, once per key (TYTO-364)', async () => {
+    // A popup that records what it was asked, and where, and picks `pick` (none past the end).
+    const stub = (pick: number) =>
+      app!.evaluate(({ Menu }, index) => {
+        const store = globalThis as {
+          keyed?: { labels: string[]; x: number | undefined; y: number | undefined }[];
+        };
+        store.keyed = [];
+        Menu.prototype.popup = function popup(this: Electron.Menu, options) {
+          store.keyed!.push({
+            labels: this.items.map((item) => item.label),
+            x: options?.x,
+            y: options?.y,
+          });
+          options?.callback?.();
+          setTimeout(() => {
+            this.items[index]?.click();
+          }, 20);
+        };
+      }, pick);
+    const keyed = () =>
+      app!.evaluate(
+        () =>
+          (
+            globalThis as {
+              keyed?: { labels: string[]; x: number | undefined; y: number | undefined }[];
+            }
+          ).keyed ?? [],
+      );
+    const under = async (name: string): Promise<{ x: number; y: number }> => {
+      const zoom = await app!.evaluate(({ BrowserWindow }) =>
+        BrowserWindow.getAllWindows()[0]!.webContents.getZoomFactor(),
+      );
+      const box = await row(name).evaluate((each) => each.getBoundingClientRect().toJSON());
+      const { left, bottom } = box as { left: number; bottom: number };
+      return { x: Math.round(left * zoom), y: Math.round(bottom * zoom) };
+    };
+    const rowItems = ['New File…', 'New Folder…', 'Rename…', 'Delete'];
+
+    await stub(99);
+    await row('logo.png').click();
+    await row('logo.png').focus();
+    await window.keyboard.press('Shift+F10');
+    await expect.poll(keyed).toHaveLength(1);
+    // The window hears the answer after main's 50 ms grace; a key before it finds a menu open.
+    await new Promise((resolve) => setTimeout(resolve, 300));
+    await window.keyboard.press('ContextMenu');
+    await expect.poll(keyed).toHaveLength(2);
+    // Chromium's own contextmenu after the key, on key up on Windows, asks for no third.
+    await new Promise((resolve) => setTimeout(resolve, 300));
+    const seen = await keyed();
+    process.stdout.write(`[TYTO-364] menus asked from the keyboard: ${JSON.stringify(seen)}
+`);
+    const at = await under('logo.png');
+    expect(seen).toEqual([
+      { labels: rowItems, ...at },
+      { labels: rowItems, ...at },
+    ]);
+
+    await stub(0);
+    await row('logo.png').focus();
+    await window.keyboard.press('Shift+F10');
+    await field().waitFor();
+    expect(await field().evaluate((each) => each === document.activeElement)).toBe(true);
+    await window.keyboard.press('Escape');
+    await expect.poll(() => field().count()).toBe(0);
+    await pickFromMenu(null);
+  }, 30_000);
+
   it('renames an open tab’s file with F2, keeps its text unsaved, and saves to the new path', async () => {
     await row('briefs').click();
     await row('capa.brief').waitFor();
