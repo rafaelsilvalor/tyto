@@ -102,7 +102,8 @@ html, width, height }` — and not the preview's `Frame`, so a later strip of an
   `<tyto-slide-thumbnails>` with `layout: 'grid'`, not a second element: the two modes share one
   set of iframes, so a keystroke on slide 3 re-navigates one document whichever mode is on, and a
   mode switch navigates none. The grid takes the stage's room, wraps the slides in order and draws
-  them at the height `gridThumbnailHeight` picks so all of them fit (never past 1:1, never under
+  them at the height and column count `gridThumbnailLayout` picks so all of them fit, rows
+  filling from the left (never past 1:1, never under
   64 px, where it scrolls down); a click or Enter on a slide opens it in One slide mode and
   reveals its `::lamina`, the arrows only choose. The bar gains two segmented buttons, **One
   slide** and **All slides** (`preview.mode.one`, `preview.mode.all`, with `aria-pressed`), and
@@ -113,3 +114,8 @@ html, width, height }` — and not the preview's `Frame`, so a later strip of an
   flag is kept for One slide, the stage keeps only the stale marker, and a brief of one slide
   shows it large whatever the mode. The manual's scenes `preview-strip` and `preview-all-slides`
   are added and `window-tour` retaken, so the picker is out of the pictures.
+- **2026-10-23, same pull request, after review:** a thumbnail's document is drawn 1 CSS px past
+  its paper on the right and bottom (`THUMBNAIL_BLEED`), clipped by it. At 125 % the paper's
+  light background is snapped out to a device pixel the transformed document did not reach, which
+  showed as a 1 px light line on a thumbnail's edge. The grid is a CSS grid of
+  `gridThumbnailLayout`'s column count, so a short last row starts under slide 1.

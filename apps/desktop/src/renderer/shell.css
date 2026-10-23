@@ -1089,15 +1089,19 @@ tyto-preview-pane[hidden] {
 
 /*
  * TYTO-323: All slides mode. The same element as the strip, given the stage's room: the slides
- * wrap in rows, in order, at the height `gridThumbnailHeight` works out so they all fit, and the
+ * fill rows from the left, in order, at the height and column count `gridThumbnailLayout` works out
+ * so they all fit, and the
  * grid scrolls down only once that height would fall under its minimum.
  */
 .preview__strip.thumbnails--grid {
+  /* A grid and not a wrapping row: a short last row starts under the first slide (TYTO-323). */
+  display: grid;
+  grid-template-columns: repeat(var(--thumbnail-columns, 1), max-content);
+  grid-auto-rows: max-content;
   flex: 1;
   min-height: 0;
-  flex-wrap: wrap;
   align-content: safe center;
-  justify-content: center;
+  justify-content: safe center;
   overflow-x: hidden;
   overflow-y: auto;
   padding: var(--tyto-space-6);

@@ -4,6 +4,7 @@ import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 import { type ElectronApplication, type Page, _electron } from 'playwright';
+import { PNG } from 'pngjs';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 
 import { closeApp } from './close-app.js';
@@ -31,6 +32,8 @@ const built = join(here, '..', 'out', 'main', 'index.js');
 const TEMPLATES = join(here, '__fixtures__', 'templates');
 const shots = process.env['TYTO_GRID_SHOTS'];
 const measureShown = process.env['TYTO_PREVIEW_SHOWN'] === '1';
+/** `TYTO_GRID_SCALE=1` forces a device scale factor, to photograph the grid at 100 % on a 125 % screen. */
+const scale = process.env['TYTO_GRID_SCALE'];
 
 const THUMBNAILS = `${SHOWN_PREVIEW} [data-preview-strip]`;
 const THUMBNAIL = `${THUMBNAILS} [data-thumbnail]`;
@@ -61,7 +64,11 @@ async function type(text: string): Promise<void> {
 
 const launch = async (): Promise<void> => {
   app = await _electron.launch({
-    args: ['.', `--user-data-dir=${userData}`],
+    args: [
+      '.',
+      `--user-data-dir=${userData}`,
+      ...(scale === undefined ? [] : [`--force-device-scale-factor=${scale}`]),
+    ],
     cwd: join(here, '..'),
     env: { ...process.env, TYTO_HEADLESS: '1', TYTO_HOME: join(scratch, 'tyto-home') },
   });
@@ -109,6 +116,54 @@ const rows = (): Promise<string[][]> =>
     }
     return [...byTop.entries()].sort(([a], [b]) => a - b).map(([, row]) => row);
   }, THUMBNAIL);
+
+/**
+ * Pixels on the right and bottom edges of every thumbnail on screen that are not the slide's own
+ * fill, by thumbnail label (TYTO-323). The seam it looks for: at 125 % a paper's light background
+ * was snapped out to a device pixel its scaled document did not reach, so the last column or row
+ * read 135,142,156 (light theme) against the slide's 20,33,61. Read off the screenshot's own
+ * device pixels, each paper's last column and row against the pixel four device pixels in from
+ * it; `guarda-teste` fills its edges with one colour and draws nothing near them, so a difference
+ * over 24 in a channel is something other than the slide showing.
+ */
+async function bareEdges(): Promise<Record<string, number>> {
+  const { ratio, papers } = await page.evaluate(
+    (selector) => ({
+      ratio: window.devicePixelRatio,
+      papers: [...document.querySelectorAll<HTMLElement>(selector)].map((cell) => {
+        const box = cell.querySelector<HTMLElement>('.thumbnail__paper')!.getBoundingClientRect();
+        return { label: cell.textContent?.trim() ?? '', box: box.toJSON() as DOMRectReadOnly };
+      }),
+    }),
+    THUMBNAIL,
+  );
+  const png = PNG.sync.read(await page.screenshot());
+  const pixel = (x: number, y: number): number[] => {
+    const at = (png.width * y + x) * 4;
+    return [png.data[at]!, png.data[at + 1]!, png.data[at + 2]!];
+  };
+  const differs = (a: number[], b: number[]): boolean =>
+    a.some((value, channel) => Math.abs(value - b[channel]!) > 24);
+  const found: Record<string, number> = {};
+  for (const { label, box } of papers) {
+    // The device pixels the paper's snapped background covers.
+    const left = Math.round(box.left * ratio);
+    const top = Math.round(box.top * ratio);
+    const right = Math.round(box.right * ratio) - 1;
+    const bottom = Math.round(box.bottom * ratio) - 1;
+    // Off screen, or partly: a strip scrolled sideways has cells past the window's edge.
+    if (left < 0 || right >= png.width || bottom >= png.height) continue;
+    let bare = 0;
+    for (let y = top + 4; y <= bottom - 4; y += 1) {
+      if (differs(pixel(right, y), pixel(right - 4, y))) bare += 1;
+    }
+    for (let x = left + 4; x <= right - 4; x += 1) {
+      if (differs(pixel(x, bottom), pixel(x, bottom - 4))) bare += 1;
+    }
+    if (bare > 0) found[label] = bare;
+  }
+  return found;
+}
 
 /** Screenshots in both schemes, when asked for; the window is left light. */
 const shoot = async (name: string, clip?: string): Promise<void> => {
@@ -286,6 +341,24 @@ describe('the preview’s All slides mode (TYTO-323)', () => {
     const grid = await rows();
     expect(grid.length).toBeGreaterThan(1);
     expect(grid.flat()).toEqual(['1', '2', '3', '4', '5', '6', '7', '8', '9', '10']);
+    // Rows fill from the left: the short last row starts under slide 1, not in the middle.
+    const lefts = await page.evaluate(
+      (selector) =>
+        Object.fromEntries(
+          [...document.querySelectorAll<HTMLElement>(selector)].map((cell) => [
+            cell.textContent?.trim() ?? '',
+            Math.round(cell.getBoundingClientRect().left),
+          ]),
+        ),
+      THUMBNAIL,
+    );
+    const lastRow = grid.at(-1)!;
+    expect(lastRow.length).toBeLessThan(grid[0]!.length);
+    expect(
+      lastRow.map((label) => lefts[label]),
+      'left edges of the last row, against the first row’s',
+    ).toEqual(grid[0]!.slice(0, lastRow.length).map((label) => lefts[label]));
+    expect(await bareEdges(), 'paper pixels on the grid thumbnails’ edges, by slide').toEqual({});
     expect(await page.locator(`${SHOWN_PREVIEW} [data-preview-stage]`).isVisible()).toBe(false);
     expect(await page.locator(MODE('all')).getAttribute('aria-pressed')).toBe('true');
     await shoot('grid-ten-slides');
@@ -317,6 +390,9 @@ describe('the preview’s All slides mode (TYTO-323)', () => {
     expect(await page.locator(`${THUMBNAIL}[aria-selected="true"]`).textContent()).toContain('7');
     // The editor follows, as the strip's click makes it.
     await expect.poll(activeLine).toContain('item7fim');
+    // The strip draws its thumbnails through the same box, so it has no seam either.
+    await page.waitForTimeout(500);
+    expect(await bareEdges(), 'paper pixels on the strip thumbnails’ edges, by slide').toEqual({});
   });
 
   it('keeps the mode through a reload and a quit', async () => {

@@ -10,7 +10,7 @@ import { cellScale } from './template-mode.js';
  *
  * **Two layouts, one element.** `strip` is the row under the stage in One slide mode; `grid` is
  * All slides mode, every slide wrapped in rows and scaled so they all fit the pane
- * ({@link gridThumbnailHeight}). The preview switches the layout of the same element rather than
+ * ({@link gridThumbnailLayout}). The preview switches the layout of the same element rather than
  * drawing a second one, so a brief's thumbnails are one set of iframes whatever the mode, and a
  * keystroke re-navigates one of them, not one per mode. In the grid a click *opens* a slide
  * (`open`), which the preview turns into One slide mode on it; the keys still only choose.
@@ -63,28 +63,75 @@ export interface GridChrome {
   readonly cellHeight: number;
 }
 
+/** How the grid is drawn: each thumbnail's height, and how many go in a row. */
+export interface GridLayout {
+  readonly height: number;
+  readonly columns: number;
+}
+
 /**
- * How tall the grid's thumbnails are drawn so that `count` slides of one format fit `box`
- * (TYTO-323): every column count is tried, and the one that leaves the largest picture wins. Never
- * past the format's own size, and never under {@link GRID_MINIMUM_HEIGHT}, where a 40-slide brief
- * in a small pane scrolls rather than shrinks to stamps.
+ * How the grid's thumbnails are drawn so that `count` slides of one format fit `box` (TYTO-323):
+ * every column count is tried, and the one that leaves the largest picture wins. Never past the
+ * format's own size, and never under {@link GRID_MINIMUM_HEIGHT}, where a 40-slide brief in a
+ * small pane scrolls rather than shrinks to stamps; there the columns are as many as fit across.
+ * The rows fill from the left, so a short last row starts under the first slide.
  */
-export function gridThumbnailHeight(
+export function gridThumbnailLayout(
   count: number,
   format: { readonly width: number; readonly height: number },
   box: { readonly width: number; readonly height: number },
   chrome: GridChrome,
-): number {
-  if (count <= 0 || box.width <= 0 || box.height <= 0 || format.width <= 0) return THUMBNAIL_HEIGHT;
+): GridLayout {
+  if (count <= 0 || box.width <= 0 || box.height <= 0 || format.width <= 0) {
+    return { height: THUMBNAIL_HEIGHT, columns: Math.max(count, 1) };
+  }
   const aspect = format.width / format.height;
   let best = 0;
+  let bestColumns = 1;
   for (let columns = 1; columns <= count; columns += 1) {
     const rows = Math.ceil(count / columns);
     const width = (box.width - chrome.gap * (columns - 1)) / columns - chrome.cellWidth;
     const height = (box.height - chrome.gap * (rows - 1)) / rows - chrome.cellHeight;
-    best = Math.max(best, Math.min(height, width / aspect));
+    const fits = Math.min(height, width / aspect);
+    if (fits > best) {
+      best = fits;
+      bestColumns = columns;
+    }
   }
-  return Math.max(GRID_MINIMUM_HEIGHT, Math.floor(Math.min(best, format.height)));
+  const height = Math.floor(Math.min(best, format.height));
+  if (height >= GRID_MINIMUM_HEIGHT) return { height, columns: bestColumns };
+  const cell = GRID_MINIMUM_HEIGHT * aspect + chrome.cellWidth + chrome.gap;
+  const across = Math.floor((box.width + chrome.gap) / cell);
+  return { height: GRID_MINIMUM_HEIGHT, columns: Math.min(count, Math.max(across, 1)) };
+}
+
+/**
+ * How far past its paper a thumbnail's document is drawn, in CSS pixels, on the right and bottom.
+ * The paper clips it.
+ */
+export const THUMBNAIL_BLEED = 1;
+
+/**
+ * A thumbnail's paper and the scale its document is drawn at (TYTO-323). The paper is the scaled
+ * size rounded down, and the document is scaled to {@link THUMBNAIL_BLEED} past it on both axes,
+ * clipped by the paper. At a fractional device pixel ratio (125 % on Windows) the paper's light
+ * background is snapped out to the next device pixel and the transformed document is not: drawn
+ * exactly to the paper's edge, the document left that pixel bare, a 1 px light line down a
+ * thumbnail's right or bottom edge. Drawn past it, the clip ends where the background does. It
+ * costs the slide's last pixel of edge at thumbnail size.
+ */
+export function thumbnailBox(
+  format: { readonly width: number; readonly height: number },
+  height: number,
+): { readonly width: number; readonly height: number; readonly scale: number } {
+  const fitted = cellScale(format, { width: Number.POSITIVE_INFINITY, height });
+  const width = Math.max(Math.floor(format.width * fitted), 1);
+  const drawn = Math.max(Math.floor(format.height * fitted), 1);
+  const scale = Math.max(
+    (width + THUMBNAIL_BLEED) / format.width,
+    (drawn + THUMBNAIL_BLEED) / format.height,
+  );
+  return { width, height: drawn, scale };
 }
 
 /** The keys that move the selection while the row has focus, and where each one goes. */
@@ -115,6 +162,7 @@ export class SlideThumbnails extends LitElement {
     label: { attribute: false },
     layout: { attribute: false },
     gridHeight: { state: true },
+    gridColumns: { state: true },
   };
 
   declare items: readonly Thumbnail[];
@@ -124,6 +172,8 @@ export class SlideThumbnails extends LitElement {
   declare layout: ThumbnailLayout;
   /** How tall a grid thumbnail is drawn, measured off the element's box. */
   declare private gridHeight: number;
+  /** How many grid thumbnails go in a row, from the same measure. */
+  declare private gridColumns: number;
   /** Called with a thumbnail's id when it is clicked or reached with a key. */
   choose: (id: string) => void = () => undefined;
   /** Called with a thumbnail's id when it is clicked, or Enter is pressed on it, in the grid. */
@@ -144,6 +194,7 @@ export class SlideThumbnails extends LitElement {
     this.label = '';
     this.layout = 'strip';
     this.gridHeight = THUMBNAIL_HEIGHT;
+    this.gridColumns = 1;
   }
 
   /** Light DOM, so `shell.css` reaches inside — the reasoning is in ADR 0024. */
@@ -159,7 +210,7 @@ export class SlideThumbnails extends LitElement {
     // the state to say so. jsdom has neither observer, and lays nothing out to observe.
     if (typeof ResizeObserver !== 'undefined') {
       this.resizes = new ResizeObserver(() => {
-        if (this.layout === 'grid') this.gridHeight = this.measuredGridHeight();
+        if (this.layout === 'grid') this.measureGrid();
       });
       this.resizes.observe(this);
     }
@@ -205,13 +256,9 @@ export class SlideThumbnails extends LitElement {
     else this.requestUpdate();
   };
 
-  /** How many thumbnails the first row holds: all of them in the strip. */
+  /** How many thumbnails a row holds: all of them in the strip. */
   private columns(): number {
-    if (this.layout === 'strip') return this.items.length;
-    const cells = [...this.querySelectorAll<HTMLElement>('[data-thumbnail]')];
-    const top = cells[0]?.offsetTop;
-    const columns = cells.filter((cell) => cell.offsetTop === top).length;
-    return Math.max(columns, 1);
+    return this.layout === 'strip' ? this.items.length : this.gridColumns;
   }
 
   private shows(id: string): boolean {
@@ -219,13 +266,13 @@ export class SlideThumbnails extends LitElement {
   }
 
   /**
-   * The grid's thumbnail height for the room the element has now. The chrome is read off a
-   * drawn cell — its padding and its number — and the gap and padding off the element, so the
-   * sizes stay `shell.css`'s.
+   * The grid's thumbnail height and columns for the room the element has now. The chrome is read
+   * off a drawn cell — its padding and its number — and the gap and padding off the element, so
+   * the sizes stay `shell.css`'s.
    */
-  private measuredGridHeight(): number {
+  private measureGrid(): void {
     const format = this.items[0];
-    if (format === undefined) return this.gridHeight;
+    if (format === undefined) return;
     const style = getComputedStyle(this);
     const pixels = (value: string): number => Number.parseFloat(value) || 0;
     const box = {
@@ -242,8 +289,10 @@ export class SlideThumbnails extends LitElement {
       cellHeight: cell && paper ? Math.ceil(cell.height - paper.height) + 1 : 0,
     };
     // A box with no size (jsdom, a pane not laid out yet) keeps what it had.
-    if (box.width <= 0 || box.height <= 0) return this.gridHeight;
-    return gridThumbnailHeight(this.items.length, format, box, chrome);
+    if (box.width <= 0 || box.height <= 0) return;
+    const layout = gridThumbnailLayout(this.items.length, format, box, chrome);
+    this.gridHeight = layout.height;
+    this.gridColumns = layout.columns;
   }
 
   protected override willUpdate(changed: PropertyValues<this>): void {
@@ -251,8 +300,10 @@ export class SlideThumbnails extends LitElement {
     // The class is on before the box is read, so the element is measured as the grid it is
     // about to be: a strip turned grid takes the pane.
     if (this.layout === 'grid' && (changed.has('layout') || changed.has('items'))) {
-      this.gridHeight = this.measuredGridHeight();
+      this.measureGrid();
     }
+    // The rows are a CSS grid of this many columns, so a short last row starts at the left.
+    this.style.setProperty('--thumbnail-columns', String(this.gridColumns));
   }
 
   protected override render(): unknown {
@@ -269,9 +320,7 @@ export class SlideThumbnails extends LitElement {
       this.items,
       (item) => item.id,
       (item) => {
-        const scale = cellScale(item, { width: Number.POSITIVE_INFINITY, height });
-        const width = Math.round(item.width * scale);
-        const drawn = Math.round(item.height * scale);
+        const { width, height: drawn, scale } = thumbnailBox(item, height);
         const on = item.id === this.selected;
         return html`<figure
           class="thumbnail ${on ? 'thumbnail--on' : ''}"
@@ -322,7 +371,10 @@ export class SlideThumbnails extends LitElement {
     // A layout or a size changed moves every cell, not only the new ones: the strip turned grid
     // shows slides the row had scrolled away, and they are given their documents now.
     // `gridHeight` is private, so not among `PropertyValues<this>`'s keys.
-    const moved = changed.has('layout') || (changed as Map<PropertyKey, unknown>).has('gridHeight');
+    const moved =
+      changed.has('layout') ||
+      (changed as Map<PropertyKey, unknown>).has('gridHeight') ||
+      (changed as Map<PropertyKey, unknown>).has('gridColumns');
     this.measure(moved ? cells : fresh);
   }
 

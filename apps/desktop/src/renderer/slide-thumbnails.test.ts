@@ -5,8 +5,10 @@ import {
   type SlideThumbnails,
   type Thumbnail,
   GRID_MINIMUM_HEIGHT,
+  THUMBNAIL_BLEED,
   THUMBNAIL_HEIGHT,
-  gridThumbnailHeight,
+  gridThumbnailLayout,
+  thumbnailBox,
 } from './slide-thumbnails.js';
 import './slide-thumbnails.js';
 
@@ -70,32 +72,67 @@ function observeFirst(visible: number): void {
   vi.stubGlobal('IntersectionObserver', FakeObserver);
 }
 
-describe('the grid’s thumbnail height', () => {
+describe('the grid’s layout', () => {
   const chrome = { gap: 16, cellWidth: 8, cellHeight: 28 };
   const square = { width: 1080, height: 1080 };
 
   it('fits ten squares in a wide pane in two rows of five', () => {
     // Five columns of (1000 - 4·16)/5 - 8 = 179.2 wide, two rows of (500 - 16)/2 - 28 = 214 tall.
-    expect(gridThumbnailHeight(10, square, { width: 1000, height: 500 }, chrome)).toBe(179);
+    expect(gridThumbnailLayout(10, square, { width: 1000, height: 500 }, chrome)).toEqual({
+      height: 179,
+      columns: 5,
+    });
   });
 
   it('keeps the format’s shape: four stories in one row, as wide as a quarter allows', () => {
     const story = { width: 1080, height: 1920 };
-    const height = gridThumbnailHeight(4, story, { width: 1000, height: 500 }, chrome);
     // (1000 - 3·16)/4 - 8 = 230 wide, so 230 · 1920/1080 = 408.9 tall, under the 472 a row has.
-    expect(height).toBe(408);
+    expect(gridThumbnailLayout(4, story, { width: 1000, height: 500 }, chrome)).toEqual({
+      height: 408,
+      columns: 4,
+    });
   });
 
   it('never draws past the format’s own size, nor under the minimum', () => {
     const tiny = { width: 100, height: 100 };
-    expect(gridThumbnailHeight(1, tiny, { width: 1000, height: 1000 }, chrome)).toBe(100);
-    expect(gridThumbnailHeight(200, square, { width: 300, height: 200 }, chrome)).toBe(
-      GRID_MINIMUM_HEIGHT,
-    );
+    expect(gridThumbnailLayout(1, tiny, { width: 1000, height: 1000 }, chrome).height).toBe(100);
+    // At the minimum the columns are as many as fit across: (300 + 16) / (64 + 8 + 16) = 3.6.
+    expect(gridThumbnailLayout(200, square, { width: 300, height: 200 }, chrome)).toEqual({
+      height: GRID_MINIMUM_HEIGHT,
+      columns: 3,
+    });
   });
 
   it('falls back to the strip’s height for a box with no size', () => {
-    expect(gridThumbnailHeight(10, square, { width: 0, height: 0 }, chrome)).toBe(THUMBNAIL_HEIGHT);
+    expect(gridThumbnailLayout(10, square, { width: 0, height: 0 }, chrome).height).toBe(
+      THUMBNAIL_HEIGHT,
+    );
+  });
+});
+
+describe('a thumbnail’s box', () => {
+  it('draws the document a pixel past its paper on both axes, so no edge of the paper shows', () => {
+    // The paper is the scaled size rounded down, and the document reaches THUMBNAIL_BLEED past it:
+    // at 125 % the paper's background is snapped out to a device pixel the document must cover.
+    for (const height of [96, 128, 133, 179, 214]) {
+      for (const format of [
+        { width: 1080, height: 1080 },
+        { width: 1080, height: 1350 },
+        { width: 1080, height: 1920 },
+        { width: 1200, height: 628 },
+      ]) {
+        const box = thumbnailBox(format, height);
+        expect(
+          format.width * box.scale,
+          `${String(format.width)} wide at ${String(height)}`,
+        ).toBeGreaterThanOrEqual(box.width + THUMBNAIL_BLEED - 1e-9);
+        expect(
+          format.height * box.scale,
+          `${String(format.height)} tall at ${String(height)}`,
+        ).toBeGreaterThanOrEqual(box.height + THUMBNAIL_BLEED - 1e-9);
+        expect(box.height).toBeLessThanOrEqual(height);
+      }
+    }
   });
 });
 
@@ -123,7 +160,7 @@ describe('the slide thumbnails', () => {
       `${String(THUMBNAIL_HEIGHT)}px`,
       `${String(THUMBNAIL_HEIGHT)}px`,
     ]);
-    expect(papers.map((paper) => paper.style.width)).toEqual(['77px', '54px']);
+    expect(papers.map((paper) => paper.style.width)).toEqual(['76px', '54px']);
   });
 
   it('marks the selected one and makes it the row’s one tab stop', async () => {
