@@ -43,10 +43,25 @@ A prévia desenha o brief enquanto você digita. **Abrir a prévia ao lado** (**
 A barra dela tem:
 
 - um botão para cada formato que o brief pede — clique num para ver aquele tamanho;
-- um botão que esconde ou mostra a faixa de slides, num carrossel;
+- **Um slide** e **Todos os slides**, os dois modos da prévia, num carrossel;
+- um botão que esconde ou mostra a faixa de slides, em Um slide;
 - **−**, o zoom, **+** e **Ajustar**, que encaixa a arte no espaço;
 - **Travar**. A prévia normalmente acompanha o brief da frente; travada, ela fica no brief que está mostrando enquanto você troca de aba, e a aba dela avisa. **Travar ou destravar a prévia** faz o mesmo pela barra de comandos.
 
 Embaixo da arte de um carrossel fica a **faixa de slides**: todos os slides no formato escolhido, pequenos e numerados a partir de 1. Clique num para mostrá-lo em cima — o editor pula para o `::lamina` que o fez — ou, com a faixa em foco, ande com **←**, **→**, **Home** e **End**. A faixa rola para o lado quando os slides não cabem, e cada aba de prévia lembra se você a escondeu.
+
+<Screenshot
+  scene="preview-strip"
+  alt="Um carrossel de seis slides na prévia: o primeiro slide grande e, embaixo, a faixa de slides com os seis, numerados de 1 a 6, o primeiro marcado."
+/>
+
+**Todos os slides** mostra de uma vez todos os slides no formato escolhido, numa grade, em ordem e numerados, cada um reduzido para que todos caibam na prévia. É ali que aparece um título que quebra só num slide, ou uma cor que muda de um slide para outro. **Clique num slide** para abri-lo: a prévia volta para Um slide com aquele slide grande, e o editor pula para o `::lamina` dele. A grade só rola para baixo quando há slides demais para caber num tamanho legível.
+
+<Screenshot
+  scene="preview-all-slides"
+  alt="O mesmo carrossel em Todos os slides: os seis slides em duas fileiras de três, numerados de 1 a 6, com Todos os slides apertado na barra da prévia."
+/>
+
+Cada aba de prévia lembra o seu modo, também depois de recarregar a janela ou de fechar e abrir o Tyto de novo. **Prévia: mostrar todos os slides** e **Prévia: mostrar um slide** trocam o modo pela barra de comandos. Um brief de um slide só não tem modos: ele aparece sempre grande.
 
 Enquanto o brief tem um erro, a prévia mantém o último desenho que funcionou, e o painel de Problemas diz o que corrigir.

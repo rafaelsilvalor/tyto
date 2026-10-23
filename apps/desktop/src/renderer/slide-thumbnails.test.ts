@@ -1,7 +1,13 @@
 // @vitest-environment jsdom
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
-import { type SlideThumbnails, type Thumbnail, THUMBNAIL_HEIGHT } from './slide-thumbnails.js';
+import {
+  type SlideThumbnails,
+  type Thumbnail,
+  GRID_MINIMUM_HEIGHT,
+  THUMBNAIL_HEIGHT,
+  gridThumbnailHeight,
+} from './slide-thumbnails.js';
 import './slide-thumbnails.js';
 
 /**
@@ -63,6 +69,35 @@ function observeFirst(visible: number): void {
   }
   vi.stubGlobal('IntersectionObserver', FakeObserver);
 }
+
+describe('the grid’s thumbnail height', () => {
+  const chrome = { gap: 16, cellWidth: 8, cellHeight: 28 };
+  const square = { width: 1080, height: 1080 };
+
+  it('fits ten squares in a wide pane in two rows of five', () => {
+    // Five columns of (1000 - 4·16)/5 - 8 = 179.2 wide, two rows of (500 - 16)/2 - 28 = 214 tall.
+    expect(gridThumbnailHeight(10, square, { width: 1000, height: 500 }, chrome)).toBe(179);
+  });
+
+  it('keeps the format’s shape: four stories in one row, as wide as a quarter allows', () => {
+    const story = { width: 1080, height: 1920 };
+    const height = gridThumbnailHeight(4, story, { width: 1000, height: 500 }, chrome);
+    // (1000 - 3·16)/4 - 8 = 230 wide, so 230 · 1920/1080 = 408.9 tall, under the 472 a row has.
+    expect(height).toBe(408);
+  });
+
+  it('never draws past the format’s own size, nor under the minimum', () => {
+    const tiny = { width: 100, height: 100 };
+    expect(gridThumbnailHeight(1, tiny, { width: 1000, height: 1000 }, chrome)).toBe(100);
+    expect(gridThumbnailHeight(200, square, { width: 300, height: 200 }, chrome)).toBe(
+      GRID_MINIMUM_HEIGHT,
+    );
+  });
+
+  it('falls back to the strip’s height for a box with no size', () => {
+    expect(gridThumbnailHeight(10, square, { width: 0, height: 0 }, chrome)).toBe(THUMBNAIL_HEIGHT);
+  });
+});
 
 afterEach(() => {
   document.body.replaceChildren();
@@ -162,6 +197,43 @@ describe('the slide thumbnails', () => {
     await element.updateComplete;
 
     expect(frames(element)).toEqual(before);
+  });
+
+  it('opens a slide clicked in the grid, and only chooses one clicked in the strip', async () => {
+    const element = await strip(TEN, TEN[0]!.id);
+    const chosen: string[] = [];
+    const opened: string[] = [];
+    element.choose = (id) => chosen.push(id);
+    element.open = (id) => opened.push(id);
+
+    element.layout = 'grid';
+    await element.updateComplete;
+    cells(element)[6]!.click();
+    element.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true }));
+
+    expect(opened).toEqual([TEN[6]!.id, TEN[0]!.id]);
+    expect(chosen).toEqual([]);
+    expect(element.classList.contains('thumbnails--grid')).toBe(true);
+    expect(element.hasAttribute('aria-orientation')).toBe(false);
+
+    element.layout = 'strip';
+    await element.updateComplete;
+    cells(element)[6]!.click();
+    expect(chosen).toEqual([TEN[6]!.id]);
+    expect(element.getAttribute('aria-orientation')).toBe('horizontal');
+  });
+
+  it('keeps every iframe when the layout changes, so a mode switch navigates nothing', async () => {
+    const element = await strip(TEN);
+    loadAll(element);
+    const before = frames(element);
+    const writes = vi.spyOn(HTMLIFrameElement.prototype, 'setAttribute');
+
+    element.layout = 'grid';
+    await element.updateComplete;
+
+    expect(frames(element)).toEqual(before);
+    expect(writes.mock.calls.filter(([name]) => name === 'srcdoc')).toEqual([]);
   });
 
   it('gives no document to a thumbnail off screen', async () => {

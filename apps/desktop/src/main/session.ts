@@ -229,12 +229,16 @@ export function createSessionService(options: SessionServiceOptions): SessionSer
           ? undefined
           : prunedGroups(groups, (tab) => {
               const strip = 'stripHidden' in tab && tab.stripHidden === true;
-              const hidden = strip ? { stripHidden: true as const } : {};
-              if (!('documentId' in tab)) return { view: 'preview' as const, ...hidden };
+              const all = 'mode' in tab && tab.mode === 'all';
+              const howShown = {
+                ...(strip ? { stripHidden: true as const } : {}),
+                ...(all ? { mode: 'all' as const } : {}),
+              };
+              if (!('documentId' in tab)) return { view: 'preview' as const, ...howShown };
               const at = keptIndex.get(tab.documentId);
               if (at === undefined) return undefined;
               if ('locked' in tab)
-                return { tab: at, view: 'preview' as const, locked: true as const, ...hidden };
+                return { tab: at, view: 'preview' as const, locked: true as const, ...howShown };
               return { tab: at, ...(tab.place === null ? {} : { place: tab.place }) };
             });
       return {

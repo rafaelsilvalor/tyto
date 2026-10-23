@@ -1282,6 +1282,7 @@
         "pane-shape.desktop.test.ts",
         "panel.desktop.test.ts",
         "preview-broken.desktop.test.ts",
+        "preview-grid.desktop.test.ts",
         "preview-height.desktop.test.ts",
         "preview-session.desktop.test.ts",
         "preview-strip.desktop.test.ts",
@@ -1317,6 +1318,7 @@
         "pane-shape.desktop.test.ts",
         "panel.desktop.test.ts",
         "preview-broken.desktop.test.ts",
+        "preview-grid.desktop.test.ts",
         "preview-height.desktop.test.ts",
         "preview-session.desktop.test.ts",
         "preview-strip.desktop.test.ts",
@@ -1423,6 +1425,7 @@
         "new-from-template.desktop.test.ts",
         "panel.desktop.test.ts",
         "preview-broken.desktop.test.ts",
+        "preview-grid.desktop.test.ts",
         "preview-height.desktop.test.ts",
         "preview-session.desktop.test.ts",
         "preview-strip.desktop.test.ts",
@@ -1442,6 +1445,7 @@
       "paths": ["apps/desktop/src/renderer/slide-thumbnails.ts"],
       "e2e": [
         "panel.desktop.test.ts",
+        "preview-grid.desktop.test.ts",
         "preview-strip.desktop.test.ts",
         "preview.desktop.test.ts",
         "window.desktop.test.ts"

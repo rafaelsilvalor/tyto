@@ -21,6 +21,8 @@ export interface Catalogue {
   readonly 'preview.strip.hide': string;
   readonly 'preview.strip.show': string;
   readonly 'preview.strip.label': string;
+  readonly 'preview.mode.one': string;
+  readonly 'preview.mode.all': string;
   readonly 'preview.zoom.out': string;
   readonly 'preview.zoom.in': string;
   readonly 'preview.zoom.fit': string;
@@ -330,6 +332,8 @@ export interface Catalogue {
   readonly 'command.preview.openToSide': string;
   readonly 'command.preview.open': string;
   readonly 'command.preview.toggleLock': string;
+  readonly 'command.preview.showOneSlide': string;
+  readonly 'command.preview.showAllSlides': string;
   /** A prefix: the tab's own name follows it, the way a recent entry's does. */
   readonly 'command.document.select': string;
 
@@ -660,6 +664,8 @@ export const CATALOGUE_KEYS = [
   'preview.strip.hide',
   'preview.strip.show',
   'preview.strip.label',
+  'preview.mode.one',
+  'preview.mode.all',
   'preview.zoom.out',
   'preview.zoom.in',
   'preview.zoom.fit',
@@ -794,6 +800,8 @@ export const CATALOGUE_KEYS = [
   'command.preview.openToSide',
   'command.preview.open',
   'command.preview.toggleLock',
+  'command.preview.showOneSlide',
+  'command.preview.showAllSlides',
   'command.document.select',
   'panel.close',
   'command.layout.togglePanel',

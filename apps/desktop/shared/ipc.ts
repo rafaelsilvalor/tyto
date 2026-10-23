@@ -287,12 +287,23 @@ function sessionGroups<T>(tab: z.ZodType<T>) {
  * `true` is written, so a record from before it reads as a strip shown.
  */
 const stripHidden = z.literal(true).optional();
-const followingPreview = z.object({ view: z.literal('preview'), stripHidden });
+/**
+ * `mode` is a preview showing every slide at once, All slides mode (TYTO-323, ADR 0123). Only
+ * `'all'` is written, so a record from before it, and a tab in One slide, reads as One slide.
+ */
+const mode = z.literal('all').optional();
+const followingPreview = z.object({ view: z.literal('preview'), stripHidden, mode });
 const sessionTabIndex = z.number().int().min(0);
 
 const writtenGroups = sessionGroups(
   z.union([
-    z.object({ documentId, view: z.literal('preview'), locked: z.literal(true), stripHidden }),
+    z.object({
+      documentId,
+      view: z.literal('preview'),
+      locked: z.literal(true),
+      stripHidden,
+      mode,
+    }),
     followingPreview,
     z.object({ documentId, place: sessionPlace.nullable() }),
   ]),
@@ -304,6 +315,7 @@ const readGroups = sessionGroups(
       view: z.literal('preview'),
       locked: z.literal(true),
       stripHidden,
+      mode,
     }),
     followingPreview,
     z.object({ tab: sessionTabIndex, place: sessionPlace.nullable() }),

@@ -95,3 +95,21 @@ html, width, height }` — and not the preview's `Frame`, so a later strip of an
 - The stage is shorter by the strip's height, so `fit` fits a smaller box while the strip shows;
   hiding the strip gives the room back.
 - The manual's screenshots still show the picker until the second pull request's scenes.
+
+## Updates
+
+- **2026-10-23, the second pull request (TYTO-323):** All slides mode is the same
+  `<tyto-slide-thumbnails>` with `layout: 'grid'`, not a second element: the two modes share one
+  set of iframes, so a keystroke on slide 3 re-navigates one document whichever mode is on, and a
+  mode switch navigates none. The grid takes the stage's room, wraps the slides in order and draws
+  them at the height `gridThumbnailHeight` picks so all of them fit (never past 1:1, never under
+  64 px, where it scrolls down); a click or Enter on a slide opens it in One slide mode and
+  reveals its `::lamina`, the arrows only choose. The bar gains two segmented buttons, **One
+  slide** and **All slides** (`preview.mode.one`, `preview.mode.all`, with `aria-pressed`), and
+  the commands `preview.showOneSlide` and `preview.showAllSlides`, with no default key. The mode is
+  per tab, kept as an optional `mode: 'all'` on the preview's session record next to
+  `stripHidden`, version still 1; a record without it, or with a value this version does not
+  know, reads as One slide. In All slides the strip's toggle and the zoom are hidden, the strip's
+  flag is kept for One slide, the stage keeps only the stale marker, and a brief of one slide
+  shows it large whatever the mode. The manual's scenes `preview-strip` and `preview-all-slides`
+  are added and `window-tour` retaken, so the picker is out of the pictures.

@@ -1,0 +1,25 @@
+---
+template: manual-sample
+formats: [grid-1x1, story]
+---
+// Six items, so the preview has a carousel of six slides to show.
+::title
+  A week of **reading**
+
+::item
+  Monday: the first chapter.
+
+::item
+  Tuesday: the long middle part.
+
+::item
+  Wednesday: a short story instead.
+
+::item
+  Thursday: back to the novel.
+
+::item
+  Friday: the last chapter.
+
+::item
+  Saturday: start the next one.

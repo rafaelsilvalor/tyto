@@ -621,6 +621,10 @@ describe('switching the language', () => {
     'command.preview.openToSide',
     'command.preview.open',
     'command.preview.toggleLock',
+    // TYTO-323: the preview's two modes, as commands, are the bar's like the lock; the mode
+    // buttons themselves are `[data-i18n]` text and counted.
+    'command.preview.showOneSlide',
+    'command.preview.showAllSlides',
     'preview.heading',
     'preview.locked',
     // E8.5: the find-and-replace panel is `@codemirror/search`'s own DOM, reached through
