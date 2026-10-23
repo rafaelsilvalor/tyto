@@ -2,6 +2,7 @@
 
 Status: accepted · 2026-10-16 · TYTO-288 (absorbing TYTO-274) · beside ADR 0010 · decision 3
 amended the same day: the path, not the folder alone
+· 2026-10-23: decision 3 amended by ADR 0125 — inside the open folder, the label is relative to it
 
 ## Context
 

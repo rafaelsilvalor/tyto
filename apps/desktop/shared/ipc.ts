@@ -752,7 +752,11 @@ export const IPC_CHANNELS = {
    * path is refused rather than stripped, so no window, however compromised, can name a folder
    * for main to read (ADR 0113). A dismissed picker answers what was already open.
    */
-  'workspace:set-folder': channel(z.strictObject({ choose: z.boolean() }), workspaceState),
+  'workspace:set-folder': channel(
+    z.strictObject({ choose: z.boolean() }),
+    // Every tab that holds a file, labelled again for the folder now open (TYTO-274, ADR 0125).
+    workspaceState.extend({ relabelled: z.array(movedDocument) }),
+  ),
 
   /**
    * Trusts the open folder, or the work profile it names, or takes that trust back (ADR 0111,
@@ -814,6 +818,8 @@ export const IPC_CHANNELS = {
         bytes: z.number().int().nonnegative(),
         version: imageVersion,
         dataUrl: z.string().startsWith('data:image/').max(IMAGE_DATA_URL_MAX),
+        /** Where the image is, for its tab's tooltip only (TYTO-274, ADR 0086, ADR 0125). */
+        pathLabel: z.string().min(1).optional(),
       }),
       z.object({ unchanged: z.literal(true) }),
       z.object({

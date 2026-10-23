@@ -124,6 +124,11 @@ export interface ExplorerService {
    * delete is asked about (TYTO-352). Never sent to the window.
    */
   pathOf(entryId: string): string | undefined;
+  /**
+   * The folder listed, as it was opened, or nothing: what a tab's label inside it is relative to
+   * (TYTO-274, ADR 0125). For main's own use; the window is told the folder by the workspace.
+   */
+  folder(): string | undefined;
   /** Stops watching. Nothing is emitted afterwards. */
   close(): void;
 }
@@ -621,6 +626,10 @@ export function createExplorerService(options: ExplorerServiceOptions): Explorer
 
     pathOf(entryId) {
       return root === undefined ? undefined : entryOf.get(entryId)?.path;
+    },
+
+    folder() {
+      return root?.folder;
     },
 
     close() {

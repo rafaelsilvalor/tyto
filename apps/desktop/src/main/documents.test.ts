@@ -601,3 +601,58 @@ describe('tabs that follow the explorer', () => {
     expect(service.releaseUnder(FOLDER)).toEqual([]);
   });
 });
+
+/** TYTO-274, ADR 0125: inside the open folder a tab's label is relative to it. */
+describe('labels inside the open folder', () => {
+  const HOME = at('casa');
+  const ROOT = at('trabalho', 'promo');
+  const CAPA = at('trabalho', 'promo', 'briefs', 'capa.brief');
+  const OUTSIDE = at('casa', 'soltos', 'fecho.brief');
+
+  const opened = async (root: { folder: string | undefined }) => {
+    const service = createDocumentService({
+      dialogs: dialogs({}),
+      recent: recentFiles(),
+      home: () => HOME,
+      root: () => root.folder,
+      disk: disk({ [CAPA]: 'a', [OUTSIDE]: 'b' }),
+    });
+    const capa = await service.openPath('tab-capa', CAPA);
+    const outside = await service.openPath('tab-outside', OUTSIDE);
+    return { service, capa, outside };
+  };
+
+  it("starts a label inside the folder with the folder's name, and keeps ~ outside it", async () => {
+    const { capa, outside } = await opened({ folder: ROOT });
+
+    expect(capa.document?.pathLabel).toBe(at('promo', 'briefs', 'capa.brief'));
+    expect(outside.document?.pathLabel).toBe(at('~', 'soltos', 'fecho.brief'));
+  });
+
+  it('labels every open tab again when the folder changes, moving nothing', async () => {
+    const root: { folder: string | undefined } = { folder: undefined };
+    const { service, capa } = await opened(root);
+    expect(capa.document?.pathLabel).toBe(CAPA);
+
+    root.folder = ROOT;
+    expect(service.relabel()).toEqual([
+      {
+        documentId: 'tab-capa',
+        name: 'capa.brief',
+        pathLabel: at('promo', 'briefs', 'capa.brief'),
+      },
+      {
+        documentId: 'tab-outside',
+        name: 'fecho.brief',
+        pathLabel: at('~', 'soltos', 'fecho.brief'),
+      },
+    ]);
+    expect(service.pathOf('tab-capa')).toBe(CAPA);
+
+    root.folder = undefined;
+    expect(service.relabel()[0]?.pathLabel).toBe(CAPA);
+    expect(service.labelOf(at('trabalho', 'promo', 'foto.png'))).toBe(
+      at('trabalho', 'promo', 'foto.png'),
+    );
+  });
+});

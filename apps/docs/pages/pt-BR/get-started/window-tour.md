@@ -25,8 +25,8 @@ Os nomes desta página são os que o resto do manual usa. A imagem mostra um bri
 />
 
 1. **Barra de título** — os menus (**Arquivo**, **Editar**, **Exibir**, **Janela**, **Ajuda**) e o nome do arquivo que está na frente. No macOS os menus e o título são os do sistema, no alto da tela.
-2. **Aba** — uma para cada arquivo aberto. Uma aba com alterações ainda não salvas avisa; fechá-la pergunta antes.
-3. **Trilha** — onde o cursor está no brief: `cabeçalho` nas linhas entre os dois `---`, ou o bloco em que ele está.
+2. **Aba** — uma para cada arquivo aberto. Uma aba com alterações ainda não salvas avisa; fechá-la pergunta antes. Pare o ponteiro sobre uma aba para ver onde o arquivo está: dentro da pasta aberta o caminho começa pelo nome da pasta, como `promo\briefs\capa.brief`, e fora dela a sua pasta pessoal aparece como `~`.
+3. **Trilha** — onde o cursor está no brief: `cabeçalho` nas linhas entre os dois `---`, ou o bloco em que ele está. Parar o ponteiro sobre a linha dela mostra onde o arquivo está, como na aba.
 4. **Grupo de editores** — uma fileira de abas e o arquivo da frente. **Dividir editor à direita** (**Ctrl+\\**) divide um grupo em dois, e o botão no fim da fileira de abas abre a prévia num grupo só dela; a imagem tem dois grupos lado a lado.
 5. **Prévia** — uma aba como qualquer outra, no segundo grupo. Ela desenha o brief ao lado enquanto você digita e, enquanto o brief tem um erro, mantém o último desenho que deu certo.
 6. **Barra da prévia** — os formatos que o brief pede (um botão para cada), **Um slide** e **Todos os slides** e o botão da faixa de slides de um carrossel, o zoom, **Ajustar** e **Travar**, que mantém a prévia neste brief quando você troca de aba.
