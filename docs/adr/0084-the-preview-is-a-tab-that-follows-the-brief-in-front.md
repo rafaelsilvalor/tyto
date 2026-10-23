@@ -60,6 +60,8 @@ second is said where it applies.
    A preview paints from the document's own state — frames, artworks, chosen format and slide,
    zoom, diagnostics — so two previews are two reads and no second request; a compile answer
    repaints when its document is on screen as text or as a preview.
+   _Changed by ADR 0123 (TYTO-323): the slide picker is gone; a slide is chosen from a strip of
+   thumbnails under the stage, and the bar holds formats, the strip's toggle, zoom and Lock._
 6. **Focus and "active", changing ADR 0083 decision 6.** A click in a preview focuses its group:
    the pane is focusable and the frame takes no pointer events, so the click lands on it. With a
    preview focused, the active document is **the brief it shows**: export, the queue, the problems
@@ -106,6 +108,8 @@ second is said where it applies.
    the file says. A session whose only kept tab was a following preview beside the untouched tab
    rebuilds no tree, so the window opens that preview to the side again. A restored brief is
    compiled once it is built, as before, so a restored preview paints its art from that answer.
+   _Extended by ADR 0123 (TYTO-323): either shape may carry `stripHidden: true`, a preview that
+   hid its strip of slides; a record without it shows the strip._
 10. **Replacing the untouched tab carries its locked preview.** When a file opened replaces the
     tab nobody typed in, every tab of that tab's document — a preview locked on it included — now
     shows the file, rather than a preview locked on a document that no longer exists, which no

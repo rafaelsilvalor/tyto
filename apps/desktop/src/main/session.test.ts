@@ -787,6 +787,55 @@ describe('the previews in the session (TYTO-287, ADR 0084)', () => {
     expect(read.groups?.root).toMatchObject({ children: [{}, { tabs: keptPreviews }] });
   });
 
+  it('keeps a hidden strip per preview through the file, and reads an old record as shown', async () => {
+    // TYTO-323 (ADR 0123): the strip of slide thumbnails is hidden per tab, so each preview
+    // carries its own flag; one written before the flag existed shows its strip.
+    const built = await twoBriefs();
+    const hidden = {
+      ...withPreviews,
+      root: {
+        ...withPreviews.root,
+        children: [
+          withPreviews.root.children[0]!,
+          {
+            tabs: [
+              {
+                documentId: 'document-1',
+                view: 'preview' as const,
+                locked: true as const,
+                stripHidden: true as const,
+              },
+              { view: 'preview' as const },
+            ],
+            active: 1,
+          },
+        ],
+      },
+    };
+    await built.session.write({ tabs, active: 1, template: null, groups: hidden, final: false });
+    const kept = [
+      { tab: 0, view: 'preview', locked: true, stripHidden: true },
+      { view: 'preview' },
+    ];
+    expect(built.store.saved()).toMatchObject({
+      groups: { root: { children: [{}, { tabs: kept }] } },
+    });
+    const file = fileSessionStore(join(scratch, 'session.json'));
+    expect(await file.write(built.store.saved() as never)).toBe(true);
+    expect(await file.read()).toEqual(built.store.saved());
+    const read = await built.session.read();
+    expect(read.groups?.root).toMatchObject({ children: [{}, { tabs: kept }] });
+    // A following preview with its strip shown carries no flag at all.
+    expect(read.groups?.root).toEqual(
+      expect.objectContaining({
+        children: [
+          expect.anything(),
+          expect.objectContaining({ tabs: [kept[0], { view: 'preview' }] }),
+        ],
+      }),
+    );
+  });
+
   it('drops a locked preview whose brief was not kept, and keeps the following one', async () => {
     const { store, session } = await twoBriefs();
     await session.write({

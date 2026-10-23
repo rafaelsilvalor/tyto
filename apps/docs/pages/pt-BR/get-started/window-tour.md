@@ -29,7 +29,7 @@ Os nomes desta página são os que o resto do manual usa. A imagem mostra um bri
 3. **Trilha** — onde o cursor está no brief: `cabeçalho` nas linhas entre os dois `---`, ou o bloco em que ele está.
 4. **Grupo de editores** — uma fileira de abas e o arquivo da frente. **Dividir editor à direita** (**Ctrl+\\**) divide um grupo em dois, e o botão no fim da fileira de abas abre a prévia num grupo só dela; a imagem tem dois grupos lado a lado.
 5. **Prévia** — uma aba como qualquer outra, no segundo grupo. Ela desenha o brief ao lado enquanto você digita e, enquanto o brief tem um erro, mantém o último desenho que deu certo.
-6. **Barra da prévia** — os formatos que o brief pede (um botão para cada), o **Slide** de um carrossel, o zoom, **Ajustar** e **Travar**, que mantém a prévia neste brief quando você troca de aba.
+6. **Barra da prévia** — os formatos que o brief pede (um botão para cada), o botão da faixa de slides de um carrossel, o zoom, **Ajustar** e **Travar**, que mantém a prévia neste brief quando você troca de aba.
 7. **Painel de problemas** — o que há de errado no brief da frente, cada um com linha e coluna; clique num para ir até lá.
 8. **Barra de status** — a linha e a coluna do cursor, o tipo de aba, o template do brief, o número de problemas, e botões para a fila, os plugins, a exportação, as configurações e as áreas da janela.
 

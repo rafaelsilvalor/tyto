@@ -58,9 +58,20 @@ const storedTabIndex = z.number().int().min(0);
  * brief's tab by index, as a text tab does. Neither keeps a `place`, and no path is ever here.
  * The locked shape is tried first, since zod keeps the first branch that parses.
  */
+/**
+ * A preview that hid its strip of slide thumbnails (TYTO-323, ADR 0123). Optional, with the
+ * version still 1, for `template`'s reason: a preview written before it shows its strip.
+ */
+const storedStripHidden = z.literal(true).optional().catch(undefined);
+
 const storedGroupTab = z.union([
-  z.object({ tab: storedTabIndex, view: z.literal('preview'), locked: z.literal(true) }),
-  z.object({ view: z.literal('preview') }),
+  z.object({
+    tab: storedTabIndex,
+    view: z.literal('preview'),
+    locked: z.literal(true),
+    stripHidden: storedStripHidden,
+  }),
+  z.object({ view: z.literal('preview'), stripHidden: storedStripHidden }),
   z.object({
     tab: storedTabIndex,
     /** Per occurrence: one document in two groups has a cursor in each (TYTO-286). */

@@ -2,13 +2,7 @@
 import { createEditor } from '@tyto/editor';
 import { describe, expect, it } from 'vitest';
 
-import {
-  type Artwork,
-  lineColumnAt,
-  paintArtworkList,
-  rangeOfArtwork,
-  revealRange,
-} from './panel.js';
+import { type Artwork, lineColumnAt, rangeOfArtwork, revealRange } from './panel.js';
 
 /**
  * The pickers and the cursor, in the only two ways they can be checked without a screen.
@@ -42,8 +36,6 @@ if (typeof Range.prototype.getClientRects !== 'function') {
 }
 
 const BRIEF = ['---', 'template: promo', '---', '::titulo Olá', '::slide', '  Um'].join('\n');
-
-const select = (): HTMLSelectElement => globalThis.document.createElement('select');
 
 describe('turning an offset into a place a person can find', () => {
   it('counts from one, the way a gutter does', () => {
@@ -112,14 +104,6 @@ describe('the artwork list', () => {
     { id: 'slide-1', index: 0, range: { start: 40, end: 52 } },
     { id: 'slide-2', index: 1, range: { start: 53, end: 65 } },
   ];
-
-  it('numbers the slides the way a person counts them', () => {
-    const picker = select();
-    paintArtworkList(picker, { artworks, selected: 'slide-2' });
-
-    expect([...picker.options].map((option) => option.textContent)).toEqual(['1', '2']);
-    expect(picker.value).toBe('slide-2');
-  });
 
   it('hands back where in the brief a slide was written', () => {
     expect(rangeOfArtwork(artworks, 'slide-2')).toEqual({ start: 53, end: 65 });

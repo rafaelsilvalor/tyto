@@ -266,17 +266,12 @@ describe('the artwork list', () => {
     );
 
     await scrollEditorToTop();
-    // The last option, whatever the repeating slot happens to be called: the artwork id is
-    // `${slot}-${n}` and the slot is the manifest's business, not this test's.
-    const last = await page.evaluate(() => {
-      const picker = document.querySelector<HTMLSelectElement>(
-        'tyto-preview-pane:not([hidden]) [data-preview-slide]',
-      );
-      return picker?.options[picker.options.length - 1]?.value ?? '';
-    });
-    expect(last).not.toBe('');
+    // The last thumbnail of the strip (TYTO-323), whatever the repeating slot happens to be
+    // called: the artwork id is `${slot}-${n}` and the slot is the manifest's business.
+    const last = page.locator('tyto-preview-pane:not([hidden]) [data-thumbnail]').last();
+    await last.waitFor();
 
-    await page.selectOption('tyto-preview-pane:not([hidden]) [data-preview-slide]', last);
+    await last.click();
     await waitForScroll();
 
     expect(await editorScrollTop()).toBeGreaterThan(0);

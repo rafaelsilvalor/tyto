@@ -41,8 +41,10 @@ The preview draws the brief as you type. **Open preview to the side** (**Ctrl+Sh
 Its toolbar has:
 
 - one chip for each format the brief asks for — click one to see that size;
-- **Slide** and a number for each artwork of a carousel;
+- a button that hides or shows the slide strip, for a carousel;
 - **−**, the zoom, **+** and **Fit**, which fits the artwork to the space;
 - **Lock**. The preview normally follows the brief in front; locked, it stays on the brief it shows while you switch tabs, and its tab says so. **Toggle preview lock** does the same from the command bar.
+
+Under a carousel's artwork is the **slide strip**: every slide in the chosen format, small and numbered from 1. Click one to show it above — the editor jumps to the `::lamina` that made it — or, with the strip focused, move with **←**, **→**, **Home** and **End**. The strip scrolls sideways when the slides do not fit, and each preview tab remembers whether you hid it.
 
 While the brief has an error the preview keeps the last drawing that worked, and the Problems panel says what to fix.

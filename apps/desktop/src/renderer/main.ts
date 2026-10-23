@@ -212,6 +212,7 @@ import {
   shownDocumentIds,
   splitGroup,
   toggleLock,
+  toggleStrip,
 } from './editor-groups.js';
 import { type PreviewPane, previewElementsOf } from './preview-pane.js';
 import { type ProblemsPanel, PROBLEMS_TAG } from './problems-panel.js';
@@ -248,6 +249,7 @@ import {
   type RequestGate,
   type Zoom,
   FORMAT_ATTRIBUTE,
+  artworkOfThumbnail,
   artworksOf,
   createRequestGate,
   errorCount,
@@ -3123,9 +3125,10 @@ function groupsForSession(): SessionGroups {
     // A preview keeps no place (TYTO-287): a following one names nothing, since it shows the
     // brief in front when the window opens again, and a locked one names its brief.
     if (isPreview(tab)) {
+      const hidden = tab.stripHidden === true ? { stripHidden: true as const } : {};
       return tab.locked === true
-        ? { documentId: tab.documentId, view: 'preview', locked: true }
-        : { view: 'preview' };
+        ? { documentId: tab.documentId, view: 'preview', locked: true, ...hidden }
+        : { view: 'preview', ...hidden };
     }
     const pane_ = panes.get(group.id);
     const remembered = tabPlaces.get(tab.id) ?? pendingPlaces.get(tab.id);
@@ -3388,9 +3391,12 @@ async function restoreGroups(
       if (!('view' in stored)) return (stale ? staleAt : builtAt).get(stored.tab);
       // A following preview is pointed at the brief in front once the groups are built; a
       // locked one shows the document its brief became, and goes when that did not come back.
-      if (!('locked' in stored)) return { view: 'preview', documentId: '' };
+      const hidden = stored.stripHidden === true ? { stripHidden: true as const } : {};
+      if (!('locked' in stored)) return { view: 'preview', documentId: '', ...hidden };
       const brief = builtAt.get(stored.tab);
-      return brief === undefined ? undefined : { view: 'preview', documentId: brief, locked: true };
+      return brief === undefined
+        ? undefined
+        : { view: 'preview', documentId: brief, locked: true, ...hidden };
     },
   );
   if (rebuilt === undefined) return;
@@ -3998,7 +4004,7 @@ async function request(
       ...document_,
       frames,
       artworks,
-      selection: keepSelection(document_.selection, frames, artworks),
+      selection: keepSelection(document_.selection, frames, artworks, document_.artworks),
       diagnostics: answer.diagnostics,
       // The brief **as asked**, not as it stands: the ranges index this text, and pairing
       // them with a buffer two keystrokes further on would show a line number that drifts.
@@ -4097,19 +4103,33 @@ function paintPreviews(): void {
       shown === undefined
         ? NOTHING_TO_PREVIEW
         : { ...shown, stale: isStale(shown), broken: isBroken(shown) };
-    paintedZoom.set(group.id, paintPreview(nodes, drawn));
+    paintedZoom.set(
+      group.id,
+      paintPreview(nodes, {
+        ...drawn,
+        // Per tab and not per brief (TYTO-323): a locked preview and the following one of the
+        // same brief can each show or hide their own.
+        stripHidden: tab.stripHidden === true,
+        stripLabel: translate(state.locale, 'preview.strip.label'),
+      }),
+    );
   }
+}
+
+/** The preview tab in front of the group `pane_` belongs to, read at the moment it is asked. */
+function tabOfPane(pane_: PreviewPane): EditorTab | undefined {
+  for (const [groupId, element] of groupElements) {
+    if (element.previewIfMade !== pane_) continue;
+    const group = groupById(groups, groupId);
+    return group === undefined ? undefined : activeTabOf(group);
+  }
+  return undefined;
 }
 
 /** The document the preview in `pane_` shows now, read off its group at the moment it is asked. */
 function documentOfPane(pane_: PreviewPane): string | undefined {
-  for (const [groupId, element] of groupElements) {
-    if (element.previewIfMade !== pane_) continue;
-    const group = groupById(groups, groupId);
-    const tab = group === undefined ? undefined : activeTabOf(group);
-    return tab === undefined || tab.documentId === '' ? undefined : tab.documentId;
-  }
-  return undefined;
+  const tab = tabOfPane(pane_);
+  return tab === undefined || tab.documentId === '' ? undefined : tab.documentId;
 }
 
 /** One stage observer for every preview: `fit` follows a split or a window resize (TYTO-287). */
@@ -4141,8 +4161,10 @@ function wirePreviewPane(pane_: PreviewPane, nodes: PreviewElements): void {
     change((document_) => ({ ...document_, selection: { ...document_.selection, format } }));
   });
 
-  nodes.slide.addEventListener('change', () => {
-    const artwork = nodes.slide.value;
+  // A thumbnail chosen — clicked, or reached with an arrow key while the strip has focus — is
+  // what choosing from the Slide picker was before TYTO-323 (ADR 0123).
+  nodes.strip.choose = (id) => {
+    const artwork = artworkOfThumbnail(id);
     change((document_) => ({ ...document_, selection: { ...document_.selection, artwork } }));
     // The card asks for both halves: the preview follows the choice, and so does the
     // editor. The range is the `::slide` directive that made this artwork, which only
@@ -4150,7 +4172,17 @@ function wirePreviewPane(pane_: PreviewPane, nodes: PreviewElements): void {
     const documentId = documentOfPane(pane_);
     const target = documentId === undefined ? undefined : primaryPaneOf(documentId);
     const at = rangeOfArtwork(documentOf(workspace, documentId ?? '')?.artworks ?? [], artwork);
+    // `revealRange` focuses the editor; a key in the strip takes the focus back once the strip
+    // has drawn the new selection, so the arrows go on moving it.
     if (at !== undefined && target !== undefined) revealRange(target.view, at);
+  };
+
+  // Hidden or shown per tab, and kept in the session with it (TYTO-323).
+  nodes.stripToggle.addEventListener('click', () => {
+    const tab = tabOfPane(pane_);
+    if (tab === undefined) return;
+    groups = toggleStrip(groups, tab.id);
+    repaint();
   });
 
   // The zoom buttons and the lock run commands rather than doing the work: a button, a key

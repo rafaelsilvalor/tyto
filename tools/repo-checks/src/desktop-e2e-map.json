@@ -1284,6 +1284,7 @@
         "preview-broken.desktop.test.ts",
         "preview-height.desktop.test.ts",
         "preview-session.desktop.test.ts",
+        "preview-strip.desktop.test.ts",
         "preview-tab.desktop.test.ts",
         "preview.desktop.test.ts",
         "settings.desktop.test.ts",
@@ -1318,6 +1319,7 @@
         "preview-broken.desktop.test.ts",
         "preview-height.desktop.test.ts",
         "preview-session.desktop.test.ts",
+        "preview-strip.desktop.test.ts",
         "preview-tab.desktop.test.ts",
         "preview.desktop.test.ts",
         "settings-writers.desktop.test.ts",
@@ -1423,6 +1425,7 @@
         "preview-broken.desktop.test.ts",
         "preview-height.desktop.test.ts",
         "preview-session.desktop.test.ts",
+        "preview-strip.desktop.test.ts",
         "preview-tab.desktop.test.ts",
         "preview.desktop.test.ts",
         "settings.desktop.test.ts",
@@ -1434,6 +1437,16 @@
         "window.desktop.test.ts"
       ],
       "why": "reviewed: imported by preview and template mode"
+    },
+    {
+      "paths": ["apps/desktop/src/renderer/slide-thumbnails.ts"],
+      "e2e": [
+        "panel.desktop.test.ts",
+        "preview-strip.desktop.test.ts",
+        "preview.desktop.test.ts",
+        "window.desktop.test.ts"
+      ],
+      "why": "reviewed: the preview's strip of slide thumbnails (TYTO-323); the suites that click, read or count it"
     },
     {
       "paths": ["apps/desktop/src/renderer/snippets-file.ts"],

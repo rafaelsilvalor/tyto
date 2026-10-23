@@ -415,6 +415,10 @@ describe('switching the language', () => {
     'app.name',
     'preview.zoom.out',
     'preview.zoom.in',
+    // TYTO-323: the strip toggle is a glyph, so its words are its `title` and `aria-label`; the
+    // strip is an element and names itself with `aria-label`. `preview.test.ts` paints both.
+    'preview.strip.toggle',
+    'preview.strip.label',
     // E9.3: the problems panel and the template picker build their own rows, so their
     // strings reach the screen through `panel.ts` rather than through the `data-i18n` pass
     // this counts. They are a locale's strings all the same — `panel.test.ts` is what holds

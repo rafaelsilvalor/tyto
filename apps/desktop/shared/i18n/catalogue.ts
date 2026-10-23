@@ -16,7 +16,9 @@
 export interface Catalogue {
   readonly 'app.name': string;
   readonly 'preview.heading': string;
-  readonly 'preview.slide.label': string;
+  /** TYTO-323: the strip toggle's tooltip, and the strip's accessible name. */
+  readonly 'preview.strip.toggle': string;
+  readonly 'preview.strip.label': string;
   readonly 'preview.zoom.out': string;
   readonly 'preview.zoom.in': string;
   readonly 'preview.zoom.fit': string;
@@ -653,7 +655,8 @@ export type CatalogueKey = keyof Catalogue;
 export const CATALOGUE_KEYS = [
   'app.name',
   'preview.heading',
-  'preview.slide.label',
+  'preview.strip.toggle',
+  'preview.strip.label',
   'preview.zoom.out',
   'preview.zoom.in',
   'preview.zoom.fit',
