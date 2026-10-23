@@ -351,6 +351,7 @@ export const ptBR: Catalogue = {
   'explorer.menu.newFolder': 'Nova pasta…',
   'explorer.menu.rename': 'Renomear…',
   'explorer.menu.delete': 'Excluir',
+  'explorer.collapseAll': 'Recolher tudo',
   'explorer.bin.windows': 'Lixeira',
   'explorer.bin.other': 'Lixeira',
   'explorer.delete.file': 'Mover “{name}” para a {bin}?',

@@ -466,6 +466,128 @@ describe('new, rename and delete', () => {
   });
 });
 
+describe('the header actions (TYTO-365)', () => {
+  const nested = (): Disk => ({
+    ...disk(),
+    slides: entries(['parte', 'parte', 'folder'], ['capa', 'capa.brief', 'brief']),
+    parte: entries(['fim', 'fim.brief', 'brief']),
+  });
+  const actions = (element: ExplorerPanel): HTMLButtonElement[] => [
+    ...element.querySelectorAll<HTMLButtonElement>('.tool__actions button[data-action]'),
+  ];
+  const click = async (element: ExplorerPanel, action: string): Promise<void> => {
+    element.querySelector<HTMLButtonElement>(`button[data-action="${action}"]`)!.click();
+    await settle(element);
+  };
+  const field = (element: ExplorerPanel): HTMLInputElement | null =>
+    element.querySelector<HTMLInputElement>('.explorer__field');
+  /** Where the open field sits: the row above it, and how deep it is drawn. */
+  const fieldRow = (element: ExplorerPanel): string =>
+    field(element)!.closest<HTMLElement>('li')!.getAttribute('style') ?? '';
+
+  it('draws three buttons before the close button, with the approved words', async () => {
+    const { element } = await mount(disk());
+    const header = element.querySelector('.tool__actions')!;
+    expect(actions(element).map((each) => [each.title, each.getAttribute('aria-label')])).toEqual([
+      ['New File…', 'New File…'],
+      ['New Folder…', 'New Folder…'],
+      ['Collapse All', 'Collapse All'],
+    ]);
+    expect(header.lastElementChild?.classList.contains('panel__close')).toBe(true);
+
+    element.locale = 'pt-BR';
+    await settle(element);
+    expect(actions(element).map((each) => each.title)).toEqual([
+      'Novo arquivo…',
+      'Nova pasta…',
+      'Recolher tudo',
+    ]);
+  });
+
+  it('draws none of them while no folder is open, or while main is asked', async () => {
+    const { element } = await mount(disk(), null);
+    expect(actions(element)).toEqual([]);
+    element.folderName = undefined;
+    await settle(element);
+    expect(actions(element)).toEqual([]);
+  });
+
+  it('opens the New File field in the root with nothing selected', async () => {
+    const { element, wrote } = await mount(disk());
+    await click(element, 'explorer.newFile');
+
+    expect(field(element)?.getAttribute('aria-label')).toBe('New File…');
+    expect(fieldRow(element)).toContain('padding-inline-start: 4px');
+    field(element)!.value = 'nota.txt';
+    field(element)!.dispatchEvent(new InputEvent('input', { bubbles: true }));
+    field(element)!.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true }));
+    await settle(element);
+    expect(wrote).toEqual([['create', null, 'nota.txt', 'file']]);
+  });
+
+  it("opens the New File field in a selected file's folder", async () => {
+    const { element, wrote } = await mount(disk());
+    row(element, 'slides').click();
+    await settle(element);
+    row(element, 'capa.brief').click();
+    await settle(element);
+    await click(element, 'explorer.newFile');
+
+    expect(fieldRow(element)).toContain('padding-inline-start: 20px');
+    field(element)!.value = 'fim.brief';
+    field(element)!.dispatchEvent(new InputEvent('input', { bubbles: true }));
+    field(element)!.dispatchEvent(new FocusEvent('blur'));
+    await settle(element);
+    expect(wrote).toEqual([['create', 'slides', 'fim.brief', 'file']]);
+  });
+
+  it('opens the New Folder field inside a selected folder, opening it', async () => {
+    const { element, wrote } = await mount(disk());
+    row(element, 'slides').click();
+    await settle(element);
+    row(element, 'slides').click();
+    await settle(element);
+    expect(row(element, 'slides').getAttribute('aria-expanded')).toBe('false');
+    await click(element, 'explorer.newFolder');
+
+    expect(field(element)?.getAttribute('aria-label')).toBe('New Folder…');
+    expect(row(element, 'slides').getAttribute('aria-expanded')).toBe('true');
+    field(element)!.value = 'anexos';
+    field(element)!.dispatchEvent(new InputEvent('input', { bubbles: true }));
+    field(element)!.dispatchEvent(new FocusEvent('blur'));
+    await settle(element);
+    expect(wrote).toEqual([['create', 'slides', 'anexos', 'folder']]);
+  });
+
+  it('closes every folder at every depth, and keeps the selection on screen', async () => {
+    const { element } = await mount(nested());
+    row(element, 'slides').click();
+    await settle(element);
+    row(element, 'parte').click();
+    await settle(element);
+    row(element, 'fim.brief').click();
+    await settle(element);
+    expect(rows(element)).toEqual([
+      'slides',
+      '  parte',
+      '    fim.brief',
+      '  capa.brief',
+      'promo.brief',
+      'logo.png',
+    ]);
+
+    await click(element, 'explorer.collapseAll');
+    expect(rows(element)).toEqual(['slides', 'promo.brief', 'logo.png']);
+    expect(element.querySelector('[aria-expanded="true"]')).toBeNull();
+    expect(row(element, 'slides').getAttribute('aria-selected')).toBe('true');
+
+    // Opening the top folder again shows the one under it closed too.
+    row(element, 'slides').click();
+    await settle(element);
+    expect(rows(element)).toEqual(['slides', '  parte', '  capa.brief', 'promo.brief', 'logo.png']);
+  });
+});
+
 describe('the delete question (TYTO-352)', () => {
   it('says Recycle Bin on Windows and Trash elsewhere in English, Lixeira in Portuguese', () => {
     const file = { name: 'capa.brief', kind: 'brief' } as const;

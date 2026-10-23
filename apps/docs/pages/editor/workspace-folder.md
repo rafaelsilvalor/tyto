@@ -1,7 +1,7 @@
 # Workspace folder
 
 ::: info How this page was checked
-Every step was followed on 2026-10-21 on a development build of Tyto on Windows 11, in a folder holding a `.tyto/project.json`, a template in `tpl/`, an image in `art/` and two briefs in `briefs/`, in a second folder whose `assets` led outside it, and on the same day in a folder naming a work profile kept in `~/.tyto/profiles/` and in one naming a profile file inside it whose `assets` led outside the profile's folder. Menus and labels below are the English window's.
+Every step was followed on 2026-10-21 on a development build of Tyto on Windows 11, in a folder holding a `.tyto/project.json`, a template in `tpl/`, an image in `art/` and two briefs in `briefs/`, in a second folder whose `assets` led outside it, and on the same day in a folder naming a work profile kept in `~/.tyto/profiles/` and in one naming a profile file inside it whose `assets` led outside the profile's folder. Menus and labels below are the English window's. The Explorer's header buttons were checked on 2026-10-23 on a development build, in the light and the dark theme.
 :::
 
 A workspace folder is a project folder with a `.tyto/project.json` in it. The file says where the project keeps its templates, images and fonts, and where its exports go:
@@ -44,6 +44,8 @@ Each entry has an icon for its type: a brief, an image, a font, a JSON file, a t
 ### New, rename and delete
 
 Right-click an entry for **New File…**, **New Folder…**, **Rename…** and **Delete**; right-click the empty space below the list for the two **New** items.
+
+While a folder is open, the Explorer's header has three buttons beside its **×**: **New File…** and **New Folder…** open the same field as the menu, in the same place, and **Collapse All** closes every open folder, at every depth. There is no refresh button: the Explorer lists again on its own when the folder changes.
 
 - **New File…** and **New Folder…** open a field in the tree: in the folder selected, in the folder of the file selected, or at the top of the folder when nothing is selected (or when you right-clicked the empty space). Type the name and press **Enter**. The name is used exactly as typed, extension or not; a new `.brief` opens in a tab, and any other file is only made.
 - **Rename…**, or **F2** on the selected entry, turns its name into the same field. A brief open in a tab keeps its tab, which shows the new name; text you had not saved stays unsaved, and the next save writes to the new name.

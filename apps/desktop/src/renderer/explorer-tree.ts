@@ -219,6 +219,20 @@ export function withExpanded(tree: ExplorerTree, folder: string, open: boolean):
   return { ...tree, expanded };
 }
 
+/**
+ * Closes every folder, at every depth (TYTO-365). A selection inside a folder that closed moves
+ * up to the top-level folder that holds it, so the selected row is still one on screen.
+ */
+export function collapseAll(tree: ExplorerTree): ExplorerTree {
+  let selected = tree.selected;
+  let parent = selected === undefined ? null : parentOf(tree, selected);
+  while (parent !== null && parent !== undefined) {
+    selected = parent;
+    parent = parentOf(tree, parent);
+  }
+  return { ...tree, expanded: new Set(), selected };
+}
+
 export const withSelected = (tree: ExplorerTree, id: string | undefined): ExplorerTree => ({
   ...tree,
   selected: id,

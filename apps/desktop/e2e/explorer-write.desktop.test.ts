@@ -32,8 +32,10 @@ import { firstWindow } from './first-window.js';
  * `menu:context` answers and when; and the picks are made by a popup that calls `callback` and
  * then an item's `click`, in the order Windows delivers them, to hold ADR 0121's 50 ms grace.
  *
- * With `TYTO_EXPLORER_SHOTS` set to a folder, the suite leaves pictures of the window. Its own
- * `--user-data-dir` and `TYTO_HOME`, one launch, inside the 60 s budget (ADR 0105).
+ * With `TYTO_EXPLORER_SHOTS` set to a folder, the suite leaves pictures of the window, and of the
+ * header's buttons (TYTO-365) in both themes at 125%, this machine's scale, where TYTO-323 found
+ * seams that 100% hides. Its own `--user-data-dir` and `TYTO_HOME`, one launch, inside the 60 s
+ * budget (ADR 0105).
  */
 
 const here = dirname(fileURLToPath(import.meta.url));
@@ -131,7 +133,11 @@ beforeAll(async () => {
   writeFileSync(join(work, 'logo.png'), '');
 
   app = await _electron.launch({
-    args: ['.', `--user-data-dir=${join(scratch, 'userData')}`],
+    args: [
+      '.',
+      `--user-data-dir=${join(scratch, 'userData')}`,
+      ...(shots === undefined ? [] : ['--force-device-scale-factor=1.25']),
+    ],
     cwd: join(here, '..'),
     env: { ...process.env, TYTO_HEADLESS: '1', TYTO_HOME: join(scratch, 'tyto-home') },
   });
@@ -301,6 +307,52 @@ describe('new, rename and delete from the explorer (TYTO-352)', () => {
 
     await expect.poll(tabs).not.toContain('velho.brief');
     expect((await tabs()).length).toBe(before);
+  }, 30_000);
+
+  it('folds every folder and opens the New File field from the header (TYTO-365)', async () => {
+    const header = window.locator('tyto-explorer-panel .tool__actions');
+    const labels = await header
+      .locator('button')
+      .evaluateAll((buttons) => buttons.map((each) => each.getAttribute('aria-label')));
+    expect(labels).toEqual(['New File…', 'New Folder…', 'Collapse All', 'Close the panel']);
+    await expect.poll(() => window.locator('[aria-expanded="true"]').count()).toBeGreaterThan(0);
+
+    await header.locator('[data-action="explorer.collapseAll"]').click();
+    await expect.poll(() => window.locator('[aria-expanded="true"]').count()).toBe(0);
+    expect(await rows()).toEqual(['briefs', 'logo.png', 'novo.brief']);
+
+    await row('briefs').click();
+    await header.locator('[data-action="explorer.newFile"]').click();
+    await field().waitFor();
+    expect(await field().getAttribute('aria-label')).toBe('New File…');
+    await window.keyboard.press('Escape');
+    await expect.poll(() => field().count()).toBe(0);
+
+    if (shots !== undefined) {
+      mkdirSync(shots, { recursive: true });
+      const ratio = await window.evaluate(() => globalThis.devicePixelRatio);
+      process.stdout.write(`[TYTO-365] devicePixelRatio of the shots: ${String(ratio)}
+`);
+      // The middle button hovered, as on the approved sheet's mock.
+      await header.locator('[data-action="explorer.newFolder"]').hover();
+      for (const scheme of ['light', 'dark'] as const) {
+        await app!.evaluate(({ nativeTheme }, source) => {
+          nativeTheme.themeSource = source;
+        }, scheme);
+        // scheme: the header's pictures in each theme Rafael compares with the sheet; main is
+        // told too.
+        await window.emulateMedia({ colorScheme: scheme });
+        await window.waitForTimeout(300);
+        await window
+          .locator('tyto-explorer-panel .pane__strip')
+          .screenshot({ path: join(shots, `header-${scheme}.png`) });
+        await window.screenshot({ path: join(shots, `header-window-${scheme}.png`) });
+      }
+      await app!.evaluate(({ nativeTheme }) => {
+        nativeTheme.themeSource = 'system';
+      });
+      await window.emulateMedia({ colorScheme: null });
+    }
   }, 30_000);
 
   it('asks in Portuguese with Delete, for a file', async () => {

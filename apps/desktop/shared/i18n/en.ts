@@ -349,6 +349,7 @@ export const en: Catalogue = {
   'explorer.menu.newFolder': 'New Folder…',
   'explorer.menu.rename': 'Rename…',
   'explorer.menu.delete': 'Delete',
+  'explorer.collapseAll': 'Collapse All',
   'explorer.bin.windows': 'Recycle Bin',
   'explorer.bin.other': 'Trash',
   'explorer.delete.file': 'Move “{name}” to the {bin}?',
