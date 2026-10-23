@@ -4111,6 +4111,10 @@ function paintPreviews(): void {
         // same brief can each show or hide their own.
         stripHidden: tab.stripHidden === true,
         stripLabel: translate(state.locale, 'preview.strip.label'),
+        stripToggleLabels: {
+          hide: translate(state.locale, 'preview.strip.hide'),
+          show: translate(state.locale, 'preview.strip.show'),
+        },
       }),
     );
   }

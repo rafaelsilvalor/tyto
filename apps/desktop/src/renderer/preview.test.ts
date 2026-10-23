@@ -76,6 +76,9 @@ const TEN: readonly Artwork[] = Array.from({ length: 10 }, (_, at) => ({
 }));
 const TEN_FRAMES: readonly Frame[] = TEN.map((artwork) => frame(artwork.id, 'grid-1x1'));
 
+/** The toggle's two labels, as `main.ts` hands them over in English. */
+const LABELS = { hide: 'Hide the slide strip', show: 'Show the slide strip' } as const;
+
 const NOTHING: Selection = { format: undefined, artwork: undefined };
 
 function pane(document_: Document): PreviewElements {
@@ -271,13 +274,37 @@ describe('the slide strip (TYTO-323)', () => {
       selection: { format: 'story', artwork: 'artwork-2' },
       zoom: 1,
       stripLabel: 'Slide strip',
+      stripToggleLabels: LABELS,
     });
 
     expect(elements.strip.hidden).toBe(false);
     expect(elements.strip.items.map((item) => item.label)).toEqual(['1', '2']);
     expect(elements.strip.selected).toBe(thumbnailId('artwork-2', 'story'));
     expect(elements.strip.label).toBe('Slide strip');
-    expect(elements.stripToggle.getAttribute('aria-pressed')).toBe('true');
+    expect(elements.stripToggle.title).toBe('Hide the slide strip');
+  });
+
+  it('says what a press does: Hide while the strip shows, Show once it is hidden', () => {
+    // Rafael, 2026-10-23: "O texto muda com o estado". The label changes, so no `aria-pressed`.
+    const { document } = globalThis;
+    const elements = pane(document);
+    const paint = (stripHidden: boolean): string[] => {
+      paintPreview(elements, {
+        stale: false,
+        frames: CAROUSEL,
+        artworks: SLIDES,
+        selection: { format: 'feed', artwork: 'artwork-1' },
+        zoom: 1,
+        stripHidden,
+        stripToggleLabels: LABELS,
+      });
+      return [elements.stripToggle.title, elements.stripToggle.getAttribute('aria-label') ?? ''];
+    };
+
+    expect(paint(false)).toEqual(['Hide the slide strip', 'Hide the slide strip']);
+    expect(paint(true)).toEqual(['Show the slide strip', 'Show the slide strip']);
+    expect(paint(false)).toEqual(['Hide the slide strip', 'Hide the slide strip']);
+    expect(elements.stripToggle.hasAttribute('aria-pressed')).toBe(false);
   });
 
   it('hides the strip when the tab hid it, and keeps the toggle to bring it back', () => {
@@ -296,7 +323,7 @@ describe('the slide strip (TYTO-323)', () => {
     expect(elements.strip.hidden).toBe(true);
     expect(elements.strip.items).toEqual([]);
     expect(elements.stripToggle.hidden).toBe(false);
-    expect(elements.stripToggle.getAttribute('aria-pressed')).toBe('false');
+    expect(elements.stripToggle.classList.contains('preview__strip-toggle--on')).toBe(false);
   });
 
   it('hides itself, and its toggle, when there is only one slide', () => {

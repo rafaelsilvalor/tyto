@@ -1087,7 +1087,7 @@ tyto-preview-pane[hidden] {
   font-weight: var(--tyto-weight-strong);
 }
 
-/* The bar's toggle for the strip: an icon, pressed while the strip is shown, like the lock. */
+/* The bar's toggle for the strip: an icon, filled while the strip is shown, like the lock. */
 .preview__strip-toggle {
   display: inline-flex;
   align-items: center;

@@ -40,13 +40,7 @@ export class PreviewPane extends LitElement {
     return html`<div class="preview__bar pane__header" data-font-area="paneHeaders">
         <div class="preview__tabs" data-preview-formats role="tablist"></div>
         <div class="pane__actions">
-          <button
-            type="button"
-            class="preview__strip-toggle"
-            data-preview-strip-toggle
-            data-i18n-title="preview.strip.toggle"
-            aria-pressed="true"
-          >
+          <button type="button" class="preview__strip-toggle" data-preview-strip-toggle>
             ${icon('strip')}
           </button>
           <div class="preview__zoom">

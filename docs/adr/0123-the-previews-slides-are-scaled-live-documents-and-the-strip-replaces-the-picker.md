@@ -56,7 +56,7 @@ html, width, height }` — and not the preview's `Frame`, so a later strip of an
 7. **A slide that went clamps to the last one left.** `keepSelection` takes the artwork list the
    selection was made in, and a selected slide past the new end — the last `::lamina` deleted
    while it was shown — lands on the new last slide rather than back on slide 1.
-8. **The strip can be hidden, per preview tab.** A button in the bar, pressed while the strip
+8. **The strip can be hidden, per preview tab.** A button in the bar, filled while the strip
    shows, toggles `stripHidden` on the tab (`toggleStrip` in `editor-groups.ts`). It is kept in
    the session as an optional `stripHidden: true` on the preview's record — following or locked —
    on both sides of `session:write`/`session:read` and in `session.json`, with the version still
@@ -64,8 +64,12 @@ html, width, height }` — and not the preview's `Frame`, so a later strip of an
       amends ADR 0084 decision 9; the mode of the second pull request is meant to be kept the same
       way.
 9. **The picker is gone**: the `<select>`, the `preview.slide.label` key and `paintArtworkList`.
-   Two keys arrive, `preview.strip.toggle` (the button's tooltip and accessible name) and
-   `preview.strip.label` (the strip's), in both locales. This amends ADR 0084 decision 5: the
+   Three keys arrive, in both locales: `preview.strip.hide` and `preview.strip.show`, the
+   button's tooltip and accessible name, which say what a press does and so change with the state
+   ("Hide the slide strip" while it shows, "Show the slide strip" while it is hidden; Rafael,
+   2026-10-23), and `preview.strip.label`, the strip's. Because the label changes, the button has
+   no `aria-pressed`: a screen reader would announce "Hide the slide strip, pressed", the action
+   and its opposite at once. The fill still marks the strip as shown. This amends ADR 0084 decision 5: the
    bar holds formats, the strip's toggle, zoom and Lock.
 
 ## Rejected

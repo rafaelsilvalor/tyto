@@ -173,11 +173,15 @@ describe('the slide strip under the preview (TYTO-323)', () => {
 
   it('hides and shows the strip with the bar’s button', async () => {
     const toggle = page.locator(`${SHOWN_PREVIEW} [data-preview-strip-toggle]`);
-    expect(await toggle.getAttribute('aria-pressed')).toBe('true');
+    expect(await toggle.getAttribute('aria-label')).toMatch(
+      /^(Hide the slide strip|Esconder a faixa de slides)$/u,
+    );
 
     await toggle.click();
     await expect.poll(() => page.locator(STRIP).isVisible()).toBe(false);
-    expect(await toggle.getAttribute('aria-pressed')).toBe('false');
+    expect(await toggle.getAttribute('aria-label')).toMatch(
+      /^(Show the slide strip|Mostrar a faixa de slides)$/u,
+    );
     await shoot('strip-hidden');
 
     await toggle.click();

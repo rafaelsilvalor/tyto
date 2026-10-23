@@ -4,7 +4,8 @@ import { type Catalogue } from './catalogue.js';
 export const en: Catalogue = {
   'app.name': 'Tyto',
   'preview.heading': 'Preview',
-  'preview.strip.toggle': 'Show the slide strip',
+  'preview.strip.hide': 'Hide the slide strip',
+  'preview.strip.show': 'Show the slide strip',
   'preview.strip.label': 'Slide strip',
   'preview.zoom.out': 'Zoom out',
   'preview.zoom.in': 'Zoom in',

@@ -249,6 +249,11 @@ export interface PreviewState {
   readonly stripHidden?: boolean;
   /** The strip's accessible name, in the window's language. */
   readonly stripLabel?: string;
+  /**
+   * The toggle's words for each state, in the window's language: what a press does, so "Hide the
+   * slide strip" while it shows and "Show the slide strip" while it is hidden (Rafael, 2026-10-23).
+   */
+  readonly stripToggleLabels?: { readonly hide: string; readonly show: string };
 }
 
 /** The attribute a format tab carries, which is how a click knows what it selected. */
@@ -304,7 +309,13 @@ function paintStrip(elements: PreviewElements, state: PreviewState): void {
   const single = artworksOf(state.artworks).length <= 1;
   const shown = !single && state.stripHidden !== true;
   stripToggle.hidden = single;
-  stripToggle.setAttribute('aria-pressed', String(shown));
+  // The label says what a press does, so it changes with the state, and there is no
+  // `aria-pressed`: "Hide the slide strip, pressed" would announce the action and its opposite at
+  // once. A toggle keeps one label and `aria-pressed`, or changes its label and drops it; this is
+  // the second. The fill still marks the strip as shown for the eye.
+  const label = shown ? state.stripToggleLabels?.hide : state.stripToggleLabels?.show;
+  stripToggle.title = label ?? '';
+  stripToggle.setAttribute('aria-label', label ?? '');
   stripToggle.classList.toggle('preview__strip-toggle--on', shown);
   strip.hidden = !shown;
   strip.label = state.stripLabel ?? '';
