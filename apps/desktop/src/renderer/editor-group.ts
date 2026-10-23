@@ -1,4 +1,5 @@
 import { LitElement, html, nothing } from 'lit';
+import { ifDefined } from 'lit/directives/if-defined.js';
 
 import { type Locale, DEFAULT_LOCALE, translate } from '../../shared/i18n/index.js';
 import { type EditorGroups, type GroupNode, groupList } from './editor-groups.js';
@@ -43,6 +44,7 @@ export class EditorGroupElement extends LitElement {
     offerPreview: { attribute: false },
     openPreview: { attribute: false },
     breadcrumb: { attribute: false },
+    breadcrumbTitle: { attribute: false },
   };
 
   declare groupId: string;
@@ -62,6 +64,11 @@ export class EditorGroupElement extends LitElement {
    * `cabeçalho › template`, or empty. Text the window writes, worded already; plain, not a link.
    */
   declare breadcrumb: string;
+  /**
+   * Where the file in front is, as its tab's tooltip says it (TYTO-274, ADR 0125): the header
+   * row's `title`, and nothing it shows. `undefined` for no file, or a preview in front.
+   */
+  declare breadcrumbTitle: string | undefined;
 
   constructor() {
     super();
@@ -76,6 +83,7 @@ export class EditorGroupElement extends LitElement {
     this.offerPreview = false;
     this.openPreview = () => undefined;
     this.breadcrumb = '';
+    this.breadcrumbTitle = undefined;
   }
 
   private ownMount: HTMLElement | undefined;
@@ -163,7 +171,12 @@ export class EditorGroupElement extends LitElement {
           }
         </div>
       </div>
-      <div class="pane__header" data-font-area="paneHeaders" ?hidden=${this.showing === 'preview'}>
+      <div
+        class="pane__header"
+        data-font-area="paneHeaders"
+        title=${ifDefined(this.breadcrumbTitle)}
+        ?hidden=${this.showing === 'preview'}
+      >
         <div class="pane__breadcrumb" data-breadcrumb>${this.breadcrumb}</div>
       </div>`;
   }

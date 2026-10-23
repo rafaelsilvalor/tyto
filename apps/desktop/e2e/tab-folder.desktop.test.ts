@@ -228,3 +228,75 @@ describe('the path on hover', () => {
     );
   });
 });
+
+/** An explorer row by its name, as the explorer suites find one. */
+const row = (name: string) => page.locator(`.explorer__row[data-name="${name}"]`);
+
+/** Every header row's `title` — the breadcrumb line's tooltip — that has one. */
+const headerTitles = async (): Promise<string[]> =>
+  page.evaluate(() =>
+    [...document.querySelectorAll('.pane__header[title]')].map(
+      (node) => node.getAttribute('title') ?? '',
+    ),
+  );
+
+/** One blue pixel, a PNG Chromium decodes, so the suite needs no binary fixture. */
+const ONE_PIXEL_PNG =
+  'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==';
+
+/**
+ * TYTO-274, ADR 0125: inside the open workspace folder a tab's label is relative to it and
+ * starts with the folder's own name; outside it stays `~`. The second launch above is still
+ * running, with the real home directory.
+ */
+describe('the path on hover inside the open folder', () => {
+  let capaPath: string;
+
+  it('labels a brief opened from the explorer from the folder’s name', async () => {
+    const promo = join(scratch, 'promo');
+    mkdirSync(join(promo, 'briefs'), { recursive: true });
+    capaPath = join(promo, 'briefs', 'capa.brief');
+    writeFileSync(capaPath, BRIEF, 'utf8');
+    writeFileSync(join(promo, 'logo.png'), Buffer.from(ONE_PIXEL_PNG, 'base64'));
+    await app?.evaluate(({ dialog }, chosen) => {
+      dialog.showOpenDialog = () => Promise.resolve({ canceled: false, filePaths: [chosen] });
+    }, promo);
+    await runFromBar('workspace.openFolder');
+    await row('briefs').waitFor({ timeout: 15_000 });
+    await row('briefs').click();
+    await row('capa.brief').click();
+    await page.waitForFunction(() =>
+      [...document.querySelectorAll('.tabs__label')].some(
+        (node) => node.textContent === 'capa.brief',
+      ),
+    );
+
+    const label = `promo${sep}briefs${sep}capa.brief`;
+    expect(await titleOf(/^capa\.brief$/u)).toBe(label);
+    // The breadcrumb line says it on hover too, and shows no new segment (ADR 0098).
+    expect(await headerTitles()).toContain(label);
+    // A brief outside the folder keeps home's `~`.
+    expect(await titleOf(/^campanha\.brief$/u)).toBe(pathLabelOf(briefPath, homedir()));
+    await shoot(/^capa\.brief$/u, 'workspace-brief-tab-hover');
+  });
+
+  it('labels an image’s preview tab the same way', async () => {
+    await expect
+      .poll(
+        async () => {
+          await row('logo.png').click();
+          return titleOf(/^logo\.png$/u);
+        },
+        { timeout: 15_000 },
+      )
+      .toBe(`promo${sep}logo.png`);
+    await shoot(/^logo\.png$/u, 'workspace-image-tab-hover');
+  });
+
+  it('labels the open tabs again when the folder closes', async () => {
+    await runFromBar('workspace.closeFolder');
+    await expect
+      .poll(async () => titleOf(/^capa\.brief$/u), { timeout: 15_000 })
+      .toBe(pathLabelOf(capaPath, homedir()));
+  });
+});

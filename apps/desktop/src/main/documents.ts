@@ -50,6 +50,11 @@ export interface DocumentServiceOptions {
    * absent.
    */
   readonly home?: () => string;
+  /**
+   * The open workspace folder, which a label inside it is relative to (TYTO-274, ADR 0125): the
+   * folder the explorer lists, asked at every open, save and relabel. None when absent.
+   */
+  readonly root?: () => string | undefined;
   /** Injected so a test can drive the whole service without touching a disk. */
   readonly disk?: {
     read(path: string): Promise<string>;
@@ -113,6 +118,14 @@ export interface DocumentService {
    */
   retargetUnder(from: string, to: string): MovedDocument[];
   /**
+   * Every tab that holds a file, labelled again (TYTO-274, ADR 0125): the open folder changed,
+   * and a label inside it is relative to it. The same answer `retargetUnder` gives, so the
+   * window applies it the same way; nothing moves.
+   */
+  relabel(): MovedDocument[];
+  /** Where `path` is, as a tooltip says it (ADR 0086, ADR 0125), for a file no tab holds. */
+  labelOf(path: string): string;
+  /**
    * The explorer sent `path` to the trash (TYTO-352): every tab at or under it lets go of its
    * file, as a save-as onto it would make it (TYTO-104), and the answer is those tabs' ids.
    */
@@ -175,11 +188,17 @@ export function createDocumentService(options: DocumentServiceOptions): Document
   const labels = new Map<string, string>();
   const nameFor = (path: string): string => labels.get(path) ?? basename(path);
   const home = options.home ?? homedir;
+  const labelOf = (path: string): string => pathLabelOf(path, home(), options.root?.());
+  const movedOf = (documentId: string, path: string): MovedDocument => ({
+    documentId,
+    name: nameFor(path),
+    pathLabel: labelOf(path),
+  });
   /** What a document crosses the bridge as: its name, its folder to show, and its text. */
   const describe = (path: string, text: string): OpenDocument => ({
     path,
     name: nameFor(path),
-    pathLabel: pathLabelOf(path, home()),
+    pathLabel: labelOf(path),
     text,
   });
 
@@ -300,11 +319,14 @@ export function createDocumentService(options: DocumentServiceOptions): Document
         labels.set(rest === '' ? to : join(to, rest), label);
       }
       // Described after the labels have moved, so a tab that carries one keeps showing it.
-      return moved.map((documentId): MovedDocument => {
-        const path = paths.get(documentId) ?? to;
-        return { documentId, name: nameFor(path), pathLabel: pathLabelOf(path, home()) };
-      });
+      return moved.map((documentId) => movedOf(documentId, paths.get(documentId) ?? to));
     },
+
+    relabel() {
+      return [...paths].map(([documentId, path]) => movedOf(documentId, path));
+    },
+
+    labelOf,
 
     heldUnder(path) {
       return [...paths].flatMap(([id, held]) =>

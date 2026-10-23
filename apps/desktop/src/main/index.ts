@@ -648,6 +648,8 @@ async function start(): Promise<void> {
     unlisted: [settingsFile, keybindingsFile, snippetsFile],
     // What a tab's folder is shortened against on hover (ADR 0086), asked at each open.
     home: () => app.getPath('home'),
+    // Inside the open folder a label is relative to it (ADR 0125): the explorer's, asked at each.
+    root: () => explorer.folder(),
     dialogs: {
       openBrief: async () => {
         const answer = await dialog.showOpenDialog({

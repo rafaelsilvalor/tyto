@@ -782,9 +782,12 @@ function previewEntry(tab: EditorTab): TabEntry {
   const image = imageOfTab(tab);
   if (image !== undefined) {
     // TYTO-366: an image's preview is called by the file's name, which main sends each answer.
+    const answer = imageViews.get(image)?.answer;
     return {
       id: tab.id,
-      label: imageViews.get(image)?.answer?.name ?? heading,
+      label: answer?.name ?? heading,
+      // Where the image is, as a brief's tab says it (TYTO-274, ADR 0125).
+      ...(answer?.ok === true && answer.pathLabel !== undefined ? { where: answer.pathLabel } : {}),
       dirty: false,
       icon: 'preview',
       preview: true,
@@ -2558,6 +2561,19 @@ function paintBreadcrumb(groupId: string): void {
   if (element === undefined) return;
   const text = breadcrumbText(groupId);
   if (element.breadcrumb !== text) element.breadcrumb = text;
+  const where = breadcrumbWhere(groupId);
+  if (element.breadcrumbTitle !== where) element.breadcrumbTitle = where;
+}
+
+/**
+ * The header row's tooltip (TYTO-274): where the file in front is, the tab's own label (ADR 0086,
+ * ADR 0125). No segment is added to the row, which still names only the block (ADR 0098).
+ */
+function breadcrumbWhere(groupId: string): string | undefined {
+  const group = groupById(groups, groupId);
+  const front = group === undefined ? undefined : activeTabOf(group);
+  if (front === undefined || isPreview(front)) return undefined;
+  return documentOf(workspace, front.documentId)?.pathLabel;
 }
 
 /**
@@ -2705,6 +2721,9 @@ async function setWorkspaceFolder(choose: boolean): Promise<void> {
   await withBridge(async (bridge) => {
     const before = workspaceShown?.folder ?? null;
     const answer = await bridge['workspace:set-folder']({ choose });
+    // A label inside the open folder is relative to it (TYTO-274, ADR 0125): main labels every
+    // open tab again, and they take it as they take a rename.
+    workspace = withMovedDocuments(workspace, answer.relabelled);
     showWorkspace(answer);
     // Opening a folder opens the explorer (Rafael, 2026-10-21), and only here: a folder the
     // session brings back at launch leaves the panel as the saved layout has it, and a picker

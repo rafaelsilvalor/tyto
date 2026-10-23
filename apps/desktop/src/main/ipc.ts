@@ -208,7 +208,7 @@ export interface IpcDependencies {
    */
   readonly workspace: {
     state: () => IpcResponse<'workspace:folder'>;
-    setFolder: (choose: boolean) => Promise<IpcResponse<'workspace:set-folder'>>;
+    setFolder: (choose: boolean) => Promise<IpcResponse<'workspace:folder'>>;
     setTrust: (
       trusted: boolean,
       source: IpcRequest<'workspace:trust'>['source'],
@@ -452,7 +452,12 @@ export function createHandlers(dependencies: IpcDependencies): Handlers {
 
     'workspace:folder': () => Promise.resolve(workspace.state()),
 
-    'workspace:set-folder': ({ choose }) => workspace.setFolder(choose),
+    // TYTO-274, ADR 0125: a label inside the open folder is relative to it, so every open tab is
+    // labelled again when the folder changes, and the window applies it as it applies a rename.
+    'workspace:set-folder': async ({ choose }) => ({
+      ...(await workspace.setFolder(choose)),
+      relabelled: documents.relabel(),
+    }),
 
     'workspace:trust': ({ trusted, source }) => workspace.setTrust(trusted, source),
 
@@ -465,7 +470,13 @@ export function createHandlers(dependencies: IpcDependencies): Handlers {
     },
 
     // TYTO-366, ADR 0124: an image for the preview, by id, as bytes main checked.
-    'explorer:image': ({ entryId, have }) => explorer.image(entryId, have),
+    // TYTO-274: the image's tab says where it is, as a brief's does (ADR 0086, ADR 0125).
+    'explorer:image': async ({ entryId, have }) => {
+      const answer = await explorer.image(entryId, have);
+      const path = explorer.pathOf(entryId);
+      if (!('ok' in answer) || !answer.ok || path === undefined) return answer;
+      return { ...answer, pathLabel: documents.labelOf(path) };
+    },
 
     // TYTO-352, ADR 0121: the explorer writes by id and name; the tabs follow here, in the one
     // place that holds both the explorer and the documents.

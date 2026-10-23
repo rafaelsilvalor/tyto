@@ -175,7 +175,12 @@ const explorerFiles = () => {
           : { ok: false, reason: 'trash-failed' },
       );
     },
-    pathOf: (entryId: string) => (entryId === 'e-folder' ? '/work/promo/slides' : undefined),
+    pathOf: (entryId: string) =>
+      entryId === 'e-folder'
+        ? '/work/promo/slides'
+        : entryId === 'e-image'
+          ? '/work/promo/foto.png'
+          : undefined,
   };
 };
 
@@ -282,6 +287,11 @@ const documents = () => {
       return ['document-9'];
     },
     heldUnder: (path: string) => (path === '/work/promo/slides' ? ['document-9'] : []),
+    // TYTO-274: one tab held, labelled again; and a label for any path, marked as this one's.
+    relabel: () => [
+      { documentId: 'document-9', name: 'capa.brief', pathLabel: 'promo/capa.brief' },
+    ],
+    labelOf: (path: string) => `label of ${path}`,
   };
 };
 
@@ -1325,7 +1335,12 @@ describe('the workspace folder channels (TYTO-278)', () => {
     expect((await handlers['workspace:folder']({})).folder).toBeNull();
     const opened = await handlers['workspace:set-folder']({ choose: true });
     expect(opened).toMatchObject({ folder: '/work/promo', output: '/work/promo/exports' });
-    expect(await handlers['workspace:folder']({})).toEqual(opened);
+    // TYTO-274, ADR 0125: the open tabs labelled again for the folder, beside what is open.
+    const { relabelled, ...state } = opened;
+    expect(relabelled).toEqual([
+      { documentId: 'document-9', name: 'capa.brief', pathLabel: 'promo/capa.brief' },
+    ]);
+    expect(await handlers['workspace:folder']({})).toEqual(state);
     expect((await handlers['workspace:set-folder']({ choose: false })).folder).toBeNull();
     expect(workspace.asked).toEqual([true, false]);
   });
@@ -1674,6 +1689,8 @@ describe('the explorer image channel', () => {
       ok: true,
       mime: 'image/png',
       version: '1:4',
+      // TYTO-274: where it is, as the documents service labels a path (ADR 0125).
+      pathLabel: 'label of /work/promo/foto.png',
     });
     await expect(image({ entryId: 'e-image', have: '1:4' })).resolves.toEqual({ unchanged: true });
     await expect(image({ entryId: 'e-brief' })).resolves.toEqual({ ok: false, reason: 'gone' });
