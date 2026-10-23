@@ -58,6 +58,12 @@ export const PREVIEW_PREVIOUS_SLIDE = 'preview.previousSlide';
 export const PREVIEW_OPEN_TO_SIDE = 'preview.openToSide';
 export const PREVIEW_OPEN = 'preview.open';
 export const PREVIEW_TOGGLE_LOCK = 'preview.toggleLock';
+/**
+ * TYTO-323 (ADR 0123): the preview's two modes. No default key: the card asks for none unless one
+ * is free, and the preview's other commands but Ctrl+Shift+V have none either.
+ */
+export const PREVIEW_SHOW_ONE_SLIDE = 'preview.showOneSlide';
+export const PREVIEW_SHOW_ALL_SLIDES = 'preview.showAllSlides';
 export const SHELL_TOGGLE_LOCALE = 'shell.toggleLocale';
 export const LAYOUT_RESTORE = 'layout.restore';
 /**
@@ -258,6 +264,8 @@ export const COMMAND_LABELS: Readonly<Record<string, CatalogueKey>> = {
   [PREVIEW_OPEN_TO_SIDE]: 'command.preview.openToSide',
   [PREVIEW_OPEN]: 'command.preview.open',
   [PREVIEW_TOGGLE_LOCK]: 'command.preview.toggleLock',
+  [PREVIEW_SHOW_ONE_SLIDE]: 'command.preview.showOneSlide',
+  [PREVIEW_SHOW_ALL_SLIDES]: 'command.preview.showAllSlides',
   [SHELL_TOGGLE_LOCALE]: 'command.shell.toggleLocale',
   [EDITOR_TOGGLE_VIM]: 'command.editor.toggleVim',
   [EDITOR_INSERT_MENU]: 'command.editor.insertMenu',
@@ -331,6 +339,8 @@ export interface DesktopActions {
   openPreview(side: boolean): void;
   /** TYTO-287. Locks the preview in front on its brief, or lets it follow again. */
   togglePreviewLock(): void;
+  /** TYTO-323. One slide over the strip, or every slide in a grid, in the preview in front. */
+  setPreviewMode(mode: 'one' | 'all'): void;
   toggleLocale(): void;
   toggleVimMode(): void;
   /** TYTO-276. Opens the "/" menu at the cursor, with no "/" typed. */
@@ -451,6 +461,12 @@ export function createDesktopRegistry(actions: DesktopActions): CommandRegistry 
   });
   add(PREVIEW_TOGGLE_LOCK, () => {
     actions.togglePreviewLock();
+  });
+  add(PREVIEW_SHOW_ONE_SLIDE, () => {
+    actions.setPreviewMode('one');
+  });
+  add(PREVIEW_SHOW_ALL_SLIDES, () => {
+    actions.setPreviewMode('all');
   });
   add(SHELL_TOGGLE_LOCALE, () => {
     actions.toggleLocale();
@@ -626,6 +642,8 @@ export const BRIEF_ONLY_COMMANDS: ReadonlySet<string> = new Set([
   PREVIEW_OPEN_TO_SIDE,
   PREVIEW_OPEN,
   PREVIEW_TOGGLE_LOCK,
+  PREVIEW_SHOW_ONE_SLIDE,
+  PREVIEW_SHOW_ALL_SLIDES,
   FILE_EXPORT,
   EDITOR_INSERT_MENU,
   EDITOR_GO_TO_BLOCK,

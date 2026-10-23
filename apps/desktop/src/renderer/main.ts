@@ -212,6 +212,7 @@ import {
   shownDocumentIds,
   splitGroup,
   toggleLock,
+  setPreviewMode,
   toggleStrip,
 } from './editor-groups.js';
 import { type PreviewPane, previewElementsOf } from './preview-pane.js';
@@ -249,6 +250,7 @@ import {
   type RequestGate,
   type Zoom,
   FORMAT_ATTRIBUTE,
+  MODE_ATTRIBUTE,
   artworkOfThumbnail,
   artworksOf,
   createRequestGate,
@@ -1088,6 +1090,14 @@ const registry: CommandRegistry = withCommandGate(
       if (target === undefined || !sessionRead) return;
       groups = toggleLock(groups, target.id);
       showGroups();
+    },
+
+    setPreviewMode: (mode) => {
+      // The same target as the lock (TYTO-323): the preview in front, or the following one.
+      const target = focusedPreview() ?? followingPreview(groups);
+      if (target === undefined) return;
+      groups = setPreviewMode(groups, target.id, mode);
+      repaint();
     },
 
     zoomToFit: () => {
@@ -3125,7 +3135,11 @@ function groupsForSession(): SessionGroups {
     // A preview keeps no place (TYTO-287): a following one names nothing, since it shows the
     // brief in front when the window opens again, and a locked one names its brief.
     if (isPreview(tab)) {
-      const hidden = tab.stripHidden === true ? { stripHidden: true as const } : {};
+      // The strip's flag and the mode, each only when it is not the default (TYTO-323).
+      const hidden = {
+        ...(tab.stripHidden === true ? { stripHidden: true as const } : {}),
+        ...(tab.mode === 'all' ? { mode: 'all' as const } : {}),
+      };
       return tab.locked === true
         ? { documentId: tab.documentId, view: 'preview', locked: true, ...hidden }
         : { view: 'preview', ...hidden };
@@ -3391,7 +3405,10 @@ async function restoreGroups(
       if (!('view' in stored)) return (stale ? staleAt : builtAt).get(stored.tab);
       // A following preview is pointed at the brief in front once the groups are built; a
       // locked one shows the document its brief became, and goes when that did not come back.
-      const hidden = stored.stripHidden === true ? { stripHidden: true as const } : {};
+      const hidden = {
+        ...(stored.stripHidden === true ? { stripHidden: true as const } : {}),
+        ...(stored.mode === 'all' ? { mode: 'all' as const } : {}),
+      };
       if (!('locked' in stored)) return { view: 'preview', documentId: '', ...hidden };
       const brief = builtAt.get(stored.tab);
       return brief === undefined
@@ -4110,6 +4127,7 @@ function paintPreviews(): void {
         // Per tab and not per brief (TYTO-323): a locked preview and the following one of the
         // same brief can each show or hide their own.
         stripHidden: tab.stripHidden === true,
+        mode: tab.mode ?? 'one',
         stripLabel: translate(state.locale, 'preview.strip.label'),
         stripToggleLabels: {
           hide: translate(state.locale, 'preview.strip.hide'),
@@ -4180,6 +4198,25 @@ function wirePreviewPane(pane_: PreviewPane, nodes: PreviewElements): void {
     // has drawn the new selection, so the arrows go on moving it.
     if (at !== undefined && target !== undefined) revealRange(target.view, at);
   };
+
+  // A slide clicked in the All slides grid opens it: chosen as the strip's click chooses it, and
+  // the tab back in One slide mode with it as the main slide (TYTO-323).
+  nodes.strip.open = (id) => {
+    const tab = tabOfPane(pane_);
+    if (tab !== undefined) groups = setPreviewMode(groups, tab.id, 'one');
+    nodes.strip.choose(id);
+  };
+
+  // The bar's two modes, per tab and kept in the session with it, as the strip's flag is.
+  for (const button of nodes.modes?.querySelectorAll<HTMLElement>(`[${MODE_ATTRIBUTE}]`) ?? []) {
+    button.addEventListener('click', () => {
+      const tab = tabOfPane(pane_);
+      const mode = button.getAttribute(MODE_ATTRIBUTE);
+      if (tab === undefined || (mode !== 'one' && mode !== 'all')) return;
+      groups = setPreviewMode(groups, tab.id, mode);
+      repaint();
+    });
+  }
 
   // Hidden or shown per tab, and kept in the session with it (TYTO-323).
   nodes.stripToggle.addEventListener('click', () => {

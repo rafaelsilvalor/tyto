@@ -25,13 +25,15 @@ describe('the scene list', () => {
     expect(sceneProblems(SCENES)).toEqual([]);
   });
 
-  it('has the five scenes the card names', () => {
+  it('has the five scenes the card names, and the preview’s two modes (TYTO-323)', () => {
     expect(SCENES.map((each) => each.name)).toEqual([
       'window-tour',
       'command-bar-open',
       'problems-panel',
       'export-dialog',
       'settings-tab',
+      'preview-strip',
+      'preview-all-slides',
     ]);
   });
 

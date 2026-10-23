@@ -99,6 +99,24 @@ async function previewBeside(page: Page): Promise<void> {
   });
 }
 
+/** Waits until every thumbnail in the preview in front has its slide drawn (TYTO-323). */
+async function thumbnailsDrawn(page: Page, count: number): Promise<void> {
+  await page.waitForFunction(
+    (wanted) => {
+      const frames = [
+        ...document.querySelectorAll<HTMLIFrameElement>(
+          'tyto-preview-pane:not([hidden]) [data-preview-strip] iframe',
+        ),
+      ];
+      return frames.length === wanted && frames.every((frame) => frame.hasAttribute('srcdoc'));
+    },
+    count,
+    { polling: 25, timeout: 30_000 },
+  );
+  // A `srcdoc` is in; its paint is a frame or two later.
+  await page.waitForTimeout(500);
+}
+
 export const SCENES: readonly Scene[] = [
   {
     name: 'window-tour',
@@ -107,6 +125,8 @@ export const SCENES: readonly Scene[] = [
     proof: { selector: '#problems-heading', key: 'problems.heading' },
     arrange: async ({ page }) => {
       await previewBeside(page);
+      // The brief's two items are two slides, so the strip is in the picture (TYTO-323).
+      await thumbnailsDrawn(page, 2);
     },
   },
   {
@@ -155,6 +175,36 @@ export const SCENES: readonly Scene[] = [
           (tab.textContent ?? '').includes('settings.json'),
         ),
       );
+    },
+  },
+  // TYTO-323: the preview's two modes on a carousel of six. One slide, the stage over the strip.
+  {
+    name: 'preview-strip',
+    brief: 'week-of-reading.brief',
+    size: LAPTOP,
+    proof: {
+      selector: 'tyto-preview-pane:not([hidden]) [data-preview-mode="one"]',
+      key: 'preview.mode.one',
+    },
+    arrange: async ({ page }) => {
+      await previewBeside(page);
+      await thumbnailsDrawn(page, 6);
+    },
+  },
+  // All slides: every slide in the grid, through the command the bar runs.
+  {
+    name: 'preview-all-slides',
+    brief: 'week-of-reading.brief',
+    size: LAPTOP,
+    proof: {
+      selector: 'tyto-preview-pane:not([hidden]) [data-preview-mode="all"]',
+      key: 'preview.mode.all',
+    },
+    arrange: async ({ page, run }) => {
+      await previewBeside(page);
+      await run('preview.showAllSlides');
+      await page.waitForSelector('tyto-preview-pane:not([hidden]) .thumbnails--grid');
+      await thumbnailsDrawn(page, 6);
     },
   },
 ];

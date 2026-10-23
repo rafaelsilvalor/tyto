@@ -2,7 +2,7 @@
 
 # Commands
 
-Everything the window can be told to do, by title as the command bar shows it: 73. Open the bar with **`Ctrl+k` / `⌘k`** and type part of a title. The id is what `keybindings.json` names to put a command on a key.
+Everything the window can be told to do, by title as the command bar shows it: 75. Open the bar with **`Ctrl+k` / `⌘k`** and type part of a title. The id is what `keybindings.json` names to put a command on a key.
 
 The window adds more while it runs, which this list cannot show: a toggle for each panel, including a plugin's, and an entry for each recently opened file.
 
@@ -26,6 +26,8 @@ The window adds more while it runs, which this list cannot show: a toggle for ea
 | Open preview to the side | `preview.openToSide` | `Ctrl+Shift+v` | `⌘⇧v` |
 | Open preview | `preview.open` |  |  |
 | Toggle preview lock | `preview.toggleLock` |  |  |
+| Preview: show one slide | `preview.showOneSlide` |  |  |
+| Preview: show all slides | `preview.showAllSlides` |  |  |
 | Switch the window language | `shell.toggleLocale` |  |  |
 | Editor: turn vim mode on or off | `editor.toggleVim` |  |  |
 | Insert: templates… | `editor.insertMenu` |  |  |

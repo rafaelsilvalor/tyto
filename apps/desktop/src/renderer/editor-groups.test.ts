@@ -32,6 +32,7 @@ import {
   splitGroup,
   stepTabInGroup,
   toggleLock,
+  setPreviewMode,
   toggleStrip,
 } from './editor-groups.js';
 
@@ -568,5 +569,32 @@ describe('hiding a preview’s strip of slides (TYTO-323)', () => {
     const groups = groupsOf(['a'], 'a');
     const text = focusedGroup(groups).tabs[0]?.id ?? '';
     expect(focusedGroup(toggleStrip(groups, text)).tabs[0]?.stripHidden).toBeUndefined();
+  });
+});
+
+describe('a preview’s mode, One slide or All slides (TYTO-323)', () => {
+  it('sets it on the one tab, keeps the strip’s flag, and survives the lock', () => {
+    const opened = openPreviewHere(groupsOf(['a'], 'a'), 'a');
+    const id = previewTabs(opened)[0]?.id ?? '';
+    const all = setPreviewMode(toggleStrip(opened, id), id, 'all');
+    expect(previewTabs(all)[0]).toMatchObject({ mode: 'all', stripHidden: true });
+
+    const locked = toggleLock(all, id);
+    expect(previewTabs(locked)[0]).toMatchObject({ locked: true, mode: 'all' });
+    expect(previewTabs(toggleStrip(locked, id))[0]).toMatchObject({ mode: 'all' });
+
+    // One slide is the absence of a mode, and the strip's flag waits for it.
+    expect(previewTabs(setPreviewMode(all, id, 'one'))[0]).toEqual({
+      id,
+      documentId: 'a',
+      view: 'preview',
+      stripHidden: true,
+    });
+  });
+
+  it('leaves a text tab alone', () => {
+    const groups = groupsOf(['a'], 'a');
+    const text = focusedGroup(groups).tabs[0]?.id ?? '';
+    expect(focusedGroup(setPreviewMode(groups, text, 'all')).tabs[0]?.mode).toBeUndefined();
   });
 });

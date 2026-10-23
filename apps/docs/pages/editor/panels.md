@@ -41,10 +41,25 @@ The preview draws the brief as you type. **Open preview to the side** (**Ctrl+Sh
 Its toolbar has:
 
 - one chip for each format the brief asks for — click one to see that size;
-- a button that hides or shows the slide strip, for a carousel;
+- **One slide** and **All slides**, the preview's two modes, for a carousel;
+- a button that hides or shows the slide strip, in One slide;
 - **−**, the zoom, **+** and **Fit**, which fits the artwork to the space;
 - **Lock**. The preview normally follows the brief in front; locked, it stays on the brief it shows while you switch tabs, and its tab says so. **Toggle preview lock** does the same from the command bar.
 
 Under a carousel's artwork is the **slide strip**: every slide in the chosen format, small and numbered from 1. Click one to show it above — the editor jumps to the `::lamina` that made it — or, with the strip focused, move with **←**, **→**, **Home** and **End**. The strip scrolls sideways when the slides do not fit, and each preview tab remembers whether you hid it.
+
+<Screenshot
+  scene="preview-strip"
+  alt="A carousel of six slides in the preview: the first slide large, and under it the slide strip with all six, numbered 1 to 6, the first one marked."
+/>
+
+**All slides** shows every slide in the chosen format at once, in a grid, in order and numbered, each scaled so they all fit the preview. It is where a title that wraps on one slide only, or a colour that changes between slides, shows up. **Click a slide** to open it: the preview goes back to One slide with that slide large, and the editor jumps to its `::lamina`. The grid scrolls down only when there are too many slides to fit at a readable size.
+
+<Screenshot
+  scene="preview-all-slides"
+  alt="The same carousel in All slides: the six slides in two rows of three, numbered 1 to 6, with All slides pressed in the preview's toolbar."
+/>
+
+Each preview tab remembers its mode, also after the window is reloaded or Tyto is closed and opened again. **Preview: show all slides** and **Preview: show one slide** switch it from the command bar. A brief with one slide has no modes: it is always shown large.
 
 While the brief has an error the preview keeps the last drawing that worked, and the Problems panel says what to fix.

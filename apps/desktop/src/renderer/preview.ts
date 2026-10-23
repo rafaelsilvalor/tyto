@@ -209,6 +209,13 @@ export interface PreviewElements {
   readonly strip: SlideThumbnails;
   /** The bar's button that hides and shows the strip, remembered per tab. */
   readonly stripToggle: HTMLElement;
+  /**
+   * The bar's two mode buttons, One slide and All slides (TYTO-323), each a `[data-preview-mode]`
+   * of `one` or `all`. Optional, as `zoom` is, for a caller that builds the pane by hand.
+   */
+  readonly modes?: HTMLElement;
+  /** The zoom's buttons and level, which have nothing to scale while every slide is shown. */
+  readonly zoom?: HTMLElement;
   readonly stage: HTMLElement;
   readonly paper: HTMLElement;
   readonly frame: HTMLIFrameElement;
@@ -247,6 +254,8 @@ export interface PreviewState {
   readonly broken?: boolean;
   /** Whether this preview tab hid its strip (TYTO-323). Absent means shown. */
   readonly stripHidden?: boolean;
+  /** One slide on the stage over the strip, or every slide in a grid (TYTO-323). Absent is one. */
+  readonly mode?: PreviewMode;
   /** The strip's accessible name, in the window's language. */
   readonly stripLabel?: string;
   /**
@@ -255,6 +264,15 @@ export interface PreviewState {
    */
   readonly stripToggleLabels?: { readonly hide: string; readonly show: string };
 }
+
+/**
+ * How a preview tab shows a brief's slides (TYTO-323, ADR 0123): `one` is the stage over the strip,
+ * `all` is every slide of the format in a grid.
+ */
+export type PreviewMode = 'one' | 'all';
+
+/** The attribute a mode button carries: `one` or `all`. */
+export const MODE_ATTRIBUTE = 'data-preview-mode';
 
 /** The attribute a format tab carries, which is how a click knows what it selected. */
 export const FORMAT_ATTRIBUTE = 'data-format';
@@ -300,29 +318,64 @@ function paintTabs(tabs: HTMLElement, state: PreviewState): void {
 }
 
 /**
- * Hands the strip its thumbnails, and hides it for a brief with only one artwork or when the tab
- * hid it (TYTO-323). One slide is not a choice, and a strip of one is furniture that reads like a
- * control, so its toggle goes with it.
+ * Whether the preview draws every slide in the grid: the tab asked for it and there is more than
+ * one slide to draw. One slide is not a choice, so a brief of one shows it on the stage, and the
+ * tab keeps its mode for when the brief grows again.
  */
-function paintStrip(elements: PreviewElements, state: PreviewState): void {
+function showsAll(state: PreviewState, thumbnails: readonly Thumbnail[]): boolean {
+  return state.mode === 'all' && artworksOf(state.artworks).length > 1 && thumbnails.length > 0;
+}
+
+/**
+ * Hands the thumbnails element its slides, as the strip under the stage or as the All slides grid
+ * (TYTO-323). **One element for both**, its layout switched, so the two modes share one set of
+ * iframes and a keystroke re-navigates one thumbnail, whichever mode is on. The strip hides for a
+ * brief with only one artwork or when the tab hid it — one slide is not a choice, and a strip of
+ * one is furniture that reads like a control, so its toggle goes with it. The grid ignores the
+ * strip's hidden flag, which waits for the tab to come back to One slide.
+ */
+function paintThumbnails(
+  elements: PreviewElements,
+  state: PreviewState,
+  thumbnails: readonly Thumbnail[],
+  all: boolean,
+): void {
   const { strip, stripToggle } = elements;
   const single = artworksOf(state.artworks).length <= 1;
-  const shown = !single && state.stripHidden !== true;
-  stripToggle.hidden = single;
+  const stripShown = !single && state.stripHidden !== true;
+  stripToggle.hidden = single || all;
   // The label says what a press does, so it changes with the state, and there is no
   // `aria-pressed`: "Hide the slide strip, pressed" would announce the action and its opposite at
   // once. A toggle keeps one label and `aria-pressed`, or changes its label and drops it; this is
   // the second. The fill still marks the strip as shown for the eye.
-  const label = shown ? state.stripToggleLabels?.hide : state.stripToggleLabels?.show;
+  const label = stripShown ? state.stripToggleLabels?.hide : state.stripToggleLabels?.show;
   stripToggle.title = label ?? '';
   stripToggle.setAttribute('aria-label', label ?? '');
-  stripToggle.classList.toggle('preview__strip-toggle--on', shown);
+  stripToggle.classList.toggle('preview__strip-toggle--on', stripShown);
+  const shown = all || stripShown;
   strip.hidden = !shown;
   strip.label = state.stripLabel ?? '';
-  strip.items = shown ? thumbnailsOf(state) : [];
+  strip.layout = all ? 'grid' : 'strip';
+  strip.items = shown ? thumbnails : [];
   const { artwork, format } = state.selection;
   strip.selected =
     artwork === undefined || format === undefined ? undefined : thumbnailId(artwork, format);
+}
+
+/**
+ * Marks the mode button that is on, and hides both for a brief of one slide, where there is
+ * nothing to show all of. The two keep their labels, so each says whether it is on with
+ * `aria-pressed`.
+ */
+function paintModes(elements: PreviewElements, state: PreviewState, all: boolean): void {
+  const { modes } = elements;
+  if (modes === undefined) return;
+  modes.hidden = artworksOf(state.artworks).length <= 1;
+  for (const button of modes.querySelectorAll<HTMLElement>(`[${MODE_ATTRIBUTE}]`)) {
+    const on = button.getAttribute(MODE_ATTRIBUTE) === (all ? 'all' : 'one');
+    button.setAttribute('aria-pressed', String(on));
+    button.classList.toggle('preview__mode--on', on);
+  }
 }
 
 /**
@@ -359,7 +412,26 @@ function paintFrame(elements: PreviewElements, frame: Frame, zoom: number): void
  */
 export function paintPreview(elements: PreviewElements, state: PreviewState): number {
   paintTabs(elements.tabs, state);
-  paintStrip(elements, state);
+  const thumbnails = thumbnailsOf(state);
+  const all = showsAll(state, thumbnails);
+  paintThumbnails(elements, state, thumbnails, all);
+  paintModes(elements, state, all);
+  if (elements.zoom !== undefined) elements.zoom.hidden = all;
+  elements.stage.classList.toggle('preview__stage--marker', all);
+
+  if (all) {
+    // The grid has the pane, and the stage is left holding only the stale marker, over the
+    // grid, while there is one: E9.13's line has to be legible in every mode. The stage's own
+    // frame is not given the new document, which it gets once the tab is back to One slide.
+    elements.stage.hidden = !state.stale;
+    elements.paper.hidden = true;
+    elements.empty.hidden = true;
+    elements.broken.hidden = true;
+    elements.stale.hidden = !state.stale;
+    elements.zoomLevel.textContent = '';
+    return 1;
+  }
+  elements.stage.hidden = false;
 
   const frame = frameFor(state.frames, state.selection);
 

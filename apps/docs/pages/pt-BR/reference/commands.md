@@ -2,7 +2,7 @@
 
 # Comandos
 
-Tudo o que a janela sabe fazer, pelo título que a barra de comandos mostra: 73. Abra a barra com **`Ctrl+k` / `⌘k`** e digite parte de um título. O id é o que o `keybindings.json` usa para pôr um comando numa tecla.
+Tudo o que a janela sabe fazer, pelo título que a barra de comandos mostra: 75. Abra a barra com **`Ctrl+k` / `⌘k`** e digite parte de um título. O id é o que o `keybindings.json` usa para pôr um comando numa tecla.
 
 A janela acrescenta outros enquanto roda, que esta lista não tem como mostrar: um para abrir e fechar cada painel, inclusive os de plugins, e um para cada arquivo aberto recentemente.
 
@@ -26,6 +26,8 @@ A janela acrescenta outros enquanto roda, que esta lista não tem como mostrar: 
 | Abrir a prévia ao lado | `preview.openToSide` | `Ctrl+Shift+v` | `⌘⇧v` |
 | Abrir a prévia | `preview.open` |  |  |
 | Travar ou destravar a prévia | `preview.toggleLock` |  |  |
+| Prévia: mostrar um slide | `preview.showOneSlide` |  |  |
+| Prévia: mostrar todos os slides | `preview.showAllSlides` |  |  |
 | Trocar o idioma da janela | `shell.toggleLocale` |  |  |
 | Editor: ligar ou desligar o modo vim | `editor.toggleVim` |  |  |
 | Inserir: templates… | `editor.insertMenu` |  |  |

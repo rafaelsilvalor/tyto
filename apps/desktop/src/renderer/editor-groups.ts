@@ -25,6 +25,8 @@ export interface EditorTab {
   readonly locked?: boolean;
   /** A preview that hid its strip of slide thumbnails (TYTO-323, ADR 0123); absent is shown. */
   readonly stripHidden?: boolean;
+  /** A preview showing every slide at once (TYTO-323); absent is One slide. */
+  readonly mode?: 'all';
 }
 
 export const isPreview = (tab: EditorTab): boolean => tab.view === 'preview';
@@ -478,7 +480,7 @@ export function layoutOf<T>(
 export type RestoredPreview = (
   | { readonly view: 'preview'; readonly documentId: '' }
   | { readonly view: 'preview'; readonly documentId: string; readonly locked: true }
-) & { readonly stripHidden?: true };
+) & { readonly stripHidden?: true; readonly mode?: 'all' };
 
 /**
  * The groups a session left, rebuilt (TYTO-286): `documentOf` says which document each kept
@@ -702,5 +704,24 @@ export function toggleStrip(groups: EditorGroups, tabId: string): EditorGroups {
       return shown;
     }
     return { ...each, stripHidden: true };
+  });
+}
+
+/**
+ * Puts a preview in One slide or All slides mode (TYTO-323, ADR 0123). Per tab, as the strip's
+ * flag is, and only `all` is written: a tab with no mode is in One slide. The strip's flag is
+ * left alone, for when the tab is back in One slide.
+ */
+export function setPreviewMode(
+  groups: EditorGroups,
+  tabId: string,
+  mode: 'one' | 'all',
+): EditorGroups {
+  return mapTabs(groups, (each) => {
+    if (each.id !== tabId || !isPreview(each)) return each;
+    if (mode === 'all') return each.mode === 'all' ? each : { ...each, mode: 'all' };
+    if (each.mode === undefined) return each;
+    const { mode: _mode, ...one } = each;
+    return one;
   });
 }

@@ -905,6 +905,52 @@ tyto-preview-pane[hidden] {
   font-weight: var(--tyto-weight-strong);
 }
 
+/*
+ * TYTO-323: One slide and All slides, two segments of one bordered control, the one that is on
+ * filled the way a format tab is. Words and not icons: the two names are the approved ones, and a
+ * pair of new glyphs would be two more to approve.
+ */
+.preview__modes {
+  display: inline-flex;
+  flex: none;
+  border: var(--tyto-hairline-width) solid var(--tyto-border);
+  border-radius: var(--tyto-radius-sm);
+  overflow: hidden;
+}
+
+.preview__modes[hidden] {
+  display: none;
+}
+
+.preview__mode {
+  border: 0;
+  padding: var(--tyto-space-1) var(--tyto-space-4);
+  background: none;
+  color: var(--tyto-text-muted);
+  font: inherit;
+  font-size: var(--tyto-text-sm);
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.preview__mode + .preview__mode {
+  border-left: var(--tyto-hairline-width) solid var(--tyto-border);
+}
+
+.preview__mode:hover {
+  background: var(--tyto-hover);
+}
+
+.preview__mode--on {
+  background: var(--tyto-button-on);
+  color: var(--tyto-text);
+  font-weight: var(--tyto-weight-strong);
+}
+
+.preview__zoom[hidden] {
+  display: none;
+}
+
 .preview__zoom {
   display: flex;
   gap: var(--tyto-space-3);
@@ -1039,6 +1085,38 @@ tyto-preview-pane[hidden] {
 
 .preview__strip[hidden] {
   display: none;
+}
+
+/*
+ * TYTO-323: All slides mode. The same element as the strip, given the stage's room: the slides
+ * fill rows from the left, in order, at the height and column count `gridThumbnailLayout` works out
+ * so they all fit, and the
+ * grid scrolls down only once that height would fall under its minimum.
+ */
+.preview__strip.thumbnails--grid {
+  /* A grid and not a wrapping row: a short last row starts under the first slide (TYTO-323). */
+  display: grid;
+  grid-template-columns: repeat(var(--thumbnail-columns, 1), max-content);
+  grid-auto-rows: max-content;
+  flex: 1;
+  min-height: 0;
+  align-content: safe center;
+  justify-content: safe center;
+  overflow-x: hidden;
+  overflow-y: auto;
+  padding: var(--tyto-space-6);
+  border-top: 0;
+  background: var(--tyto-surface-sunken);
+}
+
+.preview__stage[hidden] {
+  display: none;
+}
+
+/* In All slides mode the stage keeps only the stale marker, a line over the grid. */
+.preview__stage--marker {
+  flex: none;
+  padding: var(--tyto-space-2) var(--tyto-space-4) 0;
 }
 
 .thumbnail {

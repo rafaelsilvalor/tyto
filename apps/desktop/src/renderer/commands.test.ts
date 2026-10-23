@@ -42,6 +42,8 @@ import {
   PREVIEW_OPEN,
   PREVIEW_OPEN_TO_SIDE,
   PREVIEW_PREVIOUS_SLIDE,
+  PREVIEW_SHOW_ALL_SLIDES,
+  PREVIEW_SHOW_ONE_SLIDE,
   PREVIEW_TOGGLE_LOCK,
   PREVIEW_ZOOM_FIT,
   PREVIEW_ZOOM_IN,
@@ -118,6 +120,7 @@ const actions = () =>
     newTemplate: vi.fn<() => void>(),
     openPreview: vi.fn<(side: boolean) => void>(),
     togglePreviewLock: vi.fn<() => void>(),
+    setPreviewMode: vi.fn<(mode: 'one' | 'all') => void>(),
     zoomWindow: vi.fn<(step: 'in' | 'out' | 'reset') => void>(),
     openDocumentation: vi.fn<() => void>(),
   }) satisfies DesktopActions;
@@ -268,6 +271,26 @@ describe('the ids the window registers', () => {
 
     expect(registry.run(TEMPLATE_NEW, NO_VIEW)).toBe(true);
     expect(spies.newTemplate).toHaveBeenCalledOnce();
+  });
+
+  it('runs the preview’s two modes on a brief only, with no keystroke (TYTO-323)', () => {
+    const spies = actions();
+    let brief = true;
+    const registry = withCommandGate(
+      createDesktopRegistry(spies),
+      (id) => brief || !BRIEF_ONLY_COMMANDS.has(id),
+    );
+
+    expect(registry.run(PREVIEW_SHOW_ALL_SLIDES, NO_VIEW)).toBe(true);
+    expect(registry.run(PREVIEW_SHOW_ONE_SLIDE, NO_VIEW)).toBe(true);
+    brief = false;
+    expect(registry.run(PREVIEW_SHOW_ALL_SLIDES, NO_VIEW)).toBe(false);
+    expect(spies.setPreviewMode.mock.calls).toEqual([['all'], ['one']]);
+    expect(COMMAND_LABELS[PREVIEW_SHOW_ALL_SLIDES]).toBe('command.preview.showAllSlides');
+    expect(COMMAND_LABELS[PREVIEW_SHOW_ONE_SLIDE]).toBe('command.preview.showOneSlide');
+    const bound = bindingsOf(keymapSetFor(false), 'linux');
+    expect(bound[PREVIEW_SHOW_ALL_SLIDES]).toBeUndefined();
+    expect(bound[PREVIEW_SHOW_ONE_SLIDE]).toBeUndefined();
   });
 
   it('runs New brief from template on any tab, with no keystroke (TYTO-275)', () => {

@@ -63,6 +63,8 @@ const storedTabIndex = z.number().int().min(0);
  * version still 1, for `template`'s reason: a preview written before it shows its strip.
  */
 const storedStripHidden = z.literal(true).optional().catch(undefined);
+/** A preview in All slides mode (TYTO-323), the same way: absent, or anything else, is One slide. */
+const storedMode = z.literal('all').optional().catch(undefined);
 
 const storedGroupTab = z.union([
   z.object({
@@ -70,8 +72,9 @@ const storedGroupTab = z.union([
     view: z.literal('preview'),
     locked: z.literal(true),
     stripHidden: storedStripHidden,
+    mode: storedMode,
   }),
-  z.object({ view: z.literal('preview'), stripHidden: storedStripHidden }),
+  z.object({ view: z.literal('preview'), stripHidden: storedStripHidden, mode: storedMode }),
   z.object({
     tab: storedTabIndex,
     /** Per occurrence: one document in two groups has a cursor in each (TYTO-286). */

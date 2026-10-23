@@ -1,10 +1,11 @@
 // @vitest-environment jsdom
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 
 import {
   type Artwork,
   type Frame,
   type PreviewElements,
+  type PreviewState,
   type Selection,
   FORMAT_ATTRIBUTE,
   ZOOM_STEPS,
@@ -24,6 +25,7 @@ import {
 } from './preview.js';
 import type { SlideThumbnails } from './slide-thumbnails.js';
 import './slide-thumbnails.js';
+import { previewElementsOf } from './preview-pane.js';
 
 /**
  * The preview pane, in jsdom.
@@ -341,6 +343,134 @@ describe('the slide strip (TYTO-323)', () => {
 
     expect(elements.strip.hidden).toBe(true);
     expect(elements.stripToggle.hidden).toBe(true);
+  });
+});
+
+describe('All slides mode (TYTO-323)', () => {
+  /** Ten slides of one format with slide 1 on the stage, in `mode`. */
+  const ten = (mode: 'one' | 'all', extra: Partial<PreviewState> = {}): PreviewState => ({
+    stale: false,
+    frames: TEN_FRAMES,
+    artworks: TEN,
+    selection: { format: 'grid-1x1', artwork: 'lamina-1' },
+    zoom: 'fit',
+    mode,
+    ...extra,
+  });
+
+  it('draws every slide in the grid, in order and numbered, in place of the stage', () => {
+    const elements = pane(globalThis.document);
+
+    paintPreview(elements, ten('all'));
+
+    expect(elements.strip.hidden).toBe(false);
+    expect(elements.strip.layout).toBe('grid');
+    expect(elements.strip.items.map((item) => item.label)).toEqual(
+      TEN.map((_, at) => String(at + 1)),
+    );
+    expect(elements.strip.items.map((item) => artworkOfThumbnail(item.id))).toEqual(
+      TEN.map((artwork) => artwork.id),
+    );
+    expect(elements.stage.hidden).toBe(true);
+    // The strip's toggle has nothing to hide while the grid has the pane.
+    expect(elements.stripToggle.hidden).toBe(true);
+  });
+
+  it('shows the grid even when the tab hid its strip, and keeps the flag for One slide', () => {
+    const elements = pane(globalThis.document);
+
+    paintPreview(elements, ten('all', { stripHidden: true }));
+    expect(elements.strip.hidden).toBe(false);
+    expect(elements.strip.layout).toBe('grid');
+
+    paintPreview(elements, ten('one', { stripHidden: true }));
+    expect(elements.strip.hidden).toBe(true);
+    expect(elements.strip.layout).toBe('strip');
+    expect(elements.stage.hidden).toBe(false);
+  });
+
+  it('keeps the stale marker over the grid, and the stage holds nothing else', () => {
+    const elements = pane(globalThis.document);
+
+    paintPreview(elements, ten('all', { stale: true }));
+
+    expect(elements.stage.hidden).toBe(false);
+    expect(elements.stale.hidden).toBe(false);
+    expect(elements.paper.hidden).toBe(true);
+    expect(elements.empty.hidden).toBe(true);
+  });
+
+  it('shows a brief of one slide on the stage, whatever the mode', () => {
+    const elements = pane(globalThis.document);
+
+    paintPreview(elements, {
+      ...ten('all'),
+      frames: TEN_FRAMES.slice(0, 1),
+      artworks: TEN.slice(0, 1),
+    });
+
+    expect(elements.strip.layout).toBe('strip');
+    expect(elements.strip.hidden).toBe(true);
+    expect(elements.stage.hidden).toBe(false);
+    expect(elements.paper.hidden).toBe(false);
+  });
+
+  it('marks the mode that is on in the real pane’s bar, and hides the zoom for the grid', async () => {
+    const element = document.createElement('tyto-preview-pane');
+    document.body.append(element);
+    await element.updateComplete;
+    const elements = previewElementsOf(element)!;
+    const pressed = (): (string | null)[] =>
+      [...element.querySelectorAll('[data-preview-mode]')].map((button) =>
+        button.getAttribute('aria-pressed'),
+      );
+
+    paintPreview(elements, ten('all'));
+    expect(pressed()).toEqual(['false', 'true']);
+    expect(elements.zoom?.hidden).toBe(true);
+    expect(elements.modes?.hidden).toBe(false);
+
+    paintPreview(elements, ten('one'));
+    expect(pressed()).toEqual(['true', 'false']);
+    expect(elements.zoom?.hidden).toBe(false);
+    element.remove();
+  });
+
+  it('draws the thumbnails once for both modes: a keystroke on slide 3 re-navigates one document', async () => {
+    // The card: "a brief's thumbnails are drawn once per change, not once per mode". The real
+    // pane, so a second thumbnails element in its markup would be counted here.
+    const element = document.createElement('tyto-preview-pane');
+    document.body.append(element);
+    await element.updateComplete;
+    const elements = previewElementsOf(element)!;
+    const settle = async (): Promise<void> => {
+      for (const strip of element.querySelectorAll('tyto-slide-thumbnails')) {
+        await (strip as SlideThumbnails).updateComplete;
+      }
+      for (const iframe of element.querySelectorAll('iframe')) loaded(iframe);
+    };
+
+    paintPreview(elements, ten('one'));
+    await settle();
+    paintPreview(elements, ten('all'));
+    await settle();
+    const frames = element.querySelectorAll('iframe').length;
+    const writes = vi.spyOn(HTMLIFrameElement.prototype, 'setAttribute');
+
+    const edited = TEN_FRAMES.map((each, at) =>
+      at === 2 ? { ...each, html: `${each.html}<p>slide 3, edited</p>` } : each,
+    );
+    paintPreview(elements, ten('all', { frames: edited }));
+    await settle();
+    paintPreview(elements, ten('one', { frames: edited }));
+    await settle();
+    const navigated = writes.mock.calls.filter(([name]) => name === 'srcdoc').length;
+    writes.mockRestore();
+
+    expect(navigated, 'srcdoc writes for one keystroke on slide 3, in both modes').toBe(1);
+    // The stage's frame and one thumbnail per slide, whichever mode drew them.
+    expect(frames, 'iframes in the pane with ten slides').toBe(1 + TEN.length);
+    element.remove();
   });
 });
 

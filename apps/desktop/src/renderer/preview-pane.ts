@@ -11,8 +11,10 @@ import './slide-thumbnails.js';
  * The markup the PREVIEW dock panel had, with **no ids**: a window can show two previews at
  * once — a following one and a locked one — so every node is found by a `data-preview-*`
  * attribute inside its own pane ({@link previewElementsOf}). A bar of the brief's formats, the
- * strip's toggle, the zoom and the lock over the stage, and under the stage a strip of the
- * slides as thumbnails, which is how a slide is chosen since TYTO-323 (ADR 0123).
+ * two modes (One slide, All slides), the strip's toggle, the zoom and the lock over the stage,
+ * and under the stage a strip of the slides as thumbnails, which is how a slide is chosen since
+ * TYTO-323 (ADR 0123). In All slides mode the same thumbnails element is the grid, and takes the
+ * stage's room.
  *
  * **The bar is the pane's header row** (TYTO-288, ADR 0085): the same height as every group's
  * and every panel's, one line that never wraps, the formats taking what room is left and the
@@ -40,10 +42,26 @@ export class PreviewPane extends LitElement {
     return html`<div class="preview__bar pane__header" data-font-area="paneHeaders">
         <div class="preview__tabs" data-preview-formats role="tablist"></div>
         <div class="pane__actions">
+          <div class="preview__modes" data-preview-modes role="group" hidden>
+            <button
+              type="button"
+              class="preview__mode"
+              data-preview-mode="one"
+              data-i18n="preview.mode.one"
+              aria-pressed="true"
+            ></button>
+            <button
+              type="button"
+              class="preview__mode"
+              data-preview-mode="all"
+              data-i18n="preview.mode.all"
+              aria-pressed="false"
+            ></button>
+          </div>
           <button type="button" class="preview__strip-toggle" data-preview-strip-toggle>
             ${icon('strip')}
           </button>
-          <div class="preview__zoom">
+          <div class="preview__zoom" data-preview-zoom-group>
             <button type="button" data-preview-zoom="out" data-i18n-title="preview.zoom.out">
               −
             </button>
@@ -120,5 +138,20 @@ export function previewElementsOf(pane: ParentNode): PreviewElements | undefined
   ) {
     return undefined;
   }
-  return { tabs, strip, stripToggle, stage, paper, frame, empty, broken, stale, zoomLevel };
+  const modes = find('data-preview-modes') ?? undefined;
+  const zoom = find('data-preview-zoom-group') ?? undefined;
+  return {
+    tabs,
+    strip,
+    stripToggle,
+    stage,
+    paper,
+    frame,
+    empty,
+    broken,
+    stale,
+    zoomLevel,
+    ...(modes === undefined ? {} : { modes }),
+    ...(zoom === undefined ? {} : { zoom }),
+  };
 }

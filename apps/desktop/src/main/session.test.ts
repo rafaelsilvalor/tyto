@@ -836,6 +836,69 @@ describe('the previews in the session (TYTO-287, ADR 0084)', () => {
     );
   });
 
+  it('keeps All slides mode per preview through the file, and reads an old record as one', async () => {
+    // TYTO-323 (ADR 0123): the mode is kept as the strip's flag is, next to it, and only `all`
+    // is written; a record with no mode, or one this version does not know, reads as One slide.
+    const built = await twoBriefs();
+    const modes = {
+      ...withPreviews,
+      root: {
+        ...withPreviews.root,
+        children: [
+          withPreviews.root.children[0]!,
+          {
+            tabs: [
+              {
+                documentId: 'document-1',
+                view: 'preview' as const,
+                locked: true as const,
+                stripHidden: true as const,
+                mode: 'all' as const,
+              },
+              { view: 'preview' as const, mode: 'all' as const },
+            ],
+            active: 1,
+          },
+        ],
+      },
+    };
+    await built.session.write({ tabs, active: 1, template: null, groups: modes, final: false });
+    const kept = [
+      { tab: 0, view: 'preview', locked: true, stripHidden: true, mode: 'all' },
+      { view: 'preview', mode: 'all' },
+    ];
+    expect(built.store.saved()).toMatchObject({
+      groups: { root: { children: [{}, { tabs: kept }] } },
+    });
+    const file = fileSessionStore(join(scratch, 'session.json'));
+    expect(await file.write(built.store.saved() as never)).toBe(true);
+    expect(await file.read()).toEqual(built.store.saved());
+    const read = await built.session.read();
+    expect(read.groups?.root).toMatchObject({ children: [{}, { tabs: kept }] });
+
+    // A record from before the mode, and one with a mode it does not know, read as One slide.
+    const saved = built.store.saved() as { groups: { root: { children: unknown[] } } };
+    const old = {
+      ...saved,
+      groups: {
+        ...saved.groups,
+        root: {
+          ...saved.groups.root,
+          children: [
+            saved.groups.root.children[0],
+            { tabs: [{ view: 'preview' }, { view: 'preview', mode: 'grid' }], active: 0 },
+          ],
+        },
+      },
+    };
+    writeFileSync(join(scratch, 'session.json'), JSON.stringify(old));
+    const back = (await file.read())?.groups?.root;
+    expect(back).toMatchObject({
+      children: [{}, { tabs: [{ view: 'preview' }, { view: 'preview' }] }],
+    });
+    expect(JSON.stringify(back)).not.toContain('"mode"');
+  });
+
   it('drops a locked preview whose brief was not kept, and keeps the following one', async () => {
     const { store, session } = await twoBriefs();
     await session.write({
