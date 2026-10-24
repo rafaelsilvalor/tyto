@@ -1,0 +1,15 @@
+{
+  "columns": [
+    {"name":"key","type":"text","origin":"demo"},
+    {"name":"title","type":"text","origin":"demo"},
+    {"name":"status","type":"text","origin":"demo"},
+    {"name":"points","type":"number","origin":"demo"},
+    {"name":"due","type":"date","origin":"demo"}
+  ],
+  "rows": [
+    {"key":"DEMO-11","values":{"key":"DEMO-11","title":"Pricing page hero","status":"todo","points":8,"due":"2026-11-12"},"provenance":{"source":"demo","id":"DEMO-11","fetchedAt":"2026-10-24T09:00:00.000Z"}},
+    {"key":"DEMO-5","values":{"key":"DEMO-5","title":"Store window poster","status":"doing","points":5,"due":null},"provenance":{"source":"demo","id":"DEMO-5","fetchedAt":"2026-10-24T09:00:00.000Z"}},
+    {"key":"DEMO-10","values":{"key":"DEMO-10","title":"Webinar invite","status":"revisao","points":3,"due":"2026-11-06"},"provenance":{"source":"demo","id":"DEMO-10","fetchedAt":"2026-10-24T09:00:00.000Z"}},
+    {"key":"DEMO-4","values":{"key":"DEMO-4","title":"Newsletter header","status":"Revisão","points":2,"due":"2026-11-05"},"provenance":{"source":"demo","id":"DEMO-4","fetchedAt":"2026-10-24T09:00:00.000Z"}}
+  ]
+}

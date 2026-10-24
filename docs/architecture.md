@@ -34,6 +34,7 @@ packages/
   theme-pack     well-known colour themes (Dracula, Nord, Solarized…) as a theme plugin, bundled into main
   fonts          the faces Tyto ships, and the reader that hands them to the exporters and to measurement
   pipeline       Job: brief → artworks×formats → artifacts; local queue, cancellation, progress
+  recipe         the recipe notebook's table, the *.recipe parser, the where grammar and the generic verbs (ADR 0128)
   plugin-api     extension-point types, PluginHost, plugin manifest, permissions
   io             BriefSource/OutputSink ports; fs adapters (inbox/outbox); local watcher
   sources        none here: remote connectors are installed plugins in their own repositories (ADR 0127)
@@ -44,7 +45,7 @@ apps/
   docs           VitePress: the user manual, English at / and pt-BR at /pt-BR/ (ADR 0101)
 ```
 
-Runtime boundary — **pure** (no Node/DOM): core, brief-lang, template-lang, export-*, templates, template-kit, theme-pack, plugin-api (types). **Node**: raster, pipeline, io, fonts, sources, cli. **DOM**: editor, desktop/renderer.
+Runtime boundary — **pure** (no Node/DOM): core, brief-lang, template-lang, export-*, templates, template-kit, theme-pack, recipe, plugin-api (types). **Node**: raster, pipeline, io, fonts, sources, cli. **DOM**: editor, desktop/renderer.
 
 **`tools/docs-gen` writes what the docs derive from code**: `docs/diagnostic-codes.md`, the render contract, and the manual's Reference pages under `apps/docs/pages/reference/` and `apps/docs/pages/pt-BR/reference/` (TYTO-313), each held to the code by a test that fails on a stale copy. It is the one workspace outside `apps/*` that imports app modules, and only these: `apps/desktop/shared/` (settings, theme setting, string catalogues), `apps/desktop/src/renderer/commands.ts` (the command registry and the built-in keybindings, which pull in `@tyto/editor` and no document), the JSON data `apps/desktop/src/main/desktop.tyto-plugin.json` and `apps/desktop/src/main/themes/*.json`, and `apps/cli/src/program.ts`. It builds the registry with actions that do nothing and the CLI program without parsing it; it starts no Electron and reads no file but the pages it compares.
 

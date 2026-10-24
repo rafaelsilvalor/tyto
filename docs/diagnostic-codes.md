@@ -136,6 +136,16 @@ non-zero.
 | `W_PROFILE_NESTED` | warning | no | A work profile names another profile, which is ignored: profiles are one level deep. |
 | `W_PROJECT_PRESET_NO_FOLDER` | warning | no | An export preset names no folder and no sheet sets 'output', so the preset is left out. |
 | `E_TRUST_FILE` | error | no | TYTO_HOME/trust.json cannot be read or written. |
+| `E_RECIPE_SYNTAX` | error | yes | A line of a recipe does not match the recipe format. |
+| `E_RECIPE_PARAM` | error | yes | A recipe's parameter is used without a declaration, or has no value when it runs. |
+| `E_RECIPE_UNKNOWN_VERB` | error | no | A recipe line names a verb that neither Tyto nor an installed plugin contributes. |
+| `E_RECIPE_REGISTRATION` | error | no | A verb or a derivation cannot be registered under the name it was given. |
+| `E_RECIPE_NO_TABLE` | error | no | A verb that reads a table runs before any cell produced one. |
+| `E_RECIPE_ARGUMENTS` | error | no | A recipe verb was given arguments it does not accept. |
+| `E_RECIPE_WHERE` | error | no | A 'where' expression does not match the filter grammar. |
+| `E_RECIPE_UNKNOWN_COLUMN` | error | no | A recipe verb names a column the table does not have. |
+| `E_RECIPE_ALIAS` | error | no | A column alias cannot be used as it is defined. |
+| `W_RECIPE_WHERE_EMPTY` | warning | no | A 'where' kept no row of a table that had rows. |
 
 ## What is fatal, and why
 
@@ -227,6 +237,15 @@ incomplete brief, and a crossed box where a picture the exporter could not load 
 | `E_THEME_INVALID` | no | The base theme of the same kind replaces it, so the window keeps every colour. |
 | `E_PROJECT_SYNTAX` | no | Every key that parsed still applies, and the brief renders without the rest. |
 | `E_TRUST_FILE` | no | Every source opens restricted instead, which is what an absent approval means. |
+| `E_RECIPE_SYNTAX` | yes | A recipe that does not parse has no chain of cells to run. |
+| `E_RECIPE_PARAM` | yes | Every cell may read the parameter, so none of them can run without it. |
+| `E_RECIPE_UNKNOWN_VERB` | no | That cell has no table and the cells after it do not run; earlier cells keep theirs. |
+| `E_RECIPE_REGISTRATION` | no | Only that one is missing; everything else in the registry still runs. |
+| `E_RECIPE_NO_TABLE` | no | That cell has no table and the cells after it do not run; earlier cells keep theirs. |
+| `E_RECIPE_ARGUMENTS` | no | That cell has no table and the cells after it do not run; earlier cells keep theirs. |
+| `E_RECIPE_WHERE` | no | That cell has no table and the cells after it do not run; earlier cells keep theirs. |
+| `E_RECIPE_UNKNOWN_COLUMN` | no | That cell has no table and the cells after it do not run; earlier cells keep theirs. |
+| `E_RECIPE_ALIAS` | no | That cell has no table and the cells after it do not run; earlier cells keep theirs. |
 
 ## Errors
 
@@ -1280,6 +1299,132 @@ The trust file cannot be used: {problem}.
 
 Parameters: `problem`
 
+### `E_RECIPE_SYNTAX`
+
+**Severity:** error · **Fatal:** yes · **Spec:** `docs/adr/0128-a-recipe-is-a-closed-vocabulary-notebook-and-plugins-contribute-verbs.md`
+
+A line of a recipe does not match the recipe format.
+
+A recipe that does not parse has no chain of cells to run.
+
+```
+Recipe syntax error: {problem}.
+```
+
+Parameters: `problem`
+
+### `E_RECIPE_PARAM`
+
+**Severity:** error · **Fatal:** yes · **Spec:** `docs/adr/0128-a-recipe-is-a-closed-vocabulary-notebook-and-plugins-contribute-verbs.md`
+
+A recipe's parameter is used without a declaration, or has no value when it runs.
+
+Every cell may read the parameter, so none of them can run without it.
+
+```
+Parameter '{param}' {problem}.
+```
+
+Parameters: `param`, `problem`
+
+### `E_RECIPE_UNKNOWN_VERB`
+
+**Severity:** error · **Fatal:** no · **Spec:** `docs/adr/0128-a-recipe-is-a-closed-vocabulary-notebook-and-plugins-contribute-verbs.md`
+
+A recipe line names a verb that neither Tyto nor an installed plugin contributes.
+
+That cell has no table and the cells after it do not run; earlier cells keep theirs.
+
+```
+No verb named '{verb}' is available. Available: {available}.
+```
+
+Parameters: `verb`, `available`
+
+### `E_RECIPE_REGISTRATION`
+
+**Severity:** error · **Fatal:** no · **Spec:** `docs/adr/0128-a-recipe-is-a-closed-vocabulary-notebook-and-plugins-contribute-verbs.md`
+
+A verb or a derivation cannot be registered under the name it was given.
+
+Only that one is missing; everything else in the registry still runs.
+
+```
+The {kind} '{name}' cannot be registered: {problem}.
+```
+
+Parameters: `kind`, `name`, `problem`
+
+### `E_RECIPE_NO_TABLE`
+
+**Severity:** error · **Fatal:** no · **Spec:** `docs/adr/0128-a-recipe-is-a-closed-vocabulary-notebook-and-plugins-contribute-verbs.md`
+
+A verb that reads a table runs before any cell produced one.
+
+That cell has no table and the cells after it do not run; earlier cells keep theirs.
+
+```
+'{verb}' needs a table, and no cell before it produced one.
+```
+
+Parameters: `verb`
+
+### `E_RECIPE_ARGUMENTS`
+
+**Severity:** error · **Fatal:** no · **Spec:** `docs/adr/0128-a-recipe-is-a-closed-vocabulary-notebook-and-plugins-contribute-verbs.md`
+
+A recipe verb was given arguments it does not accept.
+
+That cell has no table and the cells after it do not run; earlier cells keep theirs.
+
+```
+'{verb}' {problem}.
+```
+
+Parameters: `verb`, `problem`
+
+### `E_RECIPE_WHERE`
+
+**Severity:** error · **Fatal:** no · **Spec:** `docs/adr/0128-a-recipe-is-a-closed-vocabulary-notebook-and-plugins-contribute-verbs.md`
+
+A 'where' expression does not match the filter grammar.
+
+That cell has no table and the cells after it do not run; earlier cells keep theirs.
+
+```
+Filter error: {problem}.
+```
+
+Parameters: `problem`
+
+### `E_RECIPE_UNKNOWN_COLUMN`
+
+**Severity:** error · **Fatal:** no · **Spec:** `docs/adr/0128-a-recipe-is-a-closed-vocabulary-notebook-and-plugins-contribute-verbs.md`
+
+A recipe verb names a column the table does not have.
+
+That cell has no table and the cells after it do not run; earlier cells keep theirs.
+
+```
+No column named '{column}' in this table. Available: {available}.
+```
+
+Parameters: `column`, `available`
+
+### `E_RECIPE_ALIAS`
+
+**Severity:** error · **Fatal:** no · **Spec:** `docs/adr/0128-a-recipe-is-a-closed-vocabulary-notebook-and-plugins-contribute-verbs.md`
+
+A column alias cannot be used as it is defined.
+
+That cell has no table and the cells after it do not run; earlier cells keep theirs.
+
+```
+Alias '{alias}' {problem}.
+```
+
+Parameters: `alias`, `problem`
+
 ## Warnings
 
 ### `W_PLUGIN_CRASHED`
@@ -1897,6 +2042,20 @@ Export preset '{preset}' names no folder and the project sets no 'output'; it is
 ```
 
 Parameters: `preset`
+
+### `W_RECIPE_WHERE_EMPTY`
+
+**Severity:** warning · **Fatal:** no · **Spec:** `docs/adr/0128-a-recipe-is-a-closed-vocabulary-notebook-and-plugins-contribute-verbs.md`
+
+A 'where' kept no row of a table that had rows.
+
+A warning never replaces a value (ADR 0013).
+
+```
+No row passed '{expression}'. Values compare without case or accents; '~' means contains and '=' means equal.
+```
+
+Parameters: `expression`
 
 ## Codes the desktop window mints
 

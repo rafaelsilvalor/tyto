@@ -28,6 +28,9 @@ const PURE_PACKAGES = [
   // A font source that reaches Google only through `host.fetch`; the app composes the network
   // (TYTO-281, ADR 0120).
   'packages/google-fonts',
+  // The recipe table, parser and generic verbs: the notebook, the CLI and a worker run the same
+  // chain (TYTO-375, ADR 0128).
+  'packages/recipe',
 ];
 
 const NODE_PACKAGES = [
