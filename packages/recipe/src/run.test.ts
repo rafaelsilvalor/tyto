@@ -106,6 +106,25 @@ describe('where', () => {
     expect(source.slice(problem?.range?.start, problem?.range?.end)).toBe('OR');
   });
 
+  it('keeps the rows whose cell matches a pattern, case ignored and accents named', async () => {
+    const launches = await run([String.raw`where title matches "^launch\b"`]);
+    expect(launches.result.ok && keys(launches.result.value.table)).toEqual(['DEMO-3', 'DEMO-6']);
+    const ads = await run(['where kind matches "^an[uú]ncio$" AND title not matches "sale|card"']);
+    expect(ads.result.ok && keys(ads.result.value.table)).toEqual([
+      'DEMO-4',
+      'DEMO-5',
+      'DEMO-10',
+      'DEMO-11',
+    ]);
+  });
+
+  it('reports a refused pattern at its construct in the recipe line', async () => {
+    const { source, result } = await run(['where title matches "(sale\\s*)+banner"']);
+    const problem = result.ok ? result.value.cells[0]?.diagnostics[0] : undefined;
+    expect(problem?.code).toBe('E_RECIPE_PATTERN_UNSAFE');
+    expect(source.slice(problem?.range?.start, problem?.range?.end)).toBe(String.raw`(sale\s*)+`);
+  });
+
   it('reads a fully quoted expression inside its quotes', async () => {
     const { result } = await run(['where "kind = post AND team = copy"']);
     expect(result.ok && keys(result.value.table)).toEqual(['DEMO-12']);

@@ -207,7 +207,8 @@ function tokenizeArguments(rest: string, offset: number): Result<Arguments, read
   return ok({ positional, named });
 }
 
-const PLACEHOLDER = /\{([A-Za-z_][\w-]*)\}/gu;
+// A pattern's `\p{Lu}`, `\P{Nd}` and `\u{FF}` are the pattern's own braces (ADR 0136).
+const PLACEHOLDER = /(?<!\\[pPu])\{([A-Za-z_][\w-]*)\}/gu;
 
 /** `{name}` in a step that no `param` line declares. */
 function undeclaredPlaceholders(

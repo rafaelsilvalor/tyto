@@ -8,7 +8,8 @@ import {
   sourceRange,
 } from '@tyto/core';
 
-import { type CellValue, comparable } from './table.js';
+import { type CompiledPattern, compilePattern } from './pattern.js';
+import { type CellValue, cellText, comparable } from './table.js';
 
 /**
  * `where`'s filter: a subset of JQL, ported from Buraqueira's `flow.py` (ADR 0128).
@@ -18,14 +19,39 @@ import { type CellValue, comparable } from './table.js';
  * joined by `AND` — and no `OR` and no parentheses. Without `OR` there is no precedence to get
  * right, and a flat list of predicates is the whole tree. Two deliberate departures, both
  * towards keeping more rows: `~` is a substring match, and `!=` keeps empty cells.
+ *
+ * One addition JQL lacks (ADR 0136): `matches "<pattern>"` and `not matches "<pattern>"` test
+ * the cell's text against a `tyto-pattern/1` pattern, compiled once while the expression is
+ * read, so a refused pattern is a diagnostic at its range before any row is read. A pattern is
+ * quoted when it holds a blank, a parenthesis, a comma, a quote, `=`, `~` or `!`. It ignores
+ * case but not accents, so `p[áa]gina` is how a pattern takes both; `not matches`, like `!=`,
+ * keeps empty cells that the pattern does not match.
  */
-export type Operator = '=' | '!=' | '~' | '!~' | 'in' | 'not in' | 'is empty' | 'is not empty';
+export type Operator =
+  | '='
+  | '!='
+  | '~'
+  | '!~'
+  | 'in'
+  | 'not in'
+  | 'is empty'
+  | 'is not empty'
+  | 'matches'
+  | 'not matches';
 
 export interface Predicate {
   readonly column: string;
   readonly columnRange: SourceRange;
   readonly operator: Operator;
   readonly values: readonly string[];
+  /** The compiled pattern of `matches` and `not matches`; absent for every other operator. */
+  readonly pattern?: CompiledPattern;
+}
+
+interface Found {
+  readonly operator: Operator;
+  readonly values: readonly string[];
+  readonly pattern?: CompiledPattern;
 }
 
 type TokenKind = 'word' | 'quoted' | 'operator' | 'symbol';
@@ -46,6 +72,8 @@ class WhereError {
   constructor(
     readonly problem: string,
     readonly range: SourceRange,
+    /** A refused pattern's own diagnostics, which stand in for the filter's. */
+    readonly diagnostics?: readonly Diagnostic[],
   ) {}
 }
 
@@ -58,8 +86,8 @@ export function parseWhere(
   offset = 0,
 ): Result<readonly Predicate[], readonly Diagnostic[]> {
   const whole = sourceRange(offset, offset + expression.length);
-  const fail = (problem: string, range: SourceRange = whole) =>
-    err([diagnostic('E_RECIPE_WHERE', { problem }, { range })]);
+  const fail = (problem: string, range: SourceRange = whole, diagnostics?: readonly Diagnostic[]) =>
+    err(diagnostics ?? [diagnostic('E_RECIPE_WHERE', { problem }, { range })]);
 
   const tokens = tokenize(expression, offset);
   if (tokens instanceof WhereError) return fail(tokens.problem, tokens.range);
@@ -69,7 +97,9 @@ export function parseWhere(
   const predicates: Predicate[] = [];
   for (;;) {
     const predicate = reader.predicate();
-    if (predicate instanceof WhereError) return fail(predicate.problem, predicate.range);
+    if (predicate instanceof WhereError) {
+      return fail(predicate.problem, predicate.range, predicate.diagnostics);
+    }
     predicates.push(predicate);
     const next = reader.next();
     if (next === undefined) return ok(predicates);
@@ -171,10 +201,7 @@ class Reader {
     return { column: column.text, columnRange: column.range, ...found };
   }
 
-  private operatorAndValues(
-    column: string,
-    operator: Token,
-  ): { operator: Operator; values: readonly string[] } | WhereError {
+  private operatorAndValues(column: string, operator: Token): Found | WhereError {
     if (operator.kind === 'operator' && COMPARISONS.has(operator.text)) {
       const value = this.value();
       if (value instanceof WhereError) return value;
@@ -182,11 +209,16 @@ class Reader {
     }
     const keyword = wordOf(operator);
     if (keyword === 'in') return this.list(column, 'in');
+    if (keyword === 'matches') return this.pattern('matches');
     if (keyword === 'not') {
-      const after = this.take("'in' after 'not'");
+      const after = this.take("'in' or 'matches' after 'not'");
       if (after instanceof WhereError) return after;
       if (wordOf(after) === 'in') return this.list(column, 'not in');
-      return new WhereError(`expected 'in' after 'not' and found '${after.text}'`, after.range);
+      if (wordOf(after) === 'matches') return this.pattern('not matches');
+      return new WhereError(
+        `expected 'in' or 'matches' after 'not' and found '${after.text}'`,
+        after.range,
+      );
     }
     if (keyword === 'is') {
       const after = this.take("'empty' after 'is'");
@@ -205,7 +237,7 @@ class Reader {
     }
     return new WhereError(
       `unknown operator '${operator.text}' after '${column}'. Available: ` +
-        '=, !=, ~, !~, in (…), not in (…), is empty, is not empty',
+        '=, !=, ~, !~, in (…), not in (…), is empty, is not empty, matches, not matches',
       operator.range,
     );
   }
@@ -227,10 +259,30 @@ class Reader {
     return token.text;
   }
 
-  private list(
-    column: string,
-    operator: 'in' | 'not in',
-  ): { operator: Operator; values: readonly string[] } | WhereError {
+  /** The pattern after `matches`, compiled here so a refusal points into it. */
+  private pattern(operator: 'matches' | 'not matches'): Found | WhereError {
+    const token = this.take(`a pattern after '${operator}'`);
+    if (token instanceof WhereError) return token;
+    if (token.kind !== 'quoted' && token.kind !== 'word') {
+      return new WhereError(
+        `expected a pattern after '${operator}' and found '${token.text}'; quote a pattern ` +
+          'that holds a blank, a parenthesis or a comma',
+        token.range,
+      );
+    }
+    if (token.kind === 'word' && RESERVED.has(token.text.toLowerCase())) {
+      return new WhereError(
+        `'${token.text}' is a reserved word; to use it as a pattern, quote it: "${token.text}"`,
+        token.range,
+      );
+    }
+    const start = token.range.start + (token.kind === 'quoted' ? 1 : 0);
+    const compiled = compilePattern(token.text, start);
+    if (!compiled.ok) return new WhereError('', token.range, compiled.error);
+    return { operator, values: [token.text], pattern: compiled.value };
+  }
+
+  private list(column: string, operator: 'in' | 'not in'): Found | WhereError {
     const open = this.take("'(' after 'in'");
     if (open instanceof WhereError) return open;
     if (open.kind !== 'symbol' || open.text !== '(') {
@@ -283,5 +335,10 @@ export function satisfies(predicate: Predicate, cell: CellValue | undefined): bo
       return targets.includes(value);
     case 'not in':
       return !targets.includes(value);
+    // The pattern reads the cell as written: `comparable` would strip the accents it names.
+    case 'matches':
+      return predicate.pattern?.test(cellText(cell)) ?? false;
+    case 'not matches':
+      return !(predicate.pattern?.test(cellText(cell)) ?? false);
   }
 }
