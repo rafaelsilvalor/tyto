@@ -955,12 +955,13 @@
         "panel.desktop.test.ts",
         "preview-broken.desktop.test.ts",
         "problems-mark.desktop.test.ts",
+        "relint.desktop.test.ts",
         "save-failure-cleared.desktop.test.ts",
         "slash-menu.desktop.test.ts",
         "status-bar.desktop.test.ts",
         "template-warnings.desktop.test.ts"
       ],
-      "why": "reviewed: diagnostics and completion answered by the preview"
+      "why": "reviewed: diagnostics and completion answered by the preview, and the relint after a re-preview (TYTO-351)"
     },
     {
       "paths": ["apps/desktop/src/renderer/color-scheme.ts"],
@@ -1629,6 +1630,7 @@
         "preview.desktop.test.ts",
         "problems-mark.desktop.test.ts",
         "quit.desktop.test.ts",
+        "relint.desktop.test.ts",
         "search.desktop.test.ts",
         "session-place.desktop.test.ts",
         "settings-assist.desktop.test.ts",

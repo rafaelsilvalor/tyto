@@ -29,6 +29,7 @@ import {
   jsonAssist,
   keyOfStroke,
   openSlashMenu,
+  relintBrief,
   type SlashSource,
   slashCompletion,
   snippetsSlashSource,
@@ -327,6 +328,11 @@ const analysis = previewAnalysis(
   () => state.templates,
   // Per document since TYTO-286: the pane asking is matched to the document it shows.
   (view) => documentShownBy(view),
+  // Every pane on the document lints the answer again, which is what a compile with no
+  // keystroke behind it — a folder, a trust, a save — needs to move the underline (TYTO-351).
+  (documentId) => {
+    relintPanesOf(documentId);
+  },
 );
 
 /** The installed plugins' panels by layout id, once main has said which there are (ADR 0045). */
@@ -1570,6 +1576,14 @@ function documentShownBy(view: object | undefined): string | undefined {
   return found === undefined ? undefined : shownIn.get(found[0]);
 }
 
+/** Asks every pane showing `documentId` to lint it again, with no change to its text. */
+function relintPanesOf(documentId: string): void {
+  for (const [groupId, shown] of shownIn) {
+    if (shown !== documentId) continue;
+    panes.get(groupId)?.view.dispatch({ effects: relintBrief.of(null) });
+  }
+}
+
 /** The focused group's pane: where a command, a reveal or the caret goes. */
 const focusedPane = (): EditorPane | undefined => panes.get(groups.focusedGroupId);
 
@@ -2277,8 +2291,14 @@ async function settingsChanged(
   if (change.refused) runCommand(SETTINGS_OPEN);
   // The `theme` setting may be what moved (TYTO-208); main has already set the mode.
   showTheme(bridge, () => bridge['theme:current']({}));
+  const before = state.templatesFolder;
   const chosen = await bridge['templates:folder']({});
-  state.templatesFolder = chosen.folder;
+  // A `templatesFolder` written by hand moves the open briefs' templates as the command does
+  // (TYTO-351); any other setting leaves them, so they are compiled again only then.
+  if (chosen.folder !== before) {
+    await afterTemplatesReread(bridge);
+    return;
+  }
   state.templatesFound = chosen.found;
   await refreshTemplates(bridge);
   repaint();
@@ -2792,8 +2812,9 @@ async function setTemplateFolder(choose: boolean): Promise<void> {
     const answer = await bridge['templates:set-folder']({ choose });
     state.templatesFolder = answer.folder;
     state.templatesFound = answer.found;
-    await refreshTemplates(bridge);
-    repaint();
+    // Through the re-preview and not only the list (TYTO-351): a brief open on a template the
+    // folder brings, or takes away, resolves differently now, and only a compile says so.
+    await afterTemplatesReread(bridge);
   });
 }
 
@@ -4150,10 +4171,11 @@ async function request(
     ...(fetch ? { fetch } : {}),
   });
   if (!gate.accept(answer.requestId)) return;
-  // Every document a group shows has its answers reach that pane's gutter (TYTO-286); a tab
-  // compiled in the background is published when it is compiled again on screen.
-  if ([...shownIn.values()].includes(documentId))
-    analysis.publish(documentId, { ...answer, brief });
+  // Every answer is kept for its document, shown or not (TYTO-351). A tab compiled behind
+  // another one — by a folder change, say — is linted when a pane shows it again, and that lint
+  // answers from what was kept; keeping only what was shown would hand it the answer before.
+  // The panes that show it now are told to lint again by the analysis's `relint`.
+  analysis.publish(documentId, { ...answer, brief });
   // The plugins' panels hear the focused document on the same pause the preview compiles on.
   if (documentId === active().id) announceDocument(document, brief);
 
@@ -4854,10 +4876,11 @@ function wireTemplateMode(mode: TemplateMode, bridge: TytoBridge): void {
 }
 
 /**
- * Main has read the folders again — a template was saved, or the installed plugins started and
- * their packs joined the search (ADR 0046) — so every open brief is compiled again. The first is
- * TYTO-44's third acceptance criterion; the second is why a brief that names an installed
- * template, open before the plugins had started, stops being `E_UNKNOWN_TEMPLATE` untouched.
+ * Main has read the folders again — a template was saved, the installed plugins started and
+ * their packs joined the search (ADR 0046), or the templates folder changed (TYTO-351) — so
+ * every open brief is compiled again. The first is TYTO-44's third acceptance criterion; the
+ * second is why a brief that names an installed template, open before the plugins had started,
+ * stops being `E_UNKNOWN_TEMPLATE` untouched; the third is TYTO-351's.
  *
  * **Every** open brief and not only the ones naming the template, because a save can rename
  * it: a brief that named the old name stops resolving and one that named the new name starts,

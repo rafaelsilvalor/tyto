@@ -80,4 +80,26 @@ describe('previewAnalysis', () => {
     publish('', answer('a'));
     expect('manifest' in (await analyzer.analyze('a'))).toBe(false);
   });
+
+  /**
+   * A compile with no keystroke behind it — a templates folder, a trust, a fetch on save —
+   * has no lint waiting for it, so nothing would draw it (TYTO-351). `relint` is the call that
+   * makes the panes on that document lint again; the editor's own test measures the redraw.
+   */
+  it('asks for a relint of the document every answer was about, waited for or not', async () => {
+    const relinted: string[] = [];
+    const { analyzer, publish } = previewAnalysis(
+      () => [],
+      () => 'document-1',
+      (documentId) => relinted.push(documentId),
+    );
+    publish('document-1', answer('a'));
+    publish('document-1', answer('a', 'E_UNKNOWN_SLOT'));
+    expect(relinted).toEqual(['document-1', 'document-1']);
+    // And the relint reads the newer answer at once: the same text, a different verdict.
+    const analysis = await settled(analyzer.analyze('a'));
+    expect(
+      analysis === 'waiting' ? analysis : analysis.diagnostics.map((item) => item.code),
+    ).toEqual(['E_UNKNOWN_SLOT']);
+  });
 });
