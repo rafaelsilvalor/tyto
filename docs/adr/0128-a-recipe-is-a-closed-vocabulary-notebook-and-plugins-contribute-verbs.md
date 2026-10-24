@@ -1,6 +1,6 @@
 # 0128 — A recipe is a closed-vocabulary notebook, and plugins contribute verbs
 
-Status: accepted · 2026-10-24 · TYTO-368 · builds on ADR 0007, ADR 0079 and ADR 0127.
+Status: accepted · 2026-10-24 · TYTO-368 · builds on ADR 0007, ADR 0079 and ADR 0127 · amended by ADR 0133.
 Reasoning in `docs/explorations/2026-10-24-data-recipes-and-connectors.md`
 
 ## Context

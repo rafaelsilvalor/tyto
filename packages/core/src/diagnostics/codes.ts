@@ -1286,6 +1286,25 @@ export const diagnosticCodes = {
     fatality:
       'That cell has no table and the cells after it do not run; earlier cells keep theirs.',
   },
+  E_RECIPE_DERIVATION: {
+    severity: 'error',
+    summary:
+      "A 'derive' names a derivation nobody registered, lacks a column it requires, or breaks its promise.",
+    template: "Derivation '{name}' {problem}.",
+    spec: 'docs/adr/0133-join-pairs-rows-on-a-column-a-derivation-produces.md',
+    fatal: false,
+    fatality:
+      'That cell has no table and the cells after it do not run; earlier cells keep theirs.',
+  },
+  E_RECIPE_RUN: {
+    severity: 'error',
+    summary: "A 'run' names a recipe that is not found, already running, or ends without a table.",
+    template: "'run {recipe}' {problem}.",
+    spec: 'docs/adr/0133-join-pairs-rows-on-a-column-a-derivation-produces.md',
+    fatal: false,
+    fatality:
+      'That cell has no table and the cells after it do not run; earlier cells keep theirs.',
+  },
   // Zero rows is a legitimate answer, but it cannot be told from a misspelt value if it is silent.
   W_RECIPE_WHERE_EMPTY: {
     severity: 'warning',
@@ -1293,6 +1312,16 @@ export const diagnosticCodes = {
     template:
       "No row passed '{expression}'. Values compare without case or accents; '~' means contains and '=' means equal.",
     spec: 'docs/adr/0128-a-recipe-is-a-closed-vocabulary-notebook-and-plugins-contribute-verbs.md',
+    fatal: false,
+    fatality: 'A warning never replaces a value (ADR 0013).',
+  },
+  // An ambiguous key never pairs; the rows say so, and this keeps one among a hundred visible.
+  W_RECIPE_JOIN_AMBIGUOUS: {
+    severity: 'warning',
+    summary: "A 'join' left rows unpaired because their key answered to more than one row.",
+    template:
+      "{count} row(s) of join '{prefix}' have more than one candidate and stay unpaired: {rows}.",
+    spec: 'docs/adr/0133-join-pairs-rows-on-a-column-a-derivation-produces.md',
     fatal: false,
     fatality: 'A warning never replaces a value (ADR 0013).',
   },

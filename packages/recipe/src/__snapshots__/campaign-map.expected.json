@@ -1,0 +1,19 @@
+{
+  "columns": [
+    {"name":"key","type":"text","origin":"demo"},
+    {"name":"title","type":"text","origin":"demo"},
+    {"name":"status","type":"text","origin":"demo"},
+    {"name":"copy_key","type":"text","origin":"join copy"},
+    {"name":"copy_status","type":"text","origin":"join copy"},
+    {"name":"copy_match","type":"text","origin":"join copy"},
+    {"name":"media_key","type":"text","origin":"join media"},
+    {"name":"media_match","type":"text","origin":"join media"}
+  ],
+  "rows": [
+    {"key":"DEMO-101","values":{"key":"DEMO-101","title":"Design · Banner · Spring sale","status":"doing","copy_key":"DEMO-201","copy_status":"done","copy_match":"paired","media_key":"DEMO-301","media_match":"paired"},"provenance":{"source":"demo","id":"DEMO-101","fetchedAt":"2026-10-24T09:00:00.000Z"}},
+    {"key":"DEMO-102","values":{"key":"DEMO-102","title":"Design · Banner · Black week","status":"todo","copy_key":null,"copy_status":null,"copy_match":"ambiguous (2 candidates)","media_key":"DEMO-302","media_match":"paired"},"provenance":{"source":"demo","id":"DEMO-102","fetchedAt":"2026-10-24T09:00:00.000Z"}},
+    {"key":"DEMO-103","values":{"key":"DEMO-103","title":"Design · Post · Launch day","status":"todo","copy_key":"DEMO-204","copy_status":"doing","copy_match":"paired","media_key":null,"media_match":"no pair"},"provenance":{"source":"demo","id":"DEMO-103","fetchedAt":"2026-10-24T09:00:00.000Z"}},
+    {"key":"DEMO-104","values":{"key":"DEMO-104","title":"Design · Newsletter header","status":"done","copy_key":null,"copy_status":null,"copy_match":"no key","media_key":null,"media_match":"no key"},"provenance":{"source":"demo","id":"DEMO-104","fetchedAt":"2026-10-24T09:00:00.000Z"}},
+    {"key":"DEMO-105","values":{"key":"DEMO-105","title":"Design · Banner · Winter preview","status":"todo","copy_key":null,"copy_status":null,"copy_match":"no pair","media_key":"DEMO-303","media_match":"paired"},"provenance":{"source":"demo","id":"DEMO-105","fetchedAt":"2026-10-24T09:00:00.000Z"}}
+  ]
+}

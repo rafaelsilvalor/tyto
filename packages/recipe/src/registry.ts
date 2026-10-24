@@ -27,12 +27,17 @@ export interface VerbContext {
   readonly aliases: ReadonlyMap<string, string>;
   readonly derivations: DerivationRegistry;
   readonly resolveRecipe: RecipeResolver;
+  /** The registry the run uses, which `run` hands to the recipe it includes. */
+  readonly verbs: VerbRegistry;
+  /** The recipes running, outermost first and this one last, so `run` can refuse a cycle. */
+  readonly recipes: readonly string[];
 }
 
 export interface VerbOutput {
   readonly table: Table;
   readonly view?: string;
-  readonly keep?: KeepRequest;
+  /** Several when the cell is a `run` whose recipe keeps more than one table. */
+  readonly keeps?: readonly KeepRequest[];
 }
 
 export type VerbResult = Result<VerbOutput, readonly Diagnostic[]>;
@@ -73,6 +78,10 @@ export type VerbRegistry = Registry<Verb>;
  * A derivation computes columns from the ones a row already has; `derive <name>` runs one.
  * The registry is open because the rules are somebody's domain, and a domain's naming rules
  * live in that domain's own plugin, never in Tyto (ADR 0127).
+ *
+ * It may answer asynchronously, like a verb: a plugin's derivation is a call into another
+ * process (TYTO-376), and `derive` awaits it (ADR 0133). It returns the whole table, with the
+ * same rows in the same order and the columns it produces added or recomputed.
  */
 export interface Derivation {
   /** Columns the derivation reads, so a missing one is named before it runs. */
@@ -108,10 +117,8 @@ function createRegistry<Entry>(
 /**
  * A registry holding the generic verbs, to which plugins add theirs. Only a namespaced name
  * (`jira.pull`) can be registered: bare names are Tyto's vocabulary, and a plugin that could
- * take `where` would change what every shared recipe means.
- *
- * `join`, `derive` and `run` are reserved and not yet implemented: until they are, a recipe
- * naming them gets the unknown-verb diagnostic at its line, like any verb nobody contributes.
+ * take `where` would change what every shared recipe means. `param` is in the vocabulary and
+ * not in the registry, because the parser reads it and it is never a cell.
  */
 export function createVerbRegistry(): VerbRegistry {
   const registry = createRegistry<Verb>('verb', (name) =>

@@ -1,0 +1,14 @@
+# An invented campaign of a demo project, for derive, join and run: no real project, team or
+# person. The shape is Buraqueira's campaign map, with the pull left out: the test feeds the
+# table in, and the pairing key comes from the test derivation in pair-key.ts.
+recipe campaign-map
+  | One row per design task of the demo campaign, its copy and its media paired.
+param team = design
+
+derive pair-key
+join copy left="team = {team}" right="team = copy" on=pair_key
+join media left="team = {team}" right="team = media" on=pair_key bring=key
+where team = {team}
+select key, title, status, copy_key, copy_status, copy_match, media_key, media_match
+show table
+keep campaign-map
