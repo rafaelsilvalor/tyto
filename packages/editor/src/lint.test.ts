@@ -1,11 +1,15 @@
 // @vitest-environment jsdom
-import { type Diagnostic as LintDiagnostic, forEachDiagnostic } from '@codemirror/lint';
+import {
+  type Diagnostic as LintDiagnostic,
+  diagnosticCount,
+  forEachDiagnostic,
+} from '@codemirror/lint';
 import { type DiagnosticCode, type TemplateManifest, diagnostic, parseManifest } from '@tyto/core';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import { type BriefAnalysis, type BriefAnalyzer, createBriefAnalyzer } from './analysis.js';
 import { createEditor, type EditorHandle } from './editor.js';
-import { BRIEF_LINT_DELAY, briefLint, suggestionFor } from './lint.js';
+import { BRIEF_LINT_DELAY, briefLint, relintBrief, suggestionFor } from './lint.js';
 
 const manifestOf = (yaml: string): TemplateManifest => {
   const parsed = parseManifest(yaml, 'manifest.yaml');
@@ -293,5 +297,76 @@ describe('suggestionFor', () => {
   it('says nothing for a code that has no list to suggest from', () => {
     const item = { severity: 'error', code: 'E_BAD_SLOT_VALUE', message: '' } as const;
     expect(suggestionFor(item, analysis(CARROSSEL), 'titulo')).toBeUndefined();
+  });
+});
+
+/**
+ * A host whose answer changes while the text does not (TYTO-351): the desktop compiles the
+ * same brief again after a templates folder changes, and its analyzer answers at once with
+ * the newest answer it holds about that text. This one is a stand-in for it, so the test
+ * says what the linter does with a new answer and no keystroke.
+ */
+function heldAnalyzer(): { analyzer: BriefAnalyzer; hold(analysis: BriefAnalysis): void } {
+  let held: BriefAnalysis | undefined;
+  return {
+    analyzer: {
+      analyze: (source: string): Promise<BriefAnalysis> =>
+        Promise.resolve(
+          held?.source === source ? held : { source, templates: [], diagnostics: [] },
+        ),
+    },
+    hold(analysis) {
+      held = analysis;
+    },
+  };
+}
+
+/** Polls `diagnosticCount` until it is `expected`, and answers what it was at the budget. */
+async function countSettles(editor: EditorHandle, expected: number): Promise<number> {
+  const started = Date.now();
+  while (diagnosticCount(editor.view.state) !== expected && Date.now() - started < 500) {
+    await new Promise((resume) => setTimeout(resume, 5));
+  }
+  return diagnosticCount(editor.view.state);
+}
+
+describe('relintBrief (TYTO-351)', () => {
+  const text = ['---', 'template: so-na-pasta-nova', '---', ''].join('\n');
+  const unknown: BriefAnalysis = {
+    source: text,
+    templates: [],
+    diagnostics: [
+      diagnostic(
+        'E_UNKNOWN_TEMPLATE',
+        { template: 'so-na-pasta-nova', available: '' },
+        { range: { start: 14, end: 30 } },
+      ),
+    ],
+  };
+  const clean: BriefAnalysis = { source: text, templates: [], diagnostics: [] };
+
+  it('lints the same text again and draws the newer answer, with no keystroke', async () => {
+    const host = heldAnalyzer();
+    host.hold(unknown);
+    const editor = open(text, { analyzer: host.analyzer });
+    expect(await countSettles(editor, 1)).toBe(1);
+
+    host.hold(clean);
+    editor.view.dispatch({ effects: relintBrief.of(null) });
+
+    expect(await countSettles(editor, 0)).toBe(0);
+  });
+
+  it('leaves the old underline in place without it, which is the bug it fixes', async () => {
+    const host = heldAnalyzer();
+    host.hold(unknown);
+    const editor = open(text, { analyzer: host.analyzer });
+    expect(await countSettles(editor, 1)).toBe(1);
+
+    host.hold(clean);
+    // A transaction with no change and no effect of its own: what a re-preview was before.
+    editor.view.dispatch({});
+
+    expect(await countSettles(editor, 0)).toBe(1);
   });
 });

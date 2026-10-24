@@ -1,5 +1,5 @@
-import { type Extension } from '@codemirror/state';
-import { type EditorView } from '@codemirror/view';
+import { type Extension, StateEffect } from '@codemirror/state';
+import { type EditorView, type ViewUpdate } from '@codemirror/view';
 import { type Diagnostic as LintDiagnostic, linter } from '@codemirror/lint';
 import { type Diagnostic, type DiagnosticCode, didYouMean } from '@tyto/core';
 
@@ -138,6 +138,25 @@ const toLintDiagnostic = (
   );
 };
 
+/**
+ * Asks a brief's linter to run again on text it has already linted (TYTO-351).
+ *
+ * CodeMirror's linter reruns on a change of text or of configuration, and on nothing else.
+ * A host whose analysis answers from outside the buffer can learn something new about the
+ * same text: a templates folder changed, a workspace was trusted, a save fetched an asset.
+ * The analyzer already holds that answer; this effect is what makes the linter ask again.
+ * `forceLinting` is not the same thing: it only hurries a lint that is already pending.
+ *
+ * Its own effect, and not `setBriefAnalysis`: the linter dispatches that one with every
+ * result, so rerunning on it would lint forever.
+ */
+export const relintBrief = StateEffect.define<null>();
+
+const asksForRelint = (update: ViewUpdate): boolean =>
+  update.transactions.some((transaction) =>
+    transaction.effects.some((effect) => effect.is(relintBrief)),
+  );
+
 export interface BriefLintOptions {
   /** Debounce in milliseconds. Defaults to `BRIEF_LINT_DELAY`. */
   readonly delay?: number;
@@ -178,6 +197,6 @@ export function briefLint(analyzer: BriefAnalyzer, options: BriefLintOptions = {
   return [
     briefAnalysisField,
     livenessPlugin,
-    linter(source, { delay: options.delay ?? BRIEF_LINT_DELAY }),
+    linter(source, { delay: options.delay ?? BRIEF_LINT_DELAY, needsRefresh: asksForRelint }),
   ];
 }
