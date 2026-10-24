@@ -15,11 +15,7 @@ O mesmo comando desliga. Ele não tem tecla própria; [Atalhos de teclado](../cu
 
 Com o vim ligado, a barra de status mostra o modo em que você está — **NORMAL**, **INSERT**, **VISUAL** ou **REPLACE**, em inglês como no vim — e as teclas de um comando que você começou a digitar. A aparência desse selo é a configuração [`vimModeStyle`](../reference/settings.md#vimmodestyle), e as cores dele estão em [`statusBarColors`](../reference/settings.md#statusbarcolors).
 
-::: warning O modo vim não é lembrado
-Nada liga o vim na abertura: não há configuração para isso, e a janela sempre abre com o vim desligado. Execute o comando de novo depois de cada reinício.
-:::
-
-<!-- TYTO-333: o estado do vim fica só na memória (editor.toggleVim o inverte). -->
+A escolha fica guardada: o comando grava a configuração [`vimMode`](../reference/settings.md#vimmode), então depois de um reinício a janela abre com o vim do jeito que você deixou. Você também pode escrever `"vimMode": true` ou `false` no `settings.json`; salvar o arquivo já liga ou desliga o vim.
 
 ## O que muda com ele ligado
 

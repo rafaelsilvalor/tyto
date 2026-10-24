@@ -28,6 +28,7 @@ describe("the app's settings outline", () => {
       'iconStrokeWidth',
       'statusBarItems',
       'statusBarColors',
+      'vimMode',
       'vimModeStyle',
       'indentGuides',
       'stickyScroll',
