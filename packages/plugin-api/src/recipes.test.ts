@@ -1,5 +1,5 @@
 import { err, ok } from '@tyto/core';
-import { type Table, parseRecipe, runRecipe } from '@tyto/recipe';
+import { type Plan, type Table, parseRecipe, runRecipe } from '@tyto/recipe';
 import { describe, expect, it } from 'vitest';
 
 import { type Plugin, type PluginHost, createPluginHost } from './host.js';
@@ -102,16 +102,66 @@ describe('a recipe namespace (ADR 0135)', () => {
 });
 
 describe('a recipe verb kind', () => {
-  it('refuses an action or a sink until the version that calls them', () => {
-    const refused = createPluginHost().tryActivate(
-      pluginOf('first', (host) =>
-        host.registerRecipeVerb({ id: 'demo.send', kind: 'sink', arguments: [] }),
-      ),
+  const marking = (writes: readonly string[] | undefined, kind: 'action' | 'sink' = 'action') =>
+    pluginOf(
+      'first',
+      (host) =>
+        host.registerRecipeVerb({
+          id: 'demo.mark',
+          kind,
+          arguments: [],
+          ...(writes === undefined ? {} : { writes }),
+          plan: () => ok({ target: 'demo', operations: [], count: 0 }),
+        }),
+      { writes: ['mark', 'assign'] },
     );
-    expect(refused.ok ? '' : refused.error[0]?.message).toBe(
-      "Plugin 'first' failed to activate: Plugin 'first' registered the verb 'demo.send' as a " +
-        'sink, which arrives in a later version of Tyto; this one calls sources and transforms.',
+  const refusal = (plugin: Plugin) => {
+    const activated = createPluginHost().tryActivate(plugin);
+    return activated.ok ? '' : activated.error[0]?.message;
+  };
+
+  it('accepts an action and a sink whose writes the manifest declares', () => {
+    expect(refusal(marking(['mark']))).toBe('');
+    expect(refusal(marking(['mark', 'assign'], 'sink'))).toBe('');
+  });
+
+  it('refuses at load a write the manifest does not declare, naming what it does', () => {
+    expect(refusal(marking(['mark', 'delete']))).toBe(
+      "Plugin 'first' failed to activate: Plugin 'first' registered the verb 'demo.mark' as an " +
+        "action writing 'delete', which its tyto-plugin.json does not declare in 'writes' " +
+        '(mark, assign).',
     );
+  });
+
+  it("refuses an action with no 'writes', and a source or a transform with some", () => {
+    expect(refusal(marking(undefined))).toContain("as an action with no 'writes'");
+    expect(refusal(marking([]))).toContain("as an action with no 'writes'");
+    const writingSource = pluginOf(
+      'first',
+      (host) =>
+        host.registerRecipeVerb({
+          id: 'demo.pull',
+          kind: 'source',
+          arguments: [],
+          writes: ['mark'],
+          page: () => ok({ table: ROWS }),
+        }),
+      { writes: ['mark'] },
+    );
+    expect(refusal(writingSource)).toContain(
+      "registered the verb 'demo.pull' as a source with 'writes', and only an action or a sink " +
+        'writes',
+    );
+  });
+
+  it("refuses an action with no 'plan'", () => {
+    const planless = pluginOf(
+      'first',
+      (host) =>
+        host.registerRecipeVerb({ id: 'demo.mark', kind: 'action', arguments: [], writes: [] }),
+      { writes: ['mark'] },
+    );
+    expect(refusal(planless)).toContain("as an action with no 'plan'");
   });
 
   it('refuses a source with nothing to call', () => {
@@ -180,6 +230,86 @@ describe('recipeRegistriesOf', () => {
     expect(problem).toBe(
       "No verb named 'demo.number' is available. Available: demo.numbers, derive, join, keep, " +
         'run, select, show, sort, where.',
+    );
+  });
+});
+
+describe('an action or a sink in a recipe (ADR 0129, ADR 0135)', () => {
+  async function planned(plan: (table: Table) => Plan) {
+    const host = createPluginHost();
+    const activated = host.tryActivate(
+      pluginOf(
+        'first',
+        (plugin) => {
+          numbers(plugin);
+          plugin.registerRecipeVerb({
+            id: 'demo.mark',
+            kind: 'action',
+            arguments: [],
+            writes: ['mark'],
+            plan: ({ table }) => ok(plan(table)),
+          });
+        },
+        { writes: ['mark', 'assign'] },
+      ),
+    );
+    if (!activated.ok) throw new Error(activated.error[0]?.message);
+    const parsed = parseRecipe('recipe test\ndemo.numbers\ndemo.mark\nwhere number = 2');
+    if (!parsed.ok) throw new Error('the recipe must parse');
+    const result = await runRecipe(parsed.value, {
+      ...recipeRegistriesOf(host.registry),
+      resolveRecipe: () => Promise.resolve(err([])),
+    });
+    if (!result.ok) throw new Error('the run must start');
+    return result.value.cells;
+  }
+
+  const operations = (table: Table, write = 'mark') =>
+    table.rows.map((row) => ({ write, rowKey: row.key, description: `Mark ${row.key}` }));
+
+  it('answers a plan in its cell, writes nothing, and hands the next cell the same rows', async () => {
+    const cells = await planned((table) => ({
+      target: 'demo items',
+      operations: operations(table),
+      count: table.rows.length,
+    }));
+    expect(cells.map((cell) => cell.status)).toEqual(['ok', 'ok', 'ok']);
+    expect(cells[1]?.plan).toEqual({
+      target: 'demo items',
+      operations: [
+        { write: 'mark', rowKey: 'N-1', description: 'Mark N-1' },
+        { write: 'mark', rowKey: 'N-2', description: 'Mark N-2' },
+      ],
+      count: 2,
+    });
+    expect(cells[1]?.table).toEqual(ROWS);
+    expect(cells[2]?.table?.rows.map((row) => row.key)).toEqual(['N-2']);
+  });
+
+  it('refuses a write the verb did not declare, even one the manifest does, at its line', async () => {
+    const cells = await planned((table) => ({
+      target: 'demo items',
+      operations: operations(table, 'assign'),
+      count: table.rows.length,
+    }));
+    expect(cells.map((cell) => cell.status)).toEqual(['ok', 'failed', 'skipped']);
+    expect(cells[1]?.plan).toBeUndefined();
+    const [problem] = cells[1]?.diagnostics ?? [];
+    expect(problem?.message).toBe(
+      "'demo.mark' answered a plan that operation 1 writes 'assign', and the verb declares " +
+        "mark; operation 2 writes 'assign', and the verb declares mark.",
+    );
+    expect(problem?.range).toEqual(cells[1]?.step.verbRange);
+  });
+
+  it('refuses a plan whose count is not its number of operations', async () => {
+    const cells = await planned((table) => ({
+      target: 'demo items',
+      operations: operations(table),
+      count: 1,
+    }));
+    expect(cells[1]?.diagnostics[0]?.message).toBe(
+      "'demo.mark' answered a plan that counts 1 operations and lists 2.",
     );
   });
 });

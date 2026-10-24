@@ -12,6 +12,8 @@ export { resolveColumn } from './columns.js';
 export type { PageFetcher, PageLimits, PageResult, SourcePage } from './paging.js';
 export { PAGE_LIMITS, pagedSource } from './paging.js';
 export { parseRecipe } from './parse.js';
+export type { Plan, PlanContext, PlanLimits, PlannedOperation } from './plan.js';
+export { PLAN_LIMITS, checkPlan } from './plan.js';
 export type {
   Derivation,
   DerivationRegistry,

@@ -1,10 +1,11 @@
 /**
- * The example recipe plugin: a paged source, a transform and a derivation, all in the
- * `example` namespace its tyto-plugin.json declares (ADR 0135).
+ * The example recipe plugin: a paged source, a transform, a derivation and an action, all in
+ * the `example` namespace its tyto-plugin.json declares (ADR 0135).
  *
  *   example.pull count=7 size=3   seven numbered items, three to a page
  *   example.tag <label>           adds a `tag` column holding the label
  *   derive example.parity         adds `parity`, even or odd, from `number`
+ *   example.mark <label>          plans one `mark` write per row, and writes nothing
  *
  * Every answer is a result, `{ ok: true, value, diagnostics: [] }`, so a failure is a value
  * the notebook shows under the cell rather than a throw. Plain ES module JavaScript with no
@@ -60,6 +61,23 @@ export function activate(host) {
         columns: [...table.columns, { name: 'tag', type: 'text', origin: 'example.tag' }],
         rows: table.rows.map((row) => ({ ...row, values: { ...row.values, tag: label } })),
       });
+    },
+  });
+
+  // An action answers a plan: what it would write, row by row. Nothing is written until a
+  // later version of Tyto applies the plan a person confirmed (ADR 0129).
+  host.registerRecipeVerb({
+    id: 'example.mark',
+    kind: 'action',
+    arguments: [{ name: 'label', type: 'text', positional: true, required: true }],
+    writes: ['mark'],
+    plan({ arguments: { label }, table }) {
+      const operations = table.rows.map((row) => ({
+        write: 'mark',
+        rowKey: row.key,
+        description: `Mark ${row.key} as '${label}'`,
+      }));
+      return answer({ target: 'example items', operations, count: operations.length });
     },
   });
 

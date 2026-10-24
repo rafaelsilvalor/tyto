@@ -15,7 +15,7 @@ import {
   resolve,
   sourceRange,
 } from '@tyto/core';
-import { type Table, parseRecipe, runRecipe } from '@tyto/recipe';
+import { type Plan, type Table, parseRecipe, runRecipe } from '@tyto/recipe';
 import { describe, expect, it } from 'vitest';
 import { z } from 'zod';
 
@@ -166,6 +166,7 @@ async function isolate(
     readonly deadlineMs?: number;
     readonly contributes?: readonly string[];
     readonly namespace?: string;
+    readonly writes?: readonly string[];
   } = {},
 ): Promise<{ readonly pair: Pair; readonly connected: Result<IsolatedPlugin, Diagnostics> }> {
   const pair = channelPair((guest) => runConfined(guest, () => Promise.resolve({ activate })));
@@ -178,6 +179,7 @@ async function isolate(
       permissions: options.permissions ?? [],
       contributes: options.contributes ?? MANIFEST.contributes,
       ...(options.namespace === undefined ? {} : { namespace: options.namespace }),
+      ...(options.writes === undefined ? {} : { writes: options.writes }),
     },
     channel: pair.host,
     ...(options.capabilities === undefined ? {} : { capabilities: options.capabilities }),
@@ -1244,6 +1246,7 @@ describe('isolated recipe verbs and derivations (TYTO-376, ADR 0135)', () => {
     const { connected } = await isolate(activate, {
       contributes: ['recipe-verb', 'recipe-derivation'],
       namespace: 'demo',
+      writes: ['mark', 'assign'],
       deadlineMs: 200,
     });
     if (!connected.ok) throw new Error(connected.error[0]?.message);
@@ -1257,8 +1260,9 @@ describe('isolated recipe verbs and derivations (TYTO-376, ADR 0135)', () => {
       resolveRecipe: () => Promise.resolve({ ok: false, error: [] }),
     });
     if (!result.ok) throw new Error('the run must start');
-    const problem = result.value.cells.flatMap((cell) => cell.diagnostics)[0];
-    return { table: result.value.table, problem, crashed: connected.value.crashed() };
+    const { cells } = result.value;
+    const problem = cells.flatMap((cell) => cell.diagnostics)[0];
+    return { table: result.value.table, problem, cells, crashed: connected.value.crashed() };
   }
 
   /** Three pages of 150 ms each: every call inside the deadline, the three together past it. */
@@ -1375,5 +1379,97 @@ describe('isolated recipe verbs and derivations (TYTO-376, ADR 0135)', () => {
       'demo.pull',
     );
     expect(cut.problem?.code).toBe('E_RECIPE_SOURCE');
+  });
+
+  /** `demo.mark` plans one `write` per row and declares only `mark`; `count` may lie. */
+  const planning = (write: string, count?: number) => (host: PluginHost) => {
+    slowPages(host);
+    host.registerRecipeVerb({
+      id: 'demo.mark',
+      kind: 'action',
+      arguments: [{ name: 'label', type: 'text', positional: true, required: true }],
+      writes: ['mark'],
+      plan: ({ arguments: { label }, table: input }) =>
+        ok({
+          target: 'demo items',
+          operations: input.rows.map((row) => ({
+            write,
+            rowKey: row.key,
+            description: `Mark ${row.key} as ${String(label)}`,
+          })),
+          count: count ?? input.rows.length,
+        }),
+    });
+  };
+
+  it('carries a plan back across the boundary, and writes nothing', async () => {
+    const { cells, problem, crashed } = await recipeIn(
+      planning('mark'),
+      'demo.pull',
+      'demo.mark x',
+    );
+    expect(problem).toBeUndefined();
+    expect(crashed).toBeUndefined();
+    expect(cells[1]?.plan).toEqual({
+      target: 'demo items',
+      operations: [1, 2, 3].map((number) => ({
+        write: 'mark',
+        rowKey: `N-${String(number)}`,
+        description: `Mark N-${String(number)} as x`,
+      })),
+      count: 3,
+    });
+    expect(cells[1]?.table?.rows.map((row) => row.key)).toEqual(['N-1', 'N-2', 'N-3']);
+  });
+
+  it('refuses a planned write the verb did not declare, at the verb, and a stray field', async () => {
+    const undeclared = await recipeIn(planning('assign'), 'demo.pull', 'demo.mark x');
+    expect(undeclared.problem?.code).toBe('E_RECIPE_PLAN');
+    expect(undeclared.problem?.message).toContain(
+      "operation 1 writes 'assign', and the verb declares mark",
+    );
+    expect(undeclared.problem?.range).toEqual(undeclared.cells[1]?.step.verbRange);
+    expect(undeclared.cells[1]?.plan).toBeUndefined();
+
+    const miscounted = await recipeIn(planning('mark', 4), 'demo.pull', 'demo.mark x');
+    expect(miscounted.problem?.message).toBe(
+      "'demo.mark' answered a plan that counts 4 operations and lists 3.",
+    );
+
+    const stray = await recipeIn(
+      (host) => {
+        slowPages(host);
+        host.registerRecipeVerb({
+          id: 'demo.mark',
+          kind: 'sink',
+          arguments: [],
+          writes: ['mark'],
+          plan: () => ok({ target: 'x', operations: [], count: 0, applied: true } as Plan),
+        });
+      },
+      'demo.pull',
+      'demo.mark',
+    );
+    expect(stray.problem?.code).toBe('E_PLUGIN_PROTOCOL');
+  });
+
+  it('refuses at load a verb whose writes the manifest does not declare', async () => {
+    const { connected } = await isolate(
+      (host) => {
+        host.registerRecipeVerb({
+          id: 'demo.mark',
+          kind: 'action',
+          arguments: [],
+          writes: ['delete'],
+          plan: () => ok({ target: 'x', operations: [], count: 0 }),
+        });
+      },
+      { contributes: ['recipe-verb'], namespace: 'demo', writes: ['mark'] },
+    );
+    if (!connected.ok) throw new Error(connected.error[0]?.message);
+    const activated = createPluginHost().tryActivate(connected.value.plugin);
+    expect(activated.ok ? '' : activated.error[0]?.message).toContain(
+      "writing 'delete', which its tyto-plugin.json does not declare in 'writes' (mark)",
+    );
   });
 });

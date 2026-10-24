@@ -5,13 +5,17 @@ import {
   type Derivation,
   type DerivationRegistry,
   PAGE_LIMITS,
+  PLAN_LIMITS,
   type PageLimits,
+  type Plan,
+  type PlanLimits,
   type SourcePage,
   type Table,
   type Verb,
   type VerbContext,
   type VerbRegistry,
   type VerbResult,
+  checkPlan,
   checkTable,
   createDerivationRegistry,
   createVerbRegistry,
@@ -31,7 +35,10 @@ import type { Contribution } from './contributions.js';
  * refused at load (`E_PLUGIN_NAMESPACE_TAKEN`) rather than settled by load order.
  */
 
-/** The four kinds of ADR 0128. Only the first two can be called in this version. */
+/**
+ * The four kinds of ADR 0128. A source and a transform answer a table; an action and a sink
+ * answer a {@link Plan} and write nothing until it is applied (ADR 0129, TYTO-378).
+ */
 export const RECIPE_VERB_KINDS = ['source', 'transform', 'action', 'sink'] as const;
 export type RecipeVerbKind = (typeof RECIPE_VERB_KINDS)[number];
 
@@ -47,12 +54,22 @@ export interface TransformRequest {
   readonly table: Table;
 }
 
+/** What an action's or a sink's `plan` is handed: the table it would write from. */
+export type PlanRequest = TransformRequest;
+
 type Answer<T> = Result<T, Diagnostics> | Promise<Result<T, Diagnostics>>;
+
+/** What the host read in the plugin's manifest that its recipe verbs are held to (ADR 0135). */
+export interface RecipeDeclarations {
+  readonly namespace?: string | undefined;
+  readonly writes?: readonly string[] | undefined;
+}
 
 /**
  * One verb. A `source` answers one page per call and the host loops, so each call fits its
  * own deadline (ADR 0042); a `transform` answers the whole table. Both are checked on the
- * host before the next cell reads them.
+ * host before the next cell reads them. An `action` or a `sink` answers a plan holding only
+ * the kinds of write it declared in `writes`, and the host refuses any other.
  */
 export interface RecipeVerbContribution extends Contribution {
   /** `<namespace>.<verb>`, in lower case. */
@@ -63,6 +80,13 @@ export interface RecipeVerbContribution extends Contribution {
   page?(request: PageRequest): Answer<SourcePage>;
   /** A transform's. */
   transform?(request: TransformRequest): Answer<Table>;
+  /**
+   * An action's or a sink's: the kinds of write its plans may hold, a subset of the manifest's
+   * `writes`. Absent on a source or a transform, which write nothing.
+   */
+  readonly writes?: readonly string[];
+  /** An action's or a sink's. Nothing is written: applying a plan is TYTO-378's. */
+  plan?(request: PlanRequest): Answer<Plan>;
 }
 
 /** A derivation for `derive` (ADR 0133), named `<namespace>.<name>`. */
@@ -101,28 +125,57 @@ function checkName(
   }
 }
 
+const CALLABLE = { source: 'page', transform: 'transform', action: 'plan', sink: 'plan' } as const;
+
 export function checkRecipeVerb(
   pluginId: string,
-  namespace: string | undefined,
+  declared: RecipeDeclarations,
   verb: RecipeVerbContribution,
 ): void {
-  checkName(pluginId, 'verb', verb.id, namespace);
+  checkName(pluginId, 'verb', verb.id, declared.namespace);
   const refuse = (problem: string): never => {
     throw new TypeError(`Plugin '${pluginId}' registered the verb '${verb.id}' ${problem}`);
   };
-  if (verb.kind === 'action' || verb.kind === 'sink') {
-    refuse(
-      `as ${verb.kind === 'action' ? 'an action' : 'a sink'}, which arrives in a later ` +
-        'version of Tyto; this one calls sources and transforms',
-    );
-  }
-  const callable = verb.kind === 'source' ? 'page' : 'transform';
-  if (typeof verb[callable] !== 'function') refuse(`as a ${verb.kind} with no '${callable}'`);
+  const kind = `${verb.kind === 'action' ? 'an' : 'a'} ${verb.kind}`;
+  const callable = CALLABLE[verb.kind];
+  if (typeof verb[callable] !== 'function') refuse(`as ${kind} with no '${callable}'`);
+  checkWrites(verb, declared.writes ?? [], (problem) => refuse(`as ${kind} ${problem}`));
   const names = new Set<string>();
   for (const argument of verb.arguments) {
     if (!ARGUMENT_NAME.test(argument.name)) refuse(`with the argument name '${argument.name}'`);
     if (names.has(argument.name)) refuse(`with the argument '${argument.name}' twice`);
     names.add(argument.name);
+  }
+}
+
+/**
+ * ADR 0129 decision 3: a verb that writes names which kinds, out of the manifest's list, so
+ * what a person read before installing is all it can plan; a verb that writes nothing names
+ * none.
+ */
+function checkWrites(
+  verb: RecipeVerbContribution,
+  manifestWrites: readonly string[],
+  refuse: (problem: string) => never,
+): void {
+  const { writes } = verb;
+  if (verb.kind === 'source' || verb.kind === 'transform') {
+    if (writes !== undefined) refuse("with 'writes', and only an action or a sink writes");
+    return;
+  }
+  if (writes === undefined || writes.length === 0) {
+    refuse("with no 'writes'; it names the kinds of write its plans hold");
+    return;
+  }
+  if (new Set(writes).size !== writes.length) refuse("with a write named twice in 'writes'");
+  const undeclared = writes.filter((write) => !manifestWrites.includes(write));
+  if (undeclared.length > 0) {
+    refuse(
+      `writing ${undeclared.map((write) => `'${write}'`).join(', ')}, which its ` +
+        `tyto-plugin.json does not declare in 'writes' (${
+          manifestWrites.length > 0 ? manifestWrites.join(', ') : 'none'
+        })`,
+    );
   }
 }
 
@@ -155,6 +208,7 @@ export interface RecipeContributions {
 export function recipeRegistriesOf(
   contributions: RecipeContributions,
   limits: PageLimits = PAGE_LIMITS,
+  planLimits: PlanLimits = PLAN_LIMITS,
 ): RecipeRegistries {
   const ownVerbs = createVerbRegistry();
   const ownDerivations = createDerivationRegistry();
@@ -170,7 +224,7 @@ export function recipeRegistriesOf(
         const own = ownVerbs.get(name);
         if (own !== undefined) return own;
         const contributed = contributedVerb(name);
-        return contributed === undefined ? undefined : verbOf(contributed, limits);
+        return contributed === undefined ? undefined : verbOf(contributed, limits, planLimits);
       },
       names: () => namesOf(ownVerbs.names(), contributions.recipeVerbs()),
     },
@@ -191,13 +245,17 @@ function namesOf(own: readonly string[], contributed: readonly Contribution[]): 
   return [...new Set([...own, ...contributed.map((entry) => entry.id)])].sort();
 }
 
-function verbOf(contribution: RecipeVerbContribution, limits: PageLimits): Verb {
+function verbOf(
+  contribution: RecipeVerbContribution,
+  limits: PageLimits,
+  planLimits: PlanLimits,
+): Verb {
   return {
     kind: contribution.kind,
     async run(context) {
       const values = readArguments(context, contribution.arguments);
       if (!values.ok) return values;
-      const { page, transform } = contribution;
+      const { page, transform, plan } = contribution;
       if (contribution.kind === 'source' && page !== undefined) {
         const fetched = await pagedSource(
           contribution.id,
@@ -215,21 +273,23 @@ function verbOf(contribution: RecipeVerbContribution, limits: PageLimits): Verb 
           fetched.ok ? ok({ table: fetched.value }, fetched.diagnostics) : fetched,
         );
       }
+      if (context.table === undefined) {
+        return err([
+          diagnostic(
+            'E_RECIPE_NO_TABLE',
+            { verb: contribution.id },
+            { range: context.written.verbRange },
+          ),
+        ]);
+      }
+      const request = { arguments: values.value, table: context.table };
       if (contribution.kind === 'transform' && transform !== undefined) {
-        if (context.table === undefined) {
-          return err([
-            diagnostic(
-              'E_RECIPE_NO_TABLE',
-              { verb: contribution.id },
-              { range: context.written.verbRange },
-            ),
-          ]);
-        }
-        const answer = await transform.call(contribution, {
-          arguments: values.value,
-          table: context.table,
-        });
+        const answer = await transform.call(contribution, request);
         return placed(context, checkedAnswer(answer, contribution.id, limits));
+      }
+      if (plan !== undefined && (contribution.kind === 'action' || contribution.kind === 'sink')) {
+        const answer = await plan.call(contribution, request);
+        return placed(context, checkedPlan(answer, contribution, context.table, planLimits));
       }
       // Registration refuses every other shape, so only a contribution changed after it was
       // registered reaches this.
@@ -274,6 +334,25 @@ function checkedAnswer(
   }
   const checked = checkTable(answer.value, origin);
   return checked.ok ? ok({ table: checked.value }, answer.diagnostics) : checked;
+}
+
+/**
+ * A plan from a plugin, held to what the verb declared (ADR 0129 decision 3). The table passes
+ * through unchanged: planning writes nothing, so the next cell reads the rows this one read.
+ */
+function checkedPlan(
+  answer: Result<Plan, Diagnostics>,
+  contribution: RecipeVerbContribution,
+  table: Table,
+  limits: PlanLimits,
+): VerbResult {
+  if (!answer.ok) return answer;
+  const checked = checkPlan(
+    answer.value,
+    { verb: contribution.id, writes: contribution.writes ?? [], table },
+    limits,
+  );
+  return checked.ok ? ok({ table, plan: checked.value }, answer.diagnostics) : checked;
 }
 
 /**

@@ -123,7 +123,9 @@ export {
 
 export {
   type PageRequest,
+  type PlanRequest,
   type RecipeContributions,
+  type RecipeDeclarations,
   type RecipeDerivationContribution,
   type RecipeRegistries,
   type RecipeVerbContribution,
