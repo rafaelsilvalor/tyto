@@ -63,6 +63,13 @@ required?, values? }` with `type` one of `text`, `number`, `date`, `boolean`. Th
 description }], count }`, minimal on purpose. TYTO-378 adds `apply` and may only add
     fields.
 
+    _Amended in the second pull request:_ a plan holds at most **10,000 operations**, each
+    description at most 500 characters (`PLAN_LIMITS`, provisional like the page ceilings), and
+    `checkPlan` in `@tyto/recipe` refuses past them as `E_RECIPE_PLAN`, never a plan shown in
+    part. The same check refuses a `count` other than the number of operations and a `rowKey`
+    the table the verb read does not hold. The table passes through an action or a sink
+    unchanged, so a cell after it reads the same rows.
+
 ## Consequences
 
 - TYTO-376 ships in two pull requests. The first carries decisions 1–8: sources, transforms,

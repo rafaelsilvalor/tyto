@@ -2,6 +2,7 @@ import { type Diagnostic, type Result, diagnostic, didYouMean, err, ok } from '@
 
 import type { RecipeAst, Step } from './ast.js';
 import { fillPlaceholders } from './parse.js';
+import type { Plan } from './plan.js';
 import type { DerivationRegistry, KeepRequest, RecipeResolver, VerbRegistry } from './registry.js';
 import type { Table } from './table.js';
 
@@ -27,6 +28,8 @@ export interface Cell {
   readonly step: Step;
   readonly status: 'ok' | 'failed' | 'skipped';
   readonly table?: Table;
+  /** An action's or a sink's plan, shown under the cell; nothing was written (ADR 0129). */
+  readonly plan?: Plan;
   readonly diagnostics: readonly Diagnostic[];
 }
 
@@ -98,7 +101,14 @@ export async function runRecipe(
     table = outcome.value.table;
     view = outcome.value.view ?? view;
     keeps.push(...(outcome.value.keeps ?? []));
-    cells.push({ step: written, status: 'ok', table, diagnostics: outcome.diagnostics });
+    const { plan } = outcome.value;
+    cells.push({
+      step: written,
+      status: 'ok',
+      table,
+      ...(plan === undefined ? {} : { plan }),
+      diagnostics: outcome.diagnostics,
+    });
     diagnostics.push(...outcome.diagnostics);
   }
 

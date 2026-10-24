@@ -135,6 +135,22 @@ export const pluginManifestSchema = z
         'must be lowercase letters, digits and hyphens, starting with a letter',
       )
       .optional(),
+    /**
+     * Every kind of write the plugin's actions and sinks may plan (ADR 0129 decision 3), so a
+     * person reads before installing what it could change: `transition`, `assign`. Each verb
+     * declares the subset it uses, and the host refuses a planned write outside it.
+     */
+    writes: z
+      .array(
+        z
+          .string()
+          .regex(
+            /^[a-z][a-z0-9-]*$/,
+            'must be lowercase letters, digits and hyphens, starting with a letter',
+          ),
+      )
+      .refine((values) => new Set(values).size === values.length, 'must not repeat a write')
+      .optional(),
   })
   .superRefine((manifest, context) => {
     const namespaced = manifest.contributes.filter((point) => NAMESPACED_POINTS.includes(point));
@@ -143,6 +159,13 @@ export const pluginManifestSchema = z
         code: 'custom',
         path: ['namespace'],
         message: `is required by a plugin that contributes ${namespaced.join(' or ')}`,
+      });
+    }
+    if (manifest.writes !== undefined && !manifest.contributes.includes('recipe-verb')) {
+      context.addIssue({
+        code: 'custom',
+        path: ['writes'],
+        message: 'is declared by a plugin that contributes no recipe-verb, so nothing could write',
       });
     }
   });

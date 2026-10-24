@@ -3,7 +3,7 @@
   "version": "0.1.0",
   "private": true,
   "type": "module",
-  "description": "A Tyto plugin contributing a paged recipe source, a transform and a derivation.",
+  "description": "A Tyto plugin contributing a paged recipe source, a transform, a derivation and an action that plans.",
   "files": [
     "tyto-plugin.json",
     "dist"

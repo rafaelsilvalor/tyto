@@ -430,7 +430,8 @@ describe('the example recipe plugin in a child process (TYTO-376)', () => {
     expect(host.tryActivate(connected.value.plugin).ok).toBe(true);
 
     const recipe = parseRecipe(
-      'recipe example\nexample.pull count=7 size=3\nexample.tag ready\nderive example.parity',
+      'recipe example\nexample.pull count=7 size=3\nexample.tag ready\nderive example.parity\n' +
+        'example.mark done',
     );
     if (!recipe.ok) throw new Error('the recipe must parse');
     const run = await runRecipe(recipe.value, {
@@ -451,5 +452,13 @@ describe('the example recipe plugin in a child process (TYTO-376)', () => {
       'EX-7',
     ]);
     expect(rows[6]?.values).toEqual({ title: 'Item 7', number: 7, tag: 'ready', parity: 'odd' });
+    // `example.mark` is an action: it plans a write per row, crosses back, and writes nothing.
+    const plan = run.ok ? run.value.cells[3]?.plan : undefined;
+    expect(plan?.count).toBe(7);
+    expect(plan?.operations[6]).toEqual({
+      write: 'mark',
+      rowKey: 'EX-7',
+      description: "Mark EX-7 as 'done'",
+    });
   }, 60_000);
 });

@@ -1,6 +1,7 @@
 import { type Diagnostic, type Result, diagnostic, err, ok } from '@tyto/core';
 
 import type { RecipeAst, Step } from './ast.js';
+import type { Plan } from './plan.js';
 import type { Table } from './table.js';
 import { genericVerbs } from './verbs.js';
 
@@ -38,6 +39,11 @@ export interface VerbOutput {
   readonly view?: string;
   /** Several when the cell is a `run` whose recipe keeps more than one table. */
   readonly keeps?: readonly KeepRequest[];
+  /**
+   * An action's or a sink's: what it would write, and nothing written (ADR 0129). Its `table`
+   * is the one it read, so a cell after it reads the same rows.
+   */
+  readonly plan?: Plan;
 }
 
 export type VerbResult = Result<VerbOutput, readonly Diagnostic[]>;

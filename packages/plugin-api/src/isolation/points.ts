@@ -16,7 +16,7 @@ import {
   templateManifestSchema,
   templateReportCodes,
 } from '@tyto/core';
-import { COLUMN_TYPES, type CellValue, type Table } from '@tyto/recipe';
+import { COLUMN_TYPES, type CellValue, type Plan, type Table } from '@tyto/recipe';
 import { z } from 'zod';
 
 import type { ContributionPoint } from '../manifest.js';
@@ -265,6 +265,19 @@ const tableSchema = z.strictObject({
   ),
 }) as unknown as z.ZodType<Table>;
 
+/** A plan as it crosses (ADR 0135 decision 10): its shape, strictly; the rest is `checkPlan`'s. */
+const planSchema = z.strictObject({
+  target: z.string(),
+  operations: z.array(
+    z.strictObject({
+      write: z.string(),
+      rowKey: z.string().optional(),
+      description: z.string(),
+    }),
+  ),
+  count: z.number().int().nonnegative(),
+}) as unknown as z.ZodType<Plan>;
+
 const argumentValuesSchema = z.record(z.string(), z.union([z.string(), z.number(), z.boolean()]));
 
 /** A recipe verb's arguments, as data: the closed schema of ADR 0135, never JSON Schema. */
@@ -445,6 +458,7 @@ export const ISOLATED_POINTS: Readonly<Partial<Record<ContributionPoint, PointSp
       id: z.string().min(1).max(200),
       kind: z.enum(RECIPE_VERB_KINDS),
       arguments: z.array(argumentSpecSchema).max(100),
+      writes: z.array(z.string().min(1).max(100)).max(100).optional(),
     }),
     callables: {
       page: {
@@ -466,6 +480,15 @@ export const ISOLATED_POINTS: Readonly<Partial<Record<ContributionPoint, PointSp
         args: z.tuple([z.strictObject({ arguments: argumentValuesSchema, table: tableSchema })]),
         send: ([request]) => [request],
         result: resultSchema(tableSchema),
+        failed: (problems) => err(problems),
+        optional: true,
+      },
+      // An action's or a sink's. Its writes and its count are held to the verb's declaration
+      // by `checkPlan` on the host, which says so in a person's words.
+      plan: {
+        args: z.tuple([z.strictObject({ arguments: argumentValuesSchema, table: tableSchema })]),
+        send: ([request]) => [request],
+        result: resultSchema(planSchema),
         failed: (problems) => err(problems),
         optional: true,
       },

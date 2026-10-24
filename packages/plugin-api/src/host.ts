@@ -36,6 +36,7 @@ import {
 import { type ContributionPoint, type PluginManifest, validatePluginManifest } from './manifest.js';
 import {
   type RecipeContributions,
+  type RecipeDeclarations,
   type RecipeDerivationContribution,
   type RecipeVerbContribution,
   checkRecipeDerivation,
@@ -121,7 +122,7 @@ export interface PluginHost {
   registerFontSource(source: FontSourceContribution): Disposable;
   /**
    * A recipe verb, named `<namespace>.<verb>` in the namespace the manifest declares
-   * (ADR 0135). A source or a transform; an action or a sink is refused in this version.
+   * (ADR 0135). An action or a sink declares `writes`, a subset of the manifest's.
    */
   registerRecipeVerb(verb: RecipeVerbContribution): Disposable;
   /** A derivation for `derive`, named `<namespace>.<name>` (ADR 0133, ADR 0135). */
@@ -534,7 +535,7 @@ export function createPluginHost(options: PluginHostOptions = {}): InProcessHost
     onConflict?: ConflictListener,
     permissions: readonly string[] = [],
     origin: PluginOrigin = 'external',
-    namespace?: string,
+    recipe: RecipeDeclarations = {},
   ): PluginHost {
     // The permissions of the manifest the host validated, never what the plugin says.
     const checked = checkedCapabilities(pluginId, permissions, options.capabilities);
@@ -570,11 +571,11 @@ export function createPluginHost(options: PluginHostOptions = {}): InProcessHost
         return fontSources.add(pluginId, source, onConflict);
       },
       registerRecipeVerb: (verb) => {
-        checkRecipeVerb(pluginId, namespace, verb);
+        checkRecipeVerb(pluginId, recipe, verb);
         return recipeVerbs.add(pluginId, verb, onConflict);
       },
       registerRecipeDerivation: (derivation) => {
-        checkRecipeDerivation(pluginId, namespace, derivation);
+        checkRecipeDerivation(pluginId, recipe.namespace, derivation);
         return recipeDerivations.add(pluginId, derivation, onConflict);
       },
 
@@ -631,7 +632,7 @@ export function createPluginHost(options: PluginHostOptions = {}): InProcessHost
       }
 
       const result = plugin.activate(
-        hostWith(plugin.id, undefined, manifest.permissions, origin, manifest.namespace),
+        hostWith(plugin.id, undefined, manifest.permissions, origin, manifest),
       );
 
       // Checked *after* activation, against what was actually registered. `contributes` is
@@ -702,7 +703,7 @@ export function createPluginHost(options: PluginHostOptions = {}): InProcessHost
             (conflict) => conflicts.push(conflict),
             manifest.permissions,
             origin,
-            manifest.namespace,
+            manifest,
           ),
         );
       } catch (cause) {
