@@ -36,7 +36,7 @@ packages/
   pipeline       Job: brief → artworks×formats → artifacts; local queue, cancellation, progress
   plugin-api     extension-point types, PluginHost, plugin manifest, permissions
   io             BriefSource/OutputSink ports; fs adapters (inbox/outbox); local watcher
-  sources        (deferred, ADR 0011) jira/trello/notion/sheets/drive plugins
+  sources        none here: remote connectors are installed plugins in their own repositories (ADR 0127)
   editor         CodeMirror 6: brief and template languages, vim, diagnostics, manifest-driven autocomplete, JSON-tab suggestions and hover from a host's source, brief skeletons and the "/" menu, find/replace, one editor in several panes
 apps/
   cli            commander: render, watch, template new|check, plugin new|install|list|remove|disable|enable

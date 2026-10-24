@@ -38,7 +38,7 @@ Boundary rules:
 
 - Jacurutu chooses the template (it knows the issue) and writes `template:` in the frontmatter. Tyto validates (it knows the manifest). There is no template catalog outside `templates/*/manifest.yaml`.
 - `result.json` is the only thing Jacurutu reads back; acknowledging the issue is its responsibility.
-- Tyto never knows about Jira, Drive, OAuth or machine identity.
+- Tyto knows no provider and no machine identity (ADR 0127): a remote connector is an installed plugin in its own repository.
 
 ## The `tyto` command
 
@@ -210,12 +210,21 @@ still does the same from outside. So `fsInbox`'s `ack` tries the rename again on
 `EACCES` or `EBUSY`, six attempts and 310 ms of waiting at most, and then fails as before.
 `ENOENT` — another consumer moved the task first — is never retried.
 
-## Deferred (E10) — only if Jacurutu does not cover it
+## Remote connectors (E10, ADR 0127)
 
-Jira/Trello/Notion/Sheets sources and a Drive sink as Tyto plugins, with per-connection field mapping and a polling scheduler. Contract preserved:
+Jacurutu does not write back to Jira and does not run Buraqueira's sheet pipeline, so the
+connectors come back as **installed plugins in their own repositories**: `tyto-plugin-jira` and
+`tyto-plugin-google`. They contribute verbs to the recipe notebook (ADR 0128), every write
+plans before it applies (ADR 0129), they store through the host (ADR 0130), and Google's
+sign-in is a host service (ADR 0131). Field ids, status graphs and sheet ids are the
+workspace's data, never this repository's. The design, with the parity map against Buraqueira,
+is `docs/explorations/2026-10-24-data-recipes-and-connectors.md`.
+
+Still frozen: Trello and Notion sources, and polling a remote queue into briefs. For that last
+one the contract stays preserved:
 
 ```ts
 RemoteBrief { id; source; brief; assets: {name, url|bytes}[]; meta; ackToken }
 ```
 
-Credentials, if they ever come in, only via `safeStorage`/OS keychain and `host.credentials()`.
+Credentials only via `safeStorage`/OS keychain and `host.credentials()`.

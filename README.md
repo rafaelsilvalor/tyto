@@ -6,7 +6,7 @@ Local-first, multi-format advertising art generator. Part of the Breu suite.
 
 A **brief** written in a custom markup language picks a **template**, fills its slots, and is compiled into a **scene tree (IR)**. Independent exporters read the scene: HTML (rasterized in Chromium to PNG/JPG/WebP) and vector SVG. One piece can produce several artworks (carousel) in several formats (feed, story, banner).
 
-Interfaces: desktop app (Electron; editor with syntax highlighting and vim mode) and a CLI. Remote queues and delivery (Jira, Drive…) belong to Jacurutu, a sibling product; the boundary is a file contract (ADR 0011). Everything that is a source, sink, exporter, rasterizer, template pack or editor command is a **plugin** — built-ins use the same API.
+Interfaces: desktop app (Electron; editor with syntax highlighting and vim mode) and a CLI. Remote sources and delivery (Jira, Google Drive and Sheets…) come as installed plugins in their own repositories, never as part of Tyto (ADR 0127); the file contract with Jacurutu, a sibling product, stays (ADR 0011). Everything that is a source, sink, exporter, rasterizer, template pack or editor command is a **plugin** — built-ins use the same API.
 
 Start with `CLAUDE.md`, then `docs/architecture.md` and `docs/backlog.md`.
 
@@ -65,8 +65,8 @@ existe na linha de comando (`tyto`).
 
 **O que ainda não funciona.** Os instaladores ainda não são assinados, então o Windows e o
 macOS avisam na primeira vez que você abre. O arquivo de Mac da versão 0.7.0 só abre em Mac
-com Apple Silicon. Plugins só se instalam pela linha de comando. E não há integração com Jira
-ou Drive: isso é papel do Jacurutu, o outro produto da suíte.
+com Apple Silicon. Plugins só se instalam pela linha de comando. E ainda não há integração com Jira
+ou Drive: os plugins que vão fazer isso estão em desenho (ADR 0127).
 
 **O manual.** Instalação, primeira arte passo a passo e o nome de cada parte da janela estão
 no manual do usuário, em `apps/docs/pages/pt-BR/` (comece por

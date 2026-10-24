@@ -22,7 +22,7 @@ Compiler: brief → Scene IR → exporters (HTML→raster, SVG), plus an Electro
 - Every adapter (fs, chromium, http…) implements a port from `core` or `plugin-api`. No package imports another package's adapter; composition happens in `apps/*` only.
 - Built-in is a plugin. If a feature does not fit an existing extension point, extend `plugin-api`; do not bypass it.
 - Electron: `contextIsolation: true`, `nodeIntegration: false`, typed preload only. Credentials only through `safeStorage`.
-- Tyto never knows about Jira, Drive, OAuth or machine identity (ADR 0011).
+- Tyto knows no provider (ADR 0011, ADR 0127): Jira, Google, Drive and the like live only in installed plugins in their own repositories. The core gains generic services (secrets, storage, OAuth 2.0 as a protocol, recipe verbs), never a provider's name or API, and never machine identity.
 
 ## Workflow
 

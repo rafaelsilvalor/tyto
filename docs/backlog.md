@@ -134,12 +134,18 @@ Spec: ADR 0001, `docs/architecture.md` (processes).
 - **E9.5** "Edit template" mode with preview across all manifest formats. AC: saving a template recompiles open briefs. (M)
 - **E9.6** Local queue panel: reads `inbox/`, shows jobs, status, retry, opens `out/`. AC: a folder created by Jacurutu (or by hand) appears and renders. (M)
 
-## E10 — Remote integrations (DEFERRED — ADR 0011)
+## E10 — Remote integrations (partly thawed — ADR 0127)
 
-Covered by Jacurutu through the file contract. Activate only if Jacurutu does not cover it.
+Jacurutu does not cover writing back to Jira, nor Buraqueira's sheet pipeline. ADR 0127 brings the
+connectors back as installed plugins in their own repositories; the design is
+`docs/explorations/2026-10-24-data-recipes-and-connectors.md`.
 
 - **E10.0** `tyto render` + `result.json` + exit-code contract documented and tested (part of E6.3). (S)
-- E10.1–E10.5 (scheduler, Jira source, Drive sink, Trello/Notion/Sheets, config UI) — frozen. Spec preserved in `docs/integrations.md`.
+- **E10.1** Scheduler, in one form: a recipe runs on an interval while the app is open (ADR 0127). (M)
+- **E10.2** `tyto-plugin-jira`: pull by JQL, board or key; status, fields, assignee, comments, new issues. (L)
+- **E10.3** `tyto-plugin-google`: Sheets read, write, sync and create; Drive folders and inbox. (L)
+- **E10.4** Parity with Buraqueira and the switch-over. (M)
+- Trello and Notion sources, and polling remote queues into briefs — still frozen.
 
 ## E11 — External plugins
 

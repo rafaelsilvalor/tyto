@@ -1,6 +1,7 @@
 # 0011 — Tyto renders, Jacurutu orchestrates; boundary is a file contract
 
-Status: accepted · 2026-09-05
+Status: accepted · 2026-09-05 · refined by ADR 0127, which brings remote connectors back as
+installed plugins and restates the rule as "Tyto knows no provider"
 
 ## Context
 
