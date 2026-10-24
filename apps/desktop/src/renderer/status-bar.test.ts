@@ -102,6 +102,19 @@ describe('the status bar', () => {
     expect(disabled).toEqual([COMMANDS.export]);
   });
 
+  it('draws no Export button with a text file or a Markdown preview in front (TYTO-247)', async () => {
+    const exportDrawn = (bar: StatusBar): boolean =>
+      buttons(bar).some((button) => button.dataset['command'] === COMMANDS.export);
+    for (const kind of ['text', 'markdown', 'markdown-preview'] as const) {
+      const { bar } = await mount({ ...base, kind });
+      expect([kind, exportDrawn(bar)]).toEqual([kind, false]);
+    }
+    for (const kind of ['brief', 'preview', 'settings'] as const) {
+      const { bar } = await mount({ ...base, kind });
+      expect([kind, exportDrawn(bar)]).toEqual([kind, true]);
+    }
+  });
+
   it('labels every button from the catalogue, in both languages', async () => {
     for (const locale of ['en', 'pt-BR'] as const) {
       const { bar } = await mount({ ...base, locale });

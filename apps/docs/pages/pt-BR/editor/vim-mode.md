@@ -20,5 +20,5 @@ A escolha fica guardada: o comando grava a configuração [`vimMode`](../referen
 ## O que muda com ele ligado
 
 - As teclas do próprio vim valem dentro do editor: **u** desfaz, **Ctrl+R** refaz, **:w** salva e **:vsplit** divide o grupo de editores, como **Dividir editor à direita**.
-- Algumas teclas da janela passam a ser do vim. **Ctrl+O**, por exemplo, é do vim e não abre mais um arquivo: use **Abrir um brief…** pela barra de comandos ou pelo menu **Arquivo**. A barra de comandos mostra as teclas que cada comando tem naquele momento, então um comando que perdeu a tecla com o vim ligado aparece sem nenhuma.
+- Algumas teclas da janela passam a ser do vim. **Ctrl+O**, por exemplo, é do vim e não abre mais um arquivo: use **Abrir…** pela barra de comandos ou pelo menu **Arquivo**. A barra de comandos mostra as teclas que cada comando tem naquele momento, então um comando que perdeu a tecla com o vim ligado aparece sem nenhuma.
 - **Ctrl+K** continua abrindo a barra de comandos, então todo comando continua a uma busca de distância.

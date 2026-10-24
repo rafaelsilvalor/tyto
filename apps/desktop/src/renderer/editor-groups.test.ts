@@ -607,7 +607,7 @@ describe('a preview of an image from the explorer (TYTO-366, ADR 0124)', () => {
   const previews = (groups: EditorGroups): string[] =>
     previewTabs(groups).map((tab) => {
       const subject = previewSubjectOf(tab);
-      const shown = subject.kind === 'brief' ? subject.documentId : `img:${subject.entryId}`;
+      const shown = subject.kind === 'image' ? `img:${subject.entryId}` : subject.documentId;
       return `${tab.locked === true ? 'L' : 'P'}(${shown})`;
     });
   const logo = { kind: 'image', entryId: 'e-logo' } as const;
@@ -657,5 +657,26 @@ describe('a preview of an image from the explorer (TYTO-366, ADR 0124)', () => {
       kind: 'brief',
       documentId: 'b',
     });
+  });
+});
+
+describe('a preview of a Markdown file (TYTO-247, ADR 0132)', () => {
+  const tab: EditorTab = { id: 't1', documentId: 'd-notes', view: 'preview' };
+
+  it('is the markdown subject of its document when the document is Markdown', () => {
+    const kinds: Record<string, string | undefined> = { 'd-notes': 'markdown' };
+    expect(previewSubjectOf(tab, (id) => kinds[id])).toEqual({
+      kind: 'markdown',
+      documentId: 'd-notes',
+    });
+  });
+
+  it('is a brief subject otherwise, and the file it names wins over both', () => {
+    expect(previewSubjectOf(tab, () => undefined)).toEqual({
+      kind: 'brief',
+      documentId: 'd-notes',
+    });
+    const image = { kind: 'image', entryId: 'e-1' } as const;
+    expect(previewSubjectOf({ ...tab, subject: image }, () => 'markdown')).toEqual(image);
   });
 });

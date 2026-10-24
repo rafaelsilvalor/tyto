@@ -55,7 +55,7 @@ The editor has focus and vim mode is off.
 | `Ctrl+Shift+g` | `⌘⇧g` | Procurar: anterior | `editor.findPrevious` |
 | `Ctrl+Alt+g` | `⌘⌥g` | Ir para a linha | `editor.gotoLine` |
 | `Ctrl+n` | `⌘n` | Novo brief | `document.new` |
-| `Ctrl+o` | `⌘o` | Abrir um brief… | `editor.open` |
+| `Ctrl+o` | `⌘o` | Abrir… | `editor.open` |
 | `Ctrl+Shift+s` | `⌘⇧s` | Salvar como… | `editor.saveAs` |
 | `Ctrl+w` | `⌘w` | Fechar a aba | `document.close` |
 | `Ctrl+r` | `⌘r` | Recarregar a janela | `window.reload` |

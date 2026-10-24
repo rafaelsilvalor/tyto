@@ -38,6 +38,7 @@ import { type SearchPhrases, searchSupport, setSearchPhrases } from './search.js
 import { type EditorKeymap, defaultKeymapSet, keymapExtension } from './keymap.js';
 import { type ThemeName, themes } from './theme.js';
 import { json } from './json-language.js';
+import { markdown } from './markdown-language.js';
 import { followerState, historyExtension, mirrored, primaryFacet } from './mirror.js';
 import { template } from './template-language.js';
 import { type VimStatus, vimMode } from './vim-mode.js';
@@ -70,14 +71,17 @@ const programmatic = Annotation.define<boolean>();
  *
  * `json` is JSON with comments, coloured and nothing more — the desktop's `settings.json` and
  * `keybindings.json` tabs (TYTO-256). Their checks are pushed in by the host as markers.
+ *
+ * `markdown` is a `.md` tab's, coloured by `@lezer/markdown` with GitHub's extensions (TYTO-247).
  */
-export type LanguageName = 'brief' | 'template' | 'plain' | 'json';
+export type LanguageName = 'brief' | 'template' | 'plain' | 'json' | 'markdown';
 
 const languages: Readonly<Record<LanguageName, () => Extension>> = {
   brief,
   template,
   plain: () => [],
   json,
+  markdown,
 };
 
 export interface EditorOptions {

@@ -68,6 +68,12 @@ interface Palette {
   readonly literal: string;
   readonly string: string;
   readonly bracket: string;
+  // Markdown's half (TYTO-247): a heading, a link's label and its address, code, a quote.
+  readonly heading: string;
+  readonly link: string;
+  readonly url: string;
+  readonly code: string;
+  readonly quote: string;
 }
 
 /**
@@ -80,7 +86,7 @@ const token = (role: string): string => `var(--tyto-${role})`;
 /**
  * One palette for both themes, because the colours are no longer here.
  *
- * Twenty-five fields over fifteen roles: the fields that always had one colour in the dark
+ * Thirty fields over fifteen roles: the fields that always had one colour in the dark
  * palette share a role, so a theme sets eight syntax colours rather than seventeen.
  */
 export const palette: Palette = {
@@ -111,6 +117,11 @@ export const palette: Palette = {
   literal: token('syntax-constant'),
   string: token('syntax-string'),
   bracket: token('syntax-punctuation'),
+  heading: token('syntax-function'),
+  link: token('syntax-keyword'),
+  url: token('syntax-string'),
+  code: token('syntax-constant'),
+  quote: token('syntax-comment'),
 };
 
 export const monoFont = token('font-mono');
@@ -402,6 +413,17 @@ const syntax = (colours: Palette): HighlightStyle =>
     { tag: [tags.atom, tags.number, tags.color], color: colours.literal },
     { tag: tags.string, color: colours.string },
     { tag: [tags.angleBracket, tags.brace, tags.derefOperator], color: colours.bracket },
+
+    // Markdown (TYTO-247): the tags `@lezer/markdown` assigns, which neither the brief nor the
+    // template grammar uses. `strong` and `emphasis` above already serve it, and its marks
+    // (`#`, `>`, `*`, `` ` ``) are `processingInstruction`, the punctuation's colour.
+    { tag: tags.heading, color: colours.heading, fontWeight: 'bold' },
+    { tag: tags.link, color: colours.link },
+    { tag: tags.url, color: colours.url, textDecoration: 'underline' },
+    { tag: tags.monospace, color: colours.code },
+    { tag: tags.quote, color: colours.quote, fontStyle: 'italic' },
+    { tag: tags.strikethrough, textDecoration: 'line-through' },
+    { tag: tags.contentSeparator, color: colours.punctuation },
   ]);
 
 /**

@@ -8,7 +8,9 @@ import {
   EDITOR_GO_TO_BLOCK,
   EDITOR_FORMAT_BRIEF,
   FILE_EXPORT,
+  PREVIEW_OPEN,
   PREVIEW_OPEN_TO_SIDE,
+  PREVIEW_TOGGLE_LOCK,
   SETTINGS_OPEN,
   TEMPLATE_EDIT,
   TEXT_COMMANDS,
@@ -82,21 +84,40 @@ describe('a text tab (TYTO-247, ADR 0132)', () => {
   });
 
   it('offers no export, preset, zoom, format or slide, and every text command', () => {
+    const markdownPreview = new Set([PREVIEW_OPEN_TO_SIDE, PREVIEW_OPEN, PREVIEW_TOGGLE_LOCK]);
     for (const kind of ['text', 'markdown'] as const) {
-      for (const id of BRIEF_ONLY_COMMANDS) expect(commandOffered(kind, id), id).toBe(false);
+      for (const id of BRIEF_ONLY_COMMANDS) {
+        const own = kind === 'markdown' && markdownPreview.has(id);
+        expect(commandOffered(kind, id), id).toBe(own);
+      }
       expect(commandOffered(kind, presetCommandId('Instagram'))).toBe(false);
       for (const id of TEXT_COMMANDS) {
         expect(commandOffered(kind, id), id).toBe(!BRIEF_ONLY_COMMANDS.has(id));
       }
       expect(commandOffered(kind, EDITOR_SAVE)).toBe(true);
-      expect(commandOffered(kind, PREVIEW_OPEN_TO_SIDE)).toBe(false);
       expect(commandOffered(kind, EDITOR_FORMAT_BRIEF)).toBe(false);
     }
   });
 
-  it('opens both in plain text, with no app-file help and no template edit', () => {
+  it('offers a preview beside a .md and not beside a .txt', () => {
+    for (const id of [PREVIEW_OPEN_TO_SIDE, PREVIEW_OPEN, PREVIEW_TOGGLE_LOCK]) {
+      expect(commandOffered('markdown', id), id).toBe(true);
+      expect(commandOffered('markdown-preview', id), id).toBe(true);
+      expect(commandOffered('text', id), id).toBe(false);
+    }
+  });
+
+  it("gives a Markdown file's preview neither a brief's commands nor the text commands", () => {
+    expect(commandOffered('markdown-preview', FILE_EXPORT)).toBe(false);
+    expect(commandOffered('markdown-preview', presetCommandId('Instagram'))).toBe(false);
+    for (const id of TEXT_COMMANDS) expect(commandOffered('markdown-preview', id), id).toBe(false);
+    expect(commandOffered('markdown-preview', EDITOR_SAVE)).toBe(true);
+  });
+
+  it('opens a .txt in plain text and a .md in Markdown, with no app-file help or template edit', () => {
     expect(languageOf('text')).toBe('plain');
-    expect(languageOf('markdown')).toBe('plain');
+    expect(languageOf('markdown')).toBe('markdown');
+    expect(languageOf('markdown-preview')).toBeUndefined();
     expect(assistOf('markdown', { settings: [] as const })).toEqual([]);
     expect(templateEditFor('markdown', '# Notas', 'promo-curso')).toBeUndefined();
   });
