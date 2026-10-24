@@ -34,7 +34,7 @@ packages/
   theme-pack     well-known colour themes (Dracula, Nord, Solarized…) as a theme plugin, bundled into main
   fonts          the faces Tyto ships, and the reader that hands them to the exporters and to measurement
   pipeline       Job: brief → artworks×formats → artifacts; local queue, cancellation, progress
-  recipe         the recipe notebook's table, the *.recipe parser, the where grammar and the generic verbs (ADR 0128)
+  recipe         the recipe notebook's table, the *.recipe parser, the where grammar and the generic verbs, join, derive and run included (ADR 0128, ADR 0133)
   plugin-api     extension-point types, PluginHost, plugin manifest, permissions
   io             BriefSource/OutputSink ports; fs adapters (inbox/outbox); local watcher
   sources        none here: remote connectors are installed plugins in their own repositories (ADR 0127)

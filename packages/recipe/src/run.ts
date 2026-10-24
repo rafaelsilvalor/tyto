@@ -15,6 +15,8 @@ export interface RunOptions {
   readonly resolveRecipe: RecipeResolver;
   /** `{alias: column}`: names a person types, read on the way in and never written out. */
   readonly aliases?: Readonly<Record<string, string>>;
+  /** The recipes that include this one through `run`, outermost first. */
+  readonly within?: readonly string[];
 }
 
 /**
@@ -62,6 +64,7 @@ export async function runRecipe(
   let table = options.input;
   let view: string | undefined;
   let failed = false;
+  const recipes = [...(options.within ?? []), recipe.name];
 
   for (const written of recipe.steps) {
     if (failed) {
@@ -83,6 +86,8 @@ export async function runRecipe(
       aliases,
       derivations: options.derivations,
       resolveRecipe: options.resolveRecipe,
+      verbs: options.verbs,
+      recipes,
     });
     if (!outcome.ok) {
       cells.push({ step: written, status: 'failed', diagnostics: outcome.error });
@@ -92,7 +97,7 @@ export async function runRecipe(
     }
     table = outcome.value.table;
     view = outcome.value.view ?? view;
-    if (outcome.value.keep !== undefined) keeps.push(outcome.value.keep);
+    keeps.push(...(outcome.value.keeps ?? []));
     cells.push({ step: written, status: 'ok', table, diagnostics: outcome.diagnostics });
     diagnostics.push(...outcome.diagnostics);
   }

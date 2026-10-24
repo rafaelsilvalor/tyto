@@ -1,76 +1,32 @@
-import { type Diagnostic, type Result, type SourceRange, diagnostic, err, ok } from '@tyto/core';
+import { diagnostic, ok } from '@tyto/core';
 
-import type { Argument } from './ast.js';
 import { resolveColumn } from './columns.js';
+import { derive } from './derive.js';
+import { include } from './include.js';
+import { join } from './join.js';
 import type { Verb, VerbContext, VerbResult } from './registry.js';
+import { argumentsProblem, columnNames, refuseNamed, requireTable, rowFilter } from './support.js';
 import { type CellValue, type Column, type Row, type Table, comparable } from './table.js';
-import { parseWhere, satisfies } from './where.js';
 
 /**
  * The generic verbs this build implements (ADR 0128). Each reads the previous cell's table and
  * hands on a new one; none mutates what it was given, so a notebook can keep every cell's table.
  */
 export const genericVerbs: Readonly<Record<string, Verb>> = {
+  run: { kind: 'transform', run: include },
   where: { kind: 'transform', run: where },
   select: { kind: 'transform', run: select },
+  join: { kind: 'transform', run: join },
   sort: { kind: 'transform', run: sort },
+  derive: { kind: 'transform', run: derive },
   show: { kind: 'transform', run: show },
   keep: { kind: 'transform', run: keep },
 };
-
-type Problems = readonly Diagnostic[];
-
-function argumentsProblem(context: VerbContext, problem: string, range?: SourceRange): VerbResult {
-  return err([
-    diagnostic(
-      'E_RECIPE_ARGUMENTS',
-      { verb: context.step.verb, problem },
-      { range: range ?? context.written.textRange },
-    ),
-  ]);
-}
-
-/** The table, or the diagnostic for a verb that runs before any cell produced one. */
-function requireTable(context: VerbContext): Result<Table, Problems> {
-  if (context.table !== undefined) return ok(context.table);
-  return err([
-    diagnostic(
-      'E_RECIPE_NO_TABLE',
-      { verb: context.step.verb },
-      { range: context.written.verbRange },
-    ),
-  ]);
-}
-
-/** A verb that takes no `name=value` says so, rather than ignoring what was written. */
-function refuseNamed(context: VerbContext, allowed: readonly string[]): VerbResult | undefined {
-  const stray = context.step.named.find((argument) => !allowed.includes(argument.name));
-  if (stray === undefined) return undefined;
-  const accepted = allowed.length > 0 ? `; it accepts ${allowed.join(', ')}` : '';
-  return argumentsProblem(context, `does not take '${stray.name}='${accepted}`, stray.range);
-}
-
-/**
- * Where a range found in the filled step points in the file. A `{param}` changes the text's
- * length, so a filled step's offsets point at the whole argument text instead.
- */
-function locate(context: VerbContext): (range: SourceRange) => SourceRange {
-  const exact = context.step.text === context.written.text;
-  return (range) => (exact ? range : context.written.textRange);
-}
-
-function relocated(problems: Problems, at: (range: SourceRange) => SourceRange): Problems {
-  return problems.map((problem) =>
-    problem.range === undefined ? problem : { ...problem, range: at(problem.range) },
-  );
-}
 
 /** `where <expression>`: keeps the rows that satisfy every predicate. */
 function where(context: VerbContext): VerbResult {
   const table = requireTable(context);
   if (!table.ok) return table;
-  const at = locate(context);
-
   // The expression is the whole argument text; a fully quoted one is read inside its quotes,
   // which is how `flow.py` wrote it on a command line.
   const text = context.step.text;
@@ -78,42 +34,15 @@ function where(context: VerbContext): VerbResult {
   const expression = quoted ? text.slice(1, -1) : text;
   const offset = context.written.textRange.start + (quoted ? 1 : 0);
   // Named arguments are not checked here: `kind=ad` tokenises as one, and here it is a predicate.
-  const parsed = parseWhere(expression, offset);
-  if (!parsed.ok) return err(relocated(parsed.error, at));
-
-  const columns: Column[] = [];
-  for (const predicate of parsed.value) {
-    const column = resolveColumn(
-      table.value,
-      predicate.column,
-      at(predicate.columnRange),
-      context.aliases,
-    );
-    if (!column.ok) return column;
-    columns.push(column.value);
-  }
-  const rows = table.value.rows.filter((row) =>
-    parsed.value.every((predicate, index) =>
-      satisfies(predicate, row.values[columns[index]?.name ?? '']),
-    ),
-  );
+  const passes = rowFilter(context, table.value, expression, offset);
+  if (!passes.ok) return passes;
+  const rows = table.value.rows.filter(passes.value);
   const result: Table = { columns: table.value.columns, rows };
   const warnings =
     rows.length === 0 && table.value.rows.length > 0
       ? [diagnostic('W_RECIPE_WHERE_EMPTY', { expression }, { range: context.written.textRange })]
       : [];
   return ok({ table: result }, warnings);
-}
-
-/** Splits `key,status` and `key, status` alike into names, each with its argument's range. */
-function columnNames(argumentsWritten: readonly Argument[]): readonly Argument[] {
-  return argumentsWritten.flatMap((argument) =>
-    argument.value
-      .split(',')
-      .map((name) => name.trim())
-      .filter((name) => name !== '')
-      .map((name) => ({ value: name, range: argument.range })),
-  );
 }
 
 /**
@@ -239,5 +168,5 @@ function keep(context: VerbContext): VerbResult {
       name?.range,
     );
   }
-  return ok({ table: table.value, keep: { name: name.value, table: table.value } });
+  return ok({ table: table.value, keeps: [{ name: name.value, table: table.value }] });
 }

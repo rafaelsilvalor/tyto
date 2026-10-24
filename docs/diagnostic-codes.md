@@ -145,7 +145,10 @@ non-zero.
 | `E_RECIPE_WHERE` | error | no | A 'where' expression does not match the filter grammar. |
 | `E_RECIPE_UNKNOWN_COLUMN` | error | no | A recipe verb names a column the table does not have. |
 | `E_RECIPE_ALIAS` | error | no | A column alias cannot be used as it is defined. |
+| `E_RECIPE_DERIVATION` | error | no | A 'derive' names a derivation nobody registered, lacks a column it requires, or breaks its promise. |
+| `E_RECIPE_RUN` | error | no | A 'run' names a recipe that is not found, already running, or ends without a table. |
 | `W_RECIPE_WHERE_EMPTY` | warning | no | A 'where' kept no row of a table that had rows. |
+| `W_RECIPE_JOIN_AMBIGUOUS` | warning | no | A 'join' left rows unpaired because their key answered to more than one row. |
 
 ## What is fatal, and why
 
@@ -246,6 +249,8 @@ incomplete brief, and a crossed box where a picture the exporter could not load 
 | `E_RECIPE_WHERE` | no | That cell has no table and the cells after it do not run; earlier cells keep theirs. |
 | `E_RECIPE_UNKNOWN_COLUMN` | no | That cell has no table and the cells after it do not run; earlier cells keep theirs. |
 | `E_RECIPE_ALIAS` | no | That cell has no table and the cells after it do not run; earlier cells keep theirs. |
+| `E_RECIPE_DERIVATION` | no | That cell has no table and the cells after it do not run; earlier cells keep theirs. |
+| `E_RECIPE_RUN` | no | That cell has no table and the cells after it do not run; earlier cells keep theirs. |
 
 ## Errors
 
@@ -1425,6 +1430,34 @@ Alias '{alias}' {problem}.
 
 Parameters: `alias`, `problem`
 
+### `E_RECIPE_DERIVATION`
+
+**Severity:** error · **Fatal:** no · **Spec:** `docs/adr/0133-join-pairs-rows-on-a-column-a-derivation-produces.md`
+
+A 'derive' names a derivation nobody registered, lacks a column it requires, or breaks its promise.
+
+That cell has no table and the cells after it do not run; earlier cells keep theirs.
+
+```
+Derivation '{name}' {problem}.
+```
+
+Parameters: `name`, `problem`
+
+### `E_RECIPE_RUN`
+
+**Severity:** error · **Fatal:** no · **Spec:** `docs/adr/0133-join-pairs-rows-on-a-column-a-derivation-produces.md`
+
+A 'run' names a recipe that is not found, already running, or ends without a table.
+
+That cell has no table and the cells after it do not run; earlier cells keep theirs.
+
+```
+'run {recipe}' {problem}.
+```
+
+Parameters: `recipe`, `problem`
+
 ## Warnings
 
 ### `W_PLUGIN_CRASHED`
@@ -2056,6 +2089,20 @@ No row passed '{expression}'. Values compare without case or accents; '~' means 
 ```
 
 Parameters: `expression`
+
+### `W_RECIPE_JOIN_AMBIGUOUS`
+
+**Severity:** warning · **Fatal:** no · **Spec:** `docs/adr/0133-join-pairs-rows-on-a-column-a-derivation-produces.md`
+
+A 'join' left rows unpaired because their key answered to more than one row.
+
+A warning never replaces a value (ADR 0013).
+
+```
+{count} row(s) of join '{prefix}' have more than one candidate and stay unpaired: {rows}.
+```
+
+Parameters: `count`, `prefix`, `rows`
 
 ## Codes the desktop window mints
 

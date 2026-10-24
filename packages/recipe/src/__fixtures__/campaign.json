@@ -1,0 +1,24 @@
+{
+  "columns": [
+    {"name": "key", "type": "text", "origin": "demo"},
+    {"name": "title", "type": "text", "origin": "demo"},
+    {"name": "team", "type": "text", "origin": "demo"},
+    {"name": "status", "type": "text", "origin": "demo"},
+    {"name": "due", "type": "date", "origin": "demo"}
+  ],
+  "rows": [
+    {"key": "DEMO-101", "values": {"key": "DEMO-101", "title": "Design · Banner · Spring sale", "team": "design", "status": "doing", "due": "2026-11-02"}, "provenance": {"source": "demo", "id": "DEMO-101", "fetchedAt": "2026-10-24T09:00:00.000Z"}},
+    {"key": "DEMO-102", "values": {"key": "DEMO-102", "title": "Design · Banner · Black week", "team": "design", "status": "todo", "due": "2026-11-05"}, "provenance": {"source": "demo", "id": "DEMO-102", "fetchedAt": "2026-10-24T09:00:00.000Z"}},
+    {"key": "DEMO-103", "values": {"key": "DEMO-103", "title": "Design · Post · Launch day", "team": "design", "status": "todo", "due": "2026-11-10"}, "provenance": {"source": "demo", "id": "DEMO-103", "fetchedAt": "2026-10-24T09:00:00.000Z"}},
+    {"key": "DEMO-104", "values": {"key": "DEMO-104", "title": "Design · Newsletter header", "team": "design", "status": "done", "due": "2026-11-12"}, "provenance": {"source": "demo", "id": "DEMO-104", "fetchedAt": "2026-10-24T09:00:00.000Z"}},
+    {"key": "DEMO-105", "values": {"key": "DEMO-105", "title": "Design · Banner · Winter preview", "team": "design", "status": "todo", "due": "2026-11-20"}, "provenance": {"source": "demo", "id": "DEMO-105", "fetchedAt": "2026-10-24T09:00:00.000Z"}},
+    {"key": "DEMO-201", "values": {"key": "DEMO-201", "title": "Copy · Banner · Spring sale", "team": "copy", "status": "done", "due": "2026-11-01"}, "provenance": {"source": "demo", "id": "DEMO-201", "fetchedAt": "2026-10-24T09:00:00.000Z"}},
+    {"key": "DEMO-202", "values": {"key": "DEMO-202", "title": "Copy · Banner · Black week", "team": "copy", "status": "doing", "due": "2026-11-04"}, "provenance": {"source": "demo", "id": "DEMO-202", "fetchedAt": "2026-10-24T09:00:00.000Z"}},
+    {"key": "DEMO-203", "values": {"key": "DEMO-203", "title": "Copy · Banner · Black week", "team": "copy", "status": "todo", "due": "2026-11-06"}, "provenance": {"source": "demo", "id": "DEMO-203", "fetchedAt": "2026-10-24T09:00:00.000Z"}},
+    {"key": "DEMO-204", "values": {"key": "DEMO-204", "title": "Copy · Post · Launch countdown", "team": "copy", "status": "doing", "due": "2026-11-10"}, "provenance": {"source": "demo", "id": "DEMO-204", "fetchedAt": "2026-10-24T09:00:00.000Z"}},
+    {"key": "DEMO-301", "values": {"key": "DEMO-301", "title": "Media · Banner · Spring sale", "team": "media", "status": "todo", "due": "2026-11-02"}, "provenance": {"source": "demo", "id": "DEMO-301", "fetchedAt": "2026-10-24T09:00:00.000Z"}},
+    {"key": "DEMO-302", "values": {"key": "DEMO-302", "title": "Media · Banner · Black week", "team": "media", "status": "todo", "due": "2026-11-05"}, "provenance": {"source": "demo", "id": "DEMO-302", "fetchedAt": "2026-10-24T09:00:00.000Z"}},
+    {"key": "DEMO-303", "values": {"key": "DEMO-303", "title": "Media · Banner · Winter preview", "team": "media", "status": "doing", "due": "2026-11-20"}, "provenance": {"source": "demo", "id": "DEMO-303", "fetchedAt": "2026-10-24T09:00:00.000Z"}},
+    {"key": "DEMO-401", "values": {"key": "DEMO-401", "title": "Social · Story · Spring sale", "team": "social", "status": "todo", "due": "2026-11-03"}, "provenance": {"source": "demo", "id": "DEMO-401", "fetchedAt": "2026-10-24T09:00:00.000Z"}}
+  ]
+}
