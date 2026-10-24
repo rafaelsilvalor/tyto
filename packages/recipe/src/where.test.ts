@@ -41,7 +41,7 @@ describe('parseWhere', () => {
     ['a = AND', 'reserved word', 'AND'],
     ['a = 1 AND', "ends in 'AND'", 'AND'],
     ['a = 1 b = 2', "expected 'AND'", 'b'],
-    ['a not x', "expected 'in' after 'not'", 'x'],
+    ['a not x', "expected 'in' or 'matches' after 'not'", 'x'],
     ['a is full', "'empty' or 'not empty'", 'full'],
     ['a in x', "expected '(' after 'in'", 'x'],
     ['a in (x y)', "expected ',' or ')'", 'y'],
@@ -84,5 +84,51 @@ describe('satisfies', () => {
 
   it('compares a number as its text', () => {
     expect(keeps('points = 3', 3)).toBe(true);
+  });
+});
+
+describe('matches', () => {
+  it('reads matches and not matches, quoted or bare, and compiles the pattern', () => {
+    const parsed = parseWhere(String.raw`a matches "^x\b" AND b NOT MATCHES y+`);
+    if (!parsed.ok) throw new Error(parsed.error[0]?.message);
+    expect(parsed.value.map(({ operator, values }) => [operator, values])).toEqual([
+      ['matches', [String.raw`^x\b`]],
+      ['not matches', ['y+']],
+    ]);
+    expect(parsed.value[0]?.pattern?.expression.flags).toBe('iu');
+  });
+
+  it('tests the cell as written, so a pattern names its accents', () => {
+    expect(keeps(String.raw`title matches "p[áa]gina\b"`, 'Nova Página de vendas')).toBe(true);
+    expect(keeps('title matches "pagina"', 'Nova Página')).toBe(false);
+    expect(keeps(String.raw`title matches "\bbanner"`, 'ébanner')).toBe(false);
+    expect(keeps('title not matches "^spring"', 'Spring sale')).toBe(false);
+    expect(keeps('title not matches "^spring"', null)).toBe(true);
+    expect(keeps('team matches "^copy, design$"', ['copy', 'design'])).toBe(true);
+  });
+
+  it('places a refused pattern at its construct, inside the quotes, in the recipe', () => {
+    const expression = 'title matches "x(a+)+" AND kind = ad';
+    const parsed = parseWhere(expression, 100);
+    expect(parsed.ok).toBe(false);
+    if (parsed.ok) return;
+    expect(parsed.error.map(({ code }) => code)).toEqual(['E_RECIPE_PATTERN_UNSAFE']);
+    const range = parsed.error[0]?.range;
+    expect(expression.slice((range?.start ?? 0) - 100, (range?.end ?? 0) - 100)).toBe('(a+)+');
+  });
+
+  it.each([
+    ['a matches', "a pattern after 'matches' is missing", ''],
+    ['a matches AND', 'reserved word', 'AND'],
+    ['a matches (x)', "expected a pattern after 'matches'", '('],
+    ['a not like x', "expected 'in' or 'matches' after 'not'", 'like'],
+  ])('refuses %j and teaches the way out', (expression, message, at) => {
+    const parsed = parseWhere(expression);
+    expect(parsed.ok).toBe(false);
+    if (parsed.ok) return;
+    const [problem] = parsed.error;
+    expect(problem?.code).toBe('E_RECIPE_WHERE');
+    expect(problem?.message).toContain(message);
+    expect(expression.slice(problem?.range?.start, problem?.range?.end)).toBe(at);
   });
 });
