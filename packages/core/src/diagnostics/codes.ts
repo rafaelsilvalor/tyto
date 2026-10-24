@@ -1336,6 +1336,27 @@ export const diagnosticCodes = {
     fatality:
       'That cell has no table and the cells after it do not run; earlier cells keep theirs.',
   },
+  E_RECIPE_PATTERN: {
+    severity: 'error',
+    summary: 'A pattern is empty, longer than 512 characters, or not a valid regular expression.',
+    template: 'This pattern cannot be compiled: {problem}.',
+    spec: 'docs/adr/0136-company-rules-are-configuration-read-by-generic-verbs.md',
+    fatal: false,
+    fatality:
+      'That cell has no table and the cells after it do not run; earlier cells keep theirs.',
+  },
+  // Refused at compile time, before any cell is read: a pattern that may take exponential time
+  // is not one a colleague's shared recipe or rules file gets to try (ADR 0136).
+  E_RECIPE_PATTERN_UNSAFE: {
+    severity: 'error',
+    summary:
+      'A pattern uses a backreference, a lookaround, a nested quantifier or another construct the pattern guard refuses.',
+    template: 'The pattern guard refuses {construct}: {problem}.',
+    spec: 'docs/adr/0136-company-rules-are-configuration-read-by-generic-verbs.md',
+    fatal: false,
+    fatality:
+      'That cell has no table and the cells after it do not run; earlier cells keep theirs.',
+  },
   // A missing column aborts rather than returning no rows: an empty result must never pass for
   // an answer, the rule Buraqueira's `flow.py` learned from a search that answered 200 and empty.
   E_RECIPE_UNKNOWN_COLUMN: {

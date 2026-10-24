@@ -81,4 +81,13 @@ describe('parseRecipe', () => {
     expect(parsed.error.map(({ code }) => code)).toEqual(['E_RECIPE_PARAM']);
     expect(slice(source, parsed.error[0]?.range)).toBe('{missing}');
   });
+
+  it("reads a pattern's \\p{…} and \\u{…} as the pattern's, not as placeholders", () => {
+    const source = String.raw`recipe x
+param a
+where b matches "\p{Lu}\P{Nd}\u{FF}{a}"`;
+    const parsed = parseRecipe(source);
+    if (!parsed.ok) throw new Error(parsed.error.map(({ message }) => message).join('\n'));
+    expect(parsed.value.steps[0]?.text).toContain(String.raw`\p{Lu}`);
+  });
 });

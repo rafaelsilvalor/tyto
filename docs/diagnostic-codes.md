@@ -150,6 +150,8 @@ non-zero.
 | `E_RECIPE_NO_TABLE` | error | no | A verb that reads a table runs before any cell produced one. |
 | `E_RECIPE_ARGUMENTS` | error | no | A recipe verb was given arguments it does not accept. |
 | `E_RECIPE_WHERE` | error | no | A 'where' expression does not match the filter grammar. |
+| `E_RECIPE_PATTERN` | error | no | A pattern is empty, longer than 512 characters, or not a valid regular expression. |
+| `E_RECIPE_PATTERN_UNSAFE` | error | no | A pattern uses a backreference, a lookaround, a nested quantifier or another construct the pattern guard refuses. |
 | `E_RECIPE_UNKNOWN_COLUMN` | error | no | A recipe verb names a column the table does not have. |
 | `E_RECIPE_ALIAS` | error | no | A column alias cannot be used as it is defined. |
 | `E_RECIPE_DERIVATION` | error | no | A 'derive' names a derivation nobody registered, lacks a column it requires, or breaks its promise. |
@@ -261,6 +263,8 @@ incomplete brief, and a crossed box where a picture the exporter could not load 
 | `E_RECIPE_NO_TABLE` | no | That cell has no table and the cells after it do not run; earlier cells keep theirs. |
 | `E_RECIPE_ARGUMENTS` | no | That cell has no table and the cells after it do not run; earlier cells keep theirs. |
 | `E_RECIPE_WHERE` | no | That cell has no table and the cells after it do not run; earlier cells keep theirs. |
+| `E_RECIPE_PATTERN` | no | That cell has no table and the cells after it do not run; earlier cells keep theirs. |
+| `E_RECIPE_PATTERN_UNSAFE` | no | That cell has no table and the cells after it do not run; earlier cells keep theirs. |
 | `E_RECIPE_UNKNOWN_COLUMN` | no | That cell has no table and the cells after it do not run; earlier cells keep theirs. |
 | `E_RECIPE_ALIAS` | no | That cell has no table and the cells after it do not run; earlier cells keep theirs. |
 | `E_RECIPE_DERIVATION` | no | That cell has no table and the cells after it do not run; earlier cells keep theirs. |
@@ -1513,6 +1517,34 @@ Filter error: {problem}.
 ```
 
 Parameters: `problem`
+
+### `E_RECIPE_PATTERN`
+
+**Severity:** error · **Fatal:** no · **Spec:** `docs/adr/0136-company-rules-are-configuration-read-by-generic-verbs.md`
+
+A pattern is empty, longer than 512 characters, or not a valid regular expression.
+
+That cell has no table and the cells after it do not run; earlier cells keep theirs.
+
+```
+This pattern cannot be compiled: {problem}.
+```
+
+Parameters: `problem`
+
+### `E_RECIPE_PATTERN_UNSAFE`
+
+**Severity:** error · **Fatal:** no · **Spec:** `docs/adr/0136-company-rules-are-configuration-read-by-generic-verbs.md`
+
+A pattern uses a backreference, a lookaround, a nested quantifier or another construct the pattern guard refuses.
+
+That cell has no table and the cells after it do not run; earlier cells keep theirs.
+
+```
+The pattern guard refuses {construct}: {problem}.
+```
+
+Parameters: `construct`, `problem`
 
 ### `E_RECIPE_UNKNOWN_COLUMN`
 
