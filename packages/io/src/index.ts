@@ -107,6 +107,13 @@ export {
   resultDiagnosticSchema,
 } from './result.js';
 
+export {
+  type JsoncSyntaxCode,
+  type JsoncText,
+  type JsoncTextOptions,
+  readJsoncText,
+} from './jsonc-text.js';
+
 export { type ProjectText, readProjectText } from './project-file.js';
 
 export {

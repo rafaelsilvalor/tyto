@@ -1,25 +1,18 @@
-import { type Diagnostic, diagnostic, sourceRange } from '@tyto/core';
+import type { Diagnostic } from '@tyto/core';
+import { type JsoncText, readJsoncText } from '@tyto/io';
 import type { SettingEntry, SettingMemberRange } from '@tyto/plugin-api';
-import {
-  type Node,
-  type ParseError,
-  applyEdits,
-  getNodeValue,
-  modify,
-  parseTree,
-  printParseErrorCode,
-} from 'jsonc-parser';
+import { applyEdits, modify } from 'jsonc-parser';
 
 /**
  * `settings.json` as text a person wrote: JSON with comments, read with the place of every
  * key, and edited in place (TYTO-206, ADR 0073).
  *
- * `jsonc-parser` and not `JSON.parse`, for two things only a syntax tree gives: the range of
- * a key or a value, so a diagnostic can point at it, and an edit that touches one property
- * and leaves every comment, blank line and indentation the person chose where it was.
+ * Read by `@tyto/io`'s one JSONC reader, the one `.tyto/project.json` is read by (TYTO-350), so
+ * a syntax error points at the same place in both files. Written here, by `jsonc-parser`'s
+ * edits, which touch one property and leave every comment, blank line and indentation the
+ * person chose where it was.
  */
 
-const OPTIONS = { allowTrailingComma: true, disallowComments: false } as const;
 const BOM = '﻿';
 
 /** What a settings text says: its top-level keys, and why it cannot be written, if it cannot. */
@@ -34,64 +27,29 @@ export interface SettingsText {
  * recovered around a syntax error are still answered, beside the error.
  */
 export function readSettingsText(text: string): SettingsText {
-  const source = withoutBom(text);
-  if (source.trim() === '') return { entries: [], syntax: [] };
-
-  const errors: ParseError[] = [];
-  const root = parseTree(source, errors, OPTIONS);
-  const syntax = errors.map((error) =>
-    diagnostic(
-      'E_SETTINGS_SYNTAX',
-      { problem: describe(printParseErrorCode(error.error)) },
-      { range: sourceRange(error.offset, error.offset + error.length) },
-    ),
-  );
-
-  if (root === undefined || root.type !== 'object') {
-    const range = root === undefined ? sourceRange(0, source.length) : rangeOf(root);
-    return {
-      entries: [],
-      syntax: [
-        ...syntax,
-        diagnostic('E_SETTINGS_SYNTAX', { problem: 'it is not an object of settings' }, { range }),
-      ],
-    };
-  }
-
-  const entries: SettingEntry[] = [];
-  for (const property of root.children ?? []) {
-    const [keyNode, valueNode] = property.children ?? [];
-    if (keyNode === undefined || typeof keyNode.value !== 'string') continue;
-    entries.push({
-      key: keyNode.value,
-      value: valueNode === undefined ? undefined : (getNodeValue(valueNode) as unknown),
-      keyRange: rangeOf(keyNode),
-      ...(valueNode === undefined ? {} : { valueRange: rangeOf(valueNode) }),
-      // A list's entries each have a place, so a setting checked entry by entry can point at
-      // the one it refuses (TYTO-301, ADR 0091).
-      ...(valueNode?.type === 'array'
-        ? { entryRanges: (valueNode.children ?? []).map((item) => rangeOf(item)) }
-        : {}),
-      // And an object's members, so one checked member by member can point at its name or its
-      // value (TYTO-301, `statusBarColors`).
-      ...(valueNode?.type === 'object' ? { memberRanges: memberRangesOf(valueNode) } : {}),
-    });
-  }
-  return { entries, syntax };
+  const read = readJsoncText(text, {
+    syntaxCode: 'E_SETTINGS_SYNTAX',
+    notAnObject: 'it is not an object of settings',
+  });
+  return { entries: read.entries.map(settingEntryOf), syntax: read.syntax };
 }
 
-/** Each member of an object node by name: where its name and its value were written. */
-function memberRangesOf(node: Node): Record<string, SettingMemberRange> {
-  const ranges: Record<string, SettingMemberRange> = {};
-  for (const property of node.children ?? []) {
-    const [keyNode, valueNode] = property.children ?? [];
-    if (keyNode === undefined || typeof keyNode.value !== 'string') continue;
-    ranges[keyNode.value] = {
-      keyRange: rangeOf(keyNode),
-      ...(valueNode === undefined ? {} : { valueRange: rangeOf(valueNode) }),
+/**
+ * A key as the settings resolver takes it: an object value's members by name, where its name
+ * and its value were written, so one checked member by member can point at either (TYTO-301,
+ * `statusBarColors`). Deeper than that a setting does not look.
+ */
+function settingEntryOf(entry: JsoncText['entries'][number]): SettingEntry {
+  const { node, ...rest } = entry;
+  if (node?.members === undefined) return rest;
+  const memberRanges: Record<string, SettingMemberRange> = {};
+  for (const member of node.members) {
+    memberRanges[member.key] = {
+      keyRange: member.keyRange,
+      ...(member.value === undefined ? {} : { valueRange: member.value.range }),
     };
   }
-  return ranges;
+  return { ...rest, memberRanges };
 }
 
 /**
@@ -121,13 +79,4 @@ export function editSettingsText(text: string, changes: Readonly<Record<string, 
 /** The BOM as a space: offsets stay those of the file, and the parser stops seeing a symbol. */
 function withoutBom(text: string): string {
   return text.startsWith(BOM) ? ` ${text.slice(1)}` : text;
-}
-
-function rangeOf(node: Node) {
-  return sourceRange(node.offset, node.offset + node.length);
-}
-
-/** `InvalidSymbol` → `invalid symbol`, for a sentence. */
-function describe(code: string): string {
-  return code.replace(/([a-z])([A-Z])/gu, '$1 $2').toLowerCase();
 }
