@@ -1,5 +1,51 @@
 # @tyto/pipeline
 
+## 0.11.0
+
+### Minor Changes
+
+- 93fcb8b: An artwork file another program holds open is now an internal failure worth retrying, not an error about the brief (TYTO-245, ADR 0108).
+
+  **`ArtifactSink.write` returns `Promise<Diagnostics>`** (`@tyto/pipeline`), and so does `TaskOutput.write` (`@tyto/io`). A sink answers what it can explain — `E_OUTPUT_FILE_BLOCKED` for a folder at the artwork's name — and `runJob` fails that one frame with it and writes the others. A rejection is no longer turned into `E_OUTPUT_WRITE`: `runJob` starts no further frame, lets the ones in flight settle and rejects with the sink's cause. A sink of your own returns `[]` where it used to return nothing.
+
+  `@tyto/core`: `E_OUTPUT_WRITE` is no longer produced and stays in the catalogue, documented as retired by ADR 0108. `E_OUTPUT_FILE_BLOCKED` is no longer fatal: on an artwork it costs that file, and the report that names it survives.
+
+- 53e01c3: TYTO-280: a plugin can supply images and fonts (ADR 0117). `@tyto/plugin-api` has two new extension points, `asset-source` (URI schemes such as `drive:`) and `font-source` (families), each with a `fetch` an installed plugin answers from its own process; the call carries the plugin's own section of the project file, absent when the folder withheld it. `@tyto/io`'s `sourceCache` asks them once and keeps the answer in `TYTO_HOME/cache/sources/<plugin>/`, named by a hash, so the next render asks nothing; a restricted folder reads the cache and fetches nothing. `@tyto/core`'s `AssetResolver` gains an optional `explain`, and a source's failure is `E_ASSET_SOURCE_FAILED` or `W_FONT_SOURCE_FAILED`. `@tyto/fonts`' library gains `refresh()`, and `@tyto/pipeline`'s `loadResources` may ask for one more compile once a fetched face arrives.
+
+### Patch Changes
+
+- d3df40e: Requested formats now narrow the brief's own list instead of being ignored (TYTO-332, ADR 0107). `ResolveOptions.formats` on a brief whose frontmatter lists formats keeps the listed ones it also names, in the brief's order; a requested format the template renders but the brief does not list is the new non-fatal error `E_FORMAT_NOT_IN_BRIEF`, on the frontmatter's `formats` line. A brief with no list is unchanged. `listedFormats` is exported: the frontmatter's `formats` as a list, a scalar read as a list of one.
+
+  **Behaviour change for callers that pass `formats`:** a brief listing `[feed, story]` resolved with `formats: ['feed']` now renders `feed` only, where it used to render both.
+
+- Updated dependencies [d4a6939]
+- Updated dependencies [08b936d]
+- Updated dependencies [7342c02]
+- Updated dependencies [15997e9]
+- Updated dependencies [15997e9]
+- Updated dependencies [93fcb8b]
+- Updated dependencies [c005b91]
+- Updated dependencies [cbbf6df]
+- Updated dependencies [2495d0d]
+- Updated dependencies [6abf89f]
+- Updated dependencies [53e01c3]
+- Updated dependencies [ae75027]
+- Updated dependencies [3b261d1]
+- Updated dependencies [74d7b28]
+- Updated dependencies [fe85505]
+- Updated dependencies [5a0c7c5]
+- Updated dependencies [bf3fd0e]
+- Updated dependencies [8e9c9c4]
+- Updated dependencies [ab9512e]
+- Updated dependencies [ab9512e]
+- Updated dependencies [d3df40e]
+- Updated dependencies [4aba89c]
+  - @tyto/plugin-api@0.5.0
+  - @tyto/core@0.29.0
+  - @tyto/brief-lang@0.7.0
+  - @tyto/raster@0.2.2
+  - @tyto/template-lang@0.8.1
+
 ## 0.10.1
 
 ### Patch Changes

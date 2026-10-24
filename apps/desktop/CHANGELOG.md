@@ -1,5 +1,276 @@
 # @tyto/desktop
 
+## 0.8.0
+
+### Minor Changes
+
+- b3532e3: TYTO-113: the window reopens where the person left it — the same tabs, in the same order, with the same one in front, and the text typed and not saved still in them. Quitting with unsaved work asks nothing any more; the drafts are kept in the app's own data folder and come back on the next launch. A file that changed on disk while the app was closed opens with the disk's text and the draft in a new tab beside it; a file that is gone is named in the problems panel. Reload is back on the View menu and on Ctrl+R, and brings every tab back. The undo history does not survive a restart.
+- 814f236: TYTO-143 (ADR 0076): the status bar's problems button carries a small accent dot beside the count when the window raised a problem of its own — a save that failed, a recent file that is gone, a template folder with no templates — while the problems panel was not on screen (closed, or inside a hidden bottom area). Showing the panel clears it; compiler diagnostics from typing never light it. Changing the template folder no longer drops a live failed-save or missing-file row from the panel.
+- d4a6939: TYTO-206 (ADR 0073): `settings.json` becomes a JSON-with-comments file the person owns. `plugin-api` gains the `configuration` extension point (`registerConfiguration`, `registry.configurations()`, `InProcessHost.configure`, `resolveSettings`), and the desktop app's four settings are declared through it by a built-in `desktop` plugin, under their existing names. Reading is tolerant one key at a time; a bad value costs that key alone and is a diagnostic with a range (`E_SETTINGS_SYNTAX`, `W_SETTING_UNKNOWN`, `W_SETTING_UNPREFIXED`, `W_SETTING_INVALID`, new in `core`). The app's screens edit the file in place, keeping comments and writing only keys that differ from their defaults, and never write a file that does not parse. The previous-version import accepts a commented `settings.json`.
+- c141ec9: TYTO-206, PR B: "Preferences: Open Settings (JSON)" opens `settings.json` in a tab. Its problems
+  show in the problems panel while you type, a save from the tab or any editor applies with no
+  restart, and a screen's change goes into the tab's unsaved buffer instead of the disk. A screen's
+  change to a file that does not parse is refused, undone and shown. `@tyto/editor`'s `blank`
+  takes an optional language for one document, without the host's language extensions.
+- 08b936d: TYTO-207, PR B: "Preferences: Open Keyboard Shortcuts (JSON)" opens `keybindings.json` (beside
+  `settings.json`) in a tab, from the command bar or the File menu. Each entry is
+  `{ "key", "command", "when"? }`, and `"command": "-<id>"` removes a default binding. A save from
+  the tab or any editor applies with no restart, and the command bar shows the key that now works.
+  Unknown commands, invalid keys, unknown contexts, duplicates and attempts to take Ctrl+K away
+  show in the problems panel at their line while you type. A file that does not parse changes
+  nothing: the keys it last bound stay.
+- 7342c02: TYTO-207 (ADR 0074): every key the window answers now comes from one keybinding table. `@tyto/editor` gains a pure resolver (`parseKey`, `resolveKeybindings`, `keymapSetFor`, `windowBindingsOf`, `shownBindingsOf`) over six closed contexts, `vimMode` and `createEditor` take their vim set as an option, and `setKeymaps` swaps both modes' bindings in place. `plugin-api`'s `editor.keymap` gains an optional `when` and is consumed by the desktop for the first time. `core` gains six codes (`E_KEYBINDINGS_SYNTAX`, `W_KEYBINDING_UNKNOWN_COMMAND`, `W_KEYBINDING_INVALID_KEY`, `W_KEYBINDING_UNKNOWN_CONTEXT`, `W_KEYBINDING_DUPLICATE`, `W_KEYBINDING_LOCKED`). The desktop's `Mod-K` listener becomes a window dispatcher for global keys, registered once. No default key changes.
+- 15997e9: TYTO-208 (ADR 0077): the window's colours arrive as a theme. The built-in `desktop` plugin registers Tyto Light and Tyto Dark through the `theme` point; main reads and checks them and answers `theme:current`, and the window applies them over `tokens.css`, which stays the first paint and the fallback. Nothing on screen changes: the two files equal the token file, which a test enforces. The shadows' colours become two themed tints.
+- 0aad8b7: TYTO-208 (ADR 0077): a person chooses the colour theme. The new `theme` setting is one theme id or `{ mode: "system" | "light" | "dark", light, dark }`; `mode: "light"` or `"dark"` overrides the system for the window, the editor and the native dialogs, and a save of `settings.json` applies it with no restart. "Preferences: Color Theme" in Ctrl+K lists every theme with its kind, previews the highlighted one, writes the choice on Enter and puts the previous theme back on Escape. Installed plugins' themes are read from their folders and can be chosen; a theme file that cannot be used is a row in the problems panel, and the built-in theme of its kind applies.
+- 18ee1d3: TYTO-244 (ADR 0078): on Windows and Linux the title bar carries the menu again — File, Edit, View, Window and Help in a row, each opening the system's own list of that menu, so Help ▸ Open the log folder and Help ▸ About are reachable again. Alt pressed alone or F10 moves focus to the row; Left and Right move between names, Enter or Down opens one, Escape goes back to the editor. The lists themselves are the system's and do not follow the colour theme. The line under the title bar now runs under the minimise, maximise and close buttons too. macOS is unchanged.
+- ee73d63: TYTO-244 (ADR 0078): on Windows and Linux the window draws its own title bar — "Tyto — <file>" for the tab in front, "Tyto" alone for an untitled one — in place of the system's title bar and the old header with the tagline, which is gone. The minimise, maximise and close buttons stay the system's, drawn over the bar's right end in the colours of the applied theme, and they follow a theme change, the picker's preview and the system's light/dark switch. macOS keeps its native frame. Until the drawn menu row lands, the File/Edit/View/Window/Help menu bar is not shown on Windows and Linux.
+- 752ddd2: TYTO-248 (ADR 0076): the foot of the window is a one-line status bar. Left: buttons for the left area and the command bar, and vim's mode and pending keys while vim is on. Right: line and column with the selection size, the tab's kind, the brief's template, a problems button holding the count, queue, plugins, export, settings, the bottom and right area buttons, and the update notice. The area buttons hide and show a whole area through the new `layout.toggleDock:left|bottom|right` commands, and a hidden area is remembered in `layout.json`. The version, the platform, the template count and the template folder moved to Help ▸ About; the language picker left the window, and the language is switched from the command bar.
+- 0dd0e56: TYTO-256: the settings and keybindings tabs read as what they are. A misspelt key or an unknown command is underlined in the editor, as a brief's mistakes are; the editor heading says "Settings" or "Keybindings"; the template picker, the format tabs, the slide and the zoom are gone from those tabs, and the preview says the file applies when it is saved. Choosing a template while `settings.json` was in front used to write a YAML block into the JSON; it no longer edits the file.
+- 6e2e350: TYTO-264: on Windows and Linux, Alt and a menu's letter opens that menu from the title bar: Alt+F opens File, Alt+E Edit, Alt+V View, Alt+W Window and Alt+H Help, and in Portuguese Alt+A Arquivo, Alt+E Editar, Alt+X Exibir, Alt+J Janela and Alt+D Ajuda. Holding Alt underlines each name's letter. The five menu names now follow the window's language; before, only File did, and Edit, View, Window and Help stayed in English. A key the editor uses, such as Alt+L to select the line, still goes to the editor. A shortcut a person or a plugin put on Alt and a letter takes that letter from the menus. macOS is unchanged.
+- 99f185d: TYTO-265: after a quit or a reload, each tab comes back with its cursor where it was and scrolled to the same place, not at line 1. A file that got shorter on disk while the app was closed puts the cursor at the end of what is there. The undo history still starts empty.
+- ee61cf6: TYTO-266: the template mode is kept on quit like the tabs are. Quitting with unsaved changes to a template's `manifest.yaml` or `template.html` asks nothing any more; the next launch reopens the mode on the same folder with the unsaved text in it. If the file changed on disk in between, the mode shows the disk's text and the draft opens in a new tab beside it, named in the problems panel. Closing the mode and choosing Discard now really drops its unsaved text.
+- c005b91: TYTO-270: a workspace's `.tyto/project.json`, or the work profile it names, can declare export presets (ADR 0126): `"exportPresets": { "entregas": { "formats": ["grid-1x1", "story"], "folder": "entregas" } }`, with `types` defaulting to `png` and `folder` to the project's `output`. Presets merge by name, profile then folder; a preset's `folder` resolves against the open workspace folder whichever sheet wrote it, and a restricted folder confines it there (`W_PROJECT_PATH_OUTSIDE`, the preset is dropped). A preset with no folder and no `output` is `W_PROJECT_PRESET_NO_FOLDER`. `core` resolves them into `ResolvedProject.exportPresets`; `@tyto/io` reads nested ranges and follows a preset's folder through `realpath`. The window lists each preset in the command bar as "Export: <name>" (`export.preset:<name>`, bindable in `keybindings.json`) and runs it through the export box, which opens already running and removes what the previous export left as before.
+- cbbf6df: TYTO-272: two new settings give each part of the window its own text size and face, over the two bases, applied on save with no restart. `fontSizes` and `fontFamilies` take a closed set of areas — `editor`, `json` (the settings, keybindings and snippets tabs) and `completion` over the code base, and `problems`, `commandBar`, `titleBar` (up to 18), `tabs`, `paneHeaders`, `statusBar`, `queue` and `explorer` (once there is one) over the UI base. An area left out follows its base, so changing the base still moves it. An unknown area or a size outside that area's bounds is a warning at that entry and the rest apply. A face the machine lacks is `W_FONT_FAMILY_MISSING` naming the area. The tab strips grow so a larger tab is never cut; the brief's editor and a settings tab beside it can be different sizes. A new `settings.json` lists every area under both keys, commented out. At the defaults the window is pixel for pixel what it was.
+- c17b976: TYTO-272: five new settings, commented in a new `settings.json`, set the window's type and zoom, all applied on save with no restart. `uiFontSize` (9 to 24, default 14) scales every label outside the editor — tabs, panels, the status bar, the preview's controls and the dialogs — and the strips grow so nothing is cut; `codeFontSize` (9 to 32, default 14) sets the editor's, and the indent guides and pinned head lines follow. `uiFontFamily` and `codeFontFamily` name a face, with the bundled one drawn when the machine lacks it and `W_FONT_FAMILY_MISSING` in the problems panel. `zoom` (-5 to 5) zooms the whole window in steps of 20%: View's Zoom In, Zoom Out and Reset Zoom, on Ctrl and =, - and 0, now write it to `settings.json`. At the defaults the window is pixel for pixel what it was. The native menus and dialogs keep the system's font.
+- 922caa8: TYTO-273: an editor group's header row shows where its caret is in the brief — `::lamina 2`, `::titulo`, or `cabeçalho › template` / `header › template` in the frontmatter — each group its own caret. Empty between blocks, after a block's last text line, for a settings tab and for a preview in front.
+- fb2b470: TYTO-274: with a folder open, resting the pointer on a tab of a file inside it shows the path from the folder's name, as `promo\briefs\capa.brief`, instead of the whole path; a file outside the folder still shows `~\…`. Opening, closing or switching the folder updates the open tabs. An image's preview tab and the breadcrumb row now show the same path on hover. Nothing changes in how tab names look.
+- 2d32db1: TYTO-275: a new brief from a template, built from its manifest. `@tyto/editor` exports `briefSkeleton`, which turns a manifest's required slots — and a repeated slot with a minimum of one — into a CodeMirror snippet whose fields Tab walks, `skeletonText` and `insertBriefSkeleton`; an enum value that is selected now completes to every value. The desktop's "New brief from template…" (Ctrl+K and the File menu) lists every template with its folder and description and opens the chosen one's skeleton in a new tab, and choosing a template in the picker on an empty brief writes the same skeleton. `templates:list` carries each template's slots and its folder.
+- c9c17a3: TYTO-276: a "/" at the start of a line lists templates. `@tyto/editor` exports `slashCompletion(sources)`, `completeSlash`, `openSlashMenu` and the `slashRequested` effect: a "/" in column 0 of a brief, outside the frontmatter and with nothing after the cursor, opens a list of the rows each `SlashSource` hands it; typing filters, Enter replaces the "/" and the query, Escape leaves the "/", and `//` stays a comment. The desktop lists its templates there — the skeleton into a brief holding only the "/", or a switch of `template:` in one undoable edit on a brief with content, the row saying which — and registers `editor.insertMenu`, brief-only and with no default key, to open the same list from a binding in `keybindings.json`.
+- 2495d0d: TYTO-277: a snippets file, as in VS Code. "Preferences: Open Snippets (JSON)" opens `snippets.json` beside `settings.json`, created with a comment on first open; an entry is `"Name": { "prefix": "aula", "body": ["::aula ${1:titulo}", "::prof ${2:nome}"] }`, so snippets copied from VS Code can be pasted. Typing a prefix at the start of a line in a brief offers the snippet, Enter inserts it with its first field selected and Tab walks the rest; the "/" menu lists the snippets under their own heading. While a completion list is open, Tab and Shift+Tab move through it. A save applies with no restart; a bad entry is a warning in the problems panel at its line, and a file that does not parse keeps the last snippets that did. The tab comes back with the session, and the file travels with the import from the previous version.
+- e1611a3: TYTO-278: when an untrusted workspace folder leaves something out, a strip above the editor says so, with **Trust this folder** (applies what was left out at once) and **Show problems**. **Workspace: Manage Trust** shows the open folder and its state, with **Trust** and **Remove trust**; removing trust applies the next time the folder is opened (ADR 0111).
+- fa24427: TYTO-278: File ▸ Open Folder opens a workspace folder, and File ▸ Close Folder closes it. A brief inside it previews and exports with the template, asset and font folders its `.tyto/project.json` names, the export dialog points at its output folder, and the folder comes back after a relaunch. The project file's problems, such as a key an untrusted folder may not use, are listed in the Problems panel with their place in the file (ADR 0113).
+- ba00301: TYTO-279: main lists the open workspace folder one folder at a time, by ids it mints and never by path, and watches it so a file made outside the app is heard (ADR 0115). The explorer panel that shows it is the next pull request.
+- 1687e7f: TYTO-279: an **Explorer** panel in the left area, above the queue, lists the open workspace folder. Opening a folder with File ▸ Open Folder opens it, clicking a brief opens it in a tab, and a file made or deleted outside Tyto shows within a moment. Its status-bar button and **Show or hide: Explorer** in the command bar show and hide it (ADR 0115).
+- 017d381: TYTO-280: the window draws images and fonts an installed plugin supplies (ADR 0117, ADR 0119). The preview fetches what it lacks when the brief is saved or opened from disk, never while you type: a half-typed `test:lo` asks nobody, and the miss says to save. A face that arrives reaches the same preview, measured. The export box fetches too; the queue never does, and draws what a save already cached. A restricted folder fetches nothing and names Workspace: Manage Trust. A failed fetch is asked once per session, and the miss says a restart or a different reference asks again. `@tyto/io`'s `sourceCache` gains `remembersFailures` and a per-call `SourceCall`, and no longer remembers a miss it was not allowed to fetch.
+- 90716e6: The window fetches a template's font this machine lacks from Google Fonts on first use, on save or open and never while typing, and names a font Google does not serve (likely licensed) with the free alternatives its template lists. The new `googleFonts` setting, on by default, turns it off (TYTO-281).
+- cad535e: TYTO-282: the Explorer and the tabs show an icon for each file type: images, fonts, JSON, text files, template folders and the files in them, the project file, and the app's settings, keybindings and snippets. The output, assets and templates folders the project names get icons of their own. A brief gets a rubber stamp (ADR 0116).
+- d755180: TYTO-286: the editor splits. Ctrl+\ opens the brief in front in a second group to the right, Ctrl+Shift+\ below (also on the View menu, in the command bar, and as `:vsplit` and `:split` in vim), and Ctrl+Alt+Left/Right moves between groups. Each group has its own row of tabs on top; the strip across the whole window is gone. The same brief can be open in two groups and typed into in either, with one undo history. The status bar, the problems panel, the preview and the title follow the group you are in. For now a window with several groups reopens after a restart as one group with every tab and draft. `@tyto/editor` makes several panes over one editor (`createPane`, `followerOf`, `isFollower`) and names the view in `onUpdate` and `onChange`.
+- ab2041a: TYTO-286: the editor groups come back after a restart — the same splits, the same tabs in each group, the same group focused, and each group's cursor where you left it, even for one brief open in two groups. Three new commands on the View menu and in the command bar: focus the next or previous group (they wrap at the ends, as Ctrl+Alt+Left/Right now do), move the tab in front to the next group (with one group, it opens a split to the right for it), and close the group, which closes its tabs as Ctrl+W does and asks before dropping unsaved text. A session written by this version still opens in an older one, as one group with every tab.
+- ffe3539: The previews come back after a restart — the following one and any locked on a brief — and the
+  first launch opens the preview beside the brief, so a new person sees the art before they know
+  Ctrl+Shift+V.
+- 6320e1c: TYTO-287: the preview is a tab. Ctrl+Shift+V (or the button at the end of a brief's tab row, the View menu or the command bar) opens "Preview <name>" in the group to the right, and the preview follows whichever brief you bring to the front, as VS Code's Markdown preview does; "Lock" in its bar pins it to one brief, so two briefs' art can sit side by side. The PREVIEW panel and the right area's status-bar button are gone. A click in a preview focuses it, and export, Save and the problems panel act on the brief it shows. For now a new window opens with no preview until you ask for one, and the preview is not kept across a restart.
+- 130a587: TYTO-288: a tab can be dragged along its strip to reorder it, or onto another group's strip to
+  move it there; an accent line shows where it will land, and Escape or a drop anywhere else
+  cancels. "Move tab left" and "Move tab right" (Ctrl+Shift+PageUp, Ctrl+Shift+PageDown) move the
+  tab in front one place. The new order is kept across a restart.
+- 5835e4c: TYTO-288: hovering a tab shows where its file is saved — its path, with the home directory
+  written `~` (`~\briefs\campanha.brief`) — for a brief, for the preview of a brief, and for
+  `settings.json`, `keybindings.json` and `snippets.json`. An untitled tab shows nothing. The path
+  comes back with a tab restored from the last session. It is for display only: the window cannot
+  open a file by it (ADR 0086).
+- 8bab2fe: Every pane now has the same row of tabs on top — the editor groups, the previews, Problems, the
+  queue and a plugin's panel alike — so their edges line up across the window, and an editor has a
+  quiet row under its tabs, as VS Code's breadcrumbs are, where the location will go. The BRIEF bar
+  and the template picker over the editor are gone: a template is chosen with "New brief from
+  template…", the "/" menu or the `template:` line. "Open preview to the side" is at the right end
+  of the tabs. A tab's name is quieter, and a panel's name reads like a file's, "Problems" rather
+  than "PROBLEMS".
+
+  The icons are drawn thinner, and how thin is a setting: `iconStrokeWidth` in `settings.json`,
+  from 0.75 to 2, 1.25 unless it says otherwise. A save applies it at once.
+
+- 1cc9e8e: The line between two editor groups can be dragged to give one side more room, and the window
+  keeps the proportion after a restart. A double-click puts the groups back to equal sizes, the
+  arrow keys move the focused line, and no group gets narrower than its minimum.
+- 3b9ca57: TYTO-293: the editor draws a thin vertical guide at each indent level, as VS Code does, and the
+  guide of the block holding the cursor in a stronger colour. A blank line inside a block keeps
+  the guide; one between two blocks breaks it. The guides appear in brief tabs, the JSON tabs
+  (settings, keybindings, snippets) and both buffers of the template mode. `"indentGuides": false`
+  in `settings.json` hides them on save, with no restart. Two theme tokens are new,
+  `indent-guide` and `indent-guide-active`, set by every built-in and pack theme (42 tokens).
+- 0255852: TYTO-295: while the top of the editor is inside a block, the block's head line stays pinned
+  there — `::lamina` while scrolling its body, and in the template mode each element the top is
+  inside, stacked. The row slides away with the block's last line, a click on it goes to the
+  directive, and the caret is never left under it. `"stickyScroll": false` in `settings.json`
+  turns it off on save. A directive's fold now ends at its last line with text.
+- 49e985f: TYTO-296 (ADR 0095): "Go to Block…" (Ctrl+Shift+O, in both input modes) lists the brief's blocks in the command bar — the frontmatter as "cabeçalho"/"header", every directive as `::lamina 2` with its first words beside it — and moving through the list previews each one; Enter leaves the caret on it and Escape puts the caret and scroll back. Brief-only and on the View menu, which now greys what the tab in front cannot use. `@tyto/editor` exports `briefBlocks`, `blocksOf` and `blockAt`: the blocks read from the syntax tree, numbered only for a slot the manifest says repeats, and remembered per tree.
+- 74d7b28: TYTO-297: "Format Brief" ("Arrumar brief", Alt+Shift+F in both input modes and in the command bar) fixes a brief's indentation, trailing spaces and repeated blank lines in one undoable step; a brief with a syntax error is left alone and the status bar says why. Two settings, commented in a new `settings.json`: `formatBriefOnSave` (false by default) formats a brief before Save writes it, and `tabSize` (2 by default) sets what Tab inserts, the indent guides' step and the indent Format Brief writes, applied on save with no restart.
+- d61d96f: TYTO-298: a new `briefColumns` setting, commented in a new `settings.json`, sets how the editor tells the columns of a brief's `|` lines apart: `off`, `separator` (the `|` coloured, the default), `alternate` (even columns muted too — in some themes the muted colour barely differs from the text) or `perColumn` (a colour per column — some themes draw a column below comfortable reading contrast). Applied on save, with no restart.
+- 6670e15: Twenty colour themes in "Preferences: Color Theme": Dracula, One Dark, Nord, Solarized Dark and
+  Light, Gruvbox Dark and Light, Tokyo Night and Tokyo Night Light each come as the original and as
+  "(adjusted)", a version with the hard-to-read colours made readable, and the picker says
+  "original colors" or "adjusted for contrast" beside each. Catppuccin Latte and Mocha read well as
+  they are and come once.
+- 3c13b00: Two well-known colour themes ship with the app: Dracula and Catppuccin Latte. Pick them with
+  "Preferences: Color Theme" in Ctrl+K, like Tyto Light and Tyto Dark; the whole window and the
+  editor change at once. They come from a built-in plugin of their own, `theme-pack` (ADR 0089).
+- 5a0c7c5: `statusBarColors` in `settings.json` colours the status bar over the theme, in every theme:
+  `background`, `foreground`, `itemHoverBackground`, `itemHoverForeground`, `itemActiveBackground`,
+  `itemActiveForeground`, vim's badges (`vimMode.normal`, `vimMode.insert`, `vimMode.visual`,
+  `vimMode.replace`) and one text colour per item (`item.problems`, `item.template`…). Colours are
+  `#rgb` or `#rrggbb`; saving applies them with no restart, and removing one gives the theme's colour
+  back. An unknown key or a bad colour is a warning at it and only that one falls back to the theme.
+  A vim badge's text is the theme's best-reading colour on it, and a badge colour nothing reads
+  4.5:1 on still applies, with a warning that says the ratio; so does a
+  `background` or `foreground` that leaves the bar's own text under 4.5:1. A new `settings.json` carries the key
+  commented out, with every key and an example colour.
+- fe85505: The status bar shows what `statusBarItems` in `settings.json` lists, in that order inside each
+  side: `leftArea`, `commandBar`, `vimMode`, `cursorPosition`, `tabKind`, `template`, `problems`,
+  `queue`, `plugins`, `export`, `settings`, `bottomArea`, `rightArea`. Leave an id out to hide that
+  item; saving the file applies it with no restart. Without the setting the bar is exactly as
+  before. An unknown or repeated id is a warning at that entry and the rest still apply. A new
+  `settings.json` carries the key commented out, with every id and what it is.
+- e964def: Vim's mode in the status bar is a coloured badge: NORMAL, INSERT, VISUAL (line and block too)
+  and REPLACE each in its own colour, in every theme, with text that reads at 4.5:1 or better. Until
+  now the badge was always the accent colour, which in Tyto Light read at only 4.01:1. The rest of
+  the bar looks as before. Themes gain ten colours for it: `status-bar` and `status-bar-text`, and a
+  background and a text for each mode (`status-bar-vim-normal`, `status-bar-vim-normal-text`…).
+- 29da92c: `vimModeStyle` in `settings.json` says how the status bar shows vim's mode: `"badge"` (the
+  default, only the mode's name coloured), `"border"` (a strip along the bar's top edge in the
+  mode's colour) or `"bar"` (the whole bar in the mode's colour, with text chosen to read on it at
+  4.5:1 or better in every theme Tyto ships). `statusBarColors`' `vimMode.*` colours apply to all
+  three, and under `"bar"` the mode's colour wins over `background`. Saving applies it with no
+  restart; with vim off every style is the plain bar. A new `settings.json` carries the key
+  commented out with the three values and what each does.
+- c94ee21: TYTO-302: the local queue, Problems and a plugin's panel are drawn as tools, not as document
+  tabs. Each has a tool header — its name in small capitals on the panel's own background, the
+  same height as the editor groups' tab strips so the lines still meet — with the tool's actions
+  at the right and the × that hides it last. The queue's "Choose folder…" moved out of the panel's
+  body into its header as a folder icon; everything else in the queue stays where it was.
+- f244b75: TYTO-304: the `keybindings.json` tab suggests as you type. Inside an entry, a quote lists the
+  fields `key`, `command` and `when` not yet written; a `command`'s value lists every command id
+  with the title the command bar shows, then `-<id>` for each one with a default key to remove;
+  a `when`'s value lists the six contexts with what each means. Hovering a command's id shows its
+  title and default key, a context what it means, and a field name what the field is. It works
+  with vim on, in insert mode, and the file's warnings are unchanged.
+- bf3fd0e: TYTO-304: the `settings.json` tab suggests as you type. A quote where a key goes lists every
+  setting not yet in the file, with what it does; picking one writes it with its default selected.
+  Inside a value it lists the values that setting accepts — `vimModeStyle`'s `badge`, `border` and
+  `bar`, `true`/`false`, the installed themes — and inside `statusBarItems` and `statusBarColors`
+  the item ids and colour keys not yet written. Hovering a key shows its description, type,
+  default and accepted values. It works with vim on, in insert mode, and the file's warnings are
+  unchanged.
+- 68dd2ad: Help ▸ Documentation opens the user manual in your browser, in the app's language: the
+  Portuguese edition when Tyto runs in pt-BR, the English one otherwise. It is also a command in
+  Ctrl+K. The manual is published online with each desktop release (ADR 0101).
+- 597da77: TYTO-323: the preview has two modes, **One slide** and **All slides**. All slides shows every slide of the chosen format in a grid, in order and numbered, scaled so they all fit; clicking one opens it as the main slide in One slide mode. Two buttons in the preview's bar switch the mode, as do the commands `preview.showOneSlide` and `preview.showAllSlides`, and each preview tab remembers its mode across a reload and a quit.
+- 52cb44d: TYTO-323: a carousel's slides show as a strip of numbered thumbnails under the preview, and the Slide dropdown is gone. Clicking a thumbnail puts that slide on the stage and the editor on its `::lamina`; with the strip focused, the arrow keys, Home and End move along it. Thumbnails are the slide's own live document, scaled to 96 px tall; only the ones on screen are drawn, and a keystroke redraws only the slide it changed. A button in the preview's bar hides the strip, and each preview tab remembers that across a restart. When the slide shown is deleted from the end of the brief, the preview stays on the new last slide instead of going back to slide 1.
+- 49db8d1: TYTO-347: the window shows the work profile an open folder names (ADR 0114). The trust strip has a line of its own for an untrusted profile that left something out, with **Trust this profile**, and a third button, **Show project**; Workspace: Manage Trust shows the profile with its own two buttons, none for a profile kept in `TYTO_HOME`. A profile's problems are listed in the problems panel with its file in front. Workspace: Show Project opens a read-only Project panel beside Problems listing `assets`, `templates`, `fonts` and `output`, each with its folders and `profile <name>`, `this folder` or `not set`. `workspace:trust` now takes a strict `source` (`folder` or `profile`) and still no path. `@tyto/io`'s `LoadedProfile` says whether it is trusted by where it lives (`byLocation`).
+- 412a60f: TYTO-352: the explorer makes, renames and deletes files and folders. Right-click an entry for New File…, New Folder…, Rename… and Delete, or the empty space for the two New items; F2 renames and Delete deletes the selected entry. The name is typed in the tree, and a taken or impossible name keeps the field open with a line saying why. A delete always asks first and moves the entry to the Recycle Bin (the Trash on macOS and Linux). A renamed brief's tab shows the new name and keeps unsaved text unsaved; a deleted one's tab keeps its text in no file. A write the disk refuses for another reason, such as a read-only drive, now says so instead of failing silently.
+- 2bb2cf3: TYTO-352: main can now create a file or folder, rename an entry and move an entry to the system's trash for the explorer, by id and name and never by path (`explorer:create`, `explorer:rename`, `explorer:delete`), and draw a native context menu of the window's items (`menu:context`). Names are checked the same on every operating system, nothing is ever overwritten, a delete never falls back to a hard delete, and open tabs follow a rename or let go of a deleted file. The window side comes in the next release.
+- aebf304: The explorer's context menu opens from the keyboard (TYTO-364): Shift+F10 or the ContextMenu key on the selected entry opens the same menu a right click does, under that entry; with no entry selected, it offers New File and New Folder.
+- b4ef3f4: TYTO-365: while a folder is open, the explorer's header has three buttons beside its close button. New File… and New Folder… open the same name field as the context menu, in the selected folder, the selected file's folder, or the top of the folder. Collapse All closes every open folder at every depth, and a selection inside one moves to the top-level folder that holds it.
+- 274ad28: TYTO-366: clicking a `.png`, `.jpg`, `.jpeg`, `.webp`, `.gif` or `.svg` in the explorer shows it in the preview, with its name, its size in pixels and its size on disk in the preview's bar. Zoom, Fit and Lock work as for a brief, and the explorer keeps the focus. Bringing a brief to the front makes the preview follow it again. An image over 32 MB, a file whose contents are not the image its name says, and an image deleted while shown each get a line saying so. An SVG is shown as a picture: its scripts do not run and it loads nothing.
+- ed73f34: TYTO-96 (ADR 0075): the window gets one visual language, Zed's One Light and One Dark, in one token file. `@tyto/editor`'s palette is now a list of `var(--tyto-…)` custom properties the host defines instead of two sets of literal colours, exported as `themeTokens`; a host that defines none gets an uncoloured editor. Its selection colour now wins over CodeMirror's base rule while the editor is focused, and `restore` brings a stored tab up to the theme the editor is in now. The desktop defines every token in `src/renderer/tokens.css`, draws in the bundled Source Sans 3, follows the system's light or dark live in the window and in every editor, and fails `pnpm check` on a literal colour, radius, size or font anywhere else in the renderer.
+
+### Patch Changes
+
+- 7cf6a11: TYTO-120: opening a file no longer replaces an untitled tab that was typed into and then emptied. The tab stays beside the new file, and Ctrl+Z in it brings the deleted text back. The same holds for a tab that lost its file to a save-as and was then emptied. The untouched tab the window opens on is still replaced, as before.
+- 4e440f4: TYTO-144: the crash box now has a button that opens the log folder, so sending the log after a crash is one click instead of copying a path into a file manager.
+- 6847c83: TYTO-146: the macOS `dmg` is universal, so it opens on an Intel Mac as well as on Apple Silicon. The bundled Node that runs plugins carries both architectures too.
+- 7a56ce2: TYTO-155 — nothing in the app changes; this corrects the 0.3.2 entry and records how dependency
+  bumps reach this changelog from now on.
+
+  **The 0.3.2 entry gives the wrong reason for the red Dependabot pull requests.** It says every
+  one of them arrives red on `changeset status` because Dependabot cannot write a changeset. The
+  measurement that followed showed otherwise: `changeset status` fails only when `.changeset/`
+  holds no file at all, so a Dependabot pull request was red whenever no other changeset was
+  pending — right after each version PR — and green otherwise, with no commit of its own. The
+  0.3.2 entry is left as published; this is its correction.
+
+  From now on the pull request check asks whether each changed package is named in a changeset of
+  that pull request's own, and a Dependabot bump of a dependency that ships with the app (Electron
+  among them) gets its line here written by the release workflow, naming the old and new version
+  (ADR 0070).
+
+- 49c1569: TYTO-239: the queue panel no longer reads its inbox while it moves a finished task to `done/`. On Windows that read held the task's brief open and the move failed with `EPERM`; a short retry hid it, and now the queue does not race itself at all. The retry stays for locks held from outside Tyto.
+- 93fcb8b: Exporting over an artwork file another program holds open ends the export with its failure message instead of an `E_OUTPUT_WRITE` diagnostic, and a folder where an artwork goes shows `E_OUTPUT_FILE_BLOCKED` (TYTO-245, ADR 0108).
+- 4c45704: A page's own `window.close()` now goes through the same quit handshake as the window's X button, so the session's final write runs first: a draft typed just before it comes back on the next launch, and the settings tab's pending screen changes reach the file. A reload, whether the window or DevTools starts it, still reloads.
+- 32f17c6: TYTO-255: a settings edit is no longer lost while `settings.json` is open in a tab. A change made from a screen right after typing in the tab, or a save of the file from another editor while the tab has unsaved typing, now lands in the tab under the typing, so the next save keeps both. Closing the tab without saving discards only the typing: a change made from a screen while it was open is written to the file.
+- 0dd0e56: TYTO-256: the settings and keybindings tabs colour their JSON: keys, values, numbers, `true`/`false`/`null` and comments each in their own colour, in the light and the dark theme.
+- 9727c28: TYTO-257: a new version's first run now offers the previous version's `keybindings.json` with the settings, layout and recent files, copied byte for byte, so a person's own keys keep working after an update. A file that does not parse stays behind in the older folder, as an unparsable `settings.json` does.
+- 9bd7527: TYTO-258: the editor's find panel, its completion list and the tooltip on a problem now match the window in light and in dark — the same raised surface, hairline and type — instead of CodeMirror's grey defaults. The selected completion is the selection's colour, quiet, and a problem's underline is the problem's own colour.
+- f82f71b: TYTO-259: the line under the preview that said "Problems: N" or "No problems" is gone. It counted only the brief's problems while the status bar's problems button counts every row of the Problems panel, so the window could show two different numbers at once; the status bar's count is now the only one.
+- a6f85ed: A save failure leaves the problems panel, and the status bar's count, as soon as the next save of that tab goes through; a file reported missing leaves it when the same recent entry opens again. A removal never lights the new-problems dot, and puts it out when no row is left for it to point at.
+- eaf3dc6: TYTO-263: on Windows, with a menu's list open from the title bar, Left and Right close it and open the neighbouring menu's list, wrapping at the ends — with Help open, Left opens Window, and with File open, Left opens Help. The arrow that moved the menu no longer reaches the editor or the menu row. Linux and macOS are unchanged.
+- 9d599db: TYTO-267: the problems panel's heading no longer shows its own problem count. With the panel open the same number used to appear twice — in the heading and on the status bar's problems button; now only the status bar shows it. The button's screen-reader label now includes the count, since the heading's count was the one a screen reader could read.
+- efec94c: TYTO-268: when a brief is written but nothing can be drawn from it — a template that does not exist, a frontmatter that will not parse — the preview now says "This brief has an error — see Problems" instead of "Write a brief to see it here", which it keeps for an empty buffer. When an artwork had already been drawn, the preview still keeps it on screen, marked as older than the text.
+- aac15e5: TYTO-269: the brief editor draws with the bundled IBM Plex Mono instead of whichever monospace the machine has, so it shows the same face and the same columns on every computer, in light and in dark. Comments stay italic, slanted by the browser, since no italic face is shipped.
+- 1ee2f97: TYTO-283: with `settings.json` or `keybindings.json` in front, the commands that act on a brief — Export, the preview's zoom, format and slide steps — are no longer offered in the command bar, do nothing on a key bound to them, and are greyed in the File menu and the status bar. Before, Export opened its dialog there and wrote the JSON out as `editaveis/settings.json.brief` beside a `result.json` of syntax errors.
+- d84eaa1: TYTO-285: nothing changes when you press Ctrl+Enter — it still adds a line, as it always did. What is gone is the built-in binding behind it to a render command the window never had, and a test now fails if any built-in key names a command the window does not register.
+- ef0584b: TYTO-288: the line under every tab strip is gone — under each editor group's tabs, a preview's, and the name of a docked panel such as the queue or Problems. The strips keep their height, so they still meet across the window.
+- f3739a3: TYTO-299: editor groups no longer overlap when the window is too narrow. Each split is held at its groups' minimum size, and the side and bottom docks give way first, down to 160 px across or 96 px tall (or their own smaller size); the sizes saved in the layout are unchanged, so a wider window gives them back. When even that is not enough, the last groups are clipped at the editor's edge instead of being painted over each other or pushing a dock out of the window.
+- 5db30d3: TYTO-322: the empty Problems panel names the document in front. With `settings.json`, `keybindings.json` or `snippets.json` active it says "Nothing to report about settings.json" (and the same for the other two) instead of "about this brief", in English and in Brazilian Portuguese; with a brief in front it still says "this brief". The manual's settings picture is retaken with the new sentence.
+- 8b61655: A template made with **New template…** is listed by **New brief from template…** and clears `E_TEMPLATE_FOLDER_EMPTY` as soon as it is created, without a Save first (TYTO-324).
+- d08be0d: TYTO-325: the Export dialog opens with PNG ticked instead of SVG the first time a window exports. A choice made in the dialog is still kept while the window stays open, and a restart starts from PNG again. A build that does not offer PNG ticks the first file type it does offer, so the dialog never opens with Export greyed out for no visible reason.
+- 20822f2: TYTO-331: in vim mode, Escape pressed right after typing goes back to normal mode on the first press. It used to stay in insert mode — 10 of 10 times in a visible window — because the key closed a completion that had not appeared yet. Escape on an open completion popup still only closes the popup. `keybindings.desktop.test.ts` now launches with `--disable-frame-rate-limit` (ADR 0104), which is what exposed this.
+- d3df40e: The Export dialog's **Formats** ticks are honoured when the brief lists formats (TYTO-332, ADR 0107). The list offers only the sizes on the brief's `formats:` line, and unticking one leaves it out of the export, where before every listed size was written whatever was ticked.
+- 4475943: TYTO-334: the window in Brazilian Portuguese no longer shows Electron's English in its menus. Every role item — Undo, Cut, Copy, Paste, Select All in Edit, Exit in File, the developer tools and full screen in View, Minimize and Zoom in Window, and macOS's application menu — carries the catalogue's word for it (Desfazer, Recortar, Copiar, Colar, Selecionar tudo, Sair, Ferramentas do desenvolvedor, Tela cheia, Minimizar, Maximizar), and the Edit list is written out so Electron no longer fills it in English. A new `keybindings.json` or `snippets.json` starts with its notes in the window's language, and the keybindings tab's suggestions and hover say what each field is in it too. Problem messages are still English (TYTO-342).
+- 4aba89c: TYTO-347: a workspace's `.tyto/project.json` can name a work profile, a sheet many folders share (ADR 0114). `"profile": "saude"` reads `TYTO_HOME/profiles/saude/profile.json`, trusted by where it lives; a path names a profile file elsewhere, which is its own source in `trust.json` and is confined to its own folder until it is trusted. The profile's keys come first and the folder's win key by key. `core` reads the key with `profileReferenceOf`, refuses a restricted folder a profile path outside it, ignores a profile's own `profile` key (`W_PROFILE_NESTED`), and says in `ResolvedProject.origins` which sheet each value came from; `W_PROJECT_PROFILE_UNSUPPORTED` is replaced by `W_PROJECT_PROFILE_INVALID` and `W_PROJECT_PROFILE_MISSING`. `@tyto/io`'s `loadWorkspace` reads the profile with its own trust answer and follows its paths through `realpath`. `tyto render` uses it, prints a profile's problems against the profile's file, `--trust` covers the folder and its profile for the run, and `tyto trust remove` takes a profile file's approval back. The window resolves a folder's profile through the same loader; showing it is the next change.
+- Updated dependencies [7cf6a11]
+- Updated dependencies [d4a6939]
+- Updated dependencies [c141ec9]
+- Updated dependencies [08b936d]
+- Updated dependencies [7342c02]
+- Updated dependencies [15997e9]
+- Updated dependencies [15997e9]
+- Updated dependencies [49c1569]
+- Updated dependencies [93fcb8b]
+- Updated dependencies [752ddd2]
+- Updated dependencies [0dd0e56]
+- Updated dependencies [0dd0e56]
+- Updated dependencies [9bd7527]
+- Updated dependencies [99f185d]
+- Updated dependencies [aac15e5]
+- Updated dependencies [c005b91]
+- Updated dependencies [cbbf6df]
+- Updated dependencies [cbbf6df]
+- Updated dependencies [cbbf6df]
+- Updated dependencies [c17b976]
+- Updated dependencies [922caa8]
+- Updated dependencies [2d32db1]
+- Updated dependencies [c9c17a3]
+- Updated dependencies [2495d0d]
+- Updated dependencies [2495d0d]
+- Updated dependencies [6abf89f]
+- Updated dependencies [91efbbb]
+- Updated dependencies [017d381]
+- Updated dependencies [53e01c3]
+- Updated dependencies [ae75027]
+- Updated dependencies [d84eaa1]
+- Updated dependencies [d755180]
+- Updated dependencies [3b9ca57]
+- Updated dependencies [3b261d1]
+- Updated dependencies [0255852]
+- Updated dependencies [49e985f]
+- Updated dependencies [74d7b28]
+- Updated dependencies [74d7b28]
+- Updated dependencies [d61d96f]
+- Updated dependencies [6670e15]
+- Updated dependencies [3c13b00]
+- Updated dependencies [d218cbe]
+- Updated dependencies [fe85505]
+- Updated dependencies [5a0c7c5]
+- Updated dependencies [e964def]
+- Updated dependencies [bf3fd0e]
+- Updated dependencies [f244b75]
+- Updated dependencies [bf3fd0e]
+- Updated dependencies [e39f1d7]
+- Updated dependencies [8e9c9c4]
+- Updated dependencies [ab9512e]
+- Updated dependencies [ab9512e]
+- Updated dependencies [20822f2]
+- Updated dependencies [d3df40e]
+- Updated dependencies [e7ea146]
+- Updated dependencies [49db8d1]
+- Updated dependencies [4aba89c]
+- Updated dependencies [3fa8604]
+- Updated dependencies [ed73f34]
+  - @tyto/editor@0.8.0
+  - @tyto/plugin-api@0.5.0
+  - @tyto/core@0.29.0
+  - @tyto/io@4.0.0
+  - @tyto/pipeline@0.11.0
+  - @tyto/fonts@0.4.0
+  - @tyto/google-fonts@0.1.0
+  - @tyto/theme-pack@0.1.0
+  - @tyto/brief-lang@0.7.0
+  - @tyto/export-html@0.7.1
+  - @tyto/export-svg@2.0.1
+  - @tyto/template-lang@0.8.1
+  - @tyto/templates@1.0.2
+
 ## 0.7.0
 
 ### Minor Changes

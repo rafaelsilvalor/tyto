@@ -1,5 +1,53 @@
 # @tyto/plugin-api
 
+## 0.5.0
+
+### Minor Changes
+
+- d4a6939: TYTO-206 (ADR 0073): `settings.json` becomes a JSON-with-comments file the person owns. `plugin-api` gains the `configuration` extension point (`registerConfiguration`, `registry.configurations()`, `InProcessHost.configure`, `resolveSettings`), and the desktop app's four settings are declared through it by a built-in `desktop` plugin, under their existing names. Reading is tolerant one key at a time; a bad value costs that key alone and is a diagnostic with a range (`E_SETTINGS_SYNTAX`, `W_SETTING_UNKNOWN`, `W_SETTING_UNPREFIXED`, `W_SETTING_INVALID`, new in `core`). The app's screens edit the file in place, keeping comments and writing only keys that differ from their defaults, and never write a file that does not parse. The previous-version import accepts a commented `settings.json`.
+- 7342c02: TYTO-207 (ADR 0074): every key the window answers now comes from one keybinding table. `@tyto/editor` gains a pure resolver (`parseKey`, `resolveKeybindings`, `keymapSetFor`, `windowBindingsOf`, `shownBindingsOf`) over six closed contexts, `vimMode` and `createEditor` take their vim set as an option, and `setKeymaps` swaps both modes' bindings in place. `plugin-api`'s `editor.keymap` gains an optional `when` and is consumed by the desktop for the first time. `core` gains six codes (`E_KEYBINDINGS_SYNTAX`, `W_KEYBINDING_UNKNOWN_COMMAND`, `W_KEYBINDING_INVALID_KEY`, `W_KEYBINDING_UNKNOWN_CONTEXT`, `W_KEYBINDING_DUPLICATE`, `W_KEYBINDING_LOCKED`). The desktop's `Mod-K` listener becomes a window dispatcher for global keys, registered once. No default key changes.
+- 15997e9: TYTO-208 (ADR 0077): a twelfth extension point, `theme` — `{ id, label, kind, path }`, a data-only JSON colour theme inside the plugin's folder. `registerTheme` and `registry.themes()`; an isolated plugin may contribute one. `isThemeColor` (the colour grammar that also refuses CSS injection), `isThemePath` and `resolveThemeColors`, which fills every token a theme leaves out from the base theme of its kind.
+- cbbf6df: TYTO-272: the `members` rule of an object setting takes `schemaByName`, a schema per member name used instead of `schema` for that member, so one object can hold members with different bounds — a size per area where each area has its own largest size. A member its own schema refuses is still `W_SETTING_INVALID` at that value, and the others apply.
+- 53e01c3: TYTO-280: a plugin can supply images and fonts (ADR 0117). `@tyto/plugin-api` has two new extension points, `asset-source` (URI schemes such as `drive:`) and `font-source` (families), each with a `fetch` an installed plugin answers from its own process; the call carries the plugin's own section of the project file, absent when the folder withheld it. `@tyto/io`'s `sourceCache` asks them once and keeps the answer in `TYTO_HOME/cache/sources/<plugin>/`, named by a hash, so the next render asks nothing; a restricted folder reads the cache and fetches nothing. `@tyto/core`'s `AssetResolver` gains an optional `explain`, and a source's failure is `E_ASSET_SOURCE_FAILED` or `W_FONT_SOURCE_FAILED`. `@tyto/fonts`' library gains `refresh()`, and `@tyto/pipeline`'s `loadResources` may ask for one more compile once a fetched face arrives.
+- fe85505: A list setting can be checked one entry at a time (TYTO-301, ADR 0091). A `configuration`
+  contribution may declare `entries: { schema, unique }`; then an entry the schema refuses, or one
+  that repeats an earlier entry when `unique` is set, is left out and reported as the new warning
+  `W_SETTING_ENTRY_INVALID` at that entry, and the rest of the list still applies. `SettingEntry`
+  gains `entryRanges`, so a reader can say where each entry of a list was written. Both are
+  optional: every existing setting and reader behaves as before.
+- 5a0c7c5: An object setting can be checked one member at a time (TYTO-301, ADR 0091). A `configuration`
+  contribution may declare `members: { key, schema }`; then a member whose name `key` refuses is
+  `W_SETTING_ENTRY_INVALID` at the name, one whose value `schema` refuses is `W_SETTING_INVALID` at
+  the value under the dotted key, either is left out, and the rest still apply. `SettingEntry` gains
+  `memberRanges`. Both are optional. `@tyto/core` adds the warning `W_SETTING_LOW_CONTRAST`, for a
+  colour setting that applies although the text it leaves reads under 4.5:1.
+- bf3fd0e: TYTO-304: a setting may say what each of its values does. `ConfigurationContribution` gains an
+  optional `options: { value, description }[]`, and `entries` and `members` gain one each; they
+  are help for the settings tab and never a rule, and an option the setting's own schema refuses
+  makes the declaration throw. `outlineOf(declared)` reads every declared schema once with Zod's
+  `z.toJSONSchema` and answers plain data — description, type in words, default as JSON and the
+  accepted values — which is what the desktop sends to its settings tab (ADR 0092).
+
+### Patch Changes
+
+- Updated dependencies [d4a6939]
+- Updated dependencies [08b936d]
+- Updated dependencies [7342c02]
+- Updated dependencies [15997e9]
+- Updated dependencies [93fcb8b]
+- Updated dependencies [c005b91]
+- Updated dependencies [2495d0d]
+- Updated dependencies [6abf89f]
+- Updated dependencies [53e01c3]
+- Updated dependencies [ae75027]
+- Updated dependencies [fe85505]
+- Updated dependencies [5a0c7c5]
+- Updated dependencies [8e9c9c4]
+- Updated dependencies [ab9512e]
+- Updated dependencies [d3df40e]
+- Updated dependencies [4aba89c]
+  - @tyto/core@0.29.0
+
 ## 0.4.1
 
 ### Patch Changes

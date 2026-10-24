@@ -1,5 +1,13 @@
 # @tyto/fonts
 
+## 0.4.0
+
+### Minor Changes
+
+- aac15e5: TYTO-269: the package now ships IBM Plex Mono, Regular and Bold (`@ibm/plex-mono@2.5.0`, OFL 1.1), for the desktop editor. It is deliberately not registered as a render face, so no scene can name it and nothing an export embeds changes.
+- 53e01c3: TYTO-280: a plugin can supply images and fonts (ADR 0117). `@tyto/plugin-api` has two new extension points, `asset-source` (URI schemes such as `drive:`) and `font-source` (families), each with a `fetch` an installed plugin answers from its own process; the call carries the plugin's own section of the project file, absent when the folder withheld it. `@tyto/io`'s `sourceCache` asks them once and keeps the answer in `TYTO_HOME/cache/sources/<plugin>/`, named by a hash, so the next render asks nothing; a restricted folder reads the cache and fetches nothing. `@tyto/core`'s `AssetResolver` gains an optional `explain`, and a source's failure is `E_ASSET_SOURCE_FAILED` or `W_FONT_SOURCE_FAILED`. `@tyto/fonts`' library gains `refresh()`, and `@tyto/pipeline`'s `loadResources` may ask for one more compile once a fetched face arrives.
+- 8e9c9c4: TYTO-329: `*italic*` exports. `@tyto/fonts` ships Source Sans 3 Italic (400) and Bold Italic (700) from the same 3.052R release as Regular and Bold, so a brief with italic over a built-in template no longer compiles cleanly and then stops at export with `E_EXPORT_FONT_UNRESOLVED`. A face the font source still cannot answer is now reported by `compile` as `E_FONT_FACE_UNAVAILABLE`, an error that is not fatal, on the text that asks for it, so the Problems panel and `tyto render` say so before the export (ADR 0110). The raster visual suite asks for weight 300 where it asked for italic as the face nobody ships; the user manual drops its warning against italic in both editions.
+
 ## 0.3.0
 
 ### Minor Changes

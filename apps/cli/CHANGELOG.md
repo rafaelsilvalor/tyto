@@ -1,5 +1,58 @@
 # @tyto/cli
 
+## 0.5.0
+
+### Minor Changes
+
+- 488e0d6: TYTO-278: `tyto render` finds the workspace a brief is in by walking up to the nearest `.tyto/project.json`, and uses its template, asset and font folders; `--out` is optional when the project declares `output`, and a typed `--out` or `--templates` still wins. An untrusted workspace renders with everything inside its own folder and prints why a key that leads outside was left out; `--trust` lifts that for one run without writing an approval, and `tyto trust remove <folder>` takes one back (ADR 0111, ADR 0112).
+- 91efbbb: TYTO-280: `tyto render` and `tyto watch` draw images and fonts an installed plugin supplies (ADR 0117, ADR 0118). A `test:logo` image or a face no folder has is fetched once into `TYTO_HOME/cache/sources/`, and the next render asks nothing; a face that arrives makes the job compile once more, so its lines break against it. `tyto render` fetches for a trusted folder and for a brief in no folder; a restricted folder and `tyto watch` read the cache only, each miss saying why. A `--folder` delivery copies a fetched image under a name from its reference (`assets/logo.png`) and points the copied brief at it, so the delivery renders without the plugin. `@tyto/io`'s `sourceCache` takes the miss's reason as `notFetchedBecause`, and its delivery names fetched images that way.
+- ae75027: TYTO-281: a template's font this machine lacks is fetched from Google Fonts on first use (ADR 0120). `@tyto/google-fonts` is a new built-in `font-source`, pure, that reaches Google only through `host.fetch` and knows which families Google serves from a bundled snapshot; the face is cached in `TYTO_HOME` and every later render reads it. A missing family nobody can supply — CircularXX — is never fetched and gets one line, the new `W_FONT_UNAVAILABLE` in `@tyto/core`, naming the substitute and the free alternatives the template's manifest lists under the new `fonts` key. `tyto render` and `tyto watch` turn it off with `--no-google-fonts` or `TYTO_GOOGLE_FONTS=off`, and then a missing face is `W_FONT_SUBSTITUTED` exactly as before.
+- d3df40e: `--formats` on `tyto render` and `tyto watch` now narrows the brief's `formats:` line instead of being ignored when the brief has one (TYTO-332, ADR 0107). A size the flag names that the line does not have is `E_FORMAT_NOT_IN_BRIEF`, so `watch --formats story` on a brief that does not list `story` now reports an error where it used to render the brief's formats.
+- 4aba89c: TYTO-347: a workspace's `.tyto/project.json` can name a work profile, a sheet many folders share (ADR 0114). `"profile": "saude"` reads `TYTO_HOME/profiles/saude/profile.json`, trusted by where it lives; a path names a profile file elsewhere, which is its own source in `trust.json` and is confined to its own folder until it is trusted. The profile's keys come first and the folder's win key by key. `core` reads the key with `profileReferenceOf`, refuses a restricted folder a profile path outside it, ignores a profile's own `profile` key (`W_PROFILE_NESTED`), and says in `ResolvedProject.origins` which sheet each value came from; `W_PROJECT_PROFILE_UNSUPPORTED` is replaced by `W_PROJECT_PROFILE_INVALID` and `W_PROJECT_PROFILE_MISSING`. `@tyto/io`'s `loadWorkspace` reads the profile with its own trust answer and follows its paths through `realpath`. `tyto render` uses it, prints a profile's problems against the profile's file, `--trust` covers the folder and its profile for the run, and `tyto trust remove` takes a profile file's approval back. The window resolves a folder's profile through the same loader; showing it is the next change.
+- 3fa8604: TYTO-349: the command line can trust a workspace folder for good. `tyto trust add <folder>` prints what the folder does while restricted (a key that leads outside it, withheld plugin sections, its profile's problems), then writes the approval to `TYTO_HOME/trust.json` under the folder's real path, with no y/N prompt so a script can run it. It refuses a path that does not exist and the folder whose `.tyto` is `TYTO_HOME` (ADR 0112), accepts a folder with no project file, and says which `tyto trust add <file>` trusts the work profile the folder names. `tyto trust add <file>` trusts a shared profile file on its own (ADR 0114); one inside `TYTO_HOME` is already trusted by where it lives. `tyto trust list` prints each approval with its date and marks one whose path is gone. `fsTrustStore` in `@tyto/io` gains `list()`, off the core `TrustStore` port.
+
+### Patch Changes
+
+- 689e872: TYTO-336: `tyto render` and `tyto watch` in a folder with no `formats.yaml` render with the built-in pack's formats, as the window does, instead of stopping with `E_FORMATS_READ`. A `--formats-file` that is not there still fails with `E_FORMATS_READ`, and a `formats.yaml` that is there and malformed still fails as before.
+- 93fcb8b: `tyto render` exits 2 (internal failure, worth retrying) when an artwork file is held open by another program, and writes no `result.json`; it used to exit 1 with `E_OUTPUT_WRITE` (TYTO-245, ADR 0108). A folder where an artwork goes still exits 1, now reported as `E_OUTPUT_FILE_BLOCKED` with the folder's path.
+- 8e9c9c4: TYTO-329: `tyto render` exports a brief with `*italic*` over a template in Source Sans 3, and reports a face the fonts cannot answer as `E_FONT_FACE_UNAVAILABLE` before the export (ADR 0110).
+- Updated dependencies [d4a6939]
+- Updated dependencies [08b936d]
+- Updated dependencies [7342c02]
+- Updated dependencies [15997e9]
+- Updated dependencies [15997e9]
+- Updated dependencies [49c1569]
+- Updated dependencies [93fcb8b]
+- Updated dependencies [aac15e5]
+- Updated dependencies [c005b91]
+- Updated dependencies [cbbf6df]
+- Updated dependencies [2495d0d]
+- Updated dependencies [6abf89f]
+- Updated dependencies [91efbbb]
+- Updated dependencies [017d381]
+- Updated dependencies [53e01c3]
+- Updated dependencies [ae75027]
+- Updated dependencies [fe85505]
+- Updated dependencies [5a0c7c5]
+- Updated dependencies [bf3fd0e]
+- Updated dependencies [8e9c9c4]
+- Updated dependencies [ab9512e]
+- Updated dependencies [d3df40e]
+- Updated dependencies [49db8d1]
+- Updated dependencies [4aba89c]
+- Updated dependencies [3fa8604]
+  - @tyto/plugin-api@0.5.0
+  - @tyto/core@0.29.0
+  - @tyto/io@4.0.0
+  - @tyto/pipeline@0.11.0
+  - @tyto/fonts@0.4.0
+  - @tyto/google-fonts@0.1.0
+  - @tyto/raster@0.2.2
+  - @tyto/export-html@0.7.1
+  - @tyto/export-svg@2.0.1
+  - @tyto/template-lang@0.8.1
+  - @tyto/templates@1.0.2
+
 ## 0.4.1
 
 ### Patch Changes
