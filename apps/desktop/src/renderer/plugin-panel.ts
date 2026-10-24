@@ -1,7 +1,7 @@
 import { html, nothing } from 'lit';
 import { z } from 'zod';
 
-import { type IpcResponse } from '../../shared/ipc.js';
+import { type IpcResponse, PANEL_CAPABILITIES, type PanelCapability } from '../../shared/ipc.js';
 import { PLUGIN_PANEL_ELEMENT } from '../../shared/layout.js';
 import { DockedPanel } from './panels.js';
 
@@ -35,14 +35,14 @@ const requestSchema = z.strictObject({
   tyto: z.literal('panel'),
   type: z.literal('request'),
   id: z.number().int().nonnegative(),
-  capability: z.enum(['fetch', 'credentials']),
+  capability: z.enum(PANEL_CAPABILITIES),
   args: z.array(z.unknown()).max(2),
 });
 
 export interface PanelBridge {
   request(
     panelId: string,
-    capability: 'fetch' | 'credentials',
+    capability: PanelCapability,
     args: readonly unknown[],
   ): Promise<IpcResponse<'panel:request'>>;
 }

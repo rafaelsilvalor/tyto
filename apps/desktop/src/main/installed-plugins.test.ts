@@ -27,26 +27,67 @@ import {
 
 const noNetwork: NetFetch = () => Promise.reject(new Error('no network in this test'));
 
+/** A keychain bound to a map, recording every account it was asked about. */
+function keychain(entries: Record<string, string> = {}) {
+  const stored = new Map(Object.entries(entries));
+  const asked: string[] = [];
+  return {
+    stored,
+    asked,
+    get: (account: string) => {
+      asked.push(account);
+      return Promise.resolve(stored.get(account) ?? null);
+    },
+    set: (account: string, secret: string) => {
+      asked.push(account);
+      stored.set(account, secret);
+      return Promise.resolve();
+    },
+    delete: (account: string) => {
+      asked.push(account);
+      return Promise.resolve(stored.delete(account));
+    },
+  };
+}
+
 describe('credentials on the desktop', () => {
   it('reads the keychain entry plugin:<name>:<key>, and nothing else', async () => {
-    const asked: string[] = [];
-    const capabilities = desktopCapabilities(
-      {
-        get: (account) => {
-          asked.push(account);
-          return Promise.resolve(account === 'plugin:meu-pdf:api-token' ? 's3cret' : null);
-        },
-      },
-      noNetwork,
-    );
+    const keys = keychain({ 'plugin:meu-pdf:api-token': 's3cret' });
+    const capabilities = desktopCapabilities(keys, noNetwork);
     const checked = checkedCapabilities('meu-pdf', ['credentials:api-token'], capabilities);
 
     expect(await checked.credentials('api-token')).toBe('s3cret');
-    expect(asked).toEqual([credentialAccount('meu-pdf', 'api-token')]);
+    expect(keys.asked).toEqual([credentialAccount('meu-pdf', 'api-token')]);
+  });
+
+  it('stores and forgets under the same entry the plugin reads (ADR 0134)', async () => {
+    const keys = keychain();
+    const checked = checkedCapabilities(
+      'meu-pdf',
+      ['credentials:api-token'],
+      desktopCapabilities(keys, noNetwork),
+    );
+
+    await checked.storeCredential('api-token', 'novo');
+    expect([...keys.stored]).toEqual([['plugin:meu-pdf:api-token', 'novo']]);
+    expect(await checked.credentials('api-token')).toBe('novo');
+    expect(await checked.deleteCredential('api-token')).toBe(true);
+    expect(await checked.deleteCredential('api-token')).toBe(false);
+    expect(new Set(keys.asked)).toEqual(new Set(['plugin:meu-pdf:api-token']));
+  });
+
+  it('never names an account under the signin: prefix ADR 0131 reserves', () => {
+    for (const [plugin, key] of [
+      ['signin', 'x'],
+      ['a', 'signin:b'],
+      ['meu-pdf', 'api-token'],
+    ] as const) {
+      expect(credentialAccount(plugin, key).startsWith('plugin:')).toBe(true);
+    }
   });
 
   it('says, when nothing is stored, where a person stores one', async () => {
-    const capabilities = desktopCapabilities({ get: () => Promise.resolve(null) }, noNetwork);
+    const capabilities = desktopCapabilities(keychain(), noNetwork);
     const checked = checkedCapabilities('meu-pdf', ['credentials:api-token'], capabilities);
 
     const refusal = await checked.credentials('api-token').catch((cause: unknown) => cause);
@@ -74,7 +115,7 @@ describe('the network on the desktop', () => {
       });
     };
 
-    const fetched = await desktopCapabilities({ get: () => Promise.resolve(null) }, netFetch).fetch(
+    const fetched = await desktopCapabilities(keychain(), netFetch).fetch(
       'https://api.example.com/moved',
       { method: 'GET' },
     );
@@ -121,7 +162,7 @@ describe('starting installed plugins', () => {
         launched += 1;
         throw new Error('not in this test');
       },
-      capabilities: desktopCapabilities({ get: () => Promise.resolve(null) }, noNetwork),
+      capabilities: desktopCapabilities(keychain(), noNetwork),
     });
 
     expect(launched).toBe(0);

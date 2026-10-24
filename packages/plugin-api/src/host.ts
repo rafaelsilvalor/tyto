@@ -23,9 +23,11 @@ import type {
 } from './contributions.js';
 import {
   type HostCapabilities,
+  type HostCredentials,
   type HostFetchInit,
   type HostFetchResponse,
   checkedCapabilities,
+  hostCredentials,
   responseOf,
 } from './capabilities.js';
 import {
@@ -152,9 +154,12 @@ export interface PluginHost {
   /**
    * A secret, for a key the manifest declares as `credentials:<key>`. An undeclared key
    * rejects with `E_PERMISSION`, and a declared one this host holds no value for with
-   * `E_CREDENTIAL_MISSING`.
+   * `E_CREDENTIAL_MISSING`. `credentials.set(key, value)` stores one and
+   * `credentials.delete(key)` forgets one, under the same permission; a value over 16 KiB
+   * is `E_CREDENTIAL_TOO_LARGE`, and a host whose secrets only read (the CLI) answers
+   * either with `E_CREDENTIAL_READ_ONLY` (ADR 0134).
    */
-  credentials(key: string): Promise<string>;
+  readonly credentials: HostCredentials;
 
   readonly log: Logger;
   readonly events: TypedEmitter;
@@ -593,7 +598,11 @@ export function createPluginHost(options: PluginHostOptions = {}): InProcessHost
       },
 
       fetch: async (url, init) => responseOf(await checked.fetch(url, init)),
-      credentials: (key) => checked.credentials(key),
+      credentials: hostCredentials(
+        (key) => checked.credentials(key),
+        (key, value) => checked.storeCredential(key, value),
+        (key) => checked.deleteCredential(key),
+      ),
 
       log,
       events: emitter,

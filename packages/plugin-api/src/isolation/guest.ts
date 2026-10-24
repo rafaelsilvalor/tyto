@@ -1,6 +1,6 @@
 import { type ZodType, z } from 'zod';
 
-import { PluginCapabilityError, responseOf } from '../capabilities.js';
+import { PluginCapabilityError, hostCredentials, responseOf } from '../capabilities.js';
 
 import type { Disposable, HostEventListener, HostEvents, Logger, PluginHost } from '../host.js';
 import type { GuestChannel } from './channel.js';
@@ -16,6 +16,7 @@ import {
   type GuestMessage,
   type HostMessage,
   RPC_PROTOCOL_VERSION,
+  type RequestedCapability,
   type Registration,
   type SandboxReport,
   describeIssues,
@@ -44,6 +45,9 @@ interface Kept {
 }
 
 const stringSchema = z.string();
+/** `credentials.set` answers nothing; `null` because a JSON channel drops `undefined`. */
+const storedSchema = z.null();
+const forgottenSchema = z.boolean();
 
 function messageOf(cause: unknown): string {
   return cause instanceof Error ? cause.message : String(cause);
@@ -68,7 +72,7 @@ export function runGuest(
 
   /** One of the host's capabilities, asked across the boundary and checked on the way back. */
   function request(
-    capability: 'fetch' | 'credentials',
+    capability: RequestedCapability,
     args: readonly unknown[],
     accept: ZodType,
   ): Promise<unknown> {
@@ -212,7 +216,13 @@ export function runGuest(
           fetchedResponseSchema,
         )) as Parameters<typeof responseOf>[0],
       ),
-    credentials: async (key) => (await request('credentials', [key], stringSchema)) as string,
+    credentials: hostCredentials(
+      async (key) => (await request('credentials', [key], stringSchema)) as string,
+      async (key, value) => {
+        await request('storeCredential', [key, value], storedSchema);
+      },
+      async (key) => (await request('deleteCredential', [key], forgottenSchema)) as boolean,
+    ),
     log,
     events: {
       on<Event extends keyof HostEvents>(event: Event, listener: HostEventListener<Event>) {

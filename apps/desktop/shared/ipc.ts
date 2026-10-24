@@ -1,8 +1,10 @@
 import { slotSchema, templateManifestSchema } from '@tyto/core';
 import {
   ASSET_SOURCE_MAX_BYTES,
+  CREDENTIAL_VALUE_LIMIT_BYTES,
   THEME_KINDS,
   THEME_TOKEN_NAME,
+  credentialByteLength,
   isThemeColor,
 } from '@tyto/plugin-api';
 import { z } from 'zod';
@@ -74,6 +76,15 @@ const channel = <Request extends z.ZodType, Response extends z.ZodType>(
  * makes the renderer's reach exactly what the plugins screen shows. Matched exactly, with
  * no trimming: `'meu-pdf '` is not `'meu-pdf'`, and a refusal says so.
  */
+/** What a plugin's panel may ask of the host through its bridge (ADR 0045, ADR 0134). */
+export const PANEL_CAPABILITIES = [
+  'fetch',
+  'credentials',
+  'storeCredential',
+  'deleteCredential',
+] as const;
+export type PanelCapability = (typeof PANEL_CAPABILITIES)[number];
+
 const pluginCredential = {
   plugin: z.string().min(1).max(200),
   key: z.string().min(1).max(200),
@@ -1269,7 +1280,17 @@ export const IPC_CHANNELS = {
    * declares `credentials:<key>`.
    */
   'credentials:set': channel(
-    z.object({ ...pluginCredential, secret: z.string().min(1) }),
+    z.object({
+      ...pluginCredential,
+      // The ceiling a plugin's own `credentials.set` keeps, in UTF-8 bytes (ADR 0134), so
+      // the screen cannot store a value the plugin could not have stored itself.
+      secret: z
+        .string()
+        .min(1)
+        .refine((secret) => credentialByteLength(secret) <= CREDENTIAL_VALUE_LIMIT_BYTES, {
+          message: `is over ${String(CREDENTIAL_VALUE_LIMIT_BYTES)} bytes`,
+        }),
+    }),
     z.object({ stored: z.boolean() }),
   ),
 
@@ -1519,14 +1540,15 @@ export const IPC_CHANNELS = {
    * What a plugin's panel asked of the host through its bridge, relayed by the renderer.
    *
    * Checked in main against that plugin's permissions — `net:<host>` for `fetch`,
-   * `credentials:<key>` for `credentials` (ADR 0042) — and answered as data: a refusal is
+   * `credentials:<key>` for `credentials` and for storing and forgetting that key
+   * (ADR 0042, ADR 0134) — and answered as data: a refusal is
    * `{ ok: false, code: 'E_PERMISSION' }`, never a rejection, so the renderer relays one
    * shape back to the page.
    */
   'panel:request': channel(
     z.object({
       panelId: z.string().min(1).max(300),
-      capability: z.enum(['fetch', 'credentials']),
+      capability: z.enum(PANEL_CAPABILITIES),
       args: z.array(z.unknown()).max(2),
     }),
     z.union([

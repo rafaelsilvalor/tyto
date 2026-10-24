@@ -249,6 +249,25 @@ describe("a plugin in a child process, asking for the host's capabilities", () =
     expect(answer.ok && answer.value).toBe('s3cret E_PERMISSION');
     await isolated.close();
   }, 60_000);
+
+  // Starts a plugin's process, which a full `pnpm check` can hold past Vitest's 5 s.
+  it('refuses set and delete of an undeclared key, and any write to the environment', async () => {
+    const { isolated, exporter } = await connect(
+      answering(
+        `Promise.all([host.credentials.set('other', 'x'), host.credentials.delete('other'), ` +
+          `host.credentials.set('api-token', 'x'), host.credentials.delete('api-token')]` +
+          `.map((attempt) => attempt.then(() => 'ok', (cause) => cause.code)))` +
+          `.then((codes) => codes.join(' '))`,
+      ),
+      [],
+      { permissions: ['credentials:api-token'] },
+    );
+    const answer = await exporter.exportFrame(SCENE, ARTWORK, FRAME);
+    expect(answer.ok && answer.value).toBe(
+      'E_PERMISSION E_PERMISSION E_CREDENTIAL_READ_ONLY E_CREDENTIAL_READ_ONLY',
+    );
+    await isolated.close();
+  }, 60_000);
 });
 
 describe('a plugin stuck in a loop', () => {

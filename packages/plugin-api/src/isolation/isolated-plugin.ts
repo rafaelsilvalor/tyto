@@ -18,6 +18,8 @@ import {
   type SandboxReport,
   callHandleSchema,
   credentialsArgsSchema,
+  deleteCredentialArgsSchema,
+  storeCredentialArgsSchema,
   describeIssues,
   fetchArgsSchema,
   guestMessageSchema,
@@ -283,11 +285,23 @@ export function connectIsolatedPlugin(
           // `undefined`, so the two are one here.
           const [url, init] = args.data as [string, HostFetchInit | undefined];
           reply({ ok: true, value: await capabilities.fetch(url, init) });
-        } else {
+        } else if (message.capability === 'credentials') {
           const args = credentialsArgsSchema.safeParse(message.args);
           if (!args.success)
             throw new TypeError(`host.credentials was given ${describeIssues(args.error)}`);
           reply({ ok: true, value: await capabilities.credentials(args.data[0]) });
+        } else if (message.capability === 'storeCredential') {
+          const args = storeCredentialArgsSchema.safeParse(message.args);
+          if (!args.success)
+            throw new TypeError(`host.credentials.set was given ${describeIssues(args.error)}`);
+          await capabilities.storeCredential(args.data[0], args.data[1]);
+          // `null`, not `undefined`: the desktop's channel is JSON, which drops the key.
+          reply({ ok: true, value: null });
+        } else {
+          const args = deleteCredentialArgsSchema.safeParse(message.args);
+          if (!args.success)
+            throw new TypeError(`host.credentials.delete was given ${describeIssues(args.error)}`);
+          reply({ ok: true, value: await capabilities.deleteCredential(args.data[0]) });
         }
       } catch (cause) {
         reply(

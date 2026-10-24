@@ -1,6 +1,7 @@
 import { type Server, createServer } from 'node:http';
 import type { AddressInfo } from 'node:net';
 
+import { PluginCapabilityError, checkedCapabilities } from '@tyto/plugin-api';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
 import { credentialVariable, pluginCapabilities } from './capabilities.js';
@@ -29,6 +30,31 @@ describe('credentials from the environment', () => {
     expect(capabilities.describeCredential('meu-pdf', 'api-token')).toBe(
       'the environment variable TYTO_PLUGIN_MEU_PDF_API_TOKEN',
     );
+  });
+});
+
+describe('writing a credential from the CLI', () => {
+  // The environment is the person's to set; a plugin that could write it would be writing
+  // a variable that disappears with the process (ADR 0134).
+  it('refuses set and delete as read-only, naming the variable', async () => {
+    const checked = checkedCapabilities(
+      'meu-pdf',
+      ['credentials:api-token'],
+      pluginCapabilities({ TYTO_PLUGIN_MEU_PDF_API_TOKEN: 's3cret' }),
+    );
+    for (const attempt of [
+      checked.storeCredential('api-token', 'novo'),
+      checked.deleteCredential('api-token'),
+    ]) {
+      const refusal = await attempt.catch((cause: unknown) => cause);
+      expect(refusal).toBeInstanceOf(PluginCapabilityError);
+      expect((refusal as PluginCapabilityError).code).toBe('E_CREDENTIAL_READ_ONLY');
+      expect((refusal as Error).message).toBe(
+        "Plugin 'meu-pdf' tried to change credential 'api-token', and the environment " +
+          'variable TYTO_PLUGIN_MEU_PDF_API_TOKEN is read-only here.',
+      );
+    }
+    expect(await checked.credentials('api-token')).toBe('s3cret');
   });
 });
 
