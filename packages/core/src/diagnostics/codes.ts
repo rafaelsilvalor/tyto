@@ -1396,6 +1396,48 @@ export const diagnosticCodes = {
     fatality:
       'That cell has no table and the cells after it do not run; earlier cells keep theirs.',
   },
+  // A data reference names configuration beside the recipe (ADR 0136, ADR 0137). Four codes, so
+  // a handler can tell a file that is not there from one that is withheld, broken or misshapen.
+  E_RECIPE_DATA: {
+    severity: 'error',
+    summary:
+      'A data reference is malformed, names a file that is missing, too large or outside the workspace, or the host reads no data files.',
+    template: "Data '{reference}' {problem}.",
+    spec: 'docs/adr/0137-a-recipe-reads-its-data-files-through-a-confined-port.md',
+    fatal: false,
+    fatality:
+      'That cell has no table and the cells after it do not run; earlier cells keep theirs.',
+  },
+  // Withheld, not missing: the file is there and trusting the folder reads it (ADR 0111).
+  E_RECIPE_DATA_RESTRICTED: {
+    severity: 'error',
+    summary: 'A data reference names a file in a workspace the person has not trusted.',
+    template:
+      "Data file '{reference}' is not read in a restricted workspace; trust the folder to read it.",
+    spec: 'docs/adr/0137-a-recipe-reads-its-data-files-through-a-confined-port.md',
+    fatal: false,
+    fatality:
+      'That cell has no table and the cells after it do not run; earlier cells keep theirs.',
+  },
+  E_RECIPE_DATA_SYNTAX: {
+    severity: 'error',
+    summary: 'A data file is not valid JSON with comments.',
+    template: "Data file '{reference}' cannot be read as JSON: {problem}.",
+    spec: 'docs/adr/0137-a-recipe-reads-its-data-files-through-a-confined-port.md',
+    fatal: false,
+    fatality:
+      'That cell has no table and the cells after it do not run; earlier cells keep theirs.',
+  },
+  E_RECIPE_DATA_SHAPE: {
+    severity: 'error',
+    summary:
+      "A data reference's pointer reaches nothing, or the slice it reaches is not what the verb reads.",
+    template: "Data '{reference}' does not hold what this verb reads: {problem}.",
+    spec: 'docs/adr/0137-a-recipe-reads-its-data-files-through-a-confined-port.md',
+    fatal: false,
+    fatality:
+      'That cell has no table and the cells after it do not run; earlier cells keep theirs.',
+  },
   // Zero rows is a legitimate answer, but it cannot be told from a misspelt value if it is silent.
   W_RECIPE_WHERE_EMPTY: {
     severity: 'warning',

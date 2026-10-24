@@ -156,6 +156,10 @@ non-zero.
 | `E_RECIPE_ALIAS` | error | no | A column alias cannot be used as it is defined. |
 | `E_RECIPE_DERIVATION` | error | no | A 'derive' names a derivation nobody registered, lacks a column it requires, or breaks its promise. |
 | `E_RECIPE_RUN` | error | no | A 'run' names a recipe that is not found, already running, or ends without a table. |
+| `E_RECIPE_DATA` | error | no | A data reference is malformed, names a file that is missing, too large or outside the workspace, or the host reads no data files. |
+| `E_RECIPE_DATA_RESTRICTED` | error | no | A data reference names a file in a workspace the person has not trusted. |
+| `E_RECIPE_DATA_SYNTAX` | error | no | A data file is not valid JSON with comments. |
+| `E_RECIPE_DATA_SHAPE` | error | no | A data reference's pointer reaches nothing, or the slice it reaches is not what the verb reads. |
 | `W_RECIPE_WHERE_EMPTY` | warning | no | A 'where' kept no row of a table that had rows. |
 | `W_RECIPE_JOIN_AMBIGUOUS` | warning | no | A 'join' left rows unpaired because their key answered to more than one row. |
 
@@ -269,6 +273,10 @@ incomplete brief, and a crossed box where a picture the exporter could not load 
 | `E_RECIPE_ALIAS` | no | That cell has no table and the cells after it do not run; earlier cells keep theirs. |
 | `E_RECIPE_DERIVATION` | no | That cell has no table and the cells after it do not run; earlier cells keep theirs. |
 | `E_RECIPE_RUN` | no | That cell has no table and the cells after it do not run; earlier cells keep theirs. |
+| `E_RECIPE_DATA` | no | That cell has no table and the cells after it do not run; earlier cells keep theirs. |
+| `E_RECIPE_DATA_RESTRICTED` | no | That cell has no table and the cells after it do not run; earlier cells keep theirs. |
+| `E_RECIPE_DATA_SYNTAX` | no | That cell has no table and the cells after it do not run; earlier cells keep theirs. |
+| `E_RECIPE_DATA_SHAPE` | no | That cell has no table and the cells after it do not run; earlier cells keep theirs. |
 
 ## Errors
 
@@ -1601,6 +1609,62 @@ That cell has no table and the cells after it do not run; earlier cells keep the
 ```
 
 Parameters: `recipe`, `problem`
+
+### `E_RECIPE_DATA`
+
+**Severity:** error · **Fatal:** no · **Spec:** `docs/adr/0137-a-recipe-reads-its-data-files-through-a-confined-port.md`
+
+A data reference is malformed, names a file that is missing, too large or outside the workspace, or the host reads no data files.
+
+That cell has no table and the cells after it do not run; earlier cells keep theirs.
+
+```
+Data '{reference}' {problem}.
+```
+
+Parameters: `reference`, `problem`
+
+### `E_RECIPE_DATA_RESTRICTED`
+
+**Severity:** error · **Fatal:** no · **Spec:** `docs/adr/0137-a-recipe-reads-its-data-files-through-a-confined-port.md`
+
+A data reference names a file in a workspace the person has not trusted.
+
+That cell has no table and the cells after it do not run; earlier cells keep theirs.
+
+```
+Data file '{reference}' is not read in a restricted workspace; trust the folder to read it.
+```
+
+Parameters: `reference`
+
+### `E_RECIPE_DATA_SYNTAX`
+
+**Severity:** error · **Fatal:** no · **Spec:** `docs/adr/0137-a-recipe-reads-its-data-files-through-a-confined-port.md`
+
+A data file is not valid JSON with comments.
+
+That cell has no table and the cells after it do not run; earlier cells keep theirs.
+
+```
+Data file '{reference}' cannot be read as JSON: {problem}.
+```
+
+Parameters: `reference`, `problem`
+
+### `E_RECIPE_DATA_SHAPE`
+
+**Severity:** error · **Fatal:** no · **Spec:** `docs/adr/0137-a-recipe-reads-its-data-files-through-a-confined-port.md`
+
+A data reference's pointer reaches nothing, or the slice it reaches is not what the verb reads.
+
+That cell has no table and the cells after it do not run; earlier cells keep theirs.
+
+```
+Data '{reference}' does not hold what this verb reads: {problem}.
+```
+
+Parameters: `reference`, `problem`
 
 ## Warnings
 

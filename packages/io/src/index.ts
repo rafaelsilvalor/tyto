@@ -111,7 +111,9 @@ export {
   type JsoncSyntaxCode,
   type JsoncText,
   type JsoncTextOptions,
+  type JsoncValue,
   readJsoncText,
+  readJsoncValue,
 } from './jsonc-text.js';
 
 export { type ProjectText, readProjectText } from './project-file.js';
@@ -125,6 +127,12 @@ export {
 } from './workspace.js';
 
 export type { LoadedProfile } from './profile.js';
+
+export {
+  type WorkspaceDataOptions,
+  DATA_FILE_MAX_BYTES,
+  workspaceDataResolver,
+} from './workspace-data.js';
 
 export {
   type FsTrustStore,
