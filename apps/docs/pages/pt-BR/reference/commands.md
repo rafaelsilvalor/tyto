@@ -4,7 +4,7 @@
 
 Tudo o que a janela sabe fazer, pelo título que a barra de comandos mostra: 75. Abra a barra com **`Ctrl+k` / `⌘k`** e digite parte de um título. O id é o que o `keybindings.json` usa para pôr um comando numa tecla.
 
-A janela acrescenta outros enquanto roda, que esta lista não tem como mostrar: um para abrir e fechar cada painel, inclusive os de plugins, e um para cada arquivo aberto recentemente.
+A janela acrescenta outros enquanto roda, que esta lista não tem como mostrar: um para abrir e fechar cada painel, inclusive os de plugins, um para cada arquivo aberto recentemente, e um para cada predefinição de exportação da pasta aberta, `export.preset:<nome>`.
 
 | Título | Id | Tecla padrão (Windows e Linux) | Tecla padrão (macOS) |
 | --- | --- | --- | --- |

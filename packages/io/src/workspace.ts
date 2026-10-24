@@ -182,16 +182,18 @@ export async function loadWorkspace(
  */
 async function linkCheck(
   layers: readonly ProjectLayer[],
-): Promise<(layer: number, path: string) => boolean> {
+): Promise<(layer: number, path: string, root: string) => boolean> {
   const outside = new Set<string>();
-  const keyOf = (layer: number, path: string): string => `${String(layer)}:${path}`;
+  // The root is part of the key: a preset's folder is confined to the workspace folder, not to
+  // the sheet that wrote it (ADR 0126), so one path can have two answers.
+  const keyOf = (layer: number, path: string, root: string): string =>
+    `${String(layer)}:${root}:${path}`;
   for (const candidate of projectPaths(layers)) {
-    const root = layers[candidate.layer]?.root;
-    if (root === undefined || !isInside(root, await realOfNearest(candidate.path))) {
-      outside.add(keyOf(candidate.layer, candidate.path));
+    if (!isInside(candidate.root, await realOfNearest(candidate.path))) {
+      outside.add(keyOf(candidate.layer, candidate.path, candidate.root));
     }
   }
-  return (layer, path) => outside.has(keyOf(layer, path));
+  return (layer, path, root) => outside.has(keyOf(layer, path, root));
 }
 
 /** Whether `folder/.tyto` and `home` are one folder once links are followed. */

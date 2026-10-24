@@ -134,6 +134,7 @@ non-zero.
 | `W_PROJECT_PROFILE_INVALID` | warning | no | The project file names a work profile in a form Tyto does not accept, so no profile is read. |
 | `W_PROJECT_PROFILE_MISSING` | warning | no | The work profile the project file names is not there, so no profile is read. |
 | `W_PROFILE_NESTED` | warning | no | A work profile names another profile, which is ignored: profiles are one level deep. |
+| `W_PROJECT_PRESET_NO_FOLDER` | warning | no | An export preset names no folder and no sheet sets 'output', so the preset is left out. |
 | `E_TRUST_FILE` | error | no | TYTO_HOME/trust.json cannot be read or written. |
 
 ## What is fatal, and why
@@ -1882,6 +1883,20 @@ A work profile cannot name another ('{profile}'): profiles are one level deep, s
 ```
 
 Parameters: `profile`
+
+### `W_PROJECT_PRESET_NO_FOLDER`
+
+**Severity:** warning · **Fatal:** no · **Spec:** `docs/adr/0126-an-export-preset-is-a-named-delivery-in-the-project-file.md`
+
+An export preset names no folder and no sheet sets 'output', so the preset is left out.
+
+A warning never replaces a value (ADR 0013).
+
+```
+Export preset '{preset}' names no folder and the project sets no 'output'; it is left out.
+```
+
+Parameters: `preset`
 
 ## Codes the desktop window mints
 

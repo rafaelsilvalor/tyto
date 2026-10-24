@@ -452,6 +452,11 @@ export interface Catalogue {
   /** Heads the list of files an earlier export left and this one removed or kept (ADR 0054). */
   readonly 'export.leftovers': string;
   readonly 'command.file.export': string;
+  /**
+   * A prefix, like `command.file.recent`: an export preset's command reads "Export: entregas",
+   * the preset's name as written in the project file (TYTO-270, ADR 0126).
+   */
+  readonly 'command.export.preset': string;
 
   /** The template mode (TYTO-44). */
   readonly 'command.template.edit': string;
@@ -886,6 +891,7 @@ export const CATALOGUE_KEYS = [
   'export.problems',
   'export.leftovers',
   'command.file.export',
+  'command.export.preset',
   'command.template.edit',
   'command.template.new',
   'templateMode.heading',

@@ -1,7 +1,7 @@
 # Pasta de trabalho
 
 ::: info Como esta página foi conferida
-Cada passo foi seguido em 2026-10-21 num build de desenvolvimento do Tyto no Windows 11, numa pasta com um `.tyto/project.json`, um template em `tpl/`, uma imagem em `art/` e dois briefs em `briefs/`, numa segunda pasta cujos `assets` levavam para fora dela, e no mesmo dia numa pasta que cita um perfil de trabalho guardado em `~/.tyto/profiles/` e numa que cita um arquivo de perfil dentro dela cujos `assets` levavam para fora da pasta do perfil. Os menus e rótulos abaixo são os da janela em português. Os botões do cabeçalho do Explorador foram conferidos em 2026-10-23 num build de desenvolvimento, no tema claro e no escuro.
+Cada passo foi seguido em 2026-10-21 num build de desenvolvimento do Tyto no Windows 11, numa pasta com um `.tyto/project.json`, um template em `tpl/`, uma imagem em `art/` e dois briefs em `briefs/`, numa segunda pasta cujos `assets` levavam para fora dela, e no mesmo dia numa pasta que cita um perfil de trabalho guardado em `~/.tyto/profiles/` e numa que cita um arquivo de perfil dentro dela cujos `assets` levavam para fora da pasta do perfil. Os menus e rótulos abaixo são os da janela em português. Os botões do cabeçalho do Explorador foram conferidos em 2026-10-23 num build de desenvolvimento, no tema claro e no escuro. As predefinições de exportação foram conferidas em 2026-10-23 num build de desenvolvimento, pela barra de comandos e por uma tecla ligada no `keybindings.json`.
 :::
 
 Uma pasta de trabalho é uma pasta de projeto com um `.tyto/project.json` dentro. O arquivo diz onde o projeto guarda seus templates, imagens e fontes, e para onde vão as exportações:
@@ -28,6 +28,34 @@ Enquanto ela está aberta:
 - **Exportar…** aponta para a pasta `output` dela até você escolher outra.
 
 Um brief fora da pasta funciona como sempre funcionou.
+
+## Predefinições de exportação: uma entrega numa tecla
+
+Um arquivo de projeto pode nomear **predefinições de exportação**: um conjunto de tamanhos e tipos de arquivo, e a pasta para onde eles vão, rodado como um comando só.
+
+```jsonc
+{
+  "output": "exports",
+  "exportPresets": {
+    "entregas": { "formats": ["grid-1x1", "story"], "folder": "entregas" },
+    "web": { "formats": ["story"], "types": ["webp", "png"] },
+  },
+}
+```
+
+- `formats` lista os tamanhos, pelo menos um. Um tamanho que o template do brief não tem é avisado quando a predefinição roda, como a janela Exportar avisa.
+- `types` lista os tipos de arquivo — `png`, `jpeg`, `webp`, `svg` — e é `png` quando fica de fora.
+- `folder` é para onde vão os arquivos, relativo à pasta aberta. Sem ele a predefinição usa `output`; sem nenhum dos dois, a predefinição fica de fora e **Problemas** diz por quê. A pasta é criada se não existir.
+
+Cada predefinição é um comando na barra de comandos, **Exportar: entregas**, para o brief da frente. Ele abre a janela Exportar já rodando, com a contagem, os problemas e **Abrir pasta** como sempre, e grava o que [Exportar](../export/index.md#o-que-e-gravado) grava: um arquivo que a exportação anterior pôs lá e esta não gerou é removido e listado, e arquivos seus na pasta nunca são tocados.
+
+Para dar uma tecla a uma predefinição, ligue o comando dela no [`keybindings.json`](../customize/keybindings-json.md):
+
+```json
+[{ "key": "ctrl+e", "command": "export.preset:entregas" }]
+```
+
+Um perfil de trabalho também pode ter predefinições. Uma pasta que define uma predefinição com o mesmo nome substitui essa e mantém as outras do perfil. O `folder` de um perfil continua relativo à pasta aberta, então `"folder": "entregas"` é a `entregas` de cada campanha. Numa pasta em que você ainda não confiou, o `folder` de uma predefinição precisa ficar dentro dela: um que leva para fora aparece como `W_PROJECT_PATH_OUTSIDE` e essa predefinição fica de fora.
 
 ## Ver os arquivos dela: o Explorador
 

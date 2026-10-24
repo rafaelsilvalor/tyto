@@ -28,6 +28,10 @@ Cada arquivo leva o nome do tamanho e o número da arte: `grid-01.png`, `grid-02
 
 Ao lado deles, uma pasta `editaveis` guarda o que é preciso para fazer os mesmos arquivos de novo: uma cópia do brief, um `template.txt` com o nome e a versão do template, e um `result.json` listando cada arquivo gravado.
 
+## Exportar com uma predefinição
+
+Quando a [pasta de trabalho](../editor/workspace-folder.md#predefinicoes-de-exportacao-uma-entrega-numa-tecla) aberta nomeia predefinições de exportação, cada uma é um comando como **Exportar: entregas**: ele exporta o brief da frente com os tamanhos e tipos de arquivo da predefinição para a pasta dela, sem nada a escolher, e mostra a exportação na mesma janela. Uma predefinição pode ter sua própria tecla no `keybindings.json`.
+
 ## Nesta seção
 
 - [Imagens](./images.md) — PNG, JPEG e WebP; escala e qualidade.

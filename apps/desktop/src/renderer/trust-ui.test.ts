@@ -24,6 +24,7 @@ const view = (overrides: Partial<WorkspaceView> = {}): WorkspaceView => ({
   output: null,
   profile: null,
   places: [],
+  exportPresets: [],
   problems: [],
   ...overrides,
 });

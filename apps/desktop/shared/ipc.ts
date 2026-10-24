@@ -125,6 +125,20 @@ const workspacePlace = z.object({
   origin: placeOrigin,
 });
 
+/**
+ * One export preset of the open folder (TYTO-270, ADR 0126): its name as written, and what the
+ * window hands `export:start` when it runs. The folder is resolved and confined by main; the
+ * window shows it in the export box and sends it back, as it does the dialog's own.
+ */
+const workspaceExportPreset = z.object({
+  // No length caps: the project file is the person's, and a cap here would fail the whole
+  // answer for one long name instead of costing that preset.
+  name: z.string().min(1),
+  formats: z.array(z.string().min(1)).min(1),
+  types: z.array(z.string().min(1)).min(1),
+  folder: z.string().min(1),
+});
+
 /** The open workspace folder, as the window may know it (TYTO-278, ADR 0113). */
 const workspaceState = z.object({
   folder: z.string().nullable(),
@@ -141,6 +155,8 @@ const workspaceState = z.object({
   profile: workspaceProfile.nullable(),
   /** Each place set by a sheet, in key order; a key no sheet set is absent. */
   places: z.array(workspacePlace).max(4),
+  /** The export presets, each a command `export.preset:<name>` in the window (TYTO-270). */
+  exportPresets: z.array(workspaceExportPreset).max(100),
   problems: z.array(diagnostic.omit({ range: true })).max(200),
 });
 

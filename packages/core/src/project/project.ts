@@ -2,6 +2,13 @@ import { type Diagnostic, diagnostic } from '../diagnostics/diagnostic.js';
 import type { Trust } from '../ports/trust-store.js';
 import type { SourceRange } from '../source/range.js';
 import { isInsidePath, resolvePath } from './paths.js';
+import {
+  EXPORT_PRESETS_KEY,
+  type ExportPreset,
+  type SheetPreset,
+  presetPaths,
+  readPresets,
+} from './presets.js';
 
 /**
  * A workspace's `.tyto/project.json`: the places a project keeps its things (TYTO-278,
@@ -31,6 +38,26 @@ export interface ProjectEntry {
   readonly valueRange?: SourceRange;
   /** Where each entry of a list value was written, in order. */
   readonly entryRanges?: readonly SourceRange[];
+  /**
+   * The value's syntax tree, for a key whose value nests (`exportPresets`, TYTO-270), so a
+   * diagnostic can point at one field of one preset. Absent, nested ones point at the value.
+   */
+  readonly node?: ProjectNode;
+}
+
+/** One value of a project text with where it was written, down to every nested member. */
+export interface ProjectNode {
+  readonly range: SourceRange;
+  /** An object's members, in order. */
+  readonly members?: readonly ProjectMember[];
+  /** An array's items, in order. */
+  readonly items?: readonly ProjectNode[];
+}
+
+export interface ProjectMember {
+  readonly key: string;
+  readonly keyRange: SourceRange;
+  readonly value: ProjectNode | undefined;
 }
 
 /** One sheet of a project: a workspace's own file, or (TYTO-347) a work profile. */
@@ -51,10 +78,12 @@ export interface ProjectResolveOptions {
    * it once links are followed.
    *
    * The I/O side answers it after `realpath` on both ends (ADR 0111); asked only for the
-   * paths {@link projectPaths} lists. Left out, the lexical check is the only one, which is
-   * what a test of the rule itself wants and what no composition root may ship.
+   * paths {@link projectPaths} lists, each with the `root` it must stay inside: the layer's
+   * own, or the workspace folder for a preset's folder (ADR 0126). Left out, the lexical check
+   * is the only one, which is what a test of the rule itself wants and what no composition root
+   * may ship.
    */
-  readonly leadsOutside?: (layer: number, path: string) => boolean;
+  readonly leadsOutside?: (layer: number, path: string, root: string) => boolean;
 }
 
 export interface ResolvedProject {
@@ -71,6 +100,11 @@ export interface ResolvedProject {
    * withheld, as if it had none (ADR 0111).
    */
   readonly sections: Readonly<Record<string, unknown>>;
+  /**
+   * The export presets, merged by name, in the order first written (TYTO-270, ADR 0126). A
+   * preset that names no folder has the project's `output`; one with neither is left out.
+   */
+  readonly exportPresets: readonly ExportPreset[];
   /**
    * Which kind of sheet each value came from, so the window can say "from the profile" or
    * "from this folder" (TYTO-347). A key no sheet set has no origin.
@@ -91,7 +125,13 @@ export interface ProjectOrigins {
 
 type ListKey = 'assets' | 'templates' | 'fonts';
 const LIST_KEYS: readonly ListKey[] = ['assets', 'templates', 'fonts'];
-const KNOWN_KEYS = new Set<string>([...LIST_KEYS, 'output', 'profile', 'plugins']);
+const KNOWN_KEYS = new Set<string>([
+  ...LIST_KEYS,
+  'output',
+  'profile',
+  'plugins',
+  EXPORT_PRESETS_KEY,
+]);
 
 /** What one sheet sets; a key it does not set, or sets to nothing usable, is absent. */
 interface LayerValues {
@@ -100,6 +140,7 @@ interface LayerValues {
   fonts?: readonly string[];
   output?: string;
   sections?: Readonly<Record<string, unknown>>;
+  presets?: ReadonlyMap<string, SheetPreset | null>;
 }
 
 /**
@@ -119,9 +160,11 @@ export function resolveProject(
   let sections: Record<string, unknown> = {};
   const origins: { -readonly [Key in ListKey | 'output']?: ProjectLayer['kind'] } = {};
   const sectionOrigins: Record<string, ProjectLayer['kind']> = {};
+  const presets = new Map<string, { preset: SheetPreset; layer: number }>();
+  const workspace = workspaceOf(layers);
   const diagnostics = layers.map((layer, index) => {
     const found: Diagnostic[] = [];
-    const values = readLayer(layer, index, options, found);
+    const values = readLayer(layer, index, workspace, options, found);
     for (const key of LIST_KEYS) {
       const value = values[key];
       if (value === undefined) continue;
@@ -136,14 +179,38 @@ export function resolveProject(
       sections = { ...sections, ...values.sections };
       for (const id of Object.keys(values.sections)) sectionOrigins[id] = layer.kind;
     }
+    // By name, the later sheet's replacing the earlier's whole; a refused one removes the name.
+    for (const [name, preset] of values.presets ?? []) {
+      if (preset === null) presets.delete(name);
+      else presets.set(name, { preset, layer: index });
+    }
     return found;
   });
+  const exportPresets: ExportPreset[] = [];
+  for (const { preset, layer } of presets.values()) {
+    const folder = preset.folder ?? merged.output;
+    if (folder === undefined) {
+      // No silent default: a delivery with nowhere to go is not run (ADR 0126).
+      diagnostics[layer]?.push(
+        diagnostic('W_PROJECT_PRESET_NO_FOLDER', { preset: preset.name }, at(preset.nameRange)),
+      );
+      continue;
+    }
+    exportPresets.push({
+      name: preset.name,
+      formats: preset.formats,
+      types: preset.types,
+      folder,
+      origin: layers[layer]?.kind ?? 'folder',
+    });
+  }
   return {
     assets: merged.assets ?? [],
     templates: merged.templates ?? [],
     fonts: merged.fonts ?? [],
     output: merged.output,
     sections,
+    exportPresets,
     origins: { ...origins, sections: sectionOrigins },
     diagnostics,
   };
@@ -155,9 +222,19 @@ export function resolveProject(
  */
 export function projectPaths(
   layers: readonly ProjectLayer[],
-): readonly { readonly layer: number; readonly path: string }[] {
-  const paths: { layer: number; path: string }[] = [];
+): readonly { readonly layer: number; readonly path: string; readonly root: string }[] {
+  const paths: { layer: number; path: string; root: string }[] = [];
+  const workspace = workspaceOf(layers);
   layers.forEach((layer, index) => {
+    // A preset's folder is confined to the workspace folder when either sheet is restricted.
+    if (layer.trust === 'restricted' || workspace.trust === 'restricted') {
+      for (const entry of layer.entries) {
+        if (entry.key !== EXPORT_PRESETS_KEY) continue;
+        for (const path of presetPaths(entry, workspace.root)) {
+          paths.push({ layer: index, path, root: workspace.root });
+        }
+      }
+    }
     if (layer.trust === 'trusted') return;
     for (const entry of layer.entries) {
       const written = LIST_KEYS.includes(entry.key as ListKey)
@@ -170,16 +247,28 @@ export function projectPaths(
       for (const value of written) {
         if (!isFolderValue(value)) continue;
         const path = resolvePath(layer.root, value);
-        if (isInsidePath(layer.root, path)) paths.push({ layer: index, path });
+        if (isInsidePath(layer.root, path)) paths.push({ layer: index, path, root: layer.root });
       }
     }
   });
   return paths;
 }
 
+/**
+ * The workspace folder's sheet, the last `folder` one, which a preset's folder resolves
+ * against whichever sheet wrote it (ADR 0126). A list with none (a test of a profile alone)
+ * answers the last sheet.
+ */
+function workspaceOf(layers: readonly ProjectLayer[]): Pick<ProjectLayer, 'root' | 'trust'> {
+  let found: ProjectLayer | undefined;
+  for (const layer of layers) if (layer.kind === 'folder') found = layer;
+  return found ?? layers[layers.length - 1] ?? { root: '/', trust: 'restricted' };
+}
+
 function readLayer(
   layer: ProjectLayer,
   index: number,
+  workspace: Pick<ProjectLayer, 'root' | 'trust'>,
   options: ProjectResolveOptions,
   found: Diagnostic[],
 ): LayerValues {
@@ -211,6 +300,21 @@ function readLayer(
           ),
         );
       }
+    } else if (entry.key === EXPORT_PRESETS_KEY) {
+      const leadsOutside = options.leadsOutside;
+      const presets = readPresets(
+        entry,
+        {
+          workspaceRoot: workspace.root,
+          confined: layer.trust === 'restricted' || workspace.trust === 'restricted',
+          leadsOutside:
+            leadsOutside === undefined
+              ? undefined
+              : (path) => leadsOutside(index, path, workspace.root),
+        },
+        found,
+      );
+      if (presets !== undefined) values.presets = presets;
     } else if (entry.key === 'plugins') {
       const sections = sectionsOf(layer, entry, found);
       if (sections !== undefined) values.sections = sections;
@@ -273,7 +377,8 @@ function folderOf(
   const path = resolvePath(layer.root, value);
   if (layer.trust === 'trusted') return path;
   // Lexically first, which needs no disk; then, for what passed, whatever links say.
-  const outside = !isInsidePath(layer.root, path) || (options.leadsOutside?.(index, path) ?? false);
+  const outside =
+    !isInsidePath(layer.root, path) || (options.leadsOutside?.(index, path, layer.root) ?? false);
   if (!outside) return path;
   found.push(
     diagnostic(

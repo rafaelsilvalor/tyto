@@ -112,6 +112,42 @@ describe('loadWorkspace', () => {
     expect(trusted?.project.output).toBe(join(trusted?.folder ?? '', 'linked', 'exports'));
   });
 
+  it("resolves a named profile's preset folder in the workspace (ADR 0126)", async () => {
+    await mkdir(join(home, 'profiles', 'saude'), { recursive: true });
+    await writeFile(
+      join(home, 'profiles', 'saude', 'profile.json'),
+      '{ "exportPresets": { "entregas": { "formats": ["story"], "folder": "entregas" } } }',
+    );
+    await project('{ "profile": "saude" }');
+    const loaded = await loadWorkspace(work, { trustStore: answering('restricted'), home });
+    expect(loaded?.project.exportPresets).toEqual([
+      {
+        name: 'entregas',
+        formats: ['story'],
+        types: ['png'],
+        folder: join(loaded?.folder ?? '', 'entregas'),
+        origin: 'profile',
+      },
+    ]);
+  });
+
+  it('refuses, in a restricted folder, a preset folder a link carries outside', async () => {
+    const outside = join(scratch, 'private');
+    await mkdir(outside);
+    await linkFolder(outside, join(work, 'linked'));
+    await project(
+      '{ "exportPresets": {\n  "fora": { "formats": ["story"], "folder": "linked/x" },\n' +
+        '  "dentro": { "formats": ["story"], "folder": "entregas" } } }',
+    );
+    const restricted = await loadWorkspace(work, { trustStore: answering('restricted'), home });
+    expect(restricted?.project.exportPresets.map((preset) => preset.name)).toEqual(['dentro']);
+    const refused = restricted?.diagnostics.find((item) => item.code === 'W_PROJECT_PATH_OUTSIDE');
+    expect(refused?.message).toContain('exportPresets.fora.folder');
+    // At the value written in the file, not at the whole key.
+    const text = restricted?.text ?? '';
+    expect(text.slice(refused?.range?.start, refused?.range?.end)).toBe('"linked/x"');
+  });
+
   it('trusts for one run on --trust without asking the store', async () => {
     await project('{ "output": "../elsewhere" }');
     const loaded = await loadWorkspace(work, {

@@ -510,6 +510,8 @@ describe('switching the language', () => {
     'command.file.save',
     'command.file.saveAs',
     'command.file.recent',
+    // TYTO-270: the prefix of an export preset's command, built with the preset's name.
+    'command.export.preset',
     'document.untitled',
     'document.unsaved',
     'file.missing',

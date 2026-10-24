@@ -114,8 +114,8 @@ describe('resolveProject', () => {
         folder({ output: 'elsewhere' }, 'trusted'),
       ]),
     ).toEqual([
-      { layer: 0, path: '/work/promo/out' },
-      { layer: 0, path: '/work/promo/art' },
+      { layer: 0, path: '/work/promo/out', root: '/work/promo' },
+      { layer: 0, path: '/work/promo/art', root: '/work/promo' },
     ]);
   });
 

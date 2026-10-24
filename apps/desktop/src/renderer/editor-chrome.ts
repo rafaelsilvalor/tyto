@@ -1,6 +1,6 @@
 import { type LanguageName, type jsonAssist } from '@tyto/editor';
 
-import { BRIEF_ONLY_COMMANDS, TEXT_COMMANDS } from './commands.js';
+import { TEXT_COMMANDS, isBriefOnlyCommand } from './commands.js';
 import { type DocumentState } from './documents.js';
 import { planTemplateEdit, type TemplateEdit, templateOf } from './frontmatter.js';
 
@@ -77,7 +77,7 @@ export function editorChromeFor(kind: Kind): EditorChrome {
  */
 export const commandOffered = (kind: Kind, id: string): boolean => {
   const chrome = editorChromeFor(kind);
-  if (!chrome.briefCommands && BRIEF_ONLY_COMMANDS.has(id)) return false;
+  if (!chrome.briefCommands && isBriefOnlyCommand(id)) return false;
   return chrome.textCommands || !TEXT_COMMANDS.has(id);
 };
 
