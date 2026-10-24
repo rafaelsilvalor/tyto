@@ -109,6 +109,7 @@ async function shoot(name: string): Promise<void> {
     await app.evaluate(({ nativeTheme }, source) => {
       nativeTheme.themeSource = source;
     }, scheme);
+    // scheme: the screenshot in each theme Rafael approves by looking; main is told too.
     await window.emulateMedia({ colorScheme: scheme });
     await window.waitForTimeout(300);
     await window.screenshot({ path: join(shots, `${name}-${scheme}.png`) });
