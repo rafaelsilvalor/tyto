@@ -180,6 +180,9 @@ const settingOutline = z.object({
   members: z.object({ options: settingOptions }).optional(),
 });
 
+/** What a file opens as in a tab (TYTO-247, ADR 0132): `DocumentFormat` in `file-icons.ts`. */
+const documentFormat = z.enum(['brief', 'text', 'markdown']);
+
 /**
  * A brief the window has open, as both sides agree to describe one.
  *
@@ -197,6 +200,13 @@ const openDocument = z.object({
   name: z.string().min(1),
   pathLabel: z.string().min(1),
   text: z.string(),
+  /**
+   * What the file opens as (TYTO-247, ADR 0132): main names it from the path's extension —
+   * `.txt` is `text`, `.md` is `markdown`, anything else `brief`. The window takes it when the
+   * file comes into a tab and keeps it for the tab's life, so a rename does not change it. The
+   * app's own files are opened by their own commands, whose kind wins over this.
+   */
+  format: documentFormat,
 });
 
 /**
@@ -263,8 +273,12 @@ const movedDocument = z.object({
   pathLabel: z.string().min(1),
 });
 
-/** What a session tab holds: a brief, or one of the app's own files (TYTO-113, TYTO-277). */
-const sessionTabKind = z.enum(['brief', 'settings', 'keybindings', 'snippets']);
+/**
+ * What a session tab holds: a brief, one of the app's own files (TYTO-113, TYTO-277), or a text
+ * file, plain or Markdown (TYTO-247, ADR 0132). A session written before TYTO-247 names only the
+ * first four, so it still reads.
+ */
+const sessionTabKind = z.enum(['brief', 'settings', 'keybindings', 'snippets', 'text', 'markdown']);
 
 /** The template mode's two files, by the name each buffer has in the window (TYTO-44). */
 const templateBuffer = z.enum(['manifest', 'markup']);
@@ -811,7 +825,8 @@ export const IPC_CHANNELS = {
 
   /**
    * Opens the brief an explorer entry names in a tab, `queue:open-brief`'s way: an id and never a
-   * path, and only a `.brief` main listed inside the open folder. Any other entry, or one whose
+   * path, and only a `.brief`, `.txt` or `.md` main listed inside the open folder (TYTO-247,
+   * ADR 0132), with the format main named from its extension. Any other entry, or one whose
    * file has gone, answers no document. Nothing else is opened, run or handed to the operating
    * system (ADR 0111).
    */
@@ -857,8 +872,8 @@ export const IPC_CHANNELS = {
   /**
    * A new empty file or folder called `name` in the folder `parentId` names (`null` is the open
    * folder), from the explorer (TYTO-352, ADR 0121). **Strict, and an id and a name, never a
-   * path.** Nothing is overwritten: a name already taken answers `exists`. A new `*.brief`
-   * opens in the tab `documentId`, the way `explorer:open` does; any other entry answers no
+   * path.** Nothing is overwritten: a name already taken answers `exists`. A new `*.brief`,
+   * `*.txt` or `*.md` opens in the tab `documentId`, the way `explorer:open` does (ADR 0132); any other entry answers no
    * document. Works in an untrusted folder too: it runs nothing.
    */
   'explorer:create': channel(
@@ -973,7 +988,16 @@ export const IPC_CHANNELS = {
    * nothing if the dialog was dismissed.
    */
   'file:save': channel(
-    z.object({ documentId, text: z.string(), saveAs: z.boolean() }),
+    z.object({
+      documentId,
+      text: z.string(),
+      saveAs: z.boolean(),
+      /**
+       * What the tab is (TYTO-247, ADR 0132), so a Save As dialog offers its own extension first.
+       * Absent is a brief, which is what every save sent before.
+       */
+      format: documentFormat.optional(),
+    }),
     z.object({
       document: openDocument.nullable(),
       /**

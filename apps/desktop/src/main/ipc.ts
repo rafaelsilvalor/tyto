@@ -19,6 +19,7 @@ import {
   parseIpc,
   parseIpcEvent,
 } from '../../shared/ipc.js';
+import { TAB_EXTENSIONS, isTextFile } from '../../shared/file-icons.js';
 import { type StatusBarColors } from '../../shared/status-bar-colors.js';
 import { type StatusBarItemId } from '../../shared/status-bar-items.js';
 import { type VimModeStyle } from '../../shared/vim-mode-style.js';
@@ -224,7 +225,7 @@ export interface IpcDependencies {
    */
   readonly explorer: Pick<
     ExplorerService,
-    'list' | 'briefPath' | 'image' | 'create' | 'rename' | 'delete' | 'pathOf'
+    'list' | 'filePath' | 'image' | 'create' | 'rename' | 'delete' | 'pathOf'
   >;
   /**
    * A native context menu of the window's items at a point, settling with the id picked or
@@ -474,8 +475,10 @@ export function createHandlers(dependencies: IpcDependencies): Handlers {
 
     'explorer:list': ({ entryId }) => explorer.list(entryId),
 
+    // TYTO-247, ADR 0132: a `.txt` or `.md` opens in a tab as a brief does, its format named by
+    // the documents service from the extension; anything else opens nothing.
     'explorer:open': async ({ documentId, entryId }) => {
-      const path = await explorer.briefPath(entryId);
+      const path = await explorer.filePath(entryId, TAB_EXTENSIONS);
       if (path === undefined) return { document: null, documentId: null };
       return documents.openPath(documentId, path);
     },
@@ -495,7 +498,7 @@ export function createHandlers(dependencies: IpcDependencies): Handlers {
       const made = await explorer.create(parentId, name, kind);
       if (!made.ok) return made;
       const opened =
-        made.entry.kind === 'brief'
+        made.entry.kind === 'brief' || (made.entry.kind === 'file' && isTextFile(made.entry.name))
           ? await documents.openPath(documentId, made.path)
           : { document: null, documentId: null };
       return { ok: true, entry: made.entry, ...opened };
@@ -526,7 +529,8 @@ export function createHandlers(dependencies: IpcDependencies): Handlers {
 
     'file:reopen': ({ documentId, path }) => documents.reopen(documentId, path),
 
-    'file:save': ({ documentId, text, saveAs }) => documents.save(documentId, text, saveAs),
+    'file:save': ({ documentId, text, saveAs, format }) =>
+      documents.save(documentId, text, saveAs, format),
 
     'file:close': async ({ documentId }) => {
       documents.close(documentId);

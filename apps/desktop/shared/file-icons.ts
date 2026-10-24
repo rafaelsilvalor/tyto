@@ -113,3 +113,36 @@ export function fileIconFor(subject: FileIconSubject): FileIconName {
  */
 export const isPreviewImage = (name: string): boolean =>
   ['png', 'jpg', 'jpeg', 'webp', 'gif', 'svg'].includes(extensionOf(name));
+
+/**
+ * What a file opens as in a tab (TYTO-247, ADR 0132): a brief, plain text or Markdown. Main
+ * names it from the path's extension at every open; the window never guesses it from a name.
+ */
+export type DocumentFormat = 'brief' | 'text' | 'markdown';
+
+/** The two text formats, and only these two: `.json`, `.csv` and `.yaml` stay out (Rafael). */
+const TEXT_FORMATS: Readonly<Record<string, 'text' | 'markdown'>> = {
+  txt: 'text',
+  md: 'markdown',
+};
+
+/** The extensions a tab opens, with the dot, as the explorer and the dialogs ask for them. */
+export const TAB_EXTENSIONS = ['.brief', '.txt', '.md'] as const;
+
+/** The text format of a file of this name, or none. Own keys only: `x.constructor` is no text. */
+const textFormatOf = (name: string): 'text' | 'markdown' | undefined => {
+  const extension = extensionOf(name);
+  return Object.prototype.hasOwnProperty.call(TEXT_FORMATS, extension)
+    ? TEXT_FORMATS[extension]
+    : undefined;
+};
+
+/** Whether a click on a file of this name opens it in a tab as text (TYTO-247): `.txt`, `.md`. */
+export const isTextFile = (name: string): boolean => textFormatOf(name) !== undefined;
+
+/**
+ * The format a file of this name opens as: `.txt` is text, `.md` is Markdown, and anything else
+ * a brief — which is what every file the window opened was before TYTO-247, `brief.brief` of a
+ * queue task and a save-as with no extension included.
+ */
+export const documentFormatOf = (name: string): DocumentFormat => textFormatOf(name) ?? 'brief';

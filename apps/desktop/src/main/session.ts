@@ -102,6 +102,13 @@ type TemplateRequest = IpcRequest<'session:write'>['template'];
 export const savedHashOf = (text: string): string =>
   createHash('sha256').update(text.replace(/\r\n?/gu, '\n')).digest('hex');
 
+/**
+ * Whether a session tab of this kind is a file main holds by path — a brief or a text file
+ * (TYTO-247, ADR 0132) — rather than one of the app's own files, which main knows by name.
+ */
+export const hasPath = (kind: StoredTab['kind']): kind is 'brief' | 'text' | 'markdown' =>
+  kind === 'brief' || kind === 'text' || kind === 'markdown';
+
 /** A brief that came back with something to show: its file, or its draft in no file. */
 const isBriefBack = (tab: RestoredTab): boolean =>
   tab.kind === 'brief' && (tab.document !== null || tab.draft !== null);
@@ -126,7 +133,7 @@ export function createSessionService(options: SessionServiceOptions): SessionSer
     const staleAgainst = (text: string): boolean =>
       tab.draft !== undefined && savedHashOf(text) !== tab.draft.savedHash;
 
-    if (tab.kind !== 'brief') {
+    if (!hasPath(tab.kind)) {
       if (tab.draft === undefined) return nothing;
       const text = await options.readText(appFileOf(tab.kind)).catch(() => '');
       return { ...nothing, stale: staleAgainst(text) };
@@ -206,9 +213,9 @@ export function createSessionService(options: SessionServiceOptions): SessionSer
           tab.draft === null || savedText === undefined
             ? undefined
             : { text: tab.draft.text, savedHash: savedHashOf(savedText) };
-        const path = tab.kind === 'brief' ? documents.pathOf(tab.documentId) : undefined;
-        // A brief in no file with nothing typed in it has nothing to bring back.
-        if (tab.kind === 'brief' && path === undefined && draft === undefined) continue;
+        const path = hasPath(tab.kind) ? documents.pathOf(tab.documentId) : undefined;
+        // A brief or a text tab in no file with nothing typed in it has nothing to bring back.
+        if (hasPath(tab.kind) && path === undefined && draft === undefined) continue;
 
         if (index === active) keptActive = kept.length;
         keptIndex.set(tab.documentId, kept.length);

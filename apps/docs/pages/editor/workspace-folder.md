@@ -62,9 +62,10 @@ A work profile can hold presets too. A folder that defines a preset of the same 
 Opening a folder with **File ▸ Open Folder…** opens the **Explorer** in the left area, above the queue. It lists the folder's files and folders, folders first, and shows a folder's contents when you open it. A file made, renamed or deleted outside Tyto appears or goes away on its own, a moment later.
 
 - **Click a brief** to open it in a tab, or select it and press **Enter**. A brief already open is its tab.
+- **Click a `.txt` or a `.md`** to open it in a tab too, as [a text file](./text-files.md).
 - **Click a folder**, or press **Right** and **Left**, to open and close it. **Up**, **Down**, **Home** and **End** move through the list.
 - **Click an image** — a `.png`, `.jpg`, `.jpeg`, `.webp`, `.gif` or `.svg` — to see it in the preview, or select it and press **Enter**. The Explorer keeps the focus, so you can go on choosing; the preview tab is named after the file, and [the preview](./panels.md#an-image-from-the-explorer) shows its size.
-- **Any other file** — a PDF, a font — is listed and does nothing when clicked. Tyto does not open files with other programs from the Explorer.
+- **Any other file** — a PDF, a font, a `.json` — is listed and does nothing when clicked. Tyto does not open files with other programs from the Explorer.
 - A folder holding more than 2,000 entries shows the first 2,000 and a line saying how many more there are. `.git` is not listed.
 
 Each entry has an icon for its type: a brief, an image, a font, a JSON file, a text file, a template folder and the `template.html`, `template.ts` and `manifest.yaml` in it, the project's own `.tyto/project.json`, and the app's `settings.json`, `keybindings.json` and `snippets.json`. A folder named `assets`, and the folders your `.tyto/project.json` names as `assets`, `templates` or `output`, get icons of their own. A file Tyto has no icon for gets a plain page. The tabs use the same icons.
@@ -75,7 +76,7 @@ Right-click an entry for **New File…**, **New Folder…**, **Rename…** and *
 
 While a folder is open, the Explorer's header has three buttons beside its **×**: **New File…** and **New Folder…** open the same field as the menu, in the same place, and **Collapse All** closes every open folder, at every depth. There is no refresh button: the Explorer lists again on its own when the folder changes.
 
-- **New File…** and **New Folder…** open a field in the tree: in the folder selected, in the folder of the file selected, or at the top of the folder when nothing is selected (or when you right-clicked the empty space). Type the name and press **Enter**. The name is used exactly as typed, extension or not; a new `.brief` opens in a tab, and any other file is only made.
+- **New File…** and **New Folder…** open a field in the tree: in the folder selected, in the folder of the file selected, or at the top of the folder when nothing is selected (or when you right-clicked the empty space). Type the name and press **Enter**. The name is used exactly as typed, extension or not; a new `.brief`, `.txt` or `.md` opens in a tab, and any other file is only made.
 - **Rename…**, or **F2** on the selected entry, turns its name into the same field. A brief open in a tab keeps its tab, which shows the new name; text you had not saved stays unsaved, and the next save writes to the new name.
 - In the field, **Enter** or clicking elsewhere confirms and **Escape** cancels. A name that is taken, or that no file can have, keeps the field open with your text and a line under it saying why.
 - **Delete**, or the **Delete** key on the selected entry, always asks first, and moves the file or the folder to the system's Recycle Bin (the Trash on macOS and Linux), where you can restore it. Tyto never deletes anything for good. If a tab has unsaved changes to a file in it, the question says so, and the text stays in the tab, which now belongs to no file. If the Recycle Bin refuses the entry — some network drives have none — nothing is deleted and the Explorer says so under the entry.

@@ -43,8 +43,8 @@ export interface ProblemsState {
   readonly kind?: ProblemsKind;
 }
 
-/** A brief, or one of the app's own files (`DocumentState.kind`). */
-export type ProblemsKind = 'brief' | 'settings' | 'keybindings' | 'snippets';
+/** A brief, one of the app's own files, or a text file (`DocumentState.kind`). */
+export type ProblemsKind = 'brief' | 'settings' | 'keybindings' | 'snippets' | 'text' | 'markdown';
 
 /** The sentence the empty panel says, by what it is about. */
 const EMPTY_KEYS: Readonly<Record<ProblemsKind, CatalogueKey>> = {
@@ -52,6 +52,10 @@ const EMPTY_KEYS: Readonly<Record<ProblemsKind, CatalogueKey>> = {
   settings: 'problems.empty.settings',
   keybindings: 'problems.empty.keybindings',
   snippets: 'problems.empty.snippets',
+  // TYTO-247, ADR 0132: nothing checks a text file, and the panel says so rather than "nothing
+  // to report", which would read as a check that passed.
+  text: 'problems.empty.text',
+  markdown: 'problems.empty.text',
 };
 
 const EMPTY_STATE: ProblemsState = {

@@ -89,3 +89,5 @@ The window never holds a path (ADR 0010, ADR 0086), the explorer names files by 
   image preview focused act on the brief behind it, as they do with a brief's preview.
 - New strings, in both locales: `preview.image.scalable`, `preview.image.tooLarge`,
   `preview.image.unsupported`, `preview.image.gone`.
+
+**Note, 2026-10-24 (TYTO-247, ADR 0132).** `explorer:open` now opens a `.txt` or a `.md` in a tab as well as a `.brief`, through `filePath`; `briefPath` is gone. The Markdown preview of TYTO-247's second pull request adds a member to the subject union of decision 1.

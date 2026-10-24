@@ -1,7 +1,7 @@
 import { type LanguageName, type jsonAssist } from '@tyto/editor';
 
 import { TEXT_COMMANDS, isBriefOnlyCommand } from './commands.js';
-import { type DocumentState } from './documents.js';
+import { type AppFileKind, type DocumentState, isAppFile } from './documents.js';
 import { planTemplateEdit, type TemplateEdit, templateOf } from './frontmatter.js';
 
 /**
@@ -51,6 +51,18 @@ const APP_FILE: EditorChrome = {
   textCommands: true,
 };
 
+/**
+ * A `.txt` or `.md` tab (TYTO-247, ADR 0132): text and nothing else. No template edits and no
+ * brief commands — so no export, no presets, no zoom, format or slide — and the text commands, as
+ * any text has. The same answer as an app file's today, kept apart because the two differ in
+ * everything else the window does with them: an app file is checked, a text file is not.
+ */
+const TEXT: EditorChrome = {
+  templateEdits: false,
+  briefCommands: false,
+  textCommands: true,
+};
+
 export function editorChromeFor(kind: Kind): EditorChrome {
   switch (kind) {
     case undefined:
@@ -63,6 +75,9 @@ export function editorChromeFor(kind: Kind): EditorChrome {
     case 'keybindings':
     case 'snippets':
       return APP_FILE;
+    case 'text':
+    case 'markdown':
+      return TEXT;
   }
 }
 
@@ -84,18 +99,19 @@ export const commandOffered = (kind: Kind, id: string): boolean => {
 /**
  * The language a tab of this kind is opened in. One place for both ways a tab is born — opened
  * from its command and brought back by the session — so the two cannot disagree. `undefined` is
- * the editor's own language, the brief's.
+ * the editor's own language, the brief's. A text tab is `plain`, Markdown included until
+ * TYTO-247's second pull request gives it colours of its own.
  */
-export const languageOf = (kind: Kind): LanguageName | undefined =>
-  kind === undefined ? undefined : 'json';
+export const languageOf = (kind: Kind): LanguageName | undefined => {
+  if (kind === undefined || kind === 'preview') return undefined;
+  return isAppFile(kind) ? 'json' : 'plain';
+};
 
 /** One document's own editor extensions: CodeMirror's `Extension`, named through the editor. */
 export type DocumentExtension = ReturnType<typeof jsonAssist>;
 
 /** The app files whose tabs get help of their own, and the help each gets (TYTO-304). */
-export type AppFileAssists = Readonly<
-  Partial<Record<NonNullable<DocumentState['kind']>, DocumentExtension>>
->;
+export type AppFileAssists = Readonly<Partial<Record<AppFileKind, DocumentExtension>>>;
 
 /**
  * The extensions a tab of this kind is opened with beside its language — `settings.json`'s
@@ -104,7 +120,7 @@ export type AppFileAssists = Readonly<
  * brief gets none, since the editor's own extensions are its language's help already.
  */
 export const assistOf = (kind: Kind, assists: AppFileAssists): readonly DocumentExtension[] => {
-  if (kind === undefined || kind === 'preview') return [];
+  if (!isAppFile(kind)) return [];
   const assist = assists[kind];
   return assist === undefined ? [] : [assist];
 };

@@ -158,6 +158,21 @@ describe('the keys', () => {
     expect(moveFor(at('fundo'), 'Enter')).toEqual({ do: 'open', id: 'fundo' });
     expect(moveFor(at('capa'), 'x')).toBeUndefined();
   });
+
+  it('opens a .txt and a .md with Enter, and nothing for another text-like file (TYTO-247)', () => {
+    const flat = withListing(
+      EMPTY_TREE,
+      null,
+      listing([
+        ['notas', 'notas.MD', 'file'],
+        ['leia', 'leia.txt', 'file'],
+        ['dados', 'dados.json', 'file'],
+      ]),
+    );
+    expect(moveFor(withSelected(flat, 'notas'), 'Enter')).toEqual({ do: 'open', id: 'notas' });
+    expect(moveFor(withSelected(flat, 'leia'), ' ')).toEqual({ do: 'open', id: 'leia' });
+    expect(moveFor(withSelected(flat, 'dados'), 'Enter')).toBeUndefined();
+  });
 });
 
 /** TYTO-352, ADR 0121: the name field is tree state, kept apart from the listings. */

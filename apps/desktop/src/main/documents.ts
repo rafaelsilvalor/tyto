@@ -2,13 +2,16 @@ import { access, readFile, writeFile } from 'node:fs/promises';
 import { homedir } from 'node:os';
 import { basename, dirname, join } from 'node:path';
 
+import { type DocumentFormat, documentFormatOf } from '../../shared/file-icons.js';
+import { type Locale, translate } from '../../shared/i18n/index.js';
 import { type IpcResponse } from '../../shared/ipc.js';
 import { relativeUnder } from './explorer.js';
 import { pathLabelOf } from './path-label.js';
 import { type RecentEntry, type RecentFiles } from './recent-files.js';
 
 /**
- * Opening and saving a `.brief`, and the folder that comes with it (E9.8, E9.11).
+ * Opening and saving a `.brief`, and the folder that comes with it (E9.8, E9.11) — and a `.txt`
+ * or `.md` since TYTO-247, which differ only in the format `describe` names (ADR 0132).
  *
  * **Main holds the path and the renderer never does.** The renderer asks to open something,
  * gets text and a name back, and paints a title; where the file is stays here, because here
@@ -30,10 +33,13 @@ import { type RecentEntry, type RecentFiles } from './recent-files.js';
 
 export type OpenDocument = NonNullable<IpcResponse<'file:open'>['document']>;
 
-/** As much of Electron's `dialog` as this needs, which is two calls. */
+/**
+ * As much of Electron's `dialog` as this needs, which is two calls. Open offers briefs and text
+ * files (TYTO-247); save offers the format of the tab being saved first (ADR 0132).
+ */
 export interface FileDialogs {
   openBrief(): Promise<string | undefined>;
-  saveBrief(suggested: string | undefined): Promise<string | undefined>;
+  saveBrief(suggested: string | undefined, format: DocumentFormat): Promise<string | undefined>;
 }
 
 export interface DocumentServiceOptions {
@@ -63,6 +69,38 @@ export interface DocumentServiceOptions {
     exists(path: string): Promise<boolean>;
   };
 }
+
+/** One filter of a file dialog, Electron's `FileFilter`. */
+export interface DialogFilter {
+  readonly name: string;
+  readonly extensions: string[];
+}
+
+/**
+ * File ▸ Open's filters, in this order (TYTO-247, ADR 0132): briefs first, which is what the
+ * dialog opens on, then text files, then everything a tab opens. "Brief" is the format's name
+ * and reads the same in both languages, as it did before.
+ */
+export const openFilters = (locale: Locale): DialogFilter[] => [
+  { name: 'Brief', extensions: ['brief'] },
+  { name: translate(locale, 'dialog.files.text'), extensions: ['txt', 'md'] },
+  { name: translate(locale, 'dialog.files.supported'), extensions: ['brief', 'txt', 'md'] },
+];
+
+/**
+ * Save As's filters: the tab's own format first, so the name it suggests ends in its extension
+ * — a text tab is saved as `.txt` or `.md`, never turned into a `.brief` by the dialog.
+ */
+export const saveFilters = (locale: Locale, format: DocumentFormat): DialogFilter[] => {
+  switch (format) {
+    case 'brief':
+      return [{ name: 'Brief', extensions: ['brief'] }];
+    case 'text':
+      return [{ name: translate(locale, 'dialog.files.text'), extensions: ['txt', 'md'] }];
+    case 'markdown':
+      return [{ name: translate(locale, 'dialog.files.text'), extensions: ['md', 'txt'] }];
+  }
+};
 
 /** What opening produced, and which tab is holding it — see `file:open` in `shared/ipc.ts`. */
 export interface AdoptedDocument {
@@ -132,7 +170,13 @@ export interface DocumentService {
   releaseUnder(path: string): string[];
   /** The tabs that hold a file at or under `path`, changing nothing (TYTO-352). */
   heldUnder(path: string): string[];
-  save(documentId: string, text: string, saveAs: boolean): Promise<SavedDocument>;
+  /** `format` is the tab's (ADR 0132), for the dialog's filter; a brief when absent. */
+  save(
+    documentId: string,
+    text: string,
+    saveAs: boolean,
+    format?: DocumentFormat,
+  ): Promise<SavedDocument>;
   /** Forgets a tab's path. A tab main never heard of is not an error. */
   close(documentId: string): void;
   /**
@@ -194,12 +238,16 @@ export function createDocumentService(options: DocumentServiceOptions): Document
     name: nameFor(path),
     pathLabel: labelOf(path),
   });
-  /** What a document crosses the bridge as: its name, its folder to show, and its text. */
+  /**
+   * What a document crosses the bridge as: its name, its folder to show, its text, and what it
+   * opens as — named here from the path's extension, the one place every open passes (ADR 0132).
+   */
   const describe = (path: string, text: string): OpenDocument => ({
     path,
     name: nameFor(path),
     pathLabel: labelOf(path),
     text,
+    format: documentFormatOf(path),
   });
 
   /** The tab already holding `path`, if any. See `file:open` in `shared/ipc.ts`. */
@@ -262,9 +310,10 @@ export function createDocumentService(options: DocumentServiceOptions): Document
       }
     },
 
-    async save(documentId, text, saveAs) {
+    async save(documentId, text, saveAs, format = 'brief') {
       const current = paths.get(documentId);
-      const path = current === undefined || saveAs ? await dialogs.saveBrief(current) : current;
+      const path =
+        current === undefined || saveAs ? await dialogs.saveBrief(current, format) : current;
       if (path === undefined) return { document: null, released: null };
 
       await disk.write(path, text);

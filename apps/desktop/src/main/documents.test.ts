@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { type FileDialogs, createDocumentService } from './documents.js';
+import { type FileDialogs, createDocumentService, openFilters, saveFilters } from './documents.js';
 import { pathLabelOf } from './path-label.js';
 import { type RecentEntry, type RecentFiles } from './recent-files.js';
 
@@ -61,6 +61,52 @@ const dialogs = (answers: { open?: string; save?: string }): FileDialogs => ({
   saveBrief: () => Promise.resolve(answers.save),
 });
 
+/** TYTO-247, ADR 0132: a `.txt` and a `.md` open as text, with the dialogs offering them. */
+describe('text files', () => {
+  it('names the format from the extension at every open and save', async () => {
+    const notes = at('briefs', 'NOTAS.MD');
+    const readme = at('briefs', 'leia.txt');
+    const asked: string[] = [];
+    const service = createDocumentService({
+      dialogs: {
+        openBrief: () => Promise.resolve(notes),
+        saveBrief: (_suggested, format) => {
+          asked.push(format);
+          return Promise.resolve(readme);
+        },
+      },
+      recent: recentFiles(),
+      disk: disk({ [notes]: '# Notas' }),
+    });
+
+    expect((await service.open(TAB)).document?.format).toBe('markdown');
+    const saved = await service.save(OTHER_TAB, 'texto', true, 'text');
+    expect(saved.document?.format).toBe('text');
+    // The dialog was asked with the tab's own format, so it offers `.txt` first.
+    expect(asked).toEqual(['text']);
+  });
+
+  it('offers briefs, then text files, then every supported file, in the window language', () => {
+    expect(openFilters('en')).toEqual([
+      { name: 'Brief', extensions: ['brief'] },
+      { name: 'Text files', extensions: ['txt', 'md'] },
+      { name: 'All supported files', extensions: ['brief', 'txt', 'md'] },
+    ]);
+    expect(openFilters('pt-BR').map((filter) => filter.name)).toEqual([
+      'Brief',
+      'Arquivos de texto',
+      'Todos os arquivos suportados',
+    ]);
+    expect(saveFilters('en', 'brief')).toEqual([{ name: 'Brief', extensions: ['brief'] }]);
+    expect(saveFilters('en', 'markdown')).toEqual([
+      { name: 'Text files', extensions: ['md', 'txt'] },
+    ]);
+    expect(saveFilters('pt-BR', 'text')).toEqual([
+      { name: 'Arquivos de texto', extensions: ['txt', 'md'] },
+    ]);
+  });
+});
+
 describe('opening', () => {
   it('hands back the text, the name and the folder to show, and nothing else', async () => {
     const service = createDocumentService({
@@ -77,6 +123,8 @@ describe('opening', () => {
         name: 'campanha.brief',
         pathLabel: BRIEF,
         text: '::titulo Olá',
+        // TYTO-247, ADR 0132: named from the extension.
+        format: 'brief',
       },
       documentId: TAB,
     });
@@ -373,6 +421,7 @@ describe('opening a path main chose (TYTO-45)', () => {
         name: 'brief.brief',
         pathLabel: TASK,
         text: '::titulo Tarefa',
+        format: 'brief',
       },
       documentId: TAB,
     });

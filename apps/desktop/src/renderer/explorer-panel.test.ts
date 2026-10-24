@@ -164,23 +164,27 @@ describe('the explorer panel', () => {
     expect(row(element, 'slides').getAttribute('aria-expanded')).toBe('true');
   });
 
-  it('opens a brief on a click, shows an image (TYTO-366), and does nothing for any other file', async () => {
+  it('opens a brief, a .txt and a .md on a click (TYTO-247), shows an image (TYTO-366), and does nothing for any other file', async () => {
     const folder = disk();
     folder['root'] = entries(
       ['promo', 'promo.brief', 'brief'],
       ['logo', 'logo.png', 'file'],
       ['vetor', 'vetor.SVG', 'file'],
       ['notas', 'notas.txt', 'file'],
+      ['leia', 'LEIA.md', 'file'],
+      ['dados', 'dados.json', 'file'],
     );
     const { element, opened, shown } = await mount(folder);
 
     row(element, 'logo.png').click();
     row(element, 'notas.txt').click();
+    row(element, 'dados.json').click();
+    row(element, 'LEIA.md').click();
     row(element, 'vetor.SVG').click();
     row(element, 'promo.brief').click();
     await settle(element);
 
-    expect(opened).toEqual(['promo']);
+    expect(opened).toEqual(['notas', 'leia', 'promo']);
     expect(shown).toEqual(['logo', 'vetor']);
     expect(row(element, 'promo.brief').getAttribute('aria-selected')).toBe('true');
   });

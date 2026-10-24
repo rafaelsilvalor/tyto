@@ -67,3 +67,5 @@ parentId | null, name, kind: file | folder }`, `explorer:rename { entryId, name 
   It never falls back to a hard delete, so the person deletes it outside the app.
 - These channels are main's half of the card. The menu, inline naming in the tree, the keys, the
   tabs' wiring, the strings and the end-to-end suite are its second pull request.
+
+**Note, 2026-10-24 (TYTO-247, ADR 0132).** A new `.txt` or `.md` opens in a tab, as a new `.brief` does; any other new file is still only made.

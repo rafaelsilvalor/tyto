@@ -98,6 +98,9 @@ describe('the problems panel', () => {
     ['keybindings', 'pt-BR', 'Nada a relatar sobre o keybindings.json'],
     ['snippets', 'pt-BR', 'Nada a relatar sobre o snippets.json'],
     ['settings', 'en', 'Nothing to report about settings.json'],
+    // TYTO-247, ADR 0132: nothing checks a text file, and the panel says so.
+    ['text', 'en', 'Text files are not checked.'],
+    ['markdown', 'pt-BR', 'Arquivos de texto não são verificados.'],
   ] as const)(
     'names the %s document when there is nothing to say (%s)',
     async (kind, locale, text) => {
