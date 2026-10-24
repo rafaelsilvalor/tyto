@@ -1,0 +1,11 @@
+{
+  "name": "tyto-plugin-example-recipe",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "A Tyto plugin contributing a paged recipe source, a transform and a derivation.",
+  "files": [
+    "tyto-plugin.json",
+    "dist"
+  ]
+}

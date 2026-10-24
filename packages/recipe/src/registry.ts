@@ -130,8 +130,16 @@ export function createVerbRegistry(): VerbRegistry {
   return registry;
 }
 
+/**
+ * Bare names are Tyto's, and Tyto registers none (ADR 0133); a plugin's derivation is
+ * namespaced like its verbs, which `@tyto/plugin-api` enforces at registration (ADR 0135).
+ */
+const DERIVATION_NAME = /^(?:[a-z][a-z0-9-]*\.)?[a-z][a-z0-9-]*$/u;
+
 export function createDerivationRegistry(): DerivationRegistry {
   return createRegistry<Derivation>('derivation', (name) =>
-    /^[a-z][a-z0-9-]*$/u.test(name) ? undefined : 'a derivation is named in lower-case words',
+    DERIVATION_NAME.test(name)
+      ? undefined
+      : "a derivation is named in lower-case words, as '<plugin>.<name>' when a plugin's",
   );
 }

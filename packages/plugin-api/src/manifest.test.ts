@@ -45,7 +45,9 @@ describe('a manifest that is right', () => {
     // here, TypeScript interfaces in `contributions.ts` — so one of them drifting is the
     // failure this catches.
     for (const point of CONTRIBUTION_POINTS) {
-      expect(isOk(validatePluginManifest({ ...VALID, contributes: [point] })), point).toBe(true);
+      // A recipe point needs the namespace its names live in (ADR 0135).
+      const manifest = { ...VALID, contributes: [point], namespace: 'demo' };
+      expect(isOk(validatePluginManifest(manifest)), point).toBe(true);
     }
     expect(pathsOf({ ...VALID, contributes: ['exportor'] })).toEqual(['contributes.0']);
   });

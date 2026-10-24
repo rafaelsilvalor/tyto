@@ -24,6 +24,7 @@
   },
   "dependencies": {
     "@tyto/core": "workspace:*",
+    "@tyto/recipe": "workspace:*",
     "zod": "^4.6.5"
   },
   "devDependencies": {

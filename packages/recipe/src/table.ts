@@ -5,7 +5,18 @@
  * needs JSON, and it is what the cache stores.
  */
 
-export type ColumnType = 'text' | 'number' | 'date' | 'datetime' | 'boolean' | 'list' | 'link';
+/** As a list, for a schema that checks a table crossing from a plugin (ADR 0135). */
+export const COLUMN_TYPES = [
+  'text',
+  'number',
+  'date',
+  'datetime',
+  'boolean',
+  'list',
+  'link',
+] as const;
+
+export type ColumnType = (typeof COLUMN_TYPES)[number];
 
 /** A cell's value is whatever the source holds, as JSON. */
 export type CellValue = string | number | boolean | null | readonly CellValue[];

@@ -42,6 +42,7 @@ non-zero.
 | `E_PLUGIN_ENGINE` | error | yes | A plugin's engine range is not satisfied by this host's plugin API. |
 | `E_PLUGIN_DUPLICATE` | error | yes | A plugin registered a contribution id that another plugin already holds. |
 | `E_PLUGIN_NAME_TAKEN` | error | yes | A plugin has the same name as one already installed or built in. |
+| `E_PLUGIN_NAMESPACE_TAKEN` | error | yes | A plugin declares a recipe namespace another loaded plugin already owns. |
 | `E_PLUGIN_NOT_INSTALLED` | error | yes | A plugin command named a plugin that is not installed. |
 | `E_PLUGIN_ACTIVATE` | error | yes | A plugin's code could not be loaded, or its activate function failed. |
 | `E_PLUGIN_PERMISSIONS_CHANGED` | error | yes | An installed plugin now asks for permissions nobody approved when it was installed. |
@@ -140,6 +141,9 @@ non-zero.
 | `E_RECIPE_PARAM` | error | yes | A recipe's parameter is used without a declaration, or has no value when it runs. |
 | `E_RECIPE_UNKNOWN_VERB` | error | no | A recipe line names a verb that neither Tyto nor an installed plugin contributes. |
 | `E_RECIPE_REGISTRATION` | error | no | A verb or a derivation cannot be registered under the name it was given. |
+| `E_RECIPE_TABLE` | error | no | A table a verb or a derivation answered repeats a column or a key, or holds a value its columns do not allow. |
+| `E_RECIPE_SOURCE` | error | no | A source was cut short, repeated a cursor, or passed a ceiling on its pages or rows. |
+| `E_RECIPE_VERB` | error | no | A verb a plugin contributes could not do its work, in its own words. |
 | `E_RECIPE_NO_TABLE` | error | no | A verb that reads a table runs before any cell produced one. |
 | `E_RECIPE_ARGUMENTS` | error | no | A recipe verb was given arguments it does not accept. |
 | `E_RECIPE_WHERE` | error | no | A 'where' expression does not match the filter grammar. |
@@ -190,6 +194,7 @@ incomplete brief, and a crossed box where a picture the exporter could not load 
 | `E_PLUGIN_ENGINE` | yes | A plugin that did not load contributed no slot to skip. |
 | `E_PLUGIN_DUPLICATE` | yes | A plugin that did not load contributed no slot to skip. |
 | `E_PLUGIN_NAME_TAKEN` | yes | A plugin that did not load contributed no slot to skip. |
+| `E_PLUGIN_NAMESPACE_TAKEN` | yes | A plugin that did not load contributed no slot to skip. |
 | `E_PLUGIN_NOT_INSTALLED` | yes | A plugin that did not load contributed no slot to skip. |
 | `E_PLUGIN_ACTIVATE` | yes | A plugin that did not load contributed no slot to skip. |
 | `E_PLUGIN_PERMISSIONS_CHANGED` | yes | A plugin that did not load contributed no slot to skip. |
@@ -244,6 +249,9 @@ incomplete brief, and a crossed box where a picture the exporter could not load 
 | `E_RECIPE_PARAM` | yes | Every cell may read the parameter, so none of them can run without it. |
 | `E_RECIPE_UNKNOWN_VERB` | no | That cell has no table and the cells after it do not run; earlier cells keep theirs. |
 | `E_RECIPE_REGISTRATION` | no | Only that one is missing; everything else in the registry still runs. |
+| `E_RECIPE_TABLE` | no | That cell has no table and the cells after it do not run; earlier cells keep theirs. |
+| `E_RECIPE_SOURCE` | no | That cell has no table and the cells after it do not run; earlier cells keep theirs. |
+| `E_RECIPE_VERB` | no | That cell has no table and the cells after it do not run; earlier cells keep theirs. |
 | `E_RECIPE_NO_TABLE` | no | That cell has no table and the cells after it do not run; earlier cells keep theirs. |
 | `E_RECIPE_ARGUMENTS` | no | That cell has no table and the cells after it do not run; earlier cells keep theirs. |
 | `E_RECIPE_WHERE` | no | That cell has no table and the cells after it do not run; earlier cells keep theirs. |
@@ -603,6 +611,20 @@ A plugin named '{plugin}' is already here ({origin}).
 ```
 
 Parameters: `plugin`, `origin`
+
+### `E_PLUGIN_NAMESPACE_TAKEN`
+
+**Severity:** error · **Fatal:** yes · **Spec:** `docs/adr/0135-a-plugin-contributes-recipe-verbs-in-a-namespace-it-owns.md`
+
+A plugin declares a recipe namespace another loaded plugin already owns.
+
+A plugin that did not load contributed no slot to skip.
+
+```
+Plugin '{plugin}' was refused: the namespace '{namespace}' belongs to plugin '{owner}'.
+```
+
+Parameters: `plugin`, `namespace`, `owner`
 
 ### `E_PLUGIN_NOT_INSTALLED`
 
@@ -1359,6 +1381,48 @@ The {kind} '{name}' cannot be registered: {problem}.
 ```
 
 Parameters: `kind`, `name`, `problem`
+
+### `E_RECIPE_TABLE`
+
+**Severity:** error · **Fatal:** no · **Spec:** `docs/adr/0135-a-plugin-contributes-recipe-verbs-in-a-namespace-it-owns.md`
+
+A table a verb or a derivation answered repeats a column or a key, or holds a value its columns do not allow.
+
+That cell has no table and the cells after it do not run; earlier cells keep theirs.
+
+```
+The table from '{origin}' is malformed: {problem}.
+```
+
+Parameters: `origin`, `problem`
+
+### `E_RECIPE_SOURCE`
+
+**Severity:** error · **Fatal:** no · **Spec:** `docs/adr/0135-a-plugin-contributes-recipe-verbs-in-a-namespace-it-owns.md`
+
+A source was cut short, repeated a cursor, or passed a ceiling on its pages or rows.
+
+That cell has no table and the cells after it do not run; earlier cells keep theirs.
+
+```
+Source '{verb}' {problem}.
+```
+
+Parameters: `verb`, `problem`
+
+### `E_RECIPE_VERB`
+
+**Severity:** error · **Fatal:** no · **Spec:** `docs/adr/0135-a-plugin-contributes-recipe-verbs-in-a-namespace-it-owns.md`
+
+A verb a plugin contributes could not do its work, in its own words.
+
+That cell has no table and the cells after it do not run; earlier cells keep theirs.
+
+```
+'{verb}' failed: {problem}.
+```
+
+Parameters: `verb`, `problem`
 
 ### `E_RECIPE_NO_TABLE`
 

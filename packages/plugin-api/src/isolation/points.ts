@@ -16,9 +16,11 @@ import {
   templateManifestSchema,
   templateReportCodes,
 } from '@tyto/core';
+import { COLUMN_TYPES, type CellValue, type Table } from '@tyto/recipe';
 import { z } from 'zod';
 
 import type { ContributionPoint } from '../manifest.js';
+import { RECIPE_VERB_KINDS } from '../recipes.js';
 import { ASSET_SOURCE_MAX_BYTES, FONT_SOURCE_MAX_BYTES, SOURCE_SCHEME } from '../sources.js';
 import { THEME_KINDS, isThemePath } from '../theme.js';
 import type { GuestFaces, ShippedFace } from './faces.js';
@@ -88,7 +90,9 @@ export type RegisterMethod =
   | 'registerConfiguration'
   | 'registerTheme'
   | 'registerAssetSource'
-  | 'registerFontSource';
+  | 'registerFontSource'
+  | 'registerRecipeVerb'
+  | 'registerRecipeDerivation';
 
 const rangeSchema = z.strictObject({
   start: z.number().int().nonnegative(),
@@ -234,6 +238,43 @@ function boundedBytes(max: number): z.ZodType<Uint8Array> {
     .instanceof(Uint8Array)
     .refine((bytes) => bytes.byteLength <= max, `must be at most ${String(max)} bytes`);
 }
+
+const cellValueSchema: z.ZodType<CellValue> = z.lazy(() =>
+  z.union([z.string(), z.number(), z.boolean(), z.null(), z.array(cellValueSchema)]),
+);
+
+/**
+ * A recipe table as it crosses (ADR 0135): its shape, strictly. What a schema cannot say —
+ * unique names and keys, a value of its column's type — is `checkTable`'s, on the host, and
+ * the ceilings are `pagedSource`'s.
+ */
+const tableSchema = z.strictObject({
+  columns: z.array(
+    z.strictObject({ name: z.string().min(1), type: z.enum(COLUMN_TYPES), origin: z.string() }),
+  ),
+  rows: z.array(
+    z.strictObject({
+      key: z.string().min(1),
+      values: z.record(z.string(), cellValueSchema),
+      provenance: z.strictObject({
+        source: z.string().min(1),
+        id: z.string().min(1),
+        fetchedAt: z.string().min(1),
+      }),
+    }),
+  ),
+}) as unknown as z.ZodType<Table>;
+
+const argumentValuesSchema = z.record(z.string(), z.union([z.string(), z.number(), z.boolean()]));
+
+/** A recipe verb's arguments, as data: the closed schema of ADR 0135, never JSON Schema. */
+const argumentSpecSchema = z.strictObject({
+  name: z.string().min(1).max(100),
+  type: z.enum(['text', 'number', 'date', 'boolean']),
+  positional: z.boolean().optional(),
+  required: z.boolean().optional(),
+  values: z.array(z.string()).max(200).optional(),
+});
 
 export const ISOLATED_POINTS: Readonly<Partial<Record<ContributionPoint, PointSpec>>> = {
   exporter: {
@@ -392,6 +433,56 @@ export const ISOLATED_POINTS: Readonly<Partial<Record<ContributionPoint, PointSp
         args: z.tuple([fontFaceSchema, sourceRequestSchema]),
         send: ([face, request]) => [face, request ?? {}],
         result: resultSchema(boundedBytes(FONT_SOURCE_MAX_BYTES)),
+        failed: (problems) => err(problems),
+      },
+    },
+  },
+  // A source answers one page per call and a transform a whole table; which of the two a verb
+  // has is checked by the host's `registerRecipeVerb`, against its kind (ADR 0135).
+  'recipe-verb': {
+    method: 'registerRecipeVerb',
+    data: z.strictObject({
+      id: z.string().min(1).max(200),
+      kind: z.enum(RECIPE_VERB_KINDS),
+      arguments: z.array(argumentSpecSchema).max(100),
+    }),
+    callables: {
+      page: {
+        args: z.tuple([
+          z.strictObject({ arguments: argumentValuesSchema, cursor: z.string().optional() }),
+        ]),
+        send: ([request]) => [request],
+        result: resultSchema(
+          z.strictObject({
+            table: tableSchema,
+            cursor: z.string().min(1).max(4096).optional(),
+            truncated: z.boolean().optional(),
+          }),
+        ),
+        failed: (problems) => err(problems),
+        optional: true,
+      },
+      transform: {
+        args: z.tuple([z.strictObject({ arguments: argumentValuesSchema, table: tableSchema })]),
+        send: ([request]) => [request],
+        result: resultSchema(tableSchema),
+        failed: (problems) => err(problems),
+        optional: true,
+      },
+    },
+  },
+  'recipe-derivation': {
+    method: 'registerRecipeDerivation',
+    data: z.strictObject({
+      id: z.string().min(1).max(200),
+      requires: z.array(z.string().min(1)),
+      produces: z.array(z.string().min(1)),
+    }),
+    callables: {
+      derive: {
+        args: z.tuple([tableSchema]),
+        send: ([table]) => [table],
+        result: resultSchema(tableSchema),
         failed: (problems) => err(problems),
       },
     },

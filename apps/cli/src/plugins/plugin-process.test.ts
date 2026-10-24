@@ -1,11 +1,13 @@
-import { mkdir, mkdtemp, readdir, rm, symlink, writeFile } from 'node:fs/promises';
+import { mkdir, mkdtemp, readFile, readdir, rm, symlink, writeFile } from 'node:fs/promises';
 import { type Server, createServer } from 'node:http';
 import type { AddressInfo } from 'node:net';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
+import { fileURLToPath } from 'node:url';
 
 import type { Scene } from '@tyto/core';
-import { connectIsolatedPlugin, createPluginHost } from '@tyto/plugin-api';
+import { connectIsolatedPlugin, createPluginHost, recipeRegistriesOf } from '@tyto/plugin-api';
+import { parseRecipe, runRecipe } from '@tyto/recipe';
 import { afterEach, beforeEach, describe, expect, inject, it } from 'vitest';
 
 import { pluginCapabilities } from './capabilities.js';
@@ -401,5 +403,53 @@ describe('a plugin under the permission model', () => {
       'ERR_ACCESS_DENIED Access to this API has been restricted. Use --allow-fs-read to manage permissions.',
     );
     await isolated.close();
+  }, 60_000);
+});
+
+describe('the example recipe plugin in a child process (TYTO-376)', () => {
+  const EXAMPLE = fileURLToPath(
+    new URL('../../../../examples/plugins/tyto-plugin-example-recipe/', import.meta.url),
+  );
+
+  // Starts a plugin's process, which a full `pnpm check` can hold past Vitest's 5 s.
+  it('pages example.pull, tags with example.tag and derives example.parity', async () => {
+    const manifest: unknown = JSON.parse(await readFile(join(EXAMPLE, 'tyto-plugin.json'), 'utf8'));
+    const launch = pluginProcessLauncher({ guest: inject('pluginGuest') });
+    const connected = await connectIsolatedPlugin({
+      name: 'example-recipe',
+      manifest,
+      channel: launch({
+        name: 'example-recipe',
+        entry: join(EXAMPLE, 'dist', 'index.js'),
+        directory: EXAMPLE,
+      }),
+      requireSandbox: true,
+    });
+    if (!connected.ok) throw new Error(connected.error[0]?.message);
+    const host = createPluginHost();
+    expect(host.tryActivate(connected.value.plugin).ok).toBe(true);
+
+    const recipe = parseRecipe(
+      'recipe example\nexample.pull count=7 size=3\nexample.tag ready\nderive example.parity',
+    );
+    if (!recipe.ok) throw new Error('the recipe must parse');
+    const run = await runRecipe(recipe.value, {
+      ...recipeRegistriesOf(host.registry),
+      resolveRecipe: () => Promise.resolve({ ok: false, error: [] }),
+    });
+    await connected.value.close();
+
+    expect(run.ok && run.value.cells.flatMap((cell) => cell.diagnostics)).toEqual([]);
+    const rows = run.ok ? (run.value.table?.rows ?? []) : [];
+    expect(rows.map((row) => row.key)).toEqual([
+      'EX-1',
+      'EX-2',
+      'EX-3',
+      'EX-4',
+      'EX-5',
+      'EX-6',
+      'EX-7',
+    ]);
+    expect(rows[6]?.values).toEqual({ title: 'Item 7', number: 7, tag: 'ready', parity: 'odd' });
   }, 60_000);
 });
