@@ -32,6 +32,11 @@ apps/cli/src/__fixtures__/plugin-sources/LICENSE.md
 # diff of families; Prettier would put every key on its own line (TYTO-281).
 packages/google-fonts/src/catalogue.json
 
+# Recipe tables, one row per line for the same reason, and the snapshot is compared byte for
+# byte (TYTO-375).
+packages/recipe/src/__fixtures__/*.json
+packages/recipe/src/__snapshots__/*.json
+
 # Tyto template markup. It looks like HTML+CSS and is not: Prettier reflows it as a
 # stylesheet and rewrites `"Source Sans 3"` to single quotes, which the grammar refuses
 # (docs/template-authoring.md says so about its own code block).

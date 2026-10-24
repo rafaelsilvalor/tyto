@@ -1,0 +1,25 @@
+{
+  "columns": [
+    {"name": "key", "type": "text", "origin": "demo"},
+    {"name": "title", "type": "text", "origin": "demo"},
+    {"name": "kind", "type": "text", "origin": "demo"},
+    {"name": "status", "type": "text", "origin": "demo"},
+    {"name": "team", "type": "text", "origin": "demo"},
+    {"name": "due", "type": "date", "origin": "demo"},
+    {"name": "points", "type": "number", "origin": "demo"}
+  ],
+  "rows": [
+    {"key": "DEMO-1", "values": {"key": "DEMO-1", "title": "Spring sale banner", "kind": "anúncio", "status": "done", "team": "design", "due": "2026-11-02", "points": 3}, "provenance": {"source": "demo", "id": "DEMO-1", "fetchedAt": "2026-10-24T09:00:00.000Z"}},
+    {"key": "DEMO-2", "values": {"key": "DEMO-2", "title": "Spring sale caption", "kind": "copy", "status": "doing", "team": "copy", "due": "2026-11-03", "points": 1}, "provenance": {"source": "demo", "id": "DEMO-2", "fetchedAt": "2026-10-24T09:00:00.000Z"}},
+    {"key": "DEMO-3", "values": {"key": "DEMO-3", "title": "Launch teaser", "kind": "vídeo", "status": "todo", "team": "video", "due": "2026-11-10", "points": 8}, "provenance": {"source": "demo", "id": "DEMO-3", "fetchedAt": "2026-10-24T09:00:00.000Z"}},
+    {"key": "DEMO-4", "values": {"key": "DEMO-4", "title": "Newsletter header", "kind": "Anuncio", "status": "Revisão", "team": "design", "due": "2026-11-05", "points": 2}, "provenance": {"source": "demo", "id": "DEMO-4", "fetchedAt": "2026-10-24T09:00:00.000Z"}},
+    {"key": "DEMO-5", "values": {"key": "DEMO-5", "title": "Store window poster", "kind": "ANÚNCIO", "status": "doing", "team": "design", "due": null, "points": 5}, "provenance": {"source": "demo", "id": "DEMO-5", "fetchedAt": "2026-10-24T09:00:00.000Z"}},
+    {"key": "DEMO-6", "values": {"key": "DEMO-6", "title": "Launch teaser script", "kind": "copy", "status": "todo", "team": "copy", "due": "2026-11-08", "points": 2}, "provenance": {"source": "demo", "id": "DEMO-6", "fetchedAt": "2026-10-24T09:00:00.000Z"}},
+    {"key": "DEMO-7", "values": {"key": "DEMO-7", "title": "Weekly tips carousel", "kind": "post", "status": "doing", "team": "design", "due": "2026-11-04", "points": 3}, "provenance": {"source": "demo", "id": "DEMO-7", "fetchedAt": "2026-10-24T09:00:00.000Z"}},
+    {"key": "DEMO-8", "values": {"key": "DEMO-8", "title": "Holiday card", "kind": "anuncio", "status": "todo", "team": "", "due": "2026-12-01", "points": 5}, "provenance": {"source": "demo", "id": "DEMO-8", "fetchedAt": "2026-10-24T09:00:00.000Z"}},
+    {"key": "DEMO-9", "values": {"key": "DEMO-9", "title": "Event recap", "kind": "vídeo", "status": "done", "team": "video", "due": "2026-10-20", "points": 5}, "provenance": {"source": "demo", "id": "DEMO-9", "fetchedAt": "2026-10-24T09:00:00.000Z"}},
+    {"key": "DEMO-10", "values": {"key": "DEMO-10", "title": "Webinar invite", "kind": "anúncio", "status": "revisao", "team": "design", "due": "2026-11-06", "points": 3}, "provenance": {"source": "demo", "id": "DEMO-10", "fetchedAt": "2026-10-24T09:00:00.000Z"}},
+    {"key": "DEMO-11", "values": {"key": "DEMO-11", "title": "Pricing page hero", "kind": "anúncio", "status": "todo", "team": "design", "due": "2026-11-12", "points": 8}, "provenance": {"source": "demo", "id": "DEMO-11", "fetchedAt": "2026-10-24T09:00:00.000Z"}},
+    {"key": "DEMO-12", "values": {"key": "DEMO-12", "title": "FAQ thread", "kind": "post", "status": "todo", "team": "copy", "due": "2026-11-09", "points": 1}, "provenance": {"source": "demo", "id": "DEMO-12", "fetchedAt": "2026-10-24T09:00:00.000Z"}}
+  ]
+}

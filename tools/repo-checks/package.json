@@ -22,6 +22,7 @@
     "@tyto/pipeline": "workspace:*",
     "@tyto/plugin-api": "workspace:*",
     "@tyto/raster": "workspace:*",
+    "@tyto/recipe": "workspace:*",
     "@tyto/template-kit": "workspace:*",
     "@tyto/template-lang": "workspace:*",
     "@tyto/templates": "workspace:*",

@@ -1203,6 +1203,99 @@ export const diagnosticCodes = {
     fatal: false,
     fatality: 'Every source opens restricted instead, which is what an absent approval means.',
   },
+  // ADR 0128: a recipe is a chain of cells. A recipe that does not parse, or whose parameters
+  // cannot be filled, has no chain at all; a cell that fails costs its own table and the cells
+  // after it, and the cells before it keep theirs.
+  E_RECIPE_SYNTAX: {
+    severity: 'error',
+    summary: 'A line of a recipe does not match the recipe format.',
+    template: 'Recipe syntax error: {problem}.',
+    spec: 'docs/adr/0128-a-recipe-is-a-closed-vocabulary-notebook-and-plugins-contribute-verbs.md',
+    fatal: true,
+    fatality: 'A recipe that does not parse has no chain of cells to run.',
+  },
+  E_RECIPE_PARAM: {
+    severity: 'error',
+    summary: "A recipe's parameter is used without a declaration, or has no value when it runs.",
+    template: "Parameter '{param}' {problem}.",
+    spec: 'docs/adr/0128-a-recipe-is-a-closed-vocabulary-notebook-and-plugins-contribute-verbs.md',
+    fatal: true,
+    fatality: 'Every cell may read the parameter, so none of them can run without it.',
+  },
+  E_RECIPE_UNKNOWN_VERB: {
+    severity: 'error',
+    summary: 'A recipe line names a verb that neither Tyto nor an installed plugin contributes.',
+    template: "No verb named '{verb}' is available. Available: {available}.",
+    spec: 'docs/adr/0128-a-recipe-is-a-closed-vocabulary-notebook-and-plugins-contribute-verbs.md',
+    fatal: false,
+    fatality:
+      'That cell has no table and the cells after it do not run; earlier cells keep theirs.',
+  },
+  E_RECIPE_REGISTRATION: {
+    severity: 'error',
+    summary: 'A verb or a derivation cannot be registered under the name it was given.',
+    template: "The {kind} '{name}' cannot be registered: {problem}.",
+    spec: 'docs/adr/0128-a-recipe-is-a-closed-vocabulary-notebook-and-plugins-contribute-verbs.md',
+    fatal: false,
+    fatality: 'Only that one is missing; everything else in the registry still runs.',
+  },
+  E_RECIPE_NO_TABLE: {
+    severity: 'error',
+    summary: 'A verb that reads a table runs before any cell produced one.',
+    template: "'{verb}' needs a table, and no cell before it produced one.",
+    spec: 'docs/adr/0128-a-recipe-is-a-closed-vocabulary-notebook-and-plugins-contribute-verbs.md',
+    fatal: false,
+    fatality:
+      'That cell has no table and the cells after it do not run; earlier cells keep theirs.',
+  },
+  E_RECIPE_ARGUMENTS: {
+    severity: 'error',
+    summary: 'A recipe verb was given arguments it does not accept.',
+    template: "'{verb}' {problem}.",
+    spec: 'docs/adr/0128-a-recipe-is-a-closed-vocabulary-notebook-and-plugins-contribute-verbs.md',
+    fatal: false,
+    fatality:
+      'That cell has no table and the cells after it do not run; earlier cells keep theirs.',
+  },
+  E_RECIPE_WHERE: {
+    severity: 'error',
+    summary: "A 'where' expression does not match the filter grammar.",
+    template: 'Filter error: {problem}.',
+    spec: 'docs/adr/0128-a-recipe-is-a-closed-vocabulary-notebook-and-plugins-contribute-verbs.md',
+    fatal: false,
+    fatality:
+      'That cell has no table and the cells after it do not run; earlier cells keep theirs.',
+  },
+  // A missing column aborts rather than returning no rows: an empty result must never pass for
+  // an answer, the rule Buraqueira's `flow.py` learned from a search that answered 200 and empty.
+  E_RECIPE_UNKNOWN_COLUMN: {
+    severity: 'error',
+    summary: 'A recipe verb names a column the table does not have.',
+    template: "No column named '{column}' in this table. Available: {available}.",
+    spec: 'docs/adr/0128-a-recipe-is-a-closed-vocabulary-notebook-and-plugins-contribute-verbs.md',
+    fatal: false,
+    fatality:
+      'That cell has no table and the cells after it do not run; earlier cells keep theirs.',
+  },
+  E_RECIPE_ALIAS: {
+    severity: 'error',
+    summary: 'A column alias cannot be used as it is defined.',
+    template: "Alias '{alias}' {problem}.",
+    spec: 'docs/adr/0128-a-recipe-is-a-closed-vocabulary-notebook-and-plugins-contribute-verbs.md',
+    fatal: false,
+    fatality:
+      'That cell has no table and the cells after it do not run; earlier cells keep theirs.',
+  },
+  // Zero rows is a legitimate answer, but it cannot be told from a misspelt value if it is silent.
+  W_RECIPE_WHERE_EMPTY: {
+    severity: 'warning',
+    summary: "A 'where' kept no row of a table that had rows.",
+    template:
+      "No row passed '{expression}'. Values compare without case or accents; '~' means contains and '=' means equal.",
+    spec: 'docs/adr/0128-a-recipe-is-a-closed-vocabulary-notebook-and-plugins-contribute-verbs.md',
+    fatal: false,
+    fatality: 'A warning never replaces a value (ADR 0013).',
+  },
 } as const satisfies Record<string, DiagnosticCodeDefinition>;
 
 export type DiagnosticCode = keyof typeof diagnosticCodes;

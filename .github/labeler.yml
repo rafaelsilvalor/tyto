@@ -41,6 +41,9 @@
 'pkg:raster':
   - changed-files:
       - any-glob-to-any-file: 'packages/raster/**'
+'pkg:recipe':
+  - changed-files:
+      - any-glob-to-any-file: 'packages/recipe/**'
 'pkg:pipeline':
   - changed-files:
       - any-glob-to-any-file: 'packages/pipeline/**'

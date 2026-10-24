@@ -1,0 +1,11 @@
+# Invented tasks of a demo project, for the generic verbs: no real project, team or person.
+recipe open-ads
+  | The open ads of the demo project that have a team, biggest first.
+param kind = anuncio
+
+where kind = {kind} AND status != done
+where team is not empty
+select key, title, status, points, due
+sort points desc
+show table
+keep open-ads
