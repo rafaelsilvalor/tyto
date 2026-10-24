@@ -913,8 +913,8 @@
         "apps/desktop/src/renderer/workspace-banner.ts",
         "apps/desktop/src/renderer/workspace-folder.ts"
       ],
-      "e2e": ["workspace.desktop.test.ts"],
-      "why": "reviewed: the open workspace folder, its places, its problem rows, its trust banner, Manage Trust (TYTO-278), its work profile and the Project panel (TYTO-347)"
+      "e2e": ["export-presets.desktop.test.ts", "workspace.desktop.test.ts"],
+      "why": "reviewed: the open workspace folder, its places, its problem rows, its trust banner, Manage Trust (TYTO-278), its work profile and the Project panel (TYTO-347), its export presets (TYTO-270)"
     },
     {
       "paths": ["apps/desktop/src/main/window-plugins.ts"],
@@ -1123,6 +1123,11 @@
         "window.desktop.test.ts"
       ],
       "why": "generated: name, prefix, static import or text of the stem in the e2e file"
+    },
+    {
+      "paths": ["apps/desktop/src/renderer/export-presets.ts"],
+      "e2e": ["export-presets.desktop.test.ts"],
+      "why": "reviewed: an export preset's command, its title and the export:start it makes (TYTO-270)"
     },
     {
       "paths": ["apps/desktop/src/renderer/frontmatter.ts"],

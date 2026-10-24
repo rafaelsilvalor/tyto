@@ -17,7 +17,8 @@ const WORDS = {
       '`keybindings.json` names to put a command on a key.',
     later:
       'The window adds more while it runs, which this list cannot show: a toggle for each ' +
-      "panel, including a plugin's, and an entry for each recently opened file.",
+      "panel, including a plugin's, an entry for each recently opened file, and one for each " +
+      'export preset of the open folder, `export.preset:<name>`.',
     title_: 'Title',
     id: 'Id',
     windows: 'Default key (Windows and Linux)',
@@ -31,8 +32,9 @@ const WORDS = {
       'que o `keybindings.json` usa para pôr um comando numa tecla.',
     later:
       'A janela acrescenta outros enquanto roda, que esta lista não tem como mostrar: um para ' +
-      'abrir e fechar cada painel, inclusive os de plugins, e um para cada arquivo aberto ' +
-      'recentemente.',
+      'abrir e fechar cada painel, inclusive os de plugins, um para cada arquivo aberto ' +
+      'recentemente, e um para cada predefinição de exportação da pasta aberta, ' +
+      '`export.preset:<nome>`.',
     title_: 'Título',
     id: 'Id',
     windows: 'Tecla padrão (Windows e Linux)',

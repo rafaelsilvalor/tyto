@@ -1,7 +1,7 @@
 # Workspace folder
 
 ::: info How this page was checked
-Every step was followed on 2026-10-21 on a development build of Tyto on Windows 11, in a folder holding a `.tyto/project.json`, a template in `tpl/`, an image in `art/` and two briefs in `briefs/`, in a second folder whose `assets` led outside it, and on the same day in a folder naming a work profile kept in `~/.tyto/profiles/` and in one naming a profile file inside it whose `assets` led outside the profile's folder. Menus and labels below are the English window's. The Explorer's header buttons were checked on 2026-10-23 on a development build, in the light and the dark theme.
+Every step was followed on 2026-10-21 on a development build of Tyto on Windows 11, in a folder holding a `.tyto/project.json`, a template in `tpl/`, an image in `art/` and two briefs in `briefs/`, in a second folder whose `assets` led outside it, and on the same day in a folder naming a work profile kept in `~/.tyto/profiles/` and in one naming a profile file inside it whose `assets` led outside the profile's folder. Menus and labels below are the English window's. The Explorer's header buttons were checked on 2026-10-23 on a development build, in the light and the dark theme. Export presets were checked on 2026-10-23 on a development build, from the command bar and from a key bound in `keybindings.json`.
 :::
 
 A workspace folder is a project folder with a `.tyto/project.json` in it. The file says where the project keeps its templates, images and fonts, and where its exports go:
@@ -28,6 +28,34 @@ While it is open:
 - **Export** points at its `output` folder until you choose another.
 
 A brief outside the folder works as it always did.
+
+## Export presets: a delivery with one key
+
+A project file can name **export presets**: a set of sizes and file types, and the folder they go to, run as one command.
+
+```jsonc
+{
+  "output": "exports",
+  "exportPresets": {
+    "entregas": { "formats": ["grid-1x1", "story"], "folder": "entregas" },
+    "web": { "formats": ["story"], "types": ["webp", "png"] },
+  },
+}
+```
+
+- `formats` lists the sizes, at least one. A size the brief's template does not have is reported when the preset runs, as the Export dialog reports it.
+- `types` lists the file types — `png`, `jpeg`, `webp`, `svg` — and is `png` when left out.
+- `folder` is where the files go, relative to the open folder. Without it the preset uses `output`; with neither, the preset is left out and **Problems** says why. The folder is made if it is not there.
+
+Each preset is a command in the command bar, **Export: entregas**, for the brief in front. It opens the Export dialog already running, with the count, the problems and **Open folder** as usual, and writes what [Export](../export/index.md#what-is-written) writes: a file the previous export put there and this one did not is removed and listed, and files of your own in the folder are never touched.
+
+To give a preset a key, bind its command in [`keybindings.json`](../customize/keybindings-json.md):
+
+```json
+[{ "key": "ctrl+e", "command": "export.preset:entregas" }]
+```
+
+A work profile can hold presets too. A folder that defines a preset of the same name replaces that one and keeps the profile's others. A profile's `folder` is still relative to the open folder, so `"folder": "entregas"` is each campaign's own `entregas`. In a folder you have not trusted, a preset's `folder` must stay inside it: one that leads outside is listed as `W_PROJECT_PATH_OUTSIDE` and that preset is left out.
 
 ## Browse its files: the Explorer
 

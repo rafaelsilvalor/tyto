@@ -226,6 +226,7 @@ export const en: Catalogue = {
   'export.problems': 'Finished with problems',
   'export.leftovers': 'In the folder, from the previous export:',
   'command.file.export': 'Export…',
+  'command.export.preset': 'Export',
   'command.template.edit': 'Edit template…',
   'command.template.new': 'New template…',
   'templateMode.heading': 'Editing template',

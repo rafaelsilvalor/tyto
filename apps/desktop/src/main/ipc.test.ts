@@ -197,6 +197,7 @@ const workspaceFolder = () => {
     output: folder === null ? null : '/work/promo/exports',
     profile: null,
     places: [],
+    exportPresets: [],
     problems: [],
   });
   return {

@@ -1,7 +1,8 @@
 # 0111 — Nothing a source ships runs before the person trusts it
 
 Status: accepted · 2026-10-21 · TYTO-271 · fulfils the second trigger of ADR 0079, beside ADR
-0011, ADR 0032, ADR 0049 and ADR 0073; the gate TYTO-261, TYTO-278 and TYTO-347 pass
+0011, ADR 0032, ADR 0049 and ADR 0073; the gate TYTO-261, TYTO-278 and TYTO-347 pass; ADR 0126
+adds the export presets row to the table below
 
 ## Context
 
@@ -59,6 +60,7 @@ per-source content joins it, or the inert list, in the pull request that adds it
 | A per-folder or per-profile settings key that turns on something that runs  | runnable  |
 | Plugin-owned sections of `project.json` or a profile                        | gated     |
 | Asset, template, font and output folder keys of `project.json` or a profile | inert     |
+| Export presets of `project.json` or a profile (ADR 0126)                    | inert     |
 | Markup templates, fonts, images and briefs inside those folders             | inert     |
 | A `template.ts` anywhere in a source                                        | never run |
 

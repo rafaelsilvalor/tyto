@@ -157,6 +157,8 @@ export {
   PROJECT_FILE_NAME,
   type ProjectEntry,
   type ProjectLayer,
+  type ProjectMember,
+  type ProjectNode,
   type ProjectOrigins,
   type ProjectResolveOptions,
   type ResolvedProject,
@@ -165,6 +167,8 @@ export {
 } from './project/project.js';
 
 export { isAbsolutePath, isInsidePath, resolvePath } from './project/paths.js';
+
+export { DEFAULT_PRESET_TYPES, EXPORT_PRESETS_KEY, type ExportPreset } from './project/presets.js';
 
 export {
   PROFILES_DIRECTORY,

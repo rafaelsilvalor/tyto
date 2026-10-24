@@ -133,6 +133,7 @@ const NOTHING_OPEN: WorkspaceState = {
   output: null,
   profile: null,
   places: [],
+  exportPresets: [],
   problems: [],
 };
 
@@ -201,6 +202,14 @@ export function createWorkspaceService(options: WorkspaceServiceOptions): Worksp
                 leftOut: profile.diagnostics.filter((item) => LEFT_OUT.has(item.code)).length,
               },
         places: placesOf(open),
+        // Already resolved against the folder and confined by `@tyto/io` (ADR 0126); at most
+        // the hundred the channel carries.
+        exportPresets: open.project.exportPresets.slice(0, 100).map((preset) => ({
+          name: preset.name,
+          formats: [...preset.formats],
+          types: [...preset.types],
+          folder: preset.folder,
+        })),
         problems: [...problemsOf(open)],
       };
     },

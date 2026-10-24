@@ -165,6 +165,15 @@ export const RECENT_PREFIX = 'file.recent:';
 export const recentCommandId = (path: string): string => `${RECENT_PREFIX}${path}`;
 export const pathOfRecentCommand = (id: string): string | undefined =>
   id.startsWith(RECENT_PREFIX) ? id.slice(RECENT_PREFIX.length) : undefined;
+/**
+ * An export preset, as a command per preset (TYTO-270, ADR 0126): `keybindings.json` takes no
+ * arguments, so a key names one preset by naming its command. The name follows the prefix as
+ * the project file wrote it, and the bar puts `command.export.preset` in front.
+ */
+export const EXPORT_PRESET_PREFIX = 'export.preset:';
+export const presetCommandId = (name: string): string => `${EXPORT_PRESET_PREFIX}${name}`;
+export const presetOfCommand = (id: string): string | undefined =>
+  id.startsWith(EXPORT_PRESET_PREFIX) ? id.slice(EXPORT_PRESET_PREFIX.length) : undefined;
 export const EDITOR_TOGGLE_VIM = 'editor.toggleVim';
 /**
  * The "/" menu without typing "/" (TYTO-276): the templates at the cursor, for a binding in
@@ -649,6 +658,10 @@ export const BRIEF_ONLY_COMMANDS: ReadonlySet<string> = new Set([
   EDITOR_GO_TO_BLOCK,
   EDITOR_FORMAT_BRIEF,
 ]);
+
+/** Whether `id` acts on the brief in front: one of the set, or an export preset (TYTO-270). */
+export const isBriefOnlyCommand = (id: string): boolean =>
+  BRIEF_ONLY_COMMANDS.has(id) || presetOfCommand(id) !== undefined;
 
 /**
  * The commands that act on the text in front, which a preview tab has none of (TYTO-287): with

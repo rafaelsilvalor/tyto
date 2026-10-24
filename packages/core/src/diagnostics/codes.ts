@@ -1184,6 +1184,17 @@ export const diagnosticCodes = {
     fatal: false,
     fatality: 'A warning never replaces a value (ADR 0013).',
   },
+  // ADR 0126: an export preset with nowhere to deliver is not run, rather than run somewhere.
+  W_PROJECT_PRESET_NO_FOLDER: {
+    severity: 'warning',
+    summary:
+      "An export preset names no folder and no sheet sets 'output', so the preset is left out.",
+    template:
+      "Export preset '{preset}' names no folder and the project sets no 'output'; it is left out.",
+    spec: 'docs/adr/0126-an-export-preset-is-a-named-delivery-in-the-project-file.md',
+    fatal: false,
+    fatality: 'A warning never replaces a value (ADR 0013).',
+  },
   E_TRUST_FILE: {
     severity: 'error',
     summary: 'TYTO_HOME/trust.json cannot be read or written.',

@@ -28,6 +28,10 @@ Each file is named after its size and the artwork's number: `grid-01.png`, `grid
 
 Beside them, an `editaveis` folder (_editable_, in Portuguese) keeps what is needed to make the same files again: a copy of the brief, a `template.txt` naming the template and its version, and a `result.json` listing every file written.
 
+## Export with a preset
+
+When the open [workspace folder](../editor/workspace-folder.md#export-presets-a-delivery-with-one-key) names export presets, each is a command such as **Export: entregas**: it exports the brief in front with the preset's sizes and file types into its folder, with no choices to make, and shows the run in the same dialog. A preset can have its own key in `keybindings.json`.
+
 ## In this section
 
 - [Images](./images.md) — PNG, JPEG and WebP; scale and quality.

@@ -60,6 +60,13 @@ import {
 import { followScheme } from './color-scheme.js';
 import { applyTheme, withThemeRows } from './theme.js';
 import { exportDestination, withWorkspaceRows } from './workspace-folder.js';
+import {
+  type ExportPresetView,
+  presetCommandTitle,
+  presetExportRequest,
+  registerPresetCommands,
+  samePresets,
+} from './export-presets.js';
 import { WORKSPACE_BANNER, paintWorkspaceBanner } from './workspace-banner.js';
 import { type TrustDialog, TRUST_DIALOG_TAG } from './trust-dialog.js';
 import { canvasMeasure, missingFamilyRows, withFontRows } from './typography.js';
@@ -434,6 +441,13 @@ function updateActive(change: (document: DocumentState) => DocumentState): void 
  * forever.
  */
 let recentCommands: (() => void)[] = [];
+
+/**
+ * The open folder's export presets, as commands (TYTO-270, ADR 0126), and the answer they were
+ * registered from, so an answer naming the same presets registers nothing again.
+ */
+let presetCommands: () => void = () => {};
+let presetsShown: readonly ExportPresetView[] = [];
 
 /**
  * Where the panels are, which is the only thing that decides what the window looks like.
@@ -824,6 +838,11 @@ function previewEntry(tab: EditorTab): TabEntry {
  * the dialog was closed would make a second export of the same brief a second folder hunt.
  */
 let exportDirectory: string | undefined;
+/**
+ * The folder of the preset whose run the box is showing (TYTO-270). Not `exportDirectory`: a
+ * preset delivers to its own folder and leaves the one the person picked alone.
+ */
+let presetDirectory: string | undefined;
 let exportId: string | undefined;
 let exportPoll: ReturnType<typeof setInterval> | undefined;
 
@@ -853,7 +872,7 @@ function paintExport(progress: ExportProgressView | undefined): void {
   const dialog = elements.exportDialog;
   if (dialog === null || dialog === undefined) return;
   dialog.locale = state.locale;
-  dialog.directory = exportDestination(exportDirectory, state.workspaceOutput);
+  dialog.directory = presetDirectory ?? exportDestination(exportDirectory, state.workspaceOutput);
   dialog.progress = progress;
 }
 
@@ -1028,11 +1047,13 @@ function openExportDialog(): void {
       // dialog leaves the path alone.
       if (answer.directory === undefined) return;
       exportDirectory = answer.directory;
+      presetDirectory = undefined;
       paintExport(dialog.progress);
     });
   };
 
   dialog.start = (request) => {
+    presetDirectory = undefined;
     void withBridge(async (bridge) => {
       const answer = await bridge['export:start']({
         documentId: active().id,
@@ -1089,6 +1110,53 @@ function openExportDialog(): void {
 
   paintExport(dialog.progress);
   dialog.open = true;
+}
+
+/**
+ * Runs an export preset on the brief in front (TYTO-270, ADR 0126): the export box opens
+ * already running, so progress, problems and the leftovers list are the ones a person knows.
+ * The request is the box's own channel with the preset's formats, types and folder, and main
+ * delivers exactly as it does for the box (ADR 0054, ADR 0057).
+ */
+function runExportPreset(preset: ExportPresetView): void {
+  openExportDialog();
+  presetDirectory = preset.folder;
+  void withBridge(async (bridge) => {
+    const answer = await bridge['export:start'](
+      presetExportRequest(preset, active().id, activeText()),
+    );
+    exportId = answer.exportId;
+    paintExport({
+      status: 'running',
+      total: 0,
+      done: 0,
+      failed: 0,
+      directory: preset.folder,
+      diagnostics: [],
+    });
+    watchExport();
+  });
+}
+
+/**
+ * The presets of a workspace answer as commands, one `export.preset:<name>` each.
+ *
+ * **The key table is resolved again after**, which nothing did when the registry changed: the
+ * resolver checks each binding's command against the registry as it stood, so a key in
+ * `keybindings.json` naming a preset that arrived with the folder would stay
+ * `W_KEYBINDING_UNKNOWN_COMMAND` until the file was next saved. Only with a layer above the
+ * built-in one, for `applyKeybindings`' own reason, and only when the presets changed.
+ */
+function showExportPresets(presets: readonly ExportPresetView[]): void {
+  if (samePresets(presetsShown, presets)) return;
+  presetsShown = presets;
+  presetCommands();
+  presetCommands = registerPresetCommands(registry, presets, runExportPreset);
+  void withBridge((bridge) => {
+    if (pluginKeybindings.length > 0 || userKeybindings.length > 0) applyKeybindings(bridge);
+    else paintCommandBar();
+    return Promise.resolve();
+  });
 }
 
 /**
@@ -2740,6 +2808,7 @@ function showWorkspace(answer: IpcResponse<'workspace:folder'>): void {
   state.workspaceOutput = answer.output;
   state.workspaceName = answer.name;
   workspaceShown = answer;
+  showExportPresets(answer.exportPresets);
   panel.installation = withWorkspaceRows(panel.installation, answer.problems);
   if (elements.workspaceBanner !== null) {
     paintWorkspaceBanner(elements.workspaceBanner, answer, state.locale);
@@ -3743,6 +3812,8 @@ function commandTitle(
   if (pathOfRecentCommand(command.id) !== undefined) {
     return `${translate(state.locale, 'command.file.recent')}: ${own}`;
   }
+  const preset = presetCommandTitle(state.locale, command.id);
+  if (preset !== undefined) return preset;
   if (slot !== undefined) {
     return `${translate(state.locale, 'command.document.select')}: ${
       tab === undefined ? String(slot) : labelOf(tab)

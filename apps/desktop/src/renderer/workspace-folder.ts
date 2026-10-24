@@ -19,6 +19,7 @@ export const WORKSPACE_CODES: ReadonlySet<string> = new Set([
   'W_PROJECT_PROFILE_INVALID',
   'W_PROJECT_PROFILE_MISSING',
   'W_PROFILE_NESTED',
+  'W_PROJECT_PRESET_NO_FOLDER',
   'E_TRUST_FILE',
 ]);
 

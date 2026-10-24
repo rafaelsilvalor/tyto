@@ -1,4 +1,11 @@
-import { type Diagnostic, type ProjectEntry, diagnostic, sourceRange } from '@tyto/core';
+import {
+  type Diagnostic,
+  type ProjectEntry,
+  type ProjectMember,
+  type ProjectNode,
+  diagnostic,
+  sourceRange,
+} from '@tyto/core';
 import {
   type Node,
   type ParseError,
@@ -66,9 +73,31 @@ export function readProjectText(text: string): ProjectText {
       ...(valueNode?.type === 'array'
         ? { entryRanges: (valueNode.children ?? []).map((item) => rangeOf(item)) }
         : {}),
+      // Only an object nests far enough to need a tree: an export preset's fields (TYTO-270).
+      ...(valueNode?.type === 'object' ? { node: nodeOf(valueNode) } : {}),
     });
   }
   return { entries, syntax };
+}
+
+/** A value with where every member and item of it was written, all the way down. */
+function nodeOf(node: Node): ProjectNode {
+  const range = rangeOf(node);
+  if (node.type === 'array') {
+    return { range, items: (node.children ?? []).map((item) => nodeOf(item)) };
+  }
+  if (node.type !== 'object') return { range };
+  const members: ProjectMember[] = [];
+  for (const property of node.children ?? []) {
+    const [keyNode, valueNode] = property.children ?? [];
+    if (keyNode === undefined || typeof keyNode.value !== 'string') continue;
+    members.push({
+      key: keyNode.value,
+      keyRange: rangeOf(keyNode),
+      value: valueNode === undefined ? undefined : nodeOf(valueNode),
+    });
+  }
+  return { range, members };
 }
 
 function rangeOf(node: Node) {

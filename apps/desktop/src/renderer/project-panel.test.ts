@@ -20,6 +20,7 @@ const view = (overrides: Partial<ProjectView> = {}): ProjectView => ({
     { key: 'assets', folders: ['/home/.tyto/profiles/Saúde/art'], origin: 'profile' },
     { key: 'output', folders: ['/work/campanha/out'], origin: 'folder' },
   ],
+  exportPresets: [],
   problems: [],
   ...overrides,
 });
