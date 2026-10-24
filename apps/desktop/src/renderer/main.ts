@@ -149,18 +149,27 @@ import { type StatusBarItemId, STATUS_BAR_ITEM_IDS } from '../../shared/status-b
 import { type VimModeStyle } from '../../shared/vim-mode-style.js';
 import { createVimSetting } from './vim-setting.js';
 import { type BriefColumnLook } from '../../shared/brief-columns.js';
+import { type DocumentFormat } from '../../shared/file-icons.js';
 import {
+  type AppFileKind,
+  type DocumentKind,
   type DocumentState,
+  type TextKind,
   type Workspace,
   activeOf,
   addDocument,
   closeDocument,
   contentOf,
   documentOf,
+  formatOfKind,
+  hasPath,
+  isAppFile,
+  isBrief,
   isBroken,
   isDisposable,
   isStale,
   isUnsaved,
+  kindOfFormat,
   newDocument,
   rebaseEdit,
   releaseDocument,
@@ -729,7 +738,8 @@ function showFontArea(mount: HTMLElement, front: EditorTab | undefined): void {
     front === undefined || isPreview(front)
       ? undefined
       : documentOf(workspace, front.documentId)?.kind;
-  mount.dataset['fontArea'] = kind === undefined ? 'editor' : 'json';
+  // A text tab is in the editor's font, as a brief is (TYTO-247): only the app's JSON is not.
+  mount.dataset['fontArea'] = isAppFile(kind) ? 'json' : 'editor';
 }
 
 function paintTabs(): void {
@@ -749,7 +759,7 @@ function paintTabs(): void {
     element.offerPreview =
       front !== undefined &&
       !isPreview(front) &&
-      documentOf(workspace, front.documentId)?.kind === undefined;
+      isBrief(documentOf(workspace, front.documentId)?.kind);
     element.openPreview = () => {
       runCommand(PREVIEW_OPEN_TO_SIDE);
     };
@@ -785,10 +795,13 @@ function paintTabs(): void {
  * snippets file, or a brief — saved or untitled, a queue task's included — so its kind says it
  * and no name is looked at.
  */
-const TAB_ICONS: Readonly<Record<NonNullable<DocumentState['kind']>, IconName>> = {
+const TAB_ICONS: Readonly<Record<DocumentKind, IconName>> = {
   settings: 'settingsFile',
   keybindings: 'keybindingsFile',
   snippets: 'snippetsFile',
+  // TYTO-247: the explorer's icon for a `.txt` and a `.md`, so a tab and its row agree.
+  text: 'text',
+  markdown: 'text',
 };
 
 const tabIconOf = (document_: DocumentState): IconName =>
@@ -1383,7 +1396,7 @@ const registry: CommandRegistry = withCommandGate(
         // Format on save (TYTO-297): a brief only, in the pane holding its record, before the
         // text is read — `onUpdate` writes the workspace in the same transaction, so the save
         // below sends the formatted text. A brief that refuses is saved as it is, and says so.
-        if (formatBriefOnSave && active().kind === undefined) {
+        if (formatBriefOnSave && isBrief(active().kind)) {
           const pane = primaryPaneOf(active().id);
           if (pane !== undefined) formatPane(pane);
         }
@@ -1765,22 +1778,22 @@ function syncActiveDocument(): void {
  * open, else the first brief in front of any group, else any open brief, else none.
  */
 function followActiveBrief(): void {
-  const isBrief = (id: string | undefined): id is string => {
+  const isBriefId = (id: string | undefined): id is string => {
     const document_ = id === undefined ? undefined : documentOf(workspace, id);
-    return document_ !== undefined && document_.kind === undefined;
+    return document_ !== undefined && isBrief(document_.kind);
   };
   const textInFront = (group: EditorGroup): string | undefined => {
     const tab = activeTabOf(group);
     return tab === undefined || isPreview(tab) ? undefined : tab.documentId;
   };
   const focused = textInFront(focusedGroup(groups));
-  const broughtForward = isBrief(focused) && focused !== frontBrief;
+  const broughtForward = isBriefId(focused) && focused !== frontBrief;
   frontBrief = focused;
-  if (isBrief(focused)) followedBrief = focused;
-  else if (!isBrief(followedBrief)) {
+  if (isBriefId(focused)) followedBrief = focused;
+  else if (!isBriefId(followedBrief)) {
     followedBrief =
-      groupList(groups).map(textInFront).find(isBrief) ??
-      workspace.documents.find((document_) => document_.kind === undefined)?.id ??
+      groupList(groups).map(textInFront).find(isBriefId) ??
+      workspace.documents.find((document_) => isBrief(document_.kind))?.id ??
       '';
   }
   groups = broughtForward
@@ -1822,7 +1835,7 @@ function showGroups(): void {
 function openPreview(side: boolean, focus: boolean): void {
   if (editor === undefined || !sessionRead) return;
   const current = active();
-  const brief = current.kind === undefined ? current.id : followedBrief;
+  const brief = isBrief(current.kind) ? current.id : followedBrief;
   groups = side ? openPreviewToSide(groups, brief, focus) : openPreviewHere(groups, brief);
   showGroups();
 }
@@ -1909,12 +1922,15 @@ function adoptEditorState(handle: EditorHandle): void {
  * rebuilding a state from a string is exactly what throws one away.
  */
 function adopt(
-  opened: { name: string; pathLabel: string; text: string } | null,
+  opened: { name: string; pathLabel: string; text: string; format: DocumentFormat } | null,
   documentId: string | null,
   wanted: string,
-  kind?: AppFile,
+  appFile?: AppFile,
 ): void {
   if (opened === null || documentId === null) return;
+  // An app file is what its command opened; anything else is what main named from the path's
+  // extension — a brief, or a `.txt` or `.md` (TYTO-247, ADR 0132), kept for the tab's life.
+  const kind = appFile ?? kindOfFormat(opened.format);
 
   if (documentId !== wanted) {
     activate(documentId);
@@ -1964,17 +1980,17 @@ function adopt(
     : addDocument(workspace, created);
 
   followWorkspace();
-  // Opened from disk, so the text is a file's and settled: it may fetch (ADR 0119).
-  void withBridge((bridge) =>
-    kind === undefined
-      ? request(bridge, created.id, opened.text, { fetch: true })
-      : validateAppFile(bridge, created.id),
-  );
+  // Opened from disk, so the text is a file's and settled: it may fetch (ADR 0119). A text
+  // file is neither compiled nor checked (TYTO-247): nothing is asked about it.
+  void withBridge(async (bridge) => {
+    if (isBrief(kind)) await request(bridge, created.id, opened.text, { fetch: true });
+    else if (isAppFile(kind)) await validateAppFile(bridge, created.id);
+  });
   void refreshRecent();
 }
 
 /** The files of the app's own a tab can hold (TYTO-206, TYTO-207, TYTO-277). */
-type AppFile = NonNullable<DocumentState['kind']>;
+type AppFile = AppFileKind;
 
 /** Asks main to open one of the app's files into the tab `documentId`. */
 const openAppFileIn = (bridge: TytoBridge, kind: AppFile, documentId: string) => {
@@ -2646,7 +2662,7 @@ function breadcrumbText(groupId: string): string {
   const group = groupById(groups, groupId);
   const front = group === undefined ? undefined : activeTabOf(group);
   if (front === undefined || isPreview(front)) return '';
-  if (documentOf(workspace, front.documentId)?.kind !== undefined) return '';
+  if (!isBrief(documentOf(workspace, front.documentId)?.kind)) return '';
   const pane_ = panes.get(groupId);
   // A pane that has not taken the tab in front yet still holds the last one's state.
   if (pane_ === undefined || shownIn.get(groupId) !== front.documentId) return '';
@@ -3048,6 +3064,10 @@ async function requestClose(id: string): Promise<void> {
   closeTab(id);
 }
 
+/** The format a save sends, only when there is one: an app file's tab has none (ADR 0132). */
+const withFormat = (format: DocumentFormat | undefined): { format?: DocumentFormat } =>
+  format === undefined ? {} : { format };
+
 /**
  * Writes one tab, asking for a name when it has none, and says how it went (TYTO-124, TYTO-153).
  *
@@ -3085,6 +3105,8 @@ async function saveOneDocument(
       // that need not be in front — and what the quit question relies on.
       text: contentOf(target),
       saveAs,
+      // So Save As offers a text tab its own extension (TYTO-247, ADR 0132).
+      ...withFormat(formatOfKind(target.kind)),
     });
   } catch (cause) {
     // Rebuilt and not appended to, the way `E_FILE_NOT_FOUND` above is: a second failed
@@ -3145,7 +3167,7 @@ async function saveOneDocument(
   // Saved, so the text is settled: this compile may ask an installed plugin for what the
   // source cache lacks (ADR 0119). While typing it never does.
   const saved = documentOf(workspace, documentId);
-  if (saved !== undefined && saved.kind === undefined) {
+  if (saved !== undefined && isBrief(saved.kind)) {
     void request(bridge, documentId, contentOf(saved), { fetch: true });
   }
   return 'saved';
@@ -3373,16 +3395,33 @@ function placed(document_: DocumentState, place: RestoredTab['place']): Document
   };
 }
 
-/** The file a restored tab holds: main's answer for a brief, the open command's for the rest. */
+/**
+ * The file a restored tab holds: main's answer for a brief or a text file, which main reopened
+ * by its path, and the open command's for the app's own files (TYTO-247, ADR 0132).
+ */
 async function fileOf(
   bridge: TytoBridge,
   tab: RestoredTab,
 ): Promise<{
-  document: { name: string; pathLabel: string; text: string } | null;
+  document: { name: string; pathLabel: string; text: string; format: DocumentFormat } | null;
   documentId: string | null;
 }> {
-  if (tab.kind === 'brief') return { document: tab.document, documentId: tab.documentId };
-  return openAppFileIn(bridge, tab.kind, nextDocumentId());
+  const kind = tab.kind === 'brief' ? undefined : tab.kind;
+  if (hasPath(kind)) return { document: tab.document, documentId: tab.documentId };
+  return openAppFileIn(bridge, kind, nextDocumentId());
+}
+
+/**
+ * The kind a restored tab is: the session's for an app file and for a draft in no file, and
+ * otherwise its file's, since a restore reopens it — a rename keeps a tab's kind only until then.
+ */
+function restoredKind(
+  tab: RestoredTab,
+  document: { format: DocumentFormat } | null,
+): DocumentKind | undefined {
+  if (isAppFile(tab.kind)) return tab.kind;
+  if (document !== null) return kindOfFormat(document.format);
+  return tab.kind === 'brief' ? undefined : tab.kind;
 }
 
 /**
@@ -3411,15 +3450,18 @@ async function restoreSession(bridge: TytoBridge, handle: EditorHandle): Promise
   /** Per session tab, by index: the document it became, and a stale draft's tab beside it. */
   const builtAt = new Map<number, string>();
   const staleAt = new Map<number, string>();
-  const untitled = (text: string, place: RestoredTab['place']): DocumentState => {
-    const born = placed(newDocument(nextDocumentId(), handle.blank(text)), place);
+  const untitled = (text: string, place: RestoredTab['place'], kind?: TextKind): DocumentState => {
+    // A text tab's draft comes back as text, not as a brief to compile (TYTO-247).
+    const fresh = newDocument(nextDocumentId(), handle.blank(text, languageOf(kind)));
+    const born = placed(kind === undefined ? fresh : { ...fresh, kind }, place);
     restored.push(born);
     return born;
   };
 
   for (const [index, tab] of answer.tabs.entries()) {
     const opened = await fileOf(bridge, tab);
-    const kind = tab.kind === 'brief' ? undefined : tab.kind;
+    const kind = restoredKind(tab, opened.document);
+    const textKind = kind === 'text' || kind === 'markdown' ? kind : undefined;
     let built: DocumentState | undefined;
     if (opened.document !== null && opened.documentId !== null) {
       const language = languageOf(kind);
@@ -3445,7 +3487,7 @@ async function restoreSession(bridge: TytoBridge, handle: EditorHandle): Promise
       );
       restored.push(built);
       if (tab.draft !== null && tab.stale) {
-        staleAt.set(index, untitled(tab.draft, tab.place).id);
+        staleAt.set(index, untitled(tab.draft, tab.place, textKind).id);
         rows.push({
           severity: 'warning',
           code: SESSION_DRAFT_STALE,
@@ -3460,7 +3502,7 @@ async function restoreSession(bridge: TytoBridge, handle: EditorHandle): Promise
           message: `${translate(state.locale, 'file.missing')}: ${tab.missing}`,
         });
       }
-      if (tab.draft !== null) built = untitled(tab.draft, tab.place);
+      if (tab.draft !== null) built = untitled(tab.draft, tab.place, textKind);
     }
     if (built !== undefined) builtAt.set(index, built.id);
     if (index === answer.active && built !== undefined) activeId = built.id;
@@ -3512,9 +3554,11 @@ async function restoreSession(bridge: TytoBridge, handle: EditorHandle): Promise
       // A tab whose text is its file's was opened from disk and may fetch; a hot-exit draft
       // that differs fetches on its first save, never on the restore (ADR 0119).
       const fetch = !isUnsaved(document_);
-      if (document_.kind === undefined)
+      // Three kinds, three answers (TYTO-247): a brief compiles, an app file is checked, and a
+      // text file is neither — it was never an app file, so it is not validated as one.
+      if (isBrief(document_.kind))
         void request(bridge, document_.id, contentOf(document_), { fetch });
-      else void validateAppFile(bridge, document_.id);
+      else if (isAppFile(document_.kind)) void validateAppFile(bridge, document_.id);
     }
   }
   if (rows.length > 0) {
@@ -3969,7 +4013,7 @@ function paintStatusBar(): void {
     // The focused pane's caret (TYTO-286): a follower's selection is its own, not the record's.
     cursor: shownState === undefined ? { line: 1, column: 1, selected: 0 } : cursorOf(shownState),
     kind: activeKind() ?? 'brief',
-    template: current.kind === undefined ? templateOf(activeText()) : undefined,
+    template: isBrief(current.kind) ? templateOf(activeText()) : undefined,
     problems: problems.length,
     errors: errorCount(problems),
     newProblems: problemsMark.lit,
@@ -4896,7 +4940,7 @@ async function afterTemplatesReread(bridge: TytoBridge): Promise<void> {
   await refreshTemplates(bridge);
   await Promise.all(
     workspace.documents
-      .filter((document_) => document_.kind === undefined)
+      .filter((document_) => isBrief(document_.kind))
       .map((document_) => request(bridge, document_.id, contentOf(document_))),
   );
   repaint();
@@ -5204,8 +5248,9 @@ async function load(): Promise<void> {
         // exists.
         const edited = documentOf(workspace, documentId);
         if (edited === undefined) return;
-        if (edited.kind !== undefined) askAppFile(bridge, documentId);
-        else ask(bridge, documentId, contentOf(edited));
+        // A brief is compiled on the pause, an app file checked, a text file neither (TYTO-247).
+        if (isAppFile(edited.kind)) askAppFile(bridge, documentId);
+        else if (isBrief(edited.kind)) ask(bridge, documentId, contentOf(edited));
         // Typing changes no tab but the draft, and a draft is what a crash would cost.
         keepSessionSoon();
       });

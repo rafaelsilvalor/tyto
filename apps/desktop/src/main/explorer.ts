@@ -22,7 +22,8 @@ import { type ExplorerImage, IMAGE_EXTENSIONS, readExplorerImage } from './explo
  * read, which is why the cap is per folder and not on the whole tree.
  *
  * **Nothing here runs anything** (ADR 0111): an untrusted folder lists exactly as a trusted one,
- * and an entry can be used for two things: opening a `.brief` as text, and showing an image in
+ * and an entry can be used for two things: opening a `.brief`, `.txt` or `.md` as text
+ * (TYTO-247, ADR 0132), and showing an image in
  * the preview as bytes main checked (TYTO-366, ADR 0124).
  *
  * **New, rename and delete take an id and a name, never a path** (TYTO-352, ADR 0121). A name is
@@ -82,8 +83,6 @@ export interface ExplorerService {
    * an empty listing with `gone: true`, never a throw: the window drops that branch.
    */
   list(entryId: string | null): Promise<ExplorerListing>;
-  /** The brief `entryId` names, while it still lives inside the root; nothing otherwise. */
-  briefPath(entryId: string): Promise<string | undefined>;
   /**
    * The file `entryId` names when its name ends in one of `extensions` (lower case, with the
    * dot) and it is still a file whose real path lies inside the root; nothing otherwise.
@@ -525,11 +524,6 @@ export function createExplorerService(options: ExplorerServiceOptions): Explorer
       const entry = entryOf.get(entryId);
       if (entry?.kind !== 'folder') return Promise.resolve(NOTHING);
       return listFolder(entry.path);
-    },
-
-    briefPath(entryId) {
-      if (entryOf.get(entryId)?.kind !== 'brief') return Promise.resolve(undefined);
-      return filePath(entryId, ['.brief']);
     },
 
     filePath,

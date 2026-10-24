@@ -1,5 +1,7 @@
 import { type EditorState, type ScrollPosition, hasBeenEdited, textOf } from '@tyto/editor';
 
+import { type DocumentFormat } from '../../shared/file-icons.js';
+
 import {
   type Artwork,
   type Diagnostic,
@@ -25,6 +27,43 @@ import {
  * are the reads this file makes of it.
  */
 
+/** The app's own files a tab can hold (TYTO-206, TYTO-207, TYTO-277). */
+export type AppFileKind = 'settings' | 'keybindings' | 'snippets';
+
+/** A text file a tab can hold (TYTO-247, ADR 0132). */
+export type TextKind = 'text' | 'markdown';
+
+/** What a document is when it is not a brief, which is `undefined`. */
+export type DocumentKind = AppFileKind | TextKind;
+
+/**
+ * The three questions every call site that used to ask `kind === undefined` meant one of
+ * (TYTO-247, ADR 0132). Before text tabs, "not a brief" and "an app file" were the same answer;
+ * a text tab is the first that is neither, so each site says which question it asks.
+ *
+ * - {@link isBrief}: compiled, previewed, linted, exported — the brief's own machinery.
+ * - {@link isAppFile}: one of the app's own files, checked by its own validator and opened by its
+ *   own command.
+ * - {@link hasPath}: a file main holds by path and the session reopens by it — a brief or a text
+ *   file, never an app file.
+ */
+export const isBrief = (kind: DocumentKind | 'preview' | undefined): kind is undefined =>
+  kind === undefined;
+
+export const isAppFile = (kind: string | undefined): kind is AppFileKind =>
+  kind === 'settings' || kind === 'keybindings' || kind === 'snippets';
+
+export const hasPath = (kind: DocumentKind | undefined): kind is TextKind | undefined =>
+  kind === undefined || kind === 'text' || kind === 'markdown';
+
+/** The kind a file main opened takes from the format main named (ADR 0132). */
+export const kindOfFormat = (format: DocumentFormat): TextKind | undefined =>
+  format === 'brief' ? undefined : format;
+
+/** The format a tab of this kind is saved as, for the save dialog; none for an app file. */
+export const formatOfKind = (kind: DocumentKind | undefined): DocumentFormat | undefined =>
+  isAppFile(kind) ? undefined : (kind ?? 'brief');
+
 export interface DocumentState {
   /**
    * The renderer's own id for this tab, which is also the key main files its path under.
@@ -46,9 +85,11 @@ export interface DocumentState {
    * against what the plugins declared instead of compiled. `keybindings` for
    * `keybindings.json` (TYTO-207): plain text, checked in the window against the command
    * registry. `snippets` for `snippets.json` (TYTO-277): checked in the window against the
-   * snippet syntax and the template list. Absent for a brief.
+   * snippet syntax and the template list. `text` and `markdown` for a `.txt` and a `.md`
+   * (TYTO-247, ADR 0132): plain text that nothing checks or compiles, taken from the format main
+   * named when the file came in and kept for the tab's life. Absent for a brief.
    */
-  readonly kind?: 'settings' | 'keybindings' | 'snippets';
+  readonly kind?: DocumentKind;
   /**
    * The text that is in the file — and the **empty string for a document that is in no
    * file at all** (ADR 0026, ratifying D3).

@@ -56,6 +56,8 @@ describe('the catalogue', () => {
       // format and of the language — a Portuguese speaker writing one calls it a brief, and
       // "Resumo" would name something else.
       'panel.editor',
+      // TYTO-247: the status bar's kind for a `.md` tab, the format's own name in both.
+      'status.kind.markdown',
       'shell.about.templates',
       // TYTO-44's slide picker: "Slide", which Portuguese borrowed whole (above).
       'templateMode.slide',

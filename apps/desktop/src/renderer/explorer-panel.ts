@@ -23,7 +23,7 @@ import {
   withListing,
   withSelected,
 } from './explorer-tree.js';
-import { fileIconFor, isPreviewImage } from '../../shared/file-icons.js';
+import { fileIconFor, isPreviewImage, isTextFile } from '../../shared/file-icons.js';
 import { type CatalogueKey, type Locale, translate } from '../../shared/i18n/index.js';
 import type { IpcRequest, IpcResponse } from '../../shared/ipc.js';
 import { type IconName, icon } from './icons.js';
@@ -268,12 +268,14 @@ export class ExplorerPanel extends DockedPanel {
   }
 
   /**
-   * A brief opens in a tab; an image shows in the preview, and the focus stays here so the
-   * arrows go on choosing (TYTO-366, ADR 0124). Any other file does nothing.
+   * A brief, a `.txt` or a `.md` opens in a tab (TYTO-247, ADR 0132); an image shows in the
+   * preview, and the focus stays here so the arrows go on choosing (TYTO-366, ADR 0124). Any
+   * other file does nothing.
    */
   private openEntry(entry: ExplorerEntry): void {
-    if (entry.kind === 'brief') this.source.open(entry.id);
-    else if (entry.kind === 'file' && isPreviewImage(entry.name)) this.source.show(entry.id);
+    if (entry.kind === 'brief' || (entry.kind === 'file' && isTextFile(entry.name))) {
+      this.source.open(entry.id);
+    } else if (entry.kind === 'file' && isPreviewImage(entry.name)) this.source.show(entry.id);
   }
 
   private onKey(event: KeyboardEvent): void {

@@ -67,6 +67,8 @@ export interface Catalogue {
   readonly 'problems.empty.settings': string;
   readonly 'problems.empty.keybindings': string;
   readonly 'problems.empty.snippets': string;
+  /** TYTO-247, ADR 0132: a `.txt` or `.md` tab, which nothing checks. */
+  readonly 'problems.empty.text': string;
   /** Read out for the coloured dot in front of a diagnostic, which says nothing on its own. */
   readonly 'problems.severity.error': string;
   readonly 'problems.severity.warning': string;
@@ -420,6 +422,15 @@ export interface Catalogue {
   readonly 'status.kind.settings': string;
   readonly 'status.kind.keybindings': string;
   readonly 'status.kind.snippets': string;
+  /** TYTO-247: a `.txt` tab and a `.md` tab. "Markdown" is the format's name in both. */
+  readonly 'status.kind.text': string;
+  readonly 'status.kind.markdown': string;
+  /**
+   * TYTO-247, ADR 0132: the file dialogs' filters after "Brief" — the text files, and every file
+   * a tab opens. Main builds them in the window's language at each dialog.
+   */
+  readonly 'dialog.files.text': string;
+  readonly 'dialog.files.supported': string;
   readonly 'status.problems.new': string;
   /**
    * Help > About, where the version, the platform, the template count and the template
@@ -702,6 +713,7 @@ export const CATALOGUE_KEYS = [
   'problems.empty.settings',
   'problems.empty.keybindings',
   'problems.empty.snippets',
+  'problems.empty.text',
   'problems.severity.error',
   'problems.severity.warning',
   'problems.severity.info',
@@ -866,6 +878,10 @@ export const CATALOGUE_KEYS = [
   'status.kind.settings',
   'status.kind.keybindings',
   'status.kind.snippets',
+  'status.kind.text',
+  'status.kind.markdown',
+  'dialog.files.text',
+  'dialog.files.supported',
   'status.problems.new',
   'menu.about',
   'shell.about.version',

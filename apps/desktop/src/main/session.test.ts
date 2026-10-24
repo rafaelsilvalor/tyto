@@ -212,6 +212,77 @@ const setup = (
   return { documents, store, session, templateFolder };
 };
 
+/** TYTO-247, ADR 0132: a text tab is a file main holds by path, as a brief is. */
+describe('a text tab in the session', () => {
+  it('keeps a .md tab by its path and reopens it as Markdown, its draft over it', async () => {
+    const { documents, store, session } = setup({ '/b/notas.md': '# Notas\n' });
+    await documents.openPath('document-1', '/b/notas.md');
+
+    await session.write({
+      tabs: [
+        {
+          documentId: 'document-1',
+          kind: 'markdown',
+          draft: { text: '# Notas editadas\n', savedText: '# Notas\n' },
+          place: null,
+        },
+      ],
+      active: 0,
+      template: null,
+      final: false,
+    });
+    expect((store.saved() as { tabs: unknown }).tabs).toEqual([
+      {
+        kind: 'markdown',
+        path: '/b/notas.md',
+        draft: { text: '# Notas editadas\n', savedHash: savedHashOf('# Notas\n') },
+      },
+    ]);
+
+    const [tab] = (await session.read()).tabs;
+    expect(tab).toMatchObject({
+      kind: 'markdown',
+      documentId: 'session-1',
+      document: { path: '/b/notas.md', name: 'notas.md', format: 'markdown', text: '# Notas\n' },
+      draft: '# Notas editadas\n',
+      stale: false,
+      missing: null,
+    });
+  });
+
+  it('keeps a .txt tab in no file only while it holds a draft', async () => {
+    const { store, session } = setup({});
+    await session.write({
+      tabs: [
+        { documentId: 'document-1', kind: 'text', draft: null, place: null },
+        {
+          documentId: 'document-2',
+          kind: 'text',
+          draft: { text: 'a', savedText: '' },
+          place: null,
+        },
+      ],
+      active: 1,
+      template: null,
+      final: false,
+    });
+    expect((store.saved() as { tabs: unknown }).tabs).toEqual([
+      { kind: 'text', draft: { text: 'a', savedHash: savedHashOf('') } },
+    ]);
+  });
+
+  it('still reads a session.json written before text tabs, with no text kind in it', async () => {
+    const file = join(scratch, 'session.json');
+    const before = {
+      version: 1,
+      tabs: [{ kind: 'brief', path: '/a.brief' }, { kind: 'snippets' }],
+      active: 0,
+    };
+    writeFileSync(file, JSON.stringify(before));
+    expect(await fileSessionStore(file).read()).toEqual(before);
+  });
+});
+
 describe('writing the session', () => {
   it('names each brief by the path main holds, never by one the window sent', async () => {
     const { documents, store, session } = setup({ '/b/a.brief': '::titulo A' });
@@ -354,7 +425,13 @@ describe('reading the session back', () => {
         kind: 'brief',
         documentId: 'session-1',
         // The folder to show on hover comes back with it (TYTO-288, ADR 0086).
-        document: { path: '/b/a.brief', name: 'a.brief', pathLabel: '/b/a.brief', text: '::a' },
+        document: {
+          path: '/b/a.brief',
+          name: 'a.brief',
+          pathLabel: '/b/a.brief',
+          text: '::a',
+          format: 'brief',
+        },
         draft: null,
         stale: false,
         missing: null,

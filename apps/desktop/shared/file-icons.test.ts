@@ -1,6 +1,12 @@
 import { describe, expect, it } from 'vitest';
 
-import { type FileIconName, type FileIconSubject, fileIconFor } from './file-icons.js';
+import {
+  type FileIconName,
+  type FileIconSubject,
+  documentFormatOf,
+  fileIconFor,
+  isTextFile,
+} from './file-icons.js';
 
 const file = (name: string): FileIconSubject => ({ name, kind: 'file' });
 
@@ -72,5 +78,23 @@ describe('fileIconFor', () => {
     expect(fileIconFor({ name: 'project.json', kind: 'file', place: 'project' })).toBe(
       'projectFile',
     );
+  });
+});
+
+/** TYTO-247, ADR 0132: only `.txt` and `.md` are text; everything else opens as it did. */
+describe('what a file opens as', () => {
+  it.each([
+    ['notas.md', 'markdown', true],
+    ['LEIA.MD', 'markdown', true],
+    ['leia.txt', 'text', true],
+    ['capa.brief', 'brief', false],
+    ['dados.json', 'brief', false],
+    ['tabela.csv', 'brief', false],
+    ['manifest.yaml', 'brief', false],
+    ['.md', 'brief', false],
+    ['x.constructor', 'brief', false],
+  ] as const)('%s opens as %s', (name, format, text) => {
+    expect(documentFormatOf(name)).toBe(format);
+    expect(isTextFile(name)).toBe(text);
   });
 });

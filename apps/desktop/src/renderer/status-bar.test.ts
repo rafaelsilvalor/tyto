@@ -212,6 +212,19 @@ describe('the status bar', () => {
     );
     expect(bar.querySelector('.status-bar__template')).toBeNull();
   });
+
+  it('names a text tab: Plain text for a .txt and Markdown for a .md (TYTO-247)', async () => {
+    const { bar } = await mount();
+    const kindText = async (kind: 'text' | 'markdown', locale: 'en' | 'pt-BR') => {
+      bar.state = { ...base, kind, locale, template: undefined };
+      await bar.updateComplete;
+      return bar.querySelector('.status-bar__kind')?.textContent;
+    };
+    expect(await kindText('text', 'en')).toBe('Plain text');
+    expect(await kindText('text', 'pt-BR')).toBe('Texto simples');
+    expect(await kindText('markdown', 'en')).toBe('Markdown');
+    expect(await kindText('markdown', 'pt-BR')).toBe('Markdown');
+  });
 });
 
 describe('positionText', () => {

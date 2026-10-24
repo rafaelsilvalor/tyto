@@ -34,7 +34,8 @@ import { type IconName, icon } from './icons.js';
 export const STATUS_BAR_TAG = 'tyto-status-bar';
 
 /** What the tab in front holds, from `DocumentState.kind`. */
-export type TabKind = 'brief' | 'settings' | 'keybindings' | 'snippets' | 'preview';
+export type TabKind =
+  'brief' | 'settings' | 'keybindings' | 'snippets' | 'text' | 'markdown' | 'preview';
 
 export interface StatusBarState {
   readonly locale: Locale;
@@ -77,6 +78,9 @@ const KIND_LABELS: Readonly<Record<TabKind, CatalogueKey>> = {
   settings: 'status.kind.settings',
   keybindings: 'status.kind.keybindings',
   snippets: 'status.kind.snippets',
+  // TYTO-247: "Plain text" for a `.txt`, "Markdown" for a `.md`.
+  text: 'status.kind.text',
+  markdown: 'status.kind.markdown',
   preview: 'preview.heading',
 };
 

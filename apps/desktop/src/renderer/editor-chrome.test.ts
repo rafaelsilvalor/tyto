@@ -12,6 +12,7 @@ import {
   SETTINGS_OPEN,
   TEMPLATE_EDIT,
   TEXT_COMMANDS,
+  presetCommandId,
 } from './commands.js';
 import {
   assistOf,
@@ -66,6 +67,38 @@ describe('editorChromeFor (TYTO-256)', () => {
     expect(assistOf('keybindings', assists)).toEqual([]);
     expect(assistOf(undefined, assists)).toEqual([]);
     expect(assistOf('preview', assists)).toEqual([]);
+  });
+});
+
+describe('a text tab (TYTO-247, ADR 0132)', () => {
+  it("drops the brief's controls on a .txt and a .md and keeps the text commands", () => {
+    for (const kind of ['text', 'markdown'] as const) {
+      expect(editorChromeFor(kind)).toEqual({
+        templateEdits: false,
+        briefCommands: false,
+        textCommands: true,
+      });
+    }
+  });
+
+  it('offers no export, preset, zoom, format or slide, and every text command', () => {
+    for (const kind of ['text', 'markdown'] as const) {
+      for (const id of BRIEF_ONLY_COMMANDS) expect(commandOffered(kind, id), id).toBe(false);
+      expect(commandOffered(kind, presetCommandId('Instagram'))).toBe(false);
+      for (const id of TEXT_COMMANDS) {
+        expect(commandOffered(kind, id), id).toBe(!BRIEF_ONLY_COMMANDS.has(id));
+      }
+      expect(commandOffered(kind, EDITOR_SAVE)).toBe(true);
+      expect(commandOffered(kind, PREVIEW_OPEN_TO_SIDE)).toBe(false);
+      expect(commandOffered(kind, EDITOR_FORMAT_BRIEF)).toBe(false);
+    }
+  });
+
+  it('opens both in plain text, with no app-file help and no template edit', () => {
+    expect(languageOf('text')).toBe('plain');
+    expect(languageOf('markdown')).toBe('plain');
+    expect(assistOf('markdown', { settings: [] as const })).toEqual([]);
+    expect(templateEditFor('markdown', '# Notas', 'promo-curso')).toBeUndefined();
   });
 });
 

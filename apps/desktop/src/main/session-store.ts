@@ -29,8 +29,13 @@ const storedPlace = z.object({
 });
 
 const storedTab = z.object({
-  kind: z.enum(['brief', 'settings', 'keybindings', 'snippets']),
-  /** A brief's file. Absent for a brief that is in no file, and for the app's own files. */
+  // TYTO-247, ADR 0132: `text` and `markdown` are added at the end, so a file written before
+  // them still parses, with the version still 1.
+  kind: z.enum(['brief', 'settings', 'keybindings', 'snippets', 'text', 'markdown']),
+  /**
+   * A brief's or a text file's path. Absent for one that is in no file, and for the app's own
+   * files, which main knows by name.
+   */
   path: z.string().min(1).optional(),
   /**
    * Text the tab held that is in no file: its words, and a hash of the saved text they

@@ -79,6 +79,10 @@ export const SECTIONS: readonly Section[] = [
         title: { en: 'Tabs and editor groups', 'pt-BR': 'Abas e grupos de editores' },
       },
       { slug: 'workspace-folder', title: { en: 'Workspace folder', 'pt-BR': 'Pasta de trabalho' } },
+      {
+        slug: 'text-files',
+        title: { en: 'Text and Markdown files', 'pt-BR': 'Arquivos de texto e Markdown' },
+      },
       { slug: 'panels', title: { en: 'Panels', 'pt-BR': 'Painéis' } },
       {
         slug: 'command-bar-and-search',

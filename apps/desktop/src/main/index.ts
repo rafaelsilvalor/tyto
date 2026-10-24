@@ -57,7 +57,7 @@ import {
 import { fileCredentialStore } from './credential-store.js';
 import { createCredentials } from './credentials.js';
 import { openDocumentation } from './documentation.js';
-import { createDocumentService } from './documents.js';
+import { createDocumentService, openFilters, saveFilters } from './documents.js';
 import { createExportService } from './export.js';
 import { desktopCapabilities, startDesktopPlugins } from './installed-plugins.js';
 import { fileLayoutStore } from './layout-store.js';
@@ -655,18 +655,20 @@ async function start(): Promise<void> {
     home: () => app.getPath('home'),
     // Inside the open folder a label is relative to it (ADR 0125): the explorer's, asked at each.
     root: () => explorer.folder(),
+    // TYTO-247, ADR 0132: Open offers briefs, then text files, then both; Save As offers the
+    // tab's own format first. The filters are built at each call, in the window's language.
     dialogs: {
       openBrief: async () => {
         const answer = await dialog.showOpenDialog({
           properties: ['openFile'],
-          filters: [{ name: 'Brief', extensions: ['brief'] }],
+          filters: openFilters(uiLocale),
         });
         return answer.canceled ? undefined : answer.filePaths[0];
       },
-      saveBrief: async (suggested) => {
+      saveBrief: async (suggested, format) => {
         const answer = await dialog.showSaveDialog({
           ...(suggested === undefined ? {} : { defaultPath: suggested }),
-          filters: [{ name: 'Brief', extensions: ['brief'] }],
+          filters: saveFilters(uiLocale, format),
         });
         return answer.canceled ? undefined : answer.filePath;
       },

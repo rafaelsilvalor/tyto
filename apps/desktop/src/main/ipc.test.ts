@@ -1,4 +1,5 @@
 import { type Layout, DEFAULT_LAYOUT } from '../../shared/layout.js';
+import { documentFormatOf } from '../../shared/file-icons.js';
 import { describe, expect, it, vi } from 'vitest';
 
 import {
@@ -122,8 +123,14 @@ const explorerFiles = () => {
           : { entries: [], more: 0, gone: true },
       );
     },
-    briefPath: (entryId: string) =>
-      Promise.resolve(entryId === 'e-brief' ? '/work/promo/promo.brief' : undefined),
+    // A listed file's path when its extension is one asked for, as the real service answers.
+    filePath: (entryId: string, extensions: readonly string[]) => {
+      const path = LISTED_FILES[entryId];
+      const dot = path === undefined ? -1 : path.lastIndexOf('.');
+      return Promise.resolve(
+        path !== undefined && extensions.includes(path.slice(dot)) ? path : undefined,
+      );
+    },
     // TYTO-366: the picture, at one version; that version again is unchanged.
     image: (entryId: string, have: string | undefined): ReturnType<ExplorerService['image']> => {
       asked.push(entryId);
@@ -224,6 +231,14 @@ const workspaceFolder = () => {
  * something that answers the four channels, because the registration loop is the subject
  * here and a channel with no handler is the failure it exists to prevent.
  */
+/** The fake explorer's files by id (TYTO-247): a brief, a picture, and the two text formats. */
+const LISTED_FILES: Readonly<Record<string, string>> = {
+  'e-brief': '/work/promo/promo.brief',
+  'e-image': '/work/promo/foto.png',
+  'e-notes': '/work/promo/notas.md',
+  'e-text': '/work/promo/leia.txt',
+};
+
 const documents = () => {
   const closed: string[] = [];
   const followed: string[][] = [];
@@ -236,12 +251,19 @@ const documents = () => {
           name: 'promo.brief',
           pathLabel: '/briefs/promo.brief',
           text: '::a',
+          format: 'brief' as const,
         },
         documentId,
       }),
     openPath: (documentId: string, path: string, label?: string) =>
       Promise.resolve({
-        document: { path, name: label ?? 'brief.brief', pathLabel: path, text: '::t' },
+        document: {
+          path,
+          name: label ?? 'brief.brief',
+          pathLabel: path,
+          text: '::t',
+          format: documentFormatOf(path),
+        },
         documentId,
       }),
     retarget: () => undefined,
@@ -249,7 +271,13 @@ const documents = () => {
       Promise.resolve(
         path === '/briefs/promo.brief'
           ? {
-              document: { path, name: 'promo.brief', pathLabel: path, text: '::a' },
+              document: {
+                path,
+                name: 'promo.brief',
+                pathLabel: path,
+                text: '::a',
+                format: 'brief' as const,
+              },
               documentId,
               missing: false,
             }
@@ -262,6 +290,7 @@ const documents = () => {
           name: 'promo.brief',
           pathLabel: '/briefs/promo.brief',
           text,
+          format: 'brief' as const,
         },
         released: null,
       }),
@@ -1682,6 +1711,28 @@ describe('the explorer channels', () => {
     ).toEqual({ document: null, documentId: null });
   });
 
+  it('opens a .md and a .txt in a tab with the format main names, and still refuses a .png', async () => {
+    const open = guard(
+      'explorer:open',
+      createHandlers({ ...dependencies(), explorer: explorerFiles() })['explorer:open'],
+    );
+
+    await expect(open({ documentId: 'document-8', entryId: 'e-notes' })).resolves.toMatchObject({
+      document: { path: '/work/promo/notas.md', format: 'markdown' },
+      documentId: 'document-8',
+    });
+    await expect(open({ documentId: 'document-9', entryId: 'e-text' })).resolves.toMatchObject({
+      document: { path: '/work/promo/leia.txt', format: 'text' },
+    });
+    await expect(open({ documentId: 'document-10', entryId: 'e-brief' })).resolves.toMatchObject({
+      document: { format: 'brief' },
+    });
+    await expect(open({ documentId: 'document-11', entryId: 'e-image' })).resolves.toEqual({
+      document: null,
+      documentId: null,
+    });
+  });
+
   it('refuses a request that names a path, so no window can list or open one of its choosing', async () => {
     const explorer = explorerFiles();
     const handlers = createHandlers({ ...dependencies(), explorer });
@@ -1771,6 +1822,20 @@ describe('the explorer write channels', () => {
     await expect(
       create({ documentId: 'document-5', parentId: null, name: 'taken.brief', kind: 'file' }),
     ).resolves.toEqual({ ok: false, reason: 'exists' });
+  });
+
+  it('opens a new .md or .txt in the tab it was given, and nothing for another file (ADR 0132)', async () => {
+    const create = guard('explorer:create', createHandlers(dependencies())['explorer:create']);
+
+    await expect(
+      create({ documentId: 'document-6', parentId: null, name: 'notas.md', kind: 'file' }),
+    ).resolves.toMatchObject({ documentId: 'document-6', document: { format: 'markdown' } });
+    await expect(
+      create({ documentId: 'document-7', parentId: null, name: 'leia.txt', kind: 'file' }),
+    ).resolves.toMatchObject({ documentId: 'document-7', document: { format: 'text' } });
+    await expect(
+      create({ documentId: 'document-8', parentId: null, name: 'dados.json', kind: 'file' }),
+    ).resolves.toMatchObject({ document: null, documentId: null });
   });
 
   it('moves the tabs under a renamed entry and answers each one, never a path', async () => {

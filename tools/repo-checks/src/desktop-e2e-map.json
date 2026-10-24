@@ -13,8 +13,12 @@
     },
     {
       "paths": ["apps/desktop/shared/file-icons.ts"],
-      "e2e": ["explorer-image.desktop.test.ts", "explorer.desktop.test.ts"],
-      "why": "reviewed: which icon an explorer row and a tab draw (TYTO-282), and which names a click shows in the preview (TYTO-366); only the explorer's suites assert them"
+      "e2e": [
+        "explorer-image.desktop.test.ts",
+        "explorer.desktop.test.ts",
+        "text-tabs.desktop.test.ts"
+      ],
+      "why": "reviewed: which icon an explorer row and a tab draw (TYTO-282), which names a click shows in the preview (TYTO-366), and which open in a tab as text (TYTO-247); only the explorer's suites assert them"
     },
     {
       "paths": ["apps/desktop/shared/layout.ts"],
@@ -159,6 +163,7 @@
         "explorer-image.desktop.test.ts",
         "explorer-write.desktop.test.ts",
         "explorer.desktop.test.ts",
+        "text-tabs.desktop.test.ts",
         "window.desktop.test.ts",
         "workspace.desktop.test.ts"
       ],

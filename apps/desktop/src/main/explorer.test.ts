@@ -223,13 +223,15 @@ describe('the brief a click opens', () => {
     const idOf = (name: string): string =>
       root.entries.find((entry) => entry.name === name)?.id ?? '';
 
-    expect(await explorer.briefPath(idOf('slide 2.brief'))).toBe(join(work, 'slide 2.brief'));
-    expect(await explorer.briefPath(idOf('logo.png'))).toBeUndefined();
-    expect(await explorer.briefPath(idOf('slides'))).toBeUndefined();
-    expect(await explorer.briefPath('not-an-id')).toBeUndefined();
+    expect(await explorer.filePath(idOf('slide 2.brief'), ['.brief'])).toBe(
+      join(work, 'slide 2.brief'),
+    );
+    expect(await explorer.filePath(idOf('logo.png'), ['.brief'])).toBeUndefined();
+    expect(await explorer.filePath(idOf('slides'), ['.brief'])).toBeUndefined();
+    expect(await explorer.filePath('not-an-id', ['.brief'])).toBeUndefined();
 
     await rm(join(work, 'slide 2.brief'));
-    expect(await explorer.briefPath(idOf('slide 2.brief'))).toBeUndefined();
+    expect(await explorer.filePath(idOf('slide 2.brief'), ['.brief'])).toBeUndefined();
   });
 });
 
@@ -772,7 +774,7 @@ describe('renaming an entry', () => {
     // The expanded subtree is listed by the ids it already had.
     expect(await entryIdOf(explorer, 'capa.brief', slides)).toBe(capa);
     expect(await entryIdOf(explorer, 'extra', slides)).toBe(extra);
-    expect(await explorer.briefPath(capa)).toBe(join(work, 'lâminas', 'capa.brief'));
+    expect(await explorer.filePath(capa, ['.brief'])).toBe(join(work, 'lâminas', 'capa.brief'));
   });
 
   it('answers exists and moves nothing when the name is taken', async () => {
@@ -836,7 +838,7 @@ describe('renaming an entry', () => {
       ok: true,
       entry: { id: logo, kind: 'brief' },
     });
-    expect(await explorer.briefPath(logo)).toBe(join(work, 'logo.brief'));
+    expect(await explorer.filePath(logo, ['.brief'])).toBe(join(work, 'logo.brief'));
   });
 
   it('answers gone for an entry deleted outside the app', async () => {
@@ -884,7 +886,7 @@ describe('deleting an entry', () => {
     expect(await readdir(work)).not.toContain('slides');
     expect((await readdir(join(bin, '1-slides'))).sort()).toEqual(['capa.brief', 'extra']);
     await expect(explorer.list(slides)).resolves.toMatchObject({ gone: true });
-    expect(await explorer.briefPath(capa)).toBeUndefined();
+    expect(await explorer.filePath(capa, ['.brief'])).toBeUndefined();
     await expect(explorer.delete(slides)).resolves.toEqual({ ok: false, reason: 'gone' });
   });
 

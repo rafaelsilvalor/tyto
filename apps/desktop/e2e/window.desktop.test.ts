@@ -804,6 +804,14 @@ describe('switching the language', () => {
     'status.kind.settings',
     'status.kind.keybindings',
     'status.kind.snippets',
+    // TYTO-247: a text tab's kind and empty problems line, and the dialogs' filters, which main
+    // builds (`openFilters` in `src/main/documents.ts`); `status-bar.test.ts`,
+    // `problems-panel.test.ts` and `documents.test.ts` paint them.
+    'status.kind.text',
+    'status.kind.markdown',
+    'problems.empty.text',
+    'dialog.files.text',
+    'dialog.files.supported',
     'status.problems.new',
     // TYTO-248: what the footer used to say is Help > About now, a box main shows — menu
     // chrome, like `menu.revealLogs`. `src/main/menu.test.ts` holds the five to `aboutText`, and
