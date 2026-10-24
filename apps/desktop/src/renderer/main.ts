@@ -1778,7 +1778,7 @@ function syncActiveDocument(): void {
  * open, else the first brief in front of any group, else any open brief, else none.
  */
 function followActiveBrief(): void {
-  const isBrief = (id: string | undefined): id is string => {
+  const isBriefId = (id: string | undefined): id is string => {
     const document_ = id === undefined ? undefined : documentOf(workspace, id);
     return document_ !== undefined && isBrief(document_.kind);
   };
@@ -1787,12 +1787,12 @@ function followActiveBrief(): void {
     return tab === undefined || isPreview(tab) ? undefined : tab.documentId;
   };
   const focused = textInFront(focusedGroup(groups));
-  const broughtForward = isBrief(focused) && focused !== frontBrief;
+  const broughtForward = isBriefId(focused) && focused !== frontBrief;
   frontBrief = focused;
-  if (isBrief(focused)) followedBrief = focused;
-  else if (!isBrief(followedBrief)) {
+  if (isBriefId(focused)) followedBrief = focused;
+  else if (!isBriefId(followedBrief)) {
     followedBrief =
-      groupList(groups).map(textInFront).find(isBrief) ??
+      groupList(groups).map(textInFront).find(isBriefId) ??
       workspace.documents.find((document_) => isBrief(document_.kind))?.id ??
       '';
   }
