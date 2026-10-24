@@ -169,6 +169,7 @@ const KEYS = [
   'theme',
   'iconStrokeWidth',
   'statusBarItems',
+  'vimMode',
   'vimModeStyle',
   'indentGuides',
   'stickyScroll',
@@ -204,7 +205,8 @@ describe('the settings tab’s suggestions and hover', () => {
     await waitForList(page, KEYS, true);
     // `statusBarColors` is already in the file, so it is not offered again.
     expect(await listed(page)).not.toContain('statusBarColors');
-    await page.keyboard.type('vimMode');
+    // `vimModeS`, past `vimMode` (TYTO-333), which the list would otherwise offer first.
+    await page.keyboard.type('vimModeS');
     await waitForList(page, ['vimModeStyle']);
     await expect.poll(() => info(page)).toMatch(/How the status bar shows vim's mode/u);
   });
@@ -296,7 +298,7 @@ describe.runIf(shots !== undefined)('pictures of the help, for the card', () => 
         await page.keyboard.type('"');
         await waitForList(page, ['vimModeStyle'], true);
         await page.screenshot({ path: join(shots!, `${theme}-keys.png`) });
-        await page.keyboard.type('vimMode');
+        await page.keyboard.type('vimModeS');
         await waitForList(page, ['vimModeStyle']);
         await accept(page);
         await page.keyboard.type('"');

@@ -685,6 +685,7 @@
         "typography.desktop.test.ts",
         "vim-badge.desktop.test.ts",
         "vim-mode-style.desktop.test.ts",
+        "vim-setting.desktop.test.ts",
         "window.desktop.test.ts"
       ],
       "why": "reviewed: pushes every setting to the window: the files that mention settings"
@@ -704,7 +705,8 @@
         "settings-assist.desktop.test.ts",
         "settings-writers.desktop.test.ts",
         "settings.desktop.test.ts",
-        "template-folder.desktop.test.ts"
+        "template-folder.desktop.test.ts",
+        "vim-setting.desktop.test.ts"
       ],
       "why": "reviewed: the settings file on disk"
     },
@@ -953,12 +955,13 @@
         "panel.desktop.test.ts",
         "preview-broken.desktop.test.ts",
         "problems-mark.desktop.test.ts",
+        "relint.desktop.test.ts",
         "save-failure-cleared.desktop.test.ts",
         "slash-menu.desktop.test.ts",
         "status-bar.desktop.test.ts",
         "template-warnings.desktop.test.ts"
       ],
-      "why": "reviewed: diagnostics and completion answered by the preview"
+      "why": "reviewed: diagnostics and completion answered by the preview, and the relint after a re-preview (TYTO-351)"
     },
     {
       "paths": ["apps/desktop/src/renderer/color-scheme.ts"],
@@ -1494,6 +1497,7 @@
         "typography.desktop.test.ts",
         "vim-badge.desktop.test.ts",
         "vim-mode-style.desktop.test.ts",
+        "vim-setting.desktop.test.ts",
         "window.desktop.test.ts"
       ],
       "why": "generated: name, prefix, static import or text of the stem in the e2e file"
@@ -1597,6 +1601,11 @@
       "why": "reviewed: the update notice in the status bar"
     },
     {
+      "paths": ["apps/desktop/src/renderer/vim-setting.ts"],
+      "e2e": ["vim-badge.desktop.test.ts", "vim-setting.desktop.test.ts"],
+      "why": "reviewed: the vimMode setting on the window side (TYTO-333); the restart suite and the badge it reads"
+    },
+    {
       "paths": ["packages/editor/**"],
       "e2e": [
         "block-enter.desktop.test.ts",
@@ -1621,6 +1630,7 @@
         "preview.desktop.test.ts",
         "problems-mark.desktop.test.ts",
         "quit.desktop.test.ts",
+        "relint.desktop.test.ts",
         "search.desktop.test.ts",
         "session-place.desktop.test.ts",
         "settings-assist.desktop.test.ts",
@@ -1634,7 +1644,8 @@
         "theme.desktop.test.ts",
         "typography.desktop.test.ts",
         "vim-badge.desktop.test.ts",
-        "vim-mode-style.desktop.test.ts"
+        "vim-mode-style.desktop.test.ts",
+        "vim-setting.desktop.test.ts"
       ],
       "why": "reviewed: the curated editor set, files with five or more CodeMirror class references plus vim-badge and problems-mark"
     },

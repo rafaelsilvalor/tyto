@@ -2,7 +2,7 @@
 
 # Configurações
 
-Todas as chaves que o app declara no `settings.json`: 22. Abra o arquivo com **Preferências: Abrir configurações (JSON)**; uma chave que você não escreve fica com o valor padrão, e um valor que o app não consegue ler aparece no painel Problemas e o padrão vale no lugar dele. Um plugin acrescenta as próprias chaves como `<id do plugin>.<chave>`, que não aparecem aqui.
+Todas as chaves que o app declara no `settings.json`: 23. Abra o arquivo com **Preferências: Abrir configurações (JSON)**; uma chave que você não escreve fica com o valor padrão, e um valor que o app não consegue ler aparece no painel Problemas e o padrão vale no lugar dele. Um plugin acrescenta as próprias chaves como `<id do plugin>.<chave>`, que não aparecem aqui.
 
 ::: info Descrições em inglês
 As descrições abaixo estão em inglês: o código guarda cada uma em um só idioma, e esta página as mostra como estão em vez de traduzi-las à parte.
@@ -119,6 +119,21 @@ Colours that win over the theme for the status bar, in every theme. background: 
 | `"item.settings"` | The text of settings: Opens settings.json. |
 | `"item.bottomArea"` | The text of bottomArea: Button that shows or hides the bottom area. |
 | `"item.rightArea"` | The text of rightArea: Button that shows or hides the right area. |
+
+## vimMode
+
+Give the editor vim's keys: normal, insert, visual and replace modes (default false). The command Editor: turn vim mode on or off writes it.
+
+| Tipo | Padrão |
+| --- | --- |
+| `boolean` | `false` |
+
+**Valores**
+
+| Valor | Significado |
+| --- | --- |
+| `true` | The editor takes vim's keys, and the status bar shows its mode. |
+| `false` | The editor's own keys; no vim. |
 
 ## vimModeStyle
 

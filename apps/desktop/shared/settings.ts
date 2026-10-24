@@ -32,7 +32,7 @@ import { type VimModeStyle, vimModeStyleContribution } from './vim-mode-style.js
  * reads off a disk and the window is told what the answer was, so the shape has to be one
  * declaration both halves import. Linted pure — no Node, no DOM.
  *
- * **Twenty-two settings the built-in `desktop` plugin declares** through the `configuration`
+ * **Twenty-three settings the built-in `desktop` plugin declares** through the `configuration`
  * extension point (TYTO-206, ADR 0073), like any plugin's: built-in is a plugin. Their keys
  * stay unprefixed, exactly as every `settings.json` written before that card spells them.
  * Each one is validated alone, so a hand-broken value costs that key and nothing else.
@@ -113,6 +113,35 @@ const iconStrokeWidth = {
   default: ICON_STROKE_WIDTH.default,
   description: 'How thick the icons are drawn, from 0.75 to 2 (default 1.25).',
 } satisfies ConfigurationContribution<number>;
+
+/**
+ * Whether the editor takes vim's keys (TYTO-333). Off by default, as the window always opened
+ * before the setting. Read at start, so a window opens in the mode the setting names; "Editor:
+ * turn vim mode on or off" writes it through the settings store (ADR 0073), so the choice
+ * survives a restart; and a save of the file turns vim on or off in place, on `theme:current`'s
+ * answer like `indentGuides`.
+ */
+export const vimModeContribution = {
+  id: 'vimMode',
+  schema: z.boolean(),
+  default: false,
+  description:
+    "Give the editor vim's keys: normal, insert, visual and replace modes (default false). The command Editor: turn vim mode on or off writes it.",
+  options: [
+    { value: true, description: "The editor takes vim's keys, and the status bar shows its mode." },
+    { value: false, description: "The editor's own keys; no vim." },
+  ],
+} satisfies ConfigurationContribution<boolean>;
+
+/** The key as a newly created `settings.json` shows it, commented out (TYTO-333). */
+export function vimModeExample(): string {
+  return [
+    "// Give the editor vim's keys: true or false (the default). Editor: turn vim mode on or off writes it.",
+    '// "vimMode": false,',
+  ]
+    .map((line) => `  ${line}`)
+    .join('\n');
+}
 
 /**
  * Whether the editor draws a guide per indent level (TYTO-293, ADR 0088). On by default, as
@@ -278,7 +307,7 @@ export function googleFontsExample(): string {
 }
 
 /**
- * The twenty-two, in the order the settings file is documented in. `theme` checks its ids against
+ * The twenty-three, in the order the settings file is documented in. `theme` checks its ids against
  * `lookup`, which main builds from every theme the plugins registered (TYTO-208); the default
  * knows the built-in two and lets any other id through.
  */
@@ -294,6 +323,7 @@ export function settingContributions(
     iconStrokeWidth,
     statusBarItemsContribution,
     statusBarColorsContribution,
+    vimModeContribution,
     vimModeStyleContribution,
     indentGuidesContribution,
     stickyScrollContribution,
@@ -322,6 +352,8 @@ export interface Settings {
   readonly statusBarItems: readonly StatusBarItemId[];
   /** Colours that win over the theme's for the status bar (TYTO-301, ADR 0091). */
   readonly statusBarColors: StatusBarColors;
+  /** Whether the editor takes vim's keys, at start and after a save (TYTO-333). */
+  readonly vimMode: boolean;
   /** How the status bar shows vim's mode: badge, top border or whole bar (TYTO-301). */
   readonly vimModeStyle: VimModeStyle;
   /** Whether the editor draws indent guides (TYTO-293). */
@@ -358,6 +390,7 @@ export const DEFAULT_SETTINGS: Settings = {
   iconStrokeWidth: iconStrokeWidth.default,
   statusBarItems: statusBarItemsContribution.default,
   statusBarColors: statusBarColorsContribution.default,
+  vimMode: vimModeContribution.default,
   vimModeStyle: vimModeStyleContribution.default,
   indentGuides: indentGuidesContribution.default,
   stickyScroll: stickyScrollContribution.default,
@@ -378,7 +411,7 @@ export const DEFAULT_SETTINGS: Settings = {
 export const DEFAULT_QUEUE_KINDS: readonly string[] = ['png'];
 
 /**
- * The twenty-two out of the resolved values, which already hold every declared key with a value
+ * The twenty-three out of the resolved values, which already hold every declared key with a value
  * its schema accepted or its default (`resolveSettings`).
  */
 export function settingsFrom(values: Readonly<Record<string, unknown>>): Settings {
@@ -393,6 +426,7 @@ export function settingsFrom(values: Readonly<Record<string, unknown>>): Setting
     iconStrokeWidth: pick('iconStrokeWidth'),
     statusBarItems: pick('statusBarItems'),
     statusBarColors: pick('statusBarColors'),
+    vimMode: pick('vimMode'),
     vimModeStyle: pick('vimModeStyle'),
     indentGuides: pick('indentGuides'),
     stickyScroll: pick('stickyScroll'),

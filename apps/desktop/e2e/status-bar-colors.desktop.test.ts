@@ -128,6 +128,12 @@ async function saveSettings(text: string): Promise<void> {
   await page.keyboard.press('Control+s');
 }
 
+/**
+ * Whether the file keeps `"vimMode": true`, which "Editor: turn vim mode on or off" wrote when it
+ * turned vim on (TYTO-333). A file written without it is a hand edit turning vim off again.
+ */
+let vimOn = false;
+
 const settingsText = (colours: Record<string, string> | undefined, theme = 'tyto-light'): string =>
   `{\n  "theme": "${theme}"${
     colours === undefined
@@ -135,7 +141,7 @@ const settingsText = (colours: Record<string, string> | undefined, theme = 'tyto
       : `,\n  "statusBarColors": {\n${Object.entries(colours)
           .map(([key, value]) => `    "${key}": "${value}"`)
           .join(',\n')}\n  }`
-  }\n}\n`;
+  }${vimOn ? ',\n  "vimMode": true' : ''}\n}\n`;
 
 const showTab = async (settings: boolean): Promise<void> => {
   const tabs = page.locator('.tabs__tab');
@@ -296,6 +302,7 @@ describe('the statusBarColors setting', () => {
       await page.waitForTimeout(150);
       await page.keyboard.press('Enter');
       await page.waitForSelector('tyto-status-bar .status-bar__vim');
+      vimOn = true;
       await page.click('#editor .cm-content');
       await page.keyboard.press('Escape');
     });

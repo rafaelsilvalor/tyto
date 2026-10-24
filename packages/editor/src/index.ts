@@ -97,7 +97,13 @@ export {
   setBriefAnalysis,
 } from './analysis.js';
 
-export { BRIEF_LINT_DELAY, type BriefLintOptions, briefLint, suggestionFor } from './lint.js';
+export {
+  BRIEF_LINT_DELAY,
+  type BriefLintOptions,
+  briefLint,
+  relintBrief,
+  suggestionFor,
+} from './lint.js';
 
 export { briefCompletion, completeBrief } from './completion.js';
 

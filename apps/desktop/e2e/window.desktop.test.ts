@@ -270,6 +270,9 @@ describe('the bridge', () => {
       'credentials:set',
       'dialog:confirm',
       'dialog:save-changes',
+      // TYTO-333: "Editor: turn vim mode on or off", which writes the `vimMode` setting.
+      // Exercised by `e2e/vim-setting.desktop.test.ts`.
+      'editor:vim-mode',
       // TYTO-279, ADR 0115: the explorer, by ids main minted.
       // TYTO-352, ADR 0121: new, rename and delete by id and name, and the tabs under an entry.
       'explorer:create',

@@ -8,17 +8,25 @@ import type { IpcResponse } from '../../shared/ipc.js';
  *
  * `briefLint` and `briefCompletion` read a `BriefAnalysis`: diagnostics for the gutter, the
  * manifest and the plugin directives for the list after `::`. The window already computes
- * all of it in main on every pause in typing — `brief:preview` runs parse, resolve with the
- * installed plugins' directives, and compile — so this analyzer runs nothing. It hands the
- * linter the answer the preview got for the same text. **One pass in main, not a second
- * analyzer in the renderer**, which is what keeps the underline, the problems panel and the
- * completion list from disagreeing about a template or a plugin.
+ * all of it in main — `brief:preview` runs parse, resolve with the installed plugins'
+ * directives, and compile — so this analyzer runs nothing. It hands the linter the answer the
+ * preview got for the same text. **One pass in main, not a second analyzer in the renderer**,
+ * which is what keeps the underline, the problems panel and the completion list from
+ * disagreeing about a template or a plugin.
  *
- * `analyze(source)` waits for the preview answer about exactly that text. That answer also
- * releases the waits queued **before** it — a debounced preview never compiles the text of
- * a keystroke it skipped — and CodeMirror's linter discards a result whose document has
- * moved on, so those are dropped rather than misdrawn. A wait queued after it keeps waiting:
- * handing newer text an older answer is the one way to put a squiggle on the wrong word.
+ * `analyze(source)` waits for the preview answer about exactly that text, or answers at once
+ * with the last one when it was about that text. An answer also releases the waits queued
+ * **before** it — a debounced preview never compiles the text of a keystroke it skipped — and
+ * CodeMirror's linter discards a result whose document has moved on, so those are dropped
+ * rather than misdrawn. A wait queued after it keeps waiting: handing newer text an older
+ * answer is the one way to put a squiggle on the wrong word.
+ *
+ * **The preview is not only compiled on a pause in typing**, and that is why `publish` also
+ * calls `relint` (TYTO-351). A templates folder, a trusted workspace or a save that fetched
+ * an asset (ADR 0119) all compile the same text again, and the linter, which reruns only on a
+ * change of text, would never ask: the problems panel cleared and the underline stayed until
+ * the next keystroke. The host answers `relint` by telling every pane on that document to
+ * lint again, and the lint then reads this answer from `latest` at once.
  *
  * **All of that is per document since TYTO-286**, because two editor groups can show two briefs
  * at once and both lint. A wait belongs to the document its pane shows (`documentOf`), and an
@@ -42,10 +50,14 @@ interface Wait {
   resolve(analysis: BriefAnalysis): void;
 }
 
-/** `documentOf` names the document a pane shows; a pane it does not know shares one queue. */
+/**
+ * `documentOf` names the document a pane shows; a pane it does not know shares one queue.
+ * `relint` is told the document every answer was about, after the answer is kept.
+ */
 export function previewAnalysis(
   templates: () => readonly string[],
   documentOf: (view: object | undefined) => string | undefined = () => undefined,
+  relint: (documentId: string) => void = () => undefined,
 ): PreviewAnalysis {
   const latest = new Map<string, BriefAnalysis>();
   let waiting: Wait[] = [];
@@ -76,6 +88,9 @@ export function previewAnalysis(
           : { manifest: answer.completion.manifest }),
       };
       latest.set(documentId, analysis);
+      // Before the waits are released, and whether or not any are: a lint that is waiting
+      // gets this answer anyway, and one that is not is the case this call exists for.
+      relint(documentId);
       const mine = waiting.filter((wait) => wait.documentId === documentId);
       const last = mine.map((wait) => wait.source).lastIndexOf(answer.brief);
       if (last === -1) return;

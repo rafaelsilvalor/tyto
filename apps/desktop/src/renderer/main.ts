@@ -29,6 +29,7 @@ import {
   jsonAssist,
   keyOfStroke,
   openSlashMenu,
+  relintBrief,
   type SlashSource,
   slashCompletion,
   snippetsSlashSource,
@@ -146,6 +147,7 @@ import {
 } from './status-bar.js';
 import { type StatusBarItemId, STATUS_BAR_ITEM_IDS } from '../../shared/status-bar-items.js';
 import { type VimModeStyle } from '../../shared/vim-mode-style.js';
+import { createVimSetting } from './vim-setting.js';
 import { type BriefColumnLook } from '../../shared/brief-columns.js';
 import {
   type DocumentState,
@@ -326,6 +328,11 @@ const analysis = previewAnalysis(
   () => state.templates,
   // Per document since TYTO-286: the pane asking is matched to the document it shows.
   (view) => documentShownBy(view),
+  // Every pane on the document lints the answer again, which is what a compile with no
+  // keystroke behind it — a folder, a trust, a save — needs to move the underline (TYTO-351).
+  (documentId) => {
+    relintPanesOf(documentId);
+  },
 );
 
 /** The installed plugins' panels by layout id, once main has said which there are (ADR 0045). */
@@ -1437,10 +1444,22 @@ const registry: CommandRegistry = withCommandGate(
 
     toggleVimMode: () => {
       if (editor === undefined) return;
-      editor.setVimMode(!editor.isVimMode());
+      const handle = editor;
+      // Flipped at once and written to the `vimMode` setting (TYTO-333), so the choice survives
+      // a restart. A file that does not parse refuses the write, main's answer says the setting
+      // is still the one before, and the editor goes back to it.
+      const toggled = vimSetting.toggle(handle, (on) =>
+        window.tyto === undefined
+          ? Promise.resolve({ vimMode: on, saved: false })
+          : window.tyto['editor:vim-mode']({ on }),
+      );
       // The bindings change with the mode — vim has no `Mod-z`, because undo is `u` and
       // belongs to the vim engine — so the bar has to be told what it now shows.
       paintCommandBar();
+      void toggled.then(() => {
+        paintCommandBar();
+        paintStatusBar();
+      });
     },
   }),
   offeredNow,
@@ -1555,6 +1574,14 @@ function paneOfView(view: object | undefined): [string, EditorPane] | undefined 
 function documentShownBy(view: object | undefined): string | undefined {
   const found = paneOfView(view);
   return found === undefined ? undefined : shownIn.get(found[0]);
+}
+
+/** Asks every pane showing `documentId` to lint it again, with no change to its text. */
+function relintPanesOf(documentId: string): void {
+  for (const [groupId, shown] of shownIn) {
+    if (shown !== documentId) continue;
+    panes.get(groupId)?.view.dispatch({ effects: relintBrief.of(null) });
+  }
 }
 
 /** The focused group's pane: where a command, a reveal or the caret goes. */
@@ -2264,8 +2291,14 @@ async function settingsChanged(
   if (change.refused) runCommand(SETTINGS_OPEN);
   // The `theme` setting may be what moved (TYTO-208); main has already set the mode.
   showTheme(bridge, () => bridge['theme:current']({}));
+  const before = state.templatesFolder;
   const chosen = await bridge['templates:folder']({});
-  state.templatesFolder = chosen.folder;
+  // A `templatesFolder` written by hand moves the open briefs' templates as the command does
+  // (TYTO-351); any other setting leaves them, so they are compiled again only then.
+  if (chosen.folder !== before) {
+    await afterTemplatesReread(bridge);
+    return;
+  }
   state.templatesFound = chosen.found;
   await refreshTemplates(bridge);
   repaint();
@@ -2392,6 +2425,10 @@ function showTheme(bridge: TytoBridge, ask: () => Promise<IpcResponse<'theme:cur
       statusBarItems = applied.statusBarItems;
       // And so does how vim's mode is drawn (TYTO-301).
       vimModeStyle = applied.vimModeStyle;
+      // And whether the editor takes vim's keys at all (TYTO-333): a save of the file turns it
+      // on or off in place. Followed only when the setting moved, so an answer asked before
+      // the command's write landed does not undo the command.
+      if (vimSetting.follow(applied.vimMode, editor)) paintCommandBar();
       // And whether the editors draw indent guides (TYTO-293): every tab, and the template mode.
       indentGuides = applied.indentGuides;
       editor?.setIndentGuides(indentGuides);
@@ -2775,8 +2812,9 @@ async function setTemplateFolder(choose: boolean): Promise<void> {
     const answer = await bridge['templates:set-folder']({ choose });
     state.templatesFolder = answer.folder;
     state.templatesFound = answer.found;
-    await refreshTemplates(bridge);
-    repaint();
+    // Through the re-preview and not only the list (TYTO-351): a brief open on a template the
+    // folder brings, or takes away, resolves differently now, and only a compile says so.
+    await afterTemplatesReread(bridge);
   });
 }
 
@@ -3858,6 +3896,12 @@ let vimStatus: VimStatus | null = null;
  */
 let statusBarItems: readonly StatusBarItemId[] = STATUS_BAR_ITEM_IDS;
 
+/**
+ * The `vimMode` setting, from the same answer (TYTO-333): off until it arrives. An editor made
+ * after the answer starts in it; one made before follows it when it lands.
+ */
+const vimSetting = createVimSetting();
+
 /** The `vimModeStyle` setting, from the same answer (TYTO-301): the badge until it arrives. */
 let vimModeStyle: VimModeStyle = 'badge';
 
@@ -4127,10 +4171,11 @@ async function request(
     ...(fetch ? { fetch } : {}),
   });
   if (!gate.accept(answer.requestId)) return;
-  // Every document a group shows has its answers reach that pane's gutter (TYTO-286); a tab
-  // compiled in the background is published when it is compiled again on screen.
-  if ([...shownIn.values()].includes(documentId))
-    analysis.publish(documentId, { ...answer, brief });
+  // Every answer is kept for its document, shown or not (TYTO-351). A tab compiled behind
+  // another one — by a folder change, say — is linted when a pane shows it again, and that lint
+  // answers from what was kept; keeping only what was shown would hand it the answer before.
+  // The panes that show it now are told to lint again by the analysis's `relint`.
+  analysis.publish(documentId, { ...answer, brief });
   // The plugins' panels hear the focused document on the same pause the preview compiles on.
   if (documentId === active().id) announceDocument(document, brief);
 
@@ -4831,10 +4876,11 @@ function wireTemplateMode(mode: TemplateMode, bridge: TytoBridge): void {
 }
 
 /**
- * Main has read the folders again — a template was saved, or the installed plugins started and
- * their packs joined the search (ADR 0046) — so every open brief is compiled again. The first is
- * TYTO-44's third acceptance criterion; the second is why a brief that names an installed
- * template, open before the plugins had started, stops being `E_UNKNOWN_TEMPLATE` untouched.
+ * Main has read the folders again — a template was saved, the installed plugins started and
+ * their packs joined the search (ADR 0046), or the templates folder changed (TYTO-351) — so
+ * every open brief is compiled again. The first is TYTO-44's third acceptance criterion; the
+ * second is why a brief that names an installed template, open before the plugins had started,
+ * stops being `E_UNKNOWN_TEMPLATE` untouched; the third is TYTO-351's.
  *
  * **Every** open brief and not only the ones naming the template, because a save can rename
  * it: a brief that named the old name stops resolving and one that named the new name starts,
@@ -5050,6 +5096,8 @@ async function load(): Promise<void> {
       // The status bar shows vim's mode (TYTO-248), so the library's own line would say it
       // twice. Its `:` prompt and its notifications still open in its own panel.
       vimStatus: false,
+      // Vim's keys when the `vimMode` setting says so (TYTO-333), if main answered already.
+      vim: vimSetting.current(),
       // Spaces per indent level (TYTO-297); the theme's answer brings the saved one.
       tabSize,
       // How a `|` line's columns are drawn (TYTO-298); the theme's answer brings the saved one.
