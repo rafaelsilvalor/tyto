@@ -36,6 +36,7 @@ import {
   type Settings,
   stickyScrollExample,
   tabSizeExample,
+  vimModeExample,
 } from '../../shared/settings.js';
 import {
   type ThemeInForce,
@@ -142,13 +143,14 @@ const CONTEXT_MENU_CLICK_GRACE_MS = 50;
  * `settings.json` as "Open Settings (JSON)" creates it when there is none (TYTO-206). It
  * carries `statusBarItems` commented out with every id, and `statusBarColors` with every key
  * and an example colour, and `vimModeStyle` with its three values (TYTO-301), so the bar's
- * options are in the file the person is looking at; and `indentGuides` (TYTO-293),
- * `stickyScroll` (TYTO-295), `formatBriefOnSave` and `tabSize` (TYTO-297), `briefColumns`
- * with its four looks (TYTO-298), and `googleFonts` (TYTO-281).
+ * options are in the file the person is looking at; and `vimMode` (TYTO-333), `indentGuides`
+ * (TYTO-293), `stickyScroll` (TYTO-295), `formatBriefOnSave` and `tabSize` (TYTO-297),
+ * `briefColumns` with its four looks (TYTO-298), and `googleFonts` (TYTO-281).
  */
 const NEW_SETTINGS_FILE =
   '// Tyto settings: JSON with comments. Saving this file applies it, with no restart.\n{\n' +
-  `${statusBarItemsExample()}\n${statusBarColorsExample()}\n${vimModeStyleExample()}\n` +
+  `${statusBarItemsExample()}\n${statusBarColorsExample()}\n${vimModeExample()}\n` +
+  `${vimModeStyleExample()}\n` +
   `${indentGuidesExample()}\n${stickyScrollExample()}\n` +
   `${formatBriefOnSaveExample()}\n${tabSizeExample()}\n${briefColumnsExample()}\n` +
   `${typographyExample()}\n${googleFontsExample()}\n}\n`;
@@ -548,6 +550,9 @@ async function start(): Promise<void> {
   let statusBarItems = saved.statusBarItems;
   // And its colours over the theme's (TYTO-301), on the same answer.
   let statusBarColors = saved.statusBarColors;
+  // And whether the editor takes vim's keys (TYTO-333), on the same answer: what the window
+  // opens in, and what "Editor: turn vim mode on or off" writes.
+  let vimMode = saved.vimMode;
   // And how vim's mode is shown (TYTO-301), on the same answer.
   let vimModeStyle = saved.vimModeStyle;
   // And whether the editor draws indent guides (TYTO-293), on the same answer.
@@ -871,6 +876,7 @@ async function start(): Promise<void> {
       if (keys.includes('iconStrokeWidth')) iconStrokeWidth = next.iconStrokeWidth;
       if (keys.includes('statusBarItems')) statusBarItems = next.statusBarItems;
       if (keys.includes('statusBarColors')) statusBarColors = next.statusBarColors;
+      if (keys.includes('vimMode')) vimMode = next.vimMode;
       if (keys.includes('vimModeStyle')) vimModeStyle = next.vimModeStyle;
       if (keys.includes('indentGuides')) indentGuides = next.indentGuides;
       if (keys.includes('stickyScroll')) stickyScroll = next.stickyScroll;
@@ -1349,6 +1355,7 @@ async function start(): Promise<void> {
       iconStrokeWidth: () => iconStrokeWidth,
       statusBarItems: () => statusBarItems,
       statusBarColors: () => statusBarColors,
+      vimMode: () => vimMode,
       vimModeStyle: () => vimModeStyle,
       indentGuides: () => indentGuides,
       stickyScroll: () => stickyScroll,
@@ -1366,6 +1373,15 @@ async function start(): Promise<void> {
       applyZoom(next);
       const written = await remember({ zoom: next });
       return { zoom: written ? next : before, saved: written };
+    },
+    // "Editor: turn vim mode on or off" (TYTO-333): written as a screen's change, so the choice
+    // survives a restart. A refused write (a file that does not parse) keeps the setting before,
+    // and the answer says which is in force, so the window goes back to it.
+    vimMode: async (on: boolean) => {
+      if (on === vimMode) return { vimMode, saved: true };
+      const written = await remember({ vimMode: on });
+      if (written) vimMode = on;
+      return { vimMode, saved: written };
     },
     // Help > Documentation (TYTO-318): the edition of the language the menu is in, which is the
     // one `app:locale` last set. A locale with no edition opens nothing, and the log says so.

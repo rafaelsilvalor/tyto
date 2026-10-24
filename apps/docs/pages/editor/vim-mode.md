@@ -15,11 +15,7 @@ The same command turns it off again. It has no key of its own; [Keyboard shortcu
 
 While vim is on, the status bar shows the mode you are in — **NORMAL**, **INSERT**, **VISUAL** or **REPLACE** — and the keys of a command you have started to type. How that badge looks is the [`vimModeStyle`](../reference/settings.md#vimmodestyle) setting, and its colours are in [`statusBarColors`](../reference/settings.md#statusbarcolors).
 
-::: warning Vim mode is not remembered
-Nothing turns vim on at start: there is no setting for it, and the window always opens with vim off. Run the command again after each restart.
-:::
-
-<!-- TYTO-333: vim's state is held in memory only (editor.toggleVim flips it). -->
+The choice is remembered: the command writes the [`vimMode`](../reference/settings.md#vimmode) setting, so after a restart the window opens with vim as you left it. You can also write `"vimMode": true` or `false` in `settings.json` yourself; saving the file turns vim on or off at once.
 
 ## What changes while it is on
 

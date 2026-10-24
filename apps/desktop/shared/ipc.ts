@@ -447,6 +447,11 @@ const appliedThemesSchema = z.object({
     z.enum(STATUS_BAR_COLOUR_KEYS.map((entry) => entry.key) as [string, ...string[]]),
     statusBarColour,
   ),
+  /**
+   * The `vimMode` setting in force (TYTO-333): whether the editor takes vim's keys. The window
+   * follows it when it moves, so a save of the file turns vim on or off in place.
+   */
+  vimMode: z.boolean(),
   /** The `vimModeStyle` setting in force (TYTO-301, ADR 0091): badge, top border or bar. */
   vimModeStyle: z.enum(VIM_MODE_STYLES.map((style) => style.id) as [VimModeStyle]),
   /** The `indentGuides` setting in force (TYTO-293): the editor's guides, on or off. */
@@ -1686,6 +1691,17 @@ export const IPC_CHANNELS = {
   'window:zoom': channel(
     z.object({ step: z.enum(['in', 'out', 'reset']) }),
     z.object({ zoom: z.number().int(), saved: z.boolean() }),
+  ),
+
+  /**
+   * "Editor: turn vim mode on or off" (TYTO-333): main writes the `vimMode` setting to
+   * `settings.json` as a screen's change, so the choice survives a restart. `saved` is false
+   * when the file does not parse; the setting in force is then the one before, which is what
+   * `vimMode` answers, and the window goes back to it.
+   */
+  'editor:vim-mode': channel(
+    z.object({ on: z.boolean() }),
+    z.object({ vimMode: z.boolean(), saved: z.boolean() }),
   ),
 
   /**

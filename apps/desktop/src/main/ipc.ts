@@ -53,6 +53,8 @@ export interface WindowThemes extends Pick<ThemeService, 'list' | 'current' | 'p
   statusBarItems(): readonly StatusBarItemId[];
   /** The `statusBarColors` setting in force (TYTO-301), on the same answer. */
   statusBarColors(): StatusBarColors;
+  /** The `vimMode` setting in force (TYTO-333), on the same answer. */
+  vimMode(): boolean;
   /** The `vimModeStyle` setting in force (TYTO-301), on the same answer. */
   vimModeStyle(): VimModeStyle;
   /** The `indentGuides` setting in force (TYTO-293), on the same answer. */
@@ -80,6 +82,7 @@ function appliedForWindow(
     | 'iconStrokeWidth'
     | 'statusBarItems'
     | 'statusBarColors'
+    | 'vimMode'
     | 'vimModeStyle'
     | 'indentGuides'
     | 'stickyScroll'
@@ -95,6 +98,7 @@ function appliedForWindow(
     iconStrokeWidth: themes.iconStrokeWidth(),
     statusBarItems: [...themes.statusBarItems()],
     statusBarColors: { ...themes.statusBarColors() },
+    vimMode: themes.vimMode(),
     vimModeStyle: themes.vimModeStyle(),
     indentGuides: themes.indentGuides(),
     stickyScroll: themes.stickyScroll(),
@@ -313,6 +317,13 @@ export interface IpcDependencies {
    * and whether `settings.json` took it.
    */
   readonly zoom: (step: ZoomStep) => Promise<{ readonly zoom: number; readonly saved: boolean }>;
+  /**
+   * Writes the `vimMode` setting (TYTO-333): the setting in force after, and whether
+   * `settings.json` took it.
+   */
+  readonly vimMode: (
+    on: boolean,
+  ) => Promise<{ readonly vimMode: boolean; readonly saved: boolean }>;
   /**
    * Opens the user manual in the system browser, in the window's language (TYTO-318). The
    * composition root holds the locale and `shell.openExternal`; the URL is one of the two
@@ -763,6 +774,11 @@ export function createHandlers(dependencies: IpcDependencies): Handlers {
     'window:zoom': async ({ step }) => {
       const { zoom, saved } = await dependencies.zoom(step);
       return { zoom, saved };
+    },
+
+    'editor:vim-mode': async ({ on }) => {
+      const { vimMode, saved } = await dependencies.vimMode(on);
+      return { vimMode, saved };
     },
 
     'menu:disabled': ({ ids }) => {

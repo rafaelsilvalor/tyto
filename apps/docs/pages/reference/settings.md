@@ -2,7 +2,7 @@
 
 # Settings
 
-Every key the app declares in `settings.json`: 22. Open the file with **Preferences: Open Settings (JSON)**; a key you leave out keeps its default, and a value the app cannot read is reported in the Problems panel and the default applies. A plugin adds its own keys as `<plugin id>.<key>`, which are not listed here.
+Every key the app declares in `settings.json`: 23. Open the file with **Preferences: Open Settings (JSON)**; a key you leave out keeps its default, and a value the app cannot read is reported in the Problems panel and the default applies. A plugin adds its own keys as `<plugin id>.<key>`, which are not listed here.
 
 ## templatesFolder
 
@@ -115,6 +115,21 @@ Colours that win over the theme for the status bar, in every theme. background: 
 | `"item.settings"` | The text of settings: Opens settings.json. |
 | `"item.bottomArea"` | The text of bottomArea: Button that shows or hides the bottom area. |
 | `"item.rightArea"` | The text of rightArea: Button that shows or hides the right area. |
+
+## vimMode
+
+Give the editor vim's keys: normal, insert, visual and replace modes (default false). The command Editor: turn vim mode on or off writes it.
+
+| Type | Default |
+| --- | --- |
+| `boolean` | `false` |
+
+**Values**
+
+| Value | Meaning |
+| --- | --- |
+| `true` | The editor takes vim's keys, and the status bar shows its mode. |
+| `false` | The editor's own keys; no vim. |
 
 ## vimModeStyle
 

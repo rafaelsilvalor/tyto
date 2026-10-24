@@ -146,6 +146,7 @@ import {
 } from './status-bar.js';
 import { type StatusBarItemId, STATUS_BAR_ITEM_IDS } from '../../shared/status-bar-items.js';
 import { type VimModeStyle } from '../../shared/vim-mode-style.js';
+import { createVimSetting } from './vim-setting.js';
 import { type BriefColumnLook } from '../../shared/brief-columns.js';
 import {
   type DocumentState,
@@ -1437,10 +1438,22 @@ const registry: CommandRegistry = withCommandGate(
 
     toggleVimMode: () => {
       if (editor === undefined) return;
-      editor.setVimMode(!editor.isVimMode());
+      const handle = editor;
+      // Flipped at once and written to the `vimMode` setting (TYTO-333), so the choice survives
+      // a restart. A file that does not parse refuses the write, main's answer says the setting
+      // is still the one before, and the editor goes back to it.
+      const toggled = vimSetting.toggle(handle, (on) =>
+        window.tyto === undefined
+          ? Promise.resolve({ vimMode: on, saved: false })
+          : window.tyto['editor:vim-mode']({ on }),
+      );
       // The bindings change with the mode — vim has no `Mod-z`, because undo is `u` and
       // belongs to the vim engine — so the bar has to be told what it now shows.
       paintCommandBar();
+      void toggled.then(() => {
+        paintCommandBar();
+        paintStatusBar();
+      });
     },
   }),
   offeredNow,
@@ -2392,6 +2405,10 @@ function showTheme(bridge: TytoBridge, ask: () => Promise<IpcResponse<'theme:cur
       statusBarItems = applied.statusBarItems;
       // And so does how vim's mode is drawn (TYTO-301).
       vimModeStyle = applied.vimModeStyle;
+      // And whether the editor takes vim's keys at all (TYTO-333): a save of the file turns it
+      // on or off in place. Followed only when the setting moved, so an answer asked before
+      // the command's write landed does not undo the command.
+      if (vimSetting.follow(applied.vimMode, editor)) paintCommandBar();
       // And whether the editors draw indent guides (TYTO-293): every tab, and the template mode.
       indentGuides = applied.indentGuides;
       editor?.setIndentGuides(indentGuides);
@@ -3858,6 +3875,12 @@ let vimStatus: VimStatus | null = null;
  */
 let statusBarItems: readonly StatusBarItemId[] = STATUS_BAR_ITEM_IDS;
 
+/**
+ * The `vimMode` setting, from the same answer (TYTO-333): off until it arrives. An editor made
+ * after the answer starts in it; one made before follows it when it lands.
+ */
+const vimSetting = createVimSetting();
+
 /** The `vimModeStyle` setting, from the same answer (TYTO-301): the badge until it arrives. */
 let vimModeStyle: VimModeStyle = 'badge';
 
@@ -5050,6 +5073,8 @@ async function load(): Promise<void> {
       // The status bar shows vim's mode (TYTO-248), so the library's own line would say it
       // twice. Its `:` prompt and its notifications still open in its own panel.
       vimStatus: false,
+      // Vim's keys when the `vimMode` setting says so (TYTO-333), if main answered already.
+      vim: vimSetting.current(),
       // Spaces per indent level (TYTO-297); the theme's answer brings the saved one.
       tabSize,
       // How a `|` line's columns are drawn (TYTO-298); the theme's answer brings the saved one.

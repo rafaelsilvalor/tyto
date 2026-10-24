@@ -628,6 +628,7 @@ const windowThemes = (): WindowThemes => {
     iconStrokeWidth: () => 1,
     statusBarItems: () => ['settings', 'problems'],
     statusBarColors: () => ({ background: '#1e3a5f', 'vimMode.normal': '#3b6fd9' }),
+    vimMode: () => true,
     vimModeStyle: () => 'bar',
     indentGuides: () => false,
     stickyScroll: () => false,
@@ -684,6 +685,7 @@ const dependencies = () => {
     keymaps: () => Promise.resolve([]),
     themes: windowThemes(),
     zoom: (step: string) => Promise.resolve({ zoom: step === 'in' ? 1 : 0, saved: true }),
+    vimMode: (on: boolean) => Promise.resolve({ vimMode: on, saved: true }),
     openDocumentation: () => {},
     keybindings: {
       open: () => Promise.resolve({ document: null, documentId: null }),
@@ -1533,6 +1535,8 @@ describe('the theme channels (TYTO-208)', () => {
     expect(answer.statusBarColors).toEqual({ background: '#1e3a5f', 'vimMode.normal': '#3b6fd9' });
     // And how vim's mode is drawn.
     expect(answer.vimModeStyle).toBe('bar');
+    // And whether the editor takes vim's keys at all (TYTO-333).
+    expect(answer.vimMode).toBe(true);
     // And whether the editor draws indent guides (TYTO-293).
     expect(answer.indentGuides).toBe(false);
     // And whether it pins the head line of the block at the top (TYTO-295).
@@ -1559,6 +1563,23 @@ describe('the theme channels (TYTO-208)', () => {
     const guarded = guard('window:zoom', createHandlers(dependencies())['window:zoom']);
     expect(await guarded({ step: 'in' })).toEqual({ zoom: 1, saved: true });
     await expect(guarded({ step: 'sideways' } as never)).rejects.toThrow();
+  });
+
+  it('writes the vimMode setting through main and answers what is in force (TYTO-333)', async () => {
+    const asked: boolean[] = [];
+    const guarded = guard(
+      'editor:vim-mode',
+      createHandlers({
+        ...dependencies(),
+        vimMode: (on: boolean) => {
+          asked.push(on);
+          return Promise.resolve({ vimMode: false, saved: false });
+        },
+      })['editor:vim-mode'],
+    );
+    expect(await guarded({ on: true })).toEqual({ vimMode: false, saved: false });
+    expect(asked).toEqual([true]);
+    await expect(guarded({ on: 'yes' } as never)).rejects.toThrow();
   });
 
   it('lists every theme with its label and kind, and nothing else', async () => {

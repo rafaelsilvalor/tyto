@@ -97,6 +97,12 @@ const themeApplied = (theme: string): Promise<unknown> =>
     { polling: 25, timeout: 15_000 },
   );
 
+/**
+ * Whether the file keeps `"vimMode": true`, which "Editor: turn vim mode on or off" wrote when it
+ * turned vim on (TYTO-333). A file written without it is a hand edit turning vim off again.
+ */
+let vimOn = false;
+
 const settingsText = (
   theme: string,
   style: VimModeStyle | undefined,
@@ -104,7 +110,7 @@ const settingsText = (
 ): string =>
   `{\n  "theme": "${theme}"${style === undefined ? '' : `,\n  "vimModeStyle": "${style}"`}${
     colours === undefined ? '' : `,\n  "statusBarColors": ${JSON.stringify(colours)}`
-  }\n}\n`;
+  }${vimOn ? ',\n  "vimMode": true' : ''}\n}\n`;
 
 /** Writes the file and waits until the footer names the style. */
 async function apply(
@@ -249,6 +255,7 @@ describe('the vimModeStyle setting', () => {
       await page.waitForTimeout(150);
       await page.keyboard.press('Enter');
       await page.waitForSelector('tyto-status-bar .status-bar__vim');
+      vimOn = true;
       await page.click('#editor .cm-content');
       await page.keyboard.press('Escape');
     });
@@ -352,6 +359,7 @@ describe('the vimModeStyle setting', () => {
       await page.waitForTimeout(150);
       await page.keyboard.press('Enter');
       await page.waitForSelector('tyto-status-bar .status-bar__vim', { state: 'detached' });
+      vimOn = false;
 
       for (const style of ['bar', 'border', 'badge'] as const) {
         await apply('tyto-light', style);
