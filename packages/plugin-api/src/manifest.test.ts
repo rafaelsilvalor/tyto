@@ -65,6 +65,14 @@ describe('a manifest that is wrong', () => {
     expect(pathsOf({ ...VALID, permissions: ['net:example.com', ''] })).toEqual(['permissions.1']);
   });
 
+  it("refuses 'writes' that repeat or misspell a kind, or that no recipe verb could make", () => {
+    const writer = { ...VALID, contributes: ['recipe-verb'], namespace: 'demo' };
+    expect(pathsOf({ ...writer, writes: ['mark', 'assign'] })).toEqual([]);
+    expect(pathsOf({ ...writer, writes: ['mark', 'mark'] })).toEqual(['writes']);
+    expect(pathsOf({ ...writer, writes: ['Mark'] })).toEqual(['writes.0']);
+    expect(pathsOf({ ...VALID, writes: ['mark'] })).toEqual(['writes']);
+  });
+
   it('points inside config rather than at it', () => {
     expect(pathsOf({ ...VALID, config: { $schema: '' } })).toEqual(['config.$schema']);
   });

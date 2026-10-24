@@ -1270,6 +1270,18 @@ export const diagnosticCodes = {
     fatality:
       'That cell has no table and the cells after it do not run; earlier cells keep theirs.',
   },
+  // A plan is what a person confirms before anything is written (ADR 0129), so the host checks
+  // it rather than trusting the plugin to stay inside the writes it declared.
+  E_RECIPE_PLAN: {
+    severity: 'error',
+    summary:
+      'An action or a sink planned a write it did not declare, miscounted its plan, or passed a ceiling.',
+    template: "'{verb}' answered a plan that {problem}.",
+    spec: 'docs/adr/0135-a-plugin-contributes-recipe-verbs-in-a-namespace-it-owns.md',
+    fatal: false,
+    fatality:
+      'That cell has no plan and the cells after it do not run; earlier cells keep theirs. Nothing is written.',
+  },
   E_RECIPE_VERB: {
     severity: 'error',
     summary: 'A verb a plugin contributes could not do its work, in its own words.',

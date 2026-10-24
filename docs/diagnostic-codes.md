@@ -143,6 +143,7 @@ non-zero.
 | `E_RECIPE_REGISTRATION` | error | no | A verb or a derivation cannot be registered under the name it was given. |
 | `E_RECIPE_TABLE` | error | no | A table a verb or a derivation answered repeats a column or a key, or holds a value its columns do not allow. |
 | `E_RECIPE_SOURCE` | error | no | A source was cut short, repeated a cursor, or passed a ceiling on its pages or rows. |
+| `E_RECIPE_PLAN` | error | no | An action or a sink planned a write it did not declare, miscounted its plan, or passed a ceiling. |
 | `E_RECIPE_VERB` | error | no | A verb a plugin contributes could not do its work, in its own words. |
 | `E_RECIPE_NO_TABLE` | error | no | A verb that reads a table runs before any cell produced one. |
 | `E_RECIPE_ARGUMENTS` | error | no | A recipe verb was given arguments it does not accept. |
@@ -251,6 +252,7 @@ incomplete brief, and a crossed box where a picture the exporter could not load 
 | `E_RECIPE_REGISTRATION` | no | Only that one is missing; everything else in the registry still runs. |
 | `E_RECIPE_TABLE` | no | That cell has no table and the cells after it do not run; earlier cells keep theirs. |
 | `E_RECIPE_SOURCE` | no | That cell has no table and the cells after it do not run; earlier cells keep theirs. |
+| `E_RECIPE_PLAN` | no | That cell has no plan and the cells after it do not run; earlier cells keep theirs. Nothing is written. |
 | `E_RECIPE_VERB` | no | That cell has no table and the cells after it do not run; earlier cells keep theirs. |
 | `E_RECIPE_NO_TABLE` | no | That cell has no table and the cells after it do not run; earlier cells keep theirs. |
 | `E_RECIPE_ARGUMENTS` | no | That cell has no table and the cells after it do not run; earlier cells keep theirs. |
@@ -1406,6 +1408,20 @@ That cell has no table and the cells after it do not run; earlier cells keep the
 
 ```
 Source '{verb}' {problem}.
+```
+
+Parameters: `verb`, `problem`
+
+### `E_RECIPE_PLAN`
+
+**Severity:** error · **Fatal:** no · **Spec:** `docs/adr/0135-a-plugin-contributes-recipe-verbs-in-a-namespace-it-owns.md`
+
+An action or a sink planned a write it did not declare, miscounted its plan, or passed a ceiling.
+
+That cell has no plan and the cells after it do not run; earlier cells keep theirs. Nothing is written.
+
+```
+'{verb}' answered a plan that {problem}.
 ```
 
 Parameters: `verb`, `problem`

@@ -23,15 +23,16 @@ my-plugin/
 
 `pluginManifestSchema` in `@tyto/plugin-api` is that document, and it is the only reader of it. Every field is checked and every rejection carries a **field path** — `contributes.1`, `config.$schema`, `(root)` — because "the manifest is invalid" is not a sentence anybody can act on in a file they typed by hand. Every problem is reported at once, the same promise the compiler makes about a brief.
 
-| Field         | Rule                                                                                                                     |
-| ------------- | ------------------------------------------------------------------------------------------------------------------------ |
-| `name`        | lowercase letters, digits and hyphens. **It is the plugin's id** — see below                                             |
-| `version`     | semver, with an optional prerelease tag                                                                                  |
-| `engine`      | a version range (`>=0.1`, `^1.2.3`, `>=0.1 \|\| ^1`) against `PLUGIN_API_VERSION` (ADR 0040)                             |
-| `contributes` | at least one extension point from the table below, no repeats                                                            |
-| `permissions` | non-empty strings, no repeats; `net:<host>` gates `host.fetch`, `credentials:<key>` gates `host.credentials` (ADR 0042)  |
-| `config`      | optional `{ "$schema": "…" }`, never dereferenced by the host                                                            |
-| `namespace`   | lowercase letters, digits and hyphens; required with `recipe-verb` or `recipe-derivation`, one plugin's alone (ADR 0135) |
+| Field         | Rule                                                                                                                          |
+| ------------- | ----------------------------------------------------------------------------------------------------------------------------- |
+| `name`        | lowercase letters, digits and hyphens. **It is the plugin's id** — see below                                                  |
+| `version`     | semver, with an optional prerelease tag                                                                                       |
+| `engine`      | a version range (`>=0.1`, `^1.2.3`, `>=0.1 \|\| ^1`) against `PLUGIN_API_VERSION` (ADR 0040)                                  |
+| `contributes` | at least one extension point from the table below, no repeats                                                                 |
+| `permissions` | non-empty strings, no repeats; `net:<host>` gates `host.fetch`, `credentials:<key>` gates `host.credentials` (ADR 0042)       |
+| `config`      | optional `{ "$schema": "…" }`, never dereferenced by the host                                                                 |
+| `namespace`   | lowercase letters, digits and hyphens; required with `recipe-verb` or `recipe-derivation`, one plugin's alone (ADR 0135)      |
+| `writes`      | optional; the kinds of write the plugin's recipe actions and sinks may plan, lowercase words, no repeats (ADR 0129, ADR 0135) |
 
 Unknown keys are refused, one complaint per stray key rather than one for the object holding them.
 
@@ -76,7 +77,7 @@ The last five are named `<id>.tyto-plugin.json` and that is the one place a buil
 | `theme`             | a colour theme, a JSON file in the plugin: `{ id, label, kind, path }` (0077)  | desktop (Tyto Light, Tyto Dark)                       |
 | `asset-source`      | images behind URI schemes: `{ id, schemes, fetch }`, cached (ADR 0117)         | —                                                     |
 | `font-source`       | faces of named families: `{ id, families, fetch }`, cached (ADR 0117)          | google-fonts (ADR 0120)                               |
-| `recipe-verb`       | `<namespace>.<verb>`: a paged source or a transform (ADR 0128, ADR 0135)       | — (the generic verbs are `@tyto/recipe`'s)            |
+| `recipe-verb`       | `<namespace>.<verb>`: a paged source, a transform, an action or a sink (0135)  | — (the generic verbs are `@tyto/recipe`'s)            |
 | `recipe-derivation` | `<namespace>.<name>` for `derive`: `{ id, requires, produces, derive }` (0133) | —                                                     |
 
 ### `configuration`, in full
@@ -353,7 +354,7 @@ document cannot embed is `E_ASSET_SOURCE_FAILED` for an image and `W_FONT_SOURCE
 ```ts
 interface RecipeVerbContribution {
   id: string; // '<namespace>.<verb>', the namespace the manifest declares
-  kind: 'source' | 'transform'; // 'action' and 'sink' are refused until TYTO-376's second half
+  kind: 'source' | 'transform' | 'action' | 'sink';
   arguments: {
     name;
     type: 'text' | 'number' | 'date' | 'boolean';
@@ -366,6 +367,13 @@ interface RecipeVerbContribution {
     cursor?: string;
   }): Result<{ table; cursor?: string; truncated?: boolean }>;
   transform?(request: { arguments; table }): Result<Table>;
+  writes?: string[]; // an action's or a sink's: a subset of the manifest's 'writes'
+  plan?(request: { arguments; table }): Result<Plan>; // an action's or a sink's
+}
+interface Plan {
+  target: string;
+  operations: { write: string; rowKey?: string; description: string }[];
+  count: number; // operations.length
 }
 interface RecipeDerivationContribution {
   id: string; // '<namespace>.<name>'; bare names are Tyto's
@@ -389,8 +397,19 @@ per page, 100,000 rows and 1,000 pages per table, provisional until TYTO-386 —
 `E_RECIPE_SOURCE` and never a partial table. A plugin reports its own failure as
 `E_RECIPE_VERB`, and every diagnostic it returns is placed at its cell. The composition root
 hands the runner `recipeRegistriesOf(registry)`, which reads the contributions per lookup.
-`examples/plugins/tyto-plugin-example-recipe/` contributes `example.pull`, `example.tag` and
-`example.parity`.
+
+**An action or a sink plans and writes nothing** (ADR 0129). It declares `writes`, the kinds of
+write its plans may hold, a subset of the manifest's `writes`, or the plugin is refused at load;
+a source or a transform that declares `writes` is refused too. Its `plan` is handed the table
+the cell reads and answers a `Plan`, which the runner returns as the cell's `plan`; the table
+passes through unchanged to the next cell. The host refuses a plan with `E_RECIPE_PLAN`, at the
+verb, when an operation's `write` is one the verb did not declare, when `count` is not the
+number of operations, when a `rowKey` is not a key of the table, or past 10,000 operations or a
+500-character description (`PLAN_LIMITS`, provisional). **There is no `apply` in this
+version**: nothing a plan describes is written. TYTO-378 adds it, and may add fields to `Plan`
+but never remove or retype one, so a plan written today stays valid.
+`examples/plugins/tyto-plugin-example-recipe/` contributes `example.pull`, `example.tag`,
+`example.parity` and the action `example.mark`, which plans one `mark` per row.
 
 ### `editor.command` and `editor.keymap`, in full
 
@@ -509,7 +528,7 @@ host (CLI process)                               guest (plugin's process)
                         ◀── result {value} ──      answer checked by the host
 ```
 
-**Each side validates what it receives**, with the Zod schemas in `isolation/protocol.ts` and `isolation/points.ts`: the host every guest message and every answer, the guest every host message and a call's arguments, before the plugin's code sees them. **A contribution crosses as data, and its functions stay behind as handles**; a function is callable only if its point names it, with a schema for its arguments and one for its answer. Today that is `exporter.exportFrame`, `directive.transform` (TYTO-49), `fetch` on `asset-source` and `font-source` (ADR 0117), and `page`, `transform` and `derive` on the recipe points (ADR 0135), which may therefore return a `Promise`; the job and `resolve` await them. `template-pack`, `brand-kit`, `editor.command`, `editor.keymap`, `panel` and `theme` cross as data. `source`, `sink` and `rasterizer` are refused by name — _not available to an isolated plugin yet_. A directive's answer schema is strict: a replacement that carries a `namespace` or a `range` is `E_PLUGIN_PROTOCOL`.
+**Each side validates what it receives**, with the Zod schemas in `isolation/protocol.ts` and `isolation/points.ts`: the host every guest message and every answer, the guest every host message and a call's arguments, before the plugin's code sees them. **A contribution crosses as data, and its functions stay behind as handles**; a function is callable only if its point names it, with a schema for its arguments and one for its answer. Today that is `exporter.exportFrame`, `directive.transform` (TYTO-49), `fetch` on `asset-source` and `font-source` (ADR 0117), and `page`, `transform`, `plan` and `derive` on the recipe points (ADR 0135), which may therefore return a `Promise`; the job and `resolve` await them. `template-pack`, `brand-kit`, `editor.command`, `editor.keymap`, `panel` and `theme` cross as data. `source`, `sink` and `rasterizer` are refused by name — _not available to an isolated plugin yet_. A directive's answer schema is strict: a replacement that carries a `namespace` or a `range` is `E_PLUGIN_PROTOCOL`.
 
 **The proxy goes through `tryActivate`**, so an isolated plugin meets every check an in-process one does. `protocol` is its own number, compared at the `hello` handshake and nowhere else; it is not the engine (ADR 0040), because a plugin never sees these messages.
 
