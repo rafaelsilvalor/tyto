@@ -1,6 +1,7 @@
 import { type Diagnostic, type Result, diagnostic, didYouMean, err, ok } from '@tyto/core';
 
 import type { RecipeAst, Step } from './ast.js';
+import type { DataResolver } from './data.js';
 import { fillPlaceholders } from './parse.js';
 import type { Plan } from './plan.js';
 import type { DerivationRegistry, KeepRequest, RecipeResolver, VerbRegistry } from './registry.js';
@@ -14,6 +15,11 @@ export interface RunOptions {
   readonly verbs: VerbRegistry;
   readonly derivations: DerivationRegistry;
   readonly resolveRecipe: RecipeResolver;
+  /**
+   * Reads the data files verb arguments name (ADR 0137). Optional because a host without a
+   * workspace (a test, a plugin's own runner) has none; a verb that needs one says so.
+   */
+  readonly resolveData?: DataResolver | undefined;
   /** `{alias: column}`: names a person types, read on the way in and never written out. */
   readonly aliases?: Readonly<Record<string, string>>;
   /** The recipes that include this one through `run`, outermost first. */
@@ -89,6 +95,7 @@ export async function runRecipe(
       aliases,
       derivations: options.derivations,
       resolveRecipe: options.resolveRecipe,
+      resolveData: options.resolveData,
       verbs: options.verbs,
       recipes,
     });

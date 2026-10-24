@@ -11,6 +11,7 @@ import {
   type Node,
   type ParseError,
   getNodeValue,
+  parse,
   parseTree,
   printParseErrorCode,
 } from 'jsonc-parser';
@@ -97,6 +98,40 @@ export function readJsoncText(text: string, options: JsoncTextOptions): JsoncTex
     });
   }
   return { entries, syntax };
+}
+
+export interface JsoncValue {
+  /** What the text holds; `undefined` when it holds nothing a reader could use. */
+  readonly value: unknown;
+  /** Each syntax problem as a phrase with its line and column, e.g. `comma expected at 3:7`. */
+  readonly problems: readonly string[];
+}
+
+/**
+ * A whole JSONC document as a value, for a file whose shape the reader checks itself: a
+ * recipe's data file (ADR 0137). Same options and the same BOM handling as {@link readJsoncText},
+ * so a data file and a project file accept the same text. The positions are in the problem
+ * because they point into the data file, and the diagnostic that carries them points into the
+ * recipe.
+ */
+export function readJsoncValue(text: string): JsoncValue {
+  const source = text.startsWith(BOM) ? ` ${text.slice(1)}` : text;
+  if (source.trim() === '') return { value: undefined, problems: ['the file is empty'] };
+  const errors: ParseError[] = [];
+  const value: unknown = parse(source, errors, OPTIONS);
+  const problems = errors.map(
+    (error) =>
+      `${describe(printParseErrorCode(error.error))} at ${lineAndColumn(source, error.offset)}`,
+  );
+  return { value, problems };
+}
+
+/** `3:7`, both counted from one, as an editor's status bar shows a place. */
+function lineAndColumn(text: string, offset: number): string {
+  const before = text.slice(0, offset);
+  const line = before.split('\n').length;
+  const column = offset - (before.lastIndexOf('\n') + 1) + 1;
+  return `${String(line)}:${String(column)}`;
 }
 
 /** A value with where every member and item of it was written, all the way down. */

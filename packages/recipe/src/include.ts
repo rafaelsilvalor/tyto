@@ -85,6 +85,9 @@ export async function include(context: VerbContext): Promise<VerbResult> {
     verbs: context.verbs,
     derivations: context.derivations,
     resolveRecipe: context.resolveRecipe,
+    // The included recipe reads data relative to the host's recipe folder, not its own: the
+    // port knows one folder (ADR 0137).
+    resolveData: context.resolveData,
     aliases: Object.fromEntries(context.aliases),
     within: context.recipes,
   });

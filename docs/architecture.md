@@ -34,9 +34,9 @@ packages/
   theme-pack     well-known colour themes (Dracula, Nord, Solarized…) as a theme plugin, bundled into main
   fonts          the faces Tyto ships, and the reader that hands them to the exporters and to measurement
   pipeline       Job: brief → artworks×formats → artifacts; local queue, cancellation, progress
-  recipe         the recipe notebook's table, the *.recipe parser, the where grammar and the generic verbs, join, derive and run included (ADR 0128, ADR 0133); the tyto-pattern/1 compiler and its guard that matches and every matching verb use (ADR 0136); checkTable and the paging loop a plugin's source runs through (ADR 0135)
+  recipe         the recipe notebook's table, the *.recipe parser, the where grammar and the generic verbs, join, derive and run included (ADR 0128, ADR 0133); the tyto-pattern/1 compiler and its guard that matches and every matching verb use (ADR 0136); checkTable and the paging loop a plugin's source runs through (ADR 0135); the resolveData port and readDataArgument, which read a verb argument's @./file.json#/pointer as a slice checked by the verb's Zod schema (ADR 0137)
   plugin-api     extension-point types, PluginHost, plugin manifest, permissions; recipeRegistriesOf over the recipe points (may import recipe, never the reverse, ADR 0135)
-  io             BriefSource/OutputSink ports; fs adapters (inbox/outbox); local watcher
+  io             BriefSource/OutputSink ports; fs adapters (inbox/outbox); local watcher; workspaceDataResolver, a recipe's data files confined to a trusted workspace (ADR 0137)
   sources        none here: remote connectors are installed plugins in their own repositories (ADR 0127)
   editor         CodeMirror 6: brief and template languages, vim, diagnostics, manifest-driven autocomplete, JSON-tab suggestions and hover from a host's source, brief skeletons and the "/" menu, find/replace, one editor in several panes
 apps/

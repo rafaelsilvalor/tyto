@@ -135,6 +135,12 @@ export {
   recipeRegistriesOf,
 } from './recipes.js';
 
+/**
+ * The recipe's data port, named here so `@tyto/io`'s workspace adapter implements a port from
+ * this package, as every adapter does (ADR 0137).
+ */
+export type { DataResolver } from '@tyto/recipe';
+
 export type {
   GuestChannel,
   PluginChannel,
