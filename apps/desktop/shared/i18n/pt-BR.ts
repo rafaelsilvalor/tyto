@@ -83,7 +83,7 @@ export const ptBR: Catalogue = {
   'command.preview.previousSlide': 'Prévia: slide anterior',
   'command.shell.toggleLocale': 'Trocar o idioma da janela',
   'command.editor.toggleVim': 'Editor: ligar ou desligar o modo vim',
-  'command.file.open': 'Abrir um brief…',
+  'command.file.open': 'Abrir…',
   'command.file.save': 'Salvar',
   'command.file.saveAs': 'Salvar como…',
   'command.file.recent': 'Recente',

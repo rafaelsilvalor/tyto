@@ -187,6 +187,10 @@ export {
 export { template, templateLanguage } from './template-language.js';
 
 export { json, jsonLanguage } from './json-language.js';
+
+export { markdown, markdownLanguage } from './markdown-language.js';
+
+export { escapeHtml, MARKDOWN_TAGS, markdownToHtml } from './markdown-html.js';
 export {
   type JsonAssistSource,
   type JsonCompletionAnswer,

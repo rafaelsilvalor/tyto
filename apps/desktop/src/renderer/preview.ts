@@ -417,8 +417,15 @@ function paintFrame(elements: PreviewElements, frame: Picture, zoom: number): vo
  * `fit` has to be resolved here rather than stored, because it depends on the size of the
  * stage — which changes when the window does, with no state change to notice it.
  */
+/** A pane that drew a Markdown file draws a picture again (TYTO-247): padded, and not hit. */
+function leaveDocument(elements: PreviewElements): void {
+  elements.stage.classList.remove('preview__stage--document');
+  elements.paper.classList.remove('preview__paper--document');
+}
+
 export function paintPreview(elements: PreviewElements, state: PreviewState): number {
   // The same pane shows an image when its tab's subject is one (TYTO-366): undo what that hid.
+  leaveDocument(elements);
   elements.tabs.hidden = false;
   if (elements.info !== undefined) elements.info.hidden = true;
   if (elements.notice !== undefined) elements.notice.hidden = true;
@@ -579,6 +586,7 @@ export function svgViewBoxSize(svg: string): { width: number; height: number } |
  * same `showDocument` and the same `fitZoom` as a brief's art, so Fit never enlarges past 1:1.
  */
 export function paintImage(elements: PreviewElements, state: ImagePreviewState): number {
+  leaveDocument(elements);
   elements.tabs.hidden = true;
   if (elements.info !== undefined) {
     elements.info.hidden = false;
@@ -612,6 +620,131 @@ export function paintImage(elements: PreviewElements, state: ImagePreviewState):
   paintFrame(elements, picture, zoom);
   elements.zoomLevel.textContent = `${String(Math.round(zoom * 100))}%`;
   return zoom;
+}
+
+/**
+ * What a Markdown preview's page is drawn in: the window's tokens, read where it runs (TYTO-247).
+ * The frame is a unique origin and cannot read the window's custom properties, so their values
+ * are copied in, and none is written here, as the token rule of `renderer-tokens.test.ts` asks.
+ */
+export interface MarkdownStyle {
+  readonly background: string;
+  readonly text: string;
+  readonly muted: string;
+  readonly accent: string;
+  readonly rule: string;
+  readonly code: string;
+  readonly font: string;
+  readonly codeFont: string;
+  readonly size: string;
+  readonly codeSize: string;
+  readonly radius: string;
+}
+
+const HEX = /^#[\dA-Fa-f]{3,8}$/u;
+const FAMILY = /^[\w\s,'"-]+$/u;
+const PIXELS = /^\d+(?:\.\d+)?px$/u;
+
+/**
+ * What each value must look like to go into the page's `<style>`: a token is never trusted to be
+ * what its name says, and a value with `;`, `{`, `}` or `<` in it could end the rule or the
+ * element. A value that does not match becomes `initial`, the property's own default.
+ */
+const STYLE_VALUE: Readonly<Record<keyof MarkdownStyle, RegExp>> = {
+  background: HEX,
+  text: HEX,
+  muted: HEX,
+  accent: HEX,
+  rule: HEX,
+  code: HEX,
+  font: FAMILY,
+  codeFont: FAMILY,
+  size: PIXELS,
+  codeSize: PIXELS,
+  radius: PIXELS,
+};
+
+/** A family that fails becomes a generic one, so the `font` shorthand still holds; else `initial`. */
+const fallback = (key: keyof MarkdownStyle): string =>
+  STYLE_VALUE[key] === FAMILY ? 'sans-serif' : 'initial';
+
+function checkedStyle(style: MarkdownStyle): MarkdownStyle {
+  const entries = (Object.keys(STYLE_VALUE) as (keyof MarkdownStyle)[]).map((key) => {
+    const value = style[key].trim();
+    return [key, STYLE_VALUE[key].test(value) ? value : fallback(key)] as const;
+  });
+  return Object.fromEntries(entries) as unknown as MarkdownStyle;
+}
+
+/**
+ * The document a Markdown file is shown in (TYTO-247, ADR 0132): `body` is `markdownToHtml`'s
+ * answer, which holds only whitelisted tags and escaped text, inside a page whose rules are
+ * constant but for the window's values ({@link MarkdownStyle}), each checked first. It goes into
+ * the same `sandbox=""` frame under the same CSP as a brief, through `showDocument`.
+ */
+export function markdownDocument(body: string, style: MarkdownStyle): string {
+  const value = checkedStyle(style);
+  const line = `1px solid ${value.rule}`;
+  return (
+    '<!doctype html><html><head><meta charset="utf-8"><style>' +
+    `html{background:${value.background};color:${value.text}}` +
+    `body{margin:0;padding:1.5em 2em;font:${value.size}/1.6 ${value.font},sans-serif;` +
+    'overflow-wrap:anywhere}' +
+    'body>:first-child{margin-top:0}' +
+    `h1,h2{padding-bottom:.3em;border-bottom:${line}}` +
+    `a{color:${value.accent};text-decoration:underline}` +
+    `blockquote{margin:0 0 1em;padding:0 1em;color:${value.muted};` +
+    `border-left:.25em solid ${value.rule}}` +
+    `code{font:${value.codeSize} ${value.codeFont},monospace;background:${value.code};` +
+    `padding:.1em .3em;border-radius:${value.radius}}` +
+    `pre{background:${value.code};padding:.75em 1em;border-radius:${value.radius};overflow:auto}` +
+    'pre code{padding:0;background:none}' +
+    `hr{border:0;border-top:${line}}` +
+    'table{border-collapse:collapse}' +
+    `th,td{border:${line};padding:.25em .75em}` +
+    'li:has(>input){list-style:none}input{margin:0 .5em 0 -1.3em}' +
+    `</style></head><body>${body}</body></html>`
+  );
+}
+
+/** What a Markdown preview draws: the document, ready, and the file's name for the bar. */
+export interface MarkdownPreviewState {
+  readonly html: string;
+  readonly info: string;
+}
+
+/**
+ * Paints a Markdown file in the pane (TYTO-247). No formats, modes, strip, zoom or stale marker:
+ * a note has none. The frame fills the stage at 1:1 and scrolls inside, and it takes the pointer
+ * (`preview__paper--document`), which a brief's picture does not, so the wheel scrolls it.
+ */
+export function paintMarkdown(elements: PreviewElements, state: MarkdownPreviewState): void {
+  elements.tabs.hidden = true;
+  if (elements.info !== undefined) {
+    elements.info.hidden = false;
+    elements.info.textContent = state.info;
+  }
+  if (elements.modes !== undefined) elements.modes.hidden = true;
+  if (elements.zoom !== undefined) elements.zoom.hidden = true;
+  if (elements.notice !== undefined) elements.notice.hidden = true;
+  elements.stripToggle.hidden = true;
+  elements.strip.hidden = true;
+  elements.strip.items = [];
+  elements.stage.classList.remove('preview__stage--marker');
+  elements.stage.classList.add('preview__stage--document');
+  elements.stage.hidden = false;
+  elements.empty.hidden = true;
+  elements.broken.hidden = true;
+  elements.stale.hidden = true;
+  elements.paper.hidden = false;
+  elements.paper.classList.add('preview__paper--document');
+  elements.zoomLevel.textContent = '';
+  const box = stageBox(elements.stage);
+  paintFrame(
+    elements,
+    { width: Math.max(1, box.width), height: Math.max(1, box.height), html: state.html },
+    1,
+  );
 }
 
 /** How many of `diagnostics` are errors, which is what turns the status bar's count red. */

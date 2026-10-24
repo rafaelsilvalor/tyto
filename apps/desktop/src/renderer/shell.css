@@ -1043,6 +1043,25 @@ tyto-preview-pane[hidden] {
   pointer-events: none;
 }
 
+/*
+ * A Markdown file drawn (TYTO-247): a page that fills the stage and scrolls, so no padding, no
+ * checkerboard and no shadow, and the frame takes the wheel. It is still `sandbox=""`: a click
+ * in it runs nothing and follows nothing, since its links carry no `href`.
+ */
+.preview__stage--document {
+  padding: 0;
+  overflow: hidden;
+}
+
+.preview__paper--document {
+  background: none;
+  box-shadow: none;
+}
+
+.preview__paper--document iframe {
+  pointer-events: auto;
+}
+
 .preview__empty {
   margin: 0;
   color: var(--tyto-text-muted);

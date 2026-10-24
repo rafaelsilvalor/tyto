@@ -35,7 +35,7 @@ The window adds more while it runs, which this list cannot show: a toggle for ea
 | Format Brief | `editor.formatBrief` | `Alt+Shift+f` | `⌥⇧f` |
 | New brief | `document.new` | `Ctrl+n` | `⌘n` |
 | New brief from template… | `document.newFromTemplate` |  |  |
-| Open a brief… | `editor.open` | `Ctrl+o` | `⌘o` |
+| Open… | `editor.open` | `Ctrl+o` | `⌘o` |
 | Save | `editor.save` | `Ctrl+s` | `⌘s` |
 | Save as… | `editor.saveAs` | `Ctrl+Shift+s` | `⌘⇧s` |
 | Export… | `file.export` |  |  |

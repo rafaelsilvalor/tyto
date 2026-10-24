@@ -17,6 +17,7 @@ import {
   formatsOf,
   frameFor,
   imageDocument,
+  markdownDocument,
   imageInfoLine,
   keepSelection,
   paintImage,
@@ -957,5 +958,41 @@ describe('an image in the preview', () => {
     expect(svgViewBoxSize('<svg width="80" height="40" viewBox="0 0 40 20">')).toBeUndefined();
     expect(svgViewBoxSize('<svg viewBox="0 0 0 20">')).toBeUndefined();
     expect(svgViewBoxSize('<svg>')).toBeUndefined();
+  });
+});
+
+describe('markdownDocument (TYTO-247, ADR 0132)', () => {
+  const style = {
+    background: '#fafafa',
+    text: '#242529',
+    muted: '#58585a',
+    accent: '#5c78e2',
+    rule: '#dcdcdd',
+    code: '#ebebec',
+    font: "'Source Sans 3'",
+    codeFont: "'IBM Plex Mono', monospace",
+    size: '14px',
+    codeSize: '14px',
+    radius: '6px',
+  };
+
+  it('puts the body inside a page painted in the values it was handed', () => {
+    const html = markdownDocument('<p>x</p>', style);
+    expect(html).toContain('html{background:#fafafa;color:#242529}');
+    expect(html).toContain("font:14px/1.6 'Source Sans 3',sans-serif");
+    expect(html.endsWith('<body><p>x</p></body></html>')).toBe(true);
+  });
+
+  it('leaves out a value that could end the rule or the element', () => {
+    const html = markdownDocument('', {
+      ...style,
+      background: 'red}</style><script>alert(1)</script>',
+      font: 'x;}body{display:none',
+      radius: '6px;background:url(http://x)',
+    });
+    expect(html).not.toContain('<script>');
+    expect(html).not.toContain('url(');
+    expect(html).toContain('html{background:initial;');
+    expect(html).toContain('font:14px/1.6 sans-serif,sans-serif');
   });
 });

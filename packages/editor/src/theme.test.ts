@@ -74,7 +74,9 @@ describe("CodeMirror's own panels, tooltips and diagnostics (TYTO-258)", () => {
         found.push(`named colour  ${where}`);
       }
       if (/\b\d+(?:\.\d+)?px\b/.test(line)) found.push(`px literal  ${where}`);
-      if (/monospace|system-ui|ui-monospace/.test(line)) found.push(`font stack  ${where}`);
+      // `tags.monospace` is a highlight tag, Markdown's inline code (TYTO-247), not a font stack.
+      const fonts = line.replaceAll('tags.monospace', '');
+      if (/monospace|system-ui|ui-monospace/.test(fonts)) found.push(`font stack  ${where}`);
       return found;
     });
     expect(themeCode.length).toBeGreaterThan(2000);

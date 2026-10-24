@@ -84,3 +84,30 @@ preview, and adds a dated note here.
   `status.kind.markdown` ("Markdown" in both), `dialog.files.text`, `dialog.files.supported`.
 - Measured in `e2e/text-tabs.desktop.test.ts`: opening, editing and saving a `.md` asks main for
   0 `brief:preview`, and main naming `.md` a brief turns that suite red.
+
+**Note, 2026-10-24 (TYTO-247, second pull request): the Markdown preview.** A `.md` tab opens in
+the `markdown` language: `@lezer/markdown` with its GFM extensions (tables, strikethrough, task
+lists, bare links), wrapped in a `Language` of a few lines in `packages/editor` as
+`json-language.ts` is, and not `@codemirror/lang-markdown`, which brings `lang-html`, `lang-css`
+and `lang-javascript`; MIT, depending only on `@lezer/common` and `@lezer/highlight`, already
+here. The theme styles heading, link, URL, monospace, quote and strikethrough from the host's
+tokens, so both themes. The preview is ADR 0124's subject `{ kind: 'markdown', documentId }`: the
+tab keeps `documentId` as a brief's does, so the lock and the session treat it alike, and the
+document's kind tells the two apart. It is drawn in the window, with no request and no new IPC,
+by `markdownToHtml` in `@tyto/editor`, which walks the same parser's tree and is **sanitised by
+construction**: it writes only a list of tags, every character of the source escaped; raw HTML
+(`HTMLBlock`, `HTMLTag`, comments, processing instructions) comes out as text; a link is an `<a>`
+with no `href`, its destination in `title`; an image is its alt text only (Rafael; showing images
+is another card); no `style` or `on…` attribute. The page goes into the same `sandbox=""` frame
+through `showDocument` under the unchanged CSP, fills the stage at 1:1, scrolls inside, and takes
+the pointer, which a brief's picture does not. It follows typing on the brief's pause (200 ms).
+It opens only on demand, through "Open preview to the side" (Rafael): decision 4's "no Open
+preview to the side" now holds for a `.txt` only, and a following preview follows "a document
+with a preview" (`hasPreview`), a brief or a `.md`. A Markdown preview focused is a tab kind of
+its own, `markdown-preview`: no brief command and no text command, but Open preview and Lock. No
+strip, no grid, no zoom, no export. Rafael's additions: File ▸ "Open a brief…" / "Abrir um
+brief…" is now "Open…" / "Abrir…", and the status bar draws no Export button with a `.txt`, a
+`.md` or a Markdown preview in front. Measured in `e2e/markdown-preview.desktop.test.ts` against a
+local server counting hits: a Markdown image, a raw `<img>` and a clicked link reach it 0 of 3
+times from the preview, 3 of 3 from what a renderer that kept them would write in a window with no
+sandbox and no CSP, and 0 more from the preview's own document in that same open window.

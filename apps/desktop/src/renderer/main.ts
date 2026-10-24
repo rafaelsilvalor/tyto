@@ -28,6 +28,7 @@ import {
   isFollower,
   jsonAssist,
   keyOfStroke,
+  markdownToHtml,
   openSlashMenu,
   relintBrief,
   type SlashSource,
@@ -163,6 +164,7 @@ import {
   documentOf,
   formatOfKind,
   hasPath,
+  hasPreview,
   isAppFile,
   isBrief,
   isBroken,
@@ -213,6 +215,8 @@ import {
   focusedGroup,
   followBrief,
   followBriefAgain,
+  previewSubjectOf,
+  previewTabs,
   followingPreview,
   groupById,
   groupList,
@@ -281,7 +285,10 @@ import {
   formatsOf,
   imageInfoLine,
   keepSelection,
+  type MarkdownStyle,
+  markdownDocument,
   paintImage,
+  paintMarkdown,
   paintPreview,
   stepZoom,
   svgViewBoxSize,
@@ -408,8 +415,14 @@ function focusedPreview(): EditorTab | undefined {
   return tab !== undefined && isPreview(tab) ? tab : undefined;
 }
 
-/** What the tab in front holds, for every door that asks whether a command is offered. */
-const activeKind = (): TabKind => (focusedPreview() === undefined ? active().kind : 'preview');
+/**
+ * What the tab in front holds, for every door that asks whether a command is offered. A preview
+ * of a Markdown file is a kind of its own (TYTO-247): a brief's commands have nothing there.
+ */
+const activeKind = (): TabKind => {
+  if (focusedPreview() === undefined) return active().kind;
+  return active().kind === 'markdown' ? 'markdown-preview' : 'preview';
+};
 
 /**
  * The brief the following preview shows: the last brief whose own tab was in front of the
@@ -692,6 +705,65 @@ function ask(bridge: TytoBridge, documentId: string, brief: string): void {
   );
 }
 
+/**
+ * A Markdown file's preview, rendered (TYTO-247, ADR 0132): the text it was rendered from and
+ * `markdownToHtml`'s body. In the window and not in main — it is a pure function of the text, so
+ * there is no request — and on the same pause as a brief's compile: typing marks the file
+ * pending ({@link askMarkdown}), and a preview drawn meanwhile keeps the body it had.
+ */
+const markdownBodies = new Map<string, { readonly text: string; readonly body: string }>();
+
+function markdownBodyOf(document_: DocumentState): string {
+  const text = contentOf(document_);
+  const rendered = markdownBodies.get(document_.id);
+  if (rendered !== undefined && (rendered.text === text || pending.has(document_.id))) {
+    return rendered.body;
+  }
+  const body = markdownToHtml(text);
+  markdownBodies.set(document_.id, { text, body });
+  return body;
+}
+
+/** A keystroke in a Markdown file: its previews are drawn again after {@link PREVIEW_DELAY}. */
+function askMarkdown(documentId: string): void {
+  const existing = pending.get(documentId);
+  if (existing !== undefined) clearTimeout(existing);
+  pending.set(
+    documentId,
+    setTimeout(() => {
+      pending.delete(documentId);
+      if (!previewTabs(groups).some((tab) => tab.documentId === documentId)) {
+        markdownBodies.delete(documentId);
+        return;
+      }
+      paintPreviews();
+    }, PREVIEW_DELAY),
+  );
+}
+
+/**
+ * The window's values for a Markdown preview's page, read from its tokens each time it is drawn,
+ * so a change of theme or of the editor's size is in the next paint. `markdownDocument` checks
+ * each before it writes it.
+ */
+function markdownStyle(): MarkdownStyle {
+  const style = getComputedStyle(document.documentElement);
+  const read = (name: string): string => style.getPropertyValue(`--tyto-${name}`);
+  return {
+    background: read('surface'),
+    text: read('text'),
+    muted: read('text-muted'),
+    accent: read('accent'),
+    rule: read('hairline'),
+    code: read('surface-raised'),
+    font: read('font-ui'),
+    codeFont: read('font-mono'),
+    size: read('ui-size'),
+    codeSize: read('code-size'),
+    radius: read('radius-md'),
+  };
+}
+
 /** The card's acceptance criterion, in `panel.ts` where a test can drive it. */
 function reveal(range: SourceRange): void {
   const target = commandPane();
@@ -755,11 +827,11 @@ function paintTabs(): void {
     const front = activeTabOf(group);
     element.showing = front !== undefined && isPreview(front) ? 'preview' : 'editor';
     showFontArea(element.mount, front);
-    // "Open preview to the side" at the end of the strip while a brief's own tab is in front.
-    element.offerPreview =
-      front !== undefined &&
-      !isPreview(front) &&
-      isBrief(documentOf(workspace, front.documentId)?.kind);
+    // "Open preview to the side" at the end of the strip while a brief's own tab is in front, or
+    // a Markdown file's (TYTO-247).
+    const frontDocument =
+      front === undefined || isPreview(front) ? undefined : documentOf(workspace, front.documentId);
+    element.offerPreview = frontDocument !== undefined && hasPreview(frontDocument.kind);
     element.openPreview = () => {
       runCommand(PREVIEW_OPEN_TO_SIDE);
     };
@@ -1775,12 +1847,13 @@ function syncActiveDocument(): void {
 /**
  * Points the following preview at the brief it should show (TYTO-287, ADR 0084): the brief
  * whose own tab is in front of the focused group, else the one it showed while that is still
- * open, else the first brief in front of any group, else any open brief, else none.
+ * open, else the first brief in front of any group, else any open brief, else none. "Brief" here
+ * is any document with a preview, a Markdown file included (TYTO-247, ADR 0132).
  */
 function followActiveBrief(): void {
   const isBriefId = (id: string | undefined): id is string => {
     const document_ = id === undefined ? undefined : documentOf(workspace, id);
-    return document_ !== undefined && isBrief(document_.kind);
+    return document_ !== undefined && hasPreview(document_.kind);
   };
   const textInFront = (group: EditorGroup): string | undefined => {
     const tab = activeTabOf(group);
@@ -1793,7 +1866,7 @@ function followActiveBrief(): void {
   else if (!isBriefId(followedBrief)) {
     followedBrief =
       groupList(groups).map(textInFront).find(isBriefId) ??
-      workspace.documents.find((document_) => isBrief(document_.kind))?.id ??
+      workspace.documents.find((document_) => hasPreview(document_.kind))?.id ??
       '';
   }
   groups = broughtForward
@@ -1835,7 +1908,7 @@ function showGroups(): void {
 function openPreview(side: boolean, focus: boolean): void {
   if (editor === undefined || !sessionRead) return;
   const current = active();
-  const brief = isBrief(current.kind) ? current.id : followedBrief;
+  const brief = hasPreview(current.kind) ? current.id : followedBrief;
   groups = side ? openPreviewToSide(groups, brief, focus) : openPreviewHere(groups, brief);
   showGroups();
 }
@@ -4496,6 +4569,15 @@ function paintPreviews(): void {
       continue;
     }
     const shown = documentOf(workspace, tab.documentId);
+    const subject = previewSubjectOf(tab, (id) => documentOf(workspace, id)?.kind);
+    if (shown !== undefined && subject.kind === 'markdown') {
+      paintedZoom.set(group.id, 1);
+      paintMarkdown(nodes, {
+        html: markdownDocument(markdownBodyOf(shown), markdownStyle()),
+        info: labelOf(shown),
+      });
+      continue;
+    }
     const drawn =
       shown === undefined
         ? NOTHING_TO_PREVIEW
@@ -4640,9 +4722,10 @@ function isFitPreview(group: EditorGroup): boolean {
   const tab = activeTabOf(group);
   const image = imageOfTab(tab);
   if (image !== undefined) return imageViewOf(image).zoom === 'fit';
-  return (
-    tab !== undefined && isPreview(tab) && documentOf(workspace, tab.documentId)?.zoom === 'fit'
-  );
+  if (tab === undefined || !isPreview(tab)) return false;
+  const shown = documentOf(workspace, tab.documentId);
+  // A Markdown file fills its stage whatever its size, so it is drawn again as one would be.
+  return shown?.kind === 'markdown' || shown?.zoom === 'fit';
 }
 
 /**
@@ -5180,6 +5263,8 @@ async function load(): Promise<void> {
     // every other tab up to it when it is shown.
     followScheme((scheme) => {
       handle.setTheme(scheme);
+      // A Markdown preview's page carries the window's colours, read when it is drawn (TYTO-247).
+      paintPreviews();
     });
     handle.onUpdate((next, view) => {
       // Into the document **the pane it happened in** is showing — never the active one
@@ -5251,6 +5336,7 @@ async function load(): Promise<void> {
         // A brief is compiled on the pause, an app file checked, a text file neither (TYTO-247).
         if (isAppFile(edited.kind)) askAppFile(bridge, documentId);
         else if (isBrief(edited.kind)) ask(bridge, documentId, contentOf(edited));
+        else if (edited.kind === 'markdown') askMarkdown(documentId);
         // Typing changes no tab but the draft, and a draft is what a crash would cost.
         keepSessionSoon();
       });

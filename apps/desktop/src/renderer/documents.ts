@@ -56,6 +56,14 @@ export const isAppFile = (kind: string | undefined): kind is AppFileKind =>
 export const hasPath = (kind: DocumentKind | undefined): kind is TextKind | undefined =>
   kind === undefined || kind === 'text' || kind === 'markdown';
 
+/**
+ * A document a preview shows (TYTO-247): a brief's art, or a Markdown file drawn. What a
+ * following preview follows and what "Open preview to the side" is offered beside; a `.txt`, an
+ * app file or nothing are neither.
+ */
+export const hasPreview = (kind: DocumentKind | undefined): boolean =>
+  kind === undefined || kind === 'markdown';
+
 /** The kind a file main opened takes from the format main named (ADR 0132). */
 export const kindOfFormat = (format: DocumentFormat): TextKind | undefined =>
   format === 'brief' ? undefined : format;

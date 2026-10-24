@@ -35,7 +35,20 @@ export const STATUS_BAR_TAG = 'tyto-status-bar';
 
 /** What the tab in front holds, from `DocumentState.kind`. */
 export type TabKind =
-  'brief' | 'settings' | 'keybindings' | 'snippets' | 'text' | 'markdown' | 'preview';
+  | 'brief'
+  | 'settings'
+  | 'keybindings'
+  | 'snippets'
+  | 'text'
+  | 'markdown'
+  | 'preview'
+  | 'markdown-preview';
+
+/**
+ * The kinds the Export button is not drawn for (TYTO-247): a text file and a Markdown file's
+ * preview are never exported, and a greyed button there looked like one that should work.
+ */
+const NOT_EXPORTED: ReadonlySet<TabKind> = new Set(['text', 'markdown', 'markdown-preview']);
 
 export interface StatusBarState {
   readonly locale: Locale;
@@ -82,6 +95,7 @@ const KIND_LABELS: Readonly<Record<TabKind, CatalogueKey>> = {
   text: 'status.kind.text',
   markdown: 'status.kind.markdown',
   preview: 'preview.heading',
+  'markdown-preview': 'preview.heading',
 };
 
 /** `Ln 4, Col 17 (7 selected)`, in the window's language. */
@@ -274,7 +288,7 @@ export class StatusBar extends LitElement {
               >`;
       case 'cursorPosition':
         // A preview has no caret, so no line and column (TYTO-287).
-        return state.kind === 'preview'
+        return state.kind === 'preview' || state.kind === 'markdown-preview'
           ? nothing
           : html`<span class="status-bar__text status-bar__position" data-item=${id}
               >${positionText(state)}</span
@@ -333,6 +347,7 @@ export class StatusBar extends LitElement {
           undefined,
         );
       case 'export':
+        if (NOT_EXPORTED.has(state.kind)) return nothing;
         return this.button(
           id,
           'export',

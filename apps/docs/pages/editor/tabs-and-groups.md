@@ -8,7 +8,7 @@ Each open file is a **tab**. A row of tabs and the file in front of it is an **e
 
 ## Open, switch and close
 
-- **New brief** (**Ctrl+N**) opens an empty brief, and **Open a brief…** (**Ctrl+O**) opens one from disk. Both are also in the **File** menu.
+- **New brief** (**Ctrl+N**) opens an empty brief, and **Open…** (**Ctrl+O**) opens one from disk. Both are also in the **File** menu.
 - Click a tab to bring it to the front. **Ctrl+PageDown** and **Ctrl+PageUp** go to the next and previous tab, and **Ctrl+1** to **Ctrl+9** go straight to a tab by its place in the row.
 - Close a tab with its **×** or **Close the tab** (**Ctrl+W**). A tab with changes not yet saved shows a dot after its name, and closing it asks first: **Cancel** keeps it open, **Close without saving** drops the changes.
 

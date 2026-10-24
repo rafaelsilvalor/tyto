@@ -1,6 +1,12 @@
 import { type LanguageName, type jsonAssist } from '@tyto/editor';
 
-import { TEXT_COMMANDS, isBriefOnlyCommand } from './commands.js';
+import {
+  PREVIEW_OPEN,
+  PREVIEW_OPEN_TO_SIDE,
+  PREVIEW_TOGGLE_LOCK,
+  TEXT_COMMANDS,
+  isBriefOnlyCommand,
+} from './commands.js';
 import { type AppFileKind, type DocumentState, isAppFile } from './documents.js';
 import { planTemplateEdit, type TemplateEdit, templateOf } from './frontmatter.js';
 
@@ -31,8 +37,11 @@ export interface EditorChrome {
   readonly textCommands: boolean;
 }
 
-/** What the tab in front holds: a document's kind, or a brief's preview (TYTO-287). */
-export type TabKind = DocumentState['kind'] | 'preview';
+/**
+ * What the tab in front holds: a document's kind, a brief's preview (TYTO-287), or a Markdown
+ * file's preview (TYTO-247), which has neither the brief's commands nor any text.
+ */
+export type TabKind = DocumentState['kind'] | 'preview' | 'markdown-preview';
 type Kind = TabKind;
 
 const BRIEF: EditorChrome = {
@@ -71,6 +80,9 @@ export function editorChromeFor(kind: Kind): EditorChrome {
       // A brief's art: every command on the brief still runs, on that brief; the picker and the
       // text commands act on text, which is not in front.
       return { ...BRIEF, templateEdits: false, textCommands: false };
+    case 'markdown-preview':
+      // A Markdown file drawn (TYTO-247): nothing to export, zoom or edit from here.
+      return { ...TEXT, textCommands: false };
     case 'settings':
     case 'keybindings':
     case 'snippets':
@@ -82,6 +94,19 @@ export function editorChromeFor(kind: Kind): EditorChrome {
 }
 
 /**
+ * The brief-only commands a Markdown file's tab and its preview offer too (TYTO-247, ADR 0132):
+ * "Open preview to the side", "Open preview" and Lock. Nothing else of a brief's — no export, no
+ * zoom, no format or slide.
+ */
+const MARKDOWN_PREVIEW_COMMANDS: ReadonlySet<string> = new Set([
+  PREVIEW_OPEN_TO_SIDE,
+  PREVIEW_OPEN,
+  PREVIEW_TOGGLE_LOCK,
+]);
+
+const isMarkdownKind = (kind: Kind): boolean => kind === 'markdown' || kind === 'markdown-preview';
+
+/**
  * Whether the command `id` is offered with a tab of this kind in front (TYTO-283).
  *
  * **The one predicate every door asks**: the command bar's list, the registry's `run` (which is
@@ -91,6 +116,8 @@ export function editorChromeFor(kind: Kind): EditorChrome {
  * `result.json` of syntax errors into the chosen folder — measured, not read.
  */
 export const commandOffered = (kind: Kind, id: string): boolean => {
+  // A Markdown file has a preview of its own (TYTO-247): opening it and locking it are offered.
+  if (isMarkdownKind(kind) && MARKDOWN_PREVIEW_COMMANDS.has(id)) return true;
   const chrome = editorChromeFor(kind);
   if (!chrome.briefCommands && isBriefOnlyCommand(id)) return false;
   return chrome.textCommands || !TEXT_COMMANDS.has(id);
@@ -99,11 +126,12 @@ export const commandOffered = (kind: Kind, id: string): boolean => {
 /**
  * The language a tab of this kind is opened in. One place for both ways a tab is born — opened
  * from its command and brought back by the session — so the two cannot disagree. `undefined` is
- * the editor's own language, the brief's. A text tab is `plain`, Markdown included until
- * TYTO-247's second pull request gives it colours of its own.
+ * the editor's own language, the brief's. A `.md` tab is `markdown` (TYTO-247) and a `.txt` tab
+ * `plain`.
  */
 export const languageOf = (kind: Kind): LanguageName | undefined => {
-  if (kind === undefined || kind === 'preview') return undefined;
+  if (kind === undefined || kind === 'preview' || kind === 'markdown-preview') return undefined;
+  if (kind === 'markdown') return 'markdown';
   return isAppFile(kind) ? 'json' : 'plain';
 };
 

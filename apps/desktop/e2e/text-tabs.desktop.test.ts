@@ -161,8 +161,10 @@ describe('a text file in a tab (TYTO-247)', () => {
 
     expect(await kindText()).toBe('Markdown');
     expect(await problemsText()).toBe('Text files are not checked.');
-    // No "Open preview to the side" while a text tab is in front: there is no preview for it yet.
-    expect(await window.locator('[data-action="preview.openToSide"]').count()).toBe(0);
+    // "Open preview to the side" beside a .md (TYTO-247's second pull request), which opens none
+    // by itself; `markdown-preview.desktop.test.ts` reads what it shows.
+    expect(await window.locator('[data-action="preview.openToSide"]').count()).toBe(1);
+    expect(await window.locator('[data-tab-kind="preview"]').count()).toBe(0);
     // Export and the presets are brief commands, refused by the same gate as on an app file.
     expect(await run('file.export')).toBe(false);
     expect(await window.locator('tyto-export-dialog[open], .export-dialog[open]').count()).toBe(0);
@@ -190,6 +192,7 @@ describe('a text file in a tab (TYTO-247)', () => {
     await expect.poll(kindText).toBe('Plain text');
     expect(await problemsText()).toBe('Text files are not checked.');
     expect(await briefPreviews()).toBe(0);
+    expect(await window.locator('[data-action="preview.openToSide"]').count()).toBe(0);
     await shoot('text-tab-plain');
   }, 60_000);
 

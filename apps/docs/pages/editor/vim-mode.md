@@ -20,5 +20,5 @@ The choice is remembered: the command writes the [`vimMode`](../reference/settin
 ## What changes while it is on
 
 - Vim's own keys win inside the editor: **u** undoes, **Ctrl+R** redoes, **:w** saves, and **:vsplit** splits the editor group, as **Split editor right** does.
-- Some of the window's keys are given to vim. **Ctrl+O**, for example, is vim's and no longer opens a file: run **Open a brief…** from the command bar or the **File** menu instead. The command bar shows the keys each command has right now, so a command that lost its key while vim is on shows none.
+- Some of the window's keys are given to vim. **Ctrl+O**, for example, is vim's and no longer opens a file: run **Open…** from the command bar or the **File** menu instead. The command bar shows the keys each command has right now, so a command that lost its key while vim is on shows none.
 - **Ctrl+K** still opens the command bar, so every command is still one search away.

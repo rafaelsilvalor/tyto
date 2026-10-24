@@ -109,6 +109,8 @@ describe('the File menu Electron built', () => {
       translate('pt-BR', 'command.file.open'),
       translate('en', 'command.file.open'),
     ]).toContain(open?.label);
+    // It opens text files too since TYTO-247, so it no longer says "a brief" (Rafael, 2026-10-24).
+    expect(['Abrir…', 'Open…']).toContain(open?.label);
   });
 
   it('labels the role items in that language too, not in Electron’s English (TYTO-334)', async () => {

@@ -35,7 +35,7 @@ A janela acrescenta outros enquanto roda, que esta lista não tem como mostrar: 
 | Arrumar brief | `editor.formatBrief` | `Alt+Shift+f` | `⌥⇧f` |
 | Novo brief | `document.new` | `Ctrl+n` | `⌘n` |
 | Novo brief a partir de template… | `document.newFromTemplate` |  |  |
-| Abrir um brief… | `editor.open` | `Ctrl+o` | `⌘o` |
+| Abrir… | `editor.open` | `Ctrl+o` | `⌘o` |
 | Salvar | `editor.save` | `Ctrl+s` | `⌘s` |
 | Salvar como… | `editor.saveAs` | `Ctrl+Shift+s` | `⌘⇧s` |
 | Exportar… | `file.export` |  |  |
