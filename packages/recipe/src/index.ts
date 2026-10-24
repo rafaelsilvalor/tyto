@@ -4,8 +4,13 @@
  * and a cloud worker run the same chain.
  */
 
+export type { ArgumentSpec, ArgumentType, ArgumentValue, ArgumentValues } from './arguments.js';
+export { readArguments } from './arguments.js';
 export type { Argument, NamedArgument, RecipeAst, RecipeParam, Step } from './ast.js';
+export { checkTable } from './check-table.js';
 export { resolveColumn } from './columns.js';
+export type { PageFetcher, PageLimits, PageResult, SourcePage } from './paging.js';
+export { PAGE_LIMITS, pagedSource } from './paging.js';
 export { parseRecipe } from './parse.js';
 export type {
   Derivation,
@@ -23,6 +28,6 @@ export { GENERIC_VERBS, createDerivationRegistry, createVerbRegistry } from './r
 export type { Cell, RecipeRun, RunOptions } from './run.js';
 export { runRecipe } from './run.js';
 export type { CellValue, Column, ColumnType, Provenance, Row, Table } from './table.js';
-export { cellText, comparable, findColumn } from './table.js';
+export { COLUMN_TYPES, cellText, comparable, findColumn } from './table.js';
 export type { Operator, Predicate } from './where.js';
 export { parseWhere, satisfies } from './where.js';

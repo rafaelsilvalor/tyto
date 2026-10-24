@@ -310,14 +310,14 @@ describe('activating a plugin', () => {
     expect(host.registry.exporters.list()).toEqual([]);
   });
 
-  it('knows the same fourteen points the manifest vocabulary names', () => {
+  it('knows the same sixteen points the manifest vocabulary names', () => {
     // Two declarations of one vocabulary: `CONTRIBUTION_POINTS` is what a JSON file may
     // say, and the host's points are what code may register into. This activates one
-    // plugin into all fourteen and compares what was recorded against the list.
+    // plugin into all sixteen and compares what was recorded against the list.
     const host = createPluginHost();
     host.activate(
       pluginOf({
-        manifest: manifestOf({ contributes: [...CONTRIBUTION_POINTS] }),
+        manifest: manifestOf({ contributes: [...CONTRIBUTION_POINTS], namespace: 'promo' }),
         activate: (plugin) => {
           plugin.registerSource({ id: 'a', value: 1 });
           plugin.registerSink({ id: 'b', value: 1 });
@@ -338,15 +338,27 @@ describe('activating a plugin', () => {
           plugin.registerTheme({ id: 'k', label: 'Dusk', kind: 'dark', path: 'dusk.json' });
           plugin.registerAssetSource({ id: 'l', schemes: ['test'], fetch: () => ok(PIXEL) });
           plugin.registerFontSource({ id: 'm', families: ['Inter'], fetch: () => ok(BYTES) });
+          plugin.registerRecipeVerb({
+            id: 'promo.n',
+            kind: 'transform',
+            arguments: [],
+            transform: ({ table }) => ok(table),
+          });
+          plugin.registerRecipeDerivation({
+            id: 'promo.o',
+            requires: [],
+            produces: [],
+            derive: (table) => ok(table),
+          });
         },
       }),
     );
 
     // The real assertion is that this did not throw: a point the host knows and
     // `CONTRIBUTION_POINTS` does not would have been registered without being declared,
-    // which `activate` refuses. The counts below say the fourteen arrived rather than that
+    // which `activate` refuses. The counts below say the sixteen arrived rather than that
     // nothing was attempted.
-    expect(CONTRIBUTION_POINTS).toHaveLength(14);
+    expect(CONTRIBUTION_POINTS).toHaveLength(16);
     expect(
       [
         host.registry.sources(),
@@ -363,8 +375,10 @@ describe('activating a plugin', () => {
         host.registry.themes(),
         host.registry.assetSources(),
         host.registry.fontSources(),
+        host.registry.recipeVerbs(),
+        host.registry.recipeDerivations(),
       ].map((point) => point.length),
-    ).toEqual([1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1]);
+    ).toEqual([1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1]);
   });
 });
 

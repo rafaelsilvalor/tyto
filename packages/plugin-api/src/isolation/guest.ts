@@ -193,6 +193,8 @@ export function runGuest(
     registerTheme: (value) => register('registerTheme', value),
     registerAssetSource: (value) => register('registerAssetSource', value),
     registerFontSource: (value) => register('registerFontSource', value),
+    registerRecipeVerb: (value) => register('registerRecipeVerb', value),
+    registerRecipeDerivation: (value) => register('registerRecipeDerivation', value),
     config<T>(schema: ZodType<T>): T {
       const parsed = schema.safeParse(config);
       if (!parsed.success) {

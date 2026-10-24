@@ -121,6 +121,18 @@ export {
   createPluginHost,
 } from './host.js';
 
+export {
+  type PageRequest,
+  type RecipeContributions,
+  type RecipeDerivationContribution,
+  type RecipeRegistries,
+  type RecipeVerbContribution,
+  type RecipeVerbKind,
+  type TransformRequest,
+  RECIPE_VERB_KINDS,
+  recipeRegistriesOf,
+} from './recipes.js';
+
 export type {
   GuestChannel,
   PluginChannel,

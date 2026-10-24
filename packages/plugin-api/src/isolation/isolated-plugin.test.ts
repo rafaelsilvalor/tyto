@@ -15,6 +15,7 @@ import {
   resolve,
   sourceRange,
 } from '@tyto/core';
+import { type Table, parseRecipe, runRecipe } from '@tyto/recipe';
 import { describe, expect, it } from 'vitest';
 import { z } from 'zod';
 
@@ -26,6 +27,7 @@ import type {
   TemplatePack,
 } from '../contributions.js';
 import { directiveResolverOf } from '../directives.js';
+import { recipeRegistriesOf } from '../recipes.js';
 import {
   type Disposable,
   type InProcessHost,
@@ -163,6 +165,7 @@ async function isolate(
     readonly capabilities?: HostCapabilities;
     readonly deadlineMs?: number;
     readonly contributes?: readonly string[];
+    readonly namespace?: string;
   } = {},
 ): Promise<{ readonly pair: Pair; readonly connected: Result<IsolatedPlugin, Diagnostics> }> {
   const pair = channelPair((guest) => runConfined(guest, () => Promise.resolve({ activate })));
@@ -174,6 +177,7 @@ async function isolate(
       ...MANIFEST,
       permissions: options.permissions ?? [],
       contributes: options.contributes ?? MANIFEST.contributes,
+      ...(options.namespace === undefined ? {} : { namespace: options.namespace }),
     },
     channel: pair.host,
     ...(options.capabilities === undefined ? {} : { capabilities: options.capabilities }),
@@ -1222,5 +1226,154 @@ describe('isolated asset and font sources (TYTO-280, ADR 0117)', () => {
     expect(connected.ok ? '' : connected.error[0]?.message).toContain(
       "its 'asset-source' contribution does not match",
     );
+  });
+});
+
+describe('isolated recipe verbs and derivations (TYTO-376, ADR 0135)', () => {
+  const COLUMNS: Table['columns'] = [{ name: 'number', type: 'number', origin: 'demo' }];
+  const rowOf = (number: number) => ({
+    key: `N-${String(number)}`,
+    values: { number },
+    provenance: { source: 'demo', id: `N-${String(number)}`, fetchedAt: '2026-10-24' },
+  });
+  const later = <T>(ms: number, value: T) =>
+    new Promise<T>((settle) => setTimeout(() => settle(value), ms));
+
+  /** A plugin in the `demo` namespace, isolated with a 200 ms deadline per call. */
+  async function recipeIn(activate: (host: PluginHost) => void, ...lines: string[]) {
+    const { connected } = await isolate(activate, {
+      contributes: ['recipe-verb', 'recipe-derivation'],
+      namespace: 'demo',
+      deadlineMs: 200,
+    });
+    if (!connected.ok) throw new Error(connected.error[0]?.message);
+    const host = createPluginHost();
+    const activated = host.tryActivate(connected.value.plugin);
+    if (!activated.ok) throw new Error(activated.error[0]?.message);
+    const parsed = parseRecipe(['recipe test', ...lines].join('\n'));
+    if (!parsed.ok) throw new Error('the recipe must parse');
+    const result = await runRecipe(parsed.value, {
+      ...recipeRegistriesOf(host.registry),
+      resolveRecipe: () => Promise.resolve({ ok: false, error: [] }),
+    });
+    if (!result.ok) throw new Error('the run must start');
+    const problem = result.value.cells.flatMap((cell) => cell.diagnostics)[0];
+    return { table: result.value.table, problem, crashed: connected.value.crashed() };
+  }
+
+  /** Three pages of 150 ms each: every call inside the deadline, the three together past it. */
+  const slowPages = (host: PluginHost) =>
+    host.registerRecipeVerb({
+      id: 'demo.pull',
+      kind: 'source',
+      arguments: [],
+      page: ({ cursor }) => {
+        const page = cursor === undefined ? 1 : Number(cursor);
+        return later(
+          150,
+          ok({
+            table: { columns: COLUMNS, rows: [rowOf(page)] },
+            ...(page < 3 ? { cursor: String(page + 1) } : {}),
+          }),
+        );
+      },
+    });
+
+  it('pages a source past a deadline no single call reaches, then transforms and derives', async () => {
+    const started = Date.now();
+    const { table, problem, crashed } = await recipeIn(
+      (host) => {
+        slowPages(host);
+        host.registerRecipeVerb({
+          id: 'demo.tag',
+          kind: 'transform',
+          arguments: [{ name: 'label', type: 'text', positional: true, required: true }],
+          transform: ({ arguments: { label }, table: input }) =>
+            ok({
+              columns: [...input.columns, { name: 'tag', type: 'text', origin: 'demo' }],
+              rows: input.rows.map((row) => ({
+                ...row,
+                values: { ...row.values, tag: String(label) },
+              })),
+            }),
+        });
+        host.registerRecipeDerivation({
+          id: 'demo.double',
+          requires: ['number'],
+          produces: ['double'],
+          derive: (input) =>
+            ok({
+              columns: [...input.columns, { name: 'double', type: 'number', origin: 'demo' }],
+              rows: input.rows.map((row) => ({
+                ...row,
+                values: { ...row.values, double: Number(row.values['number']) * 2 },
+              })),
+            }),
+        });
+      },
+      'demo.pull',
+      'demo.tag ready',
+      'derive demo.double',
+    );
+    expect(problem).toBeUndefined();
+    expect(crashed).toBeUndefined();
+    expect(Date.now() - started).toBeGreaterThanOrEqual(400);
+    expect(table?.rows.map((row) => row.values)).toEqual([
+      { number: 1, tag: 'ready', double: 2 },
+      { number: 2, tag: 'ready', double: 4 },
+      { number: 3, tag: 'ready', double: 6 },
+    ]);
+  });
+
+  it('refuses a malformed table: a value outside the columns, and a row with no provenance', async () => {
+    const answering = (rows: unknown[]) => (host: PluginHost) =>
+      host.registerRecipeVerb({
+        id: 'demo.pull',
+        kind: 'source',
+        arguments: [],
+        page: () => ok({ table: { columns: COLUMNS, rows } as Table }),
+      });
+    const outside = await recipeIn(
+      answering([{ ...rowOf(1), values: { title: 'x' } }]),
+      'demo.pull',
+    );
+    expect(outside.problem?.message).toBe(
+      "The table from 'demo.pull, page 1' is malformed: row 1 ('N-1') has a value for 'title', " +
+        'which is not a column.',
+    );
+    const bare = await recipeIn(answering([{ key: 'N-1', values: {} }]), 'demo.pull');
+    expect(bare.problem?.code).toBe('E_PLUGIN_PROTOCOL');
+    expect(bare.problem?.range).toEqual({ start: 12, end: 21 });
+  });
+
+  it('refuses a cursor the source gave before, and a page it says was cut short', async () => {
+    const repeating = await recipeIn(
+      (host) =>
+        host.registerRecipeVerb({
+          id: 'demo.pull',
+          kind: 'source',
+          arguments: [],
+          page: ({ cursor }) =>
+            ok({
+              table: { columns: COLUMNS, rows: [rowOf(cursor === undefined ? 1 : 2)] },
+              cursor: 'again',
+            }),
+        }),
+      'demo.pull',
+    );
+    expect(repeating.problem?.message).toBe(
+      "Source 'demo.pull' gave the cursor 'again' a second time on page 2, so it would never end.",
+    );
+    const cut = await recipeIn(
+      (host) =>
+        host.registerRecipeVerb({
+          id: 'demo.pull',
+          kind: 'source',
+          arguments: [],
+          page: () => ok({ table: { columns: COLUMNS, rows: [] }, truncated: true }),
+        }),
+      'demo.pull',
+    );
+    expect(cut.problem?.code).toBe('E_RECIPE_SOURCE');
   });
 });

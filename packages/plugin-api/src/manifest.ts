@@ -19,15 +19,15 @@ import { z } from 'zod';
  */
 
 /**
- * The fourteen extension points, spelled the way a manifest spells them.
+ * The sixteen extension points, spelled the way a manifest spells them.
  *
- * The same fourteen as `contributions.ts` and `sources.ts`, which is a duplication with a
+ * The same sixteen as `contributions.ts`, `sources.ts` and `recipes.ts`, which is a duplication with a
  * reason: those are TypeScript types a plugin's *code* implements, and these are strings a
  * JSON file declares before any code exists.
  *
  * They are held equal from both sides. `Point`'s name is typed `ContributionPoint`, so the
  * host cannot open a point this list does not name; and `host.test.ts` activates one
- * plugin declaring all fourteen and registering into all fourteen, which fails if the host
+ * plugin declaring all sixteen and registering into all sixteen, which fails if the host
  * knows a point this list has forgotten.
  */
 export const CONTRIBUTION_POINTS = [
@@ -45,9 +45,14 @@ export const CONTRIBUTION_POINTS = [
   'theme',
   'asset-source',
   'font-source',
+  'recipe-verb',
+  'recipe-derivation',
 ] as const;
 
 export type ContributionPoint = (typeof CONTRIBUTION_POINTS)[number];
+
+/** The points whose contributions are named in the plugin's recipe namespace (ADR 0135). */
+const NAMESPACED_POINTS: readonly ContributionPoint[] = ['recipe-verb', 'recipe-derivation'];
 
 /**
  * A plugin name, which is also its id.
@@ -77,44 +82,70 @@ const ENGINE_RANGE =
 /** `major.minor.patch`, with an optional prerelease tag. Narrower than the engine range. */
 const VERSION = /^\d+\.\d+\.\d+(-[0-9A-Za-z-.]+)?$/;
 
-export const pluginManifestSchema = z.strictObject({
-  name: z
-    .string()
-    .regex(NAME, 'must be lowercase letters, digits and hyphens, starting with a letter or digit'),
-  version: z.string().regex(VERSION, 'must be a semver version, such as 0.1.0'),
-  engine: z
-    .string()
-    .regex(ENGINE_RANGE, 'must be a version range, such as >=0.1, ^1.2.3 or >=0.1 || ^1'),
-  /**
-   * At least one. A plugin that contributes nothing is not a plugin that does nothing
-   * harmful — it is a plugin whose author meant something and did not say it, and the host
-   * has no way to guess which point they meant.
-   */
-  contributes: z
-    .array(z.enum(CONTRIBUTION_POINTS))
-    .nonempty('must name at least one extension point')
-    .refine((points) => new Set(points).size === points.length, 'must not repeat a point'),
-  /**
-   * Declared at install time and enforced at call time (`docs/plugin-api.md`, Isolation).
-   *
-   * Validated as shape only: non-empty strings, no duplicates. The *vocabulary* stays open
-   * because the vocabulary is still growing — `net:<host>` gates `host.fetch` and
-   * `credentials:<key>` gates `host.credentials` (ADR 0042), `font:<family>` sends a code template
-   * a face installed on this machine (ADR 0048) — and closing an enum now would
-   * reject the next scope before it is written. E11 closes it; until then a typo in a
-   * permission is caught by the grant prompt, which a person reads.
-   */
-  permissions: z
-    .array(z.string().min(1, 'must not be empty'))
-    .refine((values) => new Set(values).size === values.length, 'must not repeat a permission'),
-  /**
-   * Where the plugin's own configuration schema lives, for the editor that offers
-   * completion over it. The host never dereferences it: `PluginHost.config()` validates
-   * against a `ZodType` the plugin hands over in code, which is the copy that has to be
-   * right.
-   */
-  config: z.strictObject({ $schema: z.string().min(1, 'must not be empty') }).optional(),
-});
+export const pluginManifestSchema = z
+  .strictObject({
+    name: z
+      .string()
+      .regex(
+        NAME,
+        'must be lowercase letters, digits and hyphens, starting with a letter or digit',
+      ),
+    version: z.string().regex(VERSION, 'must be a semver version, such as 0.1.0'),
+    engine: z
+      .string()
+      .regex(ENGINE_RANGE, 'must be a version range, such as >=0.1, ^1.2.3 or >=0.1 || ^1'),
+    /**
+     * At least one. A plugin that contributes nothing is not a plugin that does nothing
+     * harmful — it is a plugin whose author meant something and did not say it, and the host
+     * has no way to guess which point they meant.
+     */
+    contributes: z
+      .array(z.enum(CONTRIBUTION_POINTS))
+      .nonempty('must name at least one extension point')
+      .refine((points) => new Set(points).size === points.length, 'must not repeat a point'),
+    /**
+     * Declared at install time and enforced at call time (`docs/plugin-api.md`, Isolation).
+     *
+     * Validated as shape only: non-empty strings, no duplicates. The *vocabulary* stays open
+     * because the vocabulary is still growing — `net:<host>` gates `host.fetch` and
+     * `credentials:<key>` gates `host.credentials` (ADR 0042), `font:<family>` sends a code template
+     * a face installed on this machine (ADR 0048) — and closing an enum now would
+     * reject the next scope before it is written. E11 closes it; until then a typo in a
+     * permission is caught by the grant prompt, which a person reads.
+     */
+    permissions: z
+      .array(z.string().min(1, 'must not be empty'))
+      .refine((values) => new Set(values).size === values.length, 'must not repeat a permission'),
+    /**
+     * Where the plugin's own configuration schema lives, for the editor that offers
+     * completion over it. The host never dereferences it: `PluginHost.config()` validates
+     * against a `ZodType` the plugin hands over in code, which is the copy that has to be
+     * right.
+     */
+    config: z.strictObject({ $schema: z.string().min(1, 'must not be empty') }).optional(),
+    /**
+     * The plugin's share of the recipe vocabulary (ADR 0135): every verb and derivation it
+     * contributes is `<namespace>.<name>`, and no other loaded plugin may declare the same one.
+     * Declared here, once, so a person reading the manifest knows which names it brings.
+     */
+    namespace: z
+      .string()
+      .regex(
+        /^[a-z][a-z0-9-]*$/,
+        'must be lowercase letters, digits and hyphens, starting with a letter',
+      )
+      .optional(),
+  })
+  .superRefine((manifest, context) => {
+    const namespaced = manifest.contributes.filter((point) => NAMESPACED_POINTS.includes(point));
+    if (namespaced.length > 0 && manifest.namespace === undefined) {
+      context.addIssue({
+        code: 'custom',
+        path: ['namespace'],
+        message: `is required by a plugin that contributes ${namespaced.join(' or ')}`,
+      });
+    }
+  });
 
 export type PluginManifest = z.infer<typeof pluginManifestSchema>;
 

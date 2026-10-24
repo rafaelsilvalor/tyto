@@ -276,6 +276,17 @@ export const diagnosticCodes = {
     fatal: true,
     fatality: 'A plugin that did not load contributed no slot to skip.',
   },
+  // A namespace is a plugin's whole share of the recipe vocabulary, so two plugins cannot both
+  // own `jira.*`; the one loaded first keeps it.
+  E_PLUGIN_NAMESPACE_TAKEN: {
+    severity: 'error',
+    summary: 'A plugin declares a recipe namespace another loaded plugin already owns.',
+    template:
+      "Plugin '{plugin}' was refused: the namespace '{namespace}' belongs to plugin '{owner}'.",
+    spec: 'docs/adr/0135-a-plugin-contributes-recipe-verbs-in-a-namespace-it-owns.md',
+    fatal: true,
+    fatality: 'A plugin that did not load contributed no slot to skip.',
+  },
   E_PLUGIN_NOT_INSTALLED: {
     severity: 'error',
     summary: 'A plugin command named a plugin that is not installed.',
@@ -1238,6 +1249,35 @@ export const diagnosticCodes = {
     spec: 'docs/adr/0128-a-recipe-is-a-closed-vocabulary-notebook-and-plugins-contribute-verbs.md',
     fatal: false,
     fatality: 'Only that one is missing; everything else in the registry still runs.',
+  },
+  E_RECIPE_TABLE: {
+    severity: 'error',
+    summary:
+      'A table a verb or a derivation answered repeats a column or a key, or holds a value its columns do not allow.',
+    template: "The table from '{origin}' is malformed: {problem}.",
+    spec: 'docs/adr/0135-a-plugin-contributes-recipe-verbs-in-a-namespace-it-owns.md',
+    fatal: false,
+    fatality:
+      'That cell has no table and the cells after it do not run; earlier cells keep theirs.',
+  },
+  // Never a partial table: a source that stopped early would look like an answer (ADR 0128).
+  E_RECIPE_SOURCE: {
+    severity: 'error',
+    summary: 'A source was cut short, repeated a cursor, or passed a ceiling on its pages or rows.',
+    template: "Source '{verb}' {problem}.",
+    spec: 'docs/adr/0135-a-plugin-contributes-recipe-verbs-in-a-namespace-it-owns.md',
+    fatal: false,
+    fatality:
+      'That cell has no table and the cells after it do not run; earlier cells keep theirs.',
+  },
+  E_RECIPE_VERB: {
+    severity: 'error',
+    summary: 'A verb a plugin contributes could not do its work, in its own words.',
+    template: "'{verb}' failed: {problem}.",
+    spec: 'docs/adr/0135-a-plugin-contributes-recipe-verbs-in-a-namespace-it-owns.md',
+    fatal: false,
+    fatality:
+      'That cell has no table and the cells after it do not run; earlier cells keep theirs.',
   },
   E_RECIPE_NO_TABLE: {
     severity: 'error',

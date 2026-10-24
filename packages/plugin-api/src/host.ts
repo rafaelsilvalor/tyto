@@ -35,6 +35,13 @@ import {
 } from './configuration.js';
 import { type ContributionPoint, type PluginManifest, validatePluginManifest } from './manifest.js';
 import {
+  type RecipeContributions,
+  type RecipeDerivationContribution,
+  type RecipeVerbContribution,
+  checkRecipeDerivation,
+  checkRecipeVerb,
+} from './recipes.js';
+import {
   type AssetSourceContribution,
   type FontSourceContribution,
   type OwnedSource,
@@ -112,6 +119,13 @@ export interface PluginHost {
   registerAssetSource(source: AssetSourceContribution): Disposable;
   /** Faces of the families it names, for a face no local folder has (ADR 0117). */
   registerFontSource(source: FontSourceContribution): Disposable;
+  /**
+   * A recipe verb, named `<namespace>.<verb>` in the namespace the manifest declares
+   * (ADR 0135). A source or a transform; an action or a sink is refused in this version.
+   */
+  registerRecipeVerb(verb: RecipeVerbContribution): Disposable;
+  /** A derivation for `derive`, named `<namespace>.<name>` (ADR 0133, ADR 0135). */
+  registerRecipeDerivation(derivation: RecipeDerivationContribution): Disposable;
 
   /**
    * The plugin's own configuration, validated.
@@ -162,7 +176,7 @@ export interface InstalledPlugin {
 }
 
 /** What the composition root reads back out. The plugins never see this half. */
-export interface PluginRegistry {
+export interface PluginRegistry extends RecipeContributions {
   /** Every activated plugin, in activation order — what `tyto plugin list` prints. */
   plugins(): readonly InstalledPlugin[];
   readonly exporters: ExporterRegistry;
@@ -456,6 +470,12 @@ export function createPluginHost(options: PluginHostOptions = {}): InProcessHost
   const themes = new Point<ThemeContribution>('theme', emitter, contributed);
   const assetSources = new Point<AssetSourceContribution>('asset-source', emitter, contributed);
   const fontSources = new Point<FontSourceContribution>('font-source', emitter, contributed);
+  const recipeVerbs = new Point<RecipeVerbContribution>('recipe-verb', emitter, contributed);
+  const recipeDerivations = new Point<RecipeDerivationContribution>(
+    'recipe-derivation',
+    emitter,
+    contributed,
+  );
   let rawConfig: Readonly<Record<string, unknown>> | undefined = options.config;
 
   const points = [
@@ -473,6 +493,8 @@ export function createPluginHost(options: PluginHostOptions = {}): InProcessHost
     themes,
     assetSources,
     fontSources,
+    recipeVerbs,
+    recipeDerivations,
   ];
 
   const registry: PluginRegistry = {
@@ -497,13 +519,22 @@ export function createPluginHost(options: PluginHostOptions = {}): InProcessHost
       assetSources.owned().map((entry) => ({ plugin: entry.plugin, source: entry.value })),
     fontSources: () =>
       fontSources.owned().map((entry) => ({ plugin: entry.plugin, source: entry.value })),
+    recipeVerbs: () => recipeVerbs.list(),
+    recipeDerivations: () => recipeDerivations.list(),
   };
+
+  /** The plugin already loaded that owns a recipe namespace (ADR 0135). */
+  function namespaceOwner(manifest: PluginManifest): InstalledPlugin | undefined {
+    if (manifest.namespace === undefined) return undefined;
+    return [...installed.values()].find((other) => other.manifest.namespace === manifest.namespace);
+  }
 
   function hostWith(
     pluginId: string,
     onConflict?: ConflictListener,
     permissions: readonly string[] = [],
     origin: PluginOrigin = 'external',
+    namespace?: string,
   ): PluginHost {
     // The permissions of the manifest the host validated, never what the plugin says.
     const checked = checkedCapabilities(pluginId, permissions, options.capabilities);
@@ -537,6 +568,14 @@ export function createPluginHost(options: PluginHostOptions = {}): InProcessHost
       registerFontSource: (source) => {
         checkFontSource(pluginId, source);
         return fontSources.add(pluginId, source, onConflict);
+      },
+      registerRecipeVerb: (verb) => {
+        checkRecipeVerb(pluginId, namespace, verb);
+        return recipeVerbs.add(pluginId, verb, onConflict);
+      },
+      registerRecipeDerivation: (derivation) => {
+        checkRecipeDerivation(pluginId, namespace, derivation);
+        return recipeDerivations.add(pluginId, derivation, onConflict);
       },
 
       config<T>(schema: ZodType<T>): T {
@@ -583,7 +622,17 @@ export function createPluginHost(options: PluginHostOptions = {}): InProcessHost
         );
       }
 
-      const result = plugin.activate(hostWith(plugin.id, undefined, manifest.permissions, origin));
+      const owner = namespaceOwner(manifest);
+      if (owner !== undefined) {
+        throw new TypeError(
+          `Plugin '${plugin.id}' declares the recipe namespace '${String(manifest.namespace)}', ` +
+            `which plugin '${owner.manifest.name}' already owns. A namespace is one plugin's.`,
+        );
+      }
+
+      const result = plugin.activate(
+        hostWith(plugin.id, undefined, manifest.permissions, origin, manifest.namespace),
+      );
 
       // Checked *after* activation, against what was actually registered. `contributes` is
       // the manifest's promise about which points this plugin touches, and a promise
@@ -632,10 +681,29 @@ export function createPluginHost(options: PluginHostOptions = {}): InProcessHost
         ]);
       }
 
+      // Before `activate` too: a namespace is the plugin's whole share of the recipe
+      // vocabulary, so the one loaded first keeps all of it rather than racing per verb.
+      const owner = namespaceOwner(manifest);
+      if (owner !== undefined) {
+        return err([
+          diagnostic('E_PLUGIN_NAMESPACE_TAKEN', {
+            plugin: plugin.id,
+            namespace: String(manifest.namespace),
+            owner: owner.manifest.name,
+          }),
+        ]);
+      }
+
       const conflicts: Conflict[] = [];
       try {
         plugin.activate(
-          hostWith(plugin.id, (conflict) => conflicts.push(conflict), manifest.permissions, origin),
+          hostWith(
+            plugin.id,
+            (conflict) => conflicts.push(conflict),
+            manifest.permissions,
+            origin,
+            manifest.namespace,
+          ),
         );
       } catch (cause) {
         // Any throw, whatever its class: this is foreign code, and the question is only

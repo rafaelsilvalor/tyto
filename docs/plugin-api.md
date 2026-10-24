@@ -23,14 +23,15 @@ my-plugin/
 
 `pluginManifestSchema` in `@tyto/plugin-api` is that document, and it is the only reader of it. Every field is checked and every rejection carries a **field path** — `contributes.1`, `config.$schema`, `(root)` — because "the manifest is invalid" is not a sentence anybody can act on in a file they typed by hand. Every problem is reported at once, the same promise the compiler makes about a brief.
 
-| Field         | Rule                                                                                                                    |
-| ------------- | ----------------------------------------------------------------------------------------------------------------------- |
-| `name`        | lowercase letters, digits and hyphens. **It is the plugin's id** — see below                                            |
-| `version`     | semver, with an optional prerelease tag                                                                                 |
-| `engine`      | a version range (`>=0.1`, `^1.2.3`, `>=0.1 \|\| ^1`) against `PLUGIN_API_VERSION` (ADR 0040)                            |
-| `contributes` | at least one extension point from the table below, no repeats                                                           |
-| `permissions` | non-empty strings, no repeats; `net:<host>` gates `host.fetch`, `credentials:<key>` gates `host.credentials` (ADR 0042) |
-| `config`      | optional `{ "$schema": "…" }`, never dereferenced by the host                                                           |
+| Field         | Rule                                                                                                                     |
+| ------------- | ------------------------------------------------------------------------------------------------------------------------ |
+| `name`        | lowercase letters, digits and hyphens. **It is the plugin's id** — see below                                             |
+| `version`     | semver, with an optional prerelease tag                                                                                  |
+| `engine`      | a version range (`>=0.1`, `^1.2.3`, `>=0.1 \|\| ^1`) against `PLUGIN_API_VERSION` (ADR 0040)                             |
+| `contributes` | at least one extension point from the table below, no repeats                                                            |
+| `permissions` | non-empty strings, no repeats; `net:<host>` gates `host.fetch`, `credentials:<key>` gates `host.credentials` (ADR 0042)  |
+| `config`      | optional `{ "$schema": "…" }`, never dereferenced by the host                                                            |
+| `namespace`   | lowercase letters, digits and hyphens; required with `recipe-verb` or `recipe-derivation`, one plugin's alone (ADR 0135) |
 
 Unknown keys are refused, one complaint per stray key rather than one for the object holding them.
 
@@ -60,21 +61,23 @@ The last five are named `<id>.tyto-plugin.json` and that is the one place a buil
 
 ## Extension points
 
-| `contributes`     | Registers                                                                     | Built-in                                              |
-| ----------------- | ----------------------------------------------------------------------------- | ----------------------------------------------------- |
-| `source` / `sink` | `BriefSource` — `pull()`, `ack()`; `OutputSink` — `push()`                    | fs-inbox, fs-outbox (remote ones deferred — ADR 0011) |
-| `exporter`        | one **frame** to a document + mime + extension + the kinds it produces        | html, svg                                             |
-| `rasterizer`      | `Rasterizer` — `raster(html, opts): Promise<Uint8Array>`                      | chromium                                              |
-| `template-pack`   | folder of templates                                                           | built-in templates                                    |
-| `brand-kit`       | a logo, a wordmark and a signature per brand id (ADR 0063, ADR 0066)          | —                                                     |
-| `directive`       | `::ns/name` in the brief → the slot directives it stands for (ADR 0043)       | —                                                     |
-| `editor.command`  | `{ id, title }`, data only: nothing runs it yet (TYTO-261, ADR 0079)          | —                                                     |
-| `editor.keymap`   | binding → command id (normal and vim)                                         | default-keymap, vim                                   |
-| `panel`           | a page in the desktop window, `sandbox="allow-scripts"` (ADR 0045)            | —                                                     |
-| `configuration`   | a key of `settings.json`: `{ id, schema, default, description }` (ADR 0073)   | desktop (the app's settings)                          |
-| `theme`           | a colour theme, a JSON file in the plugin: `{ id, label, kind, path }` (0077) | desktop (Tyto Light, Tyto Dark)                       |
-| `asset-source`    | images behind URI schemes: `{ id, schemes, fetch }`, cached (ADR 0117)        | —                                                     |
-| `font-source`     | faces of named families: `{ id, families, fetch }`, cached (ADR 0117)         | google-fonts (ADR 0120)                               |
+| `contributes`       | Registers                                                                      | Built-in                                              |
+| ------------------- | ------------------------------------------------------------------------------ | ----------------------------------------------------- |
+| `source` / `sink`   | `BriefSource` — `pull()`, `ack()`; `OutputSink` — `push()`                     | fs-inbox, fs-outbox (remote ones deferred — ADR 0011) |
+| `exporter`          | one **frame** to a document + mime + extension + the kinds it produces         | html, svg                                             |
+| `rasterizer`        | `Rasterizer` — `raster(html, opts): Promise<Uint8Array>`                       | chromium                                              |
+| `template-pack`     | folder of templates                                                            | built-in templates                                    |
+| `brand-kit`         | a logo, a wordmark and a signature per brand id (ADR 0063, ADR 0066)           | —                                                     |
+| `directive`         | `::ns/name` in the brief → the slot directives it stands for (ADR 0043)        | —                                                     |
+| `editor.command`    | `{ id, title }`, data only: nothing runs it yet (TYTO-261, ADR 0079)           | —                                                     |
+| `editor.keymap`     | binding → command id (normal and vim)                                          | default-keymap, vim                                   |
+| `panel`             | a page in the desktop window, `sandbox="allow-scripts"` (ADR 0045)             | —                                                     |
+| `configuration`     | a key of `settings.json`: `{ id, schema, default, description }` (ADR 0073)    | desktop (the app's settings)                          |
+| `theme`             | a colour theme, a JSON file in the plugin: `{ id, label, kind, path }` (0077)  | desktop (Tyto Light, Tyto Dark)                       |
+| `asset-source`      | images behind URI schemes: `{ id, schemes, fetch }`, cached (ADR 0117)         | —                                                     |
+| `font-source`       | faces of named families: `{ id, families, fetch }`, cached (ADR 0117)          | google-fonts (ADR 0120)                               |
+| `recipe-verb`       | `<namespace>.<verb>`: a paged source or a transform (ADR 0128, ADR 0135)       | — (the generic verbs are `@tyto/recipe`'s)            |
+| `recipe-derivation` | `<namespace>.<name>` for `derive`: `{ id, requires, produces, derive }` (0133) | —                                                     |
 
 ### `configuration`, in full
 
@@ -345,6 +348,50 @@ document cannot embed is `E_ASSET_SOURCE_FAILED` for an image and `W_FONT_SOURCE
 (beside `W_FONT_SUBSTITUTED`) for a face. Reach the network with `host.fetch` under
 `net:<host>`.
 
+### `recipe-verb` and `recipe-derivation`, in full
+
+```ts
+interface RecipeVerbContribution {
+  id: string; // '<namespace>.<verb>', the namespace the manifest declares
+  kind: 'source' | 'transform'; // 'action' and 'sink' are refused until TYTO-376's second half
+  arguments: {
+    name;
+    type: 'text' | 'number' | 'date' | 'boolean';
+    positional?;
+    required?;
+    values?;
+  }[];
+  page?(request: {
+    arguments;
+    cursor?: string;
+  }): Result<{ table; cursor?: string; truncated?: boolean }>;
+  transform?(request: { arguments; table }): Result<Table>;
+}
+interface RecipeDerivationContribution {
+  id: string; // '<namespace>.<name>'; bare names are Tyto's
+  requires: string[];
+  produces: string[];
+  derive(table: Table): Result<Table>;
+}
+```
+
+A plugin's share of the recipe vocabulary (ADR 0128), **named in the one namespace its
+manifest declares and owns** (ADR 0135): a second plugin declaring a namespace a loaded one
+owns is refused whole with `E_PLUGIN_NAMESPACE_TAKEN`, and a name outside the plugin's own
+namespace refuses the plugin at load. The host checks a step's arguments against `arguments`
+before the plugin is called (`E_RECIPE_ARGUMENTS`), and hands over values converted to their
+types. **A source answers one page per call and the host loops** (`pagedSource` in
+`@tyto/recipe`), so each call fits its own 30 s deadline; no `cursor` is the last page. A table
+crosses as JSON, is held to a strict schema (`E_PLUGIN_PROTOCOL`) and then to `checkTable`
+(`E_RECIPE_TABLE`: a repeated column or key, a value under no column or of the wrong type).
+A repeated cursor, a page reported `truncated`, or a page past a ceiling — 8 MiB or 5,000 rows
+per page, 100,000 rows and 1,000 pages per table, provisional until TYTO-386 — is
+`E_RECIPE_SOURCE` and never a partial table. A plugin reports its own failure as
+`E_RECIPE_VERB`, and every diagnostic it returns is placed at its cell. The composition root
+hands the runner `recipeRegistriesOf(registry)`, which reads the contributions per lookup.
+`examples/plugins/tyto-plugin-example-recipe/` contributes `example.pull`, `example.tag` and
+`example.parity`.
+
 ### `editor.command` and `editor.keymap`, in full
 
 **A plugin's `editor.command` is a name and a title, and nothing runs it yet.** The point's
@@ -462,7 +509,7 @@ host (CLI process)                               guest (plugin's process)
                         ◀── result {value} ──      answer checked by the host
 ```
 
-**Each side validates what it receives**, with the Zod schemas in `isolation/protocol.ts` and `isolation/points.ts`: the host every guest message and every answer, the guest every host message and a call's arguments, before the plugin's code sees them. **A contribution crosses as data, and its functions stay behind as handles**; a function is callable only if its point names it, with a schema for its arguments and one for its answer. Today that is `exporter.exportFrame`, `directive.transform` (TYTO-49) and `fetch` on `asset-source` and `font-source` (ADR 0117), which may therefore return a `Promise`; the job and `resolve` await them. `template-pack`, `brand-kit`, `editor.command`, `editor.keymap`, `panel` and `theme` cross as data. `source`, `sink` and `rasterizer` are refused by name — _not available to an isolated plugin yet_. A directive's answer schema is strict: a replacement that carries a `namespace` or a `range` is `E_PLUGIN_PROTOCOL`.
+**Each side validates what it receives**, with the Zod schemas in `isolation/protocol.ts` and `isolation/points.ts`: the host every guest message and every answer, the guest every host message and a call's arguments, before the plugin's code sees them. **A contribution crosses as data, and its functions stay behind as handles**; a function is callable only if its point names it, with a schema for its arguments and one for its answer. Today that is `exporter.exportFrame`, `directive.transform` (TYTO-49), `fetch` on `asset-source` and `font-source` (ADR 0117), and `page`, `transform` and `derive` on the recipe points (ADR 0135), which may therefore return a `Promise`; the job and `resolve` await them. `template-pack`, `brand-kit`, `editor.command`, `editor.keymap`, `panel` and `theme` cross as data. `source`, `sink` and `rasterizer` are refused by name — _not available to an isolated plugin yet_. A directive's answer schema is strict: a replacement that carries a `namespace` or a `range` is `E_PLUGIN_PROTOCOL`.
 
 **The proxy goes through `tryActivate`**, so an isolated plugin meets every check an in-process one does. `protocol` is its own number, compared at the `hello` handshake and nowhere else; it is not the engine (ADR 0040), because a plugin never sees these messages.
 
