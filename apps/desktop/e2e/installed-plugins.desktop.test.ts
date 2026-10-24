@@ -127,6 +127,20 @@ function writeHome(): void {
       `.then((value) => ({ ok: true, value, diagnostics: [] }));`,
     ['credentials:api-token'],
   );
+  // Stores, reads, forgets and reads again its own key, and writes each step (ADR 0134).
+  const step = (call: string) =>
+    `${call}.then((value) => String(value), (cause) => 'refused:' + (cause.code ?? cause.message))`;
+  install(
+    'cofre',
+    'cofre',
+    'vault',
+    `const steps = [() => ${step("host.credentials.set('token', 'dummy-370')")}, ` +
+      `() => ${step("host.credentials('token')")}, () => ${step("host.credentials.delete('token')")}, ` +
+      `() => ${step("host.credentials('token')")}];` +
+      `return steps.reduce((done, next) => done.then((seen) => next().then((one) => [...seen, one])), Promise.resolve([]))` +
+      `.then((seen) => ({ ok: true, value: seen.join(' '), diagnostics: [] }));`,
+    ['credentials:token'],
+  );
   const entry = { enabled: true, permissions: [], source: '.' };
   writeFileSync(
     join(home, 'plugins.json'),
@@ -137,6 +151,7 @@ function writeHome(): void {
         quebra: entry,
         espia: entry,
         chave: { ...entry, permissions: ['credentials:api-token'] },
+        cofre: { ...entry, permissions: ['credentials:token'] },
       },
     }),
   );
@@ -350,6 +365,29 @@ describe('a credential set from the plugins screen', () => {
     });
     expect(refusal).toContain("No installed plugin 'texto' declares credentials:api-token");
   });
+});
+
+describe('a credential the plugin stores itself (ADR 0134)', () => {
+  it('is set, read back, deleted and then missing, across the process boundary', async () => {
+    const out = join(scratch, 'vault');
+    const progress = await exported('vault', out);
+    expect(progress.failure).toBeUndefined();
+    const [file] = readdirSync(out).filter((entry) => entry.endsWith('.vault'));
+    const seen = readFileSync(join(out, file!), 'utf8');
+    const available = await app.evaluate(({ safeStorage }) => safeStorage.isEncryptionAvailable());
+    process.stdout.write(`[TYTO-370] safeStorage available=${String(available)} seen=${seen}
+`);
+    // A machine with no keychain refuses the write rather than storing plaintext, and the
+    // plugin hears that refusal through the same boundary (`credentials.ts`).
+    if (!available) {
+      expect(seen.split(' ')[0]).toMatch(/^refused:/u);
+      return;
+    }
+    expect(seen).toBe('undefined dummy-370 true refused:E_CREDENTIAL_MISSING');
+    expect(
+      existsSync(join(scratch, 'user-data', 'credentials', 'plugin%3Acofre%3Atoken.bin')),
+    ).toBe(false);
+  }, 180_000);
 });
 
 describe('the Node installed plugins run on (ADR 0050)', () => {

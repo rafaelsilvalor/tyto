@@ -349,7 +349,7 @@ installs it. A theme colours the window, never the exported artwork (ADR 0077).
 | Permission          | Allows                                                     |
 | ------------------- | ---------------------------------------------------------- |
 | `net:<host>`        | `host.fetch` to that host                                  |
-| `credentials:<key>` | `host.credentials('<key>')`                                |
+| `credentials:<key>` | `host.credentials('<key>')`, and `.set` and `.delete` it   |
 | `font:<family>`     | a code template is sent that face's file from this machine |
 
 `install` shows the list and asks. A permission added in a later version is refused until the
@@ -360,7 +360,11 @@ plugin is installed again (`E_PLUGIN_PERMISSIONS_CHANGED`). Wildcards and redire
 with every character that is not a letter or a digit turned into `_`. For `meu-pack`'s
 `api.token` that is `TYTO_PLUGIN_MEU_PACK_API_TOKEN`. **On the desktop a credential comes from the
 system keychain only**, and a person types it into the plugins screen, next to your plugin
-(TYTO-187). Until they do, a declared credential answers `E_CREDENTIAL_MISSING` there.
+(TYTO-187), or your plugin stores one itself with `host.credentials.set(key, value)` and forgets it
+with `host.credentials.delete(key)` (ADR 0134); a value is at most 16 KiB. Until either happens, a
+declared credential answers `E_CREDENTIAL_MISSING` there. **The CLI only reads**: `set` and
+`delete` there answer `E_CREDENTIAL_READ_ONLY`, so a plugin that stores a secret should say how to
+set the variable instead.
 
 **In the CLI your code runs confined to its own folder** (ADR 0049). It runs in a process of its
 own under Node's permission model, which can read the plugin's installed folder and nothing else.

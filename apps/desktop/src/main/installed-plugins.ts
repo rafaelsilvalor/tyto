@@ -26,7 +26,11 @@ import type { Credentials } from './credentials.js';
 /** Where the code of an installed plugin is, relative to its folder. */
 const PLUGIN_ENTRY = join('dist', 'index.js');
 
-/** The keychain entry a plugin's credential lives under. */
+/**
+ * The keychain entry a plugin's credential lives under. Always `plugin:`-prefixed, which is
+ * what keeps the `signin:<plugin>:<id>` accounts reserved for browser sign-in tokens
+ * (ADR 0131, ADR 0134) out of reach of any `credentials:<key>` a manifest declares.
+ */
 export function credentialAccount(plugin: string, key: string): string {
   return `plugin:${plugin}:${key}`;
 }
@@ -54,10 +58,10 @@ export type NetFetch = (
  * **`safeStorage` and nothing else** for a credential (`CLAUDE.md`): no environment
  * variable, because on the desktop the one place a secret lives is the OS keychain. A key
  * nobody has stored answers `E_CREDENTIAL_MISSING`, and its message points to the plugins
- * screen, where a person stores one (TYTO-187).
+ * screen, where a person stores one (TYTO-187), or the plugin stores itself (ADR 0134).
  */
 export function desktopCapabilities(
-  credentials: Pick<Credentials, 'get'>,
+  credentials: Pick<Credentials, 'get' | 'set' | 'delete'>,
   netFetch: NetFetch,
 ): HostCapabilities {
   return {
@@ -81,6 +85,8 @@ export function desktopCapabilities(
     async credential(plugin, key) {
       return (await credentials.get(credentialAccount(plugin, key))) ?? undefined;
     },
+    storeCredential: (plugin, key, value) => credentials.set(credentialAccount(plugin, key), value),
+    deleteCredential: (plugin, key) => credentials.delete(credentialAccount(plugin, key)),
     describeCredential: (plugin, key) =>
       `the keychain entry '${credentialAccount(plugin, key)}' (set it in the plugins screen)`,
   };

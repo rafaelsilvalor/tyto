@@ -213,7 +213,8 @@ has a toggle for it named after its `title`.
 The page talks to the host through `postMessage` alone:
 
 ```js
-// ask: the same permissions as the plugin's host.fetch and host.credentials (ADR 0042)
+// ask: the same permissions as the plugin's host.fetch and host.credentials (ADR 0042);
+// capability is 'fetch', 'credentials', 'storeCredential' [key, value] or 'deleteCredential' [key]
 parent.postMessage(
   { tyto: 'panel', type: 'request', id: 1, capability: 'fetch', args: [url] },
   '*',
@@ -223,7 +224,10 @@ parent.postMessage(
 ```
 
 **A panel receives the open brief's text**, with no permission asked, and the plugins screen
-says so on that plugin's row. A panel's `fetch` answers with the body as text.
+says so on that plugin's row. A panel's `fetch` answers with the body as text. **A panel may store
+and forget its own plugin's declared keys** (ADR 0134, extending ADR 0045), under the same check
+and ceiling as the plugin's process; it still reads only what `credentials` reads, and nothing of
+another plugin's.
 
 ### `template-pack`, and the host it belongs to
 
@@ -500,11 +504,13 @@ interface PluginHost {
 | `net:api.example.com` | `host.fetch` to that host, any port, `http` or `https`       |
 | `net:*.example.com`   | every host below `example.com`, and not `example.com` itself |
 | `net:*`               | any host                                                     |
-| `credentials:<key>`   | `host.credentials('<key>')`                                  |
+| `credentials:<key>`   | `host.credentials('<key>')`, `.set('<key>', v)`, `.delete`   |
 
 **Checked on the host's side, against the manifest the host validated** — never in the plugin's process — by one function, `checkedCapabilities`, which the in-process host uses too. A refusal **rejects** with a `PluginCapabilityError` whose `code` is `E_PERMISSION`, the way the platform's `fetch` rejects; a declared key with no value is `E_CREDENTIAL_MISSING`, naming where the host looked. **Redirects are not followed**: the 3xx comes back with its `location`, and the next request is checked like the first, so a declared host cannot hand the request to an undeclared one. The response crosses whole — status, headers, body as bytes — with `text()` and `json()` built on the plugin's side.
 
-The network and the secrets are a port, `HostCapabilities`. **In the CLI a credential is an environment variable**, `TYTO_PLUGIN_<NAME>_<KEY>`, both halves upper-cased with every character that is not a letter or a digit turned into `_` — plugin `meu-pdf`'s `api.token` is `TYTO_PLUGIN_MEU_PDF_API_TOKEN` — and an empty variable is unset. **On the desktop a credential is a keychain entry and nothing else** (`CLAUDE.md`): `safeStorage`, under the account `plugin:<name>:<key>`, with no environment fallback. A person stores one in the plugins screen, beside the plugin that declares it (TYTO-187); until then a declared key answers `E_CREDENTIAL_MISSING`, and its message points to that screen. The window can set or forget only a key an installed manifest declares, and it never reads one back: the screen learns whether a key is set and nothing more. The desktop's network is Electron's `net.fetch`, with `redirect: 'manual'`, so it honours the system's proxy.
+**A plugin can store and forget its own declared keys** (ADR 0134). `host.credentials` is a function with two methods: `host.credentials(key)` reads, as it always has; `host.credentials.set(key, value)` stores and resolves to nothing; `host.credentials.delete(key)` forgets and resolves to `true` when there was a value. Both sit behind the same `credentials:<key>` permission and the same `checkedCapabilities`, so an undeclared key is `E_PERMISSION` on either side of the isolation boundary. A value is a non-empty string of at most **16 KiB in UTF-8** (`CREDENTIAL_VALUE_LIMIT_BYTES`); over it is `E_CREDENTIAL_TOO_LARGE`, and an empty one is refused as a `TypeError` — forgetting is `delete`. The writers are optional on `HostCapabilities` (`storeCredential`, `deleteCredential`): a host without them answers both with `E_CREDENTIAL_READ_ONLY`, naming where it reads from.
+
+The network and the secrets are a port, `HostCapabilities`. **In the CLI a credential is an environment variable**, `TYTO_PLUGIN_<NAME>_<KEY>`, both halves upper-cased with every character that is not a letter or a digit turned into `_` — plugin `meu-pdf`'s `api.token` is `TYTO_PLUGIN_MEU_PDF_API_TOKEN` — and an empty variable is unset. **The CLI's credentials are read-only**: a plugin's `set` or `delete` there is `E_CREDENTIAL_READ_ONLY`, naming the variable, because the environment is the person's to set and a value written into it would vanish with the process. **On the desktop a credential is a keychain entry and nothing else** (`CLAUDE.md`): `safeStorage`, under the account `plugin:<name>:<key>`, with no environment fallback. A person stores one in the plugins screen, beside the plugin that declares it (TYTO-187), or the plugin stores one itself with `host.credentials.set`; until then a declared key answers `E_CREDENTIAL_MISSING`, and its message points to that screen. The window can set or forget only a key an installed manifest declares, within the same 16 KiB, and it never reads one back: the screen learns whether a key is set and nothing more. **The account prefix `signin:<plugin>:<id>` is reserved** for the tokens browser sign-in will keep (ADR 0131): `plugin:<name>:<key>` can never produce it, so no `credentials:<key>` reaches a sign-in token. The desktop's network is Electron's `net.fetch`, with `redirect: 'manual'`, so it honours the system's proxy.
 
 ## Isolation
 

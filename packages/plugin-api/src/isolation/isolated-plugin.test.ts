@@ -36,7 +36,7 @@ import {
   type PluginHost,
   createPluginHost,
 } from '../host.js';
-import type { HostCapabilities } from '../capabilities.js';
+import { CREDENTIAL_VALUE_LIMIT_BYTES, type HostCapabilities } from '../capabilities.js';
 import { ASSET_SOURCE_MAX_BYTES } from '../sources.js';
 import type { GuestChannel, PluginChannel } from './channel.js';
 import { runGuest } from './guest.js';
@@ -409,8 +409,8 @@ describe('what an isolated plugin cannot do', () => {
     );
   });
 
-  // A bootstrap left behind by an upgrade: 3 is the number before the kit's marks could be
-  // toned (ADR 0066), and it is refused by name rather than by a schema complaint.
+  // A bootstrap left behind by an upgrade: 4 is the number before a plugin could store a
+  // credential (ADR 0134), and it is refused by name rather than by a schema complaint.
   it('speaks another protocol', async () => {
     const pair = channelPair(() => undefined);
     const connecting = connectIsolatedPlugin({
@@ -422,7 +422,7 @@ describe('what an isolated plugin cannot do', () => {
     pair.inject({ type: 'hello', protocol: RPC_PROTOCOL_VERSION - 1, sandbox: CONFINED });
     const connected = await connecting;
     expect(connected.ok ? '' : connected.error[0]?.message).toBe(
-      "Plugin 'texto' failed to activate: its process speaks protocol 3 and this host speaks 4.",
+      "Plugin 'texto' failed to activate: its process speaks protocol 4 and this host speaks 5.",
     );
   });
 
@@ -573,6 +573,86 @@ describe('host.fetch and host.credentials across the boundary', () => {
 
     const answer = await exporterIn(connected.value.plugin).exportFrame(SCENE, ARTWORK, FRAME);
     expect(answer.ok && answer.value).toBe('s3cret E_PERMISSION');
+  });
+
+  /** A host whose secrets are a map the plugin may write (ADR 0134). */
+  function writable(values: Record<string, string> = {}) {
+    const stored = new Map(Object.entries(values));
+    const capabilities: HostCapabilities = {
+      ...network().capabilities,
+      credential: (_plugin, key) => Promise.resolve(stored.get(key)),
+      storeCredential: (_plugin, key, value) => {
+        stored.set(key, value);
+        return Promise.resolve();
+      },
+      deleteCredential: (_plugin, key) => Promise.resolve(stored.delete(key)),
+    };
+    return { stored, capabilities };
+  }
+
+  it('sets, reads and deletes a declared credential', async () => {
+    const { stored, capabilities } = writable();
+    const { connected } = await isolate(
+      asking(async (host) => {
+        await host.credentials.set('token', 'novo');
+        const read = await host.credentials('token');
+        const deleted = await host.credentials.delete('token');
+        const again = await host.credentials.delete('token');
+        const missing = await host
+          .credentials('token')
+          .catch((cause: { code: string }) => cause.code);
+        return `${read} ${String(deleted)} ${String(again)} ${missing}`;
+      }),
+      { permissions: ['credentials:token'], capabilities },
+    );
+    if (!connected.ok) throw new Error(connected.error[0]?.message);
+
+    const answer = await exporterIn(connected.value.plugin).exportFrame(SCENE, ARTWORK, FRAME);
+    expect(answer.ok && answer.value).toBe('novo true false E_CREDENTIAL_MISSING');
+    expect([...stored]).toEqual([]);
+  });
+
+  it('refuses set and delete of an undeclared key, and writes nothing', async () => {
+    const { stored, capabilities } = writable({ other: 'kept' });
+    const { connected } = await isolate(
+      asking(async (host) => {
+        const codes = await Promise.all(
+          [host.credentials.set('other', 'x'), host.credentials.delete('other')].map((attempt) =>
+            attempt.then(
+              () => 'ok',
+              (cause: { code: string }) => cause.code,
+            ),
+          ),
+        );
+        return codes.join(' ');
+      }),
+      { permissions: ['credentials:token'], capabilities },
+    );
+    if (!connected.ok) throw new Error(connected.error[0]?.message);
+
+    const answer = await exporterIn(connected.value.plugin).exportFrame(SCENE, ARTWORK, FRAME);
+    expect(answer.ok && answer.value).toBe('E_PERMISSION E_PERMISSION');
+    expect([...stored]).toEqual([['other', 'kept']]);
+  });
+
+  it('refuses a value over the ceiling on the host side, whatever the guest sends', async () => {
+    const { stored, capabilities } = writable();
+    const { connected } = await isolate(
+      asking(async (host) => {
+        const fits = 'a'.repeat(CREDENTIAL_VALUE_LIMIT_BYTES);
+        await host.credentials.set('token', fits);
+        return host.credentials.set('token', `${fits}a`).then(
+          () => 'ok',
+          (cause: { code: string }) => cause.code,
+        );
+      }),
+      { permissions: ['credentials:token'], capabilities },
+    );
+    if (!connected.ok) throw new Error(connected.error[0]?.message);
+
+    const answer = await exporterIn(connected.value.plugin).exportFrame(SCENE, ARTWORK, FRAME);
+    expect(answer.ok && answer.value).toBe('E_CREDENTIAL_TOO_LARGE');
+    expect(stored.get('token')).toHaveLength(CREDENTIAL_VALUE_LIMIT_BYTES);
   });
 });
 

@@ -89,6 +89,45 @@ describe('the panel service', () => {
     });
   });
 
+  it("stores and forgets its own plugin's declared key, and only that one (ADR 0134)", async () => {
+    const stored = new Map<string, string>();
+    const keychain: HostCapabilities = {
+      ...network,
+      credential: (plugin, key) => Promise.resolve(stored.get(`${plugin}/${key}`)),
+      storeCredential: (plugin, key, value) => {
+        stored.set(`${plugin}/${key}`, value);
+        return Promise.resolve();
+      },
+      deleteCredential: (plugin, key) => Promise.resolve(stored.delete(`${plugin}/${key}`)),
+    };
+    const service = createPanelService(contributed(['credentials:token']), keychain);
+    const panel = 'plugin:demo/contagem';
+
+    expect(await service.request(panel, 'storeCredential', ['token', 'novo'])).toEqual({
+      ok: true,
+      value: null,
+    });
+    expect([...stored]).toEqual([['demo/token', 'novo']]);
+    expect(await service.request(panel, 'credentials', ['token'])).toEqual({
+      ok: true,
+      value: 'novo',
+    });
+    expect(await service.request(panel, 'deleteCredential', ['token'])).toEqual({
+      ok: true,
+      value: true,
+    });
+    for (const [capability, args] of [
+      ['storeCredential', ['other', 'x']],
+      ['deleteCredential', ['other']],
+    ] as const) {
+      expect(await service.request(panel, capability, args)).toMatchObject({
+        ok: false,
+        code: 'E_PERMISSION',
+      });
+    }
+    expect([...stored]).toEqual([]);
+  });
+
   it('refuses a panel id no plugin offers', async () => {
     const service = createPanelService(contributed(['net:*']), network);
     expect(await service.request('plugin:outro/x', 'fetch', ['https://a.test/'])).toMatchObject({

@@ -20,9 +20,10 @@ import { z } from 'zod';
  * 2 since `hello` carried the sandbox report (ADR 0049); 3 since a template call carries
  * the brand kit, which a strict schema on an older guest would refuse (ADR 0063); 4 since
  * the kit's marks may be toned and it may carry a wordmark, which a guest on 3 would
- * refuse the same way (ADR 0066).
+ * refuse the same way (ADR 0066); 5 since a plugin may store and forget a credential, two
+ * requests a host on 4 would refuse as an unknown capability (ADR 0134).
  */
-export const RPC_PROTOCOL_VERSION = 4;
+export const RPC_PROTOCOL_VERSION = 5;
 
 const protocol = z.literal(RPC_PROTOCOL_VERSION);
 
@@ -151,6 +152,14 @@ export const registrationSchema = z.strictObject({
 });
 export type Registration = z.infer<typeof registrationSchema>;
 
+const requestedCapabilitySchema = z.enum([
+  'fetch',
+  'credentials',
+  'storeCredential',
+  'deleteCredential',
+]);
+export type RequestedCapability = z.infer<typeof requestedCapabilitySchema>;
+
 export const guestMessageSchema = z.discriminatedUnion('type', [
   z.strictObject({
     protocol,
@@ -177,12 +186,15 @@ export const guestMessageSchema = z.discriminatedUnion('type', [
     message: z.string(),
     detail: z.unknown().optional(),
   }),
-  /** The plugin asking the host for one of its capabilities: `host.fetch`, `host.credentials`. */
+  /**
+   * The plugin asking the host for one of its capabilities: `host.fetch`, `host.credentials`
+   * and its `.set` and `.delete`.
+   */
   z.strictObject({
     protocol,
     type: z.literal('request'),
     id: z.number().int().nonnegative(),
-    capability: z.enum(['fetch', 'credentials']),
+    capability: requestedCapabilitySchema,
     args: z.array(z.unknown()),
   }),
   /** A contribution the plugin disposed of itself, after activation. */
@@ -208,6 +220,9 @@ export const fetchArgsSchema = z.tuple([
 ]);
 
 export const credentialsArgsSchema = z.tuple([z.string().min(1)]);
+/** The size ceiling is not here: it is checked once, in `checkedCapabilities`. */
+export const storeCredentialArgsSchema = z.tuple([z.string().min(1), z.string().min(1)]);
+export const deleteCredentialArgsSchema = credentialsArgsSchema;
 
 /** What `host.fetch` answers, checked by the guest before the plugin sees it. */
 export const fetchedResponseSchema = z.strictObject({

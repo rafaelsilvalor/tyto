@@ -4,14 +4,28 @@ import { type Diagnostic, diagnostic } from '@tyto/core';
  * The runtime's own, read off `globalThis`: this package compiles against no platform's
  * types (ADR 0010), and every runtime it targets — Node, a worker, a browser — has both.
  */
-const { URL, TextDecoder } = globalThis as unknown as {
+const { URL, TextDecoder, TextEncoder } = globalThis as unknown as {
   URL: new (input: string) => {
     readonly href: string;
     readonly protocol: string;
     readonly hostname: string;
   };
   TextDecoder: new () => { decode(bytes: Uint8Array): string };
+  TextEncoder: new () => { encode(text: string): Uint8Array };
 };
+
+/**
+ * The largest credential a plugin may store, in UTF-8 bytes (ADR 0134). A Google
+ * service-account key, the largest secret a connector is known to keep, measured 2,333 B
+ * with RSA-2048 and 3,925 B with RSA-4096; 16 KiB leaves four times the larger one and
+ * still keeps a keychain entry a keychain entry rather than a file store.
+ */
+export const CREDENTIAL_VALUE_LIMIT_BYTES = 16 * 1024;
+
+/** A credential's size as the ceiling counts it: UTF-8 bytes, not UTF-16 code units. */
+export function credentialByteLength(value: string): number {
+  return new TextEncoder().encode(value).length;
+}
 
 /**
  * `host.fetch` and `host.credentials`: what a plugin may ask of the network and of secrets,
@@ -64,6 +78,13 @@ export interface HostCapabilities {
   credential(plugin: string, key: string): Promise<string | undefined>;
   /** Where {@link credential} looks, for the message that says it found nothing. */
   describeCredential(plugin: string, key: string): string;
+  /**
+   * Stores a value, already allowed and within the ceiling. Absent on a host whose
+   * secrets only read — the CLI's environment — which answers `E_CREDENTIAL_READ_ONLY`.
+   */
+  storeCredential?(plugin: string, key: string, value: string): Promise<void>;
+  /** Forgets a value; `true` when there was one. Absent exactly when the writer is. */
+  deleteCredential?(plugin: string, key: string): Promise<boolean>;
 }
 
 /**
@@ -109,6 +130,31 @@ export function allowsCredential(permissions: readonly string[], key: string): b
 export interface PluginCapabilities {
   fetch(url: string, init?: HostFetchInit): Promise<FetchedResponse>;
   credentials(key: string): Promise<string>;
+  storeCredential(key: string, value: string): Promise<void>;
+  deleteCredential(key: string): Promise<boolean>;
+}
+
+/**
+ * `host.credentials`: called, it reads a key, as it always has; `.set` stores one and
+ * `.delete` forgets one, behind the same `credentials:<key>` permission (ADR 0134). One
+ * object rather than three methods so that a plugin written before the writers still reads
+ * the way it did.
+ */
+export interface HostCredentials {
+  (key: string): Promise<string>;
+  /** Stores a non-empty value of at most {@link CREDENTIAL_VALUE_LIMIT_BYTES} UTF-8 bytes. */
+  set(key: string, value: string): Promise<void>;
+  /** Forgets a value; `true` when there was one to forget. */
+  delete(key: string): Promise<boolean>;
+}
+
+/** The callable object both sides of the isolation boundary hand a plugin. */
+export function hostCredentials(
+  read: (key: string) => Promise<string>,
+  set: (key: string, value: string) => Promise<void>,
+  forget: (key: string) => Promise<boolean>,
+): HostCredentials {
+  return Object.assign((key: string) => read(key), { set, delete: forget });
 }
 
 function refuse(problem: Diagnostic): Promise<never> {
@@ -178,7 +224,67 @@ export function checkedCapabilities(
       }
       return value;
     },
+
+    async storeCredential(key, value) {
+      if (!allowsCredential(permissions, key)) {
+        return refuse(
+          diagnostic('E_PERMISSION', {
+            plugin,
+            capability: `host.credentials.set('${key}') (credentials:${key})`,
+          }),
+        );
+      }
+      if (value.length === 0) {
+        // Not a permission and not a size: an empty secret is a delete spelled wrong, and
+        // storing one would make "set" and "missing" disagree about what a key holds.
+        throw new TypeError(
+          `host.credentials.set('${key}') was given an empty value; use host.credentials.delete.`,
+        );
+      }
+      const bytes = credentialByteLength(value);
+      if (bytes > CREDENTIAL_VALUE_LIMIT_BYTES) {
+        return refuse(
+          diagnostic('E_CREDENTIAL_TOO_LARGE', {
+            plugin,
+            key,
+            bytes: String(bytes),
+            limit: String(CREDENTIAL_VALUE_LIMIT_BYTES),
+          }),
+        );
+      }
+      if (capabilities?.storeCredential === undefined) {
+        return refuse(readOnly(plugin, key, capabilities));
+      }
+      await capabilities.storeCredential(plugin, key, value);
+    },
+
+    async deleteCredential(key) {
+      if (!allowsCredential(permissions, key)) {
+        return refuse(
+          diagnostic('E_PERMISSION', {
+            plugin,
+            capability: `host.credentials.delete('${key}') (credentials:${key})`,
+          }),
+        );
+      }
+      if (capabilities?.deleteCredential === undefined) {
+        return refuse(readOnly(plugin, key, capabilities));
+      }
+      return capabilities.deleteCredential(plugin, key);
+    },
   };
+}
+
+function readOnly(
+  plugin: string,
+  key: string,
+  capabilities: HostCapabilities | undefined,
+): Diagnostic {
+  return diagnostic('E_CREDENTIAL_READ_ONLY', {
+    plugin,
+    key,
+    source: capabilities?.describeCredential(plugin, key) ?? 'this host',
+  });
 }
 
 /** The data of a response, with the conveniences a plugin expects of one. */

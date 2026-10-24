@@ -58,6 +58,8 @@ non-zero.
 | `E_PLUGIN_CALL` | error | no | A function an isolated plugin registered threw when the host called it. |
 | `E_PLUGIN_TIMEOUT` | error | no | An isolated plugin did not answer within its deadline, and its process was ended. |
 | `E_CREDENTIAL_MISSING` | error | no | A plugin asked for a credential it declared, and this host has no value for it. |
+| `E_CREDENTIAL_TOO_LARGE` | error | no | A credential to store is larger than the ceiling every host keeps (ADR 0134). |
+| `E_CREDENTIAL_READ_ONLY` | error | no | A plugin tried to store or forget a credential on a host that only reads them. |
 | `W_PLUGIN_CRASHED` | warning | no | An installed plugin's process crashed on an earlier run. History, not a refusal. |
 | `E_PLUGIN_FETCH` | error | yes | A plugin could not be copied or fetched from where tyto plugin install was told. |
 | `E_SCENE_SHAPE` | error | yes | A scene does not match the IR schema. |
@@ -211,6 +213,8 @@ incomplete brief, and a crossed box where a picture the exporter could not load 
 | `E_PLUGIN_CALL` | no | It costs the one frame the call was for; the others are drawn (ADR 0025). |
 | `E_PLUGIN_TIMEOUT` | no | It costs the one frame the call was for; the others are drawn (ADR 0025). |
 | `E_CREDENTIAL_MISSING` | no | It is the plugin's call that is refused; what the plugin does with that is its own. |
+| `E_CREDENTIAL_TOO_LARGE` | no | It is the plugin's call that is refused; what the plugin does with that is its own. |
+| `E_CREDENTIAL_READ_ONLY` | no | It is the plugin's call that is refused; what the plugin does with that is its own. |
 | `E_PLUGIN_FETCH` | yes | A plugin that did not load contributed no slot to skip. |
 | `E_SCENE_SHAPE` | yes | The IR is malformed, so the exporter has nothing it can draw. |
 | `E_SCENE_DUPLICATE_ID` | yes | The IR is malformed, so the exporter has nothing it can draw. |
@@ -834,6 +838,34 @@ It is the plugin's call that is refused; what the plugin does with that is its o
 
 ```
 Plugin '{plugin}' asked for credential '{key}', and {source} holds none.
+```
+
+Parameters: `plugin`, `key`, `source`
+
+### `E_CREDENTIAL_TOO_LARGE`
+
+**Severity:** error · **Fatal:** no · **Spec:** `docs/plugin-api.md`
+
+A credential to store is larger than the ceiling every host keeps (ADR 0134).
+
+It is the plugin's call that is refused; what the plugin does with that is its own.
+
+```
+Plugin '{plugin}' tried to store credential '{key}' of {bytes} bytes; the ceiling is {limit}.
+```
+
+Parameters: `plugin`, `key`, `bytes`, `limit`
+
+### `E_CREDENTIAL_READ_ONLY`
+
+**Severity:** error · **Fatal:** no · **Spec:** `docs/plugin-api.md`
+
+A plugin tried to store or forget a credential on a host that only reads them.
+
+It is the plugin's call that is refused; what the plugin does with that is its own.
+
+```
+Plugin '{plugin}' tried to change credential '{key}', and {source} is read-only here.
 ```
 
 Parameters: `plugin`, `key`, `source`

@@ -6,6 +6,7 @@ import {
 } from '@tyto/plugin-api';
 import { z } from 'zod';
 
+import type { PanelCapability } from '../../shared/ipc.js';
 import { panelUrl } from './plugin-protocol.js';
 import type { WindowPlugins } from './window-plugins.js';
 
@@ -45,7 +46,7 @@ export interface PanelService {
   list(): Promise<readonly OfferedPanel[]>;
   request(
     panelId: string,
-    capability: 'fetch' | 'credentials',
+    capability: PanelCapability,
     args: readonly unknown[],
   ): Promise<PanelAnswer>;
 }
@@ -62,6 +63,7 @@ const fetchArgs = z.union([
   ]),
 ]);
 const credentialArgs = z.tuple([z.string().min(1)]);
+const storeCredentialArgs = z.tuple([z.string().min(1), z.string()]);
 
 export function createPanelService(
   plugins: WindowPlugins,
@@ -94,6 +96,19 @@ export function createPanelService(
           const parsed = credentialArgs.safeParse(args);
           if (!parsed.success) throw new TypeError('host.credentials takes one key.');
           return { ok: true, value: await checked.credentials(parsed.data[0]) };
+        }
+        // A panel stores and forgets its own plugin's declared keys, through the one check
+        // the plugin's process goes through (ADR 0134); the size and the empty value are its.
+        if (capability === 'storeCredential') {
+          const parsed = storeCredentialArgs.safeParse(args);
+          if (!parsed.success) throw new TypeError('host.credentials.set takes a key and a value.');
+          await checked.storeCredential(parsed.data[0], parsed.data[1]);
+          return { ok: true, value: null };
+        }
+        if (capability === 'deleteCredential') {
+          const parsed = credentialArgs.safeParse(args);
+          if (!parsed.success) throw new TypeError('host.credentials.delete takes one key.');
+          return { ok: true, value: await checked.deleteCredential(parsed.data[0]) };
         }
         const parsed = fetchArgs.safeParse(args);
         if (!parsed.success) throw new TypeError('host.fetch takes a URL and an optional init.');

@@ -426,6 +426,24 @@ export const diagnosticCodes = {
     fatal: false,
     fatality: "It is the plugin's call that is refused; what the plugin does with that is its own.",
   },
+  E_CREDENTIAL_TOO_LARGE: {
+    severity: 'error',
+    summary: 'A credential to store is larger than the ceiling every host keeps (ADR 0134).',
+    template:
+      "Plugin '{plugin}' tried to store credential '{key}' of {bytes} bytes; the ceiling is {limit}.",
+    spec: 'docs/plugin-api.md',
+    fatal: false,
+    fatality: "It is the plugin's call that is refused; what the plugin does with that is its own.",
+  },
+  E_CREDENTIAL_READ_ONLY: {
+    severity: 'error',
+    summary: 'A plugin tried to store or forget a credential on a host that only reads them.',
+    template:
+      "Plugin '{plugin}' tried to change credential '{key}', and {source} is read-only here.",
+    spec: 'docs/plugin-api.md',
+    fatal: false,
+    fatality: "It is the plugin's call that is refused; what the plugin does with that is its own.",
+  },
   W_PLUGIN_CRASHED: {
     severity: 'warning',
     summary: "An installed plugin's process crashed on an earlier run. History, not a refusal.",

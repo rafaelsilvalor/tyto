@@ -216,6 +216,17 @@ describe('a request that does not match', () => {
       parseIpc('credentials:set', 'request', { plugin: 'pdf', key: 'k', secret: 'token' }),
     ).toEqual({ plugin: 'pdf', key: 'k', secret: 'token' });
   });
+
+  it("keeps the plugin's own 16 KiB ceiling, in UTF-8 bytes (ADR 0134)", () => {
+    const request = (secret: string) => ({ plugin: 'pdf', key: 'k', secret });
+    expect(() => parseIpc('credentials:set', 'request', request('a'.repeat(16_384)))).not.toThrow();
+    expect(() => parseIpc('credentials:set', 'request', request('a'.repeat(16_385)))).toThrow(
+      IpcContractError,
+    );
+    expect(() => parseIpc('credentials:set', 'request', request('é'.repeat(8_193)))).toThrow(
+      IpcContractError,
+    );
+  });
 });
 
 describe('a response that does not match', () => {

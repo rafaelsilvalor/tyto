@@ -161,8 +161,10 @@ export {
 } from './isolation/isolated-plugin.js';
 
 export {
+  CREDENTIAL_VALUE_LIMIT_BYTES,
   type FetchedResponse,
   type HostCapabilities,
+  type HostCredentials,
   type HostFetchInit,
   type HostFetchResponse,
   type PluginCapabilities,
@@ -170,6 +172,8 @@ export {
   allowsCredential,
   allowsHost,
   checkedCapabilities,
+  credentialByteLength,
+  hostCredentials,
 } from './capabilities.js';
 
 export {
