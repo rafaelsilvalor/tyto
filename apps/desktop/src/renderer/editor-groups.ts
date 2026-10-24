@@ -18,9 +18,16 @@ import type { SessionGroupNode } from '../../shared/session-groups.js';
  */
 export type PreviewFileSubject = { readonly kind: 'image'; readonly entryId: string };
 
-/** What a preview tab shows: its brief, or a file the explorer named (TYTO-366, ADR 0124). */
+/**
+ * What a preview tab shows: its brief, a Markdown file (TYTO-247, ADR 0132), or a file the
+ * explorer named (TYTO-366, ADR 0124). A Markdown file's preview keeps its `documentId` as a
+ * brief's does, so every lookup by document, the lock and the session treat the two alike; the
+ * document's kind is what tells them apart, which {@link previewSubjectOf} is handed.
+ */
 export type PreviewSubject =
-  { readonly kind: 'brief'; readonly documentId: string } | PreviewFileSubject;
+  | { readonly kind: 'brief'; readonly documentId: string }
+  | { readonly kind: 'markdown'; readonly documentId: string }
+  | PreviewFileSubject;
 
 /**
  * One tab in one group. A tab with `view: 'preview'` shows a brief's art instead of its text
@@ -45,16 +52,24 @@ export interface EditorTab {
 
 export const isPreview = (tab: EditorTab): boolean => tab.view === 'preview';
 
-/** What a preview tab shows, its brief when it names no file (TYTO-366). */
-export const previewSubjectOf = (tab: EditorTab): PreviewSubject =>
-  tab.subject ?? { kind: 'brief', documentId: tab.documentId };
+/**
+ * What a preview tab shows (TYTO-366): the file it names, else its document — a Markdown file
+ * when `kindOf` says so (TYTO-247), a brief otherwise.
+ */
+export const previewSubjectOf = (
+  tab: EditorTab,
+  kindOf: (documentId: string) => string | undefined = () => undefined,
+): PreviewSubject => {
+  if (tab.subject !== undefined) return tab.subject;
+  const kind = kindOf(tab.documentId) === 'markdown' ? 'markdown' : 'brief';
+  return { kind, documentId: tab.documentId };
+};
 
 const sameSubject = (a: EditorTab, b: EditorTab): boolean => {
   const first = previewSubjectOf(a);
   const second = previewSubjectOf(b);
-  if (first.kind === 'brief')
-    return second.kind === 'brief' && first.documentId === second.documentId;
-  return second.kind === first.kind && second.entryId === first.entryId;
+  if (first.kind === 'image') return second.kind === 'image' && second.entryId === first.entryId;
+  return second.kind !== 'image' && first.documentId === second.documentId;
 };
 
 /** A tab that shows a document's text: what every lookup by document means (TYTO-287). */

@@ -82,7 +82,7 @@ export const en: Catalogue = {
   'command.preview.previousSlide': 'Preview: previous slide',
   'command.shell.toggleLocale': 'Switch the window language',
   'command.editor.toggleVim': 'Editor: turn vim mode on or off',
-  'command.file.open': 'Open a brief…',
+  'command.file.open': 'Open…',
   'command.file.save': 'Save',
   'command.file.saveAs': 'Save as…',
   'command.file.recent': 'Recent',

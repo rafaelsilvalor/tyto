@@ -8,7 +8,7 @@ Cada arquivo aberto é uma **aba**. Uma fileira de abas com o arquivo da frente 
 
 ## Abrir, trocar e fechar
 
-- **Novo brief** (**Ctrl+N**) abre um brief vazio, e **Abrir um brief…** (**Ctrl+O**) abre um do disco. Os dois também estão no menu **Arquivo**.
+- **Novo brief** (**Ctrl+N**) abre um brief vazio, e **Abrir…** (**Ctrl+O**) abre um do disco. Os dois também estão no menu **Arquivo**.
 - Clique numa aba para trazê-la para a frente. **Ctrl+PageDown** e **Ctrl+PageUp** vão para a aba seguinte e para a anterior, e **Ctrl+1** a **Ctrl+9** vão direto para uma aba pela posição dela na fileira.
 - Feche uma aba pelo **×** dela ou por **Fechar a aba** (**Ctrl+W**). Uma aba com alterações ainda não salvas mostra um ponto depois do nome, e fechá-la pergunta antes: **Cancelar** a mantém aberta, **Fechar sem salvar** descarta as alterações.
 
