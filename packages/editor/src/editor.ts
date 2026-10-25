@@ -19,13 +19,13 @@ import {
   type ViewUpdate,
   drawSelection,
   dropCursor,
-  highlightActiveLine,
   highlightActiveLineGutter,
   keymap,
   lineNumbers,
   rectangularSelection,
 } from '@codemirror/view';
 
+import { activeLine } from './active-line.js';
 import { brief } from './brief-language.js';
 import { type MarkedDiagnostic, diagnosticsSpec } from './diagnostic-markers.js';
 import { DEFAULT_TAB_SIZE, indentExtension } from './format-brief.js';
@@ -469,7 +469,7 @@ export interface EditorHandle extends EditorPane {
 const baseExtensions = (): Extension[] => [
   lineNumbers(),
   highlightActiveLineGutter(),
-  highlightActiveLine(),
+  activeLine(),
   foldGutter(),
   historyExtension(),
   drawSelection(),
