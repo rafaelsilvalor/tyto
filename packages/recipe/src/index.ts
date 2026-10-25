@@ -35,6 +35,16 @@ export type {
 export { GENERIC_VERBS, createDerivationRegistry, createVerbRegistry } from './registry.js';
 export type { Cell, RecipeRun, RunOptions } from './run.js';
 export { runRecipe } from './run.js';
+export type {
+  AppliedOperation,
+  ApplyOutcome,
+  RecipeState,
+  StateCommit,
+  StatePut,
+  StateWrite,
+  StoredEntry,
+} from './state.js';
+export { stateToCommit } from './state.js';
 export type { CellValue, Column, ColumnType, Provenance, Row, Table } from './table.js';
 export { COLUMN_TYPES, cellText, comparable, findColumn } from './table.js';
 export type { BoundTemplate, FillMode, Template, TemplateFilter } from './template.js';

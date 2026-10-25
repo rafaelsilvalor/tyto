@@ -141,6 +141,12 @@ export {
  */
 export type { DataResolver } from '@tyto/recipe';
 
+/**
+ * The recipe's state port, named here for the same reason: the host's machine-local store
+ * implements a port from this package (ADR 0140).
+ */
+export type { RecipeState } from '@tyto/recipe';
+
 export type {
   GuestChannel,
   PluginChannel,

@@ -4,6 +4,7 @@ import type { RecipeAst, Step } from './ast.js';
 import type { RunClock } from './clock.js';
 import type { DataResolver } from './data.js';
 import type { Plan } from './plan.js';
+import type { RecipeState, StateWrite } from './state.js';
 import type { Table } from './table.js';
 import { genericVerbs } from './verbs.js';
 
@@ -40,6 +41,11 @@ export interface VerbContext {
    * outside `runRecipe`; a verb then reads the system clock.
    */
   readonly clock?: RunClock | undefined;
+  /**
+   * What the last applied run of this recipe remembered (ADR 0140), which `last` reads. Absent
+   * where the host keeps no state: `last` and `remember` then refuse to run.
+   */
+  readonly state?: RecipeState | undefined;
   /** The registry the run uses, which `run` hands to the recipe it includes. */
   readonly verbs: VerbRegistry;
   /** The recipes running, outermost first and this one last, so `run` can refuse a cycle. */
@@ -51,6 +57,8 @@ export interface VerbOutput {
   readonly view?: string;
   /** Several when the cell is a `run` whose recipe keeps more than one table. */
   readonly keeps?: readonly KeepRequest[];
+  /** What `remember` asks the host to store once the run's plan is applied (ADR 0140). */
+  readonly remembers?: readonly StateWrite[];
   /**
    * An action's or a sink's: what it would write, and nothing written (ADR 0129). Its `table`
    * is the one it read, so a cell after it reads the same rows.
@@ -90,6 +98,8 @@ export const GENERIC_VERBS = [
   'map',
   'path',
   'age',
+  'last',
+  'remember',
 ] as const;
 
 const CONTRIBUTED_NAME = /^[a-z][a-z0-9-]*\.[a-z][a-z0-9-]*$/u;

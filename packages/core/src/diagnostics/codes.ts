@@ -1426,6 +1426,17 @@ export const diagnosticCodes = {
     fatality:
       'That cell has no table and the cells after it do not run; earlier cells keep theirs.',
   },
+  // Never an empty store: a host without state would read every run as the first (ADR 0140).
+  E_RECIPE_STATE: {
+    severity: 'error',
+    summary:
+      "A 'last' or 'remember' runs where the host keeps no recipe state, or the host cannot read it.",
+    template: "Recipe state '{store}' {problem}.",
+    spec: 'docs/adr/0140-a-recipe-remembers-applied-rows-in-machine-local-state.md',
+    fatal: false,
+    fatality:
+      'That cell has no table and the cells after it do not run; earlier cells keep theirs.',
+  },
   // A data reference names configuration beside the recipe (ADR 0136, ADR 0137). Four codes, so
   // a handler can tell a file that is not there from one that is withheld, broken or misshapen.
   E_RECIPE_DATA: {
