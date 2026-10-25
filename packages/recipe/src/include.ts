@@ -90,12 +90,15 @@ export async function include(context: VerbContext): Promise<VerbResult> {
     resolveData: context.resolveData,
     // One clock for the whole run, so a stamp reads the same inside an included recipe.
     clock: context.clock,
+    // The host bound the state to the recipe it ran, so an included recipe's `remember` lands in
+    // the stores of the recipe that includes it (ADR 0140).
+    state: context.state,
     aliases: Object.fromEntries(context.aliases),
     within: context.recipes,
   });
   if (!included.ok) return err(inside(name, included.error, range));
   const reported = inside(name, included.diagnostics, range);
-  const { table, view, keeps } = included.value;
+  const { table, view, keeps, remembers } = included.value;
   if (table === undefined) {
     const failed = included.value.cells.some((cell) => cell.status === 'failed');
     if (failed) return err(reported);
@@ -107,7 +110,7 @@ export async function include(context: VerbContext): Promise<VerbResult> {
       ),
     ]);
   }
-  return ok({ table, keeps, ...(view === undefined ? {} : { view }) }, reported);
+  return ok({ table, keeps, remembers, ...(view === undefined ? {} : { view }) }, reported);
 }
 
 /** Diagnostics from the included file, moved to the `run` line and labelled with the recipe. */

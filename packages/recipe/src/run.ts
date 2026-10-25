@@ -6,6 +6,7 @@ import type { DataResolver } from './data.js';
 import { fillPlaceholders } from './parse.js';
 import type { Plan } from './plan.js';
 import type { DerivationRegistry, KeepRequest, RecipeResolver, VerbRegistry } from './registry.js';
+import type { RecipeState, StateWrite } from './state.js';
 import type { Table } from './table.js';
 
 export interface RunOptions {
@@ -26,6 +27,11 @@ export interface RunOptions {
    * when absent. A test fixes it, and `run` hands it to the recipe it includes.
    */
   readonly clock?: RunClock | undefined;
+  /**
+   * The recipe's state between runs (ADR 0140), bound by the host to this workspace and this
+   * recipe. Absent where the host keeps none; `run` hands it to the recipe it includes.
+   */
+  readonly state?: RecipeState | undefined;
   /** `{alias: column}`: names a person types, read on the way in and never written out. */
   readonly aliases?: Readonly<Record<string, string>>;
   /** The recipes that include this one through `run`, outermost first. */
@@ -52,6 +58,11 @@ export interface RecipeRun {
   /** The view the last `show` picked. */
   readonly view?: string;
   readonly keeps: readonly KeepRequest[];
+  /**
+   * What `remember` asked to store, in the order the rows ran. Nothing is stored yet: the host
+   * passes these and the apply's outcome to `stateToCommit` (ADR 0140).
+   */
+  readonly remembers: readonly StateWrite[];
 }
 
 /**
@@ -75,6 +86,7 @@ export async function runRecipe(
   );
   const cells: Cell[] = [];
   const keeps: KeepRequest[] = [];
+  const remembers: StateWrite[] = [];
   const diagnostics: Diagnostic[] = [];
   let table = options.input;
   let view: string | undefined;
@@ -104,6 +116,7 @@ export async function runRecipe(
       resolveRecipe: options.resolveRecipe,
       resolveData: options.resolveData,
       clock,
+      state: options.state,
       verbs: options.verbs,
       recipes,
     });
@@ -116,6 +129,7 @@ export async function runRecipe(
     table = outcome.value.table;
     view = outcome.value.view ?? view;
     keeps.push(...(outcome.value.keeps ?? []));
+    remembers.push(...(outcome.value.remembers ?? []));
     const { plan } = outcome.value;
     cells.push({
       step: written,
@@ -130,6 +144,7 @@ export async function runRecipe(
   const run: RecipeRun = {
     cells,
     keeps,
+    remembers,
     ...(failed || table === undefined ? {} : { table }),
     ...(view === undefined ? {} : { view }),
   };
