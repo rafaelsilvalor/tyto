@@ -6,7 +6,9 @@ import { derive } from './derive.js';
 import { extract, rewrite } from './extract.js';
 import { include } from './include.js';
 import { join } from './join.js';
+import { map } from './map.js';
 import { nearest } from './nearest.js';
+import { path } from './path.js';
 import type { Verb, VerbContext, VerbResult } from './registry.js';
 import { rules } from './rules.js';
 import { argumentsProblem, columnNames, refuseNamed, requireTable, rowFilter } from './support.js';
@@ -33,6 +35,8 @@ export const genericVerbs: Readonly<Record<string, Verb>> = {
   rewrite: { kind: 'transform', run: rewrite },
   urls: { kind: 'transform', run: urls },
   nearest: { kind: 'transform', run: nearest },
+  map: { kind: 'transform', run: map },
+  path: { kind: 'transform', run: path },
 };
 
 /** `where <expression>`: keeps the rows that satisfy every predicate. */

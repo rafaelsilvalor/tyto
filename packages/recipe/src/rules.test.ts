@@ -63,6 +63,39 @@ describe('rules', () => {
     });
   });
 
+  it('compares numbers in a when expression', async () => {
+    const points = [5, '3', 2, null, 'many'];
+    const input = {
+      columns: [
+        { name: 'key', type: 'text' as const, origin: 'test' },
+        { name: 'points', type: 'number' as const, origin: 'test' },
+      ],
+      rows: points.map((value, index) => ({
+        key: `P-${String(index)}`,
+        values: { key: `P-${String(index)}`, points: value },
+        provenance: { source: 'test', id: `P-${String(index)}`, fetchedAt: '2026-10-25' },
+      })),
+    };
+    const sizes = [
+      { when: 'points >= 3', set: { size: 'big' } },
+      { when: 'points<3', set: { size: 'small' } },
+      { when: '', set: { size: 'unknown' } },
+    ];
+    const { table, problem } = await runOverShop(
+      ['rules into=size using=@./sizes.json'],
+      { './sizes.json': sizes },
+      input,
+    );
+    expect(problem).toBeUndefined();
+    expect(Object.values(columnOf(table, 'size'))).toEqual([
+      'big',
+      'big',
+      'small',
+      'unknown',
+      'unknown',
+    ]);
+  });
+
   it('reads a table written inline as the last argument', async () => {
     const { table, problem } = await runOverShop([
       'rules into=kind using=[{"when": "team in (web, copy)", "set": {"kind": "words {team|upper}"}}, {"when": "", "set": {"kind": "art"}}]',

@@ -13,7 +13,8 @@ describe('parseWhere', () => {
   it('reads every operator of the grammar, joined by AND in any case', () => {
     const parsed = parseWhere(
       'a = 1 and b != "two words" AND c ~ x AND d !~ y AND e in (p, "q r") AND ' +
-        'f not in (s) AND g is empty AND h IS NOT EMPTY',
+        'f not in (s) AND g is empty AND h IS NOT EMPTY AND i < 1 AND j <= -2 AND k>3.5 AND ' +
+        'l >= "4"',
     );
     expect(parsed.ok).toBe(true);
     if (!parsed.ok) return;
@@ -26,7 +27,12 @@ describe('parseWhere', () => {
       ['f', 'not in', ['s']],
       ['g', 'is empty', []],
       ['h', 'is not empty', []],
+      ['i', '<', ['1']],
+      ['j', '<=', ['-2']],
+      ['k', '>', ['3.5']],
+      ['l', '>=', ['4']],
     ]);
+    expect(parsed.value.slice(8).map(({ number }) => number)).toEqual([1, -2, 3.5, 4]);
   });
 
   it('places a column range in the recipe, not in the expression', () => {
@@ -46,7 +52,13 @@ describe('parseWhere', () => {
     ['a in x', "expected '(' after 'in'", 'x'],
     ['a in (x y)', "expected ',' or ')'", 'y'],
     ['a = !x', "cannot read the expression from '!x'", '!x'],
-    ['a > 1', "unknown operator '>'", '>'],
+    ['a == 1', "expected a value and found '='", '='],
+    ['a => 1', "expected a value and found '>'", '>'],
+    ['a > x', "'>' compares numbers", 'x'],
+    ['a <= 1e3', "'<=' compares numbers", '1e3'],
+    ['a < "1 000"', "'<' compares numbers", '"1 000"'],
+    ['a >', "a number after '>' is missing", ''],
+    ['a ! 1', "cannot read the expression from '! 1'", '! 1'],
     ['a like b', "unknown operator 'like'", 'like'],
     ['', 'the expression is empty', ''],
   ])('refuses %j and teaches the way out', (expression, message, at) => {
@@ -84,6 +96,24 @@ describe('satisfies', () => {
 
   it('compares a number as its text', () => {
     expect(keeps('points = 3', 3)).toBe(true);
+  });
+
+  it('orders a number cell, or text that is one once trimmed, against the value', () => {
+    expect([2, 3, 4].map((points) => keeps('points < 3', points))).toEqual([true, false, false]);
+    expect([2, 3, 4].map((points) => keeps('points <= 3', points))).toEqual([true, true, false]);
+    expect([2, 3, 4].map((points) => keeps('points > 3', points))).toEqual([false, false, true]);
+    expect([2, 3, 4].map((points) => keeps('points >= 3', points))).toEqual([false, true, true]);
+    expect(keeps('due>5', ' 12 ')).toBe(true);
+    expect(keeps('due > 5', '5.5')).toBe(true);
+    expect(keeps('due < 0', '-0.5')).toBe(true);
+    expect(keeps('due >= 10', '9')).toBe(false);
+  });
+
+  it('drops a cell that is not a number, as JQL drops an empty field', () => {
+    for (const cell of [null, '', '  ', 'ten', '1e3', '1,5', true, [5], []] as CellValue[]) {
+      expect(keeps('due > -100', cell)).toBe(false);
+      expect(keeps('due < 100', cell)).toBe(false);
+    }
   });
 });
 
