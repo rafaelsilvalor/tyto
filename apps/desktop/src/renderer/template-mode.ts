@@ -1,5 +1,6 @@
 import {
   type EditorHandle,
+  type LineNumbersStyle,
   type TemplateAnalyzer,
   EDITOR_SAVE,
   createCommandRegistry,
@@ -202,6 +203,8 @@ export class TemplateMode extends LitElement {
   private stickyScroll = true;
   /** The `tabSize` setting, kept the same way (TYTO-297). */
   private tabSize = 2;
+  /** The `lineNumbers` setting, kept the same way (TYTO-415). */
+  private lineNumbers: LineNumbersStyle = 'on';
   /** The text each buffer had when it was last read from or written to the disk. */
   private savedText: Record<BufferName, string> = { manifest: '', markup: '' };
   private gate: RequestGate = createRequestGate();
@@ -536,6 +539,7 @@ export class TemplateMode extends LitElement {
         indentGuides: this.indentGuides,
         stickyScroll: this.stickyScroll,
         tabSize: this.tabSize,
+        lineNumbers: this.lineNumbers,
         extensions:
           buffer === 'markup' ? [templateLint(this.analyzer()), templateCompletion()] : [],
       });
@@ -574,6 +578,12 @@ export class TemplateMode extends LitElement {
   showTabSize(size: number): void {
     this.tabSize = size;
     for (const editor of Object.values(this.editors)) editor?.setTabSize(size);
+  }
+
+  /** How both buffers number their lines (TYTO-415), as above. */
+  showLineNumbers(style: LineNumbersStyle): void {
+    this.lineNumbers = style;
+    for (const editor of Object.values(this.editors)) editor?.setLineNumbers(style);
   }
 
   /** Both buffers re-read their text's size after the code face or size changed (TYTO-272). */

@@ -2,6 +2,7 @@ import type { ConfigurationContribution } from '@tyto/plugin-api';
 import { z } from 'zod';
 
 import { type BriefColumnLook, briefColumnsContribution } from './brief-columns.js';
+import { type LineNumbersLook, lineNumbersContribution } from './line-numbers.js';
 import { type StatusBarColors, statusBarColorsContribution } from './status-bar-colors.js';
 import { type StatusBarItemId, statusBarItemsContribution } from './status-bar-items.js';
 import {
@@ -307,7 +308,7 @@ export function googleFontsExample(): string {
 }
 
 /**
- * The twenty-three, in the order the settings file is documented in. `theme` checks its ids against
+ * The twenty-four, in the order the settings file is documented in. `theme` checks its ids against
  * `lookup`, which main builds from every theme the plugins registered (TYTO-208); the default
  * knows the built-in two and lets any other id through.
  */
@@ -330,6 +331,7 @@ export function settingContributions(
     formatBriefOnSaveContribution,
     tabSizeContribution,
     briefColumnsContribution,
+    lineNumbersContribution,
     zoomContribution,
     uiFontFamilyContribution,
     uiFontSizeContribution,
@@ -366,6 +368,8 @@ export interface Settings {
   readonly tabSize: number;
   /** How the editor tells the columns of a `|` line apart (TYTO-298). */
   readonly briefColumns: BriefColumnLook;
+  /** How the editor numbers its lines: on, relative or off (TYTO-415). */
+  readonly lineNumbers: LineNumbersLook;
   /** How far the window is zoomed, in Electron's steps of 1.2 (TYTO-272, ADR 0099). */
   readonly zoom: number;
   /** The face and size of the window's text outside the editor (TYTO-272). */
@@ -397,6 +401,7 @@ export const DEFAULT_SETTINGS: Settings = {
   formatBriefOnSave: formatBriefOnSaveContribution.default,
   tabSize: tabSizeContribution.default,
   briefColumns: briefColumnsContribution.default,
+  lineNumbers: lineNumbersContribution.default,
   zoom: zoomContribution.default,
   uiFontFamily: uiFontFamilyContribution.default,
   uiFontSize: uiFontSizeContribution.default,
@@ -411,7 +416,7 @@ export const DEFAULT_SETTINGS: Settings = {
 export const DEFAULT_QUEUE_KINDS: readonly string[] = ['png'];
 
 /**
- * The twenty-three out of the resolved values, which already hold every declared key with a value
+ * The twenty-four out of the resolved values, which already hold every declared key with a value
  * its schema accepted or its default (`resolveSettings`).
  */
 export function settingsFrom(values: Readonly<Record<string, unknown>>): Settings {
@@ -433,6 +438,7 @@ export function settingsFrom(values: Readonly<Record<string, unknown>>): Setting
     formatBriefOnSave: pick('formatBriefOnSave'),
     tabSize: pick('tabSize'),
     briefColumns: pick('briefColumns'),
+    lineNumbers: pick('lineNumbers'),
     zoom: pick('zoom'),
     uiFontFamily: pick('uiFontFamily'),
     uiFontSize: pick('uiFontSize'),

@@ -2,7 +2,7 @@
 
 # Configurações
 
-Todas as chaves que o app declara no `settings.json`: 23. Abra o arquivo com **Preferências: Abrir configurações (JSON)**; uma chave que você não escreve fica com o valor padrão, e um valor que o app não consegue ler aparece no painel Problemas e o padrão vale no lugar dele. Um plugin acrescenta as próprias chaves como `<id do plugin>.<chave>`, que não aparecem aqui.
+Todas as chaves que o app declara no `settings.json`: 24. Abra o arquivo com **Preferências: Abrir configurações (JSON)**; uma chave que você não escreve fica com o valor padrão, e um valor que o app não consegue ler aparece no painel Problemas e o padrão vale no lugar dele. Um plugin acrescenta as próprias chaves como `<id do plugin>.<chave>`, que não aparecem aqui.
 
 ::: info Descrições em inglês
 As descrições abaixo estão em inglês: o código guarda cada uma em um só idioma, e esta página as mostra como estão em vez de traduzi-las à parte.
@@ -227,6 +227,22 @@ How the editor tells the columns of a brief's "\|" lines apart: 'off', 'separato
 | `"separator"` | Each "\|" that splits a line in the function colour. The default. |
 | `"alternate"` | The "\|" coloured, and every even column in the muted text colour. In some themes the muted colour barely differs from the text. |
 | `"perColumn"` | The "\|" coloured, and the columns cycling through three colours. Some themes draw a column below comfortable reading contrast. |
+
+## lineNumbers
+
+How the editor numbers its lines: 'on' (the default), 'relative' to the cursor's line, or 'off'.
+
+| Tipo | Padrão |
+| --- | --- |
+| `string` | `"on"` |
+
+**Valores**
+
+| Valor | Significado |
+| --- | --- |
+| `"on"` | Each line its own number. The default. |
+| `"relative"` | The cursor's line its own number, every other line its distance to the cursor: what a vim count like 5j moves. |
+| `"off"` | No line numbers. |
 
 ## zoom
 

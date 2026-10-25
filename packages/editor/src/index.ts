@@ -55,6 +55,8 @@ export {
 
 export { remeasureText } from './remeasure.js';
 
+export { LINE_NUMBERS_STYLES, type LineNumbersStyle, relativeLineNumber } from './line-numbers.js';
+
 export {
   STICKY_MAX_ROWS,
   type StickyBlock,

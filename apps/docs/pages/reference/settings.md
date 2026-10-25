@@ -2,7 +2,7 @@
 
 # Settings
 
-Every key the app declares in `settings.json`: 23. Open the file with **Preferences: Open Settings (JSON)**; a key you leave out keeps its default, and a value the app cannot read is reported in the Problems panel and the default applies. A plugin adds its own keys as `<plugin id>.<key>`, which are not listed here.
+Every key the app declares in `settings.json`: 24. Open the file with **Preferences: Open Settings (JSON)**; a key you leave out keeps its default, and a value the app cannot read is reported in the Problems panel and the default applies. A plugin adds its own keys as `<plugin id>.<key>`, which are not listed here.
 
 ## templatesFolder
 
@@ -223,6 +223,22 @@ How the editor tells the columns of a brief's "\|" lines apart: 'off', 'separato
 | `"separator"` | Each "\|" that splits a line in the function colour. The default. |
 | `"alternate"` | The "\|" coloured, and every even column in the muted text colour. In some themes the muted colour barely differs from the text. |
 | `"perColumn"` | The "\|" coloured, and the columns cycling through three colours. Some themes draw a column below comfortable reading contrast. |
+
+## lineNumbers
+
+How the editor numbers its lines: 'on' (the default), 'relative' to the cursor's line, or 'off'.
+
+| Type | Default |
+| --- | --- |
+| `string` | `"on"` |
+
+**Values**
+
+| Value | Meaning |
+| --- | --- |
+| `"on"` | Each line its own number. The default. |
+| `"relative"` | The cursor's line its own number, every other line its distance to the cursor: what a vim count like 5j moves. |
+| `"off"` | No line numbers. |
 
 ## zoom
 

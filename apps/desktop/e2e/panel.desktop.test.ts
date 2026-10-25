@@ -68,8 +68,28 @@ async function type(text: string): Promise<void> {
 const editorScrollTop = async (): Promise<number> =>
   page.evaluate(() => Math.round(document.querySelector('#editor .cm-scroller')?.scrollTop ?? 0));
 
-const activeLine = async (): Promise<string> =>
-  page.evaluate(() => document.querySelector('#editor .cm-activeLine')?.textContent ?? '');
+/**
+ * The text of the line holding the cursor, from CodeMirror's state. Not `.cm-activeLine`: a
+ * click that selects a range — a diagnostic, a slide's directive — leaves the line unshaded since
+ * TYTO-414. Not the drawn selection or the gutter's mark either: right after the preview's layout
+ * changes, the mark was measured 548 px above its line, and the selection missed it too.
+ */
+const activeLine = (): Promise<string> =>
+  page.evaluate(() => {
+    const content = document.querySelector('#editor .cm-content') as unknown as {
+      cmTile?: { root?: { view?: unknown } };
+    };
+    const view = content.cmTile?.root?.view as
+      | {
+          state: {
+            selection: { main: { head: number } };
+            doc: { lineAt(at: number): { text: string } };
+          };
+        }
+      | undefined;
+    if (view === undefined) throw new Error('no CodeMirror view behind the editor');
+    return view.state.doc.lineAt(view.state.selection.main.head).text;
+  });
 
 /**
  * Scrolls the editor to the top and waits until it is still there.

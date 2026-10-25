@@ -19,13 +19,12 @@ import {
   type ViewUpdate,
   drawSelection,
   dropCursor,
-  highlightActiveLine,
   highlightActiveLineGutter,
   keymap,
-  lineNumbers,
   rectangularSelection,
 } from '@codemirror/view';
 
+import { activeLine } from './active-line.js';
 import { brief } from './brief-language.js';
 import { type MarkedDiagnostic, diagnosticsSpec } from './diagnostic-markers.js';
 import { DEFAULT_TAB_SIZE, indentExtension } from './format-brief.js';
@@ -36,6 +35,7 @@ import { type BriefColumnStyle, DEFAULT_BRIEF_COLUMNS, briefColumns } from './co
 import { type CommandRegistry, commandRegistryFacet } from './commands.js';
 import { type SearchPhrases, searchSupport, setSearchPhrases } from './search.js';
 import { type EditorKeymap, defaultKeymapSet, keymapExtension } from './keymap.js';
+import { type LineNumbersStyle, lineNumbersExtension } from './line-numbers.js';
 import { type ThemeName, themes } from './theme.js';
 import { json } from './json-language.js';
 import { markdown } from './markdown-language.js';
@@ -158,6 +158,11 @@ export interface EditorOptions {
    * {@link EditorHandle.setBriefColumns}.
    */
   readonly briefColumns?: BriefColumnStyle;
+  /**
+   * How the gutter numbers the lines (TYTO-415): `on` (the default), `relative` or `off`. The
+   * desktop's `lineNumbers` setting changes it, live, through {@link EditorHandle.setLineNumbers}.
+   */
+  readonly lineNumbers?: LineNumbersStyle;
 }
 
 /**
@@ -430,6 +435,11 @@ export interface EditorHandle extends EditorPane {
    */
   setBriefColumns(style: BriefColumnStyle): void;
   /**
+   * Changes how the gutter numbers the lines in every pane and every tab, in place — a
+   * compartment, so nothing about the documents changes (TYTO-415).
+   */
+  setLineNumbers(style: LineNumbersStyle): void;
+  /**
    * Makes every pane read its text's size again, after the host changed the face or the size
    * it gives the editor (TYTO-272): the line height, the character width, and everything drawn
    * from them — the indent guides and the pinned head lines.
@@ -467,9 +477,8 @@ export interface EditorHandle extends EditorPane {
  * working Ctrl+Z.
  */
 const baseExtensions = (): Extension[] => [
-  lineNumbers(),
   highlightActiveLineGutter(),
-  highlightActiveLine(),
+  activeLine(),
   foldGutter(),
   historyExtension(),
   drawSelection(),
@@ -519,6 +528,8 @@ export function createEditor(parent: HTMLElement, options: EditorOptions = {}): 
   const indentCompartment = new Compartment();
   /** The look of a `|` line's columns, swapped by `setBriefColumns` (TYTO-298). */
   const columnsCompartment = new Compartment();
+  /** The line number gutter, or none, swapped by `setLineNumbers` (TYTO-415). */
+  const numbersCompartment = new Compartment();
 
   /**
    * The phrases as a mutable holder rather than a value baked into the extension list.
@@ -557,6 +568,8 @@ export function createEditor(parent: HTMLElement, options: EditorOptions = {}): 
   let guides: Extension = (options.indentGuides ?? true) ? guidesOn : [];
   /** What the sticky compartment holds now, for the same reason. */
   let sticky: Extension = (options.stickyScroll ?? true) ? stickyOn : [];
+  /** What the numbers compartment holds now, for the same reason. */
+  let numbers: Extension = lineNumbersExtension(options.lineNumbers ?? 'on');
   /** The size the indent compartment holds now, and the extension it holds for it. */
   let tabSize = options.tabSize ?? DEFAULT_TAB_SIZE;
   let indent: Extension = indentExtension(tabSize);
@@ -644,6 +657,7 @@ export function createEditor(parent: HTMLElement, options: EditorOptions = {}): 
     stickyCompartment.of(sticky),
     indentCompartment.of(indent),
     columnsCompartment.of(columns),
+    numbersCompartment.of(numbers),
     searchSupport(() => searchPhrases),
     languages[language](),
     ...baseExtensions(),
@@ -706,6 +720,9 @@ export function createEditor(parent: HTMLElement, options: EditorOptions = {}): 
         }
         if (columnsCompartment.get(view.state) !== columns) {
           view.dispatch({ effects: columnsCompartment.reconfigure(columns) });
+        }
+        if (numbersCompartment.get(view.state) !== numbers) {
+          view.dispatch({ effects: numbersCompartment.reconfigure(numbers) });
         }
         // Dispatched after, because a scroll effect is a property of the view and the view
         // has just been given a different state to measure. The phrases ride along: a state
@@ -827,6 +844,13 @@ export function createEditor(parent: HTMLElement, options: EditorOptions = {}): 
       if (next === columns) return;
       columns = next;
       everyView(columnsCompartment.reconfigure(columns));
+    },
+
+    setLineNumbers: (style: LineNumbersStyle) => {
+      const next = lineNumbersExtension(style);
+      if (next === numbers) return;
+      numbers = next;
+      everyView(numbersCompartment.reconfigure(numbers));
     },
 
     remeasure: () => {

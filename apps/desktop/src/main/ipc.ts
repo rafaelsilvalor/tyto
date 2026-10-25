@@ -24,6 +24,7 @@ import { type StatusBarColors } from '../../shared/status-bar-colors.js';
 import { type StatusBarItemId } from '../../shared/status-bar-items.js';
 import { type VimModeStyle } from '../../shared/vim-mode-style.js';
 import { type BriefColumnLook } from '../../shared/brief-columns.js';
+import { type LineNumbersLook } from '../../shared/line-numbers.js';
 import { type Typography, type ZoomStep } from '../../shared/typography.js';
 import { type Credentials } from './credentials.js';
 import { credentialAccount } from './installed-plugins.js';
@@ -68,6 +69,8 @@ export interface WindowThemes extends Pick<ThemeService, 'list' | 'current' | 'p
   formatBriefOnSave(): boolean;
   /** The `briefColumns` setting in force (TYTO-298), on the same answer. */
   briefColumns(): BriefColumnLook;
+  /** The `lineNumbers` setting in force (TYTO-415), on the same answer. */
+  lineNumbers(): LineNumbersLook;
   /** The faces and sizes in force (TYTO-272), on the same answer. */
   typography(): Typography;
 }
@@ -90,6 +93,7 @@ function appliedForWindow(
     | 'tabSize'
     | 'formatBriefOnSave'
     | 'briefColumns'
+    | 'lineNumbers'
     | 'typography'
   >,
 ): IpcResponse<'theme:current'> {
@@ -106,6 +110,7 @@ function appliedForWindow(
     tabSize: themes.tabSize(),
     formatBriefOnSave: themes.formatBriefOnSave(),
     briefColumns: themes.briefColumns(),
+    lineNumbers: themes.lineNumbers(),
     typography: { ...themes.typography() },
     light: { id: light.id, colors: light.colors },
     dark: { id: dark.id, colors: dark.colors },

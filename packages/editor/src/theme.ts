@@ -38,7 +38,9 @@ interface Palette {
    * Translucent on purpose (TYTO-246). `drawSelection` paints the selection on a layer behind
    * the text, and the active line's background sits on the line element above that layer, so
    * an opaque colour here hides any selection on the cursor's line. The host's token is chosen
-   * so that, over `background`, it composites to `activeLineGutter`.
+   * so that, over `background`, it composites to `activeLineGutter`. Since TYTO-414 the line is
+   * shaded only while nothing is selected, so no selection is under it any more; the token is
+   * kept as it is, since it still composites to the gutter's colour.
    */
   readonly activeLine: string;
   /** The gutter has no selection under it, so it keeps the opaque colour. */

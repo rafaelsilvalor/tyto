@@ -260,6 +260,7 @@ describe('the theme the window applies (TYTO-208)', () => {
     tabSize: 2,
     formatBriefOnSave: false,
     briefColumns: 'separator',
+    lineNumbers: 'on',
     typography: {
       uiFontFamily: 'Source Sans 3',
       uiFontSize: 14,
