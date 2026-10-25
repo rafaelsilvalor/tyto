@@ -1521,6 +1521,15 @@ export const diagnosticCodes = {
     fatal: false,
     fatality: 'A warning never replaces a value (ADR 0013).',
   },
+  // An unread stamp is an empty age, which 'where age >= 72' drops; one count keeps it visible.
+  W_RECIPE_AGE_UNREAD: {
+    severity: 'warning',
+    summary: "An 'age' found cells that none of its formats reads, and left their age empty.",
+    template: "{count} cell(s) of '{column}' match none of the formats '{format}' and have no age.",
+    spec: 'docs/adr/0139-a-recipe-run-reads-time-from-an-injected-clock.md',
+    fatal: false,
+    fatality: 'A warning never replaces a value (ADR 0013).',
+  },
 } as const satisfies Record<string, DiagnosticCodeDefinition>;
 
 export type DiagnosticCode = keyof typeof diagnosticCodes;

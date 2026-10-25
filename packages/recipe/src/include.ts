@@ -88,6 +88,8 @@ export async function include(context: VerbContext): Promise<VerbResult> {
     // The included recipe reads data relative to the host's recipe folder, not its own: the
     // port knows one folder (ADR 0137).
     resolveData: context.resolveData,
+    // One clock for the whole run, so a stamp reads the same inside an included recipe.
+    clock: context.clock,
     aliases: Object.fromEntries(context.aliases),
     within: context.recipes,
   });

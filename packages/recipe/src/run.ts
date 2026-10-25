@@ -1,6 +1,7 @@
 import { type Diagnostic, type Result, diagnostic, didYouMean, err, ok } from '@tyto/core';
 
 import type { RecipeAst, Step } from './ast.js';
+import { type RunClock, systemClock } from './clock.js';
 import type { DataResolver } from './data.js';
 import { fillPlaceholders } from './parse.js';
 import type { Plan } from './plan.js';
@@ -20,6 +21,11 @@ export interface RunOptions {
    * workspace (a test, a plugin's own runner) has none; a verb that needs one says so.
    */
   readonly resolveData?: DataResolver | undefined;
+  /**
+   * What now is and the offset a written time is in (ADR 0139); the machine's clock and zone
+   * when absent. A test fixes it, and `run` hands it to the recipe it includes.
+   */
+  readonly clock?: RunClock | undefined;
   /** `{alias: column}`: names a person types, read on the way in and never written out. */
   readonly aliases?: Readonly<Record<string, string>>;
   /** The recipes that include this one through `run`, outermost first. */
@@ -74,6 +80,7 @@ export async function runRecipe(
   let view: string | undefined;
   let failed = false;
   const recipes = [...(options.within ?? []), recipe.name];
+  const clock = options.clock ?? systemClock;
 
   for (const written of recipe.steps) {
     if (failed) {
@@ -96,6 +103,7 @@ export async function runRecipe(
       derivations: options.derivations,
       resolveRecipe: options.resolveRecipe,
       resolveData: options.resolveData,
+      clock,
       verbs: options.verbs,
       recipes,
     });
