@@ -150,8 +150,17 @@ export async function renderCommand(
 
   // Before the project, because an installed plugin's template pack is part of it: the
   // registry a brief is resolved against has to be able to find its templates (ADR 0046).
+  // A plugin's cache lives in `TYTO_HOME`; its workspace files are the brief's folder's, with
+  // that folder's trust, and a brief in no workspace answers that none is open (ADR 0138).
   const loaded = await loadInstalledPlugins(environment.home, {
-    capabilities: pluginCapabilities(environment.variables),
+    capabilities: pluginCapabilities(environment.variables, {
+      hostName: 'tyto render',
+      ...(environment.home === undefined ? {} : { home: environment.home }),
+      workspace:
+        workspace === undefined
+          ? { trust: 'restricted' }
+          : { folder: workspace.loaded.folder, trust: workspace.loaded.trust },
+    }),
   });
   const context = await loadRenderContext({
     templatesDirectory: resolve(cwd, options.templates),

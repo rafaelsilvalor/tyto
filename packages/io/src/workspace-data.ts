@@ -7,15 +7,14 @@ import {
   diagnostic,
   err,
   isAbsolutePath,
-  isInsidePath,
   ok,
   resolvePath,
 } from '@tyto/core';
 import type { DataResolver } from '@tyto/plugin-api';
 
-import { isInside } from './contain.js';
 import { readJsoncValue } from './jsonc-text.js';
-import { isMissing, realOrResolved } from './real-paths.js';
+import { isMissing } from './real-paths.js';
+import { confineToWorkspace } from './workspace-confine.js';
 
 /**
  * The workspace's answer to a recipe's `@./file.json#/pointer` (ADR 0136, ADR 0137).
@@ -55,17 +54,19 @@ export function workspaceDataResolver(options: WorkspaceDataOptions): DataResolv
     const refuse = (problem: string): Read =>
       err([diagnostic('E_RECIPE_DATA', { reference: path, problem })]);
 
-    // Lexical first: no disk is touched for a path that climbs out as written.
+    // Lexical first, then after `realpath`: a link inside the folder may lead out of it.
     const target = resolvePath(options.recipeFolder, path);
-    if (isAbsolutePath(path) || !isInsidePath(options.workspaceFolder, target)) {
-      return refuse('leaves the workspace folder, and a data file is read only inside it');
+    const confined = isAbsolutePath(path)
+      ? ({ refused: 'outside' } as const)
+      : await confineToWorkspace(options.workspaceFolder, target, { follow: 'existing' });
+    if ('refused' in confined) {
+      return refuse(
+        confined.refused === 'outside'
+          ? 'leaves the workspace folder, and a data file is read only inside it'
+          : 'leads out of the workspace folder through a link, and is not read',
+      );
     }
-    // Then the real path: a junction or a symbolic link inside the folder may lead out of it.
-    const real = await realOrResolved(target);
-    const realRoot = await realOrResolved(options.workspaceFolder);
-    if (!isInside(realRoot, real)) {
-      return refuse('leads out of the workspace folder through a link, and is not read');
-    }
+    const { real } = confined;
 
     let size: number;
     try {

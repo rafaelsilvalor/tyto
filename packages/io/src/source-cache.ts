@@ -152,7 +152,7 @@ async function existing(stem: string, extensions: readonly string[]): Promise<st
  * Written beside its final name and renamed into place, so a run killed mid-write leaves no
  * truncated entry that every later run would read as the answer.
  */
-async function writeEntry(path: string, bytes: Uint8Array): Promise<void> {
+export async function writeEntry(path: string, bytes: Uint8Array): Promise<void> {
   const partial = `${path}.${randomUUID()}.part`;
   try {
     await writeFile(partial, bytes);

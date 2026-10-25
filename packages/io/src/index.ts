@@ -134,6 +134,14 @@ export {
   workspaceDataResolver,
 } from './workspace-data.js';
 
+export { type PluginCacheOptions, type PluginCachePorts, pluginCache } from './plugin-cache.js';
+
+export {
+  type WorkspaceFilePorts,
+  type WorkspaceFilesOptions,
+  workspaceFiles,
+} from './workspace-files.js';
+
 export {
   type FsTrustStore,
   type FsTrustStoreOptions,

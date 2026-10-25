@@ -70,8 +70,13 @@ export async function watchCommand(
   // Read once for the life of the watcher: a plugin installed while it runs is seen on
   // restart, the same rule the machine's fonts follow. Before the project, because an
   // installed template pack is part of it (ADR 0046).
+  // The cache and no workspace files: an inbox has no folder a person opened and trusted
+  // (ADR 0118, ADR 0138), and the refusal names `tyto watch`.
   const loaded = await loadInstalledPlugins(environment.home, {
-    capabilities: pluginCapabilities(environment.variables),
+    capabilities: pluginCapabilities(environment.variables, {
+      hostName: 'tyto watch',
+      ...(environment.home === undefined ? {} : { home: environment.home }),
+    }),
   });
   const context = await loadRenderContext({
     templatesDirectory: resolve(cwd, options.templates),

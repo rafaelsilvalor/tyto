@@ -1,5 +1,8 @@
+import { mkdtemp, rm } from 'node:fs/promises';
 import { type Server, createServer } from 'node:http';
 import type { AddressInfo } from 'node:net';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 
 import { PluginCapabilityError, checkedCapabilities } from '@tyto/plugin-api';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
@@ -55,6 +58,58 @@ describe('writing a credential from the CLI', () => {
       );
     }
     expect(await checked.credentials('api-token')).toBe('s3cret');
+  });
+});
+
+describe('the cache and the workspace files of each command (ADR 0138)', () => {
+  let home: string;
+  beforeEach(async () => {
+    home = await mkdtemp(join(tmpdir(), 'tyto-cli-capabilities-'));
+  });
+  afterEach(async () => {
+    await rm(home, { recursive: true, force: true });
+  });
+
+  const refusal = (attempt: Promise<unknown>) =>
+    attempt.then(
+      () => 'resolved',
+      (cause: unknown) => (cause as Error).message,
+    );
+
+  it('gives tyto watch the cache and no workspace files, naming it in the refusal', async () => {
+    const checked = checkedCapabilities(
+      'jira',
+      ['workspace:read'],
+      pluginCapabilities({}, { hostName: 'tyto watch', home }),
+    );
+    await checked.cachePut('k', new TextEncoder().encode('v'));
+    expect((await checked.cacheList('')).map((entry) => entry.key)).toEqual(['k']);
+    expect(await refusal(checked.workspaceRead('table.csv'))).toBe(
+      "Plugin 'jira' could not use workspace file 'table.csv': tyto watch gives plugins no " +
+        'workspace files.',
+    );
+  });
+
+  it('answers that no folder is open for a brief in no workspace', async () => {
+    const checked = checkedCapabilities(
+      'jira',
+      ['workspace:read'],
+      pluginCapabilities({}, { hostName: 'tyto render', home, workspace: { trust: 'restricted' } }),
+    );
+    expect(await refusal(checked.workspaceRead('table.csv'))).toBe(
+      "Plugin 'jira' could not use workspace file 'table.csv': no workspace folder is open.",
+    );
+  });
+
+  it('keeps no cache without a TYTO_HOME, and says which command', async () => {
+    const checked = checkedCapabilities(
+      'jira',
+      [],
+      pluginCapabilities({}, { hostName: 'tyto render' }),
+    );
+    expect(await refusal(checked.cacheGet('k'))).toBe(
+      "Plugin 'jira' could not use its cache entry 'k': tyto render keeps no cache for plugins.",
+    );
   });
 });
 
