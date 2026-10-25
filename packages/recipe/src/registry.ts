@@ -1,6 +1,7 @@
 import { type Diagnostic, type Result, diagnostic, err, ok } from '@tyto/core';
 
 import type { RecipeAst, Step } from './ast.js';
+import type { RunClock } from './clock.js';
 import type { DataResolver } from './data.js';
 import type { Plan } from './plan.js';
 import type { Table } from './table.js';
@@ -34,6 +35,11 @@ export interface VerbContext {
    * Absent where the host gives recipes no files: a verb that needs one then says so.
    */
   readonly resolveData?: DataResolver | undefined;
+  /**
+   * The run's clock, which `age` reads a stamp against (ADR 0139). Absent in a context built
+   * outside `runRecipe`; a verb then reads the system clock.
+   */
+  readonly clock?: RunClock | undefined;
   /** The registry the run uses, which `run` hands to the recipe it includes. */
   readonly verbs: VerbRegistry;
   /** The recipes running, outermost first and this one last, so `run` can refuse a cycle. */
@@ -83,6 +89,7 @@ export const GENERIC_VERBS = [
   'nearest',
   'map',
   'path',
+  'age',
 ] as const;
 
 const CONTRIBUTED_NAME = /^[a-z][a-z0-9-]*\.[a-z][a-z0-9-]*$/u;

@@ -168,6 +168,7 @@ non-zero.
 | `E_RECIPE_TEMPLATE` | error | no | A 'compose' or 'rules' template has an unclosed placeholder, a stray brace or a filter that does not exist. |
 | `W_RECIPE_WHERE_EMPTY` | warning | no | A 'where' kept no row of a table that had rows. |
 | `W_RECIPE_JOIN_AMBIGUOUS` | warning | no | A 'join' left rows unpaired because their key answered to more than one row. |
+| `W_RECIPE_AGE_UNREAD` | warning | no | An 'age' found cells that none of its formats reads, and left their age empty. |
 
 ## What is fatal, and why
 
@@ -2407,6 +2408,20 @@ A warning never replaces a value (ADR 0013).
 ```
 
 Parameters: `count`, `prefix`, `rows`
+
+### `W_RECIPE_AGE_UNREAD`
+
+**Severity:** warning · **Fatal:** no · **Spec:** `docs/adr/0139-a-recipe-run-reads-time-from-an-injected-clock.md`
+
+An 'age' found cells that none of its formats reads, and left their age empty.
+
+A warning never replaces a value (ADR 0013).
+
+```
+{count} cell(s) of '{column}' match none of the formats '{format}' and have no age.
+```
+
+Parameters: `count`, `column`, `format`
 
 ## Codes the desktop window mints
 

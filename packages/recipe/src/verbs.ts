@@ -1,5 +1,6 @@
 import { diagnostic, ok } from '@tyto/core';
 
+import { age } from './age.js';
 import { resolveColumn } from './columns.js';
 import { collect, compose } from './compose.js';
 import { derive } from './derive.js';
@@ -37,6 +38,7 @@ export const genericVerbs: Readonly<Record<string, Verb>> = {
   nearest: { kind: 'transform', run: nearest },
   map: { kind: 'transform', run: map },
   path: { kind: 'transform', run: path },
+  age: { kind: 'transform', run: age },
 };
 
 /** `where <expression>`: keeps the rows that satisfy every predicate. */

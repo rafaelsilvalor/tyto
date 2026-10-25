@@ -8,6 +8,8 @@ export type { ArgumentSpec, ArgumentType, ArgumentValue, ArgumentValues } from '
 export { readArguments } from './arguments.js';
 export type { Argument, NamedArgument, RecipeAst, RecipeParam, Step } from './ast.js';
 export { checkTable } from './check-table.js';
+export type { RunClock } from './clock.js';
+export { systemClock } from './clock.js';
 export type { DataReference, DataResolver } from './data.js';
 export { isDataReference, parseDataReference, readDataArgument, resolvePointer } from './data.js';
 export { resolveColumn } from './columns.js';
