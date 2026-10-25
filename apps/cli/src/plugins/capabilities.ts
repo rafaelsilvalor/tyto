@@ -1,3 +1,5 @@
+import type { Trust } from '@tyto/core';
+import { pluginCache, workspaceFiles } from '@tyto/io';
 import type { FetchedResponse, HostCapabilities, HostFetchInit } from '@tyto/plugin-api';
 
 /**
@@ -12,6 +14,11 @@ import type { FetchedResponse, HostCapabilities, HostFetchInit } from '@tyto/plu
  * plugin `meu-pdf`'s `api.token` is `TYTO_PLUGIN_MEU_PDF_API_TOKEN`. The environment is
  * what a CLI in a CI job or a cron line already has for secrets, and Tyto stores none
  * (ADR 0011); the desktop answers from `safeStorage` instead.
+ *
+ * **The cache and the workspace files** (ADR 0138) are given when the command has them: the
+ * cache wherever there is a `TYTO_HOME`, the workspace files only to `tyto render`, against the
+ * folder `findWorkspace` found and its trust. `tyto watch` has no folder a person opened and
+ * trusted (ADR 0118), so its refusal names it.
  */
 
 type Variables = Readonly<Record<string, string | undefined>>;
@@ -44,8 +51,30 @@ async function fetchWithoutRedirects(url: string, init: HostFetchInit): Promise<
   };
 }
 
-export function pluginCapabilities(variables: Variables = {}): HostCapabilities {
+/** What a command adds to the network and the secrets (ADR 0138). */
+export interface CommandCapabilities {
+  /** The name a refusal gives the command: `tyto render`, `tyto watch`. */
+  readonly hostName?: string;
+  /** `TYTO_HOME`, where the cache lives; absent, the command keeps none. */
+  readonly home?: string;
+  /**
+   * The brief's workspace, or `undefined` for a brief in none — a call then answers that no
+   * folder is open. Absent altogether, the command gives plugins no workspace files.
+   */
+  readonly workspace?: { readonly folder?: string; readonly trust: Trust };
+}
+
+export function pluginCapabilities(
+  variables: Variables = {},
+  command: CommandCapabilities = {},
+): HostCapabilities {
+  const { workspace } = command;
   return {
+    ...(command.hostName === undefined ? {} : { hostName: command.hostName }),
+    ...(command.home === undefined ? {} : pluginCache({ home: command.home })),
+    ...(workspace === undefined
+      ? {}
+      : workspaceFiles({ folder: () => workspace.folder, trust: () => workspace.trust })),
     fetch: fetchWithoutRedirects,
     credential: (plugin, key) => {
       const value = variables[credentialVariable(plugin, key)];

@@ -5,13 +5,23 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-import type { Scene } from '@tyto/core';
-import { connectIsolatedPlugin, createPluginHost, recipeRegistriesOf } from '@tyto/plugin-api';
+import type { Scene, Trust } from '@tyto/core';
+import {
+  type HostCapabilities,
+  type PluginChannel,
+  connectIsolatedPlugin,
+  createPluginHost,
+  recipeRegistriesOf,
+} from '@tyto/plugin-api';
 import { parseRecipe, runRecipe } from '@tyto/recipe';
 import { afterEach, beforeEach, describe, expect, inject, it } from 'vitest';
 
 import { pluginCapabilities } from './capabilities.js';
-import { WINDOWS_REQUIRED_VARIABLES, pluginProcessLauncher } from './plugin-process.js';
+import {
+  WINDOWS_REQUIRED_VARIABLES,
+  pluginProcessLauncher,
+  sandboxFlags,
+} from './plugin-process.js';
 
 /**
  * The child-process adapter, with real processes under Node's permission model (TYTO-48,
@@ -79,6 +89,10 @@ interface ConnectOptions {
   /** The folder the process is told it is in: {@link folder} unless a test links to it. */
   readonly directory?: string;
   readonly flags?: (grants: readonly string[]) => string[];
+  /** The host's side: the environment's credentials unless a test composes its own. */
+  readonly capabilities?: HostCapabilities;
+  /** Stands between the process and the host, so a test can read what crossed. */
+  readonly channel?: (channel: PluginChannel) => PluginChannel;
 }
 
 async function connecting(body: string, crashes: string[] = [], options: ConnectOptions = {}) {
@@ -91,10 +105,13 @@ async function connecting(body: string, crashes: string[] = [], options: Connect
   return connectIsolatedPlugin({
     name: 'texto',
     manifest: { ...MANIFEST, permissions: options.permissions ?? [] },
-    channel: launch({ name: 'texto', entry: join(directory, 'index.js'), directory }),
+    channel: (options.channel ?? ((channel) => channel))(
+      launch({ name: 'texto', entry: join(directory, 'index.js'), directory }),
+    ),
     requireSandbox: true,
     onCrash: (reason) => crashes.push(reason),
-    capabilities: pluginCapabilities({ TYTO_PLUGIN_TEXTO_API_TOKEN: 's3cret' }),
+    capabilities:
+      options.capabilities ?? pluginCapabilities({ TYTO_PLUGIN_TEXTO_API_TOKEN: 's3cret' }),
     ...(options.deadlineMs === undefined ? {} : { deadlineMs: options.deadlineMs }),
   }).then((connected) => ({ connected, entry }));
 }
@@ -266,6 +283,87 @@ describe("a plugin in a child process, asking for the host's capabilities", () =
     expect(answer.ok && answer.value).toBe(
       'E_PERMISSION E_PERMISSION E_CREDENTIAL_READ_ONLY E_CREDENTIAL_READ_ONLY',
     );
+    await isolated.close();
+  }, 60_000);
+});
+
+describe("a plugin in a child process, using the CLI's cache and workspace files (TYTO-371)", () => {
+  // Starts a plugin's process, which a full `pnpm check` can hold past Vitest's 5 s.
+  it('puts, gets and lists, writes and reads back, and is refused out and restricted', async () => {
+    const home = join(root, 'home');
+    const workspaceFolder = join(root, 'workspace');
+    await mkdir(workspaceFolder);
+    // A junction inside the workspace that leads to the folder holding the secret.
+    await symlink(root, join(workspaceFolder, 'escape'), 'junction');
+    const workspace: { folder: string; trust: Trust } = {
+      folder: workspaceFolder,
+      trust: 'trusted',
+    };
+
+    const execArgv: string[] = [];
+    const sandbox: unknown[] = [];
+    const { isolated, exporter } = await connect(
+      answering(
+        `(async () => {
+          const code = (attempt) => attempt.then(() => 'ok', (cause) => cause.code);
+          calls += 1;
+          if (calls > 1) return code(host.workspace.read('tables/sprint.csv'));
+          const text = (bytes) => new TextDecoder().decode(bytes);
+          const put = await host.cache.put('issues/TYTO-1', 'raw answer');
+          const got = await host.cache.get('issues/TYTO-1');
+          const listed = await host.cache.list('issues/');
+          await host.workspace.write('tables/sprint.csv', 'a,b');
+          return [
+            text(got.bytes),
+            got.storedAt === put.storedAt ? 'dated by the host' : 'dates differ',
+            listed.map((entry) => entry.key + ':' + entry.size).join(','),
+            text(await host.workspace.read('tables/sprint.csv')),
+            await code(host.workspace.read('escape/secret.txt')),
+            await code(host.workspace.write('escape/written.txt', 'x')),
+            await code(host.workspace.read('../secret.txt')),
+          ].join(' | ');
+        })()`,
+      ),
+      [],
+      {
+        permissions: ['workspace:read', 'workspace:write'],
+        prelude: 'let calls = 0;',
+        capabilities: pluginCapabilities({}, { hostName: 'tyto render', home, workspace }),
+        flags: (grants) => {
+          const flags = sandboxFlags(grants);
+          execArgv.push(...flags);
+          return flags;
+        },
+        channel: (channel) => ({
+          ...channel,
+          onMessage: (listener) =>
+            channel.onMessage((message) => {
+              const hello = message as { type?: string; sandbox?: unknown };
+              if (hello.type === 'hello') sandbox.push(hello.sandbox);
+              listener(message);
+            }),
+        }),
+      },
+    );
+
+    const answer = await exporter.exportFrame(SCENE, ARTWORK, FRAME);
+    expect(answer.ok && answer.value).toBe(
+      'raw answer | dated by the host | issues/TYTO-1:10 | a,b | ' +
+        'E_WORKSPACE_FILE | E_WORKSPACE_FILE | E_WORKSPACE_FILE',
+    );
+    expect(await readFile(join(workspaceFolder, 'tables', 'sprint.csv'), 'utf8')).toBe('a,b');
+    expect(await readdir(root)).not.toContain('written.txt');
+    expect(await readdir(join(home, 'cache', 'plugins', 'texto'))).toHaveLength(2);
+
+    // The folder's trust is read on every call: restricted now, the same read is withheld.
+    workspace.trust = 'restricted';
+    const restricted = await exporter.exportFrame(SCENE, ARTWORK, FRAME);
+    expect(restricted.ok && restricted.value).toBe('E_WORKSPACE_FILE_RESTRICTED');
+
+    // Every write crossed the boundary: the process kept ADR 0049's sandbox.
+    expect(sandbox).toEqual([expect.objectContaining({ canary: 'denied' })]);
+    expect(execArgv).toContain('--permission');
+    expect(execArgv.filter((flag) => flag.startsWith('--allow-fs-write'))).toEqual([]);
     await isolated.close();
   }, 60_000);
 });
