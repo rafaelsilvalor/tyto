@@ -1,6 +1,15 @@
 import { type ZodType, z } from 'zod';
 
-import { PluginCapabilityError, hostCredentials, responseOf } from '../capabilities.js';
+import {
+  PluginCapabilityError,
+  type PluginCacheEntry,
+  type PluginCacheListing,
+  type PluginCacheStored,
+  hostCache,
+  hostCredentials,
+  hostWorkspace,
+  responseOf,
+} from '../capabilities.js';
 
 import type { Disposable, HostEventListener, HostEvents, Logger, PluginHost } from '../host.js';
 import type { GuestChannel } from './channel.js';
@@ -19,9 +28,13 @@ import {
   type RequestedCapability,
   type Registration,
   type SandboxReport,
+  cacheEntrySchema,
+  cacheListingSchema,
+  cacheStoredSchema,
   describeIssues,
   fetchedResponseSchema,
   hostMessageSchema,
+  workspaceBytesSchema,
 } from './protocol.js';
 
 /**
@@ -223,6 +236,24 @@ export function runGuest(
       },
       async (key) => (await request('deleteCredential', [key], forgottenSchema)) as boolean,
     ),
+    // Each answer checked against its schema on the way in, as `fetch`'s is (ADR 0138).
+    cache: hostCache({
+      cacheGet: async (key) =>
+        ((await request('cacheGet', [key], cacheEntrySchema)) as PluginCacheEntry | null) ??
+        undefined,
+      cachePut: async (key, bytes) =>
+        (await request('cachePut', [key, bytes], cacheStoredSchema)) as PluginCacheStored,
+      cacheDelete: async (key) => (await request('cacheDelete', [key], forgottenSchema)) as boolean,
+      cacheList: async (prefix) =>
+        (await request('cacheList', [prefix], cacheListingSchema)) as PluginCacheListing[],
+    }),
+    workspace: hostWorkspace({
+      workspaceRead: async (path) =>
+        (await request('workspaceRead', [path], workspaceBytesSchema)) as Uint8Array,
+      workspaceWrite: async (path, bytes) => {
+        await request('workspaceWrite', [path, bytes], storedSchema);
+      },
+    }),
     log,
     events: {
       on<Event extends keyof HostEvents>(event: Event, listener: HostEventListener<Event>) {

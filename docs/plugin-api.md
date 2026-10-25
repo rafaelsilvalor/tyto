@@ -491,6 +491,8 @@ interface PluginHost {
   config<T>(schema: ZodType<T>): T;             // validated user config, declared settings included
   credentials(key: string): Promise<string>;    // credentials:<key> only; env in the CLI, safeStorage on desktop
   fetch(url, init?): Promise<HostFetchResponse>; // net:<host> only; redirects not followed
+  cache: HostCache;                             // private, no permission; get/put/delete/list (ADR 0138)
+  workspace: HostWorkspace;                     // workspace:read / workspace:write; read/write (ADR 0138)
   log: Logger; events: TypedEmitter<HostEvents>;
 }
 ```
@@ -512,6 +514,20 @@ interface PluginHost {
 
 The network and the secrets are a port, `HostCapabilities`. **In the CLI a credential is an environment variable**, `TYTO_PLUGIN_<NAME>_<KEY>`, both halves upper-cased with every character that is not a letter or a digit turned into `_` — plugin `meu-pdf`'s `api.token` is `TYTO_PLUGIN_MEU_PDF_API_TOKEN` — and an empty variable is unset. **The CLI's credentials are read-only**: a plugin's `set` or `delete` there is `E_CREDENTIAL_READ_ONLY`, naming the variable, because the environment is the person's to set and a value written into it would vanish with the process. **On the desktop a credential is a keychain entry and nothing else** (`CLAUDE.md`): `safeStorage`, under the account `plugin:<name>:<key>`, with no environment fallback. A person stores one in the plugins screen, beside the plugin that declares it (TYTO-187), or the plugin stores one itself with `host.credentials.set`; until then a declared key answers `E_CREDENTIAL_MISSING`, and its message points to that screen. The window can set or forget only a key an installed manifest declares, within the same 16 KiB, and it never reads one back: the screen learns whether a key is set and nothing more. **The account prefix `signin:<plugin>:<id>` is reserved** for the tokens browser sign-in will keep (ADR 0131): `plugin:<name>:<key>` can never produce it, so no `credentials:<key>` reaches a sign-in token. The desktop's network is Electron's `net.fetch`, with `redirect: 'manual'`, so it honours the system's proxy.
 
+### `host.cache` and `host.workspace` (ADR 0138)
+
+| Permission        | Allows                                                   |
+| ----------------- | -------------------------------------------------------- |
+| none              | `host.cache.get`, `.put`, `.delete`, `.list`             |
+| `workspace:read`  | `host.workspace.read(path)`, relative to the open folder |
+| `workspace:write` | `host.workspace.write(path, bytes)`, never into `.tyto/` |
+
+**The cache is the plugin's own**, kept by the host outside every workspace and keyed by the plugin's name and a key it chooses, so it needs no permission and works in a restricted folder. `get(key)` resolves to `{ bytes, storedAt }` or `undefined`; `put(key, bytes | string)` to `{ storedAt }`; `delete(key)` to whether there was an entry; `list(prefix = '')` to `{ key, storedAt, size }[]`. `storedAt` is ISO 8601 from the host's clock, never the plugin's. A key is a non-empty string of at most **1 KiB in UTF-8** (`PLUGIN_CACHE_KEY_LIMIT_BYTES`) and an entry at most **32 MiB** (`PLUGIN_FILE_LIMIT_BYTES`); either refused is `E_PLUGIN_CACHE`. The cache as a whole has no ceiling.
+
+**The workspace is the folder the person opened**, read and written only through the host. `read(path)` resolves to the bytes; `write(path, bytes | string)` writes the file whole and resolves to `null`. A path is relative to the folder: an absolute one, a `..` that leaves it, a link that lands outside it, a missing file, a file over 32 MiB, no folder open, and a write into `.tyto/` — refused even in a trusted folder — are `E_WORKSPACE_FILE`; a restricted folder is `E_WORKSPACE_FILE_RESTRICTED`, whose remedy is trusting it. The folder and its trust are read on every call. `checkedCapabilities` refuses the permission, the sizes and the lexical path; the adapter confines the path again after `realpath`.
+
+Six optional ports on `HostCapabilities` answer them: `cacheGet`, `cachePut`, `cacheDelete`, `cacheList`, `workspaceRead`, `workspaceWrite`, each taking the plugin's name first. A host without the cache ports answers `E_PLUGIN_CACHE`, without the workspace ports `E_WORKSPACE_FILE`, naming itself by `hostName`. **In the CLI `tyto render` has both and `tyto watch` the cache only** (ADR 0118). On disk an entry is `TYTO_HOME/cache/plugins/<plugin>/<sha256(key)>.bin` with a `.json` sidecar `{ key, storedAt, size }`, both written atomically.
+
 ## Isolation
 
 - Main: each plugin in a process of its own under Node's permission model: a child of the CLI's Node, or of the Node the desktop carries (ADR 0050). Typed RPC; the host is a proxy.
@@ -525,7 +541,7 @@ The network and the secrets are a port, `HostCapabilities`. **In the CLI a crede
 
 ```
 host (CLI process)                               guest (plugin's process)
-  connectIsolatedPlugin ◀── hello {protocol: 3, sandbox} ── runGuest
+  connectIsolatedPlugin ◀── hello {protocol: 6, sandbox} ── runGuest
                            canary denied? else E_PLUGIN_SANDBOX
                         ── activate {config} ──▶   plugin.activate(guestHost)
                         ◀── activated {registrations: data + {$call: n}}

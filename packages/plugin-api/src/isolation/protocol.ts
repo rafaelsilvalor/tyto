@@ -21,9 +21,11 @@ import { z } from 'zod';
  * the brand kit, which a strict schema on an older guest would refuse (ADR 0063); 4 since
  * the kit's marks may be toned and it may carry a wordmark, which a guest on 3 would
  * refuse the same way (ADR 0066); 5 since a plugin may store and forget a credential, two
- * requests a host on 4 would refuse as an unknown capability (ADR 0134).
+ * requests a host on 4 would refuse as an unknown capability (ADR 0134); 6 since a plugin
+ * has a private cache and the workspace's files, six requests a host on 5 would refuse the
+ * same way (ADR 0138).
  */
-export const RPC_PROTOCOL_VERSION = 5;
+export const RPC_PROTOCOL_VERSION = 6;
 
 const protocol = z.literal(RPC_PROTOCOL_VERSION);
 
@@ -157,6 +159,12 @@ const requestedCapabilitySchema = z.enum([
   'credentials',
   'storeCredential',
   'deleteCredential',
+  'cacheGet',
+  'cachePut',
+  'cacheDelete',
+  'cacheList',
+  'workspaceRead',
+  'workspaceWrite',
 ]);
 export type RequestedCapability = z.infer<typeof requestedCapabilitySchema>;
 
@@ -188,7 +196,7 @@ export const guestMessageSchema = z.discriminatedUnion('type', [
   }),
   /**
    * The plugin asking the host for one of its capabilities: `host.fetch`, `host.credentials`
-   * and its `.set` and `.delete`.
+   * and its `.set` and `.delete`, `host.cache` and `host.workspace`.
    */
   z.strictObject({
     protocol,
@@ -223,6 +231,32 @@ export const credentialsArgsSchema = z.tuple([z.string().min(1)]);
 /** The size ceiling is not here: it is checked once, in `checkedCapabilities`. */
 export const storeCredentialArgsSchema = z.tuple([z.string().min(1), z.string().min(1)]);
 export const deleteCredentialArgsSchema = credentialsArgsSchema;
+
+/*
+ * The cache and the workspace (ADR 0138). Shape only: an empty key, a path that leaves the
+ * folder and an entry over the ceiling are `checkedCapabilities`' to refuse, with the
+ * diagnostic a plugin can read, rather than a schema complaint here.
+ */
+const bytesSchema = z.instanceof(Uint8Array);
+export const cacheKeyArgsSchema = z.tuple([z.string()]);
+export const cachePutArgsSchema = z.tuple([z.string(), bytesSchema]);
+export const workspaceReadArgsSchema = z.tuple([z.string()]);
+export const workspaceWriteArgsSchema = z.tuple([z.string(), bytesSchema]);
+
+/** `host.cache.get`'s answer; `null` is a miss, because a JSON channel drops `undefined`. */
+export const cacheEntrySchema = z.union([
+  z.null(),
+  z.strictObject({ bytes: bytesSchema, storedAt: z.string().min(1) }),
+]);
+export const cacheStoredSchema = z.strictObject({ storedAt: z.string().min(1) });
+export const cacheListingSchema = z.array(
+  z.strictObject({
+    key: z.string().min(1),
+    storedAt: z.string().min(1),
+    size: z.number().int().nonnegative(),
+  }),
+);
+export const workspaceBytesSchema = bytesSchema;
 
 /** What `host.fetch` answers, checked by the guest before the plugin sees it. */
 export const fetchedResponseSchema = z.strictObject({

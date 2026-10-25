@@ -444,6 +444,36 @@ export const diagnosticCodes = {
     fatal: false,
     fatality: "It is the plugin's call that is refused; what the plugin does with that is its own.",
   },
+  // A plugin's private cache and the workspace files it reaches through the host (ADR 0138,
+  // completing ADR 0130). Three codes, so a plugin can tell "trust the folder" from the rest.
+  E_PLUGIN_CACHE: {
+    severity: 'error',
+    summary:
+      "A plugin's cache call was refused: an empty or oversized key, an entry over the ceiling, or a host with no cache.",
+    template: "Plugin '{plugin}' could not use its cache entry '{key}': {problem}.",
+    spec: 'docs/adr/0138-a-plugin-cache-and-workspace-files-cross-the-host-boundary.md',
+    fatal: false,
+    fatality: "It is the plugin's call that is refused; what the plugin does with that is its own.",
+  },
+  E_WORKSPACE_FILE: {
+    severity: 'error',
+    summary:
+      "A plugin's workspace file was refused: outside the folder, through a link, missing, too large, inside .tyto/, or no folder is open.",
+    template: "Plugin '{plugin}' could not use workspace file '{path}': {problem}.",
+    spec: 'docs/adr/0138-a-plugin-cache-and-workspace-files-cross-the-host-boundary.md',
+    fatal: false,
+    fatality: "It is the plugin's call that is refused; what the plugin does with that is its own.",
+  },
+  // Withheld, not missing: trusting the folder lets the same call through (ADR 0111).
+  E_WORKSPACE_FILE_RESTRICTED: {
+    severity: 'error',
+    summary: 'A plugin asked for a file of a workspace the person has not trusted.',
+    template:
+      "Plugin '{plugin}' asked for workspace file '{path}', and this folder is restricted; trust the folder to let plugins read and write its files.",
+    spec: 'docs/adr/0138-a-plugin-cache-and-workspace-files-cross-the-host-boundary.md',
+    fatal: false,
+    fatality: "It is the plugin's call that is refused; what the plugin does with that is its own.",
+  },
   W_PLUGIN_CRASHED: {
     severity: 'warning',
     summary: "An installed plugin's process crashed on an earlier run. History, not a refusal.",
