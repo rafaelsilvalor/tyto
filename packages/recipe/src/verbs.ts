@@ -1,10 +1,12 @@
 import { diagnostic, ok } from '@tyto/core';
 
 import { resolveColumn } from './columns.js';
+import { collect, compose } from './compose.js';
 import { derive } from './derive.js';
 import { include } from './include.js';
 import { join } from './join.js';
 import type { Verb, VerbContext, VerbResult } from './registry.js';
+import { rules } from './rules.js';
 import { argumentsProblem, columnNames, refuseNamed, requireTable, rowFilter } from './support.js';
 import { type CellValue, type Column, type Row, type Table, comparable } from './table.js';
 
@@ -21,6 +23,9 @@ export const genericVerbs: Readonly<Record<string, Verb>> = {
   derive: { kind: 'transform', run: derive },
   show: { kind: 'transform', run: show },
   keep: { kind: 'transform', run: keep },
+  rules: { kind: 'transform', run: rules },
+  compose: { kind: 'transform', run: compose },
+  collect: { kind: 'transform', run: collect },
 };
 
 /** `where <expression>`: keeps the rows that satisfy every predicate. */

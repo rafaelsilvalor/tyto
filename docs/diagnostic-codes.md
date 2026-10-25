@@ -160,6 +160,8 @@ non-zero.
 | `E_RECIPE_DATA_RESTRICTED` | error | no | A data reference names a file in a workspace the person has not trusted. |
 | `E_RECIPE_DATA_SYNTAX` | error | no | A data file is not valid JSON with comments. |
 | `E_RECIPE_DATA_SHAPE` | error | no | A data reference's pointer reaches nothing, or the slice it reaches is not what the verb reads. |
+| `E_RECIPE_RULES` | error | no | A 'rules' table cannot be read, sets a column 'into=' does not name, or has an entry no row can reach. |
+| `E_RECIPE_TEMPLATE` | error | no | A 'compose' or 'rules' template has an unclosed placeholder, a stray brace or a filter that does not exist. |
 | `W_RECIPE_WHERE_EMPTY` | warning | no | A 'where' kept no row of a table that had rows. |
 | `W_RECIPE_JOIN_AMBIGUOUS` | warning | no | A 'join' left rows unpaired because their key answered to more than one row. |
 
@@ -277,6 +279,8 @@ incomplete brief, and a crossed box where a picture the exporter could not load 
 | `E_RECIPE_DATA_RESTRICTED` | no | That cell has no table and the cells after it do not run; earlier cells keep theirs. |
 | `E_RECIPE_DATA_SYNTAX` | no | That cell has no table and the cells after it do not run; earlier cells keep theirs. |
 | `E_RECIPE_DATA_SHAPE` | no | That cell has no table and the cells after it do not run; earlier cells keep theirs. |
+| `E_RECIPE_RULES` | no | That cell has no table and the cells after it do not run; earlier cells keep theirs. |
+| `E_RECIPE_TEMPLATE` | no | That cell has no table and the cells after it do not run; earlier cells keep theirs. |
 
 ## Errors
 
@@ -1665,6 +1669,34 @@ Data '{reference}' does not hold what this verb reads: {problem}.
 ```
 
 Parameters: `reference`, `problem`
+
+### `E_RECIPE_RULES`
+
+**Severity:** error · **Fatal:** no · **Spec:** `docs/adr/0136-company-rules-are-configuration-read-by-generic-verbs.md`
+
+A 'rules' table cannot be read, sets a column 'into=' does not name, or has an entry no row can reach.
+
+That cell has no table and the cells after it do not run; earlier cells keep theirs.
+
+```
+The rules table {problem}.
+```
+
+Parameters: `problem`
+
+### `E_RECIPE_TEMPLATE`
+
+**Severity:** error · **Fatal:** no · **Spec:** `docs/adr/0136-company-rules-are-configuration-read-by-generic-verbs.md`
+
+A 'compose' or 'rules' template has an unclosed placeholder, a stray brace or a filter that does not exist.
+
+That cell has no table and the cells after it do not run; earlier cells keep theirs.
+
+```
+Template '{template}' {problem}.
+```
+
+Parameters: `template`, `problem`
 
 ## Warnings
 
