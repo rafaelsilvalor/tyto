@@ -3,12 +3,14 @@ import { diagnostic, ok } from '@tyto/core';
 import { resolveColumn } from './columns.js';
 import { collect, compose } from './compose.js';
 import { derive } from './derive.js';
+import { extract, rewrite } from './extract.js';
 import { include } from './include.js';
 import { join } from './join.js';
 import type { Verb, VerbContext, VerbResult } from './registry.js';
 import { rules } from './rules.js';
 import { argumentsProblem, columnNames, refuseNamed, requireTable, rowFilter } from './support.js';
 import { type CellValue, type Column, type Row, type Table, comparable } from './table.js';
+import { urls } from './urls.js';
 
 /**
  * The generic verbs this build implements (ADR 0128). Each reads the previous cell's table and
@@ -26,6 +28,9 @@ export const genericVerbs: Readonly<Record<string, Verb>> = {
   rules: { kind: 'transform', run: rules },
   compose: { kind: 'transform', run: compose },
   collect: { kind: 'transform', run: collect },
+  extract: { kind: 'transform', run: extract },
+  rewrite: { kind: 'transform', run: rewrite },
+  urls: { kind: 'transform', run: urls },
 };
 
 /** `where <expression>`: keeps the rows that satisfy every predicate. */

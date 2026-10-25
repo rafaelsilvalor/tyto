@@ -1450,6 +1450,17 @@ export const diagnosticCodes = {
     fatality:
       'That cell has no table and the cells after it do not run; earlier cells keep theirs.',
   },
+  // A rewrite list is checked whole before any row is read, as a rules table is (ADR 0136).
+  E_RECIPE_REWRITE: {
+    severity: 'error',
+    summary:
+      "A 'rewrite' list cannot be read, or a replacement names a group its pattern lacks or writes a '$' that means nothing.",
+    template: 'The rewrite list {problem}.',
+    spec: 'docs/adr/0136-company-rules-are-configuration-read-by-generic-verbs.md',
+    fatal: false,
+    fatality:
+      'That cell has no table and the cells after it do not run; earlier cells keep theirs.',
+  },
   E_RECIPE_TEMPLATE: {
     severity: 'error',
     summary:

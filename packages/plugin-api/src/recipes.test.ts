@@ -229,7 +229,8 @@ describe('recipeRegistriesOf', () => {
     const { problem } = await run(registries(), 'demo.number');
     expect(problem).toBe(
       "No verb named 'demo.number' is available. Available: collect, compose, " +
-        'demo.numbers, derive, join, keep, rules, run, select, show, sort, where.',
+        'demo.numbers, derive, extract, join, keep, rewrite, rules, run, select, show, sort, ' +
+        'urls, where.',
     );
   });
 });

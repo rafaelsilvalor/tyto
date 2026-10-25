@@ -77,6 +77,9 @@ export const GENERIC_VERBS = [
   'rules',
   'compose',
   'collect',
+  'extract',
+  'rewrite',
+  'urls',
 ] as const;
 
 const CONTRIBUTED_NAME = /^[a-z][a-z0-9-]*\.[a-z][a-z0-9-]*$/u;
