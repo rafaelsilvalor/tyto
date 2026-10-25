@@ -22,12 +22,16 @@ import type {
   TemplatePack,
 } from './contributions.js';
 import {
+  type HostCache,
   type HostCapabilities,
   type HostCredentials,
   type HostFetchInit,
   type HostFetchResponse,
+  type HostWorkspace,
   checkedCapabilities,
+  hostCache,
   hostCredentials,
+  hostWorkspace,
   responseOf,
 } from './capabilities.js';
 import {
@@ -160,6 +164,20 @@ export interface PluginHost {
    * either with `E_CREDENTIAL_READ_ONLY` (ADR 0134).
    */
   readonly credentials: HostCredentials;
+  /**
+   * The plugin's private cache, kept by the host outside every workspace and dated by its
+   * clock (ADR 0138). No permission: it holds only what this plugin put there. A key is a
+   * non-empty string of at most 1 KiB in UTF-8 and an entry at most 32 MiB; either refused,
+   * or a host with no cache, is `E_PLUGIN_CACHE`.
+   */
+  readonly cache: HostCache;
+  /**
+   * The open folder's files, at a path relative to it (ADR 0138), behind `workspace:read` and
+   * `workspace:write`. A path that leaves the folder, a write into `.tyto/`, a file over
+   * 32 MiB or no folder open is `E_WORKSPACE_FILE`; a restricted folder is
+   * `E_WORKSPACE_FILE_RESTRICTED`.
+   */
+  readonly workspace: HostWorkspace;
 
   readonly log: Logger;
   readonly events: TypedEmitter;
@@ -603,6 +621,8 @@ export function createPluginHost(options: PluginHostOptions = {}): InProcessHost
         (key, value) => checked.storeCredential(key, value),
         (key) => checked.deleteCredential(key),
       ),
+      cache: hostCache(checked),
+      workspace: hostWorkspace(checked),
 
       log,
       events: emitter,

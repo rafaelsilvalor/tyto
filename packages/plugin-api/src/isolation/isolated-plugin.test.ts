@@ -36,7 +36,11 @@ import {
   type PluginHost,
   createPluginHost,
 } from '../host.js';
-import { CREDENTIAL_VALUE_LIMIT_BYTES, type HostCapabilities } from '../capabilities.js';
+import {
+  CREDENTIAL_VALUE_LIMIT_BYTES,
+  type HostCapabilities,
+  PLUGIN_FILE_LIMIT_BYTES,
+} from '../capabilities.js';
 import { ASSET_SOURCE_MAX_BYTES } from '../sources.js';
 import type { GuestChannel, PluginChannel } from './channel.js';
 import { runGuest } from './guest.js';
@@ -409,8 +413,9 @@ describe('what an isolated plugin cannot do', () => {
     );
   });
 
-  // A bootstrap left behind by an upgrade: 4 is the number before a plugin could store a
-  // credential (ADR 0134), and it is refused by name rather than by a schema complaint.
+  // A bootstrap left behind by an upgrade: 5 is the number before a plugin had a cache and
+  // the workspace's files (ADR 0138), and it is refused by name rather than by a schema
+  // complaint.
   it('speaks another protocol', async () => {
     const pair = channelPair(() => undefined);
     const connecting = connectIsolatedPlugin({
@@ -422,7 +427,7 @@ describe('what an isolated plugin cannot do', () => {
     pair.inject({ type: 'hello', protocol: RPC_PROTOCOL_VERSION - 1, sandbox: CONFINED });
     const connected = await connecting;
     expect(connected.ok ? '' : connected.error[0]?.message).toBe(
-      "Plugin 'texto' failed to activate: its process speaks protocol 4 and this host speaks 5.",
+      "Plugin 'texto' failed to activate: its process speaks protocol 5 and this host speaks 6.",
     );
   });
 
@@ -653,6 +658,164 @@ describe('host.fetch and host.credentials across the boundary', () => {
     const answer = await exporterIn(connected.value.plugin).exportFrame(SCENE, ARTWORK, FRAME);
     expect(answer.ok && answer.value).toBe('E_CREDENTIAL_TOO_LARGE');
     expect(stored.get('token')).toHaveLength(CREDENTIAL_VALUE_LIMIT_BYTES);
+  });
+});
+
+describe('host.cache and host.workspace across the boundary (ADR 0138)', () => {
+  /** A cache and a workspace that are maps, each answer carrying a key the guest must not see. */
+  function storing() {
+    const cache = new Map<string, Uint8Array>();
+    const files = new Map<string, Uint8Array>();
+    const capabilities: HostCapabilities = {
+      fetch: () => Promise.reject(new Error('no network here')),
+      credential: () => Promise.resolve(undefined),
+      describeCredential: () => 'nowhere',
+      cacheGet: (_plugin, key) => {
+        const bytes = cache.get(key);
+        return Promise.resolve(
+          bytes === undefined
+            ? undefined
+            : ({ bytes, storedAt: '2026-10-25T12:00:00.000Z', path: '/secret' } as never),
+        );
+      },
+      cachePut: (_plugin, key, bytes) => {
+        cache.set(key, bytes);
+        return Promise.resolve({ storedAt: '2026-10-25T12:00:00.000Z', path: '/secret' } as never);
+      },
+      cacheDelete: (_plugin, key) => Promise.resolve(cache.delete(key)),
+      cacheList: () =>
+        Promise.resolve(
+          [...cache].map(
+            ([key, bytes]) =>
+              ({
+                key,
+                storedAt: '2026-10-25T12:00:00.000Z',
+                size: bytes.length,
+                path: '/secret',
+              }) as never,
+          ),
+        ),
+      workspaceRead: (_plugin, path) => Promise.resolve(files.get(path) ?? new Uint8Array()),
+      workspaceWrite: (_plugin, path, bytes) => {
+        files.set(path, bytes);
+        return Promise.resolve();
+      },
+    };
+    return { cache, files, capabilities };
+  }
+
+  const asking = (ask: (host: PluginHost) => Promise<string>) => (host: PluginHost) =>
+    host.registerExporter({
+      ...textExporter,
+      exportFrame: async () => {
+        try {
+          return ok(await ask(host));
+        } catch (cause) {
+          return ok((cause as { code?: string }).code ?? (cause as Error).message);
+        }
+      },
+    });
+
+  async function answerOf(
+    ask: (host: PluginHost) => Promise<string>,
+    options: { permissions?: readonly string[]; capabilities?: HostCapabilities },
+  ): Promise<unknown> {
+    const { connected } = await isolate(asking(ask), options);
+    if (!connected.ok) throw new Error(connected.error[0]?.message);
+    const answer = await exporterIn(connected.value.plugin).exportFrame(SCENE, ARTWORK, FRAME);
+    return answer.ok && answer.value;
+  }
+
+  it('puts, gets, lists and deletes a cache entry with no permission declared', async () => {
+    const { cache, capabilities } = storing();
+    const answer = await answerOf(
+      async (host) => {
+        const stored = await host.cache.put('jira/TYTO-1', 'olá');
+        const entry = await host.cache.get('jira/TYTO-1');
+        const listed = await host.cache.list('jira/');
+        const deleted = await host.cache.delete('jira/TYTO-1');
+        const missing = await host.cache.get('jira/TYTO-1');
+        return JSON.stringify([
+          stored,
+          entry === undefined ? 'none' : [Array.from(entry.bytes), entry.storedAt, entry],
+          listed,
+          deleted,
+          missing === undefined ? 'undefined' : missing,
+        ]);
+      },
+      { capabilities },
+    );
+
+    expect(JSON.parse(String(answer))).toEqual([
+      { storedAt: '2026-10-25T12:00:00.000Z' },
+      [
+        [111, 108, 195, 161],
+        '2026-10-25T12:00:00.000Z',
+        // The bytes, as JSON writes a Uint8Array, and no `path`: the answer was rebuilt.
+        { bytes: { 0: 111, 1: 108, 2: 195, 3: 161 }, storedAt: '2026-10-25T12:00:00.000Z' },
+      ],
+      [{ key: 'jira/TYTO-1', storedAt: '2026-10-25T12:00:00.000Z', size: 4 }],
+      true,
+      'undefined',
+    ]);
+    expect([...cache]).toEqual([]);
+  });
+
+  it('writes and reads back a workspace file, and write answers null', async () => {
+    const { files, capabilities } = storing();
+    const answer = await answerOf(
+      async (host) => {
+        const written = await host.workspace.write('tabelas/jira.csv', new Uint8Array([1, 2]));
+        const read = await host.workspace.read('tabelas/jira.csv');
+        return `${String(written)} ${String(read instanceof Uint8Array)} ${Array.from(read).join(',')}`;
+      },
+      { permissions: ['workspace:read', 'workspace:write'], capabilities },
+    );
+
+    expect(answer).toBe('null true 1,2');
+    expect([...files.keys()]).toEqual(['tabelas/jira.csv']);
+  });
+
+  it('refuses undeclared workspace access and a path that leaves the folder, writing nothing', async () => {
+    const { files, capabilities } = storing();
+    const answer = await answerOf(
+      async (host) => {
+        const codes = await Promise.all(
+          [
+            host.workspace.read('a.csv'),
+            host.workspace.write('../fora.csv', 'x'),
+            host.workspace.write('.tyto/project.json', '{}'),
+          ].map((attempt) =>
+            attempt.then(
+              () => 'ok',
+              (cause: { code: string }) => cause.code,
+            ),
+          ),
+        );
+        return codes.join(' ');
+      },
+      { permissions: ['workspace:write'], capabilities },
+    );
+
+    expect(answer).toBe('E_PERMISSION E_WORKSPACE_FILE E_WORKSPACE_FILE');
+    expect([...files]).toEqual([]);
+  });
+
+  it('refuses a cache entry over the ceiling on the host side, whatever the guest sends', async () => {
+    const { cache, capabilities } = storing();
+    const answer = await answerOf(
+      (host) => host.cache.put('big', new Uint8Array(PLUGIN_FILE_LIMIT_BYTES + 1)).then(() => 'ok'),
+      { capabilities },
+    );
+
+    expect(answer).toBe('E_PLUGIN_CACHE');
+    expect([...cache]).toEqual([]);
+  });
+
+  it('answers E_PLUGIN_CACHE from a host composed without a cache', async () => {
+    const answer = await answerOf((host) => host.cache.get('k').then(() => 'ok'), {});
+
+    expect(answer).toBe('E_PLUGIN_CACHE');
   });
 });
 

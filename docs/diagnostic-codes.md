@@ -60,6 +60,9 @@ non-zero.
 | `E_CREDENTIAL_MISSING` | error | no | A plugin asked for a credential it declared, and this host has no value for it. |
 | `E_CREDENTIAL_TOO_LARGE` | error | no | A credential to store is larger than the ceiling every host keeps (ADR 0134). |
 | `E_CREDENTIAL_READ_ONLY` | error | no | A plugin tried to store or forget a credential on a host that only reads them. |
+| `E_PLUGIN_CACHE` | error | no | A plugin's cache call was refused: an empty or oversized key, an entry over the ceiling, or a host with no cache. |
+| `E_WORKSPACE_FILE` | error | no | A plugin's workspace file was refused: outside the folder, through a link, missing, too large, inside .tyto/, or no folder is open. |
+| `E_WORKSPACE_FILE_RESTRICTED` | error | no | A plugin asked for a file of a workspace the person has not trusted. |
 | `W_PLUGIN_CRASHED` | warning | no | An installed plugin's process crashed on an earlier run. History, not a refusal. |
 | `E_PLUGIN_FETCH` | error | yes | A plugin could not be copied or fetched from where tyto plugin install was told. |
 | `E_SCENE_SHAPE` | error | yes | A scene does not match the IR schema. |
@@ -224,6 +227,9 @@ incomplete brief, and a crossed box where a picture the exporter could not load 
 | `E_CREDENTIAL_MISSING` | no | It is the plugin's call that is refused; what the plugin does with that is its own. |
 | `E_CREDENTIAL_TOO_LARGE` | no | It is the plugin's call that is refused; what the plugin does with that is its own. |
 | `E_CREDENTIAL_READ_ONLY` | no | It is the plugin's call that is refused; what the plugin does with that is its own. |
+| `E_PLUGIN_CACHE` | no | It is the plugin's call that is refused; what the plugin does with that is its own. |
+| `E_WORKSPACE_FILE` | no | It is the plugin's call that is refused; what the plugin does with that is its own. |
+| `E_WORKSPACE_FILE_RESTRICTED` | no | It is the plugin's call that is refused; what the plugin does with that is its own. |
 | `E_PLUGIN_FETCH` | yes | A plugin that did not load contributed no slot to skip. |
 | `E_SCENE_SHAPE` | yes | The IR is malformed, so the exporter has nothing it can draw. |
 | `E_SCENE_DUPLICATE_ID` | yes | The IR is malformed, so the exporter has nothing it can draw. |
@@ -887,6 +893,48 @@ Plugin '{plugin}' tried to change credential '{key}', and {source} is read-only 
 ```
 
 Parameters: `plugin`, `key`, `source`
+
+### `E_PLUGIN_CACHE`
+
+**Severity:** error · **Fatal:** no · **Spec:** `docs/adr/0138-a-plugin-cache-and-workspace-files-cross-the-host-boundary.md`
+
+A plugin's cache call was refused: an empty or oversized key, an entry over the ceiling, or a host with no cache.
+
+It is the plugin's call that is refused; what the plugin does with that is its own.
+
+```
+Plugin '{plugin}' could not use its cache entry '{key}': {problem}.
+```
+
+Parameters: `plugin`, `key`, `problem`
+
+### `E_WORKSPACE_FILE`
+
+**Severity:** error · **Fatal:** no · **Spec:** `docs/adr/0138-a-plugin-cache-and-workspace-files-cross-the-host-boundary.md`
+
+A plugin's workspace file was refused: outside the folder, through a link, missing, too large, inside .tyto/, or no folder is open.
+
+It is the plugin's call that is refused; what the plugin does with that is its own.
+
+```
+Plugin '{plugin}' could not use workspace file '{path}': {problem}.
+```
+
+Parameters: `plugin`, `path`, `problem`
+
+### `E_WORKSPACE_FILE_RESTRICTED`
+
+**Severity:** error · **Fatal:** no · **Spec:** `docs/adr/0138-a-plugin-cache-and-workspace-files-cross-the-host-boundary.md`
+
+A plugin asked for a file of a workspace the person has not trusted.
+
+It is the plugin's call that is refused; what the plugin does with that is its own.
+
+```
+Plugin '{plugin}' asked for workspace file '{path}', and this folder is restricted; trust the folder to let plugins read and write its files.
+```
+
+Parameters: `plugin`, `path`
 
 ### `E_PLUGIN_FETCH`
 

@@ -15,7 +15,10 @@ import {
   type GuestMessage,
   RPC_PROTOCOL_VERSION,
   type Registration,
+  type RequestedCapability,
   type SandboxReport,
+  cacheKeyArgsSchema,
+  cachePutArgsSchema,
   callHandleSchema,
   credentialsArgsSchema,
   deleteCredentialArgsSchema,
@@ -23,6 +26,8 @@ import {
   describeIssues,
   fetchArgsSchema,
   guestMessageSchema,
+  workspaceReadArgsSchema,
+  workspaceWriteArgsSchema,
   helloMessageSchema,
 } from './protocol.js';
 
@@ -297,11 +302,13 @@ export function connectIsolatedPlugin(
           await capabilities.storeCredential(args.data[0], args.data[1]);
           // `null`, not `undefined`: the desktop's channel is JSON, which drops the key.
           reply({ ok: true, value: null });
-        } else {
+        } else if (message.capability === 'deleteCredential') {
           const args = deleteCredentialArgsSchema.safeParse(message.args);
           if (!args.success)
             throw new TypeError(`host.credentials.delete was given ${describeIssues(args.error)}`);
           reply({ ok: true, value: await capabilities.deleteCredential(args.data[0]) });
+        } else {
+          reply({ ok: true, value: await storage(message.capability, message.args) });
         }
       } catch (cause) {
         reply(
@@ -309,6 +316,57 @@ export function connectIsolatedPlugin(
             ? { ok: false, message: cause.message, diagnostic: cause.diagnostic }
             : { ok: false, message: cause instanceof Error ? cause.message : String(cause) },
         );
+      }
+    }
+
+    /**
+     * `host.cache` and `host.workspace` (ADR 0138), checked by the same `checkedCapabilities`.
+     * Each answer is rebuilt field by field, so an adapter's extra keys never cross, and a miss
+     * or a write answers `null`, because the desktop's channel is JSON and drops `undefined`.
+     */
+    async function storage(
+      capability: Exclude<
+        RequestedCapability,
+        'fetch' | 'credentials' | 'storeCredential' | 'deleteCredential'
+      >,
+      raw: readonly unknown[],
+    ): Promise<unknown> {
+      const named = {
+        cacheGet: 'host.cache.get',
+        cachePut: 'host.cache.put',
+        cacheDelete: 'host.cache.delete',
+        cacheList: 'host.cache.list',
+        workspaceRead: 'host.workspace.read',
+        workspaceWrite: 'host.workspace.write',
+      }[capability];
+      const parse = <T>(schema: z.ZodType<T>): T => {
+        const args = schema.safeParse(raw);
+        if (!args.success) throw new TypeError(`${named} was given ${describeIssues(args.error)}`);
+        return args.data;
+      };
+      switch (capability) {
+        case 'cacheGet': {
+          const entry = await capabilities.cacheGet(parse(cacheKeyArgsSchema)[0]);
+          return entry === undefined ? null : { bytes: entry.bytes, storedAt: entry.storedAt };
+        }
+        case 'cachePut': {
+          const [key, bytes] = parse(cachePutArgsSchema);
+          const { storedAt } = await capabilities.cachePut(key, bytes);
+          return { storedAt };
+        }
+        case 'cacheDelete':
+          return capabilities.cacheDelete(parse(cacheKeyArgsSchema)[0]);
+        case 'cacheList': {
+          const listed = await capabilities.cacheList(parse(cacheKeyArgsSchema)[0]);
+          return listed.map(({ key, storedAt, size }) => ({ key, storedAt, size }));
+        }
+        case 'workspaceRead':
+          return capabilities.workspaceRead(parse(workspaceReadArgsSchema)[0]);
+        case 'workspaceWrite': {
+          const [path, bytes] = parse(workspaceWriteArgsSchema);
+          await capabilities.workspaceWrite(path, bytes);
+          return null;
+        }
       }
     }
 

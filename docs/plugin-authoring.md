@@ -351,6 +351,8 @@ installs it. A theme colours the window, never the exported artwork (ADR 0077).
 | `net:<host>`        | `host.fetch` to that host                                  |
 | `credentials:<key>` | `host.credentials('<key>')`, and `.set` and `.delete` it   |
 | `font:<family>`     | a code template is sent that face's file from this machine |
+| `workspace:read`    | `host.workspace.read(path)` in the open folder             |
+| `workspace:write`   | `host.workspace.write(path, bytes)`, never into `.tyto/`   |
 
 `install` shows the list and asks. A permission added in a later version is refused until the
 plugin is installed again (`E_PLUGIN_PERMISSIONS_CHANGED`). Wildcards and redirects are in
@@ -365,6 +367,15 @@ with `host.credentials.delete(key)` (ADR 0134); a value is at most 16 KiB. Until
 declared credential answers `E_CREDENTIAL_MISSING` there. **The CLI only reads**: `set` and
 `delete` there answer `E_CREDENTIAL_READ_ONLY`, so a plugin that stores a secret should say how to
 set the variable instead.
+
+**Your plugin has a private cache and needs no permission for it** (ADR 0138):
+`host.cache.put(key, bytes)` stores and answers `{ storedAt }`, `host.cache.get(key)` answers
+`{ bytes, storedAt }` or `undefined`, `host.cache.list(prefix)` names what is there, and
+`host.cache.delete(key)` forgets. `storedAt` is the host's clock, so it is the age to show a
+person. A key is at most 1 KiB and an entry at most 32 MiB. **A file in the person's project is
+`host.workspace.read(path)` and `host.workspace.write(path, bytes)`**, relative to the open folder,
+behind `workspace:read` and `workspace:write`; a restricted folder answers
+`E_WORKSPACE_FILE_RESTRICTED`, and `tyto watch` has no workspace at all.
 
 **In the CLI your code runs confined to its own folder** (ADR 0049). It runs in a process of its
 own under Node's permission model, which can read the plugin's installed folder and nothing else.
