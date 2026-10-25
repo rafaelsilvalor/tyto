@@ -224,7 +224,7 @@ describe('the chain', () => {
     const problem = result.ok ? result.value.cells[0]?.diagnostics[0] : undefined;
     expect(problem?.code).toBe('E_RECIPE_UNKNOWN_VERB');
     expect(problem?.message).toBe(
-      "No verb named 'jion' is available. Available: collect, compose, derive, extract, join, keep, rewrite, rules, run, select, show, sort, urls, where.",
+      "No verb named 'jion' is available. Available: collect, compose, derive, extract, join, keep, nearest, rewrite, rules, run, select, show, sort, urls, where.",
     );
     expect(source.slice(problem?.range?.start, problem?.range?.end)).toBe('jion');
     expect(result.ok && result.value.cells[1]?.status).toBe('skipped');
