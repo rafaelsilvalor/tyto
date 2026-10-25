@@ -15,6 +15,7 @@ import type {
   DirectiveContribution,
   EditorCommand,
   EditorKeymap,
+  EditorVimContribution,
   Exporter,
   ExporterRegistry,
   PanelContribution,
@@ -111,6 +112,8 @@ export interface PluginHost {
   registerDirective(directive: DirectiveContribution): Disposable;
   registerCommand(command: EditorCommand): Disposable;
   registerKeymap(keymap: EditorKeymap): Disposable;
+  /** Vim mappings and ex commands, as data the window applies (ADR 0141). */
+  registerVim(contribution: EditorVimContribution): Disposable;
   registerPanel(panel: PanelContribution): Disposable;
   /**
    * A setting the person can write in the settings file (ADR 0073). The key the file uses is
@@ -218,6 +221,8 @@ export interface PluginRegistry extends RecipeContributions {
   directives(): readonly DirectiveContribution[];
   commands(): readonly EditorCommand[];
   keymaps(): readonly EditorKeymap[];
+  /** Every vim contribution, in registration order: built-ins first (ADR 0141). */
+  vim(): readonly EditorVimContribution[];
   panels(): readonly PanelContribution[];
   /** Every declared setting, in registration order, by the key a settings file uses. */
   configurations(): readonly DeclaredSetting[];
@@ -483,6 +488,7 @@ export function createPluginHost(options: PluginHostOptions = {}): InProcessHost
   const directives = new Point<DirectiveContribution>('directive', emitter, contributed);
   const commands = new Point<EditorCommand>('editor.command', emitter, contributed);
   const keymaps = new Point<EditorKeymap>('editor.keymap', emitter, contributed);
+  const vims = new Point<EditorVimContribution>('editor.vim', emitter, contributed);
   const panels = new Point<PanelContribution>('panel', emitter, contributed);
   // Keyed by the key the file uses, so two plugins' `fontSize` are two entries and a second
   // built-in declaring a key another built-in holds is the ordinary duplicate refusal.
@@ -512,6 +518,7 @@ export function createPluginHost(options: PluginHostOptions = {}): InProcessHost
     directives,
     commands,
     keymaps,
+    vims,
     panels,
     configurations,
     themes,
@@ -536,6 +543,7 @@ export function createPluginHost(options: PluginHostOptions = {}): InProcessHost
     directives: () => directives.list(),
     commands: () => commands.list(),
     keymaps: () => keymaps.list(),
+    vim: () => vims.list(),
     panels: () => panels.list(),
     configurations: () => configurations.list().map((entry) => entry.setting),
     themes: () => themes.list(),
@@ -572,6 +580,7 @@ export function createPluginHost(options: PluginHostOptions = {}): InProcessHost
       registerDirective: (directive) => directives.add(pluginId, directive, onConflict),
       registerCommand: (command) => commands.add(pluginId, command, onConflict),
       registerKeymap: (keymap) => keymaps.add(pluginId, keymap, onConflict),
+      registerVim: (contribution) => vims.add(pluginId, contribution, onConflict),
       registerPanel: (panel) => panels.add(pluginId, panel, onConflict),
       registerConfiguration: (setting) => {
         const declared = declaredSetting(

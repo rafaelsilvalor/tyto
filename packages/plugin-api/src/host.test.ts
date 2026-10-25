@@ -310,10 +310,10 @@ describe('activating a plugin', () => {
     expect(host.registry.exporters.list()).toEqual([]);
   });
 
-  it('knows the same sixteen points the manifest vocabulary names', () => {
+  it('knows the same seventeen points the manifest vocabulary names', () => {
     // Two declarations of one vocabulary: `CONTRIBUTION_POINTS` is what a JSON file may
     // say, and the host's points are what code may register into. This activates one
-    // plugin into all sixteen and compares what was recorded against the list.
+    // plugin into all seventeen and compares what was recorded against the list.
     const host = createPluginHost();
     host.activate(
       pluginOf({
@@ -328,6 +328,7 @@ describe('activating a plugin', () => {
           plugin.registerDirective({ id: 'e', names: [], transform: () => ok([]) });
           plugin.registerCommand({ id: 'f', title: 'Do' });
           plugin.registerKeymap({ id: 'g', bindings: {} });
+          plugin.registerVim({ id: 'p', mappings: [] });
           plugin.registerPanel({ id: 'h', title: 'Promo', entry: 'panel.html' });
           plugin.registerConfiguration({
             id: 'j',
@@ -356,9 +357,9 @@ describe('activating a plugin', () => {
 
     // The real assertion is that this did not throw: a point the host knows and
     // `CONTRIBUTION_POINTS` does not would have been registered without being declared,
-    // which `activate` refuses. The counts below say the sixteen arrived rather than that
+    // which `activate` refuses. The counts below say the seventeen arrived rather than that
     // nothing was attempted.
-    expect(CONTRIBUTION_POINTS).toHaveLength(16);
+    expect(CONTRIBUTION_POINTS).toHaveLength(17);
     expect(
       [
         host.registry.sources(),
@@ -370,6 +371,7 @@ describe('activating a plugin', () => {
         host.registry.directives(),
         host.registry.commands(),
         host.registry.keymaps(),
+        host.registry.vim(),
         host.registry.panels(),
         host.registry.configurations(),
         host.registry.themes(),
@@ -378,7 +380,7 @@ describe('activating a plugin', () => {
         host.registry.recipeVerbs(),
         host.registry.recipeDerivations(),
       ].map((point) => point.length),
-    ).toEqual([1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1]);
+    ).toEqual([1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1]);
   });
 });
 
@@ -432,6 +434,46 @@ describe('asset and font sources (TYTO-280, ADR 0117)', () => {
       plugin.registerFontSource({ id: 'f', families: [' '], fetch: () => ok(BYTES) });
     });
     expect(activated.ok).toBe(false);
+  });
+});
+
+describe('editor.vim (TYTO-417, ADR 0141)', () => {
+  const SURROUND = {
+    id: 'surround',
+    title: 'Surround',
+    mappings: [{ keys: 'ys', context: 'normal' as const, operation: 'surround.add' }],
+    ex: [{ name: 'surround', command: 'surround.run' }],
+  };
+
+  function withVim(id: string, register: (plugin: PluginHost) => void, host = createPluginHost()) {
+    const activated = host.tryActivate({
+      id,
+      manifest: {
+        name: id,
+        version: '0.1.0',
+        engine: '>=0.1',
+        contributes: ['editor.vim'],
+        permissions: [],
+      },
+      activate: register,
+    });
+    return { host, activated };
+  }
+
+  it('hands the contribution back as the data it was registered with', () => {
+    const { host } = withVim('vim-plugins', (plugin) => plugin.registerVim(SURROUND));
+
+    expect(host.registry.vim()).toEqual([SURROUND]);
+  });
+
+  it('refuses a second contribution with the same id, from another plugin', () => {
+    const { host } = withVim('first', (plugin) => plugin.registerVim(SURROUND));
+    const { activated } = withVim('second', (plugin) => plugin.registerVim(SURROUND), host);
+
+    expect(activated.ok ? [] : activated.error.map((problem) => problem.code)).toEqual([
+      'E_PLUGIN_DUPLICATE',
+    ]);
+    expect(host.registry.vim()).toHaveLength(1);
   });
 });
 

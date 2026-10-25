@@ -244,6 +244,47 @@ export interface EditorKeymap extends Contribution {
   readonly when?: string;
 }
 
+/** Where a vim mapping applies: vim's own contexts, as `Vim.mapCommand` spells them. */
+export type EditorVimContext = 'normal' | 'visual' | 'operatorPending' | 'insert';
+
+/** One key sequence bound to a named operation the editor implements (ADR 0141). */
+export interface EditorVimMapping {
+  /** Vim's notation: `ys`, `gc`, `<C-a>`. */
+  readonly keys: string;
+  /** Absent means every context the engine applies a mapping to. */
+  readonly context?: EditorVimContext;
+  /** The name of an operation `@tyto/editor` registered; an unknown one is refused there. */
+  readonly operation: string;
+  /** Handed to the operation as they are: the plugin's own parameters, such as a pair. */
+  readonly args?: Readonly<Record<string, string | number | boolean>>;
+}
+
+/** `:name` — and `:shortName` — running a command id, as the built-in `:w` does. */
+export interface EditorVimEx {
+  readonly name: string;
+  readonly shortName?: string;
+  readonly command: string;
+}
+
+/**
+ * `editor.vim` — mappings and ex commands for vim mode (TYTO-417, ADR 0141).
+ *
+ * **Data only.** A mapping names an operation the editor implements; it carries no function.
+ * A vim key runs synchronously in the window against the document, and the plugins that would
+ * contribute one run elsewhere — a built-in in the main process, an installed one in its own —
+ * so a callable would be a message across a process boundary on every keypress. Data crosses
+ * once, at registration, and the window applies it.
+ *
+ * Switched on and off per window, by `id`, never per editor: the engine's mappings are global
+ * to it (ADR 0141).
+ */
+export interface EditorVimContribution extends Contribution {
+  /** What the settings and the plugin list call it. */
+  readonly title?: string;
+  readonly mappings: readonly EditorVimMapping[];
+  readonly ex?: readonly EditorVimEx[];
+}
+
 /**
  * `panel` — a page in the desktop's window, sandboxed in an iframe (E11.3, ADR 0045).
  *

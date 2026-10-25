@@ -72,6 +72,7 @@ The last five are named `<id>.tyto-plugin.json` and that is the one place a buil
 | `directive`         | `::ns/name` in the brief → the slot directives it stands for (ADR 0043)        | —                                                     |
 | `editor.command`    | `{ id, title }`, data only: nothing runs it yet (TYTO-261, ADR 0079)           | —                                                     |
 | `editor.keymap`     | binding → command id (normal and vim)                                          | default-keymap, vim                                   |
+| `editor.vim`        | vim mappings onto operations the editor names, and ex commands (ADR 0141)      | —                                                     |
 | `panel`             | a page in the desktop window, `sandbox="allow-scripts"` (ADR 0045)             | —                                                     |
 | `configuration`     | a key of `settings.json`: `{ id, schema, default, description }` (ADR 0073)    | desktop (the app's settings)                          |
 | `theme`             | a colour theme, a JSON file in the plugin: `{ id, label, kind, path }` (0077)  | desktop (Tyto Light, Tyto Dark)                       |
@@ -415,6 +416,43 @@ but never remove or retype one, so a plan written today stays valid.
 `examples/plugins/tyto-plugin-example-recipe/` contributes `example.pull`, `example.tag`,
 `example.parity` and the action `example.mark`, which plans one `mark` per row.
 
+### `editor.vim`, in full
+
+```ts
+interface EditorVimContribution {
+  id: string; // what the window switches on and off
+  title?: string;
+  mappings: {
+    keys: string; // vim notation: ys, gc, <C-a>
+    context?: 'normal' | 'visual' | 'operatorPending' | 'insert'; // absent: wherever vim applies it
+    operation: string; // a name @tyto/editor defines; never a function
+    args?: Record<string, string | number | boolean>; // handed to the operation
+  }[];
+  ex?: { name: string; shortName?: string; command: string }[]; // :name runs a command id
+}
+```
+
+**Data only, never a callable** (ADR 0141). A vim key runs synchronously against the document,
+in the window; a plugin that contributes one runs elsewhere, so a function would be a message
+across processes on every keypress. A mapping names an operation `@tyto/editor` implements and
+registers with `defineVimOperation`, as an **action** (runs on its keys) or an **operator**
+(waits for a motion and is handed the ranges it covers).
+
+**`setVimContributions(contributions, enabledIds)` switches them per window**, not per editor:
+the engine keeps one keymap for every editor in the window. A contribution switched on is
+mapped with `Vim.mapCommand`; switched off it is unmapped, so vim's own meaning of the key comes
+back (a mapping shadows the default; it does not replace it). Calls are diffed against what is
+applied, so the same answer twice changes nothing.
+
+**A contribution that cannot be applied is left out whole**, as a non-fatal
+`E_VIM_CONTRIBUTION`: an operation the editor does not have, empty keys, an action mapped while
+an operator is pending, keys another enabled contribution already maps in the same context, an
+ex `shortName` that is not a prefix of its `name`, or an ex name another one defines.
+
+**An ex command, once defined, stays defined**: the engine has no way to remove one. Switched
+off, it does nothing. Wiring the window to the plugins' contributions and the setting that
+switches them is TYTO-418.
+
 ### `editor.command` and `editor.keymap`, in full
 
 **A plugin's `editor.command` is a name and a title, and nothing runs it yet.** The point's
@@ -550,7 +588,7 @@ host (CLI process)                               guest (plugin's process)
                         ◀── result {value} ──      answer checked by the host
 ```
 
-**Each side validates what it receives**, with the Zod schemas in `isolation/protocol.ts` and `isolation/points.ts`: the host every guest message and every answer, the guest every host message and a call's arguments, before the plugin's code sees them. **A contribution crosses as data, and its functions stay behind as handles**; a function is callable only if its point names it, with a schema for its arguments and one for its answer. Today that is `exporter.exportFrame`, `directive.transform` (TYTO-49), `fetch` on `asset-source` and `font-source` (ADR 0117), and `page`, `transform`, `plan` and `derive` on the recipe points (ADR 0135), which may therefore return a `Promise`; the job and `resolve` await them. `template-pack`, `brand-kit`, `editor.command`, `editor.keymap`, `panel` and `theme` cross as data. `source`, `sink` and `rasterizer` are refused by name — _not available to an isolated plugin yet_. A directive's answer schema is strict: a replacement that carries a `namespace` or a `range` is `E_PLUGIN_PROTOCOL`.
+**Each side validates what it receives**, with the Zod schemas in `isolation/protocol.ts` and `isolation/points.ts`: the host every guest message and every answer, the guest every host message and a call's arguments, before the plugin's code sees them. **A contribution crosses as data, and its functions stay behind as handles**; a function is callable only if its point names it, with a schema for its arguments and one for its answer. Today that is `exporter.exportFrame`, `directive.transform` (TYTO-49), `fetch` on `asset-source` and `font-source` (ADR 0117), and `page`, `transform`, `plan` and `derive` on the recipe points (ADR 0135), which may therefore return a `Promise`; the job and `resolve` await them. `template-pack`, `brand-kit`, `editor.command`, `editor.keymap`, `editor.vim`, `panel` and `theme` cross as data. `source`, `sink` and `rasterizer` are refused by name — _not available to an isolated plugin yet_. A directive's answer schema is strict: a replacement that carries a `namespace` or a `range` is `E_PLUGIN_PROTOCOL`.
 
 **The proxy goes through `tryActivate`**, so an isolated plugin meets every check an in-process one does. `protocol` is its own number, compared at the `hello` handshake and nowhere else; it is not the engine (ADR 0040), because a plugin never sees these messages.
 

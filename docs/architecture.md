@@ -38,7 +38,7 @@ packages/
   plugin-api     extension-point types, PluginHost, plugin manifest, permissions; checkedCapabilities, the one check in front of host.fetch, host.credentials, host.cache and host.workspace (ADR 0042, ADR 0138); recipeRegistriesOf over the recipe points (may import recipe, never the reverse, ADR 0135)
   io             BriefSource/OutputSink ports; fs adapters (inbox/outbox); local watcher; workspaceDataResolver, a recipe's data files confined to a trusted workspace (ADR 0137)
   sources        none here: remote connectors are installed plugins in their own repositories (ADR 0127)
-  editor         CodeMirror 6: brief and template languages, vim, diagnostics, manifest-driven autocomplete, JSON-tab suggestions and hover from a host's source, brief skeletons and the "/" menu, find/replace, one editor in several panes
+  editor         CodeMirror 6: brief and template languages, vim and the operations a plugin's editor.vim maps keys onto (ADR 0141), diagnostics, manifest-driven autocomplete, JSON-tab suggestions and hover from a host's source, brief skeletons and the "/" menu, find/replace, one editor in several panes
 apps/
   cli            commander: render, watch, template new|check, plugin new|install|list|remove|disable|enable
   desktop        electron-vite: main (pipeline, plugins, credentials) / preload / renderer (editor, preview, panels)

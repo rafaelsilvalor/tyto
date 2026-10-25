@@ -997,6 +997,42 @@ describe('an isolated panel (TYTO-49)', () => {
   });
 });
 
+describe('an isolated vim contribution (TYTO-417, ADR 0141)', () => {
+  const SURROUND = {
+    id: 'surround',
+    title: 'Surround',
+    mappings: [
+      { keys: 'ys', context: 'normal' as const, operation: 'surround.add', args: { pair: '()' } },
+    ],
+    ex: [{ name: 'surround', shortName: 'sur', command: 'surround.run' }],
+  };
+
+  it('crosses as data, so a keypress never waits on the plugin', async () => {
+    const { connected } = await isolate((host) => host.registerVim(SURROUND), {
+      contributes: ['editor.vim'],
+    });
+    if (!connected.ok) throw new Error(connected.error[0]?.message);
+
+    const host = createPluginHost();
+    host.tryActivate(connected.value.plugin);
+    expect(host.registry.vim()).toEqual([SURROUND]);
+  });
+
+  it('is refused when a mapping carries code instead of an operation name', async () => {
+    const { connected } = await isolate(
+      (host) =>
+        host.registerVim({
+          id: 'surround',
+          mappings: [{ keys: 'ys', operation: 'surround.add', source: 'return 1' }],
+        } as never),
+      { contributes: ['editor.vim'] },
+    );
+    expect(connected.ok ? '' : connected.error[0]?.message).toContain(
+      "its 'editor.vim' contribution does not match",
+    );
+  });
+});
+
 describe('an isolated theme (TYTO-208, ADR 0077)', () => {
   it('crosses as data, since a theme is a file and not a schema', async () => {
     const { connected } = await isolate(

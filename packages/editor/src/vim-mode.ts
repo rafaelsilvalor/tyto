@@ -49,7 +49,8 @@ interface VimAdapter {
   readonly cm6: EditorView;
 }
 
-const viewOf = (adapter: unknown): EditorView | undefined => {
+/** The view behind the adapter a vim handler is handed; `vim-contributions.ts` shares it. */
+export const viewOf = (adapter: unknown): EditorView | undefined => {
   const candidate = (adapter as VimAdapter | undefined)?.cm6;
   return candidate instanceof Object ? (candidate as EditorView) : undefined;
 };

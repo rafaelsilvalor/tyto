@@ -170,6 +170,7 @@ non-zero.
 | `W_RECIPE_WHERE_EMPTY` | warning | no | A 'where' kept no row of a table that had rows. |
 | `W_RECIPE_JOIN_AMBIGUOUS` | warning | no | A 'join' left rows unpaired because their key answered to more than one row. |
 | `W_RECIPE_AGE_UNREAD` | warning | no | An 'age' found cells that none of its formats reads, and left their age empty. |
+| `E_VIM_CONTRIBUTION` | error | no | A vim contribution names an operation the editor does not have, or a bad mapping. |
 
 ## What is fatal, and why
 
@@ -292,6 +293,7 @@ incomplete brief, and a crossed box where a picture the exporter could not load 
 | `E_RECIPE_RULES` | no | That cell has no table and the cells after it do not run; earlier cells keep theirs. |
 | `E_RECIPE_REWRITE` | no | That cell has no table and the cells after it do not run; earlier cells keep theirs. |
 | `E_RECIPE_TEMPLATE` | no | That cell has no table and the cells after it do not run; earlier cells keep theirs. |
+| `E_VIM_CONTRIBUTION` | no | Only that contribution is left out; vim and every other contribution keep working. |
 
 ## Errors
 
@@ -1778,6 +1780,20 @@ Template '{template}' {problem}.
 ```
 
 Parameters: `template`, `problem`
+
+### `E_VIM_CONTRIBUTION`
+
+**Severity:** error · **Fatal:** no · **Spec:** `docs/adr/0141-a-plugin-contributes-vim-mappings-as-data.md`
+
+A vim contribution names an operation the editor does not have, or a bad mapping.
+
+Only that contribution is left out; vim and every other contribution keep working.
+
+```
+Vim contribution '{id}' was not applied: {problem}.
+```
+
+Parameters: `id`, `problem`
 
 ## Warnings
 
