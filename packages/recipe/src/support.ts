@@ -74,6 +74,23 @@ export function columnNames(argumentsWritten: readonly Argument[]): readonly Arg
 }
 
 /**
+ * The arguments written up to `inline`, a named argument whose value is JSON written inline:
+ * that JSON runs to the end of the line, so the words after its start are its own and not
+ * arguments. With no inline argument, every argument.
+ */
+export function argumentsUpTo(
+  context: VerbContext,
+  inline: NamedArgument | undefined,
+): { readonly named: readonly NamedArgument[]; readonly positional: readonly Argument[] } {
+  const before = (argument: Argument) =>
+    inline === undefined || argument.range.start <= inline.range.start;
+  return {
+    named: context.step.named.filter(before),
+    positional: context.step.positional.filter(before),
+  };
+}
+
+/**
  * Where a named argument's value starts in the file: after `name=` and, when it was quoted,
  * after the quote. A quoted value is two characters longer in the file than its value.
  */

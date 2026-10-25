@@ -81,6 +81,8 @@ export const GENERIC_VERBS = [
   'rewrite',
   'urls',
   'nearest',
+  'map',
+  'path',
 ] as const;
 
 const CONTRIBUTED_NAME = /^[a-z][a-z0-9-]*\.[a-z][a-z0-9-]*$/u;

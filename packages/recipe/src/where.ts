@@ -26,6 +26,11 @@ import { type CellValue, cellText, comparable } from './table.js';
  * quoted when it holds a blank, a parenthesis, a comma, a quote, `=`, `~` or `!`. It ignores
  * case but not accents, so `p[áa]gina` is how a pattern takes both; `not matches`, like `!=`,
  * keeps empty cells that the pattern does not match.
+ *
+ * And one more (ADR 0136): `<`, `<=`, `>` and `>=` compare numbers, as in `points >= 3`. The
+ * value must be a number, written `-12` or `3.5`. A cell compares when it is a number, or text
+ * that is one once trimmed; any other cell — empty, a list, a boolean, words — fails, so the row
+ * is dropped, as JQL drops an empty field from a comparison.
  */
 export type Operator =
   | '='
@@ -37,7 +42,11 @@ export type Operator =
   | 'is empty'
   | 'is not empty'
   | 'matches'
-  | 'not matches';
+  | 'not matches'
+  | '<'
+  | '<='
+  | '>'
+  | '>=';
 
 export interface Predicate {
   readonly column: string;
@@ -46,12 +55,15 @@ export interface Predicate {
   readonly values: readonly string[];
   /** The compiled pattern of `matches` and `not matches`; absent for every other operator. */
   readonly pattern?: CompiledPattern;
+  /** The number `<`, `<=`, `>` and `>=` compare with, read once; absent for the others. */
+  readonly number?: number;
 }
 
 interface Found {
   readonly operator: Operator;
   readonly values: readonly string[];
   readonly pattern?: CompiledPattern;
+  readonly number?: number;
 }
 
 type TokenKind = 'word' | 'quoted' | 'operator' | 'symbol';
@@ -64,9 +76,13 @@ interface Token {
 
 const RESERVED = new Set(['and', 'or', 'in', 'is', 'not', 'empty']);
 const COMPARISONS = new Set(['=', '!=', '~', '!~']);
+const ORDERINGS = new Set(['<', '<=', '>', '>=']);
+/** A number as a value or a cell writes it: no exponent, no thousands separator, no `+`. */
+const NUMBER = /^-?\d+(?:\.\d+)?$/u;
 
+// `<` and `>` are no word characters, so `due>5` is three tokens, as `due=5` is.
 const TOKEN =
-  /(?<quoted>"[^"]*"|'[^']*')|(?<operator>!=|!~|=|~)|(?<symbol>[(),])|(?<word>[^\s(),"'=~!]+)/uy;
+  /(?<quoted>"[^"]*"|'[^']*')|(?<operator>!=|!~|<=|>=|<|>|=|~)|(?<symbol>[(),])|(?<word>[^\s(),"'=~!<>]+)/uy;
 
 class WhereError {
   constructor(
@@ -207,6 +223,9 @@ class Reader {
       if (value instanceof WhereError) return value;
       return { operator: operator.text as Operator, values: [value] };
     }
+    if (operator.kind === 'operator' && ORDERINGS.has(operator.text)) {
+      return this.number(operator.text as Operator);
+    }
     const keyword = wordOf(operator);
     if (keyword === 'in') return this.list(column, 'in');
     if (keyword === 'matches') return this.pattern('matches');
@@ -237,7 +256,8 @@ class Reader {
     }
     return new WhereError(
       `unknown operator '${operator.text}' after '${column}'. Available: ` +
-        '=, !=, ~, !~, in (…), not in (…), is empty, is not empty, matches, not matches',
+        '=, !=, ~, !~, <, <=, >, >=, in (…), not in (…), is empty, is not empty, matches, ' +
+        'not matches',
       operator.range,
     );
   }
@@ -257,6 +277,19 @@ class Reader {
       );
     }
     return token.text;
+  }
+
+  /** The number after `<`, `<=`, `>` or `>=`, read here so a word is refused at its range. */
+  private number(operator: Operator): Found | WhereError {
+    const token = this.take(`a number after '${operator}'`);
+    if (token instanceof WhereError) return token;
+    if ((token.kind === 'word' || token.kind === 'quoted') && NUMBER.test(token.text)) {
+      return { operator, values: [token.text], number: Number(token.text) };
+    }
+    return new WhereError(
+      `'${operator}' compares numbers, written as 3, -2 or 1.5, and '${token.text}' is not one`,
+      token.range,
+    );
   }
 
   /** The pattern after `matches`, compiled here so a refusal points into it. */
@@ -340,5 +373,26 @@ export function satisfies(predicate: Predicate, cell: CellValue | undefined): bo
       return predicate.pattern?.test(cellText(cell)) ?? false;
     case 'not matches':
       return !(predicate.pattern?.test(cellText(cell)) ?? false);
+    case '<':
+    case '<=':
+    case '>':
+    case '>=':
+      return compares(predicate.operator, numberOf(cell), predicate.number);
   }
+}
+
+/** A cell as a number: a number as itself, text when it is one once trimmed, else none. */
+function numberOf(cell: CellValue | undefined): number | undefined {
+  if (typeof cell === 'number') return Number.isFinite(cell) ? cell : undefined;
+  if (typeof cell !== 'string') return undefined;
+  const text = cell.trim();
+  return NUMBER.test(text) ? Number(text) : undefined;
+}
+
+function compares(operator: Operator, value: number | undefined, target: number | undefined) {
+  if (value === undefined || target === undefined) return false;
+  if (operator === '<') return value < target;
+  if (operator === '<=') return value <= target;
+  if (operator === '>') return value > target;
+  return value >= target;
 }

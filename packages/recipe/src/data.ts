@@ -1,7 +1,7 @@
 import { type Diagnostic, type Result, diagnostic, err, ok } from '@tyto/core';
 import type { ZodType } from 'zod';
 
-import type { Argument } from './ast.js';
+import type { Argument, NamedArgument } from './ast.js';
 import type { VerbContext } from './registry.js';
 import { type Problems, locate } from './support.js';
 
@@ -148,6 +148,39 @@ export async function readDataArgument<Shape>(
   const checked = schema.safeParse(slice.value);
   if (checked.success) return ok(checked.data);
   return misshapen(describeIssues(checked.error.issues));
+}
+
+/**
+ * The JSON written after `<name>=` to the end of the step, checked as a data file's slice would
+ * be, for a verb that takes its configuration inline as well as from a file. Its refusals are
+ * the verb's argument problems, at the argument.
+ */
+export function readInlineJson<Shape>(
+  context: VerbContext,
+  argument: NamedArgument,
+  schema: ZodType<Shape>,
+): Result<Shape, Problems> {
+  const text = context.step.text;
+  const start = new RegExp(`(?:^|\\s)${argument.name}=`, 'u').exec(text);
+  const json = start === null ? '' : text.slice(start.index + start[0].length);
+  const refuse = (problem: string): Result<Shape, Problems> =>
+    err([
+      diagnostic(
+        'E_RECIPE_ARGUMENTS',
+        { verb: context.step.verb, problem: `writes ${argument.name}= inline, and ${problem}` },
+        { range: locate(context)(argument.range) },
+      ),
+    ]);
+  let value: unknown;
+  try {
+    value = JSON.parse(json);
+  } catch (error) {
+    // JSON.parse is the one reader here that reports by throwing; its message says where.
+    return refuse(`it is not JSON (${error instanceof Error ? error.message : 'unreadable'})`);
+  }
+  const checked = schema.safeParse(value);
+  if (checked.success) return ok(checked.data);
+  return refuse(`it does not hold what this verb reads: ${describeIssues(checked.error.issues)}`);
 }
 
 /** The first issues Zod found, each with where in the slice it is, for one sentence. */
