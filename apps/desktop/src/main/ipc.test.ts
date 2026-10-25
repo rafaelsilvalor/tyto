@@ -664,6 +664,7 @@ const windowThemes = (): WindowThemes => {
     tabSize: () => 4,
     formatBriefOnSave: () => true,
     briefColumns: () => 'perColumn',
+    lineNumbers: () => 'relative',
     typography: () => ({
       uiFontFamily: 'Segoe UI',
       uiFontSize: 18,
@@ -1575,6 +1576,8 @@ describe('the theme channels (TYTO-208)', () => {
     expect(answer.formatBriefOnSave).toBe(true);
     // And how a brief's `|` columns are drawn (TYTO-298).
     expect(answer.briefColumns).toBe('perColumn');
+    // And how the lines are numbered (TYTO-415).
+    expect(answer.lineNumbers).toBe('relative');
     // And the faces and sizes (TYTO-272); the zoom is main's and is not on the answer.
     expect(answer.typography).toEqual({
       uiFontFamily: 'Segoe UI',

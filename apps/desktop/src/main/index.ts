@@ -47,6 +47,7 @@ import { statusBarItemsExample } from '../../shared/status-bar-items.js';
 import { DEFAULT_THEME_SETTING, type ThemeSetting, modeOf } from '../../shared/theme-setting.js';
 import { vimModeStyleExample } from '../../shared/vim-mode-style.js';
 import { briefColumnsExample } from '../../shared/brief-columns.js';
+import { lineNumbersExample } from '../../shared/line-numbers.js';
 import {
   type Typography,
   type ZoomStep,
@@ -145,7 +146,8 @@ const CONTEXT_MENU_CLICK_GRACE_MS = 50;
  * and an example colour, and `vimModeStyle` with its three values (TYTO-301), so the bar's
  * options are in the file the person is looking at; and `vimMode` (TYTO-333), `indentGuides`
  * (TYTO-293), `stickyScroll` (TYTO-295), `formatBriefOnSave` and `tabSize` (TYTO-297),
- * `briefColumns` with its four looks (TYTO-298), and `googleFonts` (TYTO-281).
+ * `briefColumns` with its four looks (TYTO-298), `lineNumbers` with its three (TYTO-415), and
+ * `googleFonts` (TYTO-281).
  */
 const NEW_SETTINGS_FILE =
   '// Tyto settings: JSON with comments. Saving this file applies it, with no restart.\n{\n' +
@@ -153,6 +155,7 @@ const NEW_SETTINGS_FILE =
   `${vimModeStyleExample()}\n` +
   `${indentGuidesExample()}\n${stickyScrollExample()}\n` +
   `${formatBriefOnSaveExample()}\n${tabSizeExample()}\n${briefColumnsExample()}\n` +
+  `${lineNumbersExample()}\n` +
   `${typographyExample()}\n${googleFontsExample()}\n}\n`;
 
 /**
@@ -566,6 +569,8 @@ async function start(): Promise<void> {
   let googleFonts = saved.googleFonts;
   // And how the columns of a `|` line are drawn (TYTO-298), on the same answer.
   let briefColumns = saved.briefColumns;
+  // And how the editor numbers its lines (TYTO-415), on the same answer.
+  let lineNumbers = saved.lineNumbers;
   // And the faces and sizes (TYTO-272), on the same answer. The zoom is applied here, in main.
   let typography: Typography = {
     uiFontFamily: saved.uiFontFamily,
@@ -886,6 +891,7 @@ async function start(): Promise<void> {
       if (keys.includes('formatBriefOnSave')) formatBriefOnSave = next.formatBriefOnSave;
       if (keys.includes('googleFonts')) googleFonts = next.googleFonts;
       if (keys.includes('briefColumns')) briefColumns = next.briefColumns;
+      if (keys.includes('lineNumbers')) lineNumbers = next.lineNumbers;
       if (keys.includes('zoom')) applyZoom(next.zoom);
       if (
         keys.includes('uiFontFamily') ||
@@ -1364,6 +1370,7 @@ async function start(): Promise<void> {
       tabSize: () => tabSize,
       formatBriefOnSave: () => formatBriefOnSave,
       briefColumns: () => briefColumns,
+      lineNumbers: () => lineNumbers,
       typography: () => typography,
     },
     // View > Zoom and its keys (TYTO-272): applied at once and written as a screen's change, so

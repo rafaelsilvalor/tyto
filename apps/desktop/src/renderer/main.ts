@@ -150,6 +150,7 @@ import { type StatusBarItemId, STATUS_BAR_ITEM_IDS } from '../../shared/status-b
 import { type VimModeStyle } from '../../shared/vim-mode-style.js';
 import { createVimSetting } from './vim-setting.js';
 import { type BriefColumnLook } from '../../shared/brief-columns.js';
+import { type LineNumbersLook } from '../../shared/line-numbers.js';
 import { type DocumentFormat } from '../../shared/file-icons.js';
 import {
   type AppFileKind,
@@ -2533,6 +2534,9 @@ function showTheme(bridge: TytoBridge, ask: () => Promise<IpcResponse<'theme:cur
       // no brief buffer, so it is not told.
       briefColumns = applied.briefColumns;
       editor?.setBriefColumns(briefColumns);
+      // And how the lines are numbered (TYTO-415), in every tab and the template mode.
+      lineNumbers = applied.lineNumbers;
+      editor?.setLineNumbers(lineNumbers);
       // And the faces and sizes (TYTO-272), which the sheet above already holds: CodeMirror
       // watches no custom property, so every pane re-reads its text's size, and a face this
       // machine does not have is said in the problems panel.
@@ -2542,6 +2546,7 @@ function showTheme(bridge: TytoBridge, ask: () => Promise<IpcResponse<'theme:cur
         elements.templateMode.showIndentGuides(indentGuides);
         elements.templateMode.showStickyScroll(stickyScroll);
         elements.templateMode.showTabSize(tabSize);
+        elements.templateMode.showLineNumbers(lineNumbers);
       }
       panel.installation = withThemeRows(panel.installation, applied.diagnostics);
       repaint();
@@ -4037,6 +4042,9 @@ let formatBriefOnSave = false;
 /** The `briefColumns` setting, from the same answer (TYTO-298): the separator until it arrives. */
 let briefColumns: BriefColumnLook = 'separator';
 
+/** The `lineNumbers` setting, from the same answer (TYTO-415): each line its own until it arrives. */
+let lineNumbers: LineNumbersLook = 'on';
+
 /** The ids the status bar's buttons run; the area toggles are named by the bar itself. */
 const STATUS_COMMANDS: StatusBarCommands = {
   commandBar: COMMAND_BAR_TOGGLE,
@@ -4962,6 +4970,7 @@ async function loadTemplateMode(): Promise<TemplateMode | undefined> {
   mode.showIndentGuides(indentGuides);
   mode.showStickyScroll(stickyScroll);
   mode.showTabSize(tabSize);
+  mode.showLineNumbers(lineNumbers);
   return mode;
 }
 
@@ -5229,6 +5238,8 @@ async function load(): Promise<void> {
       tabSize,
       // How a `|` line's columns are drawn (TYTO-298); the theme's answer brings the saved one.
       briefColumns,
+      // How the lines are numbered (TYTO-415); the theme's answer brings the saved one.
+      lineNumbers,
       // Slots, adjustments, enum values and plugin directives after `::`, and the
       // underline, both fed from the preview's answer. No delay of the linter's own: the
       // preview's debounce is the pause, and a second one would only add to it.

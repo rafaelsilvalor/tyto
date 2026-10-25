@@ -35,6 +35,7 @@ describe("the app's settings outline", () => {
       'formatBriefOnSave',
       'tabSize',
       'briefColumns',
+      'lineNumbers',
       'zoom',
       'uiFontFamily',
       'uiFontSize',
@@ -78,6 +79,13 @@ describe("the app's settings outline", () => {
     expect(columns?.options[2]?.description).toMatch(/barely differs/u);
     expect(columns?.options[3]?.description).toMatch(/below comfortable reading contrast/u);
     expect(columns?.default).toBe('"separator"');
+  });
+
+  it('offers lineNumbers on, relative and off, each with what it does (TYTO-415)', () => {
+    const numbers = setting('lineNumbers');
+    expect(numbers?.options.map((option) => option.value)).toEqual(['on', 'relative', 'off']);
+    expect(numbers?.options[1]?.description).toMatch(/distance to the cursor/u);
+    expect(numbers?.default).toBe('"on"');
   });
 
   it('offers stickyScroll on and off, each with what it does (TYTO-295)', () => {

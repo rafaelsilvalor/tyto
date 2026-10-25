@@ -38,7 +38,7 @@ describe('suggesting in settings.json', () => {
     const answer = complete('{\n  "|\n}');
     expect(answer?.quoted).toBe(true);
     expect(answer?.from).toBe(5);
-    expect(answer?.options).toHaveLength(23);
+    expect(answer?.options).toHaveLength(24);
     expect(labels('{\n  "queueAutoRun": true,\n  "|\n}')).not.toContain('queueAutoRun');
   });
 
