@@ -1438,6 +1438,28 @@ export const diagnosticCodes = {
     fatality:
       'That cell has no table and the cells after it do not run; earlier cells keep theirs.',
   },
+  // A rules table is checked whole before any row is read, so a mistake in its last entry is
+  // found on a table whose rows never reach that entry (ADR 0136).
+  E_RECIPE_RULES: {
+    severity: 'error',
+    summary:
+      "A 'rules' table cannot be read, sets a column 'into=' does not name, or has an entry no row can reach.",
+    template: 'The rules table {problem}.',
+    spec: 'docs/adr/0136-company-rules-are-configuration-read-by-generic-verbs.md',
+    fatal: false,
+    fatality:
+      'That cell has no table and the cells after it do not run; earlier cells keep theirs.',
+  },
+  E_RECIPE_TEMPLATE: {
+    severity: 'error',
+    summary:
+      "A 'compose' or 'rules' template has an unclosed placeholder, a stray brace or a filter that does not exist.",
+    template: "Template '{template}' {problem}.",
+    spec: 'docs/adr/0136-company-rules-are-configuration-read-by-generic-verbs.md',
+    fatal: false,
+    fatality:
+      'That cell has no table and the cells after it do not run; earlier cells keep theirs.',
+  },
   // Zero rows is a legitimate answer, but it cannot be told from a misspelt value if it is silent.
   W_RECIPE_WHERE_EMPTY: {
     severity: 'warning',

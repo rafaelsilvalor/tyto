@@ -151,7 +151,7 @@ export async function readDataArgument<Shape>(
 }
 
 /** The first issues Zod found, each with where in the slice it is, for one sentence. */
-function describeIssues(
+export function describeIssues(
   issues: readonly { readonly path: readonly PropertyKey[]; readonly message: string }[],
 ): string {
   const shown = issues.slice(0, 3).map((issue) => {
