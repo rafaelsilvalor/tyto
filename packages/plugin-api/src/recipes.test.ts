@@ -228,7 +228,7 @@ describe('recipeRegistriesOf', () => {
   it('lists the contributed names with the generic ones, for an unknown verb', async () => {
     const { problem } = await run(registries(), 'demo.number');
     expect(problem).toBe(
-      "No verb named 'demo.number' is available. Available: age, collect, compose, " +
+      "No verb named 'demo.number' is available. Available: age, collect, compose, decide, " +
         'demo.numbers, derive, extract, join, keep, last, map, nearest, path, remember, rewrite, rules, ' +
         'run, select, show, sort, urls, where.',
     );

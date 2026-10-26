@@ -1,102 +1,14 @@
-import { type Diagnostic, diagnostic, err, ok } from '@tyto/core';
+import { diagnostic, err } from '@tyto/core';
 import { describe, expect, it } from 'vitest';
 
 import { tasks } from './__fixtures__/flows.js';
-import { parseRecipe } from './parse.js';
-import { createDerivationRegistry, createVerbRegistry } from './registry.js';
-import { type RecipeRun, runRecipe } from './run.js';
 import {
-  type ApplyOutcome,
-  type RecipeState,
-  type StateWrite,
-  type StoredEntry,
-  stateToCommit,
-} from './state.js';
-import type { CellValue, Table } from './table.js';
-
-const STORED_AT = '2026-10-25T12:00:00.000Z';
-
-/** An in-memory store with the port's merge rule, standing in for the host's (PR4). */
-function memoryState(
-  initial: Record<string, Record<string, Record<string, CellValue>>> = {},
-): RecipeState & { readonly stores: Map<string, Map<string, StoredEntry>> } {
-  const stores = new Map<string, Map<string, StoredEntry>>(
-    Object.entries(initial).map(([store, entries]) => [
-      store,
-      new Map(
-        Object.entries(entries).map(([key, values]) => [key, { values, storedAt: STORED_AT }]),
-      ),
-    ]),
-  );
-  return {
-    stores,
-    read: (store, keys) => {
-      const entries = stores.get(store) ?? new Map<string, StoredEntry>();
-      const found = new Map<string, StoredEntry>();
-      for (const key of keys) {
-        const entry = entries.get(key);
-        if (entry !== undefined) found.set(key, entry);
-      }
-      return Promise.resolve(ok(found));
-    },
-    write: (store, puts, deletes) => {
-      const entries = stores.get(store) ?? new Map<string, StoredEntry>();
-      stores.set(store, entries);
-      for (const key of deletes) entries.delete(key);
-      for (const put of puts) {
-        const values = { ...entries.get(put.key)?.values, ...put.values };
-        entries.set(put.key, { values, storedAt: STORED_AT });
-      }
-      return Promise.resolve(ok(undefined));
-    },
-  };
-}
-
-interface Ran {
-  readonly run: RecipeRun;
-  readonly table: Table | undefined;
-  readonly errors: readonly Diagnostic[];
-  readonly at: string | undefined;
-}
-
-async function run(
-  lines: readonly string[],
-  input: Table,
-  state: RecipeState | undefined,
-  included: Record<string, string> = {},
-): Promise<Ran> {
-  const source = ['recipe sync', ...lines].join('\n');
-  const recipe = parseRecipe(source);
-  if (!recipe.ok) throw new Error(recipe.error.map(({ message }) => message).join('\n'));
-  const result = await runRecipe(recipe.value, {
-    input,
-    verbs: createVerbRegistry(),
-    derivations: createDerivationRegistry(),
-    resolveRecipe: (name) => {
-      const text = included[name];
-      if (text === undefined) return Promise.resolve(err([]));
-      const parsed = parseRecipe(text);
-      return Promise.resolve(parsed.ok ? ok(parsed.value) : err(parsed.error));
-    },
-    state,
-  });
-  if (!result.ok) throw new Error('the run must start');
-  const errors = result.value.cells
-    .flatMap((cell) => cell.diagnostics)
-    .filter((found) => found.severity === 'error');
-  const range = errors[0]?.range;
-  return {
-    run: result.value,
-    table: result.value.table,
-    errors,
-    at: range === undefined ? undefined : source.slice(range.start, range.end),
-  };
-}
-
-/** The values of `columns` on every row, in order. */
-function column(table: Table | undefined, name: string): readonly CellValue[] {
-  return table?.rows.map((row) => row.values[name] ?? null) ?? [];
-}
+  STORED_AT,
+  column,
+  memoryState,
+  runWithState as run,
+} from './__fixtures__/state-harness.js';
+import { type ApplyOutcome, type RecipeState, type StateWrite, stateToCommit } from './state.js';
 
 const SHEET = tasks(
   ['status', 'owner', 'parent'],
