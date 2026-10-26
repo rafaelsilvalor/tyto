@@ -1,8 +1,6 @@
 ---
 '@tyto/editor': minor
 '@tyto/desktop': minor
-'@tyto/docs': patch
-'@tyto/repo-checks': patch
 ---
 
 TYTO-418 (ADR 0143): vim mode gains its first plugin, commentary, and a `vimPlugins` setting
