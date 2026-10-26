@@ -25,6 +25,7 @@ const cache = () => pluginCache({ home, now: () => clock });
 const text = (value: string) => new TextEncoder().encode(value);
 const nameOf = (key: string) => createHash('sha256').update(key, 'utf8').digest('hex');
 const folderOf = (plugin: string) => join(home, 'cache', 'plugins', plugin);
+const digestOf = (value: string) => createHash('sha256').update(value, 'utf8').digest('hex');
 
 /** The code a refused call threw. */
 async function codeOf(attempt: Promise<unknown>): Promise<string> {
@@ -62,6 +63,7 @@ describe('pluginCache', () => {
       key: '../../escape',
       storedAt: '2026-10-25T12:00:00.000Z',
       size: 1,
+      sha256: digestOf('x'),
     });
   });
 
@@ -101,11 +103,11 @@ describe('pluginCache', () => {
     await writeFile(sidecar('corrupt'), '{ not json');
     await writeFile(
       sidecar('wrong-size'),
-      JSON.stringify({ key: 'wrong-size', storedAt: 'x', size: 99 }),
+      JSON.stringify({ key: 'wrong-size', storedAt: 'x', size: 99, sha256: digestOf('bytes') }),
     );
     await writeFile(
       sidecar('other-key'),
-      JSON.stringify({ key: 'someone-else', storedAt: 'x', size: 5 }),
+      JSON.stringify({ key: 'someone-else', storedAt: 'x', size: 5, sha256: digestOf('bytes') }),
     );
 
     for (const key of ['no-sidecar', 'corrupt', 'wrong-size', 'other-key']) {
@@ -115,6 +117,68 @@ describe('pluginCache', () => {
     // Delete still clears what is there, and says there was something.
     expect(await ports.cacheDelete('jira', 'no-sidecar')).toBe(true);
     expect(await readdir(folderOf('jira'))).not.toContain(`${nameOf('no-sidecar')}.bin`);
+  });
+
+  // Two processes putting one key with bytes of one size: one's bytes, the other's sidecar.
+  it('answers a miss for bytes of the right size and the wrong digest', async () => {
+    const ports = cache();
+    await ports.cachePut('jira', 'race', text('AAAA'));
+    const first = await readFile(join(folderOf('jira'), `${nameOf('race')}.json`));
+    await ports.cachePut('jira', 'race', text('BBBB'));
+    await writeFile(join(folderOf('jira'), `${nameOf('race')}.json`), first);
+
+    expect(await ports.cacheGet('jira', 'race')).toBeUndefined();
+    // `list` reads sidecars and sizes, never the bytes: the pair is listed and `get` misses it.
+    expect((await ports.cacheList('jira', '')).map((entry) => entry.key)).toEqual(['race']);
+  });
+
+  // What an export of several frames does: each frame's call puts and reads the same key at
+  // once. On Windows a rename onto a file another call is renaming or reading fails with
+  // EPERM; every put has to land and every get has to answer one whole entry or a miss.
+  it('lands every one of many puts and gets racing on one key', async () => {
+    const ports = cache();
+    const values = Array.from({ length: 24 }, (_, index) => `value-${String(index % 10)}`);
+    const answers = await Promise.all(
+      values.flatMap((value) => [
+        ports.cachePut('jira', 'race', text(value)).then(() => 'put'),
+        ports
+          .cacheGet('jira', 'race')
+          .then((entry) => (entry === undefined ? 'miss' : new TextDecoder().decode(entry.bytes))),
+      ]),
+    );
+
+    for (const answer of answers) expect(answer).toMatch(/^(put|miss|value-\d)$/u);
+    const last = await ports.cacheGet('jira', 'race');
+    expect(new TextDecoder().decode(last?.bytes)).toMatch(/^value-\d$/u);
+    expect((await readdir(folderOf('jira'))).filter((name) => name.endsWith('.part'))).toEqual([]);
+  });
+
+  // Two hosts — the desktop and a `tyto render` — share no turn: on Windows their renames
+  // collide, and each put must still land, whatever entry is left for `get` to judge.
+  it('lands the puts of two caches racing on one key, leaving no partial file', async () => {
+    const hosts = [cache(), cache()];
+    const puts = Array.from({ length: 24 }, (_, index) =>
+      hosts[index % 2]!.cachePut('jira', 'race', text(`value-${String(index % 10)}`)),
+    );
+
+    await expect(Promise.all(puts)).resolves.toHaveLength(24);
+    expect((await readdir(folderOf('jira'))).filter((name) => name.endsWith('.part'))).toEqual([]);
+  });
+
+  // Written by PR #180's adapter, before the digest: nothing tells it apart from a race's.
+  it('answers a miss for, and lists nothing of, a sidecar without a digest', async () => {
+    const ports = cache();
+    await ports.cachePut('jira', 'old', text('bytes'));
+    await writeFile(
+      join(folderOf('jira'), `${nameOf('old')}.json`),
+      JSON.stringify({ key: 'old', storedAt: '2026-10-24T00:00:00.000Z', size: 5 }),
+    );
+
+    expect(await ports.cacheGet('jira', 'old')).toBeUndefined();
+    expect(await ports.cacheList('jira', '')).toEqual([]);
+    expect(await ports.cacheDelete('jira', 'old')).toBe(true);
+    await ports.cachePut('jira', 'old', text('fresh'));
+    expect(new TextDecoder().decode((await ports.cacheGet('jira', 'old'))?.bytes)).toBe('fresh');
   });
 
   it('refuses an empty key, an oversized key, an entry over 32 MiB and an odd plugin name', async () => {

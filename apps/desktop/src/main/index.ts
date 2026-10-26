@@ -693,7 +693,12 @@ async function start(): Promise<void> {
   });
   // One composition of what a plugin may reach, shared by its process and its panel, so the
   // two can never be granted different things (ADR 0042, ADR 0045).
-  const capabilities = desktopCapabilities(credentials, (url, init) => net.fetch(url, init));
+  // A plugin's cache beside the sources' in `TYTO_HOME`, and the files of the folder open in the
+  // window, asked of `workspace` at every call because a plugin outlives an Open Folder (ADR 0138).
+  const capabilities = desktopCapabilities(credentials, (url, init) => net.fetch(url, init), {
+    home: pluginsHome,
+    workspace: () => workspace.state(),
+  });
 
   // The export, composed here for the reason everything else is (ADR 0010): it needs a
   // `Rasterizer`, and the only place allowed to know which adapter exists is this file. It

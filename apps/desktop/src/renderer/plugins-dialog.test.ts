@@ -162,6 +162,40 @@ describe('the plugins screen', () => {
     expect(element.querySelector('[data-plugin="svg"] .plugins__fonts')).toBeNull();
   });
 
+  it('says, on its own row, what workspace:read and workspace:write reach (ADR 0138)', async () => {
+    const element = await dialog({
+      folder: VIEW.folder,
+      plugins: [
+        {
+          ...VIEW.plugins[0]!,
+          name: 'tabelas',
+          origin: 'external',
+          contributes: ['directive'],
+          permissions: ['workspace:read', 'workspace:write'],
+        },
+        {
+          ...VIEW.plugins[0]!,
+          name: 'leitor',
+          origin: 'external',
+          contributes: ['directive'],
+          permissions: ['workspace:read'],
+        },
+        { ...VIEW.plugins[0]!, name: 'svg', contributes: ['exporter'] },
+      ],
+    });
+
+    const lines = (name: string) =>
+      [...element.querySelectorAll(`[data-plugin="${name}"] .plugins__workspace`)].map((line) =>
+        line.textContent?.trim(),
+      );
+    expect(lines('tabelas')).toEqual([
+      translate('en', 'plugins.workspace.reads'),
+      translate('en', 'plugins.workspace.writes'),
+    ]);
+    expect(lines('leitor')).toEqual([translate('en', 'plugins.workspace.reads')]);
+    expect(lines('svg')).toEqual([]);
+  });
+
   it('closes on Escape', async () => {
     const element = await dialog();
     element

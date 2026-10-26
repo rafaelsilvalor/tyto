@@ -526,6 +526,12 @@ export interface Catalogue {
    * machine, is sent to the plugin's process (ADR 0048). The families follow it.
    */
   readonly 'plugins.font.sendsMachineFaces': string;
+  /**
+   * On the row of a plugin that declares `workspace:read` or `workspace:write` (ADR 0138): the
+   * files of the folder open in the window, whichever it is when the plugin asks.
+   */
+  readonly 'plugins.workspace.reads': string;
+  readonly 'plugins.workspace.writes': string;
   readonly 'plugins.close': string;
   readonly 'plugins.unavailable': string;
   /**
@@ -957,6 +963,8 @@ export const CATALOGUE_KEYS = [
   'plugins.permissions.none',
   'plugins.panel.readsDocument',
   'plugins.font.sendsMachineFaces',
+  'plugins.workspace.reads',
+  'plugins.workspace.writes',
   'plugins.close',
   'plugins.unavailable',
   'plugins.credential.label',

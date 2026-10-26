@@ -141,6 +141,30 @@ function writeHome(): void {
       `.then((seen) => ({ ok: true, value: seen.join(' '), diagnostics: [] }));`,
     ['credentials:token'],
   );
+  // Its cache and the open folder's files through the host, each step written (ADR 0138).
+  const steps371 = [
+    "host.cache.put('jira/issues', 'cached-371').then(() => 'put')",
+    "host.cache.get('jira/issues').then((entry) => new TextDecoder().decode(entry.bytes))",
+    "host.cache.list('jira/').then((all) => all.map((one) => one.key).join(','))",
+    "host.workspace.write('dados/tabela.csv', 'a,b').then(String)",
+    "host.workspace.read('dados/tabela.csv').then((bytes) => new TextDecoder().decode(bytes))",
+    "host.workspace.write('../fora.csv', 'x').then(String)",
+    "host.workspace.write('.tyto/x.json', '{}').then(String)",
+  ];
+  install(
+    'armario',
+    'armario',
+    'shelf',
+    `const steps = [${steps371
+      .map(
+        (call) =>
+          `() => ${call}.then(String, (cause) => 'refused:' + (cause.code ?? cause.message))`,
+      )
+      .join(', ')}];` +
+      `return steps.reduce((done, next) => done.then((seen) => next().then((one) => [...seen, one])), Promise.resolve([]))` +
+      `.then((seen) => ({ ok: true, value: seen.join(' '), diagnostics: [] }));`,
+    ['workspace:read', 'workspace:write'],
+  );
   const entry = { enabled: true, permissions: [], source: '.' };
   writeFileSync(
     join(home, 'plugins.json'),
@@ -152,6 +176,7 @@ function writeHome(): void {
         espia: entry,
         chave: { ...entry, permissions: ['credentials:api-token'] },
         cofre: { ...entry, permissions: ['credentials:token'] },
+        armario: { ...entry, permissions: ['workspace:read', 'workspace:write'] },
       },
     }),
   );
@@ -388,6 +413,54 @@ describe('a credential the plugin stores itself (ADR 0134)', () => {
       existsSync(join(scratch, 'user-data', 'credentials', 'plugin%3Acofre%3Atoken.bin')),
     ).toBe(false);
   }, 180_000);
+});
+
+describe("a plugin's cache and the open folder's files (ADR 0138)", () => {
+  /** Exports `shelf` and answers what each of the plugin's seven steps said. */
+  async function shelf(out: string): Promise<string[]> {
+    const progress = await exported('shelf', out);
+    expect(progress.failure).toBeUndefined();
+    const [file] = readdirSync(out).filter((entry) => entry.endsWith('.shelf'));
+    return readFileSync(join(out, file!), 'utf8').split(' ');
+  }
+
+  it('keeps the cache in TYTO_HOME and writes only inside the trusted folder', async () => {
+    const work = join(scratch, 'obra');
+    mkdirSync(join(work, '.tyto'), { recursive: true });
+    writeFileSync(join(work, '.tyto', 'project.json'), '{}');
+    await app.evaluate(({ dialog }, chosen) => {
+      dialog.showOpenDialog = () => Promise.resolve({ canceled: false, filePaths: [chosen] });
+    }, work);
+    const opened = await call<{ folder: string | null; trust: string }>('workspace:set-folder', {
+      choose: true,
+    });
+    expect(opened).toMatchObject({ folder: work, trust: 'restricted' });
+
+    // Restricted: the cache works, the folder's files are refused until it is trusted.
+    const before = await shelf(join(scratch, 'shelf-restricted'));
+    expect(before.slice(0, 3)).toEqual(['put', 'cached-371', 'jira/issues']);
+    expect(before[3]).toBe('refused:E_WORKSPACE_FILE_RESTRICTED');
+
+    // Trusted while the plugin's process runs: the next call sees it (read on every call).
+    await call('workspace:trust', { trusted: true, source: 'folder' });
+    const after = await shelf(join(scratch, 'shelf-trusted'));
+    process.stdout.write(`[TYTO-371] desktop cache and workspace: ${after.join(' ')}\n`);
+    expect(after).toEqual([
+      'put',
+      'cached-371',
+      'jira/issues',
+      'null',
+      'a,b',
+      'refused:E_WORKSPACE_FILE',
+      'refused:E_WORKSPACE_FILE',
+    ]);
+    expect(readFileSync(join(work, 'dados', 'tabela.csv'), 'utf8')).toBe('a,b');
+    expect(existsSync(join(scratch, 'fora.csv'))).toBe(false);
+    expect(existsSync(join(work, '.tyto', 'x.json'))).toBe(false);
+    const cached = readdirSync(join(home, 'cache', 'plugins', 'armario'));
+    expect(cached.filter((name) => name.endsWith('.bin'))).toHaveLength(1);
+    expect(cached.filter((name) => name.endsWith('.json'))).toHaveLength(1);
+  }, 90_000);
 });
 
 describe('the Node installed plugins run on (ADR 0050)', () => {

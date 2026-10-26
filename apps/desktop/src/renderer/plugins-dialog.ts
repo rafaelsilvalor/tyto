@@ -104,7 +104,7 @@ export class PluginsDialog extends LitElement {
             ? html`<p class="plugins__disclosure">${say('plugins.panel.readsDocument')}</p>`
             : nothing
         }
-        ${this.fonts(say, plugin)} ${this.credentials(say, plugin)}
+        ${this.fonts(say, plugin)} ${this.workspace(say, plugin)} ${this.credentials(say, plugin)}
         ${
           plugin.problems.length === 0
             ? nothing
@@ -128,6 +128,23 @@ export class PluginsDialog extends LitElement {
     return html`<p class="plugins__disclosure plugins__fonts">
       ${say('plugins.font.sendsMachineFaces')} ${families.join(', ')}
     </p>`;
+  }
+
+  /**
+   * `workspace:read` and `workspace:write` said in words (ADR 0138): the files are the folder
+   * open in the window when the plugin asks, not the one open when it started, and only once
+   * that folder is trusted.
+   */
+  private workspace(say: (key: CatalogueKey) => string, plugin: PluginRow): unknown {
+    const lines = (['read', 'write'] as const)
+      .filter((access) => plugin.permissions.includes(`workspace:${access}`))
+      .map((access) =>
+        say(access === 'read' ? 'plugins.workspace.reads' : 'plugins.workspace.writes'),
+      );
+    if (lines.length === 0) return nothing;
+    return html`${lines.map(
+      (line) => html`<p class="plugins__disclosure plugins__workspace">${line}</p>`,
+    )}`;
   }
 
   /**
