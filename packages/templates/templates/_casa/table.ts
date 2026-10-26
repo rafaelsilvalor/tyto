@@ -56,6 +56,7 @@ import {
   HEADER,
   INK,
   ON_ACCENT,
+  OPTICAL_DROP,
   PAGE,
   PAPER,
   REFERENCE_SIZE,
@@ -88,9 +89,10 @@ export function oneImageTable(brand: TableBrand): TemplateBuild {
 
     const titleBlock = drawTitle(title, plan, width, brand.accent);
     const tableBlock = drawTable(table, glued, plan, brand.accent);
-    // The title stands under the brand row; the table is centred in what the title leaves.
-    const tableTop = regionTop + titleBlock.height + TITLE.gap;
-    const tableY = tableTop + Math.max(0, (regionBottom - tableTop - tableBlock.height) / 2);
+    // The title stands under the brand row and the table a fixed gap under the title. Whatever
+    // room the fit leaves goes to the foot: centring the table in it made the gap grow with
+    // every table that fits by its width rather than its height.
+    const tableY = regionTop + titleBlock.height + TITLE.gap;
 
     return frame({
       format: context.format,
@@ -545,16 +547,19 @@ function drawTable(table: TableContent, glued: GluedTable, plan: TablePlan, acce
         // The full height of the cell, centred: its block padding is the room around the
         // words, and subtracting it back out would leave a box a rounding error shorter than
         // the lines it was measured for.
+        // Lowered by trimming the box's top twice the drop, so the centre moves by the drop and
+        // the box stays inside the cell; the block padding is far wider than the trim.
         const padX = style.inline * plan.size;
+        const trim = 2 * OPTICAL_DROP * plan.size;
         cellNodes.push(
           text({
             ...cellText(words, role, plan.size),
             name: 'cell-text',
-            box: { w: span - 2 * padX, h: height },
+            box: { w: span - 2 * padX, h: height - trim },
             align: 'center',
             valign: 'middle',
             ...(plan.unmeasured ? { overflow: 'shrink' as const } : {}),
-            transform: { x: x + padX, y },
+            transform: { x: x + padX, y: y + trim },
           }),
         );
       }

@@ -4,7 +4,7 @@ import { describe, expect, it } from 'vitest';
 import { build } from './template.js';
 import { ROXO } from '../_casa/brands.js';
 import { NO_BREAK_SPACE } from '../_casa/breaks.js';
-import { BODY, SIGNATURE, PAGE } from '../_casa/table-tokens.js';
+import { BODY, OPTICAL_DROP, SIGNATURE, PAGE, TITLE } from '../_casa/table-tokens.js';
 
 import type {
   Frame,
@@ -221,6 +221,14 @@ const bodySize = (frame: Frame): number => {
   return span?.kind === 'text' ? span.size : Number.NaN;
 };
 
+/** From the title's foot to the table's top, in px. */
+const gapUnderTitle = (frame: Frame): number => {
+  const title = placed(frame).find((item) => item.node.name === 'title')!;
+  const table = placed(frame).find((item) => item.node.name === 'table')!;
+  const titleHeight = title.node.kind === 'text' ? (title.node.box.h ?? 0) : Number.NaN;
+  return table.y - (title.y + titleHeight);
+};
+
 /* ------------------------------------------------------------------------ the rules -- */
 
 describe.each([
@@ -239,6 +247,24 @@ describe.each([
     );
     expect(table).toBeDefined();
     expect(bottom).toBeLessThanOrEqual(1350 - PAGE.bottom - SIGNATURE.height);
+  });
+
+  it('sets the table a fixed gap under the title', () => {
+    expect(gapUnderTitle(frame)).toBeCloseTo(TITLE.gap, 6);
+  });
+
+  it('centres every cell’s words by eye: the drop below the cell’s centre, never outside it', () => {
+    const size = bodySize(frame);
+    for (const row of rows(frame)) {
+      for (const [column, item] of row.texts.entries()) {
+        const cell = row.rects[column] ?? row.rects[0];
+        if (cell === undefined || cell.node.kind !== 'rect') continue;
+        const box = (item.node as TextNode).box;
+        const textCentre = item.y + box.h! / 2;
+        const cellCentre = cell.y + cell.node.size.h / 2;
+        expect(textCentre - cellCentre, row.name).toBeCloseTo(OPTICAL_DROP * size, 6);
+      }
+    }
   });
 
   it('keeps every cell’s words inside the cell, wrapped to fit its box', () => {
@@ -336,6 +362,34 @@ describe('a table too long for one image', () => {
 
   it('fits the four-column table above the floor, so the floor is a floor and not the answer', () => {
     expect(bodySize(render(FOUR_COLUMNS).frame)).toBeGreaterThan(BODY.floor);
+  });
+});
+
+describe('a short table, which fits by its width and leaves room below', () => {
+  const FOUR_ROWS = {
+    titulo: 'Top 4 editais abertos para ganhar até 32 mil por mês!',
+    tabela: [
+      'Concurso | Salário | Vagas | Inscrições até',
+      'Conselho das Marinhas | R$ 32.070,88 | 66 + 118 CR | 17/11',
+      'GM VR | Até R$ 31.439,06 | 396 | 23/10',
+      'Fazex QA | R$ 25.270,68 | 40 + 60 CR | 21/10',
+      'CVX | R$ 20.000,00 | 60 + CR | 04/11',
+    ].join('\n'),
+  };
+
+  it('keeps the table the same fixed gap under the title, and leaves the room to the foot', () => {
+    const { frame } = render(FOUR_ROWS);
+    const table = placed(frame).find((item) => item.node.name === 'table')!;
+    const tableHeight = Math.max(
+      ...placed(frame)
+        .filter((item) => item.path.includes('table') && item.node.kind === 'text')
+        .map((item) => item.y + (item.node.kind === 'text' ? (item.node.box.h ?? 0) : 0)),
+    );
+
+    expect(gapUnderTitle(frame)).toBeCloseTo(TITLE.gap, 6);
+    // The case this guards: centring the table here put half the room above it.
+    expect(1350 - PAGE.bottom - SIGNATURE.height - tableHeight).toBeGreaterThan(TITLE.gap);
+    expect(table).toBeDefined();
   });
 });
 
