@@ -441,7 +441,9 @@ describe('editor.vim (TYTO-417, ADR 0141)', () => {
   const SURROUND = {
     id: 'surround',
     title: 'Surround',
-    mappings: [{ keys: 'ys', context: 'normal' as const, operation: 'surround.add' }],
+    // `ys` in normal mode is unreachable: `y` is a whole operator. Surround's `s` is a motion
+    // after one, as the desktop's built-in maps it (TYTO-418).
+    mappings: [{ keys: 's', context: 'operatorPending' as const, operation: 'surround.target' }],
     ex: [{ name: 'surround', command: 'surround.run' }],
   };
 
