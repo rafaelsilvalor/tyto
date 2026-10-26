@@ -186,6 +186,18 @@ export {
   vimMode,
 } from './vim-mode.js';
 
+export {
+  type VimContext,
+  type VimContribution,
+  type VimMapping,
+  type VimOperation,
+  type VimOperationArgs,
+  type VimRange,
+  VIM_CONTEXTS,
+  defineVimOperation,
+  setVimContributions,
+} from './vim-contributions.js';
+
 export { template, templateLanguage } from './template-language.js';
 
 export { json, jsonLanguage } from './json-language.js';

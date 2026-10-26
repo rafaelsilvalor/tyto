@@ -86,6 +86,7 @@ export type RegisterMethod =
   | 'registerDirective'
   | 'registerCommand'
   | 'registerKeymap'
+  | 'registerVim'
   | 'registerPanel'
   | 'registerConfiguration'
   | 'registerTheme'
@@ -386,6 +387,38 @@ export const ISOLATED_POINTS: Readonly<Partial<Record<ContributionPoint, PointSp
       bindings: z.record(z.string(), z.string()),
       mode: z.enum(['normal', 'vim']).optional(),
       when: z.string().min(1).optional(),
+    }),
+    callables: {},
+  },
+  // Data: a mapping names an operation the editor implements, so nothing is called back and a
+  // keypress never waits on the plugin's process (ADR 0141).
+  'editor.vim': {
+    method: 'registerVim',
+    data: z.strictObject({
+      id: z.string().min(1).max(200),
+      title: z.string().min(1).max(200).optional(),
+      mappings: z
+        .array(
+          z.strictObject({
+            keys: z.string().min(1).max(50),
+            context: z.enum(['normal', 'visual', 'operatorPending', 'insert']).optional(),
+            operation: z.string().min(1).max(200),
+            args: z
+              .record(z.string(), z.union([z.string().max(1000), z.number(), z.boolean()]))
+              .optional(),
+          }),
+        )
+        .max(200),
+      ex: z
+        .array(
+          z.strictObject({
+            name: z.string().min(1).max(100),
+            shortName: z.string().min(1).max(100).optional(),
+            command: z.string().min(1).max(200),
+          }),
+        )
+        .max(100)
+        .optional(),
     }),
     callables: {},
   },

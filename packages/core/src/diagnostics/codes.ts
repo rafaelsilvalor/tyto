@@ -1541,6 +1541,16 @@ export const diagnosticCodes = {
     fatal: false,
     fatality: 'A warning never replaces a value (ADR 0013).',
   },
+  // A vim contribution names operations the editor implements (TYTO-417, ADR 0141). One that
+  // cannot be applied is left out whole, so half of a plugin's keys never land.
+  E_VIM_CONTRIBUTION: {
+    severity: 'error',
+    summary: 'A vim contribution names an operation the editor does not have, or a bad mapping.',
+    template: "Vim contribution '{id}' was not applied: {problem}.",
+    spec: 'docs/adr/0141-a-plugin-contributes-vim-mappings-as-data.md',
+    fatal: false,
+    fatality: 'Only that contribution is left out; vim and every other contribution keep working.',
+  },
 } as const satisfies Record<string, DiagnosticCodeDefinition>;
 
 export type DiagnosticCode = keyof typeof diagnosticCodes;

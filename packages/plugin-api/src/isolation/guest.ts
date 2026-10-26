@@ -205,6 +205,7 @@ export function runGuest(
     registerDirective: (value) => register('registerDirective', value),
     registerCommand: (value) => register('registerCommand', value),
     registerKeymap: (value) => register('registerKeymap', value),
+    registerVim: (value) => register('registerVim', value),
     registerPanel: (value) => register('registerPanel', value),
     registerConfiguration: (value) => register('registerConfiguration', value),
     registerTheme: (value) => register('registerTheme', value),
