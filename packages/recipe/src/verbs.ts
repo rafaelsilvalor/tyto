@@ -13,7 +13,9 @@ import { last, remember } from './memory.js';
 import { nearest } from './nearest.js';
 import { path } from './path.js';
 import type { Verb, VerbContext, VerbResult } from './registry.js';
+import { rollup } from './rollup.js';
 import { rules } from './rules.js';
+import { stamp } from './stamp.js';
 import { argumentsProblem, columnNames, refuseNamed, requireTable, rowFilter } from './support.js';
 import { type CellValue, type Column, type Row, type Table, comparable } from './table.js';
 import { urls } from './urls.js';
@@ -44,6 +46,8 @@ export const genericVerbs: Readonly<Record<string, Verb>> = {
   last: { kind: 'transform', run: last },
   remember: { kind: 'transform', run: remember },
   decide: { kind: 'transform', run: decide },
+  rollup: { kind: 'transform', run: rollup },
+  stamp: { kind: 'transform', run: stamp },
 };
 
 /** `where <expression>`: keeps the rows that satisfy every predicate. */

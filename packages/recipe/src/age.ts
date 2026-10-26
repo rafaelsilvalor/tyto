@@ -9,7 +9,7 @@ import { argumentsProblem, locate, requireTable } from './support.js';
 import { type CellValue, cellText } from './table.js';
 
 const COLUMN_NAME = /^[A-Za-z_][\w-]*$/u;
-const NAMES = ['format', 'year', 'into'] as const;
+const NAMES = ['format', 'year', 'into', 'month-into'] as const;
 const MINUTE = 60_000;
 /** How far ahead of now an inferred year may put a stamp: a clock a day off still reads. */
 const TOLERANCE = 24 * 60 * MINUTE;
@@ -137,6 +137,40 @@ export function stampInstant(
   return undefined;
 }
 
+/**
+ * The text `format` writes for a wall-clock time given as a UTC date's fields: each token two
+ * digits, yyyy four, and every other character as written. `stamp` writes with it, so what it
+ * writes is what `readStamp` reads back with the same format.
+ */
+export function formatStamp(format: StampFormat, wall: Date): string {
+  const two = (value: number) => String(value).padStart(2, '0');
+  const fieldText: Record<Field, string> = {
+    year: String(wall.getUTCFullYear()).padStart(4, '0'),
+    month: two(wall.getUTCMonth() + 1),
+    day: two(wall.getUTCDate()),
+    hour: two(wall.getUTCHours()),
+    minute: two(wall.getUTCMinutes()),
+  };
+  let text = '';
+  for (let index = 0; index < format.text.length;) {
+    const token = TOKENS.find(([written]) => format.text.startsWith(written, index));
+    if (token === undefined) {
+      text += format.text.charAt(index);
+      index++;
+      continue;
+    }
+    text += fieldText[token[1]];
+    index += token[0].length;
+  }
+  return text;
+}
+
+/** The month a stamp files under, `yyyy-MM` on the wall clock: Buraqueira's `mes_de`. */
+export function monthOf(clock: RunClock, instant: Date): string {
+  const wall = wallClock(clock, instant);
+  return `${String(wall.getUTCFullYear())}-${String(wall.getUTCMonth() + 1).padStart(2, '0')}`;
+}
+
 /** Hours from `then` to `now` in whole minutes, so 72 hours is exactly 72. */
 export function hoursBetween(then: Date, now: Date): number {
   return Math.floor((now.getTime() - then.getTime()) / MINUTE) / 60;
@@ -154,6 +188,9 @@ export function hoursBetween(then: Date, now: Date): number {
  * to infer. The column is a number of hours, whole minutes over 60, added at the end or
  * recomputed in place; negative within the day an inferred year allows. An empty cell writes
  * an empty cell, and so does one no format reads, which one warning per step counts.
+ *
+ * `month-into=<column>` also writes the month the stamp files under, `yyyy-MM` on the wall
+ * clock with the year read as above (Buraqueira's `mes_de`), empty where the age is.
  */
 export function age(context: VerbContext): VerbResult {
   const table = requireTable(context);
@@ -187,6 +224,21 @@ export function age(context: VerbContext): VerbResult {
   if (extra !== undefined) return argumentsProblem(context, usage, at(extra.range));
   if (!COLUMN_NAME.test(into.value)) {
     return argumentsProblem(context, `cannot write a column named '${into.value}'`, at(into.range));
+  }
+  const monthInto = written.get('month-into');
+  if (monthInto !== undefined && !COLUMN_NAME.test(monthInto.value)) {
+    return argumentsProblem(
+      context,
+      `cannot write a column named '${monthInto.value}'`,
+      at(monthInto.range),
+    );
+  }
+  if (monthInto !== undefined && monthInto.value.toLowerCase() === into.value.toLowerCase()) {
+    return argumentsProblem(
+      context,
+      `writes the hours and the month into two columns, not both into '${into.value}'`,
+      at(monthInto.range),
+    );
   }
 
   const formats: StampFormat[] = [];
@@ -225,19 +277,27 @@ export function age(context: VerbContext): VerbResult {
   const clock = context.clock ?? systemClock;
   const now = clock.now();
   let unread = 0;
-  const hours = (value: CellValue | undefined): number | null => {
+  const instantOfCell = (value: CellValue | undefined): Date | undefined => {
     const text = cellText(value).trim();
-    if (text === '') return null;
+    if (text === '') return undefined;
     const instant = stampInstant(formats, text, clock, now);
-    if (instant === undefined) {
-      unread++;
-      return null;
-    }
-    return hoursBetween(instant, now);
+    if (instant === undefined) unread++;
+    return instant;
   };
-  const result = withColumns(table.value, [{ name: into.value, type: 'number' }], 'age', (row) => ({
-    [into.value]: hours(row.values[column.value.name]),
-  }));
+  const produced = [
+    { name: into.value, type: 'number' as const },
+    ...(monthInto === undefined ? [] : [{ name: monthInto.value, type: 'text' as const }]),
+  ];
+  const result = withColumns(table.value, produced, 'age', (row) => {
+    const instant = instantOfCell(row.values[column.value.name]);
+    const values: Record<string, CellValue> = {
+      [into.value]: instant === undefined ? null : hoursBetween(instant, now),
+    };
+    if (monthInto !== undefined) {
+      values[monthInto.value] = instant === undefined ? null : monthOf(clock, instant);
+    }
+    return values;
+  });
   const warnings =
     unread === 0
       ? []
