@@ -14,6 +14,7 @@ import { z } from 'zod';
 
 import { isMissing } from './real-paths.js';
 import { writeEntry } from './source-cache.js';
+import { writeTurns } from './write-turns.js';
 
 /**
  * A plugin's private cache, kept by the host outside every workspace (ADR 0130, ADR 0138).
@@ -109,28 +110,12 @@ function overCeiling(size: number): string {
 export function pluginCache(options: PluginCacheOptions): PluginCachePorts {
   const root = join(options.home, 'cache', 'plugins');
   const now = options.now ?? (() => new Date());
-  /** The last write queued per entry file, so this host's writes to one key run in turn. */
-  const writing = new Map<string, Promise<unknown>>();
-
   /**
-   * Runs `work` after every earlier write to the same entry has settled. One host serves
-   * every frame of an export and every plugin process at once, and two puts of one key
-   * interleaved — bytes of one, sidecar of the other — would leave a miss behind (TYTO-371).
-   * Another process can still interleave with this one; the digest makes that a miss.
+   * This host's writes to one key run in turn: two puts of one key interleaved — bytes of one,
+   * sidecar of the other — would leave a miss behind (TYTO-371). Another process can still
+   * interleave with this one; the digest makes that a miss.
    */
-  function inTurn<T>(entry: string, work: () => Promise<T>): Promise<T> {
-    const before = writing.get(entry) ?? Promise.resolve();
-    const done = before.then(work, work);
-    const settled = done.then(
-      () => undefined,
-      () => undefined,
-    );
-    writing.set(entry, settled);
-    void settled.then(() => {
-      if (writing.get(entry) === settled) writing.delete(entry);
-    });
-    return done;
-  }
+  const inTurn = writeTurns();
 
   /** The plugin's folder, once its name is known to be a plain folder name. */
   function folderOf(plugin: string, key: string): string {

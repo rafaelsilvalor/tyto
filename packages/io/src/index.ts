@@ -137,6 +137,12 @@ export {
 export { type PluginCacheOptions, type PluginCachePorts, pluginCache } from './plugin-cache.js';
 
 export {
+  RECIPE_STATE_LIMIT_BYTES,
+  type RecipeStateOptions,
+  recipeStateStore,
+} from './recipe-state.js';
+
+export {
   type WorkspaceFilePorts,
   type WorkspaceFilesOptions,
   workspaceFiles,
