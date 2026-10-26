@@ -32,6 +32,7 @@ import {
   markupTemplateSource,
 } from '@tyto/pipeline';
 
+import { configureDefaults } from './plugins/external.js';
 import {
   builtInTemplatesDirectory,
   packDirectories,
@@ -163,6 +164,9 @@ export async function loadRenderContext(
         await installedPacks(host, options.installed.plugins, options.installed.folderOf, {
           allowCode: true,
         });
+  // A code template reads its plugin's settings as every installed plugin does in the CLI:
+  // their defaults (ADR 0145).
+  configureDefaults(host);
 
   // Project first: a folder the user pointed at is a more specific statement of intent
   // than a package that came along with the program, so their `promo-curso` is the one

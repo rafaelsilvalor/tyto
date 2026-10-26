@@ -1430,7 +1430,7 @@ export const diagnosticCodes = {
   E_RECIPE_STATE: {
     severity: 'error',
     summary:
-      "A 'last' or 'remember' runs where the host keeps no recipe state, or the host cannot read it.",
+      "A 'last', 'remember' or 'recall' runs where the host keeps no recipe state, or the host cannot read it.",
     template: "Recipe state '{store}' {problem}.",
     spec: 'docs/adr/0140-a-recipe-remembers-applied-rows-in-machine-local-state.md',
     fatal: false,

@@ -2,6 +2,7 @@ import { type Diagnostic, type SourceRange, diagnostic } from '@tyto/core';
 import type { ZodType } from 'zod';
 
 import type { Contribution } from './contributions.js';
+import { type SettingForm, settingEntriesOf, settingSchemaOf } from './setting-form.js';
 
 /**
  * The `configuration` extension point: a setting a plugin declares, and the one pure rule
@@ -10,8 +11,9 @@ import type { Contribution } from './contributions.js';
  * **Declared in code, with a Zod schema**, because the settings it has to describe already
  * are Zod schemas — a templates folder is a non-empty string or `null`, a queue's file types
  * are a record of non-empty lists — and a second, JSON-shaped vocabulary for the same rules
- * would be two declarations waiting to drift. The cost is that a schema does not cross a
- * process boundary, so an isolated plugin cannot declare one yet (`NOT_YET_ISOLATED`).
+ * would be two declarations waiting to drift. A schema does not cross a process boundary, so an
+ * isolated plugin declares its setting with a `form` instead — data the host turns into the same
+ * Zod schema (TYTO-254, ADR 0145).
  */
 
 export interface ConfigurationContribution<T = unknown> extends Contribution {
@@ -72,6 +74,24 @@ export interface ConfigurationContribution<T = unknown> extends Contribution {
   };
 }
 
+/**
+ * A setting declared with a data form of its rules instead of a Zod schema (TYTO-254, ADR 0145):
+ * the one way an isolated plugin can declare one, and open to any plugin. A list form checks its
+ * entries one at a time, as `entries` does.
+ */
+export interface FormConfigurationContribution extends Contribution {
+  readonly id: string;
+  readonly form: SettingForm;
+  /** What applies when the file says nothing, or says something the form refuses. */
+  readonly default: unknown;
+  readonly description: string;
+  readonly options?: readonly SettingOption[];
+}
+
+/** What `registerConfiguration` takes: a schema or a form, exactly one of the two. */
+export type SettingDeclaration<T = unknown> =
+  ConfigurationContribution<T> | FormConfigurationContribution;
+
 /** One value a setting, a list entry or an object member may take, and what it does. */
 export interface SettingOption {
   /** A JSON value as the file writes it: a string, a number, `true`/`false` or `null`. */
@@ -101,8 +121,9 @@ const LOCAL_KEY = /^[A-Za-z][A-Za-z0-9]*$/;
 export function declaredSetting(
   plugin: string,
   prefixed: boolean,
-  contribution: ConfigurationContribution,
+  declaration: SettingDeclaration,
 ): DeclaredSetting {
+  const contribution = schemaDeclarationOf(plugin, declaration);
   if (!LOCAL_KEY.test(contribution.id)) {
     throw new TypeError(
       `Plugin '${plugin}' declares the setting '${contribution.id}'. A setting key is letters ` +
@@ -137,6 +158,46 @@ export function declaredSetting(
     prefixed,
     contribution,
   };
+}
+
+/**
+ * The declaration with a Zod schema, converting a form into one. Both or neither is the
+ * plugin's mistake, and so is a form Tyto cannot read; each throws, naming the setting.
+ */
+function schemaDeclarationOf(
+  plugin: string,
+  declaration: SettingDeclaration,
+): ConfigurationContribution {
+  const { schema, form } = declaration as {
+    readonly schema?: ZodType<unknown>;
+    readonly form?: SettingForm;
+  };
+  if ((schema === undefined) === (form === undefined)) {
+    throw new TypeError(
+      `Plugin '${plugin}' declares the setting '${declaration.id}' with ` +
+        `${schema === undefined ? 'neither a schema nor a form' : 'both a schema and a form'}; ` +
+        `a setting has exactly one of the two.`,
+    );
+  }
+  if (form === undefined) return declaration as ConfigurationContribution;
+  const { id, description, options } = declaration as FormConfigurationContribution;
+  try {
+    const entries = settingEntriesOf(form);
+    return {
+      id,
+      description,
+      default: declaration.default,
+      schema: settingSchemaOf(form),
+      ...(options === undefined ? {} : { options }),
+      ...(entries === undefined ? {} : { entries }),
+    };
+  } catch (cause) {
+    throw new TypeError(
+      `Plugin '${plugin}' declares the setting '${id}' with a form Tyto cannot read: ` +
+        `${cause instanceof Error ? cause.message : String(cause)}.`,
+      { cause },
+    );
+  }
 }
 
 /**

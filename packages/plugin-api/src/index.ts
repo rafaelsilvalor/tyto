@@ -61,7 +61,9 @@ export {
 export {
   type ConfigurationContribution,
   type DeclaredSetting,
+  type FormConfigurationContribution,
   type ResolvedSettings,
+  type SettingDeclaration,
   type SettingEntry,
   type SettingMemberRange,
   type SettingOption,
@@ -70,6 +72,16 @@ export {
 } from './configuration.js';
 
 export { type SettingOutline, outlineOf } from './outline.js';
+export {
+  SETTING_FORM_LIMITS,
+  type SettingForm,
+  type SettingFormValue,
+  type SettingListForm,
+  type SettingScalarForm,
+  type SettingScalarType,
+  settingFormSchema,
+  settingSchemaOf,
+} from './setting-form.js';
 
 export {
   type ContributionPoint,

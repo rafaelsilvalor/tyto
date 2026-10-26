@@ -13,6 +13,7 @@ import {
   NO_PLUGINS,
   activateInstalled as activateInto,
   readInstalledPlugins as readFrom,
+  resolveSettings,
   startInstalledPlugins,
 } from '@tyto/plugin-api';
 
@@ -74,7 +75,22 @@ export function pluginFolders(home: string): (plugin: string) => string {
 
 /** Activates started plugins into one host, after the built-ins; raster kinds are `@tyto/raster`'s. */
 export function activateInstalled(host: InProcessHost, loaded: LoadedPlugins): Diagnostics {
-  return activateInto(host, loaded, { encodes: isRasterFormat, encodable: 'png, jpeg and webp' });
+  const warnings = activateInto(host, loaded, {
+    encodes: isRasterFormat,
+    encodable: 'png, jpeg and webp',
+  });
+  configureDefaults(host);
+  return warnings;
+}
+
+/**
+ * Hands every declared setting its default (ADR 0145). The CLI never reads the window's
+ * `settings.json` — it is one machine's preference, and a render must not change with it — so an
+ * installed plugin's setting reads its default here. Values a project chooses arrive later as a
+ * list of entries from the workspace's own file (TYTO-428), which `resolveSettings` already takes.
+ */
+export function configureDefaults(host: InProcessHost): void {
+  host.configure(resolveSettings(host.registry.configurations(), []).config);
 }
 
 export {

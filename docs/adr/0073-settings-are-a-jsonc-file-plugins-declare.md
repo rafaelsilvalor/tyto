@@ -107,6 +107,10 @@ by one rule, with no new dialog:
 - **An isolated plugin cannot declare a setting yet**: a Zod schema is code and does not cross
   to the plugin's process, so `registerConfiguration` is refused by name there, like `source`.
   Lifting that needs a data form of a schema the host can validate against.
+  _Amended 2026-10-26 by TYTO-254 (ADR 0145):_ lifted. An isolated plugin declares a setting
+  with a `form` — a closed slice of JSON Schema the host converts to Zod — instead of a `schema`,
+  and its process receives its values in a `configure` message (protocol 7). The CLI configures
+  installed plugins with their defaults only.
 - `core` gains four codes: `E_SETTINGS_SYNTAX`, `W_SETTING_UNKNOWN`, `W_SETTING_UNPREFIXED`,
   `W_SETTING_INVALID`. The syntax code is an error because it is also why a write is refused;
   none is fatal, because reading never fails.
