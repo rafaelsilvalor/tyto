@@ -23,9 +23,10 @@ import { z } from 'zod';
  * refuse the same way (ADR 0066); 5 since a plugin may store and forget a credential, two
  * requests a host on 4 would refuse as an unknown capability (ADR 0134); 6 since a plugin
  * has a private cache and the workspace's files, six requests a host on 5 would refuse the
- * same way (ADR 0138).
+ * same way (ADR 0138); 7 since the host sends a plugin its settings again whenever they change,
+ * a `configure` message a guest on 6 would not read (ADR 0145).
  */
-export const RPC_PROTOCOL_VERSION = 6;
+export const RPC_PROTOCOL_VERSION = 7;
 
 const protocol = z.literal(RPC_PROTOCOL_VERSION);
 
@@ -70,6 +71,17 @@ export const activateMessageSchema = z.strictObject({
   config: z.unknown(),
 });
 
+/**
+ * The plugin's slice of the configuration, replaced (ADR 0145): sent when the plugin is
+ * activated into a host and again on every `InProcessHost.configure`. One process activated
+ * into several hosts keeps the last one it was sent.
+ */
+export const configureMessageSchema = z.strictObject({
+  protocol,
+  type: z.literal('configure'),
+  config: z.unknown(),
+});
+
 export const callMessageSchema = z.strictObject({
   protocol,
   type: z.literal('call'),
@@ -110,6 +122,7 @@ export const responseMessageSchema = z.discriminatedUnion('ok', [
 
 export const hostMessageSchema = z.union([
   activateMessageSchema,
+  configureMessageSchema,
   callMessageSchema,
   eventMessageSchema,
   responseMessageSchema,

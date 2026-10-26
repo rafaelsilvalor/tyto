@@ -159,7 +159,7 @@ non-zero.
 | `E_RECIPE_ALIAS` | error | no | A column alias cannot be used as it is defined. |
 | `E_RECIPE_DERIVATION` | error | no | A 'derive' names a derivation nobody registered, lacks a column it requires, or breaks its promise. |
 | `E_RECIPE_RUN` | error | no | A 'run' names a recipe that is not found, already running, or ends without a table. |
-| `E_RECIPE_STATE` | error | no | A 'last' or 'remember' runs where the host keeps no recipe state, or the host cannot read it. |
+| `E_RECIPE_STATE` | error | no | A 'last', 'remember' or 'recall' runs where the host keeps no recipe state, or the host cannot read it. |
 | `E_RECIPE_DATA` | error | no | A data reference is malformed, names a file that is missing, too large or outside the workspace, or the host reads no data files. |
 | `E_RECIPE_DATA_RESTRICTED` | error | no | A data reference names a file in a workspace the person has not trusted. |
 | `E_RECIPE_DATA_SYNTAX` | error | no | A data file is not valid JSON with comments. |
@@ -1674,7 +1674,7 @@ Parameters: `recipe`, `problem`
 
 **Severity:** error · **Fatal:** no · **Spec:** `docs/adr/0140-a-recipe-remembers-applied-rows-in-machine-local-state.md`
 
-A 'last' or 'remember' runs where the host keeps no recipe state, or the host cannot read it.
+A 'last', 'remember' or 'recall' runs where the host keeps no recipe state, or the host cannot read it.
 
 That cell has no table and the cells after it do not run; earlier cells keep theirs.
 

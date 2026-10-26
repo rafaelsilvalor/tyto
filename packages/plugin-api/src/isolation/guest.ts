@@ -145,6 +145,12 @@ export function runGuest(
   function register(method: RegisterMethod, value: object): Disposable {
     // The object itself, not a copy: a spread would drop the methods of a class instance.
     const contribution = value as Record<string, unknown>;
+    if (method === 'registerConfiguration' && contribution['schema'] !== undefined) {
+      throw new TypeError(
+        `the setting '${String(contribution['id'])}' carries a Zod schema, which is code and ` +
+          `does not cross to the host; use form, the same rules as data (ADR 0145)`,
+      );
+    }
     const refused = NOT_YET_ISOLATED[method];
     if (refused !== undefined) {
       throw new TypeError(
@@ -340,7 +346,11 @@ export function runGuest(
     }
     const message = parsed.data;
     if (message.type === 'activate') void activate(message);
-    else if (message.type === 'call') void call(message);
+    else if (message.type === 'configure') {
+      // Synchronous, so a call sent after it is answered with the new values.
+      config = message.config;
+      host.events.emit('configured', {});
+    } else if (message.type === 'call') void call(message);
     else if (message.type === 'response') answer(message);
     else host.events.emit(message.event, message.payload);
   });
