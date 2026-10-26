@@ -2,7 +2,7 @@
 
 # Settings
 
-Every key the app declares in `settings.json`: 24. Open the file with **Preferences: Open Settings (JSON)**; a key you leave out keeps its default, and a value the app cannot read is reported in the Problems panel and the default applies. A plugin adds its own keys as `<plugin id>.<key>`, which are not listed here.
+Every key the app declares in `settings.json`: 25. Open the file with **Preferences: Open Settings (JSON)**; a key you leave out keeps its default, and a value the app cannot read is reported in the Problems panel and the default applies. A plugin adds its own keys as `<plugin id>.<key>`, which are not listed here.
 
 ## templatesFolder
 
@@ -130,6 +130,21 @@ Give the editor vim's keys: normal, insert, visual and replace modes (default fa
 | --- | --- |
 | `true` | The editor takes vim's keys, and the status bar shows its mode. |
 | `false` | The editor's own keys; no vim. |
+
+## vimPlugins
+
+Switch each vim plugin on or off by its id, with true or false; every vim plugin, built-in or installed, is on unless named false here. surround: Not in this version yet: ys{motion}{char}, cs{old}{new}, ds{char} and visual S, to add, change or delete a pair around text. commentary: gc{motion}, gcc and visual gc toggle a comment with the language's own: // in a brief, &lt;!-- --> in a Markdown file. Off, gc is vim's line comment only.
+
+| Type | Default |
+| --- | --- |
+| `object` | `{}` |
+
+**Names of each member**
+
+| Value | Meaning |
+| --- | --- |
+| `"surround"` | Not in this version yet: ys{motion}{char}, cs{old}{new}, ds{char} and visual S, to add, change or delete a pair around text. |
+| `"commentary"` | gc{motion}, gcc and visual gc toggle a comment with the language's own: // in a brief, &lt;!-- --> in a Markdown file. Off, gc is vim's line comment only. |
 
 ## vimModeStyle
 

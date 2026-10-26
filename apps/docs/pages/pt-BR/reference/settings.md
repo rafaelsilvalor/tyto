@@ -2,7 +2,7 @@
 
 # Configurações
 
-Todas as chaves que o app declara no `settings.json`: 24. Abra o arquivo com **Preferências: Abrir configurações (JSON)**; uma chave que você não escreve fica com o valor padrão, e um valor que o app não consegue ler aparece no painel Problemas e o padrão vale no lugar dele. Um plugin acrescenta as próprias chaves como `<id do plugin>.<chave>`, que não aparecem aqui.
+Todas as chaves que o app declara no `settings.json`: 25. Abra o arquivo com **Preferências: Abrir configurações (JSON)**; uma chave que você não escreve fica com o valor padrão, e um valor que o app não consegue ler aparece no painel Problemas e o padrão vale no lugar dele. Um plugin acrescenta as próprias chaves como `<id do plugin>.<chave>`, que não aparecem aqui.
 
 ::: info Descrições em inglês
 As descrições abaixo estão em inglês: o código guarda cada uma em um só idioma, e esta página as mostra como estão em vez de traduzi-las à parte.
@@ -134,6 +134,21 @@ Give the editor vim's keys: normal, insert, visual and replace modes (default fa
 | --- | --- |
 | `true` | The editor takes vim's keys, and the status bar shows its mode. |
 | `false` | The editor's own keys; no vim. |
+
+## vimPlugins
+
+Switch each vim plugin on or off by its id, with true or false; every vim plugin, built-in or installed, is on unless named false here. surround: Not in this version yet: ys{motion}{char}, cs{old}{new}, ds{char} and visual S, to add, change or delete a pair around text. commentary: gc{motion}, gcc and visual gc toggle a comment with the language's own: // in a brief, &lt;!-- --> in a Markdown file. Off, gc is vim's line comment only.
+
+| Tipo | Padrão |
+| --- | --- |
+| `object` | `{}` |
+
+**Nomes de cada membro**
+
+| Valor | Significado |
+| --- | --- |
+| `"surround"` | Not in this version yet: ys{motion}{char}, cs{old}{new}, ds{char} and visual S, to add, change or delete a pair around text. |
+| `"commentary"` | gc{motion}, gcc and visual gc toggle a comment with the language's own: // in a brief, &lt;!-- --> in a Markdown file. Off, gc is vim's line comment only. |
 
 ## vimModeStyle
 

@@ -22,3 +22,29 @@ The choice is remembered: the command writes the [`vimMode`](../reference/settin
 - Vim's own keys win inside the editor: **u** undoes, **Ctrl+R** redoes, **:w** saves, and **:vsplit** splits the editor group, as **Split editor right** does.
 - Some of the window's keys are given to vim. **Ctrl+O**, for example, is vim's and no longer opens a file: run **Open…** from the command bar or the **File** menu instead. The command bar shows the keys each command has right now, so a command that lost its key while vim is on shows none.
 - **Ctrl+K** still opens the command bar, so every command is still one search away.
+
+## Plugins
+
+Tyto ships some well-known vim plugins inside vim mode. Each one is on while vim is on, unless you switch it off.
+
+**Commentary** comments and uncomments lines with the comment the file's language has: `//` in a brief, `<!-- -->` in a Markdown file.
+
+| Keys                | What they do                                                                                                |
+| ------------------- | ----------------------------------------------------------------------------------------------------------- |
+| `gcc`               | Comment the line, or uncomment it when it is a comment. A count first, as in `3gcc`, takes that many lines. |
+| `gc` and a motion   | The lines the motion covers: `gcj` takes this line and the next, `gcip` the paragraph.                      |
+| `gc` in visual mode | The selected lines.                                                                                         |
+
+**.** repeats the last `gc` on the line the cursor is on.
+
+### Switch a plugin off
+
+The [`vimPlugins`](../reference/settings.md#vimplugins) setting names each plugin by its id and says `true` or `false`. A plugin the setting does not name is on, and so is a plugin an installed Tyto plugin adds, by the id that plugin gives it.
+
+```json
+"vimPlugins": {
+  "commentary": false
+}
+```
+
+Saving `settings.json` switches it at once. With commentary off, `gc` is vim's own again: it comments a brief's lines with `//`, and does nothing in a Markdown file, which has no line comment.

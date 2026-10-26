@@ -29,6 +29,7 @@ describe("the app's settings outline", () => {
       'statusBarItems',
       'statusBarColors',
       'vimMode',
+      'vimPlugins',
       'vimModeStyle',
       'indentGuides',
       'stickyScroll',

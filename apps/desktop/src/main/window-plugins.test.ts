@@ -87,6 +87,25 @@ describe('windowPlugins', () => {
     ]);
   });
 
+  it('knows which plugin mapped which vim keys (TYTO-418)', async () => {
+    const VIM: Plugin = {
+      id: 'vimmer',
+      manifest: manifest('vimmer', ['editor.vim']),
+      activate: (host) =>
+        host.registerVim({ id: 'exchange', mappings: [{ keys: 'cx', operation: 'exchange' }] }),
+    };
+    const window = windowPlugins(Promise.resolve(loaded(DEMO, VIM)));
+    expect(window.vim()).toEqual([]);
+    await window.ready;
+
+    expect(window.vim()).toEqual([
+      {
+        plugin: 'vimmer',
+        contribution: { id: 'exchange', mappings: [{ keys: 'cx', operation: 'exchange' }] },
+      },
+    ]);
+  });
+
   it('is ready, with nothing, when the plugins could not be started', async () => {
     const window = windowPlugins(Promise.reject(new Error('disk')));
     await window.ready;

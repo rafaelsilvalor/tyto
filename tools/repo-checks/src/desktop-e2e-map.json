@@ -101,6 +101,11 @@
       "why": "generated: name, prefix, static import or text of the stem in the e2e file"
     },
     {
+      "paths": ["apps/desktop/shared/vim-plugins.ts"],
+      "e2e": ["settings-assist.desktop.test.ts", "vim-setting.desktop.test.ts"],
+      "why": "reviewed: the vimPlugins setting the settings tab suggests, and the built-in vim contributions a vim window maps (TYTO-418)"
+    },
+    {
       "paths": ["apps/desktop/src/index.ts"],
       "e2e": "all",
       "why": "reviewed: placeholder entry of the package; rare, so the cheap answer is the safe one"
@@ -1617,6 +1622,11 @@
         "window.desktop.test.ts"
       ],
       "why": "reviewed: the update notice in the status bar"
+    },
+    {
+      "paths": ["apps/desktop/src/renderer/vim-plugins.ts"],
+      "e2e": ["vim-badge.desktop.test.ts", "vim-setting.desktop.test.ts"],
+      "why": "reviewed: which vim contributions the window maps (TYTO-418); the suites that drive vim in the real window"
     },
     {
       "paths": ["apps/desktop/src/renderer/vim-setting.ts"],
