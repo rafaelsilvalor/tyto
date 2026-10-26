@@ -280,9 +280,10 @@ into, or activation is refused. The shapes are in `docs/plugin-api.md`:
   folder (ADR 0077). Data only, so an installed plugin may contribute one.
 - `editor.keymap` — crosses as data, and the window reads it as a layer of its key table
   (ADR 0074).
-- `editor.vim` — vim mappings onto operations the editor names (actions, operators and the
-  text objects `indentObject` and `entireBuffer`), and ex commands; crosses as data (ADR 0141,
-  ADR 0142). The window does not read it yet (TYTO-418).
+- `editor.vim` — vim mappings onto operations the editor names (actions, operators such as
+  `comment`, and the text objects `indentObject` and `entireBuffer`), and ex commands; crosses as
+  data (ADR 0141, ADR 0142). The window reads it on `plugins:vim`, and the person's `vimPlugins`
+  setting switches each contribution by its `id`, on unless named `false` (ADR 0143).
 - `editor.command` — crosses as data, `{ id, title }`, and **nothing runs it yet**: it has no
   `run`, and the command bar does not list it. TYTO-261 makes it run; ADR 0079 says why user
   scripts wait for that.

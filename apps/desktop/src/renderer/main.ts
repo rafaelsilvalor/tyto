@@ -37,6 +37,7 @@ import {
   tabThroughCompletions,
   resolveKeybindings,
   selectionOf,
+  setVimContributions,
   shownBindingsOf,
   windowBindingsOf,
   withDiagnostics,
@@ -265,6 +266,7 @@ import {
 } from '../../shared/layout.js';
 import { type SaveOutcome, holdPageClose, listenForExit, resolveExit } from './exit.js';
 import { installErrorReporting, reportToLog } from './report-errors.js';
+import { type WindowVimPlugins, createWindowVimPlugins, vimContributionOf } from './vim-plugins.js';
 import { searchPhrasesFor } from './search-phrases.js';
 import { type SessionGroups, type TemplateSnapshot, sessionOf } from './session.js';
 import { paintUpdateNotice } from './update-notice.js';
@@ -2519,6 +2521,8 @@ function showTheme(bridge: TytoBridge, ask: () => Promise<IpcResponse<'theme:cur
       // on or off in place. Followed only when the setting moved, so an answer asked before
       // the command's write landed does not undo the command.
       if (vimSetting.follow(applied.vimMode, editor)) paintCommandBar();
+      // And which vim plugins are on (TYTO-418): mapped or unmapped in place, every editor at once.
+      windowVimPlugins?.settingArrived(applied.vimPlugins);
       // And whether the editors draw indent guides (TYTO-293): every tab, and the template mode.
       indentGuides = applied.indentGuides;
       editor?.setIndentGuides(indentGuides);
@@ -3859,6 +3863,19 @@ async function loadPluginPanels(bridge: TytoBridge): Promise<void> {
 }
 
 /**
+ * The vim contributions, once main has started the plugins (TYTO-418). Not awaited by `load`:
+ * until they arrive vim has its own keys only, and a refusal says so in the log.
+ */
+async function loadVimPlugins(bridge: TytoBridge, plugins: WindowVimPlugins): Promise<void> {
+  try {
+    const { contributions } = await bridge['plugins:vim']({});
+    plugins.contributionsArrived(contributions.map(vimContributionOf));
+  } catch (cause) {
+    reportToLog(bridge, cause, 'vim plugins not read');
+  }
+}
+
+/**
  * Asks once what every declared setting is, for the settings tab (TYTO-304). Main answers after
  * the installed plugins have started, so the answer holds their settings and themes; a refusal
  * leaves the tab without suggestions and says so in the log, never in front of the person.
@@ -4023,6 +4040,13 @@ let statusBarItems: readonly StatusBarItemId[] = STATUS_BAR_ITEM_IDS;
  * after the answer starts in it; one made before follows it when it lands.
  */
 const vimSetting = createVimSetting();
+
+/**
+ * The `vimPlugins` setting and the vim contributions it switches (TYTO-418, ADR 0143): made in
+ * `load`, where the bridge its log needs is. The setting rides the theme answer; the
+ * contributions arrive once, on `plugins:vim`.
+ */
+let windowVimPlugins: WindowVimPlugins | undefined;
 
 /** The `vimModeStyle` setting, from the same answer (TYTO-301): the badge until it arrives. */
 let vimModeStyle: VimModeStyle = 'badge';
@@ -5084,6 +5108,11 @@ async function load(): Promise<void> {
       },
     });
 
+    // Before the first theme answer, which carries the `vimPlugins` setting (TYTO-418).
+    windowVimPlugins = createWindowVimPlugins(setVimContributions, (detail) => {
+      void bridge['log:write']({ level: 'warn', message: 'A vim plugin was not applied.', detail });
+    });
+    void loadVimPlugins(bridge, windowVimPlugins);
     // The theme's colours over the token file's, which painted the first frame (TYTO-208). Not
     // awaited: a theme an installed plugin contributes waits for the plugins to start.
     showTheme(bridge, () => bridge['theme:current']({}));

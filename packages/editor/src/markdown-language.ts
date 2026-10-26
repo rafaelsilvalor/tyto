@@ -1,4 +1,9 @@
-import { Language, LanguageSupport, defineLanguageFacet } from '@codemirror/language';
+import {
+  Language,
+  LanguageSupport,
+  defineLanguageFacet,
+  languageDataProp,
+} from '@codemirror/language';
 import { GFM, parser } from '@lezer/markdown';
 
 /**
@@ -14,9 +19,17 @@ import { GFM, parser } from '@lezer/markdown';
  * decision of 2026-10-24. The preview's {@link markdownToHtml} reads the tree of this same
  * parser, so what is coloured as a table is what is drawn as one.
  */
-export const markdownParser = parser.configure(GFM);
-
 const data = defineLanguageFacet({ commentTokens: { block: { open: '<!--', close: '-->' } } });
+
+/**
+ * The facet rides on the tree's top node, which is where CodeMirror looks for a language's data:
+ * a bare `Language` attaches nothing itself, and without it `toggleComment` found no comment
+ * tokens and did nothing (TYTO-418, measured in the window and in `vim-comment.test.ts`).
+ */
+export const markdownParser = parser.configure([
+  GFM,
+  { props: [languageDataProp.add({ Document: data })] },
+]);
 
 export const markdownLanguage = new Language(data, markdownParser, [], 'markdown');
 

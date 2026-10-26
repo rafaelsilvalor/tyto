@@ -159,6 +159,66 @@ describe('vim contributions (TYTO-417, ADR 0141)', () => {
     expect(editor.view.state.doc.toString()).toBe('ABC def');
   });
 
+  it('repeats an action with . only when the operation declares itself an edit', () => {
+    const appendX = (isEdit: boolean) =>
+      defineVimOperation('test.append-x', {
+        kind: 'action',
+        isEdit,
+        run: (view) => {
+          const at = view.state.selection.main.head;
+          view.dispatch({ changes: { from: at, insert: 'x' } });
+        },
+      });
+    const press = (): string => {
+      setVimContributions(
+        [
+          {
+            id: 'test-append',
+            mappings: [{ keys: 'zx', context: 'normal', operation: 'test.append-x' }],
+          },
+        ],
+        ['test-append'],
+      );
+      const editor = open('abc');
+      editor.view.dispatch({ selection: EditorSelection.cursor(0) });
+      keys(editor.view, 'z', 'x', '.');
+      return editor.view.state.doc.toString();
+    };
+
+    appendX(true);
+    expect(press()).toBe('xxabc');
+
+    resetVimContributionsForTest();
+    appendX(false);
+    // Not an edit: `.` has nothing recorded to repeat, so one `x` only.
+    expect(press()).toBe('xabc');
+  });
+
+  it("hands the operation the key a mapping's <character> stood for", () => {
+    defineVimOperation('test.insert-key', {
+      kind: 'action',
+      run: (view, args) => {
+        const at = view.state.selection.main.head;
+        view.dispatch({ changes: { from: at, insert: String(args['selectedCharacter']) } });
+      },
+    });
+    setVimContributions(
+      [
+        {
+          id: 'test-key',
+          mappings: [{ keys: 'zr<character>', context: 'normal', operation: 'test.insert-key' }],
+        },
+      ],
+      ['test-key'],
+    );
+    const editor = open('abc');
+    editor.view.dispatch({ selection: EditorSelection.cursor(0) });
+
+    keys(editor.view, 'z', 'r', '"');
+
+    expect(editor.view.state.doc.toString()).toBe('"abc');
+  });
+
   it('runs an ex command while it is on, and nothing once it is off', () => {
     const ran: string[] = [];
     const registry = createCommandRegistry();

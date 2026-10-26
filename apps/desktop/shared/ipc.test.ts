@@ -60,6 +60,7 @@ describe('the IPC contract', () => {
       'plugins:keymaps',
       'plugins:list',
       'plugins:panels',
+      'plugins:vim',
       'queue:list',
       'queue:open-brief',
       'queue:reveal-output',
@@ -254,6 +255,7 @@ describe('the theme the window applies (TYTO-208)', () => {
     statusBarItems: ['problems', 'settings'],
     statusBarColors: {},
     vimMode: false,
+    vimPlugins: {},
     vimModeStyle: 'badge',
     indentGuides: true,
     stickyScroll: true,
@@ -393,6 +395,8 @@ describe('what the contract does not promise', () => {
       'plugins:panels',
       // TYTO-207. Nor "which keys do the plugins bind".
       'plugins:keymaps',
+      // TYTO-418. Nor "which vim keys do the plugins map": every plugin's, which main holds.
+      'plugins:vim',
       // TYTO-207. Nor "what does keybindings.json say": there is one file, and main knows it.
       'keybindings:read',
       // TYTO-277. Nor "what does snippets.json say", for the same reason.
