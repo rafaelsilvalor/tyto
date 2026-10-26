@@ -21,6 +21,12 @@ export interface RecipeState {
     keys: readonly string[],
   ): Promise<Result<ReadonlyMap<string, StoredEntry>, readonly Diagnostic[]>>;
   /**
+   * Every entry `store` holds, which is how `recall` brings back the rows a run left waiting
+   * (ADR 0144). A store never written is an empty map; one that cannot be read is an error, as
+   * it is for `read`, never an empty map.
+   */
+  entries(store: string): Promise<Result<ReadonlyMap<string, StoredEntry>, readonly Diagnostic[]>>;
+  /**
    * Removes `deletes`, then merges each put's values over what its key holds: a stored column
    * the put does not name is kept. Each put is stamped with the host clock's now.
    */

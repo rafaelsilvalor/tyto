@@ -71,6 +71,39 @@ describe('recipeStateStore', () => {
 
   it('reads a store never written as empty, not as an error', async () => {
     expect(await entriesOf(store(), 'sync', ['A-1'])).toEqual({});
+    const all = await store().entries('sync');
+    expect(all.ok ? [...all.value] : all.error).toEqual([]);
+  });
+
+  it('lists every entry a store holds, the one read recall needs (ADR 0144)', async () => {
+    const state = store();
+    await written(state, 'waiting', [{ key: 'P-1', values: { since: '2026-10-01 09:00' } }], []);
+    clock = new Date('2026-10-26T08:00:00.000Z');
+    await written(state, 'waiting', [{ key: 'P-2', values: { since: '2026-10-26 08:00' } }], []);
+    await written(state, 'other', [{ key: 'X-1', values: {} }], []);
+
+    // A fresh adapter is the next run.
+    const all = await store().entries('waiting');
+    expect(all.ok ? Object.fromEntries(all.value) : all.error).toEqual({
+      'P-1': { values: { since: '2026-10-01 09:00' }, storedAt: '2026-10-25T12:00:00.000Z' },
+      'P-2': { values: { since: '2026-10-26 08:00' }, storedAt: '2026-10-26T08:00:00.000Z' },
+    });
+  });
+
+  it('refuses to list a corrupt store, never answering it as empty', async () => {
+    const file = await fileOf('waiting');
+    await mkdir(join(file, '..'), { recursive: true });
+    await writeFile(file, '{"version":1,"entries":', 'utf8');
+
+    const all = await store().entries('waiting');
+    expect(all.ok ? [...all.value] : all.error.map(({ code, message }) => [code, message])).toEqual(
+      [
+        [
+          'E_RECIPE_STATE',
+          `Recipe state 'waiting' cannot be read: ${file} is not JSON; fix or delete it.`,
+        ],
+      ],
+    );
   });
 
   // The scenario PR1's `memoryState` (recipe's state-harness.ts) answers this way: deletes

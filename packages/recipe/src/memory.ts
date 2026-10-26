@@ -182,6 +182,92 @@ export function remember(context: VerbContext): VerbResult {
   return ok({ table: table.value, remembers });
 }
 
+/**
+ * `recall <store> [by=<column>] [mark=<column>]` brings back the rows a run left in a store
+ * (ADR 0144): it appends one row for each stored key that no row of the table has, matched on
+ * the row's key or on its `by=` column. The new row's key is the stored key, and so is its `by=`
+ * column; every other column is null, for a transform to fill by re-fetching those keys. With
+ * `mark=`, a boolean column says which rows were recalled. The table's rows come first, then the
+ * recalled ones in stored-key order, so two runs over one store append the same rows.
+ *
+ * A recalled key that is already some row's key, while `by=` names another column, is refused:
+ * two rows with one key cannot both be written back. A host without state fails, as `last`
+ * does, rather than recalling nothing.
+ */
+export async function recall(context: VerbContext): Promise<VerbResult> {
+  const named = refuseNamed(context, ['by', 'mark']);
+  if (named !== undefined) return named;
+  const table = requireTable(context);
+  if (!table.ok) return table;
+  const at = locate(context);
+
+  const store = storeName(context, 'recall <store> [by=<column>] [mark=<column>]');
+  if (!store.ok) return store;
+  const written = once(context);
+  if (!written.ok) return written;
+  const byArgument = written.value.get('by');
+  const keyOf = rowKeyOf(context, table.value, byArgument);
+  if (!keyOf.ok) return keyOf;
+  let by: { readonly column: string; readonly range: SourceRange } | undefined;
+  if (byArgument !== undefined) {
+    const range = at(byArgument.range);
+    const column = resolveColumn(table.value, byArgument.value, range, context.aliases);
+    if (!column.ok) return column;
+    by = { column: column.value.name, range };
+  }
+
+  const markArgument = written.value.get('mark');
+  let mark: Column | undefined;
+  if (markArgument !== undefined) {
+    mark = { name: markArgument.value, type: 'boolean', origin: `recall ${store.value}` };
+    const problem = !COLUMN_NAME.test(mark.name)
+      ? `cannot write a column named '${mark.name}'`
+      : collision(table.value, [mark]) === undefined
+        ? undefined
+        : `would add ${mark.name}, which the table already has; choose another mark=`;
+    if (problem !== undefined) return argumentsProblem(context, problem, at(markArgument.range));
+  }
+
+  const state = requireState(context, store.value);
+  if (!state.ok) return state;
+  const stored = await state.value.entries(store.value);
+  if (!stored.ok) return err(atStep(context, stored.error));
+
+  const present = new Set(table.value.rows.map(keyOf.value).filter(isKey));
+  const rowKeys = new Set(table.value.rows.map((row) => row.key));
+  // Sorted, so the rows a run appends do not depend on the order the host kept them in.
+  const missing = [...stored.value.keys()].filter((key) => !present.has(key)).sort();
+  const clash = by === undefined ? undefined : missing.find((key) => rowKeys.has(key));
+  if (by !== undefined && clash !== undefined) {
+    return argumentsProblem(
+      context,
+      `would recall '${clash}', which is already the key of a row with another ${by.column}; ` +
+        'two rows cannot share a key',
+      by.range,
+    );
+  }
+
+  const empty = Object.fromEntries(table.value.columns.map((column) => [column.name, null]));
+  const recalled = missing.map((key): Row => {
+    const values: Record<string, CellValue> = { ...empty };
+    if (by !== undefined) values[by.column] = key;
+    if (mark !== undefined) values[mark.name] = true;
+    const fetchedAt = stored.value.get(key)?.storedAt ?? '';
+    return { key, values, provenance: { source: `recall ${store.value}`, id: key, fetchedAt } };
+  });
+  if (mark === undefined) {
+    return ok({
+      table: { columns: table.value.columns, rows: [...table.value.rows, ...recalled] },
+    });
+  }
+  const name = mark.name;
+  const kept = table.value.rows.map((row) => ({
+    ...row,
+    values: { ...row.values, [name]: false },
+  }));
+  return ok({ table: { columns: [...table.value.columns, mark], rows: [...kept, ...recalled] } });
+}
+
 function storeName(context: VerbContext, usage: string): Result<string, Problems> {
   const [store, extra] = context.step.positional;
   if (store === undefined || extra !== undefined || !STORE_NAME.test(store.value)) {

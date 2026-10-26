@@ -9,7 +9,7 @@ import { extract, rewrite } from './extract.js';
 import { include } from './include.js';
 import { join } from './join.js';
 import { map } from './map.js';
-import { last, remember } from './memory.js';
+import { last, recall, remember } from './memory.js';
 import { nearest } from './nearest.js';
 import { path } from './path.js';
 import type { Verb, VerbContext, VerbResult } from './registry.js';
@@ -45,6 +45,7 @@ export const genericVerbs: Readonly<Record<string, Verb>> = {
   age: { kind: 'transform', run: age },
   last: { kind: 'transform', run: last },
   remember: { kind: 'transform', run: remember },
+  recall: { kind: 'transform', run: recall },
   decide: { kind: 'transform', run: decide },
   rollup: { kind: 'transform', run: rollup },
   stamp: { kind: 'transform', run: stamp },
