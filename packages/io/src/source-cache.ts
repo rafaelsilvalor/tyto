@@ -148,6 +148,33 @@ async function existing(stem: string, extensions: readonly string[]): Promise<st
   return undefined;
 }
 
+/** What Windows answers a rename onto a file another call is renaming or holds open. */
+const BUSY_CODES: ReadonlySet<string> = new Set(['EPERM', 'EACCES', 'EBUSY']);
+
+/** Tries before a busy rename is given up: about two seconds, waiting longer each time. */
+const BUSY_ATTEMPTS = 20;
+
+/**
+ * `rename`, tried again while Windows says the target is busy. Two calls putting one key at
+ * once — an export's frames do — rename onto the same name, and Windows refuses the second
+ * until the first lets go, a matter of milliseconds (TYTO-371). Elsewhere those codes mean a
+ * real refusal and are thrown at once.
+ */
+async function renameWhenFree(from: string, to: string): Promise<void> {
+  for (let attempt = 1; ; attempt += 1) {
+    try {
+      await rename(from, to);
+      return;
+    } catch (cause) {
+      const code = (cause as NodeJS.ErrnoException).code ?? '';
+      if (process.platform !== 'win32' || !BUSY_CODES.has(code) || attempt >= BUSY_ATTEMPTS) {
+        throw cause;
+      }
+      await new Promise((resolve) => setTimeout(resolve, 10 * attempt));
+    }
+  }
+}
+
 /**
  * Written beside its final name and renamed into place, so a run killed mid-write leaves no
  * truncated entry that every later run would read as the answer.
@@ -156,7 +183,7 @@ export async function writeEntry(path: string, bytes: Uint8Array): Promise<void>
   const partial = `${path}.${randomUUID()}.part`;
   try {
     await writeFile(partial, bytes);
-    await rename(partial, path);
+    await renameWhenFree(partial, path);
   } finally {
     await rm(partial, { force: true });
   }

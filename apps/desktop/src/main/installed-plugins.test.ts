@@ -1,4 +1,4 @@
-import { mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises';
+import { mkdir, mkdtemp, readFile, readdir, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
@@ -14,6 +14,8 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
 import {
   type NetFetch,
+  DESKTOP_HOST_NAME,
+  type DesktopPluginFiles,
   credentialAccount,
   desktopCapabilities,
   startDesktopPlugins,
@@ -124,6 +126,107 @@ describe('the network on the desktop', () => {
       ['https://api.example.com/moved', { method: 'GET', redirect: 'manual' }],
     ]);
     expect(fetched).toMatchObject({ status: 302, headers: { location: '/elsewhere' } });
+  });
+});
+
+describe("a plugin's cache and workspace files on the desktop (ADR 0138)", () => {
+  let home: string;
+  let first: string;
+  let second: string;
+
+  beforeEach(async () => {
+    home = await mkdtemp(join(tmpdir(), 'tyto-desktop-files-'));
+    first = join(home, 'first');
+    second = join(home, 'second');
+    await mkdir(first);
+    await mkdir(second);
+  });
+
+  afterEach(async () => {
+    await rm(home, { recursive: true, force: true });
+  });
+
+  /**
+   * A window whose open folder and trust a test changes between two calls. Each answer is a
+   * fresh object, as `workspace.state()` gives, so an answer kept at activation goes stale.
+   */
+  function window(state: ReturnType<DesktopPluginFiles['workspace']>) {
+    const open = { ...state };
+    const files: DesktopPluginFiles = {
+      home: join(home, 'tyto-home'),
+      workspace: () => ({ ...open }),
+    };
+    return { open, files };
+  }
+
+  async function refusal(promise: Promise<unknown>): Promise<string> {
+    const cause = await promise.then(
+      () => undefined,
+      (error: unknown) => error,
+    );
+    expect(cause).toBeInstanceOf(PluginCapabilityError);
+    return (cause as PluginCapabilityError).code;
+  }
+
+  it('asks for the open folder on every call, so a folder opened later is the one written', async () => {
+    const { open, files } = window({ folder: first, trust: 'trusted' });
+    const checked = checkedCapabilities(
+      'tabelas',
+      ['workspace:read', 'workspace:write'],
+      desktopCapabilities(keychain(), noNetwork, files),
+    );
+
+    await checked.workspaceWrite('data/a.csv', new TextEncoder().encode('one'));
+    open.folder = second;
+    await checked.workspaceWrite('data/a.csv', new TextEncoder().encode('two'));
+
+    expect(await readFile(join(first, 'data', 'a.csv'), 'utf8')).toBe('one');
+    expect(await readFile(join(second, 'data', 'a.csv'), 'utf8')).toBe('two');
+    expect(new TextDecoder().decode(await checked.workspaceRead('data/a.csv'))).toBe('two');
+  });
+
+  it('asks for the trust on every call: restricted refuses, trusted and revoked let it through', async () => {
+    const { open, files } = window({ folder: first, trust: 'restricted' });
+    const checked = checkedCapabilities(
+      'tabelas',
+      ['workspace:write'],
+      desktopCapabilities(keychain(), noNetwork, files),
+    );
+    const bytes = new TextEncoder().encode('x');
+
+    expect(await refusal(checked.workspaceWrite('a.csv', bytes))).toBe(
+      'E_WORKSPACE_FILE_RESTRICTED',
+    );
+    open.trust = 'trusted';
+    await checked.workspaceWrite('a.csv', bytes);
+    // Taken back while open, it holds until the folder is opened again (ADR 0111).
+    open.trust = 'revoked';
+    await checked.workspaceWrite('b.csv', bytes);
+    expect((await readdir(first)).sort()).toEqual(['a.csv', 'b.csv']);
+
+    open.folder = null;
+    expect(await refusal(checked.workspaceWrite('a.csv', bytes))).toBe('E_WORKSPACE_FILE');
+  });
+
+  it('keeps the cache in TYTO_HOME/cache/plugins/<plugin>, whatever folder is open', async () => {
+    const { files } = window({ folder: null, trust: 'restricted' });
+    const checked = checkedCapabilities(
+      'tabelas',
+      [],
+      desktopCapabilities(keychain(), noNetwork, files),
+    );
+
+    await checked.cachePut('jira/issues', new TextEncoder().encode('[]'));
+
+    const entry = await checked.cacheGet('jira/issues');
+    expect(new TextDecoder().decode(entry?.bytes)).toBe('[]');
+    const stored = await readdir(join(files.home, 'cache', 'plugins', 'tabelas'));
+    expect(stored.filter((name) => name.endsWith('.bin'))).toHaveLength(1);
+  });
+
+  it('gives the refusals a name for the desktop', () => {
+    const { files } = window({ folder: null, trust: 'restricted' });
+    expect(desktopCapabilities(keychain(), noNetwork, files).hostName).toBe(DESKTOP_HOST_NAME);
   });
 });
 

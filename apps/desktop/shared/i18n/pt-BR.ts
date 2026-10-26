@@ -291,6 +291,10 @@ export const ptBR: Catalogue = {
     'O painel dele recebe o texto do brief aberto sempre que ele muda, sem pedir permissão.',
   'plugins.font.sendsMachineFaces':
     'Os templates em código dele recebem os arquivos destas fontes instaladas neste computador, que podem ser licenciadas para você e não para o autor do plugin:',
+  'plugins.workspace.reads':
+    'Ele pode ler os arquivos da pasta aberta nesta janela, seja qual for quando ele pedir, depois que você confiar na pasta.',
+  'plugins.workspace.writes':
+    'Ele pode gravar arquivos na pasta aberta nesta janela, exceto em .tyto/, depois que você confiar na pasta.',
   'plugins.close': 'Fechar',
   'plugins.unavailable': 'Não foi possível ler a lista de plugins.',
   'plugins.credential.label': 'Credencial',

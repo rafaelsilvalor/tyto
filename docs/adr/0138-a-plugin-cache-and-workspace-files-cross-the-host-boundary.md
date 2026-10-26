@@ -45,9 +45,10 @@ cache works under a restricted folder** (ADR 0111): it holds nothing the folder 
 **The ports.** `HostCapabilities` gains six optional members, each taking the plugin's name
 first: `cacheGet`, `cachePut`, `cacheDelete`, `cacheList`, `workspaceRead`, `workspaceWrite`,
 and an optional `hostName` the refusals use. A host without a cache port answers
-`E_PLUGIN_CACHE` ("tyto watch keeps no cache for plugins"); without a workspace port,
-`E_WORKSPACE_FILE`. Every call goes through `checkedCapabilities` (ADR 0042), in process and
-across the isolation boundary alike.
+`E_PLUGIN_CACHE` ("this host keeps no cache for plugins"); without a workspace port,
+`E_WORKSPACE_FILE` ("tyto watch gives plugins no workspace files"; both examples corrected on
+2026-10-25, see the note below). Every call goes through `checkedCapabilities` (ADR 0042), in
+process and across the isolation boundary alike.
 
 **Ceilings, checked in `checkedCapabilities` and again by the adapters.** A key, and a list
 prefix, is a string of at most **1 KiB in UTF-8** (`PLUGIN_CACHE_KEY_LIMIT_BYTES`); a key may
@@ -106,3 +107,30 @@ against the folder open in the window.
   grows, as ADR 0130 said.
 - An entry over 32 MiB, or a key over 1 KiB, needs a new ADR, not a bigger constant.
 - A file a plugin writes into `.tyto/` has to be written by the person instead.
+
+## Note, 2026-10-25 — the example refusal, the sidecar's digest and the desktop (TYTO-371)
+
+The example refusal for a host without a cache named `tyto watch`, which contradicted the
+decision two sections down: `tyto watch` has the cache and refuses only workspace files. The
+example now names no command for the cache and `tyto watch` for the workspace, as the code does.
+
+The sidecar is `{ key, storedAt, size, sha256 }`. Two processes putting one key with bytes of
+the same size could leave one's bytes beside the other's sidecar, and the size could not tell;
+`get` hashes what it read and answers a miss when the digest differs. `list` still compares
+only the size, so it never opens an entry: such a pair is listed and then missed, as an entry
+deleted between the two calls would be. A sidecar written before the digest fails the schema
+and is a miss, because nothing tells its bytes apart from a race's; the next `put` replaces it.
+
+The desktop's end-to-end suite found the race was not hypothetical: an export runs its frames
+at once, each frame's plugin call put the same key, and on Windows the second rename onto the
+entry failed with `EPERM` (4 of 9 runs). One host now writes an entry in turn — a put or a
+delete of a key waits for the one before it — and a rename Windows calls busy (`EPERM`,
+`EACCES`, `EBUSY`) is tried again for about two seconds before it is thrown. Two hosts, the
+desktop and a `tyto render`, still share no turn; the retry lands both puts and the digest
+judges what is left.
+
+The desktop composes both ports for its installed plugins, with the cache in the `TYTO_HOME`
+the plugins live in and the workspace read from what the window has open at each call, a
+trust taken back counting until the folder is reopened (ADR 0111). Its refusals name
+`Tyto desktop`, and the plugins screen says in words what `workspace:read` and
+`workspace:write` reach.

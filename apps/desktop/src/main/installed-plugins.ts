@@ -1,6 +1,7 @@
 import { access } from 'node:fs/promises';
 import { join } from 'node:path';
 
+import { pluginCache, workspaceFiles } from '@tyto/io';
 import type {
   FetchedResponse,
   HostCapabilities,
@@ -12,6 +13,7 @@ import type {
 import { startInstalledPlugins } from '@tyto/plugin-api';
 
 import type { Credentials } from './credentials.js';
+import type { WorkspaceState } from './workspace.js';
 
 /**
  * Installed plugins, started for the desktop (E11.2, ADR 0044).
@@ -19,7 +21,8 @@ import type { Credentials } from './credentials.js';
  * The rules — what is enabled, what passed its checks, how a crash is recorded — are
  * `@tyto/plugin-api`'s `startInstalledPlugins`, the same the CLI runs. What this module
  * composes is the desktop's half: a process per plugin on the bundled Node, Electron's `net.fetch` for
- * `host.fetch`, and `safeStorage` for `host.credentials`. **Never activated in main**: what
+ * `host.fetch`, `safeStorage` for `host.credentials`, and `TYTO_HOME` and the open folder for
+ * `host.cache` and `host.workspace` (ADR 0138). **Never activated in main**: what
  * reaches an export's host is a proxy of a plugin living in its own process.
  */
 
@@ -63,8 +66,10 @@ export type NetFetch = (
 export function desktopCapabilities(
   credentials: Pick<Credentials, 'get' | 'set' | 'delete'>,
   netFetch: NetFetch,
+  files?: DesktopPluginFiles,
 ): HostCapabilities {
   return {
+    ...(files === undefined ? {} : desktopPluginFiles(files)),
     async fetch(url: string, init: HostFetchInit): Promise<FetchedResponse> {
       const response = await netFetch(url, {
         ...(init.method === undefined ? {} : { method: init.method }),
@@ -89,6 +94,51 @@ export function desktopCapabilities(
     deleteCredential: (plugin, key) => credentials.delete(credentialAccount(plugin, key)),
     describeCredential: (plugin, key) =>
       `the keychain entry '${credentialAccount(plugin, key)}' (set it in the plugins screen)`,
+  };
+}
+
+/** The name a refusal gives the desktop when a port is missing (ADR 0138). */
+export const DESKTOP_HOST_NAME = 'Tyto desktop';
+
+/** Where a plugin's cache lives and which folder its workspace files are read in. */
+export interface DesktopPluginFiles {
+  /** `TYTO_HOME`, the same the plugins and their sources' cache live in (ADR 0117). */
+  readonly home: string;
+  /** What main has open now: the answer `workspace:folder` gives the window. */
+  readonly workspace: () => Pick<WorkspaceState, 'folder' | 'trust'>;
+}
+
+/** The six ports of ADR 0138 and the name their refusals give. */
+export type DesktopPluginFilePorts = Required<
+  Pick<
+    HostCapabilities,
+    | 'hostName'
+    | 'cacheGet'
+    | 'cachePut'
+    | 'cacheDelete'
+    | 'cacheList'
+    | 'workspaceRead'
+    | 'workspaceWrite'
+  >
+>;
+
+/**
+ * A plugin's private cache and the open folder's files (ADR 0138), for the desktop.
+ *
+ * **The folder and its trust are asked of `workspace` on every call**, never fixed here: a
+ * plugin's process is started once for the app's life and outlives File ▸ Open Folder, so a
+ * folder captured at activation would be the wrong one after the first switch. A trust taken
+ * back while the folder is open (`revoked`) still holds until it is opened again (ADR 0111),
+ * as it does for everything else the folder gives.
+ */
+export function desktopPluginFiles(files: DesktopPluginFiles): DesktopPluginFilePorts {
+  return {
+    hostName: DESKTOP_HOST_NAME,
+    ...pluginCache({ home: files.home }),
+    ...workspaceFiles({
+      folder: () => files.workspace().folder ?? undefined,
+      trust: () => (files.workspace().trust === 'restricted' ? 'restricted' : 'trusted'),
+    }),
   };
 }
 

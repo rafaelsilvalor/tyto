@@ -288,6 +288,10 @@ export const en: Catalogue = {
     'Its panel receives the text of the open brief whenever it changes, with no permission asked.',
   'plugins.font.sendsMachineFaces':
     "Its code templates are sent the files of these faces installed on this computer, which may be licensed to you and not to the plugin's author:",
+  'plugins.workspace.reads':
+    'It can read the files of the folder open in this window, whichever folder that is when it asks, once you trust the folder.',
+  'plugins.workspace.writes':
+    'It can write files into the folder open in this window, except into .tyto/, once you trust the folder.',
   'plugins.close': 'Close',
   'plugins.unavailable': 'The plugin list could not be read.',
   'plugins.credential.label': 'Credential',
