@@ -37,6 +37,20 @@ O Tyto traz alguns plugins conhecidos do vim dentro do modo vim. Cada um fica li
 
 **.** repete o último `gc` na linha onde está o cursor.
 
+**Surround** acrescenta, troca e apaga o par em volta de um trecho de texto: parênteses, colchetes, chaves ou aspas.
+
+| Teclas                       | O que fazem                                                                                                        |
+| ---------------------------- | ------------------------------------------------------------------------------------------------------------------ |
+| `ys`, um movimento e um par  | Envolve o que o movimento cobre: `ysiw)` transforma `palavra` em `(palavra)`, `ys$"` põe aspas até o fim da linha. |
+| `yss` e um par               | Envolve a linha, a partir do primeiro caractere que não é espaço.                                                  |
+| `ds` e um par                | Apaga o par em volta do cursor: `ds"` transforma `"palavra"` em `palavra`.                                         |
+| `cs`, o par antigo e o novo  | Troca o par em volta do cursor: `cs"'` transforma `"palavra"` em `'palavra'`.                                      |
+| `S` e um par, no modo visual | Envolve a seleção.                                                                                                 |
+
+Um par é `(` `)` ou `b`, `[` `]`, `{` `}` ou `B`, `<` `>`, e as aspas `'`, `"` e `` ` ``. Um parêntese, colchete ou chave de abertura põe um espaço dentro do par, como em `( palavra )`, e um de fechamento não põe, como em `(palavra)`. Com `ds` e `cs`, o de abertura também tira os espaços logo dentro do par antigo. As aspas são procuradas na linha do cursor; os outros pares, em qualquer lugar em volta dele. **Esc**, antes do par, cancela.
+
+**.** repete o último `ys`, `cs` ou `ds` com o mesmo par.
+
 ### Desligar um plugin
 
 A configuração [`vimPlugins`](../reference/settings.md#vimplugins) dá o id de cada plugin e diz `true` ou `false`. Um plugin que a configuração não cita fica ligado, e um plugin que um plugin instalado do Tyto acrescenta também, pelo id que esse plugin dá a ele.

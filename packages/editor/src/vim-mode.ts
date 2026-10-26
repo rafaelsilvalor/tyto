@@ -12,6 +12,7 @@ import {
   EDITOR_SAVE,
   vimKeymapSet,
 } from './keymap.js';
+import { vimKeyReader } from './vim-key-reader.js';
 
 /**
  * Vim mode (ADR 0006), wired so that it drives the same command registry everything else
@@ -212,6 +213,8 @@ export function vimMode(options: VimModeOptions = {}): Extension {
   install(options.exCommands ?? defaultExCommands);
   return [
     escapeReachesVim,
+    // Ahead of `vim()`: a key a vim operation is waiting for never reaches the engine.
+    vimKeyReader,
     vim({ status: options.status ?? true }),
     // After `vim()`, so the adapter it builds exists when this plugin is constructed.
     ...(options.onStatus === undefined ? [] : [vimStatusPlugin(options.onStatus)]),

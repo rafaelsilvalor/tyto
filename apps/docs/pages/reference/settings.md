@@ -133,7 +133,7 @@ Give the editor vim's keys: normal, insert, visual and replace modes (default fa
 
 ## vimPlugins
 
-Switch each vim plugin on or off by its id, with true or false; every vim plugin, built-in or installed, is on unless named false here. surround: Not in this version yet: ys{motion}{char}, cs{old}{new}, ds{char} and visual S, to add, change or delete a pair around text. commentary: gc{motion}, gcc and visual gc toggle a comment with the language's own: // in a brief, &lt;!-- --> in a Markdown file. Off, gc is vim's line comment only.
+Switch each vim plugin on or off by its id, with true or false; every vim plugin, built-in or installed, is on unless named false here. surround: ys{motion}{char}, yss{char}, cs{old}{new}, ds{char} and visual S{char} add, change or delete a pair around text: ( ) or b, [ ], { } or B, &lt; >, and quotes. An opening bracket adds a space inside the pair. commentary: gc{motion}, gcc and visual gc toggle a comment with the language's own: // in a brief, &lt;!-- --> in a Markdown file. Off, gc is vim's line comment only.
 
 | Type | Default |
 | --- | --- |
@@ -143,7 +143,7 @@ Switch each vim plugin on or off by its id, with true or false; every vim plugin
 
 | Value | Meaning |
 | --- | --- |
-| `"surround"` | Not in this version yet: ys{motion}{char}, cs{old}{new}, ds{char} and visual S, to add, change or delete a pair around text. |
+| `"surround"` | ys{motion}{char}, yss{char}, cs{old}{new}, ds{char} and visual S{char} add, change or delete a pair around text: ( ) or b, [ ], { } or B, &lt; >, and quotes. An opening bracket adds a space inside the pair. |
 | `"commentary"` | gc{motion}, gcc and visual gc toggle a comment with the language's own: // in a brief, &lt;!-- --> in a Markdown file. Off, gc is vim's line comment only. |
 
 ## vimModeStyle

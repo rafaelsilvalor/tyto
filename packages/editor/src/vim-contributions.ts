@@ -5,6 +5,8 @@ import { Vim } from '@replit/codemirror-vim';
 import { commandRegistryOf } from './commands.js';
 import { type VimExCommand, viewOf } from './vim-mode.js';
 import { VIM_COMMENT_OPERATIONS } from './vim-comment.js';
+import { type VimPosition, offsetOf, positionOf } from './vim-positions.js';
+import { VIM_SURROUND_OPERATIONS } from './vim-surround.js';
 import { BUILT_IN_VIM_OPERATIONS } from './vim-text-objects.js';
 
 /**
@@ -96,6 +98,18 @@ export type VimOperation =
         args: VimOperationArgs,
         count: number,
       ): VimTextObjectRange | undefined;
+    }
+  | {
+      /**
+       * An operation whose contract with the engine the kinds above cannot carry, which
+       * registers itself under the name it is given (TYTO-418, ADR 0143 amendment). Surround
+       * is one: its `s` motion reads the operator pending before it, and the keys typed after
+       * it. Only the editor writes one; a plugin still only names it.
+       */
+      readonly kind: 'engine';
+      readonly type: 'motion' | 'operator';
+      readonly isEdit?: boolean;
+      define(engineName: string, nameOf: (operation: string) => string): void;
     };
 
 /** The engine's own names are global too; a prefix keeps ours from replacing one of vim's. */
@@ -107,33 +121,17 @@ const engineName = (operation: string): string => `tyto:${operation}`;
  */
 const ENGINE_TYPES = { action: 'action', operator: 'operator', textObject: 'motion' } as const;
 
+const engineTypeOf = (operation: VimOperation): 'action' | 'operator' | 'motion' =>
+  operation.kind === 'engine' ? operation.type : ENGINE_TYPES[operation.kind];
+
 const operations = new Map<string, VimOperation>();
 
-interface Position {
-  readonly line: number;
-  readonly ch: number;
-}
+type Position = VimPosition;
 
 interface EngineRange {
   readonly anchor: Position;
   readonly head: Position;
 }
-
-/**
- * Clipped to the document, as CodeMirror 5's positions were: a linewise operator on the last
- * line is handed the start of the line after it, which this document does not have (TYTO-418).
- */
-const offsetOf = (view: EditorView, position: Position): number => {
-  const { doc } = view.state;
-  if (position.line + 1 > doc.lines) return doc.length;
-  const line = doc.line(position.line + 1);
-  return Math.min(line.from + position.ch, line.to);
-};
-
-const positionOf = (view: EditorView, offset: number): Position => {
-  const line = view.state.doc.lineAt(offset);
-  return { line: line.number - 1, ch: offset - line.from };
-};
 
 /** The part of the engine's state a text object reads and writes. */
 interface EngineObjectState {
@@ -178,6 +176,10 @@ function enginePositions(
  */
 export function defineVimOperation(name: string, operation: VimOperation): void {
   operations.set(name, operation);
+  if (operation.kind === 'engine') {
+    operation.define(engineName(name), engineName);
+    return;
+  }
   if (operation.kind === 'action') {
     Vim.defineAction(engineName(name), (adapter, actionArgs) => {
       const view = viewOf(adapter);
@@ -289,12 +291,12 @@ function problemOf(
       return `'${mapping.operation}' is an action, which never runs while an operator is pending`;
     }
     if (
-      operation.kind === 'textObject' &&
+      engineTypeOf(operation) === 'motion' &&
       mapping.context !== 'visual' &&
       mapping.context !== 'operatorPending'
     ) {
       return (
-        `'${mapping.operation}' is a text object, which is mapped in 'visual' and ` +
+        `'${mapping.operation}' is a ${operation.kind === 'textObject' ? 'text object' : 'motion'}, which is mapped in 'visual' and ` +
         `'operatorPending', not in '${mapping.context ?? 'every context'}'`
       );
     }
@@ -328,7 +330,7 @@ const apply = (contribution: VimContribution): Applied => {
     if (operation === undefined) continue;
     Vim.mapCommand(
       mapping.keys,
-      ENGINE_TYPES[operation.kind],
+      engineTypeOf(operation),
       engineName(mapping.operation),
       { ...mapping.args },
       {
@@ -358,7 +360,11 @@ const defineEx = (entry: VimExCommand): void => {
  * first call rather than when the module loads: the package is free of side effects on import.
  */
 const defineBuiltInOperations = (): void => {
-  for (const [name, operation] of [...BUILT_IN_VIM_OPERATIONS, ...VIM_COMMENT_OPERATIONS]) {
+  for (const [name, operation] of [
+    ...BUILT_IN_VIM_OPERATIONS,
+    ...VIM_COMMENT_OPERATIONS,
+    ...VIM_SURROUND_OPERATIONS,
+  ]) {
     if (!operations.has(name)) defineVimOperation(name, operation);
   }
 };

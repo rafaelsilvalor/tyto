@@ -83,3 +83,57 @@ false }`. In a brief the two behave alike.
   does; the editor's template language already answers `<!-- -->` to the operator.
 - What the real window shows of `gcc` is measured once, by hand, in a `.md` and a `.brief` tab;
   jsdom covers the key sequences.
+
+## Amendment — surround is a motion after an operator, and reads its pair from the keyboard (TYTO-418 PR B, 2026-10-26)
+
+Surround ships as the `surround` contribution of the `desktop` built-in plugin, on by default as
+decision 2 says. Two things above did not survive contact with the engine.
+
+1. **`ys`, `cs` and `ds` cannot be mapped as keys.** `c`, `d` and `y` are whole operators in the
+   engine's keymap, and its dispatcher takes a full match over a partial one, so after `y` the
+   key buffer is cleared and `ys` is never seen. Each key after an operator is matched alone, in
+   `operatorPending`. Surround is therefore **one motion, `s`, mapped in `operatorPending`
+   onto `surround.target`, that reads the operator pending before it** (the engine hands a
+   motion the input state it was typed in): under `d` it deletes the pair around the cursor,
+   under `c` it changes it, and under `y` it puts the `surround.add` operator in the pending
+   yank's place and returns nothing, so the motion typed next (`iw`, `$`, or `s` again for
+   `yss`) feeds `surround.add` and the yank never runs. Visual `S` maps `surround.add`
+   directly. Measured first in a throwaway jsdom test on 6.4.0: `ysiw"` on `hello world` gave
+   `"hello" world`, with the motion seeing `yank` and the operator receiving `[0, 5]`.
+
+2. **The pair is not a `<character>` in the keys.** Decision 6's second bullet assumed
+   `ys{motion}<character>`; the engine accepts `<character>` only as the last key of a mapping,
+   matched by prefix, so nothing can stand between `s` and it. The keys after surround's are
+   read by `vim-key-reader.ts`, a keydown handler at `Prec.highest` ahead of `vim()`, which does
+   nothing unless an operation is waiting on that view: one key for `ds` and `ys`, two for `cs`.
+   A key with Ctrl or Meta, or Escape, cancels the read and goes on to vim.
+
+3. **`.` repeats with the pair that was read.** The engine records the input state before the
+   motion runs and replays it through the same args objects, so the keys are written onto the
+   motion's args (`ds`, `cs`) or the operator's (`ys`, `S`) once read, and a replay finds them
+   there and does not read again.
+
+4. **A fourth operation kind, `engine`**, `{ kind: 'engine', type: 'motion' | 'operator',
+define(engineName, nameOf) }`, for an operation whose contract with the engine the typed
+   kinds cannot carry: it registers itself under the `tyto:` name it is given. Only the editor
+   writes one; a plugin still only names it, and `setVimContributions` refuses an `engine`
+   motion outside `visual` and `operatorPending` as it does a text object (ADR 0142 §3). This
+   amends ADR 0142's "an operation never touches engine state" for this kind alone.
+
+Pairs are `( ) b`, `[ ]`, `{ } B`, `< >` and three quotes: single, double and backtick. An
+opening key adds a space inside when it wraps and takes the blanks just inside away when it is
+the old pair of `ds` or `cs`; a closing key or its letter does neither. Quotes are found on the
+cursor's line, paired from its start; brackets anywhere around the cursor, nesting counted.
+
+Consequences:
+
+- Switched off, nothing is waiting after `ds` and visual `S` is vim's own again; `s` after an
+  operator was no command before.
+- tpope's tag prompt (`ysiw<q>`), a key outside the pairs (`ysiw*`), and linewise `ys` putting
+  the pair on lines of its own are not here: an unknown key does nothing, and `ysip)` wraps the
+  paragraph inline.
+- A key typed through an input method or a dead key (the backtick on an ABNT2 keyboard) reaches
+  the reader as `Dead`, which it waits past; whether the character that follows arrives as a
+  keydown is not measured.
+- The status bar does not show the keys the reader takes as pending.
+- What the real window does with these keys is not measured here; jsdom covers the sequences.

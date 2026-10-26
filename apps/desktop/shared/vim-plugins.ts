@@ -35,25 +35,33 @@ const commentary: BuiltInVimPlugin = {
     "gc{motion}, gcc and visual gc toggle a comment with the language's own: // in a brief, <!-- --> in a Markdown file. Off, gc is vim's line comment only.",
 };
 
-/** In the order the settings tab and the example list them. */
-export const BUILT_IN_VIM_PLUGINS: readonly BuiltInVimPlugin[] = [commentary];
-
 /**
- * Every id the setting documents. `surround` is listed before its contribution ships (PR B of
- * TYTO-418), so the key a person writes today is the one that works when it lands; until then
- * a `surround` switch has nothing to switch.
+ * vim-surround: `s` after an operator, and visual `S` (ADR 0143 amendment). `c`, `d` and `y`
+ * are whole operators in the engine, so `cs`, `ds` and `ys` are never three-key mappings: `s`
+ * is a motion in `operatorPending` that reads the operator before it. Neither key is vim's
+ * own after an operator; switched off, visual `S` is vim's again.
  */
-const DOCUMENTED_IDS = [
-  {
-    value: 'surround',
-    description:
-      'Not in this version yet: ys{motion}{char}, cs{old}{new}, ds{char} and visual S, to add, change or delete a pair around text.',
+const surround: BuiltInVimPlugin = {
+  contribution: {
+    id: 'surround',
+    title: 'Surround',
+    mappings: [
+      { keys: 's', context: 'operatorPending', operation: 'surround.target' },
+      { keys: 'S', context: 'visual', operation: 'surround.add' },
+    ],
   },
-  ...BUILT_IN_VIM_PLUGINS.map(({ contribution, description }) => ({
-    value: contribution.id,
-    description,
-  })),
-];
+  description:
+    'ys{motion}{char}, yss{char}, cs{old}{new}, ds{char} and visual S{char} add, change or delete a pair around text: ( ) or b, [ ], { } or B, < >, and quotes. An opening bracket adds a space inside the pair.',
+};
+
+/** In the order the settings tab and the example list them. */
+export const BUILT_IN_VIM_PLUGINS: readonly BuiltInVimPlugin[] = [surround, commentary];
+
+/** Every id the setting documents: the built-ins'. An installed plugin's is its own. */
+const DOCUMENTED_IDS = BUILT_IN_VIM_PLUGINS.map(({ contribution, description }) => ({
+  value: contribution.id,
+  description,
+}));
 
 export type VimPlugins = Readonly<Record<string, boolean>>;
 
