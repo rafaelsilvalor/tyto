@@ -23,6 +23,7 @@ import { TAB_EXTENSIONS, isTextFile } from '../../shared/file-icons.js';
 import { type StatusBarColors } from '../../shared/status-bar-colors.js';
 import { type StatusBarItemId } from '../../shared/status-bar-items.js';
 import { type VimModeStyle } from '../../shared/vim-mode-style.js';
+import { type VimPlugins } from '../../shared/vim-plugins.js';
 import { type BriefColumnLook } from '../../shared/brief-columns.js';
 import { type LineNumbersLook } from '../../shared/line-numbers.js';
 import { type Typography, type ZoomStep } from '../../shared/typography.js';
@@ -57,6 +58,8 @@ export interface WindowThemes extends Pick<ThemeService, 'list' | 'current' | 'p
   statusBarColors(): StatusBarColors;
   /** The `vimMode` setting in force (TYTO-333), on the same answer. */
   vimMode(): boolean;
+  /** The `vimPlugins` setting in force (TYTO-418), on the same answer. */
+  vimPlugins(): VimPlugins;
   /** The `vimModeStyle` setting in force (TYTO-301), on the same answer. */
   vimModeStyle(): VimModeStyle;
   /** The `indentGuides` setting in force (TYTO-293), on the same answer. */
@@ -87,6 +90,7 @@ function appliedForWindow(
     | 'statusBarItems'
     | 'statusBarColors'
     | 'vimMode'
+    | 'vimPlugins'
     | 'vimModeStyle'
     | 'indentGuides'
     | 'stickyScroll'
@@ -104,6 +108,7 @@ function appliedForWindow(
     statusBarItems: [...themes.statusBarItems()],
     statusBarColors: { ...themes.statusBarColors() },
     vimMode: themes.vimMode(),
+    vimPlugins: { ...themes.vimPlugins() },
     vimModeStyle: themes.vimModeStyle(),
     indentGuides: themes.indentGuides(),
     stickyScroll: themes.stickyScroll(),
@@ -316,6 +321,8 @@ export interface IpcDependencies {
   readonly panels: PanelService;
   /** The installed plugins' keymaps, once they have started (TYTO-207). */
   keymaps(): Promise<IpcResponse<'plugins:keymaps'>['keymaps']>;
+  /** The vim contributions, the built-ins' first, once the plugins have started (TYTO-418). */
+  vim(): Promise<IpcResponse<'plugins:vim'>['contributions']>;
   /** The colours the window applies in each system mode, and the theme picker (TYTO-208). */
   readonly themes: WindowThemes;
   /**
@@ -669,6 +676,7 @@ export function createHandlers(dependencies: IpcDependencies): Handlers {
 
     'plugins:panels': async () => ({ panels: [...(await dependencies.panels.list())] }),
     'plugins:keymaps': async () => ({ keymaps: await dependencies.keymaps() }),
+    'plugins:vim': async () => ({ contributions: await dependencies.vim() }),
 
     'theme:current': async () =>
       appliedForWindow(await dependencies.themes.current(), dependencies.themes),

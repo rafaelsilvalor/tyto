@@ -4,6 +4,7 @@ import { Vim } from '@replit/codemirror-vim';
 
 import { commandRegistryOf } from './commands.js';
 import { type VimExCommand, viewOf } from './vim-mode.js';
+import { VIM_COMMENT_OPERATIONS } from './vim-comment.js';
 import { BUILT_IN_VIM_OPERATIONS } from './vim-text-objects.js';
 
 /**
@@ -75,10 +76,16 @@ export interface VimTextObjectRange extends VimRange {
 export type VimOperation =
   | {
       readonly kind: 'action';
+      /**
+       * The action changes the document, so `.` repeats it (TYTO-418). The engine records the
+       * last edit only for a keymap entry marked so; an operator is always recorded.
+       */
+      readonly isEdit?: boolean;
       run(view: EditorView, args: VimOperationArgs, repeat: number): void;
     }
   | {
       readonly kind: 'operator';
+      readonly isEdit?: boolean;
       run(view: EditorView, args: VimOperationArgs, ranges: readonly VimRange[]): void;
     }
   | {
@@ -112,8 +119,16 @@ interface EngineRange {
   readonly head: Position;
 }
 
-const offsetOf = (view: EditorView, position: Position): number =>
-  view.state.doc.line(position.line + 1).from + position.ch;
+/**
+ * Clipped to the document, as CodeMirror 5's positions were: a linewise operator on the last
+ * line is handed the start of the line after it, which this document does not have (TYTO-418).
+ */
+const offsetOf = (view: EditorView, position: Position): number => {
+  const { doc } = view.state;
+  if (position.line + 1 > doc.lines) return doc.length;
+  const line = doc.line(position.line + 1);
+  return Math.min(line.from + position.ch, line.to);
+};
 
 const positionOf = (view: EditorView, offset: number): Position => {
   const line = view.state.doc.lineAt(offset);
@@ -199,14 +214,11 @@ export function defineVimOperation(name: string, operation: VimOperation): void 
 /**
  * The contribution's own args: the engine adds its bookkeeping (`repeat`, registers) beside
  * them, and a text object's `linewise` stays on the motion's args when `.` replays it.
+ *
+ * `selectedCharacter` is let through (TYTO-418): it is the key a `<character>` in the
+ * mapping's keys stood for, as in `ys{motion}<character>`, and the operation is what reads it.
  */
-const ENGINE_KEYS = new Set([
-  'repeat',
-  'repeatIsExplicit',
-  'registerName',
-  'selectedCharacter',
-  'linewise',
-]);
+const ENGINE_KEYS = new Set(['repeat', 'repeatIsExplicit', 'registerName', 'linewise']);
 
 const argsOf = (engineArgs: object): VimOperationArgs =>
   Object.fromEntries(
@@ -319,7 +331,11 @@ const apply = (contribution: VimContribution): Applied => {
       ENGINE_TYPES[operation.kind],
       engineName(mapping.operation),
       { ...mapping.args },
-      mapping.context === undefined ? {} : { context: mapping.context },
+      {
+        ...(mapping.context === undefined ? {} : { context: mapping.context }),
+        // On the keymap entry, where the engine looks before it records the edit for `.`.
+        ...(operation.kind !== 'textObject' && operation.isEdit === true ? { isEdit: true } : {}),
+      },
     );
   }
   return { signature: JSON.stringify(contribution), mappings: contribution.mappings };
@@ -338,11 +354,11 @@ const defineEx = (entry: VimExCommand): void => {
 };
 
 /**
- * The operations the editor ships (`vim-text-objects.ts`), registered on the first call rather
- * than when the module loads: the package is free of side effects on import.
+ * The operations the editor ships (`vim-text-objects.ts`, `vim-comment.ts`), registered on the
+ * first call rather than when the module loads: the package is free of side effects on import.
  */
 const defineBuiltInOperations = (): void => {
-  for (const [name, operation] of BUILT_IN_VIM_OPERATIONS) {
+  for (const [name, operation] of [...BUILT_IN_VIM_OPERATIONS, ...VIM_COMMENT_OPERATIONS]) {
     if (!operations.has(name)) defineVimOperation(name, operation);
   }
 };

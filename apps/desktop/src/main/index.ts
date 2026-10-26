@@ -48,6 +48,7 @@ import { DEFAULT_THEME_SETTING, type ThemeSetting, modeOf } from '../../shared/t
 import { vimModeStyleExample } from '../../shared/vim-mode-style.js';
 import { briefColumnsExample } from '../../shared/brief-columns.js';
 import { lineNumbersExample } from '../../shared/line-numbers.js';
+import { vimPluginsExample } from '../../shared/vim-plugins.js';
 import {
   type Typography,
   type ZoomStep,
@@ -72,6 +73,7 @@ import { newKeybindingsFile, newSnippetsFile } from './seed-files.js';
 import { fileRecentFiles } from './recent-files.js';
 import { registerIpcHandlers, sendIpcEvent } from './ipc.js';
 import { exporterBuiltIns, listPlugins, tytoHome } from './plugin-list.js';
+import desktopManifest from './desktop.tyto-plugin.json';
 import { activateBuiltIns, builtInTemplatesDirectory } from './plugins.js';
 import { bundledNodeLauncher, bundledNodePaths } from './plugin-process.js';
 import { offerPreviousVersion } from './previous-version.js';
@@ -144,7 +146,8 @@ const CONTEXT_MENU_CLICK_GRACE_MS = 50;
  * `settings.json` as "Open Settings (JSON)" creates it when there is none (TYTO-206). It
  * carries `statusBarItems` commented out with every id, and `statusBarColors` with every key
  * and an example colour, and `vimModeStyle` with its three values (TYTO-301), so the bar's
- * options are in the file the person is looking at; and `vimMode` (TYTO-333), `indentGuides`
+ * options are in the file the person is looking at; and `vimMode` (TYTO-333), `vimPlugins` with
+ * every plugin id (TYTO-418), `indentGuides`
  * (TYTO-293), `stickyScroll` (TYTO-295), `formatBriefOnSave` and `tabSize` (TYTO-297),
  * `briefColumns` with its four looks (TYTO-298), `lineNumbers` with its three (TYTO-415), and
  * `googleFonts` (TYTO-281).
@@ -152,7 +155,7 @@ const CONTEXT_MENU_CLICK_GRACE_MS = 50;
 const NEW_SETTINGS_FILE =
   '// Tyto settings: JSON with comments. Saving this file applies it, with no restart.\n{\n' +
   `${statusBarItemsExample()}\n${statusBarColorsExample()}\n${vimModeExample()}\n` +
-  `${vimModeStyleExample()}\n` +
+  `${vimPluginsExample()}\n${vimModeStyleExample()}\n` +
   `${indentGuidesExample()}\n${stickyScrollExample()}\n` +
   `${formatBriefOnSaveExample()}\n${tabSizeExample()}\n${briefColumnsExample()}\n` +
   `${lineNumbersExample()}\n` +
@@ -556,6 +559,8 @@ async function start(): Promise<void> {
   // And whether the editor takes vim's keys (TYTO-333), on the same answer: what the window
   // opens in, and what "Editor: turn vim mode on or off" writes.
   let vimMode = saved.vimMode;
+  // And which vim plugins are switched off (TYTO-418), on the same answer.
+  let vimPlugins = saved.vimPlugins;
   // And how vim's mode is shown (TYTO-301), on the same answer.
   let vimModeStyle = saved.vimModeStyle;
   // And whether the editor draws indent guides (TYTO-293), on the same answer.
@@ -889,6 +894,7 @@ async function start(): Promise<void> {
       if (keys.includes('statusBarItems')) statusBarItems = next.statusBarItems;
       if (keys.includes('statusBarColors')) statusBarColors = next.statusBarColors;
       if (keys.includes('vimMode')) vimMode = next.vimMode;
+      if (keys.includes('vimPlugins')) vimPlugins = next.vimPlugins;
       if (keys.includes('vimModeStyle')) vimModeStyle = next.vimModeStyle;
       if (keys.includes('indentGuides')) indentGuides = next.indentGuides;
       if (keys.includes('stickyScroll')) stickyScroll = next.stickyScroll;
@@ -1369,6 +1375,7 @@ async function start(): Promise<void> {
       statusBarItems: () => statusBarItems,
       statusBarColors: () => statusBarColors,
       vimMode: () => vimMode,
+      vimPlugins: () => vimPlugins,
       vimModeStyle: () => vimModeStyle,
       indentGuides: () => indentGuides,
       stickyScroll: () => stickyScroll,
@@ -1413,6 +1420,29 @@ async function start(): Promise<void> {
         bindings: { ...keymap.bindings },
         ...(keymap.mode === undefined ? {} : { mode: keymap.mode }),
         ...(keymap.when === undefined ? {} : { when: keymap.when }),
+      }));
+    },
+    // The built-in plugin's vim contributions first, then the installed plugins' (TYTO-418), so
+    // a key two of them map stays the built-in's: the window refuses the second (ADR 0141).
+    vim: async () => {
+      await contributed.ready;
+      const builtIn = host.registry.vim().map((contribution) => ({
+        plugin: desktopManifest.name,
+        contribution,
+      }));
+      return [...builtIn, ...contributed.vim()].map(({ plugin, contribution }) => ({
+        plugin,
+        id: contribution.id,
+        ...(contribution.title === undefined ? {} : { title: contribution.title }),
+        mappings: contribution.mappings.map((mapping) => ({
+          keys: mapping.keys,
+          operation: mapping.operation,
+          ...(mapping.context === undefined ? {} : { context: mapping.context }),
+          ...(mapping.args === undefined ? {} : { args: { ...mapping.args } }),
+        })),
+        ...(contribution.ex === undefined
+          ? {}
+          : { ex: contribution.ex.map((entry) => ({ ...entry })) }),
       }));
     },
     preview,

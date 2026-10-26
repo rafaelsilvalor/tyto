@@ -478,6 +478,11 @@ const appliedThemesSchema = z.object({
    * follows it when it moves, so a save of the file turns vim on or off in place.
    */
   vimMode: z.boolean(),
+  /**
+   * The `vimPlugins` setting in force (TYTO-418, ADR 0143): the vim plugins switched by id. A
+   * plugin it does not name is on; the window decides, so a save switches one in place.
+   */
+  vimPlugins: z.record(z.string().min(1).max(200), z.boolean()),
   /** The `vimModeStyle` setting in force (TYTO-301, ADR 0091): badge, top border or bar. */
   vimModeStyle: z.enum(VIM_MODE_STYLES.map((style) => style.id) as [VimModeStyle]),
   /** The `indentGuides` setting in force (TYTO-293): the editor's guides, on or off. */
@@ -1481,6 +1486,54 @@ export const IPC_CHANNELS = {
             bindings: z.record(z.string().max(100), z.string().max(300)),
             mode: z.enum(['normal', 'vim']).optional(),
             when: z.string().min(1).max(100).optional(),
+          }),
+        )
+        .max(100),
+    }),
+  ),
+
+  /**
+   * Every `editor.vim` contribution (TYTO-418, ADR 0141, ADR 0143): the built-in plugin's
+   * first, then the installed plugins', answered once they have started.
+   *
+   * Data as the plugins registered it. Which ids are on is the `vimPlugins` setting's, decided
+   * in the window, and the mappings are checked against the editor's operations there too, where
+   * the operations are.
+   */
+  'plugins:vim': channel(
+    z.object({}),
+    z.object({
+      contributions: z
+        .array(
+          z.object({
+            plugin: z.string().min(1),
+            id: z.string().min(1).max(200),
+            title: z.string().min(1).max(200).optional(),
+            mappings: z
+              .array(
+                z.object({
+                  keys: z.string().min(1).max(100),
+                  context: z.enum(['normal', 'visual', 'operatorPending', 'insert']).optional(),
+                  operation: z.string().min(1).max(200),
+                  args: z
+                    .record(
+                      z.string().max(100),
+                      z.union([z.string().max(300), z.number(), z.boolean()]),
+                    )
+                    .optional(),
+                }),
+              )
+              .max(200),
+            ex: z
+              .array(
+                z.object({
+                  name: z.string().min(1).max(100),
+                  shortName: z.string().min(1).max(100).optional(),
+                  command: z.string().min(1).max(300),
+                }),
+              )
+              .max(100)
+              .optional(),
           }),
         )
         .max(100),

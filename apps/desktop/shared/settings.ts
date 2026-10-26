@@ -4,6 +4,7 @@ import { z } from 'zod';
 import { type BriefColumnLook, briefColumnsContribution } from './brief-columns.js';
 import { type LineNumbersLook, lineNumbersContribution } from './line-numbers.js';
 import { type StatusBarColors, statusBarColorsContribution } from './status-bar-colors.js';
+import { type VimPlugins, vimPluginsContribution } from './vim-plugins.js';
 import { type StatusBarItemId, statusBarItemsContribution } from './status-bar-items.js';
 import {
   DEFAULT_THEME_SETTING,
@@ -308,7 +309,7 @@ export function googleFontsExample(): string {
 }
 
 /**
- * The twenty-four, in the order the settings file is documented in. `theme` checks its ids against
+ * The twenty-five, in the order the settings file is documented in. `theme` checks its ids against
  * `lookup`, which main builds from every theme the plugins registered (TYTO-208); the default
  * knows the built-in two and lets any other id through.
  */
@@ -325,6 +326,7 @@ export function settingContributions(
     statusBarItemsContribution,
     statusBarColorsContribution,
     vimModeContribution,
+    vimPluginsContribution,
     vimModeStyleContribution,
     indentGuidesContribution,
     stickyScrollContribution,
@@ -356,6 +358,8 @@ export interface Settings {
   readonly statusBarColors: StatusBarColors;
   /** Whether the editor takes vim's keys, at start and after a save (TYTO-333). */
   readonly vimMode: boolean;
+  /** Which vim plugins are switched off, by id; every other one is on (TYTO-418, ADR 0143). */
+  readonly vimPlugins: VimPlugins;
   /** How the status bar shows vim's mode: badge, top border or whole bar (TYTO-301). */
   readonly vimModeStyle: VimModeStyle;
   /** Whether the editor draws indent guides (TYTO-293). */
@@ -395,6 +399,7 @@ export const DEFAULT_SETTINGS: Settings = {
   statusBarItems: statusBarItemsContribution.default,
   statusBarColors: statusBarColorsContribution.default,
   vimMode: vimModeContribution.default,
+  vimPlugins: vimPluginsContribution.default,
   vimModeStyle: vimModeStyleContribution.default,
   indentGuides: indentGuidesContribution.default,
   stickyScroll: stickyScrollContribution.default,
@@ -416,7 +421,7 @@ export const DEFAULT_SETTINGS: Settings = {
 export const DEFAULT_QUEUE_KINDS: readonly string[] = ['png'];
 
 /**
- * The twenty-four out of the resolved values, which already hold every declared key with a value
+ * The twenty-five out of the resolved values, which already hold every declared key with a value
  * its schema accepted or its default (`resolveSettings`).
  */
 export function settingsFrom(values: Readonly<Record<string, unknown>>): Settings {
@@ -432,6 +437,7 @@ export function settingsFrom(values: Readonly<Record<string, unknown>>): Setting
     statusBarItems: pick('statusBarItems'),
     statusBarColors: pick('statusBarColors'),
     vimMode: pick('vimMode'),
+    vimPlugins: pick('vimPlugins'),
     vimModeStyle: pick('vimModeStyle'),
     indentGuides: pick('indentGuides'),
     stickyScroll: pick('stickyScroll'),
