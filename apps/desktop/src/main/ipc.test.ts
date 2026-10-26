@@ -658,6 +658,7 @@ const windowThemes = (): WindowThemes => {
     statusBarItems: () => ['settings', 'problems'],
     statusBarColors: () => ({ background: '#1e3a5f', 'vimMode.normal': '#3b6fd9' }),
     vimMode: () => true,
+    vimPlugins: () => ({ commentary: false }),
     vimModeStyle: () => 'bar',
     indentGuides: () => false,
     stickyScroll: () => false,
@@ -713,6 +714,15 @@ const dependencies = () => {
       request: () => Promise.resolve({ ok: false as const, code: 'E_PERMISSION', message: 'no' }),
     },
     keymaps: () => Promise.resolve([]),
+    vim: () =>
+      Promise.resolve([
+        {
+          plugin: 'desktop',
+          id: 'commentary',
+          title: 'Commentary',
+          mappings: [{ keys: 'gc', operation: 'comment' }],
+        },
+      ]),
     themes: windowThemes(),
     zoom: (step: string) => Promise.resolve({ zoom: step === 'in' ? 1 : 0, saved: true }),
     vimMode: (on: boolean) => Promise.resolve({ vimMode: on, saved: true }),
@@ -1547,6 +1557,22 @@ describe('the template mode channels (TYTO-44)', () => {
   });
 });
 
+describe('the vim contributions channel (TYTO-418)', () => {
+  it('answers every contribution as data, with the plugin that registered it', async () => {
+    const guarded = guard('plugins:vim', createHandlers(dependencies())['plugins:vim']);
+    expect(await guarded({})).toEqual({
+      contributions: [
+        {
+          plugin: 'desktop',
+          id: 'commentary',
+          title: 'Commentary',
+          mappings: [{ keys: 'gc', operation: 'comment' }],
+        },
+      ],
+    });
+  });
+});
+
 describe('the theme channels (TYTO-208)', () => {
   it('answers the setting’s themes and mode through the contract', async () => {
     const guarded = guard('theme:current', createHandlers(dependencies())['theme:current']);
@@ -1574,6 +1600,8 @@ describe('the theme channels (TYTO-208)', () => {
     // And the indent width and format-on-save (TYTO-297).
     expect(answer.tabSize).toBe(4);
     expect(answer.formatBriefOnSave).toBe(true);
+    // And which vim plugins are switched off (TYTO-418).
+    expect(answer.vimPlugins).toEqual({ commentary: false });
     // And how a brief's `|` columns are drawn (TYTO-298).
     expect(answer.briefColumns).toBe('perColumn');
     // And how the lines are numbered (TYTO-415).

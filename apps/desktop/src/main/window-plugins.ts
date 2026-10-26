@@ -3,6 +3,7 @@ import {
   type AssetSourceContribution,
   type BrandKits,
   type EditorKeymap,
+  type EditorVimContribution,
   type FontSourceContribution,
   type LoadedPlugins,
   type OwnedSource,
@@ -39,6 +40,8 @@ export interface WindowPlugins {
   panels(): readonly WindowPanel[];
   /** Every `editor.keymap`, in activation order, with its plugin. Empty until `ready`. */
   keymaps(): readonly WindowKeymap[];
+  /** Every `editor.vim`, in activation order, with its plugin (TYTO-418). Empty until `ready`. */
+  vim(): readonly WindowVim[];
   /** Every colour theme, with its plugin (TYTO-208, ADR 0077). Empty until `ready`. */
   themes(): readonly WindowTheme[];
   /** The permissions the host validated for a plugin, or `undefined` for one it has not. */
@@ -66,6 +69,11 @@ export interface WindowKeymap {
   readonly keymap: EditorKeymap;
 }
 
+export interface WindowVim {
+  readonly plugin: string;
+  readonly contribution: EditorVimContribution;
+}
+
 export interface WindowTheme {
   readonly plugin: string;
   readonly theme: ThemeContribution;
@@ -75,6 +83,7 @@ export function windowPlugins(plugins: Promise<LoadedPlugins>): WindowPlugins {
   const host = createPluginHost();
   const owned: WindowPanel[] = [];
   const keymaps: WindowKeymap[] = [];
+  const vims: WindowVim[] = [];
   const themes: WindowTheme[] = [];
   const permissions = new Map<string, readonly string[]>();
   let started = false;
@@ -84,6 +93,7 @@ export function windowPlugins(plugins: Promise<LoadedPlugins>): WindowPlugins {
       for (const plugin of loaded.plugins) {
         const before = new Set(host.registry.panels());
         const keymapsBefore = new Set(host.registry.keymaps());
+        const vimBefore = new Set(host.registry.vim());
         const themesBefore = new Set(host.registry.themes());
         // A plugin this host refuses is refused by the export too, where the run reports it;
         // saying it twice on every keystroke would bury the one that matters.
@@ -96,6 +106,9 @@ export function windowPlugins(plugins: Promise<LoadedPlugins>): WindowPlugins {
         }
         for (const keymap of host.registry.keymaps()) {
           if (!keymapsBefore.has(keymap)) keymaps.push({ plugin: plugin.id, keymap });
+        }
+        for (const contribution of host.registry.vim()) {
+          if (!vimBefore.has(contribution)) vims.push({ plugin: plugin.id, contribution });
         }
         for (const theme of host.registry.themes()) {
           if (!themesBefore.has(theme)) themes.push({ plugin: plugin.id, theme });
@@ -117,6 +130,7 @@ export function windowPlugins(plugins: Promise<LoadedPlugins>): WindowPlugins {
     // Filtered against the registry, so a panel its plugin withdrew is not offered again.
     panels: () => owned.filter(({ panel }) => host.registry.panels().includes(panel)),
     keymaps: () => keymaps.filter(({ keymap }) => host.registry.keymaps().includes(keymap)),
+    vim: () => vims.filter(({ contribution }) => host.registry.vim().includes(contribution)),
     themes: () => themes.filter(({ theme }) => host.registry.themes().includes(theme)),
     permissionsOf: (plugin) => permissions.get(plugin),
     brandKits: () => (started ? host.registry.brandKitsByBrand() : noKits),

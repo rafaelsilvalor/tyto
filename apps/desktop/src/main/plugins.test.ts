@@ -107,6 +107,17 @@ describe('activateBuiltIns', () => {
     ]);
   });
 
+  it('registers the vim plugins through the editor.vim point (TYTO-418)', async () => {
+    const host = await activateBuiltIns({
+      fileSystem: fakeFileSystem(['promo-curso']),
+      directory: '/packs/built-in',
+    });
+
+    expect(host.registry.vim()).toEqual([
+      { id: 'commentary', title: 'Commentary', mappings: [{ keys: 'gc', operation: 'comment' }] },
+    ]);
+  });
+
   it('registers a rasterizer, and nothing below the root knows which one', async () => {
     // The swappability ADR 0010 asks for, proved rather than asserted: a fake goes in
     // through the same door the debugger-captured window uses, and what comes back out of

@@ -325,6 +325,9 @@ describe('the bridge', () => {
       'plugins:keymaps',
       'plugins:list',
       'plugins:panels',
+      // TYTO-418: the vim contributions, the built-in plugin's first. Applied by the window on
+      // load; their keys are measured in `@tyto/editor`'s `vim-comment.test.ts`.
+      'plugins:vim',
       // TYTO-45: the local queue panel's six, and TYTO-188's seventh. Each is exercised by
       // `e2e/queue.desktop.test.ts`.
       'queue:list',

@@ -14,6 +14,7 @@ import chromiumManifest from './chromium.tyto-plugin.json';
 import desktopManifest from './desktop.tyto-plugin.json';
 import { createDebuggerRasterizer } from './rasterizer.js';
 import { BUILT_IN_THEMES } from './themes.js';
+import { BUILT_IN_VIM_PLUGINS } from '../../shared/vim-plugins.js';
 
 /**
  * The desktop app's composition root for plugins (ADR 0007, ADR 0010).
@@ -142,6 +143,9 @@ export async function activateBuiltIns(options: BuiltInsOptions): Promise<InProc
       }
       host.registerTheme(BUILT_IN_THEMES.light);
       host.registerTheme(BUILT_IN_THEMES.dark);
+      // And its vim plugins, through the `editor.vim` point an installed plugin's would use
+      // (TYTO-418, ADR 0143); the `vimPlugins` setting switches them in the window.
+      for (const { contribution } of BUILT_IN_VIM_PLUGINS) host.registerVim(contribution);
     },
   });
 

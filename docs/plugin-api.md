@@ -452,11 +452,21 @@ mapping each:
 { keys: 'ii', context: 'operatorPending', operation: 'indentObject', args: { inner: true } },
 ```
 
+**The editor's operator `comment` is vim-commentary's `gc`** (ADR 0143): CodeMirror's
+`toggleComment`, so a line comment where the language has one and a block comment where it has
+only that. The built-in `desktop` plugin maps it on `gc` with no context.
+
+An operation that changes the document declares `isEdit: true`, so `.` repeats an action as it
+does an operator; and a mapping whose keys end in `<character>` hands the key pressed there to
+the operation as the `selectedCharacter` arg (ADR 0143).
+
 **`setVimContributions(contributions, enabledIds)` switches them per window**, not per editor:
 the engine keeps one keymap for every editor in the window. A contribution switched on is
 mapped with `Vim.mapCommand`; switched off it is unmapped, so vim's own meaning of the key comes
 back (a mapping shadows the default; it does not replace it). Calls are diffed against what is
-applied, so the same answer twice changes nothing.
+applied, so the same answer twice changes nothing. In the desktop the enabled ids are the
+`vimPlugins` setting's: every contribution, built-in or installed, unless the setting names its
+`id` `false` (ADR 0143).
 
 **A contribution that cannot be applied is left out whole**, as a non-fatal
 `E_VIM_CONTRIBUTION`: an operation the editor does not have, empty keys, an action mapped while
