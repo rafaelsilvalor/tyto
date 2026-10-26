@@ -3,6 +3,7 @@ import { diagnostic, ok } from '@tyto/core';
 import { age } from './age.js';
 import { resolveColumn } from './columns.js';
 import { collect, compose } from './compose.js';
+import { decide } from './decide.js';
 import { derive } from './derive.js';
 import { extract, rewrite } from './extract.js';
 import { include } from './include.js';
@@ -42,6 +43,7 @@ export const genericVerbs: Readonly<Record<string, Verb>> = {
   age: { kind: 'transform', run: age },
   last: { kind: 'transform', run: last },
   remember: { kind: 'transform', run: remember },
+  decide: { kind: 'transform', run: decide },
 };
 
 /** `where <expression>`: keeps the rows that satisfy every predicate. */

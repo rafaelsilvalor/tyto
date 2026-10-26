@@ -12,6 +12,8 @@ export type { RunClock } from './clock.js';
 export { systemClock } from './clock.js';
 export type { DataReference, DataResolver } from './data.js';
 export { isDataReference, parseDataReference, readDataArgument, resolvePointer } from './data.js';
+export type { DecideAction, DecideRules, DecideSides, Decision } from './decide.js';
+export { decideValue } from './decide.js';
 export { resolveColumn } from './columns.js';
 export type { PageFetcher, PageLimits, PageResult, SourcePage } from './paging.js';
 export { PAGE_LIMITS, pagedSource } from './paging.js';

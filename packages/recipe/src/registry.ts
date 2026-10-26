@@ -100,6 +100,7 @@ export const GENERIC_VERBS = [
   'age',
   'last',
   'remember',
+  'decide',
 ] as const;
 
 const CONTRIBUTED_NAME = /^[a-z][a-z0-9-]*\.[a-z][a-z0-9-]*$/u;
