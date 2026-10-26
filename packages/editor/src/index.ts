@@ -193,6 +193,7 @@ export {
   type VimOperation,
   type VimOperationArgs,
   type VimRange,
+  type VimTextObjectRange,
   VIM_CONTEXTS,
   defineVimOperation,
   setVimContributions,

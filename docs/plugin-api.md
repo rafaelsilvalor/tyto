@@ -435,8 +435,22 @@ interface EditorVimContribution {
 **Data only, never a callable** (ADR 0141). A vim key runs synchronously against the document,
 in the window; a plugin that contributes one runs elsewhere, so a function would be a message
 across processes on every keypress. A mapping names an operation `@tyto/editor` implements and
-registers with `defineVimOperation`, as an **action** (runs on its keys) or an **operator**
-(waits for a motion and is handed the ranges it covers).
+registers with `defineVimOperation`, as an **action** (runs on its keys), an **operator**
+(waits for a motion and is handed the ranges it covers) or a **text object** (answers the range
+around the cursor for an operator or a visual selection, as `ip` does; ADR 0142).
+
+**The editor's text objects are `indentObject` and `entireBuffer`** (ADR 0142), both linewise.
+`indentObject` is vim-indent-object's: with `args: { inner: true }` it is `ii`, the lines at the
+cursor's indent or deeper, blank lines inside kept and blank lines at the edges left out;
+without, it is `ai`, which adds the line that opens the block; a count climbs one level per
+step. `entireBuffer` is textobj-entire's `ae`, every line, or with `inner` its `ie`, without the
+blank lines at either end. A text object is mapped in `visual` and in `operatorPending`, one
+mapping each:
+
+```ts
+{ keys: 'ii', context: 'visual', operation: 'indentObject', args: { inner: true } },
+{ keys: 'ii', context: 'operatorPending', operation: 'indentObject', args: { inner: true } },
+```
 
 **`setVimContributions(contributions, enabledIds)` switches them per window**, not per editor:
 the engine keeps one keymap for every editor in the window. A contribution switched on is
@@ -446,8 +460,10 @@ applied, so the same answer twice changes nothing.
 
 **A contribution that cannot be applied is left out whole**, as a non-fatal
 `E_VIM_CONTRIBUTION`: an operation the editor does not have, empty keys, an action mapped while
-an operator is pending, keys another enabled contribution already maps in the same context, an
-ex `shortName` that is not a prefix of its `name`, or an ex name another one defines.
+an operator is pending, a text object mapped anywhere but `visual` and `operatorPending`, keys
+of the form `i` or `a` followed by two keys or more (`in(`: vim's own `i` and `a` match first,
+always), keys another enabled contribution already maps in the same context, an ex `shortName`
+that is not a prefix of its `name`, or an ex name another one defines.
 
 **An ex command, once defined, stays defined**: the engine has no way to remove one. Switched
 off, it does nothing. Wiring the window to the plugins' contributions and the setting that

@@ -4,6 +4,7 @@ import { Vim } from '@replit/codemirror-vim';
 
 import { commandRegistryOf } from './commands.js';
 import { type VimExCommand, viewOf } from './vim-mode.js';
+import { BUILT_IN_VIM_OPERATIONS } from './vim-text-objects.js';
 
 /**
  * The adapter of `plugin-api`'s `editor.vim` point (TYTO-417, ADR 0141).
@@ -57,8 +58,19 @@ export interface VimRange {
 }
 
 /**
+ * What a text object answers. `linewise` means whole lines: the object covers every line from
+ * the one `from` is on to the one `to` is on, as `ip` does. Otherwise `to` is exclusive.
+ */
+export interface VimTextObjectRange extends VimRange {
+  readonly linewise: boolean;
+}
+
+/**
  * What a named operation does. An **action** runs on its keys alone; an **operator** waits
- * for a motion or a text object and is handed the ranges it covers, as `d` is.
+ * for a motion or a text object and is handed the ranges it covers, as `d` is; a **text
+ * object** answers the range around the cursor, for an operator or a visual selection to use,
+ * as `ip` does (ADR 0142). `inner` (`i` versus `a`) is the contribution's own arg, and `count`
+ * is the repeat typed before the operator or the object.
  */
 export type VimOperation =
   | {
@@ -68,10 +80,25 @@ export type VimOperation =
   | {
       readonly kind: 'operator';
       run(view: EditorView, args: VimOperationArgs, ranges: readonly VimRange[]): void;
+    }
+  | {
+      readonly kind: 'textObject';
+      select(
+        view: EditorView,
+        head: number,
+        args: VimOperationArgs,
+        count: number,
+      ): VimTextObjectRange | undefined;
     };
 
 /** The engine's own names are global too; a prefix keeps ours from replacing one of vim's. */
 const engineName = (operation: string): string => `tyto:${operation}`;
+
+/**
+ * The engine's command type for each kind. A text object has no type of its own in the
+ * engine: its built-in objects are a motion that returns two positions (TYTO-420).
+ */
+const ENGINE_TYPES = { action: 'action', operator: 'operator', textObject: 'motion' } as const;
 
 const operations = new Map<string, VimOperation>();
 
@@ -88,6 +115,46 @@ interface EngineRange {
 const offsetOf = (view: EditorView, position: Position): number =>
   view.state.doc.line(position.line + 1).from + position.ch;
 
+const positionOf = (view: EditorView, offset: number): Position => {
+  const line = view.state.doc.lineAt(offset);
+  return { line: line.number - 1, ch: offset - line.from };
+};
+
+/** The part of the engine's state a text object reads and writes. */
+interface EngineObjectState {
+  visualMode: boolean;
+  visualLine: boolean;
+  readonly inputState: { readonly operatorArgs?: { linewise?: boolean } | null | undefined };
+}
+
+/**
+ * Turns a text object's range into the `[anchor, head]` the engine's motion returns.
+ *
+ * Linewise is the engine's own bookkeeping, done here as its `ip` does it, so an operation
+ * never touches engine state: the motion is marked linewise, and so is the visual selection
+ * or, with an operator pending, the operator. Without it `dii` would delete from the first
+ * line's start to the last line's start, leaving the last line behind. A charwise object in
+ * visual mode ends on its last character, because a visual head is inclusive.
+ */
+function enginePositions(
+  view: EditorView,
+  range: VimTextObjectRange,
+  motionArgs: { linewise?: boolean },
+  vim: EngineObjectState,
+): [Position, Position] {
+  if (range.linewise) {
+    motionArgs.linewise = true;
+    if (vim.visualMode) vim.visualLine = true;
+    else if (vim.inputState.operatorArgs) vim.inputState.operatorArgs.linewise = true;
+    return [
+      { line: view.state.doc.lineAt(range.from).number - 1, ch: 0 },
+      { line: view.state.doc.lineAt(range.to).number - 1, ch: 0 },
+    ];
+  }
+  const head = vim.visualMode ? Math.max(range.from, range.to - 1) : range.to;
+  return [positionOf(view, range.from), positionOf(view, head)];
+}
+
 /**
  * Names an operation a contribution can map keys onto, and registers it into the engine.
  *
@@ -103,6 +170,20 @@ export function defineVimOperation(name: string, operation: VimOperation): void 
     });
     return;
   }
+  if (operation.kind === 'textObject') {
+    Vim.defineMotion(engineName(name), (adapter, head, motionArgs, vim) => {
+      const view = viewOf(adapter);
+      if (view === undefined) return null;
+      const range = operation.select(
+        view,
+        offsetOf(view, head),
+        argsOf(motionArgs),
+        motionArgs.repeat ?? 1,
+      );
+      return range === undefined ? null : enginePositions(view, range, motionArgs, vim);
+    });
+    return;
+  }
   Vim.defineOperator(engineName(name), (adapter, operatorArgs, ranges) => {
     const view = viewOf(adapter);
     if (view === undefined) return;
@@ -115,8 +196,17 @@ export function defineVimOperation(name: string, operation: VimOperation): void 
   });
 }
 
-/** The contribution's own args: the engine adds its bookkeeping (`repeat`, registers) beside them. */
-const ENGINE_KEYS = new Set(['repeat', 'repeatIsExplicit', 'registerName', 'selectedCharacter']);
+/**
+ * The contribution's own args: the engine adds its bookkeeping (`repeat`, registers) beside
+ * them, and a text object's `linewise` stays on the motion's args when `.` replays it.
+ */
+const ENGINE_KEYS = new Set([
+  'repeat',
+  'repeatIsExplicit',
+  'registerName',
+  'selectedCharacter',
+  'linewise',
+]);
 
 const argsOf = (engineArgs: object): VimOperationArgs =>
   Object.fromEntries(
@@ -147,6 +237,25 @@ const refused = (id: string, problem: string): Diagnostic =>
 
 const slotOf = (mapping: VimMapping): string => `${mapping.context ?? ''}|${mapping.keys}`;
 
+/** One key of vim's notation: `<C-a>` is one key, as `x` is. */
+const KEY = /<[^<>]+>|[\s\S]/gu;
+
+/**
+ * Keys that start with `i` or `a` and go on for two keys or more, such as `in(` (TYTO-420).
+ *
+ * The engine's built-in objects are `i<register>` and `a<register>`, which take any one key
+ * after `i` or `a`. After the second key they are a full match while `in(` is still a partial
+ * one, and the dispatcher prefers any full match, so the built-in object runs (with `n`, which
+ * it does not know) and `(` is read as the next command. Measured: the motion behind `din(`
+ * ran 0 times. A two-key mapping such as `ii` is fine, because a mapping is ahead of the
+ * defaults and both are full matches. In normal mode `i` and `a` are whole commands after one
+ * key, so the same holds there. Insert mode never consults these entries.
+ */
+const shadowedByBuiltInObject = (keys: string): boolean => {
+  const pressed = keys.match(KEY) ?? [];
+  return (pressed[0] === 'i' || pressed[0] === 'a') && pressed.length > 2;
+};
+
 /**
  * Why a contribution cannot be applied, or nothing. `taken` holds the keys and ex names the
  * contributions accepted before it already hold: two maps of one key in one context would
@@ -166,6 +275,22 @@ function problemOf(
     if (operation === undefined) return `the editor has no operation '${mapping.operation}'`;
     if (operation.kind === 'action' && mapping.context === 'operatorPending') {
       return `'${mapping.operation}' is an action, which never runs while an operator is pending`;
+    }
+    if (
+      operation.kind === 'textObject' &&
+      mapping.context !== 'visual' &&
+      mapping.context !== 'operatorPending'
+    ) {
+      return (
+        `'${mapping.operation}' is a text object, which is mapped in 'visual' and ` +
+        `'operatorPending', not in '${mapping.context ?? 'every context'}'`
+      );
+    }
+    if (mapping.context !== 'insert' && shadowedByBuiltInObject(mapping.keys)) {
+      return (
+        `'${mapping.keys}' can never be reached: vim's own 'i' and 'a' match it whole ` +
+        `after its second key, and a whole match wins over a longer mapping`
+      );
     }
     const owner = takenKeys.get(slotOf(mapping));
     if (owner !== undefined) return `'${mapping.keys}' is already mapped by '${owner}'`;
@@ -191,7 +316,7 @@ const apply = (contribution: VimContribution): Applied => {
     if (operation === undefined) continue;
     Vim.mapCommand(
       mapping.keys,
-      operation.kind,
+      ENGINE_TYPES[operation.kind],
       engineName(mapping.operation),
       { ...mapping.args },
       mapping.context === undefined ? {} : { context: mapping.context },
@@ -213,6 +338,16 @@ const defineEx = (entry: VimExCommand): void => {
 };
 
 /**
+ * The operations the editor ships (`vim-text-objects.ts`), registered on the first call rather
+ * than when the module loads: the package is free of side effects on import.
+ */
+const defineBuiltInOperations = (): void => {
+  for (const [name, operation] of BUILT_IN_VIM_OPERATIONS) {
+    if (!operations.has(name)) defineVimOperation(name, operation);
+  }
+};
+
+/**
  * Brings the engine to "these contributions, and only those whose id is in `enabled`".
  *
  * Diffed against what is already applied, so calling it again with the same answer changes
@@ -224,6 +359,7 @@ export function setVimContributions(
   contributions: readonly VimContribution[],
   enabled: Iterable<string>,
 ): Result<readonly string[], Diagnostics> {
+  defineBuiltInOperations();
   const on = new Set(enabled);
   const diagnostics: Diagnostic[] = [];
   const wanted = new Map<string, VimContribution>();
