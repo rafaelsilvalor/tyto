@@ -1541,6 +1541,17 @@ export const diagnosticCodes = {
     fatal: false,
     fatality: 'A warning never replaces a value (ADR 0013).',
   },
+  // A child whose parent is not in the table counts toward no parent; a recipe that forgot to
+  // fetch the parents would otherwise read as parents with no children.
+  W_RECIPE_ROLLUP_ORPHANS: {
+    severity: 'warning',
+    summary:
+      "A 'rollup' found rows whose parent is not a row of the table, and counted them nowhere.",
+    template: "{count} row(s) name a parent in '{column}' that the table lacks: {parents}.",
+    spec: 'docs/adr/0140-a-recipe-remembers-applied-rows-in-machine-local-state.md',
+    fatal: false,
+    fatality: 'A warning never replaces a value (ADR 0013).',
+  },
   // A vim contribution names operations the editor implements (TYTO-417, ADR 0141). One that
   // cannot be applied is left out whole, so half of a plugin's keys never land.
   E_VIM_CONTRIBUTION: {

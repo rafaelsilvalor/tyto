@@ -170,6 +170,7 @@ non-zero.
 | `W_RECIPE_WHERE_EMPTY` | warning | no | A 'where' kept no row of a table that had rows. |
 | `W_RECIPE_JOIN_AMBIGUOUS` | warning | no | A 'join' left rows unpaired because their key answered to more than one row. |
 | `W_RECIPE_AGE_UNREAD` | warning | no | An 'age' found cells that none of its formats reads, and left their age empty. |
+| `W_RECIPE_ROLLUP_ORPHANS` | warning | no | A 'rollup' found rows whose parent is not a row of the table, and counted them nowhere. |
 | `E_VIM_CONTRIBUTION` | error | no | A vim contribution names an operation the editor does not have, or a bad mapping. |
 
 ## What is fatal, and why
@@ -2454,6 +2455,20 @@ A warning never replaces a value (ADR 0013).
 ```
 
 Parameters: `count`, `column`, `format`
+
+### `W_RECIPE_ROLLUP_ORPHANS`
+
+**Severity:** warning · **Fatal:** no · **Spec:** `docs/adr/0140-a-recipe-remembers-applied-rows-in-machine-local-state.md`
+
+A 'rollup' found rows whose parent is not a row of the table, and counted them nowhere.
+
+A warning never replaces a value (ADR 0013).
+
+```
+{count} row(s) name a parent in '{column}' that the table lacks: {parents}.
+```
+
+Parameters: `count`, `column`, `parents`
 
 ## Codes the desktop window mints
 

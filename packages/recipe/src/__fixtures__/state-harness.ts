@@ -1,5 +1,6 @@
 import { type Diagnostic, err, ok } from '@tyto/core';
 
+import type { RunClock } from '../clock.js';
 import { parseRecipe } from '../parse.js';
 import { createDerivationRegistry, createVerbRegistry } from '../registry.js';
 import { type RecipeRun, runRecipe } from '../run.js';
@@ -51,12 +52,20 @@ export interface Ran {
   readonly at: string | undefined;
 }
 
+/** What else a run may be given: its clock (ADR 0139) and the workspace's data files. */
+export interface RunExtras {
+  readonly clock?: RunClock;
+  readonly files?: Record<string, unknown>;
+}
+
 export async function runWithState(
   lines: readonly string[],
   input: Table,
   state: RecipeState | undefined,
   included: Record<string, string> = {},
+  extras: RunExtras = {},
 ): Promise<Ran> {
+  const files = extras.files ?? {};
   const source = ['recipe sync', ...lines].join('\n');
   const recipe = parseRecipe(source);
   if (!recipe.ok) throw new Error(recipe.error.map(({ message }) => message).join('\n'));
@@ -71,6 +80,8 @@ export async function runWithState(
       return Promise.resolve(parsed.ok ? ok(parsed.value) : err(parsed.error));
     },
     state,
+    clock: extras.clock,
+    resolveData: (path) => Promise.resolve(path in files ? ok(files[path]) : err([])),
   });
   if (!result.ok) throw new Error('the run must start');
   const errors = result.value.cells
