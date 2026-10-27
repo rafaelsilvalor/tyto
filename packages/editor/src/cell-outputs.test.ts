@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import { EditorState } from '@codemirror/state';
-import { EditorView } from '@codemirror/view';
+import { EditorView, type WidgetType } from '@codemirror/view';
 import { afterEach, describe, expect, it } from 'vitest';
 
 import {
@@ -130,6 +130,50 @@ describe('cell outputs', () => {
 
     expect(first).toBeDefined();
     expect(outputElement(on, 'select')).toBe(first);
+    expect(renders).toBe(rendersBefore);
+  });
+
+  it('keeps the element while its own line is typed in and the output is re-sent', () => {
+    const on = open();
+    on.dispatch({ effects: setCellOutputs.of([output(3, 'select', on)]) });
+    const first = outputElement(on, 'select');
+    const rendersBefore = renders;
+
+    // The edit and the re-send together, as a host re-running a cell on each keystroke would.
+    on.dispatch({
+      changes: { from: on.state.doc.line(3).to, insert: ', status' },
+      effects: setCellOutputs.of([output(3, 'select', on)]),
+    });
+    on.dispatch({
+      changes: {
+        from: on.state.doc.line(3).from,
+        to: on.state.doc.line(3).to,
+        insert: 'select key',
+      },
+    });
+
+    expect(placement(on)).toEqual([['select key', 'output select']]);
+    expect(outputElement(on, 'select')).toBe(first);
+    expect(renders).toBe(rendersBefore);
+  });
+
+  it('hands back the element already built when the view asks for it again', () => {
+    // A block widget scrolled out of the viewport is dropped from the DOM and asked for again
+    // when it comes back. jsdom has no layout to scroll, so the test asks the way the view does.
+    const on = open();
+    on.dispatch({ effects: setCellOutputs.of([output(3, 'select', on)]) });
+    const widgets: WidgetType[] = [];
+    for (const source of on.state.facet(EditorView.decorations)) {
+      const set = typeof source === 'function' ? source(on) : source;
+      set.between(0, on.state.doc.length, (_from, _to, decoration) => {
+        const widget = decoration.spec.widget as WidgetType | undefined;
+        if (widget !== undefined) widgets.push(widget);
+      });
+    }
+    const rendersBefore = renders;
+
+    expect(widgets).toHaveLength(1);
+    expect(widgets[0]?.toDOM(on)).toBe(outputElement(on, 'select'));
     expect(renders).toBe(rendersBefore);
   });
 
