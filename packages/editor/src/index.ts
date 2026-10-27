@@ -202,10 +202,13 @@ export {
 export {
   type VimYank,
   type VimYankListener,
+  type VimYankRegister,
   YANK_FLASH_MS,
   onVimYank,
   setVimYankFlash,
 } from './vim-yank.js';
+
+export { type SystemClipboard, setVimSystemClipboard } from './vim-system-clipboard.js';
 
 export { template, templateLanguage } from './template-language.js';
 

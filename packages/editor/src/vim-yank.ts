@@ -17,14 +17,20 @@ import type { VimRange } from './vim-contributions.js';
  * through `Vim.getRegisterController()`: a new register `0`, or new text in the unnamed one
  * (`"ayiw` leaves `0` alone).
  *
- * The detector is its own piece so TYTO-442 can write the system clipboard from it.
+ * The detector is its own piece so TYTO-442 can write the system clipboard from it, and it says
+ * which register the yank went to: a new register `0` is an unnamed yank, new text in `+` is
+ * `"+y` (the engine writes the clipboard itself), anything else a named register.
  */
+
+/** Where a yank went: no register (`yiw`, and `"*yiw`, an invalid name), `+`, or another. */
+export type VimYankRegister = 'unnamed' | 'named' | 'clipboard';
 
 /** What a yank took: the ranges it covered (a line's last line break left out) and the text. */
 export interface VimYank {
   readonly ranges: readonly VimRange[];
   readonly text: string;
   readonly linewise: boolean;
+  readonly register: VimYankRegister;
 }
 
 export type VimYankListener = (yank: VimYank) => void;
@@ -41,6 +47,7 @@ export function onVimYank(view: EditorView, listener: VimYankListener): () => vo
 
 interface RegisterSnapshot {
   readonly zero: object;
+  readonly plus: string;
   readonly text: string;
   readonly linewise: boolean;
 }
@@ -51,6 +58,8 @@ const registers = (): RegisterSnapshot => {
   const unnamed = controller.getRegister('"');
   return {
     zero: controller.getRegister('0'),
+    // `+` is one object the engine sets text on, so its text is what changes.
+    plus: controller.getRegister('+').toString(),
     text: unnamed.toString(),
     linewise: unnamed.linewise === true,
   };
@@ -72,6 +81,7 @@ const yankDetector = ViewPlugin.define((view) => {
     const { before } = window;
     if (
       after.zero === before.zero &&
+      after.plus === before.plus &&
       after.text === before.text &&
       after.linewise === before.linewise
     ) {
@@ -83,8 +93,10 @@ const yankDetector = ViewPlugin.define((view) => {
         ? { from, to: to - 1 }
         : { from, to },
     );
+    const register: VimYankRegister =
+      after.plus !== before.plus ? 'clipboard' : after.zero !== before.zero ? 'unnamed' : 'named';
     for (const listener of listeners.get(view) ?? []) {
-      listener({ ranges, text: after.text, linewise: after.linewise });
+      listener({ ranges, text: after.text, linewise: after.linewise, register });
     }
   };
   getCM(view)?.on('vim-command-done', () => {

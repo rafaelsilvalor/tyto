@@ -257,3 +257,58 @@ Consequences:
 - `getRegister('0')` creates an empty register `0` when none exists, as the engine itself does.
 - What the real window shows of the flash and of sneak is not measured here; jsdom covers the
   sequences, and `j` in visual line mode is not usable there (no layout).
+
+## Amendment — vim's yank shares the system clipboard (TYTO-442, 2026-10-27)
+
+The editor half of the card: `@tyto/editor` shares vim's unnamed register with the system
+clipboard, as vim's `clipboard=unnamed` does. The desktop passes the clipboard in the card's
+next change; until a host calls `setVimSystemClipboard(port)` nothing is read or written.
+
+1. **The clipboard is a port.** `SystemClipboard` is `readText()` and `writeText(text)`, both
+   promises, and `setVimSystemClipboard(port | undefined)` sets it for every editor of the
+   window, as `setVimYankFlash` switches the flash. Undefined, the default, switches the
+   sharing off and forgets the last text seen.
+
+2. **Outward, only an unnamed yank writes.** `onVimYank` now says where a yank went
+   (`register`): a new register `0` is `unnamed` (`yiw`, `yy`, and `"*yiw`, since `*` is no
+   register to the engine and it treats the name as none), new text in `+` is `clipboard`,
+   anything else is `named`. `"ayiw` does not write, as in vim with `clipboard=unnamed`, and
+   `"+yiw` does not either: the engine writes `navigator.clipboard` itself on a `+` yank.
+   `dd`, `x`, `ciw` and `p` are not yanks and write nothing. The register name cannot be read
+   from the keys, because the engine reports a command done between `"` and `+`; it is read
+   from the registers. Measured in a jsdom suite with a stub port.
+
+3. **Inward, on editor focus, into `"` and `+`.** When the editor's content takes focus the
+   clipboard is read and, if it changed, put in the unnamed register and `+`; register `0`
+   is left alone. `p`, `P`, a count, `.`, visual `p`, `gr` and `grr` then paste it exactly as
+   they paste the same text set in the register directly (one suite case each, compared with
+   that). Reading on `p` instead was measured and dropped: the read is asynchronous, so the
+   paste lost its count, and `gr`, an operator that runs at once, could not wait for it.
+
+4. **"Changed" means it differs from the text Tyto last wrote or mirrored**, compared with
+   `\r\n` normalised to `\n`, because Windows returns `\r\n` for text written with `\n`.
+   Without that, Tyto's own `yy` came back at the next focus and overwrote a later `dd`; and
+   without remembering a mirrored text, the same outside copy overwrote a later `dd` at every
+   focus. An empty clipboard changes nothing. A read that a yank overtook (the read started,
+   then a yank, then the read resolved) is remembered and dropped, so the yank stays. A port
+   that rejects (an unfocused window rejects a read with `NotAllowedError`) or throws changes
+   nothing.
+
+5. **Linewise is "ends in a line break"**, as vim reads its `+` register: `L\n` copied outside
+   pastes as a line under the cursor.
+
+6. **The desktop will pass the renderer's `navigator.clipboard`.** Electron grants
+   `clipboard-read` to the renderer when no permission handler is set, which is the case
+   today. A future `session.setPermissionRequestHandler` must allow `clipboard-read` and
+   `clipboard-sanitized-write`, or this sharing stops with no error (both calls reject, and
+   rejections are dropped).
+
+Consequences:
+
+- A clipboard change made inside Tyto while the editor stays focused (a copy from another
+  input in the same window, without the editor losing focus) arrives at the next focus, not
+  at once.
+- `"+gr` reads `+`, which holds the clipboard after a focus mirrored it; `"+p` is the engine's
+  own and reads `navigator.clipboard` directly.
+- The suite never touches a real clipboard: the port is a stub and so is `navigator.clipboard`
+  for the engine's `"+y`. What the real window does is the desktop change's to measure.
