@@ -13,6 +13,8 @@ import {
   vimKeymapSet,
 } from './keymap.js';
 import { vimKeyReader } from './vim-key-reader.js';
+import { vimFindTracker } from './vim-sneak.js';
+import { vimYankFlash } from './vim-yank.js';
 
 /**
  * Vim mode (ADR 0006), wired so that it drives the same command registry everything else
@@ -218,6 +220,9 @@ export function vimMode(options: VimModeOptions = {}): Extension {
     vim({ status: options.status ?? true }),
     // After `vim()`, so the adapter it builds exists when this plugin is constructed.
     ...(options.onStatus === undefined ? [] : [vimStatusPlugin(options.onStatus)]),
+    // After `vim()` too: both follow the engine's events (sneak's `;`, the yank flash).
+    vimFindTracker,
+    vimYankFlash,
     keymapExtension(options.keymap ?? vimKeymapSet),
   ];
 }

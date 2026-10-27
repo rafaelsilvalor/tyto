@@ -199,6 +199,14 @@ export {
   setVimContributions,
 } from './vim-contributions.js';
 
+export {
+  type VimYank,
+  type VimYankListener,
+  YANK_FLASH_MS,
+  onVimYank,
+  setVimYankFlash,
+} from './vim-yank.js';
+
 export { template, templateLanguage } from './template-language.js';
 
 export { json, jsonLanguage } from './json-language.js';
