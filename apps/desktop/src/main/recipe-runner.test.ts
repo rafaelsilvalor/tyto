@@ -275,8 +275,9 @@ describe('running a recipe cell by cell', () => {
     expect(newer.cells[1]?.table?.rows.map((row) => row.key)).toEqual(['T-2']);
     expect(calls).toMatchObject({ pull: 2, tag: 2 });
 
-    // The newer run's cells are what is kept: its text again runs nothing.
-    await run(text('open'));
+    // The newer run's cells are what is kept: its text again, saved, runs nothing. Had the older
+    // run's been kept, its `where` would differ and it and `acme.tag` would run again.
+    await run(text('open'), { saved: true });
     expect(calls).toMatchObject({ pull: 2, tag: 2 });
   });
 
