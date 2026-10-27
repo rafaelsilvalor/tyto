@@ -1,5 +1,6 @@
 import type { LoadedWorkspace } from '@tyto/io';
 
+import type { SectionOverrides } from './options.js';
 import type { TaskSources } from './render-task.js';
 
 /**
@@ -26,14 +27,33 @@ export const WATCH_NEVER_FETCHES =
 export function renderSources(
   home: string | undefined,
   workspace: LoadedWorkspace | undefined,
+  typed: SectionOverrides = {},
 ): TaskSources | undefined {
   if (home === undefined) return undefined;
-  if (workspace === undefined) return { home, fetches: true };
-  return {
-    home,
-    fetches: workspace.trust === 'trusted',
-    sections: workspace.project.sections,
-  };
+  const sections = projectSections(workspace, typed);
+  const handed = Object.keys(sections).length === 0 ? {} : { sections };
+  if (workspace === undefined) return { home, fetches: true, ...handed };
+  return { home, fetches: workspace.trust === 'trusted', ...handed };
+}
+
+/**
+ * Each plugin's section for this run, by plugin id (ADR 0147): the workspace's, which a
+ * restricted folder has already withheld, with the keys typed in `--section` shallow-merged
+ * over its plugin's. **Typed keys apply in a restricted folder too**: the person typing the
+ * command is the approval, as `tyto trust add` takes it, and they lift nothing the file says.
+ * A file section that is not an object is replaced by the typed keys.
+ */
+export function projectSections(
+  workspace: LoadedWorkspace | undefined,
+  typed: SectionOverrides,
+): Readonly<Record<string, unknown>> {
+  const sections: Record<string, unknown> = { ...workspace?.project.sections };
+  for (const [plugin, keys] of Object.entries(typed)) {
+    const file = sections[plugin];
+    const base = typeof file === 'object' && file !== null && !Array.isArray(file) ? file : {};
+    sections[plugin] = { ...base, ...keys };
+  }
+  return sections;
 }
 
 /** Spread into `RenderTaskOptions`, which under `exactOptionalPropertyTypes` takes no `undefined`. */

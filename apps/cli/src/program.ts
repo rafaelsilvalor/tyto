@@ -2,7 +2,13 @@ import { Command, CommanderError } from 'commander';
 
 import type { CliEnvironment } from './environment.js';
 import { EXIT_DIAGNOSTICS, EXIT_INTERNAL, EXIT_OK, type ExitCode } from './exit.js';
-import { parseFormatList, parsePositiveInteger, parseQuality, parseTypes } from './options.js';
+import {
+  parseFormatList,
+  parsePositiveInteger,
+  parseQuality,
+  parseSection,
+  parseTypes,
+} from './options.js';
 import { pluginNewCommand } from './plugin-new.js';
 import { pluginInstallCommand, pluginListCommand, pluginStateCommand } from './plugin.js';
 import { renderCommand } from './render.js';
@@ -138,6 +144,13 @@ export function createProgram(environment: CliEnvironment, captured: Captured): 
       '--trust',
       "trust the brief's workspace folder and its work profile for this run only; never written to trust.json",
       false,
+    )
+    // Repeatable, one key each, rather than a JSON blob: a shell quotes `jira.site=acme.example`
+    // the same everywhere, and a script adds a key without rebuilding an object (ADR 0147).
+    .option(
+      '--section <plugin.key=value>',
+      "set a key of a plugin's project section for this run, over .tyto/project.json; repeatable, value read as JSON or else as text",
+      parseSection,
     );
 
   withOutputOptions(withProjectOptions(render)).action(async (brief: string) => {

@@ -81,6 +81,48 @@ export function parseQuality(value: string): number {
   return parsed;
 }
 
+/**
+ * What `--section` collects: keys typed for a plugin's section of the project, by plugin id
+ * (ADR 0147). Shallow-merged over the file's section for that plugin by `projectSections`.
+ */
+export type SectionOverrides = Readonly<Record<string, Readonly<Record<string, unknown>>>>;
+
+/**
+ * `<plugin>.<key>=<value>`. A plugin id is a manifest name, which never holds a dot, so the
+ * first dot ends it; the first `=` ends the key, so a value may hold either.
+ */
+const SECTION_FLAG = /^([a-z0-9][a-z0-9-]*)\.([^=]+)=(.*)$/su;
+
+/**
+ * The value as JSON when it reads as JSON — `5`, `true`, `["a","b"]`, `{"id":1}` — and as the
+ * text typed otherwise, so `--section jira.site=acme.example` needs no quotes inside quotes. A
+ * number meant as text is written as a JSON string: `--section jira.board='"42"'`.
+ */
+function sectionValue(text: string): unknown {
+  try {
+    return JSON.parse(text) as unknown;
+  } catch {
+    return text;
+  }
+}
+
+/**
+ * Commander's collector for the repeatable `--section <plugin>.<key>=<value>`: the same key
+ * typed twice keeps the last, as a later flag wins on every command line.
+ */
+export function parseSection(value: string, previous?: SectionOverrides): SectionOverrides {
+  const match = SECTION_FLAG.exec(value);
+  if (match === null) {
+    throw new InvalidArgumentError(
+      `'${value}' is not <plugin>.<key>=<value>: a plugin id in lowercase letters, digits and ` +
+        'hyphens, a dot, a key, an equals sign and the value, such as jira.site=acme.example.',
+    );
+  }
+  const [, plugin = '', key = '', text = ''] = match;
+  const known = previous ?? {};
+  return { ...known, [plugin]: { ...known[plugin], [key]: sectionValue(text) } };
+}
+
 export interface OutputOptions {
   readonly types: readonly OutputKind[];
   readonly scale?: number;

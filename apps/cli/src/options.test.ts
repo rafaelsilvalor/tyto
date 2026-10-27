@@ -8,9 +8,51 @@ import {
   outputRequests,
   parseFormatList,
   parseQuality,
+  parseSection,
   parseTypes,
   unavailableTypes,
 } from './options.js';
+import { run } from './program.js';
+
+describe('--section (ADR 0147)', () => {
+  it('reads <plugin>.<key>=<value>, the value as JSON or else as the text typed', () => {
+    let typed = parseSection('jira.site=acme.example');
+    typed = parseSection('jira.limit=50', typed);
+    typed = parseSection('jira.fields=["summary","status"]', typed);
+    typed = parseSection('jira.board="42"', typed);
+    typed = parseSection('google.sheet=1AbC=x', typed);
+    expect(typed).toEqual({
+      jira: { site: 'acme.example', limit: 50, fields: ['summary', 'status'], board: '42' },
+      google: { sheet: '1AbC=x' },
+    });
+  });
+
+  it('keeps the last value of a key typed twice', () => {
+    expect(parseSection('jira.site=b', parseSection('jira.site=a'))).toEqual({
+      jira: { site: 'b' },
+    });
+  });
+
+  it('refuses a flag that is not <plugin>.<key>=<value>', () => {
+    for (const value of ['jira', 'jira.site', 'jira=x', '.site=x', 'Jira.site=x', 'jira.=x']) {
+      expect(() => parseSection(value), value).toThrow(InvalidArgumentError);
+    }
+  });
+
+  it('is a usage error on the command line, as every other malformed flag is', async () => {
+    const errors: string[] = [];
+    const code = await run(['render', 'missing.brief', '--section', 'jira'], {
+      console: { out: () => undefined, err: (text) => errors.push(text) },
+      version: '0.0.0-test',
+      cwd: process.cwd(),
+      rasterizer: () => {
+        throw new Error('no run starts');
+      },
+    });
+    expect(code).toBe(1);
+    expect(errors.join('')).toContain("'jira' is not <plugin>.<key>=<value>");
+  });
+});
 
 function exporter(id: string, kinds: readonly string[], rasterized: boolean): Exporter {
   return { id, mime: `x/${id}`, extension: id, kinds, rasterized, exportFrame: () => ok('') };
