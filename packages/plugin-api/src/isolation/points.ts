@@ -234,6 +234,12 @@ const fontFaceSchema = z.strictObject({
  */
 const sourceRequestSchema = z.strictObject({ section: z.unknown().optional() });
 
+/**
+ * The same section on every recipe verb call (ADR 0147): the verb's own plugin's, or absent.
+ * Opaque here as on a source call, because it is the plugin's data and the plugin checks it.
+ */
+const verbSection = { section: z.unknown().optional() };
+
 /** Bytes under a ceiling, so an answer over it is refused before anything caches it. */
 function boundedBytes(max: number): z.ZodType<Uint8Array> {
   return z
@@ -519,7 +525,11 @@ export const ISOLATED_POINTS: Readonly<Partial<Record<ContributionPoint, PointSp
     callables: {
       page: {
         args: z.tuple([
-          z.strictObject({ arguments: argumentValuesSchema, cursor: z.string().optional() }),
+          z.strictObject({
+            arguments: argumentValuesSchema,
+            cursor: z.string().optional(),
+            ...verbSection,
+          }),
         ]),
         send: ([request]) => [request],
         result: resultSchema(
@@ -533,7 +543,9 @@ export const ISOLATED_POINTS: Readonly<Partial<Record<ContributionPoint, PointSp
         optional: true,
       },
       transform: {
-        args: z.tuple([z.strictObject({ arguments: argumentValuesSchema, table: tableSchema })]),
+        args: z.tuple([
+          z.strictObject({ arguments: argumentValuesSchema, table: tableSchema, ...verbSection }),
+        ]),
         send: ([request]) => [request],
         result: resultSchema(tableSchema),
         failed: (problems) => err(problems),
@@ -542,7 +554,9 @@ export const ISOLATED_POINTS: Readonly<Partial<Record<ContributionPoint, PointSp
       // An action's or a sink's. Its writes and its count are held to the verb's declaration
       // by `checkPlan` on the host, which says so in a person's words.
       plan: {
-        args: z.tuple([z.strictObject({ arguments: argumentValuesSchema, table: tableSchema })]),
+        args: z.tuple([
+          z.strictObject({ arguments: argumentValuesSchema, table: tableSchema, ...verbSection }),
+        ]),
         send: ([request]) => [request],
         result: resultSchema(planSchema),
         failed: (problems) => err(problems),

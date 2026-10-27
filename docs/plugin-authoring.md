@@ -288,8 +288,19 @@ into, or activation is refused. The shapes are in `docs/plugin-api.md`:
   `run`, and the command bar does not list it. TYTO-261 makes it run; ADR 0079 says why user
   scripts wait for that.
 - `source`, `sink`, `rasterizer` — **refused for an installed plugin** today.
-- `configuration` — a setting in the desktop app's `settings.json` (ADR 0073). Declared with a
-  Zod schema, which does not cross to an installed plugin's process, so **refused there too**.
+- `configuration` — a setting in the desktop app's `settings.json` (ADR 0073). An installed
+  plugin declares it as a `form`, which crosses as data (ADR 0145); a Zod schema does not.
+- `recipe-verb`, `asset-source`, `font-source` — each call carries `section`: your plugin's own
+  key under `plugins` in the folder's `.tyto/project.json`, merged with the work profile (ADR
+  0117, ADR 0147). It is where a folder says which site or sheet it works with, and it wins
+  over your settings, which are the person's and the same in every folder. **It is absent in
+  a restricted folder**, and you never see another plugin's. Tyto does not check it, so answer
+  your own diagnostic when it is wrong. Never put a secret there: the file is shared as text,
+  and a token is a declared credential (ADR 0134). To try a value without editing the file:
+
+  ```sh
+  tyto render poster.brief --section my-plugin.site=acme.example --section my-plugin.limit=50
+  ```
 
 ## Ship a theme
 

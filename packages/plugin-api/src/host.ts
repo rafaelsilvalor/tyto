@@ -555,6 +555,9 @@ export function createPluginHost(options: PluginHostOptions = {}): InProcessHost
     fontSources: () =>
       fontSources.owned().map((entry) => ({ plugin: entry.plugin, source: entry.value })),
     recipeVerbs: () => recipeVerbs.list(),
+    // With the plugin, as the sources are, so a verb is handed its own plugin's section.
+    ownedRecipeVerbs: () =>
+      recipeVerbs.owned().map((entry) => ({ plugin: entry.plugin, verb: entry.value })),
     recipeDerivations: () => recipeDerivations.list(),
   };
 

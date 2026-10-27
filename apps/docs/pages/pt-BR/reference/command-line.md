@@ -30,6 +30,7 @@ tyto render [options] <brief>
 | `--folder` | deliver into &lt;out>/&lt;brief-name>/ — artwork at the top, brief and result.json in editaveis/ |  |
 | `--assets <dir>` | what relative asset paths resolve against (default: assets/ beside the brief, else the brief's folder) |  |
 | `--trust` | trust the brief's workspace folder and its work profile for this run only; never written to trust.json |  |
+| `--section <plugin.key=value>` | set a key of a plugin's project section for this run, over .tyto/project.json; repeatable, value read as JSON or else as text |  |
 | `--templates <dir>` | folder holding one subfolder per template | `"templates"` |
 | `--formats-file <path>` | the project's formats.yaml; the built-in sizes when the default is not there | `"formats.yaml"` |
 | `-t, --template <name>` | template to use when the brief's frontmatter names none |  |

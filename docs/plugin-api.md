@@ -126,7 +126,7 @@ host.registerConfiguration({
 });
 ```
 
-The host turns the form into a Zod schema (`settingSchemaOf`) and the setting goes on exactly as one declared with a schema: the same per-key tolerance, the same ranged `W_SETTING_INVALID`, and a default the form refuses is `E_PLUGIN_ACTIVATE`. A list form checks its entries one at a time, as `entries` does. A form that names a keyword of another type, crosses its bounds or carries a `pattern` that `tyto-pattern/1` refuses (ADR 0136: flags `iu`, at most 512 characters, no unbounded matching) is the plugin's bug and refuses activation. There is no object form and no secret field: a setting is plain text in `settings.json`, and a secret is a declared credential (ADR 0134). The plugin's process receives its slice in a `configure` message whenever its host is configured, and `host.config` answers the newest; a plugin that wants to know listens to the `configured` event. **The CLI never reads `settings.json`**: there an installed plugin's settings take their defaults; values a workspace chooses belong in its `project.json` section (TYTO-428).
+The host turns the form into a Zod schema (`settingSchemaOf`) and the setting goes on exactly as one declared with a schema: the same per-key tolerance, the same ranged `W_SETTING_INVALID`, and a default the form refuses is `E_PLUGIN_ACTIVATE`. A list form checks its entries one at a time, as `entries` does. A form that names a keyword of another type, crosses its bounds or carries a `pattern` that `tyto-pattern/1` refuses (ADR 0136: flags `iu`, at most 512 characters, no unbounded matching) is the plugin's bug and refuses activation. There is no object form and no secret field: a setting is plain text in `settings.json`, and a secret is a declared credential (ADR 0134). The plugin's process receives its slice in a `configure` message whenever its host is configured, and `host.config` answers the newest; a plugin that wants to know listens to the `configured` event. **The CLI never reads `settings.json`**: there an installed plugin's settings take their defaults; values a workspace chooses belong in its `project.json` section, which rides on each source and recipe verb call (ADR 0147).
 
 ### `exporter`, in full
 
@@ -395,10 +395,11 @@ interface RecipeVerbContribution {
   page?(request: {
     arguments;
     cursor?: string;
+    section?: unknown; // this plugin's project section (ADR 0147)
   }): Result<{ table; cursor?: string; truncated?: boolean }>;
-  transform?(request: { arguments; table }): Result<Table>;
+  transform?(request: { arguments; table; section? }): Result<Table>;
   writes?: string[]; // an action's or a sink's: a subset of the manifest's 'writes'
-  plan?(request: { arguments; table }): Result<Plan>; // an action's or a sink's
+  plan?(request: { arguments; table; section? }): Result<Plan>; // an action's or a sink's
 }
 interface Plan {
   target: string;
@@ -426,7 +427,22 @@ A repeated cursor, a page reported `truncated`, or a page past a ceiling — 8 M
 per page, 100,000 rows and 1,000 pages per table, provisional until TYTO-386 — is
 `E_RECIPE_SOURCE` and never a partial table. A plugin reports its own failure as
 `E_RECIPE_VERB`, and every diagnostic it returns is placed at its cell. The composition root
-hands the runner `recipeRegistriesOf(registry)`, which reads the contributions per lookup.
+hands the runner `recipeRegistriesOf(registry, { sectionOf })`, which reads the contributions
+per lookup.
+
+**Every call carries the plugin's own project section** (ADR 0147): `section` on `page`,
+`transform` and `plan` is the plugin's section of the folder's `.tyto/project.json`, resolved
+with the work profile — the same value an `asset-source` gets. The composition root's
+`sectionOf(plugin)` is asked on every call, so a folder trusted or edited between two runs is
+what the next call reads, and a verb is handed its own plugin's section and never another's.
+**Absent, not `{}`, when the folder has none or is restricted.** The host does not check it: it
+is the plugin's data, and a plugin that finds it wrong answers its own diagnostic, which is
+placed at the verb. `host.config` stays the person's settings (`settings.json` in the window,
+the declared defaults in the CLI), process-wide and the same in every folder; treat the
+section as what this folder chooses over them. **Never a secret**: the file is plain text a
+team shares, and a token is a declared credential (ADR 0134).
+`tyto render --section <plugin>.<key>=<value>` sets a key for one run over the file's, and applies in a restricted
+folder too. Runnable commands (TYTO-261) will carry the same field.
 
 **An action or a sink plans and writes nothing** (ADR 0129). It declares `writes`, the kinds of
 write its plans may hold, a subset of the manifest's `writes`, or the plugin is refused at load;
@@ -630,7 +646,7 @@ Six optional ports on `HostCapabilities` answer them: `cacheGet`, `cachePut`, `c
 
 ```
 host (CLI process)                               guest (plugin's process)
-  connectIsolatedPlugin ◀── hello {protocol: 7, sandbox} ── runGuest
+  connectIsolatedPlugin ◀── hello {protocol: 8, sandbox} ── runGuest
                            canary denied? else E_PLUGIN_SANDBOX
                         ── activate {config} ──▶   plugin.activate(guestHost)
                         ◀── activated {registrations: data + {$call: n}}

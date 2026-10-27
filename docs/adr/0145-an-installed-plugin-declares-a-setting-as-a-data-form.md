@@ -77,6 +77,11 @@ could validate would never have reached the plugin's code.
    connector's base URL for one company — belong in the plugin's section of that workspace's
    `.tyto/project.json` (ADR 0127 decision 4), read as a list of entries `resolveSettings`
    already takes. That is TYTO-428; nothing here blocks it.
+   _Amended 2026-10-27 (TYTO-428, ADR 0147):_ the section does not go through
+   `resolveSettings` and `configure`. `configure` is process-wide and the last one wins, so a
+   folder's values would leak into the next folder's run; a form has no object; and sources
+   already get the section raw. It rides on each source and recipe verb call instead, as
+   `section`, and `tyto render --section` types keys over it.
 
 ## Consequences
 
@@ -100,8 +105,12 @@ could validate would never have reached the plugin's code.
   outline, and the log of the file's problems at launch, wait for the installed plugins to
   start, and the file is read again then. So a plugin's key is unknown only when its plugin is
   not running — and then the warning is `W_SETTING_PLUGIN_NOT_RUNNING`, which names the plugin,
-  for one installed but disabled, failed or refused.
+  for one installed but disabled, failed or refused. Since #200 the desktop's export also waits
+  for the installed plugins to be configured before it runs, so an export started at launch
+  does not run on their defaults.
 - A pattern in a form is case-insensitive. A JSON Schema written for another tool and copied in
   may accept more than its author meant; the ADR says so rather than adding a second dialect.
 - Out: object forms, `minItems`/`maxItems`, `format`s other than `uri`, and per-workspace values
   (TYTO-428).
+  _Amended 2026-10-27:_ per-workspace values are ADR 0147's — the plugin's project section on
+  each call, not a setting.

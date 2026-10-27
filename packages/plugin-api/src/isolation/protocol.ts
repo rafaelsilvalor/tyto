@@ -24,9 +24,11 @@ import { z } from 'zod';
  * requests a host on 4 would refuse as an unknown capability (ADR 0134); 6 since a plugin
  * has a private cache and the workspace's files, six requests a host on 5 would refuse the
  * same way (ADR 0138); 7 since the host sends a plugin its settings again whenever they change,
- * a `configure` message a guest on 6 would not read (ADR 0145).
+ * a `configure` message a guest on 6 would not read (ADR 0145); 8 since every recipe verb call
+ * carries the plugin's project section, a field the strict schemas of a guest on 7 would refuse
+ * (ADR 0147).
  */
-export const RPC_PROTOCOL_VERSION = 7;
+export const RPC_PROTOCOL_VERSION = 8;
 
 const protocol = z.literal(RPC_PROTOCOL_VERSION);
 

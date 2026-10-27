@@ -42,14 +42,29 @@ import type { Contribution } from './contributions.js';
 export const RECIPE_VERB_KINDS = ['source', 'transform', 'action', 'sink'] as const;
 export type RecipeVerbKind = (typeof RECIPE_VERB_KINDS)[number];
 
+/**
+ * What every verb call carries besides its own input (ADR 0147).
+ *
+ * `section` is the verb's plugin's own section of the folder's `.tyto/project.json`, resolved
+ * with its work profile (ADR 0112, ADR 0114), as a `SourceRequest` hands a source: where a
+ * connector learns which site or sheet the folder works with. It rides on every call rather
+ * than on activation, because a plugin's process outlives the folder that was open when it
+ * started. **Absent when the folder has none or withheld it** (a restricted folder, ADR 0111),
+ * and never another plugin's section. The host does not check it: it is the plugin's data,
+ * and the plugin answers its own diagnostics about it.
+ */
+export interface VerbRequest {
+  readonly section?: unknown;
+}
+
 /** What `page` is handed: the step's arguments, checked, and where the last page left off. */
-export interface PageRequest {
+export interface PageRequest extends VerbRequest {
   readonly arguments: ArgumentValues;
   /** Absent for the first page. */
   readonly cursor?: string;
 }
 
-export interface TransformRequest {
+export interface TransformRequest extends VerbRequest {
   readonly arguments: ArgumentValues;
   readonly table: Table;
 }
@@ -192,10 +207,29 @@ export interface RecipeRegistries {
   readonly derivations: DerivationRegistry;
 }
 
+/** A recipe verb with the plugin that registered it, which names the section it is handed. */
+export interface OwnedRecipeVerb {
+  readonly plugin: string;
+  readonly verb: RecipeVerbContribution;
+}
+
 /** The two points as the host's registry holds them. `PluginRegistry` is one. */
 export interface RecipeContributions {
   recipeVerbs(): readonly RecipeVerbContribution[];
+  ownedRecipeVerbs(): readonly OwnedRecipeVerb[];
   recipeDerivations(): readonly RecipeDerivationContribution[];
+}
+
+export interface RecipeRegistryOptions {
+  /**
+   * A plugin's own section of the open folder's project, by plugin id (ADR 0147), or
+   * `undefined` when it has none or the folder withheld it. **Asked on every verb call**, so a
+   * folder trusted or edited between two runs is what the next call reads; the caller answers
+   * from the folder the recipe belongs to.
+   */
+  readonly sectionOf?: (plugin: string) => unknown;
+  readonly limits?: PageLimits;
+  readonly planLimits?: PlanLimits;
 }
 
 /**
@@ -207,13 +241,15 @@ export interface RecipeContributions {
  */
 export function recipeRegistriesOf(
   contributions: RecipeContributions,
-  limits: PageLimits = PAGE_LIMITS,
-  planLimits: PlanLimits = PLAN_LIMITS,
+  options: RecipeRegistryOptions = {},
 ): RecipeRegistries {
+  const limits = options.limits ?? PAGE_LIMITS;
+  const planLimits = options.planLimits ?? PLAN_LIMITS;
+  const sectionOf = options.sectionOf ?? (() => undefined);
   const ownVerbs = createVerbRegistry();
   const ownDerivations = createDerivationRegistry();
   const contributedVerb = (name: string) =>
-    contributions.recipeVerbs().find((verb) => verb.id === name);
+    contributions.ownedRecipeVerbs().find((owned) => owned.verb.id === name);
   const contributedDerivation = (name: string) =>
     contributions.recipeDerivations().find((derivation) => derivation.id === name);
 
@@ -224,7 +260,9 @@ export function recipeRegistriesOf(
         const own = ownVerbs.get(name);
         if (own !== undefined) return own;
         const contributed = contributedVerb(name);
-        return contributed === undefined ? undefined : verbOf(contributed, limits, planLimits);
+        return contributed === undefined
+          ? undefined
+          : verbOf(contributed.verb, () => sectionOf(contributed.plugin), limits, planLimits);
       },
       names: () => namesOf(ownVerbs.names(), contributions.recipeVerbs()),
     },
@@ -245,8 +283,21 @@ function namesOf(own: readonly string[], contributed: readonly Contribution[]): 
   return [...new Set([...own, ...contributed.map((entry) => entry.id)])].sort();
 }
 
+/**
+ * The section rides only when there is one, so a verb in a restricted folder is handed no key
+ * at all rather than an empty object it could mistake for a folder that chose nothing.
+ */
+function withSection(section: unknown): VerbRequest {
+  return section === undefined ? {} : { section };
+}
+
+/**
+ * `sectionOfOwner` is bound to the plugin that registered the verb, so the verb is handed its
+ * own plugin's section and no other: this is the per-plugin filter of ADR 0147.
+ */
 function verbOf(
   contribution: RecipeVerbContribution,
+  sectionOfOwner: () => unknown,
   limits: PageLimits,
   planLimits: PlanLimits,
 ): Verb {
@@ -260,12 +311,11 @@ function verbOf(
         const fetched = await pagedSource(
           contribution.id,
           async (cursor) =>
-            page.call(
-              contribution,
-              cursor === undefined
-                ? { arguments: values.value }
-                : { arguments: values.value, cursor },
-            ),
+            page.call(contribution, {
+              arguments: values.value,
+              ...(cursor === undefined ? {} : { cursor }),
+              ...withSection(sectionOfOwner()),
+            }),
           limits,
         );
         return placed(
@@ -282,7 +332,11 @@ function verbOf(
           ),
         ]);
       }
-      const request = { arguments: values.value, table: context.table };
+      const request = {
+        arguments: values.value,
+        table: context.table,
+        ...withSection(sectionOfOwner()),
+      };
       if (contribution.kind === 'transform' && transform !== undefined) {
         const answer = await transform.call(contribution, request);
         return placed(context, checkedAnswer(answer, contribution.id, limits));

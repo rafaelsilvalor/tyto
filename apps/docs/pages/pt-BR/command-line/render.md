@@ -170,5 +170,6 @@ O que ainda deu para desenhar é gravado, como o `grid-01.png` aqui; então conf
 - `--template` diz qual template usar num brief cujo frontmatter não cita nenhum; um brief que cita ganha.
 - `--formats` diz quais tamanhos fazer. Num brief com linha `formats:`, escolhe alguns dos tamanhos dessa linha; um tamanho que a linha não tem dá `E_FORMAT_NOT_IN_BRIEF`. Num brief sem a linha, é a lista de tamanhos.
 - `--assets` diz onde procurar os caminhos de imagem do brief; por padrão, numa pasta `assets/` ao lado do brief, senão na própria pasta do brief.
+- `--section <plugin>.<chave>=<valor>` define, só nesta execução, uma chave da entrada de um plugin em `plugins` no `.tyto/project.json`, por cima do que o arquivo diz, sem mexer no arquivo. Repita para mais chaves. O valor é lido como JSON quando é JSON — `50`, `true`, `["a","b"]` — e, senão, como o texto digitado; escreva `'"42"'` para o texto `42`. Vale também numa pasta sem confiança, em que as entradas de plugin do próprio arquivo continuam retidas: você digitou, então você aprovou. Uma opção fora do formato `<plugin>.<chave>=<valor>` para a execução antes de começar.
 
 O [`tyto render`](../reference/command-line.md#tyto-render) da Referência lista cada opção com o valor padrão.

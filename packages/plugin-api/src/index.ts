@@ -138,15 +138,18 @@ export {
 } from './host.js';
 
 export {
+  type OwnedRecipeVerb,
   type PageRequest,
   type PlanRequest,
   type RecipeContributions,
   type RecipeDeclarations,
   type RecipeDerivationContribution,
   type RecipeRegistries,
+  type RecipeRegistryOptions,
   type RecipeVerbContribution,
   type RecipeVerbKind,
   type TransformRequest,
+  type VerbRequest,
   RECIPE_VERB_KINDS,
   recipeRegistriesOf,
 } from './recipes.js';

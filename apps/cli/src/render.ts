@@ -5,7 +5,13 @@ import type { Diagnostics } from '@tyto/core';
 
 import type { CliEnvironment } from './environment.js';
 import { EXIT_DIAGNOSTICS, EXIT_OK, type ExitCode } from './exit.js';
-import { type OutputKind, needsRasterizer, outputRequests, unavailableTypes } from './options.js';
+import {
+  type OutputKind,
+  type SectionOverrides,
+  needsRasterizer,
+  outputRequests,
+  unavailableTypes,
+} from './options.js';
 import {
   type LoadedPlugins,
   loadInstalledPlugins,
@@ -70,6 +76,11 @@ export interface RenderCommandOptions {
   readonly json: boolean;
   /** `--no-google-fonts` makes this false; on by default (ADR 0120). */
   readonly googleFonts?: boolean;
+  /**
+   * `--section <plugin>.<key>=<value>`, repeated: keys over the plugin's section of the
+   * project for this run, applied in a restricted folder too (ADR 0147).
+   */
+  readonly section?: SectionOverrides;
 }
 
 /**
@@ -220,7 +231,7 @@ export async function renderCommand(
         ...(rasterizer === undefined ? {} : { rasterizer }),
         ...(options.concurrency === undefined ? {} : { concurrency: options.concurrency }),
         ...(project === undefined ? {} : { fontDirectories: project.fonts }),
-        ...optionalSources(renderSources(environment.home, workspace?.loaded)),
+        ...optionalSources(renderSources(environment.home, workspace?.loaded, options.section)),
         ...googleFontsOption(options.googleFonts, environment.variables),
       },
       [...projectDiagnostics, ...context.diagnostics],

@@ -403,8 +403,9 @@ describe('what an isolated plugin cannot do', () => {
     );
   });
 
-  // A bootstrap left behind by an upgrade: 6 is the number before the host sent a plugin its
-  // settings again (ADR 0145), and it is refused by name rather than by a schema complaint.
+  // A bootstrap left behind by an upgrade: 7 is the number before a recipe verb call carried
+  // the plugin's project section (ADR 0147), and it is refused by name rather than by a schema
+  // complaint at the first call that carries one.
   it('speaks another protocol', async () => {
     const pair = channelPair(() => undefined);
     const connecting = connectIsolatedPlugin({
@@ -416,7 +417,7 @@ describe('what an isolated plugin cannot do', () => {
     pair.inject({ type: 'hello', protocol: RPC_PROTOCOL_VERSION - 1, sandbox: CONFINED });
     const connected = await connecting;
     expect(connected.ok ? '' : connected.error[0]?.message).toBe(
-      "Plugin 'texto' failed to activate: its process speaks protocol 6 and this host speaks 7.",
+      "Plugin 'texto' failed to activate: its process speaks protocol 7 and this host speaks 8.",
     );
   });
 
@@ -1643,6 +1644,15 @@ describe('isolated recipe verbs and derivations (TYTO-376, ADR 0135)', () => {
 
   /** A plugin in the `demo` namespace, isolated with a 200 ms deadline per call. */
   async function recipeIn(activate: (host: PluginHost) => void, ...lines: string[]) {
+    return recipeWith({}, activate, ...lines);
+  }
+
+  /** As {@link recipeIn}, with each plugin's project section by id (ADR 0147). */
+  async function recipeWith(
+    sections: Readonly<Record<string, unknown>>,
+    activate: (host: PluginHost) => void,
+    ...lines: string[]
+  ) {
     const { connected } = await isolate(activate, {
       contributes: ['recipe-verb', 'recipe-derivation'],
       namespace: 'demo',
@@ -1656,7 +1666,7 @@ describe('isolated recipe verbs and derivations (TYTO-376, ADR 0135)', () => {
     const parsed = parseRecipe(['recipe test', ...lines].join('\n'));
     if (!parsed.ok) throw new Error('the recipe must parse');
     const result = await runRecipe(parsed.value, {
-      ...recipeRegistriesOf(host.registry),
+      ...recipeRegistriesOf(host.registry, { sectionOf: (plugin) => sections[plugin] }),
       resolveRecipe: () => Promise.resolve({ ok: false, error: [] }),
     });
     if (!result.ok) throw new Error('the run must start');
@@ -1726,6 +1736,79 @@ describe('isolated recipe verbs and derivations (TYTO-376, ADR 0135)', () => {
       { number: 1, tag: 'ready', double: 2 },
       { number: 2, tag: 'ready', double: 4 },
       { number: 3, tag: 'ready', double: 6 },
+    ]);
+  });
+
+  /** A source, a transform and an action that each write down what their call carried. */
+  const recording = (heard: unknown[]) => (host: PluginHost) => {
+    const note = (verb: string, request: object) =>
+      heard.push([verb, 'section' in request, (request as { section?: unknown }).section]);
+    host.registerRecipeVerb({
+      id: 'demo.pull',
+      kind: 'source',
+      arguments: [],
+      page: (request) => {
+        note('page', request);
+        return ok({ table: { columns: COLUMNS, rows: [rowOf(1)] } });
+      },
+    });
+    host.registerRecipeVerb({
+      id: 'demo.tag',
+      kind: 'transform',
+      arguments: [],
+      transform: (request) => {
+        note('transform', request);
+        return ok(request.table);
+      },
+    });
+    host.registerRecipeVerb({
+      id: 'demo.mark',
+      kind: 'action',
+      arguments: [],
+      writes: ['mark'],
+      plan: (request) => {
+        note('plan', request);
+        const operations = request.table.rows.map((row) => ({
+          write: 'mark',
+          rowKey: row.key,
+          description: `Mark ${row.key}`,
+        }));
+        return ok({ target: 'demo items', operations, count: operations.length });
+      },
+    });
+  };
+
+  it("hands every kind of verb its own plugin's project section across the wire (ADR 0147)", async () => {
+    const heard: unknown[] = [];
+    const { problem } = await recipeWith(
+      { texto: { site: 'acme.example' }, other: { site: 'rival.example' } },
+      recording(heard),
+      'demo.pull',
+      'demo.tag',
+      'demo.mark',
+    );
+    expect(problem).toBeUndefined();
+    expect(heard).toEqual([
+      ['page', true, { site: 'acme.example' }],
+      ['transform', true, { site: 'acme.example' }],
+      ['plan', true, { site: 'acme.example' }],
+    ]);
+  });
+
+  it('hands no section at all when its plugin has none, even if another plugin has one', async () => {
+    const heard: unknown[] = [];
+    const { problem } = await recipeWith(
+      { other: { site: 'rival.example' } },
+      recording(heard),
+      'demo.pull',
+      'demo.tag',
+      'demo.mark',
+    );
+    expect(problem).toBeUndefined();
+    expect(heard).toEqual([
+      ['page', false, undefined],
+      ['transform', false, undefined],
+      ['plan', false, undefined],
     ]);
   });
 

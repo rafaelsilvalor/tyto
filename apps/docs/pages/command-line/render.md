@@ -170,5 +170,6 @@ What could still be drawn is written, as `grid-01.png` was here, so check the ex
 - `--template` says which template to use for a brief whose frontmatter names none; a brief that names one wins.
 - `--formats` says which sizes to make. For a brief with a `formats:` line it picks some of the sizes on that line; a size the line does not have is `E_FORMAT_NOT_IN_BRIEF`. For a brief without the line it is the list of sizes.
 - `--assets` says where image paths in the brief are looked for; by default an `assets/` folder beside the brief, else the brief's own folder.
+- `--section <plugin>.<key>=<value>` sets one key of a plugin's own key under `plugins` in `.tyto/project.json` for this run, over what the file says, and leaves the file alone. Repeat it for more keys. The value is read as JSON when it is JSON — `50`, `true`, `["a","b"]` — and as the text you typed otherwise; write `'"42"'` for the text `42`. It counts in an untrusted folder too, where the file's own plugin keys stay withheld: you typed it, so you approved it. A flag that is not `<plugin>.<key>=<value>` stops the run before it starts.
 
 The Reference's [`tyto render`](../reference/command-line.md#tyto-render) lists every option with its default.

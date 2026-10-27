@@ -314,3 +314,78 @@ describe('an action or a sink in a recipe (ADR 0129, ADR 0135)', () => {
     );
   });
 });
+
+describe("a verb's project section (TYTO-428, ADR 0147)", () => {
+  /** Two plugins in two namespaces, each with a source that answers the section it was handed. */
+  function twoPlugins(): ReturnType<typeof createPluginHost> {
+    const host = createPluginHost();
+    for (const [id, namespace] of [
+      ['demo-plugin', 'demo'],
+      ['other-plugin', 'other'],
+    ] as const) {
+      const activated = host.tryActivate(
+        pluginOf(
+          id,
+          (plugin) =>
+            plugin.registerRecipeVerb({
+              id: `${namespace}.section`,
+              kind: 'source',
+              arguments: [],
+              page: (request) =>
+                ok({
+                  table: {
+                    columns: [{ name: 'section', type: 'text', origin: id }],
+                    rows: [
+                      {
+                        key: id,
+                        values: {
+                          section: 'section' in request ? JSON.stringify(request.section) : 'none',
+                        },
+                        provenance: { source: id, id, fetchedAt: '2026-10-27' },
+                      },
+                    ],
+                  },
+                }),
+            }),
+          { namespace },
+        ),
+      );
+      if (!activated.ok) throw new Error(activated.error[0]?.message);
+    }
+    return host;
+  }
+
+  const sectionSeen = async (registries: RecipeRegistries, verb: string) =>
+    (await run(registries, verb)).table?.rows[0]?.values['section'];
+
+  it("hands each verb its own plugin's section and never another's", async () => {
+    const sections: Record<string, unknown> = {
+      'demo-plugin': { site: 'acme.example' },
+      'other-plugin': { site: 'rival.example' },
+    };
+    const registries = recipeRegistriesOf(twoPlugins().registry, {
+      sectionOf: (plugin) => sections[plugin],
+    });
+    expect(await sectionSeen(registries, 'demo.section')).toBe('{"site":"acme.example"}');
+    expect(await sectionSeen(registries, 'other.section')).toBe('{"site":"rival.example"}');
+  });
+
+  it('hands no section key when the plugin has none, and none at all without sectionOf', async () => {
+    const host = twoPlugins();
+    const withheld = recipeRegistriesOf(host.registry, {
+      sectionOf: (plugin) => (plugin === 'other-plugin' ? { site: 'rival.example' } : undefined),
+    });
+    expect(await sectionSeen(withheld, 'demo.section')).toBe('none');
+    expect(await sectionSeen(recipeRegistriesOf(host.registry), 'other.section')).toBe('none');
+  });
+
+  it('reads the section on every call, so a folder trusted between two runs is what is read', async () => {
+    const folder: { section?: unknown } = {};
+    const registries = recipeRegistriesOf(twoPlugins().registry, {
+      sectionOf: () => folder.section,
+    });
+    expect(await sectionSeen(registries, 'demo.section')).toBe('none');
+    folder.section = { site: 'acme.example' };
+    expect(await sectionSeen(registries, 'demo.section')).toBe('{"site":"acme.example"}');
+  });
+});

@@ -86,8 +86,10 @@ export function activateInstalled(host: InProcessHost, loaded: LoadedPlugins): D
 /**
  * Hands every declared setting its default (ADR 0145). The CLI never reads the window's
  * `settings.json` — it is one machine's preference, and a render must not change with it — so an
- * installed plugin's setting reads its default here. Values a project chooses arrive later as a
- * list of entries from the workspace's own file (TYTO-428), which `resolveSettings` already takes.
+ * installed plugin's setting reads its default here. Values a project chooses never come through
+ * here: `configure` is process-wide and the last one wins, so a folder's values would leak into
+ * the next folder's run. They are the plugin's section of `.tyto/project.json`, handed on each
+ * source and recipe verb call (ADR 0147), with `tyto render --section` typed over it.
  */
 export function configureDefaults(host: InProcessHost): void {
   host.configure(resolveSettings(host.registry.configurations(), []).config);
