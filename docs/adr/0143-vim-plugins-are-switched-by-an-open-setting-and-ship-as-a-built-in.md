@@ -196,3 +196,64 @@ Consequences:
 - A count typed before `cx` reaches the motion after it: `2cxx` marks two lines.
 - Visual `[e` / `]e` (moving a selection's lines) is not here.
 - What the real window does with these keys is not measured here; jsdom covers the sequences.
+
+## Amendment — sneak, the yank flash, and built-ins that start off (TYTO-419 A2, 2026-10-27)
+
+Two more pieces in `@tyto/editor`, and the rule decision 2 left open. The desktop's table, ids
+and defaults come in the card's last change (PR B), which implements the rule below.
+
+1. **A built-in may default off.** The desktop's table of built-in vim plugins carries
+   `defaultOn: false` for one that should start off, and the window resolves
+   `value[id] ?? defaultOn ?? true`. Sneak is the first: on, it shadows vim's own `s` (`cl`)
+   and `S` (`cc`), which a person who never asked for sneak would lose. An installed plugin
+   cannot say so and stays on unless the setting says `false`, as decision 2 says.
+
+2. **A `vimPlugins` id may switch an editor effect instead of a contribution**, for built-ins
+   only. `highlightedYank` is one: a yank is not a key to map, so there is nothing for a
+   contribution to carry, and the id switches `setVimYankFlash(on)`, which is per window like
+   `setVimContributions`.
+
+3. **A yank is inferred from public surfaces, never `cm.state.vim`.** The engine signals no
+   yank and `y` is its own operator, which cannot be wrapped. It does signal
+   `vim-command-done`, **before** a command's motion and operator run, so that signal opens a
+   window that closes at the next one or at the end of the task. In it, the last selection that
+   covered text is the range the operator was handed (the engine selects it before calling any
+   operator), and a yank is a window that left the document unchanged while it changed the
+   registers read through `Vim.getRegisterController()`: a new register `0` object, or new text
+   or linewise in the unnamed register (`"ayiw` does not touch `0`). `dd`, `p`, `ysiw)` and
+   `cxiw` are not yanks: the first two change the document, the last two change no register.
+   Measured in a jsdom suite: `yiw`, `yy`, `3yy`, `y$`, `"ayiw`, `viwy`, `V2Gy` and `yii` each
+   flash exactly the text yanked, a linewise yank without its last line break. The detector is
+   its own piece, `onVimYank(view, listener)`, which reports the ranges, the text and linewise,
+   so TYTO-442 can write the system clipboard from it. The flash marks the ranges for 200 ms in
+   the `--tyto-selection` colour, as exchange's marked span; no new token.
+
+4. **Sneak is two normal-mode actions**, `sneak` (`s`, and `S` with `backward`) and
+   `sneak.repeat` (`;`, and `,` with `reverse`). `s` reads its two keys through
+   `vim-key-reader.ts`, which works after an action as it does after a motion; Escape cancels.
+   A count picks the Nth match, the match is case-sensitive, and nothing wraps. It is not an
+   edit, so `.` still repeats the last change. Normal mappings never match while an operator
+   is pending, so sneak's `s` does not meet surround's `s` in `operatorPending` or its visual
+   `S`. Visual and operator-pending sneak are not here.
+
+5. **`;` and `,` repeat the most recent find, sneak or `f`/`t`**, as vim-sneak does (Rafael,
+   2026-10-27). Which came last is tracked per view from `vim-keypress` and `vim-command-done`,
+   as `vimStatusPlugin` follows the engine: a command whose keys end in `f`, `F`, `t` or `T`
+   and a character is a find, unless a `"` before the letter makes it a register name. **The
+   `f`/`t` repeat is re-implemented** with the engine's arithmetic (the count, `,` reversing,
+   and a `t` repeat starting one character on so it does not stay put next to the match),
+   because the engine's last character search lives in its internals, and handing `;` back to
+   it by unmapping and re-sending the key from inside a handler would re-enter its dispatcher.
+   `d;` is still the engine's own `;`, which repeats `f`/`t` only.
+
+Consequences:
+
+- With sneak on, `;` and `,` in normal mode are sneak's; in visual mode and after an operator
+  they are the engine's, which knows `f`/`t` only.
+- The tracker and the engine each keep a last find; they agree in one view, and in two editors
+  the engine's is shared while sneak's is per view.
+- `"ayiw` twice on the same word changes no register the detector can see, so the second does
+  not flash; the engine's register objects are read, not watched.
+- `getRegister('0')` creates an empty register `0` when none exists, as the engine itself does.
+- What the real window shows of the flash and of sneak is not measured here; jsdom covers the
+  sequences, and `j` in visual line mode is not usable there (no layout).

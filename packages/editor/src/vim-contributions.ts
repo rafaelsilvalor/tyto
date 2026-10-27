@@ -8,6 +8,7 @@ import { VIM_COMMENT_OPERATIONS } from './vim-comment.js';
 import { VIM_EXCHANGE_OPERATIONS } from './vim-exchange.js';
 import { type VimPosition, offsetOf, positionOf } from './vim-positions.js';
 import { VIM_REPLACE_WITH_REGISTER_OPERATIONS } from './vim-replace-with-register.js';
+import { VIM_SNEAK_OPERATIONS } from './vim-sneak.js';
 import { VIM_SURROUND_OPERATIONS } from './vim-surround.js';
 import { BUILT_IN_VIM_OPERATIONS } from './vim-text-objects.js';
 import { VIM_UNIMPAIRED_OPERATIONS } from './vim-unimpaired.js';
@@ -371,6 +372,7 @@ const defineBuiltInOperations = (): void => {
     ...VIM_REPLACE_WITH_REGISTER_OPERATIONS,
     ...VIM_EXCHANGE_OPERATIONS,
     ...VIM_UNIMPAIRED_OPERATIONS,
+    ...VIM_SNEAK_OPERATIONS,
   ]) {
     if (!operations.has(name)) defineVimOperation(name, operation);
   }
