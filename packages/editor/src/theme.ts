@@ -426,6 +426,10 @@ const syntax = (colours: Palette): HighlightStyle =>
     { tag: tags.quote, color: colours.quote, fontStyle: 'italic' },
     { tag: tags.strikethrough, textDecoration: 'line-through' },
     { tag: tags.contentSeparator, color: colours.punctuation },
+
+    // A recipe's `{param}` placeholder (TYTO-377): text that stands for other text, which the
+    // escape colour already means. No new colour token for one construct of one language.
+    { tag: tags.special(tags.variableName), color: colours.escape },
   ]);
 
 /**

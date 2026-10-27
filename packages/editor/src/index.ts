@@ -216,6 +216,22 @@ export { json, jsonLanguage } from './json-language.js';
 
 export { markdown, markdownLanguage } from './markdown-language.js';
 
+export { recipe, recipeLanguage } from './recipe-language.js';
+
+export {
+  type RecipeVerbSource,
+  completeRecipeVerb,
+  recipeCompletion,
+} from './recipe-completion.js';
+
+export {
+  type CellOutput,
+  cellOutputs,
+  cellOutputsOf,
+  clearCellOutputs,
+  setCellOutputs,
+} from './cell-outputs.js';
+
 export { escapeHtml, MARKDOWN_TAGS, markdownToHtml } from './markdown-html.js';
 export {
   type JsonAssistSource,
