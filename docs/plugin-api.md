@@ -440,8 +440,8 @@ is the plugin's data, and a plugin that finds it wrong answers its own diagnosti
 placed at the verb. `host.config` stays the person's settings (`settings.json` in the window,
 the declared defaults in the CLI), process-wide and the same in every folder; treat the
 section as what this folder chooses over them. **Never a secret**: the file is plain text a
-team shares, and a token is a declared credential (ADR 0134). `tyto render --section
-<plugin>.<key>=<value>` sets a key for one run over the file's, and applies in a restricted
+team shares, and a token is a declared credential (ADR 0134).
+`tyto render --section <plugin>.<key>=<value>` sets a key for one run over the file's, and applies in a restricted
 folder too. Runnable commands (TYTO-261) will carry the same field.
 
 **An action or a sink plans and writes nothing** (ADR 0129). It declares `writes`, the kinds of
