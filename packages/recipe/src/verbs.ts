@@ -6,6 +6,7 @@ import { collect, compose } from './compose.js';
 import { decide } from './decide.js';
 import { derive } from './derive.js';
 import { extract, rewrite } from './extract.js';
+import { count, group } from './group.js';
 import { include } from './include.js';
 import { join } from './join.js';
 import { map } from './map.js';
@@ -49,6 +50,8 @@ export const genericVerbs: Readonly<Record<string, Verb>> = {
   decide: { kind: 'transform', run: decide },
   rollup: { kind: 'transform', run: rollup },
   stamp: { kind: 'transform', run: stamp },
+  group: { kind: 'transform', run: group },
+  count: { kind: 'transform', run: count },
 };
 
 /** `where <expression>`: keeps the rows that satisfy every predicate. */

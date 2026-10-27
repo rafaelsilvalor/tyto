@@ -1,0 +1,8 @@
+# Invented tasks of a demo project, for the generic verbs: no real project, team or person.
+recipe summary
+  | How many tasks each kind has in each team, with the grand total.
+
+group by=kind,team
+count rows into=tasks
+select without=rows
+show summary

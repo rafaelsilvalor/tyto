@@ -47,6 +47,8 @@ export type {
   StoredEntry,
 } from './state.js';
 export { stateToCommit } from './state.js';
+export type { Summary } from './summary.js';
+export { summarize } from './summary.js';
 export type { CellValue, Column, ColumnType, Provenance, Row, Table } from './table.js';
 export { COLUMN_TYPES, cellText, comparable, findColumn } from './table.js';
 export type { BoundTemplate, FillMode, Template, TemplateFilter } from './template.js';

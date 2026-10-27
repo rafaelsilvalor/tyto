@@ -1,0 +1,16 @@
+{
+  "columns": [
+    {"name":"kind","type":"text","origin":"demo"},
+    {"name":"team","type":"text","origin":"demo"},
+    {"name":"tasks","type":"number","origin":"count rows"}
+  ],
+  "rows": [
+    {"key":"[\"anuncio\",\"design\"]","values":{"kind":"anúncio","team":"design","tasks":5},"provenance":{"source":"group","id":"[\"anuncio\",\"design\"]","fetchedAt":"2026-10-24T09:00:00.000Z"}},
+    {"key":"[\"copy\",\"copy\"]","values":{"kind":"copy","team":"copy","tasks":2},"provenance":{"source":"group","id":"[\"copy\",\"copy\"]","fetchedAt":"2026-10-24T09:00:00.000Z"}},
+    {"key":"[\"video\",\"video\"]","values":{"kind":"vídeo","team":"video","tasks":2},"provenance":{"source":"group","id":"[\"video\",\"video\"]","fetchedAt":"2026-10-24T09:00:00.000Z"}},
+    {"key":"[\"post\",\"design\"]","values":{"kind":"post","team":"design","tasks":1},"provenance":{"source":"group","id":"[\"post\",\"design\"]","fetchedAt":"2026-10-24T09:00:00.000Z"}},
+    {"key":"[\"anuncio\",\"\"]","values":{"kind":"anuncio","team":"","tasks":1},"provenance":{"source":"group","id":"[\"anuncio\",\"\"]","fetchedAt":"2026-10-24T09:00:00.000Z"}},
+    {"key":"[\"post\",\"copy\"]","values":{"kind":"post","team":"copy","tasks":1},"provenance":{"source":"group","id":"[\"post\",\"copy\"]","fetchedAt":"2026-10-24T09:00:00.000Z"}}
+  ],
+  "totals": {"tasks":12}
+}
