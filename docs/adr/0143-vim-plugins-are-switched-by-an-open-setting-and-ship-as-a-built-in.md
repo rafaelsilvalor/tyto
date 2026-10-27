@@ -137,3 +137,62 @@ Consequences:
   keydown is not measured.
 - The status bar does not show the keys the reader takes as pending.
 - What the real window does with these keys is not measured here; jsdom covers the sequences.
+
+## Amendment — replace-with-register, exchange and part of unimpaired (TYTO-419, 2026-10-27)
+
+Three more operations in `@tyto/editor`, each meant for its own id in `vimPlugins`. This
+amendment records how they meet the engine (`@replit/codemirror-vim` 6.4.0) and why unimpaired
+is only a part; the desktop's contributions, and so the ids and their defaults, come in a later
+change of the same card.
+
+1. **`gr` is an `engine` operator, `replaceWithRegister`, mapped with no context** (normal and
+   visual, as commentary's `gc`). It needs the register the person named (`"agr{motion}`), which
+   the typed `operator` kind filters out of the args it hands an operation. It reads the
+   engine's register (`Vim.getRegisterController()`), dispatches the replacement and never
+   writes a register, so `p` afterwards still pastes what was yanked. A linewise register over
+   a charwise target drops its last line break; a charwise register over `grr` replaces the
+   line's text and keeps its line break. The engine has no default `gr`, and a repeated
+   multi-key operator is linewise (`grr`), so a count, visual `gr` and `.` come from the engine.
+   `"+gr` reads the engine's `+` register, not the system clipboard.
+
+2. **Exchange is an `engine` operator, `exchange`, and two `engine` motions mapped in
+   `operatorPending`**, by the pattern of surround's `s`, because `c` is a whole operator and
+   `cx` is never matched as two keys:
+   - `x` (`exchange.target`): under `change` it puts the exchange operator in the cleared
+     input state's place, carrying the count typed before `c`, and returns nothing, so the
+     motion typed next feeds exchange and the change never runs; under the exchange operator
+     it is the current line and the count after it, linewise (`cxx`); under any other operator
+     it does nothing, as `x` after one did before.
+   - `c` (`exchange.clear`): under the exchange operator it forgets the marked span (`cxc`).
+     **Under `change` it is the line, linewise, as the engine's `expandToLine`**: the mapping
+     shadows the engine's own doubling of `c`, so `cc` now runs this motion. Measured before
+     shipping it, in a throwaway jsdom test turned into a suite case: `cc`, `3cc`, `c2c`, `cc`
+     on an indented line, `cc` on the last line and `.` after `cc` leave the same text and
+     cursor with exchange on as off. Under any other operator it does nothing, as `c` after
+     one did before.
+   - Visual `X` maps the operator directly, in place of the engine's delete-lines `X`, which
+     comes back when exchange is off.
+
+   The first span lives in a `StateField` the operator adds to its view the first time it runs
+   there (`StateEffect.appendConfig`), mapped through every change until the second, and is
+   marked with the `--tyto-selection` colour, a role every theme already sets. The second span
+   swaps both in one transaction, so one `u` undoes it; when one span holds the other the outer
+   is replaced by the inner, as vim-exchange does, and any other overlap cancels.
+
+3. **Unimpaired is `[<Space>` / `]<Space>` and `[e` / `]e` in normal mode**, two actions
+   marked `isEdit`, with an `up` arg for the bracket. A blank line is added above or below with
+   the cursor left on its text; a line is moved by its count in one change, so one `u` undoes
+   it. The engine's `[<character>` and `]<character>` motions lose only `e` and the space, which
+   they had no meaning for; `[(` and the others are untouched. A keydown of `' '` reaches the
+   engine as `<Space>`, measured in jsdom. The rest of unimpaired is not here: `[b`, `[f`, `[q`
+   and `[o` drive buffers, files, the quickfix list and options, which a vim contribution
+   cannot name (only text operations live in the editor); `[x` encodes markup, and the
+   template editor has no vim; `[p` and `]p` are already the engine's.
+
+Consequences:
+
+- `c` in `operatorPending` belongs to exchange while it is on; a later change of the engine's
+  `cc` would not reach a person with exchange on until the motion follows it.
+- A count typed before `cx` reaches the motion after it: `2cxx` marks two lines.
+- Visual `[e` / `]e` (moving a selection's lines) is not here.
+- What the real window does with these keys is not measured here; jsdom covers the sequences.
