@@ -9,6 +9,7 @@ import {
   type LoadedPlugins,
   type OwnedSource,
   type PanelContribution,
+  type RecipeContributions,
   type ThemeContribution,
   createPluginHost,
   directiveNamesOf,
@@ -71,6 +72,14 @@ export interface WindowPlugins {
   configure(config: Readonly<Record<string, unknown>>): void;
   /** The ids of the plugins activated here — the ones running. Empty until `ready`. */
   running(): readonly string[];
+  /**
+   * The installed plugins' recipe verbs and derivations (ADR 0135), which the recipe notebook
+   * runs (TYTO-377, ADR 0148). Read per call, so a verb is found once the plugins have started
+   * and a withdrawn one stops answering. Empty until they have started, like the directives:
+   * a recipe run in the first second names its plugin's verbs as unknown, and the next run
+   * after start-up finds them.
+   */
+  recipeContributions(): RecipeContributions;
 }
 
 export interface WindowPanel {
@@ -139,6 +148,11 @@ export function windowPlugins(plugins: Promise<LoadedPlugins>): WindowPlugins {
 
   const directives = () => (started ? host.registry.directives() : []);
   const noKits: BrandKits = { kits: new Map(), diagnostics: [] };
+  const recipes: RecipeContributions = {
+    recipeVerbs: () => (started ? host.registry.recipeVerbs() : []),
+    ownedRecipeVerbs: () => (started ? host.registry.ownedRecipeVerbs() : []),
+    recipeDerivations: () => (started ? host.registry.recipeDerivations() : []),
+  };
   return {
     resolver: directiveResolverOf(directives),
     names: () => directiveNamesOf(directives()),
@@ -157,5 +171,6 @@ export function windowPlugins(plugins: Promise<LoadedPlugins>): WindowPlugins {
       host.configure(config);
     },
     running: () => (started ? activatedIds : []),
+    recipeContributions: () => recipes,
   };
 }

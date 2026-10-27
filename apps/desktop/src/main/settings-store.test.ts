@@ -124,6 +124,7 @@ describe('fileSettingsStore', () => {
       fontSizes: DEFAULT_SETTINGS.fontSizes,
       fontFamilies: DEFAULT_SETTINGS.fontFamilies,
       googleFonts: DEFAULT_SETTINGS.googleFonts,
+      recipeTimeZone: DEFAULT_SETTINGS.recipeTimeZone,
     });
   });
 
@@ -162,6 +163,7 @@ describe('fileSettingsStore', () => {
       fontSizes: DEFAULT_SETTINGS.fontSizes,
       fontFamilies: DEFAULT_SETTINGS.fontFamilies,
       googleFonts: DEFAULT_SETTINGS.googleFonts,
+      recipeTimeZone: DEFAULT_SETTINGS.recipeTimeZone,
     });
   });
 
@@ -200,6 +202,7 @@ describe('fileSettingsStore', () => {
       fontSizes: DEFAULT_SETTINGS.fontSizes,
       fontFamilies: DEFAULT_SETTINGS.fontFamilies,
       googleFonts: DEFAULT_SETTINGS.googleFonts,
+      recipeTimeZone: DEFAULT_SETTINGS.recipeTimeZone,
     });
   });
 
@@ -237,6 +240,7 @@ describe('fileSettingsStore', () => {
       fontSizes: DEFAULT_SETTINGS.fontSizes,
       fontFamilies: DEFAULT_SETTINGS.fontFamilies,
       googleFonts: DEFAULT_SETTINGS.googleFonts,
+      recipeTimeZone: DEFAULT_SETTINGS.recipeTimeZone,
     });
   });
 

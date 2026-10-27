@@ -68,6 +68,11 @@ export interface SourceTrust {
   readonly sections?: Readonly<Record<string, unknown>>;
   /** The folder the window has open, which Workspace: Manage Trust acts on. */
   readonly open?: true;
+  /**
+   * The workspace folder that answered, as `loadWorkspace` or `findWorkspace` found it: what a
+   * recipe's data files and its state are bound to (TYTO-377, ADR 0148). Absent for `none`.
+   */
+  readonly folder?: string;
 }
 
 export interface WorkspaceService {
@@ -100,6 +105,14 @@ export interface WorkspaceService {
    * no file yet, which has no folder to answer for it.
    */
   sourceTrustFor(briefDirectory: string | undefined): Promise<SourceTrust | undefined>;
+  /**
+   * `plugin`'s own section of the open folder's project, for a recipe in `recipeDirectory`
+   * (TYTO-377, ADR 0147, ADR 0148). **Read on every call**, never kept: a folder edited, trusted
+   * or reopened between two verb calls is what the next call reads. `undefined` when the recipe
+   * is outside the open folder, when nothing is open, when the folder names no section for the
+   * plugin, and in a restricted folder, whose sections `loadWorkspace` already withheld.
+   */
+  sectionFor(recipeDirectory: string | undefined, plugin: string): unknown;
 }
 
 /** The places of the resolved project: what a restricted folder refused is not among them. */
@@ -262,13 +275,25 @@ export function createWorkspaceService(options: WorkspaceServiceOptions): Worksp
     async sourceTrustFor(briefDirectory) {
       if (briefDirectory === undefined) return undefined;
       if (open !== undefined && isInside(open.folder, briefDirectory)) {
-        return { trust: open.trust, sections: open.project.sections, open: true };
+        return {
+          trust: open.trust,
+          sections: open.project.sections,
+          open: true,
+          folder: open.folder,
+        };
       }
       const folder = await findWorkspace(briefDirectory, { home: options.home });
       if (folder === undefined) return { trust: 'none' };
       // The store resolves the real path itself, as `loadWorkspace` asks it.
       const answer = await options.trustStore.trustOf(folder);
-      return { trust: answer.trust };
+      return { trust: answer.trust, folder };
+    },
+
+    sectionFor(recipeDirectory, plugin) {
+      if (open === undefined || recipeDirectory === undefined) return undefined;
+      if (!isInside(open.folder, recipeDirectory)) return undefined;
+      const sections: Readonly<Record<string, unknown>> = open.project.sections;
+      return Object.prototype.hasOwnProperty.call(sections, plugin) ? sections[plugin] : undefined;
     },
   };
 }

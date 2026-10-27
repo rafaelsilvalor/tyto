@@ -112,6 +112,60 @@ const diagnostic = z.object({
   hint: z.string().optional(),
 });
 
+/**
+ * The bounds of a recipe cell on the wire (TYTO-377, ADR 0148): the first rows of its table and
+ * how many it has, each text cut to a length a cell can show. A table is up to 50,000 rows
+ * (`PAGE_LIMITS`), and the notebook shows a preview of it, never the whole; `src/main/recipe-wire.ts`
+ * is where a cell is cut to these.
+ */
+export const RECIPE_WIRE_LIMITS = {
+  rows: 50,
+  columns: 200,
+  /** Characters of one value, a column's name, or a plan's target. */
+  text: 1000,
+  cells: 2000,
+  diagnostics: 200,
+} as const;
+
+/** A value as the notebook shows it: a list is already joined, a long text already cut. */
+const recipeValue = z.union([
+  z.string().max(RECIPE_WIRE_LIMITS.text),
+  z.number(),
+  z.boolean(),
+  z.null(),
+]);
+
+const recipeCell = z.object({
+  /** The step's index among the recipe's cells; `param`, comments and the header are none. */
+  index: z.number().int().nonnegative(),
+  /** One-based line of the step in the text the request carried. */
+  line: z.number().int().positive(),
+  /**
+   * `stale` is a cell that did not run this time — a source while typing, anything in a
+   * restricted folder before Run, everything after a syntax error — and shows the table it had.
+   */
+  status: z.enum(['ok', 'failed', 'skipped', 'stale']),
+  table: z
+    .object({
+      columns: z
+        .array(z.object({ name: z.string(), type: z.string() }))
+        .max(RECIPE_WIRE_LIMITS.columns),
+      rows: z
+        .array(z.object({ key: z.string(), values: z.array(recipeValue) }))
+        .max(RECIPE_WIRE_LIMITS.rows),
+      /** Every row the table has, of which `rows` are the first. */
+      total: z.number().int().nonnegative(),
+    })
+    .optional(),
+  /** An action's or a sink's plan: what it would write, and nothing written (ADR 0129). */
+  plan: z.object({ target: z.string(), count: z.number().int().nonnegative() }).optional(),
+  diagnostics: z.array(diagnostic).max(RECIPE_WIRE_LIMITS.diagnostics),
+  /** When the host ran this cell, from its own clock (ADR 0138, ADR 0148). */
+  ranAt: z.string().optional(),
+  /** The oldest `fetchedAt` among the table's rows: how old the data it shows is. */
+  oldestFetchedAt: z.string().optional(),
+});
+
 /** Whether a source is trusted; `revoked` is trust taken back while it is open (ADR 0111). */
 const sourceTrust = z.enum(['trusted', 'restricted', 'revoked']);
 
@@ -1967,6 +2021,54 @@ export const IPC_CHANNELS = {
       problem: z.enum(['name', 'exists', 'write']).optional(),
       detail: z.string().optional(),
     }),
+  ),
+  /**
+   * Runs a recipe's cells in main (TYTO-377, ADR 0148), from the first line that changed since
+   * this document's last run, against the cells it kept.
+   *
+   * `requestId` is `brief:preview`'s, for its reason: a run fired on a pause in typing can
+   * land after the one that replaced it, so the renderer keeps the id it last asked for and
+   * drops every other answer. Main echoes it untouched, and a superseded run does not replace
+   * the cells it keeps for the document.
+   *
+   * The recipe's file is the one main holds for `documentId`; the window never names a path
+   * (ADR 0086). `explicit` is Run, the person's approval: it runs in a restricted folder, and it
+   * runs sources. `saved` is the run after a save, which runs sources too (ADR 0119). Neither is
+   * a pause in typing, which runs nothing in a restricted folder and stops before a source.
+   * `from` reruns from that cell down whatever changed; `fresh` forgets this document's cells
+   * first. It never fails: a half-typed recipe is the normal state of this channel.
+   */
+  'recipe:run': channel(
+    z.object({
+      requestId: z.number().int().nonnegative(),
+      documentId,
+      text: z.string().max(1_000_000),
+      from: z.number().int().nonnegative().optional(),
+      explicit: z.boolean().optional(),
+      saved: z.boolean().optional(),
+      fresh: z.boolean().optional(),
+    }),
+    z.object({
+      requestId: z.number().int().nonnegative(),
+      cells: z.array(recipeCell).max(RECIPE_WIRE_LIMITS.cells),
+      /** The whole file's: a syntax error, a parameter without a value. */
+      diagnostics: z.array(diagnostic).max(RECIPE_WIRE_LIMITS.diagnostics),
+      /**
+       * Why cells were left `stale` this time: `restricted` is a folder not trusted, which
+       * runs on Run only; `source` is a source reached while typing, which runs on save or Run.
+       */
+      held: z.enum(['restricted', 'source']).optional(),
+      ranAt: z.string(),
+    }),
+  ),
+
+  /**
+   * The verbs a recipe may name here, for completion (TYTO-377): the generic ones and every
+   * running plugin's, namespaced. It has no subject: the plugins are main's.
+   */
+  'recipe:verbs': channel(
+    z.object({}),
+    z.object({ verbs: z.array(z.string().max(200)).max(5000) }),
   ),
 } as const;
 

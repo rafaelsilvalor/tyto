@@ -39,6 +39,8 @@ import { type SessionService, type TemplateFolder } from './session.js';
 import { type PanelService } from './panels.js';
 import { type PreviewService } from './preview.js';
 import { type QueueService, type QueueView } from './queue.js';
+import { type RecipeRunner } from './recipe-runner.js';
+import { recipeAnswerToWire } from './recipe-wire.js';
 import { type TemplateDiagnostic, type TemplateEditorService } from './template-editor.js';
 import { type TemplateCatalogue } from './templates.js';
 import { type AppliedThemes, type ThemeService, themeVariant } from './themes.js';
@@ -350,6 +352,11 @@ export interface IpcDependencies {
     /** Where a new template goes when no template folder is chosen. */
     chooseParent: () => Promise<string | undefined>;
   };
+  /**
+   * The recipe notebook's runner (TYTO-377, ADR 0148): a document's cells, kept in main and
+   * forgotten when its tab closes.
+   */
+  readonly recipes: RecipeRunner;
 }
 
 /** A setting's outline as the contract writes it: the same fields, in arrays of its own. */
@@ -429,6 +436,7 @@ export function createHandlers(dependencies: IpcDependencies): Handlers {
     workspace,
     explorer,
     queue,
+    recipes,
     session,
     settings,
     templateDialogs,
@@ -476,6 +484,23 @@ export function createHandlers(dependencies: IpcDependencies): Handlers {
     'templates:set-folder': ({ choose }) => project.setFolder(choose),
 
     'workspace:folder': () => Promise.resolve(workspace.state()),
+
+    'recipe:run': async ({ requestId, documentId, text, from, explicit, saved, fresh }) => {
+      // The file is the one main holds for this tab, never a path the window sent (ADR 0086).
+      // The id goes back untouched, as `brief:preview`'s does: the renderer drops a stale one.
+      const answer = await recipes.run({
+        documentId,
+        text,
+        path: documents.pathOf(documentId),
+        from,
+        explicit,
+        saved,
+        fresh,
+      });
+      return { requestId, ...recipeAnswerToWire(answer) };
+    },
+
+    'recipe:verbs': () => Promise.resolve({ verbs: [...recipes.verbs()] }),
 
     // TYTO-274, ADR 0125: a label inside the open folder is relative to it, so every open tab is
     // labelled again when the folder changes, and the window applies it as it applies a rename.
@@ -547,6 +572,8 @@ export function createHandlers(dependencies: IpcDependencies): Handlers {
 
     'file:close': async ({ documentId }) => {
       documents.close(documentId);
+      // A recipe's cells die with its tab (ADR 0148): nothing of them outlives the document.
+      recipes.close(documentId);
       // Awaited: a settings tab closed unsaved may still owe the file a screen's change.
       await settings.closed(documentId);
       return {};

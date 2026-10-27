@@ -583,6 +583,15 @@
       "why": "generated: name, prefix, static import or text of the stem in the e2e file"
     },
     {
+      "paths": [
+        "apps/desktop/src/main/recipe-clock.ts",
+        "apps/desktop/src/main/recipe-runner.ts",
+        "apps/desktop/src/main/recipe-wire.ts"
+      ],
+      "e2e": ["window.desktop.test.ts"],
+      "why": "reviewed: the recipe notebook's runner in main (TYTO-377); no window draws it until the .recipe tab, so only window.desktop's channel list reaches it, and its logic is in recipe-runner.test.ts"
+    },
+    {
       "paths": ["apps/desktop/src/main/quit.ts"],
       "e2e": [
         "banner.desktop.test.ts",

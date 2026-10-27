@@ -144,6 +144,9 @@ importers:
       '@tyto/plugin-api':
         specifier: workspace:*
         version: link:../../packages/plugin-api
+      '@tyto/recipe':
+        specifier: workspace:*
+        version: link:../../packages/recipe
       '@tyto/template-lang':
         specifier: workspace:*
         version: link:../../packages/template-lang

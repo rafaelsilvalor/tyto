@@ -134,3 +134,10 @@ the plugins live in and the workspace read from what the window has open at each
 trust taken back counting until the folder is reopened (ADR 0111). Its refusals name
 `Tyto desktop`, and the plugins screen says in words what `workspace:read` and
 `workspace:write` reach.
+
+## Note, 2026-10-27 — the notebook shows `ranAt`, not `storedAt` (TYTO-377)
+
+The age the notebook shows is not this record's `storedAt`: a cache entry stays inside the
+plugin, and nothing of it reaches a verb's result. ADR 0148 decision 8 shows the host's `ranAt`
+for the cell and the oldest `fetchedAt` among its rows instead, both from the host or the
+row's provenance, never from the plugin's clock.

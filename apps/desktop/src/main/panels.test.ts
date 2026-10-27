@@ -26,6 +26,11 @@ function contributed(permissions: readonly string[]): WindowPlugins {
     configurations: () => [],
     configure: () => undefined,
     running: () => ['demo'],
+    recipeContributions: () => ({
+      recipeVerbs: () => [],
+      ownedRecipeVerbs: () => [],
+      recipeDerivations: () => [],
+    }),
   };
 }
 
