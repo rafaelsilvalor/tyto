@@ -7,6 +7,7 @@ import { ok } from '@tyto/core';
 import { nodeFileSystem } from '@tyto/io';
 import type { LoadedPlugins, Plugin } from '@tyto/plugin-api';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { z } from 'zod';
 
 import {
   type ExportProgress,
@@ -458,6 +459,57 @@ describe('installed plugins in the export (TYTO-48)', () => {
     ]);
     const svg = readdirSync(out).find((name) => name.endsWith('.svg'));
     expect(readFileSync(join(out, svg!), 'utf8')).not.toBe('<svg/>');
+  }, 60_000);
+
+  // A plugin's setting, read in its exporter (TYTO-254, ADR 0145). It writes what `host.config`
+  // answered at activation and again in `exportFrame`, so the first half says the run's host was
+  // configured before the plugin was activated into it.
+  it("hands an installed plugin its settings before activating it into the run's host", async () => {
+    const baseUrl = z.object({ baseUrl: z.string() }).partial().optional();
+    const conector: Plugin = {
+      id: 'conector',
+      manifest: {
+        ...(manifestOf('conector') as object),
+        contributes: ['exporter', 'configuration'],
+      },
+      activate: (host) => {
+        host.registerConfiguration({
+          id: 'baseUrl',
+          form: { type: 'string', format: 'uri' },
+          default: 'https://default.example',
+          description: 'Where the service is.',
+        });
+        const atActivation = String(host.config(baseUrl)?.baseUrl);
+        return host.registerExporter({
+          id: 'cfg',
+          mime: 'text/plain',
+          extension: 'cfg',
+          kinds: ['cfg'],
+          rasterized: false,
+          exportFrame: () => ok(`${atActivation} ${String(host.config(baseUrl)?.baseUrl)}`),
+        });
+      },
+    };
+    const service = await createExportService({
+      fileSystem: nodeFileSystem(),
+      sources: await createProjectSources({ fileSystem: nodeFileSystem(), builtIn: packDirectory }),
+      version: '0.0.0-test',
+      plugins: Promise.resolve(installed(conector)),
+      configuration: () => ({ conector: { baseUrl: 'https://acme.example' } }),
+    });
+    const progress = await service.run({
+      brief: exampleBrief('promo-curso', 'promo.brief'),
+      directory: out,
+      label: 'promo',
+      outputs: [{ kind: 'cfg' }],
+    });
+
+    expect(progress.failure).toBeUndefined();
+    const written = readdirSync(out).filter((name) => name.endsWith('.cfg'));
+    expect(written.length).toBeGreaterThan(0);
+    expect(readFileSync(join(out, written[0]!), 'utf8')).toBe(
+      'https://acme.example https://acme.example',
+    );
   }, 60_000);
 });
 

@@ -972,6 +972,16 @@ export const diagnosticCodes = {
     fatal: false,
     fatality: 'A warning never replaces a value (ADR 0013).',
   },
+  // An installed plugin's key while that plugin is disabled, failed or refused (TYTO-254): nothing
+  // declares it, but saying "unknown" would send the person looking for a typo that is not there.
+  W_SETTING_PLUGIN_NOT_RUNNING: {
+    severity: 'warning',
+    summary: 'The settings file names a setting of an installed plugin that is not running.',
+    template: "Setting '{key}' belongs to plugin '{plugin}', which is not running.",
+    spec: 'docs/adr/0145-an-installed-plugin-declares-a-setting-as-a-data-form.md',
+    fatal: false,
+    fatality: 'A warning never replaces a value (ADR 0013).',
+  },
   W_SETTING_INVALID: {
     severity: 'warning',
     summary: "A setting's value is not one its plugin accepts, so its default applies instead.",

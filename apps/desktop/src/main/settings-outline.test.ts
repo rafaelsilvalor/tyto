@@ -132,3 +132,18 @@ describe("the app's settings outline", () => {
     expect(setting('queueAutoRun')?.options.map((option) => option.value)).toEqual([true, false]);
   });
 });
+
+describe("an installed plugin's setting in the outline (TYTO-254)", () => {
+  it('is listed under its prefixed key, beside the built-ins', () => {
+    const plugin = declaredSetting('demo', true, {
+      id: 'baseUrl',
+      form: { type: 'string', format: 'uri' },
+      default: 'https://default.example',
+      description: 'Where the service is.',
+    });
+    const listed = settingsOutline([plugin], []);
+    expect(listed.map((each) => [each.key, each.description])).toEqual([
+      ['demo.baseUrl', 'Where the service is.'],
+    ]);
+  });
+});

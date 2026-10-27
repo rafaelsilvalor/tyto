@@ -90,6 +90,17 @@ could validate would never have reached the plugin's code.
   (ADR 0073), so an installed plugin's setting reaches it there through the same event; showing
   and editing those settings in the window, with their diagnostics, is the desktop's second pull
   request of TYTO-254.
+  _Corrected 2026-10-27 (TYTO-254, desktop pull request):_ the bullet above was wrong. The host
+  the desktop configured on start and on every reload was the built-ins' alone; installed plugins
+  are never activated there. They live in the window's host (`window-plugins.ts`) and in a host
+  built per export, and neither was configured, so no value reached an installed plugin. The
+  desktop now configures both from the same reading: the window's host on every reading, and each
+  export's host before the installed plugins are activated into it. The file is checked against
+  the built-ins' settings and the installed plugins' together; the settings tab's validation and
+  outline, and the log of the file's problems at launch, wait for the installed plugins to
+  start, and the file is read again then. So a plugin's key is unknown only when its plugin is
+  not running — and then the warning is `W_SETTING_PLUGIN_NOT_RUNNING`, which names the plugin,
+  for one installed but disabled, failed or refused.
 - A pattern in a form is case-insensitive. A JSON Schema written for another tool and copied in
   may accept more than its author meant; the ADR says so rather than adding a second dialect.
 - Out: object forms, `minItems`/`maxItems`, `format`s other than `uri`, and per-workspace values

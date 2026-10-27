@@ -3,6 +3,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
 import { ok } from '@tyto/core';
+import { declaredSetting } from '@tyto/plugin-api';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
 import { DEFAULT_SETTINGS } from '../../shared/settings.js';
@@ -577,5 +578,51 @@ describe("the bar's own colours of statusBarColors", () => {
     expect(problems.map((item) => item.message)).toEqual([
       expect.stringContaining("in theme 'tyto-dark'"),
     ]);
+  });
+});
+
+/**
+ * An installed plugin's keys in the file (TYTO-254, ADR 0145): checked like a built-in's while
+ * the plugin runs, and named — not called unknown — while it does not.
+ */
+describe("an installed plugin's setting in the file", () => {
+  const BASE_URL = declaredSetting('demo', true, {
+    id: 'baseUrl',
+    form: { type: 'string', format: 'uri' },
+    default: 'https://default.example',
+    description: 'Where the service is.',
+  });
+
+  it('is W_SETTING_INVALID at the value when its form refuses it, and never unknown', () => {
+    const text = '{ "demo.baseUrl": "not a uri" }';
+    const diagnostics = validateSettingsText(text, [...BUILT_IN_SETTINGS, BASE_URL]);
+    const value = text.indexOf('"not a uri"');
+    expect(diagnostics.map((item) => [item.code, item.range])).toEqual([
+      ['W_SETTING_INVALID', { start: value, end: value + '"not a uri"'.length }],
+    ]);
+  });
+
+  it('names the plugin that is not running instead of calling its key unknown', () => {
+    const text = '{ "parado.token": "x", "nobody.key": 1 }';
+    const diagnostics = validateSettingsText(text, BUILT_IN_SETTINGS, undefined, ['parado']);
+    expect(diagnostics.map((item) => [item.code, item.message, item.range])).toEqual([
+      ['W_SETTING_UNKNOWN', "Unknown setting 'nobody.key'.", { start: 23, end: 35 }],
+      [
+        'W_SETTING_PLUGIN_NOT_RUNNING',
+        "Setting 'parado.token' belongs to plugin 'parado', which is not running.",
+        { start: 2, end: 16 },
+      ],
+    ]);
+  });
+
+  it('names it in the reading the log gets too', async () => {
+    writeFileSync(file, '{ "parado.token": "x" }');
+    const reading = await fileSettingsStore(
+      file,
+      () => BUILT_IN_SETTINGS,
+      () => undefined,
+      () => ['parado'],
+    ).load();
+    expect(reading.diagnostics.map((item) => item.code)).toEqual(['W_SETTING_PLUGIN_NOT_RUNNING']);
   });
 });

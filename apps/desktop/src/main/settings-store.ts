@@ -1,9 +1,10 @@
 import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import { dirname } from 'node:path';
 
-import { type Diagnostics, type Result, err, ok } from '@tyto/core';
+import { type Diagnostic, type Diagnostics, type Result, diagnostic, err, ok } from '@tyto/core';
 import {
   type DeclaredSetting,
+  type ResolvedSettings,
   type SettingEntry,
   declaredSetting,
   resolveSettings,
@@ -73,9 +74,49 @@ export function validateSettingsText(
   text: string,
   declared: readonly DeclaredSetting[],
   advise: SettingsAdvice = () => [],
+  stopped: readonly string[] = [],
 ): Diagnostics {
   const { entries, syntax } = readSettingsText(text);
-  return [...syntax, ...resolveSettings(declared, entries).diagnostics, ...advise(entries)];
+  return [
+    ...syntax,
+    ...resolveWrittenSettings(declared, entries, stopped).diagnostics,
+    ...advise(entries),
+  ];
+}
+
+/**
+ * `resolveSettings`, with the keys of installed plugins that are not running set aside first
+ * (TYTO-254). A disabled, failed or refused plugin declares nothing, so its `<plugin>.<key>` would
+ * be `W_SETTING_UNKNOWN` — a warning that sends the person looking for a typo. It is still a
+ * warning, and the key still does nothing, but the message names the plugin and why.
+ */
+export function resolveWrittenSettings(
+  declared: readonly DeclaredSetting[],
+  entries: readonly SettingEntry[],
+  stopped: readonly string[],
+): ResolvedSettings {
+  if (stopped.length === 0) return resolveSettings(declared, entries);
+  const notRunning = new Set(stopped);
+  const known = new Set(declared.map((setting) => setting.key));
+  const kept: SettingEntry[] = [];
+  const aside: Diagnostic[] = [];
+  for (const entry of entries) {
+    const dot = entry.key.indexOf('.');
+    const plugin = dot > 0 ? entry.key.slice(0, dot) : undefined;
+    if (plugin === undefined || !notRunning.has(plugin) || known.has(entry.key)) {
+      kept.push(entry);
+      continue;
+    }
+    aside.push(
+      diagnostic(
+        'W_SETTING_PLUGIN_NOT_RUNNING',
+        { key: entry.key, plugin },
+        entry.keyRange === undefined ? {} : { range: entry.keyRange },
+      ),
+    );
+  }
+  const resolved = resolveSettings(declared, kept);
+  return { ...resolved, diagnostics: [...resolved.diagnostics, ...aside] };
 }
 
 /**
@@ -112,6 +153,8 @@ export function fileSettingsStore(
   declared: () => readonly DeclaredSetting[] = () => BUILT_IN_SETTINGS,
   /** Told the text just before it is written, so a watcher can recognise the app's own write. */
   onWrite: (text: string) => void = () => undefined,
+  /** The installed plugins that are not running, whose keys are named rather than unknown. */
+  stopped: () => readonly string[] = () => [],
 ): SettingsStore {
   // One write at a time: two patches racing through read-then-write would each keep the
   // other's old value.
@@ -136,7 +179,7 @@ export function fileSettingsStore(
       // Unreadable reads as empty; reading never fails.
     }
     const { entries, syntax } = readSettingsText(source);
-    const resolved = resolveSettings(declared(), entries);
+    const resolved = resolveWrittenSettings(declared(), entries, stopped());
     return {
       settings: settingsFrom(resolved.values),
       values: resolved.values,

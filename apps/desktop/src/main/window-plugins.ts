@@ -2,6 +2,7 @@ import type { DirectiveResolver } from '@tyto/core';
 import {
   type AssetSourceContribution,
   type BrandKits,
+  type DeclaredSetting,
   type EditorKeymap,
   type EditorVimContribution,
   type FontSourceContribution,
@@ -57,6 +58,19 @@ export interface WindowPlugins {
    */
   assetSources(): readonly OwnedSource<AssetSourceContribution>[];
   fontSources(): readonly OwnedSource<FontSourceContribution>[];
+  /**
+   * The settings the installed plugins declared, prefixed with their ids (TYTO-254, ADR 0145).
+   * Empty until the plugins have started, like the directives.
+   */
+  configurations(): readonly DeclaredSetting[];
+  /**
+   * Hands the installed plugins their settings: each plugin's process is sent its slice
+   * (`InProcessHost.configure`, protocol 7). Before they have started, the slice is held and sent
+   * when each is activated here.
+   */
+  configure(config: Readonly<Record<string, unknown>>): void;
+  /** The ids of the plugins activated here — the ones running. Empty until `ready`. */
+  running(): readonly string[];
 }
 
 export interface WindowPanel {
@@ -86,6 +100,7 @@ export function windowPlugins(plugins: Promise<LoadedPlugins>): WindowPlugins {
   const vims: WindowVim[] = [];
   const themes: WindowTheme[] = [];
   const permissions = new Map<string, readonly string[]>();
+  const activatedIds: string[] = [];
   let started = false;
 
   const ready = plugins.then(
@@ -99,6 +114,7 @@ export function windowPlugins(plugins: Promise<LoadedPlugins>): WindowPlugins {
         // saying it twice on every keystroke would bury the one that matters.
         const activated = host.tryActivate(plugin, 'external');
         if (!activated.ok) continue;
+        activatedIds.push(plugin.id);
         const manifest = validatePluginManifest(plugin.manifest);
         permissions.set(plugin.id, manifest.ok ? manifest.value.permissions : []);
         for (const panel of host.registry.panels()) {
@@ -136,5 +152,10 @@ export function windowPlugins(plugins: Promise<LoadedPlugins>): WindowPlugins {
     brandKits: () => (started ? host.registry.brandKitsByBrand() : noKits),
     assetSources: () => (started ? host.registry.assetSources() : []),
     fontSources: () => (started ? host.registry.fontSources() : []),
+    configurations: () => (started ? host.registry.configurations() : []),
+    configure: (config) => {
+      host.configure(config);
+    },
+    running: () => (started ? activatedIds : []),
   };
 }
