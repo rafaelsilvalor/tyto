@@ -39,6 +39,7 @@ import { type LineNumbersStyle, lineNumbersExtension } from './line-numbers.js';
 import { type ThemeName, themes } from './theme.js';
 import { json } from './json-language.js';
 import { markdown } from './markdown-language.js';
+import { recipe } from './recipe-language.js';
 import { followerState, historyExtension, mirrored, primaryFacet } from './mirror.js';
 import { template } from './template-language.js';
 import { type VimStatus, vimMode } from './vim-mode.js';
@@ -73,8 +74,11 @@ const programmatic = Annotation.define<boolean>();
  * `keybindings.json` tabs (TYTO-256). Their checks are pushed in by the host as markers.
  *
  * `markdown` is a `.md` tab's, coloured by `@lezer/markdown` with GitHub's extensions (TYTO-247).
+ *
+ * `recipe` is a `.recipe` file's, coloured line by line and nothing more (TYTO-377): what a
+ * recipe means is `parseRecipe`'s, and the host pushes its diagnostics in.
  */
-export type LanguageName = 'brief' | 'template' | 'plain' | 'json' | 'markdown';
+export type LanguageName = 'brief' | 'template' | 'plain' | 'json' | 'markdown' | 'recipe';
 
 const languages: Readonly<Record<LanguageName, () => Extension>> = {
   brief,
@@ -82,6 +86,7 @@ const languages: Readonly<Record<LanguageName, () => Extension>> = {
   plain: () => [],
   json,
   markdown,
+  recipe,
 };
 
 export interface EditorOptions {
