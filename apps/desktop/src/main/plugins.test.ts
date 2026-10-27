@@ -123,6 +123,14 @@ describe('activateBuiltIns', () => {
         ],
       },
       { id: 'commentary', title: 'Commentary', mappings: [{ keys: 'gc', operation: 'comment' }] },
+      ...[
+        'replaceWithRegister',
+        'exchange',
+        'unimpaired',
+        'indentObject',
+        'entireBuffer',
+        'sneak',
+      ].map((id) => expect.objectContaining({ id })),
     ]);
   });
 

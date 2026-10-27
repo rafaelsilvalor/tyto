@@ -1,5 +1,5 @@
 import type { Diagnostics, Result } from '@tyto/core';
-import type { VimContribution } from '@tyto/editor';
+import type { SystemClipboard, VimContribution } from '@tyto/editor';
 
 import type { IpcResponse } from '../../shared/ipc.js';
 
@@ -100,4 +100,25 @@ export function createWindowVimPlugins(
       bring();
     },
   };
+}
+
+/** `@tyto/editor`'s switches for the two effects, passed in so the decision is tested without it. */
+export interface VimEffectSwitches {
+  setVimYankFlash(on: boolean): void;
+  setVimSystemClipboard(clipboard: SystemClipboard | undefined): void;
+}
+
+/**
+ * The ids that switch an editor effect instead of a contribution (ADR 0143, TYTO-419 A2
+ * amendment): `highlightedYank` the yank flash, `systemClipboard` the sharing of vim's yank with
+ * `clipboard`. Called on every settings answer; both switches take the same value again with no
+ * effect, and the same port keeps the last text it saw.
+ */
+export function applyVimEffects(
+  switches: VimPlugins,
+  editor: VimEffectSwitches,
+  clipboard: SystemClipboard,
+): void {
+  editor.setVimYankFlash(vimPluginIsOn(switches, 'highlightedYank'));
+  editor.setVimSystemClipboard(vimPluginIsOn(switches, 'systemClipboard') ? clipboard : undefined);
 }
