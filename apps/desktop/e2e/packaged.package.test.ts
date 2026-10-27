@@ -128,10 +128,47 @@ function writeHome(home: string): void {
   );
   writeCodeTemplate(home);
   writeSpy(home);
+  writeConnector(home);
   const entry = { enabled: true, permissions: [], source: '.' };
   writeFileSync(
     join(home, 'plugins.json'),
-    JSON.stringify({ plugins: { texto: entry, cartaz: entry, espia: entry } }),
+    JSON.stringify({ plugins: { texto: entry, cartaz: entry, espia: entry, conector: entry } }),
+  );
+}
+
+/**
+ * A plugin that declares a setting as a form and exports what `host.config` answers for it
+ * (TYTO-254, ADR 0145), and the `settings.json` that gives it a value: the packaged app has to
+ * read the file against the plugin's declaration and hand the value to the plugin's process.
+ */
+function writeConnector(home: string): void {
+  const folder = join(home, 'plugins', 'conector');
+  mkdirSync(join(folder, 'dist'), { recursive: true });
+  writeFileSync(
+    join(folder, 'tyto-plugin.json'),
+    JSON.stringify({
+      name: 'conector',
+      version: '1.0.0',
+      engine: `>=${PLUGIN_API_VERSION}`,
+      contributes: ['exporter', 'configuration'],
+      permissions: [],
+    }),
+  );
+  writeFileSync(join(folder, 'package.json'), JSON.stringify({ name: 'conector', type: 'module' }));
+  writeFileSync(
+    join(folder, 'dist', 'index.js'),
+    `const anything = { safeParse: (value) => ({ success: true, data: value }) };
+export function activate(host) {
+  host.registerConfiguration({
+    id: 'baseUrl', form: { type: 'string', format: 'uri' },
+    default: 'https://default.example', description: 'Where the service is.',
+  });
+  host.registerExporter({
+    id: 'cfg', mime: 'text/plain', extension: 'cfg', kinds: ['cfg'], rasterized: false,
+    exportFrame: () => ({ ok: true, value: String(host.config(anything)?.baseUrl), diagnostics: [] }),
+  });
+}
+`,
   );
 }
 
@@ -248,6 +285,11 @@ beforeAll(async () => {
 
   scratch = mkdtempSync(join(tmpdir(), 'tyto-packaged-'));
   writeHome(join(scratch, 'tyto-home'));
+  mkdirSync(join(scratch, 'user-data'), { recursive: true });
+  writeFileSync(
+    join(scratch, 'user-data', 'settings.json'),
+    '{ "conector.baseUrl": "https://packaged.example" }\n',
+  );
 
   // Over CDP and not `_electron.launch`, which needs the inspect fuse this build switches off
   // (TYTO-249, ADR 0067). Its own data folder and its own `TYTO_HOME`, so the packaged app
@@ -402,6 +444,43 @@ describe('the packaged app', () => {
         `and exported ${String(texts.length)} .txt file(s)\n`,
     );
     expect(readFileSync(join(out, texts[0]!), 'utf8')).toMatch(/^\S+ \S+$/u);
+  }, 120_000);
+
+  it('hands an installed plugin its setting from settings.json (TYTO-254)', async () => {
+    type Bridge = Record<string, (request: unknown) => Promise<unknown>>;
+    const call = <T>(channel: string, request: unknown): Promise<T> =>
+      page.evaluate(
+        ([name, body]) => (globalThis as never as { tyto: Bridge }).tyto[name as string]!(body),
+        [channel, request] as const,
+      ) as Promise<T>;
+
+    const out = join(scratch, 'out-cfg');
+    const { exportId } = await call<{ exportId: string }>('export:start', {
+      documentId: 'packaged',
+      brief: ['---', 'template: promo-curso', '---', '::titulo Empacotado'].join('\n'),
+      directory: out,
+      outputs: [{ kind: 'cfg' }],
+    });
+    const started = Date.now();
+    for (;;) {
+      const { progress } = await call<{ progress?: { status: string; failure?: string } }>(
+        'export:progress',
+        { exportId },
+      );
+      if (progress !== undefined && progress.status !== 'running') {
+        expect(progress.failure).toBeUndefined();
+        break;
+      }
+      if (Date.now() - started > 60_000) throw new Error('the packaged export never finished');
+      await new Promise((resolve) => setTimeout(resolve, 100));
+    }
+    const [file] = readdirSync(out).filter((name) => name.endsWith('.cfg'));
+    const value = readFileSync(join(out, file!), 'utf8');
+    process.stdout.write(
+      `[TYTO-254] packaged app delivered settings.json's conector.baseUrl to the installed ` +
+        `plugin's process: ${value}\n`,
+    );
+    expect(value).toBe('https://packaged.example');
   }, 120_000);
 
   it("renders an installed code template in its plugin's process on the bundled Node", async () => {

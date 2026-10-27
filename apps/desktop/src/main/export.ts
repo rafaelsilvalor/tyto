@@ -209,6 +209,13 @@ export interface ExportServiceOptions {
    */
   readonly plugins?: LoadedPlugins | Promise<LoadedPlugins>;
   /**
+   * The settings in force, by plugin id (TYTO-254, ADR 0145): what `settings.json` resolved to,
+   * which every run's host is configured with **before** the installed plugins are activated
+   * into it, so a plugin's process is sent its slice on activation and reads it in
+   * `exportFrame`. Absent: no host is configured, and a plugin keeps whatever it last had.
+   */
+  readonly configuration?: () => Readonly<Record<string, unknown>>;
+  /**
    * The open workspace's asset and font folders for a brief in this folder (TYTO-278,
    * ADR 0113), asked per run, as `preview.ts` asks per compile.
    */
@@ -248,8 +255,13 @@ function exporterHost(
   rasterizer: Rasterizer | undefined,
   plugins: LoadedPlugins,
   { fonts }: FontsInForce,
+  configuration: Readonly<Record<string, unknown>> | undefined,
 ): { readonly host: InProcessHost; readonly warnings: Diagnostics } {
   const host = createPluginHost();
+  // Before the installed plugins, the CLI's rule (`configureDefaults`): a proxy sends its process
+  // the slice when it is activated into a host that holds one, so the values are there when the
+  // plugin's `activate` and every `exportFrame` after it read `host.config`.
+  if (configuration !== undefined) host.configure(configuration);
 
   host.activate(
     htmlExporterPlugin({
@@ -366,6 +378,7 @@ export async function createExportService(options: ExportServiceOptions): Promis
       options.rasterizer,
       await plugins,
       inForce,
+      options.configuration?.(),
     );
     // Asked through this run's host, the activation the run reports refusals of, and then
     // Google Fonts while it is on (ADR 0120), which no run's host activates.
@@ -632,7 +645,13 @@ export async function createExportService(options: ExportServiceOptions): Promis
 
     async kinds(): Promise<readonly ExportableKind[]> {
       // A host with no folder's bytes bound: what is asked is only which kinds exist.
-      const { host } = exporterHost({}, options.rasterizer, await plugins, fontsFor([]));
+      const { host } = exporterHost(
+        {},
+        options.rasterizer,
+        await plugins,
+        fontsFor([]),
+        options.configuration?.(),
+      );
       return host.registry.exporters
         .list()
         .flatMap((exporter) =>

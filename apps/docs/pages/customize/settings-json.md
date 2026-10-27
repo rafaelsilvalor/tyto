@@ -26,6 +26,20 @@ Lines starting with `//` are notes for yourself. Tyto keeps them: when the windo
 
 [Settings](../reference/settings.md) lists every setting, its type, its default and the values it takes.
 
+## A plugin's settings
+
+A plugin you installed may have settings of its own. Each is written with the plugin's name, a dot and the setting's name, and it is suggested and checked like Tyto's own once the plugin has started:
+
+```jsonc
+{
+  "conector.baseUrl": "https://example.atlassian.net",
+}
+```
+
+The plugin reads the value when it next works — the next export — and again after every save. A setting of a plugin that is installed but switched off, or that could not start, does nothing; the Problems panel says which plugin it belongs to and that it is not running.
+
+<!-- TYTO-254: checked by e2e/installed-plugins.desktop.test.ts, not by following the steps in the window. -->
+
 ## When a value is wrong
 
 A value Tyto cannot use does not stop anything. The Problems panel names it, with its line, and the default applies for that setting alone; the others still apply:

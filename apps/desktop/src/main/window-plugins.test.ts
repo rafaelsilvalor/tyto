@@ -1,6 +1,7 @@
 import { ok } from '@tyto/core';
 import type { LoadedPlugins, Plugin } from '@tyto/plugin-api';
 import { describe, expect, it } from 'vitest';
+import { z } from 'zod';
 
 import { windowPlugins } from './window-plugins.js';
 
@@ -110,5 +111,39 @@ describe('windowPlugins', () => {
     const window = windowPlugins(Promise.reject(new Error('disk')));
     await window.ready;
     expect(window.panels()).toEqual([]);
+  });
+
+  // TYTO-254, ADR 0145: the installed plugins' settings, and the door their values go through.
+  it("declares the installed plugins' settings once started, and hands them their values", async () => {
+    let start: (value: LoadedPlugins) => void = () => undefined;
+    const read: unknown[] = [];
+    const CONNECTOR: Plugin = {
+      id: 'conector',
+      manifest: manifest('conector', ['configuration']),
+      activate: (host) => {
+        host.events.on('configured', () => {
+          read.push(host.config(z.object({ baseUrl: z.string() }).optional())?.baseUrl);
+        });
+        return host.registerConfiguration({
+          id: 'baseUrl',
+          form: { type: 'string', format: 'uri' },
+          default: 'https://default.example',
+          description: 'Where the service is.',
+        });
+      },
+    };
+    const window = windowPlugins(new Promise((resolve) => (start = resolve)));
+    expect(window.configurations()).toEqual([]);
+    expect(window.running()).toEqual([]);
+
+    start(loaded(CONNECTOR));
+    await window.ready;
+    expect(window.configurations().map((setting) => [setting.key, setting.prefixed])).toEqual([
+      ['conector.baseUrl', true],
+    ]);
+    expect(window.running()).toEqual(['conector']);
+
+    window.configure({ conector: { baseUrl: 'https://acme.example' } });
+    expect(read).toEqual(['https://acme.example']);
   });
 });

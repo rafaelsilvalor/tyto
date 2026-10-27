@@ -26,6 +26,20 @@ Linhas que começam com `//` são anotações suas. O Tyto as mantém: quando a 
 
 [Configurações](../reference/settings.md) lista cada configuração, o tipo, o valor padrão e os valores que ela aceita.
 
+## As configurações de um plugin
+
+Um plugin que você instalou pode ter configurações próprias. Cada uma é escrita com o nome do plugin, um ponto e o nome da configuração, e é sugerida e conferida como as do próprio Tyto depois que o plugin inicia:
+
+```jsonc
+{
+  "conector.baseUrl": "https://example.atlassian.net",
+}
+```
+
+O plugin lê o valor na próxima vez que trabalha — a próxima exportação — e de novo a cada vez que você salva. A configuração de um plugin instalado mas desligado, ou que não conseguiu iniciar, não faz nada; o painel de Problemas diz a qual plugin ela pertence e que ele não está rodando.
+
+<!-- TYTO-254: conferido por e2e/installed-plugins.desktop.test.ts, não seguindo os passos na janela. -->
+
 ## Quando um valor está errado
 
 Um valor que o Tyto não consegue usar não trava nada. O painel de Problemas aponta o valor, com a linha, e o padrão vale só para aquela configuração; as outras continuam valendo:

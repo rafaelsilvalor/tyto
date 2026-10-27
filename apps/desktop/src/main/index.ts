@@ -537,15 +537,41 @@ async function start(): Promise<void> {
   // And the snippets, read by the window for the same reason (TYTO-277, ADR 0082).
   const snippetsFile = join(app.getPath('userData'), 'snippets.json');
   // Bound below, once the queue it applies to exists; the store tells it every write it makes.
-  const late: { live?: LiveSettings } = {};
+  // `installed` too: the window's plugins start after the window opens (TYTO-254).
+  const late: { live?: LiveSettings; installed?: WindowPlugins } = {};
+  // What the settings file is checked against: the built-ins' settings and, once they have
+  // started, the installed plugins' (TYTO-254, ADR 0145). One list for the store, the tab's
+  // validation and its outline, so a plugin's key is the same key everywhere.
+  const declared = () => [
+    ...host.registry.configurations(),
+    ...(late.installed?.configurations() ?? []),
+  ];
+  // The installed plugins that are not running — disabled, failed or refused — whose keys the
+  // file may still hold: named in the warning rather than called unknown (TYTO-254).
+  let installedFolders: readonly string[] = [];
+  const stopped = (): readonly string[] => {
+    const running = new Set(late.installed?.running() ?? []);
+    return installedFolders.filter((name) => !running.has(name));
+  };
+  // The settings in force by plugin id, which each export's host is configured with (TYTO-254).
+  let configuration: Readonly<Record<string, unknown>> = {};
+  // Every host that runs plugins gets the same reading: the built-ins' here, the installed
+  // plugins' processes through the window's host, and each export's host from `configuration`.
+  const configureAll = (config: Readonly<Record<string, unknown>>): void => {
+    configuration = config;
+    host.configure(config);
+    late.installed?.configure(config);
+  };
   const settings = fileSettingsStore(
     settingsFile,
-    () => host.registry.configurations(),
+    declared,
     (text) => late.live?.wrote(text),
+    stopped,
   );
+  // The problems are logged once the installed plugins have started (`redeclared` below): read
+  // now, a plugin's key would be logged as unknown on every launch.
   const reading = await settings.load();
-  host.configure(reading.config);
-  for (const problem of reading.diagnostics) log.warn(`settings.json: ${problem.message}`);
+  configureAll(reading.config);
   const saved = reading.settings;
   // Before the window exists, so a window told to be dark is never painted light first.
   themeSetting = saved.theme;
@@ -777,6 +803,23 @@ async function start(): Promise<void> {
   // What the installed plugins contribute to the window itself: the directives the preview
   // and the template mode resolve, and the panels (ADR 0043, ADR 0045).
   const contributed = windowPlugins(checked);
+  late.installed = contributed;
+  // Which installed plugins exist at all, read once they have started, so a key of one that is
+  // not running is named (TYTO-254). Never rejects: an unreadable folder names none.
+  const pluginsSettled = contributed.ready
+    .then(() => pluginStore.list())
+    .then(
+      (folders) => {
+        installedFolders = folders.map((stored) => stored.folder);
+      },
+      () => undefined,
+    );
+  // Held until the installed plugins have been handed their settings, so an export started in
+  // the first second is not drawn with a plugin's defaults (TYTO-254).
+  let markConfigured: () => void = () => undefined;
+  const pluginsConfigured = new Promise<void>((resolve) => {
+    markConfigured = resolve;
+  });
   // An installed plugin's theme file is read from its own folder, never outside it (ADR 0077).
   themeSources.installed = () =>
     contributed.themes().map(({ plugin, theme }) => ({
@@ -823,7 +866,11 @@ async function start(): Promise<void> {
     fileSystem,
     log,
     sources,
-    plugins: checked,
+    plugins: checked.then(async (loaded) => {
+      await pluginsConfigured;
+      return loaded;
+    }),
+    configuration: () => configuration,
     places: (directory) => workspace.placesFor(directory),
     pluginSources,
     version: app.getVersion(),
@@ -870,7 +917,9 @@ async function start(): Promise<void> {
   // with no restart. Bound here, after the queue, because applying a key means reaching it.
   const liveSettings = createLiveSettings({
     store: settings,
-    declared: () => host.registry.configurations(),
+    declared,
+    stopped,
+    ready: pluginsSettled,
     // A vim badge colour no text of the theme reads on is said at the value (TYTO-301).
     advise: (entries) => statusBarColorsContrast(entries, themesInForce()),
     initial: saved,
@@ -922,9 +971,7 @@ async function start(): Promise<void> {
         };
       }
     },
-    configure: (config) => {
-      host.configure(config);
-    },
+    configure: configureAll,
     send: (payload) => {
       const contents = mainWindow?.webContents;
       if (contents === undefined || contents.isDestroyed()) return;
@@ -933,6 +980,9 @@ async function start(): Promise<void> {
     log,
   });
   late.live = liveSettings;
+  // The installed plugins have started and declared their settings: the file is read again
+  // against them, every plugin is handed its values, and the file's problems are logged once.
+  void pluginsSettled.then(() => liveSettings.redeclared()).then(markConfigured);
   // **The tabs, kept for the next launch** (TYTO-113, ADR 0080), beside `layout.json`.
   const session = createSessionService({
     store: fileSessionStore(join(app.getPath('userData'), 'session.json')),
@@ -1304,8 +1354,8 @@ async function start(): Promise<void> {
       // Read off the registry's schemas once the installed plugins have started, with the
       // themes they registered as the `theme` setting's values (TYTO-304, ADR 0092).
       outline: async () => {
-        await contributed.ready;
-        return settingsOutline(host.registry.configurations(), await themes.list());
+        await pluginsSettled;
+        return settingsOutline(declared(), await themes.list());
       },
     },
     keybindings: {
