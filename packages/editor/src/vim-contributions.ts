@@ -5,9 +5,12 @@ import { Vim } from '@replit/codemirror-vim';
 import { commandRegistryOf } from './commands.js';
 import { type VimExCommand, viewOf } from './vim-mode.js';
 import { VIM_COMMENT_OPERATIONS } from './vim-comment.js';
+import { VIM_EXCHANGE_OPERATIONS } from './vim-exchange.js';
 import { type VimPosition, offsetOf, positionOf } from './vim-positions.js';
+import { VIM_REPLACE_WITH_REGISTER_OPERATIONS } from './vim-replace-with-register.js';
 import { VIM_SURROUND_OPERATIONS } from './vim-surround.js';
 import { BUILT_IN_VIM_OPERATIONS } from './vim-text-objects.js';
+import { VIM_UNIMPAIRED_OPERATIONS } from './vim-unimpaired.js';
 
 /**
  * The adapter of `plugin-api`'s `editor.vim` point (TYTO-417, ADR 0141).
@@ -356,14 +359,18 @@ const defineEx = (entry: VimExCommand): void => {
 };
 
 /**
- * The operations the editor ships (`vim-text-objects.ts`, `vim-comment.ts`), registered on the
- * first call rather than when the module loads: the package is free of side effects on import.
+ * The operations the editor ships (`vim-text-objects.ts`, `vim-comment.ts` and the other
+ * `vim-*.ts` plugins), registered on the first call rather than when the module loads: the
+ * package is free of side effects on import.
  */
 const defineBuiltInOperations = (): void => {
   for (const [name, operation] of [
     ...BUILT_IN_VIM_OPERATIONS,
     ...VIM_COMMENT_OPERATIONS,
     ...VIM_SURROUND_OPERATIONS,
+    ...VIM_REPLACE_WITH_REGISTER_OPERATIONS,
+    ...VIM_EXCHANGE_OPERATIONS,
+    ...VIM_UNIMPAIRED_OPERATIONS,
   ]) {
     if (!operations.has(name)) defineVimOperation(name, operation);
   }
