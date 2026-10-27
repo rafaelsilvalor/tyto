@@ -37,6 +37,20 @@ Tyto ships some well-known vim plugins inside vim mode. Each one is on while vim
 
 **.** repeats the last `gc` on the line the cursor is on.
 
+**Surround** adds, changes and deletes the pair around a piece of text: brackets or quotes.
+
+| Keys                      | What they do                                                                                          |
+| ------------------------- | ----------------------------------------------------------------------------------------------------- |
+| `ys`, a motion and a pair | Wraps what the motion covers: `ysiw)` turns `word` into `(word)`, `ys$"` quotes up to the line's end. |
+| `yss` and a pair          | Wraps the line, from its first character that is not a space.                                         |
+| `ds` and a pair           | Deletes the pair around the cursor: `ds"` turns `"word"` into `word`.                                 |
+| `cs`, the old and the new | Changes the pair around the cursor: `cs"'` turns `"word"` into `'word'`.                              |
+| `S` and a pair, in visual | Wraps the selection.                                                                                  |
+
+A pair is `(` `)` or `b`, `[` `]`, `{` `}` or `B`, `<` `>`, and the quotes `'`, `"` and `` ` ``. An opening bracket puts a space inside the pair, as in `( word )`, and a closing one does not, as in `(word)`. With `ds` and `cs`, an opening bracket also takes away the spaces just inside the old pair. Quotes are looked for on the cursor's line; brackets anywhere around it. **Escape**, before the pair, cancels.
+
+**.** repeats the last `ys`, `cs` or `ds` with the same pair.
+
 ### Switch a plugin off
 
 The [`vimPlugins`](../reference/settings.md#vimplugins) setting names each plugin by its id and says `true` or `false`. A plugin the setting does not name is on, and so is a plugin an installed Tyto plugin adds, by the id that plugin gives it.

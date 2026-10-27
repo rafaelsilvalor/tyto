@@ -114,6 +114,14 @@ describe('activateBuiltIns', () => {
     });
 
     expect(host.registry.vim()).toEqual([
+      {
+        id: 'surround',
+        title: 'Surround',
+        mappings: [
+          { keys: 's', context: 'operatorPending', operation: 'surround.target' },
+          { keys: 'S', context: 'visual', operation: 'surround.add' },
+        ],
+      },
       { id: 'commentary', title: 'Commentary', mappings: [{ keys: 'gc', operation: 'comment' }] },
     ]);
   });

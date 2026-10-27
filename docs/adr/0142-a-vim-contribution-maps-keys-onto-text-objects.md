@@ -1,7 +1,8 @@
 # 0142 — A vim contribution maps keys onto text objects
 
 Status: accepted · 2026-10-26 · TYTO-422 · amends ADR 0141 · measured in TYTO-420
-(`docs/explorations/2026-10-26-vim-text-objects.md`)
+(`docs/explorations/2026-10-26-vim-text-objects.md`) · decision 2's last sentence amended for the
+`engine` operation kind by ADR 0143's 2026-10-26 amendment (TYTO-418)
 
 ## Context
 
