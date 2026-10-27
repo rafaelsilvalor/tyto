@@ -33,6 +33,12 @@ TYTO-401 lands in four pull requests: this record, the port and the verbs `last`
    key holds, so a stored column the put does not name is kept. `storedAt` comes from the host's
    clock, never the recipe's. `@tyto/plugin-api` names the type, so the adapter implements a
    port from it.
+
+   > **Amended by ADR 0144 (TYTO-423, 2026-10-26).** The port also requires `entries(store)`,
+   > every entry a store holds, which the `recall` verb reads to bring back rows the source did
+   > not fetch. Because `storedAt` is re-stamped on every put, it says when a row was last
+   > remembered, not since when; an expiry measures from a stamped column instead.
+
 2. **Where it lives: on the machine, outside the workspace**, at
    `TYTO_HOME/state/recipes/<sha256(workspace realpath + recipe path)>/<store>.json` (decided by
    the maintainer on 2026-10-25). The host binds the workspace and the recipe when it builds the

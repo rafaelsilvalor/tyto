@@ -35,11 +35,7 @@ import {
   hostWorkspace,
   responseOf,
 } from './capabilities.js';
-import {
-  type ConfigurationContribution,
-  type DeclaredSetting,
-  declaredSetting,
-} from './configuration.js';
+import { type DeclaredSetting, type SettingDeclaration, declaredSetting } from './configuration.js';
 import { type ContributionPoint, type PluginManifest, validatePluginManifest } from './manifest.js';
 import {
   type RecipeContributions,
@@ -85,6 +81,11 @@ export interface HostEvents {
   registered: { readonly point: string; readonly id: string };
   /** A contribution was withdrawn, by its own `dispose` or by its plugin's. */
   disposed: { readonly point: string; readonly id: string };
+  /**
+   * The configuration `config()` reads was replaced (`InProcessHost.configure`): read it again.
+   * How an isolated plugin's proxy learns to send its process the new values (ADR 0145).
+   */
+  configured: Readonly<Record<string, never>>;
 }
 
 export type HostEventListener<Event extends keyof HostEvents> = (
@@ -117,9 +118,10 @@ export interface PluginHost {
   registerPanel(panel: PanelContribution): Disposable;
   /**
    * A setting the person can write in the settings file (ADR 0073). The key the file uses is
-   * `<plugin id>.<id>`, or `id` alone for a built-in.
+   * `<plugin id>.<id>`, or `id` alone for a built-in. Declared with a Zod `schema`, or with a
+   * `form` — the data an isolated plugin sends instead, since a schema does not cross (ADR 0145).
    */
-  registerConfiguration<T>(setting: ConfigurationContribution<T>): Disposable;
+  registerConfiguration<T>(setting: SettingDeclaration<T>): Disposable;
   /**
    * A colour theme: a JSON file inside the plugin's folder the window can apply (ADR 0077).
    * Data only, so an installed plugin may contribute one.
@@ -293,6 +295,7 @@ export interface InProcessHost {
   /**
    * Replaces the raw configuration `config()` reads, by plugin id — the `config` of
    * `resolveSettings`, once the settings file has been read against the declared settings.
+   * Emits `configured`, so an isolated plugin's process receives its new slice (ADR 0145).
    */
   configure(config: Readonly<Record<string, unknown>>): void;
 }
@@ -586,7 +589,7 @@ export function createPluginHost(options: PluginHostOptions = {}): InProcessHost
         const declared = declaredSetting(
           pluginId,
           origin !== 'built-in',
-          setting as ConfigurationContribution,
+          setting as SettingDeclaration,
         );
         return configurations.add(pluginId, { id: declared.key, setting: declared }, onConflict);
       },
@@ -795,6 +798,7 @@ export function createPluginHost(options: PluginHostOptions = {}): InProcessHost
 
     configure(config) {
       rawConfig = config;
+      emitter.emit('configured', {});
     },
   };
 }

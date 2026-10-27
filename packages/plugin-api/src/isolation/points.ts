@@ -21,6 +21,7 @@ import { z } from 'zod';
 
 import type { ContributionPoint } from '../manifest.js';
 import { RECIPE_VERB_KINDS } from '../recipes.js';
+import { settingFormSchema } from '../setting-form.js';
 import { ASSET_SOURCE_MAX_BYTES, FONT_SOURCE_MAX_BYTES, SOURCE_SCHEME } from '../sources.js';
 import { THEME_KINDS, isThemePath } from '../theme.js';
 import type { GuestFaces, ShippedFace } from './faces.js';
@@ -434,6 +435,28 @@ export const ISOLATED_POINTS: Readonly<Partial<Record<ContributionPoint, PointSp
     }),
     callables: {},
   },
+  // Data: a setting's rules cross as a form, and the host builds the schema from it, so the
+  // value is validated on the host and nothing is called back (ADR 0145). No `schema`, no
+  // `entries`, no `members`: a list form is how an isolated plugin checks entries one by one.
+  configuration: {
+    method: 'registerConfiguration',
+    data: z.strictObject({
+      id: z.string().min(1).max(200),
+      form: settingFormSchema,
+      default: z.unknown(),
+      description: z.string().max(2000),
+      options: z
+        .array(
+          z.strictObject({
+            value: z.union([z.string().max(1000), z.number(), z.boolean(), z.null()]),
+            description: z.string().max(1000),
+          }),
+        )
+        .max(200)
+        .optional(),
+    }),
+    callables: {},
+  },
   // Data: the theme is a file the host reads out of the plugin's folder and validates itself,
   // so nothing is called back and no schema has to cross (ADR 0077).
   theme: {
@@ -556,8 +579,6 @@ export const NOT_YET_ISOLATED: Readonly<Record<string, ContributionPoint>> = {
   registerSource: 'source',
   registerSink: 'sink',
   registerRasterizer: 'rasterizer',
-  // A setting is declared with a Zod schema, which is code and does not cross (ADR 0073).
-  registerConfiguration: 'configuration',
 };
 
 export function pointSpecOf(point: string): PointSpec | undefined {

@@ -29,6 +29,8 @@ import { writeTurns } from './write-turns.js';
  * Reading a corrupt file as no state would make the next run a first run without saying so,
  * which ADR 0140 decision 6 refuses. Every failure is `E_RECIPE_STATE` naming the file.
  *
+ * `entries` answers the whole store, which `recall` reads (ADR 0144), under the same rule.
+ *
  * `write` deletes, then merges each put's values over its key's (a stored column the put does
  * not name is kept), stamps every put with this host's clock, and replaces the file atomically:
  * written beside it and renamed into place, retried while Windows holds the old one. This
@@ -183,6 +185,12 @@ export function recipeStateStore(options: RecipeStateOptions): RecipeState {
           if (entry !== undefined) found.set(key, entry);
         }
         return found;
+      }),
+
+    entries: (store) =>
+      answered(async () => {
+        const { entries } = await load(store, await fileOf(store));
+        return new Map<string, StoredEntry>(Object.entries(entries));
       }),
 
     write: (store, puts, deletes) =>

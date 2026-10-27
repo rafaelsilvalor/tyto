@@ -32,6 +32,7 @@ export function memoryState(
       }
       return Promise.resolve(ok(found));
     },
+    entries: (store) => Promise.resolve(ok(new Map(stores.get(store) ?? []))),
     write: (store, puts, deletes) => {
       const entries = stores.get(store) ?? new Map<string, StoredEntry>();
       stores.set(store, entries);

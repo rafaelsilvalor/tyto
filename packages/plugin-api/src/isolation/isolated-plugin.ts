@@ -524,6 +524,18 @@ export function connectIsolatedPlugin(
           }),
         );
 
+        // This host's slice of the configuration, now and after every `configure` (ADR 0145).
+        // A process activated into several hosts holds one slice: the last one sent wins. At
+        // activation a host that holds no slice says nothing, so the `config` the process was
+        // started with stands until some host is configured.
+        const configure = (): void => {
+          if (crash !== undefined || closed) return;
+          const config: unknown = host.config(z.unknown());
+          channel.send({ protocol: RPC_PROTOCOL_VERSION, type: 'configure', config });
+        };
+        if (host.config(z.unknown()) !== undefined) configure();
+        forwarded.push(host.events.on('configured', configure));
+
         return {
           dispose: () => {
             for (const { key, disposable } of mine) {

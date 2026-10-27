@@ -62,24 +62,24 @@ The last five are named `<id>.tyto-plugin.json` and that is the one place a buil
 
 ## Extension points
 
-| `contributes`       | Registers                                                                      | Built-in                                              |
-| ------------------- | ------------------------------------------------------------------------------ | ----------------------------------------------------- |
-| `source` / `sink`   | `BriefSource` — `pull()`, `ack()`; `OutputSink` — `push()`                     | fs-inbox, fs-outbox (remote ones deferred — ADR 0011) |
-| `exporter`          | one **frame** to a document + mime + extension + the kinds it produces         | html, svg                                             |
-| `rasterizer`        | `Rasterizer` — `raster(html, opts): Promise<Uint8Array>`                       | chromium                                              |
-| `template-pack`     | folder of templates                                                            | built-in templates                                    |
-| `brand-kit`         | a logo, a wordmark and a signature per brand id (ADR 0063, ADR 0066)           | —                                                     |
-| `directive`         | `::ns/name` in the brief → the slot directives it stands for (ADR 0043)        | —                                                     |
-| `editor.command`    | `{ id, title }`, data only: nothing runs it yet (TYTO-261, ADR 0079)           | —                                                     |
-| `editor.keymap`     | binding → command id (normal and vim)                                          | default-keymap, vim                                   |
-| `editor.vim`        | vim mappings onto operations the editor names, and ex commands (ADR 0141)      | —                                                     |
-| `panel`             | a page in the desktop window, `sandbox="allow-scripts"` (ADR 0045)             | —                                                     |
-| `configuration`     | a key of `settings.json`: `{ id, schema, default, description }` (ADR 0073)    | desktop (the app's settings)                          |
-| `theme`             | a colour theme, a JSON file in the plugin: `{ id, label, kind, path }` (0077)  | desktop (Tyto Light, Tyto Dark)                       |
-| `asset-source`      | images behind URI schemes: `{ id, schemes, fetch }`, cached (ADR 0117)         | —                                                     |
-| `font-source`       | faces of named families: `{ id, families, fetch }`, cached (ADR 0117)          | google-fonts (ADR 0120)                               |
-| `recipe-verb`       | `<namespace>.<verb>`: a paged source, a transform, an action or a sink (0135)  | — (the generic verbs are `@tyto/recipe`'s)            |
-| `recipe-derivation` | `<namespace>.<name>` for `derive`: `{ id, requires, produces, derive }` (0133) | —                                                     |
+| `contributes`       | Registers                                                                                 | Built-in                                              |
+| ------------------- | ----------------------------------------------------------------------------------------- | ----------------------------------------------------- |
+| `source` / `sink`   | `BriefSource` — `pull()`, `ack()`; `OutputSink` — `push()`                                | fs-inbox, fs-outbox (remote ones deferred — ADR 0011) |
+| `exporter`          | one **frame** to a document + mime + extension + the kinds it produces                    | html, svg                                             |
+| `rasterizer`        | `Rasterizer` — `raster(html, opts): Promise<Uint8Array>`                                  | chromium                                              |
+| `template-pack`     | folder of templates                                                                       | built-in templates                                    |
+| `brand-kit`         | a logo, a wordmark and a signature per brand id (ADR 0063, ADR 0066)                      | —                                                     |
+| `directive`         | `::ns/name` in the brief → the slot directives it stands for (ADR 0043)                   | —                                                     |
+| `editor.command`    | `{ id, title }`, data only: nothing runs it yet (TYTO-261, ADR 0079)                      | —                                                     |
+| `editor.keymap`     | binding → command id (normal and vim)                                                     | default-keymap, vim                                   |
+| `editor.vim`        | vim mappings onto operations the editor names, and ex commands (ADR 0141)                 | —                                                     |
+| `panel`             | a page in the desktop window, `sandbox="allow-scripts"` (ADR 0045)                        | —                                                     |
+| `configuration`     | a key of `settings.json`: `{ id, schema \| form, default, description }` (ADR 0073, 0145) | desktop (the app's settings)                          |
+| `theme`             | a colour theme, a JSON file in the plugin: `{ id, label, kind, path }` (0077)             | desktop (Tyto Light, Tyto Dark)                       |
+| `asset-source`      | images behind URI schemes: `{ id, schemes, fetch }`, cached (ADR 0117)                    | —                                                     |
+| `font-source`       | faces of named families: `{ id, families, fetch }`, cached (ADR 0117)                     | google-fonts (ADR 0120)                               |
+| `recipe-verb`       | `<namespace>.<verb>`: a paged source, a transform, an action or a sink (0135)             | — (the generic verbs are `@tyto/recipe`'s)            |
+| `recipe-derivation` | `<namespace>.<name>` for `derive`: `{ id, requires, produces, derive }` (0133)            | —                                                     |
 
 ### `configuration`, in full
 
@@ -101,7 +101,32 @@ A setting is a key of the desktop app's `settings.json`, a JSON-with-comments fi
 
 **What the settings tab suggests and explains is derived from the declaration** (TYTO-304, ADR 0092). `outlineOf(declared)` reads each schema once with Zod's own `z.toJSONSchema` and answers plain data — the key, its description, its type in words (`list of string`, `number from 0.75 to 2`), its default as JSON, and the values it, one list entry or one object member may take. Those values are `options`, `entries.options` and `members.options` where the plugin wrote them, each with a sentence, and otherwise an enum's values or a boolean's two from the schema, with none. `options` are help and never a rule: the schema still decides, and an option the schema refuses makes the declaration throw, as a bad default does. The desktop sends the outline to the window on `settings:outline`, which is how a plugin's setting is suggested like a built-in's.
 
-**An isolated plugin cannot declare one yet**: the schema is Zod, which is code and does not cross to the plugin's process, so `registerConfiguration` is refused by name there, like `source`.
+**An installed plugin declares one with a `form` instead of a `schema`** (TYTO-254, ADR 0145). A Zod schema is code and does not cross to the plugin's process, so an isolated plugin that passes `schema` is refused by name, told to use `form`. Any plugin may use a form; a setting has exactly one of the two.
+
+```ts
+type SettingForm =
+  | {
+      type: 'string' | 'number' | 'integer' | 'boolean';
+      nullable?: boolean;
+      enum?: (string | number | boolean | null)[]; // alone: no bounds beside it
+      minimum?: number;
+      maximum?: number; // number, integer
+      minLength?: number;
+      maxLength?: number;
+      pattern?: string;
+      format?: 'uri'; // string
+    }
+  | { type: 'array'; items: /* one scalar form */ SettingForm; uniqueItems?: boolean };
+
+host.registerConfiguration({
+  id: 'baseUrl',
+  form: { type: 'string', format: 'uri' },
+  default: 'https://example.atlassian.net',
+  description: 'The Jira site this plugin reads.',
+});
+```
+
+The host turns the form into a Zod schema (`settingSchemaOf`) and the setting goes on exactly as one declared with a schema: the same per-key tolerance, the same ranged `W_SETTING_INVALID`, and a default the form refuses is `E_PLUGIN_ACTIVATE`. A list form checks its entries one at a time, as `entries` does. A form that names a keyword of another type, crosses its bounds or carries a `pattern` that `tyto-pattern/1` refuses (ADR 0136: flags `iu`, at most 512 characters, no unbounded matching) is the plugin's bug and refuses activation. There is no object form and no secret field: a setting is plain text in `settings.json`, and a secret is a declared credential (ADR 0134). The plugin's process receives its slice in a `configure` message whenever its host is configured, and `host.config` answers the newest; a plugin that wants to know listens to the `configured` event. **The CLI never reads `settings.json`**: there an installed plugin's settings take their defaults; values a workspace chooses belong in its `project.json` section (TYTO-428).
 
 ### `exporter`, in full
 
@@ -551,7 +576,7 @@ get their own commands.
 ```ts
 interface PluginHost {
   registerSource(s: BriefSource): Disposable;  registerSink(...); registerExporter(...); …
-  registerConfiguration<T>(setting: ConfigurationContribution<T>): Disposable; // ADR 0073
+  registerConfiguration<T>(setting: SettingDeclaration<T>): Disposable; // ADR 0073, 0145
   config<T>(schema: ZodType<T>): T;             // validated user config, declared settings included
   credentials(key: string): Promise<string>;    // credentials:<key> only; env in the CLI, safeStorage on desktop
   fetch(url, init?): Promise<HostFetchResponse>; // net:<host> only; redirects not followed
@@ -561,7 +586,7 @@ interface PluginHost {
 }
 ```
 
-**For an installed plugin every member is a message** (ADR 0041). `config` validates, in the plugin's thread, the slice of configuration the host sent at activation. `log` lines cross to the host, with a `detail` that cannot be cloned sent as its text. `events` hears the `registered` and `disposed` events of each host the plugin is activated in; `emit` stays in the plugin's thread, because a plugin announcing a registration would be speaking for the registry. `fetch` and `credentials` are requests the host answers — below.
+**For an installed plugin every member is a message** (ADR 0041). `config` validates, in the plugin's thread, the slice of configuration the host sent last — at activation, then in a `configure` message each time a host it is activated in is configured (ADR 0145). `log` lines cross to the host, with a `detail` that cannot be cloned sent as its text. `events` hears the `registered` and `disposed` events of each host the plugin is activated in; `emit` stays in the plugin's thread, because a plugin announcing a registration would be speaking for the registry. `fetch` and `credentials` are requests the host answers — below.
 
 ### `host.fetch` and `host.credentials` (ADR 0042)
 
@@ -605,16 +630,17 @@ Six optional ports on `HostCapabilities` answer them: `cacheGet`, `cachePut`, `c
 
 ```
 host (CLI process)                               guest (plugin's process)
-  connectIsolatedPlugin ◀── hello {protocol: 6, sandbox} ── runGuest
+  connectIsolatedPlugin ◀── hello {protocol: 7, sandbox} ── runGuest
                            canary denied? else E_PLUGIN_SANDBOX
                         ── activate {config} ──▶   plugin.activate(guestHost)
                         ◀── activated {registrations: data + {$call: n}}
   tryActivate(proxy)       per task host, replayed
+  host.configure(...)   ── configure {config} ──▶ host.config answers it (last one wins)
   exportFrame(...)      ── call {handle, args} ──▶ args checked, function run
                         ◀── result {value} ──      answer checked by the host
 ```
 
-**Each side validates what it receives**, with the Zod schemas in `isolation/protocol.ts` and `isolation/points.ts`: the host every guest message and every answer, the guest every host message and a call's arguments, before the plugin's code sees them. **A contribution crosses as data, and its functions stay behind as handles**; a function is callable only if its point names it, with a schema for its arguments and one for its answer. Today that is `exporter.exportFrame`, `directive.transform` (TYTO-49), `fetch` on `asset-source` and `font-source` (ADR 0117), and `page`, `transform`, `plan` and `derive` on the recipe points (ADR 0135), which may therefore return a `Promise`; the job and `resolve` await them. `template-pack`, `brand-kit`, `editor.command`, `editor.keymap`, `editor.vim`, `panel` and `theme` cross as data. `source`, `sink` and `rasterizer` are refused by name — _not available to an isolated plugin yet_. A directive's answer schema is strict: a replacement that carries a `namespace` or a `range` is `E_PLUGIN_PROTOCOL`.
+**Each side validates what it receives**, with the Zod schemas in `isolation/protocol.ts` and `isolation/points.ts`: the host every guest message and every answer, the guest every host message and a call's arguments, before the plugin's code sees them. **A contribution crosses as data, and its functions stay behind as handles**; a function is callable only if its point names it, with a schema for its arguments and one for its answer. Today that is `exporter.exportFrame`, `directive.transform` (TYTO-49), `fetch` on `asset-source` and `font-source` (ADR 0117), and `page`, `transform`, `plan` and `derive` on the recipe points (ADR 0135), which may therefore return a `Promise`; the job and `resolve` await them. `template-pack`, `brand-kit`, `editor.command`, `editor.keymap`, `editor.vim`, `panel`, `theme` and `configuration` — as a form, ADR 0145 — cross as data. `source`, `sink` and `rasterizer` are refused by name — _not available to an isolated plugin yet_. A directive's answer schema is strict: a replacement that carries a `namespace` or a `range` is `E_PLUGIN_PROTOCOL`.
 
 **The proxy goes through `tryActivate`**, so an isolated plugin meets every check an in-process one does. `protocol` is its own number, compared at the `hello` handshake and nowhere else; it is not the engine (ADR 0040), because a plugin never sees these messages.
 

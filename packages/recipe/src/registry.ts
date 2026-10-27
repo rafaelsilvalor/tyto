@@ -100,6 +100,7 @@ export const GENERIC_VERBS = [
   'age',
   'last',
   'remember',
+  'recall',
   'decide',
   'rollup',
   'stamp',

@@ -27,6 +27,7 @@ import type {
   TemplatePack,
 } from '../contributions.js';
 import { directiveResolverOf } from '../directives.js';
+import { resolveSettings } from '../configuration.js';
 import { recipeRegistriesOf } from '../recipes.js';
 import {
   type Disposable,
@@ -386,17 +387,6 @@ describe('what an isolated plugin cannot do', () => {
     ['source', (host: PluginHost) => host.registerSource({ id: 'inbox', value: {} })],
     ['sink', (host: PluginHost) => host.registerSink({ id: 'outbox', value: {} })],
     ['rasterizer', (host: PluginHost) => host.registerRasterizer({ id: 'r', value: {} })],
-    // A setting is declared with a Zod schema, which is code (ADR 0073).
-    [
-      'configuration',
-      (host: PluginHost) =>
-        host.registerConfiguration({
-          id: 'size',
-          schema: z.number(),
-          default: 1,
-          description: 'A size.',
-        }),
-    ],
   ])('registers into %s, which is refused by name', async (point, activate) => {
     const { connected } = await isolate(activate);
     expect(connected.ok ? '' : connected.error[0]?.message).toBe(
@@ -413,9 +403,8 @@ describe('what an isolated plugin cannot do', () => {
     );
   });
 
-  // A bootstrap left behind by an upgrade: 5 is the number before a plugin had a cache and
-  // the workspace's files (ADR 0138), and it is refused by name rather than by a schema
-  // complaint.
+  // A bootstrap left behind by an upgrade: 6 is the number before the host sent a plugin its
+  // settings again (ADR 0145), and it is refused by name rather than by a schema complaint.
   it('speaks another protocol', async () => {
     const pair = channelPair(() => undefined);
     const connecting = connectIsolatedPlugin({
@@ -427,7 +416,7 @@ describe('what an isolated plugin cannot do', () => {
     pair.inject({ type: 'hello', protocol: RPC_PROTOCOL_VERSION - 1, sandbox: CONFINED });
     const connected = await connecting;
     expect(connected.ok ? '' : connected.error[0]?.message).toBe(
-      "Plugin 'texto' failed to activate: its process speaks protocol 5 and this host speaks 6.",
+      "Plugin 'texto' failed to activate: its process speaks protocol 6 and this host speaks 7.",
     );
   });
 
@@ -492,6 +481,138 @@ describe('what crosses besides contributions', () => {
     });
     await new Promise((resolve) => setTimeout(resolve, 0));
     expect(seen).toEqual(['exporter/svg']);
+  });
+});
+
+describe('a setting an isolated plugin declares (ADR 0145)', () => {
+  const SETTINGS_MANIFEST = { ...MANIFEST, contributes: ['exporter', 'configuration'] };
+  const passThrough = { safeParse: (value: unknown) => ({ success: true, data: value }) } as never;
+
+  /** An exporter that answers the `baseUrl` the plugin reads from `host.config` at call time. */
+  function declaring(declare: (host: PluginHost) => void) {
+    return isolate(
+      (host) => {
+        declare(host);
+        host.registerExporter({
+          ...textExporter,
+          exportFrame: () => {
+            const config = host.config(passThrough) as { baseUrl?: string } | undefined;
+            return ok(config?.baseUrl ?? '(none)');
+          },
+        });
+      },
+      { contributes: SETTINGS_MANIFEST.contributes },
+    );
+  }
+
+  const declareBaseUrl = (host: PluginHost): void =>
+    void host.registerConfiguration({
+      id: 'baseUrl',
+      form: { type: 'string', format: 'uri' },
+      default: 'https://example.com',
+      description: 'Where the service is.',
+    });
+
+  it('crosses as a form and is validated on the host', async () => {
+    const { connected } = await declaring(declareBaseUrl);
+    if (!connected.ok) throw new Error(connected.error[0]?.message);
+    const host = createPluginHost();
+    expect(host.tryActivate(connected.value.plugin).ok).toBe(true);
+
+    const [declared] = host.registry.configurations();
+    expect(declared?.key).toBe('texto.baseUrl');
+    const resolved = resolveSettings(host.registry.configurations(), [
+      { key: 'texto.baseUrl', value: 'not a uri', valueRange: sourceRange(10, 21) },
+    ]);
+    expect(resolved.diagnostics.map((item) => [item.code, item.range])).toEqual([
+      ['W_SETTING_INVALID', sourceRange(10, 21)],
+    ]);
+    expect(resolved.values['texto.baseUrl']).toBe('https://example.com');
+  });
+
+  it('reaches the process on every configure, and a call reads the newest', async () => {
+    const { connected } = await declaring(declareBaseUrl);
+    if (!connected.ok) throw new Error(connected.error[0]?.message);
+    const host = createPluginHost();
+    host.tryActivate(connected.value.plugin);
+    const exporter = host.registry.exporters.forKind('txt');
+    if (exporter === undefined) throw new Error('no txt exporter');
+
+    const configureWith = (value: string): void =>
+      host.configure(
+        resolveSettings(host.registry.configurations(), [{ key: 'texto.baseUrl', value }]).config,
+      );
+    configureWith('https://a.example');
+    expect(await exporter.exportFrame(SCENE, ARTWORK, FRAME)).toMatchObject({
+      value: 'https://a.example',
+    });
+    configureWith('https://b.example');
+    expect(await exporter.exportFrame(SCENE, ARTWORK, FRAME)).toMatchObject({
+      value: 'https://b.example',
+    });
+  });
+
+  it('holds the last configure when activated into two hosts', async () => {
+    const { connected } = await declaring(declareBaseUrl);
+    if (!connected.ok) throw new Error(connected.error[0]?.message);
+    const first = createPluginHost();
+    const second = createPluginHost();
+    first.tryActivate(connected.value.plugin);
+    second.tryActivate(connected.value.plugin);
+    first.configure({ texto: { baseUrl: 'https://first.example' } });
+    second.configure({ texto: { baseUrl: 'https://second.example' } });
+    const exporter = first.registry.exporters.forKind('txt');
+    expect(await exporter?.exportFrame(SCENE, ARTWORK, FRAME)).toMatchObject({
+      value: 'https://second.example',
+    });
+  });
+
+  it('refuses a Zod schema by name, saying to use form', async () => {
+    const { connected } = await declaring((host) =>
+      host.registerConfiguration({
+        id: 'size',
+        schema: z.number(),
+        default: 1,
+        description: 'A size.',
+      }),
+    );
+    expect(connected.ok ? '' : connected.error[0]?.message).toBe(
+      "Plugin 'texto' failed to activate: the setting 'size' carries a Zod schema, which is code " +
+        'and does not cross to the host; use form, the same rules as data (ADR 0145).',
+    );
+  });
+
+  it('refuses a default its form refuses, at activation', async () => {
+    const { connected } = await declaring((host) =>
+      host.registerConfiguration({
+        id: 'baseUrl',
+        form: { type: 'string', format: 'uri' },
+        default: 'nowhere',
+        description: 'Where the service is.',
+      }),
+    );
+    if (!connected.ok) throw new Error(connected.error[0]?.message);
+    const activated = createPluginHost().tryActivate(connected.value.plugin);
+    expect(activated.ok ? [] : activated.error.map((item) => item.code)).toEqual([
+      'E_PLUGIN_ACTIVATE',
+    ]);
+    expect(activated.ok ? '' : activated.error[0]?.message).toContain(
+      "declares the setting 'baseUrl' with a default its own schema refuses",
+    );
+  });
+
+  it('refuses an object form when the data crosses', async () => {
+    const { connected } = await declaring((host) =>
+      host.registerConfiguration({
+        id: 'board',
+        form: { type: 'object' } as never,
+        default: {},
+        description: 'A board.',
+      }),
+    );
+    expect(connected.ok ? '' : connected.error[0]?.message).toContain(
+      "its 'configuration' contribution does not match: form",
+    );
   });
 });
 
