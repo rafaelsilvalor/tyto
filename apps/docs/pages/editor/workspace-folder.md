@@ -85,6 +85,22 @@ These work in every folder, trusted or not: none of them runs anything in it.
 
 The **Explorer** button in the status bar, beside the queue's, shows and hides it, as does **Show or hide: Explorer** in the command bar. When Tyto starts again with the folder still open, the Explorer is as you left it: closed if you closed it. With no folder open it says _No folder open_ and offers **Open Folder…**. It lists an untrusted folder like any other: listing a folder runs nothing in it.
 
+## What a plugin reads from the folder
+
+An installed plugin can have a key of its own under `plugins`, named by the plugin's id. It is where the folder tells that plugin what this project uses — which site to read, which sheet to fill — and it wins over the plugin's settings in `settings.json`, which are yours and the same in every folder:
+
+```jsonc
+{
+  "plugins": {
+    "my-connector": { "site": "acme.example", "limit": 50 },
+  },
+}
+```
+
+The plugin reads its own key each time it is asked for something, so an edit counts from the next request. **It never sees another plugin's key**, and while the folder is untrusted it sees none. Tyto does not check what is inside: the plugin says when something is wrong. **Never put a password or a token here**: the file is plain text that you copy and share. A plugin that needs one asks for it and keeps it in the system's secure storage.
+
+From the command line, `--section` sets one key for one run without editing the file, and works in an untrusted folder too — see [Render a brief](../command-line/render.md#other-options).
+
 ## A folder you have not trusted
 
 Every folder starts untrusted. An untrusted folder still opens, previews and exports, but every folder its project file names must be inside it: a name that leads outside — `../shared`, an absolute path, or a shortcut inside the folder that points elsewhere — is left out. Each one left out is listed in the **Problems** panel as `W_PROJECT_PATH_OUTSIDE`, with its line and column in `.tyto/project.json`. Its plugin sections are withheld too.

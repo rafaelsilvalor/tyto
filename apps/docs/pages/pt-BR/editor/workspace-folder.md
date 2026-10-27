@@ -85,6 +85,22 @@ Isso funciona em qualquer pasta, confiável ou não: nada disso executa coisa al
 
 O botão do **Explorador** na barra de status, ao lado do da fila, mostra e esconde o painel, assim como **Mostrar ou esconder: Explorador** na barra de comandos. Quando o Tyto abre de novo com a pasta ainda aberta, o Explorador fica como você deixou: fechado, se você o fechou. Sem pasta aberta, ele diz _Nenhuma pasta aberta_ e oferece **Abrir pasta…**. Ele lista uma pasta em que você não confiou como qualquer outra: listar uma pasta não executa nada dela.
 
+## O que um plugin lê da pasta
+
+Um plugin instalado pode ter uma chave só dele em `plugins`, com o id do plugin como nome. É ali que a pasta diz a esse plugin o que este projeto usa — qual site ler, qual planilha preencher — e ela ganha das configurações do plugin no `settings.json`, que são suas e valem igual em toda pasta:
+
+```jsonc
+{
+  "plugins": {
+    "my-connector": { "site": "acme.example", "limit": 50 },
+  },
+}
+```
+
+O plugin lê a chave dele a cada pedido que recebe, então uma edição vale a partir do próximo pedido. **Ele nunca vê a chave de outro plugin**, e enquanto a pasta não tem confiança ele não vê nenhuma. O Tyto não confere o que tem dentro: é o plugin que avisa quando algo está errado. **Nunca ponha senha nem token aqui**: o arquivo é texto simples, que você copia e compartilha. Um plugin que precisa de um pede e guarda no armazenamento seguro do sistema.
+
+Na linha de comando, `--section` define uma chave numa execução sem editar o arquivo, e funciona também numa pasta sem confiança — veja [Renderizar um brief](../command-line/render.md#outras-opcoes).
+
 ## Uma pasta em que você ainda não confiou
 
 Toda pasta começa sem confiança. Uma pasta assim abre, mostra a prévia e exporta, mas toda pasta que o arquivo do projeto nomeia precisa estar dentro dela: um nome que leva para fora — `../shared`, um caminho absoluto, ou um atalho dentro da pasta que aponta para outro lugar — fica de fora. Cada um que fica de fora aparece no painel **Problemas** como `W_PROJECT_PATH_OUTSIDE`, com linha e coluna no `.tyto/project.json`. As seções de plugin dela também ficam retidas.
