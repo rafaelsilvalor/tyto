@@ -205,6 +205,20 @@ describe('surround in vim mode (TYTO-418, ADR 0143)', () => {
     expect(isReadingVimKeys(view)).toBe(false);
   });
 
+  it('switched on and then off, vim’s own keys come back', () => {
+    // What the engine's own visual `S` does, measured before surround was ever mapped.
+    const vimOwnS = after('|hello world', 'viwS');
+    on();
+    const off = setVimContributions([SURROUND], []);
+    expect(off.ok && off.value).toEqual([]);
+
+    // `ds` reads nothing and the `"` after it is no command: the text stays.
+    expect(after('say "h|i" now', 'ds"')).toBe('say "hi" now');
+    // Visual `S` is vim's again: it changes the line instead of waiting for a pair.
+    expect(after('|hello world', 'viwS')).toBe(vimOwnS);
+    expect(vimOwnS).not.toContain('hello');
+  });
+
   it('refuses the s motion outside operatorPending and visual, as a text object is', () => {
     const result = setVimContributions(
       [
