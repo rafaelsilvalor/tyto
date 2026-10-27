@@ -45,6 +45,7 @@ describe("the app's settings outline", () => {
       'fontSizes',
       'fontFamilies',
       'googleFonts',
+      'recipeTimeZone',
     ]);
   });
 
