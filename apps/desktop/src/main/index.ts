@@ -94,6 +94,8 @@ import { type WindowPlugins, windowPlugins } from './window-plugins.js';
 import { desktopSources } from './plugin-sources.js';
 import { googleFontsOptionsFor, windowGoogleFonts } from './google-fonts.js';
 import { createPreviewService } from './preview.js';
+import { recipeClock } from './recipe-clock.js';
+import { createRecipeRunner } from './recipe-runner.js';
 import { createProjectSources } from './project.js';
 import { createTemplateEditor } from './template-editor.js';
 import { createWorkspaceService } from './workspace.js';
@@ -598,6 +600,8 @@ async function start(): Promise<void> {
   let formatBriefOnSave = saved.formatBriefOnSave;
   // And whether a missing face is asked of Google Fonts (TYTO-281), read on every compile.
   let googleFonts = saved.googleFonts;
+  // And the zone a recipe reads written times in (TYTO-377, ADR 0148), read at every run.
+  let recipeTimeZone = saved.recipeTimeZone;
   // And how the columns of a `|` line are drawn (TYTO-298), on the same answer.
   let briefColumns = saved.briefColumns;
   // And how the editor numbers its lines (TYTO-415), on the same answer.
@@ -828,6 +832,20 @@ async function start(): Promise<void> {
       read: folderThemeReader(pluginStore.directoryOf(plugin)),
     }));
   void contributed.ready.then(themesReady);
+  // The recipe notebook's runner (TYTO-377, ADR 0148): the plugins' verbs, each with its own
+  // section of the folder a recipe is in, read per call (ADR 0147); the folder's trust and data
+  // files; the recipe's state in the same `TYTO_HOME`; and the clock in the setting's zone.
+  const recipes = createRecipeRunner({
+    contributions: contributed.recipeContributions(),
+    placeOf: async (directory) => {
+      const answer = await workspace.sourceTrustFor(directory);
+      if (answer === undefined || answer.trust === 'none') return { trust: 'none' };
+      return { trust: answer.trust, folder: answer.folder };
+    },
+    sectionFor: (directory, plugin) => workspace.sectionFor(directory, plugin),
+    home: pluginsHome,
+    clock: () => recipeClock(recipeTimeZone),
+  });
   // The images and faces installed plugins supply, in one cache for the process, which the
   // preview and the export share (ADR 0117, ADR 0119).
   const pluginSources = desktopSources({
@@ -950,6 +968,7 @@ async function start(): Promise<void> {
       if (keys.includes('tabSize')) tabSize = next.tabSize;
       if (keys.includes('formatBriefOnSave')) formatBriefOnSave = next.formatBriefOnSave;
       if (keys.includes('googleFonts')) googleFonts = next.googleFonts;
+      if (keys.includes('recipeTimeZone')) recipeTimeZone = next.recipeTimeZone;
       if (keys.includes('briefColumns')) briefColumns = next.briefColumns;
       if (keys.includes('lineNumbers')) lineNumbers = next.lineNumbers;
       if (keys.includes('zoom')) applyZoom(next.zoom);
@@ -1496,6 +1515,7 @@ async function start(): Promise<void> {
       }));
     },
     preview,
+    recipes,
     templates,
     templateEditor,
     templateFolder,

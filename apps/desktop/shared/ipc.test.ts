@@ -68,6 +68,8 @@ describe('the IPC contract', () => {
       'queue:set-auto-run',
       'queue:set-folder',
       'queue:set-kinds',
+      'recipe:run',
+      'recipe:verbs',
       'session:read',
       'session:write',
       'settings:open',
@@ -397,6 +399,8 @@ describe('what the contract does not promise', () => {
       'plugins:keymaps',
       // TYTO-418. Nor "which vim keys do the plugins map": every plugin's, which main holds.
       'plugins:vim',
+      // TYTO-377. Nor "which verbs may a recipe name": the generic ones and every plugin's.
+      'recipe:verbs',
       // TYTO-207. Nor "what does keybindings.json say": there is one file, and main knows it.
       'keybindings:read',
       // TYTO-277. Nor "what does snippets.json say", for the same reason.

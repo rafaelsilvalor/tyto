@@ -28,6 +28,7 @@
     "@tyto/io": "workspace:*",
     "@tyto/pipeline": "workspace:*",
     "@tyto/plugin-api": "workspace:*",
+    "@tyto/recipe": "workspace:*",
     "@tyto/template-lang": "workspace:*",
     "@tyto/templates": "workspace:*",
     "@tyto/theme-pack": "workspace:*",

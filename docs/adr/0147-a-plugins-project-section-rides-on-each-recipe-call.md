@@ -68,3 +68,11 @@ wrong on three counts:
   TYTO-261, command of the plugin, on each call.
 - Out: a schema a plugin could declare for its section so the window could check and outline
   it; nesting in `--section` (`jira.fields.status=…` sets the key `fields.status`).
+
+## Note, 2026-10-27 — `sectionOf` composed in the desktop (TYTO-377)
+
+The desktop's recipe runner passes `sectionOf` (ADR 0148): `WorkspaceService.sectionFor` reads
+the open folder's resolved sections on every call, for a recipe inside the open folder, and
+answers nothing outside it. The runner hands a section on only in a trusted folder, on top
+of the sections `loadWorkspace` already withheld, so Run in a restricted folder hands no verb
+a section.

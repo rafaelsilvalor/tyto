@@ -219,9 +219,51 @@ describe('the trust a plugin fetch answers to (ADR 0119)', () => {
     // would find walking up — restricted, because nobody trusted it.
     expect(await workspace.sourceTrustFor(join(elsewhere, 'briefs'))).toEqual({
       trust: 'restricted',
+      folder: elsewhere,
     });
     expect(await workspace.sourceTrustFor(loose)).toEqual({ trust: 'none' });
     expect(await workspace.sourceTrustFor(undefined)).toBeUndefined();
+  });
+});
+
+describe('the section a recipe verb is handed (TYTO-377, ADR 0147, ADR 0148)', () => {
+  const PROJECT =
+    '{ "plugins": { "acme": { "site": "https://acme.example" }, "other": { "sheet": "s1" } } }';
+
+  it("is the open folder's, per plugin, read again on every call", async () => {
+    await writeFile(join(work, '.tyto', 'project.json'), PROJECT);
+    const workspace = createWorkspaceService({
+      trustStore: fsTrustStore({ home }),
+      home,
+      setTemplateFolders: () => Promise.resolve(),
+    });
+    const recipes = join(work, 'recipes');
+    expect(workspace.sectionFor(recipes, 'acme')).toBeUndefined();
+
+    await workspace.open(work);
+    // Restricted: `loadWorkspace` withheld every section, so a verb is handed none.
+    expect(workspace.sectionFor(recipes, 'acme')).toBeUndefined();
+
+    expect((await workspace.grant('folder')).ok).toBe(true);
+    expect(workspace.sectionFor(recipes, 'acme')).toEqual({ site: 'https://acme.example' });
+    expect(workspace.sectionFor(recipes, 'other')).toEqual({ sheet: 's1' });
+    expect(workspace.sectionFor(recipes, 'nobody')).toBeUndefined();
+    // Only an own key is a section: nothing every object inherits is one.
+    expect(workspace.sectionFor(recipes, 'constructor')).toBeUndefined();
+    // Outside the open folder, or in no file yet, no folder chose anything.
+    expect(workspace.sectionFor(join(scratch, 'elsewhere'), 'acme')).toBeUndefined();
+    expect(workspace.sectionFor(undefined, 'acme')).toBeUndefined();
+
+    // Edited and read again: the next call reads the new value, nothing kept from the last.
+    await writeFile(
+      join(work, '.tyto', 'project.json'),
+      '{ "plugins": { "acme": { "site": "https://b.example" } } }',
+    );
+    await workspace.open(work);
+    expect(workspace.sectionFor(recipes, 'acme')).toEqual({ site: 'https://b.example' });
+
+    await workspace.close();
+    expect(workspace.sectionFor(recipes, 'acme')).toBeUndefined();
   });
 });
 

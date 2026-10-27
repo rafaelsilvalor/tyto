@@ -146,4 +146,44 @@ describe('windowPlugins', () => {
     window.configure({ conector: { baseUrl: 'https://acme.example' } });
     expect(read).toEqual(['https://acme.example']);
   });
+
+  // TYTO-377, ADR 0148: the recipe notebook's verbs, read per call and gated like the rest.
+  it('offers no recipe verbs until the plugins have started, and each with its plugin after', async () => {
+    let start: (value: LoadedPlugins) => void = () => undefined;
+    const CONNECTOR: Plugin = {
+      id: 'conector',
+      manifest: {
+        ...manifest('conector', ['recipe-verb', 'recipe-derivation']),
+        namespace: 'acme',
+      },
+      activate: (host) => {
+        host.registerRecipeVerb({
+          id: 'acme.tidy',
+          kind: 'transform',
+          arguments: [],
+          transform: ({ table }) => ok(table),
+        });
+        return host.registerRecipeDerivation({
+          id: 'acme.kind',
+          requires: [],
+          produces: [],
+          derive: (table) => ok(table),
+        });
+      },
+    };
+    const window = windowPlugins(new Promise((resolve) => (start = resolve)));
+    const recipes = window.recipeContributions();
+    expect(recipes.recipeVerbs()).toEqual([]);
+    expect(recipes.ownedRecipeVerbs()).toEqual([]);
+    expect(recipes.recipeDerivations()).toEqual([]);
+
+    start(loaded(CONNECTOR));
+    await window.ready;
+    // The object asked for before start-up answers now: it reads the host on every call.
+    expect(recipes.recipeVerbs().map((verb) => verb.id)).toEqual(['acme.tidy']);
+    expect(recipes.ownedRecipeVerbs().map(({ plugin, verb }) => [plugin, verb.id])).toEqual([
+      ['conector', 'acme.tidy'],
+    ]);
+    expect(recipes.recipeDerivations().map((derivation) => derivation.id)).toEqual(['acme.kind']);
+  });
 });

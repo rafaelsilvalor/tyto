@@ -46,3 +46,9 @@ São Paulo stamp three hours off.
   done stamp files under is the stamp read through the same offset and year inference.
 - Nothing wires a person's zone yet. Every host today runs on the default, which is the
   machine's; the notebook (TYTO-377) is where a setting for it would land.
+
+## Note, 2026-10-27 — the zone is a setting in the desktop (TYTO-377)
+
+The desktop's notebook reads its clock from the `recipeTimeZone` setting (ADR 0148 decision 7):
+an IANA name, or `null` for the machine's zone, which is what every run used before. The offset
+is read per instant with `Intl.DateTimeFormat`. The CLI still runs on `systemClock`.

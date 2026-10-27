@@ -11,6 +11,7 @@ import {
 import { type Credentials } from './credentials.js';
 import { type ExplorerService } from './explorer.js';
 import { type WindowThemes, createHandlers, guard, registerIpcHandlers } from './ipc.js';
+import { type RecipeRunInput, type RecipeRunner } from './recipe-runner.js';
 import { createTemplateFolder } from './session.js';
 import { BUILT_IN_THEMES, builtInThemeSource, createThemeService } from './themes.js';
 
@@ -304,7 +305,8 @@ const documents = () => {
     // One folder per tab, which is what `brief:preview` looks up from the id it is given.
     folderOf: (documentId: string) => (documentId === 'document-1' ? '/briefs' : undefined),
     nameOf: (documentId: string) => (documentId === 'document-1' ? 'promo' : undefined),
-    pathOf: () => undefined,
+    pathOf: (documentId: string) =>
+      documentId === 'document-1' ? '/recipes/weekly.recipe' : undefined,
     reset: () => undefined,
     // TYTO-352: what the explorer's handlers hand on, recorded, with one tab under each.
     followed,
@@ -677,6 +679,36 @@ const windowThemes = (): WindowThemes => {
   };
 };
 
+/**
+ * The recipe runner, recorded (TYTO-377). What it decides is `recipe-runner.test.ts`'s; here
+ * the handler has to hand it the tab's own file and echo the id.
+ */
+const recipeRunner = () => {
+  const asked: RecipeRunInput[] = [];
+  const closed: string[] = [];
+  const runner: RecipeRunner & {
+    readonly asked: RecipeRunInput[];
+    readonly closed: string[];
+  } = {
+    asked,
+    closed,
+    run: (input) => {
+      asked.push(input);
+      return Promise.resolve({
+        cells: [{ index: 0, line: 2, status: 'stale', diagnostics: [] }],
+        diagnostics: [],
+        held: 'restricted',
+        ranAt: '2026-10-27T12:00:00.000Z',
+      });
+    },
+    verbs: () => ['acme.pull', 'where'],
+    close: (documentId) => {
+      closed.push(documentId);
+    },
+  };
+  return runner;
+};
+
 const dependencies = () => {
   const keychain = credentials();
   return {
@@ -736,6 +768,7 @@ const dependencies = () => {
       read: () => Promise.resolve(''),
     },
     preview: preview(),
+    recipes: recipeRunner(),
     project: projectFolder(),
     workspace: workspaceFolder(),
     explorer: explorerFiles(),
@@ -884,6 +917,36 @@ describe('the tab a message is about (E9.11)', () => {
 
     expect(await handlers['file:close']({ documentId: 'document-7' })).toEqual({});
     expect(injected.documents.closed).toEqual(['document-7']);
+    // A recipe's cells die with its tab (ADR 0148).
+    expect(injected.recipes.closed).toEqual(['document-7']);
+  });
+
+  // TYTO-377, ADR 0148: the recipe runs against the tab's own file, and the id goes back.
+  it('runs a recipe against the file main holds for the tab, and echoes the id', async () => {
+    const injected = dependencies();
+    const handlers = createHandlers(injected);
+
+    const answer = await handlers['recipe:run']({
+      requestId: 41,
+      documentId: 'document-1',
+      text: 'recipe weekly\nwhere status = done\n',
+      explicit: true,
+    });
+    await handlers['recipe:run']({ requestId: 42, documentId: 'document-2', text: '' });
+
+    expect(answer).toEqual({
+      requestId: 41,
+      cells: [{ index: 0, line: 2, status: 'stale', diagnostics: [] }],
+      diagnostics: [],
+      held: 'restricted',
+      ranAt: '2026-10-27T12:00:00.000Z',
+    });
+    expect(injected.recipes.asked.map((input) => [input.documentId, input.path])).toEqual([
+      ['document-1', '/recipes/weekly.recipe'],
+      ['document-2', undefined],
+    ]);
+    expect(injected.recipes.asked[0]?.explicit).toBe(true);
+    expect(await handlers['recipe:verbs']({})).toEqual({ verbs: ['acme.pull', 'where'] });
   });
 
   it('passes a confirmation straight through, strings and all', async () => {

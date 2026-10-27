@@ -55,3 +55,11 @@ reusable adapter come first and the wiring comes with the app that runs them.
   relative data should name paths from the workspace's recipe folder until a host needs more.
 - The adapter is not wired into the desktop or the CLI. TYTO-377 composes it in the desktop
   from `loadWorkspace`'s `folder` and `trust`; a CLI recipe runner is a card of its own.
+
+## Note, 2026-10-27 — composed in the desktop (TYTO-377)
+
+The desktop composes `workspaceDataResolver` for the recipe notebook (ADR 0148), with the
+workspace folder and trust the window's workspace answers for the recipe's folder: the open
+folder's inside it, the trust store's for a workspace found by walking up outside it. A recipe
+in no workspace, or in a tab never saved, is handed no resolver, so a verb that needs data says
+there is none. A restricted folder's Run still reads no data file.

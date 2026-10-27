@@ -34,7 +34,7 @@ import { type VimModeStyle, vimModeStyleContribution } from './vim-mode-style.js
  * reads off a disk and the window is told what the answer was, so the shape has to be one
  * declaration both halves import. Linted pure — no Node, no DOM.
  *
- * **Twenty-three settings the built-in `desktop` plugin declares** through the `configuration`
+ * **Twenty-six settings the built-in `desktop` plugin declares** through the `configuration`
  * extension point (TYTO-206, ADR 0073), like any plugin's: built-in is a plugin. Their keys
  * stay unprefixed, exactly as every `settings.json` written before that card spells them.
  * Each one is validated alone, so a hand-broken value costs that key and nothing else.
@@ -308,8 +308,39 @@ export function googleFontsExample(): string {
     .join('\n');
 }
 
+/** Whether the runtime knows `zone` as an IANA time zone name, such as `America/Sao_Paulo`. */
+export function isTimeZone(zone: string): boolean {
+  try {
+    new Intl.DateTimeFormat('en-US', { timeZone: zone });
+    return true;
+  } catch {
+    return false;
+  }
+}
+
 /**
- * The twenty-five, in the order the settings file is documented in. `theme` checks its ids against
+ * The time zone a recipe reads a written time in, and the one `age` counts hours against
+ * (TYTO-377, ADR 0139, ADR 0148). `null`, the default, is this machine's zone, which is what a
+ * run used before the setting existed. An IANA name rather than an offset, so a zone with
+ * daylight saving answers each date its own. Read at every run, so a save applies to the next
+ * one with no restart.
+ *
+ * The key is `recipeTimeZone` and not `recipes.timeZone`: a built-in's key is letters and
+ * digits, and the host would read a dot as a plugin's prefix (`configuration.ts`).
+ */
+export const recipeTimeZoneContribution = {
+  id: 'recipeTimeZone',
+  schema: z
+    .string()
+    .refine(isTimeZone, { message: 'Expected an IANA time zone, such as "America/Sao_Paulo"' })
+    .nullable(),
+  default: null,
+  description:
+    'The IANA time zone a recipe reads written times in, such as "America/Sao_Paulo", or null for this machine’s (the default).',
+} satisfies ConfigurationContribution<string | null>;
+
+/**
+ * The twenty-six, in the order the settings file is documented in. `theme` checks its ids against
  * `lookup`, which main builds from every theme the plugins registered (TYTO-208); the default
  * knows the built-in two and lets any other id through.
  */
@@ -342,6 +373,7 @@ export function settingContributions(
     fontSizesContribution,
     fontFamiliesContribution,
     googleFontsContribution,
+    recipeTimeZoneContribution,
   ] as readonly ConfigurationContribution[];
 }
 
@@ -387,6 +419,8 @@ export interface Settings {
   readonly fontFamilies: FontFamilies;
   /** Whether a missing face is asked of Google Fonts (TYTO-281, ADR 0120). */
   readonly googleFonts: boolean;
+  /** The zone a recipe reads written times in, or `null` for the machine's (TYTO-377). */
+  readonly recipeTimeZone: string | null;
 }
 
 export const DEFAULT_SETTINGS: Settings = {
@@ -415,13 +449,14 @@ export const DEFAULT_SETTINGS: Settings = {
   fontSizes: fontSizesContribution.default,
   fontFamilies: fontFamiliesContribution.default,
   googleFonts: googleFontsContribution.default,
+  recipeTimeZone: recipeTimeZoneContribution.default,
 };
 
 /** What a queue folder produces until a person chooses otherwise (ADR 0044). */
 export const DEFAULT_QUEUE_KINDS: readonly string[] = ['png'];
 
 /**
- * The twenty-five out of the resolved values, which already hold every declared key with a value
+ * The twenty-six out of the resolved values, which already hold every declared key with a value
  * its schema accepted or its default (`resolveSettings`).
  */
 export function settingsFrom(values: Readonly<Record<string, unknown>>): Settings {
@@ -453,5 +488,6 @@ export function settingsFrom(values: Readonly<Record<string, unknown>>): Setting
     fontSizes: pick('fontSizes'),
     fontFamilies: pick('fontFamilies'),
     googleFonts: pick('googleFonts'),
+    recipeTimeZone: pick('recipeTimeZone'),
   };
 }
