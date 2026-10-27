@@ -2,7 +2,7 @@
 
 # Settings
 
-Every key the app declares in `settings.json`: 25. Open the file with **Preferences: Open Settings (JSON)**; a key you leave out keeps its default, and a value the app cannot read is reported in the Problems panel and the default applies. A plugin adds its own keys as `<plugin id>.<key>`, which are not listed here.
+Every key the app declares in `settings.json`: 26. Open the file with **Preferences: Open Settings (JSON)**; a key you leave out keeps its default, and a value the app cannot read is reported in the Problems panel and the default applies. A plugin adds its own keys as `<plugin id>.<key>`, which are not listed here.
 
 ## templatesFolder
 
@@ -402,3 +402,11 @@ Fetch a template's font this machine lacks from Google Fonts on first use (defau
 | --- | --- |
 | `true` | A missing font Google serves is fetched once, on save or open, and drawn from then on. |
 | `false` | Nothing is asked of Google; a missing font is drawn in a substitute, reported. |
+
+## recipeTimeZone
+
+The IANA time zone a recipe reads written times in, such as "America/Sao_Paulo", or null for this machine’s (the default).
+
+| Type | Default |
+| --- | --- |
+| `string \| null` | `null` |

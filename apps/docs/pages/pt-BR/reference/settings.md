@@ -2,7 +2,7 @@
 
 # Configurações
 
-Todas as chaves que o app declara no `settings.json`: 25. Abra o arquivo com **Preferências: Abrir configurações (JSON)**; uma chave que você não escreve fica com o valor padrão, e um valor que o app não consegue ler aparece no painel Problemas e o padrão vale no lugar dele. Um plugin acrescenta as próprias chaves como `<id do plugin>.<chave>`, que não aparecem aqui.
+Todas as chaves que o app declara no `settings.json`: 26. Abra o arquivo com **Preferências: Abrir configurações (JSON)**; uma chave que você não escreve fica com o valor padrão, e um valor que o app não consegue ler aparece no painel Problemas e o padrão vale no lugar dele. Um plugin acrescenta as próprias chaves como `<id do plugin>.<chave>`, que não aparecem aqui.
 
 ::: info Descrições em inglês
 As descrições abaixo estão em inglês: o código guarda cada uma em um só idioma, e esta página as mostra como estão em vez de traduzi-las à parte.
@@ -406,3 +406,11 @@ Fetch a template's font this machine lacks from Google Fonts on first use (defau
 | --- | --- |
 | `true` | A missing font Google serves is fetched once, on save or open, and drawn from then on. |
 | `false` | Nothing is asked of Google; a missing font is drawn in a substitute, reported. |
+
+## recipeTimeZone
+
+The IANA time zone a recipe reads written times in, such as "America/Sao_Paulo", or null for this machine’s (the default).
+
+| Tipo | Padrão |
+| --- | --- |
+| `string \| null` | `null` |
