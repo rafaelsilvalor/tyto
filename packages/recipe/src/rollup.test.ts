@@ -1,23 +1,14 @@
 import { describe, expect, it } from 'vitest';
 
 import { tasks } from './__fixtures__/flows.js';
+import { PARENT_RULES } from './__fixtures__/parents.js';
 import { column, runWithState } from './__fixtures__/state-harness.js';
 import type { CellValue } from './table.js';
 
 /**
- * A parent's decision, ported from Buraqueira's `decidir_pai` (`lib_status.py`) as a recipe:
- * three counts over the children, an ordered rules table over them, and a `where` that drops
- * the parents already moved on. The children's kinds are neutral: artwork stands for the
- * design, posting for social media, animation for motion, and ads and video for the kinds that
- * are not a posting.
+ * A parent's decision as a recipe: three counts over the children, the ordered rules table in
+ * `__fixtures__/parents.ts` over them, and a `where` that drops the parents already moved on.
  */
-const PARENT_RULES = [
-  { when: 'open_artwork > 0', set: { decision: 'wait-artwork' } },
-  { when: 'posting > 0 AND open_animation > 0', set: { decision: 'wait-animation' } },
-  { when: 'posting > 0', set: { decision: 'post' } },
-  { when: 'description ~ "card as a whole"', set: { decision: 'conclude' } },
-  { when: '', set: { decision: 'none' } },
-];
 const FILES = { './parents.json': { decision: PARENT_RULES } };
 
 const ROLLUPS = [
