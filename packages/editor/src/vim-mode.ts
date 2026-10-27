@@ -14,6 +14,7 @@ import {
 } from './keymap.js';
 import { vimKeyReader } from './vim-key-reader.js';
 import { vimFindTracker } from './vim-sneak.js';
+import { vimSystemClipboard } from './vim-system-clipboard.js';
 import { vimYankFlash } from './vim-yank.js';
 
 /**
@@ -223,6 +224,7 @@ export function vimMode(options: VimModeOptions = {}): Extension {
     // After `vim()` too: both follow the engine's events (sneak's `;`, the yank flash).
     vimFindTracker,
     vimYankFlash,
+    vimSystemClipboard,
     keymapExtension(options.keymap ?? vimKeymapSet),
   ];
 }
