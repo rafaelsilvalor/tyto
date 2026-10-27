@@ -34,6 +34,8 @@ describe('the vimPlugins setting', () => {
     expect(reading.settings.vimPlugins).toEqual({});
     expect(vimPluginIsOn(reading.settings.vimPlugins, 'commentary')).toBe(true);
     expect(vimPluginIsOn(reading.settings.vimPlugins, 'an-installed-one')).toBe(true);
+    // But sneak, which would take vim's own s and S (TYTO-419).
+    expect(vimPluginIsOn(reading.settings.vimPlugins, 'sneak')).toBe(false);
   });
 
   it('takes any plugin id, an installed plugin’s included, switched with a boolean', async () => {
@@ -67,6 +69,17 @@ describe('the vimPlugins setting', () => {
       .replace(/,$/u, '');
     const reading = await read(`{\n${uncommented}\n}\n`);
     expect(reading.diagnostics).toEqual([]);
-    expect(reading.settings.vimPlugins).toEqual({ surround: true, commentary: true });
+    expect(reading.settings.vimPlugins).toEqual({
+      surround: true,
+      commentary: true,
+      replaceWithRegister: true,
+      exchange: true,
+      unimpaired: true,
+      indentObject: true,
+      entireBuffer: true,
+      sneak: false,
+      highlightedYank: true,
+      systemClipboard: true,
+    });
   });
 });

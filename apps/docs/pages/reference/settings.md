@@ -133,7 +133,7 @@ Give the editor vim's keys: normal, insert, visual and replace modes (default fa
 
 ## vimPlugins
 
-Switch each vim plugin on or off by its id, with true or false; every vim plugin, built-in or installed, is on unless named false here. surround: ys{motion}{char}, yss{char}, cs{old}{new}, ds{char} and visual S{char} add, change or delete a pair around text: ( ) or b, [ ], { } or B, &lt; >, and quotes. An opening bracket adds a space inside the pair. commentary: gc{motion}, gcc and visual gc toggle a comment with the language's own: // in a brief, &lt;!-- --> in a Markdown file. Off, gc is vim's line comment only.
+Switch each vim plugin on or off by its id, with true or false; every vim plugin, built-in or installed, is on unless named false here, except sneak, which is off unless named true. surround: ys{motion}{char}, yss{char}, cs{old}{new}, ds{char} and visual S{char} add, change or delete a pair around text: ( ) or b, [ ], { } or B, &lt; >, and quotes. An opening bracket adds a space inside the pair. commentary: gc{motion}, gcc and visual gc toggle a comment with the language's own: // in a brief, &lt;!-- --> in a Markdown file. Off, gc is vim's line comment only. replaceWithRegister: gr{motion}, grr and visual gr replace text with a register ("agr with register a) and leave the register as it was, so p still pastes what was yanked. exchange: cx{motion} marks text and a second cx{motion} swaps the two; cxx marks a line, visual X marks the selection and cxc forgets the mark. Off, visual X deletes lines again. unimpaired: [&lt;Space> and ]&lt;Space> add a blank line above or below; [e and ]e move the line up or down. A count repeats either. indentObject: ii is the block of lines at the cursor's indent or deeper and ai adds the line that opens it, after an operator or in visual mode: dii, yai, vii. entireBuffer: ae is every line of the file and ie leaves blank lines at either end out, after an operator or in visual mode: yae, dae, vie. sneak: Off unless set to true. s{char}{char} jumps to the next place those two characters appear and S to the previous one; ; and , repeat the last sneak or f/t. On, vim's own s and S are gone in normal mode. highlightedYank: A yank marks the yanked text for a moment, as vim-highlightedyank does. systemClipboard: y also copies to the system clipboard (a named register such as "ay does not), and text copied in another program is what p pastes once the editor has focus again.
 
 | Type | Default |
 | --- | --- |
@@ -145,6 +145,14 @@ Switch each vim plugin on or off by its id, with true or false; every vim plugin
 | --- | --- |
 | `"surround"` | ys{motion}{char}, yss{char}, cs{old}{new}, ds{char} and visual S{char} add, change or delete a pair around text: ( ) or b, [ ], { } or B, &lt; >, and quotes. An opening bracket adds a space inside the pair. |
 | `"commentary"` | gc{motion}, gcc and visual gc toggle a comment with the language's own: // in a brief, &lt;!-- --> in a Markdown file. Off, gc is vim's line comment only. |
+| `"replaceWithRegister"` | gr{motion}, grr and visual gr replace text with a register ("agr with register a) and leave the register as it was, so p still pastes what was yanked. |
+| `"exchange"` | cx{motion} marks text and a second cx{motion} swaps the two; cxx marks a line, visual X marks the selection and cxc forgets the mark. Off, visual X deletes lines again. |
+| `"unimpaired"` | [&lt;Space> and ]&lt;Space> add a blank line above or below; [e and ]e move the line up or down. A count repeats either. |
+| `"indentObject"` | ii is the block of lines at the cursor's indent or deeper and ai adds the line that opens it, after an operator or in visual mode: dii, yai, vii. |
+| `"entireBuffer"` | ae is every line of the file and ie leaves blank lines at either end out, after an operator or in visual mode: yae, dae, vie. |
+| `"sneak"` | Off unless set to true. s{char}{char} jumps to the next place those two characters appear and S to the previous one; ; and , repeat the last sneak or f/t. On, vim's own s and S are gone in normal mode. |
+| `"highlightedYank"` | A yank marks the yanked text for a moment, as vim-highlightedyank does. |
+| `"systemClipboard"` | y also copies to the system clipboard (a named register such as "ay does not), and text copied in another program is what p pastes once the editor has focus again. |
 
 ## vimModeStyle
 

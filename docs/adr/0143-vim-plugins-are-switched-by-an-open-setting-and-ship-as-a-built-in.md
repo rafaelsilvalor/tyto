@@ -312,3 +312,27 @@ Consequences:
   own and reads `navigator.clipboard` directly.
 - The suite never touches a real clipboard: the port is a stub and so is `navigator.clipboard`
   for the engine's `"+y`. What the real window does is the desktop change's to measure.
+
+## Amendment — the desktop's ids, and the clipboard it passes (TYTO-419 B / TYTO-442 desktop, 2026-10-27)
+
+The desktop change the two amendments above left for later.
+
+1. **The built-in table has ten ids.** Eight contributions of the `desktop` built-in plugin,
+   `surround`, `commentary`, `replaceWithRegister` (`gr`), `exchange` (`x` and `c` in
+   `operatorPending`, visual `X`), `unimpaired` (`[<Space>`, `]<Space>`, `[e`, `]e`),
+   `indentObject` (`ii`, `ai`), `entireBuffer` (`ie`, `ae`) and `sneak` (`s`, `S`, `;`, `,` in
+   normal mode), and two effects, `highlightedYank` and `systemClipboard`. ADR 0142 left the
+   text objects' keys and switch to this card; their ids are the editor's operation names, and
+   each key is mapped in `visual` and in `operatorPending`, the two contexts ADR 0142 decision
+   3 allows. Only `sneak` says `defaultOn: false`.
+2. **A new `settings.json` shows each id with its default**, `"sneak": false` among them,
+   instead of every id `true`, so uncommenting the example changes nothing.
+3. **The window passes one port object**, the renderer's `navigator.clipboard`, to
+   `setVimSystemClipboard` on every settings answer while `systemClipboard` is on, and
+   `undefined` when it is off; the same object again keeps the last text the editor saw. No
+   preload, IPC or main-process change.
+
+Consequences:
+
+- `systemClipboard` and the new keys are not measured in the real window here; jsdom types the
+  shipped mappings, and the clipboard is a stub in every test.

@@ -37,7 +37,10 @@ import {
   tabThroughCompletions,
   resolveKeybindings,
   selectionOf,
+  type SystemClipboard,
   setVimContributions,
+  setVimSystemClipboard,
+  setVimYankFlash,
   shownBindingsOf,
   windowBindingsOf,
   withDiagnostics,
@@ -266,7 +269,12 @@ import {
 } from '../../shared/layout.js';
 import { type SaveOutcome, holdPageClose, listenForExit, resolveExit } from './exit.js';
 import { installErrorReporting, reportToLog } from './report-errors.js';
-import { type WindowVimPlugins, createWindowVimPlugins, vimContributionOf } from './vim-plugins.js';
+import {
+  type WindowVimPlugins,
+  applyVimEffects,
+  createWindowVimPlugins,
+  vimContributionOf,
+} from './vim-plugins.js';
 import { searchPhrasesFor } from './search-phrases.js';
 import { type SessionGroups, type TemplateSnapshot, sessionOf } from './session.js';
 import { paintUpdateNotice } from './update-notice.js';
@@ -2523,6 +2531,12 @@ function showTheme(bridge: TytoBridge, ask: () => Promise<IpcResponse<'theme:cur
       if (vimSetting.follow(applied.vimMode, editor)) paintCommandBar();
       // And which vim plugins are on (TYTO-418): mapped or unmapped in place, every editor at once.
       windowVimPlugins?.settingArrived(applied.vimPlugins);
+      // And the two that switch an effect, the yank flash and the system clipboard (TYTO-419).
+      applyVimEffects(
+        applied.vimPlugins,
+        { setVimYankFlash, setVimSystemClipboard },
+        SYSTEM_CLIPBOARD,
+      );
       // And whether the editors draw indent guides (TYTO-293): every tab, and the template mode.
       indentGuides = applied.indentGuides;
       editor?.setIndentGuides(indentGuides);
@@ -4047,6 +4061,16 @@ const vimSetting = createVimSetting();
  * contributions arrive once, on `plugins:vim`.
  */
 let windowVimPlugins: WindowVimPlugins | undefined;
+
+/**
+ * The clipboard vim's yank shares (TYTO-442, ADR 0143): the renderer's own, which Electron lets
+ * the window read with no permission handler. A read rejects while the window has no focus,
+ * and the editor drops a rejection. One object, so every settings answer passes the same port.
+ */
+const SYSTEM_CLIPBOARD: SystemClipboard = {
+  readText: () => navigator.clipboard.readText(),
+  writeText: (text) => navigator.clipboard.writeText(text),
+};
 
 /** The `vimModeStyle` setting, from the same answer (TYTO-301): the badge until it arrives. */
 let vimModeStyle: VimModeStyle = 'badge';
