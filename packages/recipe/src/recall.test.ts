@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 
 import { tasks } from './__fixtures__/flows.js';
+import { EXPIRY } from './__fixtures__/parents.js';
 import {
   STORED_AT,
   column,
@@ -119,24 +120,6 @@ describe('recall', () => {
     expect(column(table, 'last_stored_at')).toEqual([STORED_AT, null, STORED_AT]);
   });
 });
-
-/**
- * Expiry is a recipe, not a mechanism (ADR 0144): `since` is stamped the first time a parent
- * waits and carried over from the store after that, because `storedAt` is re-stamped on every
- * write and cannot say since when. A parent that waited more than 720 hours (Buraqueira's 30
- * days) is forgotten; one that stops waiting is forgotten at once.
- */
-const EXPIRY = [
-  'recall waiting by=parent',
-  'last waiting by=parent columns=since',
-  'compose since="{last_since|}"',
-  'stamp since when="decision ~ wait" format="yyyy-MM-dd HH:mm"',
-  'age since format="yyyy-MM-dd HH:mm" into=waited',
-  'rules into=still_waiting using=[{"when": "decision ~ wait AND waited <= 720", ' +
-    '"set": {"still_waiting": "yes"}}]',
-  'remember waiting by=parent columns=since,decision when="still_waiting = yes" ' +
-    'forget-when="still_waiting != yes"',
-];
 
 const UTC: RunClock['offsetMinutes'] = () => 0;
 const START = Date.parse('2026-10-01T09:00:00Z');

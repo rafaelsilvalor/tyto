@@ -2,7 +2,7 @@ import { type Diagnostic, err, ok } from '@tyto/core';
 
 import type { RunClock } from '../clock.js';
 import { parseRecipe } from '../parse.js';
-import { createDerivationRegistry, createVerbRegistry } from '../registry.js';
+import { type Verb, createDerivationRegistry, createVerbRegistry } from '../registry.js';
 import { type RecipeRun, runRecipe } from '../run.js';
 import type { RecipeState, StoredEntry } from '../state.js';
 import type { CellValue, Table } from '../table.js';
@@ -53,10 +53,14 @@ export interface Ran {
   readonly at: string | undefined;
 }
 
-/** What else a run may be given: its clock (ADR 0139) and the workspace's data files. */
+/**
+ * What else a run may be given: its clock (ADR 0139), the workspace's data files, and verbs a
+ * test registers to stand in for a plugin's, namespaced as a plugin's are.
+ */
 export interface RunExtras {
   readonly clock?: RunClock;
   readonly files?: Record<string, unknown>;
+  readonly verbs?: Readonly<Record<string, Verb>>;
 }
 
 export async function runWithState(
@@ -70,9 +74,14 @@ export async function runWithState(
   const source = ['recipe sync', ...lines].join('\n');
   const recipe = parseRecipe(source);
   if (!recipe.ok) throw new Error(recipe.error.map(({ message }) => message).join('\n'));
+  const verbs = createVerbRegistry();
+  for (const [name, verb] of Object.entries(extras.verbs ?? {})) {
+    const registered = verbs.register(name, verb);
+    if (!registered.ok) throw new Error(registered.error.map(({ message }) => message).join('\n'));
+  }
   const result = await runRecipe(recipe.value, {
     input,
-    verbs: createVerbRegistry(),
+    verbs,
     derivations: createDerivationRegistry(),
     resolveRecipe: (name) => {
       const text = included[name];
