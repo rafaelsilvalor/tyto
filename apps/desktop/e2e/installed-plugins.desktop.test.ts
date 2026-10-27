@@ -56,7 +56,11 @@ const BUNDLED_NODE = join(
   process.platform === 'win32' ? 'node.exe' : 'node',
 );
 
+/** The settings file the app opens on: a value for the running connector, a key for the off one. */
+const SETTINGS = '{\n  "conector.baseUrl": "https://acme.example",\n  "parado.token": "x"\n}\n';
+
 let scratch: string;
+let settingsFile: string;
 let home: string;
 let queueFolder: string;
 let app: ElectronApplication;
@@ -90,6 +94,41 @@ function install(
     id: ${JSON.stringify(id)}, mime: 'text/plain', extension: ${JSON.stringify(kind)},
     kinds: [${JSON.stringify(kind)}], rasterized: false,
     exportFrame: (scene, artwork, frame) => { ${body} },
+  });
+}
+`,
+  );
+}
+
+/**
+ * `conector`: a `baseUrl` setting declared as a form, and a `cfg` exporter that writes what
+ * `host.config` answers for it when a frame is drawn (TYTO-254, ADR 0145).
+ */
+function installConnector(): void {
+  const folder = join(home, 'plugins', 'conector');
+  mkdirSync(join(folder, 'dist'), { recursive: true });
+  writeFileSync(
+    join(folder, 'tyto-plugin.json'),
+    JSON.stringify({
+      name: 'conector',
+      version: '1.0.0',
+      engine: `>=${PLUGIN_API_VERSION}`,
+      contributes: ['exporter', 'configuration'],
+      permissions: [],
+    }),
+  );
+  writeFileSync(join(folder, 'package.json'), JSON.stringify({ name: 'conector', type: 'module' }));
+  writeFileSync(
+    join(folder, 'dist', 'index.js'),
+    `const anything = { safeParse: (value) => ({ success: true, data: value }) };
+export function activate(host) {
+  host.registerConfiguration({
+    id: 'baseUrl', form: { type: 'string', format: 'uri' },
+    default: 'https://default.example', description: 'Where the service is.',
+  });
+  host.registerExporter({
+    id: 'cfg', mime: 'text/plain', extension: 'cfg', kinds: ['cfg'], rasterized: false,
+    exportFrame: () => ({ ok: true, value: String(host.config(anything)?.baseUrl), diagnostics: [] }),
   });
 }
 `,
@@ -165,6 +204,10 @@ function writeHome(): void {
       `.then((seen) => ({ ok: true, value: seen.join(' '), diagnostics: [] }));`,
     ['workspace:read', 'workspace:write'],
   );
+  // Declares a setting as a form and writes what `host.config` answers for it (TYTO-254).
+  installConnector();
+  // Installed and switched off: its key in settings.json is named, not called unknown.
+  install('parado', 'parado', 'off', `return { ok: true, value: 'off', diagnostics: [] };`);
   const entry = { enabled: true, permissions: [], source: '.' };
   writeFileSync(
     join(home, 'plugins.json'),
@@ -177,6 +220,8 @@ function writeHome(): void {
         chave: { ...entry, permissions: ['credentials:api-token'] },
         cofre: { ...entry, permissions: ['credentials:token'] },
         armario: { ...entry, permissions: ['workspace:read', 'workspace:write'] },
+        conector: entry,
+        parado: { ...entry, enabled: false },
       },
     }),
   );
@@ -226,6 +271,10 @@ beforeAll(async () => {
   queueFolder = join(scratch, 'fila');
   mkdirSync(queueFolder);
   writeHome();
+  // Before launch, as a person who edited it last session left it (TYTO-254).
+  settingsFile = join(scratch, 'user-data', 'settings.json');
+  mkdirSync(dirname(settingsFile), { recursive: true });
+  writeFileSync(settingsFile, SETTINGS, 'utf8');
 
   app = await _electron.launch({
     args: ['.', `--user-data-dir=${join(scratch, 'user-data')}`],
@@ -488,4 +537,74 @@ describe('the Node installed plugins run on (ADR 0050)', () => {
       `[TYTO-186] window guest on bundled node ${String(version)}: read outside grant → ${String(code)}\n`,
     );
   }, 90_000);
+});
+
+/**
+ * An installed plugin's setting in settings.json (TYTO-254, ADR 0145): declared to the settings
+ * tab, checked there, and delivered to the plugin's own process — at launch and on a save. Last
+ * in the file, because the save rewrites settings.json, where the queue's folder is too.
+ */
+describe('TYTO-254 an installed plugin reads its setting from settings.json', () => {
+  interface Checked {
+    readonly diagnostics: readonly {
+      readonly code: string;
+      readonly message: string;
+      readonly range?: { readonly start: number; readonly end: number };
+    }[];
+  }
+
+  /** What `conector`'s exporter wrote: the `baseUrl` its process holds. */
+  async function baseUrl(name: string): Promise<string> {
+    const out = join(scratch, name);
+    const progress = await exported('cfg', out);
+    expect(progress.failure).toBeUndefined();
+    const [file] = readdirSync(out).filter((entry) => entry.endsWith('.cfg'));
+    return readFileSync(join(out, file!), 'utf8');
+  }
+
+  it("suggests the plugin's key in the settings tab", async () => {
+    const { settings } = await call<{ settings: { key: string }[] }>('settings:outline', {});
+    const keys = settings.map((setting) => setting.key);
+    expect(keys).toContain('conector.baseUrl');
+    expect(keys.filter((key) => key.startsWith('parado.'))).toEqual([]);
+  });
+
+  it('checks its value, and names a key of a plugin that is not running', async () => {
+    const text = '{ "conector.baseUrl": "not a uri", "conector.nope": 1, "parado.token": "x" }';
+    const { diagnostics } = await call<Checked>('settings:validate', {
+      documentId: 'e2e-settings',
+      text,
+      dirty: false,
+    });
+    const at = (needle: string) => ({
+      start: text.indexOf(needle),
+      end: text.indexOf(needle) + needle.length,
+    });
+    expect(diagnostics.map((item) => [item.code, item.range])).toEqual([
+      ['W_SETTING_INVALID', at('"not a uri"')],
+      ['W_SETTING_UNKNOWN', at('"conector.nope"')],
+      ['W_SETTING_PLUGIN_NOT_RUNNING', at('"parado.token"')],
+    ]);
+    expect(diagnostics[2]?.message).toBe(
+      "Setting 'parado.token' belongs to plugin 'parado', which is not running.",
+    );
+  });
+
+  it("delivers the file's value to the plugin's process, and a saved change too", async () => {
+    const started = await baseUrl('cfg-launch');
+    expect(started).toBe('https://acme.example');
+
+    // Whatever else the file holds by now (the queue's folder) stays; only the value moves.
+    const text = readFileSync(settingsFile, 'utf8');
+    expect(text).toContain('https://acme.example');
+    writeFileSync(settingsFile, text.replace('https://acme.example', 'https://beta.example'));
+    const deadline = Date.now() + 30_000;
+    let seen = started;
+    for (let attempt = 0; seen !== 'https://beta.example'; attempt += 1) {
+      if (Date.now() > deadline) throw new Error(`the plugin still read ${seen}`);
+      await new Promise((resolve) => setTimeout(resolve, 250));
+      seen = await baseUrl(`cfg-saved-${attempt}`);
+    }
+    process.stdout.write(`[TYTO-254] desktop plugin setting: ${started} then ${seen}\n`);
+  }, 120_000);
 });

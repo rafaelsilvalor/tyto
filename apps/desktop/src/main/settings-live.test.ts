@@ -3,6 +3,7 @@ import { readFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
+import { declaredSetting } from '@tyto/plugin-api';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
 import type { IpcEventPayload } from '../../shared/ipc.js';
@@ -100,7 +101,7 @@ describe('live settings', () => {
     writeFileSync(file, onDisk, 'utf8');
     const settings = live();
     const typing = '{\n  // typing\n  "queueAutoRun": false\n}\n';
-    settings.validate('document-2', typing, true);
+    await settings.validate('document-2', typing, true);
 
     expect(await settings.remember({ queueFolder: '/fila' })).toBe(true);
 
@@ -128,7 +129,7 @@ describe('live settings', () => {
   it('keeps a clean tab in step with the disk', async () => {
     writeFileSync(file, '{}', 'utf8');
     const settings = live();
-    settings.validate('document-2', '{}', false);
+    await settings.validate('document-2', '{}', false);
 
     await settings.remember({ queueAutoRun: true });
     writeFileSync(file, '{ "queueKinds": { "/fila": ["svg"] } }', 'utf8');
@@ -146,7 +147,7 @@ describe('live settings', () => {
     // that typing onto the text the screen just wrote, instead of dropping one of them.
     writeFileSync(file, '{}', 'utf8');
     const settings = live();
-    settings.validate('document-2', '{}', false);
+    await settings.validate('document-2', '{}', false);
 
     await settings.remember({ queueAutoRun: true });
 
@@ -165,7 +166,7 @@ describe('live settings', () => {
     writeFileSync(file, before, 'utf8');
     const settings = live();
     await settings.changed();
-    settings.validate('document-2', `// typing\n${before}`, true);
+    await settings.validate('document-2', `// typing\n${before}`, true);
     sent = [];
 
     const outside = '{\n  "queueAutoRun": true\n}\n';
@@ -179,7 +180,7 @@ describe('live settings', () => {
     const onDisk = '{\n  // kept\n  "queueAutoRun": false\n}\n';
     writeFileSync(file, onDisk, 'utf8');
     const settings = live();
-    settings.validate('document-2', `// typing\n${onDisk}`, true);
+    await settings.validate('document-2', `// typing\n${onDisk}`, true);
     await settings.remember({ queueAutoRun: true });
     await settings.remember({ queueFolder: '/fila' });
     expect(readFileSync(file, 'utf8')).toBe(onDisk);
@@ -200,22 +201,98 @@ describe('live settings', () => {
     const onDisk = '{\n  "queueAutoRun": false\n}\n';
     writeFileSync(file, onDisk, 'utf8');
     const settings = live();
-    settings.validate('document-2', `// typing\n${onDisk}`, true);
+    await settings.validate('document-2', `// typing\n${onDisk}`, true);
     await settings.remember({ queueAutoRun: true });
     // The person saved, and then set the value back by hand and saved again.
     writeFileSync(file, onDisk, 'utf8');
-    settings.validate('document-2', onDisk, false);
+    await settings.validate('document-2', onDisk, false);
 
     await settings.closed('document-2');
 
     expect(readFileSync(file, 'utf8')).toBe(onDisk);
   });
 
-  it("finds a buffer's problems the way the store finds the file's", () => {
+  it("finds a buffer's problems the way the store finds the file's", async () => {
     const settings = live();
-    const diagnostics = settings.validate('document-2', '{ "queueAutRun": true }', false);
+    const diagnostics = await settings.validate('document-2', '{ "queueAutRun": true }', false);
     expect(diagnostics.map((item) => [item.code, item.range])).toEqual([
       ['W_SETTING_UNKNOWN', { start: 2, end: 15 }],
     ]);
+  });
+});
+
+/**
+ * An installed plugin's setting while the app runs (TYTO-254, ADR 0145). The plugins start after
+ * the window opens, so what is declared grows once; the tab waits for it, and the file is read
+ * again against it.
+ */
+describe("live settings and the installed plugins' settings", () => {
+  const BASE_URL = declaredSetting('demo', true, {
+    id: 'baseUrl',
+    form: { type: 'string', format: 'uri' },
+    default: 'https://default.example',
+    description: 'Where the service is.',
+  });
+
+  /** A live store whose declared list gains `demo.baseUrl` when `start` is called. */
+  const withPlugins = () => {
+    let started = false;
+    let start: () => void = () => undefined;
+    const ready = new Promise<void>((resolve) => {
+      start = () => {
+        started = true;
+        resolve();
+      };
+    });
+    const declared = () => (started ? [...BUILT_IN_SETTINGS, BASE_URL] : BUILT_IN_SETTINGS);
+    const configured: unknown[] = [];
+    const settings = createLiveSettings({
+      store: fileSettingsStore(file, declared),
+      declared,
+      ready,
+      initial: DEFAULT_SETTINGS,
+      readText: () => readFile(file, 'utf8').catch(() => ''),
+      apply: (next, keys) => {
+        applied.push({ next, keys });
+        return Promise.resolve();
+      },
+      configure: (config) => configured.push(config),
+      send: (payload) => sent.push(payload),
+      log: {
+        info: (message) => logged.push(message),
+        warn: (message) => logged.push(message),
+      },
+    });
+    return { settings, start, configured };
+  };
+
+  it('answers the tab only once the plugins have started, so their key is never unknown', async () => {
+    const { settings, start } = withPlugins();
+    let answered = false;
+    const diagnostics = settings
+      .validate('document-2', '{ "demo.baseUrl": "not a uri" }', false)
+      .then((found) => {
+        answered = true;
+        return found;
+      });
+    await new Promise((resolve) => setTimeout(resolve, 10));
+    expect(answered).toBe(false);
+
+    start();
+    expect((await diagnostics).map((item) => item.code)).toEqual(['W_SETTING_INVALID']);
+  });
+
+  it('reads the file again once they have, hands them their values and logs it once', async () => {
+    writeFileSync(file, '{ "demo.baseUrl": "https://acme.example" }');
+    const { settings, start, configured } = withPlugins();
+    start();
+    await settings.redeclared();
+
+    expect(configured).toEqual([
+      expect.objectContaining({ demo: { baseUrl: 'https://acme.example' } }),
+    ]);
+    // Nothing built-in moved, so nothing is applied, and the plugin's key is not unknown.
+    expect(applied).toEqual([]);
+    expect(logged.filter((line) => line.includes('demo.baseUrl'))).toEqual([]);
   });
 });

@@ -294,7 +294,8 @@ export interface IpcDependencies {
   /** The settings tab (TYTO-206): the one file it opens, its validation, its closing. */
   readonly settings: {
     open: (documentId: string) => Promise<IpcResponse<'settings:open'>>;
-    validate: (request: IpcRequest<'settings:validate'>) => Diagnostics;
+    /** Answered once the installed plugins have started, so their keys are known (TYTO-254). */
+    validate: (request: IpcRequest<'settings:validate'>) => Promise<Diagnostics>;
     closed: (documentId: string) => Promise<boolean>;
     /** What every declared setting is, for the tab's suggestions and hover (TYTO-304). */
     outline: () => Promise<readonly SettingOutline[]>;
@@ -762,16 +763,15 @@ export function createHandlers(dependencies: IpcDependencies): Handlers {
 
     'settings:outline': async () => ({ settings: (await settings.outline()).map(wireOutline) }),
 
-    'settings:validate': (request) =>
-      Promise.resolve({
-        diagnostics: settings.validate(request).map((item) => ({
-          severity: item.severity,
-          code: item.code,
-          message: item.message,
-          ...(item.range === undefined ? {} : { range: item.range }),
-          ...(item.hint === undefined ? {} : { hint: item.hint }),
-        })),
-      }),
+    'settings:validate': async (request) => ({
+      diagnostics: (await settings.validate(request)).map((item) => ({
+        severity: item.severity,
+        code: item.code,
+        message: item.message,
+        ...(item.range === undefined ? {} : { range: item.range }),
+        ...(item.hint === undefined ? {} : { hint: item.hint }),
+      })),
+    }),
 
     'log:reveal': async () => {
       await folders.reveal(log.directory);

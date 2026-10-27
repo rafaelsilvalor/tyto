@@ -713,22 +713,24 @@
     {
       "paths": ["apps/desktop/src/main/settings-outline.ts"],
       "e2e": [
+        "installed-plugins.desktop.test.ts",
         "settings-assist.desktop.test.ts",
         "settings-writers.desktop.test.ts",
         "settings.desktop.test.ts"
       ],
-      "why": "reviewed: the settings tab"
+      "why": "reviewed: the settings tab, and an installed plugin's key in its outline (TYTO-254)"
     },
     {
       "paths": ["apps/desktop/src/main/settings-store.ts"],
       "e2e": [
+        "installed-plugins.desktop.test.ts",
         "settings-assist.desktop.test.ts",
         "settings-writers.desktop.test.ts",
         "settings.desktop.test.ts",
         "template-folder.desktop.test.ts",
         "vim-setting.desktop.test.ts"
       ],
-      "why": "reviewed: the settings file on disk"
+      "why": "reviewed: the settings file on disk, and an installed plugin's key checked in it (TYTO-254)"
     },
     {
       "paths": ["apps/desktop/src/main/template-editor.ts"],

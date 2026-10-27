@@ -45,6 +45,14 @@ interface SettingsTab {
 export interface LiveSettingsOptions {
   readonly store: SettingsStore;
   readonly declared: () => readonly DeclaredSetting[];
+  /** The installed plugins that are not running, whose keys are named rather than unknown. */
+  readonly stopped?: () => readonly string[];
+  /**
+   * Settles when the installed plugins have started (TYTO-254). The tab's buffer is checked only
+   * after it, so a tab restored with the session never flashes `W_SETTING_UNKNOWN` on a plugin's
+   * key that is declared a second later. Absent: already settled.
+   */
+  readonly ready?: Promise<void>;
   /** What the tab is told about accepted values beyond their schemas (TYTO-301). */
   readonly advise?: SettingsAdvice;
   /** The settings in effect when the app started. */
@@ -66,8 +74,11 @@ export interface LiveSettingsOptions {
 export interface LiveSettings {
   /** Called by the store before every write it makes, and by whoever creates the file. */
   wrote(text: string): void;
-  /** The tab's buffer, checked against what the plugins declared; also records its state. */
-  validate(documentId: string, text: string, dirty: boolean): Diagnostics;
+  /**
+   * The tab's buffer, checked against what the plugins declared once they have started; also
+   * records its state, at once.
+   */
+  validate(documentId: string, text: string, dirty: boolean): Promise<Diagnostics>;
   /**
    * The tab with this id was closed. A screen's changes it held unsaved are written to the
    * file then, so closing without saving discards only the person's typing. The same holds
@@ -78,6 +89,13 @@ export interface LiveSettings {
   remember(changes: Partial<Settings>): Promise<boolean>;
   /** The watcher saw the file move. Reads it, and applies it unless it was the app's write. */
   changed(): Promise<void>;
+  /**
+   * What the plugins declared changed: the installed plugins have started (TYTO-254). Reads the
+   * file again whatever its hash, hands every plugin its values and logs the file's problems
+   * once, now that a plugin's key is known. No built-in key moved, so nothing is applied.
+   * Queued behind the watcher's readings, never beside one. Never rejects.
+   */
+  redeclared(): Promise<void>;
 }
 
 const hashOf = (text: string): string => createHash('sha256').update(text).digest('hex');
@@ -164,12 +182,18 @@ export function createLiveSettings(options: LiveSettingsOptions): LiveSettings {
       disk = text;
     },
 
-    validate(documentId, text, dirty) {
+    async validate(documentId, text, dirty) {
       tab = { documentId, text, dirty };
       // Clean means saved or reverted: either way the buffer no longer holds a screen's change
       // the file lacks, and writing one on close would undo the person's own choice.
       if (!dirty) pendingFromScreens = {};
-      return validateSettingsText(text, options.declared(), options.advise);
+      await options.ready;
+      return validateSettingsText(
+        text,
+        options.declared(),
+        options.advise,
+        options.stopped?.() ?? [],
+      );
     },
 
     async closed(documentId) {
@@ -222,6 +246,19 @@ export function createLiveSettings(options: LiveSettingsOptions): LiveSettings {
       const next = chain.then(react, react);
       chain = next.catch(() => undefined);
       return next;
+    },
+
+    redeclared() {
+      const redeclare = async (): Promise<void> => {
+        const reading = await store.load();
+        options.configure(reading.config);
+        for (const problem of reading.diagnostics) log.warn(`settings.json: ${problem.message}`);
+      };
+      const next = chain.then(redeclare, redeclare);
+      chain = next.catch(() => undefined);
+      return next.catch((cause: unknown) => {
+        log.warn('settings.json could not be read again for the installed plugins', cause);
+      });
     },
   };
 }

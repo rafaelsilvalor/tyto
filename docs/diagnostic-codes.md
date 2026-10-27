@@ -111,6 +111,7 @@ non-zero.
 | `E_SETTINGS_SYNTAX` | error | no | The settings file is not valid JSON with comments, so the app will not write it. |
 | `W_SETTING_UNKNOWN` | warning | no | The settings file names a key no plugin declares. |
 | `W_SETTING_UNPREFIXED` | warning | no | The settings file names a plugin's setting without the plugin id in front of it. |
+| `W_SETTING_PLUGIN_NOT_RUNNING` | warning | no | The settings file names a setting of an installed plugin that is not running. |
 | `W_SETTING_INVALID` | warning | no | A setting's value is not one its plugin accepts, so its default applies instead. |
 | `W_SETTING_ENTRY_INVALID` | warning | no | An entry of a list setting is not one its plugin accepts, so it is left out. |
 | `W_SETTING_LOW_CONTRAST` | warning | no | A colour setting applies, but the text it leaves reads under 4.5:1. |
@@ -2049,6 +2050,20 @@ Setting '{key}' belongs to plugin '{plugin}' and is written '{expected}'.
 ```
 
 Parameters: `key`, `plugin`, `expected`
+
+### `W_SETTING_PLUGIN_NOT_RUNNING`
+
+**Severity:** warning · **Fatal:** no · **Spec:** `docs/adr/0145-an-installed-plugin-declares-a-setting-as-a-data-form.md`
+
+The settings file names a setting of an installed plugin that is not running.
+
+A warning never replaces a value (ADR 0013).
+
+```
+Setting '{key}' belongs to plugin '{plugin}', which is not running.
+```
+
+Parameters: `key`, `plugin`
 
 ### `W_SETTING_INVALID`
 

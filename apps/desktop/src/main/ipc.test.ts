@@ -742,7 +742,7 @@ const dependencies = () => {
     queue: queueDependency(),
     settings: {
       open: () => Promise.resolve({ document: null, documentId: null }),
-      validate: () => [],
+      validate: () => Promise.resolve([]),
       closed: () => Promise.resolve(false),
       outline: () =>
         Promise.resolve([
