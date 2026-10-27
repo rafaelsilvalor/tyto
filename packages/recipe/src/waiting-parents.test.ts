@@ -203,10 +203,14 @@ describe('waiting parents, ported from processar_pais', () => {
   });
 
   it('design_reaberto_avisa_e_nao_mexe_na_pai: a reopened artwork does not move its parent', async () => {
-    const state = memoryState();
-    const table = await runOnce(state, parentWithAnimation('to-post', true), artwork('review'));
-    expect(column(table, 'key')).toEqual([]);
-    expect(stored(state, 'waiting')).toEqual({});
+    // Buraqueira's parent sat in to-post, which the already-moved `where` holds on its own; in
+    // doing, only the artwork's status keeps a parent that would post from moving.
+    for (const status of ['to-post', 'doing']) {
+      const state = memoryState();
+      const table = await runOnce(state, parentWithAnimation(status, true), artwork('review'));
+      expect(column(table, 'key')).toEqual([]);
+      expect(stored(state, 'waiting')).toEqual({});
+    }
   });
 
   it.todo(
