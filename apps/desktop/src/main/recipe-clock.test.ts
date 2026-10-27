@@ -32,6 +32,8 @@ describe('a clock in a named zone', () => {
     const at = new Date('2026-07-01T12:00:00.000Z');
     expect(recipeClock('Asia/Kolkata').offsetMinutes(at)).toBe(330);
     expect(recipeClock('America/Sao_Paulo').offsetMinutes(at)).toBe(-180);
-    expect(recipeClock(null).offsetMinutes(at)).toBe(-at.getTimezoneOffset());
+    // `0 -` rather than a bare minus: on a machine in UTC the latter is -0, which `toBe` tells
+    // apart from the 0 the clock answers (CI runs in UTC).
+    expect(recipeClock(null).offsetMinutes(at)).toBe(0 - at.getTimezoneOffset());
   });
 });
