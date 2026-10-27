@@ -104,6 +104,8 @@ export const GENERIC_VERBS = [
   'decide',
   'rollup',
   'stamp',
+  'group',
+  'count',
 ] as const;
 
 const CONTRIBUTED_NAME = /^[a-z][a-z0-9-]*\.[a-z][a-z0-9-]*$/u;
