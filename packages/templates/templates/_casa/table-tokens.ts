@@ -89,6 +89,14 @@ export const BAND = { tracking: 0.04, block: 0.94, inline: 0.6 } as const;
 export const CELL = { radius: 4, gapX: 6, gapY: 5 } as const;
 
 /**
+ * How far a cell's words are lowered, in em, to centre them by eye. Centring the line box
+ * leaves the room under the baseline for descenders that capitals and digits — the header,
+ * the numbers — never use, so they stood 5 to 5.5 px above the cell's centre at 34 px in
+ * CircularXX: 0.15 em.
+ */
+export const OPTICAL_DROP = 0.15;
+
+/**
  * The sizes used when nothing can measure (no faces in this compile): the approved art's,
  * with equal columns and every cell shrinking into its box.
  */
