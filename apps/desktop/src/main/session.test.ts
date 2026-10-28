@@ -70,6 +70,17 @@ describe('the session file', () => {
     expect(await store.read()).toEqual(session);
   });
 
+  it('reads back a recipe tab, its kind appended to the version 1 file (TYTO-377)', async () => {
+    const store = fileSessionStore(join(scratch, 'session.json'));
+    const session = {
+      version: 1 as const,
+      tabs: [{ kind: 'recipe' as const, path: '/b/semanal.recipe' }],
+      active: 0,
+    };
+    expect(await store.write(session)).toBe(true);
+    expect(await store.read()).toEqual(session);
+  });
+
   it('reads a version 1 file written before the template mode was kept (TYTO-266)', async () => {
     // The shape TYTO-113 wrote, and the shape an update imports (ADR 0036): no `template`.
     const file = join(scratch, 'session.json');
