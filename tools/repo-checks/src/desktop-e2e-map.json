@@ -588,13 +588,22 @@
         "apps/desktop/src/main/recipe-runner.ts",
         "apps/desktop/src/main/recipe-wire.ts"
       ],
-      "e2e": ["recipe-tab.desktop.test.ts", "window.desktop.test.ts"],
-      "why": "reviewed: the recipe notebook's runner in main (TYTO-377); the .recipe tab runs it on a pause, and window.desktop's channel list reaches it; its logic is in recipe-runner.test.ts"
+      "e2e": [
+        "recipe-notebook.desktop.test.ts",
+        "recipe-tab.desktop.test.ts",
+        "window.desktop.test.ts"
+      ],
+      "why": "reviewed: the recipe notebook's runner in main (TYTO-377); the .recipe tab runs it on a pause, the notebook suite runs it against an installed source, and window.desktop's channel list reaches it; its logic is in recipe-runner.test.ts"
     },
     {
       "paths": ["apps/desktop/src/renderer/recipe-notebook.ts"],
-      "e2e": ["recipe-tab.desktop.test.ts"],
-      "why": "reviewed: when a .recipe tab runs and the line under each cell (TYTO-377); the logic is in recipe-notebook.test.ts, and the real window draws the lines"
+      "e2e": ["recipe-notebook.desktop.test.ts", "recipe-tab.desktop.test.ts"],
+      "why": "reviewed: when a .recipe tab runs and the line under each cell (TYTO-377); the logic is in recipe-notebook.test.ts, and the real window draws the lines and the tables"
+    },
+    {
+      "paths": ["apps/desktop/src/renderer/recipe-cell-view.ts"],
+      "e2e": ["recipe-notebook.desktop.test.ts", "recipe-tab.desktop.test.ts"],
+      "why": "reviewed: the header and table under a recipe's cell (TYTO-377); the logic is in recipe-cell-view.test.ts, and only the real window lays the table out and scrolls it"
     },
     {
       "paths": ["apps/desktop/src/main/quit.ts"],

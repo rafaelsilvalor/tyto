@@ -42,6 +42,12 @@ Three things have to be settled before a renderer can show anything:
    text of `x.recipe` and of every recipe it includes in turn (a cycle not followed, at most
    `INCLUDED_DEPTH_MAX` = 8 deep), read once per run through the same reader the run uses, so
    editing an included recipe on disk reruns the cell that includes it on the next run.
+   _Amended 2026-10-28 (TYTO-377, pull request D):_ **Run from here** under a cell, and the
+   command `recipe.runFromCell` from the cell at or above the cursor, send `from` with
+   `explicit`: it is Run, so it fetches and runs in a folder not trusted. The window shows 20 of
+   the 50 rows the wire carries under each cell, then how many it leaves out. Which tables the
+   person folded is the renderer's alone, per open tab: never sent to main, never written, and
+   forgotten when the tab closes or the app restarts.
 3. **A pause in typing runs from the changed line down, and stops before the first source.**
    A source fetches only on save (`saved`) or Run (`explicit`), as a brief's images do (ADR
    0119). The source's cell and the ones after it are `stale`: they show the table they had and
@@ -64,6 +70,10 @@ Three things have to be settled before a renderer can show anything:
 8. **A cell's age is the host's `ranAt` and its oldest row's `fetchedAt`.** A plugin cache's
    `storedAt` (ADR 0138) stays inside the plugin and never reaches a verb's result, so the
    notebook shows when the host ran the cell and how old the oldest data in it is.
+   _Amended 2026-10-28 (TYTO-377, pull request D):_ the age is relative ("ran 2 min. ago · data
+   fetched 3 hr. ago"), computed in the renderer with `Intl.RelativeTimeFormat` in the window's
+   language, and rewritten in place every 30 s so a cell's element and key stay. A change of
+   language shows every open recipe's last answer again, built anew in the new language.
 9. **The wire is bounded** (`RECIPE_WIRE_LIMITS`): the first 50 rows of each table and its
    total, a value cut at 1,000 characters, a list joined as a person writes it. Main keeps whole
    tables; the window is shown a preview.
@@ -76,6 +86,11 @@ Three things have to be settled before a renderer can show anything:
     fetches; an ordinary run carries no key. The field crosses to an isolated plugin over
     isolation protocol 9, so a plugin process on 8 is refused at `hello`. `transform` and `plan`
     carry nothing new, since they read no cache.
+    _Amended 2026-10-28 (TYTO-377, pull request D):_ the person reaches it as **Fetch again**
+    (`fresh` with `explicit`), for the whole document only: a button on a cell that fetches,
+    and the command `recipe.runFresh`. Which cells fetch crosses the wire as each cell's
+    `source`, which main decides with the policy's own test (a source verb, or a `run` whose
+    recipe holds one), since the window knows verbs by name and not by kind.
 
 ## Consequences
 

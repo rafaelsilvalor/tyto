@@ -9,6 +9,7 @@ Everything the window does is a command, run from the command bar with **Ctrl+K*
 - [Tabs and editor groups](./tabs-and-groups.md) — open, split, move and close.
 - [Workspace folder](./workspace-folder.md) — open a project folder and use its templates, images and fonts.
 - [Text and Markdown files](./text-files.md) — open and edit a `.txt` or a `.md` beside your briefs, and preview the Markdown.
+- [Recipes](./recipes.md) — open a `.recipe` as a notebook, with each step's table under it.
 - [Panels](./panels.md) — Problems, the local queue and the preview.
 - [The command bar and search](./command-bar-and-search.md) — run a command, find text, go to a block.
 - [Format Brief](./format-brief.md) — tidy a brief's spacing in one key.

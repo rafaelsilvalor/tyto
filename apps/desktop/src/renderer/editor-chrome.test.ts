@@ -12,6 +12,8 @@ import {
   PREVIEW_OPEN_TO_SIDE,
   PREVIEW_TOGGLE_LOCK,
   RECIPE_RUN,
+  RECIPE_RUN_FRESH,
+  RECIPE_RUN_FROM_CELL,
   SETTINGS_OPEN,
   TEMPLATE_EDIT,
   TEXT_COMMANDS,
@@ -81,9 +83,11 @@ describe('a recipe tab (TYTO-377)', () => {
       textCommands: true,
     });
     for (const id of BRIEF_ONLY_COMMANDS) expect(commandOffered('recipe', id), id).toBe(false);
-    expect(commandOffered('recipe', RECIPE_RUN)).toBe(true);
-    for (const kind of [undefined, 'text', 'markdown', 'settings', 'preview'] as const) {
-      expect(commandOffered(kind, RECIPE_RUN), String(kind)).toBe(false);
+    for (const id of [RECIPE_RUN, RECIPE_RUN_FROM_CELL, RECIPE_RUN_FRESH]) {
+      expect(commandOffered('recipe', id), id).toBe(true);
+      for (const kind of [undefined, 'text', 'markdown', 'settings', 'preview'] as const) {
+        expect(commandOffered(kind, id), `${id} ${String(kind)}`).toBe(false);
+      }
     }
   });
 

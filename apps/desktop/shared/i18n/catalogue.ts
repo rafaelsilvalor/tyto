@@ -451,6 +451,21 @@ export interface Catalogue {
   readonly 'recipe.cell.stale': string;
   readonly 'recipe.cell.held.source': string;
   readonly 'recipe.cell.held.restricted': string;
+  /**
+   * TYTO-377, the notebook's table: the two commands that run from the cursor's cell and fetch
+   * again, the age line (`{when}` is `Intl.RelativeTimeFormat`'s, in the window's language),
+   * what the table leaves out, the buttons and the fold toggle's name.
+   */
+  readonly 'command.recipe.runFromCell': string;
+  readonly 'command.recipe.runFresh': string;
+  readonly 'recipe.cell.ran': string;
+  readonly 'recipe.cell.fetched': string;
+  readonly 'recipe.cell.more': string;
+  readonly 'recipe.cell.more.one': string;
+  readonly 'recipe.cell.runFrom': string;
+  readonly 'recipe.cell.fetchAgain': string;
+  readonly 'recipe.cell.collapse': string;
+  readonly 'recipe.cell.expand': string;
   readonly 'status.problems.new': string;
   /**
    * Help > About, where the version, the platform, the template count and the template
@@ -922,6 +937,16 @@ export const CATALOGUE_KEYS = [
   'recipe.cell.stale',
   'recipe.cell.held.source',
   'recipe.cell.held.restricted',
+  'command.recipe.runFromCell',
+  'command.recipe.runFresh',
+  'recipe.cell.ran',
+  'recipe.cell.fetched',
+  'recipe.cell.more',
+  'recipe.cell.more.one',
+  'recipe.cell.runFrom',
+  'recipe.cell.fetchAgain',
+  'recipe.cell.collapse',
+  'recipe.cell.expand',
   'status.problems.new',
   'menu.about',
   'shell.about.version',

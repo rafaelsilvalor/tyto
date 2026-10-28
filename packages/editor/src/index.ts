@@ -229,6 +229,7 @@ export {
   cellOutputs,
   cellOutputsOf,
   clearCellOutputs,
+  remeasureCellOutput,
   setCellOutputs,
 } from './cell-outputs.js';
 

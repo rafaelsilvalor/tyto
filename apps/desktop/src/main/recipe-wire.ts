@@ -37,6 +37,7 @@ function cellToWire(cell: RunnerCell): WireCell {
     diagnostics: diagnosticsToWire(cell.diagnostics),
     ...(cell.ranAt === undefined ? {} : { ranAt: cell.ranAt }),
     ...(cell.oldestFetchedAt === undefined ? {} : { oldestFetchedAt: cell.oldestFetchedAt }),
+    ...(cell.source === true ? { source: true } : {}),
   };
 }
 

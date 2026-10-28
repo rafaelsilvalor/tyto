@@ -5,6 +5,8 @@ import {
   PREVIEW_OPEN_TO_SIDE,
   PREVIEW_TOGGLE_LOCK,
   RECIPE_RUN,
+  RECIPE_RUN_FRESH,
+  RECIPE_RUN_FROM_CELL,
   TEXT_COMMANDS,
   isBriefOnlyCommand,
 } from './commands.js';
@@ -113,6 +115,13 @@ const MARKDOWN_PREVIEW_COMMANDS: ReadonlySet<string> = new Set([
   PREVIEW_TOGGLE_LOCK,
 ]);
 
+/** Run recipe, Run from the cursor's cell and Run fetching again (TYTO-377). */
+const RECIPE_COMMANDS: ReadonlySet<string> = new Set([
+  RECIPE_RUN,
+  RECIPE_RUN_FROM_CELL,
+  RECIPE_RUN_FRESH,
+]);
+
 const isMarkdownKind = (kind: Kind): boolean => kind === 'markdown' || kind === 'markdown-preview';
 
 /**
@@ -125,8 +134,8 @@ const isMarkdownKind = (kind: Kind): boolean => kind === 'markdown' || kind === 
  * `result.json` of syntax errors into the chosen folder — measured, not read.
  */
 export const commandOffered = (kind: Kind, id: string): boolean => {
-  // Run recipe acts on the recipe in front and on nothing else (TYTO-377).
-  if (id === RECIPE_RUN) return kind === 'recipe';
+  // The recipe commands act on the recipe in front and on nothing else (TYTO-377).
+  if (RECIPE_COMMANDS.has(id)) return kind === 'recipe';
   // A Markdown file has a preview of its own (TYTO-247): opening it and locking it are offered.
   if (isMarkdownKind(kind) && MARKDOWN_PREVIEW_COMMANDS.has(id)) return true;
   const chrome = editorChromeFor(kind);

@@ -116,6 +116,8 @@ export interface RunnerCell {
   readonly ranAt?: string;
   /** The oldest `fetchedAt` among the table's rows (ADR 0148). */
   readonly oldestFetchedAt?: string;
+  /** The step fetches: a source verb, or a `run` whose recipe holds one (Fetch again's cell). */
+  readonly source?: true;
 }
 
 /** Why cells were left `stale`: a folder not trusted, or a source reached while typing. */
@@ -257,8 +259,15 @@ export function createRecipeRunner(options: RecipeRunnerOptions): RecipeRunner {
       if (latest.get(request.documentId) === run) {
         kept.set(request.documentId, { header, cells: next });
       }
+      // Which cells fetch, for the notebook's Fetch again; the reader already holds every text.
+      const sources = await Promise.all(
+        steps.map((step) => holdsSource(step, registries, read, new Set(), 0)),
+      );
       return {
-        cells: next.map((cell, index) => shown(cell, index)),
+        cells: next.map((cell, index) => ({
+          ...shown(cell, index),
+          ...(sources[index] === true ? { source: true as const } : {}),
+        })),
         diagnostics,
         ...(held === undefined ? {} : { held }),
         ranAt,

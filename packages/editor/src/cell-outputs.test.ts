@@ -8,6 +8,7 @@ import {
   cellOutputs,
   cellOutputsOf,
   clearCellOutputs,
+  remeasureCellOutput,
   setCellOutputs,
 } from './cell-outputs.js';
 
@@ -196,6 +197,24 @@ describe('cell outputs', () => {
 
     expect(placement(on)).toEqual([]);
     expect(cellOutputsOf(on.state)).toEqual([]);
+  });
+
+  it('asks the view holding an output to measure again, and nothing for a loose element', () => {
+    const on = open();
+    on.dispatch({ effects: setCellOutputs.of([output(3, 'select', on)]) });
+    let asked = 0;
+    const requestMeasure = on.requestMeasure.bind(on);
+    on.requestMeasure = (request) => {
+      asked += 1;
+      requestMeasure(request);
+    };
+    const element = outputElement(on, 'select');
+    if (!(element instanceof HTMLElement)) throw new Error('no output');
+
+    remeasureCellOutput(element);
+    remeasureCellOutput(document.createElement('div'));
+
+    expect(asked).toBe(1);
   });
 
   it('ignores an output whose position is outside the document', () => {

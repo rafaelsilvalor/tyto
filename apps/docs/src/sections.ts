@@ -83,6 +83,7 @@ export const SECTIONS: readonly Section[] = [
         slug: 'text-files',
         title: { en: 'Text and Markdown files', 'pt-BR': 'Arquivos de texto e Markdown' },
       },
+      { slug: 'recipes', title: { en: 'Recipes', 'pt-BR': 'Receitas' } },
       { slug: 'panels', title: { en: 'Panels', 'pt-BR': 'Painéis' } },
       {
         slug: 'command-bar-and-search',
