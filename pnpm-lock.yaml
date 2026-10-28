@@ -490,9 +490,15 @@ importers:
 
   packages/template-kit:
     dependencies:
+      '@tyto/brief-lang':
+        specifier: workspace:*
+        version: link:../brief-lang
       '@tyto/core':
         specifier: workspace:*
         version: link:../core
+      '@tyto/export-html':
+        specifier: workspace:*
+        version: link:../export-html
 
   packages/template-lang:
     dependencies:
