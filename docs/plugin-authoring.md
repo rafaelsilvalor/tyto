@@ -310,6 +310,53 @@ expect(satisfiesEngine(manifest.engine, PLUGIN_API_VERSION)).toBe(true);
 1.0. A `^0.4.1` range does not take a minor, so such a change never reaches your plugin through
 an ordinary update: you move the range, run your tests, and move `engine` with it.
 
+### Test it without Tyto
+
+`@tyto/plugin-api/testing` runs your plugin the way the app runs it (ADR 0150): the manifest
+checked as `install` checks it, against the version you installed; your built entry activated
+over the real isolation protocol and through the same `tryActivate`; the settings you hand it
+resolved as the desktop resolves `settings.json`. Build first, then:
+
+```ts
+import { readFileSync } from 'node:fs';
+import { testPlugin } from '@tyto/plugin-api/testing';
+
+const manifest = readFileSync(new URL('../tyto-plugin.json', import.meta.url), 'utf8');
+
+const harness = await testPlugin({
+  manifest,
+  load: () => import('../dist/index.js'),
+  settings: { 'jira.site': 'https://example.atlassian.net' },
+  section: { project: 'TYTO' },
+  secrets: { token: 'test-token' },
+  fetch: async (url) => ({
+    url,
+    status: 200,
+    statusText: 'OK',
+    headers: { 'content-type': 'application/json' },
+    body: new TextEncoder().encode('{"issues":[]}'),
+  }),
+});
+if (!harness.ok) throw new Error(harness.error.map((item) => item.message).join('\n'));
+
+// The clock is what `age` and `stamp` read; fixed, a run says the same thing every day.
+const clock = { now: () => new Date('2026-10-27T15:00:00Z'), offsetMinutes: () => -180 };
+const run = await harness.value.runRecipe('jira.issues jql="project = TYTO"', { clock });
+await harness.value.close();
+```
+
+`testPlugin` answers the diagnostics the app would refuse your plugin with — `E_PLUGIN_ENGINE`
+for an engine range the installed version does not satisfy, `E_PLUGIN_ACTIVATE` for a
+registration into a point `contributes` does not list or a setting whose default its own form
+refuses — and the harness carries `settings.diagnostics`, where a value you wrote that the
+setting refuses is a `W_SETTING_INVALID` and its default applies. A point you list and never
+register into is not an error, here or in the app.
+
+**It does not test the sandbox.** Your code runs in the test's own process, so a plugin that
+reads a file outside its folder passes here and is refused by the app. And it reads no folder:
+the link check and the approval `install` records are the installed copy's, which a test does
+not have.
+
 It replaces the checkout, not the bundle. The installed folder still has no `node_modules`
 (_A code template_), so whatever your code imports from `@tyto/*` at run time is inlined into
 `dist/index.js` as before; a package installed from the registry is inlined the same way.
