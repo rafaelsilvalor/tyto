@@ -279,7 +279,7 @@ under the repository owner's scope, `@rafaelsilvalor/tyto-<name>`, because nobod
 ```json
 {
   "devDependencies": {
-    "@tyto/plugin-api": "npm:@rafaelsilvalor/tyto-plugin-api@^0.4.1"
+    "@tyto/plugin-api": "npm:@rafaelsilvalor/tyto-plugin-api@^0.5.0"
   }
 }
 ```
@@ -288,12 +288,37 @@ and tell npm (or pnpm) where that scope lives, in the repository's `.npmrc`:
 
 ```
 @rafaelsilvalor:registry=https://npm.pkg.github.com
-//npm.pkg.github.com/:_authToken=${NODE_AUTH_TOKEN}
 ```
 
-`NODE_AUTH_TOKEN` is a GitHub personal access token (classic) with `read:packages`. GitHub
-asks for one to install any package from its npm registry, public ones included. In a
-GitHub Actions workflow of your own, a repository secret holding that token does the same.
+GitHub asks for a token with `read:packages` to install any package from its npm registry,
+public ones included. **The token goes in your user-level `~/.npmrc`, not the repository's:**
+pnpm 11 expands no `${VARIABLE}` in a committed `.npmrc`'s credentials, so a line there installs
+with no token and the registry answers 401. With the GitHub CLI:
+
+```sh
+gh auth refresh -s read:packages
+echo '//npm.pkg.github.com/:_authToken=${NODE_AUTH_TOKEN}' >> ~/.npmrc
+NODE_AUTH_TOKEN=$(gh auth token) pnpm install
+```
+
+In a GitHub Actions workflow you need no secret: the four packages are public, so the workflow's
+own `GITHUB_TOKEN` with `packages: read` installs them, and `actions/setup-node` writes the
+user-level file for you:
+
+```yaml
+permissions:
+  contents: read
+  packages: read
+# ...
+    env:
+      NODE_AUTH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+    steps:
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+          registry-url: https://npm.pkg.github.com
+          scope: '@rafaelsilvalor'
+```
 
 **The version you install is the engine your manifest is checked against.** A host compares
 `engine` with `PLUGIN_API_VERSION`, which is `@tyto/plugin-api`'s own version (ADR 0040), so a
@@ -307,7 +332,7 @@ expect(satisfiesEngine(manifest.engine, PLUGIN_API_VERSION)).toBe(true);
 ```
 
 **A change to the isolation protocol is a minor while the contract is 0.x**, and a major from
-1.0. A `^0.4.1` range does not take a minor, so such a change never reaches your plugin through
+1.0. A `^0.5.0` range does not take a minor, so such a change never reaches your plugin through
 an ordinary update: you move the range, run your tests, and move `engine` with it.
 
 ### Test it without Tyto
@@ -360,6 +385,29 @@ not have.
 It replaces the checkout, not the bundle. The installed folder still has no `node_modules`
 (_A code template_), so whatever your code imports from `@tyto/*` at run time is inlined into
 `dist/index.js` as before; a package installed from the registry is inlined the same way.
+
+### Hear about a breaking release before your users do
+
+Your range keeps your tests on the contract you built against, so a release that breaks your
+plugin reaches you only when you move the range. A scheduled workflow moves it for one run —
+install as locked, then the newest published contract over it, then build and test:
+
+```yaml
+on:
+  schedule:
+    - cron: '0 9 * * 1'
+  workflow_dispatch:
+    # ...
+    - run: pnpm install --frozen-lockfile
+    - run: pnpm add --save-dev '@tyto/plugin-api@npm:@rafaelsilvalor/tyto-plugin-api@latest'
+    - run: pnpm build
+    - run: pnpm test
+```
+
+`@latest` goes past your caret on purpose: a protocol change is a minor while the contract is
+0.x, and that minor is the release you want to hear about. The run changes nothing in the
+repository. A red run means a new Tyto refuses or breaks your plugin; move the range and
+`engine` together once it passes. `tyto-plugin-jira` runs this as its `contract` workflow.
 
 ## Other extension points
 
