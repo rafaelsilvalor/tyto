@@ -539,6 +539,10 @@ importers:
       '@tyto/template-kit':
         specifier: workspace:*
         version: link:../template-kit
+    devDependencies:
+      '@tyto/export-svg':
+        specifier: workspace:*
+        version: link:../export-svg
 
   packages/theme-pack:
     dependencies:
