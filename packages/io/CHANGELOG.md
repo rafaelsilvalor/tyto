@@ -1,5 +1,84 @@
 # @tyto/io
 
+## 4.0.0
+
+### Major Changes
+
+- 93fcb8b: An artwork file another program holds open is now an internal failure worth retrying, not an error about the brief (TYTO-245, ADR 0108).
+
+  **`ArtifactSink.write` returns `Promise<Diagnostics>`** (`@tyto/pipeline`), and so does `TaskOutput.write` (`@tyto/io`). A sink answers what it can explain — `E_OUTPUT_FILE_BLOCKED` for a folder at the artwork's name — and `runJob` fails that one frame with it and writes the others. A rejection is no longer turned into `E_OUTPUT_WRITE`: `runJob` starts no further frame, lets the ones in flight settle and rejects with the sink's cause. A sink of your own returns `[]` where it used to return nothing.
+
+  `@tyto/core`: `E_OUTPUT_WRITE` is no longer produced and stays in the catalogue, documented as retired by ADR 0108. `E_OUTPUT_FILE_BLOCKED` is no longer fatal: on an artwork it costs that file, and the report that names it survives.
+
+### Minor Changes
+
+- c005b91: TYTO-270: a workspace's `.tyto/project.json`, or the work profile it names, can declare export presets (ADR 0126): `"exportPresets": { "entregas": { "formats": ["grid-1x1", "story"], "folder": "entregas" } }`, with `types` defaulting to `png` and `folder` to the project's `output`. Presets merge by name, profile then folder; a preset's `folder` resolves against the open workspace folder whichever sheet wrote it, and a restricted folder confines it there (`W_PROJECT_PATH_OUTSIDE`, the preset is dropped). A preset with no folder and no `output` is `W_PROJECT_PRESET_NO_FOLDER`. `core` resolves them into `ResolvedProject.exportPresets`; `@tyto/io` reads nested ranges and follows a preset's folder through `realpath`. The window lists each preset in the command bar as "Export: <name>" (`export.preset:<name>`, bindable in `keybindings.json`) and runs it through the export box, which opens already running and removes what the previous export left as before.
+- 6abf89f: TYTO-278: a workspace folder's `.tyto/project.json` names its asset, template and font folders, its output folder and one section per plugin (ADR 0112). `core` resolves the file key by key from a list of sheets, so a work profile slots in later without a new signature, confines a restricted sheet's folders lexically and withholds its plugin sections (ADR 0111), and declares the `TrustStore` port. `@tyto/io` reads the file with ranges, follows every folder a restricted workspace names through `realpath` so a link inside that leads out is refused too, finds the workspace above a brief, never reads the folder whose `.tyto` is `TYTO_HOME`, and keeps approvals in `TYTO_HOME/trust.json` with `fsTrustStore`. `briefAssetResolver` takes the workspace's asset folders after the brief's own.
+- 91efbbb: TYTO-280: `tyto render` and `tyto watch` draw images and fonts an installed plugin supplies (ADR 0117, ADR 0118). A `test:logo` image or a face no folder has is fetched once into `TYTO_HOME/cache/sources/`, and the next render asks nothing; a face that arrives makes the job compile once more, so its lines break against it. `tyto render` fetches for a trusted folder and for a brief in no folder; a restricted folder and `tyto watch` read the cache only, each miss saying why. A `--folder` delivery copies a fetched image under a name from its reference (`assets/logo.png`) and points the copied brief at it, so the delivery renders without the plugin. `@tyto/io`'s `sourceCache` takes the miss's reason as `notFetchedBecause`, and its delivery names fetched images that way.
+- 017d381: TYTO-280: the window draws images and fonts an installed plugin supplies (ADR 0117, ADR 0119). The preview fetches what it lacks when the brief is saved or opened from disk, never while you type: a half-typed `test:lo` asks nobody, and the miss says to save. A face that arrives reaches the same preview, measured. The export box fetches too; the queue never does, and draws what a save already cached. A restricted folder fetches nothing and names Workspace: Manage Trust. A failed fetch is asked once per session, and the miss says a restart or a different reference asks again. `@tyto/io`'s `sourceCache` gains `remembersFailures` and a per-call `SourceCall`, and no longer remembers a miss it was not allowed to fetch.
+- 53e01c3: TYTO-280: a plugin can supply images and fonts (ADR 0117). `@tyto/plugin-api` has two new extension points, `asset-source` (URI schemes such as `drive:`) and `font-source` (families), each with a `fetch` an installed plugin answers from its own process; the call carries the plugin's own section of the project file, absent when the folder withheld it. `@tyto/io`'s `sourceCache` asks them once and keeps the answer in `TYTO_HOME/cache/sources/<plugin>/`, named by a hash, so the next render asks nothing; a restricted folder reads the cache and fetches nothing. `@tyto/core`'s `AssetResolver` gains an optional `explain`, and a source's failure is `E_ASSET_SOURCE_FAILED` or `W_FONT_SOURCE_FAILED`. `@tyto/fonts`' library gains `refresh()`, and `@tyto/pipeline`'s `loadResources` may ask for one more compile once a fetched face arrives.
+- 49db8d1: TYTO-347: the window shows the work profile an open folder names (ADR 0114). The trust strip has a line of its own for an untrusted profile that left something out, with **Trust this profile**, and a third button, **Show project**; Workspace: Manage Trust shows the profile with its own two buttons, none for a profile kept in `TYTO_HOME`. A profile's problems are listed in the problems panel with its file in front. Workspace: Show Project opens a read-only Project panel beside Problems listing `assets`, `templates`, `fonts` and `output`, each with its folders and `profile <name>`, `this folder` or `not set`. `workspace:trust` now takes a strict `source` (`folder` or `profile`) and still no path. `@tyto/io`'s `LoadedProfile` says whether it is trusted by where it lives (`byLocation`).
+- 4aba89c: TYTO-347: a workspace's `.tyto/project.json` can name a work profile, a sheet many folders share (ADR 0114). `"profile": "saude"` reads `TYTO_HOME/profiles/saude/profile.json`, trusted by where it lives; a path names a profile file elsewhere, which is its own source in `trust.json` and is confined to its own folder until it is trusted. The profile's keys come first and the folder's win key by key. `core` reads the key with `profileReferenceOf`, refuses a restricted folder a profile path outside it, ignores a profile's own `profile` key (`W_PROFILE_NESTED`), and says in `ResolvedProject.origins` which sheet each value came from; `W_PROJECT_PROFILE_UNSUPPORTED` is replaced by `W_PROJECT_PROFILE_INVALID` and `W_PROJECT_PROFILE_MISSING`. `@tyto/io`'s `loadWorkspace` reads the profile with its own trust answer and follows its paths through `realpath`. `tyto render` uses it, prints a profile's problems against the profile's file, `--trust` covers the folder and its profile for the run, and `tyto trust remove` takes a profile file's approval back. The window resolves a folder's profile through the same loader; showing it is the next change.
+- 3fa8604: TYTO-349: the command line can trust a workspace folder for good. `tyto trust add <folder>` prints what the folder does while restricted (a key that leads outside it, withheld plugin sections, its profile's problems), then writes the approval to `TYTO_HOME/trust.json` under the folder's real path, with no y/N prompt so a script can run it. It refuses a path that does not exist and the folder whose `.tyto` is `TYTO_HOME` (ADR 0112), accepts a folder with no project file, and says which `tyto trust add <file>` trusts the work profile the folder names. `tyto trust add <file>` trusts a shared profile file on its own (ADR 0114); one inside `TYTO_HOME` is already trusted by where it lives. `tyto trust list` prints each approval with its date and marks one whose path is gone. `fsTrustStore` in `@tyto/io` gains `list()`, off the core `TrustStore` port.
+- 6511c41: TYTO-371 (ADR 0138): the CLI implements a plugin's private cache and its workspace files. `@tyto/io` adds `pluginCache({ home })`, which keeps each entry at `TYTO_HOME/cache/plugins/<plugin>/<sha256(key)>.bin` beside a `{ key, storedAt, size }` sidecar, both written atomically and dated by the host's clock, and `workspaceFiles({ folder, trust })`, which reads the folder and its trust on every call, refuses a restricted folder with `E_WORKSPACE_FILE_RESTRICTED`, confines a path again after `realpath`, refuses a write that lands in `.tyto/` through a link, and creates the folders a write needs. `workspaceDataResolver` now shares its containment check with it. `tyto render` gives plugins both, against the brief's workspace and its trust (`--trust` counting); a brief in no workspace answers that no folder is open. `tyto watch` gives the cache only, and its refusal names it.
+- cfa70ff: TYTO-395 (ADR 0137): a recipe verb can read configuration from a JSON file beside the recipe, written `@./vocab.json#/kinds` (a JSON Pointer into the file) or `@./vocab.json` for the whole document. `@tyto/recipe` gains the optional `resolveData` port in `RunOptions` and `VerbContext` (passed on by `run`) and `readDataArgument`, which parses the reference, walks the pointer and checks the slice with the verb's Zod schema, reporting every refusal at the argument. `@tyto/io` gains `workspaceDataResolver`, which reads JSON with comments relative to the recipe's folder, confined to the workspace lexically and after `realpath`, refuses every file in a restricted workspace and caps a file at 1 MiB, and `readJsoncValue`. `@tyto/plugin-api` re-exports the `DataResolver` type. `@tyto/core` gains `E_RECIPE_DATA`, `E_RECIPE_DATA_RESTRICTED`, `E_RECIPE_DATA_SYNTAX` and `E_RECIPE_DATA_SHAPE`.
+- c7cf84e: TYTO-401: `recipeStateStore({ home, workspace, recipe })` keeps a recipe's state between runs (ADR 0140) in `TYTO_HOME/state/recipes/<identity>/<store>.json`, where the identity is the SHA-256 of the workspace's real path and the recipe's path inside it. A store never written reads as empty; a corrupt or oversized one (over 32 MiB) is `E_RECIPE_STATE` naming the file, never an empty store. A write deletes, then merges each put over its key's values, stamps it with the host's clock and replaces the file atomically; this process's writes to one store take turns, and across processes the last writer wins. No host composes it yet.
+- 885d0f5: TYTO-423 (ADR 0144): a recipe brings back the rows it remembered. `RecipeState`, which `@tyto/plugin-api` names, requires `entries(store)`: every entry a store holds, empty for a store never written and `E_RECIPE_STATE` for one that cannot be read. `recipeStateStore` implements it. `recall <store> [by=<column>] [mark=<column>]` appends one row per stored key the table lacks, after the table's rows and sorted by key, with the key (and the `by=` column) set and every other column null; `mark=` adds a boolean column true on the recalled rows. A recalled key that is already another row's key under `by=` is refused, and a host without state fails as `last` does. An expiry is a recipe pattern (stamp, `age`, `rules`, `remember … forget-when=`), documented in the ADR.
+
+### Patch Changes
+
+- 49c1569: TYTO-239: the comment on `fsInbox`'s ack retry says what it is still for — locks held from outside the desktop queue, which no longer races itself.
+- e4255e4: TYTO-350: one JSONC reader for the project file and the settings file. `@tyto/io` exports `readJsoncText`, the reader `readProjectText` already used (parse, recovery around a syntax error, the range of every key and of every syntax error), now taking the file's own syntax code and its "not an object" problem. The desktop's `settings.json` is read through it and keeps its own in-place writer. Nothing a person sees changes: the same codes, messages and ranges as before.
+- d247c20: TYTO-371 (ADR 0138): the desktop gives installed plugins a private cache and the open folder's files. `host.cache` keeps entries in the same `TYTO_HOME` the plugins live in, and `host.workspace` reads and writes the folder open in the window, asked at every call, so a folder opened or trusted while the plugin runs is the one it sees; refusals name `Tyto desktop`. The plugins screen says in words what `workspace:read` and `workspace:write` reach. In `@tyto/io` the cache's sidecar now carries the bytes' SHA-256 and `get` answers a miss when it disagrees, so two processes racing on one key with bytes of the same size never hand back one's bytes as the other's; a sidecar written before the digest is a miss and the next `put` replaces it. One host now writes an entry in turn, and the atomic write tries a rename again while Windows says the target is busy, which an export's frames putting one key at once used to hit as `EPERM`.
+- Updated dependencies [d4a6939]
+- Updated dependencies [08b936d]
+- Updated dependencies [7342c02]
+- Updated dependencies [15997e9]
+- Updated dependencies [15997e9]
+- Updated dependencies [93fcb8b]
+- Updated dependencies [ea97dc3]
+- Updated dependencies [3921252]
+- Updated dependencies [c005b91]
+- Updated dependencies [cbbf6df]
+- Updated dependencies [2495d0d]
+- Updated dependencies [6abf89f]
+- Updated dependencies [53e01c3]
+- Updated dependencies [ae75027]
+- Updated dependencies [fe85505]
+- Updated dependencies [5a0c7c5]
+- Updated dependencies [bf3fd0e]
+- Updated dependencies [8e9c9c4]
+- Updated dependencies [ab9512e]
+- Updated dependencies [d3df40e]
+- Updated dependencies [4aba89c]
+- Updated dependencies [58f54d6]
+- Updated dependencies [7a5f578]
+- Updated dependencies [3355317]
+- Updated dependencies [eb55249]
+- Updated dependencies [a2b7fbd]
+- Updated dependencies [532221f]
+- Updated dependencies [5f98674]
+- Updated dependencies [cfa70ff]
+- Updated dependencies [bdab5da]
+- Updated dependencies [eb0694a]
+- Updated dependencies [7704e9c]
+- Updated dependencies [dded20c]
+- Updated dependencies [320c0c7]
+- Updated dependencies [e4ce1e8]
+- Updated dependencies [fdcfda9]
+- Updated dependencies [4186112]
+- Updated dependencies [3da246d]
+- Updated dependencies [885d0f5]
+- Updated dependencies [3921252]
+- Updated dependencies [ffd4770]
+- Updated dependencies [431bf23]
+  - @tyto/plugin-api@0.5.0
+  - @tyto/core@0.29.0
+  - @tyto/pipeline@0.11.0
+  - @tyto/export-html@0.7.1
+  - @tyto/export-svg@2.0.1
+  - @tyto/template-lang@0.8.1
+
 ## 3.0.0
 
 ### Major Changes

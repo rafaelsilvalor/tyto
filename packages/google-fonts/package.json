@@ -1,6 +1,6 @@
 {
   "name": "@tyto/google-fonts",
-  "version": "0.0.0",
+  "version": "0.1.0",
   "type": "module",
   "description": "A built-in font source: a family this machine lacks is fetched from Google Fonts once, when Google serves it.",
   "license": "UNLICENSED",
