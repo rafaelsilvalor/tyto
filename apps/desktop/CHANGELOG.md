@@ -1,5 +1,26 @@
 # @tyto/desktop
 
+## 0.9.0
+
+### Minor Changes
+
+- dcd1757: A recipe opens as a notebook: under each cell, its table (20 rows, then how many more), when it ran and how old its data is, a fold toggle, **Run from here** and, on a cell that fetches, **Fetch again**. Two commands do the same from the keyboard, Run recipe from this cell and Run recipe, fetching again. `@tyto/editor` gains `remeasureCellOutput`, for an output whose height changed in place.
+- 8b06696: A `.recipe` file opens in a tab of its own: in the recipe colours, with the verbs offered at the start of a line, run on a pause in typing, on save and by Run recipe, with one line under each cell and its problems in Problems. A `run x` whose recipe holds a source no longer fetches while typing, and editing an included recipe on disk reruns the cell that includes it.
+
+### Patch Changes
+
+- a558c12: A source's `page` request carries `refresh: true` on a run without cache, so the source skips its private cache and fetches; an ordinary run carries no key. The isolation protocol moves to 9, so a plugin process on 8 is refused at `hello`. The desktop's recipe notebook hands the flag on when a run is asked to start fresh.
+- Updated dependencies [dcd1757]
+- Updated dependencies [a558c12]
+  - @tyto/editor@0.9.0
+  - @tyto/plugin-api@0.6.0
+  - @tyto/export-html@0.7.2
+  - @tyto/export-svg@2.0.2
+  - @tyto/google-fonts@0.1.1
+  - @tyto/io@4.0.1
+  - @tyto/pipeline@0.11.1
+  - @tyto/theme-pack@0.1.1
+
 ## 0.8.0
 
 ### Minor Changes
