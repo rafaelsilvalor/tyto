@@ -112,6 +112,26 @@ describe('changesets', () => {
     expect(unknown).toEqual([]);
   });
 
+  it('name only packages that carry a version, or `changeset version` never consumes them', () => {
+    // The same skip as the tools test below, from the other side: a changeset naming only
+    // `@tyto/docs` or a `tools/*` package survives every version PR, so `changesets/action`
+    // keeps reporting changesets left and never reaches the run that tags. Three such files
+    // held the release after #24 and opened #208 empty (TYTO-448). `changeset-coverage.mjs`
+    // refuses the branch that adds one; this catches one already on `main`.
+    const unversioned = new Set(
+      WORKSPACE_GLOBS.flatMap((group) =>
+        [...versionsUnder(group)].filter(([, version]) => version === undefined),
+      ).map(([name]) => name),
+    );
+    const stale = changesetFiles.flatMap((file) =>
+      namesIn(readFileSync(join(repoRoot, '.changeset', file), 'utf8'))
+        .filter((name) => unversioned.has(name))
+        .map((name) => `${file}: ${name}`),
+    );
+
+    expect(stale).toEqual([]);
+  });
+
   it('read the frontmatter the way Changesets does, both ways', () => {
     // The assertion above passes on a correct `.changeset/` without having caught anything,
     // so the predicate is measured against a file that names two packages and one that names

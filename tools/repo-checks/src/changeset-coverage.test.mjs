@@ -5,6 +5,7 @@ import {
   coverage,
   parseChangeset,
   readBranch,
+  unversionedNamed,
 } from './changeset-coverage.mjs';
 
 /**
@@ -137,6 +138,36 @@ describe('coverage', () => {
   });
 });
 
+describe('unversionedNamed', () => {
+  // TYTO-448: the three changesets that held the release after #24 had exactly this shape.
+  it('names every package without a version that an added changeset names', () => {
+    expect(
+      unversionedNamed({
+        addedChangesets: [
+          { file: '.changeset/docs.md', packages: ['@tyto/docs', '@tyto/repo-checks'] },
+          { file: '.changeset/core.md', packages: ['@tyto/core'] },
+        ],
+        unversioned: ['@tyto/docs', '@tyto/repo-checks', '@tyto/docs-gen'],
+      }),
+    ).toEqual([
+      { file: '.changeset/docs.md', name: '@tyto/docs' },
+      { file: '.changeset/docs.md', name: '@tyto/repo-checks' },
+    ]);
+  });
+
+  it('lets an empty changeset and a versioned name through', () => {
+    expect(
+      unversionedNamed({
+        addedChangesets: [
+          { file: '.changeset/empty.md', packages: [] },
+          { file: '.changeset/core.md', packages: ['@tyto/core'] },
+        ],
+        unversioned: ['@tyto/docs'],
+      }),
+    ).toEqual([]);
+  });
+});
+
 describe('readBranch', () => {
   /**
    * A fake git answering the handful of commands the check sends. Each fixture is a branch
@@ -220,6 +251,26 @@ describe('readBranch', () => {
         bumps: { '@tyto/core': 'patch' },
       },
     ]);
+  });
+
+  it('reads which workspace packages carry no version, tools included', () => {
+    const branch = readBranch({
+      base: 'main',
+      head: 'HEAD',
+      git: (args) => {
+        if (args[0] === 'ls-tree' && args.includes('-d') && args.includes('tools/'))
+          return 'apps/docs\npackages/core\ntools/repo-checks\ntools/scratch\n';
+        return fakeGit({
+          changed: [],
+          files: {
+            'HEAD:apps/docs/package.json': json({ name: '@tyto/docs', private: true }),
+            'HEAD:packages/core/package.json': json({ name: '@tyto/core', version: '1.0.0' }),
+            'HEAD:tools/repo-checks/package.json': json({ name: '@tyto/repo-checks' }),
+          },
+        })(args);
+      },
+    });
+    expect(branch.unversioned).toEqual(['@tyto/docs', '@tyto/repo-checks']);
   });
 
   it('reads the protocol number on both sides and the package version before the branch', () => {

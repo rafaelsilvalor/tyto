@@ -664,6 +664,39 @@ describe('Dependabot changesets at release', () => {
   });
 });
 
+/**
+ * Where the plugin contract is published from (ADR 0149 and its 2026-10-28 amendment,
+ * TYTO-448). Gated on `hasChangesets == 'false'` after the action, the step was skipped on
+ * every push while one unconsumable changeset sat in `.changeset/`; moved after the action
+ * without the gate, it would publish the versions v2 writes into the checkout for the next
+ * version PR. Before the action, ungated and loud is the only placement that publishes what
+ * `main` released.
+ */
+describe('Contract publishing at release', () => {
+  const PUBLISHER = 'tools/repo-checks/src/publish-contract.mjs';
+  const releaseSteps = () =>
+    Object.values(readYaml<Workflow>(`${WORKFLOWS_DIR}/release.yml`).jobs ?? {}).flatMap(
+      (job) => job.steps ?? [],
+    );
+
+  it('runs before changesets/action moves the checkout to the version branch', () => {
+    const steps = releaseSteps();
+    const publisher = steps.findIndex((step) => step.run?.includes(PUBLISHER) === true);
+    const action = steps.findIndex((step) => step.uses?.startsWith('changesets/action@') === true);
+
+    expect(publisher, 'release.yml no longer publishes the contract').not.toBe(-1);
+    expect(publisher).toBeLessThan(action);
+  });
+
+  it('runs on every push, and fails the job when the upload fails', () => {
+    const step = releaseSteps().find((candidate) => candidate.run?.includes(PUBLISHER) === true);
+
+    expect(step?.if, 'a condition on the publish step can skip it for good').toBeUndefined();
+    expect(step?.['continue-on-error']).toBeUndefined();
+    expect(step?.run).not.toContain('--dry-run');
+  });
+});
+
 describe('labeler', () => {
   type LabelerConfig = Record<string, { 'changed-files': { 'any-glob-to-any-file': unknown }[] }[]>;
 

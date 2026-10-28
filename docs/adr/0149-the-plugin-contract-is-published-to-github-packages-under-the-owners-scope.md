@@ -1,6 +1,6 @@
 # 0149 — The plugin contract is published to GitHub Packages under the owner's scope
 
-Status: accepted · 2026-10-27 · TYTO-444 · builds on ADR 0040, ADR 0041, ADR 0070 and ADR 0072
+Status: accepted · 2026-10-27 · TYTO-444 · amended 2026-10-28 (TYTO-448) · builds on ADR 0040, ADR 0041, ADR 0070 and ADR 0072
 
 ## Context
 
@@ -76,6 +76,40 @@ publish` uploads every package that is not private — sixteen here — so it is
   upload or the token's permission.
 - A version PR that bumps none of the four publishes nothing; a rerun of a release publishes
   nothing twice.
+
+## Amendment — 2026-10-28 · TYTO-448: publish on every push, before the action
+
+Decision 3 gated the publish on `hasChangesets == 'false'`, after `changesets/action`. It never
+ran. Version PR #24 merged as `b47a5dc`, and release run 40616244062 skipped the step: three
+changesets on `main` named only `@tyto/docs` and `@tyto/repo-checks`, which carry no
+`version` field, so `changeset version` skipped them, they stayed in `.changeset/`, and the
+action reported changesets left and opened #208 with no files. Any changeset like that holds
+every later release the same way.
+
+1. **The publish step runs on every push to `main`, before `changesets/action`, with no
+   condition.** The script already skips every version the registry holds, so the gate bought
+   nothing but the failure above. It cannot simply drop the gate and stay after the action:
+   when changesets are left, `changesets/action@v2` switches the checkout to
+   `changeset-release/main`, writes the next versions into it and does not switch back, so a
+   step after it would publish versions no release has made. Before the action the checkout
+   is `main`, whose versions move only when a version PR merges.
+2. **A changeset may not name a package without a `version` field.** Those packages stay
+   unversioned — the manual is built from the desktop app's version (ADR 0101) and `tools/*`
+   never ship. `changeset-coverage.mjs` fails a branch that adds such a changeset, and
+   `changesets.test.ts` fails one already in `.changeset/`. A change that ships nothing
+   versioned takes `pnpm changeset add --empty`, which `changeset version` does consume. The
+   three stale files were deleted with this amendment.
+
+Consequences:
+
+- **A failed upload now fails the release job before the version PR is refreshed** — no
+  `continue-on-error`, on purpose. A red release run reads "publish failed" first, and the
+  version PR catches up on the next green push.
+- The first upload is the push that merges this amendment: `main` already holds
+  `@tyto/plugin-api` 0.5.0, `@tyto/core` 0.29.0, `@tyto/recipe` 0.1.0 and
+  `@tyto/template-kit` 0.2.2 from #24, none of them published.
+- `github-config.test.ts` pins the step's position, the absent condition and the absent
+  `continue-on-error`.
 
 ## Rejected
 
