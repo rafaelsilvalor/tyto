@@ -1,0 +1,197 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1080" height="1350" viewBox="0 0 1080 1350">
+  <defs>
+    <style>@font-face{font-family:"CircularXX";font-weight:400;font-style:normal;src:url("tyto-test-font:CircularXX-400-normal")}@font-face{font-family:"CircularXX";font-weight:900;font-style:normal;src:url("tyto-test-font:CircularXX-900-normal")}
+    </style>
+  </defs>
+  <rect width="1080" height="1350" fill="#fbfbfb"/>
+  <g id="artwork-1.grid.0" transform="matrix(0.2442 0 0 0.2442 64 64)">
+    <path d="M24,0H162.09A24,24,0,0,1,186.09,24V352.79A24,24,0,0,1,162.09,376.79H24A24,24,0,0,1,0,352.79V24A24,24,0,0,1,24,0ZM51.05,120A42,42,0,1,0,135.05,120A42,42,0,1,0,51.05,120Z" fill-rule="evenodd" fill="#5900a6"/>
+  </g>
+  <g id="artwork-1.grid.1" transform="matrix(1 0 0 1 64 160)">
+    <g id="artwork-1.grid.1.0" transform="matrix(1 0 0 1 20 0)">
+      <text x="456" y="51.46" text-anchor="middle" letter-spacing="-0.62" xml:space="preserve"><tspan font-family="CircularXX" font-size="62" font-weight="900" fill="#5900a6">10 CONCURSOS PREVISTOS PARA QC AINDA EM 2026!</tspan></text>
+    </g>
+  </g>
+  <g id="artwork-1.grid.2" transform="matrix(1 0 0 1 64 245.72)">
+    <g id="artwork-1.grid.2.0">
+      <g id="artwork-1.grid.2.0.0">
+        <path d="M4 0 H309.3333 A4 4 0 0 1 313.3333 4 V59.712 A4 4 0 0 1 309.3333 63.712 H4 A4 4 0 0 1 0 59.712 V4 A4 4 0 0 1 4 0 Z" fill="#5900a6"/>
+      </g>
+      <g id="artwork-1.grid.2.0.1" transform="matrix(1 0 0 1 11 6.6)">
+        <text x="145.6667" y="35.156" text-anchor="middle" letter-spacing="1.1" xml:space="preserve"><tspan font-family="CircularXX" font-size="22" font-weight="400" fill="#ffffff">CONCURSO</tspan></text>
+      </g>
+      <g id="artwork-1.grid.2.0.2" transform="matrix(1 0 0 1 319.3333 0)">
+        <path d="M4 0 H309.3333 A4 4 0 0 1 313.3333 4 V59.712 A4 4 0 0 1 309.3333 63.712 H4 A4 4 0 0 1 0 59.712 V4 A4 4 0 0 1 4 0 Z" fill="#5900a6"/>
+      </g>
+      <g id="artwork-1.grid.2.0.3" transform="matrix(1 0 0 1 330.3333 6.6)">
+        <text x="145.6667" y="35.156" text-anchor="middle" letter-spacing="1.1" xml:space="preserve"><tspan font-family="CircularXX" font-size="22" font-weight="400" fill="#ffffff">SITUAÇÃO</tspan></text>
+      </g>
+      <g id="artwork-1.grid.2.0.4" transform="matrix(1 0 0 1 638.6667 0)">
+        <path d="M4 0 H309.3333 A4 4 0 0 1 313.3333 4 V59.712 A4 4 0 0 1 309.3333 63.712 H4 A4 4 0 0 1 0 59.712 V4 A4 4 0 0 1 4 0 Z" fill="#5900a6"/>
+      </g>
+      <g id="artwork-1.grid.2.0.5" transform="matrix(1 0 0 1 649.6667 6.6)">
+        <text x="145.6667" y="35.156" text-anchor="middle" letter-spacing="1.1" xml:space="preserve"><tspan font-family="CircularXX" font-size="22" font-weight="400" fill="#ffffff">VAGAS</tspan></text>
+      </g>
+    </g>
+    <g id="artwork-1.grid.2.1">
+      <g id="artwork-1.grid.2.1.0" transform="matrix(1 0 0 1 0 68.712)">
+        <path d="M4 0 H309.3333 A4 4 0 0 1 313.3333 4 V58.7 A4 4 0 0 1 309.3333 62.7 H4 A4 4 0 0 1 0 58.7 V4 A4 4 0 0 1 4 0 Z" fill="#f2f2f4"/>
+      </g>
+      <g id="artwork-1.grid.2.1.1" transform="matrix(1 0 0 1 11 75.312)">
+        <text x="145.6667" y="34.65" text-anchor="middle" xml:space="preserve"><tspan font-family="CircularXX" font-size="22" font-weight="400" fill="#000000">TRZ2</tspan></text>
+      </g>
+      <g id="artwork-1.grid.2.1.2" transform="matrix(1 0 0 1 319.3333 68.712)">
+        <path d="M4 0 H309.3333 A4 4 0 0 1 313.3333 4 V58.7 A4 4 0 0 1 309.3333 62.7 H4 A4 4 0 0 1 0 58.7 V4 A4 4 0 0 1 4 0 Z" fill="#f2f2f4"/>
+      </g>
+      <g id="artwork-1.grid.2.1.3" transform="matrix(1 0 0 1 330.3333 75.312)">
+        <text x="145.6667" y="34.65" text-anchor="middle" xml:space="preserve"><tspan font-family="CircularXX" font-size="22" font-weight="400" fill="#000000">Banca definida (Ômegas)</tspan></text>
+      </g>
+      <g id="artwork-1.grid.2.1.4" transform="matrix(1 0 0 1 638.6667 68.712)">
+        <path d="M4 0 H309.3333 A4 4 0 0 1 313.3333 4 V58.7 A4 4 0 0 1 309.3333 62.7 H4 A4 4 0 0 1 0 58.7 V4 A4 4 0 0 1 4 0 Z" fill="#f2f2f4"/>
+      </g>
+      <g id="artwork-1.grid.2.1.5" transform="matrix(1 0 0 1 649.6667 75.312)">
+        <text x="145.6667" y="34.65" text-anchor="middle" xml:space="preserve"><tspan font-family="CircularXX" font-size="22" font-weight="400" fill="#000000">-</tspan></text>
+      </g>
+    </g>
+    <g id="artwork-1.grid.2.2">
+      <g id="artwork-1.grid.2.2.0" transform="matrix(1 0 0 1 11 143.012)">
+        <text x="145.6667" y="34.65" text-anchor="middle" xml:space="preserve"><tspan font-family="CircularXX" font-size="22" font-weight="400" fill="#000000">Corex QC</tspan></text>
+      </g>
+      <g id="artwork-1.grid.2.2.1" transform="matrix(1 0 0 1 330.3333 143.012)">
+        <text x="145.6667" y="34.65" text-anchor="middle" xml:space="preserve"><tspan font-family="CircularXX" font-size="22" font-weight="400" fill="#000000">Banca definida (Quintex)</tspan></text>
+      </g>
+      <g id="artwork-1.grid.2.2.2" transform="matrix(1 0 0 1 649.6667 143.012)">
+        <text x="145.6667" y="34.65" text-anchor="middle" xml:space="preserve"><tspan font-family="CircularXX" font-size="22" font-weight="400" fill="#000000">76 + CR</tspan></text>
+      </g>
+    </g>
+    <g id="artwork-1.grid.2.3">
+      <g id="artwork-1.grid.2.3.0" transform="matrix(1 0 0 1 0 204.112)">
+        <path d="M4 0 H309.3333 A4 4 0 0 1 313.3333 4 V58.7 A4 4 0 0 1 309.3333 62.7 H4 A4 4 0 0 1 0 58.7 V4 A4 4 0 0 1 4 0 Z" fill="#f2f2f4"/>
+      </g>
+      <g id="artwork-1.grid.2.3.1" transform="matrix(1 0 0 1 11 210.712)">
+        <text x="145.6667" y="34.65" text-anchor="middle" xml:space="preserve"><tspan font-family="CircularXX" font-size="22" font-weight="400" fill="#000000">Fazex QC (Analista)</tspan></text>
+      </g>
+      <g id="artwork-1.grid.2.3.2" transform="matrix(1 0 0 1 319.3333 204.112)">
+        <path d="M4 0 H309.3333 A4 4 0 0 1 313.3333 4 V58.7 A4 4 0 0 1 309.3333 62.7 H4 A4 4 0 0 1 0 58.7 V4 A4 4 0 0 1 4 0 Z" fill="#f2f2f4"/>
+      </g>
+      <g id="artwork-1.grid.2.3.3" transform="matrix(1 0 0 1 330.3333 210.712)">
+        <text x="145.6667" y="34.65" text-anchor="middle" xml:space="preserve"><tspan font-family="CircularXX" font-size="22" font-weight="400" fill="#000000">Banca definida (BXT)</tspan></text>
+      </g>
+      <g id="artwork-1.grid.2.3.4" transform="matrix(1 0 0 1 638.6667 204.112)">
+        <path d="M4 0 H309.3333 A4 4 0 0 1 313.3333 4 V58.7 A4 4 0 0 1 309.3333 62.7 H4 A4 4 0 0 1 0 58.7 V4 A4 4 0 0 1 4 0 Z" fill="#f2f2f4"/>
+      </g>
+      <g id="artwork-1.grid.2.3.5" transform="matrix(1 0 0 1 649.6667 210.712)">
+        <text x="145.6667" y="34.65" text-anchor="middle" xml:space="preserve"><tspan font-family="CircularXX" font-size="22" font-weight="400" fill="#000000">60</tspan></text>
+      </g>
+    </g>
+    <g id="artwork-1.grid.2.4">
+      <g id="artwork-1.grid.2.4.0" transform="matrix(1 0 0 1 11 278.412)">
+        <text x="145.6667" y="34.65" text-anchor="middle" xml:space="preserve"><tspan font-family="CircularXX" font-size="22" font-weight="400" fill="#000000">QC Águas</tspan></text>
+      </g>
+      <g id="artwork-1.grid.2.4.1" transform="matrix(1 0 0 1 330.3333 278.412)">
+        <text x="145.6667" y="34.65" text-anchor="middle" xml:space="preserve"><tspan font-family="CircularXX" font-size="22" font-weight="400" fill="#000000">Banca definida (BLM)</tspan></text>
+      </g>
+      <g id="artwork-1.grid.2.4.2" transform="matrix(1 0 0 1 649.6667 278.412)">
+        <text x="145.6667" y="34.65" text-anchor="middle" xml:space="preserve"><tspan font-family="CircularXX" font-size="22" font-weight="400" fill="#000000">190</tspan></text>
+      </g>
+    </g>
+    <g id="artwork-1.grid.2.5">
+      <g id="artwork-1.grid.2.5.0" transform="matrix(1 0 0 1 0 339.512)">
+        <path d="M4 0 H309.3333 A4 4 0 0 1 313.3333 4 V58.7 A4 4 0 0 1 309.3333 62.7 H4 A4 4 0 0 1 0 58.7 V4 A4 4 0 0 1 4 0 Z" fill="#f2f2f4"/>
+      </g>
+      <g id="artwork-1.grid.2.5.1" transform="matrix(1 0 0 1 11 346.112)">
+        <text x="145.6667" y="34.65" text-anchor="middle" xml:space="preserve"><tspan font-family="CircularXX" font-size="22" font-weight="400" fill="#000000">IPX QC</tspan></text>
+      </g>
+      <g id="artwork-1.grid.2.5.2" transform="matrix(1 0 0 1 319.3333 339.512)">
+        <path d="M4 0 H309.3333 A4 4 0 0 1 313.3333 4 V58.7 A4 4 0 0 1 309.3333 62.7 H4 A4 4 0 0 1 0 58.7 V4 A4 4 0 0 1 4 0 Z" fill="#f2f2f4"/>
+      </g>
+      <g id="artwork-1.grid.2.5.3" transform="matrix(1 0 0 1 330.3333 346.112)">
+        <text x="145.6667" y="34.65" text-anchor="middle" xml:space="preserve"><tspan font-family="CircularXX" font-size="22" font-weight="400" fill="#000000">Banca definida (Ômegas)</tspan></text>
+      </g>
+      <g id="artwork-1.grid.2.5.4" transform="matrix(1 0 0 1 638.6667 339.512)">
+        <path d="M4 0 H309.3333 A4 4 0 0 1 313.3333 4 V58.7 A4 4 0 0 1 309.3333 62.7 H4 A4 4 0 0 1 0 58.7 V4 A4 4 0 0 1 4 0 Z" fill="#f2f2f4"/>
+      </g>
+      <g id="artwork-1.grid.2.5.5" transform="matrix(1 0 0 1 649.6667 346.112)">
+        <text x="145.6667" y="34.65" text-anchor="middle" xml:space="preserve"><tspan font-family="CircularXX" font-size="22" font-weight="400" fill="#000000">98</tspan></text>
+      </g>
+    </g>
+    <g id="artwork-1.grid.2.6">
+      <g id="artwork-1.grid.2.6.0" transform="matrix(1 0 0 1 11 413.812)">
+        <text x="145.6667" y="34.65" text-anchor="middle" xml:space="preserve"><tspan font-family="CircularXX" font-size="22" font-weight="400" fill="#000000">CDVX</tspan></text>
+      </g>
+      <g id="artwork-1.grid.2.6.1" transform="matrix(1 0 0 1 330.3333 413.812)">
+        <text x="145.6667" y="34.65" text-anchor="middle" xml:space="preserve"><tspan font-family="CircularXX" font-size="22" font-weight="400" fill="#000000">Banca definida (Ômegas)</tspan></text>
+      </g>
+      <g id="artwork-1.grid.2.6.2" transform="matrix(1 0 0 1 649.6667 413.812)">
+        <text x="145.6667" y="34.65" text-anchor="middle" xml:space="preserve"><tspan font-family="CircularXX" font-size="22" font-weight="400" fill="#000000">388</tspan></text>
+      </g>
+    </g>
+    <g id="artwork-1.grid.2.7">
+      <g id="artwork-1.grid.2.7.0" transform="matrix(1 0 0 1 0 474.912)">
+        <path d="M4 0 H309.3333 A4 4 0 0 1 313.3333 4 V58.7 A4 4 0 0 1 309.3333 62.7 H4 A4 4 0 0 1 0 58.7 V4 A4 4 0 0 1 4 0 Z" fill="#f2f2f4"/>
+      </g>
+      <g id="artwork-1.grid.2.7.1" transform="matrix(1 0 0 1 11 481.512)">
+        <text x="145.6667" y="34.65" text-anchor="middle" xml:space="preserve"><tspan font-family="CircularXX" font-size="22" font-weight="400" fill="#000000">SEQ QC</tspan></text>
+      </g>
+      <g id="artwork-1.grid.2.7.2" transform="matrix(1 0 0 1 319.3333 474.912)">
+        <path d="M4 0 H309.3333 A4 4 0 0 1 313.3333 4 V58.7 A4 4 0 0 1 309.3333 62.7 H4 A4 4 0 0 1 0 58.7 V4 A4 4 0 0 1 4 0 Z" fill="#f2f2f4"/>
+      </g>
+      <g id="artwork-1.grid.2.7.3" transform="matrix(1 0 0 1 330.3333 481.512)">
+        <text x="145.6667" y="34.65" text-anchor="middle" xml:space="preserve"><tspan font-family="CircularXX" font-size="22" font-weight="400" fill="#000000">Banca definida (BLM)</tspan></text>
+      </g>
+      <g id="artwork-1.grid.2.7.4" transform="matrix(1 0 0 1 638.6667 474.912)">
+        <path d="M4 0 H309.3333 A4 4 0 0 1 313.3333 4 V58.7 A4 4 0 0 1 309.3333 62.7 H4 A4 4 0 0 1 0 58.7 V4 A4 4 0 0 1 4 0 Z" fill="#f2f2f4"/>
+      </g>
+      <g id="artwork-1.grid.2.7.5" transform="matrix(1 0 0 1 649.6667 481.512)">
+        <text x="145.6667" y="34.65" text-anchor="middle" xml:space="preserve"><tspan font-family="CircularXX" font-size="22" font-weight="400" fill="#000000">5 mil</tspan></text>
+      </g>
+    </g>
+    <g id="artwork-1.grid.2.8">
+      <g id="artwork-1.grid.2.8.0" transform="matrix(1 0 0 1 11 549.212)">
+        <text x="145.6667" y="34.65" text-anchor="middle" xml:space="preserve"><tspan font-family="CircularXX" font-size="22" font-weight="400" fill="#000000">TX QC</tspan></text>
+      </g>
+      <g id="artwork-1.grid.2.8.1" transform="matrix(1 0 0 1 330.3333 549.212)">
+        <text x="145.6667" y="34.65" text-anchor="middle" xml:space="preserve"><tspan font-family="CircularXX" font-size="22" font-weight="400" fill="#000000">Em estudos</tspan></text>
+      </g>
+      <g id="artwork-1.grid.2.8.2" transform="matrix(1 0 0 1 649.6667 549.212)">
+        <text x="145.6667" y="34.65" text-anchor="middle" xml:space="preserve"><tspan font-family="CircularXX" font-size="22" font-weight="400" fill="#000000">-</tspan></text>
+      </g>
+    </g>
+    <g id="artwork-1.grid.2.9">
+      <g id="artwork-1.grid.2.9.0" transform="matrix(1 0 0 1 0 610.312)">
+        <path d="M4 0 H309.3333 A4 4 0 0 1 313.3333 4 V58.7 A4 4 0 0 1 309.3333 62.7 H4 A4 4 0 0 1 0 58.7 V4 A4 4 0 0 1 4 0 Z" fill="#f2f2f4"/>
+      </g>
+      <g id="artwork-1.grid.2.9.1" transform="matrix(1 0 0 1 11 616.912)">
+        <text x="145.6667" y="34.65" text-anchor="middle" xml:space="preserve"><tspan font-family="CircularXX" font-size="22" font-weight="400" fill="#000000">Cetrix</tspan></text>
+      </g>
+      <g id="artwork-1.grid.2.9.2" transform="matrix(1 0 0 1 319.3333 610.312)">
+        <path d="M4 0 H309.3333 A4 4 0 0 1 313.3333 4 V58.7 A4 4 0 0 1 309.3333 62.7 H4 A4 4 0 0 1 0 58.7 V4 A4 4 0 0 1 4 0 Z" fill="#f2f2f4"/>
+      </g>
+      <g id="artwork-1.grid.2.9.3" transform="matrix(1 0 0 1 330.3333 616.912)">
+        <text x="145.6667" y="34.65" text-anchor="middle" xml:space="preserve"><tspan font-family="CircularXX" font-size="22" font-weight="400" fill="#000000">Comissão formada</tspan></text>
+      </g>
+      <g id="artwork-1.grid.2.9.4" transform="matrix(1 0 0 1 638.6667 610.312)">
+        <path d="M4 0 H309.3333 A4 4 0 0 1 313.3333 4 V58.7 A4 4 0 0 1 309.3333 62.7 H4 A4 4 0 0 1 0 58.7 V4 A4 4 0 0 1 4 0 Z" fill="#f2f2f4"/>
+      </g>
+      <g id="artwork-1.grid.2.9.5" transform="matrix(1 0 0 1 649.6667 616.912)">
+        <text x="145.6667" y="34.65" text-anchor="middle" xml:space="preserve"><tspan font-family="CircularXX" font-size="22" font-weight="400" fill="#000000">107 + CR</tspan></text>
+      </g>
+    </g>
+    <g id="artwork-1.grid.2.10">
+      <g id="artwork-1.grid.2.10.0" transform="matrix(1 0 0 1 11 684.612)">
+        <text x="145.6667" y="34.65" text-anchor="middle" xml:space="preserve"><tspan font-family="CircularXX" font-size="22" font-weight="400" fill="#000000">QC Regula</tspan></text>
+      </g>
+      <g id="artwork-1.grid.2.10.1" transform="matrix(1 0 0 1 330.3333 684.612)">
+        <text x="145.6667" y="34.65" text-anchor="middle" xml:space="preserve"><tspan font-family="CircularXX" font-size="22" font-weight="400" fill="#000000">Grupo de Trabalho Formado</tspan></text>
+      </g>
+      <g id="artwork-1.grid.2.10.2" transform="matrix(1 0 0 1 649.6667 684.612)">
+        <text x="145.6667" y="34.65" text-anchor="middle" xml:space="preserve"><tspan font-family="CircularXX" font-size="22" font-weight="400" fill="#000000">-</tspan></text>
+      </g>
+    </g>
+  </g>
+  <g id="artwork-1.grid.3" transform="matrix(1 0 0 1 64 1234)">
+    <g id="artwork-1.grid.3.0">
+      <text x="476" y="54.3" text-anchor="middle" letter-spacing="5.32" xml:space="preserve"><tspan font-family="CircularXX" font-size="19" font-weight="400" fill="#8c8ca1">@assinatura</tspan></text>
+    </g>
+  </g>
+</svg>
