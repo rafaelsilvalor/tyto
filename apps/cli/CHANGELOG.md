@@ -1,5 +1,12 @@
 # @tyto/cli
 
+## 0.5.2
+
+### Patch Changes
+
+- Updated dependencies [8ece763]
+  - @tyto/templates@1.0.3
+
 ## 0.5.1
 
 ### Patch Changes
