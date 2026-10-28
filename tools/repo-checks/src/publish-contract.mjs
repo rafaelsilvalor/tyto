@@ -3,8 +3,9 @@
  * Publishes the plugin contract to GitHub Packages (ADR 0149, TYTO-444).
  *
  * A plugin or a template in its own repository depends on `@tyto/plugin-api` and
- * `@tyto/template-kit`. Those two are the contract; `@tyto/core` and `@tyto/recipe` are what
- * they import, so they are published beside them rather than bundled into them — a bundled
+ * `@tyto/template-kit`. Those two are the contract; `@tyto/core`, `@tyto/recipe`,
+ * `@tyto/brief-lang` and `@tyto/export-html` are what they import (the last two for
+ * `@tyto/template-kit/testing`, ADR 0152), so they are published beside them rather than bundled into them — a bundled
  * core would be two copies of `Scene` the day a template installs both packages.
  *
  * **The workspace keeps `@tyto/*`; what is published is renamed.** GitHub Packages scopes a
@@ -17,8 +18,8 @@
  *
  * **Changesets versions and tags these packages and never publishes them.** `changeset
  * publish` publishes every package that is not private, which is sixteen here; the list
- * below is the four that are meant to leave the repository. A version already on the
- * registry is skipped, so a release that bumped none of the four publishes nothing.
+ * below is the ones that are meant to leave the repository. A version already on the
+ * registry is skipped, so a release that bumped none of them publishes nothing.
  *
  * Plain JavaScript and the package managers alone, like `changeset-coverage.mjs`. It packs
  * with pnpm, which turns `workspace:*` into the version it points at, and publishes with npm,
@@ -51,6 +52,8 @@ export const CONTRACT_PACKAGES = [
   { name: '@tyto/core', directory: 'packages/core' },
   { name: '@tyto/recipe', directory: 'packages/recipe' },
   { name: '@tyto/plugin-api', directory: 'packages/plugin-api' },
+  { name: '@tyto/brief-lang', directory: 'packages/brief-lang' },
+  { name: '@tyto/export-html', directory: 'packages/export-html' },
   { name: '@tyto/template-kit', directory: 'packages/template-kit' },
 ];
 

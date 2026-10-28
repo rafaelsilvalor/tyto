@@ -24,7 +24,7 @@ jobs:
       - run: pnpm build
       # **The plugin contract goes to GitHub Packages** (ADR 0149, TYTO-444), on every push to
       # `main` and before changesets/action. The script skips every version the registry
-      # already holds, so a push that moved none of the four publishes nothing, and a rerun
+      # already holds, so a push that moved none of them publishes nothing, and a rerun
       # publishes nothing twice. Changesets itself never publishes: `changeset publish` would
       # upload all sixteen public packages.
       #

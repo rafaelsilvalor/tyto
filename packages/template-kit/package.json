@@ -10,6 +10,10 @@
     ".": {
       "types": "./dist/index.d.ts",
       "import": "./dist/index.js"
+    },
+    "./testing": {
+      "types": "./dist/testing.d.ts",
+      "import": "./dist/testing.js"
     }
   },
   "files": [
@@ -23,6 +27,8 @@
     "test": "vitest run --passWithNoTests"
   },
   "dependencies": {
-    "@tyto/core": "workspace:*"
+    "@tyto/brief-lang": "workspace:*",
+    "@tyto/core": "workspace:*",
+    "@tyto/export-html": "workspace:*"
   }
 }

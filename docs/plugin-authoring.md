@@ -271,8 +271,9 @@ to GitHub, so a `github:` or registry install has not been run against a real pl
 ## Develop it in its own repository
 
 A plugin in its own repository depends on the contract instead of copying it. Tyto publishes
-four packages to GitHub Packages (ADR 0149): `@tyto/plugin-api` and `@tyto/template-kit`, which
-are the contract, and `@tyto/core` and `@tyto/recipe`, which they import. They are published
+six packages to GitHub Packages (ADR 0149): `@tyto/plugin-api` and `@tyto/template-kit`, which
+are the contract, and `@tyto/core`, `@tyto/recipe`, `@tyto/brief-lang` and `@tyto/export-html`,
+which they import. They are published
 under the repository owner's scope, `@rafaelsilvalor/tyto-<name>`, because nobody here owns
 `@tyto` on any registry. **Write an alias, and keep importing `@tyto/...`:**
 
@@ -301,7 +302,7 @@ echo '//npm.pkg.github.com/:_authToken=${NODE_AUTH_TOKEN}' >> ~/.npmrc
 NODE_AUTH_TOKEN=$(gh auth token) pnpm install
 ```
 
-In a GitHub Actions workflow you need no secret: the four packages are public, so the workflow's
+In a GitHub Actions workflow you need no secret: the published packages are public, so the workflow's
 own `GITHUB_TOKEN` with `packages: read` installs them, and `actions/setup-node` writes the
 user-level file for you:
 
@@ -385,6 +386,38 @@ not have.
 It replaces the checkout, not the bundle. The installed folder still has no `node_modules`
 (_A code template_), so whatever your code imports from `@tyto/*` at run time is inlined into
 `dist/index.js` as before; a package installed from the registry is inlined the same way.
+
+### Test a template's output without Tyto
+
+`@tyto/template-kit/testing` compiles a brief against one code template the way the app does
+(ADR 0152): the real `parseBrief`, `resolve`, `compile` and HTML exporter, in the preview's
+order, and answers the `Scene` and one HTML document per frame — or every diagnostic that stopped
+it. You pass the formats your template renders; the kit ships no catalogue of sizes.
+
+```ts
+import { readFileSync } from 'node:fs';
+import { defineTemplate, formatCatalogue, parseManifest } from '@tyto/core';
+import { compileTemplate } from '@tyto/template-kit/testing';
+import { build } from './template.js';
+
+const read = (path: string) => readFileSync(new URL(path, import.meta.url), 'utf8');
+const manifest = parseManifest(read('./manifest.yaml'), 'manifest.yaml');
+if (!manifest.ok) throw new Error(manifest.error.map((item) => item.message).join('\n'));
+
+const result = await compileTemplate({
+  brief: read('./examples/tres-colunas.brief'),
+  template: defineTemplate(manifest.value, build),
+  formats: formatCatalogue({ grid: { w: 1080, h: 1350, kind: 'grid' } }),
+});
+if (!result.ok) throw new Error(result.error.map((item) => item.message).join('\n'));
+await expect(result.value.frames[0]?.html).toMatchFileSnapshot('./__snapshots__/tres-colunas.html');
+```
+
+**The snapshot is not the export, on purpose.** By default nothing is measured, so text keeps
+the lines your template produced, and every face is written as a placeholder
+(`tyto-test-font:Inter-700-normal`) rather than a font file. The snapshot changes when your
+template does, not when a machine has another font. Pass `faces` and `font` for the measured
+layout. A markup template (`template.html`) is not covered yet, and neither is the PNG.
 
 ### Hear about a breaking release before your users do
 

@@ -98,7 +98,7 @@ jobs:
             grep -qxF "${name%%[.-]*}" <<<"$used" || rm -f "$file"
           done
           du -sh .turbo/cache && find .turbo/cache -type f | wc -l
-      # **The plugin contract would publish** (ADR 0149, TYTO-444): the four packages
+      # **The plugin contract would publish** (ADR 0149, TYTO-444): the packages
       # `release.yml` uploads to GitHub Packages are packed, renamed and handed to
       # `npm publish --dry-run`, which uploads nothing and needs no token. After the turbo
       # run because it packs the `dist/` that run built. A package that gains a dependency on

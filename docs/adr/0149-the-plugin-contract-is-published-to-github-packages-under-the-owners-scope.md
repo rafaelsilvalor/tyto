@@ -43,6 +43,9 @@ And `@tyto/plugin-api` cannot be published alone. It depends on `@tyto/core` and
    first; `publish-contract.test.mjs` fails if a listed package depends on a workspace package
    outside it, or before it. The licence stays `UNLICENSED`: a registry package is read with a
    token, and the repository being public does not change what the licence grants.
+   _Amended 2026-10-28 (TYTO-447, ADR 0152):_ `@tyto/brief-lang` and `@tyto/export-html` are
+   published too, between `@tyto/plugin-api` and `@tyto/template-kit`, as what
+   `@tyto/template-kit/testing` imports.
 3. **Changesets versions and tags these packages and never publishes them.** `changeset
 publish` uploads every package that is not private — sixteen here — so it is not used. The
    release run that tags (the one where no changeset is left, `hasChangesets == 'false'`) then
