@@ -2,6 +2,7 @@ import { execFile } from 'node:child_process';
 import { join, relative } from 'node:path';
 
 import {
+  HOUSE_STYLE_PACKAGE,
   KIT_PACKAGE,
   REBUILD_SCRIPT,
   REPOSITORY_ROOT,
@@ -151,23 +152,29 @@ export interface RebuildOutcome {
 
 /** Which packages a save asks to be rebuilt before the render. */
 export interface RebuildPackages {
-  /** `@tyto/template-kit`, whose `dist/` the templates package imports. */
+  /**
+   * `@tyto/template-kit` and `@tyto/house-style`, whose `dist/` the templates package imports.
+   * One flag for both: the house's package imports the kit, so a kit save rebuilds it too.
+   */
   readonly kit: boolean;
   /** `@tyto/templates`, whose `dist/` is where `BUILT_IN_TEMPLATE_BUILDS` is read from. */
   readonly templates: boolean;
 }
 
 /**
- * Rebuilds what the save touched, the kit before the templates, so the next `tyto render`
- * imports the code just saved (TYTO-181).
+ * Rebuilds what the save touched, the kit and the house's package before the templates, so the
+ * next `tyto render` imports the code just saved (TYTO-181, TYTO-431).
  *
- * The kit goes first because the templates import it; a kit that failed to build stops here,
- * and the page says which package is stale rather than drawing with the one from before.
+ * Dependencies first: the house's package imports the kit and the templates import both. A
+ * package that failed to build stops here, and the page says which one is stale rather than
+ * drawing with the one from before.
  */
 export async function rebuildPackages(packages: RebuildPackages): Promise<RebuildOutcome> {
   if (packages.kit) {
     const kit = await rebuildPackage(KIT_PACKAGE, '@tyto/template-kit');
     if (!kit.ok) return kit;
+    const houseStyle = await rebuildPackage(HOUSE_STYLE_PACKAGE, '@tyto/house-style');
+    if (!houseStyle.ok) return houseStyle;
   }
   if (packages.templates) return rebuildPackage(TEMPLATES_PACKAGE, '@tyto/templates');
   return { ok: true, diagnostics: [] };

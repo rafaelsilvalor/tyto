@@ -38,5 +38,12 @@ export const BUILT_IN_FORMATS = join(BUILT_IN_PACK, 'formats.yaml');
 export const KIT_PACKAGE = join(REPOSITORY_ROOT, 'packages', 'template-kit');
 export const KIT_SOURCE = join(KIT_PACKAGE, 'src');
 
+/**
+ * `@tyto/house-style`'s package folder and source: the house's tokens and shared parts, which
+ * `@tyto/templates`' `dist/` imports as it imports the kit (TYTO-431).
+ */
+export const HOUSE_STYLE_PACKAGE = join(REPOSITORY_ROOT, 'packages', 'house-style');
+export const HOUSE_STYLE_SOURCE = join(HOUSE_STYLE_PACKAGE, 'src');
+
 /** The script that rebuilds a package, run with that package as its working folder. */
 export const REBUILD_SCRIPT = fileURLToPath(new URL('./rebuild-templates.ts', import.meta.url));

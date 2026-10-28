@@ -26,6 +26,7 @@
   },
   "dependencies": {
     "@tyto/core": "workspace:*",
+    "@tyto/house-style": "workspace:*",
     "@tyto/template-kit": "workspace:*"
   }
 }

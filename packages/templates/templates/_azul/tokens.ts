@@ -12,7 +12,7 @@
  * `ARROW` holds a `d` and the box it was drawn in, and no colour. The fill is decided where
  * the mark is placed, which is what lets the same mark be blue on paper and white on a dark
  * panel without a second copy of the geometry. The logo is not here: the brand kit supplies
- * it (ADR 0063), and `_casa/marks.ts` holds the placeholder drawn without one (ADR 0065).
+ * it (ADR 0063), and `house-style/src/marks.ts` holds the placeholder drawn without one (ADR 0065).
  */
 
 import { systemFont } from '@tyto/core/template';

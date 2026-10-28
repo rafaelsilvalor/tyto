@@ -20,6 +20,7 @@ type Request = { readonly rebuild: boolean; readonly kit?: boolean };
 let root: string;
 let pack: string;
 let kit: string;
+let houseStyle: string;
 let stop: (() => void) | undefined;
 let requests: Request[];
 
@@ -52,15 +53,18 @@ beforeEach(async () => {
   root = await mkdtemp(join(tmpdir(), 'tyto-preview-watch-'));
   pack = join(root, 'templates');
   kit = join(root, 'kit', 'src');
+  houseStyle = join(root, 'house-style', 'src');
   for (const folder of ['agenda/examples', '_marca', 'outro'].map((each) => join(pack, each))) {
     await mkdir(folder, { recursive: true });
   }
   await mkdir(kit, { recursive: true });
+  await mkdir(houseStyle, { recursive: true });
   await writeFile(join(pack, 'agenda', 'template.ts'), '');
   await writeFile(join(pack, 'agenda', 'examples', 'agenda.brief'), '');
   await writeFile(join(pack, '_marca', 'tokens.ts'), '');
   await writeFile(join(pack, 'outro', 'template.ts'), '');
   await writeFile(join(kit, 'pill-table.ts'), '');
+  await writeFile(join(houseStyle, 'table.ts'), '');
   requests = [];
 });
 
@@ -72,15 +76,32 @@ afterEach(async () => {
 
 describe('watchTarget', () => {
   it('asks for a kit rebuild when a kit function is saved', async () => {
-    stop = watchTarget(target(true), session as unknown as PreviewSession, { kitSource: kit });
+    stop = watchTarget(target(true), session as unknown as PreviewSession, {
+      kitSource: kit,
+      houseStyleSource: houseStyle,
+    });
 
     await save(join(kit, 'pill-table.ts'));
 
     expect(requests).toEqual([{ rebuild: false, kit: true }]);
   });
 
+  it("asks for a kit rebuild when one of the house's shared parts is saved", async () => {
+    stop = watchTarget(target(true), session as unknown as PreviewSession, {
+      kitSource: kit,
+      houseStyleSource: houseStyle,
+    });
+
+    await save(join(houseStyle, 'table.ts'));
+
+    expect(requests).toEqual([{ rebuild: false, kit: true }]);
+  });
+
   it('asks for a templates rebuild when the brand module beside the template is saved', async () => {
-    stop = watchTarget(target(true), session as unknown as PreviewSession, { kitSource: kit });
+    stop = watchTarget(target(true), session as unknown as PreviewSession, {
+      kitSource: kit,
+      houseStyleSource: houseStyle,
+    });
 
     await save(join(pack, '_marca', 'tokens.ts'));
 
@@ -88,7 +109,10 @@ describe('watchTarget', () => {
   });
 
   it('still asks for a templates rebuild when the template itself is saved', async () => {
-    stop = watchTarget(target(true), session as unknown as PreviewSession, { kitSource: kit });
+    stop = watchTarget(target(true), session as unknown as PreviewSession, {
+      kitSource: kit,
+      houseStyleSource: houseStyle,
+    });
 
     await save(join(pack, 'agenda', 'template.ts'));
 
@@ -96,7 +120,10 @@ describe('watchTarget', () => {
   });
 
   it('ignores a save to another template of the pack', async () => {
-    stop = watchTarget(target(true), session as unknown as PreviewSession, { kitSource: kit });
+    stop = watchTarget(target(true), session as unknown as PreviewSession, {
+      kitSource: kit,
+      houseStyleSource: houseStyle,
+    });
 
     await save(join(pack, 'outro', 'template.ts'));
 
@@ -104,7 +131,10 @@ describe('watchTarget', () => {
   });
 
   it('does not watch the kit or a brand module for a template that is not compiled', async () => {
-    stop = watchTarget(target(false), session as unknown as PreviewSession, { kitSource: kit });
+    stop = watchTarget(target(false), session as unknown as PreviewSession, {
+      kitSource: kit,
+      houseStyleSource: houseStyle,
+    });
 
     await save(join(kit, 'pill-table.ts'));
     await save(join(pack, '_marca', 'tokens.ts'));

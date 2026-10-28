@@ -66,6 +66,7 @@ const SUITES = {
       'packages/export-*/',
       'packages/raster/',
       'packages/templates/',
+      'packages/house-style/',
       'packages/core/',
       'packages/fonts/',
       'apps/cli/',

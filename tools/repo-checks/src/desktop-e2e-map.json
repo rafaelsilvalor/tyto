@@ -1722,7 +1722,7 @@
     },
     {
       "paths": [
-        "packages/{core,pipeline,templates,template-kit,raster,template-lang,brief-lang,io,fonts,plugin-api}/**",
+        "packages/{core,pipeline,templates,template-kit,house-style,raster,template-lang,brief-lang,io,fonts,plugin-api}/**",
         "packages/export-*/**",
         "apps/cli/**"
       ],

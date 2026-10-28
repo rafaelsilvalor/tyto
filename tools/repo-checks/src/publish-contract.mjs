@@ -3,9 +3,10 @@
  * Publishes the plugin contract to GitHub Packages (ADR 0149, TYTO-444).
  *
  * A plugin or a template in its own repository depends on `@tyto/plugin-api` and
- * `@tyto/template-kit`. Those two are the contract; `@tyto/core`, `@tyto/recipe`,
- * `@tyto/brief-lang` and `@tyto/export-html` are what they import (the last two for
- * `@tyto/template-kit/testing`, ADR 0152), so they are published beside them rather than bundled into them — a bundled
+ * `@tyto/template-kit`, and a template of the house on `@tyto/house-style` too (ADR 0151).
+ * Those three are the contract; `@tyto/core`, `@tyto/recipe`, `@tyto/brief-lang` and
+ * `@tyto/export-html` are what they import (the last two for `@tyto/template-kit/testing`,
+ * ADR 0152), so they are published beside them rather than bundled into them — a bundled
  * core would be two copies of `Scene` the day a template installs both packages.
  *
  * **The workspace keeps `@tyto/*`; what is published is renamed.** GitHub Packages scopes a
@@ -45,8 +46,6 @@ export const REGISTRY = 'https://npm.pkg.github.com';
  * The packages that are published, dependencies first so a real run never uploads a package
  * whose dependency is not there yet. `publish-contract.test.mjs` fails if one of them depends
  * on a workspace package outside this list, which is what would make it uninstallable.
- *
- * TYTO-431's `_casa` package joins this list when it exists (ADR 0149).
  */
 export const CONTRACT_PACKAGES = [
   { name: '@tyto/core', directory: 'packages/core' },
@@ -55,6 +54,7 @@ export const CONTRACT_PACKAGES = [
   { name: '@tyto/brief-lang', directory: 'packages/brief-lang' },
   { name: '@tyto/export-html', directory: 'packages/export-html' },
   { name: '@tyto/template-kit', directory: 'packages/template-kit' },
+  { name: '@tyto/house-style', directory: 'packages/house-style' },
 ];
 
 const REPOSITORY = 'https://github.com/rafaelsilvalor/tyto';

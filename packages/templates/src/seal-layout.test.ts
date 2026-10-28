@@ -1,11 +1,11 @@
 import { measureNothing, noBrandKit } from '@tyto/core';
 import { describe, expect, it } from 'vitest';
 
-import { build as agendaSemana } from '../agenda-semana/template.js';
-import { build as aprovados } from '../aprovados/template.js';
-import { build as simuladosOcre } from '../simulados-semana-ocre/template.js';
-import { build as simuladosVinho } from '../simulados-semana-vinho/template.js';
-import { SEAL_HEIGHT } from './seal.js';
+import { build as agendaSemana } from '../templates/agenda-semana/template.js';
+import { build as aprovados } from '../templates/aprovados/template.js';
+import { build as simuladosOcre } from '../templates/simulados-semana-ocre/template.js';
+import { build as simuladosVinho } from '../templates/simulados-semana-vinho/template.js';
+import { SEAL_HEIGHT } from '@tyto/house-style';
 
 import type {
   AssetRef,

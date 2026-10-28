@@ -12,12 +12,6 @@ yours, and without a convention each template invents its own and shares nothing
 ## The folder
 
 ```
-_casa/             the house: what several of its brands share (ADR 0055)
-  marks.ts          the logo and signature placeholders, the speech balloon
-  kit.ts            the brand kit's logo and signature, or the placeholders
-  brands.ts         what sets each brand apart — an accent, a sign-off
-  seal.ts           when a slide carries the brief's `selo` (the last grid slide)
-  compose.ts        one piece's composition, for every brand that publishes it
 _azul/             a brand: no manifest, so the registry skips it (ADR 0047)
   tokens.ts         colours, type scale, spacing, marks — the brand's spec sheet
   presets.ts        the kit's components in this brand's look
@@ -33,6 +27,14 @@ agenda-semana/
 Same folder as the markup route, with `template.ts` where `template.html` would be. A
 folder holds one or the other, never both. A template folder holds a `tokens.ts` or a
 `parts.ts` of its own only for what no other template of its brand draws.
+
+**What several of the house's brands share is a package, not a folder** (ADR 0055, ADR 0151):
+`@tyto/house-style` holds the logo and signature placeholders (`marks.ts`), the brand kit's
+marks or the placeholders (`kit.ts`), what sets each brand apart (`brands.ts`), when a slide
+carries the brief's `selo` (`seal.ts`) and one piece's composition for every brand that
+publishes it (`compose.ts`, `table.ts`, `banner.ts`). A template imports it by name, so the
+same import works from a template in its own repository. The table's tokens are the subpath
+`@tyto/house-style/table-tokens`, because they reuse three names of the root's `tokens.ts`.
 
 **A template that ships _with the application_ keeps that folder and adds one import.** Nothing
 resolves a path at runtime — running code that arrived in a folder is the plugin host's job
@@ -163,7 +165,7 @@ A carousel may close with a seal: the brief's optional `selo`, an art the frame'
 **The page shrinks by the seal's height**: `sealed` in the kit hands the layout the shorter
 size and returns the seal to draw, so a middle centred on the page centres above the seal and
 a footer standing on the bottom edge stands on the seal. When a slide carries it is the
-house's rule, in `_casa/seal.ts`; a template only passes `sealOf(context)` to `sealed`
+house's rule, in `house-style/src/seal.ts`; a template only passes `sealOf(context)` to `sealed`
 and spreads the seal into its frame's children.
 
 ## Names
@@ -190,7 +192,7 @@ blue on a light one without a second file.
 
 **A brand's logo and signature are not tokens of the repository.** A brand kit supplies them
 (ADR 0063) and the template reads them through `drawLogo(context.brand, height, inks)` and
-`signatureOf(context.brand)` in `_casa/kit.ts`, which answer the placeholders when the kit
+`signatureOf(context.brand)` in `house-style/src/kit.ts`, which answer the placeholders when the kit
 leaves a field out (ADR 0065). A kit's mark may come in two tones (ADR 0066); the template
 passes the colour of each, and `oneInk(colour)` where it draws the logo in one. `tools/repo-checks` fails when a known brand token comes back
 into a tracked text file.
@@ -215,17 +217,17 @@ no-break space draws and measures as a space and breaks nothing, in the measurem
 `export-html` and in `export-svg` alike. No exporter has to agree to anything.
 
 The same move chooses _where_ a phrase breaks. `R$ 5.667,92 a R$ 13.560,00` glues the `a` to
-the value before it, so the only break left falls between the two values. `_casa/breaks.ts`
+the value before it, so the only break left falls between the two values. `house-style/src/breaks.ts`
 holds the mechanism and the rules the house's templates share: a parenthesised group like
 `(GO)` stays whole and joins the word before it, and `pieces` are what a line can never be
-narrower than. `_casa/table-text.ts` (TYTO-218) adds the table's own rules on top.
+narrower than. `house-style/src/table-text.ts` (TYTO-218) adds the table's own rules on top.
 
 ## A short text in a fixed box sets its own breaks
 
 Tyto's layout breaks greedily, so a title it wraps leaves a long line over a short one and
 ends a line wherever the width runs out. A template that must do better decides the breaks
 itself and draws each line after a `lineBreak()`, leaving the layout nothing to choose.
-`_casa/balance.ts` (TYTO-210, the product banner) does it for a text of up to twelve
+`house-style/src/balance.ts` (TYTO-210, the product banner) does it for a text of up to twelve
 pieces: the largest size between a floor and a ceiling at which it fits; then, at that size,
 no line ending on a short function word (`de`, `do`, `e`…) when a break that fits avoids it,
 the fewest lines, and the narrowest widest line. A clean break at a smaller size beats an

@@ -2,17 +2,16 @@
  * `banner-roxo` — roxo's product banner (TYTO-210): one text over a fixed
  * background, in 1200×628, 600×600 and 345×146.
  *
- * The piece is drawn by `_casa/banner.ts`; this template is its boxes, measured from
+ * The piece is drawn by `house-style/src/banner.ts`; this template is its boxes, measured from
  * the maintainer's three references of 2026-10-03 (the agency text): the text's centre, the
  * room the white area leaves it, and its size there. The reference sizes are the ceilings, so
  * a short name is drawn as large as the reference draws a long one and never larger.
  */
 
-import { ROXO } from '../_casa/brands.js';
-import { productBanner } from '../_casa/banner.js';
+import { ROXO, productBanner } from '@tyto/house-style';
 
-import type { BannerLayout } from '../_casa/banner.js';
 import type { TemplateBuild } from '@tyto/core';
+import type { BannerLayout } from '@tyto/house-style';
 
 /** The reference's line pitch over its size, the same in all three: 65.5 / 55.5, 59 / 49.8. */
 const LINE_HEIGHT = 1.18;
