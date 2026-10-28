@@ -1,7 +1,8 @@
 name: release
 on:
   push: { branches: [main] }
-permissions: { contents: write, pull-requests: write }
+# `packages: write` is for the contract step at the end and nothing else (ADR 0149).
+permissions: { contents: write, pull-requests: write, packages: write }
 jobs:
   release:
     runs-on: ubuntu-latest
@@ -47,6 +48,7 @@ jobs:
       # being handed. The line was removed because it had stopped doing anything, not
       # because the step stopped needing a token.
       - uses: changesets/action@v2
+        id: changesets
         with:
           version-script: pnpm changeset version
           # `git-tag`, not `tag`: CLI v3 renamed the command. `tag` still runs and still
@@ -66,3 +68,13 @@ jobs:
           # message repeating the tag's own name — measured on `@tyto/core@0.19.0`, which
           # carries no signature either. `docs/git-workflow.md` has the decision;
           # `github-config.test.ts` fails if this line changes without it.
+      # **The plugin contract goes to GitHub Packages** (ADR 0149, TYTO-444). Only when the
+      # action found no changeset left, which is the run where it tagged instead of opening the
+      # version PR: `main` then holds released versions. The script skips every version the
+      # registry already has, so a release that moved none of the four publishes nothing, and
+      # a rerun of the same release publishes nothing twice. Changesets itself never publishes:
+      # `changeset publish` would upload all sixteen public packages.
+      - if: steps.changesets.outputs.hasChangesets == 'false'
+        run: node tools/repo-checks/src/publish-contract.mjs
+        env:
+          NODE_AUTH_TOKEN: ${{ github.token }}

@@ -32,6 +32,8 @@
 import { execFileSync } from 'node:child_process';
 import { pathToFileURL } from 'node:url';
 
+import { PROTOCOL_FILE, protocolBumpVerdict, protocolVersionOf } from './protocol-bump.mjs';
+
 /** Where versioned packages live; `tools/*` carry no `version` field (TYTO-94). */
 const WORKSPACE_ROOTS = ['packages', 'apps'];
 
@@ -74,6 +76,25 @@ export function parseChangeset(text) {
     .map((found) => found[1]);
 
   return { packages, empty: packages.length === 0 };
+}
+
+/**
+ * The bump a changeset gives each package it names, which the protocol check reads
+ * (`protocol-bump.mjs`); `parseChangeset` keeps to names so its callers stay as they were.
+ *
+ * @param {string} text
+ * @returns {Record<string, string>}
+ */
+export function changesetBumps(text) {
+  const match = /^---\r?\n([\s\S]*?)\r?\n?---/u.exec(text.trimStart());
+  if (match === null) return {};
+  return Object.fromEntries(
+    (match[1] ?? '')
+      .split(/\r?\n/u)
+      .map((line) => /^\s*['"]?([^'":\s]+)['"]?\s*:\s*(major|minor|patch|none)\s*$/u.exec(line))
+      .filter((found) => found !== null)
+      .map((found) => [found[1], found[2]]),
+  );
 }
 
 /**
@@ -210,13 +231,24 @@ export function readBranch({ base, head, git = defaultGit }) {
     git(['diff', '--name-only', '--diff-filter=A', mergeBase, head, '--', '.changeset/']),
   )
     .filter((file) => file.endsWith('.md') && !file.toLowerCase().endsWith('/readme.md'))
-    .map((file) => ({ file, ...parseChangeset(readAt(head, file) ?? '') }));
+    .map((file) => {
+      const text = readAt(head, file) ?? '';
+      return { file, ...parseChangeset(text), bumps: changesetBumps(text) };
+    });
 
   const pendingChangesets = lines(git(['ls-tree', '--name-only', head, '.changeset/'])).filter(
     (file) => file.endsWith('.md') && !file.toLowerCase().endsWith('/readme.md'),
   );
 
-  return { mergeBase, changed, addedChangesets, pendingChangesets };
+  // The version before this branch, because the bump it needs depends on whether the
+  // package is still 0.x when the protocol moves.
+  const protocol = {
+    before: protocolVersionOf(readAt(mergeBase, PROTOCOL_FILE)),
+    after: protocolVersionOf(readAt(head, PROTOCOL_FILE)),
+    version: manifestAt(mergeBase, 'packages/plugin-api/package.json')?.version ?? '0.0.0',
+  };
+
+  return { mergeBase, changed, addedChangesets, pendingChangesets, protocol };
 }
 
 /** @param {string[]} argv */
@@ -269,6 +301,17 @@ function main() {
         'docs/git-workflow.md has the rule; ADR 0070 has why.',
       ].join('\n'),
     );
+    process.exit(1);
+  }
+
+  const protocol = protocolBumpVerdict({
+    ...branch.protocol,
+    addedChangesets: branch.addedChangesets,
+  });
+  const [headline, ...advice] = protocol.message.split('\n');
+  console.log(`\nprotocol: ${headline}`);
+  if (!protocol.ok) {
+    console.error(advice.join('\n'));
     process.exit(1);
   }
 

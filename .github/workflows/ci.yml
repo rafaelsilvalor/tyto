@@ -98,6 +98,12 @@ jobs:
             grep -qxF "${name%%[.-]*}" <<<"$used" || rm -f "$file"
           done
           du -sh .turbo/cache && find .turbo/cache -type f | wc -l
+      # **The plugin contract would publish** (ADR 0149, TYTO-444): the four packages
+      # `release.yml` uploads to GitHub Packages are packed, renamed and handed to
+      # `npm publish --dry-run`, which uploads nothing and needs no token. After the turbo
+      # run because it packs the `dist/` that run built. A package that gains a dependency on
+      # an unpublished workspace package fails here, on the pull request, instead of on `main`.
+      - run: node tools/repo-checks/src/publish-contract.mjs --dry-run
       - uses: actions/upload-artifact@v7
         if: failure()
         with: { name: test-results, path: '**/test-results/**' }

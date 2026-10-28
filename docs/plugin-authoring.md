@@ -268,6 +268,52 @@ The first command's `npm notice` lines are not shown. The `.git` source was a ba
 scaffold folder after a `git init` and a commit. This repository has published nothing to npm or
 to GitHub, so a `github:` or registry install has not been run against a real plugin.
 
+## Develop it in its own repository
+
+A plugin in its own repository depends on the contract instead of copying it. Tyto publishes
+four packages to GitHub Packages (ADR 0149): `@tyto/plugin-api` and `@tyto/template-kit`, which
+are the contract, and `@tyto/core` and `@tyto/recipe`, which they import. They are published
+under the repository owner's scope, `@rafaelsilvalor/tyto-<name>`, because nobody here owns
+`@tyto` on any registry. **Write an alias, and keep importing `@tyto/...`:**
+
+```json
+{
+  "devDependencies": {
+    "@tyto/plugin-api": "npm:@rafaelsilvalor/tyto-plugin-api@^0.4.1"
+  }
+}
+```
+
+and tell npm (or pnpm) where that scope lives, in the repository's `.npmrc`:
+
+```
+@rafaelsilvalor:registry=https://npm.pkg.github.com
+//npm.pkg.github.com/:_authToken=${NODE_AUTH_TOKEN}
+```
+
+`NODE_AUTH_TOKEN` is a GitHub personal access token (classic) with `read:packages`. GitHub
+asks for one to install any package from its npm registry, public ones included. In a
+GitHub Actions workflow of your own, a repository secret holding that token does the same.
+
+**The version you install is the engine your manifest is checked against.** A host compares
+`engine` with `PLUGIN_API_VERSION`, which is `@tyto/plugin-api`'s own version (ADR 0040), so a
+test in your repository can ask the installed package the same question the host will:
+
+```ts
+import { PLUGIN_API_VERSION, satisfiesEngine } from '@tyto/plugin-api';
+import manifest from '../tyto-plugin.json' with { type: 'json' };
+
+expect(satisfiesEngine(manifest.engine, PLUGIN_API_VERSION)).toBe(true);
+```
+
+**A change to the isolation protocol is a minor while the contract is 0.x**, and a major from
+1.0. A `^0.4.1` range does not take a minor, so such a change never reaches your plugin through
+an ordinary update: you move the range, run your tests, and move `engine` with it.
+
+It replaces the checkout, not the bundle. The installed folder still has no `node_modules`
+(_A code template_), so whatever your code imports from `@tyto/*` at run time is inlined into
+`dist/index.js` as before; a package installed from the registry is inlined the same way.
+
 ## Other extension points
 
 A plugin can contribute more than templates. `contributes` must name every point it registers
