@@ -69,6 +69,12 @@ publish` uploads every package that is not private — sixteen here — so it is
 - A consumer needs two lines of `.npmrc` and a token with `read:packages`, even though the
   repository is public: GitHub's npm registry asks for a token to install any package.
   `docs/plugin-authoring.md` has them.
+  _Amended 2026-10-28 (TYTO-446, #210):_ only the scope line goes in the repository's committed
+  `.npmrc`. pnpm 11 expands no `${VARIABLE}` in a project `.npmrc`'s credentials, so the token
+  line there installs with no token and the registry answers 401; it goes in the user-level
+  `~/.npmrc`. CI needs no secret: the packages are public, and `actions/setup-node` with
+  `registry-url` and `scope` writes that user-level file from the workflow's own
+  `GITHUB_TOKEN` with `packages: read`.
 - Every consumer writes the alias. A plain `"@tyto/plugin-api": "^0.4.1"` asks npmjs.com, where
   nothing by that name exists.
 - The first publish creates the four packages, linked to this repository by `repository`.

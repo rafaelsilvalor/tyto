@@ -66,6 +66,12 @@ Three things have to be settled before a renderer can show anything:
 10. **`refresh` has a seam and no meaning yet.** The runner hands its registries factory a
     `refresh` flag (from `fresh`); TYTO-377's last pull request gives sources a way to skip their
     cache with it, in `@tyto/plugin-api`.
+    _Amended 2026-10-28 (TYTO-377, pull request E):_ the flag has its meaning. Run again without
+    cache builds the registries with `refresh: true`, and every `page` call of that run, on every
+    page, carries `refresh: true` to the source, which skips its private cache (ADR 0138) and
+    fetches; an ordinary run carries no key. The field crosses to an isolated plugin over
+    isolation protocol 9, so a plugin process on 8 is refused at `hello`. `transform` and `plan`
+    carry nothing new, since they read no cache.
 
 ## Consequences
 
