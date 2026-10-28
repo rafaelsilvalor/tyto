@@ -183,8 +183,9 @@ describe('quitting with unsaved text, which keeps it and asks nothing (TYTO-113)
     await page.waitForSelector('.tabs__dirty');
     await app.evaluate(({ dialog }, file) => {
       dialog.showMessageBox = ((): Promise<unknown> => {
-        // eslint-disable-next-line @typescript-eslint/no-require-imports
-        const fs = require('node:fs') as { appendFileSync: (to: string, data: string) => void };
+        // `getBuiltinModule` and not `require`, which main's ESM bundle does not define: until
+        // TYTO-452 this line threw, so a box asked here wrote no witness and only a hang said so.
+        const fs = process.getBuiltinModule('node:fs');
         fs.appendFileSync(file, 'asked');
         return Promise.resolve({ response: 2, checkboxChecked: false });
       }) as never;
@@ -467,8 +468,7 @@ describe('quitting with nothing unsaved', () => {
     // it is a rejected promise. The file is the one witness that outlives the process.
     await app.evaluate(({ dialog }, file) => {
       dialog.showMessageBox = ((): Promise<unknown> => {
-        // eslint-disable-next-line @typescript-eslint/no-require-imports
-        const fs = require('node:fs') as { appendFileSync: (to: string, data: string) => void };
+        const fs = process.getBuiltinModule('node:fs');
         fs.appendFileSync(file, 'asked');
         // Answering **no**, deliberately. A window that asked anything would refuse the exit
         // and still be running, so the close below would never resolve.
@@ -541,12 +541,45 @@ describe('quitting a page that cannot hear the question yet', () => {
     });
     await expect.poll(async () => (await boxes(app)).length, { timeout: 5_000 }).toBe(1);
 
-    await captureBoxes(app, 'discard');
+    // **The poll above sees the box drawn, not the cancel delivered** (TYTO-452). The answer
+    // reaches main one hop later, through the page, and until it does the first question is
+    // still outstanding: `mayExit` folds a quit that lands then into it and asks nothing, by
+    // design (ADR 0031). A single quit here raced that hop and lost on CI — measured locally by
+    // answering the cancel 300 ms after the box: red 3 of 3, waiting out the 30 s for a close
+    // nobody had asked about. So the quit is repeated until the app goes, which is what a person
+    // pressing it again does, and the witness is on disk because the app is gone by then.
+    const asked = join(scratch, 'reloaded-asked.txt');
+    await app.evaluate(
+      ({ dialog }, [file, response]) => {
+        dialog.showMessageBox = ((): Promise<unknown> => {
+          const fs = process.getBuiltinModule('node:fs');
+          fs.appendFileSync(file as string, 'asked');
+          return Promise.resolve({ response: response as number, checkboxChecked: false });
+        }) as never;
+      },
+      [asked, BUTTON.discard] as [string, number],
+    );
     const gone = app.waitForEvent('close');
-    await app.evaluate(({ app: electronApp }) => {
-      electronApp.quit();
-    });
-    await gone;
+    for (;;) {
+      await app
+        .evaluate(({ app: electronApp }) => {
+          electronApp.quit();
+        })
+        .catch(() => undefined);
+      const went = await Promise.race([
+        gone.then(() => true),
+        new Promise<false>((resolve) => {
+          setTimeout(() => {
+            resolve(false);
+          }, 250);
+        }),
+      ]);
+      if (went) break;
+    }
+
+    // Asked exactly once: the repeats that landed while the question was outstanding asked
+    // nothing, and the one that was asked was answered Não (`BUTTON.discard`) and let it go.
+    expect(readFileSync(asked, 'utf8')).toBe('asked');
   });
 });
 
