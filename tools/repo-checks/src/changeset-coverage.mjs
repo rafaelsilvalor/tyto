@@ -21,6 +21,10 @@
  *   touching only dependency fields. Dependabot cannot write a changeset; `release.yml`
  *   writes it at release time instead (`dependabot-changesets.mjs`).
  *
+ * It also fails a changeset this branch added that names a package with no `version` field
+ * (`@tyto/docs`, `tools/*`): `changeset version` never consumes it, and a changeset left over
+ * keeps `release.yml` from ever tagging (TYTO-448, `unversionedNamed`).
+ *
  * When `.changeset/` holds any changeset it then runs `changeset status` as well, because
  * that is still the one place the tool itself validates the files `release.yml` will
  * version (the mixed-file refusal of TYTO-109 is that class). With the folder empty it has
@@ -36,6 +40,9 @@ import { PROTOCOL_FILE, protocolBumpVerdict, protocolVersionOf } from './protoco
 
 /** Where versioned packages live; `tools/*` carry no `version` field (TYTO-94). */
 const WORKSPACE_ROOTS = ['packages', 'apps'];
+
+/** Every workspace root, versioned or not, for the packages a changeset may not name. */
+const ALL_WORKSPACE_ROOTS = [...WORKSPACE_ROOTS, 'tools'];
 
 /**
  * devDependencies that end up inside what a person installs, by package name. `electron`
@@ -182,6 +189,23 @@ export function coverage({ changed, addedChangesets, dependabot }) {
 }
 
 /**
+ * Every package a changeset this branch added names that has no `version` field, which
+ * `changeset version` skips (TYTO-448). Such a changeset is never consumed: it stays in
+ * `.changeset/` after the version PR merges, `changesets/action` keeps reporting changesets
+ * left, and every release opens an empty version PR instead of tagging. Three of them, naming
+ * only `@tyto/docs` and `@tyto/repo-checks`, held the release that way after #24.
+ *
+ * @param {{ addedChangesets: { file?: string, packages: string[] }[], unversioned: string[] }} input
+ * @returns {{ file: string, name: string }[]}
+ */
+export function unversionedNamed({ addedChangesets, unversioned }) {
+  const skipped = new Set(unversioned);
+  return addedChangesets.flatMap(({ file = '(changeset)', packages }) =>
+    packages.filter((name) => skipped.has(name)).map((name) => ({ file, name })),
+  );
+}
+
+/**
  * Reads what the check needs from git, at two revisions, without touching the working tree.
  *
  * @param {{ base: string, head: string, git?: (args: string[]) => string }} options
@@ -236,6 +260,13 @@ export function readBranch({ base, head, git = defaultGit }) {
       return { file, ...parseChangeset(text), bumps: changesetBumps(text) };
     });
 
+  const unversioned = lines(
+    git(['ls-tree', '-d', '--name-only', head, ...ALL_WORKSPACE_ROOTS.map((root) => `${root}/`)]),
+  ).flatMap((directory) => {
+    const manifest = manifestAt(head, `${directory}/package.json`);
+    return manifest?.name !== undefined && manifest.version === undefined ? [manifest.name] : [];
+  });
+
   const pendingChangesets = lines(git(['ls-tree', '--name-only', head, '.changeset/'])).filter(
     (file) => file.endsWith('.md') && !file.toLowerCase().endsWith('/readme.md'),
   );
@@ -248,7 +279,7 @@ export function readBranch({ base, head, git = defaultGit }) {
     version: manifestAt(mergeBase, 'packages/plugin-api/package.json')?.version ?? '0.0.0',
   };
 
-  return { mergeBase, changed, addedChangesets, pendingChangesets, protocol };
+  return { mergeBase, changed, addedChangesets, unversioned, pendingChangesets, protocol };
 }
 
 /** @param {string[]} argv */
@@ -299,6 +330,22 @@ function main() {
         '  pnpm changeset            # names the packages and the bump',
         '  pnpm changeset add --empty  # when nothing here ships (a test, a comment)',
         'docs/git-workflow.md has the rule; ADR 0070 has why.',
+      ].join('\n'),
+    );
+    process.exit(1);
+  }
+
+  const unconsumed = unversionedNamed(branch);
+  if (unconsumed.length > 0) {
+    console.error(
+      [
+        '',
+        ...unconsumed.map(({ file, name }) => `${file} names ${name}, which has no version field.`),
+        '`changeset version` skips such a package, so the changeset would stay in `.changeset/`',
+        'for good and keep every release from publishing (TYTO-448). Drop those names; when',
+        'nothing versioned is left, replace the file with:',
+        '  pnpm changeset add --empty',
+        'docs/git-workflow.md has the rule; ADR 0149 has why.',
       ].join('\n'),
     );
     process.exit(1);

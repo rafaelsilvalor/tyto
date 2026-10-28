@@ -1,7 +1,7 @@
 name: release
 on:
   push: { branches: [main] }
-# `packages: write` is for the contract step at the end and nothing else (ADR 0149).
+# `packages: write` is for the contract step and nothing else (ADR 0149).
 permissions: { contents: write, pull-requests: write, packages: write }
 jobs:
   release:
@@ -22,6 +22,23 @@ jobs:
         with: { node-version: 22, cache: pnpm }
       - run: pnpm install --frozen-lockfile
       - run: pnpm build
+      # **The plugin contract goes to GitHub Packages** (ADR 0149, TYTO-444), on every push to
+      # `main` and before changesets/action. The script skips every version the registry
+      # already holds, so a push that moved none of the four publishes nothing, and a rerun
+      # publishes nothing twice. Changesets itself never publishes: `changeset publish` would
+      # upload all sixteen public packages.
+      #
+      # **Before the action, and with no `if`** (TYTO-448, the 2026-10-28 amendment to ADR
+      # 0149). It used to run after it, only when `hasChangesets == 'false'` — and a changeset
+      # `changeset version` cannot consume kept that true on every push, so the step was
+      # skipped for good. After the action is no place for it either: when changesets are
+      # left, v2 leaves this checkout on `changeset-release/main` with the *next* versions
+      # written in, which are not released yet. Here the tree is `main`, whose versions move
+      # only when a version PR merges. A failed upload fails the job before the version PR is
+      # refreshed; that is on purpose, and a red release run reads "publish failed" first.
+      - run: node tools/repo-checks/src/publish-contract.mjs
+        env:
+          NODE_AUTH_TOKEN: ${{ github.token }}
       # The changesets Dependabot's merged bumps could not carry (ADR 0070, TYTO-155). One
       # file per package whose shipped dependencies a Dependabot commit since the last version
       # PR moved, naming each `dep old → new`; written to the working tree and never
@@ -68,13 +85,3 @@ jobs:
           # message repeating the tag's own name — measured on `@tyto/core@0.19.0`, which
           # carries no signature either. `docs/git-workflow.md` has the decision;
           # `github-config.test.ts` fails if this line changes without it.
-      # **The plugin contract goes to GitHub Packages** (ADR 0149, TYTO-444). Only when the
-      # action found no changeset left, which is the run where it tagged instead of opening the
-      # version PR: `main` then holds released versions. The script skips every version the
-      # registry already has, so a release that moved none of the four publishes nothing, and
-      # a rerun of the same release publishes nothing twice. Changesets itself never publishes:
-      # `changeset publish` would upload all sixteen public packages.
-      - if: steps.changesets.outputs.hasChangesets == 'false'
-        run: node tools/repo-checks/src/publish-contract.mjs
-        env:
-          NODE_AUTH_TOKEN: ${{ github.token }}
