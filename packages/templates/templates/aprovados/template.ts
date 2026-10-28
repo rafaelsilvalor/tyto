@@ -17,9 +17,9 @@
  */
 
 import { frame, solid } from '@tyto/core/template';
+import { sealOf } from '@tyto/house-style';
 import { type Block, bandedPage, pillTable, stack, titleBlock, sealed } from '@tyto/template-kit';
 
-import { sealOf } from '../_casa/seal.js';
 import { footer, hasNextSlide, header } from '../_azul/parts.js';
 import { approvedTable, resultTitle } from '../_azul/presets.js';
 import { APPROVED, BAND, EDGE, MARGIN, PAPER } from '../_azul/tokens.js';

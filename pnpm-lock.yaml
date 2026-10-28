@@ -368,6 +368,15 @@ importers:
         specifier: workspace:*
         version: link:../plugin-api
 
+  packages/house-style:
+    dependencies:
+      '@tyto/core':
+        specifier: workspace:*
+        version: link:../core
+      '@tyto/template-kit':
+        specifier: workspace:*
+        version: link:../template-kit
+
   packages/io:
     dependencies:
       '@tyto/core':
@@ -524,6 +533,9 @@ importers:
       '@tyto/core':
         specifier: workspace:*
         version: link:../core
+      '@tyto/house-style':
+        specifier: workspace:*
+        version: link:../house-style
       '@tyto/template-kit':
         specifier: workspace:*
         version: link:../template-kit
@@ -625,6 +637,9 @@ importers:
       '@tyto/google-fonts':
         specifier: workspace:*
         version: link:../../packages/google-fonts
+      '@tyto/house-style':
+        specifier: workspace:*
+        version: link:../../packages/house-style
       '@tyto/io':
         specifier: workspace:*
         version: link:../../packages/io

@@ -2,9 +2,7 @@ import { measureNothing, noBrandKit } from '@tyto/core';
 import { describe, expect, it } from 'vitest';
 
 import { LAYOUTS, build } from './template.js';
-import { ROXO } from '../_casa/brands.js';
-import { FUNCTION_WORDS, NO_BREAK_SPACE } from '../_casa/breaks.js';
-import { PLACEHOLDER_LOGO } from '../_casa/marks.js';
+import { FUNCTION_WORDS, NO_BREAK_SPACE, PLACEHOLDER_LOGO, ROXO } from '@tyto/house-style';
 
 import type {
   AssetRef,

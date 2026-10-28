@@ -22,6 +22,9 @@ const PURE_PACKAGES = [
   'packages/templates',
   // Everything a template imports runs wherever the compiler runs (TYTO-185).
   'packages/template-kit',
+  // The house's tokens and shared parts, which a template in its own repository imports
+  // (TYTO-431, ADR 0151).
+  'packages/house-style',
   'packages/plugin-api',
   // Data and one `registerTheme` loop: it is bundled into main and runs anywhere (TYTO-300).
   'packages/theme-pack',

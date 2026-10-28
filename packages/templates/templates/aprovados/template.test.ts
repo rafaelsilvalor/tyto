@@ -2,7 +2,7 @@ import { measureNothing, noBrandKit, noFiles, reportNothing } from '@tyto/core';
 import { describe, expect, it } from 'vitest';
 
 import { APPROVED } from '../_azul/tokens.js';
-import { PLACEHOLDER_SIGNATURE } from '../_casa/marks.js';
+import { PLACEHOLDER_SIGNATURE } from '@tyto/house-style';
 import { build } from './template.js';
 
 import type { AssetRef, Inline, RichText, SceneNode, TemplateContext } from '@tyto/core';

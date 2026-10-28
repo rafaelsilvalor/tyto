@@ -326,6 +326,7 @@ describe('the pure packages', () => {
       'export-html',
       'export-svg',
       'google-fonts',
+      'house-style',
       'plugin-api',
       'recipe',
       'template-kit',

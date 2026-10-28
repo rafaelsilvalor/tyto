@@ -1,0 +1,33 @@
+{
+  "name": "@tyto/house-style",
+  "version": "0.0.0",
+  "type": "module",
+  "description": "The house's tokens, presets and shared parts its templates are drawn with.",
+  "license": "UNLICENSED",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    },
+    "./table-tokens": {
+      "types": "./dist/table-tokens.d.ts",
+      "import": "./dist/table-tokens.js"
+    }
+  },
+  "files": [
+    "dist"
+  ],
+  "sideEffects": false,
+  "scripts": {
+    "build": "tsup",
+    "typecheck": "tsc --noEmit",
+    "lint": "eslint . --max-warnings 0",
+    "test": "vitest run --passWithNoTests"
+  },
+  "dependencies": {
+    "@tyto/core": "workspace:*",
+    "@tyto/template-kit": "workspace:*"
+  }
+}

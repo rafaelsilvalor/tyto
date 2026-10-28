@@ -17,6 +17,9 @@
 'pkg:template-kit':
   - changed-files:
       - any-glob-to-any-file: 'packages/template-kit/**'
+'pkg:house-style':
+  - changed-files:
+      - any-glob-to-any-file: 'packages/house-style/**'
 'pkg:export-html':
   - changed-files:
       - any-glob-to-any-file: 'packages/export-html/**'

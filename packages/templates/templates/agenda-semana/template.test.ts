@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 
 import { build } from './template.js';
 import { ARROW, CHROME, INK } from '../_azul/tokens.js';
-import { PLACEHOLDER_LOGO, PLACEHOLDER_SIGNATURE } from '../_casa/marks.js';
+import { PLACEHOLDER_LOGO, PLACEHOLDER_SIGNATURE } from '@tyto/house-style';
 
 import { measureNothing, noBrandKit, noFiles, reportNothing } from '@tyto/core';
 

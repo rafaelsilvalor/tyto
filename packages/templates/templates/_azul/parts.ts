@@ -11,9 +11,8 @@
  */
 
 import { group, run, text } from '@tyto/core/template';
+import { drawLogo, oneInk, signatureOf } from '@tyto/house-style';
 import { type Block, at, block, mark } from '@tyto/template-kit';
-
-import { drawLogo, oneInk, signatureOf } from '../_casa/kit.js';
 
 import { ARROW, BAND, CHROME, FACE, INK, LIGHT, TYPE } from './tokens.js';
 

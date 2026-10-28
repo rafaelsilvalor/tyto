@@ -2,9 +2,8 @@ import { measureNothing, noBrandKit, noFiles } from '@tyto/core';
 import { describe, expect, it } from 'vitest';
 
 import { build } from './template.js';
-import { ROXO } from '../_casa/brands.js';
-import { NO_BREAK_SPACE } from '../_casa/breaks.js';
-import { BODY, OPTICAL_DROP, SIGNATURE, PAGE, TITLE } from '../_casa/table-tokens.js';
+import { NO_BREAK_SPACE, ROXO } from '@tyto/house-style';
+import { BODY, OPTICAL_DROP, SIGNATURE, PAGE, TITLE } from '@tyto/house-style/table-tokens';
 
 import type {
   Frame,

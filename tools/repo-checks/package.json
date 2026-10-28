@@ -18,6 +18,7 @@
     "@tyto/export-svg": "workspace:*",
     "@tyto/fonts": "workspace:*",
     "@tyto/google-fonts": "workspace:*",
+    "@tyto/house-style": "workspace:*",
     "@tyto/io": "workspace:*",
     "@tyto/pipeline": "workspace:*",
     "@tyto/plugin-api": "workspace:*",

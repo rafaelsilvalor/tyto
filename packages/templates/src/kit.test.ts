@@ -1,14 +1,14 @@
 import { measureNothing, noBrandKit, noFiles, reportNothing } from '@tyto/core';
 import { describe, expect, it } from 'vitest';
 
-import { build as agendaSemana } from '../agenda-semana/template.js';
-import { build as aprovados } from '../aprovados/template.js';
-import { build as bannerRoxo } from '../banner-roxo/template.js';
-import { build as simuladosOcre } from '../simulados-semana-ocre/template.js';
-import { build as simuladosRoxo } from '../simulados-semana-roxo/template.js';
-import { build as simuladosVinho } from '../simulados-semana-vinho/template.js';
-import { build as tabelaRoxo } from '../tabela-roxo/template.js';
-import { PLACEHOLDER_LOGO, PLACEHOLDER_SIGNATURE } from './marks.js';
+import { build as agendaSemana } from '../templates/agenda-semana/template.js';
+import { build as aprovados } from '../templates/aprovados/template.js';
+import { build as bannerRoxo } from '../templates/banner-roxo/template.js';
+import { build as simuladosOcre } from '../templates/simulados-semana-ocre/template.js';
+import { build as simuladosRoxo } from '../templates/simulados-semana-roxo/template.js';
+import { build as simuladosVinho } from '../templates/simulados-semana-vinho/template.js';
+import { build as tabelaRoxo } from '../templates/tabela-roxo/template.js';
+import { PLACEHOLDER_LOGO, PLACEHOLDER_SIGNATURE } from '@tyto/house-style';
 
 import type {
   BrandKit,

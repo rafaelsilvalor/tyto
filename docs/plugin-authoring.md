@@ -271,9 +271,10 @@ to GitHub, so a `github:` or registry install has not been run against a real pl
 ## Develop it in its own repository
 
 A plugin in its own repository depends on the contract instead of copying it. Tyto publishes
-six packages to GitHub Packages (ADR 0149): `@tyto/plugin-api` and `@tyto/template-kit`, which
-are the contract, and `@tyto/core`, `@tyto/recipe`, `@tyto/brief-lang` and `@tyto/export-html`,
-which they import. They are published
+seven packages to GitHub Packages (ADR 0149): `@tyto/plugin-api` and `@tyto/template-kit`, which
+are the contract, `@tyto/house-style`, the house's tokens and shared parts (ADR 0151), and
+`@tyto/core`, `@tyto/recipe`, `@tyto/brief-lang` and `@tyto/export-html`, which they import.
+They are published
 under the repository owner's scope, `@rafaelsilvalor/tyto-<name>`, because nobody here owns
 `@tyto` on any registry. **Write an alias, and keep importing `@tyto/...`:**
 

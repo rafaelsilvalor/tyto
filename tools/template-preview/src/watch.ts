@@ -1,14 +1,14 @@
 import { type FSWatcher, watch } from 'node:fs';
 import { dirname, isAbsolute, join, relative } from 'node:path';
 
-import { KIT_SOURCE } from './paths.ts';
+import { HOUSE_STYLE_SOURCE, KIT_SOURCE } from './paths.ts';
 
 import type { PreviewSession, PreviewTarget } from './session.ts';
 
 /**
  * Re-renders when anything the picture is drawn from changes: the template folder, the brief,
- * and — for a template compiled into the build — the brand module beside it and
- * `@tyto/template-kit` (TYTO-181).
+ * and — for a template compiled into the build — the brand module beside it,
+ * `@tyto/template-kit` (TYTO-181) and `@tyto/house-style` (TYTO-431).
  *
  * `fs.watch` and not a poll, unlike `tyto watch`'s inbox: this runs on the machine the
  * files are being typed on, never on a network share, and a poll interval would be added
@@ -16,10 +16,10 @@ import type { PreviewSession, PreviewTarget } from './session.ts';
  * metadata touch), so events are gathered for a short quiet period and answered once.
  *
  * **What a code template draws with is wider than its folder.** Its parts import a brand
- * module (`_azul/`, a sibling folder with no manifest — ADR 0047) and the kit, and
- * a save to either used to leave the page drawing the build from before. Both are watched now;
- * the kit asks for its own rebuild, because `@tyto/templates` imports the kit's `dist/` rather
- * than bundling it.
+ * module (`_azul/`, a sibling folder with no manifest — ADR 0047), the kit and the house's
+ * package, and a save to any of them used to leave the page drawing the build from before. All
+ * are watched now; the kit and the house's package ask for their own rebuild, because
+ * `@tyto/templates` imports their `dist/` rather than bundling them.
  */
 
 export const QUIET_MS = 80;
@@ -50,6 +50,8 @@ const isBrandModule = (folder: string): boolean => folder.startsWith('_');
 export interface WatchOptions {
   /** The kit's source folder; the repository's own unless a test points elsewhere. */
   readonly kitSource?: string;
+  /** `@tyto/house-style`'s source folder, likewise; a save to it rebuilds as a kit save does. */
+  readonly houseStyleSource?: string;
 }
 
 export function watchTarget(
@@ -90,7 +92,10 @@ export function watchTarget(
 
   if (target.compiled) {
     const kitSource = options.kitSource ?? KIT_SOURCE;
-    watchers.push(watch(kitSource, { recursive: true }, (_event, file) => changed(file, 'kit')));
+    const houseStyleSource = options.houseStyleSource ?? HOUSE_STYLE_SOURCE;
+    for (const source of [kitSource, houseStyleSource]) {
+      watchers.push(watch(source, { recursive: true }, (_event, file) => changed(file, 'kit')));
+    }
   }
 
   // The brief is usually `examples/…` inside the template folder; one outside it gets its own.
