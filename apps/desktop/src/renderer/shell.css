@@ -875,6 +875,16 @@ tyto-preview-pane[hidden] {
   height: 100%;
 }
 
+/* The line under a recipe's cell (TYTO-377): muted and smaller than the text, so it reads as
+   the cell's result and not as a line of the recipe. A failure is muted too (Rafael): its
+   marker and its Problems row are what draw the eye. */
+.recipe-cell-status {
+  padding: 0 0 var(--tyto-space-1) var(--tyto-space-2);
+  color: var(--tyto-text-muted);
+  font-size: var(--tyto-text-sm);
+  user-select: none;
+}
+
 /* The bar is a header row (TYTO-288): the formats take what the toggle, zoom and lock leave. */
 .preview__tabs {
   display: flex;

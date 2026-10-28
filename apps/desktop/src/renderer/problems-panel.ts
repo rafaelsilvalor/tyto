@@ -44,7 +44,8 @@ export interface ProblemsState {
 }
 
 /** A brief, one of the app's own files, or a text file (`DocumentState.kind`). */
-export type ProblemsKind = 'brief' | 'settings' | 'keybindings' | 'snippets' | 'text' | 'markdown';
+export type ProblemsKind =
+  'brief' | 'settings' | 'keybindings' | 'snippets' | 'text' | 'markdown' | 'recipe';
 
 /** The sentence the empty panel says, by what it is about. */
 const EMPTY_KEYS: Readonly<Record<ProblemsKind, CatalogueKey>> = {
@@ -56,6 +57,8 @@ const EMPTY_KEYS: Readonly<Record<ProblemsKind, CatalogueKey>> = {
   // to report", which would read as a check that passed.
   text: 'problems.empty.text',
   markdown: 'problems.empty.text',
+  // TYTO-377: a recipe is checked, by its run, so an empty panel is a check that passed.
+  recipe: 'problems.empty.recipe',
 };
 
 const EMPTY_STATE: ProblemsState = {

@@ -41,14 +41,21 @@ export type TabKind =
   | 'snippets'
   | 'text'
   | 'markdown'
+  | 'recipe'
   | 'preview'
   | 'markdown-preview';
 
 /**
  * The kinds the Export button is not drawn for (TYTO-247): a text file and a Markdown file's
- * preview are never exported, and a greyed button there looked like one that should work.
+ * preview are never exported, and a greyed button there looked like one that should work. Nor
+ * is a recipe (TYTO-377).
  */
-const NOT_EXPORTED: ReadonlySet<TabKind> = new Set(['text', 'markdown', 'markdown-preview']);
+const NOT_EXPORTED: ReadonlySet<TabKind> = new Set([
+  'text',
+  'markdown',
+  'recipe',
+  'markdown-preview',
+]);
 
 export interface StatusBarState {
   readonly locale: Locale;
@@ -94,6 +101,8 @@ const KIND_LABELS: Readonly<Record<TabKind, CatalogueKey>> = {
   // TYTO-247: "Plain text" for a `.txt`, "Markdown" for a `.md`.
   text: 'status.kind.text',
   markdown: 'status.kind.markdown',
+  // TYTO-377: "Recipe" / "Receita".
+  recipe: 'status.kind.recipe',
   preview: 'preview.heading',
   'markdown-preview': 'preview.heading',
 };

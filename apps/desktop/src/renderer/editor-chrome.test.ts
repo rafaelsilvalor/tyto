@@ -11,6 +11,7 @@ import {
   PREVIEW_OPEN,
   PREVIEW_OPEN_TO_SIDE,
   PREVIEW_TOGGLE_LOCK,
+  RECIPE_RUN,
   SETTINGS_OPEN,
   TEMPLATE_EDIT,
   TEXT_COMMANDS,
@@ -69,6 +70,28 @@ describe('editorChromeFor (TYTO-256)', () => {
     expect(assistOf('keybindings', assists)).toEqual([]);
     expect(assistOf(undefined, assists)).toEqual([]);
     expect(assistOf('preview', assists)).toEqual([]);
+  });
+});
+
+describe('a recipe tab (TYTO-377)', () => {
+  it('is text with no brief control, and offers Run recipe where no other tab does', () => {
+    expect(editorChromeFor('recipe')).toEqual({
+      templateEdits: false,
+      briefCommands: false,
+      textCommands: true,
+    });
+    for (const id of BRIEF_ONLY_COMMANDS) expect(commandOffered('recipe', id), id).toBe(false);
+    expect(commandOffered('recipe', RECIPE_RUN)).toBe(true);
+    for (const kind of [undefined, 'text', 'markdown', 'settings', 'preview'] as const) {
+      expect(commandOffered(kind, RECIPE_RUN), String(kind)).toBe(false);
+    }
+  });
+
+  it('opens in the recipe language with its own help', () => {
+    const completion = [] as const;
+    expect(languageOf('recipe')).toBe('recipe');
+    expect(assistOf('recipe', { recipe: completion })).toEqual([completion]);
+    expect(assistOf('text', { recipe: completion })).toEqual([]);
   });
 });
 

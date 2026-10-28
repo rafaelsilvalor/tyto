@@ -337,8 +337,8 @@ describe('the bridge', () => {
       'queue:set-auto-run',
       'queue:set-folder',
       'queue:set-kinds',
-      // TYTO-377, ADR 0148: the recipe notebook's runner in main. No window draws it yet (its
-      // tab is TYTO-377's next pull request); `recipe-runner.test.ts` covers the logic.
+      // TYTO-377, ADR 0148: the recipe notebook's runner in main, which a `.recipe` tab runs
+      // (`recipe-tab.desktop.test.ts`); `recipe-runner.test.ts` covers the logic.
       'recipe:run',
       'recipe:verbs',
       // TYTO-113: the tabs kept for the next launch. Exercised by `e2e/session.desktop.test.ts`.

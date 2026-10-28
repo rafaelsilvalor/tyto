@@ -117,6 +117,11 @@ export const WINDOW_ZOOM_RESET = 'window.zoomReset';
  */
 export const HELP_OPEN_DOCUMENTATION = 'help.openDocumentation';
 /**
+ * TYTO-377 (ADR 0148). Runs the recipe in front to its end: the person's approval, so it runs in
+ * a folder not trusted and it runs sources. Offered only with a recipe in front.
+ */
+export const RECIPE_RUN = 'recipe.run';
+/**
  * TYTO-208. "Preferences: Color Theme": the themes in the bar, previewed as the selection
  * moves, written to the `theme` setting on Enter. No key by default (ADR 0074): a person
  * binds one in `keybindings.json` if they switch often.
@@ -296,6 +301,7 @@ export const COMMAND_LABELS: Readonly<Record<string, CatalogueKey>> = {
   [WINDOW_ZOOM_OUT]: 'command.window.zoomOut',
   [WINDOW_ZOOM_RESET]: 'command.window.zoomReset',
   [HELP_OPEN_DOCUMENTATION]: 'command.help.openDocumentation',
+  [RECIPE_RUN]: 'command.recipe.run',
   [THEME_PICK]: 'command.theme.pick',
   [TEMPLATES_CHOOSE_FOLDER]: 'command.templates.chooseFolder',
   [TEMPLATES_CLEAR_FOLDER]: 'command.templates.clearFolder',
@@ -400,6 +406,8 @@ export interface DesktopActions {
   zoomWindow(step: 'in' | 'out' | 'reset'): void;
   /** TYTO-318. Asks main to open the manual; which edition, and its address, are main's. */
   openDocumentation(): void;
+  /** TYTO-377. Runs the recipe in front with `explicit`; the run itself is main's. */
+  runRecipe(): void;
   /** TYTO-208. Lists the colour themes in the bar; the list and the choice are main's. */
   pickTheme(): void;
   /**
@@ -544,6 +552,9 @@ export function createDesktopRegistry(actions: DesktopActions): CommandRegistry 
   });
   add(HELP_OPEN_DOCUMENTATION, () => {
     actions.openDocumentation();
+  });
+  add(RECIPE_RUN, () => {
+    actions.runRecipe();
   });
   add(THEME_PICK, () => {
     actions.pickTheme();

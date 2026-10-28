@@ -247,7 +247,7 @@ const settingOutline = z.object({
 });
 
 /** What a file opens as in a tab (TYTO-247, ADR 0132): `DocumentFormat` in `file-icons.ts`. */
-const documentFormat = z.enum(['brief', 'text', 'markdown']);
+const documentFormat = z.enum(['brief', 'text', 'markdown', 'recipe']);
 
 /**
  * A brief the window has open, as both sides agree to describe one.
@@ -341,10 +341,18 @@ const movedDocument = z.object({
 
 /**
  * What a session tab holds: a brief, one of the app's own files (TYTO-113, TYTO-277), or a text
- * file, plain or Markdown (TYTO-247, ADR 0132). A session written before TYTO-247 names only the
- * first four, so it still reads.
+ * file, plain or Markdown (TYTO-247, ADR 0132), or a recipe (TYTO-377). A session written before
+ * TYTO-247 names only the first four, so it still reads; `recipe` is appended for the same reason.
  */
-const sessionTabKind = z.enum(['brief', 'settings', 'keybindings', 'snippets', 'text', 'markdown']);
+const sessionTabKind = z.enum([
+  'brief',
+  'settings',
+  'keybindings',
+  'snippets',
+  'text',
+  'markdown',
+  'recipe',
+]);
 
 /** The template mode's two files, by the name each buffer has in the window (TYTO-44). */
 const templateBuffer = z.enum(['manifest', 'markup']);

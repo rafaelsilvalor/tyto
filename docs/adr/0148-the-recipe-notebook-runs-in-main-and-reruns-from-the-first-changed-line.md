@@ -38,6 +38,10 @@ Three things have to be settled before a renderer can show anything:
    wins: the older one, finishing later, keeps nothing. The cells are forgotten when the tab
    closes (`file:close`) and on `fresh`. Nothing is written to the recipe or to disk (ADR 0128
    decision 6); `from` reruns from a cell down whatever changed.
+   _Amended 2026-10-28 (TYTO-377, pull request C):_ a `run x` step's signature also holds the
+   text of `x.recipe` and of every recipe it includes in turn (a cycle not followed, at most
+   `INCLUDED_DEPTH_MAX` = 8 deep), read once per run through the same reader the run uses, so
+   editing an included recipe on disk reruns the cell that includes it on the next run.
 3. **A pause in typing runs from the changed line down, and stops before the first source.**
    A source fetches only on save (`saved`) or Run (`explicit`), as a brief's images do (ADR
    0119). The source's cell and the ones after it are `stale`: they show the table they had and
@@ -79,9 +83,13 @@ Three things have to be settled before a renderer can show anything:
   is asked again only when the person saves or presses Run.
 - A colleague's recipe opened from a restricted folder shows its lines and nothing runs until
   Run; the run then has no data files and no sections, so a rules verb fails visibly.
-- **Open: a `run x` whose recipe holds a source fetches while typing.** The runner reads the
-  kind of the verbs written in the file being edited; `run` is a transform. A later card can
-  read the included recipe's verbs before the pause runs it.
+- ~~Open: a `run x` whose recipe holds a source fetches while typing.~~ **Closed 2026-10-28
+  (TYTO-377, pull request C):** the policy reads the included recipe before a pause runs it. A
+  `run` step counts as a source when its recipe holds one at any depth, through the run's own
+  reader, with the recipes already on the chain not followed (a cycle ends) and the same depth
+  bound as the signature; an included recipe that cannot be read is not a source, and the run
+  fails it as before. Measured in `recipe-runner.test.ts`: `run x` and `run y` → `run x` hold
+  with 0 fetches while typing, and fetch on save and on Run.
 - Open: cells kept for a large table cost main's memory until the tab closes; no ceiling is
   measured yet.
 - The renderer drops a stale answer by `requestId`, as `brief:preview` does; main's part is

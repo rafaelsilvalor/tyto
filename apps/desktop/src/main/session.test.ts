@@ -250,6 +250,27 @@ describe('a text tab in the session', () => {
     });
   });
 
+  it('keeps a .recipe tab by its path and reopens it as a recipe (TYTO-377)', async () => {
+    const { documents, store, session } = setup({ '/b/semanal.recipe': 'recipe semanal\n' });
+    await documents.openPath('document-1', '/b/semanal.recipe');
+
+    await session.write({
+      tabs: [{ documentId: 'document-1', kind: 'recipe', draft: null, place: null }],
+      active: 0,
+      template: null,
+      final: false,
+    });
+    expect((store.saved() as { tabs: unknown }).tabs).toEqual([
+      { kind: 'recipe', path: '/b/semanal.recipe' },
+    ]);
+
+    const [tab] = (await session.read()).tabs;
+    expect(tab).toMatchObject({
+      kind: 'recipe',
+      document: { path: '/b/semanal.recipe', format: 'recipe', text: 'recipe semanal\n' },
+    });
+  });
+
   it('keeps a .txt tab in no file only while it holds a draft', async () => {
     const { store, session } = setup({});
     await session.write({

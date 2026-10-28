@@ -350,6 +350,71 @@ describe('a restricted folder (ADR 0111, ADR 0148)', () => {
   });
 });
 
+describe('a recipe a run includes', () => {
+  const write = (name: string, lines: readonly string[]) =>
+    writeFile(join(workspace, 'recipes', `${name}.recipe`), [...lines, ''].join('\n'));
+
+  it('holds a run whose recipe holds a source while typing, and runs it on save or Run', async () => {
+    await write('tasks', ['recipe tasks', 'acme.pull']);
+    const { run, calls } = harness();
+    const outer = ['recipe outer', 'run tasks', 'acme.tag', ''].join('\n');
+
+    const typing = await run(outer);
+    expect(typing.held).toBe('source');
+    expect(statuses(typing)).toEqual(['stale', 'stale']);
+    expect(calls.pull).toBe(0);
+
+    const saved = await run(outer, { saved: true });
+    expect(statuses(saved)).toEqual(['ok', 'ok']);
+    expect(calls.pull).toBe(1);
+
+    const explicit = await run(outer, { explicit: true, from: 0 });
+    expect(explicit.held).toBeUndefined();
+    expect(calls.pull).toBe(2);
+  });
+
+  it('holds it through a recipe that includes the one with the source', async () => {
+    await write('tasks', ['recipe tasks', 'acme.pull']);
+    await write('wrapped', ['recipe wrapped', 'run tasks']);
+    const { run, calls } = harness();
+
+    const typing = await run(['recipe outer', 'run wrapped', ''].join('\n'));
+    expect(typing.held).toBe('source');
+    expect(statuses(typing)).toEqual(['stale']);
+    expect(calls.pull).toBe(0);
+  });
+
+  it('ends on recipes that include each other, and the run reports the loop', async () => {
+    await write('ping', ['recipe ping', 'run pong']);
+    await write('pong', ['recipe pong', 'run ping']);
+    const { run, calls } = harness();
+
+    const typing = await run(['recipe outer', 'run ping', ''].join('\n'));
+    expect(typing.held).toBeUndefined();
+    expect(statuses(typing)).toEqual(['failed']);
+    expect(typing.cells[0]?.diagnostics.map((item) => item.code)).toEqual(['E_RECIPE_RUN']);
+    expect(calls.pull).toBe(0);
+  });
+
+  it('reruns the cell when the included recipe changes on disk', async () => {
+    await write('done', ['recipe done', 'acme.tag']);
+    const { run, calls } = harness();
+    const outer = ['recipe outer', 'acme.pull', 'run done', ''].join('\n');
+    await run(outer, { saved: true });
+    expect(calls).toMatchObject({ pull: 1, tag: 1 });
+
+    // The same text again: the included recipe has not moved, so nothing runs.
+    await run(outer);
+    expect(calls).toMatchObject({ pull: 1, tag: 1 });
+
+    await write('done', ['recipe done', 'acme.tag', 'where status = done']);
+    const typing = await run(outer);
+    expect(statuses(typing)).toEqual(['ok', 'ok']);
+    expect(typing.cells[1]?.table?.rows.map((row) => row.key)).toEqual(['T-1']);
+    expect(calls).toMatchObject({ pull: 1, tag: 2 });
+  });
+});
+
 describe('what a run may read beside it', () => {
   it('includes a recipe from its own folder, and from nowhere else', async () => {
     await writeFile(

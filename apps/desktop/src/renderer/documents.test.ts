@@ -9,6 +9,11 @@ import {
   closeDocument,
   documentAtSlot,
   documentOf,
+  formatOfKind,
+  hasPath,
+  hasPreview,
+  isRecipe,
+  kindOfFormat,
   isDisposable,
   isBroken,
   isStale,
@@ -484,5 +489,18 @@ describe('isBroken', () => {
   it('is false for a blank text, which is "no brief yet" whatever was said about it', () => {
     expect(isBroken(answered(0, '  \n', [error]))).toBe(false);
     expect(isBroken(newDocument('a'))).toBe(false);
+  });
+});
+
+/** TYTO-377: a recipe is a text file main holds by path, with no preview and no compile. */
+describe('a recipe tab', () => {
+  it('takes its kind from the format main names and is saved as one', () => {
+    expect(kindOfFormat('recipe')).toBe('recipe');
+    expect(formatOfKind('recipe')).toBe('recipe');
+    expect(hasPath('recipe')).toBe(true);
+    expect(hasPreview('recipe')).toBe(false);
+    expect(isRecipe('recipe')).toBe(true);
+    expect(isRecipe('text')).toBe(false);
+    expect(isRecipe(undefined)).toBe(false);
   });
 });

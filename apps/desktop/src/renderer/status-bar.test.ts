@@ -105,7 +105,7 @@ describe('the status bar', () => {
   it('draws no Export button with a text file or a Markdown preview in front (TYTO-247)', async () => {
     const exportDrawn = (bar: StatusBar): boolean =>
       buttons(bar).some((button) => button.dataset['command'] === COMMANDS.export);
-    for (const kind of ['text', 'markdown', 'markdown-preview'] as const) {
+    for (const kind of ['text', 'markdown', 'recipe', 'markdown-preview'] as const) {
       const { bar } = await mount({ ...base, kind });
       expect([kind, exportDrawn(bar)]).toEqual([kind, false]);
     }
@@ -228,7 +228,7 @@ describe('the status bar', () => {
 
   it('names a text tab: Plain text for a .txt and Markdown for a .md (TYTO-247)', async () => {
     const { bar } = await mount();
-    const kindText = async (kind: 'text' | 'markdown', locale: 'en' | 'pt-BR') => {
+    const kindText = async (kind: 'text' | 'markdown' | 'recipe', locale: 'en' | 'pt-BR') => {
       bar.state = { ...base, kind, locale, template: undefined };
       await bar.updateComplete;
       return bar.querySelector('.status-bar__kind')?.textContent;
@@ -237,6 +237,9 @@ describe('the status bar', () => {
     expect(await kindText('text', 'pt-BR')).toBe('Texto simples');
     expect(await kindText('markdown', 'en')).toBe('Markdown');
     expect(await kindText('markdown', 'pt-BR')).toBe('Markdown');
+    // TYTO-377.
+    expect(await kindText('recipe', 'en')).toBe('Recipe');
+    expect(await kindText('recipe', 'pt-BR')).toBe('Receita');
   });
 });
 

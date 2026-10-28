@@ -111,3 +111,20 @@ brief…" is now "Open…" / "Abrir…", and the status bar draws no Export butt
 local server counting hits: a Markdown image, a raw `<img>` and a clicked link reach it 0 of 3
 times from the preview, 3 of 3 from what a renderer that kept them would write in a window with no
 sandbox and no CSP, and 0 more from the preview's own document in that same open window.
+
+**Note, 2026-10-28 (TYTO-377, pull request C): `.recipe` is a third text format.** A recipe opens
+in a tab of its own kind, `recipe`, as `.txt` and `.md` do: main names it from the extension
+(`documentFormatOf` answers `recipe` for `.recipe`, case-insensitive), `TAB_EXTENSIONS` gains
+`.recipe`, so a click in the explorer and `explorer:create` open it in a tab, and the session keeps
+it by its path with `recipe` appended to the tab kinds (still version 1). It opens in the `recipe`
+language with the verbs `recipe:verbs` names offered at the start of a line, and is neither
+compiled nor validated: the recipe notebook runs it in main (ADR 0148) on the pause a brief
+compiles on, on save (`saved`) and by the one command Run recipe / "Executar receita"
+(`explicit`), which is offered only with a recipe in front. Its diagnostics, the file's and each
+cell's, go to the editor's lint and to Problems, whose empty state says "Nothing to report about
+this recipe" / "Nada a relatar sobre esta receita", since a run is a check. Under each step one
+muted line says what the cell did (Rafael): its table's rows and columns, a plan's count, "Failed:
+see Problems", or why it did not run. File ▸ Open adds "Recipe" / "Receita" after "Text files",
+and "All supported files" includes `recipe`; Save As offers `.recipe` for a recipe tab. The status
+bar names it "Recipe" / "Receita" and draws no Export button. The explorer and the tab draw it
+with the generic file icon.

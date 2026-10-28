@@ -1930,6 +1930,10 @@ describe('the explorer write channels', () => {
     await expect(
       create({ documentId: 'document-8', parentId: null, name: 'dados.json', kind: 'file' }),
     ).resolves.toMatchObject({ document: null, documentId: null });
+    // TYTO-377: a new recipe opens in its tab as one.
+    await expect(
+      create({ documentId: 'document-9', parentId: null, name: 'semanal.recipe', kind: 'file' }),
+    ).resolves.toMatchObject({ documentId: 'document-9', document: { format: 'recipe' } });
   });
 
   it('moves the tabs under a renamed entry and answers each one, never a path', async () => {

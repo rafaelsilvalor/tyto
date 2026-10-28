@@ -123,6 +123,7 @@ const actions = () =>
     setPreviewMode: vi.fn<(mode: 'one' | 'all') => void>(),
     zoomWindow: vi.fn<(step: 'in' | 'out' | 'reset') => void>(),
     openDocumentation: vi.fn<() => void>(),
+    runRecipe: vi.fn<() => void>(),
   }) satisfies DesktopActions;
 
 /**

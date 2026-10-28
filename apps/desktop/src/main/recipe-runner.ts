@@ -1,14 +1,7 @@
 import { readFile, realpath, stat } from 'node:fs/promises';
 import { dirname, join } from 'node:path';
 
-import {
-  type Diagnostic,
-  type Result,
-  createLineIndex,
-  diagnostic,
-  err,
-  lineColumnAtIndex,
-} from '@tyto/core';
+import { type Diagnostic, createLineIndex, diagnostic, err, lineColumnAtIndex } from '@tyto/core';
 import {
   type RecipeStateOptions,
   type WorkspaceDataOptions,
@@ -52,7 +45,8 @@ import {
  *
  * **When cells run** (the maintainer's decision, ADR 0148):
  * - a pause in typing runs from the changed step down, and stops before the first `source`, which
- *   fetches only on save or Run (ADR 0119); that cell and the ones after it are `stale`;
+ *   fetches only on save or Run (ADR 0119); that cell and the ones after it are `stale`. A
+ *   `run x` whose recipe holds a source, at any depth, counts as one;
  * - a restricted folder runs nothing until Run, which is the approval (as ADR 0147 takes a typed
  *   `--section`): even then its data files stay refused and its sections withheld;
  * - outside any workspace there are no data files and no state, and cells run as in a trusted
@@ -207,9 +201,13 @@ export function createRecipeRunner(options: RecipeRunnerOptions): RecipeRunner {
         refresh: request.fresh === true,
       });
       const steps = recipe.steps;
-      const changed = firstChanged(steps, reusable);
+      // Each included recipe is read once per run, so the signatures, the policy and the run
+      // itself all see the same text.
+      const read = includedReader(directory);
+      const signatures = await Promise.all(steps.map((step) => signatureOf(step, read)));
+      const changed = firstChanged(signatures, reusable);
       const start = request.from === undefined ? changed : Math.min(changed, request.from);
-      const { stop, held } = runPolicy(steps, start, place, request, registries);
+      const { stop, held } = await runPolicy(steps, start, place, request, registries, read);
 
       const lines = createLineIndex(request.text);
       const lineOf = (step: Step): number => lineColumnAtIndex(lines, step.range.start).line;
@@ -227,14 +225,19 @@ export function createRecipeRunner(options: RecipeRunnerOptions): RecipeRunner {
             ...(input === undefined ? {} : { input }),
             verbs: registries.verbs,
             derivations: registries.derivations,
-            resolveRecipe: (name) => readIncluded(directory, name),
+            resolveRecipe: async (name) => {
+              const text = await read(name);
+              return text === undefined ? err([]) : parseRecipe(text);
+            },
             resolveData: dataFor(place, directory, dataOf),
             clock,
             state: stateFor(place, request.path, options.home, stateOf),
           },
         );
         if (result.ok) {
-          for (const cell of result.value.cells) next.push(keptOf(cell, lineOf(cell.step), ranAt));
+          for (const cell of result.value.cells) {
+            next.push(keptOf(cell, signatures[next.length] ?? '', lineOf(cell.step), ranAt));
+          }
         } else {
           diagnostics.push(...result.error);
         }
@@ -244,7 +247,7 @@ export function createRecipeRunner(options: RecipeRunnerOptions): RecipeRunner {
         const step = steps[index] as Step;
         next.push({
           ...reusable[index],
-          signature: signatureOf(step),
+          signature: signatures[index] ?? '',
           line: lineOf(step),
           status: 'stale',
           diagnostics: [],
@@ -277,25 +280,102 @@ export function createRecipeRunner(options: RecipeRunnerOptions): RecipeRunner {
  * Where this run stops (ADR 0148): before `start` in a restricted folder until Run, and before
  * the first source from `start` down while typing. Run and a save run to the end.
  */
-function runPolicy(
+async function runPolicy(
   steps: readonly Step[],
   start: number,
   place: RecipePlace,
   request: RecipeRunInput,
   registries: RecipeRegistries,
-): { readonly stop: number; readonly held?: RunHeld } {
+  read: IncludedReader,
+): Promise<{ readonly stop: number; readonly held?: RunHeld }> {
   const explicit = request.explicit === true;
   if (place.trust === 'restricted' && !explicit) return { stop: start, held: 'restricted' };
   if (explicit || request.saved === true) return { stop: steps.length };
-  const source = steps.findIndex(
-    (step, index) => index >= start && registries.verbs.get(step.verb)?.kind === 'source',
-  );
-  return source === -1 ? { stop: steps.length } : { stop: source, held: 'source' };
+  for (let index = start; index < steps.length; index += 1) {
+    if (await holdsSource(steps[index] as Step, registries, read, new Set(), 0)) {
+      return { stop: index, held: 'source' };
+    }
+  }
+  return { stop: steps.length };
 }
 
-/** A step's identity for the cache: its verb and everything after it, as written. */
-function signatureOf(step: Step): string {
-  return `${step.verb}\u0000${step.text}`;
+/** The verb that includes another recipe: `run x` reads `x.recipe`. */
+const INCLUDE_VERB = 'run';
+
+/**
+ * How deep included recipes are followed when the policy and the signature read them. A
+ * recipe including one that includes another is already rare; past this the chain is not
+ * read, and the run itself answers whatever it meets there.
+ */
+export const INCLUDED_DEPTH_MAX = 8;
+
+/**
+ * Whether a step fetches: a source verb, or a `run` whose recipe holds one at any depth, read
+ * through the run's own reader. A recipe already on the chain (a cycle) or past the depth bound
+ * is not followed, and one that cannot be read is not a source: the run fails it as before.
+ */
+async function holdsSource(
+  step: Step,
+  registries: RecipeRegistries,
+  read: IncludedReader,
+  visited: ReadonlySet<string>,
+  depth: number,
+): Promise<boolean> {
+  if (registries.verbs.get(step.verb)?.kind === 'source') return true;
+  const included = await includedOf(step, read, visited, depth);
+  if (included === undefined) return false;
+  const inside = new Set([...visited, included.name]);
+  for (const each of included.steps) {
+    if (await holdsSource(each, registries, read, inside, depth + 1)) return true;
+  }
+  return false;
+}
+
+interface Included {
+  readonly name: string;
+  readonly text: string;
+  /** None when it does not parse: the run reports that, the policy finds no source in it. */
+  readonly steps: readonly Step[];
+}
+
+/** The recipe a `run` step includes, when it is one to follow and it was found. */
+async function includedOf(
+  step: Step,
+  read: IncludedReader,
+  visited: ReadonlySet<string>,
+  depth: number,
+): Promise<Included | undefined> {
+  const name = step.verb === INCLUDE_VERB ? step.positional[0]?.value : undefined;
+  if (name === undefined || visited.has(name) || depth >= INCLUDED_DEPTH_MAX) return undefined;
+  const text = await read(name);
+  if (text === undefined) return undefined;
+  const parsed = parseRecipe(text);
+  return { name, text, steps: parsed.ok ? parsed.value.steps : [] };
+}
+
+/**
+ * A step's identity for the cache: its verb and everything after it, as written, and for a
+ * `run` the text of every recipe it includes, so an included recipe edited on disk reruns the
+ * cell (ADR 0148 decision 2, amended).
+ */
+async function signatureOf(step: Step, read: IncludedReader): Promise<string> {
+  return [step.verb, step.text, ...(await includedTexts(step, read, new Set(), 0))].join('\u0000');
+}
+
+async function includedTexts(
+  step: Step,
+  read: IncludedReader,
+  visited: ReadonlySet<string>,
+  depth: number,
+): Promise<string[]> {
+  const included = await includedOf(step, read, visited, depth);
+  if (included === undefined) return [];
+  const inside = new Set([...visited, included.name]);
+  const texts = [included.text];
+  for (const each of included.steps) {
+    texts.push(...(await includedTexts(each, read, inside, depth + 1)));
+  }
+  return texts;
 }
 
 /**
@@ -315,18 +395,18 @@ function headerSignature(recipe: RecipeAst, path: string | undefined, place: Rec
 }
 
 /** The first step to run: one that changed, or one whose last answer was not a table. */
-function firstChanged(steps: readonly Step[], kept: readonly KeptCell[]): number {
-  const index = steps.findIndex((step, at) => {
+function firstChanged(signatures: readonly string[], kept: readonly KeptCell[]): number {
+  const index = signatures.findIndex((signature, at) => {
     const before = kept[at];
-    return before?.status !== 'ok' || before.signature !== signatureOf(step);
+    return before?.status !== 'ok' || before.signature !== signature;
   });
-  return index === -1 ? steps.length : index;
+  return index === -1 ? signatures.length : index;
 }
 
-function keptOf(cell: Cell, line: number, ranAt: string): KeptCell {
+function keptOf(cell: Cell, signature: string, line: number, ranAt: string): KeptCell {
   const oldest = cell.table === undefined ? undefined : oldestFetchedAt(cell.table);
   return {
-    signature: signatureOf(cell.step),
+    signature,
     line,
     status: cell.status,
     ...(cell.table === undefined ? {} : { table: cell.table }),
@@ -412,21 +492,38 @@ export function readOnlyState(state: RecipeState): RecipeState {
 /**
  * `run <name>`'s recipe: `<name>.recipe` in the including recipe's folder, and only there,
  * checked after `realpath` so a link beside it that leads elsewhere is not followed (ADR 0112).
- * An empty error is "names no recipe that was found", which `run` words itself.
+ * Its text, or `undefined` for none found, which reaches `run` as an empty error: "names no
+ * recipe that was found", which `run` words itself.
  */
 async function readIncluded(
   directory: string | undefined,
   name: string,
-): Promise<Result<RecipeAst, readonly Diagnostic[]>> {
-  if (directory === undefined || !RECIPE_NAME.test(name)) return err([]);
+): Promise<string | undefined> {
+  if (directory === undefined || !RECIPE_NAME.test(name)) return undefined;
   try {
     const folder = await realpath(directory);
     const file = await realpath(join(directory, `${name}.recipe`));
-    if (!isInside(folder, file) || dirname(file) !== folder) return err([]);
+    if (!isInside(folder, file) || dirname(file) !== folder) return undefined;
     const found = await stat(file);
-    if (!found.isFile() || found.size > INCLUDED_RECIPE_MAX_BYTES) return err([]);
-    return parseRecipe(await readFile(file, 'utf8'));
+    if (!found.isFile() || found.size > INCLUDED_RECIPE_MAX_BYTES) return undefined;
+    return await readFile(file, 'utf8');
   } catch {
-    return err([]);
+    return undefined;
   }
+}
+
+/** An included recipe's text by name, `undefined` when none was found. */
+type IncludedReader = (name: string) => Promise<string | undefined>;
+
+/** {@link readIncluded}, each name read once: one reader per run. */
+function includedReader(directory: string | undefined): IncludedReader {
+  const texts = new Map<string, Promise<string | undefined>>();
+  return (name) => {
+    let text = texts.get(name);
+    if (text === undefined) {
+      text = readIncluded(directory, name);
+      texts.set(name, text);
+    }
+    return text;
+  };
 }
