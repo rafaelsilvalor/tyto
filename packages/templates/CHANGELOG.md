@@ -1,5 +1,45 @@
 # @tyto/templates
 
+## 1.0.2
+
+### Patch Changes
+
+- 0f5ad72: TYTO-427: in `tabela-roxo` the table stands a fixed 20 px under the title, whatever its size; the room a short table leaves now goes to the foot instead of half of it opening between the title and the table. Every cell's words are centred by eye, lowered by 0.15 em, so the header's capitals and the body's numbers no longer sit 5 px above the middle of their cells.
+- Updated dependencies [d4a6939]
+- Updated dependencies [08b936d]
+- Updated dependencies [7342c02]
+- Updated dependencies [15997e9]
+- Updated dependencies [93fcb8b]
+- Updated dependencies [ea97dc3]
+- Updated dependencies [c005b91]
+- Updated dependencies [2495d0d]
+- Updated dependencies [6abf89f]
+- Updated dependencies [53e01c3]
+- Updated dependencies [ae75027]
+- Updated dependencies [fe85505]
+- Updated dependencies [5a0c7c5]
+- Updated dependencies [8e9c9c4]
+- Updated dependencies [ab9512e]
+- Updated dependencies [d3df40e]
+- Updated dependencies [4aba89c]
+- Updated dependencies [58f54d6]
+- Updated dependencies [7a5f578]
+- Updated dependencies [3355317]
+- Updated dependencies [eb55249]
+- Updated dependencies [a2b7fbd]
+- Updated dependencies [532221f]
+- Updated dependencies [5f98674]
+- Updated dependencies [cfa70ff]
+- Updated dependencies [bdab5da]
+- Updated dependencies [eb0694a]
+- Updated dependencies [dded20c]
+- Updated dependencies [e4ce1e8]
+- Updated dependencies [fdcfda9]
+- Updated dependencies [4186112]
+- Updated dependencies [3921252]
+  - @tyto/core@0.29.0
+  - @tyto/template-kit@0.2.2
+
 ## 1.0.1
 
 ### Patch Changes

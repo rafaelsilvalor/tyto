@@ -1,5 +1,92 @@
 # @tyto/cli
 
+## 0.5.0
+
+### Minor Changes
+
+- 3921252: TYTO-254 (ADR 0145): an installed plugin can declare a setting. `registerConfiguration` takes a `form` instead of a `schema` — a scalar of one type with JSON Schema's bounds, an enum, a `tyto-pattern/1` pattern, `format: 'uri'`, or a list of one scalar; no object, no secret — which the host converts with `settingSchemaOf` and validates like any setting, with the same ranged `W_SETTING_INVALID`. The `configuration` point crosses the isolation boundary as data; an isolated plugin that passes a Zod `schema` is refused by name and told to use `form`. The isolation protocol is 7: the host sends a plugin its settings in a `configure` message whenever its host is configured, `InProcessHost.configure` emits a new `configured` host event, and `host.config` in the plugin's process answers the newest. The CLI never reads the window's `settings.json`: an installed plugin's settings take their defaults there.
+- 488e0d6: TYTO-278: `tyto render` finds the workspace a brief is in by walking up to the nearest `.tyto/project.json`, and uses its template, asset and font folders; `--out` is optional when the project declares `output`, and a typed `--out` or `--templates` still wins. An untrusted workspace renders with everything inside its own folder and prints why a key that leads outside was left out; `--trust` lifts that for one run without writing an approval, and `tyto trust remove <folder>` takes one back (ADR 0111, ADR 0112).
+- 91efbbb: TYTO-280: `tyto render` and `tyto watch` draw images and fonts an installed plugin supplies (ADR 0117, ADR 0118). A `test:logo` image or a face no folder has is fetched once into `TYTO_HOME/cache/sources/`, and the next render asks nothing; a face that arrives makes the job compile once more, so its lines break against it. `tyto render` fetches for a trusted folder and for a brief in no folder; a restricted folder and `tyto watch` read the cache only, each miss saying why. A `--folder` delivery copies a fetched image under a name from its reference (`assets/logo.png`) and points the copied brief at it, so the delivery renders without the plugin. `@tyto/io`'s `sourceCache` takes the miss's reason as `notFetchedBecause`, and its delivery names fetched images that way.
+- ae75027: TYTO-281: a template's font this machine lacks is fetched from Google Fonts on first use (ADR 0120). `@tyto/google-fonts` is a new built-in `font-source`, pure, that reaches Google only through `host.fetch` and knows which families Google serves from a bundled snapshot; the face is cached in `TYTO_HOME` and every later render reads it. A missing family nobody can supply — CircularXX — is never fetched and gets one line, the new `W_FONT_UNAVAILABLE` in `@tyto/core`, naming the substitute and the free alternatives the template's manifest lists under the new `fonts` key. `tyto render` and `tyto watch` turn it off with `--no-google-fonts` or `TYTO_GOOGLE_FONTS=off`, and then a missing face is `W_FONT_SUBSTITUTED` exactly as before.
+- d3df40e: `--formats` on `tyto render` and `tyto watch` now narrows the brief's `formats:` line instead of being ignored when the brief has one (TYTO-332, ADR 0107). A size the flag names that the line does not have is `E_FORMAT_NOT_IN_BRIEF`, so `watch --formats story` on a brief that does not list `story` now reports an error where it used to render the brief's formats.
+- 4aba89c: TYTO-347: a workspace's `.tyto/project.json` can name a work profile, a sheet many folders share (ADR 0114). `"profile": "saude"` reads `TYTO_HOME/profiles/saude/profile.json`, trusted by where it lives; a path names a profile file elsewhere, which is its own source in `trust.json` and is confined to its own folder until it is trusted. The profile's keys come first and the folder's win key by key. `core` reads the key with `profileReferenceOf`, refuses a restricted folder a profile path outside it, ignores a profile's own `profile` key (`W_PROFILE_NESTED`), and says in `ResolvedProject.origins` which sheet each value came from; `W_PROJECT_PROFILE_UNSUPPORTED` is replaced by `W_PROJECT_PROFILE_INVALID` and `W_PROJECT_PROFILE_MISSING`. `@tyto/io`'s `loadWorkspace` reads the profile with its own trust answer and follows its paths through `realpath`. `tyto render` uses it, prints a profile's problems against the profile's file, `--trust` covers the folder and its profile for the run, and `tyto trust remove` takes a profile file's approval back. The window resolves a folder's profile through the same loader; showing it is the next change.
+- 3fa8604: TYTO-349: the command line can trust a workspace folder for good. `tyto trust add <folder>` prints what the folder does while restricted (a key that leads outside it, withheld plugin sections, its profile's problems), then writes the approval to `TYTO_HOME/trust.json` under the folder's real path, with no y/N prompt so a script can run it. It refuses a path that does not exist and the folder whose `.tyto` is `TYTO_HOME` (ADR 0112), accepts a folder with no project file, and says which `tyto trust add <file>` trusts the work profile the folder names. `tyto trust add <file>` trusts a shared profile file on its own (ADR 0114); one inside `TYTO_HOME` is already trusted by where it lives. `tyto trust list` prints each approval with its date and marks one whose path is gone. `fsTrustStore` in `@tyto/io` gains `list()`, off the core `TrustStore` port.
+- 6511c41: TYTO-371 (ADR 0138): the CLI implements a plugin's private cache and its workspace files. `@tyto/io` adds `pluginCache({ home })`, which keeps each entry at `TYTO_HOME/cache/plugins/<plugin>/<sha256(key)>.bin` beside a `{ key, storedAt, size }` sidecar, both written atomically and dated by the host's clock, and `workspaceFiles({ folder, trust })`, which reads the folder and its trust on every call, refuses a restricted folder with `E_WORKSPACE_FILE_RESTRICTED`, confines a path again after `realpath`, refuses a write that lands in `.tyto/` through a link, and creates the folders a write needs. `workspaceDataResolver` now shares its containment check with it. `tyto render` gives plugins both, against the brief's workspace and its trust (`--trust` counting); a brief in no workspace answers that no folder is open. `tyto watch` gives the cache only, and its refusal names it.
+- ffd4770: TYTO-428: `tyto render --section <plugin>.<key>=<value>`, repeatable, sets one key of a plugin's section of `.tyto/project.json` for the run, over what the file says. The value is JSON when it parses and the typed text otherwise. It applies in an untrusted folder too, where the file's own sections stay withheld; a flag of another shape is a usage error (ADR 0147).
+
+### Patch Changes
+
+- 689e872: TYTO-336: `tyto render` and `tyto watch` in a folder with no `formats.yaml` render with the built-in pack's formats, as the window does, instead of stopping with `E_FORMATS_READ`. A `--formats-file` that is not there still fails with `E_FORMATS_READ`, and a `formats.yaml` that is there and malformed still fails as before.
+- 93fcb8b: `tyto render` exits 2 (internal failure, worth retrying) when an artwork file is held open by another program, and writes no `result.json`; it used to exit 1 with `E_OUTPUT_WRITE` (TYTO-245, ADR 0108). A folder where an artwork goes still exits 1, now reported as `E_OUTPUT_FILE_BLOCKED` with the folder's path.
+- 8e9c9c4: TYTO-329: `tyto render` exports a brief with `*italic*` over a template in Source Sans 3, and reports a face the fonts cannot answer as `E_FONT_FACE_UNAVAILABLE` before the export (ADR 0110).
+- 58f54d6: TYTO-370 (ADR 0134): an installed plugin can store and forget its own secrets. `host.credentials` is now a function with two methods: `host.credentials(key)` reads as before, `host.credentials.set(key, value)` stores, and `host.credentials.delete(key)` forgets and answers whether there was a value. Both need the same `credentials:<key>` permission, so an undeclared key is `E_PERMISSION`, in process and across the isolation boundary. A value is a non-empty string of at most 16 KiB in UTF-8 (`CREDENTIAL_VALUE_LIMIT_BYTES`); over it is the new `E_CREDENTIAL_TOO_LARGE` from `@tyto/core`. `HostCapabilities` gains optional `storeCredential` and `deleteCredential`; a host without them answers the new `E_CREDENTIAL_READ_ONLY`. The isolation protocol is 5. The desktop stores in the keychain, under the `plugin:<name>:<key>` account it already reads, lets a plugin's panel store and forget its own declared keys, and holds the plugins screen to the same 16 KiB. `tyto` stays read-only: a plugin's `set` or `delete` there is `E_CREDENTIAL_READ_ONLY`, naming the environment variable to set instead.
+- a2b7fbd: TYTO-376 (ADR 0135), second half: a plugin can contribute recipe actions and sinks. A `recipe-verb` of kind `action` or `sink` is accepted now; it declares `writes`, the kinds of write its plans may hold, a subset of a new top-level `writes` in `tyto-plugin.json`, and is refused at load otherwise (a source or a transform declaring `writes` is refused too). Its `plan(request)` answers a `Plan` — `{ target, operations: [{ write, rowKey?, description }], count }`, new in `@tyto/recipe` with `checkPlan` and `PLAN_LIMITS` — and **nothing is written**: the plan rides the cell's result (`Cell.plan`, `VerbOutput.plan`), and the table passes through to the next cell. The host refuses a plan holding a write the verb did not declare, a `count` that is not the number of operations, a `rowKey` the table does not hold, or more than 10,000 operations, with the new `E_RECIPE_PLAN` from `@tyto/core`, placed at the verb. `tyto` loads an installed plugin that contributes them.
+- 532221f: TYTO-376 (ADR 0135), first half: a plugin can contribute recipe verbs and derivations. `@tyto/plugin-api` has two new extension points, `recipe-verb` (a paged `source` or a `transform`, with its arguments declared as a small closed schema) and `recipe-derivation` (for `derive`), both named `<namespace>.<name>` in the one `namespace` a manifest now declares and owns alone; a second plugin claiming a loaded plugin's namespace is refused with `E_PLUGIN_NAMESPACE_TAKEN`, and an `action` or `sink` verb is refused until the second half. They cross to an installed plugin's process, and `recipeRegistriesOf(registry)` hands the recipe runner its verb and derivation registries. `@tyto/recipe` gains `checkTable`, `readArguments` and `pagedSource`, which loops a source page by page under provisional ceilings (8 MiB and 5,000 rows per page, 100,000 rows, 1,000 pages) and refuses a repeated cursor or a truncated page rather than answer a partial table; a plugin's derivation may be namespaced. `@tyto/core` gains `E_PLUGIN_NAMESPACE_TAKEN`, `E_RECIPE_TABLE`, `E_RECIPE_SOURCE` and `E_RECIPE_VERB`. `tyto` loads an installed plugin that contributes them.
+- Updated dependencies [d4a6939]
+- Updated dependencies [08b936d]
+- Updated dependencies [7342c02]
+- Updated dependencies [15997e9]
+- Updated dependencies [15997e9]
+- Updated dependencies [49c1569]
+- Updated dependencies [93fcb8b]
+- Updated dependencies [ea97dc3]
+- Updated dependencies [3921252]
+- Updated dependencies [aac15e5]
+- Updated dependencies [c005b91]
+- Updated dependencies [cbbf6df]
+- Updated dependencies [2495d0d]
+- Updated dependencies [6abf89f]
+- Updated dependencies [91efbbb]
+- Updated dependencies [017d381]
+- Updated dependencies [53e01c3]
+- Updated dependencies [ae75027]
+- Updated dependencies [fe85505]
+- Updated dependencies [5a0c7c5]
+- Updated dependencies [bf3fd0e]
+- Updated dependencies [8e9c9c4]
+- Updated dependencies [ab9512e]
+- Updated dependencies [d3df40e]
+- Updated dependencies [49db8d1]
+- Updated dependencies [4aba89c]
+- Updated dependencies [3fa8604]
+- Updated dependencies [e4255e4]
+- Updated dependencies [58f54d6]
+- Updated dependencies [d247c20]
+- Updated dependencies [6511c41]
+- Updated dependencies [7a5f578]
+- Updated dependencies [3355317]
+- Updated dependencies [eb55249]
+- Updated dependencies [a2b7fbd]
+- Updated dependencies [532221f]
+- Updated dependencies [5f98674]
+- Updated dependencies [cfa70ff]
+- Updated dependencies [bdab5da]
+- Updated dependencies [eb0694a]
+- Updated dependencies [7704e9c]
+- Updated dependencies [dded20c]
+- Updated dependencies [320c0c7]
+- Updated dependencies [c7cf84e]
+- Updated dependencies [e4ce1e8]
+- Updated dependencies [fdcfda9]
+- Updated dependencies [4186112]
+- Updated dependencies [3da246d]
+- Updated dependencies [885d0f5]
+- Updated dependencies [3921252]
+- Updated dependencies [0f5ad72]
+- Updated dependencies [ffd4770]
+- Updated dependencies [431bf23]
+  - @tyto/plugin-api@0.5.0
+  - @tyto/core@0.29.0
+  - @tyto/io@4.0.0
+  - @tyto/pipeline@0.11.0
+  - @tyto/fonts@0.4.0
+  - @tyto/google-fonts@0.1.0
+  - @tyto/raster@0.2.2
+  - @tyto/templates@1.0.2
+  - @tyto/export-html@0.7.1
+  - @tyto/export-svg@2.0.1
+  - @tyto/template-lang@0.8.1
+
 ## 0.4.1
 
 ### Patch Changes
