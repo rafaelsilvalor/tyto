@@ -431,6 +431,26 @@ export interface Catalogue {
    */
   readonly 'dialog.files.text': string;
   readonly 'dialog.files.supported': string;
+  /** TYTO-377: a `.recipe` file, in the dialogs, the status bar and the empty Problems panel. */
+  readonly 'dialog.files.recipe': string;
+  readonly 'status.kind.recipe': string;
+  readonly 'problems.empty.recipe': string;
+  /** TYTO-377: the one command that runs a whole recipe, the person's approval (ADR 0148). */
+  readonly 'command.recipe.run': string;
+  /**
+   * TYTO-377: the muted line under a recipe's cell. `.one` is the singular; the window joins a
+   * table's two counts with a middle dot.
+   */
+  readonly 'recipe.cell.rows': string;
+  readonly 'recipe.cell.rows.one': string;
+  readonly 'recipe.cell.columns': string;
+  readonly 'recipe.cell.columns.one': string;
+  readonly 'recipe.cell.plan': string;
+  readonly 'recipe.cell.failed': string;
+  readonly 'recipe.cell.skipped': string;
+  readonly 'recipe.cell.stale': string;
+  readonly 'recipe.cell.held.source': string;
+  readonly 'recipe.cell.held.restricted': string;
   readonly 'status.problems.new': string;
   /**
    * Help > About, where the version, the platform, the template count and the template
@@ -888,6 +908,20 @@ export const CATALOGUE_KEYS = [
   'status.kind.markdown',
   'dialog.files.text',
   'dialog.files.supported',
+  'dialog.files.recipe',
+  'status.kind.recipe',
+  'problems.empty.recipe',
+  'command.recipe.run',
+  'recipe.cell.rows',
+  'recipe.cell.rows.one',
+  'recipe.cell.columns',
+  'recipe.cell.columns.one',
+  'recipe.cell.plan',
+  'recipe.cell.failed',
+  'recipe.cell.skipped',
+  'recipe.cell.stale',
+  'recipe.cell.held.source',
+  'recipe.cell.held.restricted',
   'status.problems.new',
   'menu.about',
   'shell.about.version',

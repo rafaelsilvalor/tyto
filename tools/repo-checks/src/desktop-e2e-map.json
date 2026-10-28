@@ -588,8 +588,13 @@
         "apps/desktop/src/main/recipe-runner.ts",
         "apps/desktop/src/main/recipe-wire.ts"
       ],
-      "e2e": ["window.desktop.test.ts"],
-      "why": "reviewed: the recipe notebook's runner in main (TYTO-377); no window draws it until the .recipe tab, so only window.desktop's channel list reaches it, and its logic is in recipe-runner.test.ts"
+      "e2e": ["recipe-tab.desktop.test.ts", "window.desktop.test.ts"],
+      "why": "reviewed: the recipe notebook's runner in main (TYTO-377); the .recipe tab runs it on a pause, and window.desktop's channel list reaches it; its logic is in recipe-runner.test.ts"
+    },
+    {
+      "paths": ["apps/desktop/src/renderer/recipe-notebook.ts"],
+      "e2e": ["recipe-tab.desktop.test.ts"],
+      "why": "reviewed: when a .recipe tab runs and the line under each cell (TYTO-377); the logic is in recipe-notebook.test.ts, and the real window draws the lines"
     },
     {
       "paths": ["apps/desktop/src/main/quit.ts"],

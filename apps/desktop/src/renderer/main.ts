@@ -15,9 +15,12 @@ import {
   blockAt,
   blocksOf,
   breadcrumbOf,
+  cellOutputs,
   directiveLabel,
   formatBriefInView,
   previewBlock,
+  recipeCompletion,
+  setCellOutputs,
   briefCompletion,
   briefLint,
   briefSnippets,
@@ -92,6 +95,12 @@ import { readKeybindingsText } from './keybindings-file.js';
 import { type KeybindingCommand, keybindingsAssist } from './keybindings-assist.js';
 import { type SettingOutline, settingsAssist } from './settings-assist.js';
 import { readSnippetsText } from './snippets-file.js';
+import {
+  type RecipeRunAnswer,
+  cellOutputOf,
+  cellStatuses,
+  createRecipeNotebook,
+} from './recipe-notebook.js';
 import {
   type Diagnostic,
   type SourceRange,
@@ -174,6 +183,7 @@ import {
   isBrief,
   isBroken,
   isDisposable,
+  isRecipe,
   isStale,
   isUnsaved,
   kindOfFormat,
@@ -621,7 +631,68 @@ const appFileAssists: AppFileAssists = {
       ),
     ),
   ],
+  // A recipe's (TYTO-377): its verbs at the start of a line, and the lines under its cells.
+  recipe: [tabThroughCompletions(), recipeCompletion(() => recipeVerbs), cellOutputs()],
 };
+
+/**
+ * Every verb a recipe may name here, from `recipe:verbs`, read again each time a recipe opens so
+ * a plugin installed since is offered (TYTO-377). Empty until main answers.
+ */
+let recipeVerbs: readonly string[] = [];
+
+function refreshRecipeVerbs(): void {
+  void withBridge(async (bridge) => {
+    recipeVerbs = (await bridge['recipe:verbs']({})).verbs;
+  });
+}
+
+/** When each recipe tab runs, and only its newest answer shown (TYTO-377, `recipe-notebook.ts`). */
+const recipeNotebook = createRecipeNotebook({
+  run: async (request) => {
+    const bridge = window.tyto;
+    if (bridge === undefined) return { requestId: -1, cells: [], diagnostics: [], ranAt: '' };
+    return bridge['recipe:run'](request);
+  },
+  textOf: (documentId) => {
+    const document_ = documentOf(workspace, documentId);
+    return document_ === undefined ? undefined : contentOf(document_);
+  },
+  show: showRecipeAnswer,
+  delay: PREVIEW_DELAY,
+});
+
+/** A recipe came into a tab, opened or restored: its verbs are read again, and it runs once. */
+function openedRecipe(documentId: string): void {
+  refreshRecipeVerbs();
+  void recipeNotebook.runNow(documentId, 'typed');
+}
+
+/**
+ * A recipe's newest answer, on its tab: every diagnostic, the file's and each cell's, where a
+ * brief's go (the lint and Problems), and one line under each cell. Every pane showing it is
+ * given the lines, as `setFileDiagnostics` gives the markers; a tab not shown keeps them in its
+ * state for when it is.
+ */
+function showRecipeAnswer(documentId: string, text: string, answer: RecipeRunAnswer): void {
+  setFileDiagnostics(documentId, text, [
+    ...answer.diagnostics,
+    ...answer.cells.flatMap((cell) => cell.diagnostics),
+  ]);
+  const target = documentOf(workspace, documentId);
+  if (target?.state === undefined || contentOf(target) !== text) return;
+  const effects = setCellOutputs.of(cellStatuses(text, answer, state.locale).map(cellOutputOf));
+  const showing = [...shownIn]
+    .filter(([, shown]) => shown === documentId)
+    .flatMap(([groupId]) => panes.get(groupId) ?? []);
+  for (const each of showing) each.view.dispatch({ effects });
+  if (showing.length === 0) {
+    workspace = updateDocument(workspace, documentId, (document_) => ({
+      ...document_,
+      state: document_.state?.update({ effects }).state,
+    }));
+  }
+}
 
 const byId = <T extends HTMLElement>(id: string): T | null =>
   document.getElementById(id) as T | null;
@@ -885,6 +956,8 @@ const TAB_ICONS: Readonly<Record<DocumentKind, IconName>> = {
   // TYTO-247: the explorer's icon for a `.txt` and a `.md`, so a tab and its row agree.
   text: 'text',
   markdown: 'text',
+  // TYTO-377: the explorer's generic file icon, as its row has.
+  recipe: 'file',
 };
 
 const tabIconOf = (document_: DocumentState): IconName =>
@@ -1400,6 +1473,11 @@ const registry: CommandRegistry = withCommandGate(
       void withBridge(async (bridge) => {
         await bridge['window:zoom']({ step });
       });
+    },
+    runRecipe: () => {
+      // TYTO-377: Run is the approval, for a folder not trusted and for sources (ADR 0148).
+      const front = active();
+      if (isRecipe(front.kind)) void recipeNotebook.runNow(front.id, 'explicit');
     },
     openDocumentation: () => {
       // TYTO-318. Names nothing: main opens one of its two literals, by the menu's language.
@@ -2070,6 +2148,8 @@ function adopt(
     if (isBrief(kind)) await request(bridge, created.id, opened.text, { fetch: true });
     else if (isAppFile(kind)) await validateAppFile(bridge, created.id);
   });
+  // A recipe runs as a pause would (TYTO-377): no source fetches until a save or Run.
+  if (isRecipe(kind)) openedRecipe(created.id);
   void refreshRecent();
 }
 
@@ -3266,6 +3346,8 @@ async function saveOneDocument(
   if (saved !== undefined && isBrief(saved.kind)) {
     void request(bridge, documentId, contentOf(saved), { fetch: true });
   }
+  // And a recipe runs its sources (TYTO-377, ADR 0148).
+  if (saved !== undefined && isRecipe(saved.kind)) void recipeNotebook.runNow(documentId, 'saved');
   return 'saved';
 }
 
@@ -3548,7 +3630,10 @@ async function restoreSession(bridge: TytoBridge, handle: EditorHandle): Promise
   const staleAt = new Map<number, string>();
   const untitled = (text: string, place: RestoredTab['place'], kind?: TextKind): DocumentState => {
     // A text tab's draft comes back as text, not as a brief to compile (TYTO-247).
-    const fresh = newDocument(nextDocumentId(), handle.blank(text, languageOf(kind)));
+    const fresh = newDocument(
+      nextDocumentId(),
+      handle.blank(text, languageOf(kind), assistOf(kind, appFileAssists)),
+    );
     const born = placed(kind === undefined ? fresh : { ...fresh, kind }, place);
     restored.push(born);
     return born;
@@ -3557,7 +3642,7 @@ async function restoreSession(bridge: TytoBridge, handle: EditorHandle): Promise
   for (const [index, tab] of answer.tabs.entries()) {
     const opened = await fileOf(bridge, tab);
     const kind = restoredKind(tab, opened.document);
-    const textKind = kind === 'text' || kind === 'markdown' ? kind : undefined;
+    const textKind = kind === 'text' || kind === 'markdown' || kind === 'recipe' ? kind : undefined;
     let built: DocumentState | undefined;
     if (opened.document !== null && opened.documentId !== null) {
       const language = languageOf(kind);
@@ -3655,6 +3740,7 @@ async function restoreSession(bridge: TytoBridge, handle: EditorHandle): Promise
       if (isBrief(document_.kind))
         void request(bridge, document_.id, contentOf(document_), { fetch });
       else if (isAppFile(document_.kind)) void validateAppFile(bridge, document_.id);
+      else if (isRecipe(document_.kind)) openedRecipe(document_.id);
     }
   }
   if (rows.length > 0) {
@@ -3768,6 +3854,7 @@ function closeTab(id: string): void {
   if (timer !== undefined) clearTimeout(timer);
   pending.delete(id);
   gates.delete(id);
+  recipeNotebook.close(id);
   void withBridge(async (bridge) => {
     await bridge['file:close']({ documentId: id });
   });
@@ -5401,6 +5488,7 @@ async function load(): Promise<void> {
         if (isAppFile(edited.kind)) askAppFile(bridge, documentId);
         else if (isBrief(edited.kind)) ask(bridge, documentId, contentOf(edited));
         else if (edited.kind === 'markdown') askMarkdown(documentId);
+        else if (isRecipe(edited.kind)) recipeNotebook.typed(documentId);
         // Typing changes no tab but the draft, and a draft is what a crash would cost.
         keepSessionSoon();
       });

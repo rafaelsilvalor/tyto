@@ -337,8 +337,8 @@ describe('the bridge', () => {
       'queue:set-auto-run',
       'queue:set-folder',
       'queue:set-kinds',
-      // TYTO-377, ADR 0148: the recipe notebook's runner in main. No window draws it yet (its
-      // tab is TYTO-377's next pull request); `recipe-runner.test.ts` covers the logic.
+      // TYTO-377, ADR 0148: the recipe notebook's runner in main, which a `.recipe` tab runs
+      // (`recipe-tab.desktop.test.ts`); `recipe-runner.test.ts` covers the logic.
       'recipe:run',
       'recipe:verbs',
       // TYTO-113: the tabs kept for the next launch. Exercised by `e2e/session.desktop.test.ts`.
@@ -819,6 +819,24 @@ describe('switching the language', () => {
     'problems.empty.text',
     'dialog.files.text',
     'dialog.files.supported',
+    // TYTO-377: a recipe tab's kind, its empty problems line, its dialog filter, Run recipe, and
+    // the line under each cell, drawn only with a recipe open; `recipe-notebook.test.ts`,
+    // `status-bar.test.ts`, `problems-panel.test.ts` and `documents.test.ts` paint them, and
+    // `recipe-tab.desktop.test.ts` reads the cell lines in the real window.
+    'dialog.files.recipe',
+    'status.kind.recipe',
+    'problems.empty.recipe',
+    'command.recipe.run',
+    'recipe.cell.rows',
+    'recipe.cell.rows.one',
+    'recipe.cell.columns',
+    'recipe.cell.columns.one',
+    'recipe.cell.plan',
+    'recipe.cell.failed',
+    'recipe.cell.skipped',
+    'recipe.cell.stale',
+    'recipe.cell.held.source',
+    'recipe.cell.held.restricted',
     'status.problems.new',
     // TYTO-248: what the footer used to say is Help > About now, a box main shows — menu
     // chrome, like `menu.revealLogs`. `src/main/menu.test.ts` holds the five to `aboutText`, and

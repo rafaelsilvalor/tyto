@@ -217,7 +217,8 @@ describe('a text file in a tab (TYTO-247)', () => {
       .toEqual([
         { name: 'Brief', extensions: ['brief'] },
         { name: 'Text files', extensions: ['txt', 'md'] },
-        { name: 'All supported files', extensions: ['brief', 'txt', 'md'] },
+        { name: 'Recipe', extensions: ['recipe'] },
+        { name: 'All supported files', extensions: ['brief', 'txt', 'md', 'recipe'] },
       ]);
   }, 60_000);
 

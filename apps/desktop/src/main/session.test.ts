@@ -70,6 +70,17 @@ describe('the session file', () => {
     expect(await store.read()).toEqual(session);
   });
 
+  it('reads back a recipe tab, its kind appended to the version 1 file (TYTO-377)', async () => {
+    const store = fileSessionStore(join(scratch, 'session.json'));
+    const session = {
+      version: 1 as const,
+      tabs: [{ kind: 'recipe' as const, path: '/b/semanal.recipe' }],
+      active: 0,
+    };
+    expect(await store.write(session)).toBe(true);
+    expect(await store.read()).toEqual(session);
+  });
+
   it('reads a version 1 file written before the template mode was kept (TYTO-266)', async () => {
     // The shape TYTO-113 wrote, and the shape an update imports (ADR 0036): no `template`.
     const file = join(scratch, 'session.json');
@@ -247,6 +258,27 @@ describe('a text tab in the session', () => {
       draft: '# Notas editadas\n',
       stale: false,
       missing: null,
+    });
+  });
+
+  it('keeps a .recipe tab by its path and reopens it as a recipe (TYTO-377)', async () => {
+    const { documents, store, session } = setup({ '/b/semanal.recipe': 'recipe semanal\n' });
+    await documents.openPath('document-1', '/b/semanal.recipe');
+
+    await session.write({
+      tabs: [{ documentId: 'document-1', kind: 'recipe', draft: null, place: null }],
+      active: 0,
+      template: null,
+      final: false,
+    });
+    expect((store.saved() as { tabs: unknown }).tabs).toEqual([
+      { kind: 'recipe', path: '/b/semanal.recipe' },
+    ]);
+
+    const [tab] = (await session.read()).tabs;
+    expect(tab).toMatchObject({
+      kind: 'recipe',
+      document: { path: '/b/semanal.recipe', format: 'recipe', text: 'recipe semanal\n' },
     });
   });
 

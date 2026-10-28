@@ -2,7 +2,7 @@
 
 # Comandos
 
-Tudo o que a janela sabe fazer, pelo título que a barra de comandos mostra: 75. Abra a barra com **`Ctrl+k` / `⌘k`** e digite parte de um título. O id é o que o `keybindings.json` usa para pôr um comando numa tecla.
+Tudo o que a janela sabe fazer, pelo título que a barra de comandos mostra: 76. Abra a barra com **`Ctrl+k` / `⌘k`** e digite parte de um título. O id é o que o `keybindings.json` usa para pôr um comando numa tecla.
 
 A janela acrescenta outros enquanto roda, que esta lista não tem como mostrar: um para abrir e fechar cada painel, inclusive os de plugins, um para cada arquivo aberto recentemente, e um para cada predefinição de exportação da pasta aberta, `export.preset:<nome>`.
 
@@ -49,6 +49,7 @@ A janela acrescenta outros enquanto roda, que esta lista não tem como mostrar: 
 | Diminuir zoom | `window.zoomOut` | `Ctrl+-` | `⌘-` |
 | Redefinir zoom | `window.zoomReset` | `Ctrl+0` | `⌘0` |
 | Documentação | `help.openDocumentation` |  |  |
+| Executar receita | `recipe.run` |  |  |
 | Preferências: Tema de cores | `theme.pick` |  |  |
 | Escolher pasta de templates… | `templates.chooseFolder` |  |  |
 | Voltar aos templates internos | `templates.clearFolder` |  |  |

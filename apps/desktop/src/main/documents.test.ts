@@ -86,17 +86,20 @@ describe('text files', () => {
     expect(asked).toEqual(['text']);
   });
 
-  it('offers briefs, then text files, then every supported file, in the window language', () => {
+  it('offers briefs, then text files, then recipes, then every supported file, in the window language', () => {
     expect(openFilters('en')).toEqual([
       { name: 'Brief', extensions: ['brief'] },
       { name: 'Text files', extensions: ['txt', 'md'] },
-      { name: 'All supported files', extensions: ['brief', 'txt', 'md'] },
+      { name: 'Recipe', extensions: ['recipe'] },
+      { name: 'All supported files', extensions: ['brief', 'txt', 'md', 'recipe'] },
     ]);
     expect(openFilters('pt-BR').map((filter) => filter.name)).toEqual([
       'Brief',
       'Arquivos de texto',
+      'Receita',
       'Todos os arquivos suportados',
     ]);
+    expect(saveFilters('pt-BR', 'recipe')).toEqual([{ name: 'Receita', extensions: ['recipe'] }]);
     expect(saveFilters('en', 'brief')).toEqual([{ name: 'Brief', extensions: ['brief'] }]);
     expect(saveFilters('en', 'markdown')).toEqual([
       { name: 'Text files', extensions: ['md', 'txt'] },

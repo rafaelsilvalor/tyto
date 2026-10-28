@@ -30,8 +30,11 @@ import {
 /** The app's own files a tab can hold (TYTO-206, TYTO-207, TYTO-277). */
 export type AppFileKind = 'settings' | 'keybindings' | 'snippets';
 
-/** A text file a tab can hold (TYTO-247, ADR 0132). */
-export type TextKind = 'text' | 'markdown';
+/**
+ * A text file a tab can hold (TYTO-247, ADR 0132): plain, Markdown, or a recipe (TYTO-377), which
+ * the notebook runs instead of anything compiling it.
+ */
+export type TextKind = 'text' | 'markdown' | 'recipe';
 
 /** What a document is when it is not a brief, which is `undefined`. */
 export type DocumentKind = AppFileKind | TextKind;
@@ -54,7 +57,11 @@ export const isAppFile = (kind: string | undefined): kind is AppFileKind =>
   kind === 'settings' || kind === 'keybindings' || kind === 'snippets';
 
 export const hasPath = (kind: DocumentKind | undefined): kind is TextKind | undefined =>
-  kind === undefined || kind === 'text' || kind === 'markdown';
+  kind === undefined || kind === 'text' || kind === 'markdown' || kind === 'recipe';
+
+/** A `.recipe` tab (TYTO-377): run on the pause, on save and by Run, its cells drawn under it. */
+export const isRecipe = (kind: DocumentKind | 'preview' | undefined): kind is 'recipe' =>
+  kind === 'recipe';
 
 /**
  * A document a preview shows (TYTO-247): a brief's art, or a Markdown file drawn. What a
@@ -95,7 +102,8 @@ export interface DocumentState {
    * registry. `snippets` for `snippets.json` (TYTO-277): checked in the window against the
    * snippet syntax and the template list. `text` and `markdown` for a `.txt` and a `.md`
    * (TYTO-247, ADR 0132): plain text that nothing checks or compiles, taken from the format main
-   * named when the file came in and kept for the tab's life. Absent for a brief.
+   * named when the file came in and kept for the tab's life. `recipe` for a `.recipe` (TYTO-377),
+   * which the recipe notebook runs in main. Absent for a brief.
    */
   readonly kind?: DocumentKind;
   /**

@@ -101,6 +101,9 @@ describe('the problems panel', () => {
     // TYTO-247, ADR 0132: nothing checks a text file, and the panel says so.
     ['text', 'en', 'Text files are not checked.'],
     ['markdown', 'pt-BR', 'Arquivos de texto não são verificados.'],
+    // TYTO-377: a recipe is checked by its run.
+    ['recipe', 'en', 'Nothing to report about this recipe'],
+    ['recipe', 'pt-BR', 'Nada a relatar sobre esta receita'],
   ] as const)(
     'names the %s document when there is nothing to say (%s)',
     async (kind, locale, text) => {

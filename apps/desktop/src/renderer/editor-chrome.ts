@@ -4,6 +4,7 @@ import {
   PREVIEW_OPEN,
   PREVIEW_OPEN_TO_SIDE,
   PREVIEW_TOGGLE_LOCK,
+  RECIPE_RUN,
   TEXT_COMMANDS,
   isBriefOnlyCommand,
 } from './commands.js';
@@ -72,6 +73,12 @@ const TEXT: EditorChrome = {
   textCommands: true,
 };
 
+/**
+ * A `.recipe` tab (TYTO-377, ADR 0132's dated note): text, as a `.txt` is, with no brief command.
+ * What it adds is its one command, Run recipe, which {@link commandOffered} gates by kind.
+ */
+const RECIPE: EditorChrome = TEXT;
+
 export function editorChromeFor(kind: Kind): EditorChrome {
   switch (kind) {
     case undefined:
@@ -90,6 +97,8 @@ export function editorChromeFor(kind: Kind): EditorChrome {
     case 'text':
     case 'markdown':
       return TEXT;
+    case 'recipe':
+      return RECIPE;
   }
 }
 
@@ -116,6 +125,8 @@ const isMarkdownKind = (kind: Kind): boolean => kind === 'markdown' || kind === 
  * `result.json` of syntax errors into the chosen folder — measured, not read.
  */
 export const commandOffered = (kind: Kind, id: string): boolean => {
+  // Run recipe acts on the recipe in front and on nothing else (TYTO-377).
+  if (id === RECIPE_RUN) return kind === 'recipe';
   // A Markdown file has a preview of its own (TYTO-247): opening it and locking it are offered.
   if (isMarkdownKind(kind) && MARKDOWN_PREVIEW_COMMANDS.has(id)) return true;
   const chrome = editorChromeFor(kind);
@@ -126,29 +137,34 @@ export const commandOffered = (kind: Kind, id: string): boolean => {
 /**
  * The language a tab of this kind is opened in. One place for both ways a tab is born — opened
  * from its command and brought back by the session — so the two cannot disagree. `undefined` is
- * the editor's own language, the brief's. A `.md` tab is `markdown` (TYTO-247) and a `.txt` tab
- * `plain`.
+ * the editor's own language, the brief's. A `.md` tab is `markdown` (TYTO-247), a `.recipe` tab
+ * `recipe` (TYTO-377) and a `.txt` tab `plain`.
  */
 export const languageOf = (kind: Kind): LanguageName | undefined => {
   if (kind === undefined || kind === 'preview' || kind === 'markdown-preview') return undefined;
   if (kind === 'markdown') return 'markdown';
+  if (kind === 'recipe') return 'recipe';
   return isAppFile(kind) ? 'json' : 'plain';
 };
 
 /** One document's own editor extensions: CodeMirror's `Extension`, named through the editor. */
 export type DocumentExtension = ReturnType<typeof jsonAssist>;
 
-/** The app files whose tabs get help of their own, and the help each gets (TYTO-304). */
-export type AppFileAssists = Readonly<Partial<Record<AppFileKind, DocumentExtension>>>;
+/**
+ * The tabs that get help of their own, and the help each gets: the app files' (TYTO-304), and a
+ * recipe's verb completion (TYTO-377).
+ */
+export type AppFileAssists = Readonly<Partial<Record<AppFileKind | 'recipe', DocumentExtension>>>;
 
 /**
  * The extensions a tab of this kind is opened with beside its language — `settings.json`'s
  * suggestions and hover (TYTO-304). Beside {@link languageOf} for its reason: a tab opened by its
  * command and one brought back by the session are built by two call sites, and both ask here. A
- * brief gets none, since the editor's own extensions are its language's help already.
+ * brief gets none, since the editor's own extensions are its language's help already. A recipe
+ * gets its verbs (TYTO-377).
  */
 export const assistOf = (kind: Kind, assists: AppFileAssists): readonly DocumentExtension[] => {
-  if (!isAppFile(kind)) return [];
+  if (!isAppFile(kind) && kind !== 'recipe') return [];
   const assist = assists[kind];
   return assist === undefined ? [] : [assist];
 };

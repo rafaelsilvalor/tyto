@@ -3,6 +3,7 @@ import { describe, expect, it } from 'vitest';
 import {
   type FileIconName,
   type FileIconSubject,
+  TAB_EXTENSIONS,
   documentFormatOf,
   fileIconFor,
   isTextFile,
@@ -81,12 +82,18 @@ describe('fileIconFor', () => {
   });
 });
 
-/** TYTO-247, ADR 0132: only `.txt` and `.md` are text; everything else opens as it did. */
+/**
+ * TYTO-247, ADR 0132: only `.txt` and `.md` are text, and `.recipe` (TYTO-377); everything else
+ * opens as it did.
+ */
 describe('what a file opens as', () => {
   it.each([
     ['notas.md', 'markdown', true],
     ['LEIA.MD', 'markdown', true],
     ['leia.txt', 'text', true],
+    ['semanal.recipe', 'recipe', true],
+    ['SEMANAL.RECIPE', 'recipe', true],
+    ['.recipe', 'brief', false],
     ['capa.brief', 'brief', false],
     ['dados.json', 'brief', false],
     ['tabela.csv', 'brief', false],
@@ -96,5 +103,10 @@ describe('what a file opens as', () => {
   ] as const)('%s opens as %s', (name, format, text) => {
     expect(documentFormatOf(name)).toBe(format);
     expect(isTextFile(name)).toBe(text);
+  });
+
+  it('draws a recipe with the generic file icon, and opens it in a tab', () => {
+    expect(fileIconFor({ name: 'semanal.recipe', kind: 'file' })).toBe('file');
+    expect(TAB_EXTENSIONS).toContain('.recipe');
   });
 });

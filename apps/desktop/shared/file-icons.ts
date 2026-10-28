@@ -115,33 +115,45 @@ export const isPreviewImage = (name: string): boolean =>
   ['png', 'jpg', 'jpeg', 'webp', 'gif', 'svg'].includes(extensionOf(name));
 
 /**
- * What a file opens as in a tab (TYTO-247, ADR 0132): a brief, plain text or Markdown. Main
- * names it from the path's extension at every open; the window never guesses it from a name.
+ * What a file opens as in a tab (TYTO-247, ADR 0132): a brief, plain text, Markdown, or a recipe
+ * (TYTO-377). Main names it from the path's extension at every open; the window never guesses it
+ * from a name.
  */
-export type DocumentFormat = 'brief' | 'text' | 'markdown';
+export type DocumentFormat = 'brief' | 'text' | 'markdown' | 'recipe';
 
-/** The two text formats, and only these two: `.json`, `.csv` and `.yaml` stay out (Rafael). */
-const TEXT_FORMATS: Readonly<Record<string, 'text' | 'markdown'>> = {
+/** A format that is not a brief: a text file of one kind or another. */
+type TextFormat = Exclude<DocumentFormat, 'brief'>;
+
+/**
+ * The text formats, and only these: `.json`, `.csv` and `.yaml` stay out (Rafael). `.recipe` is
+ * the third (TYTO-377): text in a tab, which the recipe notebook runs instead of a compile.
+ */
+const TEXT_FORMATS: Readonly<Record<string, TextFormat>> = {
   txt: 'text',
   md: 'markdown',
+  recipe: 'recipe',
 };
 
 /** The extensions a tab opens, with the dot, as the explorer and the dialogs ask for them. */
-export const TAB_EXTENSIONS = ['.brief', '.txt', '.md'] as const;
+export const TAB_EXTENSIONS = ['.brief', '.txt', '.md', '.recipe'] as const;
 
 /** The text format of a file of this name, or none. Own keys only: `x.constructor` is no text. */
-const textFormatOf = (name: string): 'text' | 'markdown' | undefined => {
+const textFormatOf = (name: string): TextFormat | undefined => {
   const extension = extensionOf(name);
   return Object.prototype.hasOwnProperty.call(TEXT_FORMATS, extension)
     ? TEXT_FORMATS[extension]
     : undefined;
 };
 
-/** Whether a click on a file of this name opens it in a tab as text (TYTO-247): `.txt`, `.md`. */
+/**
+ * Whether a click on a file of this name opens it in a tab as text (TYTO-247): `.txt`, `.md` and
+ * `.recipe` (TYTO-377).
+ */
 export const isTextFile = (name: string): boolean => textFormatOf(name) !== undefined;
 
 /**
- * The format a file of this name opens as: `.txt` is text, `.md` is Markdown, and anything else
+ * The format a file of this name opens as: `.txt` is text, `.md` is Markdown, `.recipe` a recipe,
+ * and anything else
  * a brief — which is what every file the window opened was before TYTO-247, `brief.brief` of a
  * queue task and a save-as with no extension included.
  */

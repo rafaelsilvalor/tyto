@@ -78,13 +78,17 @@ export interface DialogFilter {
 
 /**
  * File ▸ Open's filters, in this order (TYTO-247, ADR 0132): briefs first, which is what the
- * dialog opens on, then text files, then everything a tab opens. "Brief" is the format's name
- * and reads the same in both languages, as it did before.
+ * dialog opens on, then text files, then recipes (TYTO-377), then everything a tab opens. "Brief"
+ * is the format's name and reads the same in both languages, as it did before.
  */
 export const openFilters = (locale: Locale): DialogFilter[] => [
   { name: 'Brief', extensions: ['brief'] },
   { name: translate(locale, 'dialog.files.text'), extensions: ['txt', 'md'] },
-  { name: translate(locale, 'dialog.files.supported'), extensions: ['brief', 'txt', 'md'] },
+  { name: translate(locale, 'dialog.files.recipe'), extensions: ['recipe'] },
+  {
+    name: translate(locale, 'dialog.files.supported'),
+    extensions: ['brief', 'txt', 'md', 'recipe'],
+  },
 ];
 
 /**
@@ -99,6 +103,8 @@ export const saveFilters = (locale: Locale, format: DocumentFormat): DialogFilte
       return [{ name: translate(locale, 'dialog.files.text'), extensions: ['txt', 'md'] }];
     case 'markdown':
       return [{ name: translate(locale, 'dialog.files.text'), extensions: ['md', 'txt'] }];
+    case 'recipe':
+      return [{ name: translate(locale, 'dialog.files.recipe'), extensions: ['recipe'] }];
   }
 };
 

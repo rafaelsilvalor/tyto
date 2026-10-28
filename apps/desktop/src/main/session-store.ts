@@ -30,8 +30,8 @@ const storedPlace = z.object({
 
 const storedTab = z.object({
   // TYTO-247, ADR 0132: `text` and `markdown` are added at the end, so a file written before
-  // them still parses, with the version still 1.
-  kind: z.enum(['brief', 'settings', 'keybindings', 'snippets', 'text', 'markdown']),
+  // them still parses, with the version still 1; `recipe` after them (TYTO-377), the same way.
+  kind: z.enum(['brief', 'settings', 'keybindings', 'snippets', 'text', 'markdown', 'recipe']),
   /**
    * A brief's or a text file's path. Absent for one that is in no file, and for the app's own
    * files, which main knows by name.

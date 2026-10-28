@@ -104,10 +104,13 @@ export const savedHashOf = (text: string): string =>
 
 /**
  * Whether a session tab of this kind is a file main holds by path — a brief or a text file
- * (TYTO-247, ADR 0132) — rather than one of the app's own files, which main knows by name.
+ * (TYTO-247, ADR 0132), a recipe among them (TYTO-377) — rather than one of the app's own files,
+ * which main knows by name.
  */
-export const hasPath = (kind: StoredTab['kind']): kind is 'brief' | 'text' | 'markdown' =>
-  kind === 'brief' || kind === 'text' || kind === 'markdown';
+export const hasPath = (
+  kind: StoredTab['kind'],
+): kind is 'brief' | 'text' | 'markdown' | 'recipe' =>
+  kind === 'brief' || kind === 'text' || kind === 'markdown' || kind === 'recipe';
 
 /** A brief that came back with something to show: its file, or its draft in no file. */
 const isBriefBack = (tab: RestoredTab): boolean =>
