@@ -213,8 +213,31 @@ describe('readBranch', () => {
       }),
     });
     expect(branch.addedChangesets).toEqual([
-      { file: '.changeset/mine.md', packages: ['@tyto/core'], empty: false },
+      {
+        file: '.changeset/mine.md',
+        packages: ['@tyto/core'],
+        empty: false,
+        bumps: { '@tyto/core': 'patch' },
+      },
     ]);
+  });
+
+  it('reads the protocol number on both sides and the package version before the branch', () => {
+    const protocol = (/** @type {number} */ version) =>
+      `export const RPC_PROTOCOL_VERSION = ${version};\n`;
+    const branch = readBranch({
+      base: 'main',
+      head: 'HEAD',
+      git: fakeGit({
+        changed: [],
+        files: {
+          'base:packages/plugin-api/src/isolation/protocol.ts': protocol(8),
+          'HEAD:packages/plugin-api/src/isolation/protocol.ts': protocol(9),
+          'base:packages/plugin-api/package.json': json({ version: '0.4.1' }),
+        },
+      }),
+    });
+    expect(branch.protocol).toEqual({ before: 8, after: 9, version: '0.4.1' });
   });
 
   it('does not count a pending changeset another card left in the folder', () => {
