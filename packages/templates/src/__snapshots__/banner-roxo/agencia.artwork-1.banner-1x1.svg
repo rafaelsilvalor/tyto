@@ -1,0 +1,16 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="600" height="600" viewBox="0 0 600 600">
+  <defs>
+    <style>@font-face{font-family:"CircularXX";font-weight:400;font-style:normal;src:url("tyto-test-font:CircularXX-400-normal")}@font-face{font-family:"CircularXX";font-weight:700;font-style:normal;src:url("tyto-test-font:CircularXX-700-normal")}
+    </style>
+  </defs>
+  <rect width="600" height="600" fill="#ffffff"/>
+  <g id="artwork-1.banner-1x1.0">
+    <image href="tyto-test-asset:assets/bg-banner-1x1.png" width="600" height="600" preserveAspectRatio="xMidYMid slice"/>
+  </g>
+  <g id="artwork-1.banner-1x1.1" transform="matrix(0.1592 0 0 0.1592 184.6835 507)">
+    <path d="M24,0H162.09A24,24,0,0,1,186.09,24V352.79A24,24,0,0,1,162.09,376.79H24A24,24,0,0,1,0,352.79V24A24,24,0,0,1,24,0ZM51.05,120A42,42,0,1,0,135.05,120A42,42,0,1,0,51.05,120Z" fill-rule="evenodd" fill="#4c30a6"/>
+  </g>
+  <g id="artwork-1.banner-1x1.2" transform="matrix(1 0 0 1 30 210)">
+    <text x="270" y="100.8" text-anchor="middle" xml:space="preserve"><tspan font-family="CircularXX" font-size="36" font-weight="400" fill="#5900a6">Agência de Fomento e Vigilância Hidroviária do Vale Alto </tspan><tspan font-family="CircularXX" font-size="36" font-weight="700" fill="#5900a6">(AFVVA)</tspan></text>
+  </g>
+</svg>
