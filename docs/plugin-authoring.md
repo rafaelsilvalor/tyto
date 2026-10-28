@@ -270,6 +270,15 @@ to GitHub, so a `github:` or registry install has not been run against a real pl
 
 ## Develop it in its own repository
 
+**A worked example of everything below is
+[`tyto-template-tabela`](https://github.com/rafaelsilvalor/tyto-template-tabela)** (TYTO-434),
+the house's one-image table moved out of `@tyto/templates` as the code template `tabela`. It has
+the aliases and the scope-only `.npmrc`, a `dist/index.js` that inlines `@tyto/house-style`, the
+kit and core, the manifest's `faces` and `font:CircularXX`, the three kinds of test (the scene's
+rules, both examples through `compileTemplate`, the built bundle through `testPlugin`), and the
+CI that fails when the committed bundle is not what `src/` builds to. `tyto-plugin-jira` is the
+same layout for a plugin that contributes no template.
+
 A plugin in its own repository depends on the contract instead of copying it. Tyto publishes
 seven packages to GitHub Packages (ADR 0149): `@tyto/plugin-api` and `@tyto/template-kit`, which
 are the contract, `@tyto/house-style`, the house's tokens and shared parts (ADR 0151), and
