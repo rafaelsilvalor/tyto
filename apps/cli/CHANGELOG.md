@@ -1,5 +1,18 @@
 # @tyto/cli
 
+## 0.5.1
+
+### Patch Changes
+
+- Updated dependencies [a558c12]
+  - @tyto/plugin-api@0.6.0
+  - @tyto/export-html@0.7.2
+  - @tyto/export-svg@2.0.2
+  - @tyto/google-fonts@0.1.1
+  - @tyto/io@4.0.1
+  - @tyto/pipeline@0.11.1
+  - @tyto/raster@0.2.2
+
 ## 0.5.0
 
 ### Minor Changes
