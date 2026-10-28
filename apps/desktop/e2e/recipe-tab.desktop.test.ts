@@ -76,12 +76,15 @@ const kindText = (): Promise<string> =>
     () => document.querySelector('tyto-status-bar .status-bar__kind')?.textContent?.trim() ?? '',
   );
 
-/** Each cell's line, with the text of the recipe line drawn just above it. */
+/**
+ * Each cell's summary, with the text of the recipe line drawn just above its output. The header
+ * also holds the cell's age and buttons since pull request D, so the summary is read on its own.
+ */
 const cellLines = (): Promise<{ above: string; text: string }[]> =>
   window.evaluate(() =>
     [...document.querySelectorAll('#editor .recipe-cell-status')].map((line) => ({
-      above: line.previousElementSibling?.textContent ?? '',
-      text: line.textContent ?? '',
+      above: line.closest('.cm-cell-output')?.previousElementSibling?.textContent ?? '',
+      text: line.querySelector('.recipe-cell-summary')?.textContent ?? '',
     })),
   );
 

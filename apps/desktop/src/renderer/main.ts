@@ -97,10 +97,11 @@ import { type SettingOutline, settingsAssist } from './settings-assist.js';
 import { readSnippetsText } from './snippets-file.js';
 import {
   type RecipeRunAnswer,
-  cellOutputOf,
+  cellAtOrAbove,
   cellStatuses,
   createRecipeNotebook,
 } from './recipe-notebook.js';
+import { AGE_TICK, type CellViewContext, cellOutputOf, tickAges } from './recipe-cell-view.js';
 import {
   type Diagnostic,
   type SourceRange,
@@ -662,6 +663,11 @@ const recipeNotebook = createRecipeNotebook({
   delay: PREVIEW_DELAY,
 });
 
+// Every age under a recipe's cells, rewritten in place: the elements and their keys stay.
+setInterval(() => {
+  tickAges(document, state.locale, Date.now());
+}, AGE_TICK);
+
 /** A recipe came into a tab, opened or restored: its verbs are read again, and it runs once. */
 function openedRecipe(documentId: string): void {
   refreshRecipeVerbs();
@@ -681,7 +687,20 @@ function showRecipeAnswer(documentId: string, text: string, answer: RecipeRunAns
   ]);
   const target = documentOf(workspace, documentId);
   if (target?.state === undefined || contentOf(target) !== text) return;
-  const effects = setCellOutputs.of(cellStatuses(text, answer, state.locale).map(cellOutputOf));
+  const context: CellViewContext = {
+    locale: state.locale,
+    collapsed: recipeNotebook.collapsedOf(documentId),
+    now: Date.now,
+    actions: {
+      runFrom: (index) => void recipeNotebook.runFrom(documentId, index),
+      fetchAgain: () => void recipeNotebook.fetchAgain(documentId),
+      toggled: (index, collapsed) => {
+        recipeNotebook.setCollapsed(documentId, index, collapsed);
+      },
+    },
+  };
+  const statuses = cellStatuses(text, answer, state.locale);
+  const effects = setCellOutputs.of(statuses.map((status) => cellOutputOf(status, context)));
   const showing = [...shownIn]
     .filter(([, shown]) => shown === documentId)
     .flatMap(([groupId]) => panes.get(groupId) ?? []);
@@ -1478,6 +1497,19 @@ const registry: CommandRegistry = withCommandGate(
       // TYTO-377: Run is the approval, for a folder not trusted and for sources (ADR 0148).
       const front = active();
       if (isRecipe(front.kind)) void recipeNotebook.runNow(front.id, 'explicit');
+    },
+    runRecipeFromCell: () => {
+      // The cell at or above the cursor, by the lines of the answer the tab shows.
+      const front = active();
+      const shown = isRecipe(front.kind) ? recipeNotebook.lastOf(front.id) : undefined;
+      const pane = focusedPane() ?? primaryPaneOf(front.id);
+      if (shown === undefined || pane === undefined) return;
+      const from = cellAtOrAbove(shown.answer, cursorOf(pane.state()).line);
+      if (from !== undefined) void recipeNotebook.runFrom(front.id, from);
+    },
+    runRecipeFresh: () => {
+      const front = active();
+      if (isRecipe(front.kind)) void recipeNotebook.fetchAgain(front.id);
     },
     openDocumentation: () => {
       // TYTO-318. Names nothing: main opens one of its two literals, by the menu's language.
@@ -4335,6 +4367,8 @@ function applyLocale(next: Locale): void {
     paintWorkspaceBanner(elements.workspaceBanner, workspaceShown, next);
   }
   editor?.setSearchPhrases(searchPhrasesFor(state.locale));
+  // A recipe's cells carry the language in their key, so showing them again builds them anew.
+  recipeNotebook.reshow();
   repaint();
   // And three things, since TYTO-124: the application menu is main's and now carries this
   // app's own verbs, so main has to be told which language to draw them in. Fire and forget —

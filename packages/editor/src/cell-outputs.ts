@@ -194,6 +194,14 @@ export function cellOutputs(): Extension {
   return [outputsField, forgetDropped];
 }
 
+/**
+ * Tells the editor holding an output that its height changed — a table folded or unfolded in
+ * place, with no new key — so the lines below it are measured again and not drawn over it.
+ */
+export function remeasureCellOutput(element: HTMLElement): void {
+  EditorView.findFromDOM(element)?.requestMeasure();
+}
+
 /** The outputs as they stand: each key and the line (1-based) it sits under. */
 export function cellOutputsOf(
   state: EditorState,

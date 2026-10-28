@@ -9,6 +9,7 @@ Tudo o que a janela faz é um comando, executado pela barra de comandos com **Ct
 - [Abas e grupos de editores](./tabs-and-groups.md) — abrir, dividir, mover e fechar.
 - [Pasta de trabalho](./workspace-folder.md) — abra a pasta de um projeto e use os templates, imagens e fontes dela.
 - [Arquivos de texto e Markdown](./text-files.md) — abra e edite um `.txt` ou um `.md` ao lado dos seus briefs, com prévia para o Markdown.
+- [Receitas](./recipes.md) — abra um `.recipe` como um caderno, com a tabela de cada passo embaixo dele.
 - [Painéis](./panels.md) — Problemas, a fila local e a prévia.
 - [A barra de comandos e a busca](./command-bar-and-search.md) — executar um comando, procurar texto, ir para um bloco.
 - [Arrumar brief](./format-brief.md) — acertar os espaços de um brief com uma tecla.

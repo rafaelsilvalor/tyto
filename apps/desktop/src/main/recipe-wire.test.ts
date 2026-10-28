@@ -34,6 +34,7 @@ describe('a recipe run on the wire', () => {
           plan: { target: 'sheet Pauta', operations: [], count: 0 },
           diagnostics: [],
           ranAt: '2026-10-27T12:00:00.000Z',
+          source: true,
         },
       ],
       diagnostics: [],
@@ -47,6 +48,7 @@ describe('a recipe run on the wire', () => {
     expect(sent?.rows[3]?.values[3]).toHaveLength(RECIPE_WIRE_LIMITS.text);
     expect(sent?.rows[3]?.values[4]).toBeNull();
     expect(wire.cells[0]?.plan).toEqual({ target: 'sheet Pauta', count: 0 });
+    expect(wire.cells[0]?.source).toBe(true);
     // What the channel's own schema accepts, so main never puts a shape on the wire it refuses.
     expect(() => parseIpc('recipe:run', 'response', { requestId: 1, ...wire })).not.toThrow();
   });

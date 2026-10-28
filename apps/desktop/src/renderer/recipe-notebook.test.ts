@@ -4,7 +4,7 @@ import { describe, expect, it } from 'vitest';
 import {
   type RecipeRunAnswer,
   type RecipeRunRequest,
-  cellOutputOf,
+  cellAtOrAbove,
   cellStatuses,
   createRecipeNotebook,
 } from './recipe-notebook.js';
@@ -103,6 +103,56 @@ describe('when a recipe runs', () => {
     expect(shown.map((each) => each.requestId)).toEqual([2]);
   });
 
+  it('runs from a cell and fetches again as Run, each carrying explicit (TYTO-377)', async () => {
+    const { notebook, asked } = harness();
+    void notebook.runFrom('tab-1', 2);
+    void notebook.fetchAgain('tab-1');
+    void notebook.runNow('tab-1', 'typed', {});
+    await settle();
+
+    expect(asked.map(({ explicit, from, fresh }) => ({ explicit, from, fresh }))).toEqual([
+      { explicit: true, from: 2, fresh: undefined },
+      { explicit: true, from: undefined, fresh: true },
+      { explicit: undefined, from: undefined, fresh: undefined },
+    ]);
+  });
+
+  it('shows every open recipe again with its last answer, and forgets a closed one', async () => {
+    const { notebook, replies, shown, texts } = harness();
+    texts.set('tab-2', 'recipe other');
+    const first = notebook.runNow('tab-1', 'typed');
+    const second = notebook.runNow('tab-2', 'typed');
+    replies[0]?.(answer(1, []));
+    replies[1]?.(answer(2, []));
+    await Promise.all([first, second]);
+    shown.length = 0;
+
+    notebook.reshow();
+    expect(shown).toEqual([
+      { documentId: 'tab-1', text: TEXT, requestId: 1 },
+      { documentId: 'tab-2', text: 'recipe other', requestId: 2 },
+    ]);
+    expect(notebook.lastOf('tab-2')?.answer.requestId).toBe(2);
+
+    notebook.close('tab-2');
+    shown.length = 0;
+    notebook.reshow();
+    expect(shown.map((each) => each.documentId)).toEqual(['tab-1']);
+    expect(notebook.lastOf('tab-2')).toBeUndefined();
+  });
+
+  it('keeps which tables were folded per tab while it is open, and forgets them on close', () => {
+    const { notebook } = harness();
+    notebook.setCollapsed('tab-1', 0, true);
+    notebook.setCollapsed('tab-1', 2, true);
+    notebook.setCollapsed('tab-1', 0, false);
+
+    expect([...notebook.collapsedOf('tab-1')]).toEqual([2]);
+    expect([...notebook.collapsedOf('tab-2')]).toEqual([]);
+    notebook.close('tab-1');
+    expect([...notebook.collapsedOf('tab-1')]).toEqual([]);
+  });
+
   it('drops every answer for a tab that closed, and asks nothing for a tab that is gone', async () => {
     const { notebook, asked, replies, shown, texts } = harness();
     const running = notebook.runNow('tab-1', 'typed');
@@ -114,6 +164,24 @@ describe('when a recipe runs', () => {
 
     expect(shown).toEqual([]);
     expect(asked).toHaveLength(1);
+  });
+});
+
+describe('the cell the cursor is in', () => {
+  const at = (index: number, line: number): Cell => ({
+    index,
+    line,
+    status: 'ok',
+    diagnostics: [],
+  });
+  const cells = answer(1, [at(0, 3), at(1, 4), at(2, 7)]);
+
+  it('is the nearest cell at or above the line, and the first above them all', () => {
+    expect(cellAtOrAbove(cells, 4)).toBe(1);
+    expect(cellAtOrAbove(cells, 6)).toBe(1);
+    expect(cellAtOrAbove(cells, 9)).toBe(2);
+    expect(cellAtOrAbove(cells, 1)).toBe(0);
+    expect(cellAtOrAbove(answer(1, []), 4)).toBeUndefined();
   });
 });
 
@@ -166,17 +234,5 @@ describe('the line under each cell', () => {
     expect(said({ plan: { target: 'sheet', count: 3 } })?.text).toBe('Plan: 3 to write to sheet');
     // A cell that answered neither a table nor a plan has no line.
     expect(said({})).toBeUndefined();
-  });
-
-  it('is one muted element, kept by a key that changes with its words', () => {
-    const [status] = cellStatuses(TEXT, answer(1, [cell({ status: 'failed' })]), 'en');
-    if (status === undefined) throw new Error('no status');
-    const output = cellOutputOf(status);
-    const element = output.render();
-
-    expect(element.className).toBe('recipe-cell-status');
-    expect(element.textContent).toBe('Failed: see Problems');
-    expect(element.dataset['failed']).toBe('');
-    expect(output.key).not.toBe(cellOutputOf({ ...status, text: 'other' }).key);
   });
 });

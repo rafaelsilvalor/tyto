@@ -384,6 +384,16 @@ describe('a recipe a run includes', () => {
     expect(calls.pull).toBe(0);
   });
 
+  // The notebook offers Fetch again on these cells only (TYTO-377, pull request D).
+  it('marks the cells that fetch, a source and a run holding one, and no other', async () => {
+    await write('tasks', ['recipe tasks', 'acme.pull']);
+    const { run } = harness();
+
+    const outer = ['recipe outer', 'run tasks', 'acme.pull', 'acme.tag', ''].join('\n');
+    const answer = await run(outer, { saved: true });
+    expect(answer.cells.map((cell) => cell.source)).toEqual([true, true, undefined]);
+  });
+
   it('ends on recipes that include each other, and the run reports the loop', async () => {
     await write('ping', ['recipe ping', 'run pong']);
     await write('pong', ['recipe pong', 'run ping']);

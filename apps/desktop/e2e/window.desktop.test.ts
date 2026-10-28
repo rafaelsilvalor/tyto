@@ -837,6 +837,19 @@ describe('switching the language', () => {
     'recipe.cell.stale',
     'recipe.cell.held.source',
     'recipe.cell.held.restricted',
+    // TYTO-377, the notebook's table: drawn only under a recipe's cells and in the command bar
+    // with a recipe in front; `recipe-cell-view.test.ts` paints them in both languages, and
+    // `recipe-notebook.desktop.test.ts` reads the table and its buttons in the real window.
+    'command.recipe.runFromCell',
+    'command.recipe.runFresh',
+    'recipe.cell.ran',
+    'recipe.cell.fetched',
+    'recipe.cell.more',
+    'recipe.cell.more.one',
+    'recipe.cell.runFrom',
+    'recipe.cell.fetchAgain',
+    'recipe.cell.collapse',
+    'recipe.cell.expand',
     'status.problems.new',
     // TYTO-248: what the footer used to say is Help > About now, a box main shows — menu
     // chrome, like `menu.revealLogs`. `src/main/menu.test.ts` holds the five to `aboutText`, and

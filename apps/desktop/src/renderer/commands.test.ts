@@ -48,6 +48,9 @@ import {
   PREVIEW_ZOOM_FIT,
   PREVIEW_ZOOM_IN,
   PREVIEW_ZOOM_OUT,
+  RECIPE_RUN,
+  RECIPE_RUN_FRESH,
+  RECIPE_RUN_FROM_CELL,
   TEMPLATES_CHOOSE_FOLDER,
   TEMPLATES_CLEAR_FOLDER,
   WORKSPACE_CLOSE_FOLDER,
@@ -124,6 +127,8 @@ const actions = () =>
     zoomWindow: vi.fn<(step: 'in' | 'out' | 'reset') => void>(),
     openDocumentation: vi.fn<() => void>(),
     runRecipe: vi.fn<() => void>(),
+    runRecipeFromCell: vi.fn<() => void>(),
+    runRecipeFresh: vi.fn<() => void>(),
   }) satisfies DesktopActions;
 
 /**
@@ -260,6 +265,23 @@ describe('the ids the window registers', () => {
     // TYTO-347.
     expect(registry.run(WORKSPACE_SHOW_PROJECT, NO_VIEW)).toBe(true);
     expect(spies.showProject).toHaveBeenCalledOnce();
+  });
+
+  it('runs the three recipe commands, each to its own action, with no keystroke (TYTO-377)', () => {
+    const spies = actions();
+    const registry = createDesktopRegistry(spies);
+
+    expect(registry.run(RECIPE_RUN_FROM_CELL, NO_VIEW)).toBe(true);
+    expect(registry.run(RECIPE_RUN_FRESH, NO_VIEW)).toBe(true);
+    expect(spies.runRecipeFromCell).toHaveBeenCalledOnce();
+    expect(spies.runRecipeFresh).toHaveBeenCalledOnce();
+    expect(spies.runRecipe).not.toHaveBeenCalled();
+    expect(COMMAND_LABELS[RECIPE_RUN_FROM_CELL]).toBe('command.recipe.runFromCell');
+    expect(COMMAND_LABELS[RECIPE_RUN_FRESH]).toBe('command.recipe.runFresh');
+    const bound = bindingsOf(keymapSetFor(false), 'linux');
+    for (const id of [RECIPE_RUN, RECIPE_RUN_FROM_CELL, RECIPE_RUN_FRESH]) {
+      expect(bound[id], id).toBeUndefined();
+    }
   });
 
   it('runs the two template mode commands, each to its own action (TYTO-44)', () => {

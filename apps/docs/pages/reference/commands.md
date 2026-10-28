@@ -2,7 +2,7 @@
 
 # Commands
 
-Everything the window can be told to do, by title as the command bar shows it: 76. Open the bar with **`Ctrl+k` / `⌘k`** and type part of a title. The id is what `keybindings.json` names to put a command on a key.
+Everything the window can be told to do, by title as the command bar shows it: 78. Open the bar with **`Ctrl+k` / `⌘k`** and type part of a title. The id is what `keybindings.json` names to put a command on a key.
 
 The window adds more while it runs, which this list cannot show: a toggle for each panel, including a plugin's, an entry for each recently opened file, and one for each export preset of the open folder, `export.preset:<name>`.
 
@@ -50,6 +50,8 @@ The window adds more while it runs, which this list cannot show: a toggle for ea
 | Reset zoom | `window.zoomReset` | `Ctrl+0` | `⌘0` |
 | Documentation | `help.openDocumentation` |  |  |
 | Run recipe | `recipe.run` |  |  |
+| Run recipe from this cell | `recipe.runFromCell` |  |  |
+| Run recipe, fetching again | `recipe.runFresh` |  |  |
 | Preferences: Color Theme | `theme.pick` |  |  |
 | Choose template folder… | `templates.chooseFolder` |  |  |
 | Back to the built-in templates | `templates.clearFolder` |  |  |

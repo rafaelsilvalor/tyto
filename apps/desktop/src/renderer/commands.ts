@@ -122,6 +122,13 @@ export const HELP_OPEN_DOCUMENTATION = 'help.openDocumentation';
  */
 export const RECIPE_RUN = 'recipe.run';
 /**
+ * TYTO-377 (ADR 0148). Run from here as a command: from the cell at or above the cursor down, and
+ * Run recipe again fetching every source anew. Both are Run, the person's approval; offered only
+ * with a recipe in front.
+ */
+export const RECIPE_RUN_FROM_CELL = 'recipe.runFromCell';
+export const RECIPE_RUN_FRESH = 'recipe.runFresh';
+/**
  * TYTO-208. "Preferences: Color Theme": the themes in the bar, previewed as the selection
  * moves, written to the `theme` setting on Enter. No key by default (ADR 0074): a person
  * binds one in `keybindings.json` if they switch often.
@@ -302,6 +309,8 @@ export const COMMAND_LABELS: Readonly<Record<string, CatalogueKey>> = {
   [WINDOW_ZOOM_RESET]: 'command.window.zoomReset',
   [HELP_OPEN_DOCUMENTATION]: 'command.help.openDocumentation',
   [RECIPE_RUN]: 'command.recipe.run',
+  [RECIPE_RUN_FROM_CELL]: 'command.recipe.runFromCell',
+  [RECIPE_RUN_FRESH]: 'command.recipe.runFresh',
   [THEME_PICK]: 'command.theme.pick',
   [TEMPLATES_CHOOSE_FOLDER]: 'command.templates.chooseFolder',
   [TEMPLATES_CLEAR_FOLDER]: 'command.templates.clearFolder',
@@ -408,6 +417,10 @@ export interface DesktopActions {
   openDocumentation(): void;
   /** TYTO-377. Runs the recipe in front with `explicit`; the run itself is main's. */
   runRecipe(): void;
+  /** TYTO-377. Runs the recipe in front from the cursor's cell down, with `explicit`. */
+  runRecipeFromCell(): void;
+  /** TYTO-377. Runs the recipe in front with `fresh` and `explicit`: every source fetches. */
+  runRecipeFresh(): void;
   /** TYTO-208. Lists the colour themes in the bar; the list and the choice are main's. */
   pickTheme(): void;
   /**
@@ -555,6 +568,12 @@ export function createDesktopRegistry(actions: DesktopActions): CommandRegistry 
   });
   add(RECIPE_RUN, () => {
     actions.runRecipe();
+  });
+  add(RECIPE_RUN_FROM_CELL, () => {
+    actions.runRecipeFromCell();
+  });
+  add(RECIPE_RUN_FRESH, () => {
+    actions.runRecipeFresh();
   });
   add(THEME_PICK, () => {
     actions.pickTheme();

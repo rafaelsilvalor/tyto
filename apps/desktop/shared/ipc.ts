@@ -164,6 +164,8 @@ const recipeCell = z.object({
   ranAt: z.string().optional(),
   /** The oldest `fetchedAt` among the table's rows: how old the data it shows is. */
   oldestFetchedAt: z.string().optional(),
+  /** The step fetches, a source or a `run` holding one: the notebook offers Fetch again on it. */
+  source: z.boolean().optional(),
 });
 
 /** Whether a source is trusted; `revoked` is trust taken back while it is open (ADR 0111). */

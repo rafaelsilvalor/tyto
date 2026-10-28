@@ -879,10 +879,77 @@ tyto-preview-pane[hidden] {
    the cell's result and not as a line of the recipe. A failure is muted too (Rafael): its
    marker and its Problems row are what draw the eye. */
 .recipe-cell-status {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--tyto-space-2) var(--tyto-space-5);
   padding: 0 0 var(--tyto-space-1) var(--tyto-space-2);
   color: var(--tyto-text-muted);
   font-size: var(--tyto-text-sm);
   user-select: none;
+}
+
+/* The header's toggle and buttons (TYTO-377, pull request D): always shown, small and quiet, so
+   the table stays what the eye lands on. */
+.recipe-cell__toggle,
+.recipe-cell__action {
+  padding: 0 var(--tyto-space-1);
+  border: var(--tyto-hairline-width) solid transparent;
+  border-radius: var(--tyto-radius-sm);
+  background: none;
+  color: inherit;
+  font: inherit;
+  cursor: pointer;
+}
+
+.recipe-cell__action {
+  border-color: var(--tyto-border);
+  padding: 0 var(--tyto-space-3);
+}
+
+.recipe-cell__toggle:hover,
+.recipe-cell__action:hover {
+  color: var(--tyto-text);
+}
+
+/* A recipe's table under its cell: up to 200 columns, so it scrolls sideways inside the cell,
+   and a long value is cut with an ellipsis, its whole text in the title. */
+.recipe-cell__body {
+  padding: 0 0 var(--tyto-space-2) var(--tyto-space-2);
+  font-size: var(--tyto-text-sm);
+}
+
+.recipe-cell--collapsed .recipe-cell__body {
+  display: none;
+}
+
+.recipe-cell__scroll {
+  overflow-x: auto;
+}
+
+.recipe-cell__table {
+  border-collapse: collapse;
+}
+
+.recipe-cell__table th,
+.recipe-cell__table td {
+  max-width: 24ch;
+  padding: var(--tyto-space-1) var(--tyto-space-4);
+  overflow: hidden;
+  border: var(--tyto-hairline-width) solid var(--tyto-border);
+  text-align: left;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.recipe-cell__table th {
+  color: var(--tyto-text-muted);
+  font-weight: var(--tyto-weight-strong);
+}
+
+.recipe-cell__more {
+  padding-top: var(--tyto-space-1);
+  color: var(--tyto-text-muted);
 }
 
 /* The bar is a header row (TYTO-288): the formats take what the toggle, zoom and lock leave. */
