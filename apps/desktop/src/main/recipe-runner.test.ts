@@ -47,6 +47,8 @@ interface Calls {
   pull: number;
   tag: number;
   sections: unknown[];
+  /** What each pull's request said of `refresh`: `absent` when it carried no key. */
+  refreshes: unknown[];
   /** When set, the next pull waits for it. */
   gate?: Promise<void> | undefined;
 }
@@ -57,9 +59,10 @@ function acme(calls: Calls): RecipeContributions {
     id: 'acme.pull',
     kind: 'source',
     arguments: [{ name: 'team', type: 'text' }],
-    page: async ({ section }) => {
+    page: async (request) => {
       calls.pull += 1;
-      calls.sections.push(section);
+      calls.sections.push(request.section);
+      calls.refreshes.push('refresh' in request ? request.refresh : 'absent');
       const gate = calls.gate;
       calls.gate = undefined;
       if (gate !== undefined) await gate;
@@ -116,7 +119,7 @@ function harness(
   place: RecipePlace = { trust: 'trusted', folder: '' },
   section: unknown = { site: 'https://acme.example' },
 ) {
-  const calls: Calls = { pull: 0, tag: 0, sections: [] };
+  const calls: Calls = { pull: 0, tag: 0, sections: [], refreshes: [] };
   const runner = createRecipeRunner({
     contributions: acme(calls),
     placeOf: () => Promise.resolve(place.folder === '' ? { ...place, folder: workspace } : place),
@@ -229,6 +232,16 @@ describe('running a recipe cell by cell', () => {
 
     await run(RECIPE, { fresh: true, saved: true });
     expect(calls).toMatchObject({ pull: 2, tag: 3 });
+  });
+
+  // The seam of ADR 0148 decision 10, through the default registries rather than a test's own:
+  // a run asked to start fresh is the one that tells the source to skip its cache.
+  it('tells the source to skip its cache only on a run asked to start fresh', async () => {
+    const { run, calls } = harness();
+    await run(RECIPE, { saved: true });
+    await run(RECIPE, { fresh: true, saved: true });
+    await run(RECIPE, { from: 0, explicit: true });
+    expect(calls.refreshes).toEqual(['absent', true, 'absent']);
   });
 
   it('forgets a document when its tab closes, and keeps documents apart', async () => {
@@ -370,7 +383,7 @@ describe('what a run may read beside it', () => {
         return Promise.resolve(ok(undefined));
       },
     };
-    const calls: Calls = { pull: 0, tag: 0, sections: [] };
+    const calls: Calls = { pull: 0, tag: 0, sections: [], refreshes: [] };
     const runner = createRecipeRunner({
       contributions: acme(calls),
       placeOf: () => Promise.resolve({ trust: 'restricted', folder: workspace }),

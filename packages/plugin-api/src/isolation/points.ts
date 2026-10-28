@@ -528,6 +528,9 @@ export const ISOLATED_POINTS: Readonly<Partial<Record<ContributionPoint, PointSp
           z.strictObject({
             arguments: argumentValuesSchema,
             cursor: z.string().optional(),
+            // A run without cache (ADR 0148). The host sends only `true`, but the field is typed
+            // `boolean` for the plugin, so a host that spells an ordinary run `false` still passes.
+            refresh: z.boolean().optional(),
             ...verbSection,
           }),
         ]),

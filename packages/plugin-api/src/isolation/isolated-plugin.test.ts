@@ -28,7 +28,7 @@ import type {
 } from '../contributions.js';
 import { directiveResolverOf } from '../directives.js';
 import { resolveSettings } from '../configuration.js';
-import { recipeRegistriesOf } from '../recipes.js';
+import { type RecipeRegistryOptions, recipeRegistriesOf } from '../recipes.js';
 import {
   type Disposable,
   type InProcessHost,
@@ -403,9 +403,9 @@ describe('what an isolated plugin cannot do', () => {
     );
   });
 
-  // A bootstrap left behind by an upgrade: 7 is the number before a recipe verb call carried
-  // the plugin's project section (ADR 0147), and it is refused by name rather than by a schema
-  // complaint at the first call that carries one.
+  // A bootstrap left behind by an upgrade: 8 is the number before a source's page call carried
+  // `refresh` (ADR 0148), and it is refused by name rather than by a schema complaint at the
+  // first run without cache.
   it('speaks another protocol', async () => {
     const pair = channelPair(() => undefined);
     const connecting = connectIsolatedPlugin({
@@ -417,7 +417,7 @@ describe('what an isolated plugin cannot do', () => {
     pair.inject({ type: 'hello', protocol: RPC_PROTOCOL_VERSION - 1, sandbox: CONFINED });
     const connected = await connecting;
     expect(connected.ok ? '' : connected.error[0]?.message).toBe(
-      "Plugin 'texto' failed to activate: its process speaks protocol 7 and this host speaks 8.",
+      "Plugin 'texto' failed to activate: its process speaks protocol 8 and this host speaks 9.",
     );
   });
 
@@ -1653,6 +1653,15 @@ describe('isolated recipe verbs and derivations (TYTO-376, ADR 0135)', () => {
     activate: (host: PluginHost) => void,
     ...lines: string[]
   ) {
+    return recipeUnder({ sectionOf: (plugin) => sections[plugin] }, activate, ...lines);
+  }
+
+  /** As {@link recipeIn}, with the registries built from `options`. */
+  async function recipeUnder(
+    options: RecipeRegistryOptions,
+    activate: (host: PluginHost) => void,
+    ...lines: string[]
+  ) {
     const { connected } = await isolate(activate, {
       contributes: ['recipe-verb', 'recipe-derivation'],
       namespace: 'demo',
@@ -1666,7 +1675,7 @@ describe('isolated recipe verbs and derivations (TYTO-376, ADR 0135)', () => {
     const parsed = parseRecipe(['recipe test', ...lines].join('\n'));
     if (!parsed.ok) throw new Error('the recipe must parse');
     const result = await runRecipe(parsed.value, {
-      ...recipeRegistriesOf(host.registry, { sectionOf: (plugin) => sections[plugin] }),
+      ...recipeRegistriesOf(host.registry, options),
       resolveRecipe: () => Promise.resolve({ ok: false, error: [] }),
     });
     if (!result.ok) throw new Error('the run must start');
@@ -1810,6 +1819,43 @@ describe('isolated recipe verbs and derivations (TYTO-376, ADR 0135)', () => {
       ['transform', false, undefined],
       ['plan', false, undefined],
     ]);
+  });
+
+  /** Three pages, each writing down what its request said of `refresh`. */
+  const refreshHeard = (heard: unknown[]) => (host: PluginHost) =>
+    host.registerRecipeVerb({
+      id: 'demo.pull',
+      kind: 'source',
+      arguments: [],
+      page: (request) => {
+        heard.push('refresh' in request ? request.refresh : 'absent');
+        const page = request.cursor === undefined ? 1 : Number(request.cursor);
+        return ok({
+          table: { columns: COLUMNS, rows: [rowOf(page)] },
+          ...(page < 3 ? { cursor: String(page + 1) } : {}),
+        });
+      },
+    });
+
+  it('hands a source refresh on every page of a run without cache (ADR 0148)', async () => {
+    const heard: unknown[] = [];
+    const { problem, table } = await recipeUnder(
+      { refresh: true },
+      refreshHeard(heard),
+      'demo.pull',
+    );
+    expect(problem).toBeUndefined();
+    expect(table?.rows).toHaveLength(3);
+    expect(heard).toEqual([true, true, true]);
+  });
+
+  it('hands no refresh key at all on an ordinary run', async () => {
+    const heard: unknown[] = [];
+    for (const options of [{}, { refresh: false }]) {
+      const { problem } = await recipeUnder(options, refreshHeard(heard), 'demo.pull');
+      expect(problem).toBeUndefined();
+    }
+    expect(heard).toEqual(['absent', 'absent', 'absent', 'absent', 'absent', 'absent']);
   });
 
   it('refuses a malformed table: a value outside the columns, and a row with no provenance', async () => {

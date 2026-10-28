@@ -528,7 +528,9 @@ set the variable instead.
 `host.cache.put(key, bytes)` stores and answers `{ storedAt }`, `host.cache.get(key)` answers
 `{ bytes, storedAt }` or `undefined`, `host.cache.list(prefix)` names what is there, and
 `host.cache.delete(key)` forgets. `storedAt` is the host's clock, so it is the age to show a
-person. A key is at most 1 KiB and an entry at most 32 MiB. **A file in the person's project is
+person. A key is at most 1 KiB and an entry at most 32 MiB. A recipe source that caches reads
+`refresh` on its `page` request: `true` when the person asked to run again without cache, and
+then it fetches instead of answering from `host.cache` (ADR 0148). **A file in the person's project is
 `host.workspace.read(path)` and `host.workspace.write(path, bytes)`**, relative to the open folder,
 behind `workspace:read` and `workspace:write`; a restricted folder answers
 `E_WORKSPACE_FILE_RESTRICTED`, and `tyto watch` has no workspace at all.

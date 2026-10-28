@@ -62,6 +62,12 @@ export interface PageRequest extends VerbRequest {
   readonly arguments: ArgumentValues;
   /** Absent for the first page. */
   readonly cursor?: string;
+  /**
+   * `true` when the person asked to run again without cache (ADR 0148): the source skips its
+   * private cache (ADR 0138) and fetches. Absent on an ordinary run, never `false`, so a source
+   * that does not cache can ignore it. On every page of that run, not only the first.
+   */
+  readonly refresh?: boolean;
 }
 
 export interface TransformRequest extends VerbRequest {
@@ -228,6 +234,11 @@ export interface RecipeRegistryOptions {
    * from the folder the recipe belongs to.
    */
   readonly sectionOf?: (plugin: string) => unknown;
+  /**
+   * The run asked for fresh data, so every source's `page` is handed `refresh: true` and skips
+   * its private cache (ADR 0148). Fixed for the registries' life: a caller builds them per run.
+   */
+  readonly refresh?: boolean;
   readonly limits?: PageLimits;
   readonly planLimits?: PlanLimits;
 }
@@ -246,6 +257,7 @@ export function recipeRegistriesOf(
   const limits = options.limits ?? PAGE_LIMITS;
   const planLimits = options.planLimits ?? PLAN_LIMITS;
   const sectionOf = options.sectionOf ?? (() => undefined);
+  const refresh = options.refresh === true;
   const ownVerbs = createVerbRegistry();
   const ownDerivations = createDerivationRegistry();
   const contributedVerb = (name: string) =>
@@ -262,7 +274,12 @@ export function recipeRegistriesOf(
         const contributed = contributedVerb(name);
         return contributed === undefined
           ? undefined
-          : verbOf(contributed.verb, () => sectionOf(contributed.plugin), limits, planLimits);
+          : verbOf(contributed.verb, {
+              sectionOfOwner: () => sectionOf(contributed.plugin),
+              refresh,
+              limits,
+              planLimits,
+            });
       },
       names: () => namesOf(ownVerbs.names(), contributions.recipeVerbs()),
     },
@@ -291,16 +308,19 @@ function withSection(section: unknown): VerbRequest {
   return section === undefined ? {} : { section };
 }
 
+interface VerbBinding {
+  readonly sectionOfOwner: () => unknown;
+  readonly refresh: boolean;
+  readonly limits: PageLimits;
+  readonly planLimits: PlanLimits;
+}
+
 /**
  * `sectionOfOwner` is bound to the plugin that registered the verb, so the verb is handed its
  * own plugin's section and no other: this is the per-plugin filter of ADR 0147.
  */
-function verbOf(
-  contribution: RecipeVerbContribution,
-  sectionOfOwner: () => unknown,
-  limits: PageLimits,
-  planLimits: PlanLimits,
-): Verb {
+function verbOf(contribution: RecipeVerbContribution, binding: VerbBinding): Verb {
+  const { sectionOfOwner, refresh, limits, planLimits } = binding;
   return {
     kind: contribution.kind,
     async run(context) {
@@ -315,6 +335,9 @@ function verbOf(
               arguments: values.value,
               ...(cursor === undefined ? {} : { cursor }),
               ...withSection(sectionOfOwner()),
+              // Only `true` rides, as a section only when there is one: an ordinary run hands
+              // no key, which is what every source written before the field already reads.
+              ...(refresh ? { refresh: true } : {}),
             }),
           limits,
         );

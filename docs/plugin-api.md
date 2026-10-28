@@ -396,6 +396,7 @@ interface RecipeVerbContribution {
     arguments;
     cursor?: string;
     section?: unknown; // this plugin's project section (ADR 0147)
+    refresh?: boolean; // true on a run without cache: skip your private cache (ADR 0148)
   }): Result<{ table; cursor?: string; truncated?: boolean }>;
   transform?(request: { arguments; table; section? }): Result<Table>;
   writes?: string[]; // an action's or a sink's: a subset of the manifest's 'writes'
@@ -646,7 +647,7 @@ Six optional ports on `HostCapabilities` answer them: `cacheGet`, `cachePut`, `c
 
 ```
 host (CLI process)                               guest (plugin's process)
-  connectIsolatedPlugin ◀── hello {protocol: 8, sandbox} ── runGuest
+  connectIsolatedPlugin ◀── hello {protocol: 9, sandbox} ── runGuest
                            canary denied? else E_PLUGIN_SANDBOX
                         ── activate {config} ──▶   plugin.activate(guestHost)
                         ◀── activated {registrations: data + {$call: n}}

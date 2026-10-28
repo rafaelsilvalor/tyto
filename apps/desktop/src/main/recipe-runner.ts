@@ -68,9 +68,8 @@ export interface RecipePlace {
 }
 
 /**
- * What a run asks of the plugins' verbs. `refresh` is the seam for TYTO-377's last pull
- * request, where a run that asked for fresh data tells a source to skip its cache; the
- * default registries do not read it yet.
+ * What a run asks of the plugins' verbs. `refresh` is a run that asked for fresh data: every
+ * source's `page` call carries it, so the source skips its private cache (ADR 0148).
  */
 export interface RecipeRegistryRequest {
   readonly sectionOf: (plugin: string) => unknown;
@@ -166,7 +165,10 @@ export function createRecipeRunner(options: RecipeRunnerOptions): RecipeRunner {
   const registriesOf =
     options.registries ??
     ((request: RecipeRegistryRequest) =>
-      recipeRegistriesOf(options.contributions, { sectionOf: request.sectionOf }));
+      recipeRegistriesOf(options.contributions, {
+        sectionOf: request.sectionOf,
+        refresh: request.refresh,
+      }));
   const stateOf = options.state ?? recipeStateStore;
   const dataOf = options.data ?? workspaceDataResolver;
 
