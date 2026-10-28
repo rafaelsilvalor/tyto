@@ -91,6 +91,17 @@ describe('stagedManifest', () => {
     expect(staged).not.toHaveProperty('devDependencies');
   });
 
+  it("keeps every subpath of the package's exports, the test harness's included", () => {
+    const { exports, files } = manifestOf('packages/plugin-api');
+    const staged = stagedManifest({ ...packed, exports, files });
+    expect(staged.exports).toEqual(exports);
+    expect(staged.exports['./testing']).toEqual({
+      types: './dist/testing.d.ts',
+      import: './dist/testing.js',
+    });
+    expect(staged.files).toEqual(['dist']);
+  });
+
   it('refuses a dependency on a workspace package that is not published', () => {
     expect(() => stagedManifest({ ...packed, dependencies: { '@tyto/editor': '0.9.0' } })).toThrow(
       /not published/u,
