@@ -538,6 +538,16 @@ export const diagnosticCodes = {
     fatal: false,
     fatality: 'Something loads; it is the project entry rather than the machine one.',
   },
+  W_PLUGIN_FILE_TEMPLATE_SHADOWED: {
+    severity: 'warning',
+    summary:
+      'A plugin file configures a template from a plugin, and another source wins that name, so the configurations do not apply.',
+    template:
+      "'{file}' configures template '{template}' from plugin '{plugin}', but the one in '{used}' is used; its configurations and aliases do not apply to it.",
+    spec: 'docs/adr/0151-plugin-files-install-and-configure-templates.md',
+    fatal: false,
+    fatality: 'The template that won the name renders with its own defaults.',
+  },
   W_PLUGIN_FILE_REPLACES_INSTALLED: {
     severity: 'warning',
     summary:

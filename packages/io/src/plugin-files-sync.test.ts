@@ -154,3 +154,33 @@ describe('the two folders', () => {
     expect(synced.diagnostics.map((item) => item.code)).toContain('E_PLUGIN_NAME_TAKEN');
   });
 });
+
+describe('the configured templates', () => {
+  it('names the plugin that fetched each one, and leaves out one nothing fetched (TYTO-462)', async () => {
+    const git = await repository('tabelas-pack');
+    const missing = pathToFileURL(join(root, 'repositories', 'not-there')).href;
+    const folder = machinePluginFiles(home);
+    await mkdir(folder, { recursive: true });
+    await writeFile(
+      join(folder, 'tabelas.yaml'),
+      [
+        'version: 1',
+        'templates:',
+        '  tabela:',
+        `    source: { git: '${git}', ref: 'main' }`,
+        '    configurations: { roxo: { values: {} } }',
+        '  aviso:',
+        `    source: { git: '${missing}', ref: 'main' }`,
+        '    configurations: { claro: { values: {} } }',
+        '',
+      ].join('\n'),
+      'utf8',
+    );
+
+    const synced = await syncPluginFiles(options());
+
+    expect(synced.configured.machine.map(({ template, plugin }) => ({ template, plugin }))).toEqual(
+      [{ template: 'tabela', plugin: 'tabelas-pack' }],
+    );
+  });
+});

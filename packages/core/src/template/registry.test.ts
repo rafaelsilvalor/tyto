@@ -219,6 +219,19 @@ describe('a search path of several roots (ADR 0020)', () => {
     expect(result.value.directoryOf('promo')).toBe('pack/promo');
   });
 
+  it('answers the origin of the root that won a name, and none for a root given none', async () => {
+    // What a plugin file's configuration binds by (TYTO-462): the label of the winner's root,
+    // not of the shadowed one.
+    const result = await loadTemplateRegistry(twoRoots(), [
+      'project',
+      { directory: 'pack', origin: 'promo-pack' },
+    ]);
+    if (!result.ok) throw new Error('expected a registry');
+
+    expect(result.value.originOf?.('promo')).toBeUndefined();
+    expect(result.value.originOf?.('so-do-pack')).toBe('promo-pack');
+  });
+
   it('unions what does not collide', async () => {
     const result = await loadTemplateRegistry(twoRoots(), ['project', 'pack']);
     if (!result.ok) throw new Error('expected a registry');

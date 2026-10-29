@@ -339,6 +339,12 @@ plugin files, not here (ADR 0127 decision 4).
   `W_CONFIGURATION_BRIEF_INVALID`, `W_EDITOR_RULE_LOOSER` and `W_SLOT_OVER_CONFIGURED_LIMIT`,
   and that a slot that repeats takes no default. See "What a configuration sets for the brief"
   in `docs/plugin-authoring.md`. The decision above is unchanged.
+- **2026-10-29, TYTO-462.** A template entry's configurations belong to the template its
+  `source` fetched, not to whichever template wins the name. When a folder template, the
+  built-in pack or another plugin wins it (decision 7's `W_TEMPLATE_SHADOWED` row), the entry
+  configures nothing: its aliases do not load, the bare name renders the winner with the
+  winner's own defaults, and `W_PLUGIN_FILE_TEMPLATE_SHADOWED` says so at the entry's name.
+  The decision above is unchanged.
 
 ## Rejected
 

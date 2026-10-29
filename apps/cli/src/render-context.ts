@@ -249,7 +249,8 @@ export async function loadRenderContext(
 /**
  * A pack fetched through plugin files offers the templates the files name and no other
  * (ADR 0151 decision 2); a `plugin:` entry names the whole plugin, and so does an installed
- * plugin, which no file names.
+ * plugin, which no file names. Each root is labelled with its plugin, so a file's
+ * configuration reaches the template that plugin supplies and no other (TYTO-462).
  */
 function fetchedRoot(
   directory: string,
@@ -258,9 +259,10 @@ function fetchedRoot(
 ): TemplateRoot {
   const plugin = installed.owners.get(directory);
   const copy = pluginFiles?.copies.find((item) => item.plugin === plugin);
+  const origin = plugin === undefined ? {} : { origin: plugin };
   return copy === undefined || copy.wholePlugin
-    ? { directory }
-    : { directory, only: new Set(copy.templates) };
+    ? { directory, ...origin }
+    : { directory, only: new Set(copy.templates), ...origin };
 }
 
 /** The built-in pack's catalogue sits beside its templates, where the window reads it. */

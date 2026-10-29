@@ -155,9 +155,15 @@ export async function createProjectSources({
     const stillInstalled = installed.filter(
       (directory) => !replaced.has(installedOwners.get(directory) ?? ''),
     );
+    // Labelled with the plugin, which a plugin file's configuration binds to (TYTO-462).
     const fetchedRoots: TemplateRoot[] = (fetched?.packs.directories ?? []).map((directory) => {
       const only = fetched?.only.get(directory);
-      return only === undefined ? { directory } : { directory, only };
+      const plugin = fetched?.packs.owners.get(directory);
+      return {
+        directory,
+        ...(only === undefined ? {} : { only }),
+        ...(plugin === undefined ? {} : { origin: plugin }),
+      };
     });
     const roots = [
       ...(chosen === undefined ? [] : [chosen]),

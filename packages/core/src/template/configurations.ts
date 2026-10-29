@@ -69,6 +69,14 @@ export interface ConfiguredTemplate {
   readonly directory: string;
   readonly default?: string;
   readonly configurations: readonly ConfigurationEntry[];
+  /** Where the entry's template name is, for a diagnostic about the whole entry. */
+  readonly range?: SourceRange;
+  /**
+   * The plugin the file fetched the template from, as the registry's `originOf` names it.
+   * When given, the entry configures that template only: another source that wins the name
+   * gets none of its values (TYTO-462). Absent, the entry binds by name.
+   */
+  readonly plugin?: string;
 }
 
 /** An image a configuration names, read and checked by the app, or why it was not. */
@@ -182,7 +190,29 @@ export async function resolveTemplateConfigurations(
 
   // A template nobody could load configures nothing: a brief that names its alias gets
   // `E_UNKNOWN_TEMPLATE`, beside the sync's own word on why it is missing.
-  const loaded = placed.filter(({ entry }) => input.registry.get(entry.template) !== undefined);
+  // A template another source won the name of configures nothing either: the values were
+  // written for the one the file fetched, and the winner may declare other values, or the
+  // same names with other meanings (TYTO-462). Its bare name renders with its own defaults.
+  const loaded = placed.filter(({ entry }) => {
+    if (input.registry.get(entry.template) === undefined) return false;
+    if (entry.plugin === undefined || input.registry.originOf?.(entry.template) === entry.plugin) {
+      return true;
+    }
+    report(
+      entry.file,
+      diagnostic(
+        'W_PLUGIN_FILE_TEMPLATE_SHADOWED',
+        {
+          template: entry.template,
+          plugin: entry.plugin,
+          file: entry.file,
+          used: input.registry.directoryOf(entry.template) ?? 'another source',
+        },
+        atRange(entry.range),
+      ),
+    );
+    return false;
+  });
 
   // Every name a template answers to, whether it loaded or not: an alias that shadows one
   // would render one thing or another depending on a fetch (ADR 0151 decision 7).

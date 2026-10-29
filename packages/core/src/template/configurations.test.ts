@@ -284,6 +284,62 @@ describe('collisions, decided and never by load order (ADR 0151 decision 7)', ()
   });
 });
 
+describe('a configuration binds to the template its plugin file fetched (TYTO-462)', () => {
+  /** The registry's answer, with each name's source labelled as the app labels a root. */
+  function registryFrom(origins: Readonly<Record<string, string | undefined>>): TemplateRegistry {
+    return { ...registryOf(TABELA), originOf: (name) => origins[name] };
+  }
+
+  it('applies when the template that won the name came from the plugin the file fetched', async () => {
+    const { configurations, diagnostics } = await resolved({
+      project: [entry({ plugin: 'tabelas-pack' })],
+      registry: registryFrom({ tabela: 'tabelas-pack' }),
+    });
+
+    expect(diagnostics).toEqual([]);
+    expect(configurations.select('tabela-roxa')?.configuration).toBe('roxo');
+  });
+
+  it('configures nothing, and says so at the entry, when a project folder template shadows it', async () => {
+    const { configurations, diagnostics } = await resolved({
+      project: [entry({ plugin: 'tabelas-pack', range: at(5) })],
+      // A folder template has no plugin: the project's own `tabela` won the name.
+      registry: registryFrom({}),
+    });
+
+    expect(configurations.select('tabela')).toBeUndefined();
+    expect(configurations.select('tabela-roxa')).toBeUndefined();
+    expect(configurations.aliases()).toEqual([]);
+    expect(diagnostics).toEqual([
+      {
+        file: 'tabelas.yaml',
+        diagnostic: expect.objectContaining({
+          code: 'W_PLUGIN_FILE_TEMPLATE_SHADOWED',
+          range: at(5),
+        }) as unknown,
+      },
+    ]);
+    expect(diagnostics[0]?.diagnostic.message).toContain('tabelas-pack');
+  });
+
+  it('configures nothing when another plugin’s template won the name', async () => {
+    const { configurations, diagnostics } = await resolved({
+      project: [entry({ plugin: 'tabelas-pack' })],
+      registry: registryFrom({ tabela: 'other-pack' }),
+    });
+
+    expect(configurations.select('tabela-roxa')).toBeUndefined();
+    expect(codes({ configurations, diagnostics })).toEqual(['W_PLUGIN_FILE_TEMPLATE_SHADOWED']);
+  });
+
+  it('binds by name when the app names no plugin for the entry', async () => {
+    const { configurations, diagnostics } = await resolved({ registry: registryFrom({}) });
+
+    expect(diagnostics).toEqual([]);
+    expect(configurations.select('tabela-roxa')?.configuration).toBe('roxo');
+  });
+});
+
 describe('a brief that names an alias', () => {
   const FORMATS = formatCatalogue({ feed: { w: 100, h: 100 } });
 

@@ -63,6 +63,8 @@ export interface PluginFileTemplate {
   readonly source: PluginFileSource;
   readonly default?: string;
   readonly configurations: Readonly<Record<string, PluginFileConfiguration>>;
+  /** Where the entry's name is written, for a diagnostic about the whole entry. */
+  readonly range?: SourceRange;
 }
 
 export interface PluginFile {
@@ -282,7 +284,13 @@ class FileReader {
         );
       }
     }
-    return { name, source, ...(chosen === undefined ? {} : { default: chosen }), configurations };
+    return {
+      name,
+      source,
+      ...(chosen === undefined ? {} : { default: chosen }),
+      configurations,
+      ...at(nameNode),
+    };
   }
 }
 
@@ -501,6 +509,7 @@ export function configuredTemplates(
       file,
       directory,
       ...(template.default === undefined ? {} : { default: template.default }),
+      ...(template.range === undefined ? {} : { range: template.range }),
       configurations: Object.entries(template.configurations).map(([name, configuration]) => ({
         name,
         ...(configuration.alias === undefined ? {} : { alias: configuration.alias }),
