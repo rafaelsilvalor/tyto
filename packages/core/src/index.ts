@@ -136,6 +136,21 @@ export {
 export { type RunStyle, type RunsOptions, runsOf } from './template/runs.js';
 
 export {
+  type ResolvedValues,
+  type SuppliedValue,
+  type SuppliedValues,
+  resolveValues,
+} from './template/declared-values.js';
+export {
+  type TemplateValue,
+  type TemplateValues,
+  colorValue,
+  faceValue,
+  imageValue,
+  numberValue,
+} from './template/value-readers.js';
+
+export {
   type ResolveOptions,
   type ResolvedAdjustment,
   type ResolvedArtwork,
@@ -196,11 +211,16 @@ export type { DirectoryEntry, FileSystem } from './ports/file-system.js';
 export {
   type Adjustment,
   type AdjustmentType,
+  type DeclaredValue,
+  type DeclaredValueType,
+  type ManifestFace,
   type Slot,
   type SlotType,
   type TemplateManifest,
   adjustmentSchema,
   adjustmentTypeSchema,
+  declaredValueSchema,
+  declaredValueTypeSchema,
   manifestFaceSchema,
   parseManifest,
   slotSchema,

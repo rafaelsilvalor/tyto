@@ -108,6 +108,8 @@ non-zero.
 | `E_FONT_FACE_UNAVAILABLE` | error | no | Text asks for a face the fonts Tyto can read do not have, so it cannot be exported. |
 | `W_TEXT_OVERFLOW` | warning | no | Compiled text does not fit its frame in one of the requested formats. |
 | `W_TEMPLATE_OVERFLOW` | warning | no | An artwork's content runs past the room its template has for it in one format. |
+| `W_TEMPLATE_VALUE_UNKNOWN` | warning | no | A configuration sets a value the template does not declare configurable. |
+| `W_TEMPLATE_VALUE_INVALID` | warning | no | A configuration sets a declared value to one of the wrong kind or outside its limits. |
 | `W_UNUSED_SLOT` | warning | no | The brief sets a slot the chosen template never renders. |
 | `W_MARKUP_IN_FRONTMATTER` | warning | no | A frontmatter scalar on a rich-text slot contains what looks like inline markup. |
 | `W_REDUNDANT_BREAK` | warning | no | A line of a directive body ends in a `\` and another line of its indented block follows, which already starts a new line. |
@@ -2034,6 +2036,34 @@ Artwork '{artwork}' does not fit format '{format}': its content runs {overflow}p
 ```
 
 Parameters: `artwork`, `format`, `overflow`
+
+### `W_TEMPLATE_VALUE_UNKNOWN`
+
+**Severity:** warning · **Fatal:** no · **Spec:** `docs/adr/0153-a-template-declares-its-configurable-values-in-its-manifest.md`
+
+A configuration sets a value the template does not declare configurable.
+
+A warning never replaces a value (ADR 0013).
+
+```
+Template '{template}' declares no configurable value '{name}'; the setting is ignored.
+```
+
+Parameters: `template`, `name`
+
+### `W_TEMPLATE_VALUE_INVALID`
+
+**Severity:** warning · **Fatal:** no · **Spec:** `docs/adr/0153-a-template-declares-its-configurable-values-in-its-manifest.md`
+
+A configuration sets a declared value to one of the wrong kind or outside its limits.
+
+A warning never replaces a value (ADR 0013).
+
+```
+Value '{name}' of template '{template}' {problem}; the template's default is used.
+```
+
+Parameters: `name`, `template`, `problem`
 
 ### `W_UNUSED_SLOT`
 

@@ -9,6 +9,7 @@ import {
   type Result,
   type Scene,
   type SceneFontFace,
+  type SuppliedValues,
   type Template,
   type TemplateRegistry,
   compile,
@@ -74,6 +75,11 @@ export interface CompileTemplateOptions {
   readonly asset?: (ref: AssetRef) => string | undefined;
   /** Brand kits by brand id, as the app hands a template the kit under its own brand. */
   readonly brandKits?: ReadonlyMap<string, BrandKit>;
+  /**
+   * Values for what the template declares configurable (ADR 0153), as a plugin file's
+   * configuration will supply them; absent, every value draws with its default.
+   */
+  readonly values?: SuppliedValues;
 }
 
 /** One frame of one artwork, as the document the HTML exporter wrote. */
@@ -125,6 +131,7 @@ export async function compileTemplate(
     formats: options.formats,
     ...(options.faces === undefined ? {} : { faces: options.faces }),
     ...(options.brandKits === undefined ? {} : { brandKits: options.brandKits }),
+    ...(options.values === undefined ? {} : { values: options.values }),
   });
   if (!scene.ok) return err([...ast.diagnostics, ...resolved.diagnostics, ...scene.error]);
 

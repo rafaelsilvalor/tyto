@@ -166,6 +166,14 @@ external is a plugin that does not activate.
 
   The warning lists them; nothing is drawn in them unless somebody changes the template.
 
+- **What a configuration may change is declared in the manifest's `values`** (ADR 0153,
+  `docs/template-authoring.md`), and read with `numberValue`, `colorValue`, `faceValue` and
+  `imageValue` from `@tyto/core/template`, each with your own constant as the fallback. In your
+  plugin's thread `context.values` is absent for now, so the fallback is what draws: keep it
+  equal to the manifest's default. **A manifest with `values` needs a `@tyto/core` that knows
+  the key, and so does the Tyto that loads it**: an older one refuses the manifest as unknown.
+  Move your `engine` range up with the dependency in the same release.
+
 `tyto template check` reads markup, so it has nothing to check in a code template's folder but
 the manifest. Render the example brief instead.
 
@@ -427,7 +435,8 @@ await expect(result.value.frames[0]?.html).toMatchFileSnapshot('./__snapshots__/
 the lines your template produced, and every face is written as a placeholder
 (`tyto-test-font:Inter-700-normal`) rather than a font file. The snapshot changes when your
 template does, not when a machine has another font. Pass `faces` and `font` for the measured
-layout. A markup template (`template.html`) is not covered yet, and neither is the PNG.
+layout, and `values` (`{ 'title-gap': { value: 32 } }`) to compile with what a configuration
+would set (ADR 0153). A markup template (`template.html`) is not covered yet, and neither is the PNG.
 
 ### Hear about a breaking release before your users do
 

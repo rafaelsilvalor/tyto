@@ -40,7 +40,17 @@
  * depend on where the lines break.
  */
 
-import { frame, group, lineBreak, rect, run, solid, text } from '@tyto/core/template';
+import {
+  colorValue,
+  frame,
+  group,
+  lineBreak,
+  numberValue,
+  rect,
+  run,
+  solid,
+  text,
+} from '@tyto/core/template';
 import { type Block, at, block, lines, plain, reportOverflow } from '@tyto/template-kit';
 
 import { drawLogo, oneInk, signatureOf } from './kit.js';
@@ -80,32 +90,90 @@ export function oneImageTable(brand: TableBrand): TemplateBuild {
     const regionBottom = context.size.h - PAGE.bottom - SIGNATURE.height;
     const room = regionBottom - regionTop;
 
+    const look = lookOf(context);
     const table = readTable(richTextOf(context, 'tabela') ?? []);
     const title = titleLines(richTextOf(context, 'titulo') ?? []);
     const glued = gluedCells(table);
 
-    const plan = fit(table, glued, title, width, room, context.measure);
+    const plan = fit(table, glued, title, width, room, context.measure, look);
     reportOverflow(context.report, plan.height, room);
 
     const titleBlock = drawTitle(title, plan, width, brand.accent);
-    const tableBlock = drawTable(table, glued, plan, brand.accent);
+    const tableBlock = drawTable(table, glued, plan, brand.accent, look);
     // The title stands under the brand row and the table a fixed gap under the title. Whatever
     // room the fit leaves goes to the foot: centring the table in it made the gap grow with
     // every table that fits by its width rather than its height.
-    const tableY = regionTop + titleBlock.height + TITLE.gap;
+    const tableY = regionTop + titleBlock.height + look.titleGap;
 
     return frame({
       format: context.format,
       size: context.size,
       idPrefix: context.idPrefix,
-      background: solid(PAPER),
+      background: solid(look.paper),
       children: [
         at(PAGE.side, PAGE.top, drawLogo(context.brand, BRAND_ROW.logo, oneInk(brand.accent))),
         at(PAGE.side, regionTop, titleBlock),
         at(PAGE.side, tableY, tableBlock),
-        at(PAGE.side, regionBottom, drawSignature(context.brand, width)),
+        at(PAGE.side, regionBottom, drawSignature(context.brand, width, look)),
       ],
     });
+  };
+}
+
+/* ----------------------------------------------------------------------- the look -- */
+
+/**
+ * What a configuration may change in the table (TYTO-438, ADR 0153), by the names a
+ * template's manifest declares them under, each defaulting to the token it replaced. A
+ * template that declares them in its manifest's `values` gets them configurable; one that
+ * does not, or a context with no values, draws with these.
+ *
+ * Not the accent: that is the brand's, and moves with the brand kit (TYTO-455).
+ */
+export const TABLE_VALUE_DEFAULTS = {
+  'title-gap': TITLE.gap,
+  'title-floor': TITLE.floor,
+  'title-ceiling': TITLE.ceiling,
+  'body-floor': BODY.floor,
+  'body-ceiling': BODY.ceiling,
+  'optical-drop': OPTICAL_DROP,
+  paper: PAPER,
+  ink: INK,
+  zebra: ZEBRA,
+  'on-accent': ON_ACCENT,
+  'signature-ink': SIGNATURE_INK,
+} as const;
+
+/** The table's configurable values, resolved for one call. */
+interface TableLook {
+  readonly titleGap: number;
+  readonly titleFloor: number;
+  readonly titleCeiling: number;
+  readonly bodyFloor: number;
+  readonly bodyCeiling: number;
+  /** In em; see {@link OPTICAL_DROP}. */
+  readonly opticalDrop: number;
+  readonly paper: string;
+  readonly ink: string;
+  readonly zebra: string;
+  readonly onAccent: string;
+  readonly signatureInk: string;
+}
+
+function lookOf(context: TemplateContext): TableLook {
+  const defaults = TABLE_VALUE_DEFAULTS;
+  return {
+    titleGap: numberValue(context, 'title-gap', defaults['title-gap']),
+    titleFloor: numberValue(context, 'title-floor', defaults['title-floor']),
+    titleCeiling: numberValue(context, 'title-ceiling', defaults['title-ceiling']),
+    bodyFloor: numberValue(context, 'body-floor', defaults['body-floor']),
+    bodyCeiling: numberValue(context, 'body-ceiling', defaults['body-ceiling']),
+    opticalDrop: numberValue(context, 'optical-drop', defaults['optical-drop']),
+    paper: colorValue(context, 'paper', defaults.paper),
+    ink: colorValue(context, 'ink', defaults.ink),
+    zebra: colorValue(context, 'zebra', defaults.zebra),
+    onAccent: colorValue(context, 'on-accent', defaults['on-accent']),
+    signatureInk: colorValue(context, 'signature-ink', defaults['signature-ink']),
   };
 }
 
@@ -125,12 +193,12 @@ interface RoleStyle {
   readonly upper: boolean;
 }
 
-function roleStyle(role: Role): RoleStyle {
+function roleStyle(role: Role, look: TableLook): RoleStyle {
   switch (role) {
     case 'cell':
       return {
         weight: BOOK,
-        color: INK,
+        color: look.ink,
         tracking: 0,
         lineHeight: BODY.lineHeight,
         block: BODY.padding.block,
@@ -140,7 +208,7 @@ function roleStyle(role: Role): RoleStyle {
     case 'header':
       return {
         weight: BOOK,
-        color: ON_ACCENT,
+        color: look.onAccent,
         tracking: HEADER.tracking,
         lineHeight: HEADER.lineHeight,
         block: BODY.padding.block * HEADER.block,
@@ -150,7 +218,7 @@ function roleStyle(role: Role): RoleStyle {
     case 'band':
       return {
         weight: BOLD,
-        color: ON_ACCENT,
+        color: look.onAccent,
         tracking: BAND.tracking,
         lineHeight: HEADER.lineHeight,
         block: BODY.padding.block * BAND.block,
@@ -161,8 +229,8 @@ function roleStyle(role: Role): RoleStyle {
 }
 
 /** A cell's words as a text node's options, at a size. */
-function cellText(words: string, role: Role, size: number) {
-  const style = roleStyle(role);
+function cellText(words: string, role: Role, size: number, look: TableLook) {
+  const style = roleStyle(role, look);
   return {
     runs: [
       run(style.upper ? words.toLocaleUpperCase('pt-BR') : words, {
@@ -225,18 +293,19 @@ function fit(
   width: number,
   room: number,
   measure: Measure,
+  look: TableLook,
 ): TablePlan {
   const columns = table.header.length;
   const across = width - CELL.gapX * Math.max(0, columns - 1);
-  const demand = columnDemand(table, glued, measure);
-  if (demand === undefined) return unmeasuredPlan(table, title, width);
+  const demand = columnDemand(table, glued, measure, look);
+  if (demand === undefined) return unmeasuredPlan(table, title, width, look);
 
   const planAt = (size: number): TablePlan | undefined => {
     const widths = columnWidths(demand, size, across);
     if (widths === undefined) return undefined;
-    const heights = rowHeights(table, glued, widths, size, measure);
-    const titleSize = titleSizeFor(title, size, width, measure);
-    const titleHeight = titleHeightAt(title, titleSize, width, measure);
+    const heights = rowHeights(table, glued, widths, size, measure, look);
+    const titleSize = titleSizeFor(title, size, width, measure, look);
+    const titleHeight = titleHeightAt(title, titleSize, width, measure, look);
     const tableHeight = sum(heights) + CELL.gapY * Math.max(0, heights.length - 1);
     return {
       size,
@@ -244,14 +313,14 @@ function fit(
       titleHeight,
       widths,
       heights,
-      height: titleHeight + TITLE.gap + tableHeight,
+      height: titleHeight + look.titleGap + tableHeight,
       unmeasured: false,
     };
   };
 
   // The largest step whose plan fits; the steps are the sizes the loop may land on.
-  let low = Math.ceil(BODY.floor / BODY.step);
-  let high = Math.floor(BODY.ceiling / BODY.step);
+  let low = Math.ceil(look.bodyFloor / BODY.step);
+  let high = Math.floor(look.bodyCeiling / BODY.step);
   let best: TablePlan | undefined;
   while (low <= high) {
     const middle = Math.floor((low + high) / 2);
@@ -267,7 +336,9 @@ function fit(
 
   // Not even the floor fits: draw it at the floor, and the caller reports the overflow. If
   // the floor's pieces do not fit across either, they share the width by their minimums.
-  return planAt(BODY.floor) ?? floorPlan(table, glued, demand, title, width, across, measure);
+  return (
+    planAt(look.bodyFloor) ?? floorPlan(table, glued, demand, title, width, across, measure, look)
+  );
 }
 
 /** How much room each column asks for, measured once at {@link REFERENCE_SIZE}. */
@@ -282,16 +353,17 @@ function columnDemand(
   table: TableContent,
   glued: GluedTable,
   measure: Measure,
+  look: TableLook,
 ): Demand | undefined {
   const min: number[] = table.header.map(() => 0);
   const natural: number[] = table.header.map(() => 0);
 
   const take = (words: string, role: Role, column: number): boolean => {
-    const whole = widthAt(words, role, measure);
+    const whole = widthAt(words, role, measure, look);
     if (whole === undefined) return false;
     natural[column] = Math.max(natural[column]!, whole);
     for (const piece of pieces(words)) {
-      const one = widthAt(piece, role, measure);
+      const one = widthAt(piece, role, measure, look);
       if (one === undefined) return false;
       min[column] = Math.max(min[column]!, one);
     }
@@ -311,9 +383,9 @@ function columnDemand(
 }
 
 /** One line's width at the reference size, or nothing when nothing can measure. */
-function widthAt(words: string, role: Role, measure: Measure): number | undefined {
+function widthAt(words: string, role: Role, measure: Measure, look: TableLook): number | undefined {
   if (words === '') return 0;
-  const measured = measure(text({ ...cellText(words, role, REFERENCE_SIZE), box: {} }));
+  const measured = measure(text({ ...cellText(words, role, REFERENCE_SIZE, look), box: {} }));
   return measured?.width;
 }
 
@@ -350,15 +422,16 @@ function rowHeights(
   widths: readonly number[],
   size: number,
   measure: Measure,
+  look: TableLook,
 ): number[] {
   const whole = sum(widths) + CELL.gapX * Math.max(0, widths.length - 1);
   const rowOf = (cells: readonly string[], role: Role, spans: readonly number[]): number => {
-    const style = roleStyle(role);
+    const style = roleStyle(role, look);
     let tallest = style.lineHeight * size;
     for (const [column, words] of cells.entries()) {
       if (words === '') continue;
       const inner = spans[column]! - 2 * style.inline * size;
-      const measured = measure(text({ ...cellText(words, role, size), box: { w: inner } }));
+      const measured = measure(text({ ...cellText(words, role, size, look), box: { w: inner } }));
       tallest = Math.max(tallest, measured?.height ?? style.lineHeight * size);
     }
     return tallest + 2 * style.block * size;
@@ -380,14 +453,18 @@ function titleSizeFor(
   size: number,
   width: number,
   measure: Measure,
+  look: TableLook,
 ): number {
-  const ceiling = Math.max(TITLE.floor, Math.min(TITLE.ceiling, Math.floor(TITLE.perBody * size)));
-  let low: number = TITLE.floor;
+  const ceiling = Math.max(
+    look.titleFloor,
+    Math.min(look.titleCeiling, Math.floor(TITLE.perBody * size)),
+  );
+  let low = look.titleFloor;
   let high = ceiling;
-  let best: number = TITLE.floor;
+  let best = look.titleFloor;
   while (low <= high) {
     const middle = Math.floor((low + high) / 2);
-    const measured = measureTitle(title, middle, width, measure);
+    const measured = measureTitle(title, middle, width, measure, look);
     if (measured === undefined || measured.lines <= TITLE.maxLines) {
       best = middle;
       low = middle + 1;
@@ -403,19 +480,25 @@ function titleHeightAt(
   size: number,
   width: number,
   measure: Measure,
+  look: TableLook,
 ): number {
   if (title.length === 0) return 0;
-  const measured = measureTitle(title, size, width, measure);
+  const measured = measureTitle(title, size, width, measure, look);
   return measured?.height ?? TITLE.maxLines * TITLE.lineHeight * size;
 }
 
 /** When nothing can measure: equal columns, the approved art's sizes, and guessed heights. */
-function unmeasuredPlan(table: TableContent, title: readonly string[], width: number): TablePlan {
+function unmeasuredPlan(
+  table: TableContent,
+  title: readonly string[],
+  width: number,
+  look: TableLook,
+): TablePlan {
   const columns = Math.max(1, table.header.length);
   const size = UNMEASURED.body;
   const column = (width - CELL.gapX * (columns - 1)) / columns;
   const line = (role: Role) => {
-    const style = roleStyle(role);
+    const style = roleStyle(role, look);
     return style.lineHeight * size + 2 * style.block * size;
   };
   const heights = [
@@ -429,7 +512,8 @@ function unmeasuredPlan(table: TableContent, title: readonly string[], width: nu
     titleHeight,
     widths: table.header.map(() => column),
     heights,
-    height: titleHeight + TITLE.gap + sum(heights) + CELL.gapY * Math.max(0, heights.length - 1),
+    height:
+      titleHeight + look.titleGap + sum(heights) + CELL.gapY * Math.max(0, heights.length - 1),
     unmeasured: true,
   };
 }
@@ -443,21 +527,23 @@ function floorPlan(
   width: number,
   room: number,
   measure: Measure,
+  look: TableLook,
 ): TablePlan {
-  const size = BODY.floor;
+  const size = look.bodyFloor;
   const total = sum(demand.min);
   const widths = demand.min.map((value) =>
     total === 0 ? room / demand.min.length : (room * value) / total,
   );
-  const heights = rowHeights(table, glued, widths, size, measure);
-  const titleHeight = titleHeightAt(title, TITLE.floor, width, measure);
+  const heights = rowHeights(table, glued, widths, size, measure, look);
+  const titleHeight = titleHeightAt(title, look.titleFloor, width, measure, look);
   return {
     size,
-    title: TITLE.floor,
+    title: look.titleFloor,
     titleHeight,
     widths,
     heights,
-    height: titleHeight + TITLE.gap + sum(heights) + CELL.gapY * Math.max(0, heights.length - 1),
+    height:
+      titleHeight + look.titleGap + sum(heights) + CELL.gapY * Math.max(0, heights.length - 1),
     unmeasured: false,
   };
 }
@@ -489,8 +575,14 @@ function titleNode(
 }
 
 /** The title measured as it will be drawn: inside the page and its own inset. */
-function measureTitle(title: readonly string[], size: number, width: number, measure: Measure) {
-  return measure(titleNode(title, size, width - 2 * TITLE.inset, INK));
+function measureTitle(
+  title: readonly string[],
+  size: number,
+  width: number,
+  measure: Measure,
+  look: TableLook,
+) {
+  return measure(titleNode(title, size, width - 2 * TITLE.inset, look.ink));
 }
 
 function drawTitle(
@@ -513,7 +605,13 @@ function drawTitle(
  * The table: the header row in the accent, the body rows zebra-striped from the first, a
  * band across every column in the accent. Rounded cells with small gaps between them.
  */
-function drawTable(table: TableContent, glued: GluedTable, plan: TablePlan, accent: string): Block {
+function drawTable(
+  table: TableContent,
+  glued: GluedTable,
+  plan: TablePlan,
+  accent: string,
+  look: TableLook,
+): Block {
   const whole = sum(plan.widths) + CELL.gapX * Math.max(0, plan.widths.length - 1);
   const children: NodeDraft[] = [];
   let y = 0;
@@ -527,7 +625,7 @@ function drawTable(table: TableContent, glued: GluedTable, plan: TablePlan, acce
     fill: string | undefined,
     height: number,
   ): void => {
-    const style = roleStyle(role);
+    const style = roleStyle(role, look);
     const cellNodes: NodeDraft[] = [];
     let x = 0;
     for (const [column, words] of cells.entries()) {
@@ -550,10 +648,10 @@ function drawTable(table: TableContent, glued: GluedTable, plan: TablePlan, acce
         // Lowered by trimming the box's top twice the drop, so the centre moves by the drop and
         // the box stays inside the cell; the block padding is far wider than the trim.
         const padX = style.inline * plan.size;
-        const trim = 2 * OPTICAL_DROP * plan.size;
+        const trim = 2 * look.opticalDrop * plan.size;
         cellNodes.push(
           text({
-            ...cellText(words, role, plan.size),
+            ...cellText(words, role, plan.size, look),
             name: 'cell-text',
             box: { w: span - 2 * padX, h: height - trim },
             align: 'center',
@@ -582,7 +680,7 @@ function drawTable(table: TableContent, glued: GluedTable, plan: TablePlan, acce
         glued.rows[index]!,
         'cell',
         plan.widths,
-        striped % 2 === 0 ? ZEBRA : undefined,
+        striped % 2 === 0 ? look.zebra : undefined,
         height,
       );
       striped += 1;
@@ -595,7 +693,7 @@ function drawTable(table: TableContent, glued: GluedTable, plan: TablePlan, acce
 }
 
 /** The signature, centred and tracked out, standing on the foot of its row. */
-function drawSignature(kit: BrandKit, width: number): Block {
+function drawSignature(kit: BrandKit, width: number, look: TableLook): Block {
   const words = text({
     name: 'signature',
     runs: [
@@ -603,7 +701,7 @@ function drawSignature(kit: BrandKit, width: number): Block {
         font: FACE,
         size: SIGNATURE.size,
         weight: BOOK,
-        color: SIGNATURE_INK,
+        color: look.signatureInk,
       }),
     ],
     box: { w: width, h: SIGNATURE.height },
