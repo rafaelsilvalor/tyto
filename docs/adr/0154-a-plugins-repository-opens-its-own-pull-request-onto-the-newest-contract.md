@@ -103,3 +103,12 @@ Three constraints shape any automation of it:
   configuration, and still does not move `engine`.
 - **A fixed list of the four packages.** The Jira plugin asks for one and the workspace for two
   that are not in the list.
+
+## Note, 2026-10-29 — a pull request opened with `GITHUB_TOKEN` does start `ci`
+
+The first constraint under _Context_ is wrong as measured. On `tyto-plugin-jira#3`, opened by
+`github-actions[bot]` on `tyto/contract-update`, `pull_request` did start `ci` (run 40897613023,
+head `63b72475`). Its first attempt ended `action_required`: GitHub held it for the approval a
+first-time contributor's run needs. The second attempt, started by the maintainer, ran and
+passed. So the pull request does not sit with no checks; it sits with a check waiting for a
+person. The decision stands, because a dispatched run needs no approval.

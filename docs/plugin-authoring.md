@@ -287,6 +287,13 @@ rules, both examples through `compileTemplate`, the built bundle through `testPl
 CI that fails when the committed bundle is not what `src/` builds to. `tyto-plugin-jira` is the
 same layout for a plugin that contributes no template.
 
+**Starting a new template repository from a Claude Code session in this checkout, run
+`/new-template`** (`.claude/commands/new-template.md`, TYTO-463). It asks the name, the artwork
+and its formats, brand kit or neutral, and public or private; reads the contract's versions from
+`tyto-template-tabela`'s current `package.json` and confirms them on GitHub Packages; creates the
+repository only after the maintainer's yes, with tabela's tests, CI and scope-only `.npmrc`; and
+closes with `tyto plugin install` and an example brief that renders.
+
 A plugin in its own repository depends on the contract instead of copying it. Tyto publishes
 seven packages to GitHub Packages (ADR 0149): `@tyto/plugin-api` and `@tyto/template-kit`, which
 are the contract, `@tyto/house-style`, the house's tokens and shared parts (ADR 0151), and
@@ -298,7 +305,7 @@ under the repository owner's scope, `@rafaelsilvalor/tyto-<name>`, because nobod
 ```json
 {
   "devDependencies": {
-    "@tyto/plugin-api": "npm:@rafaelsilvalor/tyto-plugin-api@^0.5.0"
+    "@tyto/plugin-api": "npm:@rafaelsilvalor/tyto-plugin-api@^0.7.0"
   }
 }
 ```
@@ -351,7 +358,7 @@ expect(satisfiesEngine(manifest.engine, PLUGIN_API_VERSION)).toBe(true);
 ```
 
 **A change to the isolation protocol is a minor while the contract is 0.x**, and a major from
-1.0. A `^0.5.0` range does not take a minor, so such a change never reaches your plugin through
+1.0. A `^0.7.0` range does not take a minor, so such a change never reaches your plugin through
 an ordinary update: you move the range, run your tests, and move `engine` with it.
 
 ### Test it without Tyto
