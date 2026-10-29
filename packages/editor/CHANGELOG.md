@@ -1,5 +1,21 @@
 # @tyto/editor
 
+## 0.10.0
+
+### Minor Changes
+
+- 303c2dc: TYTO-440: the desktop's New brief from template and "/" menu write what a plugin file's configuration says about a new brief. `templates:list` rows carry `configured` (the configuration's `skeleton`, `formats` and the slots it fills) for the template's own name and each alias. `@tyto/editor`'s `briefSkeleton` takes it as `SkeletonManifest.configured`: a configured skeleton is written whole, its `template:` line naming the row picked; without one, the computed skeleton uses the configured formats and leaves out the filled slots. The window shows `W_SLOT_OVER_CONFIGURED_LIMIT` like any other warning. The manual's Plugins page says so in both editions.
+
+### Patch Changes
+
+- Updated dependencies [c590e01]
+- Updated dependencies [e7588e9]
+- Updated dependencies [4388575]
+- Updated dependencies [e2b72a7]
+  - @tyto/core@0.32.0
+  - @tyto/brief-lang@0.7.3
+  - @tyto/template-lang@0.8.4
+
 ## 0.9.2
 
 ### Patch Changes

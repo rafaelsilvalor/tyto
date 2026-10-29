@@ -1,5 +1,21 @@
 # @tyto/plugin-api
 
+## 0.9.0
+
+### Minor Changes
+
+- e7588e9: TYTO-440: a plugin file's configuration sets the brief's side under `brief:` (ADR 0151). `slots` fills a slot that does not repeat when the brief leaves it unset, `formats` says what renders when the brief lists none, `skeleton` keeps the text a new brief starts with, and `editor` sets a `max` per slot, tighter than the manifest's. The brief wins every one. `@tyto/plugin-api`'s `parsePluginFile` keeps the block with each part's range (`PluginFileConfiguration.brief` is now a `ConfigurationBrief`), and warns on a key that is not one of the four. `@tyto/core`'s `resolveTemplateConfigurations` checks it against the manifest once and hands it on as `TemplateSelection.brief`; `resolve` applies it. New warnings: `W_CONFIGURATION_BRIEF_INVALID` and `W_EDITOR_RULE_LOOSER` at the plugin file's line, `W_SLOT_OVER_CONFIGURED_LIMIT` at the brief's. Nothing crosses to a plugin's process, so the protocol is unchanged. The manual's Plugins page describes it in both editions.
+- 4388575: TYTO-455 (ADR 0155): a plugin file's configuration picks its brand, and the brand kit carries the brand's accent. A configuration may write `brand:`; the template is then handed that brand's kit in `context.brand` instead of its manifest's — the configuration's own brand, else its entry `default`'s, else the manifest's. A brief cannot name a brand. `@tyto/core`'s `BrandKit` gains `colors?: { accent? }` (`BrandColors`, `brandColorsSchema`; closed and strict, a hex accent only), `TemplateSelection` and `ResolvedBrief` gain `brand`, `resolveTemplateConfigurations` takes optional `kitBrands`, and two warnings join: `W_CONFIGURATION_BRAND_INVALID` for a brand spelled against the manifest's rule, and `W_BRAND_KIT_MISSING` at the plugin file's line for a brand no installed kit offers (a manifest's brand with no kit stays silent). `@tyto/plugin-api`'s `parsePluginFile` keeps `brand` with its range. **The isolation protocol is 11**, because a kit with colours crosses in the strict template-call and `brand-kit` schemas: a plugin process on 10 is refused at `hello`, and this release is the breaking minor ADR 0149 point 4 requires. After it is published, the contract-update workflow (ADR 0154) opens the pull request that moves `tyto-template-tabela`, `tyto-template-concursos-abertos` and the plugin repositories onto it. `@tyto/house-style` adds `accentOf(kit, fallback)`, and the house's compositions (`simuladosDaSemana`, `oneImageTable`, `productBanner`) draw the kit's accent over their own; the built-in templates, azul's `agenda-semana` and `aprovados` included, do the same, with today's colour as the fallback, so every render without a kit is byte-identical. `tyto render` passes the installed kits' brands, so the CLI reports `W_BRAND_KIT_MISSING`; the desktop already draws a configuration's kit, and reports the warning in a later change. The manual's Plugins page describes it in both editions.
+
+### Patch Changes
+
+- Updated dependencies [c590e01]
+- Updated dependencies [e7588e9]
+- Updated dependencies [4388575]
+- Updated dependencies [e2b72a7]
+  - @tyto/core@0.32.0
+  - @tyto/recipe@0.1.3
+
 ## 0.8.0
 
 ### Minor Changes

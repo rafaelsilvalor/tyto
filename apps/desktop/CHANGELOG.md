@@ -1,5 +1,35 @@
 # @tyto/desktop
 
+## 0.10.0
+
+### Minor Changes
+
+- fbabe97: TYTO-433: the desktop resolves the plugin files' configurations and aliases (ADR 0151). A brief that names an alias previews and exports as its template with that configuration's values, as `tyto render` does; an alias named like a template that loaded is refused with `E_TEMPLATE_ALIAS_TAKEN` at its place in the plugin file. `templates:list` lists each alias as a row of its own, carrying `alias: { template, configuration }`, so the template picker, the "/" menu and "New brief from template" offer it. A sync that only edited a plugin file tells the window too. The permission box is `approveInABox`, a function around Electron's dialog.
+- c590e01: TYTO-433: the desktop fetches the templates the plugin files name (ADR 0151). Main runs the sync `tyto render` runs when the app starts, when the window opens a workspace folder, and on Plugins: Sync Plugin Files and Plugins: Update Plugin Files (`plugin-files:sync`; the update moves every ref). The fetched copies run as a plugin set of their own, beside the installed plugins, started again when a sync changes which copies load; their template packs are searched after the built-in pack and before the installed ones, offer only the templates their files name, and leave out an installed plugin a copy replaces. A failed fetch is a row in the problems panel naming the repository, and the copy fetched before keeps loading; `templates:changed` tells the window to list and compile again. A permission prompt is a native box, recorded in `plugins.json` by name. A restricted folder's plugin files are neither fetched nor loaded, and are `W_PROJECT_PLUGIN_FILES_WITHHELD` in the trust strip's count. A fetched plugin contributes templates only in the window for now. `@tyto/io` adds `syncPluginFiles`, both folders' sync moved from the CLI, with the built-in names, the path display and the permission answer as parameters, plus `machinePluginFiles`, `projectPluginFiles` and `NO_PLUGIN_FILES`; the CLI composes it unchanged. `@tyto/core` adds `W_PROJECT_PLUGIN_FILES_WITHHELD`. A failed fetch or a refused commit is now printed by the CLI, and shown by the window, under the plugin file that named the source (`onSourceProblem` on `syncPluginFolder` and `syncPluginFiles`).
+- 303c2dc: TYTO-440: the desktop's New brief from template and "/" menu write what a plugin file's configuration says about a new brief. `templates:list` rows carry `configured` (the configuration's `skeleton`, `formats` and the slots it fills) for the template's own name and each alias. `@tyto/editor`'s `briefSkeleton` takes it as `SkeletonManifest.configured`: a configured skeleton is written whole, its `template:` line naming the row picked; without one, the computed skeleton uses the configured formats and leaves out the filled slots. The window shows `W_SLOT_OVER_CONFIGURED_LIMIT` like any other warning. The manual's Plugins page says so in both editions.
+
+### Patch Changes
+
+- Updated dependencies [c590e01]
+- Updated dependencies [e7588e9]
+- Updated dependencies [303c2dc]
+- Updated dependencies [4388575]
+- Updated dependencies [e2b72a7]
+  - @tyto/core@0.32.0
+  - @tyto/io@4.3.0
+  - @tyto/plugin-api@0.9.0
+  - @tyto/editor@0.10.0
+  - @tyto/templates@1.0.6
+  - @tyto/brief-lang@0.7.3
+  - @tyto/export-html@0.7.5
+  - @tyto/export-svg@2.0.5
+  - @tyto/fonts@0.4.0
+  - @tyto/google-fonts@0.1.4
+  - @tyto/pipeline@0.12.1
+  - @tyto/recipe@0.1.3
+  - @tyto/template-lang@0.8.4
+  - @tyto/theme-pack@0.1.4
+
 ## 0.9.3
 
 ### Patch Changes
