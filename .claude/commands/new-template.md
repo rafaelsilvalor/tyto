@@ -119,7 +119,7 @@ git clone https://github.com/rafaelsilvalor/tyto-template-<name>.git C:/projects
 | ----------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------- |
 | `.github/workflows/ci.yml`, `.github/workflows/contract.yml`                                                | `src/template.ts`, `src/index.ts` (the `BUILDS` map with the new name)                                                  |
 | `.npmrc` — **the scope line and its comment only**, never a token                                           | `templates/<name>/manifest.yaml`, `templates/<name>/examples/*.brief`                                                   |
-| `.gitattributes`, `.gitignore`, `.prettierrc.json`, `.prettierignore`                                       | `templates/formats.yaml` — only the formats from step 1                                                                 |
+| `.gitattributes`, `.gitignore` (plus a `*.psd` line), `.prettierrc.json`, `.prettierignore`                 | `templates/formats.yaml` — only the formats from step 1                                                                 |
 | `eslint.config.js`, `tsconfig.json`, `tsup.config.ts`, `vitest.config.ts`, `pnpm-workspace.yaml`            | `README.md`, in tabela's order: install, permissions, what a configuration may change, development, the tests           |
 | `package.json` (name, description; the `@tyto/*` ranges from step 2; drop `@tyto/house-style` when neutral) | `tyto-plugin.json` (`name`, `version` 0.1.0, `engine`; `permissions` only for what it measures, e.g. `font:CircularXX`) |
 
@@ -195,6 +195,61 @@ Rules for the loop:
 - `pnpm check` and the snapshots move with the composition: update them on purpose, never to
   make a red go away.
 
+## 5a. With a PSD, it is the answer key
+
+Before the first iteration, look for the art in `C:\projects\tyto\references\<name>\` (one
+folder per template, named after it). **No PSD there: skip this step**, and the reference is
+whatever Rafael shows.
+
+**The PSD never enters a repository**, nor does anything extracted from it — not the PSD, the
+flattened PNG, the layer list or its copy. Everything extracted goes to the scratchpad. The
+template's `.gitignore` carries `*.psd` as a second lock, and the example briefs keep invented
+copy even when the PSD has the real one.
+
+**psd-tools first.** `python -c "import psd_tools; print(psd_tools.__version__)"` — without
+`-I`, which hides the user-level site-packages where it is installed. When it fails, ask
+Rafael to install it (`pip install psd-tools`) and wait; do not continue without it.
+
+Extract, into `<scratchpad>/psd/<name>/`:
+
+- **`flat.png`** — `PSDImage.open(path).composite().convert('RGB')`, the whole canvas.
+- **`layers.json`** — for every layer of `psd.descendants()`: `name`, `kind`, `is_visible()`
+  and `bbox` (left, top, right, bottom in canvas pixels). For a `type` layer also `text` (lines
+  break on `\r`) and, for each run of `engine_dict['StyleRun']['RunArray']`, its font, size,
+  leading and colour. Write it with `encoding='utf-8', newline=''`.
+
+Three traps, measured on `questao-estrategica.psd` when this step was written:
+
+- **The size is in points before the layer's scale.** The pixel size is the run's `FontSize`
+  times `transform[3]`, the layer's vertical scale: one title reads `25.66` and is drawn at
+  86 px (`× 3.359`), with a bounding box 85 px tall. The same holds for `Leading`.
+- **The font comes quoted** from `resource_dict['FontSet'][index]['Name']` (`'CircularXX-Black'`):
+  strip the quotes. The PSD may use weights Tyto does not ship (Black, Medium, Light,
+  ExtraBlack in that file); a weight Tyto lacks is a question for Rafael, never a silent
+  substitute.
+- **The canvas may not be a format.** That PSD is 4395 × 2800, a carousel of four slides side
+  by side. Name the region of each slide in canvas pixels and the scale to the format from
+  step 1, say both to Rafael, and confirm them before comparing.
+
+Colours are `FillColor.Values`, `[alpha, r, g, b]` from 0 to 1: write them as hex. These
+become the template's numbers and `values` defaults: positions and sizes from `bbox` and the
+scaled sizes, colours from the runs. **They replace reading the reference by eye**, so the
+"a few pixels off" warning of step 5 does not apply to a number taken from `layers.json`; say
+which numbers came from it.
+
+**Every iteration ends with the comparison**, beside the PNG of step 5. Crop the slide's region
+from `flat.png`, scale it to the format with the factor you confirmed (state it; at 1:1 there
+is none), and diff it against the render in RGB with `ImageChops.difference`. Report:
+
+- the pixels that differ by more than a small threshold (say which), over the total
+  (`12 345 of 1 458 000`), and the bounding box of the difference;
+- a diff image (the difference amplified, or the two overlaid) sent with `SendUserFile`, so
+  Rafael sees where, not only how much.
+
+The copy differs between the brief and the PSD unless the example brief carries the same
+words, which it may not (invented copy). Compare the layout with a scratch brief holding the
+PSD's text, kept in the scratchpad, and say that is what the number measures.
+
 ## 6. Close: installed, rendering, and in the skill
 
 1. **Released.** `pnpm check` green, `dist/` committed and equal to what `src/` builds (CI's
@@ -218,7 +273,8 @@ Rules for the loop:
 5. **The card** goes to Review with the repository's link, never to Done. Tell the template-repos
    coordinator, when active, in one line.
 6. **Report** in Estilo Bancada: what exists now (repository, tag, install, the rendered example),
-   the `gh run view` output, and the "O que ficou" table — whatever was not measured, the
+   the `gh run view` output, the last comparison with the PSD when there was one (pixels over
+   total), and the "O que ficou" table — whatever was not measured, the
    preview's answer from step 5, and what the art still lacks in his eyes.
 
 ## Rules that come from past mistakes
