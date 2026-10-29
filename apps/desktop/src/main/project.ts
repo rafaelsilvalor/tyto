@@ -111,6 +111,12 @@ export interface ProjectSources {
    * workspace is open. Reads the folders again with the chosen one kept.
    */
   setWorkspaceFolders(folders: readonly string[]): Promise<ProjectSnapshot>;
+  /**
+   * The brands the started plugins' kits offer (TYTO-471, ADR 0155), the kits the preview draws
+   * with. Until it is called nothing is said about a configuration's `brand:`: before the plugins
+   * start there are no kits yet, and an empty set would warn on every brand.
+   */
+  setKitBrands(brands: ReadonlySet<string>): Promise<ProjectSnapshot>;
 }
 
 export interface ProjectSourcesOptions {
@@ -149,6 +155,7 @@ export async function createProjectSources({
   let codePacks: readonly InstalledCodePack[] = [];
   let workspaceFolders: readonly string[] = [];
   let fetched: FetchedTemplates | undefined;
+  let kitBrands: ReadonlySet<string> | undefined;
 
   const read = async (chosen: string | undefined): Promise<ProjectSnapshot> => {
     const replaced = fetched?.replaces ?? new Set<string>();
@@ -221,6 +228,7 @@ export async function createProjectSources({
             ...fetched.configured,
             registry: registry.value,
             images: fetched.images,
+            ...(kitBrands === undefined ? {} : { kitBrands }),
           });
     const configurationProblems = configured.diagnostics.map(({ file, diagnostic: item }) => {
       const text = file === undefined ? undefined : fetched?.texts.get(file);
@@ -273,6 +281,11 @@ export async function createProjectSources({
     },
     setWorkspaceFolders: async (folders) => {
       workspaceFolders = [...folders];
+      snapshot = await read(chosenFolder);
+      return snapshot;
+    },
+    setKitBrands: async (brands) => {
+      kitBrands = brands;
       snapshot = await read(chosenFolder);
       return snapshot;
     },

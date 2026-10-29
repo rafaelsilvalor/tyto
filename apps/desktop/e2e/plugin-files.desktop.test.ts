@@ -149,6 +149,8 @@ describe('the plugin files in the window', () => {
         '      laranja: { alias: aviso-laranja }',
         // A built-in template's name until TYTO-436: refused, and the template stands.
         '      roxo: { alias: tabela-roxo }',
+        // TYTO-471: a brand no started plugin's kit offers, a row at its line, the eighth.
+        '      marca: { brand: nonexistent }',
         '',
       ].join('\n'),
       'utf8',
@@ -170,6 +172,8 @@ describe('the plugin files in the window', () => {
       .poll(rows, { timeout: 15_000 })
       .toEqual(expect.arrayContaining([expect.stringContaining('E_TEMPLATE_ALIAS_TAKEN')]));
     expect((await rows()).some((row) => row.includes('W_PLUGIN_FILE_FETCH'))).toBe(false);
+    const brand = (await rows()).find((row) => row.includes('W_BRAND_KIT_MISSING'));
+    expect(brand).toMatch(/templates\.yaml:8:\d+: .*nonexistent/u);
 
     await page.click('#editor .cm-content');
     await page.keyboard.press('Control+End');

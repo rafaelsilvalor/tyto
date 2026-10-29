@@ -6,7 +6,7 @@ import { diagnostic } from '@tyto/core';
 import { NO_INSTALLED_PACKS, NO_PLUGIN_FILES, nodeFileSystem } from '@tyto/io';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 
-import { createProjectSources } from './project.js';
+import { type ProjectSnapshot, createProjectSources } from './project.js';
 
 /**
  * Which folders are searched, and in which order (TYTO-122).
@@ -416,5 +416,72 @@ describe("the plugin files' configurations and aliases (TYTO-433, ADR 0151)", ()
     const snapshot = await sources.reload(mine);
 
     expect(snapshot.configurations.select('aviso-claro')?.template).toBe('aviso');
+  });
+});
+
+describe("a configuration's brand with no kit (TYTO-471, ADR 0155)", () => {
+  // The brand on the file's fourth line, so the row's line is the `brand:` key's and not the
+  // configuration's or the file's first.
+  const text = [
+    'version: 1',
+    'aviso:',
+    '  roxo:',
+    '    brand: nonexistent',
+    '  verde:',
+    '    brand: casa',
+    '',
+  ].join('\n');
+  const brandAt = (value: string) => {
+    const start = text.indexOf(`brand: ${value}`) + 'brand: '.length;
+    return { value, range: { start, end: start + value.length } };
+  };
+  const synced = () => ({
+    packs: NO_INSTALLED_PACKS,
+    only: new Map(),
+    replaces: new Set<string>(),
+    problems: [],
+    configured: {
+      project: [],
+      machine: [
+        {
+          template: 'aviso',
+          file: 'marcas.yaml',
+          directory: scratch,
+          configurations: [
+            { name: 'roxo', values: {}, brand: brandAt('nonexistent') },
+            { name: 'verde', values: {}, brand: brandAt('casa') },
+          ],
+        },
+      ],
+    },
+    images: NO_PLUGIN_FILES.images,
+    texts: new Map([['marcas.yaml', text]]),
+  });
+  const missing = (snapshot: ProjectSnapshot) =>
+    snapshot.pluginFiles.filter((item) => item.code === 'W_BRAND_KIT_MISSING');
+
+  it('says nothing before the plugins have said which kits there are', async () => {
+    const sources = await sourcesOver();
+
+    expect(missing(await sources.setFetched(synced()))).toEqual([]);
+  });
+
+  it('is a row at the `brand:` line of its plugin file once the kits are known', async () => {
+    const sources = await sourcesOver();
+    await sources.setFetched(synced());
+
+    const rows = missing(await sources.setKitBrands(new Set(['casa'])));
+
+    expect(rows).toHaveLength(1);
+    expect(rows[0]?.severity).toBe('warning');
+    expect(rows[0]?.message).toMatch(/^marcas\.yaml:4:12: .*nonexistent/u);
+  });
+
+  it('is said again by the next sync, and not once a kit offers the brand', async () => {
+    const sources = await sourcesOver();
+    await sources.setKitBrands(new Set(['casa']));
+
+    expect(missing(await sources.setFetched(synced()))).toHaveLength(1);
+    expect(missing(await sources.setKitBrands(new Set(['casa', 'nonexistent'])))).toEqual([]);
   });
 });
