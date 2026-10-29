@@ -6,6 +6,7 @@ import type { Frame } from '../scene/scene.js';
 import type { MeasurableText, TextMeasurement } from '../text/layout.js';
 import type { AssetRef } from '../scene/primitives.js';
 import type { BrandKit } from './brand.js';
+import type { TemplateValues } from './value-readers.js';
 
 /**
  * `defineTemplate` — what a `template.ts` exports (`docs/template-authoring.md`).
@@ -114,6 +115,17 @@ export interface TemplateContext {
    * crosses to a template running in its plugin's process with the call.
    */
   readonly brand: BrandKit;
+
+  /**
+   * The values the manifest declares configurable, resolved: each default, overlaid by what a
+   * configuration supplied (ADR 0153). Read them through `numberValue`, `colorValue`,
+   * `faceValue` and `imageValue`, which take the template's own constant as the fallback.
+   *
+   * Optional, because a context built by hand has none, and so does a template running in
+   * its plugin's process: values do not cross the call yet (TYTO-439). `compile` always
+   * sets it.
+   */
+  readonly values?: TemplateValues;
 }
 
 /**
@@ -184,9 +196,10 @@ export function defineTemplate(
  * rebuilds `measure` over the faces that crossed with the call, with the same `measureText`,
  * `report` as a list that crosses back beside the frame (ADR 0058), and `files` as
  * {@link noFiles}: a plugin's own folder is not read for its templates yet (ADR 0062).
- * `brand` is data and crosses as it is (ADR 0063).
+ * `brand` is data and crosses as it is (ADR 0063). `values` does not cross yet: the call's
+ * wire is strict, and adding it is TYTO-439's protocol bump (ADR 0153).
  */
-export type TemplateCall = Omit<TemplateContext, 'measure' | 'report' | 'files'>;
+export type TemplateCall = Omit<TemplateContext, 'measure' | 'report' | 'files' | 'values'>;
 
 /** What an installed template's build answers across the boundary: its frame and reports. */
 export interface TemplateAnswer {

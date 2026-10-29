@@ -1,8 +1,10 @@
-import { measureNothing, noBrandKit, noFiles } from '@tyto/core';
+import { measureNothing, noBrandKit, noFiles, parseManifest, resolveValues } from '@tyto/core';
+import { solid } from '@tyto/core/template';
 import { describe, expect, it } from 'vitest';
 
+import manifestYaml from './manifest.yaml?raw';
 import { build } from './template.js';
-import { NO_BREAK_SPACE, ROXO } from '@tyto/house-style';
+import { NO_BREAK_SPACE, ROXO, TABLE_VALUE_DEFAULTS } from '@tyto/house-style';
 import { BODY, OPTICAL_DROP, SIGNATURE, PAGE, TITLE } from '@tyto/house-style/table-tokens';
 
 import type {
@@ -12,6 +14,7 @@ import type {
   SceneNode,
   TemplateContext,
   TemplateReport,
+  TemplateValues,
   TextNode,
 } from '@tyto/core';
 
@@ -137,6 +140,7 @@ interface Built {
 function render(
   brief: { titulo: string; tabela: string },
   measure: TemplateContext['measure'] = proportional,
+  values?: TemplateValues,
 ): Built {
   const reports: TemplateReport[] = [];
   const frame = build({
@@ -161,6 +165,7 @@ function render(
     report: (report) => reports.push(report),
     files: noFiles,
     brand: noBrandKit,
+    ...(values === undefined ? {} : { values }),
   });
   return { frame, reports };
 }
@@ -399,5 +404,107 @@ describe('with nothing to measure', () => {
 
     expect(texts).toHaveLength(4 + 10 * 4);
     for (const item of texts) expect((item.node as TextNode).overflow).toBe('shrink');
+  });
+});
+
+/* ------------------------------------------------------------- declared values -- */
+
+function valueOf<T>(result: { ok: true; value: T } | { ok: false; error: unknown }): T {
+  if (!result.ok) throw new Error(JSON.stringify(result.error, undefined, 2));
+  return result.value;
+}
+
+/**
+ * What a configuration may change (TYTO-438, ADR 0153): every value the manifest declares,
+ * set one at a time and found in the scene. Nothing reads a plugin file yet (TYTO-439), so
+ * the values are set here as `compile` would hand them over, resolved.
+ */
+describe('declared values', () => {
+  const manifest = valueOf(parseManifest(manifestYaml, 'tabela-roxo/manifest.yaml'));
+  const withValues = (values: TemplateValues) => render(FOUR_COLUMNS, proportional, values).frame;
+
+  it('declares the table’s defaults, each equal to the token it replaced', () => {
+    const defaults = Object.fromEntries(
+      Object.entries(manifest.values ?? {}).map(([name, declared]) => [name, declared.default]),
+    );
+    expect(defaults).toEqual(TABLE_VALUE_DEFAULTS);
+  });
+
+  it('draws the same scene with its declared defaults as with no values at all', () => {
+    const declared = resolveValues(manifest, undefined, noFiles);
+    expect(declared.diagnostics).toEqual([]);
+    expect(withValues(declared.values)).toEqual(render(FOUR_COLUMNS).frame);
+  });
+
+  it('sets the gap under the title', () => {
+    expect(gapUnderTitle(withValues({ 'title-gap': 57 }))).toBeCloseTo(57, 6);
+  });
+
+  it('sets the title between its floor and its ceiling', () => {
+    const titleSize = (frame: Frame) => {
+      const title = placed(frame).find((item) => item.node.name === 'title')!.node;
+      const span = title.kind === 'text' ? title.runs.find((r) => r.kind === 'text') : undefined;
+      return span?.kind === 'text' ? span.size : Number.NaN;
+    };
+    expect(titleSize(withValues({ 'title-floor': 70, 'title-ceiling': 70 }))).toBe(70);
+    const capped = titleSize(withValues({ 'title-ceiling': 41 }));
+    expect(capped).toBeLessThanOrEqual(41);
+    expect(capped).toBeLessThan(titleSize(render(FOUR_COLUMNS).frame));
+  });
+
+  it('sets the body between its floor and its ceiling', () => {
+    expect(bodySize(withValues({ 'body-floor': 20, 'body-ceiling': 20 }))).toBe(20);
+    expect(bodySize(withValues({ 'body-ceiling': 18 }))).toBeLessThanOrEqual(18);
+  });
+
+  it('lowers a cell’s words by the configured optical drop', () => {
+    const frame = withValues({ 'optical-drop': 0.3 });
+    const size = bodySize(frame);
+    const header = rows(frame).find((row) => row.name === 'header-row')!;
+    const cell = header.rects[0]!;
+    const words = header.texts[0]!;
+    const textCentre = words.y + (words.node as TextNode).box.h! / 2;
+    const cellCentre = cell.y + (cell.node.kind === 'rect' ? cell.node.size.h : 0) / 2;
+    expect(textCentre - cellCentre).toBeCloseTo(0.3 * size, 6);
+  });
+
+  it.each([
+    ['paper', (frame: Frame) => frame.background],
+    [
+      'zebra',
+      (frame: Frame) => {
+        const first = rows(frame).find((row) => row.name === 'body-row')!.rects[0]!.node;
+        return first.kind === 'rect' ? first.fill : undefined;
+      },
+    ],
+  ])('paints %s in the configured colour', (name, paintOf) => {
+    expect(paintOf(withValues({ [name]: '#123456' }))).toEqual(solid('#123456'));
+  });
+
+  it.each([
+    ['ink', 'body-row', 'cell-text'],
+    ['on-accent', 'header-row', 'cell-text'],
+    ['signature-ink', 'sign-off', 'signature'],
+  ])('sets %s on the words of %s', (name, group, node) => {
+    const frame = withValues({ [name]: '#123456' });
+    const found = placed(frame).find(
+      (item) => item.path.at(-1) === group && item.node.name === node,
+    )!.node;
+    const span = found.kind === 'text' ? found.runs.find((r) => r.kind === 'text') : undefined;
+    expect(span?.kind === 'text' && span.color).toEqual(solid('#123456'));
+  });
+
+  it('refuses a value outside its limits at the range it was written, and keeps the default', () => {
+    const range = { start: 3, end: 9 };
+    const resolved = resolveValues(manifest, { 'title-gap': { value: '400px', range } }, noFiles);
+    expect(resolved.values['title-gap']).toBe(20);
+    expect(resolved.diagnostics).toEqual([
+      expect.objectContaining({
+        code: 'W_TEMPLATE_VALUE_INVALID',
+        severity: 'warning',
+        range,
+        message: expect.stringContaining('above its maximum of 120px'),
+      }),
+    ]);
   });
 });

@@ -112,6 +112,28 @@ These are the rules it enforces beyond the shape:
   (`azul` or `tyto-demo`). It is the one fact about a template's identity nothing
   else in the manifest answers: the name says what the piece is about, and the formats and the
   repeatable slot say what kind of piece it is (`docs/format-kinds.md`).
+- **`values` declares what a configuration may change** (TYTO-438, ADR 0153), and nothing
+  else is configurable (ADR 0151). Each entry is a `color` (hex), a `length` (px), a `number`,
+  a `face` (`{ family, weight, style }`) or an `image` (a path in the template's folder), with
+  a `default` and, on a length or a number, optional `min` and `max`. A value changes a value,
+  never which pieces appear or in what order: that is a slot or an adjustment, which the brief
+  owns. A default outside its own limits is refused while the manifest is read. Declare a
+  value with the constant the template already draws as its default, so nothing configured
+  draws the same bytes.
+
+  ```yaml
+  values:
+    title-gap: { type: length, default: 20, min: 0, max: 120 }
+    paper: { type: color, default: '#fbfbfb' }
+  ```
+
+  A code template reads them with `numberValue(context, 'title-gap', TITLE.gap)`,
+  `colorValue`, `faceValue` and `imageValue` from `@tyto/core/template`. The last argument is
+  its own constant, drawn when the context carries no values; pin it to the manifest's default
+  in a test, as `tabela-roxo/template.test.ts` does. A value supplied with a name the template
+  did not declare is `W_TEMPLATE_VALUE_UNKNOWN`; one of the wrong kind or outside its limits is
+  `W_TEMPLATE_VALUE_INVALID`. Both are warnings, and the default is drawn. Nothing reads a
+  plugin file's configuration yet (TYTO-439).
 
 ## Discovery: `TemplateRegistry`
 

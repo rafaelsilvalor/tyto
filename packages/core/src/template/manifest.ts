@@ -160,6 +160,59 @@ export const manifestFaceSchema = z.strictObject({
   weight: z.number().int().min(100).max(900),
   style: z.enum(['normal', 'italic']).default('normal'),
 });
+export type ManifestFace = z.infer<typeof manifestFaceSchema>;
+
+/** The hex forms `color()` in `values.ts` accepts, so a declared colour is one it can draw. */
+export const HEX_COLOR = /^#(?:[0-9a-fA-F]{3,4}|[0-9a-fA-F]{6}|[0-9a-fA-F]{8})$/u;
+
+/**
+ * The kinds of value a template may declare configurable (ADR 0151 decision 1, ADR 0153):
+ * each changes a value and never the composition. `length` is in px, `number` is unitless
+ * (a ratio, an `em` multiple).
+ */
+export const declaredValueTypeSchema = z.enum(['color', 'length', 'number', 'face', 'image']);
+export type DeclaredValueType = z.infer<typeof declaredValueTypeSchema>;
+
+const limits = { min: z.number().optional(), max: z.number().optional() };
+
+/**
+ * One configurable value: its kind, its default and, for a length or a number, its limits.
+ * The default is what the template draws with when nothing configures it, so a template that
+ * declares a value it used to hold as a constant draws the same bytes as before.
+ */
+export const declaredValueSchema = z
+  .discriminatedUnion('type', [
+    z.strictObject({
+      type: z.literal('color'),
+      default: z.string().regex(HEX_COLOR, "must be a hex colour such as '#5900a7'"),
+    }),
+    z.strictObject({ type: z.literal('length'), default: z.number(), ...limits }),
+    z.strictObject({ type: z.literal('number'), default: z.number(), ...limits }),
+    z.strictObject({ type: z.literal('face'), default: manifestFaceSchema }),
+    // A path inside the template's own folder (ADR 0062). Optional: a template may declare an
+    // image it draws only when somebody supplies one.
+    z.strictObject({ type: z.literal('image'), default: z.string().min(1).optional() }),
+  ])
+  .superRefine((value, context) => {
+    if (value.type !== 'length' && value.type !== 'number') return;
+    const { min, max } = value;
+    if (min !== undefined && max !== undefined && min > max) {
+      context.addIssue({
+        code: 'custom',
+        path: ['min'],
+        message: `min ${min} is above max ${max}`,
+      });
+      return;
+    }
+    if ((min !== undefined && value.default < min) || (max !== undefined && value.default > max)) {
+      context.addIssue({
+        code: 'custom',
+        path: ['default'],
+        message: `default ${value.default} is outside its own limits`,
+      });
+    }
+  });
+export type DeclaredValue = z.infer<typeof declaredValueSchema>;
 
 export const templateManifestSchema = z
   .strictObject({
@@ -203,6 +256,13 @@ export const templateManifestSchema = z
         z.strictObject({ alternatives: z.array(z.string().min(1)).min(1) }),
       )
       .optional(),
+    /**
+     * What a configuration may change in this template, by name (ADR 0151, ADR 0153):
+     * `title-gap: { type: length, default: 20, min: 0, max: 120 }`. Only what is declared here
+     * is configurable, and a value changes a value, never which pieces are drawn or in what
+     * order. Optional, so every manifest written before it still loads.
+     */
+    values: z.record(z.string(), declaredValueSchema).optional(),
   })
   .superRefine((manifest, context) => {
     // Checked here rather than as a key schema on the records: Zod reports a failing
@@ -211,6 +271,7 @@ export const templateManifestSchema = z
     for (const [group, names] of [
       ['slots', Object.keys(manifest.slots)],
       ['adjustments', Object.keys(manifest.adjustments)],
+      ['values', Object.keys(manifest.values ?? {})],
     ] as const) {
       for (const name of names) {
         if (!IDENTIFIER.test(name)) {

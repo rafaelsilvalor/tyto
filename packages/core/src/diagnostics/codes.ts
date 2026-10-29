@@ -934,6 +934,26 @@ export const diagnosticCodes = {
     fatal: false,
     fatality: 'A warning never replaces a value (ADR 0013).',
   },
+  // Warnings and not errors: a configuration is tolerant per value, as a plugin file is per
+  // entry (ADR 0151 decision 2). The template draws with its default instead, and says so.
+  W_TEMPLATE_VALUE_UNKNOWN: {
+    severity: 'warning',
+    summary: 'A configuration sets a value the template does not declare configurable.',
+    template:
+      "Template '{template}' declares no configurable value '{name}'; the setting is ignored.",
+    spec: 'docs/adr/0153-a-template-declares-its-configurable-values-in-its-manifest.md',
+    fatal: false,
+    fatality: 'A warning never replaces a value (ADR 0013).',
+  },
+  W_TEMPLATE_VALUE_INVALID: {
+    severity: 'warning',
+    summary:
+      'A configuration sets a declared value to one of the wrong kind or outside its limits.',
+    template: "Value '{name}' of template '{template}' {problem}; the template's default is used.",
+    spec: 'docs/adr/0153-a-template-declares-its-configurable-values-in-its-manifest.md',
+    fatal: false,
+    fatality: 'A warning never replaces a value (ADR 0013).',
+  },
   W_UNUSED_SLOT: {
     severity: 'warning',
     summary: 'The brief sets a slot the chosen template never renders.',

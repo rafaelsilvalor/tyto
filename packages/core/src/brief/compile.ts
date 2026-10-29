@@ -21,6 +21,8 @@ import {
   noFiles,
 } from '../template/define.js';
 import type { TemplateManifest } from '../template/manifest.js';
+import { type SuppliedValues, resolveValues } from '../template/declared-values.js';
+import type { TemplateValues } from '../template/value-readers.js';
 import { type BrandKit, noBrandKit } from '../template/brand.js';
 
 /**
@@ -313,6 +315,13 @@ export interface CompileOptions {
    * other. Absent, or without that brand, the template is handed {@link noBrandKit}.
    */
   readonly brandKits?: ReadonlyMap<string, BrandKit>;
+  /**
+   * Values for what the template's manifest declares configurable, by name (ADR 0153), each
+   * with the range it was written at. What is not supplied draws with its default; what the
+   * template did not declare, or what its limits refuse, is a warning there and the default
+   * stands. Nothing reads a plugin file's configuration into this yet (TYTO-439).
+   */
+  readonly values?: SuppliedValues;
 }
 
 export function compile(
@@ -366,6 +375,9 @@ export async function compileDeferred(
         measure,
         noFiles,
         brand,
+        // Values do not cross to a plugin's process yet (TYTO-439); compileWith below still
+        // checks the supplied ones and reports what it refuses.
+        undefined,
         reports,
       );
       answers.set(context.idPrefix, await template.buildLater(context));
@@ -414,6 +426,7 @@ function contextOf(
   measure: TemplateContext['measure'],
   files: TemplateFiles,
   brand: BrandKit,
+  values: TemplateValues | undefined,
   reports: Diagnostic[],
 ): TemplateContext {
   return {
@@ -427,6 +440,7 @@ function contextOf(
     measure,
     files,
     brand,
+    ...(values === undefined ? {} : { values }),
     report: (report) => {
       reports.push(reportDiagnostic(report, plan, format));
     },
@@ -461,9 +475,10 @@ function compileWith(
   // What a template is told a node will measure is what it then measures (ADR 0038).
   const measure = measureOf(faces);
   const brand = brandKitOf(manifest, options);
+  const values = resolveValues(manifest, options.values, files);
 
   const plans = planArtworks(resolved, manifest);
-  const problems: Diagnostic[] = [];
+  const problems: Diagnostic[] = [...values.diagnostics];
   const artworks: Artwork[] = [];
   const fonts = new Map<string, FontRef>();
   const assets = new Map<string, AssetRef>();
@@ -482,6 +497,7 @@ function compileWith(
         measure,
         files,
         brand,
+        values.values,
         reports,
       );
 

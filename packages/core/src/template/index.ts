@@ -36,6 +36,15 @@ export {
 export { type RunStyle, type RunsOptions, runsOf } from './runs.js';
 
 export {
+  type TemplateValue,
+  type TemplateValues,
+  colorValue,
+  faceValue,
+  imageValue,
+  numberValue,
+} from './value-readers.js';
+
+export {
   type FrameOptions,
   type GroupDraft,
   type GroupOptions,
