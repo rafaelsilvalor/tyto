@@ -1,5 +1,32 @@
 # @tyto/cli
 
+## 0.8.0
+
+### Minor Changes
+
+- e2b72a7: TYTO-456: `tyto plugin list [folder]` shows what the plugin files name, below the installed plugins: the plugin, machine or project, git, ref, the locked commit and whether a render loads it (`approved`, `not approved`, `not synced`, `refused`), then every alias as `alias → template (configuration)`. It reads the files, their lock, the cached copy's manifest and the approvals; it fetches nothing and runs no plugin. `--json` adds `pluginFiles` and `aliases`; `--active` keeps the approved copies. In a restricted workspace, `tyto render` and `tyto plugin list` name the project's `.tyto/plugin-files` as left out, in the words `tyto plugin sync` already used (ADR 0111). A plugin-file diagnostic about no file the run names (`W_PLUGIN_FILE_FETCH`, say) prints with no path instead of under the brief's name. `@tyto/core` exports `configurationAlias`, the `<template>-<configuration>` rule; `@tyto/io` exports `locationOf`. The manual's Plugins page describes the listing in both editions.
+
+### Patch Changes
+
+- c590e01: TYTO-433: the desktop fetches the templates the plugin files name (ADR 0151). Main runs the sync `tyto render` runs when the app starts, when the window opens a workspace folder, and on Plugins: Sync Plugin Files and Plugins: Update Plugin Files (`plugin-files:sync`; the update moves every ref). The fetched copies run as a plugin set of their own, beside the installed plugins, started again when a sync changes which copies load; their template packs are searched after the built-in pack and before the installed ones, offer only the templates their files name, and leave out an installed plugin a copy replaces. A failed fetch is a row in the problems panel naming the repository, and the copy fetched before keeps loading; `templates:changed` tells the window to list and compile again. A permission prompt is a native box, recorded in `plugins.json` by name. A restricted folder's plugin files are neither fetched nor loaded, and are `W_PROJECT_PLUGIN_FILES_WITHHELD` in the trust strip's count. A fetched plugin contributes templates only in the window for now. `@tyto/io` adds `syncPluginFiles`, both folders' sync moved from the CLI, with the built-in names, the path display and the permission answer as parameters, plus `machinePluginFiles`, `projectPluginFiles` and `NO_PLUGIN_FILES`; the CLI composes it unchanged. `@tyto/core` adds `W_PROJECT_PLUGIN_FILES_WITHHELD`. A failed fetch or a refused commit is now printed by the CLI, and shown by the window, under the plugin file that named the source (`onSourceProblem` on `syncPluginFolder` and `syncPluginFiles`).
+- e7588e9: TYTO-440: a plugin file's configuration sets the brief's side under `brief:` (ADR 0151). `slots` fills a slot that does not repeat when the brief leaves it unset, `formats` says what renders when the brief lists none, `skeleton` keeps the text a new brief starts with, and `editor` sets a `max` per slot, tighter than the manifest's. The brief wins every one. `@tyto/plugin-api`'s `parsePluginFile` keeps the block with each part's range (`PluginFileConfiguration.brief` is now a `ConfigurationBrief`), and warns on a key that is not one of the four. `@tyto/core`'s `resolveTemplateConfigurations` checks it against the manifest once and hands it on as `TemplateSelection.brief`; `resolve` applies it. New warnings: `W_CONFIGURATION_BRIEF_INVALID` and `W_EDITOR_RULE_LOOSER` at the plugin file's line, `W_SLOT_OVER_CONFIGURED_LIMIT` at the brief's. Nothing crosses to a plugin's process, so the protocol is unchanged. The manual's Plugins page describes it in both editions.
+- 4388575: TYTO-455 (ADR 0155): a plugin file's configuration picks its brand, and the brand kit carries the brand's accent. A configuration may write `brand:`; the template is then handed that brand's kit in `context.brand` instead of its manifest's — the configuration's own brand, else its entry `default`'s, else the manifest's. A brief cannot name a brand. `@tyto/core`'s `BrandKit` gains `colors?: { accent? }` (`BrandColors`, `brandColorsSchema`; closed and strict, a hex accent only), `TemplateSelection` and `ResolvedBrief` gain `brand`, `resolveTemplateConfigurations` takes optional `kitBrands`, and two warnings join: `W_CONFIGURATION_BRAND_INVALID` for a brand spelled against the manifest's rule, and `W_BRAND_KIT_MISSING` at the plugin file's line for a brand no installed kit offers (a manifest's brand with no kit stays silent). `@tyto/plugin-api`'s `parsePluginFile` keeps `brand` with its range. **The isolation protocol is 11**, because a kit with colours crosses in the strict template-call and `brand-kit` schemas: a plugin process on 10 is refused at `hello`, and this release is the breaking minor ADR 0149 point 4 requires. After it is published, the contract-update workflow (ADR 0154) opens the pull request that moves `tyto-template-tabela`, `tyto-template-concursos-abertos` and the plugin repositories onto it. `@tyto/house-style` adds `accentOf(kit, fallback)`, and the house's compositions (`simuladosDaSemana`, `oneImageTable`, `productBanner`) draw the kit's accent over their own; the built-in templates, azul's `agenda-semana` and `aprovados` included, do the same, with today's colour as the fallback, so every render without a kit is byte-identical. `tyto render` passes the installed kits' brands, so the CLI reports `W_BRAND_KIT_MISSING`; the desktop already draws a configuration's kit, and reports the warning in a later change. The manual's Plugins page describes it in both editions.
+- Updated dependencies [c590e01]
+- Updated dependencies [e7588e9]
+- Updated dependencies [4388575]
+- Updated dependencies [e2b72a7]
+  - @tyto/core@0.32.0
+  - @tyto/io@4.3.0
+  - @tyto/plugin-api@0.9.0
+  - @tyto/templates@1.0.6
+  - @tyto/export-html@0.7.5
+  - @tyto/export-svg@2.0.5
+  - @tyto/fonts@0.4.0
+  - @tyto/google-fonts@0.1.4
+  - @tyto/pipeline@0.12.1
+  - @tyto/raster@0.2.2
+  - @tyto/template-lang@0.8.4
+
 ## 0.7.0
 
 ### Minor Changes

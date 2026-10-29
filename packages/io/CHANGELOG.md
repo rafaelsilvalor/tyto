@@ -1,5 +1,25 @@
 # @tyto/io
 
+## 4.3.0
+
+### Minor Changes
+
+- c590e01: TYTO-433: the desktop fetches the templates the plugin files name (ADR 0151). Main runs the sync `tyto render` runs when the app starts, when the window opens a workspace folder, and on Plugins: Sync Plugin Files and Plugins: Update Plugin Files (`plugin-files:sync`; the update moves every ref). The fetched copies run as a plugin set of their own, beside the installed plugins, started again when a sync changes which copies load; their template packs are searched after the built-in pack and before the installed ones, offer only the templates their files name, and leave out an installed plugin a copy replaces. A failed fetch is a row in the problems panel naming the repository, and the copy fetched before keeps loading; `templates:changed` tells the window to list and compile again. A permission prompt is a native box, recorded in `plugins.json` by name. A restricted folder's plugin files are neither fetched nor loaded, and are `W_PROJECT_PLUGIN_FILES_WITHHELD` in the trust strip's count. A fetched plugin contributes templates only in the window for now. `@tyto/io` adds `syncPluginFiles`, both folders' sync moved from the CLI, with the built-in names, the path display and the permission answer as parameters, plus `machinePluginFiles`, `projectPluginFiles` and `NO_PLUGIN_FILES`; the CLI composes it unchanged. `@tyto/core` adds `W_PROJECT_PLUGIN_FILES_WITHHELD`. A failed fetch or a refused commit is now printed by the CLI, and shown by the window, under the plugin file that named the source (`onSourceProblem` on `syncPluginFolder` and `syncPluginFiles`).
+- e2b72a7: TYTO-456: `tyto plugin list [folder]` shows what the plugin files name, below the installed plugins: the plugin, machine or project, git, ref, the locked commit and whether a render loads it (`approved`, `not approved`, `not synced`, `refused`), then every alias as `alias → template (configuration)`. It reads the files, their lock, the cached copy's manifest and the approvals; it fetches nothing and runs no plugin. `--json` adds `pluginFiles` and `aliases`; `--active` keeps the approved copies. In a restricted workspace, `tyto render` and `tyto plugin list` name the project's `.tyto/plugin-files` as left out, in the words `tyto plugin sync` already used (ADR 0111). A plugin-file diagnostic about no file the run names (`W_PLUGIN_FILE_FETCH`, say) prints with no path instead of under the brief's name. `@tyto/core` exports `configurationAlias`, the `<template>-<configuration>` rule; `@tyto/io` exports `locationOf`. The manual's Plugins page describes the listing in both editions.
+
+### Patch Changes
+
+- Updated dependencies [c590e01]
+- Updated dependencies [e7588e9]
+- Updated dependencies [4388575]
+- Updated dependencies [e2b72a7]
+  - @tyto/core@0.32.0
+  - @tyto/plugin-api@0.9.0
+  - @tyto/export-html@0.7.5
+  - @tyto/export-svg@2.0.5
+  - @tyto/pipeline@0.12.1
+  - @tyto/template-lang@0.8.4
+
 ## 4.2.0
 
 ### Minor Changes

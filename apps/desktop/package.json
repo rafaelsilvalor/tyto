@@ -1,7 +1,7 @@
 {
   "name": "@tyto/desktop",
   "private": true,
-  "version": "0.9.3",
+  "version": "0.10.0",
   "type": "module",
   "description": "Electron desktop application.",
   "license": "UNLICENSED",
