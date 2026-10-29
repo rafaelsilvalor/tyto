@@ -23,6 +23,7 @@ import {
   fsTrustStore,
   installedPacks,
   nodeFileSystem,
+  syncPluginFiles as syncPluginFolders,
   withoutRefused,
 } from '@tyto/io';
 import { NO_PLUGINS, type ThemeKind, createPluginHost } from '@tyto/plugin-api';
@@ -62,6 +63,7 @@ import { openDocumentation } from './documentation.js';
 import { createDocumentService, openFilters, saveFilters } from './documents.js';
 import { createExportService } from './export.js';
 import { desktopCapabilities, startDesktopPlugins } from './installed-plugins.js';
+import { createDesktopPluginFiles } from './plugin-files.js';
 import { fileLayoutStore } from './layout-store.js';
 import { createSessionService, createTemplateFolder } from './session.js';
 import { fileSessionStore } from './session-store.js';
@@ -668,13 +670,26 @@ async function start(): Promise<void> {
     explorer.close();
   });
 
+  // The plugin files' sync (TYTO-433), bound once the plugin launcher below exists. Asked when a
+  // folder opens; until it is bound, the first sync after binding reads the folder anyway.
+  let syncPluginFiles: (update: boolean) => Promise<void> = () => Promise.resolve();
+  const pluginFilesSoon = (update: boolean): void => {
+    syncPluginFiles(update).catch((cause: unknown) => {
+      log.error('The plugin files could not be synced.', cause);
+    });
+  };
   const workspace = createWorkspaceService({
     trustStore: fsTrustStore({ home: pluginsHome }),
     home: pluginsHome,
     setTemplateFolders: async (folders) => {
       await sources.setWorkspaceFolders(folders);
     },
-    onFolder: (folder, places) => explorer.setRoot(folder, places),
+    onFolder: async (folder, places) => {
+      await explorer.setRoot(folder, places);
+      // Not awaited: a fetch may take a while, and the folder is open meanwhile. The templates
+      // it brings arrive with `templates:changed` (ADR 0151 decision 3).
+      pluginFilesSoon(false);
+    },
   });
 
   aboutFacts = () => ({
@@ -744,20 +759,21 @@ async function start(): Promise<void> {
   // What they can reach is behind their declared permissions: `net.fetch` for the network,
   // and `safeStorage`, through the same `credentials`, for secrets (ADR 0042).
   // Not awaited: the window opens while they start, and the export waits for them.
+  const launch = bundledNodeLauncher({
+    spawn: (command, args, options) => spawn(command, args, options),
+    realpath: (path) => realpathSync(path),
+    ...bundledNodePaths({
+      packaged: app.isPackaged,
+      mainDirectory: dirname(fileURLToPath(import.meta.url)),
+      mainFile: fileURLToPath(import.meta.url),
+      resourcesPath: process.resourcesPath,
+      platform: process.platform,
+      join,
+    }),
+  });
   const plugins = startDesktopPlugins({
     store: pluginStore,
-    launch: bundledNodeLauncher({
-      spawn: (command, args, options) => spawn(command, args, options),
-      realpath: (path) => realpathSync(path),
-      ...bundledNodePaths({
-        packaged: app.isPackaged,
-        mainDirectory: dirname(fileURLToPath(import.meta.url)),
-        mainFile: fileURLToPath(import.meta.url),
-        resourcesPath: process.resourcesPath,
-        platform: process.platform,
-        join,
-      }),
-    }),
+    launch,
     capabilities,
   }).catch((cause: unknown) => {
     // A disk that refused the folder: the app opens without installed plugins, and says so.
@@ -794,6 +810,62 @@ async function start(): Promise<void> {
       log.error("The installed plugins' templates could not be read.", cause);
       return loaded;
     }
+  });
+
+  // **The plugin files** (TYTO-433, ADR 0151): the sync `tyto render` runs, here in main, with
+  // the copies in a plugin set of their own that starts again when what loads changes. Synced
+  // at start, when a folder opens (above) and on the two commands; never in the renderer.
+  const pluginFiles = createDesktopPluginFiles({
+    home: pluginsHome,
+    builtInNames: new Set(
+      [...host.registry.plugins(), ...exporterBuiltIns()].map((plugin) => plugin.manifest.name),
+    ),
+    sync: syncPluginFolders,
+    approve: async (manifest, source) => {
+      const box = {
+        type: 'question' as const,
+        message: translate(uiLocale, 'pluginFiles.approve.message').replaceAll(
+          '{plugin}',
+          manifest.name,
+        ),
+        detail: [source, '', ...manifest.permissions].join('\n'),
+        buttons: [
+          translate(uiLocale, 'pluginFiles.approve.load'),
+          translate(uiLocale, 'pluginFiles.approve.skip'),
+        ],
+        defaultId: 1,
+        cancelId: 1,
+      };
+      const answer =
+        mainWindow === undefined
+          ? await dialog.showMessageBox(box)
+          : await dialog.showMessageBox(mainWindow, box);
+      return answer.response === 0;
+    },
+    start: (store) => startDesktopPlugins({ store, launch, capabilities }),
+    packs: (loaded, folderOf) =>
+      installedPacks(createPluginHost(), loaded, folderOf, { allowCode: true }),
+    apply: async (fetched) => {
+      for (const problem of fetched.problems) log.warn(problem.message);
+      await sources.setFetched(fetched);
+      const contents = mainWindow?.webContents;
+      if (contents === undefined || contents.isDestroyed()) return;
+      sendIpcEvent(contents, 'templates:changed', {});
+    },
+  });
+  syncPluginFiles = (update) => {
+    const open = workspace.state();
+    return pluginFiles.sync({
+      update,
+      ...(open.folder === null
+        ? {}
+        : // A trust taken back while the folder is open holds until it reopens (ADR 0111).
+          { workspace: { folder: open.folder, trusted: open.trust !== 'restricted' } }),
+    });
+  };
+  pluginFilesSoon(false);
+  app.on('will-quit', () => {
+    void pluginFiles.close();
   });
 
   // Built before the window, for the same reason the registry is: the preview's first
@@ -1342,6 +1414,7 @@ async function start(): Promise<void> {
         return { ...state, problems: [...state.problems, ...failures] };
       },
     },
+    pluginFiles: { sync: (update) => syncPluginFiles(update) },
     explorer,
     queue: {
       service: queue,

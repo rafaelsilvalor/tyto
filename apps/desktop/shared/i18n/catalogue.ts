@@ -99,6 +99,11 @@ export interface Catalogue {
   readonly 'command.workspace.openFolder': string;
   readonly 'command.workspace.closeFolder': string;
   readonly 'command.workspace.manageTrust': string;
+  readonly 'command.pluginFiles.sync': string;
+  readonly 'command.pluginFiles.update': string;
+  readonly 'pluginFiles.approve.message': string;
+  readonly 'pluginFiles.approve.load': string;
+  readonly 'pluginFiles.approve.skip': string;
   readonly 'command.workspace.showProject': string;
   readonly 'workspace.banner.text': string;
   readonly 'workspace.banner.trust': string;
@@ -769,6 +774,11 @@ export const CATALOGUE_KEYS = [
   'command.workspace.openFolder',
   'command.workspace.closeFolder',
   'command.workspace.manageTrust',
+  'command.pluginFiles.sync',
+  'command.pluginFiles.update',
+  'pluginFiles.approve.message',
+  'pluginFiles.approve.load',
+  'pluginFiles.approve.skip',
   'command.workspace.showProject',
   'workspace.banner.text',
   'workspace.banner.trust',

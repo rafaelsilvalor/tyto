@@ -3,7 +3,8 @@ import { createRequire } from 'node:module';
 import { tmpdir } from 'node:os';
 import { basename, dirname, join } from 'node:path';
 
-import { nodeFileSystem } from '@tyto/io';
+import { diagnostic } from '@tyto/core';
+import { NO_INSTALLED_PACKS, nodeFileSystem } from '@tyto/io';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 
 import { createProjectSources } from './project.js';
@@ -173,6 +174,31 @@ describe('the template catalogue', () => {
     expect(answer.failures[0]?.diagnostics.length).toBeGreaterThan(0);
     expect(answer.failures[0]?.diagnostics[0]?.code).toMatch(/^E_/u);
     expect(answer.failures[0]?.diagnostics[0]?.message).not.toBe('');
+  });
+
+  it("lists the plugin files' last sync among the failures, with no brief open (TYTO-433)", async () => {
+    const sources = await sourcesOver(join(scratch, 'with-preview'));
+    const fetch = diagnostic('W_PLUGIN_FILE_FETCH', {
+      git: 'https://example.invalid/tabela.git',
+      ref: 'v1',
+      problem: 'fatal: repository not found',
+      outcome: 'Nothing from it loads.',
+    });
+    await sources.setFetched({
+      packs: NO_INSTALLED_PACKS,
+      only: new Map(),
+      replaces: new Set(),
+      problems: [fetch],
+    });
+
+    const { failures } = await (await createTemplateCatalogue({ sources })).list();
+
+    expect(failures).toEqual([
+      {
+        directory: 'plugin-files',
+        diagnostics: [{ severity: 'warning', code: 'W_PLUGIN_FILE_FETCH', message: fetch.message }],
+      },
+    ]);
   });
 
   it('carries each manifest’s slots and names the folder a template came from', async () => {

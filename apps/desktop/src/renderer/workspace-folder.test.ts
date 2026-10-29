@@ -18,6 +18,13 @@ describe('the workspace rows in the problems panel (TYTO-278)', () => {
     const carried = carriedAcrossTemplateRead([row('E_TRUST_FILE'), row('E_TEMPLATE_READ')]);
     expect(carried.map((item) => item.code)).toEqual(['E_TRUST_FILE']);
   });
+
+  it("keeps a restricted folder's plugin files row across a template read (TYTO-433)", () => {
+    // Seen in the real window: the strip counted it and the panel had dropped it, because a
+    // sync's `templates:changed` rebuilds the installation list right after the folder opens.
+    const carried = carriedAcrossTemplateRead([row('W_PROJECT_PLUGIN_FILES_WITHHELD')]);
+    expect(carried.map((item) => item.code)).toEqual(['W_PROJECT_PLUGIN_FILES_WITHHELD']);
+  });
 });
 
 describe("the export dialog's destination (TYTO-278)", () => {

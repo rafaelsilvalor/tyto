@@ -771,6 +771,7 @@ const dependencies = () => {
     recipes: recipeRunner(),
     project: projectFolder(),
     workspace: workspaceFolder(),
+    pluginFiles: { sync: () => Promise.resolve() },
     explorer: explorerFiles(),
     queue: queueDependency(),
     settings: {

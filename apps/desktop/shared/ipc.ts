@@ -1508,6 +1508,16 @@ export const IPC_CHANNELS = {
   ),
 
   /**
+   * Syncs the plugin files now (TYTO-433, ADR 0151 decision 3), from Plugins: Sync Plugin Files
+   * (`update: false`) or Plugins: Update Plugin Files (`update: true`, which moves every ref).
+   * **Strict, and it names no folder**: main syncs the machine's files and those of the folder
+   * it has open, if trusted. Answers once the sync and the template list it changes are done;
+   * what went wrong is in the template list's failures, which `templates:changed` asks the
+   * window to read again.
+   */
+  'plugin-files:sync': channel(z.strictObject({ update: z.boolean() }), z.object({})),
+
+  /**
    * The installed plugins' panels (TYTO-49, ADR 0045), answered once the plugins have started.
    *
    * `src` is a `tyto-plugin:` URL main serves out of that plugin's folder; the renderer puts
@@ -2179,6 +2189,13 @@ export const IPC_EVENTS = {
 
   /** `snippets.json` changed on disk (TYTO-277), with its new text, as `keybindings:changed`. */
   'snippets:changed': z.object({ text: z.string() }),
+
+  /**
+   * The templates main searches changed without the window asking (TYTO-433): a sync of the
+   * plugin files, at start or on opening a folder, fetched or dropped a pack. Empty, for
+   * `queue:changed`'s reason: the window asks `templates:list` and compiles its briefs again.
+   */
+  'templates:changed': z.object({}),
 } as const;
 
 export type IpcEvents = typeof IPC_EVENTS;

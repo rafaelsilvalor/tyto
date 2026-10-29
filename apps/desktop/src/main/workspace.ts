@@ -1,3 +1,4 @@
+import { readdir } from 'node:fs/promises';
 import { basename, dirname, join, relative } from 'node:path';
 
 import {
@@ -7,6 +8,7 @@ import {
   type Result,
   type TrustStore,
   createLineIndex,
+  diagnostic,
   lineColumnAtIndex,
   ok,
 } from '@tyto/core';
@@ -16,7 +18,9 @@ import {
   findWorkspace,
   isInside,
   loadWorkspace,
+  projectPluginFiles,
 } from '@tyto/io';
+import { PLUGIN_FILE_EXTENSION } from '@tyto/plugin-api';
 
 import type { IpcResponse } from '../../shared/ipc.js';
 import { type FontsInForce, fontsFor } from './fonts.js';
@@ -160,6 +164,8 @@ const PLACE_KEYS = ['assets', 'templates', 'fonts', 'output'] as const;
 
 export function createWorkspaceService(options: WorkspaceServiceOptions): WorkspaceService {
   let open: LoadedWorkspace | undefined;
+  /** The open folder's plugin files, left out because it is restricted (ADR 0151 decision 6). */
+  let withheld: Diagnostic | undefined;
   /** Trust taken back while the folder is open, per source: still trusted until it reopens. */
   let revoked: Record<TrustSource, boolean> = { folder: false, profile: false };
 
@@ -169,6 +175,8 @@ export function createWorkspaceService(options: WorkspaceServiceOptions): Worksp
       home: options.home,
     });
     open = loaded;
+    withheld =
+      loaded?.trust === 'restricted' ? await pluginFilesWithheld(loaded.folder) : undefined;
     revoked = { folder: false, profile: false };
     await options.setTemplateFolders(loaded?.project.templates ?? []);
     await options.onFolder?.(
@@ -203,7 +211,9 @@ export function createWorkspaceService(options: WorkspaceServiceOptions): Worksp
         folder: open.folder,
         name: basename(open.folder),
         trust: revoked.folder ? 'revoked' : open.trust,
-        leftOut: open.diagnostics.filter((item) => LEFT_OUT.has(item.code)).length,
+        leftOut:
+          open.diagnostics.filter((item) => LEFT_OUT.has(item.code)).length +
+          (withheld === undefined ? 0 : 1),
         output: open.project.output ?? null,
         profile:
           profile === undefined
@@ -223,7 +233,7 @@ export function createWorkspaceService(options: WorkspaceServiceOptions): Worksp
           types: [...preset.types],
           folder: preset.folder,
         })),
-        problems: [...problemsOf(open)],
+        problems: [...problemsOf(open), ...(withheld === undefined ? [] : [withheld])],
       };
     },
 
@@ -231,6 +241,7 @@ export function createWorkspaceService(options: WorkspaceServiceOptions): Worksp
 
     async close() {
       open = undefined;
+      withheld = undefined;
       revoked = { folder: false, profile: false };
       await options.setTemplateFolders([]);
       await options.onFolder?.(undefined, NO_FOLDER_PLACES);
@@ -296,6 +307,23 @@ export function createWorkspaceService(options: WorkspaceServiceOptions): Worksp
       return Object.prototype.hasOwnProperty.call(sections, plugin) ? sections[plugin] : undefined;
     },
   };
+}
+
+/**
+ * The row a restricted folder's plugin files earn, or nothing when it has none: the strip
+ * shows only when a folder actually ships something it left out (ADR 0111), and an empty or
+ * missing `.tyto/plugin-files/` ships nothing. Named, never hidden: the files, and where.
+ */
+async function pluginFilesWithheld(folder: string): Promise<Diagnostic | undefined> {
+  const directory = projectPluginFiles(folder);
+  const files = (await readdir(directory).catch(() => []))
+    .filter((name) => name.endsWith(PLUGIN_FILE_EXTENSION))
+    .sort();
+  if (files.length === 0) return undefined;
+  return diagnostic('W_PROJECT_PLUGIN_FILES_WITHHELD', {
+    folder: relative(folder, directory),
+    files: files.join(', '),
+  });
 }
 
 /**

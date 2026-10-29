@@ -232,6 +232,11 @@ export interface IpcDependencies {
     ) => Promise<IpcResponse<'workspace:trust'>>;
   };
   /**
+   * The plugin files' sync (TYTO-433, ADR 0151): the composition root knows the open folder,
+   * its trust and the plugin set the copies run in, so the handler only says whether refs move.
+   */
+  readonly pluginFiles: { sync: (update: boolean) => Promise<void> };
+  /**
    * The open workspace folder's files (TYTO-279, ADR 0115): listed by id, and a brief's path
    * found by id, only inside the folder main has open.
    */
@@ -434,6 +439,7 @@ export function createHandlers(dependencies: IpcDependencies): Handlers {
     preview,
     project,
     workspace,
+    pluginFiles,
     explorer,
     queue,
     recipes,
@@ -510,6 +516,11 @@ export function createHandlers(dependencies: IpcDependencies): Handlers {
     }),
 
     'workspace:trust': ({ trusted, source }) => workspace.setTrust(trusted, source),
+
+    'plugin-files:sync': async ({ update }) => {
+      await pluginFiles.sync(update);
+      return {};
+    },
 
     'explorer:list': ({ entryId }) => explorer.list(entryId),
 

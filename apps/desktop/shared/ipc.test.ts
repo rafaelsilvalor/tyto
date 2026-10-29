@@ -57,6 +57,8 @@ describe('the IPC contract', () => {
       'menu:model',
       'menu:popup',
       'panel:request',
+      // TYTO-433: Plugins: Sync / Update Plugin Files.
+      'plugin-files:sync',
       'plugins:keymaps',
       'plugins:list',
       'plugins:panels',
@@ -137,6 +139,8 @@ describe('the event table', () => {
       'settings:changed',
       // TYTO-277. snippets.json changed on disk; the push carries its text.
       'snippets:changed',
+      // TYTO-433. A plugin files' sync changed the templates; the window lists them again.
+      'templates:changed',
       // TYTO-131. The update status changed; the window asks `update:status`.
       'update:changed',
     ]);

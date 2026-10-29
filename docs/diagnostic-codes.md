@@ -149,6 +149,7 @@ non-zero.
 | `W_PROJECT_KEY_INVALID` | warning | no | A project key's value, or one entry of it, is not accepted, so it is left out. |
 | `W_PROJECT_PATH_OUTSIDE` | warning | no | A restricted source's folder key leads outside the source, directly or through a link, so it is left out. |
 | `W_PROJECT_SECTIONS_WITHHELD` | warning | no | A restricted source's plugin sections are withheld from the plugins that would read them. |
+| `W_PROJECT_PLUGIN_FILES_WITHHELD` | warning | no | A restricted folder's plugin files are neither fetched nor loaded until the folder is trusted. |
 | `W_PROJECT_PROFILE_INVALID` | warning | no | The project file names a work profile in a form Tyto does not accept, so no profile is read. |
 | `W_PROJECT_PROFILE_MISSING` | warning | no | The work profile the project file names is not there, so no profile is read. |
 | `W_PROFILE_NESTED` | warning | no | A work profile names another profile, which is ignored: profiles are one level deep. |
@@ -2542,6 +2543,20 @@ The sections for {plugins} are withheld because this folder is not trusted.
 ```
 
 Parameters: `plugins`
+
+### `W_PROJECT_PLUGIN_FILES_WITHHELD`
+
+**Severity:** warning · **Fatal:** no · **Spec:** `docs/adr/0151-plugin-files-install-and-configure-templates.md`
+
+A restricted folder's plugin files are neither fetched nor loaded until the folder is trusted.
+
+Only the project's plugin files are left out; the machine's still load.
+
+```
+The plugin files in {folder} ({files}) were not fetched or loaded because this folder is not trusted.
+```
+
+Parameters: `folder`, `files`
 
 ### `W_PROJECT_PROFILE_INVALID`
 

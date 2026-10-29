@@ -178,6 +178,38 @@ describe('trusting the open folder (ADR 0111)', () => {
     expect(workspace.state()).toMatchObject({ trust: 'restricted', leftOut: 1 });
   });
 
+  it("names a restricted folder's plugin files as left out, and drops them once trusted (TYTO-433)", async () => {
+    await mkdir(join(work, '.tyto', 'plugin-files'), { recursive: true });
+    await writeFile(join(work, '.tyto', 'plugin-files', 'tabelas.yaml'), 'version: 1\n');
+    await writeFile(join(work, '.tyto', 'plugin-files', 'notes.txt'), 'not a plugin file');
+    const workspace = createWorkspaceService({
+      trustStore: fsTrustStore({ home }),
+      home,
+      setTemplateFolders: () => Promise.resolve(),
+    });
+
+    await workspace.open(work);
+    const state = workspace.state();
+    expect(state).toMatchObject({ trust: 'restricted', leftOut: 1 });
+    const row = state.problems.find((item) => item.code === 'W_PROJECT_PLUGIN_FILES_WITHHELD');
+    expect(row?.message).toContain(join('.tyto', 'plugin-files'));
+    expect(row?.message).toContain('tabelas.yaml');
+    expect(row?.message).not.toContain('notes.txt');
+
+    expect((await workspace.grant('folder')).ok).toBe(true);
+    expect(workspace.state()).toMatchObject({ trust: 'trusted', leftOut: 0 });
+    expect(workspace.state().problems).toEqual([]);
+  });
+
+  it('leaves nothing out for a restricted folder with no plugin files', async () => {
+    await mkdir(join(work, '.tyto', 'plugin-files'), { recursive: true });
+    const { workspace } = service();
+
+    await workspace.open(work);
+
+    expect(workspace.state()).toMatchObject({ trust: 'restricted', leftOut: 0 });
+  });
+
   it('writes nothing and changes nothing when the trust file cannot be read', async () => {
     await writeFile(join(work, '.tyto', 'project.json'), '{ "assets": ["../shared"] }');
     await writeFile(join(home, 'trust.json'), 'not json');

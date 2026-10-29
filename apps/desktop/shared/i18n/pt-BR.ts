@@ -41,9 +41,15 @@ export const ptBR: Catalogue = {
   'command.workspace.openFolder': 'Abrir pasta…',
   'command.workspace.closeFolder': 'Fechar pasta',
   'command.workspace.manageTrust': 'Pasta de trabalho: gerenciar confiança',
+  'command.pluginFiles.sync': 'Plugins: sincronizar arquivos de plugins',
+  'command.pluginFiles.update': 'Plugins: atualizar arquivos de plugins',
+  'pluginFiles.approve.message':
+    "Os arquivos de plugins pedem '{plugin}', que pede estas permissões. Carregar?",
+  'pluginFiles.approve.load': 'Carregar',
+  'pluginFiles.approve.skip': 'Agora não',
   'command.workspace.showProject': 'Pasta de trabalho: mostrar projeto',
   'workspace.banner.text':
-    'Esta pasta não é confiável, então {count} das pastas e seções que o arquivo do projeto nomeia ficaram de fora.',
+    'Esta pasta não é confiável, então {count} das pastas, seções e arquivos de plugins que ela traz ficaram de fora.',
   'workspace.banner.trust': 'Confiar nesta pasta',
   'workspace.banner.problems': 'Mostrar problemas',
   'workspace.banner.project': 'Mostrar projeto',

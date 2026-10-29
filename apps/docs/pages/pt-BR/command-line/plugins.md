@@ -122,6 +122,8 @@ aviso-laranja → aviso (laranja)  home\plugin-files\avisos.yaml
 
 Numa pasta que não é confiável, os arquivos de plugins do projeto não são carregados nem listados, e `tyto render` e `tyto plugin list` avisam isso numa linha que nomeia `.tyto/plugin-files`.
 
+**O app de mesa faz a mesma sincronização** ao abrir, ao abrir uma pasta de trabalho e com os comandos **Plugins: sincronizar arquivos de plugins** e **Plugins: atualizar arquivos de plugins** (Ctrl+K), este último movendo cada ref como `--update`. Os templates buscados aparecem na lista de templates; um repositório que não respondeu vira uma linha no painel de problemas com o nome dele, e a cópia anterior continua valendo. Um plugin que pede permissões é perguntado numa caixa. Numa pasta que ainda não é confiável, os arquivos de plugins do projeto não são buscados, e a faixa de confiança os conta entre o que ficou de fora.
+
 ### Configurações e apelidos
 
 Um pacote buscado oferece só os templates que o arquivo cita. Cada template pode ter **configurações** com nome, que mudam os valores que o template declara que deixa mudar, como uma cor, um tamanho, uma fonte ou uma imagem. Um brief chega a uma configuração pelo **apelido**: escreva `alias:` para escolher o apelido, ou deixe de fora e o apelido é o nome do template, um traço e o nome da configuração. `default:` diz qual configuração um brief recebe quando escreve o nome do próprio template, e toda outra configuração parte dessa e muda só o que lista. O caminho de uma imagem é lido a partir da pasta do próprio arquivo de plugin e precisa ficar dentro do projeto, ou dentro de `~/.tyto` nos arquivos da máquina.
