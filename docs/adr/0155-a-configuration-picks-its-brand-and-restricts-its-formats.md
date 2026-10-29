@@ -1,6 +1,6 @@
 # 0155 — A configuration picks its brand, the brand's kit carries its accent, and a configuration may restrict its formats
 
-Status: proposed · 2026-10-29 · TYTO-455 · amends ADR 0063 (a plugin contributes a brand kit)
+Status: accepted · 2026-10-29, by the maintainer · TYTO-455 · amends ADR 0063 (a plugin contributes a brand kit)
 and ADR 0151 (plugin files install and configure templates) · builds on ADR 0052, ADR 0055,
 ADR 0065, ADR 0066 and ADR 0153
 
