@@ -29,9 +29,11 @@ import { z } from 'zod';
  * (ADR 0147); 9 since a source's `page` call carries `refresh` on a run without cache, a field
  * the strict `page` schema of a guest on 8 would refuse (ADR 0148); 10 since a template call
  * carries the template's declared values, a field the strict schema of a guest on 9 would
- * refuse (ADR 0153, TYTO-439).
+ * refuse (ADR 0153, TYTO-439); 11 since a brand kit may carry the brand's colours, which the
+ * strict kit schema of a guest on 10 would refuse in a template call and a host on 10 in a
+ * `brand-kit` registration (ADR 0155).
  */
-export const RPC_PROTOCOL_VERSION = 10;
+export const RPC_PROTOCOL_VERSION = 11;
 
 const protocol = z.literal(RPC_PROTOCOL_VERSION);
 

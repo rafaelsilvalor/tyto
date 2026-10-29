@@ -11,16 +11,24 @@
  */
 
 import { group, run, text } from '@tyto/core/template';
-import { drawLogo, oneInk, signatureOf } from '@tyto/house-style';
+import { accentOf, drawLogo, oneInk, signatureOf } from '@tyto/house-style';
 import { type Block, at, block, mark } from '@tyto/template-kit';
 
 import { ARROW, BAND, CHROME, FACE, INK, LIGHT, TYPE } from './tokens.js';
 
 import type { BrandKit } from '@tyto/core';
 
+/**
+ * The colour of the logo, the signature, the arrow, the badges and the headings: the kit's
+ * accent, or azul's own `INK` without one (ADR 0155).
+ */
+export function accentOfAzul(kit: BrandKit): string {
+  return accentOf(kit, INK);
+}
+
 /** The brand kit's logo, or its placeholder, top left of every slide. */
 export function header(kit: BrandKit): Block {
-  return drawLogo(kit, CHROME.logo, oneInk(INK));
+  return drawLogo(kit, CHROME.logo, oneInk(accentOfAzul(kit)));
 }
 
 /**
@@ -35,9 +43,12 @@ export function header(kit: BrandKit): Block {
  * be one more thing for a brief to fill in correctly every time.
  */
 export function footer(width: number, kit: BrandKit, options: { readonly next: boolean }): Block {
+  const accent = accentOfAzul(kit);
   const signature = text({
     name: 'signature',
-    runs: [run(signatureOf(kit), { font: FACE, size: TYPE.signature, weight: LIGHT, color: INK })],
+    runs: [
+      run(signatureOf(kit), { font: FACE, size: TYPE.signature, weight: LIGHT, color: accent }),
+    ],
     box: { w: width, h: BAND.footer },
     align: 'center',
     valign: 'middle',
@@ -47,7 +58,7 @@ export function footer(width: number, kit: BrandKit, options: { readonly next: b
   if (!options.next)
     return block(width, BAND.footer, group({ name: 'footer', children: [signature] }));
 
-  const glyph = mark(ARROW, CHROME.arrow, INK, 'arrow');
+  const glyph = mark(ARROW, CHROME.arrow, accent, 'arrow');
   return block(
     width,
     BAND.footer,

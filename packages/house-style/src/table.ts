@@ -53,7 +53,7 @@ import {
 } from '@tyto/core/template';
 import { type Block, at, block, lines, plain, reportOverflow } from '@tyto/template-kit';
 
-import { drawLogo, oneInk, signatureOf } from './kit.js';
+import { accentOf, drawLogo, oneInk, signatureOf } from './kit.js';
 import { pieces } from './breaks.js';
 import { glue, readTable } from './table-text.js';
 import {
@@ -83,8 +83,10 @@ import type { NodeDraft, NonEmpty } from '@tyto/core/template';
 import type { Measure } from '@tyto/template-kit';
 
 /** The build for one brand's table. */
-export function oneImageTable(brand: TableBrand): TemplateBuild {
+export function oneImageTable(own: TableBrand): TemplateBuild {
   return (context: TemplateContext) => {
+    // The kit's accent over the template's own (ADR 0155).
+    const brand: TableBrand = { accent: accentOf(context.brand, own.accent) };
     const width = context.size.w - PAGE.side * 2;
     const regionTop = PAGE.top + BRAND_ROW.height;
     const regionBottom = context.size.h - PAGE.bottom - SIGNATURE.height;

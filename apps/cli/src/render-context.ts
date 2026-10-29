@@ -202,6 +202,9 @@ export async function loadRenderContext(
           ...pluginFiles.configured,
           registry: registry.value,
           images: pluginFiles.images,
+          // Every installed plugin is active in this host, so the brands its kits offer are
+          // known here: a configuration naming another says so once (ADR 0155).
+          kitBrands: new Set(host.registry.brandKitsByBrand().kits.keys()),
         });
   // Each range points into the plugin file that wrote it, not into the brief being rendered.
   const configurationProblems = configured.diagnostics.map(({ file, diagnostic: item }) => {

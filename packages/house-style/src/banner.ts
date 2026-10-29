@@ -23,7 +23,7 @@ import { at, atLeastOne, reportOverflow } from '@tyto/template-kit';
 
 import { balance } from './balance.js';
 import { glueParenthesised } from './breaks.js';
-import { drawBrandMark, drawLogo } from './kit.js';
+import { accentOf, drawBrandMark, drawLogo } from './kit.js';
 import { BOLD, BOOK, FACE, PAPER } from './tokens.js';
 
 import type { SizeRange } from './balance.js';
@@ -82,7 +82,12 @@ export function productBanner(style: BannerStyle): TemplateBuild {
   return (context: TemplateContext) => {
     const background = context.files.image(`assets/bg-${context.format}.png`);
     const layout = style.layouts[context.format] ?? fallbackLayout(context.size);
-    const words = styledText(richTextOf(context, 'titulo') ?? [], style.ink);
+    // The kit's accent over the template's own (ADR 0155); the logo's tone inks stay the
+    // template's, because a tone is a role the template maps (ADR 0066).
+    const words = styledText(
+      richTextOf(context, 'titulo') ?? [],
+      accentOf(context.brand, style.ink),
+    );
 
     const children: NodeDraft[] = [];
     if (background !== undefined) {

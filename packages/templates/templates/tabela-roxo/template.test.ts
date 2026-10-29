@@ -8,6 +8,7 @@ import { NO_BREAK_SPACE, ROXO, TABLE_VALUE_DEFAULTS } from '@tyto/house-style';
 import { BODY, OPTICAL_DROP, SIGNATURE, PAGE, TITLE } from '@tyto/house-style/table-tokens';
 
 import type {
+  BrandKit,
   Frame,
   Inline,
   RichText,
@@ -141,6 +142,7 @@ function render(
   brief: { titulo: string; tabela: string },
   measure: TemplateContext['measure'] = proportional,
   values?: TemplateValues,
+  brand: BrandKit = noBrandKit,
 ): Built {
   const reports: TemplateReport[] = [];
   const frame = build({
@@ -164,7 +166,7 @@ function render(
     measure,
     report: (report) => reports.push(report),
     files: noFiles,
-    brand: noBrandKit,
+    brand,
     ...(values === undefined ? {} : { values }),
   });
   return { frame, reports };
@@ -330,6 +332,65 @@ describe('the brand', () => {
       });
     }
     expect(ROXO.accent).toBe('#5900a6');
+  });
+
+  // Two configurations of one template naming two kits (ADR 0155): each render draws its own
+  // kit's logo, signature and accent, and the accent is the kit's, not the template's.
+  const KIT_LOGO = (d: string) => ({ box: { w: 10, h: 20 }, d, fillRule: 'nonzero' as const });
+  const ROXO_KIT: BrandKit = {
+    logo: KIT_LOGO('M0 0H10V20Z'),
+    signature: '@roxo-kit',
+    colors: { accent: '#5900a6' },
+  };
+  const AZUL_KIT: BrandKit = {
+    logo: KIT_LOGO('M0 0H10V10Z'),
+    signature: '@azul-kit',
+    colors: { accent: '#009fe3' },
+  };
+
+  function drawn(kit: BrandKit) {
+    const { frame } = render(FOUR_COLUMNS, proportional, undefined, kit);
+    const header = rows(frame).find((row) => row.name === 'header-row')!;
+    const nodes = placed(frame).map((item) => item.node);
+    const logo = nodes.find((node) => node.kind === 'vector' && node.name === 'logo');
+    const signature = nodes.find((node) => node.kind === 'text' && node.name === 'signature');
+    return {
+      fills: header.rects.map((cell) => (cell.node.kind === 'rect' ? cell.node.fill : undefined)),
+      logo: logo?.kind === 'vector' && logo.geometry.kind === 'path' ? logo.geometry.d : undefined,
+      signature: signature === undefined ? undefined : textOf(signature),
+    };
+  }
+
+  const solidOf = (r: number, g: number, b: number) => ({
+    kind: 'solid',
+    color: { r, g, b, a: 1 },
+  });
+
+  it('draws each kit’s logo, signature and accent, one configuration per kit', () => {
+    const roxo = drawn(ROXO_KIT);
+    const azul = drawn(AZUL_KIT);
+
+    expect(roxo.logo).toBe('M0 0H10V20Z');
+    expect(roxo.signature).toBe('@roxo-kit');
+    expect(new Set(roxo.fills.map((fill) => JSON.stringify(fill)))).toEqual(
+      new Set([JSON.stringify(solidOf(0x59, 0x00, 0xa6))]),
+    );
+    expect(azul.logo).toBe('M0 0H10V10Z');
+    expect(azul.signature).toBe('@azul-kit');
+    expect(new Set(azul.fills.map((fill) => JSON.stringify(fill)))).toEqual(
+      new Set([JSON.stringify(solidOf(0x00, 0x9f, 0xe3))]),
+    );
+  });
+
+  it('takes the accent from the kit: a kit with another accent draws that one', () => {
+    const perturbed = drawn({ ...ROXO_KIT, colors: { accent: '#123456' } });
+
+    expect(
+      perturbed.fills.every(
+        (fill) => JSON.stringify(fill) === JSON.stringify(solidOf(0x12, 0x34, 0x56)),
+      ),
+    ).toBe(true);
+    expect(drawn({ ...ROXO_KIT, colors: {} }).fills[0]).toEqual(solidOf(0x59, 0x00, 0xa6));
   });
 });
 

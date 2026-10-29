@@ -1039,6 +1039,27 @@ export const diagnosticCodes = {
     fatal: false,
     fatality: 'A warning never replaces a value (ADR 0013).',
   },
+  // A warning, never an error: a render with placeholders is the normal public case (ADR 0065).
+  // Said only for a brand a plugin file names, where a typo is the likely reason; a
+  // manifest's brand with no kit stays silent, as every render without the private kit is.
+  W_BRAND_KIT_MISSING: {
+    severity: 'warning',
+    summary: 'A configuration names a brand that no installed brand kit offers.',
+    template:
+      "No installed brand kit offers '{brand}', which '{alias}' names; it draws the placeholders and the template's own accent.",
+    spec: 'docs/adr/0155-a-configuration-picks-its-brand-and-restricts-its-formats.md',
+    fatal: false,
+    fatality: 'A warning never replaces a value (ADR 0013).',
+  },
+  W_CONFIGURATION_BRAND_INVALID: {
+    severity: 'warning',
+    summary: "A configuration's brand is not spelled as a brand id.",
+    template:
+      "The brand of configuration '{configuration}' of template '{template}' must be lower case letters, digits and single hyphens; it is ignored.",
+    spec: 'docs/adr/0155-a-configuration-picks-its-brand-and-restricts-its-formats.md',
+    fatal: false,
+    fatality: 'A warning never replaces a value (ADR 0013).',
+  },
   W_TEMPLATE_SHADOWED: {
     severity: 'warning',
     summary: 'Two template sources declare the same name; the earlier source is the one used.',
